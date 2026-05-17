@@ -55,74 +55,63 @@ Status: Final
 ### SOA Collection and MNAME Classification (steps 2-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS SOA query
-    probe --> accepted : usable SOA
-    probe --> skipNS : not usable
-    accepted --> classify
-    classify : MNAME type
-    classify --> isLocal : localhost
-    classify --> isDot : dot
-    classify --> isHost : hostname
-    isLocal : MNAME-localhost tag
-    isDot : MNAME-dot tag
-    isHost --> nextStep
-    nextStep : continue MNAME checks
-    isLocal --> [*]
-    isDot --> [*]
-    nextStep --> [*]
-    skipNS --> [*]
-{{< /mermaid >}}
+```
+For each nameserver in Method4and5:
+   query SOA at z.Name
+   accept response only when ALL true:
+     resp.Msg present, RCODE == NOERROR, AA, at least one SOA RR for z.Name
+
+For each accepted response, capture:
+   - SOA.Mname  (record in mnameSet)
+   - SOA.Serial (record in childSerialsByNS[ns])
+   - source nameserver IP when Mname == "localhost"  -> localhostSources
+   - source nameserver IP when Mname == "."          -> dotSources
+
+Emit (once):
+   localhostSources non-empty -> Z01_MNAME_IS_LOCALHOST (addresses)
+   dotSources       non-empty -> Z01_MNAME_IS_DOT       (addresses)
+
+(Continue to per-MNAME checks for every Mname value that is not
+ "localhost" and not ".".)
+```
 {{% /expand %}}
 
 ### Per-MNAME Resolution and Master Check (steps 6-8)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> nsCheck
-    nsCheck : MNAME in NS list?
-    nsCheck --> notInList : no
-    nsCheck --> resolveOK : yes
-    notInList : not-in-NS-list tag
-    notInList --> resolve
-    resolveOK --> resolve
-    resolve : resolve A/AAAA
-    resolve --> noAddr : no resolution
-    resolve --> perAddr : has addresses
-    noAddr : MNAME-not-resolve tag
-    perAddr : per-address probe
-    perAddr --> localhost : loopback addr
-    perAddr --> directQ : public IP
-    localhost : localhost-addr tag
-    directQ : direct SOA query
-    directQ --> noRespM : no response
-    directQ --> badRcode : non-NOERROR
-    directQ --> noSoaRec : no SOA
-    directQ --> notAuth : AA false
-    directQ --> authSerial : auth with serial
-    noRespM : MNAME-no-response tag
-    badRcode : MNAME-bad-rcode tag
-    noSoaRec : MNAME-missing-SOA tag
-    notAuth : MNAME-not-auth tag
-    authSerial --> compare
-    compare : compare serials
-    compare --> notMaster : child higher
-    compare --> isMaster : MNAME at least
-    notMaster : MNAME-not-master tag
-    isMaster : MNAME-is-master tag
-    notInList --> [*]
-    noAddr --> [*]
-    localhost --> [*]
-    noRespM --> [*]
-    badRcode --> [*]
-    noSoaRec --> [*]
-    notAuth --> [*]
-    notMaster --> [*]
-    isMaster --> [*]
-{{< /mermaid >}}
+```
+For each MNAME (not "localhost", not "."):
+
+   MNAME not in Method3 child NS name set
+      -> Z01_MNAME_NOT_IN_NS_LIST (nsname)
+
+   resolve MNAME via recursor (A and AAAA)
+      no addresses across A/AAAA (subject to cumulative foundIP caveat)
+         -> Z01_MNAME_NOT_RESOLVE (nsname)
+      addresses found:
+         per address:
+            address == 127.0.0.1 or ::1
+               -> Z01_MNAME_HAS_LOCALHOST_ADDR (nsname, ns_ip)
+            otherwise: direct query SOA at z.Name to (mname/ip)
+               resp.Msg == nil      -> Z01_MNAME_NO_RESPONSE        (ns, address)
+               RCODE != NOERROR     -> Z01_MNAME_UNEXPECTED_RCODE   (ns, address, rcode)
+               no SOA in answer     -> Z01_MNAME_MISSING_SOA_RECORD (ns, address)
+               SOA present, !AA     -> Z01_MNAME_NOT_AUTHORITATIVE  (ns, address)
+               SOA present, AA      -> store mnameSerials[(mname,ip)] = soa.Serial
+
+After all MNAMEs:
+   for each mnameSerial vs all childSerialsByNS using RFC 1982 ordering:
+     any child serial > mname serial -> not-master candidate
+     otherwise                       -> master candidate
+
+   not-master non-empty -> Z01_MNAME_NOT_MASTER
+                           (servers from mname/ip pairs;
+                            soaserial = highest non-master mname serial;
+                            soaserial_list = ";"-joined unique child serials)
+   master     non-empty -> Z01_MNAME_IS_MASTER (servers)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

@@ -61,37 +61,69 @@ Status: Final
 ### Per-NS DNSKEY/NSEC Probe and Param Aggregation (steps 2-11)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS DNSKEY/NSEC
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : query DNSKEY and NSEC
-    query --> dnskeyCheck
-    dnskeyCheck : DNSKEY response
-    dnskeyCheck --> noDnssec : no DNSKEY
-    dnskeyCheck --> hasDnssec : DNSKEY present
-    noDnssec --> nsecCheck
-    hasDnssec --> nsecCheck
-    nsecCheck : NSEC response
-    nsecCheck --> nsecErr : error or missing
-    nsecCheck --> noNsec3 : no NSEC3
-    nsecCheck --> hasNsec3 : NSEC3 present
-    hasNsec3 --> extract
-    extract : extract NSEC3 params
-    extract --> aggregate
-    nsecErr --> aggregate
-    noNsec3 --> aggregate
-    aggregate : aggregate and check
-    aggregate --> emit
-    emit : multi-tag emission
-    emit --> done
-    done : emit test-case-end
-    disabled --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+child set = method4and5; dedupe by IP
+
+For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DNSKEY/NSEC -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DNSKEY at z.Name, DNSSEC=on
+    +- resp.Msg == nil / RCODE != NOERROR / !AA  -> skip entirely
+    +- no apex DNSKEY in answer                  -> respondsWithoutDNSKEY; stop
+    +- otherwise                                 -> respondsWithDNSKEY; continue
+
+   query NSEC at z.Name, DNSSEC=on
+    +- resp.Msg == nil                           -> noResponseNSECQuery; stop
+    +- RCODE != NOERROR or !AA                   -> errorResponseNSECQuery; stop
+    +- no NSEC3 in authority                     -> respondsWithoutNSEC3; stop
+    +- NSEC3 present
+                                                 -> respondsWithNSEC3
+        count > 1                                -> multipleNSEC3
+        first NSEC3 record -> capture hashAlgorithm, nsec3Flags,
+                              nsec3Iterations, nsec3SaltLength = len(Salt)
+
+DNSSEC-support summary:
+   no responder with DNSKEY AND some without
+      -> DS03_NO_DNSSEC_SUPPORT       (servers = respondsWithoutDNSKEY)
+   mixed
+      -> DS03_SERVER_NO_DNSSEC_SUPPORT (servers = respondsWithoutDNSKEY)
+
+NSEC3-availability summary:
+   no responder with NSEC3 AND some without
+      -> DS03_NO_NSEC3                (servers = respondsWithoutNSEC3)
+   mixed
+      -> DS03_SERVER_NO_NSEC3         (servers = respondsWithoutNSEC3)
+
+multipleNSEC3 non-empty -> DS03_ERR_MULT_NSEC3 (servers)
+
+hashAlgorithm:
+   distinct values > 1                              -> DS03_INCONSISTENT_HASH_ALGO
+   value == 1 (SHA-1)                               -> DS03_LEGAL_HASH_ALGO (servers)
+   value != 1                                       -> DS03_ILLEGAL_HASH_ALGO (algo_num, servers)
+
+nsec3Flags:
+   distinct values > 1                              -> DS03_INCONSISTENT_NSEC3_FLAGS
+   for each flags value, for each set bit in 0..6   -> DS03_UNASSIGNED_FLAG_USED (int=bit, servers)
+   bit 7 set AND zone is "." or single-label TLD    -> DS03_NSEC3_OPT_OUT_ENABLED_TLD
+   bit 7 set AND otherwise                          -> DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD
+   bit 7 unset                                      -> DS03_NSEC3_OPT_OUT_DISABLED
+
+nsec3Iterations:
+   distinct values > 1                              -> DS03_INCONSISTENT_ITERATION
+   value == 0                                       -> DS03_LEGAL_ITERATION_VALUE
+   value != 0                                       -> DS03_ILLEGAL_ITERATION_VALUE (int)
+
+nsec3SaltLength:
+   distinct values > 1                              -> DS03_INCONSISTENT_SALT_LENGTH
+   value == 0                                       -> DS03_LEGAL_EMPTY_SALT
+   value != 0                                       -> DS03_ILLEGAL_SALT_LENGTH (int)
+
+per-NS NSEC query errors:
+   noResponseNSECQuery    non-empty -> DS03_NO_RESPONSE_NSEC_QUERY     (servers)
+   errorResponseNSECQuery non-empty -> DS03_ERROR_RESPONSE_NSEC_QUERY  (servers)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

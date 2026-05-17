@@ -39,54 +39,47 @@ Status: Final
 ### Input and Per-NS SOA Probe (steps 2-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> loadNS
-    loadNS : load delegation NS
-    loadNS --> nsCheck
-    nsCheck : NS names found?
-    nsCheck --> noDel : none
-    nsCheck --> addrFB : yes
-    noDel : no-delegation tag
-    addrFB : resolve addresses via glue
-    addrFB --> probe
-    probe : per-NS SOA probe (parallel)
-    probe --> classify
-    classify : response category
-    classify --> authOK : authoritative SOA
-    classify --> nsBroken : NOERROR AA no SOA
-    classify --> notAuth : AA not set
-    classify --> noIP : NS name unresolved
-    classify --> noResp : no response
-    classify --> badRcode : unexpected rcode
-    noDel --> [*]
-    authOK --> [*]
-    nsBroken --> [*]
-    notAuth --> [*]
-    noIP --> [*]
-    noResp --> [*]
-    badRcode --> [*]
-{{< /mermaid >}}
+```
+load Method2 (NS names) + Method4 (NS addresses)
+ +- no NS names                       -> B02_NO_DELEGATION (domain)
+ |                                       emit TEST_CASE_END and return
+ +- NS names present, Method4 empty   -> fall back to z.GlueAddresses
+ |    +- per name, add nameserver for each matching glue addr
+ |    +- names with no resolved addr  -> mark nsCantResolve[name]
+ +- otherwise                         -> use Method4 addresses
+
+For each nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport check for SOA
+    +- IPv6 + Net.IPv6 disabled       -> IPV6_DISABLED, mark skipped
+    +- IPv4 + Net.IPv4 disabled       -> IPV4_DISABLED, mark skipped
+    +- enabled                        -> IPV4_ENABLED / IPV6_ENABLED
+
+   query SOA at z.Name
+    +- error or resp.Msg absent        -> nsNoResponse[key]
+    +- RCODE != NOERROR                -> unexpectedRcode[key] = rcode
+    +- !AA                             -> nsNotAuth[key]
+    +- SOA records for z.Name in answer -> authResponseSOA[key]
+    +- otherwise (NOERROR + AA, no SOA)-> nsBroken[key]
+```
 {{% /expand %}}
 
 ### Aggregation and Final Emission (steps 6-8)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> aggregate
-    aggregate : per-NS results
-    aggregate --> anyAuth : any authoritative
-    aggregate --> noWork : none authoritative
-    anyAuth : auth-response-soa tag
-    noWork : no-working-ns tag
-    noWork --> categories
-    categories : per-failure category tags
-    anyAuth --> done
-    categories --> done
-    done : emit test-case-end
-    done --> [*]
-{{< /mermaid >}}
+```
+authResponseSOA non-empty
+ +- yes  -> B02_AUTH_RESPONSE_SOA (domain, servers)
+ +- no   -> B02_NO_WORKING_NS (domain)
+            then emit one tag per non-empty failure category:
+              nsBroken          -> B02_NS_BROKEN        (per ns)
+              nsNotAuth         -> B02_NS_NOT_AUTH      (per ns)
+              nsCantResolve     -> B02_NS_NO_IP_ADDR    (per nsname)
+              nsNoResponse      -> B02_NS_NO_RESPONSE   (per ns)
+              unexpectedRcode   -> B02_UNEXPECTED_RCODE (per ns, rcode)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

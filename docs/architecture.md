@@ -30,8 +30,6 @@ service (`gonemaster-client`).
 Each binary instantiates its own engine. The engine itself has no
 shared state across binaries.
 
-Further reading: [Chapter 2](#2-component-map).
-
 ## 2. Component map
 
 gonemaster ships four binaries and three web UIs. The UIs are built

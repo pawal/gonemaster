@@ -60,39 +60,55 @@ Status: Draft
 ### Per-NS DNSKEY Probe and Badkey Checks (steps 2-10)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> setup
-    setup : load blocklist
-    setup --> probe
-    probe : per-NS DNSKEY probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : DNSKEY query
-    query --> ignored : bad response
-    query --> noKey : no DNSKEY
-    query --> hasKey : DNSKEY present
-    hasKey --> perKey
-    perKey : per DNSKEY check
-    perKey --> rsaCheck : RSA algos
-    perKey --> nonRsa : other algos
-    rsaCheck : RSA crypto checks
-    nonRsa --> blocklist
-    rsaCheck --> blocklist
-    blocklist : blocklist lookup
-    blocklist --> finding : compromised
-    blocklist --> clean : safe
-    finding : per-finding tag
-    clean : key-OK tag
-    finding --> done
-    clean --> done
-    noKey --> done
-    done : aggregate emissions
-    done --> [*]
-    disabled --> [*]
-    ignored --> [*]
-{{< /mermaid >}}
+```
+DNSSEC19 runs only when DNSSEC07 did NOT emit DS07_NOT_SIGNED.
+
+setup:
+   load badkeys blocklist (CLI flag, XDG dir, system dir, embedded fallback)
+   blocklist absent -> blocklist_available = false
+
+nss = methodsv2.GetDelNSNamesAndIPs ++ methodsv2.GetZoneNSNamesAndIPs;
+      group by IP
+
+For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DNSKEY at z.Name, DNSSEC=on
+    +- resp.Msg == nil / RCODE != NOERROR / !AA -> ignored
+    +- no apex DNSKEY in answer                 -> respondsWithoutDNSKEY
+    +- otherwise                                -> respondsWithDNSKEY
+        for each DNSKEY:
+          parse key material per algorithm (RSA 1/5/7/8/10; DSA 3/6;
+            ECDSA P-256 13; ECDSA P-384 14; Ed25519 15; Ed448 16)
+          unparseable                           -> skip key (no tag)
+          RSA family: run
+             fermat, pattern, roca, rsainvalid, smallfactors, smalld
+          if blocklist_available:
+             BKHASH120 = SHA-256(numeric key value)[0..15]
+             binary search in blocklist.dat
+          record each finding as (check_name, keytag, algo, ns/ip, details)
+
+Emit:
+  blocklist_available == false   -> DS19_BLOCKLIST_NOT_FOUND (once)
+
+  group findings by (keytag, check_name); one tag per group:
+     DS19_BADKEY_FERMAT, DS19_BADKEY_PATTERN, DS19_BADKEY_ROCA,
+     DS19_BADKEY_RSA_INVALID (subtest=invalid_e|e_too_large),
+     DS19_BADKEY_SMALL_FACTORS, DS19_BADKEY_SMALL_D,
+     DS19_BADKEY_BLOCKLIST (blocklist_name)
+        each with (servers, keytag, algo_num, algo_descr)
+
+  DNSKEYs with no findings, grouped by keytag
+     -> DS19_KEY_OK (servers, keytag, algo_num, algo_descr)
+
+  respondsWithDNSKEY empty AND respondsWithoutDNSKEY empty AND ignored non-empty
+     -> DS19_NO_RESPONSE (servers = ignored)
+
+  respondsWithoutDNSKEY non-empty AND respondsWithDNSKEY empty
+     -> DS19_NO_DNSKEY (servers = respondsWithoutDNSKEY)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

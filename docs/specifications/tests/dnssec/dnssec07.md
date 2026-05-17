@@ -60,68 +60,76 @@ Status: Final
 ### Child Signing-State Classification (steps 2-3, 8)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-child-NS probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : SOA and DNSKEY queries
-    query --> ignored : SOA fails
-    query --> dnskeyOnly : DNSKEY check
-    dnskeyOnly --> noResp : no response
-    dnskeyOnly --> nonAuth : non-AA
-    dnskeyOnly --> errRcode : non-NOERROR
-    dnskeyOnly --> signed : RRSIG covers DNSKEY
-    dnskeyOnly --> unsigned : no RRSIG cover
-    noResp : no-response tag
-    nonAuth : non-auth-response tag
-    errRcode : error-rcode tag
-    signed : signed-on-server set
-    unsigned : not-signed-on-server set
-    signed --> emit
-    unsigned --> emit
-    emit : signing-state tags
-    emit --> [*]
-    disabled --> [*]
-    ignored --> [*]
-    noResp --> [*]
-    nonAuth --> [*]
-    errRcode --> [*]
-{{< /mermaid >}}
+```
+child set = GetDelNSNamesAndIPs ++ GetZoneNSNamesAndIPs; group by IP
+
+For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for SOA/DNSKEY/DS -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query SOA at z.Name
+    +- no resp / RCODE != NOERROR / !AA / no SOA -> ignored child NS
+
+   query DNSKEY at z.Name, DNSSEC=on
+    +- resp.Msg == nil               -> noResponseDNSKEY
+    +- !AA                           -> nonAuthDNSKEY
+    +- RCODE != NOERROR              -> errRcodeDNSKEY (rcode)
+    +- RRSIG covering DNSKEY present -> signedOnServer
+    +- otherwise                     -> notSignedOnServer
+
+Child-side emissions:
+   union(ignored, noResponseDNSKEY, nonAuthDNSKEY, errRcodeDNSKEY) == all child NS
+     -> DS07_NOT_SIGNED (no args)
+
+   noResponseDNSKEY  non-empty -> DS07_NO_RESPONSE_DNSKEY      (servers)
+   nonAuthDNSKEY     non-empty -> DS07_NON_AUTH_RESPONSE_DNSKEY (servers)
+   errRcodeDNSKEY    non-empty -> DS07_UNEXP_RCODE_RESP_DNSKEY  (servers, rcode)
+   signedOnServer    non-empty -> DS07_SIGNED_ON_SERVER         (servers)
+   notSignedOnServer non-empty -> DS07_NOT_SIGNED_ON_SERVER     (servers)
+   both signedOnServer AND notSignedOnServer non-empty
+                               -> DS07_INCONSISTENT_SIGNED      (no args)
+   signedOnServer non-empty AND notSignedOnServer empty
+                               -> DS07_SIGNED                   (no args)
+   signedOnServer empty AND notSignedOnServer non-empty
+                               -> DS07_NOT_SIGNED               (no args)
+```
 {{% /expand %}}
 
 ### Parent DS and Final Aggregation (steps 4-9)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> hasSigned
-    hasSigned : signed children?
-    hasSigned --> skip : none signed
-    hasSigned --> probe : at least one
-    skip : skip parent DS check
-    probe : per-parent-NS DS probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : DS query DNSSEC
-    query --> ignored : bad shape
-    query --> hasDS : DS and RRSIG present
-    query --> noDS : no DS or RRSIG
-    hasDS : DS-present set
-    noDS : no-DS set
-    hasDS --> emit
-    noDS --> emit
-    emit : DS tags and summary
-    emit --> done
-    skip --> done
-    done : emit test-case-end
-    disabled --> [*]
-    ignored --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+parent set = methodsv2.GetParentNSNamesAndIPs; group by IP
+
+undelegated DS shortcut:
+   any parent NS has FakeDSRecords for z
+     -> dsInResponse += "-"; skip parent DS queries
+
+no signedOnServer NS observed
+     -> clear parent evaluation sets; skip parent DS phase
+
+Otherwise, for each unique parent NS IP (parallel):
+
+   transport disabled for DS -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DS at z.Name, DNSSEC=on
+    +- resp.Msg == nil / RCODE != NOERROR / no EDNS / !DO / !AA -> ignored parent
+    +- answer has RRSIG covering DS at z.Name                    -> dsInResponse
+    +- otherwise                                                 -> noDSInResponse
+
+Parent-side emissions:
+   noDSInResponse non-empty AND dsInResponse non-empty
+                              -> DS07_NO_DS_ON_PARENT_SERVER (servers = noDSInResponse)
+                              (suppressed when every parent fails)
+   dsInResponse non-empty     -> DS07_DS_ON_PARENT_SERVER    (servers)
+   both non-empty             -> DS07_INCONSISTENT_DS        (no args)
+
+Signed-zone aggregate (signedOnServer non-empty AND notSignedOnServer empty):
+   noDSInResponse non-empty AND dsInResponse empty
+                              -> DS07_NO_DS_FOR_SIGNED_ZONE  (no args)
+   noDSInResponse empty AND dsInResponse non-empty
+                              -> DS07_DS_FOR_SIGNED_ZONE     (no args)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

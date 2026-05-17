@@ -40,35 +40,46 @@ Status: Final
 ### Per-NS Recursor Probe and Classification (steps 2-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS A probe
-    probe --> disabled : transport off
-    probe --> probes : transport on
-    disabled : transport-disabled tag
-    probes : 3 probe names
-    probes --> noResp : no response
-    probes --> response : got responses
-    noResp : no-response tag
-    response --> raCheck
-    raCheck : RA seen?
-    raCheck --> recursor : RA=1
-    raCheck --> nxCheck : no RA
-    nxCheck : all NX no AA?
-    nxCheck --> recursor : yes
-    nxCheck --> nonRecursor : no
-    recursor : is-a-recursor set
-    nonRecursor : no-recursor set
-    recursor --> emit
-    nonRecursor --> emit
-    emit : aggregate emissions
-    emit --> done
-    done : emit test-case-end
-    disabled --> [*]
-    noResp --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+ns list = Method4and5  (no testcase-local dedupe)
+
+probes = [
+   xn--nameservertest.iis.se,
+   xn--nameservertest.icann.org,
+   xn--nameservertest.ripe.net,
+]
+
+For each nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for A  -> IPV4_DISABLED / IPV6_DISABLED, skip
+   init responseCount=0, nxdomainCount=0, hasSeenRA=false,
+        allNxdomainAA=true, isNoRecursor=true
+
+   for each probe in probes:
+      query A at probe
+      +- resp.Msg == nil          -> NO_RESPONSE (ns, domain=probe)
+      |                              isNoRecursor=false; continue
+      +- otherwise:
+            responseCount += 1
+            resp.RA  -> hasSeenRA=true
+            RCODE == NXDOMAIN -> nxdomainCount += 1
+                                 !AA -> allNxdomainAA=false
+
+   hasSeenRA == true
+      -> recursorSet[ns]; isNoRecursor=false
+   else if responseCount > 0
+              AND nxdomainCount == responseCount
+              AND allNxdomainAA == false
+      -> recursorSet[ns]; isNoRecursor=false
+   isNoRecursor still true
+      -> nonRecursorSet[ns]
+
+After all tasks:
+  recursorSet    non-empty -> IS_A_RECURSOR (servers; sorted)
+  nonRecursorSet non-empty -> NO_RECURSOR   (servers; sorted)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

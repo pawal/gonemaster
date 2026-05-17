@@ -46,65 +46,68 @@ Status: Final
 ### Parent Glue and Child Address Lookup (steps 2-7)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> parentNS
-    parentNS : query parent for NS
-    parentNS --> parentAdr
-    parentAdr : query A/AAAA for glue
-    parentAdr --> splitGlue
-    splitGlue : split by bailiwick
-    splitGlue --> ibSet
-    ibSet : in-bailiwick NS set
-    ibSet --> hasIB : has IB servers
-    ibSet --> noIB : none
-    noIB : use strict glue
-    noIB --> hasIB
-    hasIB --> probeChild
-    probeChild : per-NS A/AAAA probe
-    probeChild --> noResp : no response
-    probeChild --> failed : non-AA no referral
-    probeChild --> referral : referral
-    probeChild --> ok : usable
-    referral --> recurse
-    recurse : recursive fallback
-    recurse --> ok
-    noResp : no-response tag
-    failed : child-ns-failed tag
-    ok : accumulate addresses
-    noResp --> [*]
-    failed --> [*]
-    ok --> [*]
-{{< /mermaid >}}
+```
+queryParentAll(z, "NS")
+ +- collect distinct child NS names from NS answer records
+
+For each child NS name (sorted):
+   queryParentAll(name, "A");    collect (owner lower / addr) glue items
+   queryParentAll(name, "AAAA"); collect (owner lower / addr) glue items
+
+split parent glue by bailiwick:
+   z.Name.IsInBailiwick(nsName) -> strictGlue[owner/ip]
+   otherwise                    -> extendedGlue[nsName] += "owner/ip"
+
+build in-bailiwick name set + NS server set:
+   inBailiwickNames  = Method2and3 names filtered by IsInBailiwick
+   inBailiwickServers = Method4and5 filtered by Net.IPv4 / Net.IPv6 enable
+   inBailiwickServers empty AND strict glue available:
+       fall back to strictGlue endpoints (filtered by Net.IPv4/IPv6)
+       extend inBailiwickNames with names learned from those endpoints
+
+For each in-bailiwick NS name:
+   for each in-bailiwick child NS server:
+     getAddrRRs(ns, name, "A")    \
+     getAddrRRs(ns, name, "AAAA") /  per qtype:
+        +- error / no resp.Msg          -> NO_RESPONSE (child ns), no records
+        +- IsRedirect                   -> recurse(z, name, qtype); use answer
+        +- AA + NOERROR                 -> use answer records
+        +- AA + NXDOMAIN                -> no records (treated as success)
+        +- otherwise                    -> CHILD_NS_FAILED (child ns), no records
+
+     records found accumulate into childIBStrings (owner/ip set)
+     a child NS attempt is "successful" if neither qtype emitted NO_RESPONSE
+     a name's lookups "failed" only if every server failed for both qtypes
+     overall "all failed" only if every in-bailiwick name had all-failed lookups
+```
 {{% /expand %}}
 
 ### Bailiwick Comparison and Final Emission (steps 8-12)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> usable
-    usable : usable IB path?
-    usable --> lame : none usable
-    usable --> compare : at least one
-    lame : child-zone-lame tag
-    compare : compare IB and OOB
-    compare --> parentOnly : IB parent-only
-    compare --> childOnly : IB child-only
-    compare --> oobMiss : OOB mismatch
-    compare --> allMatch : all match
-    parentOnly : IB mismatch tag
-    childOnly : extra-child-addr tag
-    oobMiss : OOB mismatch tag
-    allMatch : addresses-match tag
-    parentOnly --> done
-    childOnly --> done
-    oobMiss --> done
-    allMatch --> done
-    done : emit test-case-end
-    lame --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+all in-bailiwick lookups failed                -> CHILD_ZONE_LAME
+                                                  emit TEST_CASE_END and return
+
+compare in-bailiwick sets:
+  ibMismatch     = strictGlue keys NOT in childIBStrings
+  ibExtraChild   = childIBStrings keys NOT in strictGlue
+  ibMismatch non-empty   -> IN_BAILIWICK_ADDR_MISMATCH (parent_servers, zone_servers)
+  ibExtraChild non-empty -> EXTRA_ADDRESS_CHILD (addresses)
+
+out-of-bailiwick (per nsName in extendedGlue, sorted):
+  recurse(z, nsName, "A");    add answers to childOOB
+  recurse(z, nsName, "AAAA"); add answers to childOOB
+  for each parent glue string at nsName missing from childOOB:
+     append to mismatchForGlue and oobMismatch
+  mismatchForGlue non-empty
+     -> OUT_OF_BAILIWICK_ADDR_MISMATCH (parent_servers, zone_servers)
+
+ibMismatch empty AND ibExtraChild empty AND oobMismatch empty
+                                          -> ADDRESSES_MATCH
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

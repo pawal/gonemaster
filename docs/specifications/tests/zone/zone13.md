@@ -34,6 +34,7 @@ Status: Draft
      - `exists:domain`: count +1.
      - `all`, `ip4:...`, `ip6:...`: do not count (no DNS lookup).
      - `exp=domain`: do not count toward the mechanism limit.
+   - If an `include`/`redirect` target contains an SPF macro (RFC 7208 Section 7), the count is still incremented but the target is not followed; emit `Z13_SPF_MACRO_TARGET`. The sub-tree's lookup count is undecidable at audit time.
    - If a domain has already been visited during recursion, emit `Z13_SPF_LOOKUP_LOOP` and stop recursing that branch.
    - If an `include`/`redirect` target cannot be resolved, emit `Z13_SPF_RECURSIVE_ERROR` and stop recursing that branch.
    - If a `ptr` or `ptr:domain` mechanism is encountered, emit `Z13_SPF_PTR_DEPRECATED`.
@@ -49,6 +50,7 @@ Status: Draft
 | `Z13_SPF_LOOKUP_COUNT_EXCEEDED` | Total DNS-resolving mechanism count exceeds the configured limit. |
 | `Z13_SPF_LOOKUP_COUNT_OK` | Total DNS-resolving mechanism count is within the configured limit. |
 | `Z13_SPF_LOOKUP_LOOP` | Recursive `include`/`redirect` chain revisits a previously seen domain. |
+| `Z13_SPF_MACRO_TARGET` | An `include`/`redirect` target contains SPF macros and cannot be followed at audit time. |
 | `Z13_SPF_PTR_DEPRECATED` | SPF record uses the deprecated `ptr` mechanism (RFC 7208 Section 5.5). |
 | `Z13_SPF_RECURSIVE_ERROR` | An `include`/`redirect` target could not be resolved via DNS. |
 | `Z13_UNABLE_TO_CHECK` | No authoritative TXT response could be obtained for the zone apex. |
@@ -66,6 +68,8 @@ Status: Draft
 | `Z13_SPF_LOOKUP_COUNT_OK` | `count` | `int` | Total number of DNS-resolving mechanisms found. |
 | `Z13_SPF_LOOKUP_LOOP` | `domain` | `string` | Tested zone name. |
 | `Z13_SPF_LOOKUP_LOOP` | `loop_domain` | `string` | The domain that was visited a second time. |
+| `Z13_SPF_MACRO_TARGET` | `domain` | `string` | Tested zone name. |
+| `Z13_SPF_MACRO_TARGET` | `target` | `string` | The macro-laden `include`/`redirect` target as published in the SPF record. |
 | `Z13_SPF_PTR_DEPRECATED` | `domain` | `string` | Tested zone name. |
 | `Z13_SPF_RECURSIVE_ERROR` | `domain` | `string` | Tested zone name. |
 | `Z13_SPF_RECURSIVE_ERROR` | `target` | `string` | The `include`/`redirect` target domain that could not be resolved. |
@@ -80,6 +84,7 @@ Status: Draft
 | `Z13_SPF_LOOKUP_COUNT_EXCEEDED` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z13_SPF_LOOKUP_COUNT_OK` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z13_SPF_LOOKUP_LOOP` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `Z13_SPF_MACRO_TARGET` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z13_SPF_PTR_DEPRECATED` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z13_SPF_RECURSIVE_ERROR` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z13_UNABLE_TO_CHECK` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
@@ -97,3 +102,4 @@ Status: Draft
 - `exp=domain` modifiers are not counted toward the lookup limit per RFC 7208, as they are only evaluated during result explanation and do not affect SPF evaluation.
 - The `ptr` mechanism is counted toward the lookup limit AND flagged as deprecated; both tags may be emitted for the same record.
 - Qualified mechanisms (e.g., `+include:`, `-a`, `~mx`) are handled identically to their unqualified forms for counting purposes.
+- SPF macros (RFC 7208 Section 7) are detected by the presence of `%` in an `include`/`redirect` target. Such targets are not resolved because macros (e.g., `%{ir}`, `%{v}`, `%{d}`) are only expanded at SMTP time with a real client IP/sender; the audit emits `Z13_SPF_MACRO_TARGET` and stops recursing that branch. The `+1` lookup itself still counts toward the limit, but any nested lookups in the macro-targeted policy are not counted.

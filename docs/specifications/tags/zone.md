@@ -83,6 +83,7 @@ _Do not edit by hand - regenerate with the command above._
 | `Z13_SPF_LOOKUP_COUNT_EXCEEDED` | `WARNING` | [zone13](../tests/zone/zone13.md) | yes |
 | `Z13_SPF_LOOKUP_COUNT_OK` | `INFO` | [zone13](../tests/zone/zone13.md) | yes |
 | `Z13_SPF_LOOKUP_LOOP` | `WARNING` | [zone13](../tests/zone/zone13.md) | yes |
+| `Z13_SPF_MACRO_TARGET` | `NOTICE` | [zone13](../tests/zone/zone13.md) | yes |
 | `Z13_SPF_PTR_DEPRECATED` | `WARNING` | [zone13](../tests/zone/zone13.md) | yes |
 | `Z13_SPF_RECURSIVE_ERROR` | `NOTICE` | [zone13](../tests/zone/zone13.md) | yes |
 | `Z13_UNABLE_TO_CHECK` | `WARNING` | [zone13](../tests/zone/zone13.md) | yes |

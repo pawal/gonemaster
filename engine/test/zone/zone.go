@@ -334,6 +334,7 @@ func Metadata() map[string][]string {
 			"Z13_SPF_LOOKUP_COUNT_EXCEEDED",
 			"Z13_SPF_LOOKUP_COUNT_OK",
 			"Z13_SPF_LOOKUP_LOOP",
+			"Z13_SPF_MACRO_TARGET",
 			"Z13_SPF_PTR_DEPRECATED",
 			"Z13_SPF_RECURSIVE_ERROR",
 			"Z13_UNABLE_TO_CHECK",
@@ -1746,9 +1747,9 @@ func Zone13(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 	limit := profile.FromContext(ctx).TestCasesVars.Zone13.SPFLookupLimit
 	visited := map[string]bool{}
-	count, loopDomain, errorTarget, hasPtr, hasLoop, hasError := spfWalkLookups(ctx, z, spfRecord, visited)
+	walk := spfWalkLookups(ctx, z, spfRecord, visited)
 
-	if hasPtr {
+	if walk.hasPtr {
 		if err := appendLog(ctx, &results, testcase, "Z13_SPF_PTR_DEPRECATED", map[string]any{
 			"domain": z.Name.String(),
 		}); err != nil {
@@ -1756,24 +1757,34 @@ func Zone13(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if hasLoop {
+	if walk.hasLoop {
 		if err := appendLog(ctx, &results, testcase, "Z13_SPF_LOOKUP_LOOP", map[string]any{
 			"domain":      z.Name.String(),
-			"loop_domain": loopDomain,
+			"loop_domain": walk.loopDomain,
 		}); err != nil {
 			return results, err
 		}
 	}
 
-	if hasError {
+	if walk.hasMacro {
+		if err := appendLog(ctx, &results, testcase, "Z13_SPF_MACRO_TARGET", map[string]any{
+			"domain": z.Name.String(),
+			"target": walk.macroTarget,
+		}); err != nil {
+			return results, err
+		}
+	}
+
+	if walk.hasError {
 		if err := appendLog(ctx, &results, testcase, "Z13_SPF_RECURSIVE_ERROR", map[string]any{
 			"domain": z.Name.String(),
-			"target": errorTarget,
+			"target": walk.errorTarget,
 		}); err != nil {
 			return results, err
 		}
 	}
 
+	count := walk.count
 	if count > limit {
 		if err := appendLog(ctx, &results, testcase, "Z13_SPF_LOOKUP_COUNT_EXCEEDED", map[string]any{
 			"domain": z.Name.String(),
@@ -1794,17 +1805,45 @@ func Zone13(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	return appendTestCaseEnd(ctx, results, testcase)
 }
 
+// spfLookupResult is the aggregated outcome of walking an SPF record's DNS-resolving mechanisms.
+type spfLookupResult struct {
+	count       int
+	loopDomain  string
+	errorTarget string
+	macroTarget string
+	hasPtr      bool
+	hasLoop     bool
+	hasError    bool
+	hasMacro    bool
+}
+
+func (r *spfLookupResult) merge(sub spfLookupResult) {
+	r.count += sub.count
+	if sub.hasPtr {
+		r.hasPtr = true
+	}
+	if sub.hasLoop && !r.hasLoop {
+		r.hasLoop = true
+		r.loopDomain = sub.loopDomain
+	}
+	if sub.hasError && !r.hasError {
+		r.hasError = true
+		r.errorTarget = sub.errorTarget
+	}
+	if sub.hasMacro && !r.hasMacro {
+		r.hasMacro = true
+		r.macroTarget = sub.macroTarget
+	}
+}
+
 // spfWalkLookups recursively walks an SPF record and counts DNS-resolving mechanisms.
-// Returns (count, loopDomain, errorTarget, hasPtr, hasLoop, hasError).
-func spfWalkLookups(ctx context.Context, z *zonepkg.Zone, spfRecord string, visited map[string]bool) (int, string, string, bool, bool, bool) {
+func spfWalkLookups(ctx context.Context, z *zonepkg.Zone, spfRecord string, visited map[string]bool) spfLookupResult {
 	rest := strings.TrimSpace(spfRecord[len("v=spf1"):])
 	if rest == "" {
-		return 0, "", "", false, false, false
+		return spfLookupResult{}
 	}
 
-	count := 0
-	var loopDomain, errorTarget string
-	var hasPtr, hasLoop, hasError bool
+	var res spfLookupResult
 
 	for term := range strings.FieldsSeq(rest) {
 		// Strip qualifier
@@ -1822,59 +1861,50 @@ func spfWalkLookups(ctx context.Context, z *zonepkg.Zone, spfRecord string, visi
 			// exp modifier does not count toward the limit.
 
 		case strings.HasPrefix(term, "include:"):
-			count++
+			res.count++
 			target := term[len("include:"):]
-			subCount, subLoop, subErr, subPtr, subHasLoop, subHasErr := spfResolveLookups(ctx, z, target, visited)
-			count += subCount
-			if subPtr {
-				hasPtr = true
+			if strings.Contains(target, "%") {
+				// Macro-laden target cannot be statically resolved; record it and stop recursing this branch.
+				if !res.hasMacro {
+					res.hasMacro = true
+					res.macroTarget = target
+				}
+				continue
 			}
-			if subHasLoop && !hasLoop {
-				hasLoop = true
-				loopDomain = subLoop
-			}
-			if subHasErr && !hasError {
-				hasError = true
-				errorTarget = subErr
-			}
+			res.merge(spfResolveLookups(ctx, z, target, visited))
 
 		case strings.HasPrefix(term, "redirect="):
-			count++
+			res.count++
 			target := term[len("redirect="):]
-			subCount, subLoop, subErr, subPtr, subHasLoop, subHasErr := spfResolveLookups(ctx, z, target, visited)
-			count += subCount
-			if subPtr {
-				hasPtr = true
+			if strings.Contains(target, "%") {
+				if !res.hasMacro {
+					res.hasMacro = true
+					res.macroTarget = target
+				}
+				continue
 			}
-			if subHasLoop && !hasLoop {
-				hasLoop = true
-				loopDomain = subLoop
-			}
-			if subHasErr && !hasError {
-				hasError = true
-				errorTarget = subErr
-			}
+			res.merge(spfResolveLookups(ctx, z, target, visited))
 
 		case term == "a" || strings.HasPrefix(term, "a:") || strings.HasPrefix(term, "a/"):
-			count++
+			res.count++
 		case term == "mx" || strings.HasPrefix(term, "mx:") || strings.HasPrefix(term, "mx/"):
-			count++
+			res.count++
 		case term == "ptr" || strings.HasPrefix(term, "ptr:") || strings.HasPrefix(term, "ptr/"):
-			count++
-			hasPtr = true
+			res.count++
+			res.hasPtr = true
 		case strings.HasPrefix(term, "exists:"):
-			count++
+			res.count++
 		}
 	}
 
-	return count, loopDomain, errorTarget, hasPtr, hasLoop, hasError
+	return res
 }
 
 // spfResolveLookups fetches the SPF record for a target domain and recursively walks it.
-func spfResolveLookups(ctx context.Context, z *zonepkg.Zone, target string, visited map[string]bool) (int, string, string, bool, bool, bool) {
+func spfResolveLookups(ctx context.Context, z *zonepkg.Zone, target string, visited map[string]bool) spfLookupResult {
 	target = strings.ToLower(strings.TrimRight(target, "."))
 	if visited[target] {
-		return 0, target, "", false, true, false
+		return spfLookupResult{hasLoop: true, loopDomain: target}
 	}
 	visited[target] = true
 
@@ -1886,7 +1916,7 @@ func spfResolveLookups(ctx context.Context, z *zonepkg.Zone, target string, visi
 
 	resp, err := recurse(ctx, z, fqdn, "TXT")
 	if err != nil || resp.Msg == nil {
-		return 0, "", target, false, false, true
+		return spfLookupResult{hasError: true, errorTarget: target}
 	}
 
 	txtRecords := resp.GetRecords("TXT")
@@ -1902,7 +1932,7 @@ func spfResolveLookups(ctx context.Context, z *zonepkg.Zone, target string, visi
 	}
 
 	// No SPF record found at target - treat as resolution error.
-	return 0, "", target, false, false, true
+	return spfLookupResult{hasError: true, errorTarget: target}
 }
 
 func appendTestCaseEnd(ctx context.Context, results []*logger.Entry, testcase string) ([]*logger.Entry, error) {

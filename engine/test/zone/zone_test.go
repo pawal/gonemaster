@@ -1008,6 +1008,125 @@ func TestZone13CustomLimit(t *testing.T) {
 	}
 }
 
+func TestZone13MacroInInclude(t *testing.T) {
+	setupZone13(t)
+
+	// Real-world pattern from ibm.com: the include target uses RFC 7208 §7 macros
+	// that can only be expanded at SMTP time, so the audit cannot follow it.
+	const macroTarget = "%{ir}.%{v}.%{d}.spf.has.pphosted.com"
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 include:"+macroTarget+" -all"), nil
+	}
+	recurse = func(_ context.Context, _ *zonepkg.Zone, name string, _ string) (packet.Packet, error) {
+		t.Fatalf("recurse should not be called for macro-laden target, got %q", name)
+		return packet.Packet{}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_MACRO_TARGET") {
+		t.Fatalf("expected Z13_SPF_MACRO_TARGET, got tags: %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "Z13_SPF_RECURSIVE_ERROR") {
+		t.Fatalf("did not expect Z13_SPF_RECURSIVE_ERROR for a macro-laden target")
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK, got tags: %v", entryTags(entries))
+	}
+	for _, e := range entries {
+		if e == nil {
+			continue
+		}
+		switch e.Tag {
+		case "Z13_SPF_MACRO_TARGET":
+			if got, _ := e.Args["target"].(string); got != macroTarget {
+				t.Fatalf("expected target=%q, got %v", macroTarget, e.Args["target"])
+			}
+			if got, _ := e.Args["domain"].(string); got != "example.com" {
+				t.Fatalf("expected domain=example.com, got %v", e.Args["domain"])
+			}
+		case "Z13_SPF_LOOKUP_COUNT_OK":
+			// The include itself still counts +1 even though we cannot follow it.
+			if count, ok := e.Args["count"].(int); !ok || count != 1 {
+				t.Fatalf("expected count=1 (include +1, no recursion), got %v", e.Args["count"])
+			}
+		}
+	}
+}
+
+func TestZone13MacroInRedirect(t *testing.T) {
+	setupZone13(t)
+
+	const macroTarget = "%{l1r+}.%{d}._spf.example.net"
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 redirect="+macroTarget), nil
+	}
+	recurse = func(_ context.Context, _ *zonepkg.Zone, name string, _ string) (packet.Packet, error) {
+		t.Fatalf("recurse should not be called for macro-laden redirect, got %q", name)
+		return packet.Packet{}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_MACRO_TARGET") {
+		t.Fatalf("expected Z13_SPF_MACRO_TARGET, got tags: %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "Z13_SPF_RECURSIVE_ERROR") {
+		t.Fatalf("did not expect Z13_SPF_RECURSIVE_ERROR for a macro-laden redirect")
+	}
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z13_SPF_MACRO_TARGET" {
+			if got, _ := e.Args["target"].(string); got != macroTarget {
+				t.Fatalf("expected target=%q, got %v", macroTarget, e.Args["target"])
+			}
+		}
+	}
+}
+
+func TestZone13MacroAndResolvableIncludeCoexist(t *testing.T) {
+	setupZone13(t)
+
+	// One macro-laden include (counted, not followed) plus one normal include
+	// (counted and followed for nested lookups). Expected count: 1 (macro) + 1 (real include) + 2 (a, mx inside) = 4.
+	queryAuth = func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", "v=spf1 include:%{ir}.spf.pphosted.com include:real.example.org -all"), nil
+	}
+	recurse = func(_ context.Context, _ *zonepkg.Zone, name string, _ string) (packet.Packet, error) {
+		if strings.Contains(name, "%") {
+			t.Fatalf("recurse must not be called for macro target, got %q", name)
+		}
+		if strings.HasPrefix(name, "real.example.org") {
+			return recurseTxtPacket("real.example.org", "v=spf1 a mx -all"), nil
+		}
+		return packet.Packet{}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone13(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("zone13: %v", err)
+	}
+	if !hasEntryTag(entries, "Z13_SPF_MACRO_TARGET") {
+		t.Fatalf("expected Z13_SPF_MACRO_TARGET, got tags: %v", entryTags(entries))
+	}
+	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
+		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK, got tags: %v", entryTags(entries))
+	}
+	for _, e := range entries {
+		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_OK" {
+			if count, ok := e.Args["count"].(int); !ok || count != 4 {
+				t.Fatalf("expected count=4 (macro+1, include+1, a+1, mx+1), got %v", e.Args["count"])
+			}
+		}
+	}
+}
+
 // --- Zone14 tests ---
 
 type zonemdRecord struct {

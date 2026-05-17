@@ -48,76 +48,62 @@ Status: Final
 ### Per-NS Query and Delete Semantics (steps 2-5a)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : query CDS and DNSKEY
-    query --> empty : no CDS records
-    query --> hasCDS : CDS present
-    empty : skip findings
-    hasCDS --> delCheck
-    delCheck : delete semantics
-    delCheck --> mixedDel : mixed delete
-    delCheck --> allDel : only delete
-    delCheck --> normal : non-delete only
-    mixedDel : mixed-delete-CDS tag
-    allDel : delete-CDS tag
-    normal --> dnskeyCheck
-    dnskeyCheck : DNSKEY present?
-    dnskeyCheck --> noKey : absent
-    dnskeyCheck --> validate : present
-    noKey : CDS-without-DNSKEY tag
-    validate : continue validation
-    validate --> [*]
-    mixedDel --> [*]
-    allDel --> [*]
-    noKey --> [*]
-    empty --> [*]
-    disabled --> [*]
-{{< /mermaid >}}
+```
+child set = Method4 ++ Method5; dedupe by IP
+
+For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for CDS/DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query CDS at z.Name, DNSSEC=on
+     AA + NOERROR + at least one CDS  -> record cdsByNS[ns], cdsRRSIGByNS[ns]
+   query DNSKEY at z.Name, DNSSEC=on
+     AA + NOERROR + at least one DNSKEY -> record dnskeyByNS[ns], dnskeyRRSIGByNS[ns]
+
+No NS with CDS records -> emit no DS16 findings (TEST_CASE_END only)
+
+For each NS with CDS records (parallel validation):
+
+   delete semantics:
+     mixed delete and non-delete CDS  -> DS16_MIXED_DELETE_CDS  (addresses); stop ns
+     only delete CDS                  -> DS16_DELETE_CDS        (addresses); stop ns
+
+   dnskeyByNS[ns] absent              -> DS16_CDS_WITHOUT_DNSKEY (addresses)
+   continue with per-CDS validation below
+```
 {{% /expand %}}
 
 ### Per-CDS DNSKEY Match and RRSIG Check (step 5b-c)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> perCDS
-    perCDS : per non-delete CDS
-    perCDS --> noKt : no matching keytag
-    perCDS --> nonZone : DNSKEY non-zone
-    perCDS --> chained : matched DNSKEY
-    noKt : no-DNSKEY-match tag
-    nonZone : non-zone-DNSKEY tag
-    chained --> sigChecks
-    sigChecks : RRSIG keytag checks
-    sigChecks --> noDSig : DNSKEY RRSIG missing
-    sigChecks --> noCSig : CDS RRSIG missing
-    sigChecks --> nonSEP : DNSKEY non-SEP
-    sigChecks --> rrsigVerify : verify
-    noDSig : DNSKEY-unsigned tag
-    noCSig : CDS-unsigned-self tag
-    nonSEP : non-SEP-DNSKEY tag
-    rrsigVerify --> noRRSIG : no CDS RRSIG
-    rrsigVerify --> perRRSIG : per CDS RRSIG
-    noRRSIG : CDS-unsigned tag
-    perRRSIG --> unknownKey : no DNSKEY for kt
-    perRRSIG --> invalidSig : verify failed
-    unknownKey : signed-by-unknown tag
-    invalidSig : CDS-invalid-RRSIG tag
-    noKt --> [*]
-    nonZone --> [*]
-    noDSig --> [*]
-    noCSig --> [*]
-    nonSEP --> [*]
-    noRRSIG --> [*]
-    unknownKey --> [*]
-    invalidSig --> [*]
-{{< /mermaid >}}
+```
+For each non-delete CDS at ns (keytag = cds.KeyTag):
+
+   matchingDNSKEYs = DNSKEYs in dnskeyByNS[ns] with same keytag
+    +- empty                            -> DS16_CDS_MATCHES_NO_DNSKEY (keytag, addresses)
+    |                                      continue to next CDS
+    +- any has zone bit unset           -> DS16_CDS_MATCHES_NON_ZONE_DNSKEY (keytag, addresses)
+    +- otherwise:
+         dnskeyRRSIGByNS[ns] lacks RRSIG with this keytag
+             -> DS16_DNSKEY_NOT_SIGNED_BY_CDS (keytag, addresses)
+         cdsRRSIGByNS[ns] lacks RRSIG with this keytag
+             -> DS16_CDS_NOT_SIGNED_BY_CDS    (keytag, addresses)
+         any matchingDNSKEY has SEP bit unset
+             -> DS16_CDS_MATCHES_NON_SEP_DNSKEY (keytag, addresses)
+
+CDS RRSIG verification:
+   cdsRRSIGByNS[ns] empty               -> DS16_CDS_UNSIGNED (addresses)
+   otherwise, for each CDS RRSIG (keyed by sig.KeyTag):
+     no DNSKEY in dnskeyByNS[ns] with that keytag
+                                        -> DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY
+                                           (keytag, addresses)
+     verify CDS rrset against each matching DNSKEY:
+        none validates                  -> DS16_CDS_INVALID_RRSIG (keytag, addresses)
+
+Aggregation: each tag is emitted once per (keytag, joined ns IP list)
+where applicable, or once per ns IP list otherwise.
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

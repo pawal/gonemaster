@@ -36,24 +36,15 @@ Status: Final
 ### Overall NS Count Checks (steps 2-3)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> delCount
-    delCount : delegation NS count
-    delCount --> delOK : at minimum
-    delCount --> delShort : below minimum
-    delOK : enough-del tag
-    delShort : short-del tag
-    delOK --> childCount
-    delShort --> childCount
-    childCount : child NS count
-    childCount --> chOK : at minimum
-    childCount --> chShort : below minimum
-    chOK : enough-child tag
-    chShort : short-child tag
-    chOK --> [*]
-    chShort --> [*]
-{{< /mermaid >}}
+```
+delegation NS names = sort(Method2)
+   len >= constants.MinimumNumberOfNameservers -> ENOUGH_NS_DEL     (count, minimum, servers)
+   otherwise                                   -> NOT_ENOUGH_NS_DEL (count, minimum, servers)
+
+child NS names = sort(Method3)
+   len >= constants.MinimumNumberOfNameservers -> ENOUGH_NS_CHILD     (count, minimum, servers)
+   otherwise                                   -> NOT_ENOUGH_NS_CHILD (count, minimum, servers)
+```
 {{% /expand %}}
 
 ### Per-Family Addressed NS Checks (steps 4-5)
@@ -61,20 +52,19 @@ stateDiagram-v2
 Same shape runs four times: child IPv4, child IPv6, delegation IPv4, delegation IPv6.
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> family
-    family : per-family count
-    family --> enough : at minimum
-    family --> notEnough : below minimum
-    family --> none : zero
-    enough : enough-v4/v6 tag
-    notEnough : not-enough-v4/v6 tag
-    none : no-v4/v6 tag
-    enough --> [*]
-    notEnough --> [*]
-    none --> [*]
-{{< /mermaid >}}
+```
+Per side <SIDE> in {CHILD (Method5), DEL (Method4)}:
+  Per family <V> in {IPV4, IPV6}:
+    count = unique-NS-name count whose address is in that family
+
+    count == 0                                      -> NO_<V>_NS_<SIDE>
+    0 < count <  MinimumNumberOfNameservers         -> NOT_ENOUGH_<V>_NS_<SIDE>
+    count >= MinimumNumberOfNameservers             -> ENOUGH_<V>_NS_<SIDE>
+
+  All tags carry (count, minimum, servers)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

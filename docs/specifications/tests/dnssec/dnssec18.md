@@ -70,82 +70,105 @@ Status: Final
 ### Parent DS Collection and Per-Child Queries (steps 2-7)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> parents
-    parents : per-parent DS probe
-    parents --> dsCheck
-    dsCheck : DS set empty?
-    dsCheck --> stopEarly : empty
-    dsCheck --> children : non-empty
-    children : per-child queries
-    children --> gates
-    gates : RRset present?
-    gates --> skipVal : neither present
-    gates --> validate : at least one
-    stopEarly : emit test-case-end
-    skipVal --> stopEarly
-    validate : continue to validation
-    validate --> [*]
-    stopEarly --> [*]
-{{< /mermaid >}}
+```
+parent set = parentNameservers; dedupe by IP
+
+For each unique parent NS IP (parallel; fan-out = resolver.defaults.parallel):
+   transport disabled for DS  -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DS at z.Name, DNSSEC=on
+     resp.Msg + RCODE == NOERROR + AA
+        -> add DS records matching z.Name; dedupe by (keytag,
+                                                       digestType,
+                                                       algorithm,
+                                                       digest)
+
+dsRecords empty
+   -> emit no DS18 findings (TEST_CASE_END only)
+
+child set = Method4 ++ Method5; dedupe by IP
+
+For each unique child NS IP (parallel):
+   transport disabled for CDS/CDNSKEY/DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   AA + NOERROR + records present per type -> record per-NS RRsets and RRSIGs:
+     cdsByNS[ns], cdsRRSIGByNS[ns]
+     cdnskeyByNS[ns], cdnskeyRRSIGByNS[ns]
+     dnskeyByNS[ns], dnskeyRRSIGByNS[ns]  (TypeCovered == DNSKEY)
+```
 {{% /expand %}}
 
 ### RRSIG-vs-DS Validation (steps 8-12)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> cdsCheck
-    cdsCheck : per-NS CDS check
-    cdsCheck --> cdsNoMatch : no keytag match
-    cdsCheck --> cdsMatch : keytag matches
-    cdsNoMatch : no-match-CDS tag
-    cdsMatch : match-CDS tag
-    cdsNoMatch --> cdnskeyCheck
-    cdsMatch --> cdnskeyCheck
-    cdnskeyCheck : per-NS CDNSKEY check
-    cdnskeyCheck --> cdnskeyNoMatch : no keytag match
-    cdnskeyCheck --> cdnskeyMatch : keytag matches
-    cdnskeyNoMatch : no-match-CDNSKEY tag
-    cdnskeyMatch : match-CDNSKEY tag
-    cdnskeyNoMatch --> [*]
-    cdnskeyMatch --> [*]
-{{< /mermaid >}}
+```
+Gating: per-NS RRSIG-vs-DS checks run only when both DNSKEY and the
+        respective CDS/CDNSKEY RRset are present for that NS.
+
+Per NS with CDS RRset:
+   any DS in dsRecords whose keytag is in dnskeyByNS[ns] AND in cdsRRSIGByNS[ns]
+                              -> match (not marked)
+   otherwise                  -> mark for DS18_NO_MATCH_CDS_RRSIG_DS
+
+Per NS with CDNSKEY RRset:
+   any DS in dsRecords whose keytag is in dnskeyByNS[ns] AND in cdnskeyRRSIGByNS[ns]
+                              -> match (not marked)
+   otherwise                  -> mark for DS18_NO_MATCH_CDNSKEY_RRSIG_DS
+
+Emit:
+   marked CDS    NS list non-empty -> DS18_NO_MATCH_CDS_RRSIG_DS    (addresses)
+   marked CDNSKEY NS list non-empty -> DS18_NO_MATCH_CDNSKEY_RRSIG_DS (addresses)
+
+   unmarked NS with CDS RRset non-empty
+                              -> DS18_MATCH_CDS_RRSIG_DS     (addresses)
+   unmarked NS with CDNSKEY RRset non-empty
+                              -> DS18_MATCH_CDNSKEY_RRSIG_DS (addresses)
+```
 {{% /expand %}}
 
 ### Content Comparison and Rollover Signals (steps 13-16)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> cdsComp
-    cdsComp : CDS vs DS content
-    cdsComp --> cdsMatchTag : match
-    cdsComp --> cdsRollTag : differ
-    cdsMatchTag : CDS-matches-DS tag
-    cdsRollTag : CDS-rollover tag
-    cdsMatchTag --> cdnskeyComp
-    cdsRollTag --> cdnskeyComp
-    cdnskeyComp : CDNSKEY vs DS
-    cdnskeyComp --> cdnskeyMatchTag : match
-    cdnskeyComp --> cdnskeyRollTag : differ
-    cdnskeyMatchTag : matches-DS tag
-    cdnskeyRollTag : rollover tag
-    cdnskeyMatchTag --> softSig
-    cdnskeyRollTag --> softSig
-    softSig : soft rollover signals
-    softSig --> emitSig
-    emitSig : evidence tags
-    emitSig --> absentCheck
-    absentCheck : RRsets absent and signal?
-    absentCheck --> emitAbsent : yes
-    absentCheck --> done : no
-    emitAbsent : absent-evidence tag
-    emitAbsent --> done
-    done : emit test-case-end
-    done --> [*]
-{{< /mermaid >}}
+```
+CDS-vs-DS content comparison (first NS with any non-DELETE CDS):
+   cdsKeySet = {(keyTag, algorithm, digestType, digest) | non-DELETE CDS}
+   dsKeySet  = {(keyTag, algorithm, digestType, digest) | parent DS}
+   cdsKeySet == dsKeySet
+      -> DS18_CDS_MATCHES_DS         (cds_keytags, ds_keytags)
+   otherwise
+      -> DS18_CDS_ROLLOVER_SIGNALED  (cds_keytags, ds_keytags)
+   (every NS has only DELETE sentinels -> emit neither)
+
+CDNSKEY-vs-DS content comparison (first NS with any non-DELETE CDNSKEY):
+   digestTypes = distinct DS.digestType values
+   dsKeytagSet = {DS.keyTag}
+   every CDNSKEY.KeyTag() is in dsKeytagSet
+     AND every DS entry is covered by some
+         DNSKEY.ToDS(digestType).Digest for one of its digestTypes
+     AND every CDNSKEY contributes at least one matching DS entry
+      -> DS18_CDNSKEY_MATCHES_DS         (cdnskey_keytags, ds_keytags)
+   otherwise
+      -> DS18_CDNSKEY_ROLLOVER_SIGNALED  (cdnskey_keytags, ds_keytags)
+
+Soft rollover signals (when DNSKEY records are available, first representative NS):
+   sepKeytags      = DNSKEY keytags with SEP flag
+   dnskeySigners   = DNSKEY-RRSIG keytags that are in sepKeytags
+   dsKeytags       = DS keytags
+   dnskeyKeytagSet = all DNSKEY keytags
+
+   |sepKeytags| > 1
+      -> DS18_ROLLOVER_EVIDENCE_MULTI_KSK        (keytags = sepKeytags)
+   |dnskeySigners| > 1
+      -> DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG       (keytags = dnskeySigners)
+   dsKeytags minus dnskeyKeytagSet non-empty
+      -> DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY (keytags)
+   sepKeytags minus dsKeytags non-empty
+      -> DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS (keytags)
+
+On-demand absence:
+   no NS has CDS or CDNSKEY AND at least one soft signal emitted above
+      -> DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE (no args)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Rollover Evidence And Scoring

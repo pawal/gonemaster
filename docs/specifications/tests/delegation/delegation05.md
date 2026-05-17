@@ -39,54 +39,37 @@ Status: Final
 ### Per-NS CNAME Detection (step 4)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> dispatch
-    dispatch : per-NS name
-    dispatch --> ib : in-bailiwick
-    dispatch --> oob : out-of-bailiwick
-    ib : per-NS-IP probe
-    ib --> disabled : transport off
-    ib --> ibQuery : transport on
-    disabled : transport-disabled tag
-    ibQuery : A query RD=0
-    ibQuery --> noResp : no response
-    ibQuery --> badRcode : non-NOERROR
-    ibQuery --> cname : CNAME in answer
-    ibQuery --> referral : referral
-    referral --> retry
-    retry : recursive retry RD=1
-    retry --> cname : CNAME found
-    retry --> noCname : no CNAME
-    oob : recursive lookup
-    oob --> cname : CNAME found
-    oob --> noCname : no CNAME
-    noResp : no-response tag
-    badRcode : unexpected-rcode tag
-    cname : ns-is-cname tag
-    noResp --> [*]
-    badRcode --> [*]
-    cname --> [*]
-    noCname --> [*]
-    disabled --> [*]
-{{< /mermaid >}}
+```
+nsNames = Method2and3
+allNS   = Method4 ++ Method5, unique by ns.String() ("name/ip"); keys sorted
+
+For each nsName in nsNames:
+
+  z.Name.IsInBailiwick(nsName)
+    +- yes -> for each (name/ip) in allNS, in parallel:
+                transport disabled for A
+                   -> IPV4_DISABLED / IPV6_DISABLED (rrtype=A); skip
+                query A at nsName, Recurse=false
+                  +- err or resp.Msg == nil   -> NO_RESPONSE (query_name, rrtype)
+                  +- RCODE != NOERROR         -> UNEXPECTED_RCODE (rcode, ...)
+                  +- CNAME in answer          -> NS_IS_CNAME (ns=nsName)
+                  +- IsRedirect               -> retry with Recurse=true
+                                                  CNAME in answer
+                                                    -> NS_IS_CNAME (ns=nsName)
+    +- no  -> recurse(z, nsName, "A")
+                resp.Msg present AND CNAME in answer
+                  -> NS_IS_CNAME (ns=nsName)
+```
 {{% /expand %}}
 
 ### Final CNAME Status Emission (steps 5-6)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> check
-    check : any cname emitted?
-    check --> noNs : none
-    check --> hadCname : at least one
-    noNs : no-ns-cname tag
-    hadCname --> done
-    noNs --> done
-    done : emit test-case-end
-    done --> [*]
-{{< /mermaid >}}
+```
+no NS_IS_CNAME tag emitted -> NO_NS_CNAME
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

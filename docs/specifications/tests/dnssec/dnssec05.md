@@ -37,39 +37,36 @@ Status: Final
 ### Per-NS DNSKEY Algorithm Classification (steps 2-7)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS DNSKEY probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : DNSKEY query
-    query --> ignored : bad response
-    query --> noDnskey : no DNSKEY
-    query --> hasDnskey : has DNSKEY
-    hasDnskey --> classify
-    classify : per-DNSKEY algo class
-    classify --> emitAlgo
-    emitAlgo : per-algo-class tags
-    emitAlgo --> summary
-    ignored --> summary
-    noDnskey --> summary
-    summary : zone signing summary
-    summary --> noRespAll : only ignored
-    summary --> zoneNoDnssec : none had DNSKEY
-    summary --> partial : mixed
-    summary --> done : all had DNSKEY
-    noRespAll : no-response tag
-    zoneNoDnssec : zone-no-DNSSEC tag
-    partial : server-no-DNSSEC tag
-    noRespAll --> done
-    zoneNoDnssec --> done
-    partial --> done
-    done : emit test-case-end
-    disabled --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+nss = methodsv2.GetDelNSNamesAndIPs ++ methodsv2.GetZoneNSNamesAndIPs;
+      group by IP
+
+For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DNSKEY at z.Name, DNSSEC=on
+    +- resp.Msg == nil / RCODE != NOERROR / !AA  -> classify as ignored
+    +- no apex DNSKEY records in answer          -> respondsWithoutDNSKEY
+    +- otherwise                                 -> respondsWithDNSKEY
+        for each DNSKEY in answer:
+          keytag = key.KeyTag()
+          tag    = dnssec05TagForAlgorithm(key.Algorithm)
+                   (DS05_ALGO_{DEPRECATED, NOT_RECOMMENDED, NOT_ZONE_SIGN,
+                              PRIVATE, RESERVED, UNASSIGNED, OK})
+          record (tag, algo, keytag, ns/ip)
+
+Emit DS05_ALGO_* tags grouped by (algo, keytag), one per non-empty entry:
+   <tag> (servers, keytag, algo_num, algo_descr, algo_mnemo)
+
+respondsWithDNSKEY empty AND respondsWithoutDNSKEY empty AND ignored non-empty
+   -> DS05_NO_RESPONSE (servers = ignored)
+
+respondsWithoutDNSKEY non-empty:
+   respondsWithDNSKEY empty -> DS05_ZONE_NO_DNSSEC   (servers = respondsWithoutDNSKEY)
+   otherwise                -> DS05_SERVER_NO_DNSSEC (servers = respondsWithoutDNSKEY)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

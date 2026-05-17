@@ -37,35 +37,34 @@ Status: Final
 ### Per-IP PTR-vs-Name Match (steps 2-6)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-IP PTR query
-    probe --> noResp : no response
-    probe --> hasResp : got response
-    hasResp --> shapeCheck
-    shapeCheck : NOERROR with PTR?
-    shapeCheck --> nameMatch : yes
-    shapeCheck --> noReverse : no
-    nameMatch : compare to nsname
-    nameMatch --> mismatch : no match
-    nameMatch --> matchOK : matched
-    mismatch : PTR-mismatch tag
-    matchOK : counts as success
-    noReverse : no-reverse tag
-    noResp : no-response-PTR tag
-    matchOK --> aggregate
-    aggregate : all IPs matched?
-    aggregate --> emitOK : yes
-    aggregate --> done : no
-    emitOK : PTR-match tag
-    emitOK --> done
-    done : emit test-case-end
-    noResp --> [*]
-    mismatch --> [*]
-    noReverse --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+collect nameserver IPs from Method5
+ +- dedupe by IP string; first-seen (nsname, ip) wins
+ |
+ v
+For each unique IP (parallel; fan-out = resolver.defaults.parallel):
+
+   ptrQuery = dnsutil.ReverseAddr(ip)
+    |
+    v
+   rec.Recurse(ptrQuery, PTR, IN)
+    +- resp.Msg absent                       -> NO_RESPONSE_PTR_QUERY
+    +- resp.Msg present
+       +- RCODE == NOERROR and PTR records in answer
+       |    +- collect PTR target names
+       |    +- compare each to nsname (case-insensitive, normalized)
+       |    +- any match?
+       |        +- no  -> NAMESERVER_IP_PTR_MISMATCH (with sorted unique PTR names)
+       |        +- yes -> (success; silent)
+       +- otherwise (RCODE != NOERROR or no PTR records) -> NAMESERVER_IP_WITHOUT_REVERSE
+
+After all tasks:
+  at least one IP checked AND no failure tag emitted -> NAMESERVER_IP_PTR_MATCH
+emit TEST_CASE_END
+
+Module-level gating (in AddressAll):
+  Address03 runs only when Address02 emitted NAMESERVERS_IP_WITH_REVERSE.
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

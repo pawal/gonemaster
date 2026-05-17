@@ -3,6 +3,8 @@
 Start with the path that matches what you are doing. The older top-level pages
 remain in place while the documentation is being split into narrower guides.
 
+The [architecture overview](architecture.md) is a one-sitting tour of the system: binaries, request lifecycles, data model, concurrency, security posture, and known limitations.
+
 ## Common Paths
 
 | I want to... | Start here |

@@ -32,34 +32,29 @@ Status: Final
 ### Parent-Child Name Set Comparison (steps 2-10)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> setup
-    setup : build nameCounts
-    setup --> p1
-    p1 : parent extras?
-    p1 --> emitP : yes
-    p1 --> p2 : no
-    emitP : extra-name-parent tag
-    emitP --> p2
-    p2 : child extras?
-    p2 --> emitC : yes
-    p2 --> p3 : no
-    emitC : extra-name-child tag
-    emitC --> p3
-    p3 : both empty?
-    p3 --> emitM : yes
-    p3 --> p4 : no
-    emitM : names-match tag
-    emitM --> p4
-    p4 : sameNames empty?
-    p4 --> emitMis : yes
-    p4 --> done : no
-    emitMis : total-mismatch tag
-    emitMis --> done
-    done : emit test-case-end
-    done --> [*]
-{{< /mermaid >}}
+```
+parentNames = Method2
+childNames  = Method3
+
+build nameCounts:
+   for each name in parentNames: nameCounts[name] += 1
+   for each name in childNames:  nameCounts[name] -= 1
+
+partition (sort each list):
+   nameCounts[name] == 0  -> sameNames
+   nameCounts[name] >  0  -> extraParent
+   nameCounts[name] <  0  -> extraChild
+
+emit (in this order):
+   extraParent non-empty      -> EXTRA_NAME_PARENT  (extra=";"-joined)
+   extraChild  non-empty      -> EXTRA_NAME_CHILD   (extra=";"-joined)
+   extraParent empty
+     AND extraChild empty     -> NAMES_MATCH        (names=";"-joined sameNames)
+   sameNames empty            -> TOTAL_NAME_MISMATCH (glue=";"-joined extraParent,
+                                                      child=";"-joined extraChild)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

@@ -39,39 +39,35 @@ Status: Final
 ### Per-RRSIG Validity Classification (steps 2-8)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> setup
-    setup : query DNSKEY and SOA
-    setup --> errCheck
-    errCheck : either error?
-    errCheck --> stop : error
-    errCheck --> collect : ok
-    collect : collect RRSIGs
-    collect --> perSig
-    perSig : per RRSIG
-    perSig --> expCheck
-    expCheck : remaining time
-    expCheck --> expired : negative
-    expCheck --> short : below short
-    expCheck --> long : above long
-    expCheck --> normal : within range
-    expired : RRSIG-expired tag
-    short : remaining-short tag
-    long : remaining-long tag
-    normal --> durCheck
-    durCheck : signature duration
-    durCheck --> durLong : above long
-    durCheck --> durOk : within range
-    durLong : duration-long tag
-    durOk : duration-ok tag
-    stop --> [*]
-    expired --> [*]
-    short --> [*]
-    long --> [*]
-    durLong --> [*]
-    durOk --> [*]
-{{< /mermaid >}}
+```
+zoneQueryOne for DNSKEY and SOA at z.Name, DNSSEC=on
+  resolver.defaults.parallel <= 1 -> sequential (DNSKEY then SOA)
+  resolver.defaults.parallel >  1 -> concurrent (ordered)
+
+either query returned an error -> return error
+either resp.Msg == nil          -> emit TEST_CASE_END and stop
+
+collect rrsigs from both answer sections
+thresholds = profile.test_cases_vars.dnssec04
+   {REMAINING_SHORT, REMAINING_LONG, DURATION_LONG}
+now = packetTime(DNSKEY response)
+
+For each RRSIG:
+   emit RRSIG_EXPIRATION (date in RFC3339, keytag, types)
+
+   remaining = sig.Expiration - now
+     remaining < 0                       -> RRSIG_EXPIRED      (expiration, keytag, types)
+     0 <= remaining < REMAINING_SHORT    -> REMAINING_SHORT    (duration, keytag, types)
+     remaining > REMAINING_LONG          -> REMAINING_LONG     (duration, keytag, types)
+
+   duration = sig.Expiration - sig.Inception
+     duration > DURATION_LONG            -> DURATION_LONG      (duration, keytag, types)
+
+   no remaining-time tag AND no DURATION_LONG for this RRSIG
+                                         -> DURATION_OK        (duration, keytag, types)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

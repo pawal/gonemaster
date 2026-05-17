@@ -42,93 +42,92 @@ Status: Final
 ### Mode Classification (steps 2-3)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> classify
-    classify : determine mode
-    classify --> rootCase : child is root
-    classify --> fakeCase : fake addresses
-    classify --> traverse : normal mode
-    rootCase : root-zone tags
-    fakeCase : fake-address tags
-    traverse : iterative parent discovery
-    rootCase --> [*]
-    fakeCase --> [*]
-    traverse --> [*]
-{{< /mermaid >}}
+```
+z.Name
+ +- "."                              -> B01_CHILD_FOUND
+ |                                      B01_ROOT_HAS_NO_PARENT
+ |                                      emit TEST_CASE_END and return
+ +- Recursor.HasFakeAddresses(child) -> B01_CHILD_FOUND
+ |                                      B01_PARENT_DISREGARDED
+ |                                      emit TEST_CASE_END and return
+ +- otherwise                        -> normal-mode traversal from root
+```
 {{% /expand %}}
 
 ### Per-Server Probe (step 5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> nextHop
-    nextHop : pick next NS address
-    nextHop --> loopCheck
-    loopCheck : iteration count
-    loopCheck --> loopHit : over threshold
-    loopCheck --> transport : under threshold
-    loopHit : loop-protection tag
-    transport : transport check per rrtype
-    transport --> tagDis : disabled
-    transport --> tagEn : enabled
-    tagDis : transport-disabled tag
-    tagEn : transport-enabled tag
-    tagEn --> queryRR
-    queryRR : SOA/NS/DNAME query
-    queryRR --> respCheck
-    respCheck : response validation
-    respCheck --> tagErr : invalid
-    respCheck --> extract : valid
-    tagErr : server-zone-error tag
-    extract : delegation and alias data
-    loopHit --> [*]
-    tagDis --> [*]
-    tagErr --> [*]
-    extract --> [*]
-{{< /mermaid >}}
+```
+For each remaining label (BFS from "." down toward child):
+   for each NS at that label:
+     +- already handled (zone, addr)?              -> skip
+     +- transport disabled for SOA/NS/DNAME        -> IPV4_DISABLED / IPV6_DISABLED, skip
+     +- otherwise                                  -> IPV4_ENABLED / IPV6_ENABLED
+                                                     |
+                                                     v
+        query SOA at zoneName
+         +- error / no Msg / RCODE != NOERROR / !AA / !=1 SOA at name
+              -> B01_SERVER_ZONE_ERROR (query_type=SOA), skip ns
+        query NS  at zoneName
+         +- error / no Msg / RCODE != NOERROR / !AA / no NS / NS owner != name
+              -> B01_SERVER_ZONE_ERROR (query_type=NS),  skip ns
+         +- success
+              -> extract NS names + A/AAAA glue (recurse to resolve missing glue),
+                 enqueue new (label, ns) pairs
+
+   inner: prepend labels of child name to intermediate (parent walk)
+     +- loopCount >= 1000   -> LOOP_PROTECTION (with caller, zone, intermediate),
+                              emit TEST_CASE_END and return
+     +- intermediate has all labels of child  -> stop inner loop
+
+     query SOA at intermediate
+      +- error / no Msg                      -> B01_SERVER_ZONE_ERROR, skip ns
+      +- NOERROR + AA + 1 SOA at intermediate
+      |    +- intermediate == child          -> parentFound, aaSOA
+      |    +- else: query NS at intermediate
+      |                +- invalid response   -> B01_SERVER_ZONE_ERROR, skip ns
+      |                +- valid              -> extract NS+glue, enqueue, continue inner
+      +- NXDOMAIN + AA                       -> parentFound, aaNXDomain
+      +- IsRedirect with NS in authority for intermediate
+      |    +- intermediate == child          -> parentFound, delegationFound
+      |    +- else                           -> extract NS+glue, enqueue
+      +- NOERROR + AA, intermediate == child
+      |    +- CNAME in answer for child      -> parentFound, aaCNAME
+      |    +- DNAME query: AA+NOERROR+1 DNAME-> parentFound, aaDname[target]
+      |    +- otherwise                      -> parentFound, aaNodata
+      +- IsRedirect with CNAME in answer     -> parentFound, cnameWithReferral
+      +- any other shape                     -> B01_SERVER_ZONE_ERROR (query_type=SOA)
+```
 {{% /expand %}}
 
 ### Outcome Aggregation (steps 6-9)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> parentE
-    parentE : parent outcome
-    parentE --> pOne : one candidate
-    parentE --> pMulti : multiple candidates
-    parentE --> pNone : no candidate
-    pOne : parent-found tag
-    pMulti : parent-undetermined tag
-    pNone : parent-not-found tag
-    pOne --> childE
-    pMulti --> childE
-    pNone --> childE
-    childE : child outcome
-    childE --> cFound : delegation or SOA
-    childE --> cIncon : inconsistent
-    childE --> cAbsent : no evidence
-    cFound : child-found tag
-    cIncon : inconsistent-delegation tag
-    cAbsent : no-child or not-exist tag
-    cFound --> aliasE
-    cIncon --> aliasE
-    cAbsent --> aliasE
-    aliasE : alias outcome
-    aliasE --> aOne : single DNAME
-    aliasE --> aMulti : multiple DNAMEs
-    aliasE --> aNone : none
-    aOne : child-is-alias tag
-    aMulti : inconsistent-alias tag
-    aNone : no alias tag
-    aOne --> done
-    aMulti --> done
-    aNone --> done
-    done : emit test-case-end
-    done --> [*]
-{{< /mermaid >}}
+```
+1. Parent
+     parentFound non-empty:
+       per (parent domain, ns set)         -> B01_PARENT_FOUND
+       len(parentFound) > 1                -> B01_PARENT_UNDETERMINED (merged ns set)
+     parentFound empty                     -> B01_PARENT_NOT_FOUND
+
+2. Child
+     delegationFound non-empty OR aaSOA non-empty
+       -> B01_CHILD_FOUND
+          if not fake-addresses:
+            for each parent observed in aaNXDomain / aaCNAME / cnameWithReferral
+            / aaNodata / aaDname:
+              -> B01_INCONSISTENT_DELEGATION (domain_parent, domain_child, servers)
+     delegationFound empty AND aaSOA empty
+       +- fake-addresses                   -> B01_CHILD_NOT_EXIST (domain)
+       +- otherwise                        -> B01_NO_CHILD (domain_child, domain_super)
+
+3. Alias
+     aaDname non-empty:
+       per DNAME target                    -> B01_CHILD_IS_ALIAS (domain_child, domain_target, servers)
+       len(aaDname) > 1                    -> B01_INCONSISTENT_ALIAS (domain)
+
+4. emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

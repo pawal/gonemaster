@@ -31,33 +31,25 @@ Status: Final
 ### Three-Set Duplicate-IP Detection (steps 3-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> delDup
-    delDup : del NS duplicates?
-    delDup --> delSame : duplicate IPs
-    delDup --> delDistinct : all distinct
-    delSame : del-NS-same-IP tag
-    delDistinct : del-distinct tag
-    delSame --> childDup
-    delDistinct --> childDup
-    childDup : child NS duplicates?
-    childDup --> chSame : duplicate IPs
-    childDup --> chDistinct : all distinct
-    chSame : child-NS-same-IP tag
-    chDistinct : child-distinct tag
-    chSame --> bothDup
-    chDistinct --> bothDup
-    bothDup : combined duplicates?
-    bothDup --> bothSame : duplicate IPs
-    bothDup --> bothDistinct : all distinct
-    bothSame : same-IP-address tag
-    bothDistinct : distinct-IP tag
-    bothSame --> done
-    bothDistinct --> done
-    done : emit test-case-end
-    done --> [*]
-{{< /mermaid >}}
+```
+delNS    = Method4
+childNS  = Method5
+combined = delNS ++ childNS
+
+findDupNS(nsList, duplicateTag, distinctTag):
+   group nsList by address; nsList first deduped by "name/ip"
+   any address with >= 2 distinct NS names
+     -> for each such address (sorted): emit duplicateTag (servers, address)
+   no duplicate emitted AND nsList non-empty
+     -> emit distinctTag (no args)
+
+Run three times:
+   findDupNS(delNS,    DEL_NS_SAME_IP,    DEL_DISTINCT_NS_IP)
+   findDupNS(childNS,  CHILD_NS_SAME_IP,  CHILD_DISTINCT_NS_IP)
+   findDupNS(combined, SAME_IP_ADDRESS,   DISTINCT_IP_ADDRESS)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

@@ -1,0 +1,5 @@
+# Codeberg/Gitea CODEOWNERS routes review requests by file path.
+# Syntax: <path-pattern> <owner1> <owner2> ...
+
+docs/architecture.md @pawal
+tools/architecture-check/ @pawal

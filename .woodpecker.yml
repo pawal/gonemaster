@@ -30,6 +30,11 @@ steps:
       - go run ./tools/specifications/export-log-args --check-coherency --markdown-out '' >/dev/null
       - go run ./tools/i18n/check-placeholders
 
+  architecture_check:
+    image: golang:1.25
+    commands:
+      - go run ./tools/architecture-check
+
   go_test:
     image: golang:1.25
     depends_on:

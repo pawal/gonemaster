@@ -23,7 +23,7 @@ CMD ?= all
 	install-gonemaster-nagios ui-check test-go test-integration vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
-	badkeys-update badkeys-update-embed man clean-man
+	architecture-check badkeys-update badkeys-update-embed man clean-man
 
 help:
 	@echo "Targets:"
@@ -62,6 +62,7 @@ help:
 	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
 	@echo "  spec-check-i18n-placeholders  Verify placeholder parity and reject non-allowlisted legacy placeholders"
 	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder checks"
+	@echo "  architecture-check Verify docs/architecture.md against cmd/, build tags, drivers, and the Last reviewed date"
 	@echo "  docs             Build the documentation site (writes site/public/)"
 	@echo "  docs-serve       Serve the documentation site locally"
 	@echo "  man              Generate man pages from docs/man/*.md"
@@ -280,6 +281,9 @@ spec-check-i18n-placeholders:
 	GOOS= GOARCH= $(GO) run ./tools/i18n/check-placeholders
 
 spec-check: spec-validate spec-check-tags spec-check-coherency spec-check-i18n-placeholders
+
+architecture-check:
+	GOOS= GOARCH= $(GO) run ./tools/architecture-check
 
 badkeys-update:
 	GOOS= GOARCH= $(GO) run ./tools/badkeys-update --output share/badkeys

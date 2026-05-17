@@ -73,6 +73,8 @@ documentation/specification checks. Run `make help` for the current list.
 
 Full documentation: [pawal.codeberg.page/gonemaster](https://pawal.codeberg.page/gonemaster/)
 
+Start with the [architecture overview](https://pawal.codeberg.page/gonemaster/architecture/) for a one-sitting tour of the system: binaries, request lifecycles, data model, concurrency, security posture, and known limitations.
+
 - [CLI](https://pawal.codeberg.page/gonemaster/cli/) - local test runner
 - [Server](https://pawal.codeberg.page/gonemaster/server/) - HTTP server and queue
 - [Client](https://pawal.codeberg.page/gonemaster/client/) - automation client

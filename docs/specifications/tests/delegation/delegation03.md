@@ -36,33 +36,34 @@ Status: Final
 ### Synthetic Referral Build and Size Check (steps 2-11)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> setup
-    setup : build qname/message
-    setup --> auth
-    auth : add NS records
-    auth --> v4
-    v4 : v4 glue check
-    v4 --> addV4 : eligible
-    v4 --> v6 : not eligible
-    addV4 : add A glue
-    addV4 --> v6
-    v6 : v6 glue check
-    v6 --> addV6 : eligible
-    v6 --> pack : not eligible
-    addV6 : add AAAA glue
-    addV6 --> pack
-    pack : pack with compression
-    pack --> size
-    size : check vs 512 limit
-    size --> tooLarge : over 512
-    size --> sizeOK : within 512
-    tooLarge : too-large tag
-    sizeOK : size-ok tag
-    tooLarge --> [*]
-    sizeOK --> [*]
-{{< /mermaid >}}
+```
+build qname = maxLengthNameFor(z.Name)   (FQDN padded to constants.FQDNMaxLength)
+build msg with question <qname> IN NS
+
+authority section:
+   for each name in Method2 -> add NS RR (owner = z.Name)
+
+parent = Method1
+parent absent -> return error (testcase aborts)
+
+delNS = Method4
+
+additional section, A:
+   nssV4 = filterByIPVersion(delNS, IPv4)
+   nssV4 non-empty AND every NS name in nssV4 is in-bailiwick(parent.Name)
+     -> add one A RR using nssV4[0]
+
+additional section, AAAA:
+   nssV6 = filterByIPVersion(delNS, IPv6)
+   nssV6 non-empty AND every NS name in nssV6 is in-bailiwick(parent.Name)
+     -> add one AAAA RR using nssV6[0]
+
+pack msg with compression; size = len(packed)
+   size >  constants.UDPPayloadLimit (512) -> REFERRAL_SIZE_TOO_LARGE (size)
+   size <= 512                             -> REFERRAL_SIZE_OK        (size)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

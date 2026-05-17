@@ -48,79 +48,61 @@ Status: Final
 ### Per-NS Query and Delete Semantics (steps 2-5a)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : query CDNSKEY and DNSKEY
-    query --> empty : no CDNSKEY
-    query --> hasKeys : CDNSKEY present
-    empty : skip findings
-    hasKeys --> delCheck
-    delCheck : delete semantics
-    delCheck --> mixedDel : mixed delete
-    delCheck --> allDel : only delete
-    delCheck --> normal : non-delete only
-    mixedDel : mixed-delete tag
-    allDel : delete-CDNSKEY tag
-    normal --> dnskeyCheck
-    dnskeyCheck : DNSKEY present?
-    dnskeyCheck --> noKey : absent
-    dnskeyCheck --> validate : present
-    noKey : CDNSKEY-without-DNSKEY
-    validate : continue validation
-    validate --> [*]
-    mixedDel --> [*]
-    allDel --> [*]
-    noKey --> [*]
-    empty --> [*]
-    disabled --> [*]
-{{< /mermaid >}}
+```
+child set = Method4 ++ Method5; dedupe by IP
+
+For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for CDNSKEY/DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query CDNSKEY at z.Name, DNSSEC=on
+     AA + NOERROR + at least one CDNSKEY  -> record cdnskeyByNS[ns],
+                                                    cdnskeyRRSIGByNS[ns]
+   query DNSKEY at z.Name, DNSSEC=on
+     AA + NOERROR + at least one DNSKEY   -> record dnskeyByNS[ns],
+                                                    dnskeyRRSIGByNS[ns]
+
+No NS with CDNSKEY records -> emit no DS17 findings (TEST_CASE_END only)
+
+For each NS with CDNSKEY records:
+
+   delete semantics:
+     mixed delete and non-delete   -> DS17_MIXED_DELETE_CDNSKEY (addresses); stop ns
+     only delete CDNSKEY           -> DS17_DELETE_CDNSKEY       (addresses); stop ns
+
+   dnskeyByNS[ns] absent           -> DS17_CDNSKEY_WITHOUT_DNSKEY (addresses)
+   continue with per-CDNSKEY validation below
+```
 {{% /expand %}}
 
 ### Per-CDNSKEY Validation and RRSIG Check (step 5b-c)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> perKey
-    perKey : per non-delete CDNSKEY
-    perKey --> nonZone : zone bit unset
-    perKey --> sepCheck : zone bit set
-    nonZone : non-zone tag
-    sepCheck : SEP bit?
-    sepCheck --> nonSEP : unset
-    sepCheck --> ktCheck : set
-    nonSEP : non-SEP tag
-    nonSEP --> ktCheck
-    ktCheck : matching keytag?
-    ktCheck --> noKt : none
-    ktCheck --> rrsigChecks : matched
-    noKt : matches-no-DNSKEY tag
-    rrsigChecks : RRSIG keytag checks
-    rrsigChecks --> noDSig : DNSKEY RRSIG missing
-    rrsigChecks --> noCSig : CDNSKEY RRSIG missing
-    rrsigChecks --> verifyCheck : continue
-    noDSig : DNSKEY-unsigned tag
-    noCSig : CDNSKEY-unsigned-self tag
-    verifyCheck --> noRRSIG : no CDNSKEY RRSIG
-    verifyCheck --> perRRSIG : per CDNSKEY RRSIG
-    noRRSIG : CDNSKEY-unsigned tag
-    perRRSIG --> unknownKey : no DNSKEY for kt
-    perRRSIG --> invalidSig : verify failed
-    unknownKey : signed-by-unknown tag
-    invalidSig : invalid-RRSIG tag
-    nonZone --> [*]
-    noKt --> [*]
-    noDSig --> [*]
-    noCSig --> [*]
-    noRRSIG --> [*]
-    unknownKey --> [*]
-    invalidSig --> [*]
-{{< /mermaid >}}
+```
+For each non-delete CDNSKEY at ns (keytag = cdnskey.KeyTag()):
+
+   zone bit unset                  -> DS17_CDNSKEY_IS_NON_ZONE (keytag, addresses)
+                                      continue to next CDNSKEY
+   SEP bit unset                   -> DS17_CDNSKEY_IS_NON_SEP  (keytag, addresses)
+
+   matchingDNSKEYs = DNSKEYs in dnskeyByNS[ns] with same keytag
+    +- empty                       -> DS17_CDNSKEY_MATCHES_NO_DNSKEY (keytag, addresses)
+    +- non-empty:
+         dnskeyRRSIGByNS[ns] lacks RRSIG with this keytag
+            -> DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY   (keytag, addresses)
+         cdnskeyRRSIGByNS[ns] lacks RRSIG with this keytag
+            -> DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY  (keytag, addresses)
+
+CDNSKEY RRSIG verification:
+   cdnskeyRRSIGByNS[ns] empty      -> DS17_CDNSKEY_UNSIGNED (addresses)
+   otherwise, for each CDNSKEY RRSIG (keyed by sig.KeyTag):
+     no DNSKEY in dnskeyByNS[ns] with that keytag
+                                   -> DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY
+                                      (keytag, addresses)
+     verify CDNSKEY rrset against each matching DNSKEY:
+        none validates             -> DS17_CDNSKEY_INVALID_RRSIG (keytag, addresses)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

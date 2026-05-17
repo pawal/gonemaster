@@ -47,63 +47,65 @@ Status: Final
 ### Per-Parent-NS DS Query (steps 4-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> source
-    source : DS source type
-    source --> fakeDS : undelegated fake
-    source --> probe : real parents
-    fakeDS : classify directly
-    probe : per-parent-NS probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : DS query DNSSEC on
-    query --> ignored : bad shape
-    query --> noOwner : no DS for owner
-    query --> hasDS : DS present
-    ignored : mark ignored
-    noOwner : without-DS set
-    hasDS : per-digest classify
-    fakeDS --> [*]
-    hasDS --> [*]
-    ignored --> [*]
-    noOwner --> [*]
-    disabled --> [*]
-{{< /mermaid >}}
+```
+parentNS = methodsv2.GetParentNSNamesAndIPs
+
+undelegated DS path (any parent NS has FakeDSRecords for z):
+   for each DS record in fake set:
+     classify by digest -> sets[<tag>][digest][keytag] += "-"
+     digest == 2 -> algo2DS[keytag] += "-"
+     else        -> nonAlgo2DS[keytag] += "-"
+   respondsWithDS += "-"
+   skip live parent queries (parentNS = nil)
+
+Otherwise, per unique parent NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DS -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DS at z.Name, DNSSEC=on
+    +- resp.Msg == nil / RCODE != NOERROR / no EDNS / !DO / !AA
+                                         -> ignoredParentNS += matching ns/ip
+    +- no DS with owner == z.Name        -> respondsWithoutValidDS += matching ns/ip
+    +- DS present
+                                         -> respondsWithDS += matching ns/ip
+        for each DS:
+          tag = dnssec01TagForDigest(digest)
+            ({DEPRECATED, RESERVED, UNASSIGNED, PRIVATE, NOT_DS, OK})
+          sets[tag][digest][keytag] += ns/ip
+          digest == 2 -> algo2DS[keytag]    += ns/ip
+          else        -> nonAlgo2DS[keytag] += ns/ip
+```
 {{% /expand %}}
 
 ### Aggregation and Summary Emission (steps 6-10)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> emitDigest
-    emitDigest : per-digest tags
-    emitDigest --> algoCheck
-    algoCheck : algo-2 present?
-    algoCheck --> emitMiss : missing
-    algoCheck --> respCheck : present
-    emitMiss : algo-2-missing tag
-    emitMiss --> respCheck
-    respCheck : any responders?
-    respCheck --> noResp : only ignored
-    respCheck --> infoTags : at least one
-    noResp : no-response tag
-    infoTags : zone-type info tags
-    noResp --> noDSCheck
-    infoTags --> noDSCheck
-    noDSCheck : without-DS set?
-    noDSCheck --> zoneNoDS : none had DS
-    noDSCheck --> serverNoDS : mixed
-    noDSCheck --> done : all had DS
-    zoneNoDS : zone-no-DS tag
-    serverNoDS : server-no-DS tag
-    zoneNoDS --> done
-    serverNoDS --> done
-    done : emit test-case-end
-    done --> [*]
-{{< /mermaid >}}
+```
+emit per-digest classification tags:
+   for each tag in sorted DS01_DS_ALGO_* keys:
+     for each digest in sorted digest keys:
+       for each keytag in sorted keytag keys:
+         -> <tag> (keytag, ds_algo_num, ds_algo_descr, servers)
+
+algo-2 coverage:
+   for each keytag in nonAlgo2DS:
+     missing = nonAlgo2DS[keytag] minus algo2DS[keytag]
+     missing non-empty -> DS01_DS_ALGO_2_MISSING (keytag, servers=missing)
+
+no usable responders:
+   respondsWithoutValidDS empty AND respondsWithDS empty AND ignoredParentNS non-empty
+     -> DS01_NO_RESPONSE (servers = ignoredParentNS)
+
+zone-type info tags:
+   z.Name == "." AND no undelegated DS              -> DS01_ROOT_N_NO_UNDEL_DS
+   z.Name != "." AND hasFakeAddresses AND no undel DS -> DS01_UNDEL_N_NO_UNDEL_DS
+
+without-valid-DS responders:
+   respondsWithoutValidDS non-empty:
+     respondsWithDS empty -> DS01_PARENT_ZONE_NO_DS  (servers)
+     otherwise            -> DS01_PARENT_SERVER_NO_DS (servers)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

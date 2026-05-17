@@ -588,6 +588,23 @@ func TestCompute_N16HasNSIDNopenalty(t *testing.T) {
 	}
 }
 
+func TestCompute_Z13SpfMacroTargetNopenalty(t *testing.T) {
+	// Z13_SPF_MACRO_TARGET is NOTICE but should carry no penalty - the SPF
+	// construct is valid, only the sub-lookup count is unauditable.
+	entries := []Entry{
+		e("ZONE", "Z13_SPF_MACRO_TARGET", "NOTICE"),
+		e("ZONE", "Z13_SPF_MACRO_TARGET", "NOTICE"),
+	}
+	r := Compute("example.com", entries, cfg)
+	if r.Score != 100 {
+		t.Errorf("expected score 100 with Z13_SPF_MACRO_TARGET entries, got %d", r.Score)
+	}
+	cat := r.Categories["zone_consistency"]
+	if cat.Penalties != 0 {
+		t.Errorf("expected zone_consistency penalties 0 for Z13_SPF_MACRO_TARGET, got %d", cat.Penalties)
+	}
+}
+
 func TestCompute_TagPenaltyNotAffectingOtherTags(t *testing.T) {
 	// A regular WARNING tag should still use the severity penalty (5 pts).
 	entries := []Entry{

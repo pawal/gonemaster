@@ -121,6 +121,10 @@ func DefaultConfig() Config {
 			// N16_HAS_NSID: nameserver returns an NSID value when explicitly asked.
 			// This is informational only and should not affect the zone score.
 			"N16_HAS_NSID": 0,
+			// Z13_SPF_MACRO_TARGET: an include/redirect target uses RFC 7208
+			// macros that can only be expanded at SMTP time. The construct is
+			// valid SPF; we just cannot audit the sub-lookup count statically.
+			"Z13_SPF_MACRO_TARGET": 0,
 		},
 		GradeBands: []GradeBand{
 			{Grade: "A", MinScore: 90},

@@ -43,46 +43,41 @@ CSYNC content identity is determined by comparing the concatenation of `soaseria
 ### Per-NS CSYNC Probe and Aggregation (steps 2-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS CSYNC query
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : CSYNC and SOA queries
-    query --> skipNS : not auth NOERROR
-    query --> classify : auth NOERROR
-    classify : CSYNC record count
-    classify --> multiple : more than one
-    classify --> single : exactly one
-    classify --> zeroCS : zero
-    multiple : multiple-CSYNC tag
-    single --> compareSerial
-    compareSerial : serial vs SOA
-    compareSerial --> mismatch : differs
-    compareSerial --> ok : matches
-    mismatch : serial-mismatch tag
-    ok : in content group
-    zeroCS : in no-CSYNC group
-    ok --> aggregate
-    zeroCS --> aggregate
-    multiple --> aggregate
-    mismatch --> aggregate
-    aggregate : aggregate per-group
-    aggregate --> emitFound : CSYNC groups
-    emitFound : CSYNC-found tag
-    emitFound --> mixedCheck
-    mixedCheck : both present and absent?
-    mixedCheck --> mixedTag : yes
-    mixedCheck --> doneFlow : no
-    mixedTag : mixed-presence tag
-    mixedTag --> doneFlow
-    doneFlow : emit test-case-end
-    skipNS --> [*]
-    disabled --> [*]
-    doneFlow --> [*]
-{{< /mermaid >}}
+```
+ns list = Method4and5
+
+For each nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for CSYNC -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query CSYNC at z.Name
+    +- no resp / not authoritative NOERROR -> skip silently
+    +- otherwise                            -> capture CSYNC RRs in answer
+   query SOA at z.Name (same NS)            -> capture SOA serial when available
+
+After all queries, per ns with auth NOERROR CSYNC response:
+   count of CSYNC records:
+     > 1                          -> Z12_MULTIPLE_CSYNC (ns, count)
+     == 1                         -> group ns by (serial, flags, type_bitmap);
+                                     also evaluate against SOA serial (below)
+     == 0                         -> add ns to noCsyncGroup
+
+   single-CSYNC serial check (only when SOA serial was captured):
+     flag 0x2 "soaminimum" set:
+       csync.serial > soa.serial  -> Z12_SERIAL_MISMATCH (ns, csync_serial, soa_serial)
+     "soaminimum" unset:
+       csync.serial != soa.serial -> Z12_SERIAL_MISMATCH (ns, csync_serial, soa_serial)
+
+Aggregate emissions:
+   per (serial, flags, type_bitmap) group
+                                  -> Z12_CSYNC_FOUND (servers, serial, flags, type_bitmap)
+   noCsyncGroup non-empty         -> Z12_NO_CSYNC (servers)
+   any NS has CSYNC AND any NS has none
+                                  -> Z12_MIXED_PRESENCE
+   more than one single-CSYNC group (content differs across NS)
+                                  -> Z12_INCONSISTENT_CSYNC
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

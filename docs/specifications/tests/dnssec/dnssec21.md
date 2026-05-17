@@ -53,58 +53,50 @@ Status: Draft
 ### Per-Parent-NS DS RRSIG Verification (steps 2-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> parentCheck
-    parentCheck : has parent zone?
-    parentCheck --> noParent : root
-    parentCheck --> probe : delegated
-    noParent : no-parent-zone tag
-    probe : per-parent probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : DS and DNSKEY queries
-    query --> undet : DS bad shape
-    query --> noDS : no DS no proof
-    query --> hasDS : DS records
-    hasDS --> dnskeyCheck
-    dnskeyCheck : parent DNSKEY?
-    dnskeyCheck --> noDnskey : missing
-    noDnskey : DNSKEY-missing tag
-    dnskeyCheck --> verify : present
-    verify : verify DS RRSIG
-    verify --> notYet : inception future
-    verify --> expired : exp past
-    verify --> noKey : no DNSKEY for kt
-    verify --> unsupAlgo : algo unsupported
-    verify --> failed : verify failed
-    verify --> success : verified
-    notYet : not-yet-valid tag
-    expired : RRSIG-expired tag
-    noKey : no-key-for-DS tag
-    unsupAlgo : algo-not-supported tag
-    failed : RRSIG-invalid tag
-    success --> aggregate
-    notYet --> aggregate
-    expired --> aggregate
-    noKey --> aggregate
-    unsupAlgo --> aggregate
-    failed --> aggregate
-    aggregate : per-NS aggregation
-    aggregate --> emitVerified : at least one verified
-    aggregate --> emitNotVer : none verified
-    emitVerified : RRSIG-verified tag
-    emitNotVer : not-verifiable tag
-    emitVerified --> done
-    emitNotVer --> done
-    done : emit test-case-end
-    noParent --> done
-    disabled --> [*]
-    undet --> [*]
-    noDS --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+zoneParent(ctx, z)
+   z is root OR zoneParent returns error
+      -> DS21_NO_PARENT_ZONE (zone = z.Name)
+         emit TEST_CASE_END and stop
+
+parent set = methodsv2.GetParentNSNamesAndIPs; dedupe by IP
+
+For each unique parent NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DS/DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, mark ignored, skip
+   query DS at z.Name, DNSSEC=on (UDP; TC -> retry over TCP)
+    +- no resp / RCODE != NOERROR / !AA / no OPT / !DO -> undeterminedDS, skip
+    +- no DS records AND no NSEC/NSEC3 proof in authority -> noDS, skip (no DS21 findings)
+    +- DS records present -> retain dsRRset, dsRRSIGs (RRSIGs covering DS, signer = parent.Name)
+
+   query DNSKEY at parent.Name, DNSSEC=on
+    +- no resp / RCODE != NOERROR / !AA / no apex DNSKEY
+         -> DS21_PARENT_DNSKEY_MISSING (parent_zone, addresses); skip verification
+
+   no RRSIG covering DS in answer
+         -> DS21_NO_DS_RRSIG (addresses)
+
+   For each RRSIG over DS (signer matches parent.Name; per-sig keyed by sig.KeyTag):
+     sig.Inception in future          -> DS21_DS_RRSIG_NOT_YET_VALID[keytag][ns]
+     sig.Expiration in past           -> DS21_DS_RRSIG_EXPIRED[keytag][ns]
+     no parent DNSKEY with keytag     -> DS21_NO_DNSKEY_FOR_DS_RRSIG[keytag][ns]
+     for each candidate DNSKEY:
+        algorithm unsupported         -> DS21_ALGO_NOT_SUPPORTED[keytag][algo][ns]
+        verifyRRSIG(sig, dsRRset, dnskey, testTime)
+           success                    -> mark NS as having a verified DS RRSIG (keytag)
+           failure                    -> DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY[keytag][ns]
+   any RRSIG present but none verified
+         -> mark NS as "DS RRSIG not verifiable"
+
+Aggregation:
+   per keytag entries -> emit corresponding DS21_* tag with merged addresses
+   any parent NS verified DS RRSIG
+         -> DS21_DS_RRSIG_VERIFIED (keytag, addresses)
+   none verified AND at least one parent NS returned a signed DS RRset
+         -> DS21_DS_RRSIG_NOT_VERIFIABLE (addresses)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

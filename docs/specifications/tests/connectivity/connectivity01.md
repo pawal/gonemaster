@@ -40,63 +40,48 @@ Status: Final
 ### Per-NS UDP Probe (steps 2-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> resolve
-    resolve : resolve NS list
-    resolve --> summary
-    summary : per-family transport tags
-    summary --> probe
-    probe : per-NS UDP probe (parallel)
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : per-rrtype transport tags
-    query : SOA and NS over UDP
-    query --> noBoth : both absent
-    query --> checks : evaluate
-    noBoth : no-response-udp tag
-    checks : per-qtype shape checks
-    checks --> ok : all pass
-    checks --> shapeFail : any fail
-    ok : recorded as ok
-    shapeFail : per-shape failure tags
-    ok --> agg
-    shapeFail --> agg
-    agg : ok-udp aggregate tag
-    agg --> done
-    done : emit test-case-end
-    disabled --> [*]
-    noBoth --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+resolve NS list with method4and5
+ |
+ v
+summary tags (per family, once):
+  any IPv4 NS exists while Net.IPv4 disabled -> CN01_IPV4_DISABLED (servers)
+  any IPv6 NS exists while Net.IPv6 disabled -> CN01_IPV6_DISABLED (servers)
+
+For each nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport check for SOA+NS
+    +- IPv6 + Net.IPv6 disabled  -> IPV6_DISABLED per rrtype, skip ns
+    +- IPv4 + Net.IPv4 disabled  -> IPV4_DISABLED per rrtype, skip ns
+    +- enabled                   -> proceed
+
+   query SOA over UDP, query NS over UDP
+    +- both resp.Msg == nil      -> CN01_NO_RESPONSE_UDP, skip ns
+    +- otherwise                 -> per-qtype shape checks (see below)
+
+After all tasks:
+  any nameserver passed all per-qtype checks -> CN01_OK_UDP (servers)
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ### Per-Query Response Shape Checks (step 4 details)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> qresp
-    qresp : SOA or NS response
-    qresp --> noResp : missing response
-    qresp --> badRcode : non-NOERROR rcode
-    qresp --> noRec : no record in answer
-    qresp --> wrongOwn : wrong owner name
-    qresp --> notAA : AA flag unset
-    qresp --> qOK : all checks pass
-    noResp : no-response qtype tag
-    badRcode : unexpected rcode tag
-    noRec : missing-record qtype tag
-    wrongOwn : wrong-record qtype tag
-    notAA : record-not-aa qtype tag
-    qOK : qtype ok
-    noResp --> [*]
-    badRcode --> [*]
-    noRec --> [*]
-    wrongOwn --> [*]
-    notAA --> [*]
-    qOK --> [*]
-{{< /mermaid >}}
+```
+Per qtype in {SOA, NS}, checks run in this order; first failure wins:
+
+   resp.Msg == nil                       -> CN01_NO_RESPONSE_<QTYPE>_QUERY_UDP   (ok=false)
+   RCODE != NOERROR                      -> CN01_UNEXPECTED_RCODE_<QTYPE>_QUERY_UDP (rcode)
+   no <QTYPE> record in answer           -> CN01_MISSING_<QTYPE>_RECORD_UDP
+   first answer owner != z.Name (FQDN, case-insensitive)
+                                         -> CN01_WRONG_<QTYPE>_RECORD_UDP
+                                            (domain_found, domain_expected)
+   !AA                                   -> CN01_<QTYPE>_RECORD_NOT_AA_UDP
+   otherwise                             -> qtype ok
+
+A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

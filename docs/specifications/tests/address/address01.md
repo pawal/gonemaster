@@ -37,69 +37,47 @@ Status: Final
 ### Address Collection and Classification (steps 2-6)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> gather
-    gather : gather NS sources
-    gather --> filter
-    filter : keep entries with address
-    filter --> dedupe
-    dedupe : dedupe by name/ip
-    dedupe --> count
-    count : addressed NS count
-    count --> noServers : zero
-    count --> iterate : non-zero
-    noServers : no-name-servers tag
-    iterate : each IP group (lex order)
-    iterate --> classify
-    classify : special-address category
-    classify --> doc : Documentation
-    classify --> local : Local-use range
-    classify --> notGlobal : other non-global
-    classify --> global : globally reachable
-    doc : documentation set
-    local : local-use set
-    notGlobal : not-globally-reachable set
-    global : globally-reachable set
-    noServers --> [*]
-    doc --> [*]
-    local --> [*]
-    notGlobal --> [*]
-    global --> [*]
-{{< /mermaid >}}
+```
+gather NS items (GetDelNSNamesAndIPs + GetZoneNSNamesAndIPs)
+ |
+ +- per item: keep only if item.HasAddress
+ +- dedupe by lower-case "name/ip" string
+ |
+ v
+addressed NS count
+ +- zero    -> emit A01_NO_NAME_SERVERS_FOUND
+ |              emit TEST_CASE_END and return
+ +- nonzero -> group by Address.String(); iterate IP keys in lex order
+                 |
+                 v
+              FindSpecialAddress(ip)  (constants.FindSpecialAddress on group[0])
+                +- no special-purpose block         -> globallyReachable
+                +- block.Name contains "Documentation" -> documentationAddr
+                +- isLocalUseCategory(block.Name)   -> localUseAddr
+                |     ("Private-Use", "Loopback",
+                |      "Link Local", "Link-Local",
+                |      "Unique-Local", "Shared Address Space")
+                +- !IsGloballyReachable(block)      -> notGloballyReachable
+                +- otherwise                        -> globallyReachable
+```
 {{% /expand %}}
 
 ### Aggregation and Final Emission (steps 7-11)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> globalCheck
-    globalCheck : globally-reachable set
-    globalCheck --> tagGlobal : non-empty
-    globalCheck --> tagNoGlobal : empty
-    tagGlobal : global-addr tag
-    tagNoGlobal : no-global-addr tag
-    tagGlobal --> docCheck
-    tagNoGlobal --> docCheck
-    docCheck : documentation set
-    docCheck --> tagDoc : non-empty
-    docCheck --> localCheck : empty
-    tagDoc : doc-addr tag
-    tagDoc --> localCheck
-    localCheck : local-use set
-    localCheck --> tagLocal : non-empty
-    localCheck --> notGlobalCheck : empty
-    tagLocal : local-use-addr tag
-    tagLocal --> notGlobalCheck
-    notGlobalCheck : not-globally-reachable set
-    notGlobalCheck --> tagNotGlobal : non-empty
-    notGlobalCheck --> done : empty
-    tagNotGlobal : not-global-addr tag
-    tagNotGlobal --> done
-    done : test-case end
-    done --> [*]
-{{< /mermaid >}}
+```
+After classification, emit in fixed order:
+
+1. globallyReachable
+     non-empty -> A01_GLOBALLY_REACHABLE_ADDR     (servers)
+     empty     -> A01_NO_GLOBALLY_REACHABLE_ADDR  (no args)
+
+2. documentationAddr non-empty   -> A01_DOCUMENTATION_ADDR        (servers)
+3. localUseAddr non-empty        -> A01_LOCAL_USE_ADDR            (servers)
+4. notGloballyReachable non-empty -> A01_ADDR_NOT_GLOBALLY_REACHABLE (servers)
+
+5. emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

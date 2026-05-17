@@ -37,45 +37,34 @@ Status: Final
 ### Per-NS A Baseline and AAAA Probe (steps 2-6)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS A baseline
-    probe --> disabled : transport off
-    probe --> aQuery : transport on
-    disabled : transport-disabled tag
-    aQuery : A query at apex
-    aQuery --> aNoResp : no response
-    aQuery --> aBadRcode : non-NOERROR
-    aQuery --> aaaaQuery : A ok
-    aNoResp : no-response tag
-    aBadRcode : A-bad-rcode tag
-    aaaaQuery : AAAA query at apex
-    aaaaQuery --> aDropped : no response
-    aaaaQuery --> aBadRcode2 : non-NOERROR
-    aaaaQuery --> perRR : got AAAA
-    aDropped : AAAA-dropped tag
-    aBadRcode2 : AAAA-bad-rcode tag
-    perRR : per AAAA RR
-    perRR --> badRdata : len not 16
-    perRR --> goodRdata : len 16
-    badRdata : AAAA-bad-rdata tag
-    goodRdata : counter increment
-    goodRdata --> aggregate
-    aggregate : ok and no issues?
-    aggregate --> emitOK : yes
-    aggregate --> done : no
-    emitOK : AAAA-OK tag
-    emitOK --> done
-    done : emit test-case-end
-    disabled --> [*]
-    aNoResp --> [*]
-    aBadRcode --> [*]
-    aDropped --> [*]
-    aBadRcode2 --> [*]
-    badRdata --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+ns list = Method4and5; dedupe by ns.String() ("name/ip"), preserve first-seen order
+
+For each nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for A -> IPV4_DISABLED / IPV6_DISABLED;
+                               not included in summary; skip
+   mark included
+
+   query A at z.Name, UseVC=false
+    +- resp.Msg == nil          -> NO_RESPONSE (ns, domain); stop ns
+    +- RCODE != NOERROR         -> A_UNEXPECTED_RCODE (ns, rcode); stop ns
+
+   query AAAA at z.Name, UseVC=false
+    +- resp.Msg == nil          -> AAAA_QUERY_DROPPED (ns)
+    |                              aaaaIssue += 1; stop ns
+    +- RCODE != NOERROR         -> AAAA_UNEXPECTED_RCODE (ns, rcode)
+    |                              aaaaIssue += 1; stop ns
+    +- for each AAAA RR in answer:
+         len(RDATA) != 16       -> AAAA_BAD_RDATA (ns, length); aaaaIssue += 1
+         len(RDATA) == 16       -> aaaaOk += 1
+
+After all tasks:
+   aaaaOk > 0 AND aaaaIssue == 0
+      -> AAAA_WELL_PROCESSED (servers = sorted included)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

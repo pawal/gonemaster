@@ -35,35 +35,30 @@ Status: Final
 ### Per-IP PTR Probe and Aggregation (steps 2-6)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-IP PTR query
-    probe --> noResp : no response
-    probe --> hasResp : got response
-    hasResp --> cnameCheck
-    cnameCheck : answer has CNAME?
-    cnameCheck --> followCname : NOERROR with CNAME
-    cnameCheck --> shapeCheck : no CNAME
-    followCname : second PTR query
-    followCname --> shapeCheck
-    shapeCheck : usable PTR?
-    shapeCheck --> noPtr : no usable PTR
-    shapeCheck --> ptrOK : usable
-    noPtr : no-reverse tag
-    ptrOK : counts as success
-    noResp : no-response-PTR tag
-    ptrOK --> aggregate
-    aggregate : all IPs successful?
-    aggregate --> emitOK : yes
-    aggregate --> done : no
-    emitOK : all-reverse tag
-    emitOK --> done
-    done : emit test-case-end
-    noResp --> [*]
-    noPtr --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+collect nameserver IPs from Method4 then Method5
+ +- dedupe by IP string; first-seen (nsname, ip) wins
+ |
+ v
+For each unique IP (parallel; fan-out = resolver.defaults.parallel):
+
+   ptrQuery = dnsutil.ReverseAddr(ip)
+    |
+    v
+   rec.Recurse(ptrQuery, PTR, IN)
+    +- resp.Msg != nil, RCODE == NOERROR, CNAME in answer
+    |     -> ptrQuery = first CNAME target
+    |        rec.Recurse(new ptrQuery, PTR, IN)  (one hop max)
+    |
+    +- resp.Msg present
+    |    +- RCODE != NOERROR or no PTR records   -> NAMESERVER_IP_WITHOUT_REVERSE
+    |    +- otherwise                            -> (success; silent)
+    +- resp.Msg absent                           -> NO_RESPONSE_PTR_QUERY
+
+After all tasks:
+  at least one IP checked AND no failure tag emitted -> NAMESERVERS_IP_WITH_REVERSE
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

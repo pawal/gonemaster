@@ -39,47 +39,37 @@ Status: Final
 ### Per-NS EDNS Probe and Aggregation (steps 2-6)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS EDNS probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : SOA with EDNS v0
-    query --> failed : no response or error
-    query --> response : has response
-    response --> formerr : FORMERR no OPT
-    response --> compliant : NOERROR OPT v0 SOA
-    response --> noOpt : NOERROR no OPT
-    response --> badVer : OPT version not 0
-    response --> otherErr : other
-    formerr : no-EDNS-support tag
-    noOpt : response-no-EDNS tag
-    badVer : version-error tag
-    otherErr : NS-error tag
-    failed --> fallback
-    fallback : SOA without EDNS
-    fallback --> breaks : got response
-    fallback --> noResp : still no response
-    breaks : breaks-on-EDNS tag
-    noResp : no-response tag
-    compliant --> aggregate
-    aggregate : all compliant?
-    aggregate --> emitOk : yes
-    aggregate --> done : no
-    emitOk : EDNS0-support tag
-    emitOk --> done
-    done : emit test-case-end
-    disabled --> [*]
-    formerr --> [*]
-    noOpt --> [*]
-    badVer --> [*]
-    otherErr --> [*]
-    breaks --> [*]
-    noResp --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+ns list = Method4and5; dedupe by ns.String() ("name/ip"), preserve first-seen order
+
+For each nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for SOA -> IPV4_DISABLED / IPV6_DISABLED;
+                                 not included in summary; skip
+   mark included
+
+   query SOA at z.Name with EDNS version 0
+    +- resp present:
+       RCODE == FORMERR AND no OPT
+                                  -> NO_EDNS_SUPPORT (ns) (one error)
+       RCODE == NOERROR AND EdnsRcode == 0 AND SOA in answer AND EdnsVersion == 0
+                                  -> compliant (no error)
+       RCODE == NOERROR AND no OPT
+                                  -> EDNS_RESPONSE_WITHOUT_EDNS (ns, domain)
+       RCODE == NOERROR AND has OPT AND EdnsVersion != 0
+                                  -> EDNS_VERSION_ERROR (ns, domain)
+       otherwise                  -> NS_ERROR (ns)
+    +- resp missing / query error:
+       fallback query SOA without EDNS
+         response present         -> BREAKS_ON_EDNS (ns, domain)
+         no response              -> NO_RESPONSE (ns, domain)
+
+After all tasks:
+  included > 0 AND no included ns had any error tag
+     -> EDNS0_SUPPORT (servers = sorted included)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

@@ -38,40 +38,41 @@ Status: Final
 ### Per-NS CDS/CDNSKEY Presence and Match (steps 2-10)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS probe
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : query CDS and CDNSKEY
-    query --> emptyCheck
-    emptyCheck : any non-empty?
-    emptyCheck --> emptyAll : none
-    emptyCheck --> classify : at least one
-    emptyAll : no-CDS-CDNSKEY tag
-    classify : per-NS classify
-    classify --> cdsOnly : CDS no CDNSKEY
-    classify --> cdnskeyOnly : CDNSKEY no CDS
-    classify --> both : both present
-    cdsOnly : CDS-only tag
-    cdnskeyOnly : CDNSKEY-only tag
-    both --> matchCheck
-    matchCheck : content match?
-    matchCheck --> mismatch : no match
-    matchCheck --> bothOK : matches
-    mismatch : mismatch tag
-    bothOK : both-present tag
-    mismatch --> done
-    bothOK --> done
-    cdsOnly --> done
-    cdnskeyOnly --> done
-    done : per-set consistency tags
-    done --> [*]
-    emptyAll --> [*]
-    disabled --> [*]
-{{< /mermaid >}}
+```
+child set = Method4 ++ Method5; dedupe by IP
+
+For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for CDS/CDNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query CDS at z.Name, DNSSEC=on
+     resp.Msg present AND RCODE == NOERROR AND AA
+        -> cdsByNS[ns] = CDS records in answer (may be empty)
+   query CDNSKEY at z.Name, DNSSEC=on
+     resp.Msg present AND RCODE == NOERROR AND AA
+        -> cdnskeyByNS[ns] = CDNSKEY records in answer (may be empty)
+
+After all tasks:
+   no non-empty CDS AND no non-empty CDNSKEY across any NS
+      -> DS15_NO_CDS_CDNSKEY
+
+Per NS present in both maps:
+   non-empty CDS,     empty     CDNSKEY  -> hasCDSNoCDNSKEY[ns]
+   empty     CDS,     non-empty CDNSKEY  -> hasCDNSKEYNoCDS[ns]
+   non-empty CDS AND non-empty CDNSKEY   -> hasCDSAndCDNSKEY[ns]
+        for each CDS, search CDNSKEY by keytag (or both algorithm == 0)
+        for each CDNSKEY, search CDS  by keytag (or both algorithm == 0)
+        any unmatched on either side    -> mismatchCDSCDNSKEY[ns]
+
+Emit:
+  hasCDSNoCDNSKEY    non-empty -> DS15_HAS_CDS_NO_CDNSKEY   (addresses)
+  hasCDNSKEYNoCDS    non-empty -> DS15_HAS_CDNSKEY_NO_CDS   (addresses)
+  hasCDSAndCDNSKEY   non-empty -> DS15_HAS_CDS_AND_CDNSKEY  (addresses)
+  CDS RRsets differ across NS  -> DS15_INCONSISTENT_CDS     (no args)
+  CDNSKEY RRsets differ        -> DS15_INCONSISTENT_CDNSKEY (no args)
+  mismatchCDSCDNSKEY non-empty -> DS15_MISMATCH_CDS_CDNSKEY (addresses)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

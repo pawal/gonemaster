@@ -45,43 +45,48 @@ Status: Draft
 ### Per-NS Bitmap Probe and Aggregation (steps 2-5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> probe
-    probe : per-NS DNSKEY query
-    probe --> disabled : transport off
-    probe --> query : transport on
-    disabled : transport-disabled tag
-    query : DNSKEY check
-    query --> noDnssec : not signed
-    query --> getBitmap : signed
-    getBitmap : get NSEC/NSEC3 bitmap
-    getBitmap --> noBitmap : not obtained
-    getBitmap --> probeTypes : obtained
-    probeTypes : probe A/AAAA/MX/TXT
-    probeTypes --> mismatch : missing in bitmap
-    probeTypes --> okBitmap : all present
-    mismatch --> aggregate
-    okBitmap --> aggregate
-    noBitmap --> aggregate
-    noDnssec --> aggregate
-    aggregate : aggregate per-type
-    aggregate --> emitMismatch : has mismatches
-    aggregate --> emitOK : no mismatches
-    aggregate --> emitNoBitmap : only no-bitmap
-    aggregate --> emitNoDnssec : only no-DNSSEC
-    emitMismatch : mismatch tags
-    emitOK : bitmap-OK tag
-    emitNoBitmap : no-bitmap tag
-    emitNoDnssec : no-DNSSEC tag
-    emitMismatch --> done
-    emitOK --> done
-    emitNoBitmap --> done
-    emitNoDnssec --> done
-    done : emit test-case-end
-    disabled --> [*]
-    done --> [*]
-{{< /mermaid >}}
+```
+nss = methodsv2.GetDelNSNamesAndIPs ++ methodsv2.GetZoneNSNamesAndIPs;
+      group by IP
+
+For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query DNSKEY at z.Name, DNSSEC=on
+    +- resp.Msg == nil / RCODE != NOERROR / !AA -> classify ns as no_dnssec
+    +- no apex DNSKEY in answer                 -> classify ns as no_dnssec
+    +- apex DNSKEY present                      -> continue
+
+   obtain apex type bitmap:
+     query NSEC at z.Name, DNSSEC=on
+       NSEC for apex in answer    -> bitmap from NSEC (mark zone style NSEC)
+       NSEC3 for apex in authority -> bitmap from NSEC3 (mark zone style NSEC3)
+     no bitmap yet:
+       query NSEC3PARAM at z.Name, DNSSEC=on
+         NSEC for apex in authority (NODATA) -> bitmap from NSEC
+
+   no bitmap obtained                          -> classify ns as no_bitmap
+   bitmap obtained:
+     for each probed type in {A, AAAA, MX, TXT}:
+       query type at z.Name, DNSSEC=on
+         RCODE NOERROR with matching apex RR in answer -> type exists
+         type exists AND type missing from bitmap
+            -> record mismatch (kind, query_type, ns)
+
+Aggregate:
+   per (kind, query_type), mismatches non-empty
+      -> DS20_NSEC_BITMAP_MISMATCHES_RRTYPE  (query_type, servers)
+         or
+         DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE (query_type, servers)
+   NS with bitmap AND zero mismatches non-empty
+      -> DS20_BITMAP_OK (servers)
+   NS classified no_bitmap non-empty
+      -> DS20_NO_BITMAP (servers)
+   no NS with DNSSEC observed
+      -> DS20_NO_DNSSEC (servers = no_dnssec)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

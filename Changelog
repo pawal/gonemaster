@@ -2,6 +2,19 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.4.8] - 2026-05-18
+
+### Added
+
+- docs: added architecture document
+- docs: added test case specification ascii diagrams
+
+### Changed
+
+- zone13: detect SPF macros in include/redirect targets, no penalty for Z13_SPF_MACRO_TARGET
+- cache: preserve qname case in packet keys
+- ui-public: autofocus domain input on home load and new-test reset
+
 ## [v1.4.7] - 2026-05-15
 
 Small security release, Svelte update.

@@ -38,65 +38,47 @@ Status: Final
 ### Per-IP ASN Lookup (step 4)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> resolve
-    resolve : resolve NS list
-    resolve --> split
-    split : split by IP family
-    split --> lookup
-    lookup : per-IP ASN lookup (parallel)
-    lookup --> code
-    code : result code
-    code --> dbErr : db error
-    code --> emptySet : empty
-    code --> ok : lookup ok
-    dbErr : asn-db-error tag
-    emptySet : empty-asn-set tag
-    ok : observability tags
-    ok --> stored
-    stored : ASNs stored per family
-    dbErr --> [*]
-    emptySet --> [*]
-    stored --> [*]
-{{< /mermaid >}}
+```
+resolve NS list with method4and5
+ +- split unique IPs per family (dedupe by IP string):
+      v4ips, v6ips
+
+Per family, run tasks in parallel (fan-out = max(resolver.defaults.parallel, 1)):
+
+   For each IP:
+     lookupASN(rec, ip)
+      +- res.Code == CodeError  -> ERROR_ASN_DATABASE  (address); stop this IP
+      +- res.Code == CodeEmpty  -> EMPTY_ASN_SET       (address); stop this IP
+      +- res.Raw non-empty      -> ASN_INFOS_RAW       (address, data)
+      +- len(res.ASNs) > 0      -> ASN_INFOS_ANNOUNCE_BY (address, asns)
+      |                            record asnset signature for this IP/family
+      +- res.Prefix != nil      -> ASN_INFOS_ANNOUNCE_IN (address, prefixes)
+```
 {{% /expand %}}
 
 ### Per-Family Diversity Classification (steps 5-6)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> v4Class
-    v4Class : IPv4 stored ASN data
-    v4Class --> v4None : no ASNs stored
-    v4Class --> v4One : exactly one ASN
-    v4Class --> v4Same : same ASN signature
-    v4Class --> v4Diff : different signatures
-    v4None : no IPv4 diversity tag
-    v4One : ipv4-one-asn tag
-    v4Same : ipv4-same-asn tag
-    v4Diff : ipv4-different-asn tag
-    v4None --> v6Class
-    v4One --> v6Class
-    v4Same --> v6Class
-    v4Diff --> v6Class
-    v6Class : IPv6 stored ASN data
-    v6Class --> v6None : no ASNs stored
-    v6Class --> v6One : exactly one ASN
-    v6Class --> v6Same : same ASN signature
-    v6Class --> v6Diff : different signatures
-    v6None : no IPv6 diversity tag
-    v6One : ipv6-one-asn tag
-    v6Same : ipv6-same-asn tag
-    v6Diff : ipv6-different-asn tag
-    v6None --> done
-    v6One --> done
-    v6Same --> done
-    v6Diff --> done
-    done : emit test-case-end
-    done --> [*]
-{{< /mermaid >}}
+```
+After per-IP lookups:
+  v4asns    = sorted-unique ASNs across IPv4 IPs that returned ANNOUNCE_BY
+  v4asnsets = sorted-unique ASN-set signatures across the same IPs
+  (v6asns, v6asnsets defined the same way for IPv6)
+
+IPv4:
+  v4asns empty                 -> (no IPv4 summary)
+  len(v4asns) == 1             -> IPV4_ONE_ASN       (asn)
+  len(v4asnsets) == 1          -> IPV4_SAME_ASN      (asns)
+  otherwise                    -> IPV4_DIFFERENT_ASN (asns)
+
+IPv6 (same shape):
+  v6asns empty                 -> (no IPv6 summary)
+  len(v6asns) == 1             -> IPV6_ONE_ASN       (asn)
+  len(v6asnsets) == 1          -> IPV6_SAME_ASN      (asns)
+  otherwise                    -> IPV6_DIFFERENT_ASN (asns)
+
+emit TEST_CASE_END
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

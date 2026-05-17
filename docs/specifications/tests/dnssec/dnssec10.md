@@ -50,110 +50,159 @@ Status: Final
 ### Per-Nameserver DNSKEY Classification (step 3)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> transport
-    transport : transport check
-    transport --> ignored : disabled
-    transport --> queryDNSKEY : enabled
-    queryDNSKEY : query DNSKEY
-    queryDNSKEY --> ignored : bad response
-    queryDNSKEY --> noDNSKEY : no apex DNSKEY
-    queryDNSKEY --> withDNSKEY : apex DNSKEY present
-    ignored : mark ignored
-    noDNSKEY : without DNSKEY
-    withDNSKEY : with DNSKEY
-    ignored --> [*]
-    noDNSKEY --> [*]
-    withDNSKEY --> nsecProc
-    nsecProc : NSEC/NSEC3PARAM checks
-    nsecProc --> [*]
-{{< /mermaid >}}
+```
+For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport check (IPv4 / IPv6 via net.ipv4 / net.ipv6)
+    +- disabled  -> emit IPV4_DISABLED / IPV6_DISABLED for DNSKEY,
+    |               NSEC, NSEC3PARAM; mark ignored; stop
+    +- enabled   -> query DNSKEY at apex (DNSSEC=on)
+                     +- no Msg / RCODE != NOERROR / not AA  -> mark ignored; stop
+                     +- answer has no apex DNSKEY records   -> "without DNSKEY"; stop
+                     +- no records parse as *dns.DNSKEY     -> "without DNSKEY"; stop
+                     +- apex DNSKEY records present         -> "with DNSKEY"
+                                                                |
+                                                                v
+                                                       run NSEC      (see below)
+                                                       run NSEC3PARAM (see below)
+```
 {{% /expand %}}
 
 ### NSEC Query Processing (step 4)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> querying
-    querying : query NSEC at apex
-    querying --> respErr : shape failure
-    querying --> nonEmpty : non-empty answer
-    querying --> empty : empty answer
-    nonEmpty --> nsecAns : NSEC in answer
-    nonEmpty --> errAns : no NSEC in answer
-    empty --> nsec3Nodata : NSEC3 only
-    empty --> nsecNodata : NSEC only
-    empty --> noEvid : neither
-    respErr : response error
-    nsecAns : NSEC-in-answer path
-    errAns : erroneous answer
-    nsec3Nodata : NSEC3-NODATA path
-    nsecNodata : NSEC-NODATA path
-    noEvid : no evidence
-    respErr --> [*]
-    nsecAns --> [*]
-    errAns --> [*]
-    nsec3Nodata --> [*]
-    nsecNodata --> [*]
-    noEvid --> [*]
-{{< /mermaid >}}
+```
+query NSEC at apex (DNSSEC=on)
+ |
+ +- no Msg / RCODE != NOERROR / not AA       -> nsecResponseError
+ |
+ +- answer non-empty
+ |   +- NSEC RRs in answer                   -> nsecInAnswer
+ |   |    +- count > 1                       -> erroneousMultipleNSEC
+ |   |    +- count == 1, owner != apex       -> nsecMismatchesApex
+ |   +- no NSEC RRs in answer                -> nsecErroneousAnswer
+ |
+ +- empty answer, NSEC3 in authority         -> nsecNsec3Nodata  (NSEC3-NODATA)
+ |   +- SOA missing                          -> nsec3NodataMissingSOA
+ |   +- SOA owner != apex                    -> nsec3NodataWrongSOA
+ |   +- NSEC3 RRs in authority:
+ |        +- count > 1                       -> erroneousMultipleNSEC3
+ |        +- count == 1, owner-hash != apex  -> nsec3MismatchesApex
+ |        +- count == 1, bitmap fails check  -> nsec3IncorrectTypeList
+ |        |     mandatory: SOA, NS, DNSKEY, NSEC3PARAM, RRSIG
+ |        |     forbidden: NSEC, NSEC3
+ |        +- RRSIG over the NSEC3 RRset:
+ |             +- none present               -> nsec3MissingSignature
+ |             +- per signature (keytag):    -> [signature check]  (see below)
+ |
+ +- empty answer, NSEC in authority          -> nsecNsecNodata  (RFC 4470 / 9824)
+ |   +- SOA missing                          -> nsecNodataMissingSOA
+ |   +- SOA owner != apex                    -> nsecNodataWrongSOA
+ |   +- NSEC RRs in authority:
+ |        +- count > 1                       -> erroneousMultipleNSEC
+ |        +- count == 1, owner != apex       -> nsecMismatchesApex
+ |        |     (type-list check skipped: synthesized bitmap may exclude
+ |        |      the queried type and include normally-forbidden types)
+ |        +- RRSIG over the NSEC RRset:
+ |             +- none present               -> nsecMissingSignature
+ |             +- per signature (keytag):    -> [signature check]  (see below)
+ |
+ +- empty answer, neither NSEC nor NSEC3     -> (no evidence; silent)
+
+
+[signature check]  applied per RRSIG, keyed by sig.KeyTag:
+   +- no DNSKEY with that keytag             -> *RRSIGNoDNSKEY[keytag]
+   +- sig.Expiration < now                   -> *RRSIGExpired[keytag]
+   +- sig.Inception  > now                   -> *RRSIGNotYetValid[keytag]
+   +- verify succeeds against any DNSKEY     -> *RRSIGVerified  (sets per-NS flag)
+   +- verify fails with dns.ErrAlg           -> algoNotSupportedByZM[keytag][algo]
+   +- verify fails for any other reason      -> *RRSIGVerifyError[keytag]
+```
 {{% /expand %}}
 
 ### NSEC3PARAM Query Processing (step 5)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> querying
-    querying : query NSEC3PARAM at apex
-    querying --> respErr : shape failure
-    querying --> nonEmpty : non-empty answer
-    querying --> empty : empty answer
-    nonEmpty --> nsec3pAns : NSEC3PARAM in answer
-    nonEmpty --> errAns : no NSEC3PARAM in answer
-    empty --> nsecNodata : NSEC in authority
-    empty --> noEvid : neither
-    respErr : response error
-    nsec3pAns : NSEC3PARAM path
-    errAns : erroneous answer
-    nsecNodata : NSEC-NODATA path
-    noEvid : no evidence
-    respErr --> [*]
-    nsec3pAns --> [*]
-    errAns --> [*]
-    nsecNodata --> [*]
-    noEvid --> [*]
-{{< /mermaid >}}
+```
+query NSEC3PARAM at apex (DNSSEC=on)
+ |
+ +- no Msg / RCODE != NOERROR / not AA       -> nsec3paramResponseError
+ |
+ +- answer non-empty
+ |   +- NSEC3PARAM RRs in answer             -> nsec3paramInAnswer
+ |   |    +- for each RR, owner != apex      -> nsec3paramMismatchesApex
+ |   |       (every RR is checked; multi-RR salt/iterations rollover allowed)
+ |   +- no NSEC3PARAM RRs in answer          -> nsec3paramErroneousAnswer
+ |
+ +- empty answer, NSEC in authority          -> nsec3paramNsecNodata
+ |   +- SOA missing                          -> nsecNodataMissingSOA
+ |   +- SOA owner != apex                    -> nsecNodataWrongSOA
+ |   +- NSEC RRs in authority:
+ |        +- count > 1                       -> erroneousMultipleNSEC
+ |        +- count == 1, owner != apex       -> nsecMismatchesApex
+ |        +- count == 1, bitmap fails check  -> nsecIncorrectTypeList
+ |        |     mandatory: SOA, NS, DNSKEY, NSEC, RRSIG
+ |        |     forbidden: NSEC3PARAM, NSEC3
+ |        +- RRSIG over the NSEC RRset:
+ |             +- none present               -> nsecMissingSignature
+ |             +- per signature (keytag):    -> [signature check] (see NSEC section)
+ |
+ +- empty answer, no NSEC in authority       -> (no evidence; silent)
+```
 {{% /expand %}}
 
 ### Aggregation and Final Emission (steps 6-11)
 
 {{% expand "Show diagram" %}}
-{{< mermaid >}}
-stateDiagram-v2
-    [*] --> sigTags
-    sigTags : signature condition tags
-    sigTags --> consTags
-    consTags : structural consistency tags
-    consTags --> shapeTags
-    shapeTags : content and shape tags
-    shapeTags --> dkeyCheck
-    dkeyCheck : DNSKEY across NSes?
-    dkeyCheck --> allDNSKEY : all have DNSKEY
-    dkeyCheck --> noDNSKEY : none have DNSKEY
-    dkeyCheck --> mixedDNSKEY : mixed
-    noDNSKEY --> zoneTag
-    zoneTag : DS10_ZONE_NO_DNSSEC
-    mixedDNSKEY --> srvTag
-    srvTag : DS10_SERVER_NO_DNSSEC
-    allDNSKEY --> missing
-    zoneTag --> missing
-    srvTag --> missing
-    missing : NSEC/NSEC3 missing
-    missing --> [*]
-{{< /mermaid >}}
+```
+After the per-nameserver phase, with:
+    NSEC_set  = nsecInAnswer  union nsec3paramNsecNodata
+    NSEC3_set = nsec3paramInAnswer union nsecNsec3Nodata
+    (nsecInAnswer first absorbs nsecNsecNodata per RFC 4470 / 9824)
+
+1. Consistency and presence (set algebra over evidence sets)
+     nsecInAnswer  symdiff nsec3paramNsecNodata, minus opposite-kind set
+                                                  -> DS10_INCONSISTENT_NSEC
+     nsec3paramInAnswer symdiff nsecNsec3Nodata,  minus opposite-kind set
+                                                  -> DS10_INCONSISTENT_NSEC3
+     NSEC3_set intersect NSEC_set                 -> DS10_MIXED_NSEC_NSEC3
+     NSEC_set  non-empty, NSEC3_set empty         -> DS10_HAS_NSEC
+     NSEC3_set non-empty, NSEC_set  empty         -> DS10_HAS_NSEC3
+     NSEC_set and NSEC3_set each have an exclusive member
+                                                  -> DS10_INCONSISTENT_NSEC_NSEC3
+
+2. Content and shape (one tag per non-empty per-NS list)
+     DS10_ERR_MULT_NSEC, DS10_ERR_MULT_NSEC3,
+     DS10_NSEC_ERR_TYPE_LIST,   DS10_NSEC3_ERR_TYPE_LIST,
+     DS10_NSEC_MISMATCHES_APEX, DS10_NSEC3_MISMATCHES_APEX,
+     DS10_NSEC3PARAM_MISMATCHES_APEX,
+     DS10_NSEC_NODATA_MISSING_SOA,  DS10_NSEC_NODATA_WRONG_SOA,
+     DS10_NSEC3_NODATA_MISSING_SOA, DS10_NSEC3_NODATA_WRONG_SOA,
+     DS10_NSEC_GIVES_ERR_ANSWER,    DS10_NSEC3PARAM_GIVES_ERR_ANSWER,
+     DS10_NSEC_QUERY_RESPONSE_ERR,  DS10_NSEC3PARAM_QUERY_RESPONSE_ERR,
+     DS10_NSEC_MISSING_SIGNATURE,   DS10_NSEC3_MISSING_SIGNATURE
+
+3. Signature conditions
+     One tag per (kind, keytag):
+       DS10_{NSEC,NSEC3}_RRSIG_{NO_DNSKEY, EXPIRED, NOT_YET_VALID, VERIFY_ERROR}
+     One tag per (keytag, algo):
+       DS10_ALGO_NOT_SUPPORTED_BY_ZM
+     DS10_{NSEC,NSEC3}_NO_VERIFIED_SIGNATURE =
+       NSes appearing in any condition above, minus NSes with at least
+       one verified signature for the same kind.
+
+4. DNSKEY presence across nameservers
+     withDNSKEY empty,     withoutDNSKEY non-empty -> DS10_ZONE_NO_DNSSEC
+     withDNSKEY non-empty, withoutDNSKEY non-empty -> DS10_SERVER_NO_DNSSEC
+
+5. Expected evidence
+     missing = allNS minus (ignoredNS, withoutDNSKEY,
+                            nsecInAnswer, nsec3paramNsecNodata,
+                            nsec3paramInAnswer, nsecNsec3Nodata)
+     missing non-empty -> DS10_EXPECTED_NSEC_NSEC3_MISSING
+
+6. Emit TEST_CASE_END.
+```
 {{% /expand %}}
 
 ## Emitted Tags (Possible Set)

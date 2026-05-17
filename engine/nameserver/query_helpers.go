@@ -370,7 +370,7 @@ func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions)
 	buf := (*bufPtr)[:0]
 	defer putCacheKeyBuffer(bufPtr, buf)
 
-	buf = appendCacheKeyString(buf, "NAME", strings.ToLower(nameObj.String()))
+	buf = appendCacheKeyString(buf, "NAME", nameObj.String())
 	buf = appendCacheKeyString(buf, "TYPE", qtype)
 	buf = appendCacheKeyString(buf, "CLASS", qclass)
 	buf = appendCacheKeyBool(buf, "DNSSEC", dnssec)

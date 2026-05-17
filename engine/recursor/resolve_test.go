@@ -106,6 +106,17 @@ func TestCacheStoreLookupAndClear(t *testing.T) {
 	}
 }
 
+func TestCacheNameKeyPreservesQNameCase(t *testing.T) {
+	mixed := cacheNameKey(dnsname.New("ExAmPlE.CoM."), nil)
+	lower := cacheNameKey(dnsname.New("example.com."), nil)
+	if mixed == lower {
+		t.Fatalf("recursor packet cache key must preserve QNAME case:\n mixed: %s\n lower: %s", mixed, lower)
+	}
+	if !strings.HasSuffix(mixed, "|ExAmPlE.CoM") {
+		t.Fatalf("mixed-case recursor key lost QNAME case: %q", mixed)
+	}
+}
+
 func TestCacheStoreBoundsCacheSize(t *testing.T) {
 	oldMax := recurseCacheMaxEntries
 	recurseCacheMaxEntries = 2

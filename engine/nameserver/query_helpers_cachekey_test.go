@@ -28,7 +28,7 @@ func TestBuildCacheKeyDefaultLayout(t *testing.T) {
 		t.Fatalf("ednsSize = %d, want 0", ednsSize)
 	}
 
-	expectedName := strings.ToLower(dnsname.New("ExAmPlE.CoM.").String())
+	expectedName := dnsname.New("ExAmPlE.CoM.").String()
 	gotParts := strings.Split(key, "|")
 	wantParts := []string{
 		"NAME=" + expectedName,
@@ -41,6 +41,25 @@ func TestBuildCacheKeyDefaultLayout(t *testing.T) {
 	}
 	if !reflect.DeepEqual(gotParts, wantParts) {
 		t.Fatalf("cache key parts mismatch:\n got: %v\nwant: %v", gotParts, wantParts)
+	}
+}
+
+func TestBuildCacheKeyPreservesQNameCase(t *testing.T) {
+	t.Parallel()
+
+	mixedKey, _, _, err := buildCacheKey("ExAmPlE.CoM.", "A", "IN", nil)
+	if err != nil {
+		t.Fatalf("buildCacheKey mixed: %v", err)
+	}
+	lowerKey, _, _, err := buildCacheKey("example.com.", "A", "IN", nil)
+	if err != nil {
+		t.Fatalf("buildCacheKey lower: %v", err)
+	}
+	if mixedKey == lowerKey {
+		t.Fatalf("cache key must preserve QNAME case:\n mixed: %s\n lower: %s", mixedKey, lowerKey)
+	}
+	if !strings.Contains(mixedKey, "NAME=ExAmPlE.CoM") {
+		t.Fatalf("mixed-case key lost QNAME case: %q", mixedKey)
 	}
 }
 

@@ -1422,6 +1422,48 @@ func TestQueryEmitsQueryAndCachedReturn(t *testing.T) {
 	}
 }
 
+func TestQueryCacheKeyPreservesQNameCase(t *testing.T) {
+	ctx, _ := testContext(t)
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.81", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		msg := new(dns.Msg)
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.StringToType[qtype])
+		return packet.Packet{Msg: msg}, nil
+	})
+
+	mixed, err := ns.QueryWithOptions(ctx, "ExAmPlE.com", "A", nil)
+	if err != nil {
+		t.Fatalf("mixed query: %v", err)
+	}
+	lower, err := ns.QueryWithOptions(ctx, "example.com", "A", nil)
+	if err != nil {
+		t.Fatalf("lower query: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("expected differently cased QNAMEs to use distinct cache entries, got %d network calls", calls)
+	}
+	if got := mixed.Question()[0].Header().Name; got != "ExAmPlE.com." {
+		t.Fatalf("mixed response question = %q, want ExAmPlE.com.", got)
+	}
+	if got := lower.Question()[0].Header().Name; got != "example.com." {
+		t.Fatalf("lower response question = %q, want example.com.", got)
+	}
+
+	if _, err := ns.QueryWithOptions(ctx, "ExAmPlE.com", "A", nil); err != nil {
+		t.Fatalf("mixed query cache hit: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("expected exact-case repeat to hit cache, got %d network calls", calls)
+	}
+}
+
 func TestQueryLogsIPBlocked(t *testing.T) {
 	ctx, prof := testContext(t)
 	log := logger.FromContext(ctx)

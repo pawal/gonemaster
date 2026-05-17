@@ -589,6 +589,54 @@ func TestNameserver08QNameCaseInsensitive(t *testing.T) {
 	}
 }
 
+func TestNameserver08DoesNotReuseDifferentCaseCachedPacket(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := method4and5
+	origScramble := scrambleCaseFunc
+	t.Cleanup(func() {
+		method4and5 = origM4and5
+		scrambleCaseFunc = origScramble
+	})
+
+	var calls int
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.98", func(qname string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		calls++
+		msg := new(dns.Msg)
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.StringToType[qtype])
+		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
+		cname := &dns.CNAME{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 3600}}
+		cname.Target = "alias.example."
+		msg.Answer = []dns.RR{cname}
+		return packet.Packet{Msg: msg}
+	})
+
+	if _, err := ns1.QueryWithOptions(context.Background(), "www.example", "SOA", nil); err != nil {
+		t.Fatalf("prime lower-case cache entry: %v", err)
+	}
+
+	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+	scrambleCaseFunc = func(string) string { return "wWw.eXaMpLe" }
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver08(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver08: %v", err)
+	}
+	if calls != 2 {
+		t.Fatalf("expected mixed-case query to bypass differently cased cached packet, got %d network calls", calls)
+	}
+	if !hasEntryTag(entries, "QNAME_CASE_SENSITIVE") {
+		t.Fatalf("expected QNAME_CASE_SENSITIVE")
+	}
+	if hasEntryTag(entries, "QNAME_CASE_INSENSITIVE") {
+		t.Fatalf("unexpected QNAME_CASE_INSENSITIVE from differently cased cached packet")
+	}
+}
+
 func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
 	setupTest(t)
 

@@ -409,14 +409,14 @@ type inflightLookup struct {
 
 func cacheNameKey(name dnsname.Name, ns []nameserver.Nameserver) string {
 	if len(ns) == 0 {
-		return "root|" + strings.ToLower(name.String())
+		return "root|" + name.String()
 	}
 	parts := make([]string, 0, len(ns))
 	for _, server := range ns {
 		parts = append(parts, strings.ToLower(server.Name.String())+"@"+server.Address.String())
 	}
 	sort.Strings(parts)
-	return "ns|" + strings.Join(parts, ",") + "|" + strings.ToLower(name.String())
+	return "ns|" + strings.Join(parts, ",") + "|" + name.String()
 }
 
 func recurseLookupKey(name string, qtype string, qclass string) string {

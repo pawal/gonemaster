@@ -21,7 +21,7 @@ func TestBuildKeyBasic(t *testing.T) {
 	wantParts := []string{
 		"SERVER=192.0.2.10:53",
 		"TRANSPORT=udp",
-		"NAME=example.com",
+		"NAME=Example.COM",
 		"TYPE=A",
 		"CLASS=IN",
 		"DNSSEC=false",
@@ -35,6 +35,33 @@ func TestBuildKeyBasic(t *testing.T) {
 	}
 	if strings.Contains(key, "EDNS_VERSION=") || strings.Contains(key, "EDNS_DATA=") {
 		t.Fatalf("unexpected EDNS detail in key: %q", key)
+	}
+}
+
+func TestBuildKeyPreservesQNameCase(t *testing.T) {
+	mixedKey, err := BuildKey(KeyParts{
+		ServerAddr: "192.0.2.10",
+		Name:       "ExAmPlE.CoM.",
+		Qtype:      "A",
+		Qclass:     "IN",
+	})
+	if err != nil {
+		t.Fatalf("BuildKey mixed: %v", err)
+	}
+	lowerKey, err := BuildKey(KeyParts{
+		ServerAddr: "192.0.2.10",
+		Name:       "example.com.",
+		Qtype:      "A",
+		Qclass:     "IN",
+	})
+	if err != nil {
+		t.Fatalf("BuildKey lower: %v", err)
+	}
+	if mixedKey == lowerKey {
+		t.Fatalf("cache key must preserve QNAME case:\n mixed: %s\n lower: %s", mixedKey, lowerKey)
+	}
+	if !strings.Contains(mixedKey, "NAME=ExAmPlE.CoM") {
+		t.Fatalf("mixed-case key lost QNAME case: %q", mixedKey)
 	}
 }
 

@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	dns "codeberg.org/miekg/dns"
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
 )
 
 // KeyParts defines the granularity for global DNS query caching.
@@ -58,7 +58,7 @@ func BuildKey(parts KeyParts) (string, error) {
 	partsList := []string{
 		"SERVER=" + strings.ToLower(strings.TrimSpace(parts.ServerAddr)),
 		"TRANSPORT=" + transport,
-		"NAME=" + strings.ToLower(nameObj.String()),
+		"NAME=" + nameObj.String(),
 		"TYPE=" + qtype,
 		"CLASS=" + qclass,
 		"DNSSEC=" + strconv.FormatBool(parts.DNSSEC),

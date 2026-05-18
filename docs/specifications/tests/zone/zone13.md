@@ -43,6 +43,50 @@ Status: Draft
    - If count > limit, emit `Z13_SPF_LOOKUP_COUNT_EXCEEDED`.
 7. Emit `TEST_CASE_END`.
 
+### SPF Lookup Walk and Limit Check (steps 2-7)
+
+{{% expand "Show diagram" %}}
+```
+prior results lack Z11_SPF_SYNTAX_OK
+   -> Z13_NO_SPF_FOUND (domain)
+      emit TEST_CASE_END and stop
+
+retrieve apex SPF TXT record (authoritative query)
+   no usable authoritative response
+   -> Z13_UNABLE_TO_CHECK (no args)
+      emit TEST_CASE_END and stop
+
+parse SPF record into terms
+walk terms recursively, carrying visited-domain set; count = 0:
+
+   per term, by mechanism (qualifier-stripped):
+     a | a:domain | a:domain/cidr           -> count += 1
+     mx | mx:domain | mx:domain/cidr        -> count += 1
+     exists:domain                          -> count += 1
+     ptr | ptr:domain                       -> count += 1
+                                             Z13_SPF_PTR_DEPRECATED (domain)
+     include:domain | redirect=domain       -> count += 1
+        target contains "%" (SPF macro)
+           -> Z13_SPF_MACRO_TARGET (domain, target)
+              do not recurse
+        target already in visited set
+           -> Z13_SPF_LOOKUP_LOOP (domain, loop_domain)
+              do not recurse
+        target SPF cannot be resolved
+           -> Z13_SPF_RECURSIVE_ERROR (domain, target)
+              do not recurse
+        otherwise
+           -> add to visited; fetch+parse target SPF; recurse
+     all | ip4:... | ip6:...                -> (no count)
+     exp=domain                             -> (no count)
+
+count <= spf_lookup_limit  -> Z13_SPF_LOOKUP_COUNT_OK       (domain, count)
+count >  spf_lookup_limit  -> Z13_SPF_LOOKUP_COUNT_EXCEEDED (domain, count, limit)
+
+emit TEST_CASE_END
+```
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

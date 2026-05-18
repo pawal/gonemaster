@@ -2,6 +2,7 @@ package methods
 
 import (
 	"context"
+	"net/netip"
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
@@ -221,6 +222,224 @@ func TestMethod5ReturnsApexNameserversFromZone(t *testing.T) {
 func TestMethod5NilZoneReturnsError(t *testing.T) {
 	if _, err := Method5(context.Background(), nil); err == nil {
 		t.Fatalf("expected error for nil zone")
+	}
+}
+
+// mixedRecordsPacket builds a response containing a mix of NS, A, and SOA
+// records at the zone apex, used by TestMethod3SkipsNonNSRecords.
+func mixedRecordsPacket(zoneName string, nsNames []string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+
+	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 3600}}
+	soa.Ns = dnsutil.Fqdn("ns1." + zoneName)
+	soa.Mbox = dnsutil.Fqdn("hostmaster." + zoneName)
+	msg.Answer = append(msg.Answer, soa)
+
+	for _, nsName := range nsNames {
+		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
+		nsRR.Ns = dnsutil.Fqdn(nsName)
+		msg.Answer = append(msg.Answer, nsRR)
+	}
+
+	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn("decoy." + zoneName), Class: dns.ClassINET, TTL: 60}}
+	aRR.Addr = netip.MustParseAddr("192.0.2.99")
+	msg.Answer = append(msg.Answer, aRR)
+
+	return packet.Packet{Msg: msg}
+}
+
+// setHookWithPacket installs a query hook that returns a caller-supplied
+// packet for any NS query at the named zone apex; other queries return an
+// empty packet (nil Msg).
+func setHookWithPacket(ctx context.Context, t *testing.T, r *recursor.Recursor, name string, addr string, zoneName string, p packet.Packet) {
+	t.Helper()
+	ns, err := nameserver.NewWithContext(ctx, name, addr, r.Client())
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if qname != zoneName || qtype != "NS" {
+			return packet.Packet{}, nil
+		}
+		return p, nil
+	})
+}
+
+// TestMethod3NoNSRecordsReturnsEmpty verifies that when authoritative servers
+// reply successfully but include no NS RRs at the apex, Method3 returns an
+// empty slice and no error.
+func TestMethod3NoNSRecordsReturnsEmpty(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+	})
+	// Hook returns an empty success response (no NS records).
+	empty := packet.Packet{Msg: new(dns.Msg)}
+	setHookWithPacket(ctx, t, r, "a.root", "192.0.2.1", ".", empty)
+
+	z, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := Method3(ctx, &z)
+	if err != nil {
+		t.Fatalf("method3: %v", err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("expected empty slice, got %#v", names)
+	}
+}
+
+// TestMethod3QueryAllErrorPropagates verifies that an error from z.QueryAll
+// (here triggered by a zone with no recursor) is returned to the caller.
+func TestMethod3QueryAllErrorPropagates(t *testing.T) {
+	// Zone with no recursor: z.NS errors with "missing recursor", which
+	// QueryAll propagates and Method3 must surface.
+	z := zone.Zone{Name: dnsname.New("example.com.")}
+	if _, err := Method3(context.Background(), &z); err == nil {
+		t.Fatalf("expected error from QueryAll/NS, got nil")
+	}
+}
+
+// TestMethod3SkipsNonNSRecords verifies that A and SOA records mixed into
+// the apex response are ignored; only NS records contribute to the result.
+func TestMethod3SkipsNonNSRecords(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+	})
+	setHookWithPacket(ctx, t, r, "a.root", "192.0.2.1", ".",
+		mixedRecordsPacket(".", []string{"a.root", "b.root"}))
+
+	z, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := Method3(ctx, &z)
+	if err != nil {
+		t.Fatalf("method3: %v", err)
+	}
+	want := []string{"a.root", "b.root"}
+	if len(names) != len(want) {
+		t.Fatalf("expected %d names, got %d: %#v", len(want), len(names), names)
+	}
+	for i, name := range names {
+		if name.String() != want[i] {
+			t.Fatalf("expected %q at %d, got %q", want[i], i, name.String())
+		}
+	}
+}
+
+// TestMethod3SkipsNilMsgResponses verifies that nameservers returning a
+// packet with a nil Msg are skipped silently; remaining servers still
+// contribute their NS records.
+func TestMethod3SkipsNilMsgResponses(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	})
+	// a.root returns Msg=nil. b.root returns valid NS records.
+	setHookWithPacket(ctx, t, r, "a.root", "192.0.2.1", ".", packet.Packet{Msg: nil})
+	setNSHook(ctx, t, r, "b.root", "192.0.2.2", ".", "a.root", "b.root")
+
+	z, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := Method3(ctx, &z)
+	if err != nil {
+		t.Fatalf("method3: %v", err)
+	}
+	want := []string{"a.root", "b.root"}
+	if len(names) != len(want) {
+		t.Fatalf("expected %d names, got %d: %#v", len(want), len(names), names)
+	}
+	for i, name := range names {
+		if name.String() != want[i] {
+			t.Fatalf("expected %q at %d, got %q", want[i], i, name.String())
+		}
+	}
+}
+
+// TestMethod3DedupesAcrossMultipleServers verifies that when two servers
+// each return a partially overlapping NS set, the union (deduplicated) is
+// returned.
+func TestMethod3DedupesAcrossMultipleServers(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	})
+	// a returns {ns1, ns2}; b returns {ns2, ns3}. Union must be {ns1,ns2,ns3}.
+	setNSHook(ctx, t, r, "a.root", "192.0.2.1", ".", "ns1.example", "ns2.example")
+	setNSHook(ctx, t, r, "b.root", "192.0.2.2", ".", "ns2.example", "ns3.example")
+
+	z, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := Method3(ctx, &z)
+	if err != nil {
+		t.Fatalf("method3: %v", err)
+	}
+	want := []string{"ns1.example", "ns2.example", "ns3.example"}
+	if len(names) != len(want) {
+		t.Fatalf("expected %d names, got %d: %#v", len(want), len(names), names)
+	}
+	for i, name := range names {
+		if name.String() != want[i] {
+			t.Fatalf("expected %q at %d, got %q", want[i], i, name.String())
+		}
+	}
+}
+
+// TestMethod3CaseFoldedDeduplication verifies that NS records differing only
+// in letter case are collapsed to a single lowercase entry.
+func TestMethod3CaseFoldedDeduplication(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	})
+	// Same logical name, mixed case across servers.
+	setNSHook(ctx, t, r, "a.root", "192.0.2.1", ".", "NS1.Example.")
+	setNSHook(ctx, t, r, "b.root", "192.0.2.2", ".", "ns1.example.")
+
+	z, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := Method3(ctx, &z)
+	if err != nil {
+		t.Fatalf("method3: %v", err)
+	}
+	if len(names) != 1 {
+		t.Fatalf("expected 1 name (case-folded), got %d: %#v", len(names), names)
+	}
+	if names[0].String() != "ns1.example" {
+		t.Fatalf("expected %q, got %q", "ns1.example", names[0].String())
 	}
 }
 

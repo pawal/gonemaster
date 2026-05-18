@@ -773,3 +773,168 @@ func TestGetIBAddrInZoneBreaksEarlyOnSuccess(t *testing.T) {
 		t.Errorf("ns2 queried more than ns1 (%d > %d); early break may not be working", c2, c1)
 	}
 }
+
+// seedParentCache stores a sentinel entry for the given zone key using
+// cacheParent. Returns a freshly built nameserver matching the entry so
+// tests can compare materialized output.
+func seedParentCache(ctx context.Context, t *testing.T, r *recursor.Recursor, zoneKey string, nsName string, nsAddr string) nameserver.Nameserver {
+	t.Helper()
+	ns, err := nameserver.NewWithContext(ctx, nsName, nsAddr, r.Client())
+	if err != nil {
+		t.Fatalf("seed nameserver: %v", err)
+	}
+	cacheParent(zoneKey, []nameserver.Nameserver{ns}, true)
+	return ns
+}
+
+// TestGetParentNSNamesAndIPsUsesCacheOnSecondCall verifies that a pre-seeded
+// cache entry is returned without traversing the delegation chain. The test
+// uses a recursor with no fake addresses and no hooked servers, so any
+// cache miss would either fail or return a different (empty) result.
+func TestGetParentNSNamesAndIPsUsesCacheOnSecondCall(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	// Add root hints so r.Recursor isn't unusable, but example.com is not
+	// undelegated (no fake addresses for it).
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add root: %v", err)
+	}
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	// Seed cache with a sentinel entry under the same key
+	// GetParentNSNamesAndIPs would derive from z.Name.
+	key := z.Name.String()
+	seedParentCache(ctx, t, r, key, "sentinel.ns.example", "203.0.113.99")
+
+	out, err := GetParentNSNamesAndIPs(ctx, &z)
+	if err != nil {
+		t.Fatalf("get parent: %v", err)
+	}
+	if len(out) != 1 {
+		t.Fatalf("expected 1 cached server materialized, got %d: %#v", len(out), out)
+	}
+	if out[0].Name.String() != "sentinel.ns.example" || out[0].Address.String() != "203.0.113.99" {
+		t.Fatalf("expected sentinel.ns.example/203.0.113.99, got %s/%s",
+			out[0].Name.String(), out[0].Address.String())
+	}
+}
+
+// TestClearCacheRemovesAllEntries verifies that ClearCache empties the
+// global parent cache map, so subsequent calls miss and re-walk the chain.
+func TestClearCacheRemovesAllEntries(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
+		t.Fatalf("add root: %v", err)
+	}
+
+	seedParentCache(ctx, t, r, "example.com.", "ns.example", "203.0.113.1")
+	seedParentCache(ctx, t, r, "example.org.", "ns.example", "203.0.113.2")
+
+	parentCache.mu.Lock()
+	before := len(parentCache.items)
+	parentCache.mu.Unlock()
+	if before != 2 {
+		t.Fatalf("expected 2 cache entries before clear, got %d", before)
+	}
+
+	ClearCache()
+
+	parentCache.mu.Lock()
+	after := len(parentCache.items)
+	parentCache.mu.Unlock()
+	if after != 0 {
+		t.Fatalf("expected empty cache after ClearCache, got %d entries", after)
+	}
+}
+
+// TestGetParentNSNamesAndIPsCacheIsolatedPerZone verifies that cache entries
+// for two distinct zones do not bleed into each other.
+func TestGetParentNSNamesAndIPsCacheIsolatedPerZone(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
+		t.Fatalf("add root: %v", err)
+	}
+
+	zA, err := zone.NewWithRecursor("alpha.test", r)
+	if err != nil {
+		t.Fatalf("new zone alpha: %v", err)
+	}
+	zB, err := zone.NewWithRecursor("beta.test", r)
+	if err != nil {
+		t.Fatalf("new zone beta: %v", err)
+	}
+
+	seedParentCache(ctx, t, r, zA.Name.String(), "ns.alpha", "203.0.113.10")
+	seedParentCache(ctx, t, r, zB.Name.String(), "ns.beta", "203.0.113.20")
+
+	outA, err := GetParentNSNamesAndIPs(ctx, &zA)
+	if err != nil {
+		t.Fatalf("get parent alpha: %v", err)
+	}
+	outB, err := GetParentNSNamesAndIPs(ctx, &zB)
+	if err != nil {
+		t.Fatalf("get parent beta: %v", err)
+	}
+
+	if len(outA) != 1 || outA[0].Name.String() != "ns.alpha" {
+		t.Fatalf("alpha: expected ns.alpha, got %#v", outA)
+	}
+	if len(outB) != 1 || outB[0].Name.String() != "ns.beta" {
+		t.Fatalf("beta: expected ns.beta, got %#v", outB)
+	}
+}
+
+// TestGetParentNSNamesAndIPsCacheSurvivesAcrossContexts verifies that the
+// cache lookup is keyed by zone name only, not by context. Two distinct
+// contexts querying the same zone must both hit the cache.
+func TestGetParentNSNamesAndIPsCacheSurvivesAcrossContexts(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx1, _, _ := testhelpers.Context(t)
+	ctx2, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
+		t.Fatalf("add root: %v", err)
+	}
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	seedParentCache(ctx1, t, r, z.Name.String(), "sentinel.ns", "203.0.113.7")
+
+	out1, err := GetParentNSNamesAndIPs(ctx1, &z)
+	if err != nil {
+		t.Fatalf("ctx1: %v", err)
+	}
+	out2, err := GetParentNSNamesAndIPs(ctx2, &z)
+	if err != nil {
+		t.Fatalf("ctx2: %v", err)
+	}
+	if len(out1) != 1 || len(out2) != 1 {
+		t.Fatalf("expected both contexts to hit cache; got %d and %d", len(out1), len(out2))
+	}
+	if out1[0].Name.String() != "sentinel.ns" || out2[0].Name.String() != "sentinel.ns" {
+		t.Fatalf("expected sentinel.ns from both contexts, got %s and %s",
+			out1[0].Name.String(), out2[0].Name.String())
+	}
+}

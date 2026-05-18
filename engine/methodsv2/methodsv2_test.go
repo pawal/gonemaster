@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"net/netip"
+	"sort"
+	"sync"
 	"sync/atomic"
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -936,5 +939,194 @@ func TestGetParentNSNamesAndIPsCacheSurvivesAcrossContexts(t *testing.T) {
 	if out1[0].Name.String() != "sentinel.ns" || out2[0].Name.String() != "sentinel.ns" {
 		t.Fatalf("expected sentinel.ns from both contexts, got %s and %s",
 			out1[0].Name.String(), out2[0].Name.String())
+	}
+}
+
+// TestGetParentNSNamesAndIPsConcurrentCallsSameZone launches 50 goroutines
+// calling GetParentNSNamesAndIPs on the same zone with a pre-seeded cache.
+// Run under -race to detect missing mutex protection on parentCache.
+func TestGetParentNSNamesAndIPsConcurrentCallsSameZone(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
+		t.Fatalf("add root: %v", err)
+	}
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	seedParentCache(ctx, t, r, z.Name.String(), "shared.ns", "203.0.113.42")
+
+	const N = 50
+	var wg sync.WaitGroup
+	wg.Add(N)
+	for i := 0; i < N; i++ {
+		go func() {
+			defer wg.Done()
+			out, err := GetParentNSNamesAndIPs(ctx, &z)
+			if err != nil {
+				t.Errorf("goroutine got error: %v", err)
+				return
+			}
+			if len(out) != 1 || out[0].Name.String() != "shared.ns" {
+				t.Errorf("goroutine got unexpected result: %#v", out)
+			}
+		}()
+	}
+	wg.Wait()
+}
+
+// TestGetParentNSNamesAndIPsConcurrentCallsDifferentZones launches 50
+// goroutines spread across 10 distinct zones, each with its own pre-seeded
+// cache entry. Verifies the cache map's per-key isolation under contention.
+func TestGetParentNSNamesAndIPsConcurrentCallsDifferentZones(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
+		t.Fatalf("add root: %v", err)
+	}
+
+	const NZones = 10
+	zones := make([]zone.Zone, NZones)
+	expectedNS := make([]string, NZones)
+	for i := 0; i < NZones; i++ {
+		name := fmt.Sprintf("zone%d.test", i)
+		z, err := zone.NewWithRecursor(name, r)
+		if err != nil {
+			t.Fatalf("new zone %s: %v", name, err)
+		}
+		zones[i] = z
+		nsName := fmt.Sprintf("ns.zone%d", i)
+		expectedNS[i] = nsName
+		seedParentCache(ctx, t, r, z.Name.String(), nsName, fmt.Sprintf("203.0.113.%d", 10+i))
+	}
+
+	const PerZone = 5 // 50 total goroutines
+	var wg sync.WaitGroup
+	wg.Add(NZones * PerZone)
+	for i := 0; i < NZones; i++ {
+		for j := 0; j < PerZone; j++ {
+			i := i
+			go func() {
+				defer wg.Done()
+				out, err := GetParentNSNamesAndIPs(ctx, &zones[i])
+				if err != nil {
+					t.Errorf("zone %d: %v", i, err)
+					return
+				}
+				if len(out) != 1 || out[0].Name.String() != expectedNS[i] {
+					t.Errorf("zone %d: expected %s, got %#v", i, expectedNS[i], out)
+				}
+			}()
+		}
+	}
+	wg.Wait()
+
+	parentCache.mu.Lock()
+	count := len(parentCache.items)
+	parentCache.mu.Unlock()
+	if count != NZones {
+		t.Fatalf("expected %d cache entries, got %d", NZones, count)
+	}
+}
+
+// TestClearCacheConcurrentWithGetParent runs ClearCache repeatedly in one
+// goroutine while many readers call GetParentNSNamesAndIPs. The mutex must
+// serialize them; the test passes as long as no race is reported and no
+// goroutine panics. Reader results may be either cached or empty depending
+// on timing; both are acceptable.
+func TestClearCacheConcurrentWithGetParent(t *testing.T) {
+	ClearCache()
+	defer ClearCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
+		t.Fatalf("add root: %v", err)
+	}
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	// Initial seed so readers have something to find on cache hits.
+	seedParentCache(ctx, t, r, z.Name.String(), "ns.example", "203.0.113.50")
+
+	const Iterations = 200
+	var wg sync.WaitGroup
+
+	// Clearer goroutine: clears cache repeatedly, re-seeding between rounds
+	// so readers can hit the cache during some iterations.
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < Iterations; i++ {
+			ClearCache()
+			seedParentCache(ctx, t, r, z.Name.String(), "ns.example", "203.0.113.50")
+		}
+	}()
+
+	// Reader goroutines.
+	const NReaders = 20
+	wg.Add(NReaders)
+	for i := 0; i < NReaders; i++ {
+		go func() {
+			defer wg.Done()
+			for j := 0; j < Iterations; j++ {
+				// Result may be empty (cache cleared, no real chain to walk
+				// since recursor has no servers for example.com) or contain
+				// the seeded sentinel. Both are acceptable; we just must
+				// not race or panic.
+				_, _ = GetParentNSNamesAndIPs(ctx, &z)
+			}
+		}()
+	}
+
+	wg.Wait()
+}
+
+// TestNSItemStringStableForSort verifies that NSItem.String() is a
+// deterministic, total order key suitable for sort.SliceStable: items with
+// the same String() produce equal output across repeated shuffled sorts,
+// and items with different String() sort in lexicographic order.
+func TestNSItemStringStableForSort(t *testing.T) {
+	items := []NSItem{
+		{Name: dnsname.New("b.example"), Address: netip.MustParseAddr("192.0.2.2"), HasAddress: true},
+		{Name: dnsname.New("a.example"), Address: netip.MustParseAddr("192.0.2.1"), HasAddress: true},
+		{Name: dnsname.New("c.example"), HasAddress: false},
+		{Name: dnsname.New("a.example"), Address: netip.MustParseAddr("192.0.2.10"), HasAddress: true},
+	}
+
+	sortByString := func(in []NSItem) []NSItem {
+		out := append([]NSItem(nil), in...)
+		sort.SliceStable(out, func(i, j int) bool { return out[i].String() < out[j].String() })
+		return out
+	}
+
+	first := sortByString(items)
+	// Shuffle and re-sort multiple times; result must be identical.
+	for trial := 0; trial < 20; trial++ {
+		shuffled := append([]NSItem(nil), items...)
+		// Rotate by trial to vary order.
+		shuffled = append(shuffled[trial%len(shuffled):], shuffled[:trial%len(shuffled)]...)
+		got := sortByString(shuffled)
+		if len(got) != len(first) {
+			t.Fatalf("trial %d: length mismatch", trial)
+		}
+		for i := range got {
+			if got[i].String() != first[i].String() {
+				t.Fatalf("trial %d index %d: expected %q, got %q",
+					trial, i, first[i].String(), got[i].String())
+			}
+		}
 	}
 }

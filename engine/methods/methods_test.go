@@ -605,3 +605,265 @@ func TestMethod4and5UnionSorted(t *testing.T) {
 		}
 	}
 }
+
+// TestMethod2and3EmptyInputs verifies that when neither glue nor apex NS
+// queries return any names, the union is an empty slice (not nil-typed
+// error, not a panic).
+func TestMethod2and3EmptyInputs(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+	})
+	// Mark example.com as undelegated with no fake glue. Method2 returns
+	// empty fake names; Method3 has no servers to query (z.NS = z.Glue =
+	// empty) and returns empty.
+	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := Method2and3(ctx, &z)
+	if err != nil {
+		t.Fatalf("method2and3: %v", err)
+	}
+	if len(names) != 0 {
+		t.Fatalf("expected empty slice, got %#v", names)
+	}
+}
+
+// TestMethod2and3OnlyGlueWhenApexReturnsNoNS verifies that when Method2
+// returns names but Method3 returns empty (apex servers reply with no NS
+// records), the union equals the glue set. This exercises the one-side-
+// empty branch of the dedup loop.
+func TestMethod2and3OnlyGlueWhenApexReturnsNoNS(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+	})
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+		"ns2.example.com": {"192.0.2.12"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+	// Both apex servers reply with SOA + A only (no NS RRs) so Method3 is
+	// empty while Method2 stays nonempty.
+	noNS := packet.Packet{Msg: new(dns.Msg)}
+	setHookWithPacket(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", noNS)
+	setHookWithPacket(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", noNS)
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := Method2and3(ctx, &z)
+	if err != nil {
+		t.Fatalf("method2and3: %v", err)
+	}
+	want := []string{"ns1.example.com", "ns2.example.com"}
+	if len(names) != len(want) {
+		t.Fatalf("expected %d names, got %d: %#v", len(want), len(names), names)
+	}
+	for i, name := range names {
+		if name.String() != want[i] {
+			t.Fatalf("expected %q at %d, got %q", want[i], i, name.String())
+		}
+	}
+}
+
+// TestMethod2and3OverlapDedupedCaseInsensitively verifies that names which
+// appear in both the glue set and the apex set, differing only by case,
+// collapse to a single lowercased entry.
+func TestMethod2and3OverlapDedupedCaseInsensitively(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+	})
+	// Glue uses lowercase names; apex query will return upper-case
+	// variants. Result must contain one entry per logical name, lowercased.
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "NS1.Example.com.")
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := Method2and3(ctx, &z)
+	if err != nil {
+		t.Fatalf("method2and3: %v", err)
+	}
+	if len(names) != 1 || names[0].String() != "ns1.example.com" {
+		t.Fatalf("expected single lowercase ns1.example.com, got %#v", names)
+	}
+}
+
+// TestMethod2and3PropagatesError verifies that an error from Method2 (here
+// triggered by a non-root zone with no recursor, which fails in z.Parent)
+// is propagated to the caller and Method3 is not consulted.
+func TestMethod2and3PropagatesError(t *testing.T) {
+	// Zone with no recursor: z.Parent errors "missing recursor", which
+	// z.GlueNames returns and Method2 forwards. Method2and3 must surface it.
+	z := zone.Zone{Name: dnsname.New("example.com.")}
+	if _, err := Method2and3(context.Background(), &z); err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}
+
+// TestMethod4and5EmptyInputs verifies the empty-input branch for the
+// nameserver-object union.
+func TestMethod4and5EmptyInputs(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+	})
+	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	out, err := Method4and5(ctx, &z)
+	if err != nil {
+		t.Fatalf("method4and5: %v", err)
+	}
+	if len(out) != 0 {
+		t.Fatalf("expected empty slice, got %#v", out)
+	}
+}
+
+// TestMethod4and5OnlyGlueWhenApexHasNoServers verifies that when Method4
+// returns nameservers but Method5 returns none (no apex NS resolves to
+// servers), the union equals the glue set.
+func TestMethod4and5OnlyGlueWhenApexHasNoServers(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+	})
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+	// Apex server returns the same single NS as glue, so Method5's NS set
+	// equals Method4's. The union dedupes them.
+	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com")
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	out, err := Method4and5(ctx, &z)
+	if err != nil {
+		t.Fatalf("method4and5: %v", err)
+	}
+	if len(out) != 1 || out[0].String() != "ns1.example.com/192.0.2.11" {
+		t.Fatalf("expected single ns1.example.com/192.0.2.11, got %#v", out)
+	}
+}
+
+// TestMethod4and5DedupesByNameserverString verifies that a name+IP pair
+// appearing identically in both glue and apex sets yields one entry
+// (dedup key is ns.String() which combines name and IP).
+func TestMethod4and5DedupesByNameserverString(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+	})
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+		"ns2.example.com": {"192.0.2.12"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+	// Both apex servers report the same NS set as the glue, so every
+	// (name,IP) pair appears in both Method4 and Method5; the union must
+	// dedupe them.
+	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns2.example.com")
+	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns2.example.com")
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	out, err := Method4and5(ctx, &z)
+	if err != nil {
+		t.Fatalf("method4and5: %v", err)
+	}
+	want := []string{
+		"ns1.example.com/192.0.2.11",
+		"ns2.example.com/192.0.2.12",
+	}
+	got := make([]string, 0, len(out))
+	for _, ns := range out {
+		got = append(got, ns.String())
+	}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d entries (deduped), got %d: %#v", len(want), len(got), got)
+	}
+	for i, g := range got {
+		if g != want[i] {
+			t.Fatalf("expected %q at %d, got %q", want[i], i, g)
+		}
+	}
+}
+
+// TestMethod4and5PropagatesError verifies that an error during glue resolution
+// (here, a non-root zone with no recursor) propagates from Method4 through
+// Method4and5 without consulting Method5.
+func TestMethod4and5PropagatesError(t *testing.T) {
+	z := zone.Zone{Name: dnsname.New("example.com.")}
+	if _, err := Method4and5(context.Background(), &z); err == nil {
+		t.Fatalf("expected error, got nil")
+	}
+}

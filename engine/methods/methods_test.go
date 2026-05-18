@@ -60,6 +60,170 @@ func TestMethod1ParentRoot(t *testing.T) {
 	}
 }
 
+// TestMethod2ReturnsGlueNamesFromZone verifies that Method2 forwards to
+// z.GlueNames and returns the names registered via the recursor's fake glue
+// for an undelegated zone.
+func TestMethod2ReturnsGlueNamesFromZone(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	})
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+		"ns2.example.com": {"192.0.2.12"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := Method2(ctx, &z)
+	if err != nil {
+		t.Fatalf("method2: %v", err)
+	}
+	want := []string{"ns1.example.com", "ns2.example.com"}
+	if len(names) != len(want) {
+		t.Fatalf("expected %d names, got %d: %#v", len(want), len(names), names)
+	}
+	for i, name := range names {
+		if name.String() != want[i] {
+			t.Fatalf("expected %q at %d, got %q", want[i], i, name.String())
+		}
+	}
+}
+
+// TestMethod2NilZoneReturnsError verifies the nil-zone guard.
+func TestMethod2NilZoneReturnsError(t *testing.T) {
+	if _, err := Method2(context.Background(), nil); err == nil {
+		t.Fatalf("expected error for nil zone")
+	}
+}
+
+// TestMethod4ReturnsGlueNameserversFromZone verifies that Method4 forwards to
+// z.Glue and returns nameserver objects (name + IP) for the zone's glue.
+func TestMethod4ReturnsGlueNameserversFromZone(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	})
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+		"ns2.example.com": {"192.0.2.12"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	out, err := Method4(ctx, &z)
+	if err != nil {
+		t.Fatalf("method4: %v", err)
+	}
+	want := []string{
+		"ns1.example.com/192.0.2.11",
+		"ns2.example.com/192.0.2.12",
+	}
+	got := make([]string, 0, len(out))
+	for _, ns := range out {
+		got = append(got, ns.String())
+	}
+	if len(got) != len(want) {
+		t.Fatalf("expected %d nameservers, got %d: %#v", len(want), len(got), got)
+	}
+	// Glue order from the recursor is not strictly guaranteed, so allow any order.
+	seen := map[string]bool{}
+	for _, g := range got {
+		seen[g] = true
+	}
+	for _, w := range want {
+		if !seen[w] {
+			t.Fatalf("missing %q in %#v", w, got)
+		}
+	}
+}
+
+// TestMethod4NilZoneReturnsError verifies the nil-zone guard.
+func TestMethod4NilZoneReturnsError(t *testing.T) {
+	if _, err := Method4(context.Background(), nil); err == nil {
+		t.Fatalf("expected error for nil zone")
+	}
+}
+
+// TestMethod5ReturnsApexNameserversFromZone verifies that Method5 forwards to
+// z.NS and returns nameserver objects resolved from the child zone apex.
+func TestMethod5ReturnsApexNameserversFromZone(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := newRootRecursor(t, map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	})
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+		"ns2.example.com": {"192.0.2.12"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
+	}
+	// Both apex nameservers return themselves as the authoritative NS set.
+	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns2.example.com")
+	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns2.example.com")
+
+	z, err := zone.NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	out, err := Method5(ctx, &z)
+	if err != nil {
+		t.Fatalf("method5: %v", err)
+	}
+	if len(out) == 0 {
+		t.Fatalf("expected non-empty nameserver set")
+	}
+	// We accept any subset of the configured pair as long as both names are present.
+	seenName := map[string]bool{}
+	for _, ns := range out {
+		seenName[ns.Name.String()] = true
+	}
+	for _, name := range []string{"ns1.example.com", "ns2.example.com"} {
+		if !seenName[name] {
+			t.Fatalf("missing nameserver %q in %#v", name, out)
+		}
+	}
+}
+
+// TestMethod5NilZoneReturnsError verifies the nil-zone guard.
+func TestMethod5NilZoneReturnsError(t *testing.T) {
+	if _, err := Method5(context.Background(), nil); err == nil {
+		t.Fatalf("expected error for nil zone")
+	}
+}
+
 func TestMethod3DedupAndSort(t *testing.T) {
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true

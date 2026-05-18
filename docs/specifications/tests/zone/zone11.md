@@ -44,6 +44,60 @@ Status: Final
        - else emit `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN`;
      - if syntax valid and zone is regular mail domain, emit `Z11_SPF_SYNTAX_OK`.
 
+### Per-IP SPF Collection and Policy Classification (steps 1-4)
+
+{{% expand "Show diagram" %}}
+```
+all NS = methodsv2 delegation + zone items; group by IP
+
+For each unique IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for TXT -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query TXT at z.Name
+    +- not (resp.Msg present AND RCODE == NOERROR AND AA) -> skip (no policies)
+    +- accepted:
+         extract apex TXT records, concat fragments per RR, lowercase
+         keep only entries starting with "v=spf1" followed by end / space / tab
+         outcome.checked  = true
+         outcome.policies = spf entries (may be empty)
+
+After all tasks, build:
+   nsSpf[ip]        = policies     (only for checked IPs)
+   ipToNS[ip]       = NS name/ip list at that IP
+   spfNS[policyKey] = combined NS list across IPs sharing the same sorted
+                       policy multiset (length-prefixed canonical key)
+
+Classification:
+   len(nsSpf) == 0
+      -> Z11_UNABLE_TO_CHECK_FOR_SPF
+
+   every IP has empty policy list (all spfNS keys empty):
+      z.Name == "." OR nextHigherIsRoot OR z.Name ends ".arpa"
+         -> Z11_NO_SPF_NON_MAIL_DOMAIN (domain)
+      otherwise
+         -> Z11_NO_SPF_FOUND          (domain)
+
+   len(spfNS) > 1 (distinct policy sets across IPs):
+      -> Z11_INCONSISTENT_SPF_POLICIES (no args)
+         per spfNS group:
+            Z11_DIFFERENT_SPF_POLICIES_FOUND (servers)
+
+   any IP has more than one SPF policy:
+      -> Z11_SPF_MULTIPLE_RECORDS (servers = NS at offending IPs)
+
+   otherwise (single consistent policy, single record per IP):
+      spfText = the one policy value
+      spfSyntaxOk(spfText):
+         z.Name is root / TLD / .arpa:
+            nullSpfRegex matches  -> Z11_NULL_SPF_NON_MAIL_DOMAIN     (domain)
+            otherwise             -> Z11_NON_NULL_SPF_NON_MAIL_DOMAIN (domain)
+         otherwise                -> Z11_SPF_SYNTAX_OK                (domain)
+      !spfSyntaxOk(spfText)       -> Z11_SPF_SYNTAX_ERROR  (servers = all NS with policies, domain)
+
+emit TEST_CASE_END
+```
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

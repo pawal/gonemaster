@@ -46,6 +46,56 @@ Status: Draft
 
 ZONEMD record identity (for `Z14_ZONEMD_FOUND` consolidation) is determined by the tuple `(Serial, Scheme, Hash, Digest)`. Per-nameserver consistency identity (for `Z14_INCONSISTENT_ZONEMD`) is determined by the canonical sorted concatenation of all `(Serial, Scheme, Hash, Digest)` tuples on that nameserver.
 
+### Per-NS ZONEMD Probe and Aggregation (steps 2-5)
+
+{{% expand "Show diagram" %}}
+```
+ns list = Method4and5
+
+For each nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for ZONEMD -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query ZONEMD at z.Name
+    +- no resp / not authoritative NOERROR -> skip silently
+    +- otherwise                            -> capture ZONEMD RRs in answer
+                                               (may be zero)
+   query SOA at z.Name (same NS)            -> capture SOA serial when available
+
+After all queries, per ns with auth NOERROR ZONEMD response:
+
+   ZONEMD RRset empty
+      -> add ns to noZonemdGroup
+   ZONEMD RRset non-empty:
+      build (scheme, hash) multiset over this ns's records
+         every pair appearing >1 times
+            -> Z14_DUPLICATE_SCHEME_HASH (ns, address, scheme, hash)
+               (one per distinct duplicated pair)
+      build hash-algorithm set over this ns's records
+         every hash NOT in {1 (SHA-384), 2 (SHA-512)}
+            -> Z14_UNSUPPORTED_HASH (ns, address, hash)
+               (one per distinct ns/hash pair)
+      per record on this ns:
+         group ns into contentGroup by (serial, scheme, hash, digest)
+         SOA serial was captured AND record.Serial != soa.Serial
+            -> Z14_SERIAL_MISMATCH (ns, address, zonemd_serial, soa_serial)
+      compute ns-level consistencyKey =
+         canonical sorted concat of all (serial, scheme, hash, digest)
+         tuples on this ns; add to consistencyKeySet
+
+Aggregate emissions:
+   per contentGroup (distinct ZONEMD record content)
+      -> Z14_ZONEMD_FOUND (servers, serial, scheme, hash, digest)
+   noZonemdGroup non-empty
+      -> Z14_NO_ZONEMD (servers)
+   any ns with ZONEMD AND any ns with none
+      -> Z14_MIXED_PRESENCE
+   more than one ns with ZONEMD AND consistencyKeySet has > 1 entries
+      -> Z14_INCONSISTENT_ZONEMD
+
+emit TEST_CASE_END
+```
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

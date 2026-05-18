@@ -52,6 +52,65 @@ Status: Final
    - Otherwise (zone is root, TLD, or under `.arpa`): emit no tag.
 8. Emit `TEST_CASE_END`.
 
+### Per-NS MX Probe and Aggregation (steps 2-8)
+
+{{% expand "Show diagram" %}}
+```
+ns list = Method4and5; dedupe by IP (uniqueServersByIP)
+
+For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for SOA/MX -> IPV4_DISABLED / IPV6_DISABLED, skip
+   query SOA at z.Name
+    +- no resp / RCODE != NOERROR / !AA / no SOA for z.Name -> skip silently
+    +- otherwise                                            -> proceed (checked=true)
+
+   query MX at z.Name (UseVC=false, Fallback=false)
+      resp.TC() -> retry with UseVC=true
+    +- resp.Msg == nil                              -> noResponseMX[ip]
+    +- RCODE != NOERROR                             -> unexpectedRcodeMX[rcode][ip]
+    +- !AA                                          -> nonAuthoritativeMX[ip]
+    +- no MX records for z.Name in answer           -> noMXSet[ip]
+    +- otherwise                                    -> mxSet[ip] = MX records
+
+Aggregate operational tags (independent of branch below):
+   noResponseMX       non-empty -> Z09_NO_RESPONSE_MX_QUERY (addresses)
+   unexpectedRcodeMX  non-empty -> Z09_UNEXPECTED_RCODE_MX  (rcode, addresses) per rcode
+   nonAuthoritativeMX non-empty -> Z09_NON_AUTH_MX_RESPONSE (addresses)
+      (note: this tag currently carries the noResponseMX list, not the
+       nonAuthoritativeMX list; see Differences From Upstream)
+
+Mixed presence:
+   noMXSet non-empty AND mxSet non-empty
+      -> Z09_INCONSISTENT_MX (no args)
+         Z09_NO_MX_FOUND     (addresses = noMXSet)
+         Z09_MX_FOUND        (addresses = mxSet keys)
+
+mxSet non-empty (per-IP RRset content compared by lowercase wire-text):
+
+   content differs across IPs
+      -> Z09_INCONSISTENT_MX_DATA (no args)
+         per child NS name (allNSOrder):
+            Z09_MX_DATA (addresses = name's IPs, mail_targets)
+
+   content consistent:
+      examine first IP's MX records:
+         any MX with target == "." -> hasNullMX = true
+            len(records) > 1       -> Z09_NULL_MX_WITH_OTHER_MX (no args)
+            MX.Preference > 0      -> Z09_NULL_MX_NON_ZERO_PREF (no args)
+      !hasNullMX:
+         z.Name == "."             -> Z09_ROOT_EMAIL_DOMAIN (no args)
+         nextHigherIsRoot(z.Name)  -> Z09_TLD_EMAIL_DOMAIN  (no args)
+         otherwise                 -> Z09_MX_DATA (addresses = mxSet IPs, mail_targets)
+
+mxSet empty AND noMXSet non-empty:
+   z.Name != "." AND not TLD AND not under .arpa
+      -> Z09_MISSING_MAIL_TARGET (no args)
+
+emit TEST_CASE_END
+```
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

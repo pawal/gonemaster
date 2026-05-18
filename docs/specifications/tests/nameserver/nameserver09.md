@@ -36,6 +36,49 @@ Status: Final
 6. If no nameserver outcome is marked mismatch, emit `CASE_QUERIES_RESULTS_OK`; else emit `CASE_QUERIES_RESULTS_DIFFER`.
 7. Emit `TEST_CASE_END`.
 
+### Per-NS Case-Variant Comparison (steps 2-7)
+
+{{% expand "Show diagram" %}}
+```
+original = "www." + z.Name (trailing dot stripped); recordType = SOA
+random1 = scrambleCase(original)  // != original
+random2 = scrambleCase(original)  // != original, != random1
+
+ns list = Method4and5; dedupe by ns key, preserve first-seen order
+
+For each unique nameserver (parallel; fan-out = resolver.defaults.parallel):
+
+   transport disabled for SOA -> IPV4_DISABLED / IPV6_DISABLED
+                                 (no mismatch recorded); skip
+   query SOA at random1 -> p1
+   query SOA at random2 -> p2
+
+   p1.Answer() non-empty:
+      compare normalizedAnswer(p1) vs normalizedAnswer(p2)
+         equal      -> CASE_QUERY_SAME_ANSWER      (ns, type, query1, query2)
+         differ     -> CASE_QUERY_DIFFERENT_ANSWER (ns, type, query1, query2);
+                       mismatch = true
+   else p1.Msg != nil AND p2.Msg != nil:
+      compare p1.Rcode() vs p2.Rcode()
+         equal      -> CASE_QUERY_SAME_RC      (ns, type, query1, query2, rcode)
+         differ     -> CASE_QUERY_DIFFERENT_RC (ns, type, query1, query2,
+                                                rcode1, rcode2);
+                       mismatch = true
+   else exactly one of p1.Msg, p2.Msg is non-nil:
+      -> CASE_QUERY_NO_ANSWER (ns, type, domain); mismatch = true
+   else (both responses missing):
+      -> (no per-server tag; mismatch unset)
+
+After all tasks:
+   any outcome.mismatch == true
+      -> CASE_QUERIES_RESULTS_DIFFER (type, domain = original)
+   otherwise
+      -> CASE_QUERIES_RESULTS_OK     (type, domain = original)
+
+emit TEST_CASE_END
+```
+{{% /expand %}}
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

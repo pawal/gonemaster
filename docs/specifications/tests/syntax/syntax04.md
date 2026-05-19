@@ -9,13 +9,13 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver names from `methods.Method2` and `methods.Method3`.
+  - Nameserver names from `z.GlueNames(ctx)` and `z.ApexNSNames(ctx)`.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: controls parallel per-nameserver hostname checks.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Load nameserver names from `Method2` and `Method3`.
+2. Load nameserver names from `z.GlueNames` and `z.ApexNSNames`.
 3. Merge names into a deduplicated, case-insensitive set and sort keys for deterministic output.
 4. For each unique name, run `checkNameSyntaxWithLogger("NAMESERVER", name)` (parallelizable):
    - Emit `NAMESERVER_NON_ALLOWED_CHARS` if any label has disallowed characters.

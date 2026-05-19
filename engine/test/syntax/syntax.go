@@ -300,11 +300,11 @@ func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	glueNames, err := methods.Method2(ctx, z)
+	glueNames, err := methods.GlueNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nsNames, err := methods.Method3(ctx, z)
+	nsNames, err := methods.ApexNSNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -416,11 +416,11 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	glueNS, err := methods.Method4(ctx, z)
+	glueNS, err := methods.GlueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	authNS, err := methods.Method5(ctx, z)
+	authNS, err := methods.ApexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}

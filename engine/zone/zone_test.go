@@ -468,3 +468,81 @@ func TestZoneIsInZone(t *testing.T) {
 		t.Fatalf("expected name to be in zone")
 	}
 }
+
+// TestZoneApexNSNamesUnionsAcrossServers verifies that ApexNSNames queries
+// every authoritative server and unions the NS RRsets (deduplicated,
+// case-folded, sorted), unlike NSNames which stops at the first answer.
+func TestZoneApexNSNamesUnionsAcrossServers(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r, err := recursor.New()
+	if err != nil {
+		t.Fatalf("new recursor: %v", err)
+	}
+	if err := r.AddFakeAddresses("example.com", map[string][]string{
+		"ns1.example.com": {"192.0.2.11"},
+		"ns2.example.com": {"192.0.2.12"},
+	}); err != nil {
+		t.Fatalf("add fake: %v", err)
+	}
+
+	// Both apex servers reply with overlapping but distinct NS sets.
+	mkHook := func(names ...string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			if qname != "example.com" || qtype != "NS" {
+				return packet.Packet{}, nil
+			}
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeSuccess
+			msg.Authoritative = true
+			for _, n := range names {
+				rr := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn("example.com"), Class: dns.ClassINET, TTL: 60}}
+				rr.Ns = dnsutil.Fqdn(n)
+				msg.Answer = append(msg.Answer, rr)
+			}
+			return packet.Packet{Msg: msg}, nil
+		}
+	}
+
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example.com", "192.0.2.11", r.Client())
+	if err != nil {
+		t.Fatalf("ns1: %v", err)
+	}
+	ns1.SetQueryHook(mkHook("NS1.Example.com.", "ns3.example.com."))
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example.com", "192.0.2.12", r.Client())
+	if err != nil {
+		t.Fatalf("ns2: %v", err)
+	}
+	ns2.SetQueryHook(mkHook("ns2.example.com.", "ns3.example.com."))
+
+	z, err := NewWithRecursor("example.com", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	names, err := z.ApexNSNames(ctx)
+	if err != nil {
+		t.Fatalf("apex names: %v", err)
+	}
+	want := []string{"ns1.example.com", "ns2.example.com", "ns3.example.com"}
+	if len(names) != len(want) {
+		t.Fatalf("expected %d names, got %d: %#v", len(want), len(names), names)
+	}
+	for i, n := range names {
+		if n.String() != want[i] {
+			t.Fatalf("at %d expected %q got %q", i, want[i], n.String())
+		}
+	}
+}
+
+// TestZoneApexNSNamesNilZone verifies the nil-zone guard.
+func TestZoneApexNSNamesNilZone(t *testing.T) {
+	var z *Zone
+	if _, err := z.ApexNSNames(context.Background()); err == nil {
+		t.Fatalf("expected error for nil zone")
+	}
+}

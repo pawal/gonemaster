@@ -27,13 +27,13 @@ import (
 const moduleName = "Delegation"
 
 var (
-	method1     = methods.Method1
-	method2     = methods.Method2
-	method3     = methods.Method3
-	method4     = methods.Method4
-	method5     = methods.Method5
-	method2and3 = methods.Method2and3
-	recurse     = defaultRecurse
+	parentZone      = methods.ParentZone
+	glueNames       = methods.GlueNames
+	apexNSNames     = methods.ApexNSNames
+	glueNameservers = methods.GlueNameservers
+	apexNameservers = methods.ApexNameservers
+	allNSNames      = methods.AllNSNames
+	recurse         = defaultRecurse
 )
 
 // All runs the Delegation test cases in order, mirroring the Perl implementation.
@@ -192,7 +192,7 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	delNames, err := method2(ctx, z)
+	delNames, err := glueNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -213,7 +213,7 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	childNames, err := method3(ctx, z)
+	childNames, err := apexNSNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -234,7 +234,7 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	childNS, err := method5(ctx, z)
+	childNS, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -281,7 +281,7 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	delNS, err := method4(ctx, z)
+	delNS, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -340,11 +340,11 @@ func Delegation02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	delNS, err := method4(ctx, z)
+	delNS, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	childNS, err := method5(ctx, z)
+	childNS, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -382,15 +382,15 @@ func Delegation03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	longName := maxLengthNameFor(z.Name)
-	nsNames, err := method2(ctx, z)
+	nsNames, err := glueNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nss, err := method4(ctx, z)
+	nss, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	parent, err := method1(ctx, z)
+	parent, err := parentZone(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -451,11 +451,11 @@ func Delegation04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	list4, err := method4(ctx, z)
+	list4, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	list5, err := method5(ctx, z)
+	list5, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -560,16 +560,16 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nsNames, err := method2and3(ctx, z)
+	nsNames, err := allNSNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
 
-	list4, err := method4(ctx, z)
+	list4, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	list5, err := method5(ctx, z)
+	list5, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -667,11 +667,11 @@ func Delegation06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	list4, err := method4(ctx, z)
+	list4, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	list5, err := method5(ctx, z)
+	list5, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -754,11 +754,11 @@ func Delegation07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	parentNames, err := method2(ctx, z)
+	parentNames, err := glueNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	childNames, err := method3(ctx, z)
+	childNames, err := apexNSNames(ctx, z)
 	if err != nil {
 		return results, err
 	}

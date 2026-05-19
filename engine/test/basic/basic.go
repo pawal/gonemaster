@@ -102,6 +102,7 @@ func Metadata() map[string][]string {
 			"B01_PARENT_DISREGARDED",
 			"B01_PARENT_FOUND",
 			"B01_PARENT_NOT_FOUND",
+			"B01_PARENT_NXDOMAIN_HIDES_DELEGATION",
 			"B01_PARENT_UNDETERMINED",
 			"B01_ROOT_HAS_NO_PARENT",
 			"B01_SERVER_ZONE_ERROR",
@@ -187,6 +188,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	cnameWithReferral := map[string]map[string]bool{}
 	aaDname := map[string]map[string]map[string]bool{}
 	aaNodata := map[string]map[string]bool{}
+	nxdomainHidesDelegation := map[string]map[string]string{}
 
 	root, err := rec.RootServers(ctx)
 	if err != nil {
@@ -404,8 +406,27 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 				} else if pSOA.Rcode() == "NXDOMAIN" && pSOA.AA() {
-					addNS(parentFound, loopZoneName, ns.String())
-					addNS(aaNXDomain, loopZoneName, ns.String())
+					if !strings.EqualFold(intermediate.String(), z.Name.String()) {
+						pChild, probeErr := ns.Query(ctx, z.Name.String(), "SOA")
+						if probeErr == nil && pChild.Msg != nil &&
+							pChild.IsRedirect() &&
+							len(pChild.GetRecordsForName("NS", z.Name, "authority")) > 0 {
+							addNS(parentFound, loopZoneName, ns.String())
+							addNS(delegationFound, loopZoneName, ns.String())
+							if nxdomainHidesDelegation[loopZoneName] == nil {
+								nxdomainHidesDelegation[loopZoneName] = map[string]string{}
+							}
+							if _, seen := nxdomainHidesDelegation[loopZoneName][ns.String()]; !seen {
+								nxdomainHidesDelegation[loopZoneName][ns.String()] = intermediate.String()
+							}
+						} else {
+							addNS(parentFound, loopZoneName, ns.String())
+							addNS(aaNXDomain, loopZoneName, ns.String())
+						}
+					} else {
+						addNS(parentFound, loopZoneName, ns.String())
+						addNS(aaNXDomain, loopZoneName, ns.String())
+					}
 				} else if pSOA.IsRedirect() && len(pSOA.GetRecordsForName("NS", intermediate, "authority")) > 0 {
 					if strings.EqualFold(intermediate.String(), z.Name.String()) {
 						addNS(parentFound, loopZoneName, ns.String())
@@ -530,6 +551,31 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	} else {
 		if err := appendLog(ctx, &results, testcase, "B01_PARENT_NOT_FOUND", map[string]any{}); err != nil {
 			return results, err
+		}
+	}
+
+	if len(nxdomainHidesDelegation) > 0 {
+		parents := make([]string, 0, len(nxdomainHidesDelegation))
+		for parent := range nxdomainHidesDelegation {
+			parents = append(parents, parent)
+		}
+		sort.Strings(parents)
+		for _, parent := range parents {
+			perNS := nxdomainHidesDelegation[parent]
+			endpoints := make([]string, 0, len(perNS))
+			for endpoint := range perNS {
+				endpoints = append(endpoints, endpoint)
+			}
+			sort.Strings(endpoints)
+			for _, endpoint := range endpoints {
+				args := withEndpointKeyArgs(endpoint, map[string]any{
+					"query_name":   perNS[endpoint],
+					"domain_child": z.Name.String(),
+				})
+				if err := appendLog(ctx, &results, testcase, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION", args); err != nil {
+					return results, err
+				}
+			}
 		}
 	}
 

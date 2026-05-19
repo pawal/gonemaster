@@ -1110,6 +1110,321 @@ func TestBasic01InconsistentDelegation(t *testing.T) {
 	}
 }
 
+// TestBasic01ParentNXDomainHidesDelegation models a parent NS that returns
+// NXDOMAIN+AA at an intermediate empty non-terminal but a proper referral at
+// the child name (an RFC 8020 violation). Basic01 must emit
+// B01_PARENT_NXDOMAIN_HIDES_DELEGATION and still recognize the child as
+// delegated (B01_CHILD_FOUND) so downstream test cases run.
+func TestBasic01ParentNXDomainHidesDelegation(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.root"), nil
+		case name == "." && kind == "NS":
+			return nsPacketMulti(".", "a.root"), nil
+		case name == "example" && kind == "SOA":
+			return referralPacketMulti("example", []nsEntry{
+				{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
+			}), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	nsExample, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
+	if err != nil {
+		t.Fatalf("new ns1.example: %v", err)
+	}
+	nsExample.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "example" && kind == "SOA":
+			return soaPacket("example", "ns1.example", "hostmaster.example"), nil
+		case name == "example" && kind == "NS":
+			return nsPacketMulti("example", "ns1.example"), nil
+		case name == "mid.example" && kind == "SOA":
+			return nxdomainAAPacket(), nil
+		case name == "child.mid.example" && kind == "SOA":
+			return referralPacketMulti("child.mid.example", []nsEntry{
+				{name: "ns.child.example", addr: net.IPv4(192, 0, 2, 54)},
+			}), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	z, err := zone.NewWithRecursor("child.mid.example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Basic01(ctx, &z)
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+
+	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
+		t.Fatalf("expected B01_PARENT_FOUND")
+	}
+	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
+		t.Fatalf("expected B01_CHILD_FOUND")
+	}
+	if !hasEntryTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION") {
+		t.Fatalf("expected B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
+	}
+	if hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("did not expect B01_NO_CHILD")
+	}
+	if hasEntryTag(entries, "B01_INCONSISTENT_DELEGATION") {
+		t.Fatalf("did not expect B01_INCONSISTENT_DELEGATION")
+	}
+
+	entry := firstEntryByTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
+	if entry == nil {
+		t.Fatalf("missing B01_PARENT_NXDOMAIN_HIDES_DELEGATION entry")
+	}
+	if entry.Args["ns"] != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
+	}
+	if entry.Args["address"] != "192.0.2.53" {
+		t.Fatalf("expected address=192.0.2.53, got %#v", entry.Args["address"])
+	}
+	if entry.Args["query_name"] != "mid.example" {
+		t.Fatalf("expected query_name=mid.example, got %#v", entry.Args["query_name"])
+	}
+	if entry.Args["domain_child"] != "child.mid.example" {
+		t.Fatalf("expected domain_child=child.mid.example, got %#v", entry.Args["domain_child"])
+	}
+}
+
+// TestBasic01ParentNXDomainNoDelegation models a parent NS that returns
+// NXDOMAIN+AA at every probed name including the child. The contradiction
+// probe must NOT fire, and Basic01 must emit the plain B01_NO_CHILD.
+func TestBasic01ParentNXDomainNoDelegation(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.root"), nil
+		case name == "." && kind == "NS":
+			return nsPacketMulti(".", "a.root"), nil
+		case name == "example" && kind == "SOA":
+			return referralPacketMulti("example", []nsEntry{
+				{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
+			}), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	nsExample, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
+	if err != nil {
+		t.Fatalf("new ns1.example: %v", err)
+	}
+	nsExample.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "example" && kind == "SOA":
+			return soaPacket("example", "ns1.example", "hostmaster.example"), nil
+		case name == "example" && kind == "NS":
+			return nsPacketMulti("example", "ns1.example"), nil
+		case (name == "mid.example" || name == "child.mid.example") && kind == "SOA":
+			return nxdomainAAPacket(), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	z, err := zone.NewWithRecursor("child.mid.example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Basic01(ctx, &z)
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+
+	if !hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("expected B01_NO_CHILD")
+	}
+	if hasEntryTag(entries, "B01_CHILD_FOUND") {
+		t.Fatalf("did not expect B01_CHILD_FOUND")
+	}
+	if hasEntryTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION") {
+		t.Fatalf("did not expect B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
+	}
+
+	noChild := firstEntryByTag(entries, "B01_NO_CHILD")
+	if noChild == nil {
+		t.Fatalf("missing B01_NO_CHILD entry")
+	}
+	if noChild.Args["domain_child"] != "child.mid.example" {
+		t.Fatalf("expected domain_child=child.mid.example, got %#v", noChild.Args["domain_child"])
+	}
+	if noChild.Args["domain_super"] != "mid.example" {
+		t.Fatalf("expected domain_super=mid.example, got %#v", noChild.Args["domain_super"])
+	}
+}
+
+// TestBasic01MixedNXDomainContradiction models two parent nameservers where
+// one returns a clean referral at the child and the other returns NXDOMAIN at
+// an intermediate ENT plus a referral at the child. Both contribute to
+// delegationFound, B01_PARENT_NXDOMAIN_HIDES_DELEGATION fires only for the
+// broken NS, and no B01_INCONSISTENT_DELEGATION is emitted because the
+// broken NS is no longer in aaNXDomain.
+func TestBasic01MixedNXDomainContradiction(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.root"), nil
+		case name == "." && kind == "NS":
+			return nsPacketMulti(".", "a.root"), nil
+		case name == "example" && kind == "SOA":
+			return referralPacketMulti("example", []nsEntry{
+				{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
+				{name: "ns2.example", addr: net.IPv4(192, 0, 2, 54)},
+			}), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	// ns1.example: well-behaved, returns NODATA at mid.example and a
+	// referral at child.mid.example.
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
+	if err != nil {
+		t.Fatalf("new ns1.example: %v", err)
+	}
+	ns1.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "example" && kind == "SOA":
+			return soaPacket("example", "ns1.example", "hostmaster.example"), nil
+		case name == "example" && kind == "NS":
+			return nsPacketMulti("example", "ns1.example", "ns2.example"), nil
+		case name == "mid.example" && kind == "SOA":
+			return emptyAnswerPacket(), nil
+		case name == "child.mid.example" && kind == "SOA":
+			return referralPacketMulti("child.mid.example", []nsEntry{
+				{name: "ns.child.example", addr: net.IPv4(192, 0, 2, 55)},
+			}), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	// ns2.example: NXDOMAIN at mid.example, referral at child.mid.example
+	// (the RFC 8020 contradiction).
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.54", r.Client())
+	if err != nil {
+		t.Fatalf("new ns2.example: %v", err)
+	}
+	ns2.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "example" && kind == "SOA":
+			return soaPacket("example", "ns1.example", "hostmaster.example"), nil
+		case name == "example" && kind == "NS":
+			return nsPacketMulti("example", "ns1.example", "ns2.example"), nil
+		case name == "mid.example" && kind == "SOA":
+			return nxdomainAAPacket(), nil
+		case name == "child.mid.example" && kind == "SOA":
+			return referralPacketMulti("child.mid.example", []nsEntry{
+				{name: "ns.child.example", addr: net.IPv4(192, 0, 2, 55)},
+			}), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	z, err := zone.NewWithRecursor("child.mid.example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Basic01(ctx, &z)
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+
+	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
+		t.Fatalf("expected B01_CHILD_FOUND")
+	}
+	if !hasEntryTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION") {
+		t.Fatalf("expected B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
+	}
+	if hasEntryTag(entries, "B01_INCONSISTENT_DELEGATION") {
+		t.Fatalf("did not expect B01_INCONSISTENT_DELEGATION (broken NS was diverted to delegationFound)")
+	}
+	if hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("did not expect B01_NO_CHILD")
+	}
+
+	count := 0
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "B01_PARENT_NXDOMAIN_HIDES_DELEGATION" {
+			count++
+			if entry.Args["ns"] != "ns2.example" {
+				t.Fatalf("expected ns=ns2.example, got %#v", entry.Args["ns"])
+			}
+			if entry.Args["address"] != "192.0.2.54" {
+				t.Fatalf("expected address=192.0.2.54, got %#v", entry.Args["address"])
+			}
+		}
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly one B01_PARENT_NXDOMAIN_HIDES_DELEGATION entry, got %d", count)
+	}
+}
+
 func TestBasic01ChildAlias(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()

@@ -10,7 +10,7 @@ Status: Final
   - A `zone.Zone` object is available.
 - Required inputs:
   - Parent nameservers from `parentNameservers`.
-  - Child nameservers from `methods.Method4` and `methods.Method5`.
+  - Child nameservers from `GlueNameservers` and `ApexNameservers`.
   - DS, SOA, and DNSKEY query responses.
   - Optional undelegated DS records (`FakeDSRecords`) when fake-address mode is active.
 - Profile/config knobs that affect behavior:
@@ -33,7 +33,7 @@ Status: Final
    - Mixed `No DS` and `Has DS` => emit `DS11_INCONSISTENT_DS`, `DS11_PARENT_WITHOUT_DS`, `DS11_PARENT_WITH_DS`, then continue to child phase.
    - `Has DS` only => continue to child phase.
 6. Child phase (only when parent decision allows):
-   - Build child nameserver set from Method4+Method5, deduplicate by IP.
+   - Build child nameserver set from AllNameservers, deduplicate by IP.
    - For each nameserver (parallelized):
      - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `SOA` and `DNSKEY` and skip.
      - Query SOA over UDP (`UseVC=false`); require usable authoritative apex SOA.
@@ -79,7 +79,7 @@ Parent decision:
 
 {{% expand "Show diagram" %}}
 ```
-child set = Method4 ++ Method5; dedupe by IP
+child set = GlueNameservers ++ ApexNameservers; dedupe by IP
 
 For each unique child NS IP (parallel):
 
@@ -168,7 +168,7 @@ emit TEST_CASE_END
 ## Differences From Upstream
 - Upstream reference: [`dnssec11.md`](../../upstream/tests/DNSSEC-TP/dnssec11.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: describes normal parent lookup through Method1 and undelegated behavior from test-type inputs. Gonemaster: uses the `parentNameservers` abstraction plus a fake-DS shortcut via nameserver `FakeDSRecords`.
+  - Upstream: describes normal parent lookup through z.Parent(ctx) and undelegated behavior from test-type inputs. Gonemaster: uses the `parentNameservers` abstraction plus a fake-DS shortcut via nameserver `FakeDSRecords`.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`

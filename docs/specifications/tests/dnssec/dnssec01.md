@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Parent nameserver names/IPs from `methodsv2.GetParentNSNamesAndIPs`.
+  - Parent nameserver names/IPs from `ParentNameservers`.
   - Optional undelegated DS records exposed via parent nameserver `FakeDSRecords`.
   - DS query responses for child zone name from parent nameservers.
 - Profile/config knobs that affect behavior:
@@ -48,7 +48,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-parentNS = methodsv2.GetParentNSNamesAndIPs
+parentNS = ParentNameservers
 
 undelegated DS path (any parent NS has FakeDSRecords for z):
    for each DS record in fake set:

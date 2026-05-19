@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver sets from `methods.Method4` and `methods.Method5`.
+  - Child nameserver sets from `GlueNameservers` and `ApexNameservers`.
   - DNSKEY and SOA responses with DNSSEC enabled from child nameservers.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Build nameserver set from Method4+Method5 and deduplicate by IP.
+2. Build nameserver set from AllNameservers and deduplicate by IP.
 3. For each unique nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
    - Query `DNSKEY` at child apex with DNSSEC enabled.
@@ -40,7 +40,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-child set = Method4 ++ Method5; dedupe by IP
+child set = GlueNameservers ++ ApexNameservers; dedupe by IP
 
 For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
 

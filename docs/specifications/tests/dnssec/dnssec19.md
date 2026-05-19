@@ -11,7 +11,7 @@ Status: Draft
   - A `zone.Zone` object is available.
   - DNSSEC07 has run and the zone is signed (i.e., `DS07_NOT_SIGNED` was not emitted). If the zone is unsigned, DNSSEC19 is skipped entirely.
 - Required inputs:
-  - Nameserver name/IP items from `methodsv2.GetDelNSNamesAndIPs` and `methodsv2.GetZoneNSNamesAndIPs`.
+  - Nameserver name/IP items from `DelegationNameservers` and `ZoneNameservers`.
   - DNSKEY query responses for child apex from the collected nameservers.
   - Badkeys blocklist data (`blocklist.dat` and `badkeysdata.json`) from the filesystem or embedded fallback. The blocklist is optional; if absent, only RSA crypto checks run.
 - Profile/config knobs that affect behavior:
@@ -67,7 +67,7 @@ setup:
    load badkeys blocklist (CLI flag, XDG dir, system dir, embedded fallback)
    blocklist absent -> blocklist_available = false
 
-nss = methodsv2.GetDelNSNamesAndIPs ++ methodsv2.GetZoneNSNamesAndIPs;
+nss = DelegationNameservers ++ ZoneNameservers;
       group by IP
 
 For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):

@@ -9,8 +9,8 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver name/IP items from `methodsv2.GetDelNSNamesAndIPs` and `methodsv2.GetZoneNSNamesAndIPs`.
-  - Parent nameservers from `methodsv2.GetParentNSNamesAndIPs` (or undelegated fake-DS data path).
+  - Child nameserver name/IP items from `DelegationNameservers` and `ZoneNameservers`.
+  - Parent nameservers from `ParentNameservers` (or undelegated fake-DS data path).
   - SOA, DNSKEY, and DS query responses.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -98,7 +98,7 @@ Child-side emissions:
 
 {{% expand "Show diagram" %}}
 ```
-parent set = methodsv2.GetParentNSNamesAndIPs; group by IP
+parent set = ParentNameservers; group by IP
 
 undelegated DS shortcut:
    any parent NS has FakeDSRecords for z

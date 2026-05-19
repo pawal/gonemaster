@@ -1,42 +1,34 @@
-package methods
+package nsdiscovery
 
 import (
 	"sort"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/methodsv2"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 // Equivalence tests document where AllNameservers (zone-view union of glue
-// and apex NS) and methodsv2.ZoneNameservers (parent-queried delegation
-// view) agree and where they differ.
+// and apex NS) and ZoneNameservers (parent-queried delegation view) agree
+// and where they differ.
 //
-// These tests do not drive a behavior change; they make the difference
-// explicit so future readers and the post-refactor audit can reason about
-// when each function is appropriate.
-//
-// Note: in undelegated mode (the test infra in use), both functions
-// ultimately read from the recursor's fake-address map, so they agree on
-// the nameserver set. Tests asserting the differ cases (lame delegation,
-// out-of-bailiwick recursion) require a delegated zone scaffold with
-// distinct parent and child NS responses; that scaffold is not yet present
-// in either methods or methodsv2 test files (see
-// TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse for the complex
-// pattern such a setup requires).
+// Note: in undelegated mode both functions ultimately read from the
+// recursor's fake-address map so they agree on the nameserver set. Tests
+// asserting the divergent cases (lame delegation, out-of-bailiwick recursion)
+// require a delegated zone scaffold with distinct parent and child NS
+// responses; see TestParentNameserversSkipsOnIntermediateNoResponse for the
+// pattern such a setup requires.
 
 // TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated verifies that
-// for an undelegated zone with clean glue, AllNameservers and
-// ZoneNameservers return the same nameserver set (modulo []Nameserver vs
-// []NSItem types).
+// for an undelegated zone with clean glue, AllNameservers and ZoneNameservers
+// return the same nameserver set.
 func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	methodsv2.ClearParentNSCache()
-	t.Cleanup(methodsv2.ClearParentNSCache)
+	ClearParentNSCache()
+	t.Cleanup(ClearParentNSCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -54,7 +46,6 @@ func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("add example.com: %v", err)
 	}
-	// Apex servers respond authoritatively with the same NS set as the glue.
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns2.example.com")
 	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns2.example.com")
 
@@ -67,12 +58,11 @@ func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AllNameservers: %v", err)
 	}
-	zoneItems, err := methodsv2.ZoneNameservers(ctx, &z)
+	zoneItems, err := ZoneNameservers(ctx, &z)
 	if err != nil {
 		t.Fatalf("ZoneNameservers: %v", err)
 	}
 
-	// Normalize both to a sorted set of "name|address" strings.
 	allSet := make([]string, 0, len(allNS))
 	for _, ns := range allNS {
 		allSet = append(allSet, ns.Name.String()+"|"+ns.Address.String())
@@ -102,19 +92,13 @@ func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 }
 
 // TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue verifies that
-// when the zone's nameservers are out-of-bailiwick (e.g. example zone's
-// NS records point at *.example.net), both functions still return the same
-// set in undelegated mode, since the recursor's fake-address map serves as
-// the single source of truth for both.
-//
-// The semantically interesting case - where ApexNameservers cannot resolve
-// OOB names but methodsv2's recursor-driven resolution can - requires a
-// delegated zone scaffold; see the file header.
+// when the zone's nameservers are out-of-bailiwick, both functions still
+// return the same set in undelegated mode.
 func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	methodsv2.ClearParentNSCache()
-	t.Cleanup(methodsv2.ClearParentNSCache)
+	ClearParentNSCache()
+	t.Cleanup(ClearParentNSCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -126,7 +110,6 @@ func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) 
 	}); err != nil {
 		t.Fatalf("add root: %v", err)
 	}
-	// Zone "example.com" served by out-of-bailiwick nameservers in .net.
 	if err := r.AddFakeAddresses("example.com", map[string][]string{
 		"ns1.example.net": {"192.0.2.53"},
 		"ns2.example.net": {"192.0.2.54"},
@@ -145,7 +128,7 @@ func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) 
 	if err != nil {
 		t.Fatalf("AllNameservers: %v", err)
 	}
-	zoneItems, err := methodsv2.ZoneNameservers(ctx, &z)
+	zoneItems, err := ZoneNameservers(ctx, &z)
 	if err != nil {
 		t.Fatalf("ZoneNameservers: %v", err)
 	}
@@ -174,8 +157,8 @@ func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) 
 func TestAllNameserversVsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	methodsv2.ClearParentNSCache()
-	t.Cleanup(methodsv2.ClearParentNSCache)
+	ClearParentNSCache()
+	t.Cleanup(ClearParentNSCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -198,7 +181,7 @@ func TestAllNameserversVsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("AllNameservers: %v", err)
 	}
-	zoneItems, err := methodsv2.ZoneNameservers(ctx, &z)
+	zoneItems, err := ZoneNameservers(ctx, &z)
 	if err != nil {
 		t.Fatalf("ZoneNameservers: %v", err)
 	}

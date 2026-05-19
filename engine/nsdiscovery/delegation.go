@@ -15,17 +15,21 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-// NSItem represents either a nameserver with an address or a bare nameserver name.
+// NSItem is a nameserver as reported by parent delegation or zone apex.
+// It captures the parent-queried distinction that a plain nameserver type
+// cannot: a name may be known without yet having a resolved address (for
+// example, an out-of-bailiwick NS before recursion completes).
 type NSItem struct {
-	// Name is the canonical nameserver host name.
+	// Name is the canonical nameserver host name (lowercased).
 	Name dnsname.Name
 	// Address is the nameserver IP address when available.
 	Address netip.Addr
-	// HasAddress reports whether Address is populated.
+	// HasAddress reports whether Address has been resolved.
 	HasAddress bool
 }
 
-// String returns a stable string representation for sorting/deduplication.
+// String returns a stable "name" or "name/address" representation suitable
+// for sorting and deduplication.
 func (n NSItem) String() string {
 	if n.HasAddress {
 		return n.Name.String() + "/" + n.Address.String()
@@ -33,7 +37,14 @@ func (n NSItem) String() string {
 	return n.Name.String()
 }
 
-// DelegationNameservers returns delegation names and addresses for the zone.
+// DelegationNameservers returns the parent-queried delegation view of the
+// zone's nameservers: NS records from the parent, paired with addresses
+// from in-bailiwick glue (if present) and out-of-bailiwick recursive
+// resolution (for non-bailiwick names). Result is sorted and deduplicated.
+//
+// Errors are returned if the zone is nil or if the underlying parent
+// chain walk / OOB resolution fails. An unreachable delegation chain
+// returns an empty slice with a nil error - callers must check len().
 func DelegationNameservers(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 	if z == nil {
 		return nil, fmt.Errorf("zone is nil")
@@ -125,7 +136,15 @@ func zoneNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 	return sortedNames(seen), nil
 }
 
-// ZoneNameservers returns names and addresses from the zone apex.
+// ZoneNameservers returns the authoritative apex view of the zone's
+// nameservers. It queries the delegation servers for the apex NS RRset,
+// keeps only responses with AA set, and pairs the resulting names with
+// addresses via in-bailiwick (apex query) and out-of-bailiwick
+// (recursive resolution) paths. Result is sorted and deduplicated.
+//
+// Differs from [DelegationNameservers] in that the names come from the
+// child zone's own apex NS RRset, not the parent's delegation - useful
+// for detecting lame delegations where parent and child disagree.
 func ZoneNameservers(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 	nsNames, err := zoneNSNames(ctx, z)
 	if err != nil || nsNames == nil {

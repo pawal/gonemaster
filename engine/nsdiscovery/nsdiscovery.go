@@ -11,7 +11,10 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-// GlueNameservers returns nameserver objects (name + address) from the parent's glue.
+// GlueNameservers returns the nameservers from the parent's delegation glue
+// (name and address). Equivalent to z.Glue(ctx) with a nil-zone guard.
+// Returns an error if z is nil; otherwise propagates errors from the
+// underlying zone lookup.
 func GlueNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
 	if z == nil {
 		return nil, fmt.Errorf("zone is nil")
@@ -19,7 +22,10 @@ func GlueNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 	return z.Glue(ctx)
 }
 
-// ApexNameservers returns nameserver objects resolved from the child zone's apex NS RRset.
+// ApexNameservers returns the nameservers resolved from the child zone's
+// apex NS RRset. Equivalent to z.NS(ctx) with a nil-zone guard. For
+// in-bailiwick names this resolves via the zone's own glue; out-of-
+// bailiwick names are resolved via the recursor.
 func ApexNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
 	if z == nil {
 		return nil, fmt.Errorf("zone is nil")
@@ -27,7 +33,9 @@ func ApexNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 	return z.NS(ctx)
 }
 
-// AllNSNames returns the deduplicated union of glue names and apex NS names.
+// AllNSNames returns the deduplicated union of z.GlueNames and z.ApexNSNames.
+// Names are lowercased and sorted lexicographically. If either underlying
+// call returns an error, the error is propagated and no result is returned.
 func AllNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 	glue, err := z.GlueNames(ctx)
 	if err != nil {
@@ -49,7 +57,10 @@ func AllNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 	return sortedNames(seen), nil
 }
 
-// AllNameservers returns the deduplicated union of GlueNameservers and ApexNameservers.
+// AllNameservers returns the deduplicated union of [GlueNameservers] and
+// [ApexNameservers] (name+address pairs). The dedup key is the lower-cased
+// "name/address" string, so the same name with two different addresses is
+// kept as two entries. Output is sorted by that same key.
 func AllNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
 	glue, err := GlueNameservers(ctx, z)
 	if err != nil {

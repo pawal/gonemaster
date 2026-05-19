@@ -31,15 +31,32 @@ var parentCache = struct {
 	items: map[string]parentCacheEntry{},
 }
 
-// ClearParentNSCache clears the cache used by ParentNameservers.
+// ClearParentNSCache empties the package-global cache used by
+// [ParentNameservers]. Safe to call concurrently with ParentNameservers;
+// in-flight readers see either the cached or a fresh result. Intended
+// for long-running processes that need to invalidate the cache between
+// runs, and for tests.
 func ClearParentNSCache() {
 	parentCache.mu.Lock()
 	parentCache.items = map[string]parentCacheEntry{}
 	parentCache.mu.Unlock()
 }
 
-// ParentNameservers returns the parent zone's nameservers by walking the
-// delegation chain from the root.
+// ParentNameservers returns the nameservers of the parent zone, found by
+// walking the delegation chain from the root down to the parent of z and
+// collecting the parent's NS RRset and addresses.
+//
+// Results are cached per zone name in a package-global map protected by
+// a mutex. The cache survives across context boundaries; use
+// [ClearParentNSCache] to invalidate.
+//
+// For the root zone and zones whose names appear in the recursor's
+// fake-address map (undelegated test setups), an empty slice and nil
+// error are returned without caching.
+//
+// Errors are returned if z is nil, if z has no recursor, or if the chain
+// walk encounters a definitive failure. An unreachable intermediate
+// produces an empty result with no error - callers must check len().
 func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
 	if z == nil {
 		return nil, fmt.Errorf("zone is nil")

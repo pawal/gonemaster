@@ -625,11 +625,11 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nsNames, err := methods.Method2(ctx, z)
+	nsNames, err := methods.GlueNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nsServers, err := methods.Method4(ctx, z)
+	nsServers, err := methods.GlueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -841,7 +841,7 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	queryName := "www." + z.Name.String()
 
-	nsServers, err := methods.Method4(ctx, z)
+	nsServers, err := methods.GlueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}

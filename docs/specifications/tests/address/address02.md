@@ -11,16 +11,16 @@ Status: Final
   - A `zone.Zone` object is available.
   - A recursor is available on the zone object.
 - Required inputs:
-  - Nameserver addresses from `methods.Method4` (delegation/glue view).
-  - Nameserver addresses from `methods.Method5` (child/authoritative view).
+  - Nameserver addresses from `GlueNameservers` (delegation/glue view).
+  - Nameserver addresses from `ApexNameservers` (child/authoritative view).
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: controls PTR query task parallelism.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Collect nameserver entries from `Method4` and `Method5`.
+2. Collect nameserver entries from `GlueNameservers` and `ApexNameservers`.
 3. Build an ordered unique list by IP string:
-   - Concatenate `Method4` then `Method5`.
+   - Concatenate `GlueNameservers` then `ApexNameservers`.
    - Keep the first `(nsname, ip)` seen for each unique IP.
 4. For each unique IP, execute a PTR-check task (parallelized):
    - Compute reverse lookup owner with `dns.ReverseAddr`.
@@ -36,7 +36,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-collect nameserver IPs from Method4 then Method5
+collect nameserver IPs from GlueNameservers then ApexNameservers
  +- dedupe by IP string; first-seen (nsname, ip) wins
  |
  v
@@ -98,6 +98,6 @@ emit TEST_CASE_END
   - `no`
 
 ## Edge Cases And Limitations
-- If `Method4`+`Method5` yields no IP addresses, only `TEST_CASE_START` and `TEST_CASE_END` are emitted.
+- If `GlueNameservers`+`ApexNameservers` yields no IP addresses, only `TEST_CASE_START` and `TEST_CASE_END` are emitted.
 - Duplicate IPs are checked once; if multiple nameservers share an IP, the first-seen nameserver name is used in emitted arguments.
 - Only one CNAME follow-up lookup is performed for PTR checks.

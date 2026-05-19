@@ -9,8 +9,8 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Delegation addressed NS from `GlueNameservers`.
-  - Child addressed NS from `ApexNameservers`.
+  - Delegation addressed NS from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers).
+  - Child addressed NS from [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - SOA query responses from each evaluated nameserver.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports emit transport-debug tags and skip query evaluation on that transport.
@@ -18,7 +18,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read delegation addressed NS (`GlueNameservers`) and child addressed NS (`ApexNameservers`), concatenate in that order.
+2. Read delegation addressed NS ([`GlueNameservers`](../../nameserver-resolution.md#gluenameservers)) and child addressed NS ([`ApexNameservers`](../../nameserver-resolution.md#apexnameservers)), concatenate in that order.
 3. Build an ordered task list:
    - Nameservers are deduplicated by NS name (`nameKey`), not by IP.
    - If transport family is disabled, task is marked as disabled.
@@ -28,7 +28,7 @@ Status: Final
    - For query tasks, query SOA.
    - If response has `RCODE=NOERROR` and SOA answer section is empty, emit `SOA_NOT_EXISTS` (`ns`).
 5. After all tasks, emit `SOA_EXISTS` only when both conditions are true:
-   - At least one nameserver was present (`GlueNameservers` or `ApexNameservers` non-empty).
+   - At least one nameserver was present ([`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) or [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) non-empty).
    - No `SOA_NOT_EXISTS` tag has been emitted (transport-disabled debug tags do not suppress this).
 6. Emit `TEST_CASE_END`.
 
@@ -84,4 +84,4 @@ Status: Final
 ## Edge Cases And Limitations
 - Non-`NOERROR` responses and query failures do not emit `SOA_NOT_EXISTS`.
 - `SOA_EXISTS` is suppressed only by `SOA_NOT_EXISTS`; transport-disabled debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) do not suppress it.
-- If no nameservers are available from `GlueNameservers` and `ApexNameservers`, testcase emits start/end only.
+- If no nameservers are available from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers), testcase emits start/end only.

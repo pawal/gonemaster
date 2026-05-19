@@ -9,8 +9,8 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver name/IP items from `DelegationNameservers` and `ZoneNameservers`.
-  - Parent nameservers from `ParentNameservers` (or undelegated fake-DS data path).
+  - Child nameserver name/IP items from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers) and [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
+  - Parent nameservers from [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers) (or undelegated fake-DS data path).
   - SOA, DNSKEY, and DS query responses.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.

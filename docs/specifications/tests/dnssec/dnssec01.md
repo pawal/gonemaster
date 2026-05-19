@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Parent nameserver names/IPs from `ParentNameservers`.
+  - Parent nameserver names/IPs from [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers).
   - Optional undelegated DS records exposed via parent nameserver `FakeDSRecords`.
   - DS query responses for child zone name from parent nameservers.
 - Profile/config knobs that affect behavior:

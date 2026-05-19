@@ -9,8 +9,8 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Parent nameservers from `parentNameservers`.
-  - Child nameservers from `GlueNameservers` and `ApexNameservers`.
+  - Parent nameservers from [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers).
+  - Child nameservers from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - DS, SOA, and DNSKEY query responses.
   - Optional undelegated DS records (`FakeDSRecords`) when fake-address mode is active.
 - Profile/config knobs that affect behavior:
@@ -33,7 +33,7 @@ Status: Final
    - Mixed `No DS` and `Has DS` => emit `DS11_INCONSISTENT_DS`, `DS11_PARENT_WITHOUT_DS`, `DS11_PARENT_WITH_DS`, then continue to child phase.
    - `Has DS` only => continue to child phase.
 6. Child phase (only when parent decision allows):
-   - Build child nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
+   - Build child nameserver set from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) (deduplicated by `ns.String()`), then deduplicate by IP.
    - For each nameserver (parallelized):
      - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `SOA` and `DNSKEY` and skip.
      - Query SOA over UDP (`UseVC=false`); require usable authoritative apex SOA.
@@ -50,7 +50,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-parent set = parentNameservers; dedupe by IP
+parent set = ParentNameservers; dedupe by IP
 
 fake-address mode AND no undelegated DS records
    -> emit TEST_CASE_END and return
@@ -168,7 +168,7 @@ emit TEST_CASE_END
 ## Differences From Upstream
 - Upstream reference: [`dnssec11.md`](../../upstream/tests/DNSSEC-TP/dnssec11.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: describes normal parent lookup through z.Parent(ctx) and undelegated behavior from test-type inputs. Gonemaster: uses the `parentNameservers` abstraction plus a fake-DS shortcut via nameserver `FakeDSRecords`.
+  - Upstream: describes normal parent lookup through z.Parent(ctx) and undelegated behavior from test-type inputs. Gonemaster: uses the [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers) abstraction plus a fake-DS shortcut via nameserver `FakeDSRecords`.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`

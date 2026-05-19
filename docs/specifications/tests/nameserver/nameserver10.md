@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `ZoneNameservers`.
+  - Nameserver addresses from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - SOA responses to EDNS version 0 and EDNS version 1 queries.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -21,7 +21,7 @@ Status: Final
    - `No Response EDNS1 Query` (IP list)
    - `Unexpected RCODE` (rcode -> IP list)
    - `EDNS Response Error` (IP list)
-3. Read nameserver list from `ZoneNameservers`.
+3. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 4. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip this nameserver.
    - Send SOA query with EDNS version 0.
@@ -81,7 +81,7 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`nameserver10.md`](../../upstream/tests/Nameserver-TP/nameserver10.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: says input is nameserver IP set. Gonemaster: iterates raw `ZoneNameservers` output, but aggregate `addresses` values are sorted and deduplicated by IP.
+  - Upstream: says input is nameserver IP set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output, but aggregate `addresses` values are sorted and deduplicated by IP.
   - Upstream: summary assumes this testcase is relevant only after EDNSv0 success. Gonemaster: implements that gating explicitly by only evaluating EDNSv1 when EDNSv0 response exists and has `NOERROR`.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:

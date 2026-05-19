@@ -13,7 +13,7 @@ Status: Draft
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `ZoneNameservers`.
+  - Nameserver addresses from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - ZONEMD and SOA responses from authoritative nameservers at the zone apex.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -21,7 +21,7 @@ Status: Draft
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read nameserver list from `ZoneNameservers`.
+2. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 3. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `ZONEMD`, then skip.
    - Send ZONEMD query to the zone apex with default query options.

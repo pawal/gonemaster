@@ -10,7 +10,7 @@ Status: Draft
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver name/IP items from `DelegationNameservers` and `ZoneNameservers`.
+  - Child nameserver name/IP items from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers) and [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - DNSKEY query response (DNSSEC enabled) to confirm zone is signed. In a full test run, this response is cached from earlier test cases (e.g., DNSSEC10); when running standalone, the query is made directly.
   - NSEC or NSEC3PARAM query response to obtain the apex type bitmap. Also typically cached from DNSSEC10.
   - Query responses for probed RR types: A, AAAA, MX, TXT. Typically cached from earlier test cases (Basic, Zone, Connectivity).

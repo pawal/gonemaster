@@ -10,8 +10,8 @@ Status: Final
   - A `zone.Zone` object is available.
 - Required inputs:
   - Parent zone object from `z.Parent(ctx)`.
-  - Delegation NS names from `z.GlueNames(ctx)`.
-  - Delegation addressed NS from `GlueNameservers`.
+  - Delegation NS names from [`z.GlueNames(ctx)`](../../nameserver-resolution.md#gluenames).
+  - Delegation addressed NS from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers).
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
   - Size limit is fixed by `constants.UDPPayloadLimit` (512).
@@ -20,9 +20,9 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Build a maximally long qname under the tested zone apex.
 3. Build a DNS message with question `<max-length-name> IN NS`.
-4. Add NS records for all names from `z.GlueNames` into the authority section.
+4. Add NS records for all names from [`z.GlueNames`](../../nameserver-resolution.md#gluenames) into the authority section.
 5. Get parent zone from `z.Parent(ctx)`; if parent is missing, return an error.
-6. Read delegation addressed NS from `GlueNameservers`.
+6. Read delegation addressed NS from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers).
 7. If IPv4 delegation NS list is non-empty and all names are in-bailiwick of parent:
    - Add one `A` glue record to additional section, using the first IPv4 nameserver.
 8. If IPv6 delegation NS list is non-empty and all names are in-bailiwick of parent:
@@ -93,7 +93,7 @@ emit TEST_CASE_END
 ## Differences From Upstream
 - Upstream reference: [`delegation03.md`](../../upstream/tests/Delegation-TP/delegation03.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: describes adding one A/AAAA record with any address when conditions are met. Gonemaster: adds one record using the first available NS address from `GlueNameservers` for each family.
+  - Upstream: describes adding one A/AAAA record with any address when conditions are met. Gonemaster: adds one record using the first available NS address from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) for each family.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
 - Potential upstream report:
   - `no`

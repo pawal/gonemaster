@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `ZoneNameservers`.
+  - Nameserver addresses from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - NS query responses for qname `.`.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -20,7 +20,7 @@ Status: Final
 2. If tested zone name is `.`:
    - Emit `UPWARD_REFERRAL_IRRELEVANT`.
    - Emit `TEST_CASE_END` and return.
-3. Read nameserver list from `ZoneNameservers`, deduplicate by `name/ip`, preserving first-seen order.
+3. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate by `name/ip`, preserving first-seen order.
 4. For each deduplicated nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `NS`, mark not included in summary, and skip.
    - Mark nameserver as included.

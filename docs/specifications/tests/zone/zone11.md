@@ -14,7 +14,7 @@ Status: Final
   - A `zone.Zone` object is available.
   - Nameserver resolution context is available for nsdiscovery calls.
 - Required inputs:
-  - Nameserver name/IP items from `DelegationNameservers` and `ZoneNameservers`.
+  - Nameserver name/IP items from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers) and [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - Apex TXT responses for SPF extraction.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: parallel nameserver query fanout.

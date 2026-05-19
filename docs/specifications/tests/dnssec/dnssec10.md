@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver name/IP items from `DelegationNameservers` and `ZoneNameservers`.
+  - Child nameserver name/IP items from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers) and [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - DNSKEY, NSEC, and NSEC3PARAM query responses (DNSSEC enabled).
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.

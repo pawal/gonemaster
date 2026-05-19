@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `ZoneNameservers`.
+  - Nameserver addresses from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - SOA and MX responses per nameserver.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: parallel nameserver query fanout.
@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Collect nameservers from `ZoneNameservers`, deduplicate probing list by IP address, and keep a name-to-IP grouping view for later reporting.
+2. Collect nameservers from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate probing list by IP address, and keep a name-to-IP grouping view for later reporting.
 3. For each unique nameserver IP (parallelized):
    - Skip disabled transports.
    - Query apex `SOA`; continue only when response exists, `RCODE=NOERROR`, `AA=true`, and SOA answer exists.

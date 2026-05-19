@@ -11,16 +11,16 @@ Status: Final
   - A `zone.Zone` object is available.
   - A recursor is available on the zone object.
 - Required inputs:
-  - Nameserver addresses from `GlueNameservers` (delegation/glue view).
-  - Nameserver addresses from `ApexNameservers` (child/authoritative view).
+  - Nameserver addresses from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) (delegation/glue view).
+  - Nameserver addresses from [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) (child/authoritative view).
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: controls PTR query task parallelism.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Collect nameserver entries from `GlueNameservers` and `ApexNameservers`.
+2. Collect nameserver entries from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
 3. Build an ordered unique list by IP string:
-   - Concatenate `GlueNameservers` then `ApexNameservers`.
+   - Concatenate [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) then [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
    - Keep the first `(nsname, ip)` seen for each unique IP.
 4. For each unique IP, execute a PTR-check task (parallelized):
    - Compute reverse lookup owner with `dns.ReverseAddr`.
@@ -98,6 +98,6 @@ emit TEST_CASE_END
   - `no`
 
 ## Edge Cases And Limitations
-- If `GlueNameservers`+`ApexNameservers` yields no IP addresses, only `TEST_CASE_START` and `TEST_CASE_END` are emitted.
+- If [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers)+[`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) yields no IP addresses, only `TEST_CASE_START` and `TEST_CASE_END` are emitted.
 - Duplicate IPs are checked once; if multiple nameservers share an IP, the first-seen nameserver name is used in emitted arguments.
 - Only one CNAME follow-up lookup is performed for PTR checks.

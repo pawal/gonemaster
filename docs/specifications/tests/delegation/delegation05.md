@@ -9,8 +9,8 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - NS names from `AllNSNames`.
-  - Addressed NS from `GlueNameservers` and `ApexNameservers`.
+  - NS names from [`AllNSNames`](../../nameserver-resolution.md#allnsnames).
+  - Addressed NS from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - Recursive lookup function (`recurse`) for non-in-bailiwick NS names.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports emit transport-debug tags and skip per-NS-IP in-bailiwick checks.
@@ -18,8 +18,8 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Get NS name list from `AllNSNames`.
-3. Get delegation and child addressed NS lists (`GlueNameservers` and `ApexNameservers`), merge into a unique map keyed by `name/ip`, and sort keys.
+2. Get NS name list from [`AllNSNames`](../../nameserver-resolution.md#allnsnames).
+3. Get delegation and child addressed NS lists ([`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers)), merge into a unique map keyed by `name/ip`, and sort keys.
 4. For each NS name from step 2:
    - If NS name is in-bailiwick of tested zone:
      - For each merged addressed NS (`name/ip`) in sorted order (parallelized):

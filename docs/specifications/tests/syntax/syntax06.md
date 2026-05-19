@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available with a recursor.
 - Required inputs:
-  - Nameserver objects from `GlueNameservers` and `ApexNameservers`.
+  - Nameserver objects from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - SOA responses from those nameservers.
   - Recursive lookups for MX, A, and AAAA records.
 - Profile/config knobs that affect behavior:
@@ -18,7 +18,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Build deduplicated nameserver list from `GlueNameservers` and `ApexNameservers`.
+2. Build deduplicated nameserver list from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
 3. For each nameserver:
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` and skip.
    - Query SOA (RD=0, TCP off).

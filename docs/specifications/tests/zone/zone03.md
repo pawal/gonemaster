@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver addresses from `ApexNameservers`.
+  - Child nameserver addresses from [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - One authoritative SOA response for the child zone apex (if obtainable).
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6` affect transport availability during SOA retrieval.
@@ -17,7 +17,7 @@ Status: Final
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
 2. Retrieve SOA from child nameservers using shared helper logic:
-   - iterate `ApexNameservers` nameservers in order;
+   - iterate [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) nameservers in order;
    - skip disabled transports;
    - return the first response that has SOA in answer and `AA=true`.
 3. If no qualifying SOA response is found, emit `NO_RESPONSE_SOA_QUERY`.

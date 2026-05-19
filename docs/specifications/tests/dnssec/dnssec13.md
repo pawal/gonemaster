@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver sets from `GlueNameservers` and `ApexNameservers`.
+  - Child nameserver sets from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - DNSKEY, SOA, and NS query responses with DNSSEC enabled from child nameservers.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Build nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
+2. Build nameserver set from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) (deduplicated by `ns.String()`), then deduplicate by IP.
 3. For each unique nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `DNSKEY`, `SOA`, and `NS`, then skip.
    - Query `DNSKEY`, `SOA`, and `NS` at child apex with DNSSEC enabled.

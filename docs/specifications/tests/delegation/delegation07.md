@@ -9,14 +9,14 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Parent-side NS names from `z.GlueNames(ctx)`.
-  - Child-side NS names from `z.ApexNSNames(ctx)`.
+  - Parent-side NS names from [`z.GlueNames(ctx)`](../../nameserver-resolution.md#gluenames).
+  - Child-side NS names from [`z.ApexNSNames(ctx)`](../../nameserver-resolution.md#apexnsnames).
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read parent names from `z.GlueNames` and child names from `z.ApexNSNames`.
+2. Read parent names from [`z.GlueNames`](../../nameserver-resolution.md#gluenames) and child names from [`z.ApexNSNames`](../../nameserver-resolution.md#apexnsnames).
 3. Build `nameCounts` map by adding `+1` per parent name and `-1` per child name.
 4. Partition names:
    - `sameNames` for `count == 0`.

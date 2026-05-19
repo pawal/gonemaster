@@ -11,7 +11,7 @@ Status: Final
   - A `zone.Zone` object is available.
   - A recursor is available on the zone object.
 - Required inputs:
-  - Nameserver name/address sets from `DelegationNameservers` and `ZoneNameservers`.
+  - Nameserver name/address sets from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers) and [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - ASN/prefix lookup results per unique IP address from `asnlookup.GetWithPrefix`.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: parallel prefix lookup fan-out.

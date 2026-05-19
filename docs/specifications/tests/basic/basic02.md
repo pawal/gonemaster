@@ -12,8 +12,8 @@ Status: Final
   - Recursor and nameserver query path are available.
 - Required inputs:
   - Child zone name (`z.Name`).
-  - Delegation NS names from `z.GlueNames(ctx)`.
-  - Delegation NS addresses from `GlueNameservers` and fallback glue/recursive resolution path.
+  - Delegation NS names from [`z.GlueNames(ctx)`](../../nameserver-resolution.md#gluenames).
+  - Delegation NS addresses from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and fallback glue/recursive resolution path.
 - Profile/config knobs that affect behavior:
   - `net.ipv4`: enables or disables IPv4 SOA probes.
   - `net.ipv6`: enables or disables IPv6 SOA probes.
@@ -21,7 +21,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Load delegation NS names with `z.GlueNames` and delegation NS address objects with `GlueNameservers`.
+2. Load delegation NS names with [`z.GlueNames`](../../nameserver-resolution.md#gluenames) and delegation NS address objects with [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers).
 3. If no NS names exist, emit `B02_NO_DELEGATION`, then emit `TEST_CASE_END` and return.
 4. If NS names exist but address objects are empty, attempt to populate from glue addresses and mark unresolved names as `nsCantResolve`.
 5. Probe each nameserver (parallelized) with SOA query to child zone:
@@ -159,7 +159,7 @@ emit TEST_CASE_END
   - `no`
 
 ## Edge Cases And Limitations
-- If `z.GlueNames` returns names but `GlueNameservers` has no resolved addresses, unresolved names are classified via `B02_NS_NO_IP_ADDR`.
+- If [`z.GlueNames`](../../nameserver-resolution.md#gluenames) returns names but [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) has no resolved addresses, unresolved names are classified via `B02_NS_NO_IP_ADDR`.
 - If all probes are skipped due transport disable, testcase can still end in `B02_NO_WORKING_NS`.
 - Detailed error tags are emitted only when `B02_NO_WORKING_NS` is emitted.
 - Output ordering is deterministic after parallel execution because runner output is merged in task index order.

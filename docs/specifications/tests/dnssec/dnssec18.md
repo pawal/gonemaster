@@ -10,8 +10,8 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Parent nameservers from `parentNameservers` and parent DS responses.
-  - Child nameservers from `GlueNameservers` and `ApexNameservers`.
+  - Parent nameservers from [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers) and parent DS responses.
+  - Child nameservers from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - Child CDS, CDNSKEY, and DNSKEY responses with DNSSEC enabled.
   - CDS/CDNSKEY/DNSKEY answer-section RRSIG records.
 - Profile/config knobs that affect behavior:
@@ -27,7 +27,7 @@ Status: Final
    - Require response message, `RCODE=NOERROR`, and `AA=true`.
    - Collect matching-owner DS records and deduplicate by `(keytag,digestType,algorithm,digest)`.
 4. If no DS records were collected, stop DS18 findings.
-5. Build child nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
+5. Build child nameserver set from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) (deduplicated by `ns.String()`), then deduplicate by IP.
 6. For each unique child nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `CDNSKEY`, `CDS`, and `DNSKEY` and skip.
    - Query `CDS`, `CDNSKEY`, and `DNSKEY` with DNSSEC enabled; each requires authoritative `NOERROR` response for participation.
@@ -71,7 +71,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-parent set = parentNameservers; dedupe by IP
+parent set = ParentNameservers; dedupe by IP
 
 For each unique parent NS IP (parallel; fan-out = resolver.defaults.parallel):
    transport disabled for DS  -> IPV4_DISABLED / IPV6_DISABLED, skip
@@ -253,7 +253,7 @@ The bonus criterion `cds_cdnskey_published` in `scoring/bonus.go` treats `DS18_N
 ## Differences From Upstream
 - Upstream reference: [`dnssec18.md`](../../upstream/tests/DNSSEC-TP/dnssec18.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: includes explicit undelegated test-type flow using provided DS data. Gonemaster: has no explicit undelegated branch in `DNSSEC18`; it always obtains parent-side DS through `parentNameservers`.
+  - Upstream: includes explicit undelegated test-type flow using provided DS data. Gonemaster: has no explicit undelegated branch in `DNSSEC18`; it always obtains parent-side DS through [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers).
   - Upstream: objective describes trust from DS to CDS/CDNSKEY signatures via corresponding DNSKEY. Gonemaster: matching logic is keytag-based (`DS keytag` present in DNSKEY set and RRSIG keytags), without DS digest revalidation or CDS/CDNSKEY signature cryptographic verification in this testcase.
   - Upstream: does not specify rollover-detection logic. Gonemaster: adds CDS/CDNSKEY content comparison against parent DS and soft rollover-evidence signals (steps 13-16).
   - Upstream: does not explicitly specify testcase boundary and transport-disabled debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.

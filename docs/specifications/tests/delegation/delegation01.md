@@ -9,26 +9,26 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Delegation names from `z.GlueNames(ctx)`.
-  - Child NS names from `z.ApexNSNames(ctx)`.
-  - Delegation nameserver addresses from `GlueNameservers`.
-  - Child nameserver addresses from `ApexNameservers`.
+  - Delegation names from [`z.GlueNames(ctx)`](../../nameserver-resolution.md#gluenames).
+  - Child NS names from [`z.ApexNSNames(ctx)`](../../nameserver-resolution.md#apexnsnames).
+  - Delegation nameserver addresses from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers).
+  - Child nameserver addresses from [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
   - Minimum required nameserver count is fixed by `constants.MinimumNumberOfNameservers`.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Get delegation NS names (`z.GlueNames`), sort names, and emit one of:
+2. Get delegation NS names ([`z.GlueNames`](../../nameserver-resolution.md#gluenames)), sort names, and emit one of:
    - `ENOUGH_NS_DEL` when count is at least the minimum.
    - `NOT_ENOUGH_NS_DEL` otherwise.
-3. Get child NS names (`z.ApexNSNames`), sort names, and emit one of:
+3. Get child NS names ([`z.ApexNSNames`](../../nameserver-resolution.md#apexnsnames)), sort names, and emit one of:
    - `ENOUGH_NS_CHILD` when count is at least the minimum.
    - `NOT_ENOUGH_NS_CHILD` otherwise.
-4. Get child addressed NS (`ApexNameservers`), split by IP family, count unique NS names per family, and emit per family:
+4. Get child addressed NS ([`ApexNameservers`](../../nameserver-resolution.md#apexnameservers)), split by IP family, count unique NS names per family, and emit per family:
    - IPv4: `ENOUGH_IPV4_NS_CHILD`, `NOT_ENOUGH_IPV4_NS_CHILD`, or `NO_IPV4_NS_CHILD`.
    - IPv6: `ENOUGH_IPV6_NS_CHILD`, `NOT_ENOUGH_IPV6_NS_CHILD`, or `NO_IPV6_NS_CHILD`.
-5. Get delegation addressed NS (`GlueNameservers`), split by IP family, count unique NS names per family, and emit per family:
+5. Get delegation addressed NS ([`GlueNameservers`](../../nameserver-resolution.md#gluenameservers)), split by IP family, count unique NS names per family, and emit per family:
    - IPv4: `ENOUGH_IPV4_NS_DEL`, `NOT_ENOUGH_IPV4_NS_DEL`, or `NO_IPV4_NS_DEL`.
    - IPv6: `ENOUGH_IPV6_NS_DEL`, `NOT_ENOUGH_IPV6_NS_DEL`, or `NO_IPV6_NS_DEL`.
 6. Emit `TEST_CASE_END`.

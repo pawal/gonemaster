@@ -9,8 +9,8 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Parent nameserver names/IPs from `ParentNameservers`.
-  - Child nameserver sets from `GlueNameservers` and `ApexNameservers`.
+  - Parent nameserver names/IPs from [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers).
+  - Child nameserver sets from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - Parent DS responses and child DNSKEY/RRSIG responses.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -24,7 +24,7 @@ Status: Final
    - Accept response only if DNSSEC response shape passes (`NOERROR`, `OPT`, `DO`, `AA`) and at least one DS record matches child zone owner name.
    - Add unique DS RDATA values to DS record set.
 3. If DS record set is empty, emit `TEST_CASE_END` and stop.
-4. Build child nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
+4. Build child nameserver set from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) (deduplicated by `ns.String()`), then deduplicate by IP.
 5. For each unique child nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
    - Query DNSKEY with DNSSEC enabled.

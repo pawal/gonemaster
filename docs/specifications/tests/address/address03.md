@@ -11,14 +11,14 @@ Status: Final
   - A `zone.Zone` object is available.
   - A recursor is available on the zone object.
 - Required inputs:
-  - Nameserver addresses from `ApexNameservers`.
+  - Nameserver addresses from [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - PTR lookup responses for each checked nameserver IP.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: controls PTR query task parallelism.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Collect nameserver entries with `ApexNameservers`.
+2. Collect nameserver entries with [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
 3. Build an ordered unique list by IP string:
    - Keep the first `(nsname, ip)` seen for each unique IP.
 4. For each unique IP, execute a PTR-check task (parallelized):
@@ -117,6 +117,6 @@ The following behaviors are implementation choices, not mandated by protocol:
 - **PTR name list delimiter**: Multiple PTR target names in the `names` argument of `NAMESERVER_IP_PTR_MISMATCH` are joined with `/` (slash).  This delimiter is an internal formatting choice with no protocol counterpart.
 
 ## Edge Cases And Limitations
-- If `ApexNameservers` yields no IP addresses, only `TEST_CASE_START` and `TEST_CASE_END` are emitted.
+- If [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) yields no IP addresses, only `TEST_CASE_START` and `TEST_CASE_END` are emitted.
 - Duplicate IPs are checked once; if multiple nameservers share an IP, only the first-seen nameserver name is evaluated for PTR-name match.
 - PTR target matching is case-insensitive and exact on normalized DNS name string.

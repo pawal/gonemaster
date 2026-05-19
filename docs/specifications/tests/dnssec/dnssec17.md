@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver sets from `GlueNameservers` and `ApexNameservers`.
+  - Child nameserver sets from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
   - CDNSKEY and DNSKEY responses with DNSSEC enabled.
   - CDNSKEY and DNSKEY answer-section RRSIG records.
 - Profile/config knobs that affect behavior:
@@ -18,7 +18,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Build child nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
+2. Build child nameserver set from the union of [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) (deduplicated by `ns.String()`), then deduplicate by IP.
 3. For each unique nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `CDNSKEY` and `DNSKEY` and skip.
    - Query `CDNSKEY` with DNSSEC enabled; require authoritative `NOERROR` and at least one CDNSKEY record to continue.

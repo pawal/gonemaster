@@ -13,7 +13,7 @@ Status: Draft
   - The zone is delegated (a non-root parent exists). Root zone runs of DNSSEC21 emit `TEST_CASE_END` and stop.
 - Required inputs:
   - Parent zone object (resolved via `zoneParent(ctx, z)`).
-  - Parent nameserver names/IPs from `ParentNameservers`.
+  - Parent nameserver names/IPs from [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers).
   - Per parent NS IP: DS query response for the child name (DNSSEC enabled), and DNSKEY query response for the parent apex (DNSSEC enabled).
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.

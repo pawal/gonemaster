@@ -11,7 +11,7 @@ Status: Draft
   - A `zone.Zone` object is available.
   - DNSSEC07 has run and the zone is signed (i.e., `DS07_NOT_SIGNED` was not emitted). If the zone is unsigned, DNSSEC19 is skipped entirely.
 - Required inputs:
-  - Nameserver name/IP items from `DelegationNameservers` and `ZoneNameservers`.
+  - Nameserver name/IP items from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers) and [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - DNSKEY query responses for child apex from the collected nameservers.
   - Badkeys blocklist data (`blocklist.dat` and `badkeysdata.json`) from the filesystem or embedded fallback. The blocklist is optional; if absent, only RSA crypto checks run.
 - Profile/config knobs that affect behavior:

@@ -1,6 +1,5 @@
-// Coverage target for engine/methods: >=90% line coverage. As of Phase 0
-// of the methods refactoring plan, this package sits at ~92%. New tests
-// should preserve or raise that level.
+// Coverage target for engine/methods: >=90% line coverage (currently ~92%).
+// New tests should preserve or raise that level.
 
 package methods
 

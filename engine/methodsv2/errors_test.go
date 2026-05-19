@@ -11,7 +11,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-// Phase 0.8 error propagation tests.
+// Error propagation tests.
 //
 // Note: most failure modes in the parent-chain walk and apex-NS resolution
 // result in an empty slice + nil error rather than a returned error. The

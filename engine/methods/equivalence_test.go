@@ -21,13 +21,12 @@ import (
 //
 // Note: in undelegated mode (the test infra in use), both functions
 // ultimately read from the recursor's fake-address map, so they agree on
-// the nameserver set. Tests asserting the *differ* cases (lame delegation,
+// the nameserver set. Tests asserting the differ cases (lame delegation,
 // out-of-bailiwick recursion) require a delegated zone scaffold with
 // distinct parent and child NS responses; that scaffold is not yet present
 // in either methods or methodsv2 test files (see
 // TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse for the complex
-// pattern such a setup requires). The differ scenarios are deferred to
-// Phase 5 follow-up work where the AllNameservers semantic audit happens.
+// pattern such a setup requires).
 
 // TestMethod4and5VsZoneNameserversAgreeOnCleanUndelegated verifies that for
 // an undelegated zone with clean glue, Method4and5 and GetZoneNSNamesAndIPs
@@ -109,8 +108,7 @@ func TestMethod4and5VsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 //
 // The semantically interesting case - where Method5 cannot resolve OOB
 // names but methodsv2's recursor-driven resolution can - requires a
-// delegated zone scaffold and is documented in the file header as
-// deferred to Phase 5.
+// delegated zone scaffold; see the file header.
 func TestMethod4and5VsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)

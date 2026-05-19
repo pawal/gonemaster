@@ -1,11 +1,8 @@
-// Coverage target for engine/methodsv2: aim for >=90% line coverage. As of
-// Phase 0 of the methods refactoring plan, this package sits at ~69%. The
-// remaining gap is concentrated in: (a) CNAME-following code paths
+// Coverage target for engine/methodsv2: aim for >=90% line coverage
+// (currently ~69%). The remaining gap is in CNAME-following code paths
 // (cnameTargetFromQuestion, followCNAME, collectResolvedAddrs) which need
-// dedicated CNAME fixtures; (b) GetDelNSIPs and GetZoneNSIPs which are
-// scheduled for deletion in Phase 1 of the refactor and intentionally not
-// covered here. Future contributors should add CNAME-path tests if those
-// flows are exercised by new testcases.
+// dedicated CNAME fixtures. Future contributors should add CNAME-path
+// tests if those flows are exercised by new testcases.
 
 package methodsv2
 

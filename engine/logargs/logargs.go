@@ -1,3 +1,7 @@
+// Package logargs provides canonical key names and constructors for the
+// structured arguments attached to engine log entries. Centralising them
+// here keeps producers (testcases, transport) and consumers (i18n
+// renderers, metrics) in sync as the canonical key set evolves.
 package logargs
 
 import (

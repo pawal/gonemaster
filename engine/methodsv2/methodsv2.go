@@ -55,6 +55,8 @@ var parentCache = struct {
 }
 
 // ClearCache clears cached results for GetParentNSNamesAndIPs.
+//
+// Deprecated: use [ClearParentNSCache] instead.
 func ClearCache() {
 	parentCache.mu.Lock()
 	parentCache.items = map[string]parentCacheEntry{}
@@ -62,6 +64,8 @@ func ClearCache() {
 }
 
 // GetParentNSNamesAndIPs returns nameservers for the parent zone.
+//
+// Deprecated: use [ParentNameservers] instead.
 func GetParentNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
 	if z == nil {
 		return nil, fmt.Errorf("zone is nil")
@@ -303,6 +307,8 @@ func GetParentNSIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver,
 }
 
 // GetDelNSNamesAndIPs returns delegation names and addresses for the zone.
+//
+// Deprecated: use [DelegationNameservers] instead.
 func GetDelNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 	if z == nil {
 		return nil, fmt.Errorf("zone is nil")
@@ -352,29 +358,6 @@ func GetDelNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 	return sortedNames(seen), nil
 }
 
-// GetDelNSIPs returns delegation IPs for the zone.
-func GetDelNSIPs(ctx context.Context, z *zone.Zone) ([]string, error) {
-	items, err := GetDelNSNamesAndIPs(ctx, z)
-	if err != nil || items == nil {
-		return nil, err
-	}
-
-	seen := map[string]bool{}
-	var out []string
-	for _, item := range items {
-		if !item.HasAddress {
-			continue
-		}
-		ip := item.Address.String()
-		if !seen[ip] {
-			seen[ip] = true
-			out = append(out, ip)
-		}
-	}
-	sort.Strings(out)
-	return out, nil
-}
-
 // GetZoneNSNames returns authoritative nameserver names from the zone apex.
 func GetZoneNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 	if z == nil {
@@ -418,6 +401,8 @@ func GetZoneNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 }
 
 // GetZoneNSNamesAndIPs returns names and addresses from the zone apex.
+//
+// Deprecated: use [ZoneNameservers] instead.
 func GetZoneNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 	nsNames, err := GetZoneNSNames(ctx, z)
 	if err != nil || nsNames == nil {
@@ -468,28 +453,6 @@ func GetZoneNSNamesAndIPs(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 	return uniqueSortedItems(out), nil
 }
 
-// GetZoneNSIPs returns authoritative nameserver IPs from the zone apex.
-func GetZoneNSIPs(ctx context.Context, z *zone.Zone) ([]string, error) {
-	items, err := GetZoneNSNamesAndIPs(ctx, z)
-	if err != nil || items == nil {
-		return nil, err
-	}
-
-	seen := map[string]bool{}
-	var out []string
-	for _, item := range items {
-		if !item.HasAddress {
-			continue
-		}
-		ip := item.Address.String()
-		if !seen[ip] {
-			seen[ip] = true
-			out = append(out, ip)
-		}
-	}
-	sort.Strings(out)
-	return out, nil
-}
 
 func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 	r := z.Recursor()
@@ -1074,4 +1037,32 @@ func cloneNameservers(list []nameserver.Nameserver) []nameserver.Nameserver {
 	out := make([]nameserver.Nameserver, len(list))
 	copy(out, list)
 	return out
+}
+
+// Semantic-name API. These functions are one-line forwards to the legacy
+// Get* names above. Callers should prefer these names; the Get* names
+// are deprecated and will be removed once all callers migrate.
+
+// ParentNameservers returns the parent zone's nameservers by walking the
+// delegation chain from the root.
+func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
+	return GetParentNSNamesAndIPs(ctx, z)
+}
+
+// DelegationNameservers returns the delegation view of the zone's nameservers
+// as reported by the parent (names paired with addresses when available).
+func DelegationNameservers(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
+	return GetDelNSNamesAndIPs(ctx, z)
+}
+
+// ZoneNameservers returns the zone-apex view of the zone's nameservers
+// (queried from the delegation servers with AA NS at the apex), merging
+// in-bailiwick and out-of-bailiwick address resolution.
+func ZoneNameservers(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
+	return GetZoneNSNamesAndIPs(ctx, z)
+}
+
+// ClearParentNSCache clears the cache used by ParentNameservers.
+func ClearParentNSCache() {
+	ClearCache()
 }

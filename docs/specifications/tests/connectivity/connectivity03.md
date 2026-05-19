@@ -11,7 +11,7 @@ Status: Final
   - A `zone.Zone` object is available.
   - A recursor is available on the zone object.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - ASN lookup results per unique IP address from `asnlookup.GetWithPrefix`.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: parallel ASN lookup fan-out.
@@ -19,7 +19,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Resolve nameserver list from `AllNameservers`.
+2. Resolve nameserver list from `ZoneNameservers`.
 3. Split into unique IPv4 and unique IPv6 IP lists (deduplicated by IP string).
 4. For each unique IP (parallelized by family):
    - Run ASN lookup (`lookupASN`).
@@ -39,7 +39,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-resolve NS list with AllNameservers
+resolve NS list with ZoneNameservers
  +- split unique IPs per family (dedupe by IP string):
       v4ips, v6ips
 

@@ -10,7 +10,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - Child zone name (`z.Name`).
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped.
@@ -18,7 +18,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Resolve nameserver list from `AllNameservers`.
+2. Resolve nameserver list from `ZoneNameservers`.
 3. For each nameserver (parallelized):
    - If transport for this nameserver IP version is disabled:
      - Emit `IPV4_DISABLED` or `IPV6_DISABLED` for each rrtype (`SOA`, `NS`) and skip queries for that nameserver.
@@ -38,7 +38,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-resolve NS list with AllNameservers
+resolve NS list with ZoneNameservers
 
 For each nameserver (parallel; fan-out = resolver.defaults.parallel):
 
@@ -166,6 +166,6 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
   - `no`
 
 ## Edge Cases And Limitations
-- If AllNameservers yields no nameservers, only testcase start/end tags are emitted.
+- If ZoneNameservers yields no nameservers, only testcase start/end tags are emitted.
 - Query call errors are treated as absent response messages.
 - A single nameserver can emit multiple findings in one run (for example one SOA issue and one NS issue).

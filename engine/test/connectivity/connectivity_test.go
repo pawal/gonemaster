@@ -30,12 +30,12 @@ func TestConnectivity01IPv6Disabled(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origMethod := allNameservers
-	t.Cleanup(func() { allNameservers = origMethod })
+	origMethod := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod })
 
 	ns4 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
 	ns6 := newNameserver(t, "ns2.example", "2001:db8::1", nil)
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns4, ns6}, nil
 	}
 
@@ -117,16 +117,16 @@ func TestConnectivity03SameASNSet(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origMethod := allNameservers
+	origMethod := authoritativeNS
 	origLookup := lookupASN
 	t.Cleanup(func() {
-		allNameservers = origMethod
+		authoritativeNS = origMethod
 		lookupASN = origLookup
 	})
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
 	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", nil)
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
 
@@ -303,10 +303,10 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origMethod := allNameservers
+	origMethod := authoritativeNS
 	origLookup := lookupASN
 	t.Cleanup(func() {
-		allNameservers = origMethod
+		authoritativeNS = origMethod
 		lookupASN = origLookup
 	})
 
@@ -314,7 +314,7 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
 	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", nil)
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
 

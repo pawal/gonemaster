@@ -25,10 +25,16 @@ import (
 const moduleName = "Connectivity"
 
 var (
-	allNameservers        = nsdiscovery.AllNameservers
 	delegationNameservers = nsdiscovery.DelegationNameservers
 	zoneNameservers       = nsdiscovery.ZoneNameservers
-	lookupASN             = asnlookup.GetWithPrefix
+	authoritativeNS       = func(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
+		items, err := nsdiscovery.ZoneNameservers(ctx, z)
+		if err != nil {
+			return nil, err
+		}
+		return nameserversFromNSItems(ctx, z, items), nil
+	}
+	lookupASN = asnlookup.GetWithPrefix
 )
 
 // All runs the Connectivity test cases in order, mirroring the Perl implementation.
@@ -162,7 +168,7 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	}
 
 	name := z.Name
-	nsList, err := allNameservers(ctx, z)
+	nsList, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -204,7 +210,7 @@ func Connectivity02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	}
 
 	name := z.Name
-	nsList, err := allNameservers(ctx, z)
+	nsList, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -231,7 +237,7 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	nsList, err := allNameservers(ctx, z)
+	nsList, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -910,4 +916,34 @@ func setTypedServersFromNames(args map[string]any, values []string) {
 		return
 	}
 	args["servers"] = servers
+}
+
+func nameserversFromNSItems(ctx context.Context, z *zone.Zone, items []nsdiscovery.NSItem) []nameserver.Nameserver {
+	if z == nil || z.Recursor() == nil {
+		return nil
+	}
+
+	seen := map[string]nameserver.Nameserver{}
+	for _, item := range items {
+		if !item.HasAddress {
+			continue
+		}
+		ns, err := nameserver.NewWithContext(ctx, item.Name.String(), item.Address.String(), z.Recursor().Client())
+		if err != nil {
+			continue
+		}
+		seen[strings.ToLower(ns.String())] = ns
+	}
+
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	out := make([]nameserver.Nameserver, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, seen[key])
+	}
+	return out
 }

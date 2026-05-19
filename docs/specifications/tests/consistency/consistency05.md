@@ -11,8 +11,8 @@ Status: Final
   - A `zone.Zone` object is available.
 - Required inputs:
   - Parent-side NS, A, and AAAA responses via `queryParentAll`.
-  - Child-side nameserver names via `methods.Method2and3`.
-  - Child-side nameserver servers via `methods.Method4and5`.
+  - Child-side nameserver names via `AllNSNames`.
+  - Child-side nameserver servers via `AllNameservers`.
   - Recursive lookup results via `recurse` for out-of-bailiwick checks and referral fallbacks.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: filter which child nameserver addresses are queried.
@@ -24,8 +24,8 @@ Status: Final
 4. Split parent glue into:
    - in-bailiwick strict glue (`strictGlue`),
    - out-of-bailiwick extended glue (`extendedGlue` grouped by NS name).
-5. Build in-bailiwick NS name set from Method2+Method3, and in-bailiwick child NS servers from Method4+Method5 (respecting enabled IP versions).
-6. If Method4+Method5 yields no usable in-bailiwick child NS servers:
+5. Build in-bailiwick NS name set from AllNSNames, and in-bailiwick child NS servers from AllNameservers (respecting enabled IP versions).
+6. If AllNameservers yields no usable in-bailiwick child NS servers:
    - Materialize child NS server endpoints from in-bailiwick strict glue, respecting enabled IP versions.
    - Query those endpoints for the child-zone NS set and merge any in-bailiwick names into the in-bailiwick NS name set.
 7. For each in-bailiwick NS name:
@@ -59,8 +59,8 @@ split parent glue by bailiwick:
    otherwise                    -> extendedGlue[nsName] += "owner/ip"
 
 build in-bailiwick name set + NS server set:
-   inBailiwickNames  = Method2and3 names filtered by IsInBailiwick
-   inBailiwickServers = Method4and5 filtered by Net.IPv4 / Net.IPv6 enable
+   inBailiwickNames  = AllNSNames names filtered by IsInBailiwick
+   inBailiwickServers = AllNameservers filtered by Net.IPv4 / Net.IPv6 enable
    inBailiwickServers empty AND strict glue available:
        fall back to strictGlue endpoints (filtered by Net.IPv4/IPv6)
        extend inBailiwickNames with names learned from those endpoints
@@ -159,7 +159,7 @@ emit TEST_CASE_END
   - Upstream: does not explicitly define this detail. Gonemaster: In-bailiwick processing queries all discovered in-bailiwick child servers and emits one `NO_RESPONSE` or `CHILD_NS_FAILED` entry per failing nameserver before final mismatch classification.
   - Upstream: does not explicitly define this detail. Gonemaster: Referral handling explicitly falls back to recursive lookup for the same qtype and owner.
   - Upstream: the short-circuit wording can be read per in-bailiwick NS name. Gonemaster: `CHILD_ZONE_LAME` is emitted only when all in-bailiwick address lookup paths fail, so disjoint parent/child NS sets can still be classified as address mismatches.
-  - Upstream: does not explicitly define this detail. Gonemaster: If Method4+Method5 cannot produce usable in-bailiwick child NS endpoints, strict glue endpoints are used as a fallback for child-side address checks and child NS name discovery.
+  - Upstream: does not explicitly define this detail. Gonemaster: If AllNameservers cannot produce usable in-bailiwick child NS endpoints, strict glue endpoints are used as a fallback for child-side address checks and child NS name discovery.
 - Potential upstream report:
   - `no`
 

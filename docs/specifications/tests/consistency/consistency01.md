@@ -10,7 +10,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver list from `methods.Method4` and `methods.Method5`.
+  - Nameserver list from `GlueNameservers` and `ApexNameservers`.
   - SOA answers from queried nameservers.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped per nameserver.
@@ -19,7 +19,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Build deduplicated nameserver list from Method4+Method5 by `ns.String()` (`name/ip`).
+2. Build deduplicated nameserver list from AllNameservers by `ns.String()` (`name/ip`).
 3. For each nameserver (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA` and skip.
    - Query SOA for zone apex.
@@ -38,7 +38,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-gather Method4 then Method5 nameservers
+gather GlueNameservers then ApexNameservers nameservers
  +- dedupe by ns.String() ("name/ip")
 
 For each nameserver (parallel; fan-out = resolver.defaults.parallel):

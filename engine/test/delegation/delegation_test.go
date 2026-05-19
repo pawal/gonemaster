@@ -12,7 +12,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -29,29 +28,29 @@ func TestDelegation01Counts(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM2 := method2
-	origM3 := method3
-	origM4 := method4
-	origM5 := method5
+	origM2 := glueNames
+	origM3 := apexNSNames
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method2 = origM2
-		method3 = origM3
-		method4 = origM4
-		method5 = origM5
+		glueNames = origM2
+		apexNSNames = origM3
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
-	method2 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
 	}
-	method3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	apexNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
 		ns2 := newNameserver(t, "ns2.example", "2001:db8::1", nil)
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns1 := newNameserver(t, "ns1.example", "192.0.2.2", nil)
 		return []nameserver.Nameserver{ns1}, nil
 	}
@@ -156,36 +155,36 @@ func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM2 := method2
-	origM3 := method3
-	origM4 := method4
-	origM5 := method5
+	origM2 := glueNames
+	origM3 := apexNSNames
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method2 = origM2
-		method3 = origM3
-		method4 = origM4
-		method5 = origM5
+		glueNames = origM2
+		apexNSNames = origM3
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
-	method2 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{
 			dnsname.New("ns1.example"),
 			dnsname.New("ns2.example"),
 		}, nil
 	}
-	method3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	apexNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{
 			dnsname.New("ns2.example"),
 			dnsname.New("ns1.example"),
 		}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{
 			newNameserver(t, "ns1.example", "192.0.2.1", nil),
 			newNameserver(t, "ns2.example", "192.0.2.2", nil),
 		}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{
 			newNameserver(t, "ns2.example", "192.0.2.22", nil),
 			newNameserver(t, "ns1.example", "192.0.2.11", nil),
@@ -234,29 +233,29 @@ func TestDelegation01NoIPv4ChildNoLegacyKeys(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM2 := method2
-	origM3 := method3
-	origM4 := method4
-	origM5 := method5
+	origM2 := glueNames
+	origM3 := apexNSNames
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method2 = origM2
-		method3 = origM3
-		method4 = origM4
-		method5 = origM5
+		glueNames = origM2
+		apexNSNames = origM3
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
-	method2 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
-	method3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	apexNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{
 			newNameserver(t, "ns1.example", "192.0.2.1", nil),
 		}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{
 			newNameserver(t, "ns1.example", "2001:db8::53", nil),
 		}, nil
@@ -293,19 +292,19 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
 		ns2 := newNameserver(t, "ns2.example", "192.0.2.1", nil)
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns3 := newNameserver(t, "ns3.example", "192.0.2.2", nil)
 		return []nameserver.Nameserver{ns3}, nil
 	}
@@ -362,23 +361,23 @@ func TestDelegation03ReferralSizeOK(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM1 := method1
-	origM2 := method2
-	origM4 := method4
+	origM1 := parentZone
+	origM2 := glueNames
+	origM4 := glueNameservers
 	t.Cleanup(func() {
-		method1 = origM1
-		method2 = origM2
-		method4 = origM4
+		parentZone = origM1
+		glueNames = origM2
+		glueNameservers = origM4
 	})
 
-	method1 = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+	parentZone = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
 		parent := zone.Zone{Name: dnsname.New(".")}
 		return &parent, nil
 	}
-	method2 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
 		return []nameserver.Nameserver{ns1}, nil
 	}
@@ -401,14 +400,14 @@ func TestDelegation04Authoritative(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "SOA") {
 				return soaPacket("example", true)
@@ -417,7 +416,7 @@ func TestDelegation04Authoritative(t *testing.T) {
 		})
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
 	}
 
@@ -447,14 +446,14 @@ func TestDelegation04NotAuthoritative(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "SOA") {
 				return soaPacket("example", false)
@@ -463,7 +462,7 @@ func TestDelegation04NotAuthoritative(t *testing.T) {
 		})
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
 	}
 
@@ -485,11 +484,11 @@ func TestDelegation04ParallelQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -526,10 +525,10 @@ func TestDelegation04ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
 	}
 
@@ -600,19 +599,19 @@ func TestDelegation05InBailiwickCNAME(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM23 := method2and3
-	origM4 := method4
-	origM5 := method5
+	origM23 := allNSNames
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method2and3 = origM23
-		method4 = origM4
-		method5 = origM5
+		allNSNames = origM23
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
-	method2and3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "A") && strings.EqualFold(qname, "ns1.example") {
 				return cnamePacket(qname, "alias.example")
@@ -621,7 +620,7 @@ func TestDelegation05InBailiwickCNAME(t *testing.T) {
 		})
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
 	}
 
@@ -656,13 +655,13 @@ func TestDelegation05ParallelQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM23 := method2and3
-	origM4 := method4
-	origM5 := method5
+	origM23 := allNSNames
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method2and3 = origM23
-		method4 = origM4
-		method5 = origM5
+		allNSNames = origM23
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -700,13 +699,13 @@ func TestDelegation05ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method2and3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
 	}
 
@@ -785,24 +784,24 @@ func TestDelegation05OutOfBailiwickNoCNAME(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM23 := method2and3
-	origM4 := method4
-	origM5 := method5
+	origM23 := allNSNames
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	origRecurse := recurse
 	t.Cleanup(func() {
-		method2and3 = origM23
-		method4 = origM4
-		method5 = origM5
+		allNSNames = origM23
+		glueNameservers = origM4
+		apexNameservers = origM5
 		recurse = origRecurse
 	})
 
-	method2and3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.other")}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
 	}
 	recurse = func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
@@ -827,14 +826,14 @@ func TestDelegation06SOANotExists(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "SOA") {
 				return noAnswerPacket()
@@ -843,7 +842,7 @@ func TestDelegation06SOANotExists(t *testing.T) {
 		})
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
 	}
 
@@ -865,14 +864,14 @@ func TestDelegation06SOAExists(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "SOA") {
 				return soaPacket("example", true)
@@ -881,7 +880,7 @@ func TestDelegation06SOAExists(t *testing.T) {
 		})
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
 	}
 
@@ -903,17 +902,17 @@ func TestDelegation07NameMismatch(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM2 := method2
-	origM3 := method3
+	origM2 := glueNames
+	origM3 := apexNSNames
 	t.Cleanup(func() {
-		method2 = origM2
-		method3 = origM3
+		glueNames = origM2
+		apexNSNames = origM3
 	})
 
-	method2 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
 	}
-	method3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	apexNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns2.example"), dnsname.New("ns3.example")}, nil
 	}
 
@@ -938,17 +937,17 @@ func TestDelegation07NamesMatch(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM2 := method2
-	origM3 := method3
+	origM2 := glueNames
+	origM3 := apexNSNames
 	t.Cleanup(func() {
-		method2 = origM2
-		method3 = origM3
+		glueNames = origM2
+		apexNSNames = origM3
 	})
 
-	method2 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
-	method3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	apexNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
 
@@ -985,14 +984,12 @@ func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	origM2 := method2
-	origM3 := method3
+	origM2 := glueNames
+	origM3 := apexNSNames
 	t.Cleanup(func() {
-		method2 = origM2
-		method3 = origM3
+		glueNames = origM2
+		apexNSNames = origM3
 	})
-	method2 = methods.Method2
-	method3 = methods.Method3
 
 	r, err := recursor.New()
 	if err != nil {

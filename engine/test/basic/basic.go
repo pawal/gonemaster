@@ -12,7 +12,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
@@ -625,11 +625,11 @@ func Basic02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nsNames, err := methods.Method2(ctx, z)
+	nsNames, err := z.GlueNames(ctx)
 	if err != nil {
 		return results, err
 	}
-	nsServers, err := methods.Method4(ctx, z)
+	nsServers, err := nsdiscovery.GlueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -841,7 +841,7 @@ func Basic03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	queryName := "www." + z.Name.String()
 
-	nsServers, err := methods.Method4(ctx, z)
+	nsServers, err := nsdiscovery.GlueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}

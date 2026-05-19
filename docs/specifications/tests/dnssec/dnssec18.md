@@ -11,7 +11,7 @@ Status: Final
   - A `zone.Zone` object is available.
 - Required inputs:
   - Parent nameservers from `parentNameservers` and parent DS responses.
-  - Child nameservers from `methods.Method4` and `methods.Method5`.
+  - Child nameservers from `GlueNameservers` and `ApexNameservers`.
   - Child CDS, CDNSKEY, and DNSKEY responses with DNSSEC enabled.
   - CDS/CDNSKEY/DNSKEY answer-section RRSIG records.
 - Profile/config knobs that affect behavior:
@@ -27,7 +27,7 @@ Status: Final
    - Require response message, `RCODE=NOERROR`, and `AA=true`.
    - Collect matching-owner DS records and deduplicate by `(keytag,digestType,algorithm,digest)`.
 4. If no DS records were collected, stop DS18 findings.
-5. Build child nameserver set from Method4+Method5, deduplicate by IP.
+5. Build child nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
 6. For each unique child nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `CDNSKEY`, `CDS`, and `DNSKEY` and skip.
    - Query `CDS`, `CDNSKEY`, and `DNSKEY` with DNSSEC enabled; each requires authoritative `NOERROR` response for participation.
@@ -85,7 +85,7 @@ For each unique parent NS IP (parallel; fan-out = resolver.defaults.parallel):
 dsRecords empty
    -> emit no DS18 findings (TEST_CASE_END only)
 
-child set = Method4 ++ Method5; dedupe by IP
+child set = GlueNameservers ++ ApexNameservers; dedupe by IP
 
 For each unique child NS IP (parallel):
    transport disabled for CDS/CDNSKEY/DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip

@@ -14,7 +14,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -300,11 +300,11 @@ func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	glueNames, err := methods.Method2(ctx, z)
+	glueNames, err := z.GlueNames(ctx)
 	if err != nil {
 		return results, err
 	}
-	nsNames, err := methods.Method3(ctx, z)
+	nsNames, err := z.ApexNSNames(ctx)
 	if err != nil {
 		return results, err
 	}
@@ -416,11 +416,11 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	glueNS, err := methods.Method4(ctx, z)
+	glueNS, err := nsdiscovery.GlueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	authNS, err := methods.Method5(ctx, z)
+	authNS, err := nsdiscovery.ApexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}

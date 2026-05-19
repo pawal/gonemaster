@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `methods.Method4and5`.
+  - Nameserver addresses from `ZoneNameservers`.
   - `A` and `AAAA` query responses for zone apex.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read nameserver list from `Method4and5`, deduplicate by `name/ip`, preserving first-seen order.
+2. Read nameserver list from `ZoneNameservers`, deduplicate by `name/ip`, preserving first-seen order.
 3. For each deduplicated nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `A`, mark not included in summary, and skip.
    - Mark nameserver as included in summary.
@@ -38,7 +38,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-ns list = Method4and5; dedupe by ns.String() ("name/ip"), preserve first-seen order
+ns list = ZoneNameservers; dedupe by ns.String() ("name/ip"), preserve first-seen order
 
 For each nameserver (parallel; fan-out = resolver.defaults.parallel):
 

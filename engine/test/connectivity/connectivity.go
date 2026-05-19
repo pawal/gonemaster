@@ -12,9 +12,8 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
-	"codeberg.org/pawal/gonemaster/engine/methodsv2"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
@@ -26,10 +25,16 @@ import (
 const moduleName = "Connectivity"
 
 var (
-	method4and5          = methods.Method4and5
-	getDelNSNamesAndIPs  = methodsv2.GetDelNSNamesAndIPs
-	getZoneNSNamesAndIPs = methodsv2.GetZoneNSNamesAndIPs
-	lookupASN            = asnlookup.GetWithPrefix
+	delegationNameservers = nsdiscovery.DelegationNameservers
+	zoneNameservers       = nsdiscovery.ZoneNameservers
+	authoritativeNS       = func(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
+		items, err := nsdiscovery.ZoneNameservers(ctx, z)
+		if err != nil {
+			return nil, err
+		}
+		return nameserversFromNSItems(ctx, z, items), nil
+	}
+	lookupASN = asnlookup.GetWithPrefix
 )
 
 // All runs the Connectivity test cases in order, mirroring the Perl implementation.
@@ -163,7 +168,7 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	}
 
 	name := z.Name
-	nsList, err := method4and5(ctx, z)
+	nsList, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -205,7 +210,7 @@ func Connectivity02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	}
 
 	name := z.Name
-	nsList, err := method4and5(ctx, z)
+	nsList, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -232,7 +237,7 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	nsList, err := method4and5(ctx, z)
+	nsList, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -447,11 +452,11 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	delItems, err := getDelNSNamesAndIPs(ctx, z)
+	delItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	zoneItems, err := zoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -460,7 +465,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	processed := map[int]map[string]bool{}
 
 	type prefixItem struct {
-		item    methodsv2.NSItem
+		item    nsdiscovery.NSItem
 		version int
 	}
 
@@ -911,4 +916,34 @@ func setTypedServersFromNames(args map[string]any, values []string) {
 		return
 	}
 	args["servers"] = servers
+}
+
+func nameserversFromNSItems(ctx context.Context, z *zone.Zone, items []nsdiscovery.NSItem) []nameserver.Nameserver {
+	if z == nil || z.Recursor() == nil {
+		return nil
+	}
+
+	seen := map[string]nameserver.Nameserver{}
+	for _, item := range items {
+		if !item.HasAddress {
+			continue
+		}
+		ns, err := nameserver.NewWithContext(ctx, item.Name.String(), item.Address.String(), z.Recursor().Client())
+		if err != nil {
+			continue
+		}
+		seen[strings.ToLower(ns.String())] = ns
+	}
+
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	out := make([]nameserver.Nameserver, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, seen[key])
+	}
+	return out
 }

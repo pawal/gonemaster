@@ -18,13 +18,13 @@ import (
 )
 
 func BenchmarkDNSSEC18Parallel(b *testing.B) {
-	origParentNS := parentNameservers
-	origM4 := method4
-	origM5 := method5
+	origParentNS := parentApexNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	defer func() {
-		parentNameservers = origParentNS
-		method4 = origM4
-		method5 = origM5
+		parentApexNameservers = origParentNS
+		glueNameservers = origM4
+		apexNameservers = origM5
 	}()
 
 	delay := 200 * time.Microsecond
@@ -98,13 +98,13 @@ func BenchmarkDNSSEC18Parallel(b *testing.B) {
 		}
 		child2.SetQueryHook(childHook)
 
-		parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return []nameserver.Nameserver{parentNS}, nil
 		}
-		method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return []nameserver.Nameserver{child1, child2}, nil
 		}
-		method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return nil, nil
 		}
 

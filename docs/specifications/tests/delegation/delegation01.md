@@ -9,26 +9,26 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Delegation names from `methods.Method2`.
-  - Child NS names from `methods.Method3`.
-  - Delegation nameserver addresses from `methods.Method4`.
-  - Child nameserver addresses from `methods.Method5`.
+  - Delegation names from `z.GlueNames(ctx)`.
+  - Child NS names from `z.ApexNSNames(ctx)`.
+  - Delegation nameserver addresses from `GlueNameservers`.
+  - Child nameserver addresses from `ApexNameservers`.
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
   - Minimum required nameserver count is fixed by `constants.MinimumNumberOfNameservers`.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Get delegation NS names (`Method2`), sort names, and emit one of:
+2. Get delegation NS names (`z.GlueNames`), sort names, and emit one of:
    - `ENOUGH_NS_DEL` when count is at least the minimum.
    - `NOT_ENOUGH_NS_DEL` otherwise.
-3. Get child NS names (`Method3`), sort names, and emit one of:
+3. Get child NS names (`z.ApexNSNames`), sort names, and emit one of:
    - `ENOUGH_NS_CHILD` when count is at least the minimum.
    - `NOT_ENOUGH_NS_CHILD` otherwise.
-4. Get child addressed NS (`Method5`), split by IP family, count unique NS names per family, and emit per family:
+4. Get child addressed NS (`ApexNameservers`), split by IP family, count unique NS names per family, and emit per family:
    - IPv4: `ENOUGH_IPV4_NS_CHILD`, `NOT_ENOUGH_IPV4_NS_CHILD`, or `NO_IPV4_NS_CHILD`.
    - IPv6: `ENOUGH_IPV6_NS_CHILD`, `NOT_ENOUGH_IPV6_NS_CHILD`, or `NO_IPV6_NS_CHILD`.
-5. Get delegation addressed NS (`Method4`), split by IP family, count unique NS names per family, and emit per family:
+5. Get delegation addressed NS (`GlueNameservers`), split by IP family, count unique NS names per family, and emit per family:
    - IPv4: `ENOUGH_IPV4_NS_DEL`, `NOT_ENOUGH_IPV4_NS_DEL`, or `NO_IPV4_NS_DEL`.
    - IPv6: `ENOUGH_IPV6_NS_DEL`, `NOT_ENOUGH_IPV6_NS_DEL`, or `NO_IPV6_NS_DEL`.
 6. Emit `TEST_CASE_END`.
@@ -37,11 +37,11 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-delegation NS names = sort(Method2)
+delegation NS names = sort(z.GlueNames)
    len >= constants.MinimumNumberOfNameservers -> ENOUGH_NS_DEL     (count, minimum, servers)
    otherwise                                   -> NOT_ENOUGH_NS_DEL (count, minimum, servers)
 
-child NS names = sort(Method3)
+child NS names = sort(z.ApexNSNames)
    len >= constants.MinimumNumberOfNameservers -> ENOUGH_NS_CHILD     (count, minimum, servers)
    otherwise                                   -> NOT_ENOUGH_NS_CHILD (count, minimum, servers)
 ```
@@ -53,7 +53,7 @@ Same shape runs four times: child IPv4, child IPv6, delegation IPv4, delegation 
 
 {{% expand "Show diagram" %}}
 ```
-Per side <SIDE> in {CHILD (Method5), DEL (Method4)}:
+Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
   Per family <V> in {IPV4, IPV6}:
     count = unique-NS-name count whose address is in that family
 

@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `methods.Method4and5`.
+  - Nameserver addresses from `ZoneNameservers`.
   - Baseline SOA responses for zone name.
   - TXT/CH responses for query names `version.bind` and `version.server`.
 - Profile/config knobs that affect behavior:
@@ -23,7 +23,7 @@ Status: Final
    - error-on-version-query by `query_name`
    - no-version-revealed nameserver set
    - wrong-class nameserver set
-3. Read nameserver list from `Method4and5`.
+3. Read nameserver list from `ZoneNameservers`.
 4. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA TXT`, then skip.
    - Send baseline SOA query for zone; if no response, skip nameserver.
@@ -89,7 +89,7 @@ Status: Final
 - Upstream reference: [`nameserver15.md`](../../upstream/tests/Nameserver-TP/nameserver15.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes a conceptual "Sending Version Query" set then removal based on TXT data. Gonemaster: computes equivalent behavior via per-server `noVersion` state (set only when no non-empty version string was revealed).
-  - Upstream: states nameserver IP collection semantics. Gonemaster: iterates raw `Method4and5` output and emits deduplicated sorted `servers` aggregates.
+  - Upstream: states nameserver IP collection semantics. Gonemaster: iterates raw `ZoneNameservers` output and emits deduplicated sorted `servers` aggregates.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`

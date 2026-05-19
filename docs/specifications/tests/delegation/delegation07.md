@@ -9,14 +9,14 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Parent-side NS names from `methods.Method2`.
-  - Child-side NS names from `methods.Method3`.
+  - Parent-side NS names from `z.GlueNames(ctx)`.
+  - Child-side NS names from `z.ApexNSNames(ctx)`.
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read parent names from `Method2` and child names from `Method3`.
+2. Read parent names from `z.GlueNames` and child names from `z.ApexNSNames`.
 3. Build `nameCounts` map by adding `+1` per parent name and `-1` per child name.
 4. Partition names:
    - `sameNames` for `count == 0`.
@@ -33,8 +33,8 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-parentNames = Method2
-childNames  = Method3
+parentNames = z.GlueNames
+childNames  = z.ApexNSNames
 
 build nameCounts:
    for each name in parentNames: nameCounts[name] += 1

@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver name/IP items from `methodsv2.GetDelNSNamesAndIPs` and `methodsv2.GetZoneNSNamesAndIPs`.
+  - Nameserver name/IP items from `DelegationNameservers` and `ZoneNameservers`.
   - DNSKEY query responses for child apex from the collected nameservers.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -38,7 +38,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-nss = methodsv2.GetDelNSNamesAndIPs ++ methodsv2.GetZoneNSNamesAndIPs;
+nss = DelegationNameservers ++ ZoneNameservers;
       group by IP
 
 For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):

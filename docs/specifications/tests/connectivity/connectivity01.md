@@ -10,7 +10,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `methods.Method4and5`.
+  - Nameserver addresses from `ZoneNameservers`.
   - Child zone name (`z.Name`).
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped.
@@ -18,7 +18,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Resolve nameserver list from `Method4and5`.
+2. Resolve nameserver list from `ZoneNameservers`.
 3. Build disabled-transport summary tags:
    - If any IPv4 nameservers exist while IPv4 is disabled, emit `CN01_IPV4_DISABLED` with `servers`.
    - If any IPv6 nameservers exist while IPv6 is disabled, emit `CN01_IPV6_DISABLED` with `servers`.
@@ -41,7 +41,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-resolve NS list with method4and5
+resolve NS list with ZoneNameservers
  |
  v
 summary tags (per family, once):
@@ -87,8 +87,8 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `CN01_IPV4_DISABLED` | IPv4 is disabled and at least one IPv4 nameserver exists in Method4+Method5 set. |
-| `CN01_IPV6_DISABLED` | IPv6 is disabled and at least one IPv6 nameserver exists in Method4+Method5 set. |
+| `CN01_IPV4_DISABLED` | IPv4 is disabled and at least one IPv4 nameserver exists in ZoneNameservers set. |
+| `CN01_IPV6_DISABLED` | IPv6 is disabled and at least one IPv6 nameserver exists in ZoneNameservers set. |
 | `CN01_MISSING_NS_RECORD_UDP` | NS response exists with `NOERROR` but has no NS answer record. |
 | `CN01_MISSING_SOA_RECORD_UDP` | SOA response exists with `NOERROR` but has no SOA answer record. |
 | `CN01_NO_RESPONSE_NS_QUERY_UDP` | NS query has no response message while SOA handling continues. |
@@ -180,6 +180,6 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
   - `no`
 
 ## Edge Cases And Limitations
-- If Method4+Method5 yields no nameservers, only testcase start/end tags are emitted.
+- If ZoneNameservers yields no nameservers, only testcase start/end tags are emitted.
 - Query call errors are treated as absent response messages.
 - A single nameserver can emit multiple findings in one run (for example one SOA issue and one NS issue).

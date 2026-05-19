@@ -1,4 +1,4 @@
-package methodsv2
+package nsdiscovery
 
 import (
 	"context"
@@ -17,106 +17,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-func authoritativeNSPacket(zoneName string, nsNames ...string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	for _, nsName := range nsNames {
-		nsRR := &dns.NS{}
-		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}
-		nsRR.Ns = dnsutil.Fqdn(nsName)
-		msg.Answer = append(msg.Answer, nsRR)
-	}
-	return packet.Packet{Msg: msg}
-}
-
-func newAuthoritativeNameserver(ctx context.Context, t *testing.T, r *recursor.Recursor, name string, addr string, zoneName string, nsNames ...string) nameserver.Nameserver {
-	t.Helper()
-	ns, err := nameserver.NewWithContext(ctx, name, addr, r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		if qname != zoneName || qtype != "NS" {
-			return packet.Packet{}, nil
-		}
-		return authoritativeNSPacket(zoneName, nsNames...), nil
-	})
-	return ns
-}
-
-func TestParentCacheStoresSnapshotData(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
-
-	ctx, _, _ := testhelpers.Context(t)
-	ns, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	cacheParent("example", []nameserver.Nameserver{ns}, true)
-
-	parentCache.mu.Lock()
-	entry, ok := parentCache.items["example"]
-	parentCache.mu.Unlock()
-	if !ok {
-		t.Fatalf("expected parent cache entry")
-	}
-	if !entry.defined {
-		t.Fatalf("expected defined parent cache entry")
-	}
-	if len(entry.servers) != 1 {
-		t.Fatalf("expected 1 cached parent server, got %d", len(entry.servers))
-	}
-	if entry.servers[0].Name != "ns1.example" {
-		t.Fatalf("unexpected cached name %q", entry.servers[0].Name)
-	}
-	if entry.servers[0].Address != "192.0.2.53" {
-		t.Fatalf("unexpected cached address %q", entry.servers[0].Address)
-	}
-
-	ctx2, _, _ := testhelpers.Context(t)
-	servers := materializeParentServers(ctx2, nil, append(entry.servers, parentCacheServer{}))
-	if len(servers) != 1 {
-		t.Fatalf("expected malformed cached rows to be skipped, got %d materialized servers", len(servers))
-	}
-	if servers[0].Name.String() != "ns1.example" {
-		t.Fatalf("unexpected materialized name %q", servers[0].Name.String())
-	}
-	if servers[0].Address.String() != "192.0.2.53" {
-		t.Fatalf("unexpected materialized address %q", servers[0].Address.String())
-	}
-}
-
-func TestGetParentNSNamesAndIPsUndelegated(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
-	ctx, _, _ := testhelpers.Context(t)
-
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
-
-	parent, err := GetParentNSNamesAndIPs(ctx, &z)
-	if err != nil {
-		t.Fatalf("get parent: %v", err)
-	}
-	if parent == nil || len(parent) != 0 {
-		t.Fatalf("expected empty parent list, got %#v", parent)
-	}
-}
-
-func TestGetDelNSNamesAndIPsUndelegated(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
+func TestDelegationNameserversUndelegated(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -131,9 +32,9 @@ func TestGetDelNSNamesAndIPsUndelegated(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	items, err := GetDelNSNamesAndIPs(ctx, &z)
+	items, err := DelegationNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("get delegation: %v", err)
+		t.Fatalf("DelegationNameservers: %v", err)
 	}
 	if len(items) != 2 {
 		t.Fatalf("expected 2 items, got %d", len(items))
@@ -153,9 +54,7 @@ func TestGetDelNSNamesAndIPsUndelegated(t *testing.T) {
 	}
 }
 
-func TestGetZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
+func TestZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
@@ -173,9 +72,9 @@ func TestGetZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
 
 	_ = newAuthoritativeNameserver(ctx, t, r, "ns1.example.net", "192.0.2.53", "example", "NS1.EXAMPLE.NET", "ns2.example.net")
 
-	names, err := GetZoneNSNames(ctx, &z)
+	names, err := zoneNSNames(ctx, &z)
 	if err != nil {
-		t.Fatalf("get zone NS names: %v", err)
+		t.Fatalf("zoneNSNames: %v", err)
 	}
 	want := []string{"ns1.example.net"}
 	if len(names) != len(want) {
@@ -188,9 +87,7 @@ func TestGetZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
 	}
 }
 
-func TestGetZoneNSNamesAndIPsOutOfBailiwick(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
+func TestZoneNameserversOutOfBailiwick(t *testing.T) {
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
@@ -210,9 +107,9 @@ func TestGetZoneNSNamesAndIPsOutOfBailiwick(t *testing.T) {
 	_ = newAuthoritativeNameserver(ctx, t, r, "ns1.example.net", "192.0.2.53", "example", "ns1.example.net", "ns2.example.net")
 	_ = newAuthoritativeNameserver(ctx, t, r, "ns2.example.net", "192.0.2.54", "example", "ns1.example.net", "ns2.example.net")
 
-	items, err := GetZoneNSNamesAndIPs(ctx, &z)
+	items, err := ZoneNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("get zone NS names and IPs: %v", err)
+		t.Fatalf("ZoneNameservers: %v", err)
 	}
 	if len(items) != 2 {
 		t.Fatalf("expected 2 items, got %d", len(items))
@@ -232,9 +129,7 @@ func TestGetZoneNSNamesAndIPsOutOfBailiwick(t *testing.T) {
 	}
 }
 
-func TestGetDelNSNamesAndIPsUndelegatedLookupWhenNoIP(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
+func TestDelegationNameserversUndelegatedLookupWhenNoIP(t *testing.T) {
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
@@ -273,9 +168,9 @@ func TestGetDelNSNamesAndIPsUndelegatedLookupWhenNoIP(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	items, err := GetDelNSNamesAndIPs(ctx, &z)
+	items, err := DelegationNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("get delegation: %v", err)
+		t.Fatalf("DelegationNameservers: %v", err)
 	}
 	if len(items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(items))
@@ -288,9 +183,7 @@ func TestGetDelNSNamesAndIPsUndelegatedLookupWhenNoIP(t *testing.T) {
 	}
 }
 
-func TestGetDelNSNamesAndIPsUndelegatedKeepsInBailiwickNameWithoutIP(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
+func TestDelegationNameserversUndelegatedKeepsInBailiwickNameWithoutIP(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -304,9 +197,9 @@ func TestGetDelNSNamesAndIPsUndelegatedKeepsInBailiwickNameWithoutIP(t *testing.
 		t.Fatalf("new zone: %v", err)
 	}
 
-	items, err := GetDelNSNamesAndIPs(ctx, &z)
+	items, err := DelegationNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("get delegation: %v", err)
+		t.Fatalf("DelegationNameservers: %v", err)
 	}
 	if len(items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(items))
@@ -316,9 +209,7 @@ func TestGetDelNSNamesAndIPsUndelegatedKeepsInBailiwickNameWithoutIP(t *testing.
 	}
 }
 
-func TestGetZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
+func TestZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -333,9 +224,9 @@ func TestGetZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	names, err := GetZoneNSNames(ctx, &z)
+	names, err := zoneNSNames(ctx, &z)
 	if err != nil {
-		t.Fatalf("get zone ns names: %v", err)
+		t.Fatalf("zoneNSNames: %v", err)
 	}
 	if len(names) != 2 {
 		t.Fatalf("expected 2 names, got %d", len(names))
@@ -345,9 +236,7 @@ func TestGetZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
 	}
 }
 
-func TestGetZoneNSNamesAndIPsUndelegatedInBailiwickUsesProvidedGlue(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
+func TestZoneNameserversUndelegatedInBailiwickUsesProvidedGlue(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -371,9 +260,9 @@ func TestGetZoneNSNamesAndIPsUndelegatedInBailiwickUsesProvidedGlue(t *testing.T
 		return packet.Packet{}, nil
 	})
 
-	items, err := GetZoneNSNamesAndIPs(ctx, &z)
+	items, err := ZoneNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("get zone ns names and ips: %v", err)
+		t.Fatalf("ZoneNameservers: %v", err)
 	}
 	if len(items) != 1 {
 		t.Fatalf("expected 1 item, got %d", len(items))
@@ -383,105 +272,6 @@ func TestGetZoneNSNamesAndIPsUndelegatedInBailiwickUsesProvidedGlue(t *testing.T
 	}
 	if queryCalls != 0 {
 		t.Fatalf("expected no A/AAAA lookup queries for provided glue, got %d", queryCalls)
-	}
-}
-
-func TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
-	ctx, prof, _ := testhelpers.Context(t)
-	prof.Net.IPv4 = true
-	prof.Net.IPv6 = true
-
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"ns1.root": {"192.0.2.1"},
-		"ns2.root": {"192.0.2.2"},
-	}); err != nil {
-		t.Fatalf("add fake root addresses: %v", err)
-	}
-
-	rootSOA := func(name string) packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		msg.Authoritative = true
-		soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET}}
-		soaRR.Ns = "ns.example."
-		soaRR.Mbox = "hostmaster.example."
-		soaRR.Serial = 1
-		msg.Answer = []dns.RR{soaRR}
-		return packet.Packet{Msg: msg}
-	}
-
-	rootNS := func() packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		msg.Authoritative = true
-		ns1RR := &dns.NS{}
-		ns1RR.Hdr = dns.Header{Name: ".", Class: dns.ClassINET}
-		ns1RR.Ns = "ns1.root."
-		ns2RR := &dns.NS{}
-		ns2RR.Hdr = dns.Header{Name: ".", Class: dns.ClassINET}
-		ns2RR.Ns = "ns2.root."
-		msg.Answer = []dns.RR{ns1RR, ns2RR}
-		a1RR := &dns.A{}
-		a1RR.Hdr = dns.Header{Name: "ns1.root.", Class: dns.ClassINET}
-		a1RR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 1})
-		a2RR := &dns.A{}
-		a2RR.Hdr = dns.Header{Name: "ns2.root.", Class: dns.ClassINET}
-		a2RR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 2})
-		msg.Extra = []dns.RR{a1RR, a2RR}
-		return packet.Packet{Msg: msg}
-	}
-
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new ns1: %v", err)
-	}
-	ns1.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		switch {
-		case name == "." && qtype == "SOA":
-			return rootSOA("."), nil
-		case name == "." && qtype == "NS":
-			return rootNS(), nil
-		case name == "example" && qtype == "SOA":
-			return packet.Packet{}, nil
-		default:
-			return packet.Packet{}, nil
-		}
-	})
-
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.root", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new ns2: %v", err)
-	}
-	ns2.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		switch {
-		case name == "." && qtype == "SOA":
-			return rootSOA("."), nil
-		case name == "." && qtype == "NS":
-			return rootNS(), nil
-		case name == "example" && qtype == "SOA":
-			return rootSOA("example"), nil
-		default:
-			return packet.Packet{}, nil
-		}
-	})
-
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
-
-	parent, err := GetParentNSNamesAndIPs(ctx, &z)
-	if err != nil {
-		t.Fatalf("get parent: %v", err)
-	}
-	if len(parent) != 1 {
-		t.Fatalf("expected 1 parent nameserver, got %d", len(parent))
-	}
-	if parent[0].String() != "ns2.root/192.0.2.2" {
-		t.Fatalf("unexpected parent nameserver %q", parent[0].String())
 	}
 }
 
@@ -528,8 +318,8 @@ func authoritativeAPacket(name string, addr string) packet.Packet {
 	return packet.Packet{Msg: msg}
 }
 
-// ibTestRootHook returns a query hook for a root server that delegates zoneName
-// to the specified nameservers with glue.
+// ibTestRootHook returns a query hook for a root server that delegates
+// zoneName to the specified nameservers with glue.
 func ibTestRootHook(zoneName string, nsGlue map[string]string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
 	return func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		if name == "." && qtype == "SOA" {
@@ -564,13 +354,9 @@ func ibTestRootHook(zoneName string, nsGlue map[string]string) func(context.Cont
 	}
 }
 
-// TestGetIBAddrInZoneSkipsDeadDelegationServer exercises the non-undelegated
-// in-bailiwick resolution path where one delegation server is unreachable.
-// Zone "example" is delegated from root to three in-bailiwick servers, one
-// dead. The dead server should be tried at most once then skipped.
+// TestGetIBAddrInZoneSkipsDeadDelegationServer exercises in-bailiwick
+// resolution where one delegation server is unreachable.
 func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = false
@@ -582,7 +368,6 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Root delegates "example" to three in-bailiwick servers with glue.
 	rootNS, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.9", r.Client())
 	if err != nil {
 		t.Fatal(err)
@@ -593,7 +378,6 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 		"dead.example": "192.0.2.99",
 	}))
 
-	// Healthy delegation server - responds authoritatively for example.
 	ibHook := func(name string, qtype string) (packet.Packet, error) {
 		if name == "example" && qtype == "NS" {
 			return authoritativeNSPacket("example", "ns1.example", "ns2.example", "dead.example"), nil
@@ -633,7 +417,6 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 		return ibHook(name, qtype)
 	})
 
-	// Dead delegation server - returns error for all queries.
 	var deadQueryCount atomic.Int32
 	deadNS, err := nameserver.NewWithContext(ctx, "dead.example", "192.0.2.99", r.Client())
 	if err != nil {
@@ -649,9 +432,9 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	items, err := GetZoneNSNamesAndIPs(ctx, &z)
+	items, err := ZoneNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("GetZoneNSNamesAndIPs: %v", err)
+		t.Fatalf("ZoneNameservers: %v", err)
 	}
 
 	got := map[string]string{}
@@ -667,13 +450,9 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 		t.Errorf("ns2.example: want 192.0.2.12, got %q", got["ns2.example"])
 	}
 
-	// The dead server should be tried at most a few times total. Without
-	// dead-server tracking it would be queried once per IB name × qtype
-	// (3 × 1 = 3 from getIBAddrInZone alone, plus GetZoneNSNames queries).
-	// With the fix, expect ≤ 5 total across both phases.
 	dq := int(deadQueryCount.Load())
 	if dq > 5 {
-		t.Errorf("dead server queried %d times (expected ≤ 5 with dead-server skip)", dq)
+		t.Errorf("dead server queried %d times (expected <= 5 with dead-server skip)", dq)
 	}
 }
 
@@ -681,8 +460,6 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 // server provides addresses for an in-bailiwick NS name, remaining servers
 // are not tried for that name.
 func TestGetIBAddrInZoneBreaksEarlyOnSuccess(t *testing.T) {
-	ClearCache()
-	defer ClearCache()
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = false
@@ -694,7 +471,6 @@ func TestGetIBAddrInZoneBreaksEarlyOnSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Root delegates "example" to two in-bailiwick servers with glue.
 	rootNS, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.9", r.Client())
 	if err != nil {
 		t.Fatal(err)
@@ -746,7 +522,7 @@ func TestGetIBAddrInZoneBreaksEarlyOnSuccess(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Reset counters after zone creation (GetZoneNSNames queries both servers).
+	// Reset counters after zone creation (zoneNSNames queries both servers).
 	ns1Count.Store(0)
 	ns2Count.Store(0)
 

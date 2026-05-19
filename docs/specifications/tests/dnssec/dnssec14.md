@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameservers from `methods.Method4` and `methods.Method5`.
+  - Child nameservers from `GlueNameservers` and `ApexNameservers`.
   - DNSKEY responses from child nameservers.
   - RSA key-size policy map (`rsaKeySizeByAlgo`).
 - Profile/config knobs that affect behavior:
@@ -18,7 +18,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Build child nameserver set from Method4+Method5 by unique nameserver string (not IP-deduplicated).
+2. Build child nameserver set from the union of `glueNameservers` and `apexNameservers` deduplicated by `ns.String()` (not IP-deduplicated).
 3. For each nameserver (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
    - Query `DNSKEY` with DNSSEC enabled.

@@ -13,7 +13,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	ens "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -24,15 +24,15 @@ import (
 func TestZone02RefreshBelowMinimum(t *testing.T) {
 	setupTest(t)
 
-	origMethod5 := method5
-	t.Cleanup(func() { method5 = origMethod5 })
+	origMethod5 := apexNameservers
+	t.Cleanup(func() { apexNameservers = origMethod5 })
 
 	profile.Effective().TestCasesVars.Zone02.SOARefreshMinimumValue = 1000
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		return soaPacket("example", 1, 500, 50, 7200, 60)
 	})
-	method5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns}, nil
 	}
 
@@ -49,15 +49,15 @@ func TestZone02RefreshBelowMinimum(t *testing.T) {
 func TestZone05ExpireLowerThanRefreshAndMinimum(t *testing.T) {
 	setupTest(t)
 
-	origMethod5 := method5
-	t.Cleanup(func() { method5 = origMethod5 })
+	origMethod5 := apexNameservers
+	t.Cleanup(func() { apexNameservers = origMethod5 })
 
 	profile.Effective().TestCasesVars.Zone05.SOAExpireMinimumValue = 2000
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.2", func(_ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		return soaPacket("example", 1, 1500, 100, 1000, 60)
 	})
-	method5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns}, nil
 	}
 
@@ -77,8 +77,8 @@ func TestZone05ExpireLowerThanRefreshAndMinimum(t *testing.T) {
 func TestZone10ParallelQueries(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
@@ -114,7 +114,7 @@ func TestZone10ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
 	}
 
@@ -188,8 +188,8 @@ func TestZone10ParallelQueries(t *testing.T) {
 func TestZone10WrongSOAUsesQueryName(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype != "SOA" {
@@ -209,7 +209,7 @@ func TestZone10WrongSOAUsesQueryName(t *testing.T) {
 		msg.Answer = []dns.RR{soa}
 		return packet.Packet{Msg: msg}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns}, nil
 	}
 
@@ -242,8 +242,8 @@ func TestZone10WrongSOAUsesQueryName(t *testing.T) {
 func TestZone09MXQueryDisablesFallback(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	profile.Effective().Resolver.Defaults.Parallel = 1
 
@@ -285,7 +285,7 @@ func TestZone09MXQueryDisablesFallback(t *testing.T) {
 		}
 	})
 
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns}, nil
 	}
 
@@ -313,8 +313,8 @@ func TestZone09MXQueryDisablesFallback(t *testing.T) {
 func TestZone09MXDataUsesTypedMailTargets(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		switch qtype {
@@ -334,7 +334,7 @@ func TestZone09MXDataUsesTypedMailTargets(t *testing.T) {
 		}
 	})
 
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns}, nil
 	}
 
@@ -370,11 +370,11 @@ func TestZone09MXDataUsesTypedMailTargets(t *testing.T) {
 func TestZone11SpfSyntaxError(t *testing.T) {
 	setupTest(t)
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	z, err := zonepkg.New("example.com")
@@ -389,14 +389,14 @@ func TestZone11SpfSyntaxError(t *testing.T) {
 		return txtPacket(qname, "v=spf1 amx-all")
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name:       dnsname.New("ns1.example.com"),
 			Address:    netip.MustParseAddr("192.0.2.10"),
 			HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -412,11 +412,11 @@ func TestZone11SpfSyntaxError(t *testing.T) {
 func TestZone11NoSpfNonMailDomain(t *testing.T) {
 	setupTest(t)
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	z, err := zonepkg.New("se")
@@ -432,14 +432,14 @@ func TestZone11NoSpfNonMailDomain(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name:       dnsname.New("ns1.se"),
 			Address:    netip.MustParseAddr("192.0.2.10"),
 			HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -535,8 +535,8 @@ func csyncPacket(name string, serial uint32, flags uint16, types []uint16) packe
 func TestZone12CSYNCFound(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	const serial uint32 = 2024010101
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
@@ -548,7 +548,7 @@ func TestZone12CSYNCFound(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -565,8 +565,8 @@ func TestZone12CSYNCFound(t *testing.T) {
 func TestZone12NoCSYNC(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		switch qtype {
@@ -581,7 +581,7 @@ func TestZone12NoCSYNC(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -598,8 +598,8 @@ func TestZone12NoCSYNC(t *testing.T) {
 func TestZone12SerialMismatch(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		switch qtype {
@@ -611,7 +611,7 @@ func TestZone12SerialMismatch(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -628,8 +628,8 @@ func TestZone12SerialMismatch(t *testing.T) {
 func TestZone12SerialMismatchSoaMinimumNewerCSYNC(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		switch qtype {
@@ -641,7 +641,7 @@ func TestZone12SerialMismatchSoaMinimumNewerCSYNC(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -658,8 +658,8 @@ func TestZone12SerialMismatchSoaMinimumNewerCSYNC(t *testing.T) {
 func TestZone12SerialMismatchSoaMinimumOlderCSYNCNotMismatch(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		switch qtype {
@@ -671,7 +671,7 @@ func TestZone12SerialMismatchSoaMinimumOlderCSYNCNotMismatch(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -688,8 +688,8 @@ func TestZone12SerialMismatchSoaMinimumOlderCSYNCNotMismatch(t *testing.T) {
 func TestZone12MultipleCSYNC(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype != "CSYNC" {
@@ -707,7 +707,7 @@ func TestZone12MultipleCSYNC(t *testing.T) {
 		}
 		return packet.Packet{Msg: msg}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -724,8 +724,8 @@ func TestZone12MultipleCSYNC(t *testing.T) {
 func TestZone12InconsistentCSYNC(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	// ns1 and ns2 return CSYNC records with different serials.
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
@@ -740,7 +740,7 @@ func TestZone12InconsistentCSYNC(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
 	}
 
@@ -757,8 +757,8 @@ func TestZone12InconsistentCSYNC(t *testing.T) {
 func TestZone12MixedPresence(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	// ns1 returns CSYNC, ns2 returns authoritative NOERROR without CSYNC.
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
@@ -776,7 +776,7 @@ func TestZone12MixedPresence(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
 	}
 
@@ -1155,8 +1155,8 @@ func zonemdPacket(name string, records []zonemdRecord) packet.Packet {
 func TestZone14ZONEMDFound(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	const serial uint32 = 2024010101
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
@@ -1168,7 +1168,7 @@ func TestZone14ZONEMDFound(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1188,8 +1188,8 @@ func TestZone14ZONEMDFound(t *testing.T) {
 func TestZone14NoZONEMD(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype == "ZONEMD" {
@@ -1200,7 +1200,7 @@ func TestZone14NoZONEMD(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1217,8 +1217,8 @@ func TestZone14NoZONEMD(t *testing.T) {
 func TestZone14SerialMismatch(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		switch qtype {
@@ -1229,7 +1229,7 @@ func TestZone14SerialMismatch(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1246,8 +1246,8 @@ func TestZone14SerialMismatch(t *testing.T) {
 func TestZone14DuplicateSchemeHash(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype == "ZONEMD" {
@@ -1258,7 +1258,7 @@ func TestZone14DuplicateSchemeHash(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1275,8 +1275,8 @@ func TestZone14DuplicateSchemeHash(t *testing.T) {
 func TestZone14MultipleZONEMD(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype == "ZONEMD" {
@@ -1287,7 +1287,7 @@ func TestZone14MultipleZONEMD(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1313,8 +1313,8 @@ func TestZone14MultipleZONEMD(t *testing.T) {
 func TestZone14InconsistentZONEMD(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype == "ZONEMD" {
@@ -1328,7 +1328,7 @@ func TestZone14InconsistentZONEMD(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
 	}
 
@@ -1345,8 +1345,8 @@ func TestZone14InconsistentZONEMD(t *testing.T) {
 func TestZone14MixedPresence(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype == "ZONEMD" {
@@ -1363,7 +1363,7 @@ func TestZone14MixedPresence(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
 	}
 
@@ -1380,8 +1380,8 @@ func TestZone14MixedPresence(t *testing.T) {
 func TestZone14ConsolidatedFound(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	rec := zonemdRecord{serial: 2024010101, scheme: 1, hash: 1, digest: "aabbcc"}
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
@@ -1396,7 +1396,7 @@ func TestZone14ConsolidatedFound(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
 	}
 
@@ -1422,8 +1422,8 @@ func TestZone14ConsolidatedFound(t *testing.T) {
 func TestZone14NonAuthoritativeSkipped(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype == "ZONEMD" {
@@ -1442,7 +1442,7 @@ func TestZone14NonAuthoritativeSkipped(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1461,8 +1461,8 @@ func TestZone14NonAuthoritativeSkipped(t *testing.T) {
 func TestZone14UnsupportedHash(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype == "ZONEMD" {
@@ -1470,7 +1470,7 @@ func TestZone14UnsupportedHash(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1490,8 +1490,8 @@ func TestZone14UnsupportedHash(t *testing.T) {
 func TestZone14UnsupportedHashConsolidated(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	// Two ZONEMD records with the same unsupported hash but different schemes.
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
@@ -1503,7 +1503,7 @@ func TestZone14UnsupportedHashConsolidated(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1526,8 +1526,8 @@ func TestZone14UnsupportedHashConsolidated(t *testing.T) {
 func TestZone14SOAUnavailable(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype == "ZONEMD" {
@@ -1535,7 +1535,7 @@ func TestZone14SOAUnavailable(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1555,8 +1555,8 @@ func TestZone14SOAUnavailable(t *testing.T) {
 func TestZone14MixedPresenceAndInconsistent(t *testing.T) {
 	setupTest(t)
 
-	origMethod4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origMethod4and5 })
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
 		if qtype == "ZONEMD" {
@@ -1579,7 +1579,7 @@ func TestZone14MixedPresenceAndInconsistent(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2, ns3}, nil
 	}
 

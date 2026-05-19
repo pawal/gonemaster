@@ -16,8 +16,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
-	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -31,14 +30,22 @@ import (
 const moduleName = "Zone"
 
 var (
-	method3              = methods.Method3
-	method5              = methods.Method5
-	method4and5          = methods.Method4and5
-	getDelNSNamesAndIPs  = methodsv2.GetDelNSNamesAndIPs
-	getZoneNSNamesAndIPs = methodsv2.GetZoneNSNamesAndIPs
-	getAddressesFor      = defaultGetAddressesFor
-	recurse              = defaultRecurse
-	queryAuth            = defaultQueryAuth
+	apexNSNames = func(ctx context.Context, z *zonepkg.Zone) ([]dnsname.Name, error) {
+		return z.ApexNSNames(ctx)
+	}
+	apexNameservers       = nsdiscovery.ApexNameservers
+	delegationNameservers = nsdiscovery.DelegationNameservers
+	zoneNameservers       = nsdiscovery.ZoneNameservers
+	authoritativeNS       = func(ctx context.Context, z *zonepkg.Zone) ([]nameserver.Nameserver, error) {
+		items, err := nsdiscovery.ZoneNameservers(ctx, z)
+		if err != nil {
+			return nil, err
+		}
+		return nameserversFromNSItems(ctx, z, items), nil
+	}
+	getAddressesFor = defaultGetAddressesFor
+	recurse         = defaultRecurse
+	queryAuth       = defaultQueryAuth
 )
 
 var nullSpfRegex = regexp.MustCompile(`(?i)^v=spf1[ \t]+-all[ \t]*$`)
@@ -373,7 +380,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	var mnameLocalhost []string
 	var mnameDot []string
 
-	nss, err := method4and5(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -431,17 +438,17 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	foundIP := 0
 	foundSerial := 0
 
-	method3Names, err := method3(ctx, z)
+	apexNames, err := apexNSNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	method3Set := map[string]bool{}
-	for _, name := range method3Names {
-		method3Set[strings.ToLower(name.String())] = true
+	apexNameSet := map[string]bool{}
+	for _, name := range apexNames {
+		apexNameSet[strings.ToLower(name.String())] = true
 	}
 
 	for mname := range mnameNS {
-		if !method3Set[strings.ToLower(mname)] {
+		if !apexNameSet[strings.ToLower(mname)] {
 			if err := appendLog(ctx, &results, testcase, "Z01_MNAME_NOT_IN_NS_LIST", map[string]any{
 				"ns": mname,
 			}); err != nil {
@@ -991,7 +998,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	allNS := map[string][]string{}
 	var allNSOrder []string
 
-	nss, err := method4and5(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1248,7 +1255,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1327,11 +1334,11 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nsItems, err := getDelNSNamesAndIPs(ctx, z)
+	nsItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	zoneItems, err := zoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1524,7 +1531,7 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -2009,7 +2016,7 @@ func ipDisabledMessage(ctx context.Context, results *[]*logger.Entry, testcase s
 }
 
 func retrieveRecordFromZone(ctx context.Context, results *[]*logger.Entry, testcase string, z *zonepkg.Zone, name dnsname.Name, qtype string) (packet.Packet, error) {
-	nss, err := method5(ctx, z)
+	nss, err := apexNameservers(ctx, z)
 	if err != nil {
 		return packet.Packet{}, err
 	}
@@ -2202,7 +2209,7 @@ func validDomain(value string) bool {
 	return ok
 }
 
-func nameserversFromNSItems(ctx context.Context, z *zonepkg.Zone, items []methodsv2.NSItem) []nameserver.Nameserver {
+func nameserversFromNSItems(ctx context.Context, z *zonepkg.Zone, items []nsdiscovery.NSItem) []nameserver.Nameserver {
 	if z == nil || z.Recursor() == nil {
 		return nil
 	}
@@ -2497,7 +2504,7 @@ func Zone14(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}

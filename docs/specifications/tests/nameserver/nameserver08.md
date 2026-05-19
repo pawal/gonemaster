@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `methods.Method4and5`.
+  - Nameserver addresses from `ZoneNameservers`.
   - SOA response question sections for randomized-case `www.<zone>` query names.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -19,7 +19,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Build `original = "www." + <zone>` (trailing dot removed).
 3. Generate `randomized` by scrambling letter case until it differs from `original`.
-4. Read nameserver list from `Method4and5`, deduplicate by `name/ip`, preserving first-seen order.
+4. Read nameserver list from `ZoneNameservers`, deduplicate by `name/ip`, preserving first-seen order.
 5. For each deduplicated nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
    - Query `randomized` with rrtype `SOA`.

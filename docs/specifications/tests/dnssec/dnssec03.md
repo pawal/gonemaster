@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver list from `methods.Method4and5`.
+  - Child nameserver list from `ZoneNameservers`.
   - DNSKEY and NSEC query responses from child nameservers.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Resolve nameservers from Method4+Method5 and deduplicate by IP.
+2. Resolve nameservers from ZoneNameservers and deduplicate by IP.
 3. For each unique nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `DNSKEY` and `NSEC` and skip.
    - Query DNSKEY:
@@ -62,7 +62,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-child set = method4and5; dedupe by IP
+child set = ZoneNameservers; dedupe by IP
 
 For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
 

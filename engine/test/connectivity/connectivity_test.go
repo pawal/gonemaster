@@ -14,7 +14,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -30,12 +30,12 @@ func TestConnectivity01IPv6Disabled(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origMethod := method4and5
-	t.Cleanup(func() { method4and5 = origMethod })
+	origMethod := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod })
 
 	ns4 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
 	ns6 := newNameserver(t, "ns2.example", "2001:db8::1", nil)
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns4, ns6}, nil
 	}
 
@@ -117,16 +117,16 @@ func TestConnectivity03SameASNSet(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origMethod := method4and5
+	origMethod := authoritativeNS
 	origLookup := lookupASN
 	t.Cleanup(func() {
-		method4and5 = origMethod
+		authoritativeNS = origMethod
 		lookupASN = origLookup
 	})
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
 	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", nil)
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
 
@@ -303,10 +303,10 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origMethod := method4and5
+	origMethod := authoritativeNS
 	origLookup := lookupASN
 	t.Cleanup(func() {
-		method4and5 = origMethod
+		authoritativeNS = origMethod
 		lookupASN = origLookup
 	})
 
@@ -314,7 +314,7 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
 	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", nil)
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
 
@@ -404,16 +404,16 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	origLookup := lookupASN
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 		lookupASN = origLookup
 	})
 
-	items := []methodsv2.NSItem{
+	items := []nsdiscovery.NSItem{
 		{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.1"),
@@ -425,11 +425,11 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 			HasAddress: true,
 		},
 	}
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return items, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	prefix, err := netip.ParsePrefix("192.0.2.0/24")

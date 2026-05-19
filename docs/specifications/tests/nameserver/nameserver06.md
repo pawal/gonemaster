@@ -9,15 +9,15 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - NS names from `methods.Method2` and `methods.Method3`.
-  - Resolved nameserver data from `methods.Method4and5`.
+  - NS names from `z.GlueNames(ctx)` and `z.ApexNSNames(ctx)`.
+  - Resolved nameserver data from `AllNameservers`.
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read names from `Method2` (delegation) and `Method3` (child), lowercase each name, and build unique union `allNames`.
-3. Read resolved nameserver list from `Method4and5`, lowercase each nameserver name, and build set `withIP`.
+2. Read names from `z.GlueNames` (delegation) and `z.ApexNSNames` (child), lowercase each name, and build unique union `allNames`.
+3. Read resolved nameserver list from `AllNameservers`, lowercase each nameserver name, and build set `withIP`.
 4. Build sorted `withoutIP` list for names in `allNames` that are not present in `withIP`.
 5. Emit one of:
    - `CAN_NOT_BE_RESOLVED` when `withoutIP` is non-empty and `withIP` is non-empty.
@@ -64,4 +64,4 @@ Status: Final
 ## Edge Cases And Limitations
 - Name comparisons are case-insensitive (all names lowercased before set operations).
 - If both `allNames` and `withIP` are empty, `NO_RESOLUTION` is emitted with empty `names`.
-- Resolution quality depends entirely on upstream method outputs (`Method2`, `Method3`, `Method4and5`).
+- Resolution quality depends entirely on upstream method outputs (`z.GlueNames`, `z.ApexNSNames`, `AllNameservers`).

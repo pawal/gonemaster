@@ -9,8 +9,8 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - NS names from `methods.Method2and3`.
-  - Addressed NS from `methods.Method4` and `methods.Method5`.
+  - NS names from `AllNSNames`.
+  - Addressed NS from `GlueNameservers` and `ApexNameservers`.
   - Recursive lookup function (`recurse`) for non-in-bailiwick NS names.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports emit transport-debug tags and skip per-NS-IP in-bailiwick checks.
@@ -18,8 +18,8 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Get NS name list from `Method2and3`.
-3. Get delegation and child addressed NS lists (`Method4` and `Method5`), merge into a unique map keyed by `name/ip`, and sort keys.
+2. Get NS name list from `AllNSNames`.
+3. Get delegation and child addressed NS lists (`GlueNameservers` and `ApexNameservers`), merge into a unique map keyed by `name/ip`, and sort keys.
 4. For each NS name from step 2:
    - If NS name is in-bailiwick of tested zone:
      - For each merged addressed NS (`name/ip`) in sorted order (parallelized):
@@ -40,8 +40,8 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-nsNames = Method2and3
-allNS   = Method4 ++ Method5, unique by ns.String() ("name/ip"); keys sorted
+nsNames = AllNSNames
+allNS   = GlueNameservers ++ ApexNameservers, unique by ns.String() ("name/ip"); keys sorted
 
 For each nsName in nsNames:
 

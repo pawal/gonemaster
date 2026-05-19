@@ -302,6 +302,46 @@ func (z *Zone) NSNames(ctx context.Context) ([]dnsname.Name, error) {
 	return append([]dnsname.Name{}, z.nsNames...), nil
 }
 
+// ApexNSNames returns the union of NS names reported at the zone apex by
+// every authoritative server, deduplicated case-insensitively and sorted.
+// Differs from NSNames, which stops at the first successful response.
+func (z *Zone) ApexNSNames(ctx context.Context) ([]dnsname.Name, error) {
+	if z == nil {
+		return nil, fmt.Errorf("zone is nil")
+	}
+
+	responses, err := z.QueryAll(ctx, z.Name.String(), "NS", nil)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]dnsname.Name{}
+	for _, resp := range responses {
+		if resp.Msg == nil {
+			continue
+		}
+		for _, rr := range resp.GetRecordsForName("NS", z.Name) {
+			nsRR, ok := rr.(*dns.NS)
+			if !ok {
+				continue
+			}
+			name := dnsname.New(strings.ToLower(nsRR.Ns))
+			seen[name.String()] = name
+		}
+	}
+
+	keys := make([]string, 0, len(seen))
+	for key := range seen {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	out := make([]dnsname.Name, 0, len(keys))
+	for _, key := range keys {
+		out = append(out, seen[key])
+	}
+	return out, nil
+}
+
 // NS returns nameserver objects for the zone.
 func (z *Zone) NS(ctx context.Context) ([]nameserver.Nameserver, error) {
 	if z.nsSet {

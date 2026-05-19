@@ -131,7 +131,7 @@ func loadIanaSpecialBlocks(ipVersion int) ([]SpecialIPBlock, error) {
 
 	var blocks []SpecialIPBlock
 	first := true
-	prefixRe := regexp.MustCompile(`^(.+/[0-9]+)`) // matches Perl's trimming behavior
+	prefixRe := regexp.MustCompile(`^(.+/[0-9]+)`) // keep prefix; drop any trailing fields
 
 	for {
 		record, err := r.Read()

@@ -72,8 +72,8 @@ func (r *Recursor) Parent(ctx context.Context, name string) (string, packet.Pack
 			pname = state.trace[1].zoneName
 			pnameObj = dnsname.New(pname)
 		} else if nextHigher, ok := nameObj.NextHigher(); ok {
-			// Keep parity with Zonemaster behavior: when the trace only
-			// contains the child zone itself, fall back to next higher.
+			// When the trace only contains the child zone itself, fall
+			// back to next higher.
 			pname = nextHigher.String()
 			pnameObj = nextHigher
 		}

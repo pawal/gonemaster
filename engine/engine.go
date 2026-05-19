@@ -91,7 +91,7 @@ type RunRequest struct {
 	Runner *Runner
 }
 
-// LogEntry mirrors the JSON output produced by the Perl logger.
+// LogEntry is one event from a test run, suitable for JSON output.
 type LogEntry struct {
 	// Timestamp is seconds since run start.
 	Timestamp float64 `json:"timestamp"`
@@ -453,7 +453,7 @@ func EffectiveProfile(req RunRequest) (*profile.Profile, error) {
 	return p, err
 }
 
-// RunWithRunner executes a Zonemaster test run using a provided runner.
+// RunWithRunner executes an engine test run using a provided runner.
 func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	if strings.TrimSpace(req.Domain) == "" {
 		return nil, fmt.Errorf("domain is required")
@@ -556,7 +556,7 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	return convertEntries(allEntries, req.MinLevel)
 }
 
-// Run executes a Zonemaster test run.
+// Run executes an engine test run.
 func Run(req RunRequest) ([]LogEntry, error) {
 	if req.Runner != nil {
 		return RunWithRunner(req, req.Runner)

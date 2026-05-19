@@ -8,7 +8,7 @@ import (
 
 var scrambleRand = rand.New(rand.NewSource(time.Now().UnixNano()))
 
-// ScrambleCase randomly mixes upper and lower case, following the Perl algorithm.
+// ScrambleCase randomly mixes upper and lower case (DNS 0x20 query padding).
 func ScrambleCase(input string) string {
 	return ScrambleCaseWith(input, scrambleRand)
 }

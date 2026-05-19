@@ -73,7 +73,7 @@ func defaultQueryAuth(ctx context.Context, z *zonepkg.Zone, name string, qtype s
 	return z.QueryAuth(ctx, name, qtype, nil)
 }
 
-// All runs the Zone test cases in order, mirroring the Perl implementation.
+// All runs the Zone test cases in order.
 func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 

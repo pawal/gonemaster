@@ -97,7 +97,7 @@ var rsaKeySizeByAlgo = map[uint8]rsaKeySizeDetails{
 	10: {minSize: 1024, maxSize: 4096, recSize: 2048},
 }
 
-// All runs the DNSSEC test cases in order, mirroring the Perl implementation.
+// All runs the DNSSEC test cases in order.
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 

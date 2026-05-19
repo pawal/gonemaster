@@ -8,7 +8,7 @@ type Name struct {
 	cached *string
 }
 
-// FromString mirrors the Perl from_string constructor, including trailing dot handling.
+// FromString parses a domain string into a Name, preserving a single trailing dot when present.
 func FromString(domain string) (Name, error) {
 	if domain == "" {
 		empty := ""
@@ -25,7 +25,7 @@ func FromString(domain string) (Name, error) {
 	return Name{labels: labels, cached: &cached}, nil
 }
 
-// New builds a Name from a domain string, matching Perl split behavior.
+// New builds a Name from a domain string by splitting it into labels.
 func New(domain string) Name {
 	if domain == "" {
 		return Name{labels: []string{}}

@@ -11,7 +11,7 @@ import (
 
 var defaultProfileJSON = share.ProfileJSON
 
-// Profile mirrors the Zonemaster profile data and tracks which properties are set.
+// Profile holds the engine profile configuration and tracks which properties are set.
 type Profile struct {
 	// Resolver contains resolver-specific profile settings.
 	Resolver ResolverSettings `json:"resolver"`

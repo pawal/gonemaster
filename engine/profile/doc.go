@@ -1,3 +1,3 @@
-// Package profile models, loads, and merges Zonemaster profile settings.
+// Package profile models, loads, and merges engine profile settings.
 package profile
 

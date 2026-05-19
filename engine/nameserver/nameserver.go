@@ -33,7 +33,7 @@ type Nameserver struct {
 
 const systemModuleName = "System"
 
-// QueryOptions configures per-query settings that mirror Perl flags.
+// QueryOptions configures per-query DNS message flags and transport settings.
 type QueryOptions struct {
 	// Class sets the DNS query class, defaulting to IN.
 	Class string

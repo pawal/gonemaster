@@ -26,7 +26,7 @@ import (
 
 const addressModuleName = "Address"
 
-// AddressAll runs the Address test cases in order, mirroring the Perl implementation.
+// AddressAll runs the Address test cases in order.
 func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 

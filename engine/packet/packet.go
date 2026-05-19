@@ -11,7 +11,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
-// Packet wraps a DNS message and exposes helpers mirroring the Perl engine API.
+// Packet wraps a DNS message and exposes response-inspection helpers used by testcases.
 type Packet struct {
 	// Msg is the decoded DNS message.
 	Msg *dns.Msg

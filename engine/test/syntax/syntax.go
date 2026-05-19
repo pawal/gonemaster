@@ -27,7 +27,7 @@ import (
 
 const moduleName = "Syntax"
 
-// All runs the Syntax test cases in order, mirroring the Perl implementation.
+// All runs the Syntax test cases in order.
 func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var results []*logger.Entry
 

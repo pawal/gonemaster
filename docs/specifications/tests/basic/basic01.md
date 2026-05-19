@@ -26,12 +26,14 @@ Status: Final
 5. For each probed nameserver address:
    - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) per rrtype (`SOA`, `NS`, `DNAME`) and skip queries on disabled transports.
    - Emit `B01_SERVER_ZONE_ERROR` when response requirements fail.
+   - On `NXDOMAIN`+AA at an intermediate name (not the child itself), additionally probe SOA for the child name on the same nameserver. If that probe returns a referral with NS records for the child, the nameserver is contradicting itself (it denies an ancestor name but still has a deeper delegation, violating RFC 8020). The probe-confirmed referral counts as a valid delegation observation (added to `delegationFound`), and the offending `(parent NS, intermediate name)` pair is recorded for the diagnostic tag. The NS is not added to `aaNXDomain` in this case.
 6. Collect parent/delegation observations and emit:
    - `B01_PARENT_FOUND` for discovered parents.
    - `B01_PARENT_UNDETERMINED` when multiple parent candidates exist.
    - `B01_PARENT_NOT_FOUND` when none exists.
+   - `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` for each parent NS that returned NXDOMAIN at an intermediate name but also has a delegation at the child.
 7. Emit child/delegation status:
-   - `B01_CHILD_FOUND` when delegation or authoritative SOA evidence exists.
+   - `B01_CHILD_FOUND` when delegation or authoritative SOA evidence exists (including delegations recovered via the NXDOMAIN-contradiction probe).
    - `B01_INCONSISTENT_DELEGATION` for inconsistent parent-side results.
    - `B01_NO_CHILD` (normal mode) or `B01_CHILD_NOT_EXIST` (fake-address mode) when child evidence is absent.
 8. Emit alias findings:
@@ -87,7 +89,13 @@ For each remaining label (BFS from "." down toward child):
       |    +- else: query NS at intermediate
       |                +- invalid response   -> B01_SERVER_ZONE_ERROR, skip ns
       |                +- valid              -> extract NS+glue, enqueue, continue inner
-      +- NXDOMAIN + AA                       -> parentFound, aaNXDomain
+      +- NXDOMAIN + AA
+      |    +- intermediate == child          -> parentFound, aaNXDomain
+      |    +- intermediate != child: probe SOA at child on same NS
+      |         +- referral with NS for child -> parentFound, delegationFound,
+      |         |                                nxdomainHidesDelegation
+      |         |                                (NOT aaNXDomain)
+      |         +- otherwise                  -> parentFound, aaNXDomain
       +- IsRedirect with NS in authority for intermediate
       |    +- intermediate == child          -> parentFound, delegationFound
       |    +- else                           -> extract NS+glue, enqueue
@@ -109,6 +117,9 @@ For each remaining label (BFS from "." down toward child):
        per (parent domain, ns set)         -> B01_PARENT_FOUND
        len(parentFound) > 1                -> B01_PARENT_UNDETERMINED (merged ns set)
      parentFound empty                     -> B01_PARENT_NOT_FOUND
+     nxdomainHidesDelegation non-empty:
+       per offending parent NS             -> B01_PARENT_NXDOMAIN_HIDES_DELEGATION
+                                              (ns, address, query_name, domain_child)
 
 2. Child
      delegationFound non-empty OR aaSOA non-empty
@@ -142,6 +153,7 @@ For each remaining label (BFS from "." down toward child):
 | `B01_PARENT_DISREGARDED` | Fake-address (undelegated) mode is active, so parent search is skipped. |
 | `B01_PARENT_FOUND` | At least one parent zone candidate is identified. |
 | `B01_PARENT_NOT_FOUND` | No parent zone candidate was identified from any probed nameserver response. |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | A parent nameserver returned authoritative NXDOMAIN for an intermediate empty non-terminal but also has a delegation at the child name. The contradiction violates RFC 8020. The zone is still tested via the directly-observed delegation. |
 | `B01_PARENT_UNDETERMINED` | Multiple parent zone candidates were identified. |
 | `B01_ROOT_HAS_NO_PARENT` | Child zone is root (`.`). |
 | `B01_SERVER_ZONE_ERROR` | SOA/NS response validation fails for a probed server/query name. |
@@ -171,6 +183,10 @@ For each remaining label (BFS from "." down toward child):
 | `B01_PARENT_FOUND` | `domain` | `string` | Parent zone name candidate. |
 | `B01_PARENT_FOUND` | `servers` | `array<object>` | Structured nameserver list returning parent evidence. |
 | `B01_PARENT_NOT_FOUND` | `-` | `-` | No arguments. |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `query_name` | `string` | Intermediate name where the parent returned NXDOMAIN. |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `domain_child` | `string` | Child zone name that the same parent NS will delegate. |
 | `B01_PARENT_UNDETERMINED` | `servers` | `array<object>` | Structured nameserver list across competing parents. |
 | `B01_ROOT_HAS_NO_PARENT` | `-` | `-` | No arguments. |
 | `B01_SERVER_ZONE_ERROR` | `query_name` | `string` | Queried owner name that failed validation. |
@@ -208,6 +224,7 @@ For each remaining label (BFS from "." down toward child):
 | `B01_PARENT_DISREGARDED` | `INFO` | Default from `share/profile.json`. |
 | `B01_PARENT_FOUND` | `INFO` | Default from `share/profile.json`. |
 | `B01_PARENT_NOT_FOUND` | `WARNING` | Default from `share/profile.json`. |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `ERROR` | Default from `share/profile.json`. |
 | `B01_PARENT_UNDETERMINED` | `WARNING` | Default from `share/profile.json`. |
 | `B01_ROOT_HAS_NO_PARENT` | `INFO` | Default from `share/profile.json`. |
 | `B01_SERVER_ZONE_ERROR` | `DEBUG` | Default from `share/profile.json`. |
@@ -224,11 +241,12 @@ For each remaining label (BFS from "." down toward child):
 - Differences (Upstream vs Gonemaster):
   - Upstream: documents `B01_NO_CHILD` for the non-existing-child outcome. Gonemaster: also emits `B01_CHILD_NOT_EXIST` in fake-address mode.
   - Upstream: testcase summary does not list transport debug tags or `LOOP_PROTECTION`. Gonemaster: emits `IPV4_*`, `IPV6_*`, and `LOOP_PROTECTION`.
+  - Upstream: no diagnostic for parent nameservers that violate RFC 8020 by returning NXDOMAIN at an intermediate empty non-terminal while still delegating a deeper child; the child is treated as nonexistent. Gonemaster: emits `B01_PARENT_NXDOMAIN_HIDES_DELEGATION`, treats the directly-observed referral at the child as legitimate delegation evidence, emits `B01_CHILD_FOUND`, and lets the rest of the test suite run.
 - Potential upstream report:
   - `yes`
 - If yes, include:
   - Upstream expected behavior: Child-not-exist path is described with `B01_NO_CHILD` only, and summary does not include transport or loop-protection tags.
-  - Gonemaster observed behavior: `B01_CHILD_NOT_EXIST`, transport tags, and `LOOP_PROTECTION` are possible emissions.
+  - Gonemaster observed behavior: `B01_CHILD_NOT_EXIST`, `B01_PARENT_NXDOMAIN_HIDES_DELEGATION`, transport tags, and `LOOP_PROTECTION` are possible emissions.
   - evidence: `engine/test/basic/basic.go` (`Basic01`, `ipDisabledMessage`, `ipEnabledMessage`).
   - report status: `not filed`
 
@@ -244,4 +262,5 @@ The following behaviors are implementation choices, not mandated by RFC 1034/103
 - A missing recursor causes testcase execution error before completion.
 - Loop-protection fallback is defensive; when triggered it logs `LOOP_PROTECTION` and terminates the testcase early.
 - Child existence outcomes differ between normal and fake-address modes (`B01_NO_CHILD` vs `B01_CHILD_NOT_EXIST`).
+- When a parent nameserver returns authoritative NXDOMAIN at an intermediate empty non-terminal (RFC 8020 violation) but also has a delegation at the child, the per-label SOA walk would normally stop on that NS without ever reaching the child. Basic01 issues one extra SOA probe at the child name; if that probe returns a referral, the directly-observed delegation is treated as valid evidence (added to `delegationFound`, so `B01_CHILD_FOUND` fires and downstream test cases run against the real child nameservers), and `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` is emitted to flag the contradiction. Ordinary recursive resolvers reach the data the same way because they typically query only the child name and follow the referral directly.
 - Nameserver list argument order is deterministic because lists are sorted before join.

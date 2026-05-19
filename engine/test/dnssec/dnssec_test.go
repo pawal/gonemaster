@@ -35,11 +35,11 @@ func TestDNSSEC01AlgoOK(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origGetParent := getParentNSNamesAndIPs
+	origGetParent := parentNameservers
 	origZoneParent := zoneParent
 	origHasFake := hasFakeAddresses
 	t.Cleanup(func() {
-		getParentNSNamesAndIPs = origGetParent
+		parentNameservers = origGetParent
 		zoneParent = origZoneParent
 		hasFakeAddresses = origHasFake
 	})
@@ -58,7 +58,7 @@ func TestDNSSEC01AlgoOK(t *testing.T) {
 		return dsPacket(qname, 12345, 8, 2)
 	})
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
 
@@ -80,11 +80,11 @@ func TestDNSSEC01DigestGOST12(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origGetParent := getParentNSNamesAndIPs
+	origGetParent := parentNameservers
 	origZoneParent := zoneParent
 	origHasFake := hasFakeAddresses
 	t.Cleanup(func() {
-		getParentNSNamesAndIPs = origGetParent
+		parentNameservers = origGetParent
 		zoneParent = origZoneParent
 		hasFakeAddresses = origHasFake
 	})
@@ -103,7 +103,7 @@ func TestDNSSEC01DigestGOST12(t *testing.T) {
 		return dsPacket(qname, 12345, 8, 5) // digest 5 = GOST R 34.11-2012 (RFC 9558)
 	})
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
 
@@ -125,11 +125,11 @@ func TestDNSSEC01DigestSM3(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origGetParent := getParentNSNamesAndIPs
+	origGetParent := parentNameservers
 	origZoneParent := zoneParent
 	origHasFake := hasFakeAddresses
 	t.Cleanup(func() {
-		getParentNSNamesAndIPs = origGetParent
+		parentNameservers = origGetParent
 		zoneParent = origZoneParent
 		hasFakeAddresses = origHasFake
 	})
@@ -148,7 +148,7 @@ func TestDNSSEC01DigestSM3(t *testing.T) {
 		return dsPacket(qname, 12345, 8, 6) // digest 6 = SM3 (RFC 9563)
 	})
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
 
@@ -170,11 +170,11 @@ func TestDNSSEC01Algo2Missing(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origGetParent := getParentNSNamesAndIPs
+	origGetParent := parentNameservers
 	origZoneParent := zoneParent
 	origHasFake := hasFakeAddresses
 	t.Cleanup(func() {
-		getParentNSNamesAndIPs = origGetParent
+		parentNameservers = origGetParent
 		zoneParent = origZoneParent
 		hasFakeAddresses = origHasFake
 	})
@@ -193,7 +193,7 @@ func TestDNSSEC01Algo2Missing(t *testing.T) {
 		return dsPacket(qname, 54321, 8, 1)
 	})
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
 
@@ -215,11 +215,11 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origGetParent := getParentNSNamesAndIPs
+	origGetParent := parentNameservers
 	origZoneParent := zoneParent
 	origHasFake := hasFakeAddresses
 	t.Cleanup(func() {
-		getParentNSNamesAndIPs = origGetParent
+		parentNameservers = origGetParent
 		zoneParent = origZoneParent
 		hasFakeAddresses = origHasFake
 	})
@@ -260,7 +260,7 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 		t.Fatalf("add fake DS: %v", err)
 	}
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
@@ -311,11 +311,11 @@ func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origGetParent := getParentNSNamesAndIPs
+	origGetParent := parentNameservers
 	origZoneParent := zoneParent
 	origHasFake := hasFakeAddresses
 	t.Cleanup(func() {
-		getParentNSNamesAndIPs = origGetParent
+		parentNameservers = origGetParent
 		zoneParent = origZoneParent
 		hasFakeAddresses = origHasFake
 	})
@@ -362,7 +362,7 @@ func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 	}
 	parent2.SetQueryHook(hook("parent2"))
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parent1, parent2}, nil
 	}
 
@@ -436,13 +436,13 @@ func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origGetParent := getParentNSNamesAndIPs
-	origM4 := method4
-	origM5 := method5
+	origGetParent := parentNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		getParentNSNamesAndIPs = origGetParent
-		method4 = origM4
-		method5 = origM5
+		parentNameservers = origGetParent
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	parentNS := newNameserver(t, "ns-parent.example", "192.0.2.2", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -464,13 +464,13 @@ func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
 		return dnskeyPacket(qname, key)
 	})
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parentNS}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{childNS}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -495,13 +495,13 @@ func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origGetParent := getParentNSNamesAndIPs
-	origM4 := method4
-	origM5 := method5
+	origGetParent := parentNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		getParentNSNamesAndIPs = origGetParent
-		method4 = origM4
-		method5 = origM5
+		parentNameservers = origGetParent
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -528,13 +528,13 @@ func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 		return dnskeyPacket(qname, key)
 	})
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parentNS}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{childNS}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -556,13 +556,13 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origGetParent := getParentNSNamesAndIPs
-	origM4 := method4
-	origM5 := method5
+	origGetParent := parentNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		getParentNSNamesAndIPs = origGetParent
-		method4 = origM4
-		method5 = origM5
+		parentNameservers = origGetParent
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -617,13 +617,13 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 	}
 	child2.SetQueryHook(hook("child2"))
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parentNS}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{child1, child2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -694,9 +694,9 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM45 := method4and5
+	origM45 := allNameservers
 	t.Cleanup(func() {
-		method4and5 = origM45
+		allNameservers = origM45
 	})
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.4", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -715,7 +715,7 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 		}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
 
@@ -751,9 +751,9 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM45 := method4and5
+	origM45 := allNameservers
 	t.Cleanup(func() {
-		method4and5 = origM45
+		allNameservers = origM45
 	})
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.13", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -780,7 +780,7 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 		}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
 
@@ -819,9 +819,9 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM45 := method4and5
+	origM45 := allNameservers
 	t.Cleanup(func() {
-		method4and5 = origM45
+		allNameservers = origM45
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -869,7 +869,7 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
 
@@ -1170,11 +1170,11 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	newNameserver(t, "ns1.example", "192.0.2.20", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -1189,7 +1189,7 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 		return dnskeyPacket(qname, key)
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -1198,7 +1198,7 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -1223,11 +1223,11 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	newNameserver(t, "ns1.example", "192.0.2.33", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -1242,7 +1242,7 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 		return dnskeyPacket(qname, key)
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -1251,7 +1251,7 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -1276,11 +1276,11 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	newNameserver(t, "ns1.example", "192.0.2.34", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -1295,7 +1295,7 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 		return dnskeyPacket(qname, key)
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -1304,7 +1304,7 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -1329,11 +1329,11 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -1364,7 +1364,7 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 	newNameserver(t, "ns1.example", "192.0.2.220", handler("ns1"))
 	newNameserver(t, "ns2.example", "192.0.2.221", handler("ns2"))
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -1378,7 +1378,7 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -1455,11 +1455,11 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	newNameserver(t, "ns2.example", "192.0.2.21", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -1469,7 +1469,7 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 		return dnskeyPacket(qname, nil)
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns2.example"),
@@ -1478,7 +1478,7 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -1503,11 +1503,11 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	newNameserver(t, "ns3.example", "192.0.2.22", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -1517,7 +1517,7 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns3.example"),
@@ -1526,7 +1526,7 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -1644,14 +1644,14 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
-	origParent := getParentNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	origParent := parentNameservers
 	origZoneParent := zoneParent
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
-		getParentNSNamesAndIPs = origParent
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+		parentNameservers = origParent
 		zoneParent = origZoneParent
 	})
 
@@ -1691,7 +1691,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -1700,10 +1700,10 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns, _ := nameserver.New("ns-parent.example", "192.0.2.41", nil)
 		return []nameserver.Nameserver{ns}, nil
 	}
@@ -1766,14 +1766,14 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
-	origParent := getParentNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	origParent := parentNameservers
 	origZoneParent := zoneParent
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
-		getParentNSNamesAndIPs = origParent
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+		parentNameservers = origParent
 		zoneParent = origZoneParent
 	})
 
@@ -1782,7 +1782,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
 		return nil, nil
 	}
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -1829,7 +1829,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -1843,7 +1843,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -1923,14 +1923,14 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
-	origParent := getParentNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	origParent := parentNameservers
 	origZoneParent := zoneParent
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
-		getParentNSNamesAndIPs = origParent
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+		parentNameservers = origParent
 		zoneParent = origZoneParent
 	})
 
@@ -1958,7 +1958,7 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 		}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns-child.example"),
@@ -1967,7 +1967,7 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -2011,7 +2011,7 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 	}
 	parent2.SetQueryHook(hook("parent2"))
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parent1, parent2}, nil
 	}
 
@@ -2085,14 +2085,14 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
-	origParent := getParentNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	origParent := parentNameservers
 	origZoneParent := zoneParent
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
-		getParentNSNamesAndIPs = origParent
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+		parentNameservers = origParent
 		zoneParent = origZoneParent
 	})
 
@@ -2117,7 +2117,7 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 		}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns2.example"),
@@ -2126,10 +2126,10 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -2171,21 +2171,21 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
-	origParent := getParentNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	origParent := parentNameservers
 	origZoneParent := zoneParent
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
-		getParentNSNamesAndIPs = origParent
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+		parentNameservers = origParent
 		zoneParent = origZoneParent
 	})
 
 	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
 		return nil, nil
 	}
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -2237,7 +2237,7 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 		}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns-noresp.example"),
@@ -2256,7 +2256,7 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -2315,14 +2315,14 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
-	origParent := getParentNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	origParent := parentNameservers
 	origZoneParent := zoneParent
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
-		getParentNSNamesAndIPs = origParent
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+		parentNameservers = origParent
 		zoneParent = origZoneParent
 	})
 
@@ -2370,7 +2370,7 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -2379,10 +2379,10 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		nsNoDS, _ := nameserver.New("ns-parent-no-ds.example", "192.0.2.181", nil)
 		nsWithDS, _ := nameserver.New("ns-parent-with-ds.example", "192.0.2.182", nil)
 		return []nameserver.Nameserver{nsNoDS, nsWithDS}, nil
@@ -2426,14 +2426,14 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
-	origParent := getParentNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	origParent := parentNameservers
 	origZoneParent := zoneParent
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
-		getParentNSNamesAndIPs = origParent
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+		parentNameservers = origParent
 		zoneParent = origZoneParent
 	})
 
@@ -2478,7 +2478,7 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -2487,10 +2487,10 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		nsA, _ := nameserver.New("ns-parent-a.example", "192.0.2.181", nil)
 		nsB, _ := nameserver.New("ns-parent-b.example", "192.0.2.182", nil)
 		return []nameserver.Nameserver{nsA, nsB}, nil
@@ -2520,24 +2520,24 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
-	origParent := getParentNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	origParent := parentNameservers
 	origZoneParent := zoneParent
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
-		getParentNSNamesAndIPs = origParent
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+		parentNameservers = origParent
 		zoneParent = origZoneParent
 	})
 
 	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
 		return nil, nil
 	}
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -2551,7 +2551,7 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -2624,11 +2624,11 @@ func TestDNSSEC08MissingRRSIG(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -2644,10 +2644,10 @@ func TestDNSSEC08MissingRRSIG(t *testing.T) {
 		return dnskeyPacket(qname, key)
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -2669,11 +2669,11 @@ func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	now := time.Unix(1700000000, 0).UTC()
@@ -2693,10 +2693,10 @@ func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
 		return pkt
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -2718,11 +2718,11 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	now := time.Unix(1700000000, 0).UTC()
@@ -2742,10 +2742,10 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 		return pkt
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -2767,11 +2767,11 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -2815,10 +2815,10 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 	}
 	child2.SetQueryHook(hook("child2"))
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{child1, child2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -2889,11 +2889,11 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -2913,10 +2913,10 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 		}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -2938,11 +2938,11 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -2990,10 +2990,10 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 	}
 	child2.SetQueryHook(hook("child2"))
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{child1, child2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -3064,11 +3064,11 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -3108,7 +3108,7 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 		}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -3117,7 +3117,7 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -3142,11 +3142,11 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -3190,7 +3190,7 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -3204,7 +3204,7 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -3285,11 +3285,11 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	apex := dnsutil.Fqdn("example")
@@ -3340,7 +3340,7 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 		}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -3349,7 +3349,7 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -3380,11 +3380,11 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	apex := dnsutil.Fqdn("example")
@@ -3430,7 +3430,7 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 		}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
@@ -3439,7 +3439,7 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 			},
 		}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{}, nil
 	}
 
@@ -3467,14 +3467,14 @@ func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origParent := parentNameservers
-	origM4 := method4
-	origM5 := method5
+	origParent := parentApexNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	origHasFake := hasFakeAddresses
 	t.Cleanup(func() {
-		parentNameservers = origParent
-		method4 = origM4
-		method5 = origM5
+		parentApexNameservers = origParent
+		glueNameservers = origM4
+		apexNameservers = origM5
 		hasFakeAddresses = origHasFake
 	})
 
@@ -3523,13 +3523,13 @@ func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 	}
 	parent2.SetQueryHook(hook("parent2", false))
 
-	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parent1, parent2}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -3589,14 +3589,14 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origParent := parentNameservers
-	origM4 := method4
-	origM5 := method5
+	origParent := parentApexNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	origHasFake := hasFakeAddresses
 	t.Cleanup(func() {
-		parentNameservers = origParent
-		method4 = origM4
-		method5 = origM5
+		parentApexNameservers = origParent
+		glueNameservers = origM4
+		apexNameservers = origM5
 		hasFakeAddresses = origHasFake
 	})
 
@@ -3649,13 +3649,13 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 	}
 	child2.SetQueryHook(hook("child2", false))
 
-	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{child1, child2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -3715,13 +3715,13 @@ func TestDNSSEC11InconsistentDS(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origParentNS := parentNameservers
-	origM4 := method4
-	origM5 := method5
+	origParentNS := parentApexNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		parentNameservers = origParentNS
-		method4 = origM4
-		method5 = origM5
+		parentApexNameservers = origParentNS
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -3743,13 +3743,13 @@ func TestDNSSEC11InconsistentDS(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{nsWithDS, nsWithoutDS}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -3780,13 +3780,13 @@ func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origParentNS := parentNameservers
-	origM4 := method4
-	origM5 := method5
+	origParentNS := parentApexNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		parentNameservers = origParentNS
-		method4 = origM4
-		method5 = origM5
+		parentApexNameservers = origParentNS
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -3812,13 +3812,13 @@ func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 		}
 	})
 
-	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parentNS}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{childNS}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -3843,11 +3843,11 @@ func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -3882,10 +3882,10 @@ func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 		}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -3913,11 +3913,11 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -3977,10 +3977,10 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4054,11 +4054,11 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -4076,10 +4076,10 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4101,11 +4101,11 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -4151,10 +4151,10 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4205,11 +4205,11 @@ func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.141", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -4219,10 +4219,10 @@ func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4257,11 +4257,11 @@ func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.142", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -4271,10 +4271,10 @@ func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4309,20 +4309,20 @@ func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Net.IPv4 = false
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.143", nil)
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4357,11 +4357,11 @@ func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -4375,10 +4375,10 @@ func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 		}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4400,11 +4400,11 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -4452,10 +4452,10 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4526,11 +4526,11 @@ func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
@@ -4550,10 +4550,10 @@ func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 		}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4575,11 +4575,11 @@ func TestDNSSEC16ParallelQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -4627,10 +4627,10 @@ func TestDNSSEC16ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4701,11 +4701,11 @@ func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	cdnskey := &dns.CDNSKEY{DNSKEY: dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
@@ -4725,10 +4725,10 @@ func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {
 		}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4750,11 +4750,11 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -4802,10 +4802,10 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4876,13 +4876,13 @@ func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origParentNS := parentNameservers
-	origM4 := method4
-	origM5 := method5
+	origParentNS := parentApexNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		parentNameservers = origParentNS
-		method4 = origM4
-		method5 = origM5
+		parentApexNameservers = origParentNS
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -4933,13 +4933,13 @@ func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
 		}
 	})
 
-	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parentNS}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{childNS}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -4964,13 +4964,13 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origParentNS := parentNameservers
-	origM4 := method4
-	origM5 := method5
+	origParentNS := parentApexNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		parentNameservers = origParentNS
-		method4 = origM4
-		method5 = origM5
+		parentApexNameservers = origParentNS
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -5050,13 +5050,13 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 	}
 	child2.SetQueryHook(hook("ns2"))
 
-	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parentNS}, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{child1, child2}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -5130,13 +5130,13 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origParentNS := parentNameservers
-	origM4 := method4
-	origM5 := method5
+	origParentNS := parentApexNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		parentNameservers = origParentNS
-		method4 = origM4
-		method5 = origM5
+		parentApexNameservers = origParentNS
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	runDNSSEC18 := func(parallel int) []*logger.Entry {
@@ -5199,13 +5199,13 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 		child1 := newNameserver(t, "ns1.example", "192.0.2.254", childHook)
 		child2 := newNameserver(t, "ns2.example", "192.0.2.255", childHook)
 
-		parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return []nameserver.Nameserver{parentNS}, nil
 		}
-		method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return []nameserver.Nameserver{child1, child2}, nil
 		}
-		method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return nil, nil
 		}
 
@@ -5238,29 +5238,29 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 // ---- DNSSEC18 rollover-detection tests ----------------------------------------
 
 // setDNSSEC18Mocks wires the three injectable function variables and returns a
-// cleanup function.  Both method4 and method5 serve childNSs; parentNSs is
-// served by parentNameservers.
+// cleanup function.  Both glueNameservers and apexNameservers serve childNSs; parentNSs is
+// served by parentApexNameservers.
 func setDNSSEC18Mocks(
 	t *testing.T,
 	parentNSs []nameserver.Nameserver,
 	childNSs []nameserver.Nameserver,
 ) {
 	t.Helper()
-	origPNS := parentNameservers
-	origM4 := method4
-	origM5 := method5
+	origPNS := parentApexNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		parentNameservers = origPNS
-		method4 = origM4
-		method5 = origM5
+		parentApexNameservers = origPNS
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
-	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return parentNSs, nil
 	}
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return childNSs, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 }
@@ -6014,11 +6014,11 @@ func TestDNSSEC19CleanZone(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
@@ -6032,14 +6032,14 @@ func TestDNSSEC19CleanZone(t *testing.T) {
 		return dnskeyPacket(qname, dnssec19P256Key(qname))
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.201"),
 			HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6068,11 +6068,11 @@ func TestDNSSEC19BlocklistedKey(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	key := dnssec19P256Key("example")
@@ -6089,14 +6089,14 @@ func TestDNSSEC19BlocklistedKey(t *testing.T) {
 		return dnskeyPacket(qname, dnssec19P256Key(qname))
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.202"),
 			HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6136,11 +6136,11 @@ func TestDNSSEC19NoDNSKEY(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
@@ -6154,14 +6154,14 @@ func TestDNSSEC19NoDNSKEY(t *testing.T) {
 		return dnskeyPacket(qname, nil)
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.203"),
 			HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6190,11 +6190,11 @@ func TestDNSSEC19NoResponse(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
@@ -6205,14 +6205,14 @@ func TestDNSSEC19NoResponse(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.204"),
 			HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6241,11 +6241,11 @@ func TestDNSSEC19TransportDisabled(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	if err := profile.Effective().Set("net.ipv4", false); err != nil {
@@ -6262,14 +6262,14 @@ func TestDNSSEC19TransportDisabled(t *testing.T) {
 		return dnskeyPacket(qname, dnssec19P256Key(qname))
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.205"),
 			HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6477,11 +6477,11 @@ func TestDNSSEC20BitmapOK(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -6506,12 +6506,12 @@ func TestDNSSEC20BitmapOK(t *testing.T) {
 		}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{{
 			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6540,11 +6540,11 @@ func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -6565,12 +6565,12 @@ func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
 		}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{{
 			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6606,11 +6606,11 @@ func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	// Build an NSEC3 record whose owner hash matches the apex.
@@ -6642,12 +6642,12 @@ func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
 		}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{{
 			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6683,23 +6683,23 @@ func TestDNSSEC20NoDNSSEC(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origDel := getDelNSNamesAndIPs
-	origZone := getZoneNSNamesAndIPs
+	origDel := delegationNameservers
+	origZone := zoneNameservers
 	t.Cleanup(func() {
-		getDelNSNamesAndIPs = origDel
-		getZoneNSNamesAndIPs = origZone
+		delegationNameservers = origDel
+		zoneNameservers = origZone
 	})
 
 	newNameserver(t, "ns1.example", "192.0.2.201", func(_ string, _ string, _ *nameserver.QueryOptions) packet.Packet {
 		return packet.Packet{}
 	})
 
-	getDelNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return []methodsv2.NSItem{{
 			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
 		}}, nil
 	}
-	getZoneNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6894,7 +6894,7 @@ func (f dnssec21Fixture) installMocks(t *testing.T, parentNS nameserver.Nameserv
 	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
 		return &parentZone, nil
 	}
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parentNS}, nil
 	}
 }
@@ -6902,10 +6902,10 @@ func (f dnssec21Fixture) installMocks(t *testing.T, parentNS nameserver.Nameserv
 func resetDNSSEC21Mocks(t *testing.T) {
 	t.Helper()
 	origParent := zoneParent
-	origGetParent := getParentNSNamesAndIPs
+	origGetParent := parentNameservers
 	t.Cleanup(func() {
 		zoneParent = origParent
-		getParentNSNamesAndIPs = origGetParent
+		parentNameservers = origGetParent
 	})
 }
 
@@ -7069,7 +7069,7 @@ func TestDNSSEC21NoDSRRSIG(t *testing.T) {
 func TestDNSSEC21RootZone(t *testing.T) {
 	dnssec21Setup(t)
 
-	getParentNSNamesAndIPs = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {

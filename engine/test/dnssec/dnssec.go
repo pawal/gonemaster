@@ -46,17 +46,17 @@ type rsaKeySizeDetails struct {
 }
 
 var (
-	method4                = methods.Method4
-	method5                = methods.Method5
-	method4and5            = methods.Method4and5
-	getParentNSNamesAndIPs = methodsv2.GetParentNSNamesAndIPs
-	getDelNSNamesAndIPs    = methodsv2.GetDelNSNamesAndIPs
-	getZoneNSNamesAndIPs   = methodsv2.GetZoneNSNamesAndIPs
-	zoneQueryOne           = defaultZoneQueryOne
-	zoneQueryAll           = defaultZoneQueryAll
-	zoneParent             = defaultZoneParent
-	parentNameservers      = defaultParentNameservers
-	hasFakeAddresses       = defaultHasFakeAddresses
+	glueNameservers       = methods.GlueNameservers
+	apexNameservers       = methods.ApexNameservers
+	allNameservers        = methods.AllNameservers
+	parentNameservers     = methodsv2.ParentNameservers
+	delegationNameservers = methodsv2.DelegationNameservers
+	zoneNameservers       = methodsv2.ZoneNameservers
+	zoneQueryOne          = defaultZoneQueryOne
+	zoneQueryAll          = defaultZoneQueryAll
+	zoneParent            = defaultZoneParent
+	parentApexNameservers = defaultParentApexNameservers
+	hasFakeAddresses      = defaultHasFakeAddresses
 )
 
 var algoProperties = map[uint8]algoProperty{
@@ -652,7 +652,7 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"DS01_DS_ALGO_OK":         {},
 	}
 
-	parentNS, err := getParentNSNamesAndIPs(ctx, z)
+	parentNS, err := parentNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -932,7 +932,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var nsDNSKEY []string
 	var nsRRSIG []string
 
-	parentNS, err := getParentNSNamesAndIPs(ctx, z)
+	parentNS, err := parentNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1003,11 +1003,11 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	continueWithChildTests := len(dsRecords) > 0
 	if continueWithChildTests {
-		nssDel, err := method4(ctx, z)
+		nssDel, err := glueNameservers(ctx, z)
 		if err != nil {
 			return results, err
 		}
-		nssChild, err := method5(ctx, z)
+		nssChild, err := apexNameservers(ctx, z)
 		if err != nil {
 			return results, err
 		}
@@ -1382,7 +1382,7 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var noResponseNSECQuery []string
 	var errorResponseNSECQuery []string
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1928,11 +1928,11 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"DS05_ALGO_OK":              {},
 	}
 
-	delItems, err := getDelNSNamesAndIPs(ctx, z)
+	delItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	zoneItems, err := zoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -2164,11 +2164,11 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var noDS []string
 	var dsInResponse []string
 
-	delItems, err := getDelNSNamesAndIPs(ctx, z)
+	delItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	zoneItems, err := zoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -2280,7 +2280,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	parentNS, err := getParentNSNamesAndIPs(ctx, z)
+	parentNS, err := parentNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -2522,11 +2522,11 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
 	var ds08PassedIPs []string
 
-	nssDel, err := method4(ctx, z)
+	nssDel, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nssChild, err := method5(ctx, z)
+	nssChild, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -2821,11 +2821,11 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	rrsigNotValidByDNSKEY := map[uint16][]string{}
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
 
-	nssDel, err := method4(ctx, z)
+	nssDel, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nssChild, err := method5(ctx, z)
+	nssChild, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -3169,11 +3169,11 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var withoutDNSKEY []string
 	var ignoredNS []string
 
-	delItems, err := getDelNSNamesAndIPs(ctx, z)
+	delItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	zoneItems, err := zoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -4186,7 +4186,7 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var hasDSRecord []string
 	continueWithChildTests := true
 
-	parentNS, err := parentNameservers(ctx, z)
+	parentNS, err := parentApexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -4324,11 +4324,11 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		var noDNSKEYRecord []string
 		var hasDNSKEYRecord []string
 
-		nssDel, err := method4(ctx, z)
+		nssDel, err := glueNameservers(ctx, z)
 		if err != nil {
 			return results, err
 		}
-		nssChild, err := method5(ctx, z)
+		nssChild, err := apexNameservers(ctx, z)
 		if err != nil {
 			return results, err
 		}
@@ -4481,11 +4481,11 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var anyDNSKEYFound bool
 	algoNotSigned := map[string]map[uint8][]string{}
 
-	nssDel, err := method4(ctx, z)
+	nssDel, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nssChild, err := method5(ctx, z)
+	nssChild, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -4671,11 +4671,11 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	var dnskeyRRs []*dns.DNSKEY
 
-	nssDel, err := method4(ctx, z)
+	nssDel, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nssChild, err := method5(ctx, z)
+	nssChild, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -4844,11 +4844,11 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	hasCDNSKEYNoCDS := map[string]bool{}
 	hasCDSAndCDNSKEY := map[string]bool{}
 
-	nssDel, err := method4(ctx, z)
+	nssDel, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nssChild, err := method5(ctx, z)
+	nssChild, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -5093,11 +5093,11 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	cdsSignedByUnknownDNSKEY := map[uint16][]string{}
 	cdsInvalidRRSIG := map[uint16][]string{}
 
-	nssDel, err := method4(ctx, z)
+	nssDel, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nssChild, err := method5(ctx, z)
+	nssChild, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -5613,11 +5613,11 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	cdnskeySignedByUnknownDNSKEY := map[uint16][]string{}
 	cdnskeyInvalidRRSIG := map[uint16][]string{}
 
-	nssDel, err := method4(ctx, z)
+	nssDel, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	nssChild, err := method5(ctx, z)
+	nssChild, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -6107,7 +6107,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	dsNoMatchCDSRRSIG := map[string]bool{}
 	dsNoMatchCDNSKEYRRSIG := map[string]bool{}
 
-	parentNS, err := parentNameservers(ctx, z)
+	parentNS, err := parentApexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -6208,11 +6208,11 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		cdnskeyRecords := map[string][]*dns.CDNSKEY{}
 		dnskeyRRSIGs := map[string][]*dns.RRSIG{}
 
-		nssDel, err := method4(ctx, z)
+		nssDel, err := glueNameservers(ctx, z)
 		if err != nil {
 			return results, err
 		}
-		nssChild, err := method5(ctx, z)
+		nssChild, err := apexNameservers(ctx, z)
 		if err != nil {
 			return results, err
 		}
@@ -6684,11 +6684,11 @@ func DNSSEC19(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	delItems, err := getDelNSNamesAndIPs(ctx, z)
+	delItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	zoneItems, err := zoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -7548,7 +7548,7 @@ func defaultZoneParent(ctx context.Context, z *zone.Zone) (*zone.Zone, error) {
 	return z.Parent(ctx)
 }
 
-func defaultParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
+func defaultParentApexNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
 	if z == nil {
 		return nil, errors.New("zone is nil")
 	}
@@ -7855,11 +7855,11 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var noDNSSEC []string
 	var noBitmap []string
 
-	delItems, err := getDelNSNamesAndIPs(ctx, z)
+	delItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	zoneItems, err := zoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -8107,7 +8107,7 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, nil
 	}
 
-	parentNS, err := getParentNSNamesAndIPs(ctx, z)
+	parentNS, err := parentNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}

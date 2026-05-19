@@ -26,10 +26,10 @@ import (
 const moduleName = "Connectivity"
 
 var (
-	method4and5          = methods.Method4and5
-	getDelNSNamesAndIPs  = methodsv2.GetDelNSNamesAndIPs
-	getZoneNSNamesAndIPs = methodsv2.GetZoneNSNamesAndIPs
-	lookupASN            = asnlookup.GetWithPrefix
+	allNameservers        = methods.AllNameservers
+	delegationNameservers = methodsv2.DelegationNameservers
+	zoneNameservers       = methodsv2.ZoneNameservers
+	lookupASN             = asnlookup.GetWithPrefix
 )
 
 // All runs the Connectivity test cases in order, mirroring the Perl implementation.
@@ -163,7 +163,7 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	}
 
 	name := z.Name
-	nsList, err := method4and5(ctx, z)
+	nsList, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -205,7 +205,7 @@ func Connectivity02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	}
 
 	name := z.Name
-	nsList, err := method4and5(ctx, z)
+	nsList, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -232,7 +232,7 @@ func Connectivity03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	nsList, err := method4and5(ctx, z)
+	nsList, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -447,11 +447,11 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	delItems, err := getDelNSNamesAndIPs(ctx, z)
+	delItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := getZoneNSNamesAndIPs(ctx, z)
+	zoneItems, err := zoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}

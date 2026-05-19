@@ -10,8 +10,8 @@ Status: Final
   - A `zone.Zone` object is available.
   - A recursor is available on the zone object.
 - Required inputs:
-  - Nameserver addresses from `methods.Method4and5`.
-  - Child NS names from `methods.Method3`.
+  - Nameserver addresses from `AllNameservers`.
+  - Child NS names from `z.ApexNSNames(ctx)`.
   - Recursive A/AAAA lookups for SOA MNAME hostnames.
   - Direct SOA queries to SOA MNAME host/IP combinations.
 - Profile/config knobs that affect behavior:
@@ -19,7 +19,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Query each nameserver from `Method4and5` for `SOA` at the child zone apex.
+2. Query each nameserver from `AllNameservers` for `SOA` at the child zone apex.
 3. For each response, continue only when all are true:
    - response exists;
    - `RCODE=NOERROR`;
@@ -33,7 +33,7 @@ Status: Final
    - `Z01_MNAME_IS_LOCALHOST` when any accepted response had MNAME `localhost`;
    - `Z01_MNAME_IS_DOT` when any accepted response had MNAME `.`.
 6. For each non-`localhost` and non-dot MNAME:
-   - If MNAME is not in `Method3` child NS name set, emit `Z01_MNAME_NOT_IN_NS_LIST`.
+   - If MNAME is not in `z.ApexNSNames` child NS name set, emit `Z01_MNAME_NOT_IN_NS_LIST`.
    - Resolve MNAME addresses using recursor lookup (`A`/`AAAA`).
    - For each resolved address:
      - If localhost address (`127.0.0.1` or `::1`), emit `Z01_MNAME_HAS_LOCALHOST_ADDR`.
@@ -56,7 +56,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-For each nameserver in Method4and5:
+For each nameserver in AllNameservers:
    query SOA at z.Name
    accept response only when ALL true:
      resp.Msg present, RCODE == NOERROR, AA, at least one SOA RR for z.Name
@@ -82,7 +82,7 @@ Emit (once):
 ```
 For each MNAME (not "localhost", not "."):
 
-   MNAME not in Method3 child NS name set
+   MNAME not in z.ApexNSNames child NS name set
       -> Z01_MNAME_NOT_IN_NS_LIST (nsname)
 
    resolve MNAME via recursor (A and AAAA)
@@ -125,7 +125,7 @@ emit TEST_CASE_END
 | `Z01_MNAME_IS_MASTER` | One or more MNAME host/IP pairs are inferred to be master by serial comparison. |
 | `Z01_MNAME_MISSING_SOA_RECORD` | A direct SOA query to an MNAME host/IP responds without SOA in answer. |
 | `Z01_MNAME_NOT_AUTHORITATIVE` | A direct SOA query to an MNAME host/IP returns SOA but is not authoritative (`AA=false`). |
-| `Z01_MNAME_NOT_IN_NS_LIST` | MNAME hostname is not listed among child NS names (`Method3`). |
+| `Z01_MNAME_NOT_IN_NS_LIST` | MNAME hostname is not listed among child NS names (`z.ApexNSNames`). |
 | `Z01_MNAME_NOT_MASTER` | One or more MNAME host/IP pairs have a serial lower than at least one child nameserver serial. |
 | `Z01_MNAME_NOT_RESOLVE` | MNAME hostname cannot be resolved to any address. |
 | `Z01_MNAME_NO_RESPONSE` | A direct SOA query to an MNAME host/IP receives no response. |
@@ -181,7 +181,7 @@ SOA MNAME is never used for authoritative nameserver discovery and is not part o
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not describe testcase boundary debug markers in testcase outputs. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
   - Upstream: describes MNAME non-resolve handling per MNAME name. Gonemaster: uses a cumulative `foundIP` counter across all MNAME names, which can suppress `Z01_MNAME_NOT_RESOLVE` for later unresolved MNAME values after any earlier MNAME resolved.
-  - Upstream: describes processing a name server IP set. Gonemaster: iterates raw `Method4and5` output (no testcase-local IP deduplication before initial SOA probing).
+  - Upstream: describes processing a name server IP set. Gonemaster: iterates raw `AllNameservers` output (no testcase-local IP deduplication before initial SOA probing).
 - Potential upstream report:
   - `no`
 

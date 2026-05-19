@@ -12,16 +12,16 @@ Status: Final
 ## Preconditions And Inputs
 - Preconditions:
   - A `zone.Zone` object is available.
-  - Nameserver resolution context is available for MethodsV2 calls.
+  - Nameserver resolution context is available for nsdiscovery calls.
 - Required inputs:
-  - Nameserver name/IP items from `methodsv2.GetDelNSNamesAndIPs` and `methodsv2.GetZoneNSNamesAndIPs`.
+  - Nameserver name/IP items from `DelegationNameservers` and `ZoneNameservers`.
   - Apex TXT responses for SPF extraction.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: parallel nameserver query fanout.
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped.
 
 ## Algorithm And Decision Flow
-1. Build nameserver set from MethodsV2 delegation+zone items, then group by distinct IP.
+1. Build nameserver set from nsdiscovery delegation+zone items, then group by distinct IP.
 2. For each IP group (parallelized):
    - Skip disabled transports.
    - Query apex `TXT`.
@@ -48,7 +48,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-all NS = methodsv2 delegation + zone items; group by IP
+all NS = nsdiscovery delegation + zone items; group by IP
 
 For each unique IP (parallel; fan-out = resolver.defaults.parallel):
 

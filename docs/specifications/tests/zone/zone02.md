@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver addresses from `methods.Method5`.
+  - Child nameserver addresses from `ApexNameservers`.
   - One authoritative SOA response for the child zone apex (if obtainable).
 - Profile/config knobs that affect behavior:
   - `test_cases_vars.zone02.soa_refresh_minimum_value` (`Zone02.SOARefreshMinimumValue` in code): minimum accepted `refresh`.
@@ -18,7 +18,7 @@ Status: Final
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
 2. Retrieve SOA from child nameservers using shared helper logic:
-   - iterate `Method5` nameservers in order;
+   - iterate `ApexNameservers` nameservers in order;
    - skip disabled transports;
    - return the first response that has SOA in answer and `AA=true`.
 3. If no qualifying SOA response is found, emit `NO_RESPONSE_SOA_QUERY`.

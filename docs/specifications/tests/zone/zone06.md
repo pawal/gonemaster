@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Child nameserver addresses from `methods.Method5`.
+  - Child nameserver addresses from `ApexNameservers`.
   - One authoritative SOA response for the child zone apex (if obtainable).
 - Profile/config knobs that affect behavior:
   - `test_cases_vars.zone06.soa_default_ttl_maximum_value` (`Zone06.SOADefaultTTLMaximumValue` in code): upper bound.
@@ -19,7 +19,7 @@ Status: Final
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
 2. Retrieve SOA from child nameservers using shared helper logic:
-   - iterate `Method5` nameservers in order;
+   - iterate `ApexNameservers` nameservers in order;
    - skip disabled transports;
    - return the first response that has SOA in answer and `AA=true`.
 3. If no qualifying SOA response is found, emit `NO_RESPONSE_SOA_QUERY`.
@@ -66,7 +66,7 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`zone06.md`](../../upstream/tests/Zone-TP/zone06.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: describes querying over a Method4+Method5-derived nameserver IP set. Gonemaster: retrieval helper iterates `Method5` child nameserver addresses only.
+  - Upstream: describes querying over a AllNameservers-derived nameserver IP set. Gonemaster: retrieval helper iterates `ApexNameservers` child nameserver addresses only.
   - Upstream: describes fixed bounds (`300` to `86400`) as failure criteria. Gonemaster: uses profile-configurable bounds and notice-level findings for out-of-range cases under default profile.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
 - Potential upstream report:

@@ -183,6 +183,148 @@ func TestParentNameserversSkipsOnIntermediateNoResponse(t *testing.T) {
 	}
 }
 
+// TestParentNameserversAcceptsRFC8020ContradictionAtIntermediate covers the
+// case where a parent NS returns NXDOMAIN+AA at an empty non-terminal above
+// the queried zone but still returns a referral at the zone itself. The
+// walker probes the child name and accepts the NS as the parent so
+// downstream tests see a populated delegation view.
+func TestParentNameserversAcceptsRFC8020ContradictionAtIntermediate(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, NewCache())
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"ns.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root addresses: %v", err)
+	}
+
+	rootSOA := func() packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		msg.Authoritative = true
+		soaRR := &dns.SOA{Hdr: dns.Header{Name: ".", Class: dns.ClassINET}}
+		soaRR.Ns = "ns.root."
+		soaRR.Mbox = "hostmaster."
+		soaRR.Serial = 1
+		msg.Answer = []dns.RR{soaRR}
+		return packet.Packet{Msg: msg}
+	}
+	rootNS := func() packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		msg.Authoritative = true
+		nsRR := &dns.NS{Hdr: dns.Header{Name: ".", Class: dns.ClassINET}}
+		nsRR.Ns = "ns.root."
+		msg.Answer = []dns.RR{nsRR}
+		aRR := &dns.A{Hdr: dns.Header{Name: "ns.root.", Class: dns.ClassINET}}
+		aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 1})
+		msg.Extra = []dns.RR{aRR}
+		return packet.Packet{Msg: msg}
+	}
+	rootReferralExample := func() packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		nsRR := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+		nsRR.Ns = "ns.example."
+		msg.Ns = []dns.RR{nsRR}
+		aRR := &dns.A{Hdr: dns.Header{Name: "ns.example.", Class: dns.ClassINET}}
+		aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 2})
+		msg.Extra = []dns.RR{aRR}
+		return packet.Packet{Msg: msg}
+	}
+
+	exampleSOA := func() packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		msg.Authoritative = true
+		soaRR := &dns.SOA{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+		soaRR.Ns = "ns.example."
+		soaRR.Mbox = "hostmaster.example."
+		soaRR.Serial = 1
+		msg.Answer = []dns.RR{soaRR}
+		return packet.Packet{Msg: msg}
+	}
+	exampleNS := func() packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		msg.Authoritative = true
+		nsRR := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
+		nsRR.Ns = "ns.example."
+		msg.Answer = []dns.RR{nsRR}
+		aRR := &dns.A{Hdr: dns.Header{Name: "ns.example.", Class: dns.ClassINET}}
+		aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 2})
+		msg.Extra = []dns.RR{aRR}
+		return packet.Packet{Msg: msg}
+	}
+	nxdomainAA := func() packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeNameError
+		msg.Authoritative = true
+		return packet.Packet{Msg: msg}
+	}
+	childReferral := func() packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		nsRR := &dns.NS{Hdr: dns.Header{Name: "c.b.example.", Class: dns.ClassINET}}
+		nsRR.Ns = "ns.child.example."
+		msg.Ns = []dns.RR{nsRR}
+		return packet.Packet{Msg: msg}
+	}
+
+	nsRoot, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new ns.root: %v", err)
+	}
+	nsRoot.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		switch {
+		case name == "." && qtype == "SOA":
+			return rootSOA(), nil
+		case name == "." && qtype == "NS":
+			return rootNS(), nil
+		case name == "example" && qtype == "SOA":
+			return rootReferralExample(), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	nsExample, err := nameserver.NewWithContext(ctx, "ns.example", "192.0.2.2", r.Client())
+	if err != nil {
+		t.Fatalf("new ns.example: %v", err)
+	}
+	nsExample.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		switch {
+		case name == "example" && qtype == "SOA":
+			return exampleSOA(), nil
+		case name == "example" && qtype == "NS":
+			return exampleNS(), nil
+		case name == "b.example" && qtype == "SOA":
+			return nxdomainAA(), nil
+		case name == "c.b.example" && qtype == "SOA":
+			return childReferral(), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	z, err := zone.NewWithRecursor("c.b.example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	parent, err := ParentNameservers(ctx, &z)
+	if err != nil {
+		t.Fatalf("ParentNameservers: %v", err)
+	}
+	if len(parent) != 1 {
+		t.Fatalf("expected 1 parent nameserver, got %d: %#v", len(parent), parent)
+	}
+	if parent[0].String() != "ns.example/192.0.2.2" {
+		t.Fatalf("unexpected parent nameserver %q", parent[0].String())
+	}
+}
+
 // TestParentNameserversUsesCacheOnSecondCall verifies that a pre-seeded cache
 // entry is returned without traversing the delegation chain.
 func TestParentNameserversUsesCacheOnSecondCall(t *testing.T) {

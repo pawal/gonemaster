@@ -307,6 +307,16 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 					if !strings.EqualFold(intermediate.String(), z.Name.String()) {
 						continue loop
 					}
+				} else if pSOA.Rcode() == "NXDOMAIN" && pSOA.AA() && !strings.EqualFold(intermediate.String(), z.Name.String()) {
+					// RFC 8020 contradiction: NXDOMAIN at an intermediate
+					// empty non-terminal, but the same NS may still hold
+					// a referral at z.Name. Probe directly; if the child
+					// referral is present, accept this NS as the parent.
+					// Basic01 reports this as B01_PARENT_NXDOMAIN_HIDES_DELEGATION.
+					pChild := queryPacket(ctx, ns, z.Name.String(), "SOA")
+					if pChild.IsRedirect() && len(pChild.GetRecordsForName("NS", z.Name, "authority")) > 0 {
+						parentNS = append(parentNS, ns)
+					}
 				}
 				break
 			}

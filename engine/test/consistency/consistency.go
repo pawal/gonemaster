@@ -28,11 +28,11 @@ import (
 const moduleName = "Consistency"
 
 var (
-	method4        = methods.Method4
-	method5        = methods.Method5
-	method2and3    = methods.Method2and3
-	method4and5    = methods.Method4and5
-	queryParentAll = defaultQueryParentAll
+	glueNameservers = methods.GlueNameservers
+	apexNameservers = methods.ApexNameservers
+	allNSNames      = methods.AllNSNames
+	allNameservers  = methods.AllNameservers
+	queryParentAll  = defaultQueryParentAll
 	recurse        = defaultRecurse
 )
 
@@ -184,11 +184,11 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	serials := map[string][]string{}
 	queryType := "SOA"
 
-	list4, err := method4(ctx, z)
+	list4, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	list5, err := method5(ctx, z)
+	list5, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -336,11 +336,11 @@ func Consistency02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	order := []string{}
 	queryType := "SOA"
 
-	list4, err := method4(ctx, z)
+	list4, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	list5, err := method5(ctx, z)
+	list5, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -470,11 +470,11 @@ func Consistency03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	order := []string{}
 	queryType := "SOA"
 
-	list4, err := method4(ctx, z)
+	list4, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	list5, err := method5(ctx, z)
+	list5, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -621,11 +621,11 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	order := []string{}
 	queryType := "NS"
 
-	list4, err := method4(ctx, z)
+	list4, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	list5, err := method5(ctx, z)
+	list5, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -840,7 +840,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	strictGlueServers := nameserversFromStrictGlue(ctx, z, strictGlue)
 
-	ibNames, err := method2and3(ctx, z)
+	ibNames, err := allNSNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -851,7 +851,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	ibNS, err := method4and5(ctx, z)
+	ibNS, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1013,11 +1013,11 @@ func Consistency06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	order := []string{}
 	queryType := "SOA"
 
-	list4, err := method4(ctx, z)
+	list4, err := glueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	list5, err := method5(ctx, z)
+	list5, err := apexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}

@@ -28,11 +28,11 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
@@ -48,10 +48,10 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
 	}
 
@@ -93,11 +93,11 @@ func TestConsistency02MultipleRnames(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
@@ -113,10 +113,10 @@ func TestConsistency02MultipleRnames(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
 	}
 
@@ -151,11 +151,11 @@ func TestConsistency03MultipleTimeSets(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
@@ -171,10 +171,10 @@ func TestConsistency03MultipleTimeSets(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
 	}
 
@@ -209,11 +209,11 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
@@ -229,10 +229,10 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
 	}
 
@@ -272,11 +272,11 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
@@ -292,10 +292,10 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
 	}
 
@@ -328,11 +328,11 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -370,10 +370,10 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2", []string{"ns1.example", "ns2.example"}))
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
 	}
 
@@ -436,16 +436,16 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM23 := method2and3
-	origM45 := method4and5
+	origM23 := allNSNames
+	origM45 := allNameservers
 	origParent := queryParentAll
 	t.Cleanup(func() {
-		method2and3 = origM23
-		method4and5 = origM45
+		allNSNames = origM23
+		allNameservers = origM45
 		queryParentAll = origParent
 	})
 
-	method2and3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
 	}
 
@@ -469,7 +469,7 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{authNS}, nil
 	}
 
@@ -513,16 +513,16 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM23 := method2and3
-	origM45 := method4and5
+	origM23 := allNSNames
+	origM45 := allNameservers
 	origParent := queryParentAll
 	t.Cleanup(func() {
-		method2and3 = origM23
-		method4and5 = origM45
+		allNSNames = origM23
+		allNameservers = origM45
 		queryParentAll = origParent
 	})
 
-	method2and3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
 
@@ -536,7 +536,7 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 		return nonAAPacket()
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{authNS}, nil
 	}
 
@@ -578,16 +578,16 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM23 := method2and3
-	origM45 := method4and5
+	origM23 := allNSNames
+	origM45 := allNameservers
 	origParent := queryParentAll
 	t.Cleanup(func() {
-		method2and3 = origM23
-		method4and5 = origM45
+		allNSNames = origM23
+		allNameservers = origM45
 		queryParentAll = origParent
 	})
 
-	method2and3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
 
@@ -598,7 +598,7 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{authNS}, nil
 	}
 
@@ -664,16 +664,16 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM23 := method2and3
-	origM45 := method4and5
+	origM23 := allNSNames
+	origM45 := allNameservers
 	origParent := queryParentAll
 	t.Cleanup(func() {
-		method2and3 = origM23
-		method4and5 = origM45
+		allNSNames = origM23
+		allNameservers = origM45
 		queryParentAll = origParent
 	})
 
-	method2and3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
 
@@ -695,7 +695,7 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
 
@@ -735,21 +735,21 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM23 := method2and3
-	origM45 := method4and5
+	origM23 := allNSNames
+	origM45 := allNameservers
 	origParent := queryParentAll
 	origRecurse := recurse
 	t.Cleanup(func() {
-		method2and3 = origM23
-		method4and5 = origM45
+		allNSNames = origM23
+		allNameservers = origM45
 		queryParentAll = origParent
 		recurse = origRecurse
 	})
 
-	method2and3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{}, nil
 	}
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
 	}
 
@@ -804,11 +804,11 @@ func TestConsistency06MultipleMnames(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM4 := method4
-	origM5 := method5
+	origM4 := glueNameservers
+	origM5 := apexNameservers
 	t.Cleanup(func() {
-		method4 = origM4
-		method5 = origM5
+		glueNameservers = origM4
+		apexNameservers = origM5
 	})
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
@@ -824,10 +824,10 @@ func TestConsistency06MultipleMnames(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
 	}
-	method5 = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
 	}
 

@@ -21,6 +21,7 @@ _Do not edit by hand - regenerate with the command above._
 | `B01_PARENT_DISREGARDED` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
 | `B01_PARENT_FOUND` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
 | `B01_PARENT_NOT_FOUND` | `WARNING` | [basic01](../tests/basic/basic01.md) | yes |
+| `B01_PARENT_NXDOMAIN_HIDES_DELEGATION` | `ERROR` | [basic01](../tests/basic/basic01.md) | yes |
 | `B01_PARENT_UNDETERMINED` | `WARNING` | [basic01](../tests/basic/basic01.md) | yes |
 | `B01_ROOT_HAS_NO_PARENT` | `INFO` | [basic01](../tests/basic/basic01.md) | yes |
 | `B01_SERVER_ZONE_ERROR` | `DEBUG` | [basic01](../tests/basic/basic01.md) | yes |

@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 80,
-    "unique_tag_count": 517
+    "unique_tag_count": 518
   },
   "modules": {
     "address": {
@@ -55,6 +55,7 @@
         "B01_PARENT_DISREGARDED",
         "B01_PARENT_FOUND",
         "B01_PARENT_NOT_FOUND",
+        "B01_PARENT_NXDOMAIN_HIDES_DELEGATION",
         "B01_PARENT_UNDETERMINED",
         "B01_ROOT_HAS_NO_PARENT",
         "B01_SERVER_ZONE_ERROR",

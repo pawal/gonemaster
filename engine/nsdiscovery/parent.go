@@ -24,31 +24,87 @@ type parentCacheServer struct {
 	Address string
 }
 
-var parentCache = struct {
+// Cache holds memoised ParentNameservers results for one engine run.
+// Attach it to a context with [WithCache] so concurrent runs each see
+// their own cache without sharing state.
+type Cache struct {
 	mu    sync.Mutex
 	items map[string]parentCacheEntry
-}{
-	items: map[string]parentCacheEntry{},
 }
 
-// ClearParentNSCache empties the package-global cache used by
-// [ParentNameservers]. Safe to call concurrently with ParentNameservers;
-// in-flight readers see either the cached or a fresh result. Intended
-// for long-running processes that need to invalidate the cache between
-// runs, and for tests.
-func ClearParentNSCache() {
-	parentCache.mu.Lock()
-	parentCache.items = map[string]parentCacheEntry{}
-	parentCache.mu.Unlock()
+// NewCache returns an empty Cache ready to be attached via [WithCache].
+func NewCache() *Cache {
+	return &Cache{items: map[string]parentCacheEntry{}}
+}
+
+// Clear empties the cache.
+func (c *Cache) Clear() {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.items = map[string]parentCacheEntry{}
+	c.mu.Unlock()
+}
+
+// Len returns the number of cached entries.
+func (c *Cache) Len() int {
+	if c == nil {
+		return 0
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.items)
+}
+
+func (c *Cache) lookup(key string) (parentCacheEntry, bool) {
+	if c == nil {
+		return parentCacheEntry{}, false
+	}
+	c.mu.Lock()
+	entry, ok := c.items[key]
+	c.mu.Unlock()
+	return entry, ok
+}
+
+func (c *Cache) store(key string, servers []nameserver.Nameserver, defined bool) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.items[key] = parentCacheEntry{defined: defined, servers: snapshotParentServers(servers)}
+	c.mu.Unlock()
+}
+
+type cacheCtxKey struct{}
+
+// WithCache returns a context carrying c, so [ParentNameservers] reuses
+// already-walked parent chains within the run.
+func WithCache(ctx context.Context, c *Cache) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	return context.WithValue(ctx, cacheCtxKey{}, c)
+}
+
+// cacheFromContext returns the Cache attached to ctx, or nil if none.
+func cacheFromContext(ctx context.Context) *Cache {
+	if ctx == nil {
+		return nil
+	}
+	if c, ok := ctx.Value(cacheCtxKey{}).(*Cache); ok {
+		return c
+	}
+	return nil
 }
 
 // ParentNameservers returns the nameservers of the parent zone, found by
 // walking the delegation chain from the root down to the parent of z and
 // collecting the parent's NS RRset and addresses.
 //
-// Results are cached per zone name in a package-global map protected by
-// a mutex. The cache survives across context boundaries; use
-// [ClearParentNSCache] to invalidate.
+// Results are memoised in the [Cache] attached to ctx via [WithCache] (one
+// cache per engine run, isolated between runs). With no cache attached,
+// every call re-walks the chain.
 //
 // For the root zone and zones whose names appear in the recursor's
 // fake-address map (undelegated test setups), an empty slice and nil
@@ -66,21 +122,19 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 		return nil, fmt.Errorf("missing recursor")
 	}
 	prof := profile.FromContext(ctx)
+	cache := cacheFromContext(ctx)
 
 	if z.Name.String() == "." || r.HasFakeAddresses(z.Name.String()) {
 		return []nameserver.Nameserver{}, nil
 	}
 
 	key := strings.ToLower(z.Name.String())
-	parentCache.mu.Lock()
-	if cached, ok := parentCache.items[key]; ok {
-		parentCache.mu.Unlock()
+	if cached, ok := cache.lookup(key); ok {
 		if !cached.defined {
 			return nil, nil
 		}
 		return materializeParentServers(ctx, r.Client(), cached.servers), nil
 	}
-	parentCache.mu.Unlock()
 
 	root, err := r.RootServers(ctx)
 	if err != nil {
@@ -179,7 +233,7 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 			for {
 				loopCount++
 				if loopCount >= 1000 {
-					cacheParent(key, nil, false)
+					cache.store(key, nil, false)
 					return nil, nil
 				}
 
@@ -260,12 +314,12 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 	}
 
 	if len(parentNS) == 0 {
-		cacheParent(key, nil, false)
+		cache.store(key, nil, false)
 		return nil, nil
 	}
 
 	parentNS = uniqueSortedNameservers(parentNS)
-	cacheParent(key, parentNS, true)
+	cache.store(key, parentNS, true)
 	return cloneNameservers(parentNS), nil
 }
 
@@ -295,12 +349,6 @@ func parentNSIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, er
 		out = append(out, nsByIP[key])
 	}
 	return out, nil
-}
-
-func cacheParent(key string, servers []nameserver.Nameserver, defined bool) {
-	parentCache.mu.Lock()
-	parentCache.items[key] = parentCacheEntry{defined: defined, servers: snapshotParentServers(servers)}
-	parentCache.mu.Unlock()
 }
 
 func snapshotParentServers(list []nameserver.Nameserver) []parentCacheServer {

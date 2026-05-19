@@ -188,7 +188,6 @@ func TestAllNameserversPropertyAlwaysSortedAndDedupedByString(t *testing.T) {
 func TestDelegationNameserversNoNilNamesInOutput(t *testing.T) {
 	letters := []byte("abcdefghijklmnopqrstuvwxyz")
 	for trial := 0; trial < 20; trial++ {
-		ClearParentNSCache()
 		nameserver.EmptyCache()
 
 		seed := int64(trial * 11)
@@ -233,7 +232,6 @@ func TestDelegationNameserversNoNilNamesInOutput(t *testing.T) {
 		}
 	}
 	t.Cleanup(func() {
-		ClearParentNSCache()
 		nameserver.EmptyCache()
 	})
 }

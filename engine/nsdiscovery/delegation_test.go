@@ -18,8 +18,6 @@ import (
 )
 
 func TestDelegationNameserversUndelegated(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -57,8 +55,6 @@ func TestDelegationNameserversUndelegated(t *testing.T) {
 }
 
 func TestZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
@@ -92,8 +88,6 @@ func TestZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
 }
 
 func TestZoneNameserversOutOfBailiwick(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
@@ -136,8 +130,6 @@ func TestZoneNameserversOutOfBailiwick(t *testing.T) {
 }
 
 func TestDelegationNameserversUndelegatedLookupWhenNoIP(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
@@ -192,8 +184,6 @@ func TestDelegationNameserversUndelegatedLookupWhenNoIP(t *testing.T) {
 }
 
 func TestDelegationNameserversUndelegatedKeepsInBailiwickNameWithoutIP(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -220,8 +210,6 @@ func TestDelegationNameserversUndelegatedKeepsInBailiwickNameWithoutIP(t *testin
 }
 
 func TestZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -249,8 +237,6 @@ func TestZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
 }
 
 func TestZoneNameserversUndelegatedInBailiwickUsesProvidedGlue(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -371,8 +357,6 @@ func ibTestRootHook(zoneName string, nsGlue map[string]string) func(context.Cont
 // TestGetIBAddrInZoneSkipsDeadDelegationServer exercises in-bailiwick
 // resolution where one delegation server is unreachable.
 func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = false
@@ -476,8 +460,6 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 // server provides addresses for an in-bailiwick NS name, remaining servers
 // are not tried for that name.
 func TestGetIBAddrInZoneBreaksEarlyOnSuccess(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = false

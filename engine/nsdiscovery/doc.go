@@ -18,7 +18,7 @@
 //     and out-of-bailiwick address resolution. Exposed as [ZoneNameservers].
 //   - Parent chain: parent zone's own nameservers, found by walking the
 //     delegation chain from the root. Exposed as [ParentNameservers],
-//     backed by a package-global cache that [ClearParentNSCache] resets.
+//     memoised in a per-run [Cache] attached to the context via [WithCache].
 //
 // Glue/Apex/Union are appropriate for testcases that should trust the
 // zone's own view; Delegation/Zone/Parent are for testcases that need

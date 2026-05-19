@@ -17,23 +17,21 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-// Tests for ParentNameservers and the parent NS cache.
+// Tests for ParentNameservers and the per-context Cache.
 
 func TestParentCacheStoresSnapshotData(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
-
+	cache := NewCache()
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, cache)
+
 	ns, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	cacheParent("example", []nameserver.Nameserver{ns}, true)
+	cache.store("example", []nameserver.Nameserver{ns}, true)
 
-	parentCache.mu.Lock()
-	entry, ok := parentCache.items["example"]
-	parentCache.mu.Unlock()
+	entry, ok := cache.lookup("example")
 	if !ok {
 		t.Fatalf("expected parent cache entry")
 	}
@@ -64,9 +62,8 @@ func TestParentCacheStoresSnapshotData(t *testing.T) {
 }
 
 func TestParentNameserversUndelegated(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, NewCache())
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses("example", map[string][]string{
@@ -89,9 +86,8 @@ func TestParentNameserversUndelegated(t *testing.T) {
 }
 
 func TestParentNameserversSkipsOnIntermediateNoResponse(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, prof, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, NewCache())
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
@@ -190,9 +186,9 @@ func TestParentNameserversSkipsOnIntermediateNoResponse(t *testing.T) {
 // TestParentNameserversUsesCacheOnSecondCall verifies that a pre-seeded cache
 // entry is returned without traversing the delegation chain.
 func TestParentNameserversUsesCacheOnSecondCall(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
+	cache := NewCache()
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, cache)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -207,7 +203,7 @@ func TestParentNameserversUsesCacheOnSecondCall(t *testing.T) {
 	}
 
 	key := z.Name.String()
-	seedParentCache(ctx, t, r, key, "sentinel.ns.example", "203.0.113.99")
+	seedParentCache(ctx, t, r, cache, key, "sentinel.ns.example", "203.0.113.99")
 
 	out, err := ParentNameservers(ctx, &z)
 	if err != nil {
@@ -222,43 +218,37 @@ func TestParentNameserversUsesCacheOnSecondCall(t *testing.T) {
 	}
 }
 
-// TestClearParentNSCacheRemovesAllEntries verifies that ClearParentNSCache
-// empties the global parent cache map.
-func TestClearParentNSCacheRemovesAllEntries(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
+// TestCacheClearRemovesAllEntries verifies that Cache.Clear empties the cache.
+func TestCacheClearRemovesAllEntries(t *testing.T) {
+	cache := NewCache()
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, cache)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
 		t.Fatalf("add root: %v", err)
 	}
 
-	seedParentCache(ctx, t, r, "example.com.", "ns.example", "203.0.113.1")
-	seedParentCache(ctx, t, r, "example.org.", "ns.example", "203.0.113.2")
+	seedParentCache(ctx, t, r, cache, "example.com.", "ns.example", "203.0.113.1")
+	seedParentCache(ctx, t, r, cache, "example.org.", "ns.example", "203.0.113.2")
 
-	parentCache.mu.Lock()
-	before := len(parentCache.items)
-	parentCache.mu.Unlock()
-	if before != 2 {
+	if before := cache.Len(); before != 2 {
 		t.Fatalf("expected 2 cache entries before clear, got %d", before)
 	}
 
-	ClearParentNSCache()
+	cache.Clear()
 
-	parentCache.mu.Lock()
-	after := len(parentCache.items)
-	parentCache.mu.Unlock()
-	if after != 0 {
-		t.Fatalf("expected empty cache after ClearParentNSCache, got %d entries", after)
+	if after := cache.Len(); after != 0 {
+		t.Fatalf("expected empty cache after Clear, got %d entries", after)
 	}
 }
 
-// TestParentNameserversCacheIsolatedPerZone verifies that cache entries for
-// two distinct zones do not bleed into each other.
-func TestParentNameserversCacheIsolatedPerZone(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
+// TestParentNameserversCachesPerInstance verifies that two separate caches
+// hold distinct state - the per-run isolation that replaces the old
+// package-global cache.
+func TestParentNameserversCachesPerInstance(t *testing.T) {
+	cacheA := NewCache()
+	cacheB := NewCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -275,14 +265,17 @@ func TestParentNameserversCacheIsolatedPerZone(t *testing.T) {
 		t.Fatalf("new zone beta: %v", err)
 	}
 
-	seedParentCache(ctx, t, r, zA.Name.String(), "ns.alpha", "203.0.113.10")
-	seedParentCache(ctx, t, r, zB.Name.String(), "ns.beta", "203.0.113.20")
+	seedParentCache(ctx, t, r, cacheA, zA.Name.String(), "ns.alpha", "203.0.113.10")
+	seedParentCache(ctx, t, r, cacheB, zB.Name.String(), "ns.beta", "203.0.113.20")
 
-	outA, err := ParentNameservers(ctx, &zA)
+	ctxA := WithCache(ctx, cacheA)
+	ctxB := WithCache(ctx, cacheB)
+
+	outA, err := ParentNameservers(ctxA, &zA)
 	if err != nil {
 		t.Fatalf("parent alpha: %v", err)
 	}
-	outB, err := ParentNameservers(ctx, &zB)
+	outB, err := ParentNameservers(ctxB, &zB)
 	if err != nil {
 		t.Fatalf("parent beta: %v", err)
 	}
@@ -293,51 +286,48 @@ func TestParentNameserversCacheIsolatedPerZone(t *testing.T) {
 	if len(outB) != 1 || outB[0].Name.String() != "ns.beta" {
 		t.Fatalf("beta: expected ns.beta, got %#v", outB)
 	}
+
+	// cacheA must not see beta's entry, and vice versa.
+	if _, ok := cacheA.lookup(zB.Name.String()); ok {
+		t.Fatalf("cacheA leaked beta zone entry")
+	}
+	if _, ok := cacheB.lookup(zA.Name.String()); ok {
+		t.Fatalf("cacheB leaked alpha zone entry")
+	}
 }
 
-// TestParentNameserversCacheSurvivesAcrossContexts verifies the cache lookup
-// is keyed by zone name only.
-func TestParentNameserversCacheSurvivesAcrossContexts(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
-	ctx1, _, _ := testhelpers.Context(t)
-	ctx2, _, _ := testhelpers.Context(t)
+// TestParentNameserversNoCacheStillWorks verifies that calling
+// ParentNameservers without WithCache succeeds (no caching, but no panic).
+func TestParentNameserversNoCacheStillWorks(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
+	if err := r.AddFakeAddresses("example", map[string][]string{
+		"ns1.example": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake addresses: %v", err)
 	}
-
-	z, err := zone.NewWithRecursor("example.com", r)
+	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	seedParentCache(ctx1, t, r, z.Name.String(), "sentinel.ns", "203.0.113.7")
-
-	out1, err := ParentNameservers(ctx1, &z)
+	parent, err := ParentNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("ctx1: %v", err)
+		t.Fatalf("ParentNameservers: %v", err)
 	}
-	out2, err := ParentNameservers(ctx2, &z)
-	if err != nil {
-		t.Fatalf("ctx2: %v", err)
-	}
-	if len(out1) != 1 || len(out2) != 1 {
-		t.Fatalf("expected both contexts to hit cache; got %d and %d", len(out1), len(out2))
-	}
-	if out1[0].Name.String() != "sentinel.ns" || out2[0].Name.String() != "sentinel.ns" {
-		t.Fatalf("expected sentinel.ns from both contexts, got %s and %s",
-			out1[0].Name.String(), out2[0].Name.String())
+	if parent == nil || len(parent) != 0 {
+		t.Fatalf("expected empty parent list, got %#v", parent)
 	}
 }
 
 // TestParentNameserversConcurrentCallsSameZone launches 50 goroutines on the
-// same zone. Run under -race to detect missing mutex protection.
+// same zone with a shared cache. Run under -race to detect missing mutex
+// protection.
 func TestParentNameserversConcurrentCallsSameZone(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
+	cache := NewCache()
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, cache)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
@@ -349,7 +339,7 @@ func TestParentNameserversConcurrentCallsSameZone(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	seedParentCache(ctx, t, r, z.Name.String(), "shared.ns", "203.0.113.42")
+	seedParentCache(ctx, t, r, cache, z.Name.String(), "shared.ns", "203.0.113.42")
 
 	const N = 50
 	var wg sync.WaitGroup
@@ -373,9 +363,9 @@ func TestParentNameserversConcurrentCallsSameZone(t *testing.T) {
 // TestParentNameserversConcurrentCallsDifferentZones launches goroutines
 // spread across 10 distinct zones with their own pre-seeded cache entries.
 func TestParentNameserversConcurrentCallsDifferentZones(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
+	cache := NewCache()
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, cache)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
@@ -394,7 +384,7 @@ func TestParentNameserversConcurrentCallsDifferentZones(t *testing.T) {
 		zones[i] = z
 		nsName := fmt.Sprintf("ns.zone%d", i)
 		expectedNS[i] = nsName
-		seedParentCache(ctx, t, r, z.Name.String(), nsName, fmt.Sprintf("203.0.113.%d", 10+i))
+		seedParentCache(ctx, t, r, cache, z.Name.String(), nsName, fmt.Sprintf("203.0.113.%d", 10+i))
 	}
 
 	const PerZone = 5
@@ -418,20 +408,17 @@ func TestParentNameserversConcurrentCallsDifferentZones(t *testing.T) {
 	}
 	wg.Wait()
 
-	parentCache.mu.Lock()
-	count := len(parentCache.items)
-	parentCache.mu.Unlock()
-	if count != NZones {
+	if count := cache.Len(); count != NZones {
 		t.Fatalf("expected %d cache entries, got %d", NZones, count)
 	}
 }
 
-// TestClearParentNSCacheConcurrentWithParentNameservers runs ClearParentNSCache
-// repeatedly while many readers call ParentNameservers.
-func TestClearParentNSCacheConcurrentWithParentNameservers(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
+// TestCacheClearConcurrentWithParentNameservers exercises Cache.Clear under
+// contention with concurrent ParentNameservers callers.
+func TestCacheClearConcurrentWithParentNameservers(t *testing.T) {
+	cache := NewCache()
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, cache)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
@@ -443,7 +430,7 @@ func TestClearParentNSCacheConcurrentWithParentNameservers(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	seedParentCache(ctx, t, r, z.Name.String(), "ns.example", "203.0.113.50")
+	seedParentCache(ctx, t, r, cache, z.Name.String(), "ns.example", "203.0.113.50")
 
 	const Iterations = 200
 	var wg sync.WaitGroup
@@ -452,8 +439,8 @@ func TestClearParentNSCacheConcurrentWithParentNameservers(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < Iterations; i++ {
-			ClearParentNSCache()
-			seedParentCache(ctx, t, r, z.Name.String(), "ns.example", "203.0.113.50")
+			cache.Clear()
+			seedParentCache(ctx, t, r, cache, z.Name.String(), "ns.example", "203.0.113.50")
 		}
 	}()
 

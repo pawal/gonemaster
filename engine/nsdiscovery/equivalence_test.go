@@ -27,8 +27,6 @@ import (
 func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	ClearParentNSCache()
-	t.Cleanup(ClearParentNSCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -97,8 +95,6 @@ func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	ClearParentNSCache()
-	t.Cleanup(ClearParentNSCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -157,8 +153,6 @@ func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) 
 func TestAllNameserversVsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	ClearParentNSCache()
-	t.Cleanup(ClearParentNSCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true

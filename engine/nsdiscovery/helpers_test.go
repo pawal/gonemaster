@@ -101,15 +101,15 @@ func newAuthoritativeNameserver(ctx context.Context, t *testing.T, r *recursor.R
 	return ns
 }
 
-// seedParentCache stores a sentinel entry for the given zone key using
-// cacheParent. Returns a freshly built nameserver matching the entry so
-// tests can compare materialized output.
-func seedParentCache(ctx context.Context, t *testing.T, r *recursor.Recursor, zoneKey string, nsName string, nsAddr string) nameserver.Nameserver {
+// seedParentCache stores a sentinel entry in cache under the given zone key.
+// Returns a freshly built nameserver matching the entry so tests can compare
+// materialized output.
+func seedParentCache(ctx context.Context, t *testing.T, r *recursor.Recursor, cache *Cache, zoneKey string, nsName string, nsAddr string) nameserver.Nameserver {
 	t.Helper()
 	ns, err := nameserver.NewWithContext(ctx, nsName, nsAddr, r.Client())
 	if err != nil {
 		t.Fatalf("seed nameserver: %v", err)
 	}
-	cacheParent(zoneKey, []nameserver.Nameserver{ns}, true)
+	cache.store(zoneKey, []nameserver.Nameserver{ns}, true)
 	return ns
 }

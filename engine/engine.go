@@ -14,6 +14,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	address "codeberg.org/pawal/gonemaster/engine/test/address"
@@ -494,6 +495,7 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		ctx = transport.WithLimiter(ctx, runner.Limiter)
 	}
 	ctx = ns.WithCache(ctx, runner.NameserverCache)
+	ctx = nsdiscovery.WithCache(ctx, nsdiscovery.NewCache())
 	if req.ASNCache != nil {
 		ctx = asnlookup.WithCache(ctx, req.ASNCache)
 	}

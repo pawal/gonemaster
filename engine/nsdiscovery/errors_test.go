@@ -32,9 +32,8 @@ func TestParentNameserversErrorWhenMissingRecursor(t *testing.T) {
 }
 
 func TestParentNameserversReturnsEmptyWhenRootEmpty(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, NewCache())
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{}); err != nil {
@@ -62,12 +61,11 @@ func TestDelegationNameserversErrorWhenNilZone(t *testing.T) {
 }
 
 func TestDelegationNameserversReturnsEmptyWhenAllDelegationServersUnreachable(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, NewCache())
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{}); err != nil {
@@ -95,12 +93,11 @@ func TestZoneNameserversErrorWhenNilZone(t *testing.T) {
 }
 
 func TestZoneNameserversReturnsEmptyWhenDelegationEmpty(t *testing.T) {
-	ClearParentNSCache()
-	defer ClearParentNSCache()
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, NewCache())
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {

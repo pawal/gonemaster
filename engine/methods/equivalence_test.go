@@ -11,8 +11,8 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-// Equivalence tests document where Method4and5 (zone-view union of glue and
-// apex NS) and methodsv2.GetZoneNSNamesAndIPs (parent-queried delegation
+// Equivalence tests document where AllNameservers (zone-view union of glue
+// and apex NS) and methodsv2.ZoneNameservers (parent-queried delegation
 // view) agree and where they differ.
 //
 // These tests do not drive a behavior change; they make the difference
@@ -28,14 +28,15 @@ import (
 // TestGetParentNSNamesAndIPsSkipsOnIntermediateNoResponse for the complex
 // pattern such a setup requires).
 
-// TestMethod4and5VsZoneNameserversAgreeOnCleanUndelegated verifies that for
-// an undelegated zone with clean glue, Method4and5 and GetZoneNSNamesAndIPs
-// return the same nameserver set (modulo []Nameserver vs []NSItem types).
-func TestMethod4and5VsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
+// TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated verifies that
+// for an undelegated zone with clean glue, AllNameservers and
+// ZoneNameservers return the same nameserver set (modulo []Nameserver vs
+// []NSItem types).
+func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	methodsv2.ClearCache()
-	t.Cleanup(methodsv2.ClearCache)
+	methodsv2.ClearParentNSCache()
+	t.Cleanup(methodsv2.ClearParentNSCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -62,58 +63,58 @@ func TestMethod4and5VsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	m45, err := Method4and5(ctx, &z)
+	allNS, err := AllNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("method4and5: %v", err)
+		t.Fatalf("AllNameservers: %v", err)
 	}
-	zoneItems, err := methodsv2.GetZoneNSNamesAndIPs(ctx, &z)
+	zoneItems, err := methodsv2.ZoneNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("getZoneNSNamesAndIPs: %v", err)
+		t.Fatalf("ZoneNameservers: %v", err)
 	}
 
 	// Normalize both to a sorted set of "name|address" strings.
-	m45Set := make([]string, 0, len(m45))
-	for _, ns := range m45 {
-		m45Set = append(m45Set, ns.Name.String()+"|"+ns.Address.String())
+	allSet := make([]string, 0, len(allNS))
+	for _, ns := range allNS {
+		allSet = append(allSet, ns.Name.String()+"|"+ns.Address.String())
 	}
-	sort.Strings(m45Set)
+	sort.Strings(allSet)
 
-	v2Set := make([]string, 0, len(zoneItems))
+	zoneSet := make([]string, 0, len(zoneItems))
 	for _, it := range zoneItems {
 		addr := ""
 		if it.HasAddress {
 			addr = it.Address.String()
 		}
-		v2Set = append(v2Set, it.Name.String()+"|"+addr)
+		zoneSet = append(zoneSet, it.Name.String()+"|"+addr)
 	}
-	sort.Strings(v2Set)
+	sort.Strings(zoneSet)
 
-	if len(m45Set) != len(v2Set) {
-		t.Fatalf("size mismatch: Method4and5=%d, GetZoneNSNamesAndIPs=%d\nm45=%#v\nv2 =%#v",
-			len(m45Set), len(v2Set), m45Set, v2Set)
+	if len(allSet) != len(zoneSet) {
+		t.Fatalf("size mismatch: AllNameservers=%d, ZoneNameservers=%d\nall=%#v\nzone=%#v",
+			len(allSet), len(zoneSet), allSet, zoneSet)
 	}
-	for i := range m45Set {
-		if m45Set[i] != v2Set[i] {
-			t.Fatalf("mismatch at %d: m45=%q v2=%q (full: m45=%#v v2=%#v)",
-				i, m45Set[i], v2Set[i], m45Set, v2Set)
+	for i := range allSet {
+		if allSet[i] != zoneSet[i] {
+			t.Fatalf("mismatch at %d: all=%q zone=%q (full: all=%#v zone=%#v)",
+				i, allSet[i], zoneSet[i], allSet, zoneSet)
 		}
 	}
 }
 
-// TestMethod4and5VsZoneNameserversAgreeOnOutOfBailiwickGlue verifies that
+// TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue verifies that
 // when the zone's nameservers are out-of-bailiwick (e.g. example zone's
 // NS records point at *.example.net), both functions still return the same
 // set in undelegated mode, since the recursor's fake-address map serves as
 // the single source of truth for both.
 //
-// The semantically interesting case - where Method5 cannot resolve OOB
-// names but methodsv2's recursor-driven resolution can - requires a
+// The semantically interesting case - where ApexNameservers cannot resolve
+// OOB names but methodsv2's recursor-driven resolution can - requires a
 // delegated zone scaffold; see the file header.
-func TestMethod4and5VsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) {
+func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	methodsv2.ClearCache()
-	t.Cleanup(methodsv2.ClearCache)
+	methodsv2.ClearParentNSCache()
+	t.Cleanup(methodsv2.ClearParentNSCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -140,41 +141,41 @@ func TestMethod4and5VsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	m45, err := Method4and5(ctx, &z)
+	allNS, err := AllNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("method4and5: %v", err)
+		t.Fatalf("AllNameservers: %v", err)
 	}
-	zoneItems, err := methodsv2.GetZoneNSNamesAndIPs(ctx, &z)
+	zoneItems, err := methodsv2.ZoneNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("getZoneNSNamesAndIPs: %v", err)
+		t.Fatalf("ZoneNameservers: %v", err)
 	}
 
-	m45Names := map[string]bool{}
-	for _, ns := range m45 {
-		m45Names[ns.Name.String()] = true
+	allNames := map[string]bool{}
+	for _, ns := range allNS {
+		allNames[ns.Name.String()] = true
 	}
-	v2Names := map[string]bool{}
+	zoneNames := map[string]bool{}
 	for _, it := range zoneItems {
-		v2Names[it.Name.String()] = true
+		zoneNames[it.Name.String()] = true
 	}
 	for _, want := range []string{"ns1.example.net", "ns2.example.net"} {
-		if !m45Names[want] {
-			t.Errorf("Method4and5 missing %s; got %#v", want, m45Names)
+		if !allNames[want] {
+			t.Errorf("AllNameservers missing %s; got %#v", want, allNames)
 		}
-		if !v2Names[want] {
-			t.Errorf("GetZoneNSNamesAndIPs missing %s; got %#v", want, v2Names)
+		if !zoneNames[want] {
+			t.Errorf("ZoneNameservers missing %s; got %#v", want, zoneNames)
 		}
 	}
 }
 
-// TestMethod4and5VsZoneNameserversAgreeOnEmptyZone verifies that an
+// TestAllNameserversVsZoneNameserversAgreeOnEmptyZone verifies that an
 // undelegated zone with no fake addresses produces the same empty result
 // from both functions.
-func TestMethod4and5VsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
+func TestAllNameserversVsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)
-	methodsv2.ClearCache()
-	t.Cleanup(methodsv2.ClearCache)
+	methodsv2.ClearParentNSCache()
+	t.Cleanup(methodsv2.ClearParentNSCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -193,18 +194,18 @@ func TestMethod4and5VsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	m45, err := Method4and5(ctx, &z)
+	allNS, err := AllNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("method4and5: %v", err)
+		t.Fatalf("AllNameservers: %v", err)
 	}
-	zoneItems, err := methodsv2.GetZoneNSNamesAndIPs(ctx, &z)
+	zoneItems, err := methodsv2.ZoneNameservers(ctx, &z)
 	if err != nil {
-		t.Fatalf("getZoneNSNamesAndIPs: %v", err)
+		t.Fatalf("ZoneNameservers: %v", err)
 	}
-	if len(m45) != 0 {
-		t.Errorf("Method4and5 expected empty, got %#v", m45)
+	if len(allNS) != 0 {
+		t.Errorf("AllNameservers expected empty, got %#v", allNS)
 	}
 	if len(zoneItems) != 0 {
-		t.Errorf("GetZoneNSNamesAndIPs expected empty, got %#v", zoneItems)
+		t.Errorf("ZoneNameservers expected empty, got %#v", zoneItems)
 	}
 }

@@ -991,8 +991,8 @@ func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
 		glueNames = origM2
 		apexNSNames = origM3
 	})
-	glueNames = methods.Method2
-	apexNSNames = methods.Method3
+	glueNames = methods.GlueNames
+	apexNSNames = methods.ApexNSNames
 
 	r, err := recursor.New()
 	if err != nil {

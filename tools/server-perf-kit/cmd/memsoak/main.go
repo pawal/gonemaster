@@ -247,10 +247,10 @@ func runSoak(domainsPath string, domains []string, domainsSHA string, backend st
 		cfg.Database.DSN = sqliteDSN
 	}
 
-	methodsv2.ClearCache()
+	methodsv2.ClearParentNSCache()
 	report.Methodsv2CacheClearedStart = true
 	report.Methodsv2CacheEntriesStart = 0
-	defer methodsv2.ClearCache()
+	defer methodsv2.ClearParentNSCache()
 
 	srv, err := serverpkg.NewWithOptions(cfg)
 	if err != nil {

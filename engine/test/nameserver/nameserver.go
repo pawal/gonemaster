@@ -35,9 +35,9 @@ var nonExistentNames = []string{
 }
 
 var (
-	method2          = methods.Method2
-	method3          = methods.Method3
-	method4and5      = methods.Method4and5
+	glueNames        = methods.GlueNames
+	apexNSNames      = methods.ApexNSNames
+	allNameservers   = methods.AllNameservers
 	scrambleCaseFunc = util.ScrambleCase
 )
 
@@ -347,7 +347,7 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -468,7 +468,7 @@ func Nameserver02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		hasError bool
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -587,7 +587,7 @@ func Nameserver03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -674,7 +674,7 @@ func Nameserver04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -759,7 +759,7 @@ func Nameserver05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -890,11 +890,11 @@ func Nameserver06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	glueNames, err := method2(ctx, z)
+	glueNames, err := glueNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	childNames, err := method3(ctx, z)
+	childNames, err := apexNSNames(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -906,7 +906,7 @@ func Nameserver06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		allNames[strings.ToLower(name.String())] = true
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -960,7 +960,7 @@ func Nameserver07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return appendTestCaseEnd(ctx, results, testcase)
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1049,7 +1049,7 @@ func Nameserver08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		randomized = scrambleCaseFunc(original)
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1152,7 +1152,7 @@ func Nameserver09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	allResultsMatch := true
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1288,7 +1288,7 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	unexpectedRcode := map[string][]string{}
 	var ednsResponseError []string
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1416,7 +1416,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	optCode := uint16(137)
 	unknownOptData := &dns.ERFC3597{EDNS0Code: optCode, Code: ""}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1590,7 +1590,7 @@ func Nameserver12(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1656,7 +1656,7 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1738,7 +1738,7 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	sendingVersionQuery := map[string]bool{}
 	wrongRecordClass := map[string]bool{}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1927,7 +1927,7 @@ func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var noResponse []string
 	unexpectedRcode := map[string][]string{}
 
-	nss, err := method4and5(ctx, z)
+	nss, err := allNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}

@@ -24,8 +24,8 @@ import (
 func TestNameserver01RecursorAndNoRecursor(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	nsRecursor := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
@@ -38,7 +38,7 @@ func TestNameserver01RecursorAndNoRecursor(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsRecursor, nsNoRecursor}, nil
 	}
 
@@ -58,8 +58,8 @@ func TestNameserver01RecursorAndNoRecursor(t *testing.T) {
 func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	// Server returns NXDOMAIN with AA=1 on all probes (fake root authority).
 	// This should NOT be classified as a recursor.
@@ -70,7 +70,7 @@ func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsFakeRoot}, nil
 	}
 
@@ -90,8 +90,8 @@ func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
 func TestNameserver01NxdomainWithRAAndAAIsRecursor(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	// Server returns NXDOMAIN with both RA=1 and AA=1.
 	// RA takes precedence - should still be classified as a recursor.
@@ -103,7 +103,7 @@ func TestNameserver01NxdomainWithRAAndAAIsRecursor(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsRAandAA}, nil
 	}
 
@@ -120,8 +120,8 @@ func TestNameserver01NxdomainWithRAAndAAIsRecursor(t *testing.T) {
 func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	// Server returns NXDOMAIN on all probes, but only some have AA=1.
 	// Since not ALL NXDOMAIN responses are authoritative, classify as recursor.
@@ -136,7 +136,7 @@ func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsMixed}, nil
 	}
 
@@ -153,8 +153,8 @@ func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
 func TestNameserver01ParallelQueries(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
@@ -192,7 +192,7 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
 	}
 
@@ -261,8 +261,8 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 func TestNameserver02EDNS0Support(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.3", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
 		if strings.EqualFold(qtype, "SOA") {
@@ -271,7 +271,7 @@ func TestNameserver02EDNS0Support(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -288,8 +288,8 @@ func TestNameserver02EDNS0Support(t *testing.T) {
 func TestNameserver03AXFRAvailable(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.4", nil)
 	soaRR := soaRecord("example")
@@ -300,7 +300,7 @@ func TestNameserver03AXFRAvailable(t *testing.T) {
 		return nil
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -317,8 +317,8 @@ func TestNameserver03AXFRAvailable(t *testing.T) {
 func TestNameserver04DifferentSourceIP(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.5", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
@@ -326,7 +326,7 @@ func TestNameserver04DifferentSourceIP(t *testing.T) {
 		return packet.Packet{Msg: msg, AnswerFrom: "192.0.2.99:53"}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -343,8 +343,8 @@ func TestNameserver04DifferentSourceIP(t *testing.T) {
 func TestNameserver05AAAAWellProcessed(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.6", func(qname string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
 		switch strings.ToUpper(qtype) {
@@ -356,7 +356,7 @@ func TestNameserver05AAAAWellProcessed(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -373,8 +373,8 @@ func TestNameserver05AAAAWellProcessed(t *testing.T) {
 func TestNameserver05ParallelQueries(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
@@ -410,7 +410,7 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
 	}
 
@@ -481,23 +481,23 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 func TestNameserver06NotResolved(t *testing.T) {
 	setupTest(t)
 
-	origM2 := method2
-	origM3 := method3
-	origM4and5 := method4and5
+	origM2 := glueNames
+	origM3 := apexNSNames
+	origM4and5 := allNameservers
 	t.Cleanup(func() {
-		method2 = origM2
-		method3 = origM3
-		method4and5 = origM4and5
+		glueNames = origM2
+		apexNSNames = origM3
+		allNameservers = origM4and5
 	})
 
-	method2 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
-	method3 = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	apexNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns2.example")}, nil
 	}
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.7", nil)
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -525,15 +525,15 @@ func TestNameserver06NotResolved(t *testing.T) {
 func TestNameserver07NoUpwardReferral(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.8", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		return packet.Packet{Msg: msg}
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -561,10 +561,10 @@ func TestNameserver07NoUpwardReferral(t *testing.T) {
 func TestNameserver08QNameCaseInsensitive(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
+	origM4and5 := allNameservers
 	origScramble := scrambleCaseFunc
 	t.Cleanup(func() {
-		method4and5 = origM4and5
+		allNameservers = origM4and5
 		scrambleCaseFunc = origScramble
 	})
 	fixedRand := rand.New(rand.NewSource(42))
@@ -575,7 +575,7 @@ func TestNameserver08QNameCaseInsensitive(t *testing.T) {
 		dnsutil.SetQuestion(msg, dnsutil.Fqdn(strings.ToLower(qname)), dns.TypeSOA)
 		return packet.Packet{Msg: msg}
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -592,10 +592,10 @@ func TestNameserver08QNameCaseInsensitive(t *testing.T) {
 func TestNameserver08DoesNotReuseDifferentCaseCachedPacket(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
+	origM4and5 := allNameservers
 	origScramble := scrambleCaseFunc
 	t.Cleanup(func() {
-		method4and5 = origM4and5
+		allNameservers = origM4and5
 		scrambleCaseFunc = origScramble
 	})
 
@@ -616,7 +616,7 @@ func TestNameserver08DoesNotReuseDifferentCaseCachedPacket(t *testing.T) {
 		t.Fatalf("prime lower-case cache entry: %v", err)
 	}
 
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 	scrambleCaseFunc = func(string) string { return "wWw.eXaMpLe" }
@@ -640,10 +640,10 @@ func TestNameserver08DoesNotReuseDifferentCaseCachedPacket(t *testing.T) {
 func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
+	origM4and5 := allNameservers
 	origScramble := scrambleCaseFunc
 	t.Cleanup(func() {
-		method4and5 = origM4and5
+		allNameservers = origM4and5
 		scrambleCaseFunc = origScramble
 	})
 	fixedRand := rand.New(rand.NewSource(42))
@@ -652,7 +652,7 @@ func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.10", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		return soaPacket("example")
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -672,8 +672,8 @@ func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
 func TestNameserver10NoResponseEDNS1(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.11", func(_ string, _ string, _ string, opts *ens.QueryOptions) packet.Packet {
 		if opts != nil && opts.EDNSDetails != nil && opts.EDNSDetails.Version != nil {
@@ -686,7 +686,7 @@ func TestNameserver10NoResponseEDNS1(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -724,8 +724,8 @@ func TestNameserver10NoResponseEDNS1(t *testing.T) {
 func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.12", func(_ string, _ string, _ string, opts *ens.QueryOptions) packet.Packet {
 		if opts != nil && opts.EDNSDetails != nil && len(opts.EDNSDetails.Data) > 0 {
@@ -733,7 +733,7 @@ func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 		}
 		return soaPacketWithEdns("example", 0, 0, nil)
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -771,13 +771,13 @@ func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 func TestNameserver12ZFlagsNotClear(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.13", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		return soaPacketWithEdns("example", 0, 3, nil)
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -794,8 +794,8 @@ func TestNameserver12ZFlagsNotClear(t *testing.T) {
 func TestNameserver13MissingOptInTruncated(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.14", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
@@ -803,7 +803,7 @@ func TestNameserver13MissingOptInTruncated(t *testing.T) {
 		msg.Truncated = true
 		return packet.Packet{Msg: msg}
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -820,8 +820,8 @@ func TestNameserver13MissingOptInTruncated(t *testing.T) {
 func TestNameserver13NoEdnsSupport(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.14", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
@@ -829,7 +829,7 @@ func TestNameserver13NoEdnsSupport(t *testing.T) {
 		// No EDNS OPT record in response
 		return packet.Packet{Msg: msg}
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -846,8 +846,8 @@ func TestNameserver13NoEdnsSupport(t *testing.T) {
 func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.15", func(qname string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
 		switch strings.ToUpper(qtype) {
@@ -863,7 +863,7 @@ func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1030,8 +1030,8 @@ func txtPacket(name string, value string, class uint16) packet.Packet {
 func TestNameserver16HasNSID(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	nsidValue := "ns1.example"
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
@@ -1042,7 +1042,7 @@ func TestNameserver16HasNSID(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 
@@ -1083,8 +1083,8 @@ func TestNameserver16HasNSID(t *testing.T) {
 func TestNameserver16NoNSID(t *testing.T) {
 	setupTest(t)
 
-	origM4and5 := method4and5
-	t.Cleanup(func() { method4and5 = origM4and5 })
+	origM4and5 := allNameservers
+	t.Cleanup(func() { allNameservers = origM4and5 })
 
 	ns1 := newNameserver(t, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
 		if strings.ToUpper(qtype) == "SOA" {
@@ -1092,7 +1092,7 @@ func TestNameserver16NoNSID(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	method4and5 = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
 	}
 

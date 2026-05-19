@@ -2,6 +2,8 @@ package basic
 
 import (
 	"context"
+	_ "embed"
+	"encoding/json"
 	"net"
 	"net/netip"
 	"strings"
@@ -11,6 +13,8 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/asnlookup"
+	"codeberg.org/pawal/gonemaster/engine/cachefile"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -19,6 +23,9 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
+
+//go:embed testdata/bahnhof-nxdomain-contradiction.cache.json
+var bahnhofNXDomainContradictionCache []byte
 
 func TestBasic01Root(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
@@ -1422,6 +1429,81 @@ func TestBasic01MixedNXDomainContradiction(t *testing.T) {
 	}
 	if count != 1 {
 		t.Fatalf("expected exactly one B01_PARENT_NXDOMAIN_HIDES_DELEGATION entry, got %d", count)
+	}
+}
+
+// TestBasic01ParentNXDomainHidesDelegationFromRecordedCache replays a real
+// recorded DNS trace against the live zone 0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa
+// (whose parent at Bahnhof returns authoritative NXDOMAIN for the
+// intermediate ENT "b.9.1.b.9.0.1.0.0.2.ip6.arpa" while still delegating the
+// child to flashdance.cx). The fixture was captured with
+// `gonemaster --testcase basic01 --save bahnhof.cache 0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa`
+// then trimmed (recursor entries and IPv6 nameserver endpoints dropped) and
+// is replayed offline (no_network=true, IPv6 disabled in the profile) so
+// the test never touches the network.
+func TestBasic01ParentNXDomainHidesDelegationFromRecordedCache(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.NoNetwork = true
+	// Fixture only captures IPv4 endpoints to keep the file small. Force
+	// the profile to match so cache misses on IPv6 endpoints don't matter.
+	prof.Net.IPv6 = false
+
+	nsCache := nameserver.NewCacheStore()
+	rec, err := recursor.New()
+	if err != nil {
+		t.Fatalf("recursor.New: %v", err)
+	}
+	asnCache := asnlookup.NewCache()
+
+	var file cachefile.File
+	if err := json.Unmarshal(bahnhofNXDomainContradictionCache, &file); err != nil {
+		t.Fatalf("unmarshal fixture: %v", err)
+	}
+	if err := cachefile.Import(file, nsCache, rec, asnCache); err != nil {
+		t.Fatalf("import fixture: %v", err)
+	}
+
+	ctx = nameserver.WithCache(ctx, nsCache)
+
+	z, err := zone.NewWithRecursor("0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa", rec)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Basic01(ctx, &z)
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+
+	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
+		t.Fatalf("expected B01_PARENT_FOUND")
+	}
+	if !hasEntryTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION") {
+		t.Fatalf("expected B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
+	}
+	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
+		t.Fatalf("expected B01_CHILD_FOUND")
+	}
+	if hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("did not expect B01_NO_CHILD")
+	}
+
+	entry := firstEntryByTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
+	if entry == nil {
+		t.Fatalf("missing B01_PARENT_NXDOMAIN_HIDES_DELEGATION entry")
+	}
+	if entry.Args["domain_child"] != "0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa" {
+		t.Fatalf("expected domain_child=0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa, got %#v", entry.Args["domain_child"])
+	}
+	if entry.Args["query_name"] != "b.9.1.b.9.0.1.0.0.2.ip6.arpa" {
+		t.Fatalf("expected query_name=b.9.1.b.9.0.1.0.0.2.ip6.arpa, got %#v", entry.Args["query_name"])
+	}
+	nsArg, _ := entry.Args["ns"].(string)
+	if !strings.HasSuffix(strings.ToLower(nsArg), "bahnhof.net") {
+		t.Fatalf("expected ns endpoint at bahnhof.net, got %#v", entry.Args["ns"])
 	}
 }
 

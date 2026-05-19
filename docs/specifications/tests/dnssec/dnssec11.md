@@ -33,7 +33,7 @@ Status: Final
    - Mixed `No DS` and `Has DS` => emit `DS11_INCONSISTENT_DS`, `DS11_PARENT_WITHOUT_DS`, `DS11_PARENT_WITH_DS`, then continue to child phase.
    - `Has DS` only => continue to child phase.
 6. Child phase (only when parent decision allows):
-   - Build child nameserver set from AllNameservers, deduplicate by IP.
+   - Build child nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
    - For each nameserver (parallelized):
      - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `SOA` and `DNSKEY` and skip.
      - Query SOA over UDP (`UseVC=false`); require usable authoritative apex SOA.

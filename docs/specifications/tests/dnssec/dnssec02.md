@@ -24,7 +24,7 @@ Status: Final
    - Accept response only if DNSSEC response shape passes (`NOERROR`, `OPT`, `DO`, `AA`) and at least one DS record matches child zone owner name.
    - Add unique DS RDATA values to DS record set.
 3. If DS record set is empty, emit `TEST_CASE_END` and stop.
-4. Build child nameserver set from AllNameservers and deduplicate by IP.
+4. Build child nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
 5. For each unique child nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
    - Query DNSKEY with DNSSEC enabled.

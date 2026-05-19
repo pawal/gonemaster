@@ -19,7 +19,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Build deduplicated nameserver list from AllNameservers by `ns.String()` (`name/ip`).
+2. Build deduplicated nameserver list from the union of `glueNameservers` and `apexNameservers` by `ns.String()` (`name/ip`).
 3. For each nameserver (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA` and skip.
    - Query SOA for zone apex.

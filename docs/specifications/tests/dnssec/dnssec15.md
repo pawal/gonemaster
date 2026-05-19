@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Build child nameserver set from AllNameservers and deduplicate by IP.
+2. Build child nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
 3. For each unique nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `CDS` and `CDNSKEY` and skip.
    - Query `CDS` with DNSSEC enabled; when response is authoritative `NOERROR`, store CDS answer RRset (which may contain zero records).

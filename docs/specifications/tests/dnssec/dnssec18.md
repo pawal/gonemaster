@@ -27,7 +27,7 @@ Status: Final
    - Require response message, `RCODE=NOERROR`, and `AA=true`.
    - Collect matching-owner DS records and deduplicate by `(keytag,digestType,algorithm,digest)`.
 4. If no DS records were collected, stop DS18 findings.
-5. Build child nameserver set from AllNameservers, deduplicate by IP.
+5. Build child nameserver set from the union of `glueNameservers` and `apexNameservers` (deduplicated by `ns.String()`), then deduplicate by IP.
 6. For each unique child nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `CDNSKEY`, `CDS`, and `DNSKEY` and skip.
    - Query `CDS`, `CDNSKEY`, and `DNSKEY` with DNSSEC enabled; each requires authoritative `NOERROR` response for participation.

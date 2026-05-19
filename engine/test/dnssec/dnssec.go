@@ -448,6 +448,7 @@ func Metadata() map[string][]string {
 			"DS10_INCONSISTENT_NSEC3",
 			"DS10_INCONSISTENT_NSEC_NSEC3",
 			"DS10_MIXED_NSEC_NSEC3",
+			"DS10_NONSTANDARD_NSEC_RESPONSE",
 			"DS10_NSEC3PARAM_GIVES_ERR_ANSWER",
 			"DS10_NSEC3PARAM_MISMATCHES_APEX",
 			"DS10_NSEC3PARAM_QUERY_RESPONSE_ERR",
@@ -3704,9 +3705,16 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	// RFC 4470 / RFC 9824: merge NSEC-in-authority evidence from the
-	// NSEC query (white-lies / compact denial) into nsecInAnswer so
-	// consistency checks treat them identically.
+	// RFC 4470 / RFC 9824: flag NSEC-in-authority on the NSEC query as
+	// non-standard before folding the evidence into nsecInAnswer for
+	// consistency checks.
+	if len(nsecNsecNodata) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, nsecNsecNodata)
+		if err := appendLog(ctx, &results, testcase, "DS10_NONSTANDARD_NSEC_RESPONSE", args); err != nil {
+			return results, err
+		}
+	}
 	nsecInAnswer = uniqueStrings(append(nsecInAnswer, nsecNsecNodata...))
 
 	diff := symmetricDifferenceStrings(nsecInAnswer, nsec3paramNsecNodata)

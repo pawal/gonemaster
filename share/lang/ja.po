@@ -2790,6 +2790,12 @@ msgid ""
 "expected. Fetched from name servers \"{servers}\"."
 msgstr "このゾーンは NSEC と NSEC3 の両方で応答しました (本来は片方のみ)。取得元: \"{servers}\"。"
 
+msgctxt "DNSSEC:DS10_NONSTANDARD_NSEC_RESPONSE"
+msgid ""
+"NSEC query returned NSEC in the authority section instead of the answer "
+"section (RFC 4470 / RFC 9824). Fetched from name servers \"{servers}\"."
+msgstr "NSEC クエリの応答で、NSEC レコードが answer セクションではなく authority セクションに含まれていました (RFC 4470 / RFC 9824)。取得元: \"{servers}\"。"
+
 msgctxt "DNSSEC:DS10_NSEC3PARAM_GIVES_ERR_ANSWER"
 msgid ""
 "Unexpected DNS record in the answer section on an NSEC3PARAM query. Fetched "

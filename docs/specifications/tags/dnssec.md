@@ -104,6 +104,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS10_INCONSISTENT_NSEC3` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_INCONSISTENT_NSEC_NSEC3` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_MIXED_NSEC_NSEC3` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
+| `DS10_NONSTANDARD_NSEC_RESPONSE` | `NOTICE` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_NSEC3PARAM_GIVES_ERR_ANSWER` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_NSEC3PARAM_MISMATCHES_APEX` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |
 | `DS10_NSEC3PARAM_QUERY_RESPONSE_ERR` | `ERROR` | [dnssec10](../tests/dnssec/dnssec10.md) | yes |

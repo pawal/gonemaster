@@ -173,6 +173,7 @@ After the per-nameserver phase, with:
 
 2. Content and shape (one tag per non-empty per-NS list)
      DS10_ERR_MULT_NSEC, DS10_ERR_MULT_NSEC3,
+     DS10_NONSTANDARD_NSEC_RESPONSE,
      DS10_NSEC_ERR_TYPE_LIST,   DS10_NSEC3_ERR_TYPE_LIST,
      DS10_NSEC_MISMATCHES_APEX, DS10_NSEC3_MISMATCHES_APEX,
      DS10_NSEC3PARAM_MISMATCHES_APEX,
@@ -218,6 +219,7 @@ After the per-nameserver phase, with:
 | `DS10_INCONSISTENT_NSEC3` | NSEC3 evidence is inconsistent across nameservers. |
 | `DS10_INCONSISTENT_NSEC_NSEC3` | At least one nameserver uses NSEC-only and at least one uses NSEC3-only, with no nameserver exhibiting both simultaneously. |
 | `DS10_MIXED_NSEC_NSEC3` | At least one nameserver shows both NSEC and NSEC3 behavior. |
+| `DS10_NONSTANDARD_NSEC_RESPONSE` | NSEC query returned NSEC in the authority section instead of the answer section (RFC 4470 white-lies / RFC 9824 compact denial). |
 | `DS10_NSEC3PARAM_GIVES_ERR_ANSWER` | NSEC3PARAM query had unexpected non-empty answer content. |
 | `DS10_NSEC3PARAM_MISMATCHES_APEX` | NSEC3PARAM owner name did not match zone apex. |
 | `DS10_NSEC3PARAM_QUERY_RESPONSE_ERR` | NSEC3PARAM query had no usable authoritative `NOERROR` response. |
@@ -263,6 +265,7 @@ After the per-nameserver phase, with:
 | `DS10_INCONSISTENT_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_INCONSISTENT_NSEC_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_MIXED_NSEC_NSEC3` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
+| `DS10_NONSTANDARD_NSEC_RESPONSE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that placed the NSEC RR in the authority section. |
 | `DS10_NSEC3PARAM_GIVES_ERR_ANSWER` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC3PARAM_MISMATCHES_APEX` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
 | `DS10_NSEC3PARAM_QUERY_RESPONSE_ERR` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object). |
@@ -308,6 +311,7 @@ After the per-nameserver phase, with:
 | `DS10_INCONSISTENT_NSEC3` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS10_INCONSISTENT_NSEC_NSEC3` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS10_MIXED_NSEC_NSEC3` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS10_NONSTANDARD_NSEC_RESPONSE` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS10_NSEC3PARAM_GIVES_ERR_ANSWER` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS10_NSEC3PARAM_MISMATCHES_APEX` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS10_NSEC3PARAM_QUERY_RESPONSE_ERR` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -346,7 +350,7 @@ After the per-nameserver phase, with:
   - Upstream: summary for `DS10_INCONSISTENT_NSEC_NSEC3` describes two separate lists (`ns_list_nsec`, `ns_list_nsec3`). Gonemaster: emits a single combined `servers` argument.
   - Upstream: most DS10 tags are documented with `servers`. Gonemaster: `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `addresses` while other DS10 tags use `servers`.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
-  - Upstream: does not handle the case where the NSEC query returns a NODATA response with NSEC in the authority section (RFC 4470 white-lies / minimally covering NSEC / RFC 9824 compact denial of existence, as used by e.g. AWS Route 53, Cloudflare, NS1). This causes a false positive `DS10_INCONSISTENT_NSEC` for zones using on-line signing. Gonemaster: treats NSEC-in-authority on the NSEC query as NSEC evidence equivalent to NSEC-in-answer for consistency checks, and skips type-list validation on the synthesized NSEC record (whose bitmap intentionally excludes the queried type).
+  - Upstream: does not handle the case where the NSEC query returns a NODATA response with NSEC in the authority section (RFC 4470 white-lies / minimally covering NSEC / RFC 9824 compact denial of existence, as used by e.g. AWS Route 53, Cloudflare, NS1). This causes a false positive `DS10_INCONSISTENT_NSEC` for zones using on-line signing. Gonemaster: treats NSEC-in-authority on the NSEC query as NSEC evidence equivalent to NSEC-in-answer for consistency checks, skips type-list validation on the synthesized NSEC record (whose bitmap intentionally excludes the queried type), and emits `DS10_NONSTANDARD_NSEC_RESPONSE` (NOTICE) to make the non-standard response shape visible to the operator without flagging it as an error.
   - `DS10_ERR_MULT_NSEC3PARAM` is not emitted (the tag has been removed). RFC 5155 does not constrain the cardinality of the apex `NSEC3PARAM` RRset and a zone may legitimately publish more than one `NSEC3PARAM` RR during a parameter (salt/iterations) rollover. Gonemaster follows the upstream removal: the apex-owner check (`DS10_NSEC3PARAM_MISMATCHES_APEX`) is applied to every NSEC3PARAM RR in the answer instead of only the first. Apex-hash verification for the NSEC3 chain itself uses each NSEC3 record's own salt/iterations, so a multi-chain rollover is already validated correctly without a cardinality check.
 - Potential upstream report:
   - `yes` -- the upstream specification lacks a branch for NSEC-in-authority on the NSEC query, causing false `DS10_INCONSISTENT_NSEC` for RFC 4470 / RFC 9824 implementations (see [zonemaster/zonemaster#1424](https://github.com/zonemaster/zonemaster/issues/1424)).

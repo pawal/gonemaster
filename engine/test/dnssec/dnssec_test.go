@@ -3459,6 +3459,347 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 	}
 }
 
+// serverRows normalises the `servers` log argument (which `setTypedServersFromNames`
+// can construct as either []any{map[string]any{...}} or
+// []map[string]any{...}, depending on the call site) to a single shape so
+// tests can read it. Each row is the {ns, address} object.
+func serverRows(t *testing.T, v any) []map[string]any {
+	t.Helper()
+	switch s := v.(type) {
+	case []map[string]any:
+		return s
+	case []any:
+		out := make([]map[string]any, 0, len(s))
+		for _, item := range s {
+			row, ok := item.(map[string]any)
+			if !ok {
+				t.Fatalf("server entry has unexpected type %T (%#v)", item, item)
+			}
+			out = append(out, row)
+		}
+		return out
+	default:
+		t.Fatalf("'servers' arg has unexpected type %T (%#v)", v, v)
+		return nil
+	}
+}
+
+// nsecAuthorityNSECResponse builds a NODATA response to an NSEC query that
+// carries the NSEC RR in the authority section (RFC 4470 white-lies / RFC 9824
+// compact denial of existence). The SOA RR is included so that NODATA-shape
+// checks pass; no RRSIG is included (the test deliberately ignores signature
+// coverage).
+func nsecAuthorityNSECResponse(qname string, apex string) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC)
+	msg.Response = true
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	nsec := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
+	nsec.NextDomain = dnsutil.Fqdn("next." + apex)
+	nsec.TypeBitMap = []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeRRSIG}
+	msg.Ns = append(msg.Ns, soaRecord(apex), nsec)
+	msg.UDPSize = 1232
+	msg.Security = true
+	return packet.Packet{Msg: msg}
+}
+
+// nsecInAnswerResponse builds a standard NSEC query response with the NSEC RR
+// in the answer section (the conventional, non-RFC-4470 shape).
+func nsecInAnswerResponse(qname string, apex string) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC)
+	msg.Response = true
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	nsec := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
+	nsec.NextDomain = dnsutil.Fqdn("next." + apex)
+	nsec.TypeBitMap = []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeNSEC, dns.TypeRRSIG}
+	msg.Answer = []dns.RR{nsec}
+	msg.UDPSize = 1232
+	msg.Security = true
+	return packet.Packet{Msg: msg}
+}
+
+// emptyNSEC3PARAMResponse builds a NODATA NSEC3PARAM response for an NSEC
+// zone: NSEC in authority confirms NSEC3PARAM does not exist at the apex.
+func emptyNSEC3PARAMResponse(qname string, apex string) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC3PARAM)
+	msg.Response = true
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	nsec := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
+	nsec.NextDomain = dnsutil.Fqdn("next." + apex)
+	nsec.TypeBitMap = []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeNSEC, dns.TypeRRSIG}
+	msg.Ns = append(msg.Ns, soaRecord(apex), nsec)
+	msg.UDPSize = 1232
+	msg.Security = true
+	return packet.Packet{Msg: msg}
+}
+
+// TestDNSSEC10NonstandardNSECResponseEmitted exercises the single-nameserver
+// case where the NSEC query response carries NSEC in the authority section.
+// The tag DS10_NONSTANDARD_NSEC_RESPONSE must fire, the false-positive
+// DS10_INCONSISTENT_NSEC must not, and the zone must still register as having
+// NSEC evidence (DS10_HAS_NSEC).
+func TestDNSSEC10NonstandardNSECResponseEmitted(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	log := logger.New()
+	log.SetProfile(profile.Effective())
+	util.SetLogger(log)
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	t.Cleanup(func() {
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+	})
+
+	apex := "example"
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+
+	newNameserver(t, "ns1.example", "192.0.2.90", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnskeyPacket(qname, key)
+		case "NSEC":
+			return nsecAuthorityNSECResponse(qname, apex)
+		case "NSEC3PARAM":
+			return emptyNSEC3PARAMResponse(qname, apex)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.90"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
+	}
+
+	z, err := zone.New(apex)
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC10(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec10: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE") {
+		t.Fatalf("expected DS10_NONSTANDARD_NSEC_RESPONSE when NSEC arrives in authority section")
+	}
+	if hasEntryTag(entries, "DS10_INCONSISTENT_NSEC") {
+		t.Fatalf("DS10_INCONSISTENT_NSEC must not fire for a single NSEC-in-authority responder")
+	}
+	if !hasEntryTag(entries, "DS10_HAS_NSEC") {
+		t.Fatalf("authority-section NSEC must still count as NSEC evidence (DS10_HAS_NSEC)")
+	}
+
+	entry := firstEntryByTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE")
+	if entry == nil {
+		t.Fatalf("entry lookup returned nil after positive hasEntryTag")
+	}
+	if !strings.EqualFold(entry.Level(), "NOTICE") {
+		t.Fatalf("DS10_NONSTANDARD_NSEC_RESPONSE level = %q, want NOTICE", entry.Level())
+	}
+	servers, ok := entry.Args["servers"]
+	if !ok {
+		t.Fatalf("DS10_NONSTANDARD_NSEC_RESPONSE missing 'servers' arg, got args=%v", entry.Args)
+	}
+	rows := serverRows(t, servers)
+	if len(rows) != 1 {
+		t.Fatalf("DS10_NONSTANDARD_NSEC_RESPONSE 'servers' length = %d, want 1 (got %#v)", len(rows), servers)
+	}
+}
+
+// TestDNSSEC10NonstandardNSECResponseNotEmittedForStandard verifies that the
+// new tag stays silent when every nameserver returns NSEC in the answer
+// section (the conventional shape).
+func TestDNSSEC10NonstandardNSECResponseNotEmittedForStandard(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	log := logger.New()
+	log.SetProfile(profile.Effective())
+	util.SetLogger(log)
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	t.Cleanup(func() {
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+	})
+
+	apex := "example"
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+
+	newNameserver(t, "ns1.example", "192.0.2.91", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnskeyPacket(qname, key)
+		case "NSEC":
+			return nsecInAnswerResponse(qname, apex)
+		case "NSEC3PARAM":
+			return emptyNSEC3PARAMResponse(qname, apex)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.91"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
+	}
+
+	z, err := zone.New(apex)
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC10(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec10: %v", err)
+	}
+
+	if hasEntryTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE") {
+		t.Fatalf("DS10_NONSTANDARD_NSEC_RESPONSE must not fire for conventional NSEC-in-answer responders")
+	}
+	if !hasEntryTag(entries, "DS10_HAS_NSEC") {
+		t.Fatalf("expected DS10_HAS_NSEC for a normal NSEC zone")
+	}
+}
+
+// TestDNSSEC10NonstandardNSECResponseMixedServers checks the mixed case: one
+// nameserver returns NSEC-in-answer, another NSEC-in-authority. Both shapes
+// represent valid NSEC evidence, so the consistency check must not fire
+// (DS10_INCONSISTENT_NSEC absent), but the non-standard tag must call out
+// only the nameserver that used the authority-section shape.
+func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	log := logger.New()
+	log.SetProfile(profile.Effective())
+	util.SetLogger(log)
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	t.Cleanup(func() {
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+	})
+
+	apex := "example"
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = 8
+	key.PublicKey = "AwEAAc=="
+
+	newNameserver(t, "ns1.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnskeyPacket(qname, key)
+		case "NSEC":
+			return nsecInAnswerResponse(qname, apex)
+		case "NSEC3PARAM":
+			return emptyNSEC3PARAMResponse(qname, apex)
+		default:
+			return packet.Packet{}
+		}
+	})
+	newNameserver(t, "ns2.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnskeyPacket(qname, key)
+		case "NSEC":
+			return nsecAuthorityNSECResponse(qname, apex)
+		case "NSEC3PARAM":
+			return emptyNSEC3PARAMResponse(qname, apex)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.92"),
+				HasAddress: true,
+			},
+			{
+				Name:       dnsname.New("ns2.example"),
+				Address:    netip.MustParseAddr("192.0.2.93"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
+	}
+
+	z, err := zone.New(apex)
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC10(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec10: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE") {
+		t.Fatalf("expected DS10_NONSTANDARD_NSEC_RESPONSE for the authority-section responder")
+	}
+	if hasEntryTag(entries, "DS10_INCONSISTENT_NSEC") {
+		t.Fatalf("DS10_INCONSISTENT_NSEC must not fire when authority-section NSEC is treated as equivalent evidence")
+	}
+	if !hasEntryTag(entries, "DS10_HAS_NSEC") {
+		t.Fatalf("expected DS10_HAS_NSEC when both nameservers present NSEC evidence")
+	}
+
+	entry := firstEntryByTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE")
+	rows := serverRows(t, entry.Args["servers"])
+	if len(rows) != 1 {
+		t.Fatalf("'servers' length = %d, want 1 (only the non-standard responder)", len(rows))
+	}
+	if got, _ := rows[0]["ns"].(string); !strings.HasPrefix(got, "ns2.example") {
+		t.Fatalf("servers[0].ns = %q, want ns2.example...", got)
+	}
+}
+
 func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)

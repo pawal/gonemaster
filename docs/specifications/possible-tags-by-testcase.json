@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 80,
-    "unique_tag_count": 516
+    "unique_tag_count": 517
   },
   "modules": {
     "address": {
@@ -455,6 +455,7 @@
         "DS10_INCONSISTENT_NSEC3",
         "DS10_INCONSISTENT_NSEC_NSEC3",
         "DS10_MIXED_NSEC_NSEC3",
+        "DS10_NONSTANDARD_NSEC_RESPONSE",
         "DS10_NSEC3PARAM_GIVES_ERR_ANSWER",
         "DS10_NSEC3PARAM_MISMATCHES_APEX",
         "DS10_NSEC3PARAM_QUERY_RESPONSE_ERR",
@@ -979,6 +980,7 @@
         "Z13_SPF_LOOKUP_COUNT_EXCEEDED",
         "Z13_SPF_LOOKUP_COUNT_OK",
         "Z13_SPF_LOOKUP_LOOP",
+        "Z13_SPF_MACRO_TARGET",
         "Z13_SPF_PTR_DEPRECATED",
         "Z13_SPF_RECURSIVE_ERROR",
         "Z13_UNABLE_TO_CHECK"

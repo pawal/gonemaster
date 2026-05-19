@@ -642,6 +642,14 @@ Description:
 
 A nameserver published both NSEC and NSEC3 records for the zone. Only one method is allowed at a time; the mix is a protocol error that may cause some resolvers to pick one method and ignore the other, with inconsistent results.
 
+## Tag DS10_NONSTANDARD_NSEC_RESPONSE
+
+Header: Non-standard NSEC response shape
+
+Description:
+
+A nameserver answered an NSEC query by placing the NSEC record in the authority section instead of the answer section. This is the response shape used by RFC 4470 white-lies and RFC 9824 compact denial of existence implementations (e.g. AWS Route 53, Cloudflare). Validating resolvers accept either shape; the notice is informational so the operator is aware their nameserver uses the non-standard form.
+
 ## Tag DS10_NSEC3PARAM_GIVES_ERR_ANSWER
 
 Header: Error rcode on NSEC3PARAM query

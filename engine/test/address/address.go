@@ -106,11 +106,11 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	delItems, err := methodsv2.GetDelNSNamesAndIPs(ctx, z)
+	delItems, err := methodsv2.DelegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := methodsv2.GetZoneNSNamesAndIPs(ctx, z)
+	zoneItems, err := methodsv2.ZoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -228,11 +228,11 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	method4, err := methods.Method4(ctx, z)
+	glueNS, err := methods.GlueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	method5, err := methods.Method5(ctx, z)
+	apexNS, err := methods.ApexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -242,9 +242,9 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		ip   string
 	}
 
-	ordered := make([]nsIP, 0, len(method4)+len(method5))
+	ordered := make([]nsIP, 0, len(glueNS)+len(apexNS))
 	ips := map[string]bool{}
-	for _, ns := range append(method4, method5...) {
+	for _, ns := range append(glueNS, apexNS...) {
 		ip := ns.Address.String()
 		if ips[ip] {
 			continue
@@ -332,7 +332,7 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	method5, err := methods.Method5(ctx, z)
+	apexNS, err := methods.ApexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -342,9 +342,9 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		ip   string
 	}
 
-	ordered := make([]nsIP, 0, len(method5))
+	ordered := make([]nsIP, 0, len(apexNS))
 	ips := map[string]bool{}
-	for _, ns := range method5 {
+	for _, ns := range apexNS {
 		ip := ns.Address.String()
 		if ips[ip] {
 			continue

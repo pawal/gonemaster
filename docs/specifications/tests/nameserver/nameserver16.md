@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - SOA responses to EDNS query carrying NSID option (option code `3`, empty value).
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -22,7 +22,7 @@ Status: Final
    - no-NSID-revealed nameserver set
    - no-response nameserver set
    - unexpected-RCODE nameserver set by `rcode`
-3. Read nameserver list from `AllNameservers`.
+3. Read nameserver list from `ZoneNameservers`.
 4. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
    - Send SOA query for zone name with EDNS version `0` and NSID option (option code `3`, empty payload).

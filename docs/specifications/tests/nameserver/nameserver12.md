@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - SOA responses to EDNS query with Z flag bits set (`Z=3`).
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read nameserver list from `AllNameservers`.
+2. Read nameserver list from `ZoneNameservers`.
 3. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
    - Send SOA query with EDNS version `0` and `Z=3`.
@@ -76,7 +76,7 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`nameserver12.md`](../../upstream/tests/Nameserver-TP/nameserver12.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: describes iterating nameserver IP set. Gonemaster: iterates raw `AllNameservers` output (no testcase-local deduplication).
+  - Upstream: describes iterating nameserver IP set. Gonemaster: iterates raw `ZoneNameservers` output (no testcase-local deduplication).
   - Upstream: describes ignored disabled transports in prose. Gonemaster: emits explicit `IPV4_DISABLED` / `IPV6_DISABLED` tags.
   - Upstream: does not explicitly describe testcase boundary markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
 - Potential upstream report:

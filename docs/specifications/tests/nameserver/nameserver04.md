@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - SOA query responses and response-source address metadata.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read nameserver list from `AllNameservers`, deduplicate by `name/ip`, preserving first-seen order.
+2. Read nameserver list from `ZoneNameservers`, deduplicate by `name/ip`, preserving first-seen order.
 3. For each deduplicated nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, mark not included in summary, and skip.
    - Mark nameserver as included in summary.

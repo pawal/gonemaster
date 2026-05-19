@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - Baseline EDNSv0 SOA responses.
   - SOA responses to EDNS query with unknown option code (`137`).
 - Profile/config knobs that affect behavior:
@@ -18,7 +18,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read nameserver list from `AllNameservers`.
+2. Read nameserver list from `ZoneNameservers`.
 3. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, then skip.
    - Send baseline SOA query with EDNS version `0` and no unknown option.
@@ -90,7 +90,7 @@ Status: Final
 ## Differences From Upstream
 - Upstream reference: [`nameserver11.md`](../../upstream/tests/Nameserver-TP/nameserver11.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: assumes nameserver IP evaluation set. Gonemaster: iterates raw `AllNameservers` output, then emits deduplicated/sorted `addresses` aggregates.
+  - Upstream: assumes nameserver IP evaluation set. Gonemaster: iterates raw `ZoneNameservers` output, then emits deduplicated/sorted `addresses` aggregates.
   - Upstream: defines baseline gate before unknown-option probe. Gonemaster: implements this gate exactly and silently skips nameservers failing baseline checks.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:

@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - SOA query responses for two randomized-case `www.<zone>` names.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -19,7 +19,7 @@ Status: Final
 1. Emit `TEST_CASE_START`.
 2. Build `original = "www." + <zone>` (trailing dot removed), record type `SOA`.
 3. Generate two randomized case variants (`random1`, `random2`) such that both differ from `original` and from each other.
-4. Read nameserver list from `AllNameservers`, deduplicate by `name/ip`, preserving first-seen order.
+4. Read nameserver list from `ZoneNameservers`, deduplicate by `name/ip`, preserving first-seen order.
 5. For each deduplicated nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `SOA`, store no mismatch for this nameserver, and skip.
    - Query `random1` and `random2`.
@@ -44,7 +44,7 @@ original = "www." + z.Name (trailing dot stripped); recordType = SOA
 random1 = scrambleCase(original)  // != original
 random2 = scrambleCase(original)  // != original, != random1
 
-ns list = AllNameservers; dedupe by ns key, preserve first-seen order
+ns list = ZoneNameservers; dedupe by ns key, preserve first-seen order
 
 For each unique nameserver (parallel; fan-out = resolver.defaults.parallel):
 

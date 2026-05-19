@@ -151,4 +151,14 @@ For the root zone and zones whose names appear in the recursor's
 fake-address map (undelegated test setups), an empty slice and nil
 error are returned without caching.
 
+If an intermediate name returns `NXDOMAIN` with AA set, the walker
+probes the same server once at `z.Name` and, if it answers with a
+referral (NS records for the child zone in the authority section),
+accepts that server as the parent. This handles the RFC 8020
+contradiction where a parent denies an empty non-terminal but still
+holds a working delegation at the child. Without the probe, every NS
+in such a parent would be discarded and the delegation view exposed to
+downstream tests would be empty; Basic01 names the same condition with
+`B01_PARENT_NXDOMAIN_HIDES_DELEGATION`.
+
 Source: `engine/nsdiscovery/parent.go`.

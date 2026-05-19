@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - SOA responses from each nameserver.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: parallel nameserver query fanout.
@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Get nameservers from `AllNameservers`.
+2. Get nameservers from `ZoneNameservers`.
 3. For each nameserver (parallelized, input-order merged logs):
    - Skip disabled transports.
    - Query apex `SOA`.

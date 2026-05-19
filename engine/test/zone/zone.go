@@ -34,12 +34,18 @@ var (
 		return z.ApexNSNames(ctx)
 	}
 	apexNameservers       = nsdiscovery.ApexNameservers
-	allNameservers        = nsdiscovery.AllNameservers
 	delegationNameservers = nsdiscovery.DelegationNameservers
 	zoneNameservers       = nsdiscovery.ZoneNameservers
-	getAddressesFor       = defaultGetAddressesFor
-	recurse               = defaultRecurse
-	queryAuth             = defaultQueryAuth
+	authoritativeNS       = func(ctx context.Context, z *zonepkg.Zone) ([]nameserver.Nameserver, error) {
+		items, err := nsdiscovery.ZoneNameservers(ctx, z)
+		if err != nil {
+			return nil, err
+		}
+		return nameserversFromNSItems(ctx, z, items), nil
+	}
+	getAddressesFor = defaultGetAddressesFor
+	recurse         = defaultRecurse
+	queryAuth       = defaultQueryAuth
 )
 
 var nullSpfRegex = regexp.MustCompile(`(?i)^v=spf1[ \t]+-all[ \t]*$`)
@@ -374,7 +380,7 @@ func Zone01(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	var mnameLocalhost []string
 	var mnameDot []string
 
-	nss, err := allNameservers(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -992,7 +998,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	allNS := map[string][]string{}
 	var allNSOrder []string
 
-	nss, err := allNameservers(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1249,7 +1255,7 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := allNameservers(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -1525,7 +1531,7 @@ func Zone12(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := allNameservers(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -2498,7 +2504,7 @@ func Zone14(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	nss, err := allNameservers(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}

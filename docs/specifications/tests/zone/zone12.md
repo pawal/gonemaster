@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - CSYNC and SOA responses from authoritative nameservers at the zone apex.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -17,7 +17,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read nameserver list from `AllNameservers`.
+2. Read nameserver list from `ZoneNameservers`.
 3. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `CSYNC`, then skip.
    - Send CSYNC query to the zone apex with default query options.
@@ -44,7 +44,7 @@ CSYNC content identity is determined by comparing the concatenation of `soaseria
 
 {{% expand "Show diagram" %}}
 ```
-ns list = AllNameservers
+ns list = ZoneNameservers
 
 For each nameserver (parallel; fan-out = resolver.defaults.parallel):
 

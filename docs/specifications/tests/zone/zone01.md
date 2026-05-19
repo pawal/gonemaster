@@ -10,7 +10,7 @@ Status: Final
   - A `zone.Zone` object is available.
   - A recursor is available on the zone object.
 - Required inputs:
-  - Nameserver addresses from `AllNameservers`.
+  - Nameserver addresses from `ZoneNameservers`.
   - Child NS names from `z.ApexNSNames(ctx)`.
   - Recursive A/AAAA lookups for SOA MNAME hostnames.
   - Direct SOA queries to SOA MNAME host/IP combinations.
@@ -19,7 +19,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Query each nameserver from `AllNameservers` for `SOA` at the child zone apex.
+2. Query each nameserver from `ZoneNameservers` for `SOA` at the child zone apex.
 3. For each response, continue only when all are true:
    - response exists;
    - `RCODE=NOERROR`;
@@ -56,7 +56,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-For each nameserver in AllNameservers:
+For each nameserver in ZoneNameservers:
    query SOA at z.Name
    accept response only when ALL true:
      resp.Msg present, RCODE == NOERROR, AA, at least one SOA RR for z.Name
@@ -181,7 +181,7 @@ SOA MNAME is never used for authoritative nameserver discovery and is not part o
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not describe testcase boundary debug markers in testcase outputs. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
   - Upstream: describes MNAME non-resolve handling per MNAME name. Gonemaster: uses a cumulative `foundIP` counter across all MNAME names, which can suppress `Z01_MNAME_NOT_RESOLVE` for later unresolved MNAME values after any earlier MNAME resolved.
-  - Upstream: describes processing a name server IP set. Gonemaster: iterates raw `AllNameservers` output (no testcase-local IP deduplication before initial SOA probing).
+  - Upstream: describes processing a name server IP set. Gonemaster: iterates raw `ZoneNameservers` output (no testcase-local IP deduplication before initial SOA probing).
 - Potential upstream report:
   - `no`
 

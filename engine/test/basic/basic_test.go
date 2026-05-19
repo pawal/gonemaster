@@ -933,6 +933,341 @@ func TestBasic03ParallelOutputStable(t *testing.T) {
 	}
 }
 
+func TestBasic01NoChild(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	rootHook := func(owner string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			name := strings.ToLower(qname)
+			kind := strings.ToUpper(qtype)
+			switch {
+			case name == "." && kind == "SOA":
+				return soaPacket(".", owner, "hostmaster.root"), nil
+			case name == "." && kind == "NS":
+				return nsPacketMulti(".", "a.root", "b.root"), nil
+			case name == "example" && kind == "SOA":
+				return nxdomainAAPacket(), nil
+			default:
+				return packet.Packet{}, nil
+			}
+		}
+	}
+
+	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(rootHook("a.root"))
+
+	broot, err := nameserver.NewWithContext(ctx, "b.root", "192.0.2.2", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	broot.SetQueryHook(rootHook("b.root"))
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Basic01(ctx, &z)
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+
+	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
+		t.Fatalf("expected B01_PARENT_FOUND")
+	}
+	if !hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("expected B01_NO_CHILD")
+	}
+	if hasEntryTag(entries, "B01_CHILD_FOUND") {
+		t.Fatalf("did not expect B01_CHILD_FOUND")
+	}
+	if hasEntryTag(entries, "B01_INCONSISTENT_DELEGATION") {
+		t.Fatalf("did not expect B01_INCONSISTENT_DELEGATION")
+	}
+
+	noChild := firstEntryByTag(entries, "B01_NO_CHILD")
+	if noChild == nil {
+		t.Fatalf("missing B01_NO_CHILD entry")
+	}
+	if noChild.Args["domain_child"] != "example" {
+		t.Fatalf("expected domain_child=example, got %#v", noChild.Args["domain_child"])
+	}
+	if noChild.Args["domain_super"] != "." {
+		t.Fatalf("expected domain_super=., got %#v", noChild.Args["domain_super"])
+	}
+}
+
+func TestBasic01InconsistentDelegation(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	commonRoot := func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, bool) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.root"), true
+		case name == "." && kind == "NS":
+			return nsPacketMulti(".", "a.root", "b.root"), true
+		}
+		return packet.Packet{}, false
+	}
+
+	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(func(ctx context.Context, qname string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
+		if pkt, ok := commonRoot(ctx, qname, qtype, qclass, opts); ok {
+			return pkt, nil
+		}
+		if strings.EqualFold(qname, "example") && strings.EqualFold(qtype, "SOA") {
+			return referralPacketMulti("example", []nsEntry{
+				{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
+			}), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	broot, err := nameserver.NewWithContext(ctx, "b.root", "192.0.2.2", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	broot.SetQueryHook(func(ctx context.Context, qname string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
+		if pkt, ok := commonRoot(ctx, qname, qtype, qclass, opts); ok {
+			return pkt, nil
+		}
+		if strings.EqualFold(qname, "example") && strings.EqualFold(qtype, "SOA") {
+			return emptyAnswerPacket(), nil
+		}
+		if strings.EqualFold(qname, "example") && strings.EqualFold(qtype, "DNAME") {
+			return emptyAnswerPacket(), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Basic01(ctx, &z)
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+
+	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
+		t.Fatalf("expected B01_PARENT_FOUND")
+	}
+	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
+		t.Fatalf("expected B01_CHILD_FOUND")
+	}
+	if !hasEntryTag(entries, "B01_INCONSISTENT_DELEGATION") {
+		t.Fatalf("expected B01_INCONSISTENT_DELEGATION")
+	}
+	if hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("did not expect B01_NO_CHILD")
+	}
+
+	inconsistent := firstEntryByTag(entries, "B01_INCONSISTENT_DELEGATION")
+	if inconsistent == nil {
+		t.Fatalf("missing B01_INCONSISTENT_DELEGATION entry")
+	}
+	if inconsistent.Args["domain_child"] != "example" {
+		t.Fatalf("expected domain_child=example, got %#v", inconsistent.Args["domain_child"])
+	}
+	if inconsistent.Args["domain_parent"] != "." {
+		t.Fatalf("expected domain_parent=., got %#v", inconsistent.Args["domain_parent"])
+	}
+	servers, ok := inconsistent.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server for B01_INCONSISTENT_DELEGATION, got %#v", inconsistent.Args["servers"])
+	}
+	if servers[0]["ns"] != "b.root" || servers[0]["address"] != "192.0.2.2" {
+		t.Fatalf("expected only b.root in B01_INCONSISTENT_DELEGATION, got %#v", servers[0])
+	}
+}
+
+func TestBasic01ChildAlias(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.root"), nil
+		case name == "." && kind == "NS":
+			return nsPacket(".", "a.root"), nil
+		case name == "example" && kind == "SOA":
+			return emptyAnswerPacket(), nil
+		case name == "example" && kind == "DNAME":
+			return dnameAnswerPacket("example", "sister.example"), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Basic01(ctx, &z)
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+
+	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
+		t.Fatalf("expected B01_PARENT_FOUND")
+	}
+	if !hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("expected B01_NO_CHILD")
+	}
+	if !hasEntryTag(entries, "B01_CHILD_IS_ALIAS") {
+		t.Fatalf("expected B01_CHILD_IS_ALIAS")
+	}
+	if hasEntryTag(entries, "B01_CHILD_FOUND") {
+		t.Fatalf("did not expect B01_CHILD_FOUND")
+	}
+	if hasEntryTag(entries, "B01_INCONSISTENT_ALIAS") {
+		t.Fatalf("did not expect B01_INCONSISTENT_ALIAS")
+	}
+
+	alias := firstEntryByTag(entries, "B01_CHILD_IS_ALIAS")
+	if alias == nil {
+		t.Fatalf("missing B01_CHILD_IS_ALIAS entry")
+	}
+	if alias.Args["domain_child"] != "example" {
+		t.Fatalf("expected domain_child=example, got %#v", alias.Args["domain_child"])
+	}
+	if alias.Args["domain_target"] != "sister.example" {
+		t.Fatalf("expected domain_target=sister.example, got %#v", alias.Args["domain_target"])
+	}
+}
+
+func TestBasic01InconsistentAlias(t *testing.T) {
+	nameserver.EmptyCache()
+	defer nameserver.EmptyCache()
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+		"b.root": {"192.0.2.2"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	rootHook := func(target string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			name := strings.ToLower(qname)
+			kind := strings.ToUpper(qtype)
+			switch {
+			case name == "." && kind == "SOA":
+				return soaPacket(".", "a.root", "hostmaster.root"), nil
+			case name == "." && kind == "NS":
+				return nsPacketMulti(".", "a.root", "b.root"), nil
+			case name == "example" && kind == "SOA":
+				return emptyAnswerPacket(), nil
+			case name == "example" && kind == "DNAME":
+				return dnameAnswerPacket("example", target), nil
+			}
+			return packet.Packet{}, nil
+		}
+	}
+
+	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(rootHook("sister.example"))
+
+	broot, err := nameserver.NewWithContext(ctx, "b.root", "192.0.2.2", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	broot.SetQueryHook(rootHook("brother.example"))
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Basic01(ctx, &z)
+	if err != nil {
+		t.Fatalf("basic01: %v", err)
+	}
+
+	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
+		t.Fatalf("expected B01_PARENT_FOUND")
+	}
+	if !hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("expected B01_NO_CHILD")
+	}
+	if !hasEntryTag(entries, "B01_CHILD_IS_ALIAS") {
+		t.Fatalf("expected B01_CHILD_IS_ALIAS")
+	}
+	if !hasEntryTag(entries, "B01_INCONSISTENT_ALIAS") {
+		t.Fatalf("expected B01_INCONSISTENT_ALIAS")
+	}
+
+	targets := map[string]bool{}
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != "B01_CHILD_IS_ALIAS" {
+			continue
+		}
+		if target, ok := entry.Args["domain_target"].(string); ok {
+			targets[target] = true
+		}
+	}
+	if !targets["sister.example"] || !targets["brother.example"] {
+		t.Fatalf("expected both sister.example and brother.example targets, got %v", targets)
+	}
+
+	inconsistentAlias := firstEntryByTag(entries, "B01_INCONSISTENT_ALIAS")
+	if inconsistentAlias == nil {
+		t.Fatalf("missing B01_INCONSISTENT_ALIAS entry")
+	}
+	if inconsistentAlias.Args["domain"] != "example" {
+		t.Fatalf("expected domain=example, got %#v", inconsistentAlias.Args["domain"])
+	}
+}
+
 func hasEntryTag(entries []*logger.Entry, tag string) bool {
 	for _, entry := range entries {
 		if entry == nil {
@@ -1068,5 +1403,23 @@ func emptyAnswerPacket() packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
+	return packet.Packet{Msg: msg}
+}
+
+func nxdomainAAPacket() packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeNameError
+	msg.Authoritative = true
+	return packet.Packet{Msg: msg}
+}
+
+func dnameAnswerPacket(owner string, target string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	msg.Authoritative = true
+	dnameRR := &dns.DNAME{}
+	dnameRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
+	dnameRR.Target = dnsutil.Fqdn(target)
+	msg.Answer = []dns.RR{dnameRR}
 	return packet.Packet{Msg: msg}
 }

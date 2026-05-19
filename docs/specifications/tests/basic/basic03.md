@@ -9,7 +9,7 @@ Status: Final
 ## Preconditions And Inputs
 - Preconditions:
   - A `zone.Zone` is provided.
-  - Delegation nameserver addresses can be loaded using `Method4`.
+  - Delegation nameserver addresses can be loaded using `GlueNameservers`.
 - Required inputs:
   - Child zone name (`z.Name`).
   - Derived query name `www.<child-zone>`.
@@ -24,7 +24,7 @@ Status: Final
    - Otherwise `Basic03` function runs.
 2. `Basic03` function emits `TEST_CASE_START`.
 3. Build `queryName = "www." + child-zone`.
-4. Resolve nameserver targets with `Method4` and probe each in parallel:
+4. Resolve nameserver targets with `GlueNameservers` and probe each in parallel:
    - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) for rrtype `A`.
    - Send `A` query for `queryName`.
    - If response has `A` RR for `queryName`, emit `HAS_A_RECORDS`; otherwise emit `NO_A_RECORDS`.
@@ -99,6 +99,6 @@ Status: Final
   - report status: `not filed`
 
 ## Edge Cases And Limitations
-- If `Method4` yields no nameserver addresses, function path emits only testcase markers unless orchestration emitted `HAS_NAMESERVER_NO_WWW_A_TEST`.
+- If `GlueNameservers` yields no nameserver addresses, function path emits only testcase markers unless orchestration emitted `HAS_NAMESERVER_NO_WWW_A_TEST`.
 - `A_QUERY_NO_RESPONSES` is emitted only when there are zero response packets; responses without `A` produce `NO_A_RECORDS` instead.
 - Per-nameserver output ordering is deterministic after parallel execution due runner merge order.

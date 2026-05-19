@@ -694,9 +694,9 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM45 := allNameservers
+	origM45 := authoritativeNS
 	t.Cleanup(func() {
-		allNameservers = origM45
+		authoritativeNS = origM45
 	})
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.4", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -715,7 +715,7 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 		}
 	})
 
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
 
@@ -751,9 +751,9 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM45 := allNameservers
+	origM45 := authoritativeNS
 	t.Cleanup(func() {
-		allNameservers = origM45
+		authoritativeNS = origM45
 	})
 
 	ns := newNameserver(t, "ns1.example", "192.0.2.13", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
@@ -780,7 +780,7 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 		}
 	})
 
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
 
@@ -819,9 +819,9 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	origM45 := allNameservers
+	origM45 := authoritativeNS
 	t.Cleanup(func() {
-		allNameservers = origM45
+		authoritativeNS = origM45
 	})
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
@@ -869,7 +869,7 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
 

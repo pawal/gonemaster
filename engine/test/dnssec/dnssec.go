@@ -47,10 +47,16 @@ type rsaKeySizeDetails struct {
 var (
 	glueNameservers       = nsdiscovery.GlueNameservers
 	apexNameservers       = nsdiscovery.ApexNameservers
-	allNameservers        = nsdiscovery.AllNameservers
 	parentNameservers     = nsdiscovery.ParentNameservers
 	delegationNameservers = nsdiscovery.DelegationNameservers
 	zoneNameservers       = nsdiscovery.ZoneNameservers
+	authoritativeNS       = func(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
+		items, err := nsdiscovery.ZoneNameservers(ctx, z)
+		if err != nil {
+			return nil, err
+		}
+		return nameserversFromNSItems(ctx, z, items), nil
+	}
 	zoneQueryOne          = defaultZoneQueryOne
 	zoneQueryAll          = defaultZoneQueryAll
 	zoneParent            = defaultZoneParent
@@ -1381,7 +1387,7 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var noResponseNSECQuery []string
 	var errorResponseNSECQuery []string
 
-	nss, err := allNameservers(ctx, z)
+	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
 	}

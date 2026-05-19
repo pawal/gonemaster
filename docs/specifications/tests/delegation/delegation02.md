@@ -9,14 +9,14 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Delegation addressed NS from `methods.Method4`.
-  - Child addressed NS from `methods.Method5`.
+  - Delegation addressed NS from `GlueNameservers`.
+  - Child addressed NS from `ApexNameservers`.
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read delegation addressed NS (`Method4`) and child addressed NS (`Method5`).
+2. Read delegation addressed NS (`GlueNameservers`) and child addressed NS (`ApexNameservers`).
 3. Run duplicate-IP detection for delegation addressed NS:
    - For each IP used by two or more different NS names, emit `DEL_NS_SAME_IP`.
    - Else, when delegation list is non-empty, emit `DEL_DISTINCT_NS_IP`.
@@ -32,8 +32,8 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-delNS    = Method4
-childNS  = Method5
+delNS    = GlueNameservers
+childNS  = ApexNameservers
 combined = delNS ++ childNS
 
 findDupNS(nsList, duplicateTag, distinctTag):

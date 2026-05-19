@@ -9,7 +9,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Nameserver addresses from `methods.Method4and5`.
+  - Nameserver addresses from `AllNameservers`.
   - Three hardcoded probe names:
     - `xn--nameservertest.iis.se`
     - `xn--nameservertest.icann.org`
@@ -21,7 +21,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Read nameserver list from `Method4and5`.
+2. Read nameserver list from `AllNameservers`.
 3. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `A`, then skip this nameserver.
    - Initialize counters: `responseCount`, `nxdomainCount`, `hasSeenRA`, `allNxdomainAA=true`, and `isNoRecursor=true`.
@@ -41,7 +41,7 @@ Status: Final
 
 {{% expand "Show diagram" %}}
 ```
-ns list = Method4and5  (no testcase-local dedupe)
+ns list = AllNameservers  (no testcase-local dedupe)
 
 probes = [
    xn--nameservertest.iis.se,
@@ -124,7 +124,7 @@ emit TEST_CASE_END
 ## Differences From Upstream
 - Upstream reference: [`nameserver01.md`](../../upstream/tests/Nameserver-TP/nameserver01.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: describes evaluation over the retrieved nameserver IP set. Gonemaster: iterates the raw `Method4and5` list without testcase-local deduplication, so duplicate `name/ip` entries can be evaluated more than once.
+  - Upstream: describes evaluation over the retrieved nameserver IP set. Gonemaster: iterates the raw `AllNameservers` list without testcase-local deduplication, so duplicate `name/ip` entries can be evaluated more than once.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
   - Upstream: classifies a server as a recursor when all probe responses are `NXDOMAIN`, regardless of the `AA` flag. Gonemaster: excludes servers from recursor classification when all `NXDOMAIN` responses also have `AA=1`, since this indicates the server claims authoritative knowledge (e.g. a fake root zone) rather than performing recursion. Reported upstream.
 - Potential upstream report:

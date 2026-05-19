@@ -14,7 +14,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -413,7 +413,7 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 		lookupASN = origLookup
 	})
 
-	items := []methodsv2.NSItem{
+	items := []nsdiscovery.NSItem{
 		{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.1"),
@@ -425,11 +425,11 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 			HasAddress: true,
 		},
 	}
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return items, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	prefix, err := netip.ParsePrefix("192.0.2.0/24")

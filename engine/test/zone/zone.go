@@ -16,8 +16,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
-	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -31,14 +30,16 @@ import (
 const moduleName = "Zone"
 
 var (
-	apexNSNames           = methods.ApexNSNames
-	apexNameservers       = methods.ApexNameservers
-	allNameservers        = methods.AllNameservers
-	delegationNameservers = methodsv2.DelegationNameservers
-	zoneNameservers       = methodsv2.ZoneNameservers
+	apexNSNames = func(ctx context.Context, z *zonepkg.Zone) ([]dnsname.Name, error) {
+		return z.ApexNSNames(ctx)
+	}
+	apexNameservers       = nsdiscovery.ApexNameservers
+	allNameservers        = nsdiscovery.AllNameservers
+	delegationNameservers = nsdiscovery.DelegationNameservers
+	zoneNameservers       = nsdiscovery.ZoneNameservers
 	getAddressesFor       = defaultGetAddressesFor
 	recurse               = defaultRecurse
-	queryAuth            = defaultQueryAuth
+	queryAuth             = defaultQueryAuth
 )
 
 var nullSpfRegex = regexp.MustCompile(`(?i)^v=spf1[ \t]+-all[ \t]*$`)
@@ -2202,7 +2203,7 @@ func validDomain(value string) bool {
 	return ok
 }
 
-func nameserversFromNSItems(ctx context.Context, z *zonepkg.Zone, items []methodsv2.NSItem) []nameserver.Nameserver {
+func nameserversFromNSItems(ctx context.Context, z *zonepkg.Zone, items []nsdiscovery.NSItem) []nameserver.Nameserver {
 	if z == nil || z.Recursor() == nil {
 		return nil
 	}

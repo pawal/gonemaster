@@ -13,7 +13,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	ens "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -389,14 +389,14 @@ func TestZone11SpfSyntaxError(t *testing.T) {
 		return txtPacket(qname, "v=spf1 amx-all")
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name:       dnsname.New("ns1.example.com"),
 			Address:    netip.MustParseAddr("192.0.2.10"),
 			HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -432,14 +432,14 @@ func TestZone11NoSpfNonMailDomain(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name:       dnsname.New("ns1.se"),
 			Address:    netip.MustParseAddr("192.0.2.10"),
 			HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 

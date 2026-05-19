@@ -14,7 +14,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -35,9 +35,13 @@ var nonExistentNames = []string{
 }
 
 var (
-	glueNames        = methods.GlueNames
-	apexNSNames      = methods.ApexNSNames
-	allNameservers   = methods.AllNameservers
+	glueNames = func(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
+		return z.GlueNames(ctx)
+	}
+	apexNSNames = func(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
+		return z.ApexNSNames(ctx)
+	}
+	allNameservers   = nsdiscovery.AllNameservers
 	scrambleCaseFunc = util.ScrambleCase
 )
 

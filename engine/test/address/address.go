@@ -15,8 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
-	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
@@ -106,16 +105,16 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	delItems, err := methodsv2.DelegationNameservers(ctx, z)
+	delItems, err := nsdiscovery.DelegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := methodsv2.ZoneNameservers(ctx, z)
+	zoneItems, err := nsdiscovery.ZoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
 
-	seen := map[string]methodsv2.NSItem{}
+	seen := map[string]nsdiscovery.NSItem{}
 	for _, item := range append(delItems, zoneItems...) {
 		if !item.HasAddress {
 			continue
@@ -133,7 +132,7 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return appendAddressTestCaseEnd(ctx, results, testcase)
 	}
 
-	ipGroups := map[string][]methodsv2.NSItem{}
+	ipGroups := map[string][]nsdiscovery.NSItem{}
 	for _, item := range seen {
 		ipGroups[item.Address.String()] = append(ipGroups[item.Address.String()], item)
 	}
@@ -228,11 +227,11 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	glueNS, err := methods.GlueNameservers(ctx, z)
+	glueNS, err := nsdiscovery.GlueNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	apexNS, err := methods.ApexNameservers(ctx, z)
+	apexNS, err := nsdiscovery.ApexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -332,7 +331,7 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	apexNS, err := methods.ApexNameservers(ctx, z)
+	apexNS, err := nsdiscovery.ApexNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
@@ -474,7 +473,7 @@ func hasTag(entries []*logger.Entry, tag string) bool {
 	return false
 }
 
-func nsItemStrings(items []methodsv2.NSItem) []string {
+func nsItemStrings(items []nsdiscovery.NSItem) []string {
 	out := make([]string, 0, len(items))
 	for _, item := range items {
 		out = append(out, item.String())

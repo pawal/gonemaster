@@ -13,7 +13,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -27,12 +27,18 @@ import (
 const moduleName = "Delegation"
 
 var (
-	parentZone      = methods.ParentZone
-	glueNames       = methods.GlueNames
-	apexNSNames     = methods.ApexNSNames
-	glueNameservers = methods.GlueNameservers
-	apexNameservers = methods.ApexNameservers
-	allNSNames      = methods.AllNSNames
+	parentZone = func(ctx context.Context, z *zone.Zone) (*zone.Zone, error) {
+		return z.Parent(ctx)
+	}
+	glueNames = func(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
+		return z.GlueNames(ctx)
+	}
+	apexNSNames = func(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
+		return z.ApexNSNames(ctx)
+	}
+	glueNameservers = nsdiscovery.GlueNameservers
+	apexNameservers = nsdiscovery.ApexNameservers
+	allNSNames      = nsdiscovery.AllNSNames
 	recurse         = defaultRecurse
 )
 

@@ -18,7 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -1189,8 +1189,8 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 		return dnskeyPacket(qname, key)
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.20"),
@@ -1198,8 +1198,8 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -1242,8 +1242,8 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 		return dnskeyPacket(qname, key)
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.33"),
@@ -1251,8 +1251,8 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -1295,8 +1295,8 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 		return dnskeyPacket(qname, key)
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.34"),
@@ -1304,8 +1304,8 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -1364,8 +1364,8 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 	newNameserver(t, "ns1.example", "192.0.2.220", handler("ns1"))
 	newNameserver(t, "ns2.example", "192.0.2.221", handler("ns2"))
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.220"),
@@ -1378,8 +1378,8 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -1469,8 +1469,8 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 		return dnskeyPacket(qname, nil)
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns2.example"),
 				Address:    netip.MustParseAddr("192.0.2.21"),
@@ -1478,8 +1478,8 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -1517,8 +1517,8 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns3.example"),
 				Address:    netip.MustParseAddr("192.0.2.22"),
@@ -1526,8 +1526,8 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -1691,8 +1691,8 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.40"),
@@ -1700,8 +1700,8 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		ns, _ := nameserver.New("ns-parent.example", "192.0.2.41", nil)
@@ -1829,8 +1829,8 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.60"),
@@ -1843,8 +1843,8 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -1958,8 +1958,8 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 		}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns-child.example"),
 				Address:    netip.MustParseAddr("192.0.2.62"),
@@ -1967,8 +1967,8 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
@@ -2117,8 +2117,8 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 		}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns2.example"),
 				Address:    netip.MustParseAddr("192.0.2.42"),
@@ -2126,8 +2126,8 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
@@ -2237,8 +2237,8 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 		}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns-noresp.example"),
 				Address:    netip.MustParseAddr("192.0.2.170"),
@@ -2256,8 +2256,8 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -2370,8 +2370,8 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.180"),
@@ -2379,8 +2379,8 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		nsNoDS, _ := nameserver.New("ns-parent-no-ds.example", "192.0.2.181", nil)
@@ -2478,8 +2478,8 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.180"),
@@ -2487,8 +2487,8 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		nsA, _ := nameserver.New("ns-parent-a.example", "192.0.2.181", nil)
@@ -2537,8 +2537,8 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
 	}
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.160"),
@@ -2551,8 +2551,8 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	runAll := func(parallel int) []*logger.Entry {
@@ -3108,8 +3108,8 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 		}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.70"),
@@ -3117,8 +3117,8 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -3190,8 +3190,8 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.201"),
@@ -3204,8 +3204,8 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -3340,8 +3340,8 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 		}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.80"),
@@ -3349,8 +3349,8 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -3430,8 +3430,8 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 		}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
 			{
 				Name:       dnsname.New("ns1.example"),
 				Address:    netip.MustParseAddr("192.0.2.81"),
@@ -3439,8 +3439,8 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 			},
 		}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{}, nil
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
 	}
 
 	z, err := zone.New("example")
@@ -6032,14 +6032,14 @@ func TestDNSSEC19CleanZone(t *testing.T) {
 		return dnskeyPacket(qname, dnssec19P256Key(qname))
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.201"),
 			HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6089,14 +6089,14 @@ func TestDNSSEC19BlocklistedKey(t *testing.T) {
 		return dnskeyPacket(qname, dnssec19P256Key(qname))
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.202"),
 			HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6154,14 +6154,14 @@ func TestDNSSEC19NoDNSKEY(t *testing.T) {
 		return dnskeyPacket(qname, nil)
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.203"),
 			HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6205,14 +6205,14 @@ func TestDNSSEC19NoResponse(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.204"),
 			HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6262,14 +6262,14 @@ func TestDNSSEC19TransportDisabled(t *testing.T) {
 		return dnskeyPacket(qname, dnssec19P256Key(qname))
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name:       dnsname.New("ns1.example"),
 			Address:    netip.MustParseAddr("192.0.2.205"),
 			HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6506,12 +6506,12 @@ func TestDNSSEC20BitmapOK(t *testing.T) {
 		}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6565,12 +6565,12 @@ func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
 		}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6642,12 +6642,12 @@ func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
 		}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 
@@ -6694,12 +6694,12 @@ func TestDNSSEC20NoDNSSEC(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
-		return []methodsv2.NSItem{{
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
 			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
 		}}, nil
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]methodsv2.NSItem, error) {
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
 	}
 

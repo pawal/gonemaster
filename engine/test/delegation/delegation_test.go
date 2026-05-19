@@ -12,7 +12,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -991,8 +990,6 @@ func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
 		glueNames = origM2
 		apexNSNames = origM3
 	})
-	glueNames = methods.GlueNames
-	apexNSNames = methods.ApexNSNames
 
 	r, err := recursor.New()
 	if err != nil {

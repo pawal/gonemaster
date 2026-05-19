@@ -12,9 +12,8 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
-	"codeberg.org/pawal/gonemaster/engine/methodsv2"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
@@ -26,9 +25,9 @@ import (
 const moduleName = "Connectivity"
 
 var (
-	allNameservers        = methods.AllNameservers
-	delegationNameservers = methodsv2.DelegationNameservers
-	zoneNameservers       = methodsv2.ZoneNameservers
+	allNameservers        = nsdiscovery.AllNameservers
+	delegationNameservers = nsdiscovery.DelegationNameservers
+	zoneNameservers       = nsdiscovery.ZoneNameservers
 	lookupASN             = asnlookup.GetWithPrefix
 )
 
@@ -460,7 +459,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	processed := map[int]map[string]bool{}
 
 	type prefixItem struct {
-		item    methodsv2.NSItem
+		item    nsdiscovery.NSItem
 		version int
 	}
 

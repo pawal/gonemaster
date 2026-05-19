@@ -13,7 +13,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -28,10 +28,10 @@ import (
 const moduleName = "Consistency"
 
 var (
-	glueNameservers = methods.GlueNameservers
-	apexNameservers = methods.ApexNameservers
-	allNSNames      = methods.AllNSNames
-	allNameservers  = methods.AllNameservers
+	glueNameservers = nsdiscovery.GlueNameservers
+	apexNameservers = nsdiscovery.ApexNameservers
+	allNSNames      = nsdiscovery.AllNSNames
+	allNameservers  = nsdiscovery.AllNameservers
 	queryParentAll  = defaultQueryParentAll
 	recurse        = defaultRecurse
 )

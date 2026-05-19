@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
-	"codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	serverpkg "codeberg.org/pawal/gonemaster/server"
 	_ "modernc.org/sqlite"
 )
@@ -247,10 +247,10 @@ func runSoak(domainsPath string, domains []string, domainsSHA string, backend st
 		cfg.Database.DSN = sqliteDSN
 	}
 
-	methodsv2.ClearParentNSCache()
+	nsdiscovery.ClearParentNSCache()
 	report.Methodsv2CacheClearedStart = true
 	report.Methodsv2CacheEntriesStart = 0
-	defer methodsv2.ClearParentNSCache()
+	defer nsdiscovery.ClearParentNSCache()
 
 	srv, err := serverpkg.NewWithOptions(cfg)
 	if err != nil {

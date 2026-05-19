@@ -20,8 +20,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/methods"
-	methodsv2 "codeberg.org/pawal/gonemaster/engine/methodsv2"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -46,12 +45,12 @@ type rsaKeySizeDetails struct {
 }
 
 var (
-	glueNameservers       = methods.GlueNameservers
-	apexNameservers       = methods.ApexNameservers
-	allNameservers        = methods.AllNameservers
-	parentNameservers     = methodsv2.ParentNameservers
-	delegationNameservers = methodsv2.DelegationNameservers
-	zoneNameservers       = methodsv2.ZoneNameservers
+	glueNameservers       = nsdiscovery.GlueNameservers
+	apexNameservers       = nsdiscovery.ApexNameservers
+	allNameservers        = nsdiscovery.AllNameservers
+	parentNameservers     = nsdiscovery.ParentNameservers
+	delegationNameservers = nsdiscovery.DelegationNameservers
+	zoneNameservers       = nsdiscovery.ZoneNameservers
 	zoneQueryOne          = defaultZoneQueryOne
 	zoneQueryAll          = defaultZoneQueryAll
 	zoneParent            = defaultZoneParent
@@ -7738,7 +7737,7 @@ func dnskeyRRset(keys []*dns.DNSKEY) []dns.RR {
 	return rrs
 }
 
-func nameserversFromNSItems(ctx context.Context, z *zone.Zone, items []methodsv2.NSItem) []nameserver.Nameserver {
+func nameserversFromNSItems(ctx context.Context, z *zone.Zone, items []nsdiscovery.NSItem) []nameserver.Nameserver {
 	if z == nil {
 		return nil
 	}

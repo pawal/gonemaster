@@ -5,6 +5,30 @@ This directory contains canonical testcase specifications for gonemaster.
 Each testcase spec MUST be based on current implementation behavior and SHOULD
 start from `docs/specifications/templates/testcase-spec-template.md`.
 
+## Nameserver Resolution Vocabulary
+
+Specs refer to several distinct views of the nameservers that serve a zone.
+These are not interchangeable; testcases pick the view that matches what is
+actually being verified.
+
+- `z.GlueNames(ctx)` / `GlueNameservers` - NS names and addresses from the
+  parent's delegation. The parent's claim about who serves the zone.
+- `z.ApexNSNames(ctx)` / `ApexNameservers` - NS records returned by the
+  zone's own authoritative servers. The child's claim about itself.
+- `AllNSNames` / `AllNameservers` - deduplicated union of glue and apex
+  (the zone's combined view). Appropriate when a testcase should trust
+  the zone-level union.
+- `DelegationNameservers` - parent-queried delegation view returning
+  `NSItem` (names with optional addresses), with bailiwick-aware address
+  resolution. Appropriate for delegation consistency checks.
+- `ZoneNameservers` - authoritative AA NS at the apex, paired with
+  in-bailiwick and out-of-bailiwick addresses via recursion.
+- `ParentNameservers` - the parent zone's own nameservers, walked from
+  the root. Cached package-wide; see `ClearParentNSCache`.
+
+The functions live in `engine/nsdiscovery` (except `z.GlueNames` and
+`z.ApexNSNames`, which are methods on `*zone.Zone`).
+
 ## Normalization Rules
 
 - One testcase specification per file.

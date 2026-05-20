@@ -209,6 +209,36 @@ The **--config** file is JSON with optional fields:
       "idle_timeout": "60s"
     }
 
+## FILES
+
+When installed from a distribution package, the server is wired up with these
+paths. Standalone builds use whatever paths you pass via flags or env vars.
+
+**/usr/bin/gonemaster-server**
+: The server binary.
+
+**/etc/gonemaster/server.env**
+: Environment file read by the systemd unit. Sets **GONEMASTER_LISTEN**,
+  **GONEMASTER_DB_DSN**, and other knobs. Marked as a config file, so package
+  upgrades will not overwrite operator edits.
+
+**/lib/systemd/system/gonemaster-server.service**
+: Systemd unit that runs the server as the **gonemaster** system user with
+  hardening flags and **EnvironmentFile=/etc/gonemaster/server.env**.
+
+**/var/lib/gonemaster/**
+: Runtime state directory, mode 0750, owned by the **gonemaster** user.
+  Default location for the SQLite database when **GONEMASTER_DB_DRIVER=sqlite**.
+
+**/usr/lib/tmpfiles.d/gonemaster.conf**
+: tmpfiles.d snippet that recreates **/var/lib/gonemaster/** with the right
+  ownership and permissions on boot.
+
+**/usr/share/gonemaster/badkeys/blocklist.dat**, **badkeysdata.json**
+: Compromised-key blocklist data shipped by the **gonemaster-badkeys-data**
+  package. The server looks here via XDG_DATA_DIRS when no embedded data or
+  user-level dataset is available.
+
 ## EXAMPLES
 
 Start with defaults (in-memory, 4 workers):

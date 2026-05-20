@@ -99,6 +99,7 @@ For shell automation, prefer [../client/](../client/README.md) over hand-written
 
 ## Next Steps
 
+- Install from Linux packages (deb/rpm): [install.md](install.md)
 - Configure the server: [configuration.md](configuration.md)
 - Choose a database: [database.md](database.md)
 - Operate jobs and queues: [operations.md](operations.md)

@@ -44,3 +44,6 @@
 /share/badkeys/blocklist.dat
 /share/badkeys/blocklist.dat.gz
 /share/badkeys/badkeysdata.json
+
+# Packaging build output (cross-compiled binaries + .deb/.rpm)
+/dist/

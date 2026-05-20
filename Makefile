@@ -23,7 +23,8 @@ CMD ?= all
 	install-gonemaster-nagios ui-check test-go test-integration vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
-	architecture-check badkeys-update badkeys-update-embed man clean-man
+	architecture-check badkeys-update badkeys-update-embed man man-gz clean-man \
+	package-binaries package-deb package-rpm packages clean-packages
 
 help:
 	@echo "Targets:"
@@ -68,6 +69,12 @@ help:
 	@echo "  man              Generate man pages from docs/man/*.md"
 	@echo "  badkeys-update     Download badkeys blocklist to share/badkeys/"
 	@echo "  badkeys-update-embed  Download and gzip-compress blocklist for embedded builds"
+	@echo "  man-gz           Gzip-compress man pages for packaging"
+	@echo "  package-binaries Cross-build all binaries for linux/amd64 + linux/arm64"
+	@echo "  package-deb      Build .deb packages into dist/packages/"
+	@echo "  package-rpm      Build .rpm packages into dist/packages/"
+	@echo "  packages         Build both .deb and .rpm packages"
+	@echo "  clean-packages   Remove dist/ build output"
 	@echo "  clean            Remove build artifacts"
 
 $(BIN_DIR):
@@ -307,8 +314,93 @@ man/man1/%: docs/man/%.md
 	@mkdir -p man/man1
 	GOOS= GOARCH= $(GO) run github.com/cpuguy83/go-md2man/v2@latest -in $< -out $@
 
+MAN_GZ := $(patsubst docs/man/%.md,man/man1/%.gz,$(MAN_SRCS))
+
+man-gz: $(MAN_GZ)
+
+man/man1/%.gz: man/man1/%
+	gzip -9 -k -f $<
+
 clean-man:
 	@rm -rf man
 
-clean: clean-man
+# Packaging targets: produce .deb and .rpm for each binary, plus a noarch
+# data package for the badkeys blocklist. See plans/packaging.md.
+VERSION := $(shell awk '/^var Version = /{gsub(/"/,"",$$4); print $$4}' engine/engine.go)
+PACKAGE_ARCHES ?= amd64 arm64
+DIST_DIR := dist
+PKG_DIR := $(DIST_DIR)/packages
+NFPM := $(GO) run github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
+PER_ARCH_PKGS := gonemaster gonemaster-server gonemaster-server-nogui gonemaster-client gonemaster-nagios
+
+# Refresh blocklist data only if missing; an explicit `make badkeys-update`
+# is the way to pull a new snapshot.
+share/badkeys/blocklist.dat share/badkeys/badkeysdata.json:
+	$(MAKE) badkeys-update
+
+package-binaries: ui-build
+	@for arch in $(PACKAGE_ARCHES); do \
+		echo "Building binaries for linux/$$arch..."; \
+		mkdir -p $(DIST_DIR)/linux_$$arch; \
+		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 $(GO) build -trimpath -ldflags='-s -w' \
+			-o $(DIST_DIR)/linux_$$arch/gonemaster ./cmd/gonemaster || exit 1; \
+		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 $(GO) build -trimpath -ldflags='-s -w' \
+			-o $(DIST_DIR)/linux_$$arch/gonemaster-server ./cmd/gonemaster-server || exit 1; \
+		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 $(GO) build -trimpath -ldflags='-s -w' \
+			-tags nogui \
+			-o $(DIST_DIR)/linux_$$arch/gonemaster-server-nogui ./cmd/gonemaster-server || exit 1; \
+		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 $(GO) build -trimpath -ldflags='-s -w' \
+			-o $(DIST_DIR)/linux_$$arch/gonemaster-client ./cmd/gonemaster-client || exit 1; \
+		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 $(GO) build -trimpath -ldflags='-s -w' \
+			-o $(DIST_DIR)/linux_$$arch/gonemaster-nagios ./cmd/gonemaster-nagios || exit 1; \
+	done
+
+# nfpm expands env vars in scalar metadata fields (name, arch, version, ...)
+# but not inside contents.src paths, so we sed-substitute the whole YAML to
+# a per-arch temp file and feed that to nfpm.
+NFPM_CONF := $(DIST_DIR)/nfpm
+
+package-deb: package-binaries man-gz share/badkeys/blocklist.dat share/badkeys/badkeysdata.json
+	@mkdir -p $(PKG_DIR) $(NFPM_CONF)
+	@for arch in $(PACKAGE_ARCHES); do \
+		for pkg in $(PER_ARCH_PKGS); do \
+			echo "Building $$pkg $$arch deb..."; \
+			sed -e "s|\$${ARCH}|$$arch|g" -e "s|\$${VERSION}|$(VERSION)|g" \
+				packaging/nfpm/$$pkg.yaml > $(NFPM_CONF)/$$pkg-$$arch.yaml || exit 1; \
+			$(NFPM) pkg --config $(NFPM_CONF)/$$pkg-$$arch.yaml \
+				--packager deb --target $(PKG_DIR)/ || exit 1; \
+		done; \
+	done
+	@echo "Building gonemaster-badkeys-data deb..."
+	@sed -e "s|\$${VERSION}|$(VERSION)|g" \
+		packaging/nfpm/gonemaster-badkeys-data.yaml > $(NFPM_CONF)/gonemaster-badkeys-data.yaml
+	@$(NFPM) pkg --config $(NFPM_CONF)/gonemaster-badkeys-data.yaml \
+		--packager deb --target $(PKG_DIR)/
+
+package-rpm: package-binaries man-gz share/badkeys/blocklist.dat share/badkeys/badkeysdata.json
+	@mkdir -p $(PKG_DIR) $(NFPM_CONF)
+	@for arch in $(PACKAGE_ARCHES); do \
+		for pkg in $(PER_ARCH_PKGS); do \
+			echo "Building $$pkg $$arch rpm..."; \
+			sed -e "s|\$${ARCH}|$$arch|g" -e "s|\$${VERSION}|$(VERSION)|g" \
+				packaging/nfpm/$$pkg.yaml > $(NFPM_CONF)/$$pkg-$$arch.yaml || exit 1; \
+			$(NFPM) pkg --config $(NFPM_CONF)/$$pkg-$$arch.yaml \
+				--packager rpm --target $(PKG_DIR)/ || exit 1; \
+		done; \
+	done
+	@echo "Building gonemaster-badkeys-data rpm..."
+	@sed -e "s|\$${VERSION}|$(VERSION)|g" \
+		packaging/nfpm/gonemaster-badkeys-data.yaml > $(NFPM_CONF)/gonemaster-badkeys-data.yaml
+	@$(NFPM) pkg --config $(NFPM_CONF)/gonemaster-badkeys-data.yaml \
+		--packager rpm --target $(PKG_DIR)/
+
+packages: package-deb package-rpm
+	@echo ""
+	@echo "Built packages in $(PKG_DIR):"
+	@ls -1 $(PKG_DIR)
+
+clean-packages:
+	@rm -rf $(DIST_DIR)
+
+clean: clean-man clean-packages
 	@rm -rf $(BIN_DIR) $(UI_BUILD_DIR) $(UI_DIR)/node_modules

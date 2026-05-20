@@ -2,6 +2,21 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.4.9] - 2026-05-20
+
+### Added
+
+- engine: added a lot of unit tests for basic01
+- engine: accept RFC 8020 contradiction during parent chain walk, added the B01_PARENT_NXDOMAIN_HIDES_DELEGATION tag
+- engine: added DS10_NONSTANDARD_NSEC_RESPONSE notice for NSEC-in-authority
+
+### Changed
+
+- frontends: bump version of node_modules/ws
+- engine: accept RFC 8020 contradiction during parent chain walk throughout the tests following basic01
+- engine: major re-factoring the old generic "Methods*" to more descriptive packages and names
+- docs: updated documentation and test specifications to follow the re-factoring
+
 ## [v1.4.8] - 2026-05-18
 
 ### Added

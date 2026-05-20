@@ -10,6 +10,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"codeberg.org/pawal/gonemaster/share"
 )
@@ -26,7 +27,9 @@ type Blocklist struct {
 // LoadBlocklist finds and loads the blocklist using the search path:
 //  1. profilePath (from badkeys.path profile key / --badkeys-path CLI flag)
 //  2. XDG user data directory (~/.local/share/gonemaster/badkeys/)
-//  3. Embedded data (if compiled with badkeys_embed build tag)
+//  3. XDG system data directories (XDG_DATA_DIRS, default
+//     /usr/local/share:/usr/share), looking under <dir>/gonemaster/badkeys/
+//  4. Embedded data (if compiled with badkeys_embed build tag)
 //
 // Returns nil, nil if no blocklist is available anywhere.
 func LoadBlocklist(profilePath string) (*Blocklist, error) {
@@ -41,12 +44,40 @@ func LoadBlocklist(profilePath string) (*Blocklist, error) {
 		return bl, nil
 	}
 
+	// Try system data directories per XDG_DATA_DIRS.
+	for _, sysDir := range systemDataDirs() {
+		candidate := filepath.Join(sysDir, "gonemaster", "badkeys")
+		if bl, err := loadFromDir(candidate); err == nil && bl != nil {
+			return bl, nil
+		}
+	}
+
 	// Try embedded data.
 	if share.BadkeysBlocklist != nil && share.BadkeysMetadata != nil {
 		return loadFromEmbedded()
 	}
 
 	return nil, nil
+}
+
+// systemDataDirs returns the directories from XDG_DATA_DIRS, falling back to
+// the spec default (/usr/local/share, /usr/share) when unset or empty.
+func systemDataDirs() []string {
+	raw := os.Getenv("XDG_DATA_DIRS")
+	if raw == "" {
+		return []string{"/usr/local/share", "/usr/share"}
+	}
+	parts := strings.Split(raw, ":")
+	out := make([]string, 0, len(parts))
+	for _, d := range parts {
+		if d != "" {
+			out = append(out, d)
+		}
+	}
+	if len(out) == 0 {
+		return []string{"/usr/local/share", "/usr/share"}
+	}
+	return out
 }
 
 func loadFromDir(dir string) (*Blocklist, error) {

@@ -284,6 +284,73 @@ func TestBlocklistBinarySearch(t *testing.T) {
 	}
 }
 
+func TestLoadBlocklistFromSystemDataDir(t *testing.T) {
+	// Point XDG dirs at temp directories so the user-data step finds nothing
+	// and the system-data step is the only source. This makes the test
+	// independent of the host's ~/.local/share and of the badkeys_embed
+	// build tag (system dirs are checked before embedded data).
+	emptyHome := t.TempDir()
+	sysRoot := t.TempDir()
+	t.Setenv("XDG_DATA_HOME", emptyHome)
+	t.Setenv("XDG_DATA_DIRS", sysRoot)
+
+	blDir := filepath.Join(sysRoot, "gonemaster", "badkeys")
+	if err := os.MkdirAll(blDir, 0o755); err != nil {
+		t.Fatalf("mkdir blDir: %v", err)
+	}
+
+	// One 16-byte block: 15 zero bytes of hash + source id 1.
+	block := make([]byte, blockSize)
+	block[15] = 1
+	if err := os.WriteFile(filepath.Join(blDir, "blocklist.dat"), block, 0o644); err != nil {
+		t.Fatalf("write blocklist.dat: %v", err)
+	}
+	meta := []byte(`{"blocklists":[{"id":1,"name":"system-test-source"}]}`)
+	if err := os.WriteFile(filepath.Join(blDir, "badkeysdata.json"), meta, 0o644); err != nil {
+		t.Fatalf("write badkeysdata.json: %v", err)
+	}
+
+	bl, err := LoadBlocklist("")
+	if err != nil {
+		t.Fatalf("LoadBlocklist: %v", err)
+	}
+	if bl == nil {
+		t.Fatal("expected blocklist loaded from system data dir, got nil")
+	}
+	if bl.Entries != 1 {
+		t.Errorf("Entries: got %d want 1", bl.Entries)
+	}
+	if name, ok := bl.Sources[1]; !ok || name != "system-test-source" {
+		t.Errorf("Sources[1]: got %q ok=%v want %q", name, ok, "system-test-source")
+	}
+}
+
+func TestSystemDataDirsDefault(t *testing.T) {
+	t.Setenv("XDG_DATA_DIRS", "")
+	got := systemDataDirs()
+	want := []string{"/usr/local/share", "/usr/share"}
+	if len(got) != len(want) {
+		t.Fatalf("unset: got %v want %v", got, want)
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			t.Errorf("unset[%d]: got %q want %q", i, got[i], want[i])
+		}
+	}
+
+	t.Setenv("XDG_DATA_DIRS", "/opt/share:/usr/share")
+	got = systemDataDirs()
+	if len(got) != 2 || got[0] != "/opt/share" || got[1] != "/usr/share" {
+		t.Errorf("set: got %v want [/opt/share /usr/share]", got)
+	}
+
+	t.Setenv("XDG_DATA_DIRS", "::/opt/share::")
+	got = systemDataDirs()
+	if len(got) != 1 || got[0] != "/opt/share" {
+		t.Errorf("with empty entries: got %v want [/opt/share]", got)
+	}
+}
+
 func TestRSAChecks(t *testing.T) {
 	t.Run("Fermat", func(t *testing.T) {
 		// n = 1000003 * 1000033 (close primes).

@@ -1,0 +1,25 @@
+name: gonemaster-badkeys-data
+arch: all
+platform: linux
+version: ${VERSION}
+section: net
+priority: optional
+maintainer: Patrik Wallström <pawal@amplitut.de>
+description: |
+  Compromised-key blocklist data for the gonemaster DNSSEC checks.
+  Architecture-independent data file refreshed from the upstream
+  badkeys.info project. The gonemaster binaries load this at runtime.
+vendor: Patrik Wallström
+homepage: https://codeberg.org/pawal/gonemaster
+license: BSD-2-Clause
+
+contents:
+  - src: share/badkeys/blocklist.dat
+    dst: /usr/share/gonemaster/badkeys/blocklist.dat
+    file_info:
+      mode: 0644
+
+  - src: share/badkeys/badkeysdata.json
+    dst: /usr/share/gonemaster/badkeys/badkeysdata.json
+    file_info:
+      mode: 0644

@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/cliterm"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/i18n"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -444,7 +445,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			if message == "" {
 				continue
 			}
-			fmt.Fprintln(out, message)
+			fmt.Fprintln(out, cliterm.Sanitize(message))
 		}
 	}
 

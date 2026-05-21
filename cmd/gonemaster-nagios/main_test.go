@@ -107,6 +107,94 @@ func TestMaxLevel(t *testing.T) {
 	}
 }
 
+// TestRunVerboseSanitizesAttackerControlChars feeds the nagios verbose
+// output a log entry whose args carry ANSI escapes, NUL, CR and the
+// Nagios pipe separator. None of these may reach stdout verbatim:
+//   - ANSI / NUL / CR would allow terminal hijack in nagios web UIs and
+//     interactive runs;
+//   - a raw pipe character would corrupt Nagios perfdata parsing.
+func TestRunVerboseSanitizesAttackerControlChars(t *testing.T) {
+	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		return []engine.LogEntry{{
+			Module:    "NAMESERVER",
+			Testcase:  "NS01",
+			Tag:       "UNREGISTERED_ATTACK_TAG",
+			Level:     "WARNING",
+			Timestamp: 1.0,
+			Args: map[string]any{
+				"version_string": "\x1b[34mblue\x1b[0m",
+				"trailing":       "ok\r\nfake|perf=999",
+				"nul":            "x\x00y",
+			},
+		}}, nil
+	})
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"-H", "example.com", "-v"}, &out, &errOut)
+	if code != 1 {
+		t.Fatalf("expected exit code 1 (WARNING), got %d (stderr=%s)", code, errOut.String())
+	}
+
+	body := out.Bytes()
+	if !bytes.HasPrefix(body, []byte("ZONE WARNING")) {
+		t.Fatalf("expected ZONE WARNING status line, got %q", body)
+	}
+
+	// First line is the Nagios status; the rest are verbose entries.
+	// We allow newlines between lines but no other control bytes.
+	for i, b := range body {
+		if b == '\n' {
+			continue
+		}
+		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
+			t.Fatalf("nagios output leaked control byte %#x at offset %d: %q", b, i, body)
+		}
+	}
+	for _, want := range []string{
+		`\x1b[34mblue\x1b[0m`,
+		`\x0d`, // CR
+		`\x00`, // NUL
+	} {
+		if !strings.Contains(string(body), want) {
+			t.Fatalf("expected %q in nagios verbose output, got %q", want, body)
+		}
+	}
+
+	// The raw \n inside trailing="ok\r\nfake|perf=999" must have been
+	// escaped, so the literal pipe-separator attack cannot start a new
+	// physical line. Count newlines: 1 for ZONE status + 1 for the one
+	// verbose entry = 2 total.
+	if n := bytes.Count(body, []byte{'\n'}); n != 2 {
+		t.Fatalf("expected 2 newlines (status + 1 entry), got %d in %q", n, body)
+	}
+}
+
+// TestRunVerbosePreservesSafeMessages is the negative case: benign
+// Unicode in a verbose entry must reach stdout unchanged.
+func TestRunVerbosePreservesSafeMessages(t *testing.T) {
+	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+		return []engine.LogEntry{{
+			Module:    "NAMESERVER",
+			Testcase:  "NS01",
+			Tag:       "UNREGISTERED_BENIGN_TAG",
+			Level:     "WARNING",
+			Timestamp: 1.0,
+			Args:      map[string]any{"label": "café résumé"},
+		}}, nil
+	})
+
+	var out, errOut bytes.Buffer
+	if code := run([]string{"-H", "example.com", "-v"}, &out, &errOut); code != 1 {
+		t.Fatalf("expected exit code 1, got %d (stderr=%s)", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "café résumé") {
+		t.Fatalf("safe UTF-8 was altered: %q", out.String())
+	}
+	if strings.Contains(out.String(), `\x`) {
+		t.Fatalf("benign verbose output produced escapes: %q", out.String())
+	}
+}
+
 func TestStatusForLevelHonorsCustomThresholds(t *testing.T) {
 	thresholds, err := parseSeverityThresholds("NOTICE", "CRITICAL")
 	if err != nil {

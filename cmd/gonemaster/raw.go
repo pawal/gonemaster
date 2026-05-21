@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/cliterm"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
@@ -59,7 +60,7 @@ func formatRawEntry(entry *logger.Entry) string {
 	if argStr != "" {
 		argStr = " " + argStr
 	}
-	return fmt.Sprintf("%s%s:%s%s", entry.Module, testcase, entry.Tag, argStr)
+	return cliterm.Sanitize(fmt.Sprintf("%s%s:%s%s", entry.Module, testcase, entry.Tag, argStr))
 }
 
 func formatRawArgs(args map[string]any) string {

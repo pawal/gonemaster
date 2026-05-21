@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/cliterm"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/i18n"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -46,6 +47,7 @@ func writeHuman(entries []engine.LogEntry, locale string, out io.Writer) error {
 		if !found {
 			message = rawEntryString(entry)
 		}
+		message = cliterm.Sanitize(message)
 		line := formatTranslatedLine(entry.Timestamp, entry.Level, message, layout)
 		if _, err := fmt.Fprintln(out, line); err != nil {
 			return err
@@ -105,6 +107,7 @@ func (r *humanReporter) Callback(entry *logger.Entry) error {
 	if !found {
 		message = entry.String()
 	}
+	message = cliterm.Sanitize(message)
 	line := formatTranslatedLine(entry.Timestamp, entry.Level(), message, r.layout)
 	return r.printLine(line)
 }

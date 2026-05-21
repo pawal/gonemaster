@@ -19,6 +19,7 @@ import (
 	"syscall"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/cliterm"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 	"codeberg.org/pawal/gonemaster/scoring"
@@ -2358,10 +2359,10 @@ func orderedLevels() []string {
 
 func entryText(entry jobResultEntry) string {
 	if entry.Message != "" {
-		return entry.Message
+		return cliterm.Sanitize(entry.Message)
 	}
 	if entry.Raw != "" {
-		return entry.Raw
+		return cliterm.Sanitize(entry.Raw)
 	}
 	parts := []string{}
 	if entry.Module != "" {
@@ -2373,7 +2374,7 @@ func entryText(entry jobResultEntry) string {
 	if entry.Tag != "" {
 		parts = append(parts, entry.Tag)
 	}
-	return strings.Join(parts, ":")
+	return cliterm.Sanitize(strings.Join(parts, ":"))
 }
 
 func outputExt(format string) string {

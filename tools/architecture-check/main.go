@@ -52,7 +52,8 @@ func checkBinaries(doc string) []string {
 	}
 	fsBins := map[string]bool{}
 	for _, e := range entries {
-		if e.IsDir() {
+		// cmd/internal/ is Go's convention for non-binary shared code.
+		if e.IsDir() && e.Name() != "internal" {
 			fsBins[e.Name()] = true
 		}
 	}

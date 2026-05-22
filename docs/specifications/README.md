@@ -2,7 +2,7 @@
 
 This directory contains the canonical testcase specifications for **gonemaster**.
 
-The Zonemaster project may be used as an upstream reference during migration, but the documents in this tree define and describe gonemaster behavior.
+The Zonemaster project have been used as an upstream reference during migration to gonemaster, but the documents in this tree define and describe gonemaster behavior.
 
 ## Goals
 - Document each implemented gonemaster testcase with exact behavior.
@@ -89,7 +89,6 @@ make spec-check-coherency
 Copyright (c) Patrik Wallström  
 Copyright (c) The Swedish Internet Foundation (https://internetstiftelsen.se/en/)  
 Copyright (c) AFNIC (https://www.afnic.fr/en/)  
-All rights reserved.  
 
 Copyright belongs to external contributor where applicable.  
 

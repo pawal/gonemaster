@@ -17,6 +17,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/util"
 )
 
@@ -163,7 +164,7 @@ func lookupCymru(ctx context.Context, resolver Resolver, ip netip.Addr, source s
 
 	query := strings.TrimSuffix(reverse, suffix) + replacement
 	resp, err := resolver.Recurse(ctx, query, "TXT", "IN")
-	if err != nil || resp.Msg == nil {
+	if err := recursor.IgnoreCNAMEError(err); err != nil || resp.Msg == nil {
 		return Result{}, errTryNext
 	}
 
@@ -361,7 +362,7 @@ func LookupASNInfo(ctx context.Context, resolver Resolver, asn int) (Info, error
 func lookupCymruASN(ctx context.Context, resolver Resolver, asn int, source string) (Info, error) {
 	query := fmt.Sprintf("AS%d.%s", asn, source)
 	resp, err := resolver.Recurse(ctx, query, "TXT", "IN")
-	if err != nil || resp.Msg == nil {
+	if err := recursor.IgnoreCNAMEError(err); err != nil || resp.Msg == nil {
 		return Info{}, errTryNext
 	}
 	rcode := strings.ToUpper(resp.Rcode())

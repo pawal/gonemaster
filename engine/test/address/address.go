@@ -17,6 +17,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -265,7 +266,7 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				ptrQuery := dnsutil.ReverseAddr(ipAddr)
 
 				resp, err := rec.Recurse(ctx, ptrQuery, "PTR", "IN")
-				if err != nil {
+				if err := recursor.IgnoreCNAMEError(err); err != nil {
 					return err
 				}
 
@@ -273,7 +274,7 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					if cname, ok := resp.GetRecords("CNAME", "answer")[0].(*dns.CNAME); ok {
 						ptrQuery = cname.Target
 						resp, err = rec.Recurse(ctx, ptrQuery, "PTR", "IN")
-						if err != nil {
+						if err := recursor.IgnoreCNAMEError(err); err != nil {
 							return err
 						}
 					}
@@ -365,7 +366,7 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				ptrQuery := dnsutil.ReverseAddr(ipAddr)
 
 				resp, err := rec.Recurse(ctx, ptrQuery, "PTR", "IN")
-				if err != nil {
+				if err := recursor.IgnoreCNAMEError(err); err != nil {
 					return err
 				}
 

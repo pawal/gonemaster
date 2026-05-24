@@ -17,6 +17,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -1154,7 +1155,8 @@ func defaultRecurse(ctx context.Context, z *zone.Zone, name string, qtype string
 	if z == nil || z.Recursor() == nil {
 		return packet.Packet{}, fmt.Errorf("missing recursor")
 	}
-	return z.Recursor().Recurse(ctx, name, qtype, "IN")
+	resp, err := z.Recursor().Recurse(ctx, name, qtype, "IN")
+	return resp, recursor.IgnoreCNAMEError(err)
 }
 
 func nameserversFromStrictGlue(ctx context.Context, z *zone.Zone, strictGlue map[string]bool) []nameserver.Nameserver {

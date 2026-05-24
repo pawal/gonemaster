@@ -18,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -462,7 +463,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		exchangeValid := false
 
 		pA, err := rec.Recurse(ctx, mailServer, "A", "IN")
-		if err != nil {
+		if err := recursor.IgnoreCNAMEError(err); err != nil {
 			return mailOutcome{entries: buf.Entries()}, err
 		}
 		if pA.Msg != nil {
@@ -486,7 +487,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		pAAAA, err := rec.Recurse(ctx, mailServer, "AAAA", "IN")
-		if err != nil {
+		if err := recursor.IgnoreCNAMEError(err); err != nil {
 			return mailOutcome{entries: buf.Entries()}, err
 		}
 		if pAAAA.Msg != nil {
@@ -575,7 +576,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 		domain := dnsname.New(parts[1])
 		pMX, err := rec.Recurse(ctx, domain.String(), "MX", "IN")
-		if err != nil {
+		if err := recursor.IgnoreCNAMEError(err); err != nil {
 			return results, err
 		}
 		if pMX.Msg == nil || pMX.Rcode() != "NOERROR" {

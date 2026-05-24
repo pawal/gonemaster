@@ -10,6 +10,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -212,7 +213,7 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 				if len(rrsNS[nsName]) == 0 {
 					for _, qtype := range []string{"A", "AAAA"} {
 						resp, err := r.Recurse(ctx, nsName, qtype, "IN")
-						if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
+						if err := recursor.IgnoreCNAMEError(err); err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
 							continue
 						}
 						rrsNS[nsName] = append(rrsNS[nsName], collectAddrs(resp, qtype, dnsname.New(nsName))...)
@@ -263,7 +264,7 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 							if len(rrsNSBis[nsName]) == 0 {
 								for _, qtype := range []string{"A", "AAAA"} {
 									resp, err := r.Recurse(ctx, nsName, qtype, "IN")
-									if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
+									if err := recursor.IgnoreCNAMEError(err); err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
 										continue
 									}
 									rrsNSBis[nsName] = append(rrsNSBis[nsName], collectAddrs(resp, qtype, dnsname.New(nsName))...)
@@ -288,7 +289,7 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 							if len(rrsNSBis[nsName]) == 0 {
 								for _, qtype := range []string{"A", "AAAA"} {
 									resp, err := r.Recurse(ctx, nsName, qtype, "IN")
-									if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
+									if err := recursor.IgnoreCNAMEError(err); err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
 										continue
 									}
 									rrsNSBis[nsName] = append(rrsNSBis[nsName], collectAddrs(resp, qtype, dnsname.New(nsName))...)

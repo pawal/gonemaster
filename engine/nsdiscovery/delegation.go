@@ -12,6 +12,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -324,7 +325,7 @@ func getDelegation(ctx context.Context, z *zone.Zone) ([]NSItem, error) {
 				}
 				for _, qtype := range []string{"A", "AAAA"} {
 					resp, err := r.Recurse(ctx, nsName, qtype, "IN")
-					if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
+					if err := recursor.IgnoreCNAMEError(err); err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
 						continue
 					}
 					addrList := collectResolvedAddrs(resp, qtype, dnsname.New(nsName))
@@ -389,7 +390,7 @@ func getOOBIPs(ctx context.Context, z *zone.Zone, nsNames []dnsname.Name) ([]NSI
 		}
 		for _, qtype := range []string{"A", "AAAA"} {
 			resp, err := r.Recurse(ctx, nsName.String(), qtype, "IN")
-			if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
+			if err := recursor.IgnoreCNAMEError(err); err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
 				continue
 			}
 			addrs := collectResolvedAddrs(resp, qtype, nsName)

@@ -20,6 +20,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -63,7 +64,8 @@ func defaultRecurse(ctx context.Context, z *zonepkg.Zone, name string, qtype str
 	if z == nil || z.Recursor() == nil {
 		return packet.Packet{}, fmt.Errorf("missing recursor")
 	}
-	return z.Recursor().Recurse(ctx, name, qtype, "IN")
+	resp, err := z.Recursor().Recurse(ctx, name, qtype, "IN")
+	return resp, recursor.IgnoreCNAMEError(err)
 }
 
 func defaultQueryAuth(ctx context.Context, z *zonepkg.Zone, name string, qtype string) (packet.Packet, error) {

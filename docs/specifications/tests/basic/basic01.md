@@ -157,6 +157,9 @@ For each remaining label (BFS from "." down toward child):
 | `B01_PARENT_UNDETERMINED` | Multiple parent zone candidates were identified. |
 | `B01_ROOT_HAS_NO_PARENT` | Child zone is root (`.`). |
 | `B01_SERVER_ZONE_ERROR` | SOA/NS response validation fails for a probed server/query name. |
+| `CNAME_CHAIN_TOO_LONG` | CNAME chain across recursion hops while resolving a discovered NS A/AAAA exceeds `CNAMEMaxChainLength`. |
+| `CNAME_TARGET_UNRESOLVED` | CNAME chain while resolving a discovered NS A/AAAA forms a loop, breaks, or fails qtype match. |
+| `CNAME_TOO_MANY_RECORDS` | A single answer for a discovered NS A/AAAA carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for queried rrtype. |
 | `IPV4_ENABLED` | IPv4 transport is enabled for queried rrtype. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for queried rrtype. |
@@ -193,6 +196,10 @@ For each remaining label (BFS from "." down toward child):
 | `B01_SERVER_ZONE_ERROR` | `rrtype` | `string` | Queried rrtype (`SOA` or `NS`). |
 | `B01_SERVER_ZONE_ERROR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `B01_SERVER_ZONE_ERROR` | `address` | `string` | Nameserver IP address for the same endpoint. |
+| `CNAME_CHAIN_TOO_LONG` | `query_name` | `string` | The qname whose CNAME chain exceeded the depth bound. |
+| `CNAME_TARGET_UNRESOLVED` | `query_name` | `string` | The qname whose CNAME target could not be resolved. |
+| `CNAME_TARGET_UNRESOLVED` | `cname_target` | `string` | The last attempted CNAME target. |
+| `CNAME_TOO_MANY_RECORDS` | `query_name` | `string` | The qname whose answer carried too many CNAME RRs. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped due to transport disable. |
@@ -228,6 +235,9 @@ For each remaining label (BFS from "." down toward child):
 | `B01_PARENT_UNDETERMINED` | `WARNING` | Default from `share/profile.json`. |
 | `B01_ROOT_HAS_NO_PARENT` | `INFO` | Default from `share/profile.json`. |
 | `B01_SERVER_ZONE_ERROR` | `DEBUG` | Default from `share/profile.json`. |
+| `CNAME_CHAIN_TOO_LONG` | `ERROR` | Default from `share/profile.json`. |
+| `CNAME_TARGET_UNRESOLVED` | `ERROR` | Default from `share/profile.json`. |
+| `CNAME_TOO_MANY_RECORDS` | `ERROR` | Default from `share/profile.json`. |
 | `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json`. |
 | `IPV4_ENABLED` | `DEBUG` | Default from `share/profile.json`. |
 | `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json`. |

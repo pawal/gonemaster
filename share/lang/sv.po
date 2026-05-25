@@ -281,6 +281,20 @@ msgstr ""
 "Namnservern {ns} svarar med den oväntade svarskoden (RCODE) \"{rcode}\" på "
 "en SOA-fråga."
 
+msgctxt "BASIC:CNAME_CHAIN_TOO_LONG"
+msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
+msgstr ""
+"CNAME-kedjan för {query_name} överstiger den tillåtna maxlängden."
+
+msgctxt "BASIC:CNAME_TARGET_UNRESOLVED"
+msgid "CNAME target {cname_target} for {query_name} could not be resolved."
+msgstr ""
+"CNAME-målet {cname_target} för {query_name} kunde inte slås upp."
+
+msgctxt "BASIC:CNAME_TOO_MANY_RECORDS"
+msgid "Too many CNAME records in the answer for {query_name}."
+msgstr "För många CNAME-poster i svaret för {query_name}."
+
 msgctxt "BASIC:HAS_A_RECORDS"
 msgid "Nameserver {ns}/{address} returned \"A\" record(s) for {domain}."
 msgstr "Namnservern {ns}/{address} svarade med A-poster för '{domain}'."

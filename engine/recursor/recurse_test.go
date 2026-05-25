@@ -13,6 +13,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -293,8 +294,9 @@ func TestRecurseStopsOnCNAMEWithQtypeMismatch(t *testing.T) {
 
 	r := &Recursor{}
 	out, _, err := r.recurse(context.Background(), "www.example.com", "A", "IN", state)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	var ce *CNAMEError
+	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "qtype-mismatch" {
+		t.Fatalf("expected *CNAMEError unresolved/qtype-mismatch, got: %v", err)
 	}
 	if out.Msg != nil {
 		t.Fatalf("expected no response when qtype does not match CNAME target")
@@ -356,7 +358,93 @@ func TestResolveCNAMEWithTargetAnswer(t *testing.T) {
 	}
 }
 
-func TestResolveCNAMELoopReturnsEmpty(t *testing.T) {
+func TestResolveCNAMETooManyRecordsReturnsTooMany(t *testing.T) {
+	// Build an answer carrying CNAMEMaxRecords+1 distinct CNAME RRs so the
+	// per-answer cardinality cap trips.
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	for i := 0; i <= constants.CNAMEMaxRecords; i++ {
+		rr := &dns.CNAME{Hdr: dns.Header{Name: fmt.Sprintf("a%d.example.com.", i), Class: dns.ClassINET, TTL: 60}}
+		rr.Target = fmt.Sprintf("b%d.example.com.", i)
+		msg.Answer = append(msg.Answer, rr)
+	}
+	resp := packet.Packet{Msg: msg}
+
+	r := &Recursor{}
+	_, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
+	var ce *CNAMEError
+	if !errors.As(err, &ce) || ce.Reason != CNAMETooMany {
+		t.Fatalf("expected *CNAMEError too-many, got: %v", err)
+	}
+}
+
+func TestResolveCNAMEBrokenChainReturnsUnresolved(t *testing.T) {
+	// Build an answer with two unrelated CNAME pairs: a -> b and c -> d.
+	// Walking from the qname follows one pair and stops; counter != len(unique)
+	// trips the broken-chain check.
+	resp := cnamePacket("www.example.com", "alias.example.com", "203.0.113.9")
+	cnameUnrelated := &dns.CNAME{Hdr: dns.Header{Name: "orphan.example.com.", Class: dns.ClassINET, TTL: 60}}
+	cnameUnrelated.Target = "unused.example.com."
+	resp.Msg.Answer = append(resp.Msg.Answer, cnameUnrelated)
+
+	r := &Recursor{}
+	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
+	var ce *CNAMEError
+	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "broken-chain" {
+		t.Fatalf("expected *CNAMEError unresolved/broken-chain, got: %v", err)
+	}
+	if out.Msg != nil {
+		t.Fatalf("expected no response for broken chain")
+	}
+}
+
+func TestResolveCNAMEChainDepthExceededReturnsChainTooLong(t *testing.T) {
+	// Pre-seed the state's tcount above CNAMEMaxChainLength so the chain-depth
+	// check (post-state-update) trips.
+	resp := cnamePacket("www.example.com", "alias.example.net", "203.0.113.10")
+
+	state := &recurseState{tcount: constants.CNAMEMaxChainLength}
+	r := &Recursor{}
+	_, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, state)
+	var ce *CNAMEError
+	if !errors.As(err, &ce) || ce.Reason != CNAMEChainTooLong {
+		t.Fatalf("expected *CNAMEError chain-too-long, got: %v", err)
+	}
+}
+
+func TestCacheStoresAndReturnsCNAMEError(t *testing.T) {
+	// Verifies the cache stores typed *CNAMEError and returns it on hit.
+	// Guards against silent first-hit-only reporting: any subsequent lookup
+	// for the same (name, qtype, qclass) must observe the same typed error.
+	r := &Recursor{}
+	r.SetNegativeCacheTTL(60 * time.Second)
+
+	cnameErr := &CNAMEError{Reason: CNAMEUnresolved, Name: "www.example.com", Target: "loop.example.com", Detail: "loop"}
+	r.cacheStoreNegative("k", "A", "IN", cnameErr)
+
+	cached, gotErr, ok := r.cacheLookup("k", "A", "IN")
+	if !ok {
+		t.Fatalf("expected cache hit")
+	}
+	if cached.Msg != nil {
+		t.Fatalf("expected empty packet on cache hit, got Msg=%v", cached.Msg)
+	}
+	var ce *CNAMEError
+	if !errors.As(gotErr, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "loop" {
+		t.Fatalf("expected cached *CNAMEError unresolved/loop, got: %v", gotErr)
+	}
+
+	// Second lookup behaves the same (cache must not flip to nil err).
+	_, gotErr2, ok2 := r.cacheLookup("k", "A", "IN")
+	if !ok2 {
+		t.Fatalf("expected second cache hit")
+	}
+	if !errors.As(gotErr2, &ce) || ce.Reason != CNAMEUnresolved {
+		t.Fatalf("expected cached *CNAMEError on second hit, got: %v", gotErr2)
+	}
+}
+
+func TestResolveCNAMELoopReturnsUnresolved(t *testing.T) {
 	resp := cnamePacket("www.example.com", "alias.example.com", "203.0.113.8")
 	cnameRR2 := &dns.CNAME{Hdr: dns.Header{Name: "alias.example.com.", Class: dns.ClassINET, TTL: 60}}
 	cnameRR2.Target = "www.example.com."
@@ -364,8 +452,9 @@ func TestResolveCNAMELoopReturnsEmpty(t *testing.T) {
 
 	r := &Recursor{}
 	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	var ce *CNAMEError
+	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "loop" {
+		t.Fatalf("expected *CNAMEError unresolved/loop, got: %v", err)
 	}
 	if out.Msg != nil {
 		t.Fatalf("expected no response for CNAME loop")

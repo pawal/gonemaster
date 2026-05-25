@@ -48,7 +48,7 @@ func TestRecursorExportImportRootEntry(t *testing.T) {
 	if err := restored.ImportCacheEntries(entries); err != nil {
 		t.Fatalf("import: %v", err)
 	}
-	cached, ok := restored.cacheLookup(cacheNameKey(dnsname.New("example.com."), nil), "A", "IN")
+	cached, _, ok := restored.cacheLookup(cacheNameKey(dnsname.New("example.com."), nil), "A", "IN")
 	if !ok {
 		t.Fatalf("expected cached root entry after import")
 	}
@@ -85,7 +85,7 @@ func TestRecursorExportImportNSEntry(t *testing.T) {
 	if err := restored.ImportCacheEntries(entries); err != nil {
 		t.Fatalf("import: %v", err)
 	}
-	cached, ok := restored.cacheLookup(cacheNameKey(dnsname.New("example.com."), []nameserver.Nameserver{nsA, nsB}), "NS", "IN")
+	cached, _, ok := restored.cacheLookup(cacheNameKey(dnsname.New("example.com."), []nameserver.Nameserver{nsA, nsB}), "NS", "IN")
 	if !ok {
 		t.Fatalf("expected cached ns entry after import")
 	}

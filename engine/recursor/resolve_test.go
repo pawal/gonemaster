@@ -90,18 +90,18 @@ func TestCacheStoreLookupAndClear(t *testing.T) {
 	resp := packet.Packet{Msg: msg}
 
 	r.cacheStore("example", "A", "IN", resp)
-	cached, ok := r.cacheLookup("example", "A", "IN")
+	cached, _, ok := r.cacheLookup("example", "A", "IN")
 	if !ok || cached.Msg == nil {
 		t.Fatalf("expected cached response")
 	}
 
 	r.cacheStore("empty", "A", "IN", packet.Packet{})
-	if _, ok := r.cacheLookup("empty", "A", "IN"); ok {
+	if _, _, ok := r.cacheLookup("empty", "A", "IN"); ok {
 		t.Fatalf("expected empty response not to be cached")
 	}
 
 	r.ClearCache()
-	if _, ok := r.cacheLookup("example", "A", "IN"); ok {
+	if _, _, ok := r.cacheLookup("example", "A", "IN"); ok {
 		t.Fatalf("expected cache cleared")
 	}
 }
@@ -133,13 +133,13 @@ func TestCacheStoreBoundsCacheSize(t *testing.T) {
 	r.cacheStore("b", "A", "IN", resp)
 	r.cacheStore("c", "A", "IN", resp)
 
-	if _, ok := r.cacheLookup("a", "A", "IN"); ok {
+	if _, _, ok := r.cacheLookup("a", "A", "IN"); ok {
 		t.Fatalf("expected oldest entry evicted after cache cap")
 	}
-	if _, ok := r.cacheLookup("b", "A", "IN"); ok {
+	if _, _, ok := r.cacheLookup("b", "A", "IN"); ok {
 		t.Fatalf("expected cache to reset once cap exceeded")
 	}
-	if _, ok := r.cacheLookup("c", "A", "IN"); !ok {
+	if _, _, ok := r.cacheLookup("c", "A", "IN"); !ok {
 		t.Fatalf("expected latest entry to remain after reset")
 	}
 	if r.recurseCount != 1 {
@@ -1719,8 +1719,8 @@ func TestRedirectNameNoNS(t *testing.T) {
 func TestNegativeCacheTTLZeroDoesNotStore(t *testing.T) {
 	r := &Recursor{}
 	// Default TTL is 0 - should preserve old behavior.
-	r.cacheStoreNegative("k", "A", "IN")
-	if _, ok := r.cacheLookup("k", "A", "IN"); ok {
+	r.cacheStoreNegative("k", "A", "IN", nil)
+	if _, _, ok := r.cacheLookup("k", "A", "IN"); ok {
 		t.Fatalf("expected no negative cache entry when TTL is 0")
 	}
 }
@@ -1729,8 +1729,8 @@ func TestNegativeCacheStoresWithTTL(t *testing.T) {
 	r := &Recursor{}
 	r.SetNegativeCacheTTL(60 * time.Second)
 
-	r.cacheStoreNegative("k", "A", "IN")
-	cached, ok := r.cacheLookup("k", "A", "IN")
+	r.cacheStoreNegative("k", "A", "IN", nil)
+	cached, _, ok := r.cacheLookup("k", "A", "IN")
 	if !ok {
 		t.Fatalf("expected cache hit for negative entry")
 	}
@@ -1743,12 +1743,12 @@ func TestNegativeCacheExpires(t *testing.T) {
 	r := &Recursor{}
 	r.SetNegativeCacheTTL(20 * time.Millisecond)
 
-	r.cacheStoreNegative("k", "A", "IN")
-	if _, ok := r.cacheLookup("k", "A", "IN"); !ok {
+	r.cacheStoreNegative("k", "A", "IN", nil)
+	if _, _, ok := r.cacheLookup("k", "A", "IN"); !ok {
 		t.Fatalf("expected cache hit immediately after store")
 	}
 	time.Sleep(40 * time.Millisecond)
-	if _, ok := r.cacheLookup("k", "A", "IN"); ok {
+	if _, _, ok := r.cacheLookup("k", "A", "IN"); ok {
 		t.Fatalf("expected negative cache entry to expire after TTL")
 	}
 }
@@ -1756,7 +1756,7 @@ func TestNegativeCacheExpires(t *testing.T) {
 func TestNegativeCacheNotPersisted(t *testing.T) {
 	r := &Recursor{}
 	r.SetNegativeCacheTTL(60 * time.Second)
-	r.cacheStoreNegative(cacheNameKey(dnsname.New("example.com."), nil), "A", "IN")
+	r.cacheStoreNegative(cacheNameKey(dnsname.New("example.com."), nil), "A", "IN", nil)
 
 	entries, err := r.ExportCacheEntries()
 	if err != nil {
@@ -1774,7 +1774,7 @@ func TestPositiveEntryStillNotEvictedByNegativeLookup(t *testing.T) {
 	msg.Rcode = dns.RcodeSuccess
 	r.cacheStore("k", "A", "IN", packet.Packet{Msg: msg})
 
-	cached, ok := r.cacheLookup("k", "A", "IN")
+	cached, _, ok := r.cacheLookup("k", "A", "IN")
 	if !ok || cached.Msg == nil {
 		t.Fatalf("positive entry must remain after a negative-cache-enabled lookup")
 	}

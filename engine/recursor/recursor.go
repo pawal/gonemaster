@@ -20,8 +20,11 @@ var namedRoot = share.NamedRoot
 
 // recurseCacheEntry holds a cached recursion result. resp is nil for
 // negative entries; expires is zero for non-expiring (positive) entries.
+// err caches typed errors (notably *CNAMEError) so cache hits return the
+// same error contract as the cold lookup.
 type recurseCacheEntry struct {
 	resp    *packet.Packet
+	err     error
 	expires time.Time
 }
 

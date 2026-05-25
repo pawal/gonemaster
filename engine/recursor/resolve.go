@@ -325,11 +325,11 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	nameObj := dnsname.New(name)
 	key := cacheNameKey(nameObj, ns)
 	runLog := logger.FromContext(ctx)
-	if cached, ok := r.cacheLookup(key, qtype, qclass); ok {
+	if cached, cachedErr, ok := r.cacheLookup(key, qtype, qclass); ok {
 		cached.Log = runLog
-		return cached, nil
+		return cached, cachedErr
 	}
-	if cached, cachedOK, inflight, wait := r.cacheLookupOrWaitOrRegister(key, qtype, qclass); wait {
+	if cached, cachedErr, cachedOK, inflight, wait := r.cacheLookupOrWaitOrRegister(key, qtype, qclass); wait {
 		if ctx == nil {
 			<-inflight.done
 			if inflight.resp == nil {
@@ -352,7 +352,7 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 		}
 	} else if cachedOK {
 		cached.Log = runLog
-		return cached, nil
+		return cached, cachedErr
 	}
 	defer func() {
 		var infResp *packet.Packet
@@ -383,13 +383,13 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	resp, _, err = r.recurse(ctx, name, qtype, qclass, state)
 	if err != nil {
 		if ctx == nil || ctx.Err() == nil {
-			r.cacheStoreNegative(key, qtype, qclass)
+			r.cacheStoreNegative(key, qtype, qclass, err)
 		}
 		return packet.Packet{}, err
 	}
 	if resp.Msg == nil {
 		if ctx == nil || ctx.Err() == nil {
-			r.cacheStoreNegative(key, qtype, qclass)
+			r.cacheStoreNegative(key, qtype, qclass, nil)
 		}
 		resp.Log = runLog
 		return resp, nil
@@ -423,36 +423,36 @@ func recurseLookupKey(name string, qtype string, qclass string) string {
 	return name + "|" + qtype + "|" + qclass
 }
 
-func (r *Recursor) cacheLookupLocked(name string, qtype string, qclass string) (packet.Packet, bool) {
+func (r *Recursor) cacheLookupLocked(name string, qtype string, qclass string) (packet.Packet, error, bool) {
 	if r.recurseCache == nil {
-		return packet.Packet{}, false
+		return packet.Packet{}, nil, false
 	}
 	byType, ok := r.recurseCache[name]
 	if !ok {
-		return packet.Packet{}, false
+		return packet.Packet{}, nil, false
 	}
 	byClass, ok := byType[qtype]
 	if !ok {
-		return packet.Packet{}, false
+		return packet.Packet{}, nil, false
 	}
 	entry, ok := byClass[qclass]
 	if !ok {
-		return packet.Packet{}, false
+		return packet.Packet{}, nil, false
 	}
 	if entry == nil {
 		r.evictCacheEntryLocked(name, qtype, qclass)
-		return packet.Packet{}, false
+		return packet.Packet{}, nil, false
 	}
 	if !entry.expires.IsZero() && !time.Now().Before(entry.expires) {
 		r.evictCacheEntryLocked(name, qtype, qclass)
-		return packet.Packet{}, false
+		return packet.Packet{}, nil, false
 	}
 	if entry.resp == nil {
-		// Negative cache hit: return an empty packet but signal hit=true so
-		// callers skip re-issuing the lookup.
-		return packet.Packet{}, true
+		// Negative cache hit: return an empty packet plus any cached err so
+		// callers skip re-issuing the lookup and observe the same contract.
+		return packet.Packet{}, entry.err, true
 	}
-	return *entry.resp, true
+	return *entry.resp, entry.err, true
 }
 
 func (r *Recursor) evictCacheEntryLocked(name string, qtype string, qclass string) {
@@ -478,22 +478,22 @@ func (r *Recursor) evictCacheEntryLocked(name string, qtype string, qclass strin
 	}
 }
 
-func (r *Recursor) cacheLookupOrWaitOrRegister(name string, qtype string, qclass string) (packet.Packet, bool, *inflightLookup, bool) {
+func (r *Recursor) cacheLookupOrWaitOrRegister(name string, qtype string, qclass string) (packet.Packet, error, bool, *inflightLookup, bool) {
 	r.cacheMu.Lock()
 	defer r.cacheMu.Unlock()
 
-	if cached, ok := r.cacheLookupLocked(name, qtype, qclass); ok {
-		return cached, true, nil, false
+	if cached, cachedErr, ok := r.cacheLookupLocked(name, qtype, qclass); ok {
+		return cached, cachedErr, true, nil, false
 	}
 	if r.inflight == nil {
 		r.inflight = map[string]*inflightLookup{}
 	}
 	key := recurseLookupKey(name, qtype, qclass)
 	if inflight, ok := r.inflight[key]; ok {
-		return packet.Packet{}, false, inflight, true
+		return packet.Packet{}, nil, false, inflight, true
 	}
 	r.inflight[key] = &inflightLookup{done: make(chan struct{})}
-	return packet.Packet{}, false, nil, false
+	return packet.Packet{}, nil, false, nil, false
 }
 
 func (r *Recursor) finishInflightLookup(name string, qtype string, qclass string, resp *packet.Packet, err error) {
@@ -510,7 +510,7 @@ func (r *Recursor) finishInflightLookup(name string, qtype string, qclass string
 	r.cacheMu.Unlock()
 }
 
-func (r *Recursor) cacheLookup(name string, qtype string, qclass string) (packet.Packet, bool) {
+func (r *Recursor) cacheLookup(name string, qtype string, qclass string) (packet.Packet, error, bool) {
 	r.cacheMu.Lock()
 	defer r.cacheMu.Unlock()
 
@@ -529,18 +529,26 @@ func (r *Recursor) cacheStore(name string, qtype string, qclass string, resp pac
 }
 
 // cacheStoreNegative stores a "no answer" entry for the supplied lookup,
-// expiring after r.negativeCacheTTL. When the TTL is zero (default) no
-// entry is stored, preserving the historical "do not cache indeterminate
-// lookups" behavior.
-func (r *Recursor) cacheStoreNegative(name string, qtype string, qclass string) {
+// expiring after r.negativeCacheTTL. When err is non-nil the entry is
+// always stored so the typed error is re-served on cache hits.
+func (r *Recursor) cacheStoreNegative(name string, qtype string, qclass string, err error) {
 	r.cacheMu.Lock()
 	defer r.cacheMu.Unlock()
-	if r.negativeCacheTTL <= 0 {
-		return
+	entry := &recurseCacheEntry{err: err}
+	if err != nil {
+		// Cache typed errors (e.g. *CNAMEError) with the same TTL semantics.
+		// Use a far-future expiry when negativeCacheTTL is zero so the entry
+		// persists for the run.
+		if r.negativeCacheTTL > 0 {
+			entry.expires = time.Now().Add(r.negativeCacheTTL)
+		}
+	} else {
+		if r.negativeCacheTTL <= 0 {
+			return
+		}
+		entry.expires = time.Now().Add(r.negativeCacheTTL)
 	}
-	r.storeEntryLocked(name, qtype, qclass, &recurseCacheEntry{
-		expires: time.Now().Add(r.negativeCacheTTL),
-	})
+	r.storeEntryLocked(name, qtype, qclass, entry)
 }
 
 func (r *Recursor) storeEntryLocked(name string, qtype string, qclass string, entry *recurseCacheEntry) {

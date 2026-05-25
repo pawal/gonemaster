@@ -15,6 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/cnamelog"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -106,6 +107,9 @@ func Metadata() map[string][]string {
 			"B01_PARENT_UNDETERMINED",
 			"B01_ROOT_HAS_NO_PARENT",
 			"B01_SERVER_ZONE_ERROR",
+			"CNAME_CHAIN_TOO_LONG",
+			"CNAME_TARGET_UNRESOLVED",
+			"CNAME_TOO_MANY_RECORDS",
 			"IPV4_DISABLED",
 			"IPV4_ENABLED",
 			"IPV6_DISABLED",
@@ -274,7 +278,11 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if len(addrs) == 0 {
 					for _, qtype := range []string{"A", "AAAA"} {
 						resp, err := rec.Recurse(ctx, nsName, qtype, "IN")
-						if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
+						if err != nil {
+							cnamelog.Log(ctx, &results, moduleName, testcase, err)
+							continue
+						}
+						if resp.Msg == nil || resp.Rcode() != "NOERROR" {
 							continue
 						}
 						for _, rr := range resp.GetRecordsForName(qtype, dnsname.New(nsName)) {
@@ -374,7 +382,11 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							if len(addrs) == 0 {
 								for _, qtype := range []string{"A", "AAAA"} {
 									resp, err := rec.Recurse(ctx, nsName, qtype, "IN")
-									if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
+									if err != nil {
+										cnamelog.Log(ctx, &results, moduleName, testcase, err)
+										continue
+									}
+									if resp.Msg == nil || resp.Rcode() != "NOERROR" {
 										continue
 									}
 									for _, rr := range resp.GetRecordsForName(qtype, dnsname.New(nsName)) {
@@ -456,7 +468,11 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							if len(addrs) == 0 {
 								for _, qtype := range []string{"A", "AAAA"} {
 									resp, err := rec.Recurse(ctx, nsName, qtype, "IN")
-									if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
+									if err != nil {
+										cnamelog.Log(ctx, &results, moduleName, testcase, err)
+										continue
+									}
+									if resp.Msg == nil || resp.Rcode() != "NOERROR" {
 										continue
 									}
 									for _, rr := range resp.GetRecordsForName(qtype, dnsname.New(nsName)) {

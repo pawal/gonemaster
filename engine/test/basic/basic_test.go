@@ -163,6 +163,121 @@ func TestBasic01ParentFoundTypedArgs(t *testing.T) {
 	}
 }
 
+// TestBasic01EmitsCNAMETagOnNSLookup exercises the cnamelog integration:
+// when Basic01 walks the parent zone and tries to resolve an
+// out-of-bailiwick NS hostname whose A/AAAA recursion produces a typed
+// *recursor.CNAMEError, the matching CNAME_* tag must appear in the
+// emitted entries instead of disappearing silently.
+//
+// Setup: pre-populate the recursor cache with the CNAMEError for
+// "ns.outside.test" A and AAAA via SeedCNAMEError. The root server's NS
+// response for "." carries an extra NS "ns.outside.test" without glue,
+// so Basic01 calls rec.Recurse(ctx, "ns.outside.test", ...) which hits
+// the cache and surfaces the typed error to cnamelog.Log.
+func TestBasic01EmitsCNAMETagOnNSLookup(t *testing.T) {
+	cases := []struct {
+		name       string
+		seedErr    *recursor.CNAMEError
+		wantTag    string
+		wantArgs   map[string]any
+		extraArgKs []string
+	}{
+		{
+			name:    "unresolved/loop emits CNAME_TARGET_UNRESOLVED",
+			seedErr: &recursor.CNAMEError{Reason: recursor.CNAMEUnresolved, Name: "ns.outside.test", Target: "loop.outside.test", Detail: "loop"},
+			wantTag: "CNAME_TARGET_UNRESOLVED",
+			wantArgs: map[string]any{
+				"query_name":   "ns.outside.test",
+				"cname_target": "loop.outside.test",
+			},
+		},
+		{
+			name:    "too-many emits CNAME_TOO_MANY_RECORDS",
+			seedErr: &recursor.CNAMEError{Reason: recursor.CNAMETooMany, Name: "ns.outside.test"},
+			wantTag: "CNAME_TOO_MANY_RECORDS",
+			wantArgs: map[string]any{
+				"query_name": "ns.outside.test",
+			},
+		},
+		{
+			name:    "chain-too-long emits CNAME_CHAIN_TOO_LONG",
+			seedErr: &recursor.CNAMEError{Reason: recursor.CNAMEChainTooLong, Name: "ns.outside.test", Target: "deep.outside.test"},
+			wantTag: "CNAME_CHAIN_TOO_LONG",
+			wantArgs: map[string]any{
+				"query_name": "ns.outside.test",
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			nameserver.EmptyCache()
+			defer nameserver.EmptyCache()
+			ctx, _, _ := testhelpers.Context(t)
+
+			r := &recursor.Recursor{}
+			if err := r.AddFakeAddresses(".", map[string][]string{
+				"a.root": {"192.0.2.1"},
+			}); err != nil {
+				t.Fatalf("add fake root: %v", err)
+			}
+			r.SetNegativeCacheTTL(60 * time.Second)
+			r.SeedCNAMEError(tc.seedErr, "ns.outside.test", []string{"A", "AAAA"})
+
+			rootHook := func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+				name := strings.ToLower(qname)
+				kind := strings.ToUpper(qtype)
+				switch {
+				case name == "." && kind == "SOA":
+					return soaPacket(".", "a.root", "hostmaster.root"), nil
+				case name == "." && kind == "NS":
+					return nsPacketMulti(".", "a.root", "ns.outside.test"), nil
+				}
+				return packet.Packet{}, nil
+			}
+
+			aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+			if err != nil {
+				t.Fatalf("new root nameserver: %v", err)
+			}
+			aroot.SetQueryHook(rootHook)
+
+			z, err := zone.NewWithRecursor("example", r)
+			if err != nil {
+				t.Fatalf("new zone: %v", err)
+			}
+
+			entries, err := Basic01(ctx, &z)
+			if err != nil {
+				t.Fatalf("basic01: %v", err)
+			}
+			if !hasEntryTag(entries, tc.wantTag) {
+				t.Fatalf("expected %s, got tags: %v", tc.wantTag, entryTags(entries))
+			}
+			entry := firstEntryByTag(entries, tc.wantTag)
+			if entry == nil {
+				t.Fatalf("missing %s entry", tc.wantTag)
+			}
+			for k, want := range tc.wantArgs {
+				if got := entry.Args[k]; got != want {
+					t.Fatalf("%s arg %q: got %#v, want %#v", tc.wantTag, k, got, want)
+				}
+			}
+		})
+	}
+}
+
+func entryTags(entries []*logger.Entry) []string {
+	out := make([]string, 0, len(entries))
+	for _, e := range entries {
+		if e == nil {
+			continue
+		}
+		out = append(out, e.Tag)
+	}
+	return out
+}
+
 func TestBasic02NoDelegation(t *testing.T) {
 	nameserver.EmptyCache()
 	defer nameserver.EmptyCache()

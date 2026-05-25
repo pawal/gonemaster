@@ -620,7 +620,7 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 	}
 
 	if len(unique) > constants.CNAMEMaxRecords {
-		return packet.Packet{}, state, nil
+		return packet.Packet{}, state, &CNAMEError{Reason: CNAMETooMany, Name: name.String()}
 	}
 
 	cnames := map[string]string{}
@@ -633,10 +633,10 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 		targetKey := strings.ToLower(targetName.String())
 
 		if forbiddenTargets[ownerKey] {
-			return packet.Packet{}, state, nil
+			return packet.Packet{}, state, &CNAMEError{Reason: CNAMEUnresolved, Name: name.String(), Target: targetKey, Detail: "loop"}
 		}
 		if ownerKey == targetKey || seenTargets[targetKey] || forbiddenTargets[targetKey] {
-			return packet.Packet{}, state, nil
+			return packet.Packet{}, state, &CNAMEError{Reason: CNAMEUnresolved, Name: name.String(), Target: targetKey, Detail: "loop"}
 		}
 
 		seenTargets[targetKey] = true
@@ -651,15 +651,16 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 		if !ok {
 			break
 		}
+		// Bound here is CNAMEMaxRecords (single-answer cap), not chain-length-across-hops.
 		if counter > constants.CNAMEMaxRecords {
-			return packet.Packet{}, state, nil
+			return packet.Packet{}, state, &CNAMEError{Reason: CNAMETooMany, Name: name.String(), Target: targetKey}
 		}
 		targetKey = next
 		counter++
 	}
 
 	if counter != len(unique) {
-		return packet.Packet{}, state, nil
+		return packet.Packet{}, state, &CNAMEError{Reason: CNAMEUnresolved, Name: name.String(), Target: targetKey, Detail: "broken-chain"}
 	}
 
 	if len(resp.GetRecords(qtype, "answer")) > 0 {
@@ -667,7 +668,7 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 		if resp.HasRRsOfTypeForName(qtype, targetName, "answer") {
 			return resp, state, nil
 		}
-		return packet.Packet{}, state, nil
+		return packet.Packet{}, state, &CNAMEError{Reason: CNAMEUnresolved, Name: name.String(), Target: targetKey, Detail: "qtype-mismatch"}
 	}
 
 	if state == nil {
@@ -690,7 +691,7 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 	tcount := state.tcount
 	state.unlock()
 	if tcount > constants.CNAMEMaxChainLength {
-		return packet.Packet{}, state, nil
+		return packet.Packet{}, state, &CNAMEError{Reason: CNAMEChainTooLong, Name: name.String(), Target: targetKey}
 	}
 
 	targetName := dnsname.New(targetKey)

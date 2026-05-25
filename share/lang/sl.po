@@ -285,6 +285,20 @@ msgstr ""
 "Domenski strežnik\"{ns}\" odgovarja z nepričakovanim RCODE (\"{rcode}\") za "
 "SOA poizvedbo."
 
+msgctxt "BASIC:CNAME_CHAIN_TOO_LONG"
+msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
+msgstr ""
+"Veriga CNAME za {query_name} presega največjo dovoljeno dolžino."
+
+msgctxt "BASIC:CNAME_TARGET_UNRESOLVED"
+msgid "CNAME target {cname_target} for {query_name} could not be resolved."
+msgstr ""
+"Cilja CNAME {cname_target} za {query_name} ni bilo mogoče razrešiti."
+
+msgctxt "BASIC:CNAME_TOO_MANY_RECORDS"
+msgid "Too many CNAME records in the answer for {query_name}."
+msgstr "Preveč zapisov CNAME v odgovoru za {query_name}."
+
 msgctxt "BASIC:HAS_A_RECORDS"
 msgid "Nameserver {ns}/{address} returned \"A\" record(s) for {domain}."
 msgstr "Domenski strežnik {ns}/{address} je vrnil \"A\" zapise za '{domain}'."

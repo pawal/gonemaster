@@ -398,6 +398,25 @@ func TestResolveCNAMEBrokenChainReturnsUnresolved(t *testing.T) {
 	}
 }
 
+func TestResolveCNAMEQtypeMismatchReturnsUnresolved(t *testing.T) {
+	// Answer carries an A RR for an unrelated name, but none for the CNAME
+	// target. Trips the qtype-mismatch path.
+	resp := cnamePacket("www.example.com", "alias.example.net", "203.0.113.11")
+	strayA := &dns.A{Hdr: dns.Header{Name: "stray.example.org.", Class: dns.ClassINET, TTL: 60}}
+	strayA.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 11})
+	resp.Msg.Answer = append(resp.Msg.Answer, strayA)
+
+	r := &Recursor{}
+	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
+	var ce *CNAMEError
+	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "qtype-mismatch" {
+		t.Fatalf("expected *CNAMEError unresolved/qtype-mismatch, got: %v", err)
+	}
+	if out.Msg != nil {
+		t.Fatalf("expected no response for qtype mismatch")
+	}
+}
+
 func TestResolveCNAMEChainDepthExceededReturnsChainTooLong(t *testing.T) {
 	// Pre-seed the state's tcount above CNAMEMaxChainLength so the chain-depth
 	// check (post-state-update) trips.

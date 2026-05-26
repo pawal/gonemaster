@@ -3,7 +3,6 @@ package recursor
 import (
 	"errors"
 	"fmt"
-	"time"
 )
 
 // CNAMEReason identifies which CNAME-handling failure the recursor hit.
@@ -64,20 +63,3 @@ func IgnoreCNAMEError(err error) error {
 	return err
 }
 
-// SeedCNAMEError pre-populates the cache with a CNAME error for the given
-// (name, qtypes) so tests can drive Recurse-via-cache without simulating
-// the full upstream walk. Test helper.
-func (r *Recursor) SeedCNAMEError(err *CNAMEError, name string, qtypes []string) {
-	if r == nil || err == nil {
-		return
-	}
-	prev := r.negativeCacheTTL
-	if prev <= 0 {
-		r.SetNegativeCacheTTL(time.Hour)
-		defer r.SetNegativeCacheTTL(prev)
-	}
-	key := "root|" + name
-	for _, qtype := range qtypes {
-		r.cacheStoreNegative(key, qtype, "IN", err)
-	}
-}

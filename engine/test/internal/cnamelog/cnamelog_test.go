@@ -9,23 +9,19 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 )
 
-func TestLogReturnsFalseOnNilError(t *testing.T) {
+func TestLogIgnoresNilError(t *testing.T) {
 	ctx := logger.WithContext(context.Background(), logger.New())
 	var results []*logger.Entry
-	if Log(ctx, &results, "Basic", "Basic01", nil) {
-		t.Fatalf("expected false for nil error")
-	}
+	Log(ctx, &results, "Basic", "Basic01", nil)
 	if len(results) != 0 {
 		t.Fatalf("expected no entries appended, got %d", len(results))
 	}
 }
 
-func TestLogReturnsFalseOnNonCNAMEError(t *testing.T) {
+func TestLogIgnoresNonCNAMEError(t *testing.T) {
 	ctx := logger.WithContext(context.Background(), logger.New())
 	var results []*logger.Entry
-	if Log(ctx, &results, "Basic", "Basic01", errors.New("unrelated")) {
-		t.Fatalf("expected false for non-CNAMEError")
-	}
+	Log(ctx, &results, "Basic", "Basic01", errors.New("unrelated"))
 	if len(results) != 0 {
 		t.Fatalf("expected no entries appended, got %d", len(results))
 	}
@@ -35,9 +31,7 @@ func TestLogEmitsTooManyTag(t *testing.T) {
 	ctx := logger.WithContext(context.Background(), logger.New())
 	var results []*logger.Entry
 	err := &recursor.CNAMEError{Reason: recursor.CNAMETooMany, Name: "ns1.example."}
-	if !Log(ctx, &results, "Basic", "Basic01", err) {
-		t.Fatalf("expected true for *CNAMEError")
-	}
+	Log(ctx, &results, "Basic", "Basic01", err)
 	if len(results) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(results))
 	}
@@ -53,9 +47,7 @@ func TestLogEmitsChainTooLongTag(t *testing.T) {
 	ctx := logger.WithContext(context.Background(), logger.New())
 	var results []*logger.Entry
 	err := &recursor.CNAMEError{Reason: recursor.CNAMEChainTooLong, Name: "ns2.example."}
-	if !Log(ctx, &results, "Basic", "Basic01", err) {
-		t.Fatalf("expected true")
-	}
+	Log(ctx, &results, "Basic", "Basic01", err)
 	if len(results) != 1 || results[0].Tag != "CNAME_CHAIN_TOO_LONG" {
 		t.Fatalf("expected CNAME_CHAIN_TOO_LONG, got %#v", results)
 	}
@@ -68,9 +60,7 @@ func TestLogEmitsUnresolvedTagWithBothArgs(t *testing.T) {
 	ctx := logger.WithContext(context.Background(), logger.New())
 	var results []*logger.Entry
 	err := &recursor.CNAMEError{Reason: recursor.CNAMEUnresolved, Name: "ns3.example.", Target: "alias.example.", Detail: "loop"}
-	if !Log(ctx, &results, "Basic", "Basic01", err) {
-		t.Fatalf("expected true")
-	}
+	Log(ctx, &results, "Basic", "Basic01", err)
 	if len(results) != 1 || results[0].Tag != "CNAME_TARGET_UNRESOLVED" {
 		t.Fatalf("expected CNAME_TARGET_UNRESOLVED, got %#v", results)
 	}

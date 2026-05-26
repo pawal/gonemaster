@@ -21,6 +21,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/recursor/recursortest"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -170,7 +171,7 @@ func TestBasic01ParentFoundTypedArgs(t *testing.T) {
 // emitted entries instead of disappearing silently.
 //
 // Setup: pre-populate the recursor cache with the CNAMEError for
-// "ns.outside.test" A and AAAA via SeedCNAMEError. The root server's NS
+// "ns.outside.test" A and AAAA via recursortest.SeedCNAMEError. The root server's NS
 // response for "." carries an extra NS "ns.outside.test" without glue,
 // so Basic01 calls rec.Recurse(ctx, "ns.outside.test", ...) which hits
 // the cache and surfaces the typed error to cnamelog.Log.
@@ -222,7 +223,7 @@ func TestBasic01EmitsCNAMETagOnNSLookup(t *testing.T) {
 				t.Fatalf("add fake root: %v", err)
 			}
 			r.SetNegativeCacheTTL(60 * time.Second)
-			r.SeedCNAMEError(tc.seedErr, "ns.outside.test", []string{"A", "AAAA"})
+			recursortest.SeedCNAMEError(r, tc.seedErr, "ns.outside.test", []string{"A", "AAAA"})
 
 			rootHook := func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 				name := strings.ToLower(qname)

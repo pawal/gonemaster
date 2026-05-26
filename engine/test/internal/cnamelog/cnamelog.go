@@ -10,22 +10,21 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/util"
 )
 
-// Log emits the matching CNAME tag for err. Returns true if err was a *CNAMEError.
-func Log(ctx context.Context, results *[]*logger.Entry, module string, testcase string, err error) bool {
+// Log emits the matching CNAME tag for err if err is a *CNAMEError.
+func Log(ctx context.Context, results *[]*logger.Entry, module string, testcase string, err error) {
 	if err == nil {
-		return false
+		return
 	}
 	var ce *recursor.CNAMEError
 	if !errors.As(err, &ce) {
-		return false
+		return
 	}
 	tag, args := tagFor(ce)
 	entry, addErr := util.LoggerFromContext(ctx).Add(tag, args, module, testcase)
 	if addErr != nil || entry == nil {
-		return true
+		return
 	}
 	*results = append(*results, entry)
-	return true
 }
 
 func tagFor(ce *recursor.CNAMEError) (string, map[string]any) {

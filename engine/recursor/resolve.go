@@ -312,6 +312,16 @@ func (r *Recursor) ClearCache() {
 	r.cacheMu.Unlock()
 }
 
+// PrimeCacheError stores err so the next Recurse for (name, qtype, IN)
+// against root returns it. For tests and saved-cache replay.
+func (r *Recursor) PrimeCacheError(name, qtype string, err error) {
+	if r == nil || err == nil {
+		return
+	}
+	key := cacheNameKey(dnsname.New(name), nil)
+	r.cacheStoreNegative(key, strings.ToUpper(qtype), "IN", err)
+}
+
 func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtype string, qclass string, ns []nameserver.Nameserver) (resp packet.Packet, err error) {
 	if qtype == "" {
 		qtype = "A"

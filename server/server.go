@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"fmt"
+	"log"
 	"net/http"
 	"net/netip"
 	"strings"
@@ -48,6 +49,7 @@ type Server struct {
 	// clears the set.
 	cohortRebuildsMu       sync.Mutex
 	cohortRebuildsInFlight map[int64]struct{}
+	adminTokens            atomic.Pointer[tokenSet]
 }
 
 // setScoringConfig loads an optional scoring config file and sets it on the
@@ -163,8 +165,42 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		s.hotCache = newNameserverHotCache(0, cfg.EffectiveCrossJobHotCacheTTL())
 	}
 	s.retentionDays.Store(int64(cfg.Database.RetentionDays))
+	ts, err := newTokenSet(cfg.Auth)
+	if err != nil {
+		log.Printf("auth: invalid admin_tokens, running in open mode: %v", err)
+		ts = &tokenSet{}
+	}
+	s.adminTokens.Store(ts)
 	s.routes()
 	return s
+}
+
+// authTokens returns the current admin token set (never nil).
+func (s *Server) authTokens() *tokenSet {
+	if ts := s.adminTokens.Load(); ts != nil {
+		return ts
+	}
+	return &tokenSet{}
+}
+
+// authMode reports "open" or "token" and the configured token count.
+func (s *Server) authMode() (string, int) {
+	ts := s.authTokens()
+	if !ts.enabled {
+		return "open", 0
+	}
+	return "token", len(ts.tokens)
+}
+
+// ReloadAuth rebuilds and atomically swaps the admin token set. On error the
+// previous set is left in place.
+func (s *Server) ReloadAuth(cfg AuthConfig) error {
+	ts, err := newTokenSet(cfg)
+	if err != nil {
+		return err
+	}
+	s.adminTokens.Store(ts)
+	return nil
 }
 
 // Handler returns the root HTTP handler.

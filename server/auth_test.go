@@ -41,6 +41,47 @@ func TestNewTokenSetRejectsBadHash(t *testing.T) {
 	}
 }
 
+func TestServerAuthModeOpenByDefault(t *testing.T) {
+	s := New(DefaultConfig())
+	if mode, n := s.authMode(); mode != "open" || n != 0 {
+		t.Fatalf("expected open mode, got %q n=%d", mode, n)
+	}
+}
+
+func TestServerReloadAuth(t *testing.T) {
+	s := New(DefaultConfig())
+	tok := "gm_reloadtest"
+	if err := s.ReloadAuth(AuthConfig{AdminTokens: []AdminToken{{Label: "a", Hash: hashToken(tok)}}}); err != nil {
+		t.Fatal(err)
+	}
+	if mode, n := s.authMode(); mode != "token" || n != 1 {
+		t.Fatalf("expected token mode 1, got %q n=%d", mode, n)
+	}
+	if _, ok := s.authTokens().match(tok); !ok {
+		t.Fatal("reloaded token should match")
+	}
+	if err := s.ReloadAuth(AuthConfig{}); err != nil {
+		t.Fatal(err)
+	}
+	if mode, _ := s.authMode(); mode != "open" {
+		t.Fatalf("expected open mode after clearing tokens, got %q", mode)
+	}
+}
+
+func TestReloadAuthRejectsBadHashKeepsPrevious(t *testing.T) {
+	s := New(DefaultConfig())
+	good := "gm_keepme"
+	if err := s.ReloadAuth(AuthConfig{AdminTokens: []AdminToken{{Hash: hashToken(good)}}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := s.ReloadAuth(AuthConfig{AdminTokens: []AdminToken{{Hash: "bogus"}}}); err == nil {
+		t.Fatal("expected error reloading bad hash")
+	}
+	if _, ok := s.authTokens().match(good); !ok {
+		t.Fatal("previous token set should survive a failed reload")
+	}
+}
+
 func TestDefaultConfigOpenMode(t *testing.T) {
 	if len(DefaultConfig().Auth.AdminTokens) != 0 {
 		t.Fatalf("default config should be open mode (no admin tokens)")

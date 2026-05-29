@@ -31,6 +31,9 @@ func hashToken(plaintext string) string {
 	return tokenHashPrefix + hex.EncodeToString(sum[:])
 }
 
+// HashToken returns the storable hash form of a plaintext token.
+func HashToken(plaintext string) string { return hashToken(plaintext) }
+
 // parseTokenHash decodes a "sha256:<hex>" string into a raw digest.
 func parseTokenHash(s string) ([]byte, error) {
 	rest, ok := strings.CutPrefix(strings.TrimSpace(s), tokenHashPrefix)

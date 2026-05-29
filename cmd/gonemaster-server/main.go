@@ -32,6 +32,9 @@ func main() {
 }
 
 func run(args []string, out *os.File, errOut *os.File) int {
+	if len(args) > 0 && args[0] == "auth" {
+		return runAuthCommand(args[1:], out, errOut)
+	}
 	var configPath string
 	var listen string
 	var maxBodySize int64

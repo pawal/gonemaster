@@ -18,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -59,6 +60,57 @@ func TestConnectivity01IPv6Disabled(t *testing.T) {
 	names := serverNamesFromArgs(t, entry.Args)
 	if len(names) != 1 || names[0] != "ns2.example" {
 		t.Fatalf("expected typed servers with ns2.example, got %v", names)
+	}
+}
+
+// TestConnectivity01EmitsCNAMETagForUnresolvableNS verifies that when zone
+// NS discovery returns an address-less NSItem carrying a *recursor.CNAMEError,
+// Connectivity01 emits the matching CNAME_* tag. authoritativeNS is stubbed to
+// return a resolvable nameserver so the rest of the testcase proceeds normally.
+func TestConnectivity01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origAuth := authoritativeNS
+	origZone := zoneNameservers
+	t.Cleanup(func() {
+		authoritativeNS = origAuth
+		zoneNameservers = origZone
+	})
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.1", nil)
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	cnameErr := &recursor.CNAMEError{
+		Reason: recursor.CNAMEUnresolved,
+		Name:   "ns.outside.test",
+		Target: "loop.outside.test",
+		Detail: "loop",
+	}
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
+			{Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.1"), HasAddress: true},
+			{Name: dnsname.New("ns.outside.test"), Err: cnameErr},
+		}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Connectivity01(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("connectivity01: %v", err)
+	}
+
+	entry := findEntry(entries, "CNAME_TARGET_UNRESOLVED")
+	if entry == nil {
+		t.Fatalf("expected CNAME_TARGET_UNRESOLVED entry")
+	}
+	if got := entry.Args["query_name"]; got != "ns.outside.test" {
+		t.Fatalf("query_name: got %#v, want ns.outside.test", got)
 	}
 }
 

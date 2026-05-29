@@ -15,6 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/cnamelog"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -171,6 +172,23 @@ func Connectivity01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	nsList, err := authoritativeNS(ctx, z)
 	if err != nil {
 		return results, err
+	}
+
+	// Surface CNAME failures hit while resolving NS addresses; authoritativeNS
+	// drops the per-item resolution error, so re-read the NS items here.
+	if items, itemErr := zoneNameservers(ctx, z); itemErr == nil {
+		logged := map[string]bool{}
+		for _, item := range items {
+			if item.Err == nil {
+				continue
+			}
+			key := strings.ToLower(item.Name.String())
+			if logged[key] {
+				continue
+			}
+			logged[key] = true
+			cnamelog.Log(ctx, &results, moduleName, testcase, item.Err)
+		}
 	}
 
 	ipv4Disabled, ipv6Disabled := disabledNS(ctx, nsList)

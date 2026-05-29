@@ -304,7 +304,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/metrics", s.handleMetrics)
 	apiMux.HandleFunc("/healthz", s.handleHealth)
 
-	s.mux.Handle("/api/v1/", s.recoverMiddleware(s.apiMetricsMiddleware(http.StripPrefix("/api/v1", apiMux))))
+	s.mux.Handle("/api/v1/", s.recoverMiddleware(s.apiMetricsMiddleware(s.authMiddleware(http.StripPrefix("/api/v1", apiMux)))))
 	s.mux.Handle("/api/v1", s.recoverMiddleware(s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
 	}))))

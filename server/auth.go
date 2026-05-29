@@ -5,10 +5,13 @@ import (
 	"crypto/subtle"
 	"encoding/hex"
 	"fmt"
+	"net/http"
 	"strings"
 )
 
 const tokenHashPrefix = "sha256:"
+
+const adminCookieName = "gm_admin"
 
 // adminToken is a parsed, validated admin credential.
 type adminToken struct {
@@ -77,4 +80,47 @@ func (ts *tokenSet) match(plaintext string) (string, bool) {
 		}
 	}
 	return label, found == 1
+}
+
+// authExemptPath reports paths reachable without a credential in token mode.
+func authExemptPath(p string) bool {
+	switch p {
+	case "/api/v1/healthz", "/api/v1/readyz", "/api/v1/whoami", "/api/v1/session":
+		return true
+	}
+	return false
+}
+
+// credentialToken extracts a token from the Authorization header or admin cookie.
+func credentialToken(r *http.Request) string {
+	if rest, ok := strings.CutPrefix(r.Header.Get("Authorization"), "Bearer "); ok {
+		return strings.TrimSpace(rest)
+	}
+	if c, err := r.Cookie(adminCookieName); err == nil {
+		return c.Value
+	}
+	return ""
+}
+
+// authMiddleware enforces admin token auth on /api/v1 when tokens are configured.
+func (s *Server) authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ts := s.authTokens()
+		if !ts.enabled || authExemptPath(r.URL.Path) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		tok := credentialToken(r)
+		if tok == "" {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			writeError(w, http.StatusUnauthorized, "unauthorized", "admin token required", nil)
+			return
+		}
+		if _, ok := ts.match(tok); !ok {
+			w.Header().Set("WWW-Authenticate", "Bearer")
+			writeError(w, http.StatusUnauthorized, "unauthorized", "invalid admin token", nil)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }

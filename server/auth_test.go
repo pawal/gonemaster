@@ -1,9 +1,27 @@
 package server
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 )
+
+func authGet(s *Server, path string, mutate func(*http.Request)) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	if mutate != nil {
+		mutate(req)
+	}
+	rec := httptest.NewRecorder()
+	s.Handler().ServeHTTP(rec, req)
+	return rec
+}
+
+func tokenServer(tok string) *Server {
+	cfg := DefaultConfig()
+	cfg.Auth.AdminTokens = []AdminToken{{Label: "t", Hash: hashToken(tok)}}
+	return New(cfg)
+}
 
 func TestTokenSetMatch(t *testing.T) {
 	tok := "gm_testtoken"
@@ -65,6 +83,40 @@ func TestServerReloadAuth(t *testing.T) {
 	}
 	if mode, _ := s.authMode(); mode != "open" {
 		t.Fatalf("expected open mode after clearing tokens, got %q", mode)
+	}
+}
+
+func TestAuthMiddlewareOpenModeAllows(t *testing.T) {
+	s := New(DefaultConfig())
+	if rec := authGet(s, "/api/v1/locales", nil); rec.Code == http.StatusUnauthorized {
+		t.Fatalf("open mode should not require auth, got %d", rec.Code)
+	}
+}
+
+func TestAuthMiddlewareTokenMode(t *testing.T) {
+	tok := "gm_mwtest"
+	s := tokenServer(tok)
+
+	if rec := authGet(s, "/api/v1/locales", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("missing token: want 401, got %d", rec.Code)
+	}
+	bearer := func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+tok) }
+	if rec := authGet(s, "/api/v1/locales", bearer); rec.Code == http.StatusUnauthorized {
+		t.Fatal("valid bearer should not be rejected")
+	}
+	cookie := func(r *http.Request) { r.AddCookie(&http.Cookie{Name: adminCookieName, Value: tok}) }
+	if rec := authGet(s, "/api/v1/locales", cookie); rec.Code == http.StatusUnauthorized {
+		t.Fatal("valid cookie should not be rejected")
+	}
+	wrong := func(r *http.Request) { r.Header.Set("Authorization", "Bearer nope") }
+	if rec := authGet(s, "/api/v1/locales", wrong); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("wrong token: want 401, got %d", rec.Code)
+	}
+	if rec := authGet(s, "/api/v1/healthz", nil); rec.Code != http.StatusOK {
+		t.Fatalf("healthz must stay exempt: want 200, got %d", rec.Code)
+	}
+	if rec := authGet(s, "/api/v1/metrics", nil); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("metrics must be gated: want 401, got %d", rec.Code)
 	}
 }
 

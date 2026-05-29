@@ -11,9 +11,11 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
@@ -63,6 +65,73 @@ func TestAddress01NoNameServersFound(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "A01_NO_NAME_SERVERS_FOUND") {
 		t.Fatalf("expected A01_NO_NAME_SERVERS_FOUND")
+	}
+}
+
+// TestAddress01EmitsCNAMETagForUnresolvableNS verifies that when the
+// delegation/zone NS discovery returns an address-less NSItem carrying a
+// *recursor.CNAMEError, Address01 emits the matching CNAME_* tag. The same
+// failing name appears in both the delegation and zone views, so the test
+// also asserts the tag is logged exactly once (dedup by query_name).
+func TestAddress01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
+	ctx := testContext(t)
+
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	t.Cleanup(func() {
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+	})
+
+	cnameErr := &recursor.CNAMEError{
+		Reason: recursor.CNAMEUnresolved,
+		Name:   "ns.outside.test",
+		Target: "loop.outside.test",
+		Detail: "loop",
+	}
+	delItems := []nsdiscovery.NSItem{
+		{Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.1"), HasAddress: true},
+		{Name: dnsname.New("ns.outside.test"), Err: cnameErr},
+	}
+	zoneItems := []nsdiscovery.NSItem{
+		{Name: dnsname.New("ns.outside.test"), Err: cnameErr},
+	}
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return delItems, nil
+	}
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return zoneItems, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := Address01(ctx, &z)
+	if err != nil {
+		t.Fatalf("address01: %v", err)
+	}
+
+	count := 0
+	for _, e := range entries {
+		if e != nil && e.Tag == "CNAME_TARGET_UNRESOLVED" {
+			count++
+		}
+	}
+	if count != 1 {
+		t.Fatalf("expected exactly one CNAME_TARGET_UNRESOLVED entry, got %d", count)
+	}
+
+	entry := findEntry(entries, "CNAME_TARGET_UNRESOLVED")
+	if entry == nil {
+		t.Fatalf("missing CNAME_TARGET_UNRESOLVED entry")
+	}
+	if got := entry.Args["query_name"]; got != "ns.outside.test" {
+		t.Fatalf("query_name: got %#v, want ns.outside.test", got)
+	}
+	if got := entry.Args["cname_target"]; got != "loop.outside.test" {
+		t.Fatalf("cname_target: got %#v, want loop.outside.test", got)
 	}
 }
 

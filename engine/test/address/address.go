@@ -18,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/cnamelog"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -26,6 +27,12 @@ import (
 )
 
 const addressModuleName = "Address"
+
+// nsdiscovery entry points, indirected for test injection.
+var (
+	delegationNameservers = nsdiscovery.DelegationNameservers
+	zoneNameservers       = nsdiscovery.ZoneNameservers
+)
 
 // AddressAll runs the Address test cases in order.
 func AddressAll(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
@@ -106,17 +113,26 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	delItems, err := nsdiscovery.DelegationNameservers(ctx, z)
+	delItems, err := delegationNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
-	zoneItems, err := nsdiscovery.ZoneNameservers(ctx, z)
+	zoneItems, err := zoneNameservers(ctx, z)
 	if err != nil {
 		return results, err
 	}
 
 	seen := map[string]nsdiscovery.NSItem{}
+	loggedCNAME := map[string]bool{}
 	for _, item := range append(delItems, zoneItems...) {
+		// Surface a CNAME failure that left this name address-less.
+		if item.Err != nil {
+			key := strings.ToLower(item.Name.String())
+			if !loggedCNAME[key] {
+				loggedCNAME[key] = true
+				cnamelog.Log(ctx, &results, addressModuleName, testcase, item.Err)
+			}
+		}
 		if !item.HasAddress {
 			continue
 		}

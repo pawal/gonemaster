@@ -101,6 +101,9 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 | `CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP` | SOA response RCODE is not `NOERROR`. |
 | `CN01_WRONG_NS_RECORD_UDP` | First NS answer owner name is not the child zone name. |
 | `CN01_WRONG_SOA_RECORD_UDP` | First SOA answer owner name is not the child zone name. |
+| `CNAME_CHAIN_TOO_LONG` | A discovered NS hostname's CNAME chain exceeds `CNAMEMaxChainLength` while resolving its address. |
+| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address. |
+| `CNAME_TOO_MANY_RECORDS` | A single answer while resolving a discovered NS hostname carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for this nameserver/rrtype pair. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for this nameserver/rrtype pair. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -140,6 +143,10 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 | `CN01_WRONG_SOA_RECORD_UDP` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CN01_WRONG_SOA_RECORD_UDP` | `domain_found` | `string` | Lowercased owner name found in first SOA answer record. |
 | `CN01_WRONG_SOA_RECORD_UDP` | `domain_expected` | `string` | Lowercased expected child zone FQDN. |
+| `CNAME_CHAIN_TOO_LONG` | `query_name` | `string` | The NS hostname whose CNAME chain exceeded the depth bound. |
+| `CNAME_TARGET_UNRESOLVED` | `query_name` | `string` | The NS hostname whose CNAME target could not be resolved. |
+| `CNAME_TARGET_UNRESOLVED` | `cname_target` | `string` | The last attempted CNAME target. |
+| `CNAME_TOO_MANY_RECORDS` | `query_name` | `string` | The NS hostname whose answer carried too many CNAME RRs. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`SOA` or `NS`). |
@@ -166,6 +173,9 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 | `CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN01_WRONG_NS_RECORD_UDP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `CN01_WRONG_SOA_RECORD_UDP` | `WARNING` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
+| `CNAME_CHAIN_TOO_LONG` | `ERROR` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
+| `CNAME_TARGET_UNRESOLVED` | `ERROR` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
+| `CNAME_TOO_MANY_RECORDS` | `ERROR` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |

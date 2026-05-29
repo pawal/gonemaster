@@ -50,6 +50,9 @@ _Do not edit by hand - regenerate with the command above._
 | `CN04_IPV6_DIFFERENT_PREFIX` | `INFO` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
 | `CN04_IPV6_SAME_PREFIX` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
 | `CN04_IPV6_SINGLE_PREFIX` | `WARNING` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
+| `CNAME_CHAIN_TOO_LONG` | `ERROR` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
+| `CNAME_TARGET_UNRESOLVED` | `ERROR` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
+| `CNAME_TOO_MANY_RECORDS` | `ERROR` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `EMPTY_ASN_SET` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `ERROR_ASN_DATABASE` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `IPV4_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |

@@ -70,6 +70,9 @@ Module-level gating (in AddressAll):
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
+| `CNAME_CHAIN_TOO_LONG` | A discovered NS hostname's CNAME chain exceeds `CNAMEMaxChainLength` while resolving its address. |
+| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address. |
+| `CNAME_TOO_MANY_RECORDS` | A single answer while resolving a discovered NS hostname carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
 | `NAMESERVER_IP_PTR_MATCH` | All checked IPs returned PTR answers that include their expected nameserver name. |
 | `NAMESERVER_IP_PTR_MISMATCH` | PTR answers exist for an IP, but none matches the expected nameserver name. |
 | `NAMESERVER_IP_WITHOUT_REVERSE` | PTR response is present but not successful (`RCODE != NOERROR`) or has no PTR record. |
@@ -80,6 +83,10 @@ Module-level gating (in AddressAll):
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
+| `CNAME_CHAIN_TOO_LONG` | `query_name` | `string` | The NS hostname whose CNAME chain exceeded the depth bound. |
+| `CNAME_TARGET_UNRESOLVED` | `query_name` | `string` | The NS hostname whose CNAME target could not be resolved. |
+| `CNAME_TARGET_UNRESOLVED` | `cname_target` | `string` | The last attempted CNAME target. |
+| `CNAME_TOO_MANY_RECORDS` | `query_name` | `string` | The NS hostname whose answer carried too many CNAME RRs. |
 | `NAMESERVER_IP_PTR_MATCH` | `-` | `-` | No arguments. |
 | `NAMESERVER_IP_PTR_MISMATCH` | `nsname` | `string` | Expected nameserver name for the checked IP (first-seen for that IP). |
 | `NAMESERVER_IP_PTR_MISMATCH` | `ns_ip` | `string` | Checked nameserver IP address. |
@@ -93,6 +100,9 @@ Module-level gating (in AddressAll):
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
+| `CNAME_CHAIN_TOO_LONG` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
+| `CNAME_TARGET_UNRESOLVED` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
+| `CNAME_TOO_MANY_RECORDS` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `NAMESERVER_IP_PTR_MATCH` | `INFO` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `NAMESERVER_IP_PTR_MISMATCH` | `NOTICE` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `NAMESERVER_IP_WITHOUT_REVERSE` | `WARNING` | Default from `share/profile.json` (`test_levels.ADDRESS`). |

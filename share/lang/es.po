@@ -294,17 +294,45 @@ msgstr ""
 "El servidor de nombres \"{ns}\" responde con un código RCODE inesperado "
 "(\"{rcode}\") a una consulta SOA."
 
+msgctxt "ADDRESS:CNAME_CHAIN_TOO_LONG"
+msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
+msgstr ""
+"La cadena CNAME para {query_name} supera la longitud máxima permitida."
+
 msgctxt "BASIC:CNAME_CHAIN_TOO_LONG"
 msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
 msgstr ""
 "La cadena CNAME para {query_name} supera la longitud máxima permitida."
+
+msgctxt "CONNECTIVITY:CNAME_CHAIN_TOO_LONG"
+msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
+msgstr ""
+"La cadena CNAME para {query_name} supera la longitud máxima permitida."
+
+msgctxt "ADDRESS:CNAME_TARGET_UNRESOLVED"
+msgid "CNAME target {cname_target} for {query_name} could not be resolved."
+msgstr ""
+"El destino CNAME {cname_target} para {query_name} no pudo resolverse."
 
 msgctxt "BASIC:CNAME_TARGET_UNRESOLVED"
 msgid "CNAME target {cname_target} for {query_name} could not be resolved."
 msgstr ""
 "El destino CNAME {cname_target} para {query_name} no pudo resolverse."
 
+msgctxt "CONNECTIVITY:CNAME_TARGET_UNRESOLVED"
+msgid "CNAME target {cname_target} for {query_name} could not be resolved."
+msgstr ""
+"El destino CNAME {cname_target} para {query_name} no pudo resolverse."
+
+msgctxt "ADDRESS:CNAME_TOO_MANY_RECORDS"
+msgid "Too many CNAME records in the answer for {query_name}."
+msgstr "Demasiados registros CNAME en la respuesta para {query_name}."
+
 msgctxt "BASIC:CNAME_TOO_MANY_RECORDS"
+msgid "Too many CNAME records in the answer for {query_name}."
+msgstr "Demasiados registros CNAME en la respuesta para {query_name}."
+
+msgctxt "CONNECTIVITY:CNAME_TOO_MANY_RECORDS"
 msgid "Too many CNAME records in the answer for {query_name}."
 msgstr "Demasiados registros CNAME en la respuesta para {query_name}."
 

@@ -277,17 +277,45 @@ msgstr ""
 "Navnetjener \"{ns}\" svarte på en SOA-spørring med svarkoden (\"{rcode}\"), "
 "som ikke var forventet."
 
+msgctxt "ADDRESS:CNAME_CHAIN_TOO_LONG"
+msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
+msgstr ""
+"CNAME-kjeden for {query_name} overskrider den tillatte maksimumslengden."
+
 msgctxt "BASIC:CNAME_CHAIN_TOO_LONG"
 msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
 msgstr ""
 "CNAME-kjeden for {query_name} overskrider den tillatte maksimumslengden."
+
+msgctxt "CONNECTIVITY:CNAME_CHAIN_TOO_LONG"
+msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
+msgstr ""
+"CNAME-kjeden for {query_name} overskrider den tillatte maksimumslengden."
+
+msgctxt "ADDRESS:CNAME_TARGET_UNRESOLVED"
+msgid "CNAME target {cname_target} for {query_name} could not be resolved."
+msgstr ""
+"CNAME-målet {cname_target} for {query_name} kunne ikke løses."
 
 msgctxt "BASIC:CNAME_TARGET_UNRESOLVED"
 msgid "CNAME target {cname_target} for {query_name} could not be resolved."
 msgstr ""
 "CNAME-målet {cname_target} for {query_name} kunne ikke løses."
 
+msgctxt "CONNECTIVITY:CNAME_TARGET_UNRESOLVED"
+msgid "CNAME target {cname_target} for {query_name} could not be resolved."
+msgstr ""
+"CNAME-målet {cname_target} for {query_name} kunne ikke løses."
+
+msgctxt "ADDRESS:CNAME_TOO_MANY_RECORDS"
+msgid "Too many CNAME records in the answer for {query_name}."
+msgstr "For mange CNAME-poster i svaret for {query_name}."
+
 msgctxt "BASIC:CNAME_TOO_MANY_RECORDS"
+msgid "Too many CNAME records in the answer for {query_name}."
+msgstr "For mange CNAME-poster i svaret for {query_name}."
+
+msgctxt "CONNECTIVITY:CNAME_TOO_MANY_RECORDS"
 msgid "Too many CNAME records in the answer for {query_name}."
 msgstr "For mange CNAME-poster i svaret for {query_name}."
 

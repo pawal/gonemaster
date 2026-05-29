@@ -89,6 +89,9 @@ After classification, emit in fixed order:
 | `A01_LOCAL_USE_ADDR` | At least one nameserver IP is in a local-use category. |
 | `A01_NO_GLOBALLY_REACHABLE_ADDR` | No nameserver IP is classified as globally reachable. |
 | `A01_NO_NAME_SERVERS_FOUND` | No nameserver with an address was discovered from delegation+zone sources. |
+| `CNAME_CHAIN_TOO_LONG` | A discovered NS hostname's CNAME chain exceeds `CNAMEMaxChainLength` while resolving its address. |
+| `CNAME_TARGET_UNRESOLVED` | A discovered NS hostname's CNAME chain forms a loop, breaks, or fails to resolve to an address. |
+| `CNAME_TOO_MANY_RECORDS` | A single answer while resolving a discovered NS hostname carries more than `CNAMEMaxRecords` distinct CNAME RRs. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -101,6 +104,10 @@ After classification, emit in fixed order:
 | `A01_LOCAL_USE_ADDR` | `servers` | `array<object>` | Structured `{ns,address}` object pairs in local-use ranges. |
 | `A01_NO_GLOBALLY_REACHABLE_ADDR` | `-` | `-` | No arguments. |
 | `A01_NO_NAME_SERVERS_FOUND` | `-` | `-` | No arguments. |
+| `CNAME_CHAIN_TOO_LONG` | `query_name` | `string` | The NS hostname whose CNAME chain exceeded the depth bound. |
+| `CNAME_TARGET_UNRESOLVED` | `query_name` | `string` | The NS hostname whose CNAME target could not be resolved. |
+| `CNAME_TARGET_UNRESOLVED` | `cname_target` | `string` | The last attempted CNAME target. |
+| `CNAME_TOO_MANY_RECORDS` | `query_name` | `string` | The NS hostname whose answer carried too many CNAME RRs. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Address01`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Address01`). |
 
@@ -113,6 +120,9 @@ After classification, emit in fixed order:
 | `A01_LOCAL_USE_ADDR` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `A01_NO_GLOBALLY_REACHABLE_ADDR` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `A01_NO_NAME_SERVERS_FOUND` | `CRITICAL` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
+| `CNAME_CHAIN_TOO_LONG` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
+| `CNAME_TARGET_UNRESOLVED` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
+| `CNAME_TOO_MANY_RECORDS` | `ERROR` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 

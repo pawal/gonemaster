@@ -27,6 +27,8 @@ type NSItem struct {
 	Address netip.Addr
 	// HasAddress reports whether Address has been resolved.
 	HasAddress bool
+	// Err is the typed resolution failure (e.g. *recursor.CNAMEError), if any.
+	Err error
 }
 
 // String returns a stable "name" or "name/address" representation suitable
@@ -388,8 +390,13 @@ func getOOBIPs(ctx context.Context, z *zone.Zone, nsNames []dnsname.Name) ([]NSI
 				continue
 			}
 		}
+		var cnameErr error
 		for _, qtype := range []string{"A", "AAAA"} {
 			resp, err := r.Recurse(ctx, nsName.String(), qtype, "IN")
+			// Keep the typed CNAME failure for the address-less item below.
+			if err != nil && recursor.IgnoreCNAMEError(err) == nil {
+				cnameErr = err
+			}
 			if err := recursor.IgnoreCNAMEError(err); err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
 				continue
 			}
@@ -402,7 +409,7 @@ func getOOBIPs(ctx context.Context, z *zone.Zone, nsNames []dnsname.Name) ([]NSI
 			}
 		}
 		if !found {
-			out = append(out, NSItem{Name: nsName})
+			out = append(out, NSItem{Name: nsName, Err: cnameErr})
 		}
 	}
 

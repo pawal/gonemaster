@@ -46,6 +46,7 @@ type globalOptions struct {
 	version bool
 	noColor bool
 	headers headerList
+	token   string
 }
 
 type headerList []string
@@ -308,6 +309,7 @@ func parseGlobalFlags(args []string, errOut io.Writer) (globalOptions, []string,
 	fs.BoolVar(&opts.version, "version", false, "Print version and exit")
 	fs.BoolVar(&opts.noColor, "no-color", false, "Disable ANSI colors in pretty output")
 	fs.Var(&opts.headers, "header", "Extra HTTP header (repeatable, NAME:VALUE)")
+	fs.StringVar(&opts.token, "token", "", "Admin token for Authorization: Bearer (env GONEMASTER_TOKEN)")
 	if err := fs.Parse(args); err != nil {
 		return opts, nil, err
 	}
@@ -316,6 +318,9 @@ func parseGlobalFlags(args []string, errOut io.Writer) (globalOptions, []string,
 	}
 	if opts.server == "" {
 		opts.server = defaultServer
+	}
+	if opts.token == "" {
+		opts.token = os.Getenv("GONEMASTER_TOKEN")
 	}
 	return opts, fs.Args(), nil
 }
@@ -379,6 +384,9 @@ func newClient(opts globalOptions) (*apiClient, error) {
 	headers, err := parseHeaders(opts.headers)
 	if err != nil {
 		return nil, err
+	}
+	if opts.token != "" {
+		headers.Set("Authorization", "Bearer "+opts.token)
 	}
 	return &apiClient{
 		baseURL:    base,

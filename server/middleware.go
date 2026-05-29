@@ -267,7 +267,9 @@ func apiRouteTemplate(path string) string {
 		"/api/v1/queue/reorder",
 		"/api/v1/queue/remove",
 		"/api/v1/metrics",
-		"/api/v1/healthz":
+		"/api/v1/healthz",
+		"/api/v1/whoami",
+		"/api/v1/session":
 		return path
 	default:
 		return "/api/v1/unknown"

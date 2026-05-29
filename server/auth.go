@@ -124,3 +124,72 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// handleWhoami reports the auth mode and whether the request is authenticated.
+func (s *Server) handleWhoami(w http.ResponseWriter, r *http.Request) {
+	ts := s.authTokens()
+	if !ts.enabled {
+		writeJSON(w, http.StatusOK, map[string]any{"mode": "open", "authenticated": true})
+		return
+	}
+	_, authed := ts.match(credentialToken(r))
+	writeJSON(w, http.StatusOK, map[string]any{"mode": "token", "authenticated": authed})
+}
+
+// handleSession logs in (POST, sets cookie) or out (DELETE, clears it).
+func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPost:
+		s.handleSessionLogin(w, r)
+	case http.MethodDelete:
+		s.handleSessionLogout(w, r)
+	default:
+		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "use POST to log in or DELETE to log out", nil)
+	}
+}
+
+func (s *Server) handleSessionLogin(w http.ResponseWriter, r *http.Request) {
+	if !s.enforceCSRF(w, r) {
+		return
+	}
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "could not parse request body", nil)
+		return
+	}
+	ts := s.authTokens()
+	if !ts.enabled {
+		writeJSON(w, http.StatusOK, map[string]any{"mode": "open", "authenticated": true})
+		return
+	}
+	if _, ok := ts.match(req.Token); !ok {
+		writeError(w, http.StatusUnauthorized, "unauthorized", "invalid admin token", nil)
+		return
+	}
+	http.SetCookie(w, s.adminCookie(r, req.Token))
+	writeJSON(w, http.StatusOK, map[string]any{"mode": "token", "authenticated": true})
+}
+
+func (s *Server) handleSessionLogout(w http.ResponseWriter, r *http.Request) {
+	if !s.enforceCSRF(w, r) {
+		return
+	}
+	c := s.adminCookie(r, "")
+	c.MaxAge = -1
+	http.SetCookie(w, c)
+	writeJSON(w, http.StatusOK, map[string]any{"authenticated": false})
+}
+
+// adminCookie builds the session cookie holding the token value.
+func (s *Server) adminCookie(r *http.Request, value string) *http.Cookie {
+	return &http.Cookie{
+		Name:     adminCookieName,
+		Value:    value,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   requestScheme(r, s.trustedProxies) == "https",
+		SameSite: http.SameSiteStrictMode,
+	}
+}

@@ -40,6 +40,18 @@ type AnalysisConfig struct {
 	TagViewMinLevel string `json:"tag_view_min_level,omitempty"`
 }
 
+// AuthConfig configures admin-API auth. Empty AdminTokens means open mode.
+type AuthConfig struct {
+	AdminTokens []AdminToken `json:"admin_tokens,omitempty"`
+}
+
+// AdminToken is one admin credential, stored hashed. Scopes is reserved.
+type AdminToken struct {
+	Label  string   `json:"label,omitempty"`
+	Hash   string   `json:"hash"`
+	Scopes []string `json:"scopes,omitempty"`
+}
+
 // PublicAPIConfig controls the behaviour of the public-facing API at /pub/api/v1/.
 type PublicAPIConfig struct {
 	// RateLimitEnabled enables per-IP rate limiting on POST /pub/api/v1/jobs.
@@ -133,6 +145,7 @@ type Config struct {
 	Database  DatabaseConfig  `json:"database"`
 	PublicAPI PublicAPIConfig `json:"public_api"`
 	Analysis  AnalysisConfig  `json:"analysis"`
+	Auth      AuthConfig      `json:"auth"`
 	// ScoringConfigPath is an optional path to a JSON file that overrides the
 	// default scoring configuration (weights, penalties, tag overrides, etc.).
 	// When empty, scoring.DefaultConfig() is used.
@@ -204,6 +217,7 @@ type FileConfig struct {
 	Database                    *DatabaseFileConfig  `json:"database,omitempty"`
 	PublicAPI                   *PublicAPIFileConfig `json:"public_api,omitempty"`
 	Analysis                    *AnalysisFileConfig  `json:"analysis,omitempty"`
+	Auth                        *AuthConfig          `json:"auth,omitempty"`
 	ScoringConfigPath           *string              `json:"scoring_config_path,omitempty"`
 	ShowScoreAdmin              *bool                `json:"show_score_admin,omitempty"`
 	ShowScorePublic             *bool                `json:"show_score_public,omitempty"`
@@ -404,6 +418,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 				c.Analysis.TagViewMinLevel = level
 			}
 		}
+	}
+	if file.Auth != nil {
+		c.Auth = *file.Auth
 	}
 }
 

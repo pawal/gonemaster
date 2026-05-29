@@ -69,6 +69,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var showVersion bool
 	var dumpConfig bool
 	var shutdownTimeout time.Duration
+	var adminTokenHashes string
 
 	flagsSet := make(map[string]bool)
 
@@ -113,6 +114,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		printUsageGroup(errOut, "Reverse proxy", []usageLine{
 			{flag: "--trusted-proxy-cidrs LIST", detail: "Comma-separated CIDRs (or bare IPs) of reverse proxies allowed to set X-Forwarded-For. Empty = trust nothing (RemoteAddr only). Leave empty when the server is exposed directly. (env: GONEMASTER_TRUSTED_PROXY_CIDRS)"},
 		})
+		printUsageGroup(errOut, "Authentication", []usageLine{
+			{flag: "--admin-token-hashes LIST", detail: "Comma-separated admin token hashes (label=sha256:hex) gating /api/v1. Empty = open mode. Mint with 'gonemaster-server auth add-token'. (env: GONEMASTER_ADMIN_TOKEN_HASHES)"},
+		})
 		printUsageGroup(errOut, "HTTP timeouts", []usageLine{
 			{flag: "--read-timeout DURATION", detail: "Per-connection read timeout (default 30s). Caps slow request bodies. (env: GONEMASTER_READ_TIMEOUT)"},
 			{flag: "--write-timeout DURATION", detail: "Per-connection write timeout (default 60s). Must exceed --public-api-analysis-request-timeout. (env: GONEMASTER_WRITE_TIMEOUT)"},
@@ -153,6 +157,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
 	fs.BoolVar(&pubAPIAllowPrivateUndelegatedIP, "public-api-allow-private-undelegated-ip", false, "Allow private/loopback IPs as undelegated NS targets on the public API (default off)")
 	fs.StringVar(&trustedProxyCIDRs, "trusted-proxy-cidrs", "", "Comma-separated CIDRs allowed to set X-Forwarded-For (default empty = trust nothing)")
+	fs.StringVar(&adminTokenHashes, "admin-token-hashes", "", "Comma-separated admin token hashes (label=sha256:...) gating /api/v1 (default empty = open mode)")
 	fs.DurationVar(&readTimeout, "read-timeout", 0, "Per-connection read timeout (default 30s)")
 	fs.DurationVar(&writeTimeout, "write-timeout", 0, "Per-connection write timeout (default 60s)")
 	fs.DurationVar(&idleTimeout, "idle-timeout", 0, "Idle keep-alive timeout (default 60s)")
@@ -349,6 +354,18 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		cfg.IdleTimeout = server.Duration{Duration: idleTimeout}
 	}
 
+	// Admin auth tokens: file (already applied) < env < flag.
+	if env := os.Getenv("GONEMASTER_ADMIN_TOKEN_HASHES"); env != "" {
+		cfg.Auth.AdminTokens = parseAdminTokenHashes(env)
+	}
+	if flagsSet["admin-token-hashes"] {
+		cfg.Auth.AdminTokens = parseAdminTokenHashes(adminTokenHashes)
+	}
+	if err := server.ValidateAuthConfig(cfg.Auth); err != nil {
+		fmt.Fprintf(errOut, "invalid admin tokens: %v\n", err)
+		return 2
+	}
+
 	if dumpConfig {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
@@ -396,6 +413,11 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fmt.Fprintf(errOut, "Gonemaster version %s\n", engine.VersionFull())
 	fmt.Fprintf(errOut, "Miekg DNS version %s\n", moduleVersion("codeberg.org/miekg/dns"))
 	fmt.Fprintf(errOut, "Started server at %s\n", formatListenURL(cfg.ListenAddr))
+	if n := len(cfg.Auth.AdminTokens); n == 0 {
+		fmt.Fprintln(errOut, "auth: open mode (no admin tokens configured)")
+	} else {
+		fmt.Fprintf(errOut, "auth: token mode, %d token(s) configured\n", n)
+	}
 
 	shutdownCh := make(chan os.Signal, 1)
 	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)
@@ -406,6 +428,31 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		defer cancel()
 		_ = srv.Stop(ctx)
 		_ = httpServer.Shutdown(ctx)
+	}()
+
+	flagHashes := ""
+	if flagsSet["admin-token-hashes"] {
+		flagHashes = adminTokenHashes
+	}
+	hupCh := make(chan os.Signal, 1)
+	signal.Notify(hupCh, syscall.SIGHUP)
+	go func() {
+		for range hupCh {
+			auth, err := resolveAuthConfig(configPath, os.Getenv("GONEMASTER_ADMIN_TOKEN_HASHES"), flagHashes)
+			if err != nil {
+				fmt.Fprintf(errOut, "auth: reload failed: %v\n", err)
+				continue
+			}
+			if err := srv.ReloadAuth(auth); err != nil {
+				fmt.Fprintf(errOut, "auth: reload rejected: %v\n", err)
+				continue
+			}
+			if n := len(auth.AdminTokens); n == 0 {
+				fmt.Fprintln(errOut, "auth: reloaded, open mode")
+			} else {
+				fmt.Fprintf(errOut, "auth: reloaded, %d token(s) configured\n", n)
+			}
+		}
 	}()
 
 	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {

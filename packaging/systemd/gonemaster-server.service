@@ -12,6 +12,7 @@ Group=gonemaster
 WorkingDirectory=/var/lib/gonemaster
 EnvironmentFile=-/etc/gonemaster/server.env
 ExecStart=/usr/bin/gonemaster-server
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=on-failure
 RestartSec=5
 

@@ -479,7 +479,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 			}
 			for _, qtype := range []string{"A", "AAAA"} {
 				resp, err := r.RecurseWithNameservers(ctx, nsName.String(), qtype, "IN", []nameserver.Nameserver{ns})
-				if err != nil || resp.Msg == nil {
+				if err := recursor.IgnoreCNAMEError(err); err != nil || resp.Msg == nil {
 					deadDel[ns.Address.String()] = true
 					break
 				}

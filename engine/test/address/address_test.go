@@ -2,6 +2,7 @@ package address
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"sort"
 	"strings"
@@ -178,6 +179,97 @@ func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NAMESERVER_IP_WITHOUT_REVERSE") {
 		t.Fatalf("expected NAMESERVER_IP_WITHOUT_REVERSE")
+	}
+}
+
+// TestAddress02CNAMEFailure locks in the decided behavior for Address02: a
+// *recursor.CNAMEError from glue/apex NS resolution is logged as a CNAME_*
+// tag and the testcase continues (no abort), while any non-CNAME error still
+// aborts the testcase unchanged.
+func TestAddress02CNAMEFailure(t *testing.T) {
+	t.Run("cname error logs tag and continues", func(t *testing.T) {
+		ctx := testContext(t)
+
+		origGlue := glueNameservers
+		origApex := apexNameservers
+		t.Cleanup(func() {
+			glueNameservers = origGlue
+			apexNameservers = origApex
+		})
+
+		cnameErr := &recursor.CNAMEError{
+			Reason: recursor.CNAMEUnresolved,
+			Name:   "ns.outside.test",
+			Target: "loop.outside.test",
+			Detail: "loop",
+		}
+		glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, cnameErr
+		}
+		apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		}
+
+		z := newZoneWithFakeAddresses(t, "example", map[string][]string{"ns1.example": {"192.0.2.1"}})
+
+		entries, err := Address02(ctx, z)
+		if err != nil {
+			t.Fatalf("address02 must continue past a CNAME failure, got error: %v", err)
+		}
+		if !hasEntryTag(entries, "CNAME_TARGET_UNRESOLVED") {
+			t.Fatalf("expected CNAME_TARGET_UNRESOLVED")
+		}
+	})
+
+	t.Run("non-cname error still aborts", func(t *testing.T) {
+		ctx := testContext(t)
+
+		origGlue := glueNameservers
+		t.Cleanup(func() { glueNameservers = origGlue })
+
+		boom := errors.New("resolver failure")
+		glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, boom
+		}
+
+		z := newZoneWithFakeAddresses(t, "example", map[string][]string{"ns1.example": {"192.0.2.1"}})
+
+		entries, err := Address02(ctx, z)
+		if !errors.Is(err, boom) {
+			t.Fatalf("expected the non-CNAME error to propagate, got: %v", err)
+		}
+		if hasEntryTag(entries, "CNAME_TARGET_UNRESOLVED") {
+			t.Fatalf("did not expect a CNAME tag for a non-CNAME error")
+		}
+	})
+}
+
+// TestAddress03CNAMEFailureLogsTagAndContinues verifies Address03 emits the
+// matching CNAME_* tag and continues when apex NS resolution fails with a
+// *recursor.CNAMEError.
+func TestAddress03CNAMEFailureLogsTagAndContinues(t *testing.T) {
+	ctx := testContext(t)
+
+	origApex := apexNameservers
+	t.Cleanup(func() { apexNameservers = origApex })
+
+	cnameErr := &recursor.CNAMEError{
+		Reason: recursor.CNAMEChainTooLong,
+		Name:   "ns.outside.test",
+		Target: "deep.outside.test",
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, cnameErr
+	}
+
+	z := newZoneWithFakeAddresses(t, "example", map[string][]string{"ns1.example": {"192.0.2.1"}})
+
+	entries, err := Address03(ctx, z)
+	if err != nil {
+		t.Fatalf("address03 must continue past a CNAME failure, got error: %v", err)
+	}
+	if !hasEntryTag(entries, "CNAME_CHAIN_TOO_LONG") {
+		t.Fatalf("expected CNAME_CHAIN_TOO_LONG")
 	}
 }
 

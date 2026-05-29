@@ -32,6 +32,8 @@ const addressModuleName = "Address"
 var (
 	delegationNameservers = nsdiscovery.DelegationNameservers
 	zoneNameservers       = nsdiscovery.ZoneNameservers
+	glueNameservers       = nsdiscovery.GlueNameservers
+	apexNameservers       = nsdiscovery.ApexNameservers
 )
 
 // AddressAll runs the Address test cases in order.
@@ -244,13 +246,20 @@ func Address02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	glueNS, err := nsdiscovery.GlueNameservers(ctx, z)
+	glueNS, err := glueNameservers(ctx, z)
 	if err != nil {
-		return results, err
+		// CNAME failure: log the tag and continue; abort only on other errors.
+		cnamelog.Log(ctx, &results, addressModuleName, testcase, err)
+		if err := recursor.IgnoreCNAMEError(err); err != nil {
+			return results, err
+		}
 	}
-	apexNS, err := nsdiscovery.ApexNameservers(ctx, z)
+	apexNS, err := apexNameservers(ctx, z)
 	if err != nil {
-		return results, err
+		cnamelog.Log(ctx, &results, addressModuleName, testcase, err)
+		if err := recursor.IgnoreCNAMEError(err); err != nil {
+			return results, err
+		}
 	}
 
 	type nsIP struct {
@@ -348,9 +357,13 @@ func Address03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, fmt.Errorf("missing recursor")
 	}
 
-	apexNS, err := nsdiscovery.ApexNameservers(ctx, z)
+	apexNS, err := apexNameservers(ctx, z)
 	if err != nil {
-		return results, err
+		// CNAME failure: log the tag and continue; abort only on other errors.
+		cnamelog.Log(ctx, &results, addressModuleName, testcase, err)
+		if err := recursor.IgnoreCNAMEError(err); err != nil {
+			return results, err
+		}
 	}
 
 	type nsIP struct {

@@ -19,30 +19,46 @@ the admin UI (via a session cookie set after you paste the token once). Only
 
 ## Enable auth and create the first token
 
-The first token is minted on the command line; the UI cannot create one until
-you are already logged in.
+The first token must come from config, the environment, or a flag - the UI
+cannot mint one until you are already logged in.
+
+### Where token hashes live
+
+A token hash is read from one of three sources (a later source wins); see
+[configuration.md](configuration.md) for how configuration is loaded:
+
+- **JSON config file** passed with `--config <path>` (for example
+  `/etc/gonemaster/config.json`), under an `auth.admin_tokens` array:
+  ```json
+  { "auth": { "admin_tokens": [ { "label": "laptop", "hash": "sha256:..." } ] } }
+  ```
+  Edits are picked up on `SIGHUP` / `systemctl reload`, with no restart.
+- **Environment** `GONEMASTER_ADMIN_TOKEN_HASHES` - a comma-separated list of
+  `label=sha256:...` (or bare `sha256:...`). Restart to apply.
+- **Flag** `--admin-token-hashes "label=sha256:..."`. Restart to apply.
+
+The packaged systemd service runs `gonemaster-server` with no `--config` and
+reads `/etc/gonemaster/server.env`, so the simplest path there is to set
+`GONEMASTER_ADMIN_TOKEN_HASHES` in that env file. To use a JSON config file
+instead, add `--config /etc/gonemaster/config.json` to the unit's `ExecStart`.
+
+### Steps
 
 ```
 # 1. Mint a token. The plaintext is shown once - copy it now.
 gonemaster-server auth add-token --label laptop
 
-# 2. Put the printed HASH in your config file under auth.admin_tokens:
-#    "auth": { "admin_tokens": [ { "label": "laptop", "hash": "sha256:..." } ] }
+# 2. Install the printed HASH in one of the locations above. For the packaged
+#    env-file install:
+echo 'GONEMASTER_ADMIN_TOKEN_HASHES=laptop=sha256:...' >> /etc/gonemaster/server.env
+#    (or add it to auth.admin_tokens in your --config JSON file)
 
-# 3. Apply without downtime:
-systemctl reload gonemaster-server     # packaged / systemd installs
-kill -HUP <pid>                        # generic alternative
+# 3. Apply:
+systemctl reload gonemaster-server     # config-file edits, no downtime
+systemctl restart gonemaster-server    # env or flag edits
 ```
 
 The server logs `auth: token mode, 1 token` once tokens are active.
-
-Deployments without a config file can pass hashes via the environment or flag
-and restart to apply (reload re-reads the config file only):
-
-```
-GONEMASTER_ADMIN_TOKEN_HASHES=label=sha256:...,sha256:...
-gonemaster-server --admin-token-hashes "label=sha256:..."
-```
 
 ## Log into the admin UI
 

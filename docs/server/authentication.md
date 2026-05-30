@@ -63,6 +63,37 @@ Prometheus scraping `/api/v1/metrics` must send the token too
 (`authorization` or `bearer_token_file` in the scrape config). `gonemaster-nagios`
 runs the engine in-process and needs no token.
 
+## Verify a token
+
+Quick checks against a running server (adjust host, port, and token):
+
+```
+# whoami reports the mode without needing a token
+curl -s http://localhost:8080/api/v1/whoami
+# token mode, not logged in -> {"authenticated":false,"mode":"token"}
+
+# a gated endpoint without a token is rejected
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/api/v1/locales
+# -> 401
+
+# the same endpoint with a valid token succeeds
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer gm_..." \
+  http://localhost:8080/api/v1/locales
+# -> 200
+```
+
+`healthz` returns 200 without a token because it is exempt, so test enforcement
+against a gated endpoint such as `locales`. To check the cookie path the admin UI
+uses, log in and reuse the cookie:
+
+```
+curl -s -c cookies.txt -X POST -d '{"token":"gm_..."}' \
+  http://localhost:8080/api/v1/session                 # -> 200, stores the cookie
+curl -s -o /dev/null -w '%{http_code}\n' -b cookies.txt \
+  http://localhost:8080/api/v1/locales                 # -> 200
+```
+
 ## Add or revoke tokens
 
 - **Add:** mint another token, append its hash to `auth.admin_tokens`, then reload.

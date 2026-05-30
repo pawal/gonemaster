@@ -6,6 +6,26 @@ views for tagged domain cohorts.
 
 The Public UI is available here: https://gonemaster.evilbit.de/
 
+## What Gonemaster Tests
+
+Gonemaster checks the DNS health of a domain by running it through a series of
+testcases grouped into modules. Each testcase emits log messages that are scored
+into a numeric result and a letter grade. The modules are:
+
+- **basic** - does the zone exist and have a working authoritative nameserver.
+- **address** - nameserver IP addresses and their reverse DNS (PTR) mappings.
+- **connectivity** - UDP/TCP reachability and network (ASN and prefix) diversity.
+- **consistency** - whether nameservers agree on SOA, serials, NS sets, and more.
+- **delegation** - parent/child delegation: NS records, glue, and referrals.
+- **dnssec** - the DNSSEC chain of trust: DS, DNSKEY, signatures, and algorithms.
+- **nameserver** - nameserver behaviour and capabilities, such as EDNS handling.
+- **syntax** - hostname and domain name syntax.
+- **zone** - zone-level records such as SOA timers and MX.
+
+For the full inventory of testcases and what each one checks, see the
+[specifications](https://pawal.codeberg.page/gonemaster/specifications/). Scoring
+and letter grades are described in the [scoring documentation](https://pawal.codeberg.page/gonemaster/scoring/).
+
 ## Common Paths
 
 ### Run One Local Test

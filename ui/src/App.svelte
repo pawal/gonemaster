@@ -30,6 +30,8 @@
   import SettingsPanel from "./panels/SettingsPanel.svelte";
   import { status, setStatus, clearStatus } from "./lib/status.svelte.js";
   import { initThemeFromStorage } from "./lib/theme.svelte.js";
+  import { auth, refreshWhoami, markUnauthenticated, logout } from "./lib/auth.svelte.js";
+  import LoginPanel from "./components/LoginPanel.svelte";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -125,7 +127,18 @@
   // Tags tab state owned at the App level (cross-tab pointers + cohort map).
   let tagCohortByName = new Map();
   let selectedTag = null;
-  const apiFetch = async (path, options) => apiCall(apiPrefix, path, options);
+  const apiFetch = async (path, options) => {
+    try {
+      return await apiCall(apiPrefix, path, options);
+    } catch (e) {
+      if (e?.status === 401) markUnauthenticated();
+      throw e;
+    }
+  };
+  const doLogout = async () => {
+    await logout(apiFetch);
+    window.location.reload();
+  };
 
   const severityFilters = [
     { id: "all", labelKey: "sev_all" },
@@ -665,6 +678,7 @@
   const initializeApp = () => {
     if (initialized || typeof window === "undefined") return;
     initialized = true;
+    refreshWhoami(apiFetch);
     initThemeFromStorage();
 
     // Locale: restore from localStorage, or auto-detect from browser language.
@@ -723,6 +737,10 @@
   });
 </script>
 
+{#if auth.mode === "token" && !auth.authenticated}
+  <LoginPanel {apiFetch} />
+{:else}
+
 <div class="app-header">
   <header class="reveal delay-05">
     <div class="header-text">
@@ -746,6 +764,9 @@
         </select>
       {/if}
       <ThemeToggle />
+      {#if auth.mode === "token"}
+        <button type="button" class="logout-btn" onclick={doLogout}>{$t("auth_logout")}</button>
+      {/if}
     </div>
   </header>
 </div>
@@ -923,4 +944,6 @@
   onDeleted={handleBatchDeleted}
   setStatus={setStatus}
 />
+
+{/if}
 

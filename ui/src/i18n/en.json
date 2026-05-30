@@ -1,4 +1,10 @@
 {
+  "auth_required_title": "Admin authentication required",
+  "auth_token_label": "Admin token",
+  "auth_token_placeholder": "Paste your admin token",
+  "auth_token_submit": "Log in",
+  "auth_token_invalid": "Invalid token",
+  "auth_logout": "Log out",
   "app_title": "Gonemaster",
   "app_subtitle": "Launch single or batch domain jobs, watch progress, and inspect results from the embedded server UI.",
   "locale_select_title": "Result message language",

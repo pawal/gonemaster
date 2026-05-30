@@ -1,4 +1,10 @@
 {
+  "auth_required_title": "Zahtevana je skrbniška prijava",
+  "auth_token_label": "Skrbniški žeton",
+  "auth_token_placeholder": "Prilepite svoj skrbniški žeton",
+  "auth_token_submit": "Prijava",
+  "auth_token_invalid": "Neveljaven žeton",
+  "auth_logout": "Odjava",
   "app_title": "Gonemaster",
   "app_subtitle": "Zaženite posamezna ali paketna opravila za domene, spremljajte napredek in pregledujte rezultate iz vgrajenega strežniškega vmesnika.",
   "locale_select_title": "Jezik sporočil z rezultati",

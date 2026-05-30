@@ -1,4 +1,10 @@
 {
+  "auth_required_title": "Ylläpitäjän todennus vaaditaan",
+  "auth_token_label": "Ylläpitotunniste",
+  "auth_token_placeholder": "Liitä ylläpitotunnisteesi",
+  "auth_token_submit": "Kirjaudu sisään",
+  "auth_token_invalid": "Virheellinen tunniste",
+  "auth_logout": "Kirjaudu ulos",
   "app_title": "Gonemaster",
   "app_subtitle": "Käynnistä yksittäisiä tai eräverkkotunnustöitä, seuraa edistymistä ja tarkasta tulokset upotetusta palvelinkäyttöliittymästä.",
   "locale_select_title": "Tulosviestien kieli",

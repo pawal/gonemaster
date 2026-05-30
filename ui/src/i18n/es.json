@@ -1,4 +1,10 @@
 {
+  "auth_required_title": "Se requiere autenticación de administrador",
+  "auth_token_label": "Token de administrador",
+  "auth_token_placeholder": "Pega tu token de administrador",
+  "auth_token_submit": "Iniciar sesión",
+  "auth_token_invalid": "Token no válido",
+  "auth_logout": "Cerrar sesión",
   "app_title": "Gonemaster",
   "app_subtitle": "Lanza tareas individuales o por lotes para dominios, monitoriza el progreso e inspecciona los resultados desde la interfaz de servidor integrada.",
   "locale_select_title": "Idioma de los mensajes de resultados",

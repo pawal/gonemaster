@@ -1,4 +1,10 @@
 {
+  "auth_required_title": "Administratorgodkendelse kræves",
+  "auth_token_label": "Administratortoken",
+  "auth_token_placeholder": "Indsæt din administratortoken",
+  "auth_token_submit": "Log ind",
+  "auth_token_invalid": "Ugyldig token",
+  "auth_logout": "Log ud",
   "app_title": "Gonemaster",
   "app_subtitle": "Start enkelt- eller batch-domænejob, følg fremgangen og inspicér resultater fra den indlejrede servergrænseflade.",
   "locale_select_title": "Sprog til resultatmeddelelser",

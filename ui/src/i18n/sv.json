@@ -1,4 +1,10 @@
 {
+  "auth_required_title": "Administratörsinloggning krävs",
+  "auth_token_label": "Administratörstoken",
+  "auth_token_placeholder": "Klistra in din administratörstoken",
+  "auth_token_submit": "Logga in",
+  "auth_token_invalid": "Ogiltig token",
+  "auth_logout": "Logga ut",
   "app_title": "Gonemaster",
   "app_subtitle": "Starta enskilda eller batch-domänjobb, följ förloppet och granska resultat från det inbyggda servergränssnittet.",
   "locale_select_title": "Språk för resultatmeddelanden",

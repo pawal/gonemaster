@@ -226,6 +226,19 @@ header {
   border-radius: 8px;
 }
 
+.logout-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  box-shadow: none;
+  padding: 6px 11px;
+  font-size: var(--text-sm);
+  line-height: 1;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
 .theme-toggle:hover:not(:disabled) {
   transform: none;
   box-shadow: none;

@@ -1,4 +1,10 @@
 {
+  "auth_required_title": "管理者認証が必要です",
+  "auth_token_label": "管理者トークン",
+  "auth_token_placeholder": "管理者トークンを貼り付けてください",
+  "auth_token_submit": "ログイン",
+  "auth_token_invalid": "無効なトークンです",
+  "auth_logout": "ログアウト",
   "app_title": "Gonemaster",
   "app_subtitle": "シングルまたはバッチのドメインジョブを起動し、進行状況を確認して、組み込みサーバーUIから結果を検査します。",
   "locale_select_title": "結果メッセージの言語",

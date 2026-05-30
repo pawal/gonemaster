@@ -1,4 +1,10 @@
 {
+  "auth_required_title": "Authentification administrateur requise",
+  "auth_token_label": "Jeton administrateur",
+  "auth_token_placeholder": "Collez votre jeton administrateur",
+  "auth_token_submit": "Se connecter",
+  "auth_token_invalid": "Jeton invalide",
+  "auth_logout": "Se déconnecter",
   "app_title": "Gonemaster",
   "app_subtitle": "Lancez des tâches de domaine uniques ou en lot, suivez la progression et inspectez les résultats depuis l'interface serveur intégrée.",
   "locale_select_title": "Langue des messages de résultats",

@@ -15,7 +15,8 @@ serves the admin and public web interfaces.
 
 Do not expose `/` or `/api/v1/` directly to untrusted clients. The public
 surfaces are designed for internet exposure when rate limiting and reverse
-proxy rules are configured.
+proxy rules are configured. To gate `/api/v1/` and the admin UI with bearer
+tokens, see [authentication.md](authentication.md).
 
 ## Lifecycle
 

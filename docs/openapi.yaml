@@ -22,6 +22,51 @@ tags:
   - name: Public
 
 paths:
+  /whoami:
+    get:
+      tags: [Auth]
+      summary: Report auth mode and whether the request is authenticated
+      operationId: whoami
+      responses:
+        '200':
+          description: Auth status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode:
+                    type: string
+                    enum: [open, token]
+                  authenticated:
+                    type: boolean
+  /session:
+    post:
+      tags: [Auth]
+      summary: Admin UI login - validate a token and set the session cookie
+      operationId: sessionLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Authenticated; sets the gm_admin session cookie
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Auth]
+      summary: Admin UI logout - clear the session cookie
+      operationId: sessionLogout
+      responses:
+        '200':
+          description: Session cookie cleared
   /jobs:
     post:
       tags: [Jobs]
@@ -2092,6 +2137,15 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >-
+        Admin token. Required on /api/v1 endpoints when the server is started
+        with admin tokens configured (token mode); ignored in open mode. Clients
+        send "Authorization: Bearer <token>"; the admin UI uses a session cookie
+        set via POST /session.
   parameters:
     IDPath:
       name: id

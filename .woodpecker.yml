@@ -39,10 +39,8 @@ steps:
     image: golang:1.25
     depends_on:
       - ui_checks
-    environment:
-      GOMAXPROCS: 4
     commands:
-      - go test -p 4 -parallel 4 ./...
+      - go test ./...
 
   integration_test:
     image: golang:1.25

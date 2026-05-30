@@ -175,9 +175,10 @@ func checkDrivers(doc string) []string {
 	}
 
 	infrastructure := map[string]bool{
-		"main.go":     true,
-		"doc.go":      true,
+		"main.go":      true,
+		"doc.go":       true,
 		"envconfig.go": true,
+		"auth_cmd.go":  true,
 	}
 	srcDrivers := map[string]bool{}
 	entries, err := os.ReadDir("cmd/gonemaster-server")

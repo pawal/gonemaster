@@ -1,6 +1,7 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Testaa verkkotunnuksen DNS-asetukset.",
+  "pub.about_summary": "Tietoja",
 
   "pub.locale_select_title": "Tulosviestien kieli",
   "pub.locale_select_aria": "Tuloskieli",

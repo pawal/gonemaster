@@ -1345,12 +1345,60 @@ details[open] > .score-bonus-summary > .score-bonus-chevron {
   [data-testid="share-button"] { display: none !important; }
 }
 
-/* ── Version footer ──────────────────────────────────────────────────────── */
+/* ── Version footer / About ─────────────────────────────────────────────── */
 .version-footer {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
   margin-top: auto;
 }
+
+.about-details {
+  text-align: center;
+}
+
+.about-summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: var(--text-sm);
+  color: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  user-select: none;
+}
+
+.about-summary::-webkit-details-marker { display: none; }
+
+.about-summary::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-right: 1.5px solid var(--muted);
+  border-bottom: 1.5px solid var(--muted);
+  transform: rotate(-45deg);
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.about-details[open] > .about-summary::before {
+  transform: rotate(45deg);
+}
+
+.about-body {
+  margin-top: 12px;
+  font-size: var(--text-sm);
+  color: var(--ink-2);
+  line-height: 1.5;
+  max-width: 480px;
+  text-align: left;
+}
+
+.about-body p { margin: 0; }
+.about-body p + p { margin-top: 8px; }
+.about-body a { color: var(--accent-2); }
 .version-box {
   display: inline-flex;
   flex-direction: column;

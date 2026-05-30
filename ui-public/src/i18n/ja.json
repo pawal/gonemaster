@@ -1,6 +1,7 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "ドメインのDNS設定をテストします。",
+  "pub.about_summary": "概要",
 
   "pub.locale_select_title": "結果メッセージの言語",
   "pub.locale_select_aria": "結果の言語",

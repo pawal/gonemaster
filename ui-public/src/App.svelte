@@ -278,16 +278,23 @@
     {/if}
   {/if}
 
-  {#if versionGonemaster}
-    <footer class="version-footer">
+  <footer class="version-footer">
+    <details class="about-details">
+      <summary class="about-summary">{$t("pub.about_summary")}</summary>
+      <div class="about-body">
+        <p>gonemaster checks the DNS configuration of a domain. It tests delegation, DNSSEC, nameserver behaviour, zone consistency, and more, and reports findings by severity.</p>
+        <p>Written by <a href="https://codeberg.org/pawal" target="_blank" rel="noopener">Patrik Wallström</a>. Source code on <a href="https://codeberg.org/pawal/gonemaster" target="_blank" rel="noopener">Codeberg</a>.</p>
+      </div>
+    </details>
+    {#if versionGonemaster}
       <div class="version-box">
         <span class="version-row"><span class="version-name">gonemaster</span>{versionGonemaster}</span>
         {#if versionDNS}
           <span class="version-row"><span class="version-name">miekg/dns</span>{versionDNS}</span>
         {/if}
       </div>
-    </footer>
-  {/if}
+    {/if}
+  </footer>
 
   <a class="fork-ribbon right-bottom fixed" href="https://codeberg.org/pawal/gonemaster" data-ribbon="Fork me on Codeberg" title="Fork me on Codeberg">Fork me on Codeberg</a>
 </main>

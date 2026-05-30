@@ -1,6 +1,7 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Preizkusite konfiguracijo DNS domene.",
+  "pub.about_summary": "O aplikaciji",
 
   "pub.locale_select_title": "Jezik sporočil z rezultati",
   "pub.locale_select_aria": "Jezik rezultatov",

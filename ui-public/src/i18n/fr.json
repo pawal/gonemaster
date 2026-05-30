@@ -1,6 +1,7 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Tester la configuration DNS d'un domaine.",
+  "pub.about_summary": "À propos",
 
   "pub.locale_select_title": "Langue des messages de résultats",
   "pub.locale_select_aria": "Langue des résultats",

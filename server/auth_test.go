@@ -3,6 +3,7 @@ package server
 import (
 	"io"
 	"net/http"
+	"net/http/cookiejar"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -205,6 +206,57 @@ func TestSessionLogoutClearsCookie(t *testing.T) {
 	c := cookieNamed(rec, adminCookieName)
 	if c == nil || c.MaxAge >= 0 {
 		t.Fatalf("logout should clear the admin cookie, got %+v", c)
+	}
+}
+
+// TestAuthEndToEndOverHTTP drives the auth flow over a real loopback socket
+// with a real HTTP client and cookie jar, mirroring the operator curl smoke.
+func TestAuthEndToEndOverHTTP(t *testing.T) {
+	tok := "gm_e2e"
+	ts := httptest.NewServer(tokenServer(tok).Handler())
+	defer ts.Close()
+
+	jar, _ := cookiejar.New(nil)
+	client := &http.Client{Jar: jar}
+	code := func(method, path string, header http.Header, body string) int {
+		var r io.Reader
+		if body != "" {
+			r = strings.NewReader(body)
+		}
+		req, err := http.NewRequest(method, ts.URL+path, r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for k, vs := range header {
+			for _, v := range vs {
+				req.Header.Add(k, v)
+			}
+		}
+		resp, err := client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp.Body.Close()
+		return resp.StatusCode
+	}
+
+	if got := code(http.MethodGet, "/api/v1/locales", nil, ""); got != http.StatusUnauthorized {
+		t.Fatalf("no token: want 401, got %d", got)
+	}
+	if got := code(http.MethodGet, "/api/v1/healthz", nil, ""); got != http.StatusOK {
+		t.Fatalf("healthz exempt: want 200, got %d", got)
+	}
+	bearer := http.Header{"Authorization": []string{"Bearer " + tok}}
+	if got := code(http.MethodGet, "/api/v1/locales", bearer, ""); got != http.StatusOK {
+		t.Fatalf("bearer: want 200, got %d", got)
+	}
+	cType := http.Header{"Content-Type": []string{"application/json"}}
+	if got := code(http.MethodPost, "/api/v1/session", cType, `{"token":"`+tok+`"}`); got != http.StatusOK {
+		t.Fatalf("session login: want 200, got %d", got)
+	}
+	// The jar now holds the session cookie; a bare request must authenticate.
+	if got := code(http.MethodGet, "/api/v1/locales", nil, ""); got != http.StatusOK {
+		t.Fatalf("cookie from jar: want 200, got %d", got)
 	}
 }
 

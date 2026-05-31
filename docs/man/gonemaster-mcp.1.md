@@ -6,7 +6,15 @@ gonemaster-mcp - Model Context Protocol bridge for gonemaster-server
 
 ## SYNOPSIS
 
-**gonemaster-mcp**
+**gonemaster-mcp** [**-v** | **--version**] [**-h** | **--help**]
+
+## OPTIONS
+
+**-v**, **--version**
+: Print version and exit.
+
+**-h**, **--help**
+: Show usage and exit.
 
 ## DESCRIPTION
 

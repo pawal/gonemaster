@@ -21,8 +21,9 @@ make install-gonemaster-mcp
 
 ## Configuration
 
-The bridge takes no flags; the MCP client launches it as a subprocess and
-passes configuration through environment variables:
+The MCP client launches the bridge as a subprocess and passes configuration
+through environment variables. The only command-line flags are `--help` (`-h`)
+and `--version` (`-v`), which print and exit:
 
 | Variable | Default | Purpose |
 |---|---|---|

@@ -28,6 +28,7 @@ passes configuration through environment variables:
 |---|---|---|
 | `GONEMASTER_URL` | `http://localhost:8080/api/v1` | Base URL of the gonemaster-server admin API. A bare host or origin is accepted; the `/api/v1` suffix is added automatically. |
 | `GONEMASTER_TOKEN` | (unset) | Admin token sent as `Authorization: Bearer`. Leave unset for an open-mode server. |
+| `GONEMASTER_MCP_ALLOW_WRITE` | (unset) | Set to `1` to register the mutating tools (`batch_enqueue`, `batch_cancel`, `cancel_job`). Unset by default, so a default install is read + `test_domain` only. |
 
 The bridge writes logs to stderr; stdout carries only the MCP protocol.
 
@@ -76,12 +77,29 @@ Omit `GONEMASTER_TOKEN` when the server runs in open mode.
 
 ## Tools
 
+Read tools (always available):
+
 | Tool | Purpose |
 |---|---|
-| `ping` | Check connectivity to gonemaster-server and report its auth mode and whether the bridge is authenticated. Use it to confirm `GONEMASTER_URL` and `GONEMASTER_TOKEN` are correct. |
+| `ping` | Check connectivity and report the server's auth mode and whether the bridge is authenticated. |
+| `test_domain` | Run a DNS test for a domain and wait for the result: grade, score, and findings. |
+| `run_get` | Fetch a stored run's result by id. |
+| `latest_for` | List a domain's most recent completed runs. |
+| `run_search` | Search completed runs by domain, tag, status, severity, grade, or finish-time range. |
+| `run_diff` | Compare two runs at the tag level (added / removed / severity-changed). |
+| `spec_list_testcases` | List implemented testcases, optionally filtered to one module. |
+| `spec_get_testcase` | Get a testcase's module, description, and the tags it can emit with rendered messages. |
+| `batch_get` | Poll a batch: total, per-status counts, and completion. |
+| `cohort_stats` | Grade and worst-severity distribution across a batch's runs. |
+| `failures_by_tag` | Rank the tags driving failures in a batch, with example domains. |
 
-More tools (single-domain tests, run lookups, testcase metadata, and batch and
-cohort queries) are planned.
+Write tools (registered only when `GONEMASTER_MCP_ALLOW_WRITE=1`):
+
+| Tool | Purpose |
+|---|---|
+| `batch_enqueue` | Enqueue a batch of domain tests (by `domains` or `from_tag`); returns a batch id to poll. |
+| `batch_cancel` | Cancel a batch's in-flight jobs and remove the batch. |
+| `cancel_job` | Cancel a single queued or running job. |
 
 ## Verifying the connection
 

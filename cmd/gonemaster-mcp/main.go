@@ -4,6 +4,8 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -24,7 +26,8 @@ const (
 var version = "dev"
 
 // config holds settings sourced from the environment. The bridge is launched by
-// an MCP client (Claude Code / Claude Desktop), so it takes no flags.
+// an MCP client (Claude Code / Claude Desktop) as a subprocess, so configuration
+// is env-only; the only command-line flags are --help and --version.
 type config struct {
 	serverURL  string
 	token      string
@@ -65,7 +68,45 @@ func envOr(key, fallback string) string {
 	return fallback
 }
 
+// handleInfoFlags prints help or version to out and returns true when one was
+// requested, so the caller can exit before starting the stdio loop.
+func handleInfoFlags(args []string, out io.Writer) bool {
+	for _, a := range args {
+		switch a {
+		case "-h", "--help", "-help":
+			fmt.Fprint(out, usageText())
+			return true
+		case "-v", "-V", "--version", "-version":
+			fmt.Fprintf(out, "%s %s\n", serverName, version)
+			return true
+		}
+	}
+	return false
+}
+
+func usageText() string {
+	return serverName + ` - Model Context Protocol (stdio) bridge to gonemaster-server.
+
+Launched by an MCP client (e.g. Claude Code or Claude Desktop) as a subprocess
+and configured through environment variables:
+
+  GONEMASTER_URL              Admin API base URL (default ` + defaultServerURL + `)
+  GONEMASTER_TOKEN            Admin token for Authorization: Bearer (optional)
+  GONEMASTER_MCP_ALLOW_WRITE  Set to 1 to enable the write tools
+
+Options:
+  -h, --help     Show this help and exit
+  -v, --version  Print version and exit
+
+See gonemaster-mcp(1) for details.
+`
+}
+
 func main() {
+	if handleInfoFlags(os.Args[1:], os.Stdout) {
+		return
+	}
+
 	// Logs go to stderr; stdout is the MCP stdio channel and must carry only
 	// protocol messages.
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))

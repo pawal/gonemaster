@@ -216,6 +216,46 @@ func (c *apiClient) getResult(ctx context.Context, id, locale string) (resultVie
 	return out, err
 }
 
+// batchSummaryView decodes GET /batches/{id}.
+type batchSummaryView struct {
+	BatchID      string         `json:"batch_id"`
+	Tag          string         `json:"tag"`
+	Total        int            `json:"total"`
+	StatusCounts map[string]int `json:"status_counts"`
+	Grades       map[string]int `json:"grades"`
+	CreatedAt    time.Time      `json:"created_at"`
+	FinishedAt   *time.Time     `json:"finished_at"`
+}
+
+// entryRecord decodes one item from GET /entries.
+type entryRecord struct {
+	Domain string `json:"domain"`
+	Module string `json:"module"`
+	Tag    string `json:"tag"`
+	Level  string `json:"level"`
+}
+
+type entryListView struct {
+	Items []entryRecord `json:"items"`
+	Total int           `json:"total"`
+}
+
+func (c *apiClient) getBatch(ctx context.Context, id string) (batchSummaryView, error) {
+	var out batchSummaryView
+	err := c.doJSON(ctx, http.MethodGet, "/batches/"+url.PathEscape(id), nil, &out)
+	return out, err
+}
+
+func (c *apiClient) listEntries(ctx context.Context, q url.Values) (entryListView, error) {
+	var out entryListView
+	path := "/entries"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
 // specTestcaseView decodes one item from GET /spec/testcases.
 type specTestcaseView struct {
 	ID          string `json:"id"`

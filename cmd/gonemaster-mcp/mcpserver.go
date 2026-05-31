@@ -14,6 +14,7 @@ func newMCPServer(api *apiClient) *mcp.Server {
 	registerReadTools(srv, api)
 	registerSpecTools(srv, api)
 	registerHistoryTools(srv, api)
+	registerBatchTools(srv, api)
 	return srv
 }
 

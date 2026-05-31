@@ -24,6 +24,8 @@ type fakeOpts struct {
 	run            *runView                // body for GET /runs/{id}; nil yields 404
 	runs           []runView               // items for GET /runs
 	runsQuery      *url.Values             // when set, captures the GET /runs query
+	batch          *batchSummaryView       // body for GET /batches/{id}; nil yields 404
+	entries        []entryRecord           // items for GET /entries (filtered by the level query)
 	specList       *specTestcaseListView   // body for GET /spec/testcases
 	specDetail     *specTestcaseDetailView // body for GET /spec/testcases/{id}; nil yields 404
 	requireToken   string                  // when set, endpoints return 401 unless the Bearer token matches
@@ -112,6 +114,29 @@ func newFakeServer(t *testing.T, opts fakeOpts) *httptest.Server {
 			*opts.runsQuery = r.URL.Query()
 		}
 		writeJSON(w, http.StatusOK, runListView{Items: opts.runs, Total: len(opts.runs)})
+	})
+	mux.HandleFunc("GET /api/v1/batches/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !guard(w, r) {
+			return
+		}
+		if opts.batch == nil {
+			writeJSON(w, http.StatusNotFound, errBody("no batch"))
+			return
+		}
+		writeJSON(w, http.StatusOK, *opts.batch)
+	})
+	mux.HandleFunc("GET /api/v1/entries", func(w http.ResponseWriter, r *http.Request) {
+		if !guard(w, r) {
+			return
+		}
+		level := r.URL.Query().Get("level")
+		items := []entryRecord{}
+		for _, e := range opts.entries {
+			if level == "" || e.Level == level {
+				items = append(items, e)
+			}
+		}
+		writeJSON(w, http.StatusOK, entryListView{Items: items, Total: len(items)})
 	})
 	mux.HandleFunc("GET /api/v1/spec/testcases", func(w http.ResponseWriter, r *http.Request) {
 		if !guard(w, r) {

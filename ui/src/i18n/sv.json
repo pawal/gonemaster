@@ -521,6 +521,8 @@
   "settings_help_min_level": "Minsta allvarlighetsgrad för nya jobbresultat.",
   "settings_label_retention_days": "Lagringstid i dagar",
   "settings_help_retention_days": "Antal dagar som avslutade jobb behålls (0 = behåll för alltid).",
+  "settings_label_purge_interval_seconds": "Rensningsintervall (sekunder)",
+  "settings_help_purge_interval_seconds": "Hur ofta rensningen av lagrade jobb körs, i sekunder (standard 3600).",
   "settings_label_public_url": "Publik URL",
   "settings_help_public_url": "Kanonisk bas-URL för det publika gränssnittet.",
   "settings_label_rate_limit_enabled": "Hastighetsbegränsning",

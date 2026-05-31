@@ -521,6 +521,8 @@
   "settings_help_min_level": "Niveau de sévérité minimum pour les résultats de nouveaux jobs.",
   "settings_label_retention_days": "Jours de rétention",
   "settings_help_retention_days": "Nombre de jours de conservation des jobs terminés (0 = conserver indéfiniment).",
+  "settings_label_purge_interval_seconds": "Intervalle de purge (secondes)",
+  "settings_help_purge_interval_seconds": "Fréquence d'exécution de la purge de rétention, en secondes (par défaut 3600).",
   "settings_label_public_url": "URL publique",
   "settings_help_public_url": "URL de base canonique de l'interface publique.",
   "settings_label_rate_limit_enabled": "Limitation de débit",

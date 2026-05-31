@@ -521,6 +521,8 @@
   "settings_help_min_level": "Nivel de severidad mínimo para resultados de nuevos trabajos.",
   "settings_label_retention_days": "Días de retención",
   "settings_help_retention_days": "Días que se conservan los trabajos completados (0 = conservar siempre).",
+  "settings_label_purge_interval_seconds": "Intervalo de purga (segundos)",
+  "settings_help_purge_interval_seconds": "Frecuencia con la que se ejecuta la purga de retención, en segundos (predeterminado 3600).",
   "settings_label_public_url": "URL pública",
   "settings_help_public_url": "URL base canónica de la interfaz pública.",
   "settings_label_rate_limit_enabled": "Limitación de tasa",

@@ -210,6 +210,8 @@
   "settings_help_min_level": "Minimum severity level for new job results.",
   "settings_label_retention_days": "Retention days",
   "settings_help_retention_days": "Days to keep completed jobs (0 = keep forever).",
+  "settings_label_purge_interval_seconds": "Purge interval (seconds)",
+  "settings_help_purge_interval_seconds": "How often the retention purge sweep runs, in seconds (default 3600).",
   "settings_label_public_url": "Public URL",
   "settings_help_public_url": "Canonical base URL of the public UI.",
   "settings_label_rate_limit_enabled": "Rate limiting",

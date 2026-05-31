@@ -210,6 +210,8 @@
   "settings_help_min_level": "Mindest-Schweregrad für neue Job-Ergebnisse.",
   "settings_label_retention_days": "Aufbewahrungsdauer (Tage)",
   "settings_help_retention_days": "Tage, für die abgeschlossene Jobs aufbewahrt werden (0 = unbegrenzt).",
+  "settings_label_purge_interval_seconds": "Bereinigungsintervall (Sekunden)",
+  "settings_help_purge_interval_seconds": "Wie oft der Aufbewahrungs-Bereinigungslauf ausgeführt wird, in Sekunden (Standard 3600).",
   "settings_label_public_url": "Öffentliche URL",
   "settings_help_public_url": "Kanonische Basis-URL der öffentlichen UI.",
   "settings_label_rate_limit_enabled": "Rate-Limiting",

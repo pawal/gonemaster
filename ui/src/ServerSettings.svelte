@@ -29,6 +29,7 @@
         { key: "db_dsn", type: "text", readonly: true },
         { key: "profile_path", type: "text", readonly: true },
         { key: "retention_days", type: "number" },
+        { key: "purge_interval_seconds", type: "number" },
       ],
     },
     {

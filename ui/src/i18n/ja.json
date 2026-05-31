@@ -521,6 +521,8 @@
   "settings_help_min_level": "新しいジョブ結果の最小重大度レベル。",
   "settings_label_retention_days": "保持日数",
   "settings_help_retention_days": "完了したジョブを保持する日数 (0 = 永久保持)。",
+  "settings_label_purge_interval_seconds": "パージ間隔（秒）",
+  "settings_help_purge_interval_seconds": "保持パージの実行間隔（秒単位、デフォルト 3600）。",
   "settings_label_public_url": "公開URL",
   "settings_help_public_url": "公開UIの正規ベースURL。",
   "settings_label_rate_limit_enabled": "レート制限",

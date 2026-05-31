@@ -521,6 +521,8 @@
   "settings_help_min_level": "Vähimmäisvakavuustaso uusille työtuloksille.",
   "settings_label_retention_days": "Säilytyspäivät",
   "settings_help_retention_days": "Päivien määrä, jonka valmiit työt säilytetään (0 = säilytä ikuisesti).",
+  "settings_label_purge_interval_seconds": "Siivousväli (sekuntia)",
+  "settings_help_purge_interval_seconds": "Kuinka usein säilytyksen siivous suoritetaan, sekunteina (oletus 3600).",
   "settings_label_public_url": "Julkinen URL",
   "settings_help_public_url": "Julkisen käyttöliittymän kanoninen perus-URL.",
   "settings_label_rate_limit_enabled": "Nopeusrajoitus",

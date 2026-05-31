@@ -521,6 +521,8 @@
   "settings_help_min_level": "Najmanjša raven resnosti za rezultate novih opravil.",
   "settings_label_retention_days": "Dnevi hrambe",
   "settings_help_retention_days": "Število dni hrambe dokončanih opravil (0 = hrani za vedno).",
+  "settings_label_purge_interval_seconds": "Interval čiščenja (sekunde)",
+  "settings_help_purge_interval_seconds": "Kako pogosto se izvede čiščenje hrambe, v sekundah (privzeto 3600).",
   "settings_label_public_url": "Javni URL",
   "settings_help_public_url": "Kanonični osnovni URL javnega vmesnika.",
   "settings_label_rate_limit_enabled": "Omejevanje hitrosti",

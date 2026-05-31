@@ -521,6 +521,8 @@
   "settings_help_min_level": "Minimum alvorlighetsnivå for nye jobbresultater.",
   "settings_label_retention_days": "Oppbevaringsdager",
   "settings_help_retention_days": "Antall dager fullførte jobber oppbevares (0 = behold for alltid).",
+  "settings_label_purge_interval_seconds": "Oppryddingsintervall (sekunder)",
+  "settings_help_purge_interval_seconds": "Hvor ofte oppbevaringsoppryddingen kjøres, i sekunder (standard 3600).",
   "settings_label_public_url": "Offentlig URL",
   "settings_help_public_url": "Kanonisk basis-URL for det offentlige grensesnittet.",
   "settings_label_rate_limit_enabled": "Frekvensbegrensning",

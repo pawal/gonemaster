@@ -83,8 +83,8 @@ Read tools (always available):
 | Tool | Purpose |
 |---|---|
 | `ping` | Check connectivity and report the server's auth mode and whether the bridge is authenticated. |
-| `test_domain` | Run a DNS test for a domain and wait for the result: grade, score, and findings. |
-| `run_get` | Fetch a stored run's result by id. |
+| `test_domain` | Run a DNS test for a domain and wait for the result: grade, score, findings, and per-nameserver response times. |
+| `run_get` | Fetch a stored run's result by id (grade, score, findings, nameserver response times). |
 | `latest_for` | List a domain's most recent completed runs. |
 | `run_search` | Search completed runs by domain, tag, status, severity, grade, or finish-time range. |
 | `run_diff` | Compare two runs at the tag level (added / removed / severity-changed). |

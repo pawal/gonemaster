@@ -51,7 +51,8 @@ written to stderr so that stdout carries only the MCP protocol.
 : Check connectivity and report the server's auth mode.
 
 **test_domain**
-: Run a DNS test for a domain and wait for the result (grade, score, findings).
+: Run a DNS test for a domain and wait for the result (grade, score, findings,
+  per-nameserver response times).
 
 **run_get**, **latest_for**
 : Fetch a stored run's result by id, or list a domain's most recent runs.

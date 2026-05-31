@@ -11,7 +11,7 @@ UI_ANALYSIS_DIR := analysis-ui
 NODE_MIN ?= 20
 NPM_MIN ?= 9
 
-CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios
+CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios gonemaster-mcp
 CMD ?= all
 
 .PHONY: help build build-all test install ui-build ui-install ui-dev ui-test \
@@ -19,8 +19,8 @@ CMD ?= all
 	ui-analysis-build ui-analysis-install ui-analysis-dev ui-analysis-test clean \
 	build-gonemaster build-gonemaster-badkeys-embed build-gonemaster-server build-gonemaster-server-noui \
 	build-gonemaster-server-badkeys-embed build-gonemaster-server-noui-badkeys-embed build-gonemaster-client \
-	build-gonemaster-nagios install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
-	install-gonemaster-nagios ui-check test-go test-integration vet race \
+	build-gonemaster-nagios build-gonemaster-mcp install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
+	install-gonemaster-nagios install-gonemaster-mcp ui-check test-go test-integration vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
 	architecture-check badkeys-update badkeys-update-embed man man-gz clean-man \
@@ -54,6 +54,7 @@ help:
 	@echo "  build-gonemaster-server-noui-badkeys-embed  Build API-only server with embedded badkeys blocklist"
 	@echo "  build-gonemaster-client       Build the HTTP API client"
 	@echo "  build-gonemaster-nagios       Build the Nagios plugin"
+	@echo "  build-gonemaster-mcp          Build the MCP (Model Context Protocol) bridge"
 	@echo "  spec-export        Refresh generated specification inventories (JSON)"
 	@echo "  spec-export-log-args  Refresh generated log argument inventory (JSON + markdown)"
 	@echo "  spec-validate      Validate canonical testcase specs against implementation metadata"
@@ -190,6 +191,9 @@ build-gonemaster-client: $(BIN_DIR)
 build-gonemaster-nagios: $(BIN_DIR)
 	$(GO) build -o $(BIN_DIR)/gonemaster-nagios ./cmd/gonemaster-nagios
 
+build-gonemaster-mcp: $(BIN_DIR)
+	$(GO) build -ldflags "-X main.version=$(VERSION)" -o $(BIN_DIR)/gonemaster-mcp ./cmd/gonemaster-mcp
+
 test-go:
 	$(GO) test ./...
 
@@ -251,6 +255,9 @@ install-gonemaster-client:
 
 install-gonemaster-nagios:
 	$(GO) install ./cmd/gonemaster-nagios
+
+install-gonemaster-mcp:
+	$(GO) install -ldflags "-X main.version=$(VERSION)" ./cmd/gonemaster-mcp
 
 vet:
 	$(GO) vet ./...

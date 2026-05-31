@@ -32,7 +32,7 @@ shared state across binaries.
 
 ## 2. Component map
 
-gonemaster ships four binaries and three web UIs. The UIs are built
+gonemaster ships five binaries and three web UIs. The UIs are built
 to static assets and embedded into `gonemaster-server` with
 `go:embed`.
 
@@ -44,10 +44,11 @@ to static assets and embedded into `gonemaster-server` with
 | `gonemaster-server` | [cmd/gonemaster-server/](../cmd/gonemaster-server/) | HTTP service. Admin and public APIs, job queue, persistence, embedded UIs. | DNS; configured database. |
 | `gonemaster-client` | [cmd/gonemaster-client/](../cmd/gonemaster-client/) | CLI client for the admin API. | `gonemaster-server`. |
 | `gonemaster-nagios` | [cmd/gonemaster-nagios/](../cmd/gonemaster-nagios/) | Nagios-compatible probe. Runs the engine in-process and exits with a Nagios status code. | DNS. |
+| `gonemaster-mcp` | [cmd/gonemaster-mcp/](../cmd/gonemaster-mcp/) | Model Context Protocol (stdio) bridge. Forwards MCP tool calls to the admin API; runs no engine. | `gonemaster-server`. |
 
 `gonemaster`, `gonemaster-nagios`, and `gonemaster-server` are
 self-contained: each can run without the others. `gonemaster-client`
-requires `gonemaster-server`.
+and `gonemaster-mcp` require `gonemaster-server`.
 
 ### Embedded UIs
 
@@ -890,7 +891,7 @@ Top-level directories tracked in the repository.
 
 | Path | Contents |
 |---|---|
-| [cmd/](../cmd/) | Binary entry points: `gonemaster`, `gonemaster-server`, `gonemaster-client`, `gonemaster-nagios`. |
+| [cmd/](../cmd/) | Binary entry points: `gonemaster`, `gonemaster-server`, `gonemaster-client`, `gonemaster-nagios`, `gonemaster-mcp`. |
 | [engine/](../engine/) | DNS test engine. Parallel-safe; each `engine.Run` builds isolated per-run state. |
 | [server/](../server/) | HTTP handlers, job queue, batches, snapshots, persistence drivers. |
 | [scoring/](../scoring/) | Score and grade computation from run entries. |

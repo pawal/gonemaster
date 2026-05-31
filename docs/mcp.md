@@ -1,0 +1,91 @@
+# Gonemaster MCP Bridge
+
+`gonemaster-mcp` exposes `gonemaster-server`'s admin API to Model Context
+Protocol (MCP) clients as a set of tools. It speaks stdio MCP and forwards
+requests to the server over HTTP; it does not run the engine itself.
+
+MCP clients such as Claude Code, Claude Desktop, and other agent frameworks
+launch the bridge as a subprocess and talk to it over stdin/stdout.
+
+## Build
+
+```
+make build-gonemaster-mcp     # builds bin/gonemaster-mcp
+```
+
+Or install it onto your PATH:
+
+```
+make install-gonemaster-mcp
+```
+
+## Configuration
+
+The bridge takes no flags; the MCP client launches it as a subprocess and
+passes configuration through environment variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `GONEMASTER_URL` | `http://localhost:8080/api/v1` | Base URL of the gonemaster-server admin API. A bare host or origin is accepted; the `/api/v1` suffix is added automatically. |
+| `GONEMASTER_TOKEN` | (unset) | Admin token sent as `Authorization: Bearer`. Leave unset for an open-mode server. |
+
+The bridge writes logs to stderr; stdout carries only the MCP protocol.
+
+## Authentication
+
+The bridge mirrors `gonemaster-client`: when `GONEMASTER_TOKEN` is set it sends
+`Authorization: Bearer <token>` on every request; when it is unset it sends no
+credential, which works against a server running in open mode. If the server is
+in token mode and the token is missing or wrong, every call returns `401`. Mint
+a token with `gonemaster-server auth add-token`; see
+[server/authentication.md](server/authentication.md).
+
+## Connecting a client
+
+The configuration is the same shape everywhere: a command to run and an `env`
+block. Point `command` at the built binary.
+
+### Claude Code
+
+```
+claude mcp add gonemaster \
+  -e GONEMASTER_URL=http://localhost:8080 \
+  -e GONEMASTER_TOKEN=gm_your_token_here \
+  -- /path/to/gonemaster-mcp
+```
+
+### Claude Desktop
+
+Add an entry under `mcpServers` in `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "gonemaster": {
+      "command": "/path/to/gonemaster-mcp",
+      "env": {
+        "GONEMASTER_URL": "http://localhost:8080",
+        "GONEMASTER_TOKEN": "gm_your_token_here"
+      }
+    }
+  }
+}
+```
+
+Omit `GONEMASTER_TOKEN` when the server runs in open mode.
+
+## Tools
+
+| Tool | Purpose |
+|---|---|
+| `ping` | Check connectivity to gonemaster-server and report its auth mode and whether the bridge is authenticated. Use it to confirm `GONEMASTER_URL` and `GONEMASTER_TOKEN` are correct. |
+
+More tools (single-domain tests, run lookups, testcase metadata, and batch and
+cohort queries) are planned.
+
+## Verifying the connection
+
+After configuring the client, call the `ping` tool. A healthy open-mode setup
+reports `reachable: true` and `auth_mode: open`. In token mode a correct token
+reports `authenticated: true`; a missing or wrong token reports
+`authenticated: false` with a hint to set `GONEMASTER_TOKEN`.

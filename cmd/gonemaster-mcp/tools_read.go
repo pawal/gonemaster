@@ -34,14 +34,26 @@ type finding struct {
 }
 
 type testResult struct {
-	Domain     string    `json:"domain"`
-	RunID      string    `json:"run_id,omitempty" jsonschema:"the run/job id; pass to run_get"`
-	Status     string    `json:"status" jsonschema:"succeeded, failed, canceled, or expired"`
-	Grade      string    `json:"grade,omitempty" jsonschema:"letter grade A+ to F when scoring is available"`
-	Score      *int      `json:"score,omitempty" jsonschema:"numeric score 0-100 when scoring is available"`
-	DurationMs int64     `json:"duration_ms,omitempty"`
-	Findings   []finding `json:"findings" jsonschema:"all log entries; filter by level for issues"`
-	Error      string    `json:"error,omitempty" jsonschema:"failure reason when status is not succeeded"`
+	Domain            string     `json:"domain"`
+	RunID             string     `json:"run_id,omitempty" jsonschema:"the run/job id; pass to run_get"`
+	Status            string     `json:"status" jsonschema:"succeeded, failed, canceled, or expired"`
+	Grade             string     `json:"grade,omitempty" jsonschema:"letter grade A+ to F when scoring is available"`
+	Score             *int       `json:"score,omitempty" jsonschema:"numeric score 0-100 when scoring is available"`
+	DurationMs        int64      `json:"duration_ms,omitempty"`
+	Findings          []finding  `json:"findings" jsonschema:"all log entries; filter by level for issues"`
+	NameserverTimings []nsTiming `json:"nameserver_timings,omitempty" jsonschema:"per-nameserver query response-time statistics, in milliseconds"`
+	Error             string     `json:"error,omitempty" jsonschema:"failure reason when status is not succeeded"`
+}
+
+type nsTiming struct {
+	Nameserver string  `json:"nameserver"`
+	Address    string  `json:"address,omitempty"`
+	MedianMS   float64 `json:"median_ms"`
+	AvgMS      float64 `json:"avg_ms"`
+	MinMS      float64 `json:"min_ms,omitempty"`
+	MaxMS      float64 `json:"max_ms,omitempty"`
+	Count      int     `json:"count,omitempty" jsonschema:"number of timed queries"`
+	Status     string  `json:"status,omitempty" jsonschema:"ok, unreachable, or unresolved"`
 }
 
 func registerReadTools(srv *mcp.Server, api *apiClient) {
@@ -59,7 +71,7 @@ type testDomainInput struct {
 func registerTestDomain(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "test_domain",
-		Description: "Run a DNS test for a domain and wait for the result. Returns grade, score, and findings.",
+		Description: "Run a DNS test for a domain and wait for the result. Returns grade, score, findings, and per-nameserver response times.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in testDomainInput) (*mcp.CallToolResult, testResult, error) {
 		domain := strings.TrimSpace(in.Domain)
 		if domain == "" {
@@ -116,7 +128,7 @@ type runGetInput struct {
 func registerRunGet(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_get",
-		Description: "Fetch a stored run's result by id: grade, score, and findings.",
+		Description: "Fetch a stored run's result by id: grade, score, findings, and per-nameserver response times.",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runGetInput) (*mcp.CallToolResult, testResult, error) {
 		id := strings.TrimSpace(in.ID)
 		if id == "" {
@@ -213,6 +225,13 @@ func fillResult(ctx context.Context, api *apiClient, id, lang string, out *testR
 		for _, e := range res.Raw.Entries {
 			out.Findings = append(out.Findings, finding{Tag: e.Tag, Level: e.Level, Module: e.Module, Testcase: e.Testcase, Message: e.Message})
 		}
+	}
+	for _, t := range res.NameserverTimings {
+		out.NameserverTimings = append(out.NameserverTimings, nsTiming{
+			Nameserver: t.Nameserver, Address: t.Address,
+			MedianMS: t.MedianMS, AvgMS: t.AvgMS, MinMS: t.MinMS, MaxMS: t.MaxMS,
+			Count: t.Count, Status: t.Status,
+		})
 	}
 }
 

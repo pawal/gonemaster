@@ -165,10 +165,23 @@ type runListView struct {
 
 // resultView decodes GET /jobs/{id}/result (and the identical /runs/{id}/result).
 type resultView struct {
-	JobID  string         `json:"job_id"`
-	Status string         `json:"status"`
-	Raw    *resultRawView `json:"raw,omitempty"`
-	Score  *resultScore   `json:"score,omitempty"`
+	JobID             string         `json:"job_id"`
+	Status            string         `json:"status"`
+	Raw               *resultRawView `json:"raw,omitempty"`
+	Score             *resultScore   `json:"score,omitempty"`
+	NameserverTimings []nsTimingView `json:"nameserver_timings,omitempty"`
+}
+
+// nsTimingView decodes one entry of nameserver_timings.
+type nsTimingView struct {
+	Nameserver string  `json:"nameserver"`
+	Address    string  `json:"address"`
+	AvgMS      float64 `json:"avg_ms"`
+	MinMS      float64 `json:"min_ms"`
+	MaxMS      float64 `json:"max_ms"`
+	MedianMS   float64 `json:"median_ms"`
+	Count      int     `json:"count"`
+	Status     string  `json:"status"`
 }
 
 type resultRawView struct {

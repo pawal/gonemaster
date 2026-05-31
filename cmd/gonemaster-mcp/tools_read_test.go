@@ -323,6 +323,36 @@ func TestRunGet(t *testing.T) {
 	}
 }
 
+func TestRunGetIncludesNameserverTimings(t *testing.T) {
+	ts := newFakeServer(t, fakeOpts{
+		run: &runView{ID: "run_5", Domain: "timed.example", Status: "succeeded"},
+		result: &resultView{
+			JobID:  "run_5",
+			Status: "succeeded",
+			NameserverTimings: []nsTimingView{
+				{Nameserver: "ns1.example", Address: "192.0.2.1", AvgMS: 13, MedianMS: 12.5, MinMS: 9, MaxMS: 22, Count: 5, Status: "ok"},
+				{Nameserver: "ns2.example", Address: "192.0.2.2", Status: "unreachable"},
+			},
+		},
+	})
+	defer ts.Close()
+
+	var out testResult
+	res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "run_5"}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	if len(out.NameserverTimings) != 2 {
+		t.Fatalf("expected 2 nameserver timings, got %d", len(out.NameserverTimings))
+	}
+	if out.NameserverTimings[0].Nameserver != "ns1.example" || out.NameserverTimings[0].MedianMS != 12.5 || out.NameserverTimings[0].Count != 5 {
+		t.Errorf("first timing wrong: %+v", out.NameserverTimings[0])
+	}
+	if out.NameserverTimings[1].Status != "unreachable" {
+		t.Errorf("expected unreachable status, got %+v", out.NameserverTimings[1])
+	}
+}
+
 func TestLatestFor(t *testing.T) {
 	g1, g2 := "B", "C"
 	s1, s2 := 80, 70

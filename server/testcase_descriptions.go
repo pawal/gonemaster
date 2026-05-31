@@ -59,6 +59,7 @@ var testcaseDescriptions = map[string]string{
 	"DNSSEC18": "Validate trust from DS to CDS and CDNSKEY",
 	"DNSSEC19": "Check DNSKEY records for known cryptographic weaknesses",
 	"DNSSEC20": "NSEC/NSEC3 type bitmap at zone apex matches actual RR types",
+	"DNSSEC21": "Parent zone signs the delegating DS RRset",
 
 	// NAMESERVER
 	"NAMESERVER01": "A name server should not be a recursor",
@@ -101,6 +102,7 @@ var testcaseDescriptions = map[string]string{
 	"ZONE11": "SPF policy at zone apex",
 	"ZONE12": "CSYNC RR at zone apex",
 	"ZONE13": "SPF DNS lookup limit compliance",
+	"ZONE14": "ZONEMD RR at zone apex (RFC 8976 compliance)",
 }
 
 // testcaseDescriptionsForEntries returns descriptions for testcases present in entries.

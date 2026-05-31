@@ -4,8 +4,26 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
+
+// TestEveryImplementedTestcaseHasDescription guards against shipping a testcase
+// without a short description in testcaseDescriptions (which would surface as an
+// empty description in the spec endpoint and the MCP spec_list_testcases tool).
+func TestEveryImplementedTestcaseHasDescription(t *testing.T) {
+	for _, item := range engine.AvailableTestcases() {
+		_, tc, ok := splitTestcaseItem(item)
+		if !ok {
+			continue
+		}
+		if testcaseDescriptions[strings.ToUpper(tc)] == "" {
+			t.Errorf("testcase %q has no entry in testcaseDescriptions", tc)
+		}
+	}
+}
 
 func getSpec(t *testing.T, srv *Server, path string, out any) *httptest.ResponseRecorder {
 	t.Helper()

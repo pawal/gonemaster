@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 - admin-ui: add admin token login and logout; gonemaster-client gains --token / GONEMASTER_TOKEN
 - ui-public: Swedish, Japanese, and French translations for finding descriptions and test-case explanations
 - ui-public: translatable footer about text
+- docs: admin API authentication guide and OpenAPI security scheme
 
 ### Fixed
 

@@ -2,6 +2,8 @@
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Test the DNS configuration of a domain.",
   "pub.about_summary": "About",
+  "pub.about_intro": "gonemaster checks the DNS configuration of a domain. It tests delegation, DNSSEC, nameserver behaviour, zone consistency, and more, and reports findings by severity.",
+  "pub.about_credit": "Written by {author}. Source code on {repo}.",
   "pub.locale_select_title": "Result message language",
   "pub.locale_select_aria": "Result language",
   "pub.theme_cycle_title": "Color theme: {theme} - click to cycle",

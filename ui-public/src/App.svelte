@@ -91,6 +91,9 @@
   let resultLocale = $state("en");
   let versionGonemaster = $state("");
   let versionDNS = $state("");
+  // Static links injected into the translatable about credit line.
+  const authorLink = '<a href="https://codeberg.org/pawal" target="_blank" rel="noopener">Patrik Wallström</a>';
+  const repoLink = '<a href="https://codeberg.org/pawal/gonemaster" target="_blank" rel="noopener">Codeberg</a>';
   // Fail-safe default: hide scoring until server confirms it is enabled.
   let scoringEnabled = $state(false);
   let nameserverTimingsEnabled = $state(false);
@@ -282,8 +285,8 @@
     <details class="about-details">
       <summary class="about-summary">{$t("pub.about_summary")}</summary>
       <div class="about-body">
-        <p>gonemaster checks the DNS configuration of a domain. It tests delegation, DNSSEC, nameserver behaviour, zone consistency, and more, and reports findings by severity.</p>
-        <p>Written by <a href="https://codeberg.org/pawal" target="_blank" rel="noopener">Patrik Wallström</a>. Source code on <a href="https://codeberg.org/pawal/gonemaster" target="_blank" rel="noopener">Codeberg</a>.</p>
+        <p>{$t("pub.about_intro")}</p>
+        <p>{@html $t("pub.about_credit", { author: authorLink, repo: repoLink })}</p>
       </div>
     </details>
     {#if versionGonemaster}

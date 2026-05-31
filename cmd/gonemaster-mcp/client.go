@@ -8,7 +8,9 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
+	"time"
 )
 
 // apiClient is a thin bearer-authenticated HTTP client for the admin API.
@@ -123,5 +125,110 @@ type whoamiResponse struct {
 func (c *apiClient) whoami(ctx context.Context) (whoamiResponse, error) {
 	var out whoamiResponse
 	err := c.doJSON(ctx, http.MethodGet, "/whoami", nil, &out)
+	return out, err
+}
+
+// createJobRequest is the POST /api/v1/jobs payload (minimal subset).
+type createJobRequest struct {
+	Domain    string `json:"domain"`
+	ProfileID *int64 `json:"profile_id,omitempty"`
+}
+
+// jobView decodes a job from POST /jobs and GET /jobs/{id}.
+type jobView struct {
+	ID         string    `json:"id"`
+	Domain     string    `json:"domain"`
+	Status     string    `json:"status"`
+	Progress   int       `json:"progress"`
+	Error      string    `json:"error"`
+	StartedAt  time.Time `json:"started_at"`
+	FinishedAt time.Time `json:"finished_at"`
+}
+
+// runView decodes a completed run from GET /runs and GET /runs/{id}.
+type runView struct {
+	ID         string    `json:"id"`
+	Domain     string    `json:"domain"`
+	Status     string    `json:"status"`
+	DurationMs int64     `json:"duration_ms"`
+	WorstLevel string    `json:"worst_level"`
+	Score      *int      `json:"score"`
+	Grade      *string   `json:"grade"`
+	FinishedAt time.Time `json:"finished_at"`
+	Error      string    `json:"error"`
+}
+
+type runListView struct {
+	Items []runView `json:"items"`
+	Total int       `json:"total"`
+}
+
+// resultView decodes GET /jobs/{id}/result (and the identical /runs/{id}/result).
+type resultView struct {
+	JobID  string         `json:"job_id"`
+	Status string         `json:"status"`
+	Raw    *resultRawView `json:"raw,omitempty"`
+	Score  *resultScore   `json:"score,omitempty"`
+}
+
+type resultRawView struct {
+	Entries []entryView `json:"entries"`
+}
+
+type resultScore struct {
+	Score int    `json:"score"`
+	Grade string `json:"grade"`
+}
+
+type entryView struct {
+	Module   string `json:"module"`
+	Testcase string `json:"testcase"`
+	Tag      string `json:"tag"`
+	Level    string `json:"level"`
+	Message  string `json:"message"`
+}
+
+func (c *apiClient) createJob(ctx context.Context, req createJobRequest) (jobView, error) {
+	var out jobView
+	err := c.doJSON(ctx, http.MethodPost, "/jobs", req, &out)
+	return out, err
+}
+
+func (c *apiClient) getJob(ctx context.Context, id string) (jobView, error) {
+	var out jobView
+	err := c.doJSON(ctx, http.MethodGet, "/jobs/"+url.PathEscape(id), nil, &out)
+	return out, err
+}
+
+func (c *apiClient) getRun(ctx context.Context, id string) (runView, error) {
+	var out runView
+	err := c.doJSON(ctx, http.MethodGet, "/runs/"+url.PathEscape(id), nil, &out)
+	return out, err
+}
+
+func (c *apiClient) getResult(ctx context.Context, id, locale string) (resultView, error) {
+	var out resultView
+	path := "/jobs/" + url.PathEscape(id) + "/result"
+	if locale != "" {
+		path += "?locale=" + url.QueryEscape(locale)
+	}
+	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
+func (c *apiClient) listRuns(ctx context.Context, domain string, limit int) (runListView, error) {
+	var out runListView
+	q := url.Values{}
+	if domain != "" {
+		q.Set("domain", domain)
+	}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	path := "/runs"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
 	return out, err
 }

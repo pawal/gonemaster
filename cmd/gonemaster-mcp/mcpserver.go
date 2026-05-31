@@ -11,6 +11,7 @@ import (
 func newMCPServer(api *apiClient) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: version}, nil)
 	registerPing(srv, api)
+	registerReadTools(srv, api)
 	return srv
 }
 

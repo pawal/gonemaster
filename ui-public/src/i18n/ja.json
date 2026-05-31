@@ -88,6 +88,7 @@
   "pub.result_status_warning": "警告が見つかりました",
   "pub.result_status_error": "エラーが見つかりました",
   "pub.result_status_critical": "重大な問題が見つかりました",
+  "pub.about_finding": "この検出結果について",
 
   "pub.expired_heading": "結果は利用できません",
   "pub.expired_body": "この結果は期限切れか、存在しません。",

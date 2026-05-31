@@ -88,6 +88,7 @@
   "pub.result_status_warning": "Varningar hittades",
   "pub.result_status_error": "Fel hittades",
   "pub.result_status_critical": "Kritiska problem hittades",
+  "pub.about_finding": "Om det här fyndet",
 
   "pub.expired_heading": "Resultatet är inte längre tillgängligt",
   "pub.expired_body": "Det här resultatet har gått ut eller finns inte.",

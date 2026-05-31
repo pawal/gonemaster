@@ -88,6 +88,7 @@
   "pub.result_status_warning": "Advarsler funnet",
   "pub.result_status_error": "Feil funnet",
   "pub.result_status_critical": "Kritiske problemer funnet",
+  "pub.about_finding": "Om dette funnet",
 
   "pub.expired_heading": "Resultatet er ikke lenger tilgjengelig",
   "pub.expired_body": "Dette resultatet er utløpt eller finnes ikke.",

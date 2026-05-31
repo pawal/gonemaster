@@ -88,6 +88,7 @@
   "pub.result_status_warning": "Najdena opozorila",
   "pub.result_status_error": "Najdene napake",
   "pub.result_status_critical": "Najdene kritične težave",
+  "pub.about_finding": "O tej ugotovitvi",
 
   "pub.expired_heading": "Rezultat ni več na voljo",
   "pub.expired_body": "Ta rezultat je potekel ali ne obstaja.",

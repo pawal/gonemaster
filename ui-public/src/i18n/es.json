@@ -88,6 +88,7 @@
   "pub.result_status_warning": "Advertencias encontradas",
   "pub.result_status_error": "Errores encontrados",
   "pub.result_status_critical": "Problemas críticos encontrados",
+  "pub.about_finding": "Acerca de este hallazgo",
 
   "pub.expired_heading": "Resultado ya no disponible",
   "pub.expired_body": "Este resultado ha expirado o no existe.",

@@ -88,6 +88,7 @@
   "pub.result_status_warning": "Avertissements détectés",
   "pub.result_status_error": "Erreurs détectées",
   "pub.result_status_critical": "Problèmes critiques détectés",
+  "pub.about_finding": "À propos de ce constat",
 
   "pub.expired_heading": "Résultat non disponible",
   "pub.expired_body": "Ce résultat a expiré ou n'existe pas.",

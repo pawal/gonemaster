@@ -88,6 +88,7 @@
   "pub.result_status_warning": "Varoituksia löydetty",
   "pub.result_status_error": "Virheitä löydetty",
   "pub.result_status_critical": "Kriittisiä ongelmia löydetty",
+  "pub.about_finding": "Tietoja tästä havainnosta",
 
   "pub.expired_heading": "Tulos ei ole enää saatavilla",
   "pub.expired_body": "Tämä tulos on vanhentunut tai sitä ei ole olemassa.",

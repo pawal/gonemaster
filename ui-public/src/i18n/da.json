@@ -88,6 +88,7 @@
   "pub.result_status_warning": "Advarsler fundet",
   "pub.result_status_error": "Fejl fundet",
   "pub.result_status_critical": "Kritiske problemer fundet",
+  "pub.about_finding": "Om dette fund",
 
   "pub.expired_heading": "Resultat ikke længere tilgængeligt",
   "pub.expired_body": "Dette resultat er udløbet eller findes ikke.",

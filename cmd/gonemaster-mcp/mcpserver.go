@@ -13,6 +13,7 @@ func newMCPServer(api *apiClient) *mcp.Server {
 	registerPing(srv, api)
 	registerReadTools(srv, api)
 	registerSpecTools(srv, api)
+	registerHistoryTools(srv, api)
 	return srv
 }
 

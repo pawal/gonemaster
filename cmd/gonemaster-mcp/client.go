@@ -262,8 +262,17 @@ func (c *apiClient) getSpecTestcase(ctx context.Context, id, locale string) (spe
 	return out, err
 }
 
-func (c *apiClient) listRuns(ctx context.Context, domain string, limit int) (runListView, error) {
+func (c *apiClient) getRuns(ctx context.Context, q url.Values) (runListView, error) {
 	var out runListView
+	path := "/runs"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
+func (c *apiClient) listRuns(ctx context.Context, domain string, limit int) (runListView, error) {
 	q := url.Values{}
 	if domain != "" {
 		q.Set("domain", domain)
@@ -271,10 +280,5 @@ func (c *apiClient) listRuns(ctx context.Context, domain string, limit int) (run
 	if limit > 0 {
 		q.Set("limit", strconv.Itoa(limit))
 	}
-	path := "/runs"
-	if len(q) > 0 {
-		path += "?" + q.Encode()
-	}
-	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
-	return out, err
+	return c.getRuns(ctx, q)
 }

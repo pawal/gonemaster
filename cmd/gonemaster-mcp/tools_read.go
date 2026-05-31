@@ -177,18 +177,23 @@ func registerLatestFor(srv *mcp.Server, api *apiClient) {
 		}
 		out := latestForOutput{Domain: domain, Runs: []runSummary{}}
 		for _, r := range list.Items {
-			rs := runSummary{RunID: r.ID, Domain: r.Domain, Status: r.Status, Score: r.Score, WorstLevel: r.WorstLevel, DurationMs: r.DurationMs}
-			if r.Grade != nil {
-				rs.Grade = *r.Grade
-			}
-			if !r.FinishedAt.IsZero() {
-				rs.FinishedAt = r.FinishedAt.UTC().Format(time.RFC3339)
-			}
-			out.Runs = append(out.Runs, rs)
+			out.Runs = append(out.Runs, toRunSummary(r))
 		}
 		out.Count = len(out.Runs)
 		return nil, out, nil
 	})
+}
+
+// toRunSummary maps a run record to the LLM-facing summary.
+func toRunSummary(r runView) runSummary {
+	rs := runSummary{RunID: r.ID, Domain: r.Domain, Status: r.Status, Score: r.Score, WorstLevel: r.WorstLevel, DurationMs: r.DurationMs}
+	if r.Grade != nil {
+		rs.Grade = *r.Grade
+	}
+	if !r.FinishedAt.IsZero() {
+		rs.FinishedAt = r.FinishedAt.UTC().Format(time.RFC3339)
+	}
+	return rs
 }
 
 // fillResult fetches a run's result and fills grade, score, and findings into

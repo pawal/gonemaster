@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"sync"
 	"testing"
@@ -19,8 +20,10 @@ type fakeOpts struct {
 	finalStatus    string                  // terminal status (default "succeeded")
 	jobError       string                  // job.Error at the terminal poll
 	result         *resultView             // body for GET /jobs/{id}/result; nil yields 404
+	resultsByID    map[string]resultView   // per-id bodies for GET /jobs/{id}/result (checked first)
 	run            *runView                // body for GET /runs/{id}; nil yields 404
 	runs           []runView               // items for GET /runs
+	runsQuery      *url.Values             // when set, captures the GET /runs query
 	specList       *specTestcaseListView   // body for GET /spec/testcases
 	specDetail     *specTestcaseDetailView // body for GET /spec/testcases/{id}; nil yields 404
 	requireToken   string                  // when set, endpoints return 401 unless the Bearer token matches
@@ -81,6 +84,10 @@ func newFakeServer(t *testing.T, opts fakeOpts) *httptest.Server {
 		if !guard(w, r) {
 			return
 		}
+		if res, ok := opts.resultsByID[r.PathValue("id")]; ok {
+			writeJSON(w, http.StatusOK, res)
+			return
+		}
 		if opts.result == nil {
 			writeJSON(w, http.StatusNotFound, errBody("no result"))
 			return
@@ -100,6 +107,9 @@ func newFakeServer(t *testing.T, opts fakeOpts) *httptest.Server {
 	mux.HandleFunc("GET /api/v1/runs", func(w http.ResponseWriter, r *http.Request) {
 		if !guard(w, r) {
 			return
+		}
+		if opts.runsQuery != nil {
+			*opts.runsQuery = r.URL.Query()
 		}
 		writeJSON(w, http.StatusOK, runListView{Items: opts.runs, Total: len(opts.runs)})
 	})

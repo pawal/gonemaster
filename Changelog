@@ -12,6 +12,7 @@ All notable changes to all gonemaster components will be documented in this file
 - ui-public: Swedish, Japanese, and French translations for finding descriptions and test-case explanations
 - ui-public: translatable footer about text
 - docs: admin API authentication guide and OpenAPI security scheme
+- packaging: build .deb and .rpm packages via nfpm with a systemd unit and env file (make package-deb/package-rpm)
 
 ### Fixed
 

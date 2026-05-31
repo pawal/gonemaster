@@ -26,6 +26,7 @@ type fakeOpts struct {
 	runsQuery      *url.Values             // when set, captures the GET /runs query
 	batch          *batchSummaryView       // body for GET /batches/{id}; nil yields 404
 	entries        []entryRecord           // items for GET /entries (filtered by the level query)
+	batchReq       *batchCreateRequest     // when set, captures the POST /jobs/batch body
 	specList       *specTestcaseListView   // body for GET /spec/testcases
 	specDetail     *specTestcaseDetailView // body for GET /spec/testcases/{id}; nil yields 404
 	requireToken   string                  // when set, endpoints return 401 unless the Bearer token matches
@@ -138,6 +139,36 @@ func newFakeServer(t *testing.T, opts fakeOpts) *httptest.Server {
 		}
 		writeJSON(w, http.StatusOK, entryListView{Items: items, Total: len(items)})
 	})
+	mux.HandleFunc("POST /api/v1/jobs/batch", func(w http.ResponseWriter, r *http.Request) {
+		if !guard(w, r) {
+			return
+		}
+		var req batchCreateRequest
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if opts.batchReq != nil {
+			*opts.batchReq = req
+		}
+		ids := []string{}
+		for range req.Domains {
+			ids = append(ids, "job_x")
+		}
+		if len(ids) == 0 && req.FromTag != "" {
+			ids = []string{"job_x"}
+		}
+		writeJSON(w, http.StatusCreated, batchCreateResponse{BatchID: "batch_new", JobIDs: ids})
+	})
+	mux.HandleFunc("POST /api/v1/jobs/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
+		if !guard(w, r) {
+			return
+		}
+		writeJSON(w, http.StatusOK, jobView{ID: r.PathValue("id"), Status: "canceled"})
+	})
+	mux.HandleFunc("DELETE /api/v1/batches/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !guard(w, r) {
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
 	mux.HandleFunc("GET /api/v1/spec/testcases", func(w http.ResponseWriter, r *http.Request) {
 		if !guard(w, r) {
 			return
@@ -172,7 +203,7 @@ func callTool(t *testing.T, api *apiClient, name string, args map[string]any, ou
 	defer func() { cancel(); <-done }()
 
 	clientT, serverT := mcp.NewInMemoryTransports()
-	srv := newMCPServer(api)
+	srv := newMCPServer(api, true)
 	go func() { _ = srv.Run(ctx, serverT); close(done) }()
 
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)

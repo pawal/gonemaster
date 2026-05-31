@@ -216,6 +216,35 @@ func (c *apiClient) getResult(ctx context.Context, id, locale string) (resultVie
 	return out, err
 }
 
+// batchCreateRequest is the POST /api/v1/jobs/batch payload (minimal subset).
+type batchCreateRequest struct {
+	Domains []string `json:"domains,omitempty"`
+	FromTag string   `json:"from_tag,omitempty"`
+	Profile string   `json:"profile,omitempty"`
+	Tags    []string `json:"tags,omitempty"`
+}
+
+type batchCreateResponse struct {
+	BatchID string   `json:"batch_id"`
+	JobIDs  []string `json:"job_ids"`
+}
+
+func (c *apiClient) createBatch(ctx context.Context, req batchCreateRequest) (batchCreateResponse, error) {
+	var out batchCreateResponse
+	err := c.doJSON(ctx, http.MethodPost, "/jobs/batch", req, &out)
+	return out, err
+}
+
+func (c *apiClient) cancelJob(ctx context.Context, id string) (jobView, error) {
+	var out jobView
+	err := c.doJSON(ctx, http.MethodPost, "/jobs/"+url.PathEscape(id)+"/cancel", nil, &out)
+	return out, err
+}
+
+func (c *apiClient) deleteBatch(ctx context.Context, id string) error {
+	return c.doJSON(ctx, http.MethodDelete, "/batches/"+url.PathEscape(id), nil, nil)
+}
+
 // batchSummaryView decodes GET /batches/{id}.
 type batchSummaryView struct {
 	BatchID      string         `json:"batch_id"`

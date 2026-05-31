@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -25,17 +26,28 @@ var version = "dev"
 // config holds settings sourced from the environment. The bridge is launched by
 // an MCP client (Claude Code / Claude Desktop), so it takes no flags.
 type config struct {
-	serverURL string
-	token     string
-	timeout   time.Duration
+	serverURL  string
+	token      string
+	timeout    time.Duration
+	allowWrite bool
 }
 
 func configFromEnv() config {
 	return config{
-		serverURL: envOr("GONEMASTER_URL", defaultServerURL),
-		token:     os.Getenv("GONEMASTER_TOKEN"),
-		timeout:   defaultTimeout,
+		serverURL:  envOr("GONEMASTER_URL", defaultServerURL),
+		token:      os.Getenv("GONEMASTER_TOKEN"),
+		timeout:    defaultTimeout,
+		allowWrite: envBool("GONEMASTER_MCP_ALLOW_WRITE"),
 	}
+}
+
+// envBool reports whether an env var is set to an enabling value (1/true/yes/on).
+func envBool(key string) bool {
+	switch strings.ToLower(strings.TrimSpace(os.Getenv(key))) {
+	case "1", "true", "yes", "on":
+		return true
+	}
+	return false
 }
 
 // authMode describes how the bridge authenticates, for the startup log.
@@ -65,12 +77,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	srv := newMCPServer(api)
+	srv := newMCPServer(api, cfg.allowWrite)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	logger.Info("starting "+serverName, "version", version, "server_url", api.baseURL, "auth", cfg.authMode())
+	logger.Info("starting "+serverName, "version", version, "server_url", api.baseURL, "auth", cfg.authMode(), "write_tools", cfg.allowWrite)
 	if err := srv.Run(ctx, &mcp.StdioTransport{}); err != nil && !errors.Is(err, context.Canceled) {
 		logger.Error(serverName+" stopped", "error", err)
 		os.Exit(1)

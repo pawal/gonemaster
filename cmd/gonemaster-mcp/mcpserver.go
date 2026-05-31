@@ -6,15 +6,19 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// newMCPServer builds the server and registers tools. SDK use is confined to
-// this file so a later SDK swap stays contained.
-func newMCPServer(api *apiClient) *mcp.Server {
+// newMCPServer builds the server and registers tools. Write tools register only
+// when allowWrite is set. SDK use is confined to this file so a later SDK swap
+// stays contained.
+func newMCPServer(api *apiClient, allowWrite bool) *mcp.Server {
 	srv := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: version}, nil)
 	registerPing(srv, api)
 	registerReadTools(srv, api)
 	registerSpecTools(srv, api)
 	registerHistoryTools(srv, api)
 	registerBatchTools(srv, api)
+	if allowWrite {
+		registerWriteTools(srv, api)
+	}
 	return srv
 }
 

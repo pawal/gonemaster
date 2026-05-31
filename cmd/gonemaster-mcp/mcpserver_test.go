@@ -67,7 +67,7 @@ func callPing(t *testing.T, api *apiClient) pingOutput {
 	defer cancel()
 
 	clientT, serverT := mcp.NewInMemoryTransports()
-	srv := newMCPServer(api)
+	srv := newMCPServer(api, false)
 	go func() { _ = srv.Run(ctx, serverT) }()
 
 	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)

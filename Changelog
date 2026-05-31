@@ -2,12 +2,17 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.4.10] - 2026-05-31
+
+NEW: Admin API authentication (has to be enabled)
+
+Also NEW: German translation
 
 ### Added
 
 - engine: surface CNAME resolution failures in Address01-03 and Connectivity01 via the CNAME_CHAIN_TOO_LONG, CNAME_TARGET_UNRESOLVED, and CNAME_TOO_MANY_RECORDS tags
 - server: add optional admin API bearer-token authentication gating /api/v1 (open mode by default), minted via gonemaster-server auth add-token and reloadable on SIGHUP
+- ui, engine: German translations
 - admin-ui: add admin token login and logout; gonemaster-client gains --token / GONEMASTER_TOKEN
 - ui-public: Swedish, Japanese, and French translations for finding descriptions and test-case explanations
 - ui-public: translatable footer about text

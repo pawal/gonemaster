@@ -274,6 +274,9 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /runs/{id}", s.handleGetRun)
 	apiMux.HandleFunc("GET /runs", s.handleListRuns)
 
+	apiMux.HandleFunc("GET /spec/testcases/{id}", s.handleSpecTestcase)
+	apiMux.HandleFunc("GET /spec/testcases", s.handleSpecTestcases)
+
 	apiMux.HandleFunc("GET /tags/{name}/summary", s.handleTagSummary)
 	apiMux.HandleFunc("GET /tags/{name}/batches", s.handleTagBatches)
 	apiMux.HandleFunc("/tags/{name}/profile", s.handleTagProfile)

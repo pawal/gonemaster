@@ -556,6 +556,51 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /spec/testcases:
+    get:
+      tags: [Spec]
+      summary: List implemented testcases
+      operationId: listSpecTestcases
+      parameters:
+        - name: category
+          in: query
+          description: Filter to one module (alias: module)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Testcase catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecTestcaseList'
+
+  /spec/testcases/{id}:
+    get:
+      tags: [Spec]
+      summary: Get one testcase with its emitted tags and rendered messages
+      operationId: getSpecTestcase
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: locale
+          in: query
+          description: Locale for rendered messages (default en)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Testcase detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecTestcaseDetail'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
   /tags:
     get:
       tags: [Tags]
@@ -2204,6 +2249,51 @@ components:
         type: string
 
   schemas:
+    SpecTestcase:
+      type: object
+      required: [id, module]
+      properties:
+        id:
+          type: string
+          example: basic01
+        module:
+          type: string
+          example: basic
+        description:
+          type: string
+
+    SpecTestcaseList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpecTestcase'
+        total:
+          type: integer
+
+    SpecTag:
+      type: object
+      required: [tag]
+      properties:
+        tag:
+          type: string
+        message:
+          type: string
+
+    SpecTestcaseDetail:
+      allOf:
+        - $ref: '#/components/schemas/SpecTestcase'
+        - type: object
+          properties:
+            locale:
+              type: string
+            tags:
+              type: array
+              items:
+                $ref: '#/components/schemas/SpecTag'
+
     JobStatus:
       type: string
       enum: [queued, running, succeeded, failed, canceled, expired, paused]

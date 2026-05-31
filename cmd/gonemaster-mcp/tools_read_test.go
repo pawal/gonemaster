@@ -15,13 +15,15 @@ import (
 
 // fakeOpts configures the stand-in gonemaster-server.
 type fakeOpts struct {
-	pollsUntilDone int         // GET /jobs/{id} returns "running" for this many polls, then finalStatus
-	finalStatus    string      // terminal status (default "succeeded")
-	jobError       string      // job.Error at the terminal poll
-	result         *resultView // body for GET /jobs/{id}/result; nil yields 404
-	run            *runView    // body for GET /runs/{id}; nil yields 404
-	runs           []runView   // items for GET /runs
-	requireToken   string      // when set, endpoints return 401 unless the Bearer token matches
+	pollsUntilDone int                     // GET /jobs/{id} returns "running" for this many polls, then finalStatus
+	finalStatus    string                  // terminal status (default "succeeded")
+	jobError       string                  // job.Error at the terminal poll
+	result         *resultView             // body for GET /jobs/{id}/result; nil yields 404
+	run            *runView                // body for GET /runs/{id}; nil yields 404
+	runs           []runView               // items for GET /runs
+	specList       *specTestcaseListView   // body for GET /spec/testcases
+	specDetail     *specTestcaseDetailView // body for GET /spec/testcases/{id}; nil yields 404
+	requireToken   string                  // when set, endpoints return 401 unless the Bearer token matches
 }
 
 func newFakeServer(t *testing.T, opts fakeOpts) *httptest.Server {
@@ -100,6 +102,26 @@ func newFakeServer(t *testing.T, opts fakeOpts) *httptest.Server {
 			return
 		}
 		writeJSON(w, http.StatusOK, runListView{Items: opts.runs, Total: len(opts.runs)})
+	})
+	mux.HandleFunc("GET /api/v1/spec/testcases", func(w http.ResponseWriter, r *http.Request) {
+		if !guard(w, r) {
+			return
+		}
+		if opts.specList == nil {
+			writeJSON(w, http.StatusOK, specTestcaseListView{})
+			return
+		}
+		writeJSON(w, http.StatusOK, *opts.specList)
+	})
+	mux.HandleFunc("GET /api/v1/spec/testcases/{id}", func(w http.ResponseWriter, r *http.Request) {
+		if !guard(w, r) {
+			return
+		}
+		if opts.specDetail == nil {
+			writeJSON(w, http.StatusNotFound, errBody("no testcase"))
+			return
+		}
+		writeJSON(w, http.StatusOK, *opts.specDetail)
 	})
 	return httptest.NewServer(mux)
 }

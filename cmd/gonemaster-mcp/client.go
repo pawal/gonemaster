@@ -216,6 +216,52 @@ func (c *apiClient) getResult(ctx context.Context, id, locale string) (resultVie
 	return out, err
 }
 
+// specTestcaseView decodes one item from GET /spec/testcases.
+type specTestcaseView struct {
+	ID          string `json:"id"`
+	Module      string `json:"module"`
+	Description string `json:"description"`
+}
+
+type specTestcaseListView struct {
+	Items []specTestcaseView `json:"items"`
+	Total int                `json:"total"`
+}
+
+type specTagView struct {
+	Tag     string `json:"tag"`
+	Message string `json:"message"`
+}
+
+// specTestcaseDetailView decodes GET /spec/testcases/{id} (flat shape).
+type specTestcaseDetailView struct {
+	ID          string        `json:"id"`
+	Module      string        `json:"module"`
+	Description string        `json:"description"`
+	Locale      string        `json:"locale"`
+	Tags        []specTagView `json:"tags"`
+}
+
+func (c *apiClient) listSpecTestcases(ctx context.Context, category string) (specTestcaseListView, error) {
+	var out specTestcaseListView
+	path := "/spec/testcases"
+	if category != "" {
+		path += "?category=" + url.QueryEscape(category)
+	}
+	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
+func (c *apiClient) getSpecTestcase(ctx context.Context, id, locale string) (specTestcaseDetailView, error) {
+	var out specTestcaseDetailView
+	path := "/spec/testcases/" + url.PathEscape(id)
+	if locale != "" {
+		path += "?locale=" + url.QueryEscape(locale)
+	}
+	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
 func (c *apiClient) listRuns(ctx context.Context, domain string, limit int) (runListView, error) {
 	var out runListView
 	q := url.Values{}

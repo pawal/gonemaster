@@ -19,6 +19,9 @@ type DatabaseConfig struct {
 	// RetentionDays is the number of days to keep completed jobs. Zero means
 	// keep forever (disabled).
 	RetentionDays int `json:"retention_days,omitempty"`
+	// PurgeIntervalSeconds is how often the retention purge loop runs. Zero
+	// uses the default (3600s / 1h).
+	PurgeIntervalSeconds int `json:"purge_interval_seconds,omitempty"`
 	// MaxOpenConns caps the connection pool size. Zero uses the
 	// driver-appropriate default (1 for sqlite, 25 otherwise).
 	MaxOpenConns int `json:"max_open_conns,omitempty"`
@@ -94,6 +97,8 @@ func (d *Duration) UnmarshalJSON(b []byte) error {
 }
 
 const defaultCrossJobHotCacheTTLSeconds = 60
+
+const defaultPurgeIntervalSeconds = 3600
 
 // Config controls HTTP server behavior.
 type Config struct {
@@ -182,6 +187,7 @@ type DatabaseFileConfig struct {
 	Driver                 string `json:"driver,omitempty"`
 	DSN                    string `json:"dsn,omitempty"`
 	RetentionDays          *int   `json:"retention_days,omitempty"`
+	PurgeIntervalSeconds   *int   `json:"purge_interval_seconds,omitempty"`
 	MaxOpenConns           *int   `json:"max_open_conns,omitempty"`
 	MaxIdleConns           *int   `json:"max_idle_conns,omitempty"`
 	ConnMaxLifetimeSeconds *int   `json:"conn_max_lifetime_seconds,omitempty"`
@@ -262,6 +268,15 @@ func (c Config) EffectiveCrossJobHotCacheTTL() time.Duration {
 	secs := c.CrossJobHotCacheTTLSeconds
 	if secs <= 0 {
 		secs = defaultCrossJobHotCacheTTLSeconds
+	}
+	return time.Duration(secs) * time.Second
+}
+
+// EffectivePurgeInterval returns the retention purge interval as a time.Duration.
+func (c Config) EffectivePurgeInterval() time.Duration {
+	secs := c.Database.PurgeIntervalSeconds
+	if secs <= 0 {
+		secs = defaultPurgeIntervalSeconds
 	}
 	return time.Duration(secs) * time.Second
 }
@@ -377,6 +392,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 		}
 		if file.Database.RetentionDays != nil {
 			c.Database.RetentionDays = *file.Database.RetentionDays
+		}
+		if file.Database.PurgeIntervalSeconds != nil {
+			c.Database.PurgeIntervalSeconds = *file.Database.PurgeIntervalSeconds
 		}
 		if file.Database.MaxOpenConns != nil {
 			c.Database.MaxOpenConns = *file.Database.MaxOpenConns

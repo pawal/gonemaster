@@ -3,6 +3,7 @@ package server
 import (
 	"math"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -622,5 +623,26 @@ func TestMetricsCollectorInsightsEvictionAndCaps(t *testing.T) {
 	}
 	if snapshot.Insights.Domains.Other.RunsTotal < 1 {
 		t.Fatalf("insights.domains.other = %+v, expected contribution from evicted entries", snapshot.Insights.Domains.Other)
+	}
+}
+
+func TestMetricsCollectorTracksJobsPurged(t *testing.T) {
+	collector := newMetricsCollector(DefaultConfig(), time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC))
+
+	// Two purge cycles accumulate into a single lifetime counter; non-positive
+	// counts are ignored so an empty sweep does not move the metric.
+	collector.ObserveJobsPurged(3)
+	collector.ObserveJobsPurged(0)
+	collector.ObserveJobsPurged(-5)
+	collector.ObserveJobsPurged(2)
+
+	snapshot := collector.Snapshot()
+	if snapshot.Jobs.PurgedTotal != 5 {
+		t.Fatalf("jobs.purged_total = %d, want 5", snapshot.Jobs.PurgedTotal)
+	}
+
+	prom := string(renderPrometheusMetrics(collector.prometheusSnapshot()))
+	if !strings.Contains(prom, "gonemaster_jobs_purged_total 5") {
+		t.Fatalf("expected prometheus counter gonemaster_jobs_purged_total 5, got:\n%s", prom)
 	}
 }

@@ -35,6 +35,7 @@ type metricsPromSnapshot struct {
 	FailedTotal    int64
 	CanceledTotal  int64
 	ExpiredTotal   int64
+	PurgedTotal    int64
 	StatusCounts   map[string]int64
 
 	APIRequestsTotal     int64
@@ -90,6 +91,7 @@ func (m *MetricsCollector) prometheusSnapshot() metricsPromSnapshot {
 		FailedTotal:          m.failedTotal,
 		CanceledTotal:        m.canceledTotal,
 		ExpiredTotal:         expiredTotal,
+		PurgedTotal:          m.purgedTotal,
 		StatusCounts:         copyStatusCounts(m.statusCounts),
 		APIRequestsTotal:     m.apiRequestsTotal,
 		APIStatusClassCounts: copyStatusClassCounts(m.apiStatusClassCounts),
@@ -188,6 +190,9 @@ func renderPrometheusMetrics(snapshot metricsPromSnapshot) []byte {
 
 	writePromHeader(&buf, "gonemaster_jobs_completed_total", "Lifetime terminal job transitions.", "counter")
 	writePromSample(&buf, "gonemaster_jobs_completed_total", nil, snapshot.CompletedTotal)
+
+	writePromHeader(&buf, "gonemaster_jobs_purged_total", "Lifetime jobs deleted by the retention purge loop.", "counter")
+	writePromSample(&buf, "gonemaster_jobs_purged_total", nil, snapshot.PurgedTotal)
 
 	writePromHeader(&buf, "gonemaster_job_terminal_outcomes_total", "Lifetime terminal job outcomes by outcome.", "counter")
 	writePromSample(&buf, "gonemaster_job_terminal_outcomes_total", map[string]string{"outcome": "succeeded"}, snapshot.SucceededTotal)

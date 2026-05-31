@@ -297,6 +297,46 @@ func TestApplyEnvVarsDBRetentionDaysCLIWins(t *testing.T) {
 	}
 }
 
+func TestApplyEnvVarsDBPurgeInterval(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_DB_PURGE_INTERVAL": "1800",
+	}), &warn)
+	if cfg.Database.PurgeIntervalSeconds != 1800 {
+		t.Fatalf("expected PurgeIntervalSeconds=1800, got %d", cfg.Database.PurgeIntervalSeconds)
+	}
+	if warn.String() != "" {
+		t.Fatalf("unexpected warning: %q", warn.String())
+	}
+}
+
+func TestApplyEnvVarsDBPurgeIntervalInvalidIsWarned(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_DB_PURGE_INTERVAL": "notanumber",
+	}), &warn)
+	if cfg.Database.PurgeIntervalSeconds != 0 {
+		t.Fatalf("expected PurgeIntervalSeconds unchanged at 0, got %d", cfg.Database.PurgeIntervalSeconds)
+	}
+	if warn.String() == "" {
+		t.Fatal("expected warning for invalid purge interval, got none")
+	}
+}
+
+func TestApplyEnvVarsDBPurgeIntervalCLIWins(t *testing.T) {
+	cfg := server.DefaultConfig()
+	cfg.Database.PurgeIntervalSeconds = 900
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{"db-purge-interval": true}, fakeEnv(map[string]string{
+		"GONEMASTER_DB_PURGE_INTERVAL": "1800",
+	}), &warn)
+	if cfg.Database.PurgeIntervalSeconds != 900 {
+		t.Fatalf("expected CLI value 900 to win, got %d", cfg.Database.PurgeIntervalSeconds)
+	}
+}
+
 func TestApplyEnvVarsPublicAPIRateLimitEnabled(t *testing.T) {
 	cfg := server.DefaultConfig()
 	var warn strings.Builder

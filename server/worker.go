@@ -42,9 +42,10 @@ func (s *Server) Start() {
 		s.startWorker()
 	}
 
-	// Always start the purge goroutine; it reads RetentionDays dynamically so
-	// changes via the settings API take effect without a restart.
-	startPurgeLoop(ctx, s.store, &s.retentionDays, func(format string, args ...any) {
+	// Always start the purge goroutine; it reads RetentionDays and the purge
+	// interval dynamically so changes via the settings API take effect without
+	// a restart.
+	startPurgeLoop(ctx, s.store, &s.retentionDays, &s.purgeIntervalSec, s.metrics, func(format string, args ...any) {
 		log.Printf(format, args...)
 	})
 

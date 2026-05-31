@@ -450,6 +450,58 @@ func TestGetSettingsIncludesHotCacheTTL(t *testing.T) {
 	}
 }
 
+func TestPutSettingsUpdatesPurgeInterval(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	body := `{"purge_interval_seconds": 1800}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	if srv.cfg.Database.PurgeIntervalSeconds != 1800 {
+		t.Fatalf("PurgeIntervalSeconds after PUT: got %d, want 1800", srv.cfg.Database.PurgeIntervalSeconds)
+	}
+	// The purge loop reads the interval from the atomic, so it must track the
+	// new value for the change to take effect without a restart.
+	if got := srv.purgeIntervalSec.Load(); got != 1800 {
+		t.Fatalf("purgeIntervalSec atomic after PUT: got %d, want 1800", got)
+	}
+}
+
+func TestGetSettingsIncludesPurgeInterval(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	var settings map[string]settingEntry
+	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+
+	entry, ok := settings["purge_interval_seconds"]
+	if !ok {
+		t.Fatal("missing setting purge_interval_seconds")
+	}
+	val, ok2 := entry.Value.(float64)
+	if !ok2 {
+		t.Fatalf("expected float64 value, got %T", entry.Value)
+	}
+	// The endpoint reports the effective interval, so an unset config field
+	// surfaces as the 3600s default rather than 0.
+	if int(val) != defaultPurgeIntervalSeconds {
+		t.Fatalf("value: got %v, want %d", val, defaultPurgeIntervalSeconds)
+	}
+	if entry.Readonly {
+		t.Fatal("expected purge_interval_seconds to be mutable")
+	}
+}
+
 func TestPublicInfoEndpointDefault(t *testing.T) {
 	srv := New(DefaultConfig())
 

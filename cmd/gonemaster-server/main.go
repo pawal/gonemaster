@@ -55,6 +55,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var dbDriver string
 	var dbDSN string
 	var dbRetentionDays int
+	var dbPurgeInterval int
 	var pubAPIRateLimitEnabled bool
 	var pubAPIRateLimitMax int
 	var pubAPIRateLimitWindow time.Duration
@@ -110,6 +111,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--db-driver DRIVER", detail: "Storage backend: sqlite (or leave empty for in-memory) (env: GONEMASTER_DB_DRIVER)"},
 			{flag: "--db-dsn DSN", detail: "SQLite: file path e.g. /var/lib/gonemaster/jobs.db (env: GONEMASTER_DB_DSN)"},
 			{flag: "--db-retention-days N", detail: "Delete completed jobs older than N days (0 = keep forever) (env: GONEMASTER_DB_RETENTION_DAYS)"},
+			{flag: "--db-purge-interval N", detail: "Retention purge sweep interval in seconds (default 3600) (env: GONEMASTER_DB_PURGE_INTERVAL)"},
 		})
 		printUsageGroup(errOut, "Reverse proxy", []usageLine{
 			{flag: "--trusted-proxy-cidrs LIST", detail: "Comma-separated CIDRs (or bare IPs) of reverse proxies allowed to set X-Forwarded-For. Empty = trust nothing (RemoteAddr only). Leave empty when the server is exposed directly. (env: GONEMASTER_TRUSTED_PROXY_CIDRS)"},
@@ -152,6 +154,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.StringVar(&dbDriver, "db-driver", "", "Storage backend: sqlite (empty = in-memory)")
 	fs.StringVar(&dbDSN, "db-dsn", "", "Database file path or connection string (optional)")
 	fs.IntVar(&dbRetentionDays, "db-retention-days", 0, "Delete completed jobs older than N days (0 = keep forever)")
+	fs.IntVar(&dbPurgeInterval, "db-purge-interval", 0, "Retention purge sweep interval in seconds (default 3600)")
 	fs.BoolVar(&pubAPIRateLimitEnabled, "public-api-rate-limit-enabled", false, "Enable per-IP rate limiting on POST /pub/api/v1/jobs")
 	fs.IntVar(&pubAPIRateLimitMax, "public-api-rate-limit-max", 0, "Max job submissions per IP per window (default 10)")
 	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
@@ -210,6 +213,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if flagsSet["db-retention-days"] && dbRetentionDays < 0 {
 		fmt.Fprintln(errOut, "--db-retention-days must be >= 0")
+		return 2
+	}
+	if flagsSet["db-purge-interval"] && dbPurgeInterval < 1 {
+		fmt.Fprintln(errOut, "--db-purge-interval must be >= 1")
 		return 2
 	}
 	if flagsSet["public-api-rate-limit-max"] && pubAPIRateLimitMax < 1 {
@@ -328,6 +335,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if flagsSet["db-retention-days"] {
 		cfg.Database.RetentionDays = dbRetentionDays
+	}
+	if flagsSet["db-purge-interval"] {
+		cfg.Database.PurgeIntervalSeconds = dbPurgeInterval
 	}
 	if flagsSet["public-api-rate-limit-enabled"] {
 		cfg.PublicAPI.RateLimitEnabled = pubAPIRateLimitEnabled
@@ -537,9 +547,10 @@ func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string
 		"db-driver":                     "db_driver",
 		"db-dsn":                        "db_dsn",
 		"db-retention-days":             "retention_days",
-		"public-api-rate-limit-enabled":           "rate_limit_enabled",
-		"public-api-rate-limit-max":               "rate_limit_max",
-		"public-api-rate-limit-window":            "rate_limit_window",
+		"db-purge-interval":             "purge_interval_seconds",
+		"public-api-rate-limit-enabled": "rate_limit_enabled",
+		"public-api-rate-limit-max":     "rate_limit_max",
+		"public-api-rate-limit-window":  "rate_limit_window",
 		"public-api-allow-private-undelegated-ip": "allow_private_undelegated_ip",
 		"trusted-proxy-cidrs":                     "trusted_proxy_cidrs",
 		"read-timeout":                            "read_timeout",

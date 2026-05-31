@@ -87,7 +87,8 @@ func TestDatabaseSetupMDExists(t *testing.T) {
 }
 
 // TestServerDatabaseMDRetentionDays verifies that docs/server/database.md
-// documents the retention_days configuration field, env var, and CLI flag.
+// documents the retention_days and purge-interval configuration fields, env
+// vars, and CLI flags.
 func TestServerDatabaseMDRetentionDays(t *testing.T) {
 	data, err := os.ReadFile("../../docs/server/database.md")
 	if err != nil {
@@ -97,7 +98,9 @@ func TestServerDatabaseMDRetentionDays(t *testing.T) {
 	for _, want := range []string{
 		"retention_days",
 		"--db-retention-days",
-		"hourly",
+		"every hour",
+		"--db-purge-interval",
+		"purge_interval_seconds",
 	} {
 		if !strings.Contains(src, want) {
 			t.Errorf("docs/server/database.md missing %q", want)

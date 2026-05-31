@@ -122,6 +122,7 @@ type MetricsJobsSnapshot struct {
 	StartedTotal   int64            `json:"started_total"`
 	CompletedTotal int64            `json:"completed_total"`
 	CanceledTotal  int64            `json:"canceled_total"`
+	PurgedTotal    int64            `json:"purged_total"`
 	StatusCounts   map[string]int64 `json:"status_counts"`
 }
 
@@ -226,6 +227,7 @@ type MetricsCollector struct {
 	succeededTotal int64
 	failedTotal    int64
 	canceledTotal  int64
+	purgedTotal    int64
 	statusCounts   map[string]int64
 
 	apiRequestsTotal     int64
@@ -478,6 +480,16 @@ func (m *MetricsCollector) ObserveJobCompletionWithContext(batchID string, domai
 	m.mu.Unlock()
 }
 
+// ObserveJobsPurged records n jobs deleted by the retention purge loop.
+func (m *MetricsCollector) ObserveJobsPurged(n int64) {
+	if n <= 0 {
+		return
+	}
+	m.mu.Lock()
+	m.purgedTotal += n
+	m.mu.Unlock()
+}
+
 // ObserveResultLocale records locale usage when rendering results.
 func (m *MetricsCollector) ObserveResultLocale(locale string) {
 	normalized := normalizeMetricsLocale(locale)
@@ -571,6 +583,7 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 	succeededTotal := m.succeededTotal
 	failedTotal := m.failedTotal
 	canceledTotal := m.canceledTotal
+	purgedTotal := m.purgedTotal
 	apiRequestsTotal := m.apiRequestsTotal
 	apiStatusClassCounts := copyStatusClassCounts(m.apiStatusClassCounts)
 	apiErrorCodeCounts := copyStringCounts(m.apiErrorCodeCounts)
@@ -627,6 +640,7 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 			StartedTotal:   startedTotal,
 			CompletedTotal: completedTotal,
 			CanceledTotal:  canceledTotal,
+			PurgedTotal:    purgedTotal,
 			StatusCounts:   statusCounts,
 		},
 		API: MetricsAPISnapshot{

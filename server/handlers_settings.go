@@ -85,6 +85,11 @@ func (s *Server) applySetting(key, val string) {
 			s.cfg.Database.RetentionDays = v
 			s.retentionDays.Store(int64(v))
 		}
+	case "purge_interval_seconds":
+		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
+			s.cfg.Database.PurgeIntervalSeconds = v
+			s.purgeIntervalSec.Store(int64(v))
+		}
 	case "public_url":
 		s.cfg.PublicURL = val
 	case "rate_limit_enabled":
@@ -189,6 +194,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"max_concurrent_jobs":             {Value: cfg.MaxConcurrentJobs, Source: s.settingSource("max_concurrent_jobs")},
 		"min_level":                       {Value: cfg.MinLevel, Source: s.settingSource("min_level")},
 		"retention_days":                  {Value: cfg.Database.RetentionDays, Source: s.settingSource("retention_days")},
+		"purge_interval_seconds":          {Value: int(cfg.EffectivePurgeInterval() / time.Second), Source: s.settingSource("purge_interval_seconds")},
 		"public_url":                      {Value: cfg.PublicURL, Source: s.settingSource("public_url")},
 		"rate_limit_enabled":              {Value: cfg.PublicAPI.RateLimitEnabled, Source: s.settingSource("rate_limit_enabled")},
 		"rate_limit_max":                  {Value: cfg.PublicAPI.RateLimitMax, Source: s.settingSource("rate_limit_max")},

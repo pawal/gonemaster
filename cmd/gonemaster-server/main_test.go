@@ -173,6 +173,51 @@ func TestRunDBRetentionDaysHelpText(t *testing.T) {
 	}
 }
 
+func TestRunDBPurgeIntervalValidation(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--db-purge-interval", "0"}, out, errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "--db-purge-interval must be >= 1") {
+		t.Fatalf("expected purge-interval validation error, got %q", errText)
+	}
+}
+
+func TestRunDBPurgeIntervalDumpConfig(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--dump-config", "--db-purge-interval", "1800"}, out, errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d", code)
+	}
+	outText := readTempFile(t, out)
+	if !strings.Contains(outText, `"purge_interval_seconds": 1800`) {
+		t.Fatalf("expected purge_interval_seconds in dump-config output, got:\n%s", outText)
+	}
+}
+
+func TestRunDBPurgeIntervalHelpText(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	run([]string{"-h"}, out, errOut)
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "--db-purge-interval") {
+		t.Fatalf("expected --db-purge-interval in help output, got:\n%s", errText)
+	}
+}
+
 func TestRunSourceAddr6Validation(t *testing.T) {
 	out := newTempFile(t)
 	errOut := newTempFile(t)

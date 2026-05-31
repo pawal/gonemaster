@@ -342,6 +342,64 @@ func TestDatabaseFileConfigRetentionDaysJSON(t *testing.T) {
 	}
 }
 
+func TestEffectivePurgeIntervalDefaultsToOneHour(t *testing.T) {
+	cfg := DefaultConfig()
+	// PurgeIntervalSeconds is unset (0), so the effective interval falls back
+	// to the 3600s default rather than a zero-length interval.
+	if got := cfg.EffectivePurgeInterval(); got != time.Hour {
+		t.Fatalf("expected default purge interval 1h, got %s", got)
+	}
+}
+
+func TestEffectivePurgeIntervalUsesConfiguredValue(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Database.PurgeIntervalSeconds = 1800
+	if got := cfg.EffectivePurgeInterval(); got != 30*time.Minute {
+		t.Fatalf("expected purge interval 30m, got %s", got)
+	}
+}
+
+func TestEffectivePurgeIntervalNegativeFallsBackToDefault(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Database.PurgeIntervalSeconds = -5
+	if got := cfg.EffectivePurgeInterval(); got != time.Hour {
+		t.Fatalf("expected negative interval to fall back to 1h, got %s", got)
+	}
+}
+
+func TestApplyFileConfigPurgeIntervalSeconds(t *testing.T) {
+	cfg := DefaultConfig()
+	secs := 1800
+	cfg.ApplyFileConfig(FileConfig{
+		Database: &DatabaseFileConfig{PurgeIntervalSeconds: &secs},
+	})
+	if cfg.Database.PurgeIntervalSeconds != 1800 {
+		t.Fatalf("expected purge_interval_seconds 1800, got %d", cfg.Database.PurgeIntervalSeconds)
+	}
+}
+
+func TestApplyFileConfigPurgeIntervalSecondsNilIsNoop(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Database.PurgeIntervalSeconds = 900
+	cfg.ApplyFileConfig(FileConfig{
+		Database: &DatabaseFileConfig{Driver: "sqlite"},
+	})
+	if cfg.Database.PurgeIntervalSeconds != 900 {
+		t.Fatalf("expected purge_interval_seconds 900 unchanged, got %d", cfg.Database.PurgeIntervalSeconds)
+	}
+}
+
+func TestDatabaseFileConfigPurgeIntervalJSON(t *testing.T) {
+	raw := `{"driver":"sqlite","dsn":"/tmp/x.db","purge_interval_seconds":1800}`
+	var d DatabaseFileConfig
+	if err := json.Unmarshal([]byte(raw), &d); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	if d.PurgeIntervalSeconds == nil || *d.PurgeIntervalSeconds != 1800 {
+		t.Fatalf("expected purge_interval_seconds 1800, got %v", d.PurgeIntervalSeconds)
+	}
+}
+
 func TestDefaultConfigPublicAPIDefaults(t *testing.T) {
 	cfg := DefaultConfig()
 	if cfg.PublicAPI.RateLimitEnabled {

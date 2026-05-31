@@ -2,6 +2,14 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- server: gonemaster_jobs_purged_total metric (JSON metrics and Prometheus) counting jobs deleted by the retention purge loop
+- server: configurable retention purge interval via --db-purge-interval, GONEMASTER_DB_PURGE_INTERVAL, or database.purge_interval_seconds (default 1h)
+- admin-ui: purge interval field in System Settings; retention window and interval now take effect without a restart
+
 ## [v1.4.10] - 2026-05-31
 
 NEW: Admin API authentication (has to be enabled)

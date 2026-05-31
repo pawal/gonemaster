@@ -196,3 +196,80 @@ func TestPurgeLoopRetentionDaysDynamic(t *testing.T) {
 		}
 	}
 }
+
+// TestRunPurgeLoopRecordsPurgeMetric verifies the loop reports the number of
+// deleted jobs to the metrics collector. The metric is recorded just before
+// the log line, so once the log arrives the counter is already updated.
+func TestRunPurgeLoopRecordsPurgeMetric(t *testing.T) {
+	store := NewInMemoryJobStore()
+	old := time.Now().UTC().Add(-91 * 24 * time.Hour)
+	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+	if _, err := store.Create(job); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := store.GraduateJob(job, nil); err != nil {
+		t.Fatalf("graduate: %v", err)
+	}
+
+	metrics := NewMetricsCollector(DefaultConfig())
+	logCh := make(chan string, 4)
+	logger := func(format string, args ...any) { logCh <- fmt.Sprintf(format, args...) }
+
+	var retDays atomic.Int64
+	retDays.Store(90)
+	runPurgeLoop(t.Context(), store, &retDays, metrics, logger, func() time.Duration { return 10 * time.Millisecond })
+
+	select {
+	case <-logCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for purge log message")
+	}
+
+	if got := metrics.Snapshot().Jobs.PurgedTotal; got != 1 {
+		t.Fatalf("jobs.purged_total = %d, want 1", got)
+	}
+}
+
+// TestRunPurgeLoopAppliesIntervalChange verifies that changing the interval
+// while the loop runs resets the ticker and the loop keeps purging. This
+// exercises the ticker.Reset branch.
+func TestRunPurgeLoopAppliesIntervalChange(t *testing.T) {
+	store := NewInMemoryJobStore()
+	logCh := make(chan string, 8)
+	logger := func(format string, args ...any) { logCh <- fmt.Sprintf(format, args...) }
+
+	var intervalNanos atomic.Int64
+	intervalNanos.Store(int64(10 * time.Millisecond))
+	intervalFn := func() time.Duration { return time.Duration(intervalNanos.Load()) }
+
+	var retDays atomic.Int64
+	retDays.Store(90)
+	runPurgeLoop(t.Context(), store, &retDays, nil, logger, intervalFn)
+
+	addOldJob := func(id string) {
+		old := time.Now().UTC().Add(-91 * 24 * time.Hour)
+		job := Job{ID: id, Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+		if _, err := store.Create(job); err != nil {
+			t.Fatalf("create %s: %v", id, err)
+		}
+		if err := store.GraduateJob(job, nil); err != nil {
+			t.Fatalf("graduate %s: %v", id, err)
+		}
+	}
+	waitForPurge := func(label string) {
+		select {
+		case <-logCh:
+		case <-time.After(2 * time.Second):
+			t.Fatalf("timeout waiting for purge (%s)", label)
+		}
+	}
+
+	// First job purged under the initial 10ms interval.
+	addOldJob("j1")
+	waitForPurge("initial interval")
+
+	// Change the interval; the loop should reset its ticker and keep purging.
+	intervalNanos.Store(int64(25 * time.Millisecond))
+	addOldJob("j2")
+	waitForPurge("after interval change")
+}

@@ -90,9 +90,27 @@ gonemaster-server \
 ```
 
 - `0` keeps completed results forever.
-- A positive value starts an hourly purge loop.
+- A positive value starts a background purge loop that runs every hour by
+  default.
 - Only terminal jobs are purged.
 - Queued, running, and paused jobs are never purged automatically.
+
+The sweep interval is configurable with `--db-purge-interval`,
+`database.purge_interval_seconds`, or `GONEMASTER_DB_PURGE_INTERVAL` (seconds,
+default `3600`):
+
+```sh
+gonemaster-server \
+  --db-driver sqlite \
+  --db-dsn /var/lib/gonemaster/gonemaster.db \
+  --db-retention-days 90 \
+  --db-purge-interval 1800
+```
+
+The retention window and the purge interval can both be changed at runtime from
+the admin Settings page; the new values take effect at the next sweep without a
+restart. Each sweep that deletes rows increments the `gonemaster_jobs_purged_total`
+metric.
 
 Manual batch deletion is separate from retention. It removes one batch and its
 derived records regardless of age. See [operations.md](operations.md).

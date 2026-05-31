@@ -338,7 +338,7 @@ PACKAGE_ARCHES ?= amd64 arm64
 DIST_DIR := dist
 PKG_DIR := $(DIST_DIR)/packages
 NFPM := $(GO) run github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
-PER_ARCH_PKGS := gonemaster gonemaster-server gonemaster-server-nogui gonemaster-client gonemaster-nagios
+PER_ARCH_PKGS := gonemaster gonemaster-server gonemaster-server-nogui gonemaster-client gonemaster-nagios gonemaster-mcp
 
 # Refresh blocklist data only if missing; an explicit `make badkeys-update`
 # is the way to pull a new snapshot.
@@ -360,6 +360,8 @@ package-binaries: ui-build
 			-o $(DIST_DIR)/linux_$$arch/gonemaster-client ./cmd/gonemaster-client || exit 1; \
 		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 $(GO) build -trimpath -ldflags='-s -w' \
 			-o $(DIST_DIR)/linux_$$arch/gonemaster-nagios ./cmd/gonemaster-nagios || exit 1; \
+		GOOS=linux GOARCH=$$arch CGO_ENABLED=0 $(GO) build -trimpath -ldflags="-s -w -X main.version=$(VERSION)" \
+			-o $(DIST_DIR)/linux_$$arch/gonemaster-mcp ./cmd/gonemaster-mcp || exit 1; \
 	done
 
 # nfpm expands env vars in scalar metadata fields (name, arch, version, ...)

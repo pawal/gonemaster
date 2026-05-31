@@ -85,6 +85,7 @@
   const localeKey = "gonemaster.ui.locale.v1";
   const localeDisplayNames = {
     da: "Dansk",
+    de: "Deutsch",
     en: "English",
     es: "Español",
     fi: "Suomi",

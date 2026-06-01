@@ -13,27 +13,18 @@ priority, so a large sweep does not block a waiting interactive user.
 
 Create one job:
 
-```http
-POST /api/v1/jobs
-Content-Type: application/json
-
-{
-  "domain": "example.com",
-  "min_level": "NOTICE"
-}
+```bash
+curl -s -X POST http://127.0.0.1:8080/api/v1/jobs \
+  -H "Content-Type: application/json" \
+  -d '{"domain": "example.com", "min_level": "NOTICE"}'
 ```
 
 Create a batch:
 
-```http
-POST /api/v1/jobs/batch
-Content-Type: application/json
-
-{
-  "from_tag": "tld",
-  "tags": ["tld"],
-  "description": "TLD sweep"
-}
+```bash
+curl -s -X POST http://127.0.0.1:8080/api/v1/jobs/batch \
+  -H "Content-Type: application/json" \
+  -d '{"from_tag": "tld", "tags": ["tld"], "description": "TLD sweep"}'
 ```
 
 Batch submission does not support undelegated input. Use a single job when you

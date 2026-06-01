@@ -15,7 +15,7 @@ The [architecture overview](architecture.md) is a one-sitting tour of the system
 | Manage domain tags and batch runs | [analysis/tags.md](analysis/tags.md) |
 | Publish public cohort analysis | [analysis/](analysis/README.md) |
 | Integrate with Nagios or Icinga | [nagios.md](nagios.md) |
-| Drive gonemaster from an AI agent (MCP) | [mcp.md](mcp.md) |
+| Drive gonemaster from an AI agent (MCP) | [mcp/](mcp/README.md) |
 | Call the engine from Go | [dev.md](dev.md) |
 
 ## Server

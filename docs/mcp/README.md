@@ -41,7 +41,7 @@ The bridge mirrors `gonemaster-client`: when `GONEMASTER_TOKEN` is set it sends
 credential, which works against a server running in open mode. If the server is
 in token mode and the token is missing or wrong, every call returns `401`. Mint
 a token with `gonemaster-server auth add-token`; see
-[server/authentication.md](server/authentication.md).
+[../server/authentication.md](../server/authentication.md).
 
 ## Connecting a client
 

@@ -4948,6 +4948,12 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	// RFC 9975: only MUST digest types participate in CDS consistency.
+	cdsForConsistency := make(map[string][]dns.RR, len(cdsRRsets))
+	for ip, rrs := range cdsRRsets {
+		cdsForConsistency[ip] = filterCDSDigestMUST(rrs)
+	}
+
 	noCDSCDNSKEY := true
 	for _, rrset := range cdsRRsets {
 		if len(rrset) > 0 {
@@ -4984,7 +4990,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		for nsIP, cdsRRs := range cdsRRsets {
+		for nsIP, cdsRRs := range cdsForConsistency {
 			cdnsRRs, ok := cdnskeyRRsets[nsIP]
 			if !ok || len(cdsRRs) == 0 || len(cdnsRRs) == 0 {
 				continue
@@ -5007,7 +5013,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, cds := range cdsRecords {
 				matched := false
 				for _, cdnskey := range cdnskeyRecords {
-					if cds.KeyTag == cdnskey.KeyTag() || (cds.Algorithm == 0 && cdnskey.Algorithm == 0) {
+					if (cds.KeyTag == cdnskey.KeyTag() && cds.Algorithm == cdnskey.Algorithm) || (cds.Algorithm == 0 && cdnskey.Algorithm == 0) {
 						matched = true
 						break
 					}
@@ -5020,7 +5026,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, cdnskey := range cdnskeyRecords {
 				matched := false
 				for _, cds := range cdsRecords {
-					if cdnskey.KeyTag() == cds.KeyTag || (cdnskey.Algorithm == 0 && cds.Algorithm == 0) {
+					if (cdnskey.KeyTag() == cds.KeyTag && cdnskey.Algorithm == cds.Algorithm) || (cdnskey.Algorithm == 0 && cds.Algorithm == 0) {
 						matched = true
 						break
 					}
@@ -5053,7 +5059,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		if rrsetInconsistent(cdsRRsets) {
+		if rrsetInconsistent(cdsForConsistency) {
 			if err := appendLog(ctx, &results, testcase, "DS15_INCONSISTENT_CDS", map[string]any{}); err != nil {
 				return results, err
 			}
@@ -7738,6 +7744,41 @@ func dsDigestSupported(digest uint8) bool {
 	default:
 		return false
 	}
+}
+
+// cdsDigestMUST: digest types designated MUST in the IANA "Implement for
+// DNSSEC Delegation" column. RFC 9975 restricts CDS consistency checks to
+// these. Today: SHA-256 and SHA-384.
+func cdsDigestMUST(digest uint8) bool {
+	switch digest {
+	case 2, 4:
+		return true
+	}
+	return false
+}
+
+// filterCDSDigestMUST drops CDS records with non-MUST digest types. The
+// RFC 8078 delete signal (0/0/0) is preserved so mixed delete/update
+// responses still trip inconsistency.
+func filterCDSDigestMUST(rrs []dns.RR) []dns.RR {
+	if len(rrs) == 0 {
+		return rrs
+	}
+	out := make([]dns.RR, 0, len(rrs))
+	for _, rr := range rrs {
+		cds, ok := rr.(*dns.CDS)
+		if !ok {
+			continue
+		}
+		if cds.Algorithm == 0 && cds.DigestType == 0 && cds.KeyTag == 0 {
+			out = append(out, rr)
+			continue
+		}
+		if cdsDigestMUST(cds.DigestType) {
+			out = append(out, rr)
+		}
+	}
+	return out
 }
 
 func dnskeyRRset(keys []*dns.DNSKEY) []dns.RR {

@@ -28,9 +28,10 @@ Status: Final
      - `Has CDS No CDNSKEY` (non-empty CDS, empty CDNSKEY),
      - `Has CDNSKEY No CDS` (non-empty CDNSKEY, empty CDS),
      - `Has CDS And CDNSKEY` (both non-empty).
-   - If both RRsets are non-empty, compare each CDS against CDNSKEY set and each CDNSKEY against CDS set; mark nameserver mismatch when no match is found.
+   - Build a digest-filtered CDS view that retains only records whose digest type is designated MUST in the IANA "Implement for DNSSEC Delegation" column (currently SHA-256 and SHA-384), plus any RFC 8078 delete-signal record (algorithm 0, digest type 0, key tag 0). The classification step above operates on the unfiltered RRset; all later cross-server and cross-RRset consistency checks operate on the filtered view per RFC 9975.
+   - If both the filtered CDS and the CDNSKEY RRsets are non-empty for a nameserver, compare each CDS against the CDNSKEY set and each CDNSKEY against the CDS set; a pair is considered to reference the same key when both the key tag and the DNSSEC algorithm match, or when both records use algorithm `0` (delete signal). Mark nameserver mismatch when no match is found.
 6. Emit classification tags with `addresses`.
-7. Emit `DS15_INCONSISTENT_CDS` when CDS RRsets differ across nameservers.
+7. Emit `DS15_INCONSISTENT_CDS` when the digest-filtered CDS RRsets differ across nameservers.
 8. Emit `DS15_INCONSISTENT_CDNSKEY` when CDNSKEY RRsets differ across nameservers.
 9. Emit `DS15_MISMATCH_CDS_CDNSKEY` for nameservers with CDS/CDNSKEY mismatch.
 10. Emit `TEST_CASE_END`.
@@ -59,15 +60,21 @@ Per NS present in both maps:
    non-empty CDS,     empty     CDNSKEY  -> hasCDSNoCDNSKEY[ns]
    empty     CDS,     non-empty CDNSKEY  -> hasCDNSKEYNoCDS[ns]
    non-empty CDS AND non-empty CDNSKEY   -> hasCDSAndCDNSKEY[ns]
-        for each CDS, search CDNSKEY by keytag (or both algorithm == 0)
-        for each CDNSKEY, search CDS  by keytag (or both algorithm == 0)
+        cdsForConsistency[ns] = filter cdsByNS[ns] to MUST digest types
+                                (RFC 9975), preserving the RFC 8078 delete
+                                signal (0/0/0)
+        for each filtered CDS, search CDNSKEY by (keytag AND algorithm)
+          or both algorithm == 0
+        for each CDNSKEY, search filtered CDS by (keytag AND algorithm)
+          or both algorithm == 0
         any unmatched on either side    -> mismatchCDSCDNSKEY[ns]
 
 Emit:
   hasCDSNoCDNSKEY    non-empty -> DS15_HAS_CDS_NO_CDNSKEY   (addresses)
   hasCDNSKEYNoCDS    non-empty -> DS15_HAS_CDNSKEY_NO_CDS   (addresses)
   hasCDSAndCDNSKEY   non-empty -> DS15_HAS_CDS_AND_CDNSKEY  (addresses)
-  CDS RRsets differ across NS  -> DS15_INCONSISTENT_CDS     (no args)
+  cdsForConsistency differ across NS
+                               -> DS15_INCONSISTENT_CDS     (no args)
   CDNSKEY RRsets differ        -> DS15_INCONSISTENT_CDNSKEY (no args)
   mismatchCDSCDNSKEY non-empty -> DS15_MISMATCH_CDS_CDNSKEY (addresses)
 
@@ -127,12 +134,18 @@ emit TEST_CASE_END
 ## Differences From Upstream
 - Upstream reference: [`dnssec15.md`](../../upstream/tests/DNSSEC-TP/dnssec15.md)
 - Differences (Upstream vs Gonemaster):
-  - Upstream: CDS/CDNSKEY matching is described as "derived from the same DNSKEY" (or both delete). Gonemaster: mismatch check is based on CDS keytag vs CDNSKEY keytag equality (or both algorithm `0`), without deeper digest/material derivation checks.
+  - Upstream: CDS/CDNSKEY matching is described as "derived from the same DNSKEY" (or both delete). Gonemaster: mismatch check pairs records when both the key tag and the DNSSEC algorithm match (or both records use algorithm `0`), without deeper digest/material derivation checks. Key tag alone is insufficient because two keys with different algorithms can share a key tag.
   - Upstream: does not explicitly specify testcase boundary and transport-disabled debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`
 
+## RFC References
+- RFC 7344: defines CDS and CDNSKEY semantics for child-to-parent DS maintenance.
+- RFC 8078: defines the delete signal (algorithm `0`, digest type `0`, key tag `0`) that asks the parent to remove the DS RRset.
+- RFC 9975: clarifies CDS/CDNSKEY consistency rules for parental agents. Gonemaster applies the digest-type filter from RFC 9975 to its consistency checks: only CDS records whose digest type is designated MUST in the IANA "Implement for DNSSEC Delegation" column participate in `DS15_INCONSISTENT_CDS` and `DS15_MISMATCH_CDS_CDNSKEY`. The delete signal is preserved across the filter so that mixed delete/update responses still surface as inconsistent.
+
 ## Edge Cases And Limitations
 - Only nameservers that produced authoritative `NOERROR` responses are included in CDS/CDNSKEY set maps; others are silently ignored except for transport-disabled debug tags.
-- RRset consistency comparison uses RR string signatures; ordering differences are normalized by sorting.
+- RRset consistency comparison uses RR string signatures over the digest-filtered CDS view; ordering differences are normalized by sorting.
+- CDS records whose digest type is not designated MUST by IANA are excluded from consistency checks per RFC 9975. They still appear in the underlying DNS responses; only the consistency comparison ignores them.
 - Nameserver evaluation is deduplicated by IP.

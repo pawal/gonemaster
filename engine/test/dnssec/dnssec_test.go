@@ -4859,6 +4859,212 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 	}
 }
 
+// TestDNSSEC15IgnoresNonMUSTCDSDigest verifies the RFC 9975 digest-type
+// filter: CDS records whose digest type is not designated MUST in IANA's
+// "Implement for DNSSEC Delegation" column must not participate in the
+// cross-server consistency check.
+//
+// NS1 publishes both a SHA-256 (digest type 2, MUST) and a SHA-1
+// (digest type 1, MUST NOT) CDS for the same key. NS2 publishes only the
+// SHA-256 CDS. The raw RRsets differ; the MUST-only views are identical.
+// Before the filter was added, this scenario produced
+// DS15_INCONSISTENT_CDS. After the filter it must not.
+func TestDNSSEC15IgnoresNonMUSTCDSDigest(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	cdsSHA256 := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdsSHA256.KeyTag = 12345
+	cdsSHA256.Algorithm = 8
+	cdsSHA256.DigestType = 2
+	cdsSHA256.Digest = "DEADBEEF"
+
+	cdsSHA1 := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdsSHA1.KeyTag = 12345
+	cdsSHA1.Algorithm = 8
+	cdsSHA1.DigestType = 1
+	cdsSHA1.Digest = "ABCD"
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.241", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CDS":
+			return answerPacket(qname, dns.TypeCDS, cdsSHA256, cdsSHA1)
+		case "CDNSKEY":
+			return answerPacket(qname, dns.TypeCDNSKEY)
+		}
+		return packet.Packet{}
+	})
+
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.242", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CDS":
+			return answerPacket(qname, dns.TypeCDS, cdsSHA256)
+		case "CDNSKEY":
+			return answerPacket(qname, dns.TypeCDNSKEY)
+		}
+		return packet.Packet{}
+	})
+
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1, ns2}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC15(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec15: %v", err)
+	}
+	if hasEntryTag(entries, "DS15_INCONSISTENT_CDS") {
+		t.Fatalf("DS15_INCONSISTENT_CDS must not fire when only the SHA-1 CDS diverges across servers (RFC 9975 digest filter)")
+	}
+}
+
+// TestDNSSEC15InconsistencyOnMUSTCDSDigest is the counterpart of
+// TestDNSSEC15IgnoresNonMUSTCDSDigest. When two servers diverge on a CDS
+// record that uses a MUST digest type, the filter must not mask the
+// divergence: DS15_INCONSISTENT_CDS is still required.
+func TestDNSSEC15InconsistencyOnMUSTCDSDigest(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	cdsA := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdsA.KeyTag = 12345
+	cdsA.Algorithm = 8
+	cdsA.DigestType = 2
+	cdsA.Digest = "DEADBEEF"
+
+	cdsB := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdsB.KeyTag = 12345
+	cdsB.Algorithm = 8
+	cdsB.DigestType = 2
+	cdsB.Digest = "CAFEBABE"
+
+	ns1 := newNameserver(t, "ns1.example", "192.0.2.243", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CDS":
+			return answerPacket(qname, dns.TypeCDS, cdsA)
+		case "CDNSKEY":
+			return answerPacket(qname, dns.TypeCDNSKEY)
+		}
+		return packet.Packet{}
+	})
+
+	ns2 := newNameserver(t, "ns2.example", "192.0.2.244", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CDS":
+			return answerPacket(qname, dns.TypeCDS, cdsB)
+		case "CDNSKEY":
+			return answerPacket(qname, dns.TypeCDNSKEY)
+		}
+		return packet.Packet{}
+	})
+
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1, ns2}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC15(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec15: %v", err)
+	}
+	if !hasEntryTag(entries, "DS15_INCONSISTENT_CDS") {
+		t.Fatalf("expected DS15_INCONSISTENT_CDS when MUST-digest CDS records diverge across servers")
+	}
+}
+
+// TestDNSSEC15MismatchOnAlgorithmDifference verifies that the CDS/CDNSKEY
+// cross-RRset match requires algorithm equality as well as key-tag
+// equality. RFC 9975 talks in terms of the underlying key; two records
+// that share a key tag but use different DNSSEC algorithms are not the
+// same key. Before this fix the keytag-only match silently treated them
+// as paired and did not emit DS15_MISMATCH_CDS_CDNSKEY.
+func TestDNSSEC15MismatchOnAlgorithmDifference(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	cdnskey := &dns.CDNSKEY{DNSKEY: dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cdnskey.Flags = dns.FlagZONE
+	cdnskey.Protocol = 3
+	cdnskey.Algorithm = 13
+	cdnskey.PublicKey = "AwEAAc=="
+
+	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+	cds.KeyTag = cdnskey.KeyTag()
+	cds.Algorithm = 8
+	cds.DigestType = 2
+	cds.Digest = "DEADBEEF"
+
+	if cds.Algorithm == cdnskey.Algorithm {
+		t.Fatalf("test setup invalid: CDS and CDNSKEY must have differing algorithms")
+	}
+
+	ns := newNameserver(t, "ns1.example", "192.0.2.245", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "CDS":
+			return answerPacket(qname, dns.TypeCDS, cds)
+		case "CDNSKEY":
+			return answerPacket(qname, dns.TypeCDNSKEY, cdnskey)
+		}
+		return packet.Packet{}
+	})
+
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC15(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("dnssec15: %v", err)
+	}
+	if !hasEntryTag(entries, "DS15_MISMATCH_CDS_CDNSKEY") {
+		t.Fatalf("expected DS15_MISMATCH_CDS_CDNSKEY when CDS and CDNSKEY share a key tag but use different DNSSEC algorithms")
+	}
+}
+
 func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)

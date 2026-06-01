@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 80,
-    "unique_tag_count": 518
+    "unique_tag_count": 519
   },
   "modules": {
     "address": {
@@ -529,6 +529,7 @@
         "TEST_CASE_START"
       ],
       "dnssec15": [
+        "DS15_CDS_NON_MUST_DIGEST",
         "DS15_HAS_CDNSKEY_NO_CDS",
         "DS15_HAS_CDS_AND_CDNSKEY",
         "DS15_HAS_CDS_NO_CDNSKEY",

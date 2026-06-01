@@ -962,6 +962,14 @@ Description:
 
 A nameserver did not answer the DNSKEY probe. The check cannot inspect the zone's keys through that server, and real resolvers validating your zone will fail if they hit the same silent path.
 
+## Tag DS15_CDS_NON_MUST_DIGEST
+
+Header: CDS uses an inert digest type
+
+Description:
+
+Your CDS RRset includes records whose digest type is not on the IANA mandatory list for DNSSEC delegation. Modern registries ignore those records, so they cannot trigger a DS update at the parent. Publish a CDS with SHA-256 (currently the mandatory digest type) if you want the parent to act.
+
 ## Tag DS15_INCONSISTENT_CDNSKEY
 
 Header: Inconsistent CDNSKEY across servers

@@ -801,5 +801,7 @@
   "pub.tag.dnssec.DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE.header": "NSEC3-bitmap missar befintlig posttyp",
   "pub.tag.dnssec.DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE.desc": "Typbitmappen i en NSEC3-post utelämnar en RR-typ som faktiskt existerar vid det hashade namnet. Aggressiv negativ cachning kan då felaktigt behandla den typen som icke-existerande, vilket i praktiken förgiftar resolver-cachar. Det krävs att signeraren korrigeras för att rätta bitmappen.",
   "pub.tag.dnssec.DS20_NSEC_BITMAP_MISMATCHES_RRTYPE.header": "NSEC-bitmap missar befintlig posttyp",
-  "pub.tag.dnssec.DS20_NSEC_BITMAP_MISMATCHES_RRTYPE.desc": "Typbitmappen i en NSEC-post saknar en RR-typ som existerar vid ägarnamnet. Resolvers som använder aggressiv negativ cachning enligt RFC 8198 kan då leverera felaktiga \"ingen sådan typ\"-svar från cache, så detta är ett korrekthets- och säkerhetsproblem som måste åtgärdas hos signeraren."
+  "pub.tag.dnssec.DS20_NSEC_BITMAP_MISMATCHES_RRTYPE.desc": "Typbitmappen i en NSEC-post saknar en RR-typ som existerar vid ägarnamnet. Resolvers som använder aggressiv negativ cachning enligt RFC 8198 kan då leverera felaktiga \"ingen sådan typ\"-svar från cache, så detta är ett korrekthets- och säkerhetsproblem som måste åtgärdas hos signeraren.",
+  "pub.tag.dnssec.DS15_CDS_NON_MUST_DIGEST.header": "CDS använder en inert digest-typ",
+  "pub.tag.dnssec.DS15_CDS_NON_MUST_DIGEST.desc": "Ditt CDS-RRset innehåller poster vars digest-typ inte finns på IANA:s obligatoriska lista för DNSSEC-delegering. Föräldrazoner ignorerar dessa poster, så de utlöser inte någon DS-uppdatering. Publicera en CDS med SHA-256 (för närvarande den obligatoriska digest-typen) om du vill att föräldern ska agera."
 }

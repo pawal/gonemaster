@@ -801,5 +801,7 @@
   "pub.tag.dnssec.DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE.header": "NSEC3 bitmap misses present record type",
   "pub.tag.dnssec.DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE.desc": "An NSEC3 record's type bitmap omits an RR type that actually exists at the hashed name. Aggressive negative caching can then wrongly treat that type as non-existent, effectively poisoning resolver caches. Correcting the signer is required to fix the bitmap.",
   "pub.tag.dnssec.DS20_NSEC_BITMAP_MISMATCHES_RRTYPE.header": "NSEC bitmap misses present record type",
-  "pub.tag.dnssec.DS20_NSEC_BITMAP_MISMATCHES_RRTYPE.desc": "An NSEC record's type bitmap is missing an RR type that exists at the owner name. Resolvers using RFC 8198 aggressive negative caching can then serve wrong \"no such type\" answers from cache, so this is a correctness and security issue that must be fixed at the signer."
+  "pub.tag.dnssec.DS20_NSEC_BITMAP_MISMATCHES_RRTYPE.desc": "An NSEC record's type bitmap is missing an RR type that exists at the owner name. Resolvers using RFC 8198 aggressive negative caching can then serve wrong \"no such type\" answers from cache, so this is a correctness and security issue that must be fixed at the signer.",
+  "pub.tag.dnssec.DS15_CDS_NON_MUST_DIGEST.header": "CDS uses an inert digest type",
+  "pub.tag.dnssec.DS15_CDS_NON_MUST_DIGEST.desc": "Your CDS RRset includes records whose digest type is not on the IANA mandatory list for DNSSEC delegation. Modern registries ignore those records, so they cannot trigger a DS update at the parent. Publish a CDS with SHA-256 (currently the mandatory digest type) if you want the parent to act."
 }

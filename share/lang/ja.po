@@ -3095,6 +3095,12 @@ msgctxt "DNSSEC:DS13_ALL_ALGOS_SIGNED"
 msgid "All DNSKEY algorithms have RRSIG coverage in DNSKEY, SOA, and NS answers."
 msgstr "すべてのDNSKEYアルゴリズムがDNSKEY、SOA、NSの応答においてRRSIGカバレッジを持っています。"
 
+msgctxt "DNSSEC:DS15_CDS_NON_MUST_DIGEST"
+msgid ""
+"CDS records with non-mandatory digest types are found on nameservers that "
+"resolve to IP addresses ({addresses}); parents ignore them."
+msgstr "必須でないダイジェストタイプの CDS レコードがネームサーバー IP: ({addresses}) で見つかりました。親ゾーンはこれらを無視します。"
+
 msgctxt "DNSSEC:DS15_HAS_CDNSKEY_NO_CDS"
 msgid ""
 "CDNSKEY RRset is found on nameservers that resolve to IP addresses "

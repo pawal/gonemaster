@@ -521,6 +521,7 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"dnssec15": {
+			"DS15_CDS_NON_MUST_DIGEST",
 			"DS15_HAS_CDNSKEY_NO_CDS",
 			"DS15_HAS_CDS_AND_CDNSKEY",
 			"DS15_HAS_CDS_NO_CDNSKEY",
@@ -4949,9 +4950,16 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	// RFC 9975: only MUST digest types participate in CDS consistency.
+	// Track addresses that returned at least one non-MUST CDS so operators
+	// see the records exist even though parents will ignore them.
 	cdsForConsistency := make(map[string][]dns.RR, len(cdsRRsets))
+	cdsNonMUSTDigest := map[string]bool{}
 	for ip, rrs := range cdsRRsets {
-		cdsForConsistency[ip] = filterCDSDigestMUST(rrs)
+		filtered := filterCDSDigestMUST(rrs)
+		cdsForConsistency[ip] = filtered
+		if len(filtered) < len(rrs) {
+			cdsNonMUSTDigest[ip] = true
+		}
 	}
 
 	noCDSCDNSKEY := true
@@ -5075,6 +5083,14 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			args := map[string]any{}
 			setTypedAddressesFromValues(args, mapKeysSorted(mismatch))
 			if err := appendLog(ctx, &results, testcase, "DS15_MISMATCH_CDS_CDNSKEY", args); err != nil {
+				return results, err
+			}
+		}
+
+		if len(cdsNonMUSTDigest) > 0 {
+			args := map[string]any{}
+			setTypedAddressesFromValues(args, mapKeysSorted(cdsNonMUSTDigest))
+			if err := appendLog(ctx, &results, testcase, "DS15_CDS_NON_MUST_DIGEST", args); err != nil {
 				return results, err
 			}
 		}

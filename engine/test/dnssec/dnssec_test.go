@@ -4931,6 +4931,20 @@ func TestDNSSEC15IgnoresNonMUSTCDSDigest(t *testing.T) {
 	if hasEntryTag(entries, "DS15_INCONSISTENT_CDS") {
 		t.Fatalf("DS15_INCONSISTENT_CDS must not fire when only the SHA-1 CDS diverges across servers (RFC 9975 digest filter)")
 	}
+	// The filter only silences the false-positive ERROR. The operator still
+	// needs to know they published an inert record, so the NOTICE must fire,
+	// and it must name the IP of the server that returned the SHA-1 CDS.
+	notice := firstEntryByTag(entries, "DS15_CDS_NON_MUST_DIGEST")
+	if notice == nil {
+		t.Fatalf("DS15_CDS_NON_MUST_DIGEST must fire when a server returns a CDS with a non-MUST digest type")
+	}
+	gotAddresses, ok := notice.Args["addresses"].([]string)
+	if !ok {
+		t.Fatalf("DS15_CDS_NON_MUST_DIGEST addresses arg has unexpected type: %#v", notice.Args["addresses"])
+	}
+	if want := []string{"192.0.2.241"}; len(gotAddresses) != 1 || gotAddresses[0] != want[0] {
+		t.Fatalf("DS15_CDS_NON_MUST_DIGEST addresses=%v, want %v (only NS1 published SHA-1)", gotAddresses, want)
+	}
 }
 
 // TestDNSSEC15InconsistencyOnMUSTCDSDigest is the counterpart of

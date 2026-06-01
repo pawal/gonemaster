@@ -147,6 +147,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS13_ALGO_NOT_SIGNED_NS` | `WARNING` | [dnssec13](../tests/dnssec/dnssec13.md) | yes |
 | `DS13_ALGO_NOT_SIGNED_SOA` | `WARNING` | [dnssec13](../tests/dnssec/dnssec13.md) | yes |
 | `DS13_ALL_ALGOS_SIGNED` | `INFO` | [dnssec13](../tests/dnssec/dnssec13.md) | yes |
+| `DS15_CDS_NON_MUST_DIGEST` | `NOTICE` | [dnssec15](../tests/dnssec/dnssec15.md) | yes |
 | `DS15_HAS_CDNSKEY_NO_CDS` | `NOTICE` | [dnssec15](../tests/dnssec/dnssec15.md) | yes |
 | `DS15_HAS_CDS_AND_CDNSKEY` | `INFO` | [dnssec15](../tests/dnssec/dnssec15.md) | yes |
 | `DS15_HAS_CDS_NO_CDNSKEY` | `NOTICE` | [dnssec15](../tests/dnssec/dnssec15.md) | yes |

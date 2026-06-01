@@ -801,5 +801,7 @@
   "pub.tag.dnssec.DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE.header": "NSEC3 ビットマップが存在するレコードタイプを欠いています",
   "pub.tag.dnssec.DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE.desc": "ある NSEC3 レコードのタイプビットマップが、ハッシュ化された名前に実際に存在する RR タイプを欠いています。その結果、アグレッシブな否定キャッシュがそのタイプを誤って存在しないものとして扱い、事実上リゾルバーのキャッシュを汚染するおそれがあります。ビットマップを修正するには署名者の修正が必要です。",
   "pub.tag.dnssec.DS20_NSEC_BITMAP_MISMATCHES_RRTYPE.header": "NSEC ビットマップが存在するレコードタイプを欠いています",
-  "pub.tag.dnssec.DS20_NSEC_BITMAP_MISMATCHES_RRTYPE.desc": "ある NSEC レコードのタイプビットマップが、オーナー名に存在する RR タイプを欠いています。その結果、RFC 8198 のアグレッシブな否定キャッシュを使用するリゾルバーが誤った「そのタイプは存在しない」という応答をキャッシュから返す可能性があり、これは署名者で修正しなければならない正当性とセキュリティの問題です。"
+  "pub.tag.dnssec.DS20_NSEC_BITMAP_MISMATCHES_RRTYPE.desc": "ある NSEC レコードのタイプビットマップが、オーナー名に存在する RR タイプを欠いています。その結果、RFC 8198 のアグレッシブな否定キャッシュを使用するリゾルバーが誤った「そのタイプは存在しない」という応答をキャッシュから返す可能性があり、これは署名者で修正しなければならない正当性とセキュリティの問題です。",
+  "pub.tag.dnssec.DS15_CDS_NON_MUST_DIGEST.header": "CDS のダイジェストタイプが無視されます",
+  "pub.tag.dnssec.DS15_CDS_NON_MUST_DIGEST.desc": "公開している CDS RRset には、IANA の DNSSEC 委任における必須リストに含まれていないダイジェストタイプのレコードが含まれています。最近のレジストリはこうしたレコードを無視するため、親側の DS 更新が行われません。親に処理してもらうには、SHA-256 (現在必須のダイジェストタイプ) を使った CDS を公開してください。"
 }

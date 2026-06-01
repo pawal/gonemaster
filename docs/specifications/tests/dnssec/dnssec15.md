@@ -34,7 +34,8 @@ Status: Final
 7. Emit `DS15_INCONSISTENT_CDS` when the digest-filtered CDS RRsets differ across nameservers.
 8. Emit `DS15_INCONSISTENT_CDNSKEY` when CDNSKEY RRsets differ across nameservers.
 9. Emit `DS15_MISMATCH_CDS_CDNSKEY` for nameservers with CDS/CDNSKEY mismatch.
-10. Emit `TEST_CASE_END`.
+10. Emit `DS15_CDS_NON_MUST_DIGEST` for nameservers that returned at least one CDS record with a non-MUST digest type (records that the consistency check already excluded).
+11. Emit `TEST_CASE_END`.
 
 ### Per-NS CDS/CDNSKEY Presence and Match (steps 2-10)
 
@@ -77,6 +78,7 @@ Emit:
                                -> DS15_INCONSISTENT_CDS     (no args)
   CDNSKEY RRsets differ        -> DS15_INCONSISTENT_CDNSKEY (no args)
   mismatchCDSCDNSKEY non-empty -> DS15_MISMATCH_CDS_CDNSKEY (addresses)
+  cdsNonMUSTDigest   non-empty -> DS15_CDS_NON_MUST_DIGEST  (addresses)
 
 emit TEST_CASE_END
 ```
@@ -85,11 +87,12 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
+| `DS15_CDS_NON_MUST_DIGEST` | Nameserver returned at least one CDS record whose digest type is not designated MUST by IANA. |
 | `DS15_HAS_CDNSKEY_NO_CDS` | Nameserver has non-empty CDNSKEY RRset and empty CDS RRset. |
 | `DS15_HAS_CDS_AND_CDNSKEY` | Nameserver has both non-empty CDS and non-empty CDNSKEY RRsets. |
 | `DS15_HAS_CDS_NO_CDNSKEY` | Nameserver has non-empty CDS RRset and empty CDNSKEY RRset. |
 | `DS15_INCONSISTENT_CDNSKEY` | CDNSKEY RRsets are not identical across participating nameservers. |
-| `DS15_INCONSISTENT_CDS` | CDS RRsets are not identical across participating nameservers. |
+| `DS15_INCONSISTENT_CDS` | Digest-filtered CDS RRsets are not identical across participating nameservers. |
 | `DS15_MISMATCH_CDS_CDNSKEY` | Nameserver has both RRsets but CDS/CDNSKEY matching checks failed. |
 | `DS15_NO_CDS_CDNSKEY` | No non-empty CDS or CDNSKEY RRset found on participating nameservers. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`CDS`, `CDNSKEY`). |
@@ -100,6 +103,7 @@ emit TEST_CASE_END
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
+| `DS15_CDS_NON_MUST_DIGEST` | `addresses` | `array<string>` | Structured child nameserver IP list that returned at least one non-MUST CDS digest. |
 | `DS15_HAS_CDNSKEY_NO_CDS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS15_HAS_CDS_AND_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS15_HAS_CDS_NO_CDNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
@@ -119,6 +123,7 @@ emit TEST_CASE_END
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
+| `DS15_CDS_NON_MUST_DIGEST` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS15_HAS_CDNSKEY_NO_CDS` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS15_HAS_CDS_AND_CDNSKEY` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS15_HAS_CDS_NO_CDNSKEY` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |

@@ -93,6 +93,7 @@ Read tools (always available):
 | `spec_get_testcase` | Get a testcase's module, description, and the tags it can emit with rendered messages. |
 | `batch_get` | Poll a batch: total, per-status counts, and completion. |
 | `cohort_stats` | Grade and worst-severity distribution across a batch's runs. |
+| `cohort_operators` | Top operators in a batch grouped by `ns_parent` or `asn`, ranked by mean score. |
 | `failures_by_tag` | Rank the tags driving failures in a batch, with example domains. |
 
 Write tools (registered only when `GONEMASTER_MCP_ALLOW_WRITE=1`):

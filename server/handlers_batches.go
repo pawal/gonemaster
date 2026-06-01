@@ -31,6 +31,78 @@ func (s *Server) handleTagBatches(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
+// handleBatchOperators handles GET /api/v1/batches/{id}/operators.
+func (s *Server) handleBatchOperators(w http.ResponseWriter, r *http.Request) {
+	batchID := strings.TrimSpace(r.PathValue("id"))
+	if batchID == "" {
+		writeError(w, http.StatusBadRequest, "missing_batch_id", "batch id is required", nil)
+		return
+	}
+
+	groupBy := strings.TrimSpace(r.URL.Query().Get("group_by"))
+	if groupBy != "ns_parent" && groupBy != "asn" {
+		writeError(w, http.StatusBadRequest, "invalid_group_by", "group_by must be ns_parent or asn", nil)
+		return
+	}
+	minCount, ok := parsePositiveQuery(r, "min_count", 10)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid_min_count", "min_count must be a positive integer", nil)
+		return
+	}
+	limit, ok := parsePositiveQuery(r, "limit", 20)
+	if !ok {
+		writeError(w, http.StatusBadRequest, "invalid_limit", "limit must be a positive integer", nil)
+		return
+	}
+	if limit > 100 {
+		limit = 100
+	}
+
+	if !s.batchExists(batchID) {
+		writeError(w, http.StatusNotFound, "not_found", "batch not found", nil)
+		return
+	}
+	if s.store.List(JobFilter{BatchID: batchID, Limit: 1}).Total > 0 {
+		writeError(w, http.StatusConflict, "batch_not_complete", "batch not complete", nil)
+		return
+	}
+
+	operators := s.batchOperators(batchID, groupBy, minCount, limit)
+	if operators == nil {
+		operators = []OperatorRollup{}
+	}
+	writeJSON(w, http.StatusOK, BatchOperatorsResponse{
+		BatchID:   batchID,
+		GroupBy:   groupBy,
+		MinCount:  minCount,
+		Operators: operators,
+	})
+}
+
+// batchExists checks the batches table, then in-flight jobs, then runs.
+func (s *Server) batchExists(batchID string) bool {
+	if _, ok := s.store.GetBatch(batchID); ok {
+		return true
+	}
+	if s.store.List(JobFilter{BatchID: batchID, Limit: 1}).Total > 0 {
+		return true
+	}
+	return s.store.ListRuns(RunFilter{BatchID: batchID, Limit: 1}).Total > 0
+}
+
+// parsePositiveQuery reads an optional positive int; empty yields def.
+func parsePositiveQuery(r *http.Request, name string, def int) (int, bool) {
+	raw := strings.TrimSpace(r.URL.Query().Get(name))
+	if raw == "" {
+		return def, true
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil || n < 1 {
+		return 0, false
+	}
+	return n, true
+}
+
 // handleBatchDeletePreview handles GET /api/v1/batches/{id}/delete-preview.
 // Returns row counts plus the cohort snapshots that will be removed,
 // including whether any of them is the cohort's current default.

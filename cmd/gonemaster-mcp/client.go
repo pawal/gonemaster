@@ -298,6 +298,31 @@ func (c *apiClient) listEntries(ctx context.Context, q url.Values) (entryListVie
 	return out, err
 }
 
+// operatorRollupView decodes one row of GET /batches/{id}/operators.
+type operatorRollupView struct {
+	Key           string   `json:"key"`
+	DomainCount   int      `json:"domain_count"`
+	AvgScore      float64  `json:"avg_score"`
+	SampleDomains []string `json:"sample_domains"`
+}
+
+type batchOperatorsView struct {
+	BatchID   string               `json:"batch_id"`
+	GroupBy   string               `json:"group_by"`
+	MinCount  int                  `json:"min_count"`
+	Operators []operatorRollupView `json:"operators"`
+}
+
+func (c *apiClient) getBatchOperators(ctx context.Context, id string, q url.Values) (batchOperatorsView, error) {
+	var out batchOperatorsView
+	path := "/batches/" + url.PathEscape(id) + "/operators"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
 // specTestcaseView decodes one item from GET /spec/testcases.
 type specTestcaseView struct {
 	ID          string `json:"id"`

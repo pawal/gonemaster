@@ -15,6 +15,7 @@ import (
 func registerBatchTools(srv *mcp.Server, api *apiClient) {
 	registerBatchGet(srv, api)
 	registerCohortStats(srv, api)
+	registerCohortOperators(srv, api)
 	registerFailuresByTag(srv, api)
 }
 
@@ -107,6 +108,65 @@ func registerCohortStats(srv *mcp.Server, api *apiClient) {
 			grades = map[string]int{}
 		}
 		return nil, cohortStatsOutput{BatchID: id, Total: total, Grades: grades, WorstLevels: worst}, nil
+	})
+}
+
+type cohortOperatorsInput struct {
+	BatchID  string `json:"batch_id" jsonschema:"the batch id"`
+	GroupBy  string `json:"group_by" jsonschema:"grouping dimension: ns_parent or asn"`
+	MinCount int    `json:"min_count,omitempty" jsonschema:"suppress operators serving fewer than this many domains (default 10)"`
+	Limit    int    `json:"limit,omitempty" jsonschema:"max operator rows to return (default 20, max 100)"`
+}
+
+type operatorRollupOutput struct {
+	Key           string   `json:"key" jsonschema:"the NS parent domain or ASN number"`
+	DomainCount   int      `json:"domain_count" jsonschema:"distinct domains in the batch served by this operator"`
+	AvgScore      float64  `json:"avg_score" jsonschema:"mean score of those domains"`
+	SampleDomains []string `json:"sample_domains" jsonschema:"up to 10 domains, highest score first"`
+}
+
+type cohortOperatorsOutput struct {
+	BatchID   string                 `json:"batch_id"`
+	GroupBy   string                 `json:"group_by"`
+	MinCount  int                    `json:"min_count"`
+	Operators []operatorRollupOutput `json:"operators" jsonschema:"operators ranked by avg_score, highest first"`
+}
+
+func registerCohortOperators(srv *mcp.Server, api *apiClient) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "cohort_operators",
+		Description: "Top operators in a completed batch, grouped by ns_parent or asn, ranked by mean score. " +
+			"Use group_by=asn for cross-TLD operator rollups: with ns_parent, per-TLD nameserver names " +
+			"like dns1.nic.<tld> do not collapse across TLDs. ASN keys are numbers only, with no org-name enrichment.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in cohortOperatorsInput) (*mcp.CallToolResult, cohortOperatorsOutput, error) {
+		id := strings.TrimSpace(in.BatchID)
+		if id == "" {
+			return nil, cohortOperatorsOutput{}, errors.New("batch_id is required")
+		}
+		groupBy := strings.TrimSpace(in.GroupBy)
+		if groupBy != "ns_parent" && groupBy != "asn" {
+			return nil, cohortOperatorsOutput{}, errors.New("group_by must be ns_parent or asn")
+		}
+		q := url.Values{}
+		q.Set("group_by", groupBy)
+		if in.MinCount > 0 {
+			q.Set("min_count", strconv.Itoa(in.MinCount))
+		}
+		if in.Limit > 0 {
+			q.Set("limit", strconv.Itoa(in.Limit))
+		}
+		v, err := api.getBatchOperators(ctx, id, q)
+		if err != nil {
+			return nil, cohortOperatorsOutput{}, toolError("get batch operators", err)
+		}
+		out := cohortOperatorsOutput{BatchID: v.BatchID, GroupBy: v.GroupBy, MinCount: v.MinCount}
+		out.Operators = make([]operatorRollupOutput, 0, len(v.Operators))
+		for _, op := range v.Operators {
+			out.Operators = append(out.Operators, operatorRollupOutput{
+				Key: op.Key, DomainCount: op.DomainCount, AvgScore: op.AvgScore, SampleDomains: op.SampleDomains,
+			})
+		}
+		return nil, out, nil
 	})
 }
 

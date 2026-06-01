@@ -1,4 +1,4 @@
 ---
 title: "Syntax"
 ---
-{{< children >}}
+{{< children description="true" >}}

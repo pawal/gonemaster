@@ -1,4 +1,4 @@
 ---
 title: "Connectivity"
 ---
-{{< children >}}
+{{< children description="true" >}}

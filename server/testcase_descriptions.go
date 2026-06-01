@@ -105,6 +105,12 @@ var testcaseDescriptions = map[string]string{
 	"ZONE14": "ZONEMD RR at zone apex (RFC 8976 compliance)",
 }
 
+// TestcaseDescriptions returns the short testcase descriptions keyed by
+// uppercase testcase ID. The returned map is shared and must not be modified.
+func TestcaseDescriptions() map[string]string {
+	return testcaseDescriptions
+}
+
 // testcaseDescriptionsForEntries returns descriptions for testcases present in entries.
 // Keys in the returned map match the casing from the entries (typically lowercase).
 func testcaseDescriptionsForEntries(entries []JobResultEntry) map[string]string {

@@ -22,6 +22,7 @@ CMD ?= all
 	build-gonemaster-nagios build-gonemaster-mcp install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
 	install-gonemaster-nagios install-gonemaster-mcp ui-check test-go test-integration vet race \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
+	spec-export-testcase-descriptions spec-check-testcase-descriptions \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
 	architecture-check badkeys-update badkeys-update-embed man man-gz clean-man \
 	package-binaries package-deb package-rpm packages clean-packages
@@ -56,6 +57,8 @@ help:
 	@echo "  build-gonemaster-nagios       Build the Nagios plugin"
 	@echo "  build-gonemaster-mcp          Build the MCP (Model Context Protocol) bridge"
 	@echo "  spec-export        Refresh generated specification inventories (JSON)"
+	@echo "  spec-export-testcase-descriptions  Refresh the site testcase-description data file (TOML)"
+	@echo "  spec-check-testcase-descriptions   Check the site testcase-description data file is up to date"
 	@echo "  spec-export-log-args  Refresh generated log argument inventory (JSON + markdown)"
 	@echo "  spec-validate      Validate canonical testcase specs against implementation metadata"
 	@echo "  spec-validate-scan Validate specs + scan append*Log literals for metadata omissions"
@@ -63,7 +66,7 @@ help:
 	@echo "  spec-check-tags    Check tag catalog files are up to date (drift detection)"
 	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
 	@echo "  spec-check-i18n-placeholders  Verify placeholder parity and reject non-allowlisted legacy placeholders"
-	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder checks"
+	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder + testcase-description checks"
 	@echo "  architecture-check Verify docs/architecture.md against cmd/, build tags, drivers, and the Last reviewed date"
 	@echo "  docs             Build the documentation site (writes site/public/)"
 	@echo "  docs-serve       Serve the documentation site locally"
@@ -271,7 +274,13 @@ spec-export-implemented:
 spec-export-tags:
 	GOOS= GOARCH= $(GO) run ./tools/specifications/export-tags > docs/specifications/possible-tags-by-testcase.json
 
-spec-export: spec-export-implemented spec-export-tags
+spec-export-testcase-descriptions:
+	GOOS= GOARCH= $(GO) run ./tools/specifications/export-testcase-descriptions
+
+spec-check-testcase-descriptions:
+	GOOS= GOARCH= $(GO) run ./tools/specifications/export-testcase-descriptions --check
+
+spec-export: spec-export-implemented spec-export-tags spec-export-testcase-descriptions
 
 spec-export-log-args:
 	GOOS= GOARCH= $(GO) run ./tools/specifications/export-log-args > docs/specifications/log-args-inventory.json
@@ -294,7 +303,7 @@ spec-check-coherency:
 spec-check-i18n-placeholders:
 	GOOS= GOARCH= $(GO) run ./tools/i18n/check-placeholders
 
-spec-check: spec-validate spec-check-tags spec-check-coherency spec-check-i18n-placeholders
+spec-check: spec-validate spec-check-tags spec-check-coherency spec-check-i18n-placeholders spec-check-testcase-descriptions
 
 architecture-check:
 	GOOS= GOARCH= $(GO) run ./tools/architecture-check

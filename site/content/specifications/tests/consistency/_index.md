@@ -1,4 +1,4 @@
 ---
 title: "Consistency"
 ---
-{{< children >}}
+{{< children description="true" >}}

@@ -1,4 +1,4 @@
 ---
 title: "Nameserver"
 ---
-{{< children >}}
+{{< children description="true" >}}

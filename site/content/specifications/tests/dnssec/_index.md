@@ -1,4 +1,4 @@
 ---
 title: "DNSSEC"
 ---
-{{< children >}}
+{{< children description="true" >}}

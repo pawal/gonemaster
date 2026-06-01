@@ -1,4 +1,4 @@
 ---
 title: "Basic"
 ---
-{{< children >}}
+{{< children description="true" >}}

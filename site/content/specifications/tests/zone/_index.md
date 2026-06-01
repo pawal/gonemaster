@@ -1,4 +1,4 @@
 ---
 title: "Zone"
 ---
-{{< children >}}
+{{< children description="true" >}}

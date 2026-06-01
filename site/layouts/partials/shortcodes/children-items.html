@@ -13,7 +13,11 @@
 {{ (printf "  <%s>" $.style) | safeHTML }}{{ if .RelPermalink }}<a href="{{ partial "relLangPrettyUglyURL.hugo" (dict "to" .) }}">{{ $computed_title }}</a>{{ else }}<span>{{ $computed_title }}</span>{{ end }}{{ (printf "</%s>" $.style) | safeHTML }}
       {{- end }}
       {{- if $.description }}
-        {{- with or .Description .Summary -}}
+        {{- $desc := .Description }}
+        {{- if and (not $desc) .File }}
+          {{- $desc = index (index site.Data "testcase_descriptions") .File.ContentBaseName }}
+        {{- end }}
+        {{- with or $desc .Summary -}}
 <p>{{ . }}</p>
         {{- end }}
       {{- end }}

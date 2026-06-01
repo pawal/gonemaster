@@ -1,4 +1,4 @@
 ---
 title: "Delegation"
 ---
-{{< children >}}
+{{< children description="true" >}}

@@ -2,13 +2,18 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.5.0] - 2026-06-01
+
+**NEW:** MCP server for AI agents, see documentation here: https://pawal.codeberg.page/gonemaster/mcp/
 
 ### Added
 
 - server: gonemaster_jobs_purged_total metric (JSON metrics and Prometheus) counting jobs deleted by the retention purge loop
 - server: configurable retention purge interval via --db-purge-interval, GONEMASTER_DB_PURGE_INTERVAL, or database.purge_interval_seconds (default 1h)
 - admin-ui: purge interval field in System Settings; retention window and interval now take effect without a restart
+- gonemaster-mcp: new Model Context Protocol (stdio) bridge exposing gonemaster-server's admin API to AI agents as MCP tools (domain tests, run/spec/batch queries; write tools gated by GONEMASTER_MCP_ALLOW_WRITE)
+- server: add GET /api/v1/spec/testcases and /testcases/{id} endpoints (testcase catalog with rendered i18n messages) backing the MCP spec tools
+- server: add missing dnssec21 and zone14 testcase descriptions
 
 ## [v1.4.10] - 2026-05-31
 

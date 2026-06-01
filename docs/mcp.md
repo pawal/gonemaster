@@ -4,8 +4,9 @@
 Protocol (MCP) clients as a set of tools. It speaks stdio MCP and forwards
 requests to the server over HTTP; it does not run the engine itself.
 
-MCP clients such as Claude Code, Claude Desktop, and other agent frameworks
-launch the bridge as a subprocess and talk to it over stdin/stdout.
+Any MCP-compatible client or agent framework can drive it, for example Claude
+Code, Cursor, Cline, Zed, or a custom agent built on an MCP SDK. The client
+launches the bridge as a subprocess and talks to it over stdin/stdout.
 
 ## Build
 

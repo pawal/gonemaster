@@ -98,6 +98,7 @@ Start with the [architecture overview](https://pawal.codeberg.page/gonemaster/ar
 - [CLI](https://pawal.codeberg.page/gonemaster/cli/) - local test runner
 - [Server](https://pawal.codeberg.page/gonemaster/server/) - HTTP server and queue
 - [Client](https://pawal.codeberg.page/gonemaster/client/) - automation client
+- [MCP](https://pawal.codeberg.page/gonemaster/mcp/) - Model Context Protocol bridge for AI agents
 - [Analysis](https://pawal.codeberg.page/gonemaster/analysis/) - cohort analysis and snapshots
 - [Specifications](https://pawal.codeberg.page/gonemaster/specifications/) - testcase and tag reference
 - [OpenAPI](docs/openapi.yaml) - machine-readable API spec

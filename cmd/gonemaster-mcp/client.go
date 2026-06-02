@@ -149,6 +149,7 @@ type jobView struct {
 type runView struct {
 	ID         string    `json:"id"`
 	Domain     string    `json:"domain"`
+	BatchID    string    `json:"batch_id"`
 	Status     string    `json:"status"`
 	DurationMs int64     `json:"duration_ms"`
 	WorstLevel string    `json:"worst_level"`

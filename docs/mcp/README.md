@@ -105,6 +105,10 @@ rank the operators behind a batch by mean score, call it with
 appear only in the `*_DIFFERENT_ASN` / `*_SAME_ASN` tags, call those tags too
 and union client-side.
 
+`run_get`, `run_search`, and `latest_for` include a `batch_id` field, so an
+agent can pivot from a known run to the batch (cohort) it belongs to. It is
+empty for ad-hoc single-domain runs.
+
 Write tools (registered only when `GONEMASTER_MCP_ALLOW_WRITE=1`):
 
 | Tool | Purpose |

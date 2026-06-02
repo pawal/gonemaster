@@ -393,6 +393,34 @@ func TestLatestFor(t *testing.T) {
 	}
 }
 
+func TestRunOutputsExposeBatchID(t *testing.T) {
+	// run_get and the run-summary tools must surface the batch a run belongs
+	// to so an agent can pivot from a run to its cohort.
+	ts := newFakeServer(t, fakeOpts{
+		run: &runView{ID: "run_b", Domain: "x.example", BatchID: "batch_42", Status: "succeeded"},
+		runs: []runView{
+			{ID: "run_b", Domain: "x.example", BatchID: "batch_42", Status: "succeeded", FinishedAt: time.Unix(2000, 0)},
+		},
+	})
+	defer ts.Close()
+
+	var got testResult
+	if res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "run_b"}, &got); res.IsError {
+		t.Fatalf("run_get error: %s", errorText(res))
+	}
+	if got.BatchID != "batch_42" {
+		t.Errorf("run_get batch_id = %q, want batch_42", got.BatchID)
+	}
+
+	var latest latestForOutput
+	if res := callTool(t, clientFor(t, ts.URL, ""), "latest_for", map[string]any{"domain": "x.example"}, &latest); res.IsError {
+		t.Fatalf("latest_for error: %s", errorText(res))
+	}
+	if len(latest.Runs) != 1 || latest.Runs[0].BatchID != "batch_42" {
+		t.Errorf("latest_for batch_id not surfaced: %+v", latest.Runs)
+	}
+}
+
 func TestRunGetUnauthorizedGivesTokenHint(t *testing.T) {
 	ts := newFakeServer(t, fakeOpts{requireToken: "gm_secret", run: &runView{ID: "r", Domain: "d", Status: "succeeded"}})
 	defer ts.Close()

@@ -36,6 +36,7 @@ type finding struct {
 type testResult struct {
 	Domain            string     `json:"domain"`
 	RunID             string     `json:"run_id,omitempty" jsonschema:"the run/job id; pass to run_get"`
+	BatchID           string     `json:"batch_id,omitempty" jsonschema:"the batch this run belongs to; empty for ad-hoc single-domain runs"`
 	Status            string     `json:"status" jsonschema:"succeeded, failed, canceled, or expired"`
 	Grade             string     `json:"grade,omitempty" jsonschema:"letter grade A+ to F when scoring is available"`
 	Score             *int       `json:"score,omitempty" jsonschema:"numeric score 0-100 when scoring is available"`
@@ -142,7 +143,7 @@ func registerRunGet(srv *mcp.Server, api *apiClient) {
 		if err != nil {
 			return nil, testResult{}, toolError("get run", err)
 		}
-		out := testResult{Domain: run.Domain, RunID: run.ID, Status: run.Status, DurationMs: run.DurationMs, Error: run.Error, Findings: []finding{}}
+		out := testResult{Domain: run.Domain, RunID: run.ID, BatchID: run.BatchID, Status: run.Status, DurationMs: run.DurationMs, Error: run.Error, Findings: []finding{}}
 		fillResult(ctx, api, id, lang, &out)
 		return nil, out, nil
 	})
@@ -156,6 +157,7 @@ type latestForInput struct {
 type runSummary struct {
 	RunID      string `json:"run_id"`
 	Domain     string `json:"domain"`
+	BatchID    string `json:"batch_id,omitempty"`
 	Status     string `json:"status"`
 	Grade      string `json:"grade,omitempty"`
 	Score      *int   `json:"score,omitempty"`
@@ -198,7 +200,7 @@ func registerLatestFor(srv *mcp.Server, api *apiClient) {
 
 // toRunSummary maps a run record to the LLM-facing summary.
 func toRunSummary(r runView) runSummary {
-	rs := runSummary{RunID: r.ID, Domain: r.Domain, Status: r.Status, Score: r.Score, WorstLevel: r.WorstLevel, DurationMs: r.DurationMs}
+	rs := runSummary{RunID: r.ID, Domain: r.Domain, BatchID: r.BatchID, Status: r.Status, Score: r.Score, WorstLevel: r.WorstLevel, DurationMs: r.DurationMs}
 	if r.Grade != nil {
 		rs.Grade = *r.Grade
 	}

@@ -49,6 +49,53 @@ func TestBatchGetNotDoneWhenRunning(t *testing.T) {
 	}
 }
 
+func TestBatchList(t *testing.T) {
+	fin := time.Unix(5000, 0)
+	var captured url.Values
+	ts := newFakeServer(t, fakeOpts{
+		batchListQuery: &captured,
+		batchList: &batchListView{
+			Total: 2,
+			Items: []batchListItemView{
+				{BatchID: "b2", Tag: "tld-weekly", Status: "done", Total: 1437, Completed: 1437, Completion: 100, CreatedAt: time.Unix(4000, 0), FinishedAt: &fin},
+				{BatchID: "b1", Tag: "se", Status: "running", Total: 10, Completed: 4, Completion: 40, CreatedAt: time.Unix(1000, 0)},
+			},
+		},
+	})
+	defer ts.Close()
+
+	var out batchListOutput
+	res := callTool(t, clientFor(t, ts.URL, ""), "batch_list", map[string]any{"label": "tld", "limit": float64(5)}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	// label and limit must reach the server.
+	if captured.Get("label") != "tld" || captured.Get("limit") != "5" {
+		t.Errorf("forwarded query wrong: %v", captured)
+	}
+	if out.Count != 2 || out.Total != 2 {
+		t.Fatalf("count/total wrong: %+v", out)
+	}
+	// A done batch carries finished_at; a running one does not.
+	if b := out.Batches[0]; b.BatchID != "b2" || b.Status != "done" || b.Completion != 100 || b.FinishedAt == "" {
+		t.Errorf("first batch wrong: %+v", b)
+	}
+	if b := out.Batches[1]; b.Status != "running" || b.FinishedAt != "" {
+		t.Errorf("running batch should have no finished_at: %+v", b)
+	}
+}
+
+func TestBatchListDefaultLimit(t *testing.T) {
+	var captured url.Values
+	ts := newFakeServer(t, fakeOpts{batchListQuery: &captured})
+	defer ts.Close()
+	var out batchListOutput
+	callTool(t, clientFor(t, ts.URL, ""), "batch_list", map[string]any{}, &out)
+	if captured.Get("limit") != "20" {
+		t.Errorf("default limit = %q, want 20", captured.Get("limit"))
+	}
+}
+
 func TestCohortStats(t *testing.T) {
 	ts := newFakeServer(t, fakeOpts{
 		batch: &batchSummaryView{BatchID: "b1", Total: 3, Grades: map[string]int{"A": 2, "C": 1}},

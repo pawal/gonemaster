@@ -164,6 +164,10 @@ func (s *spyJobStore) ListBatchesByTag(tag string, limit, offset int) BatchList 
 	return s.inner.ListBatchesByTag(tag, limit, offset)
 }
 
+func (s *spyJobStore) ListBatches(tagLike string, limit, offset int) BatchList {
+	return s.inner.ListBatches(tagLike, limit, offset)
+}
+
 func (s *spyJobStore) BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error) {
 	return s.inner.BatchDeletePreviewStats(batchID)
 }

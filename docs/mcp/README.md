@@ -91,6 +91,7 @@ Read tools (always available):
 | `run_diff` | Compare two runs at the tag level (added / removed / severity-changed). |
 | `spec_list_testcases` | List implemented testcases, optionally filtered to one module. |
 | `spec_get_testcase` | Get a testcase's module, description, and the tags it can emit with rendered messages. |
+| `batch_list` | List recent batches (cohort runs), newest first, with status and completion; optional `label` tag-substring filter. |
 | `batch_get` | Poll a batch: total, per-status counts, and completion. |
 | `cohort_stats` | Grade and worst-severity distribution across a batch's runs. |
 | `cohort_tag_values` | Roll up the values a tag's argument takes across a batch (by count, or by mean score with `weight_by_score`), with sample domains. |

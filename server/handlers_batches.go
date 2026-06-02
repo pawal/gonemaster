@@ -31,6 +31,74 @@ func (s *Server) handleTagBatches(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
+// BatchListItem is one row of GET /api/v1/batches.
+type BatchListItem struct {
+	BatchID     string     `json:"batch_id"`
+	Tag         string     `json:"tag,omitempty"`
+	Description string     `json:"description,omitempty"`
+	Status      string     `json:"status"`
+	Total       int        `json:"total"`
+	Completed   int        `json:"completed"`
+	Completion  int        `json:"completion"`
+	CreatedAt   time.Time  `json:"created_at"`
+	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+}
+
+// BatchListResponse is the body of GET /api/v1/batches.
+type BatchListResponse struct {
+	Items  []BatchListItem `json:"items"`
+	Total  int             `json:"total"`
+	Limit  int             `json:"limit,omitempty"`
+	Offset int             `json:"offset,omitempty"`
+}
+
+// handleListBatches handles GET /api/v1/batches, newest first, ?label= filters by tag substring.
+func (s *Server) handleListBatches(w http.ResponseWriter, r *http.Request) {
+	limit, offset := parseLimitOffset(r, 20, 100)
+	label := strings.TrimSpace(r.URL.Query().Get("label"))
+	list := s.store.ListBatches(label, limit, offset)
+	items := make([]BatchListItem, 0, len(list.Items))
+	for _, b := range list.Items {
+		items = append(items, s.batchListItem(b))
+	}
+	writeJSON(w, http.StatusOK, BatchListResponse{
+		Items:  items,
+		Total:  list.Total,
+		Limit:  list.Limit,
+		Offset: list.Offset,
+	})
+}
+
+// batchListItem derives status, completion, and finish time from jobs and runs.
+func (s *Server) batchListItem(b Batch) BatchListItem {
+	item := BatchListItem{
+		BatchID:     b.ID,
+		Tag:         b.Tag,
+		Description: b.Description,
+		Total:       b.DomainCount,
+		CreatedAt:   b.CreatedAt,
+	}
+	runs := s.store.ListRuns(RunFilter{BatchID: b.ID, Limit: 1, Sort: JobSortFinishedAtDesc})
+	item.Completed = runs.Total
+	if s.store.List(JobFilter{BatchID: b.ID, Limit: 1}).Total > 0 {
+		item.Status = "running"
+	} else {
+		item.Status = "done"
+		if len(runs.Items) > 0 && !runs.Items[0].FinishedAt.IsZero() {
+			ft := runs.Items[0].FinishedAt
+			item.FinishedAt = &ft
+		}
+	}
+	if item.Total > 0 {
+		pct := item.Completed * 100 / item.Total
+		if pct > 100 {
+			pct = 100
+		}
+		item.Completion = pct
+	}
+	return item
+}
+
 // handleBatchTagValues handles GET /api/v1/batches/{id}/tag-values.
 func (s *Server) handleBatchTagValues(w http.ResponseWriter, r *http.Request) {
 	batchID := strings.TrimSpace(r.PathValue("id"))

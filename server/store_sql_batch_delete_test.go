@@ -288,3 +288,54 @@ func TestSQLJobStoreListBatchesByTag(t *testing.T) {
 		})
 	}
 }
+
+func TestSQLJobStoreListBatches(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			base := time.Now().UTC()
+			for i, entry := range []struct{ id, tag string }{
+				{"b_tld_a", "tld-weekly"},
+				{"b_se", "se-batch"},
+				{"b_tld_b", "tld-monthly"},
+			} {
+				if err := s.CreateBatch(Batch{
+					ID:        entry.id,
+					Tag:       entry.tag,
+					CreatedAt: base.Add(time.Duration(i) * time.Minute),
+				}); err != nil {
+					t.Fatalf("CreateBatch %s: %v", entry.id, err)
+				}
+			}
+
+			all := s.ListBatches("", 10, 0)
+			if all.Total != 3 {
+				t.Fatalf("Total = %d, want 3", all.Total)
+			}
+			if all.Items[0].ID != "b_tld_b" || all.Items[2].ID != "b_tld_a" {
+				t.Fatalf("order = %v, want newest first", runBatchIDs(all.Items))
+			}
+
+			tld := s.ListBatches("TLD", 10, 0)
+			if tld.Total != 2 {
+				t.Fatalf("label=TLD Total = %d, want 2", tld.Total)
+			}
+			if tld.Items[0].ID != "b_tld_b" || tld.Items[1].ID != "b_tld_a" {
+				t.Fatalf("label=TLD order = %v, want [b_tld_b b_tld_a]", runBatchIDs(tld.Items))
+			}
+
+			page := s.ListBatches("", 1, 1)
+			if page.Total != 3 || len(page.Items) != 1 || page.Items[0].ID != "b_se" {
+				t.Fatalf("limit=1 offset=1 = %+v, want only b_se", page)
+			}
+		})
+	}
+}
+
+func runBatchIDs(items []Batch) []string {
+	out := make([]string, len(items))
+	for i, b := range items {
+		out[i] = b.ID
+	}
+	return out
+}

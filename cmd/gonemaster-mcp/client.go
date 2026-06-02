@@ -289,6 +289,34 @@ func (c *apiClient) getBatch(ctx context.Context, id string) (batchSummaryView, 
 	return out, err
 }
 
+// batchListItemView decodes one row of GET /batches.
+type batchListItemView struct {
+	BatchID     string     `json:"batch_id"`
+	Tag         string     `json:"tag,omitempty"`
+	Description string     `json:"description,omitempty"`
+	Status      string     `json:"status"`
+	Total       int        `json:"total"`
+	Completed   int        `json:"completed"`
+	Completion  int        `json:"completion"`
+	CreatedAt   time.Time  `json:"created_at"`
+	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+}
+
+type batchListView struct {
+	Items []batchListItemView `json:"items"`
+	Total int                 `json:"total"`
+}
+
+func (c *apiClient) listBatches(ctx context.Context, q url.Values) (batchListView, error) {
+	var out batchListView
+	path := "/batches"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
+	return out, err
+}
+
 func (c *apiClient) listEntries(ctx context.Context, q url.Values) (entryListView, error) {
 	var out entryListView
 	path := "/entries"

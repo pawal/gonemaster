@@ -25,6 +25,8 @@ type fakeOpts struct {
 	runs           []runView               // items for GET /runs
 	runsQuery      *url.Values             // when set, captures the GET /runs query
 	batch          *batchSummaryView       // body for GET /batches/{id}; nil yields 404
+	batchList      *batchListView          // body for GET /batches
+	batchListQuery *url.Values             // when set, captures the GET /batches query
 	tagValues      *batchTagValuesView     // body for GET /batches/{id}/tag-values
 	tagValuesQuery *url.Values             // when set, captures the tag-values query
 	entries        []entryRecord           // items for GET /entries (filtered by the level query)
@@ -127,6 +129,19 @@ func newFakeServer(t *testing.T, opts fakeOpts) *httptest.Server {
 			return
 		}
 		writeJSON(w, http.StatusOK, *opts.batch)
+	})
+	mux.HandleFunc("GET /api/v1/batches", func(w http.ResponseWriter, r *http.Request) {
+		if !guard(w, r) {
+			return
+		}
+		if opts.batchListQuery != nil {
+			*opts.batchListQuery = r.URL.Query()
+		}
+		if opts.batchList == nil {
+			writeJSON(w, http.StatusOK, batchListView{})
+			return
+		}
+		writeJSON(w, http.StatusOK, *opts.batchList)
 	})
 	mux.HandleFunc("GET /api/v1/batches/{id}/tag-values", func(w http.ResponseWriter, r *http.Request) {
 		if !guard(w, r) {

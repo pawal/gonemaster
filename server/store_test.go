@@ -1104,6 +1104,51 @@ func TestInMemoryJobStoreListBatchesByTag(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStoreListBatches(t *testing.T) {
+	store := NewInMemoryJobStore()
+	base := time.Now().UTC()
+	for i, entry := range []struct {
+		id  string
+		tag string
+	}{
+		{"b1", "tld-weekly"},
+		{"b2", "se-batch"},
+		{"b3", "tld-monthly"},
+	} {
+		if err := store.CreateBatch(Batch{
+			ID:        entry.id,
+			Tag:       entry.tag,
+			CreatedAt: base.Add(time.Duration(i) * time.Minute),
+		}); err != nil {
+			t.Fatalf("CreateBatch %s: %v", entry.id, err)
+		}
+	}
+
+	// All batches, newest first.
+	all := store.ListBatches("", 10, 0)
+	if all.Total != 3 {
+		t.Fatalf("Total = %d, want 3", all.Total)
+	}
+	if all.Items[0].ID != "b3" || all.Items[2].ID != "b1" {
+		t.Fatalf("order = %v, want newest first", []string{all.Items[0].ID, all.Items[1].ID, all.Items[2].ID})
+	}
+
+	// Substring tag filter is case-insensitive and matches both tld batches.
+	tld := store.ListBatches("TLD", 10, 0)
+	if tld.Total != 2 {
+		t.Fatalf("label=TLD Total = %d, want 2", tld.Total)
+	}
+	if tld.Items[0].ID != "b3" || tld.Items[1].ID != "b1" {
+		t.Fatalf("label=TLD order = %v, want [b3 b1]", []string{tld.Items[0].ID, tld.Items[1].ID})
+	}
+
+	// Pagination.
+	page := store.ListBatches("", 1, 1)
+	if page.Total != 3 || len(page.Items) != 1 || page.Items[0].ID != "b2" {
+		t.Fatalf("limit=1 offset=1 = %+v, want only b2", page)
+	}
+}
+
 func TestInMemoryJobStoreDeleteBatchRemovesEverything(t *testing.T) {
 	store := NewInMemoryJobStore()
 	now := time.Now().UTC()

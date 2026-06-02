@@ -153,6 +153,10 @@ func (s *countingJobStore) ListBatchesByTag(tag string, limit, offset int) Batch
 	return s.inner.ListBatchesByTag(tag, limit, offset)
 }
 
+func (s *countingJobStore) ListBatches(tagLike string, limit, offset int) BatchList {
+	return s.inner.ListBatches(tagLike, limit, offset)
+}
+
 func (s *countingJobStore) BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error) {
 	return s.inner.BatchDeletePreviewStats(batchID)
 }

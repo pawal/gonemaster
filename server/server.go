@@ -254,6 +254,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/jobs/purge", s.handleJobsPurge)
 	apiMux.HandleFunc("/jobs/", s.handleJobByID)
 	apiMux.HandleFunc("/jobs", s.handleJobs)
+	apiMux.HandleFunc("GET /batches", s.handleListBatches)
 	apiMux.HandleFunc("GET /batches/{id}/delete-preview", s.handleBatchDeletePreview)
 	apiMux.HandleFunc("GET /batches/{id}/tag-values", s.handleBatchTagValues)
 	apiMux.HandleFunc("DELETE /batches/{id}", s.handleDeleteBatch)

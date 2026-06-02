@@ -14,9 +14,72 @@ import (
 
 func registerBatchTools(srv *mcp.Server, api *apiClient) {
 	registerBatchGet(srv, api)
+	registerBatchList(srv, api)
 	registerCohortStats(srv, api)
 	registerCohortTagValues(srv, api)
 	registerFailuresByTag(srv, api)
+}
+
+type batchListInput struct {
+	Label string `json:"label,omitempty" jsonschema:"filter to batches whose tag contains this substring"`
+	Limit int    `json:"limit,omitempty" jsonschema:"max batches to return (default 20, max 100)"`
+}
+
+type batchListItemOutput struct {
+	BatchID     string `json:"batch_id"`
+	Tag         string `json:"tag,omitempty" jsonschema:"the cohort tag this batch was built from"`
+	Description string `json:"description,omitempty"`
+	Status      string `json:"status" jsonschema:"done or running"`
+	Total       int    `json:"total" jsonschema:"domains in the batch"`
+	Completed   int    `json:"completed" jsonschema:"domains with a completed run"`
+	Completion  int    `json:"completion" jsonschema:"percent complete, 0-100"`
+	CreatedAt   string `json:"created_at,omitempty"`
+	FinishedAt  string `json:"finished_at,omitempty"`
+}
+
+type batchListOutput struct {
+	Count   int                   `json:"count"`
+	Total   int                   `json:"total" jsonschema:"total batches on the server, before limit"`
+	Batches []batchListItemOutput `json:"batches" jsonschema:"recent batches, newest first"`
+}
+
+func registerBatchList(srv *mcp.Server, api *apiClient) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "batch_list",
+		Description: "List recent batches (cohort runs), newest first, with status and completion. " +
+			"Use to discover a batch_id (for example the most recent TLD run) to feed the other cohort " +
+			"tools. The optional label filters by a substring of the batch tag.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in batchListInput) (*mcp.CallToolResult, batchListOutput, error) {
+		q := url.Values{}
+		if label := strings.TrimSpace(in.Label); label != "" {
+			q.Set("label", label)
+		}
+		limit := in.Limit
+		if limit <= 0 {
+			limit = 20
+		}
+		q.Set("limit", strconv.Itoa(limit))
+		v, err := api.listBatches(ctx, q)
+		if err != nil {
+			return nil, batchListOutput{}, toolError("list batches", err)
+		}
+		out := batchListOutput{Total: v.Total, Batches: []batchListItemOutput{}}
+		for _, b := range v.Items {
+			item := batchListItemOutput{
+				BatchID: b.BatchID, Tag: b.Tag, Description: b.Description, Status: b.Status,
+				Total: b.Total, Completed: b.Completed, Completion: b.Completion,
+			}
+			if !b.CreatedAt.IsZero() {
+				item.CreatedAt = b.CreatedAt.UTC().Format(time.RFC3339)
+			}
+			if b.FinishedAt != nil && !b.FinishedAt.IsZero() {
+				item.FinishedAt = b.FinishedAt.UTC().Format(time.RFC3339)
+			}
+			out.Batches = append(out.Batches, item)
+		}
+		out.Count = len(out.Batches)
+		return nil, out, nil
+	})
 }
 
 type batchGetInput struct {

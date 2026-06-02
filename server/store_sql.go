@@ -1747,6 +1747,55 @@ func (s *SQLJobStore) ListBatchesByTag(tag string, limit, offset int) BatchList 
 	return out
 }
 
+// ListBatches returns batches newest first, optionally filtered by a
+// case-insensitive substring of the batch tag.
+func (s *SQLJobStore) ListBatches(tagLike string, limit, offset int) BatchList {
+	if limit <= 0 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	out := BatchList{Limit: limit, Offset: offset}
+
+	where := ""
+	var filterArgs []any
+	if tagLike != "" {
+		where = fmt.Sprintf(" WHERE LOWER(tag) LIKE %s", s.ph(1))
+		filterArgs = append(filterArgs, "%"+strings.ToLower(tagLike)+"%")
+	}
+
+	if err := s.db.QueryRow(`SELECT COUNT(*) FROM batches`+where, filterArgs...).Scan(&out.Total); err != nil {
+		return out
+	}
+	dataArgs := append(append([]any{}, filterArgs...), limit, offset)
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description, snapshot_intent
+			FROM batches%s
+			ORDER BY created_at DESC, id DESC
+			LIMIT %s OFFSET %s`, where, s.ph(len(filterArgs)+1), s.ph(len(filterArgs)+2)),
+		dataArgs...,
+	)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var (
+			b              Batch
+			createdAt      string
+			snapshotIntent int
+		)
+		if err := rows.Scan(&b.ID, &b.Tag, &createdAt, &b.DomainCount, &b.Description, &snapshotIntent); err != nil {
+			return out
+		}
+		b.CreatedAt = parseTimestampStr(createdAt)
+		b.SnapshotIntent = intToBool(snapshotIntent)
+		out.Items = append(out.Items, b)
+	}
+	return out
+}
+
 // BatchDeletePreviewStats counts the rows that a DeleteBatch call
 // would remove. Snapshot list is left to the handler to fill in.
 func (s *SQLJobStore) BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error) {

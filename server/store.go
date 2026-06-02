@@ -162,6 +162,7 @@ type JobStore interface {
 	GetBatch(id string) (Batch, bool)
 	SetBatchSnapshotIntent(batchID string, intent bool) error
 	ListBatchesByTag(tag string, limit, offset int) BatchList
+	ListBatches(tagLike string, limit, offset int) BatchList
 	BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error)
 	DeleteBatch(batchID string) ([]int64, error)
 	BatchHasRuns(batchID string) bool
@@ -1325,6 +1326,42 @@ func (s *InMemoryJobStore) ListBatchesByTag(tag string, limit, offset int) Batch
 		if b.Tag == tag {
 			items = append(items, b)
 		}
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if !items[i].CreatedAt.Equal(items[j].CreatedAt) {
+			return items[i].CreatedAt.After(items[j].CreatedAt)
+		}
+		return items[i].ID > items[j].ID
+	})
+	total := len(items)
+	start := min(offset, total)
+	end := min(start+limit, total)
+	return BatchList{
+		Items:  items[start:end],
+		Total:  total,
+		Limit:  limit,
+		Offset: offset,
+	}
+}
+
+// ListBatches returns batches newest first, optionally filtered by a
+// case-insensitive substring of the batch tag.
+func (s *InMemoryJobStore) ListBatches(tagLike string, limit, offset int) BatchList {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if limit <= 0 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+	needle := strings.ToLower(tagLike)
+	items := make([]Batch, 0)
+	for _, b := range s.batches {
+		if needle != "" && !strings.Contains(strings.ToLower(b.Tag), needle) {
+			continue
+		}
+		items = append(items, b)
 	}
 	sort.Slice(items, func(i, j int) bool {
 		if !items[i].CreatedAt.Equal(items[j].CreatedAt) {

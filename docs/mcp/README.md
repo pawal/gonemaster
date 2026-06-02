@@ -93,8 +93,17 @@ Read tools (always available):
 | `spec_get_testcase` | Get a testcase's module, description, and the tags it can emit with rendered messages. |
 | `batch_get` | Poll a batch: total, per-status counts, and completion. |
 | `cohort_stats` | Grade and worst-severity distribution across a batch's runs. |
-| `cohort_operators` | Top operators in a batch grouped by `ns_parent` or `asn`, ranked by mean score. |
+| `cohort_tag_values` | Roll up the values a tag's argument takes across a batch (by count, or by mean score with `weight_by_score`), with sample domains. |
 | `failures_by_tag` | Rank the tags driving failures in a batch, with example domains. |
+
+`cohort_tag_values` is the generic primitive for "what values does argument
+`<arg>` of tag `<tag>` take across this batch?". The `(tag, arg)` pair comes
+from the [log-args inventory](../specifications/log-args-inventory.json); use
+`spec_list_testcases` and `spec_get_testcase` to discover a module's tags. To
+rank the operators behind a batch by mean score, call it with
+`tag=IPV4_ONE_ASN`, `arg=asn`, `weight_by_score=true`; to also fold in ASNs that
+appear only in the `*_DIFFERENT_ASN` / `*_SAME_ASN` tags, call those tags too
+and union client-side.
 
 Write tools (registered only when `GONEMASTER_MCP_ALLOW_WRITE=1`):
 

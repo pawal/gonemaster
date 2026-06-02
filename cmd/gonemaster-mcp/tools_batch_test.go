@@ -1,6 +1,7 @@
 package main
 
 import (
+	"net/url"
 	"testing"
 	"time"
 )
@@ -72,6 +73,50 @@ func TestCohortStats(t *testing.T) {
 	}
 	if out.Total != 3 {
 		t.Errorf("total = %d, want 3", out.Total)
+	}
+}
+
+func TestCohortTagValues(t *testing.T) {
+	avg := 92.5
+	var captured url.Values
+	ts := newFakeServer(t, fakeOpts{
+		tagValuesQuery: &captured,
+		tagValues: &batchTagValuesView{
+			BatchID: "b1", Tag: "IPV4_ONE_ASN", Arg: "asn", MinCount: 1, WeightByScore: true,
+			Values: []tagValueRollupView{
+				{Value: "13335", Count: 12, AvgScore: &avg, SampleDomains: []string{"a", "b"}},
+			},
+		},
+	})
+	defer ts.Close()
+
+	var out cohortTagValuesOutput
+	res := callTool(t, clientFor(t, ts.URL, ""), "cohort_tag_values", map[string]any{
+		"batch_id": "b1", "tag": "IPV4_ONE_ASN", "arg": "asn", "weight_by_score": true,
+	}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	// The tool must forward tag, arg, and weight_by_score to the server.
+	if captured.Get("tag") != "IPV4_ONE_ASN" || captured.Get("arg") != "asn" || captured.Get("weight_by_score") != "true" {
+		t.Errorf("forwarded query wrong: %v", captured)
+	}
+	if len(out.Values) != 1 {
+		t.Fatalf("expected one value row, got %+v", out.Values)
+	}
+	v := out.Values[0]
+	if v.Value != "13335" || v.Count != 12 || v.AvgScore == nil || *v.AvgScore != 92.5 {
+		t.Errorf("value row wrong: %+v", v)
+	}
+}
+
+func TestCohortTagValuesRequiresTagAndArg(t *testing.T) {
+	ts := newFakeServer(t, fakeOpts{})
+	defer ts.Close()
+	var out cohortTagValuesOutput
+	res := callTool(t, clientFor(t, ts.URL, ""), "cohort_tag_values", map[string]any{"batch_id": "b1", "arg": "asn"}, &out)
+	if !res.IsError {
+		t.Errorf("expected an error when tag is missing")
 	}
 }
 

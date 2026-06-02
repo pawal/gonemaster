@@ -31,31 +31,45 @@ func (s *Server) handleTagBatches(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, list)
 }
 
-// handleBatchOperators handles GET /api/v1/batches/{id}/operators.
-func (s *Server) handleBatchOperators(w http.ResponseWriter, r *http.Request) {
+// handleBatchTagValues handles GET /api/v1/batches/{id}/tag-values.
+func (s *Server) handleBatchTagValues(w http.ResponseWriter, r *http.Request) {
 	batchID := strings.TrimSpace(r.PathValue("id"))
 	if batchID == "" {
 		writeError(w, http.StatusBadRequest, "missing_batch_id", "batch id is required", nil)
 		return
 	}
 
-	groupBy := strings.TrimSpace(r.URL.Query().Get("group_by"))
-	if groupBy != "ns_parent" && groupBy != "asn" {
-		writeError(w, http.StatusBadRequest, "invalid_group_by", "group_by must be ns_parent or asn", nil)
+	tag := strings.TrimSpace(r.URL.Query().Get("tag"))
+	if tag == "" {
+		writeError(w, http.StatusBadRequest, "missing_tag", "tag is required", nil)
 		return
 	}
-	minCount, ok := parsePositiveQuery(r, "min_count", 10)
+	arg := strings.TrimSpace(r.URL.Query().Get("arg"))
+	if arg == "" {
+		writeError(w, http.StatusBadRequest, "missing_arg", "arg is required", nil)
+		return
+	}
+	minCount, ok := parsePositiveQuery(r, "min_count", 1)
 	if !ok {
 		writeError(w, http.StatusBadRequest, "invalid_min_count", "min_count must be a positive integer", nil)
 		return
 	}
-	limit, ok := parsePositiveQuery(r, "limit", 20)
+	limit, ok := parsePositiveQuery(r, "limit", 50)
 	if !ok {
 		writeError(w, http.StatusBadRequest, "invalid_limit", "limit must be a positive integer", nil)
 		return
 	}
-	if limit > 100 {
-		limit = 100
+	if limit > 500 {
+		limit = 500
+	}
+	weightByScore := false
+	if raw := strings.TrimSpace(r.URL.Query().Get("weight_by_score")); raw != "" {
+		b, err := strconv.ParseBool(raw)
+		if err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_weight_by_score", "weight_by_score must be a boolean", nil)
+			return
+		}
+		weightByScore = b
 	}
 
 	if !s.batchExists(batchID) {
@@ -67,15 +81,17 @@ func (s *Server) handleBatchOperators(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	operators := s.batchOperators(batchID, groupBy, minCount, limit)
-	if operators == nil {
-		operators = []OperatorRollup{}
+	values := s.batchTagValues(batchID, tag, arg, minCount, limit, weightByScore)
+	if values == nil {
+		values = []TagValueRollup{}
 	}
-	writeJSON(w, http.StatusOK, BatchOperatorsResponse{
-		BatchID:   batchID,
-		GroupBy:   groupBy,
-		MinCount:  minCount,
-		Operators: operators,
+	writeJSON(w, http.StatusOK, BatchTagValuesResponse{
+		BatchID:       batchID,
+		Tag:           tag,
+		Arg:           arg,
+		MinCount:      minCount,
+		WeightByScore: weightByScore,
+		Values:        values,
 	})
 }
 

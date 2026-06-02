@@ -298,24 +298,26 @@ func (c *apiClient) listEntries(ctx context.Context, q url.Values) (entryListVie
 	return out, err
 }
 
-// operatorRollupView decodes one row of GET /batches/{id}/operators.
-type operatorRollupView struct {
-	Key           string   `json:"key"`
-	DomainCount   int      `json:"domain_count"`
-	AvgScore      float64  `json:"avg_score"`
+// tagValueRollupView decodes one row of GET /batches/{id}/tag-values.
+type tagValueRollupView struct {
+	Value         string   `json:"value"`
+	Count         int      `json:"count"`
+	AvgScore      *float64 `json:"avg_score,omitempty"`
 	SampleDomains []string `json:"sample_domains"`
 }
 
-type batchOperatorsView struct {
-	BatchID   string               `json:"batch_id"`
-	GroupBy   string               `json:"group_by"`
-	MinCount  int                  `json:"min_count"`
-	Operators []operatorRollupView `json:"operators"`
+type batchTagValuesView struct {
+	BatchID       string               `json:"batch_id"`
+	Tag           string               `json:"tag"`
+	Arg           string               `json:"arg"`
+	MinCount      int                  `json:"min_count"`
+	WeightByScore bool                 `json:"weight_by_score,omitempty"`
+	Values        []tagValueRollupView `json:"values"`
 }
 
-func (c *apiClient) getBatchOperators(ctx context.Context, id string, q url.Values) (batchOperatorsView, error) {
-	var out batchOperatorsView
-	path := "/batches/" + url.PathEscape(id) + "/operators"
+func (c *apiClient) getBatchTagValues(ctx context.Context, id string, q url.Values) (batchTagValuesView, error) {
+	var out batchTagValuesView
+	path := "/batches/" + url.PathEscape(id) + "/tag-values"
 	if len(q) > 0 {
 		path += "?" + q.Encode()
 	}

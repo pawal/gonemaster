@@ -15,7 +15,7 @@ import (
 func registerBatchTools(srv *mcp.Server, api *apiClient) {
 	registerBatchGet(srv, api)
 	registerCohortStats(srv, api)
-	registerCohortOperators(srv, api)
+	registerCohortTagValues(srv, api)
 	registerFailuresByTag(srv, api)
 }
 
@@ -111,59 +111,75 @@ func registerCohortStats(srv *mcp.Server, api *apiClient) {
 	})
 }
 
-type cohortOperatorsInput struct {
-	BatchID  string `json:"batch_id" jsonschema:"the batch id"`
-	GroupBy  string `json:"group_by" jsonschema:"grouping dimension: ns_parent or asn"`
-	MinCount int    `json:"min_count,omitempty" jsonschema:"suppress operators serving fewer than this many domains (default 10)"`
-	Limit    int    `json:"limit,omitempty" jsonschema:"max operator rows to return (default 20, max 100)"`
+type cohortTagValuesInput struct {
+	BatchID       string `json:"batch_id" jsonschema:"the batch id"`
+	Tag           string `json:"tag" jsonschema:"the log message tag whose arg to roll up, e.g. N16_HAS_NSID or IPV4_ONE_ASN"`
+	Arg           string `json:"arg" jsonschema:"the arg key within that tag to extract, e.g. nsid or asn"`
+	MinCount      int    `json:"min_count,omitempty" jsonschema:"suppress values carried by fewer than this many domains (default 1)"`
+	Limit         int    `json:"limit,omitempty" jsonschema:"max value rows to return (default 50, max 500)"`
+	WeightByScore bool   `json:"weight_by_score,omitempty" jsonschema:"rank by mean domain score instead of occurrence count"`
 }
 
-type operatorRollupOutput struct {
-	Key           string   `json:"key" jsonschema:"the NS parent domain or ASN number"`
-	DomainCount   int      `json:"domain_count" jsonschema:"distinct domains in the batch served by this operator"`
-	AvgScore      float64  `json:"avg_score" jsonschema:"mean score of those domains"`
-	SampleDomains []string `json:"sample_domains" jsonschema:"up to 10 domains, highest score first"`
+type tagValueRollupOutput struct {
+	Value         string   `json:"value" jsonschema:"the arg value"`
+	Count         int      `json:"count" jsonschema:"distinct domains in the batch carrying this value"`
+	AvgScore      *float64 `json:"avg_score,omitempty" jsonschema:"mean score of those domains, only when weight_by_score is set"`
+	SampleDomains []string `json:"sample_domains" jsonschema:"up to 10 contributing domains"`
 }
 
-type cohortOperatorsOutput struct {
-	BatchID   string                 `json:"batch_id"`
-	GroupBy   string                 `json:"group_by"`
-	MinCount  int                    `json:"min_count"`
-	Operators []operatorRollupOutput `json:"operators" jsonschema:"operators ranked by avg_score, highest first"`
+type cohortTagValuesOutput struct {
+	BatchID       string                 `json:"batch_id"`
+	Tag           string                 `json:"tag"`
+	Arg           string                 `json:"arg"`
+	MinCount      int                    `json:"min_count"`
+	WeightByScore bool                   `json:"weight_by_score,omitempty"`
+	Values        []tagValueRollupOutput `json:"values" jsonschema:"values ranked by count, or by avg_score when weight_by_score is set"`
 }
 
-func registerCohortOperators(srv *mcp.Server, api *apiClient) {
+func registerCohortTagValues(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
-		Name: "cohort_operators",
-		Description: "Top operators in a completed batch, grouped by ns_parent or asn, ranked by mean score. " +
-			"Use group_by=asn for cross-TLD operator rollups: with ns_parent, per-TLD nameserver names " +
-			"like dns1.nic.<tld> do not collapse across TLDs. ASN keys are numbers only, with no org-name enrichment.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in cohortOperatorsInput) (*mcp.CallToolResult, cohortOperatorsOutput, error) {
+		Name: "cohort_tag_values",
+		Description: "Roll up the values an argument takes across a completed batch: for the given (tag, arg), " +
+			"how often each value appears and which domains carry it. Ranked by count, or by mean domain score " +
+			"when weight_by_score is set. The (tag, arg) pair must come from the log-args inventory at " +
+			"docs/specifications/log-args-inventory.json; use spec_list_testcases and spec_get_testcase to find " +
+			"which tags a module emits. Examples: tag=N16_HAS_NSID arg=nsid (NSID strings in use), " +
+			"tag=IPV4_ONE_ASN arg=asn (which AS serves each domain). List-valued args are unpacked: an entry whose " +
+			"nameservers arg holds [\"a\",\"b\",\"c\"] contributes one count to each of a, b, and c.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in cohortTagValuesInput) (*mcp.CallToolResult, cohortTagValuesOutput, error) {
 		id := strings.TrimSpace(in.BatchID)
 		if id == "" {
-			return nil, cohortOperatorsOutput{}, errors.New("batch_id is required")
+			return nil, cohortTagValuesOutput{}, errors.New("batch_id is required")
 		}
-		groupBy := strings.TrimSpace(in.GroupBy)
-		if groupBy != "ns_parent" && groupBy != "asn" {
-			return nil, cohortOperatorsOutput{}, errors.New("group_by must be ns_parent or asn")
+		tag := strings.TrimSpace(in.Tag)
+		if tag == "" {
+			return nil, cohortTagValuesOutput{}, errors.New("tag is required")
+		}
+		arg := strings.TrimSpace(in.Arg)
+		if arg == "" {
+			return nil, cohortTagValuesOutput{}, errors.New("arg is required")
 		}
 		q := url.Values{}
-		q.Set("group_by", groupBy)
+		q.Set("tag", tag)
+		q.Set("arg", arg)
 		if in.MinCount > 0 {
 			q.Set("min_count", strconv.Itoa(in.MinCount))
 		}
 		if in.Limit > 0 {
 			q.Set("limit", strconv.Itoa(in.Limit))
 		}
-		v, err := api.getBatchOperators(ctx, id, q)
-		if err != nil {
-			return nil, cohortOperatorsOutput{}, toolError("get batch operators", err)
+		if in.WeightByScore {
+			q.Set("weight_by_score", "true")
 		}
-		out := cohortOperatorsOutput{BatchID: v.BatchID, GroupBy: v.GroupBy, MinCount: v.MinCount}
-		out.Operators = make([]operatorRollupOutput, 0, len(v.Operators))
-		for _, op := range v.Operators {
-			out.Operators = append(out.Operators, operatorRollupOutput{
-				Key: op.Key, DomainCount: op.DomainCount, AvgScore: op.AvgScore, SampleDomains: op.SampleDomains,
+		v, err := api.getBatchTagValues(ctx, id, q)
+		if err != nil {
+			return nil, cohortTagValuesOutput{}, toolError("get batch tag values", err)
+		}
+		out := cohortTagValuesOutput{BatchID: v.BatchID, Tag: v.Tag, Arg: v.Arg, MinCount: v.MinCount, WeightByScore: v.WeightByScore}
+		out.Values = make([]tagValueRollupOutput, 0, len(v.Values))
+		for _, row := range v.Values {
+			out.Values = append(out.Values, tagValueRollupOutput{
+				Value: row.Value, Count: row.Count, AvgScore: row.AvgScore, SampleDomains: row.SampleDomains,
 			})
 		}
 		return nil, out, nil

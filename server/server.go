@@ -255,7 +255,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/jobs/", s.handleJobByID)
 	apiMux.HandleFunc("/jobs", s.handleJobs)
 	apiMux.HandleFunc("GET /batches/{id}/delete-preview", s.handleBatchDeletePreview)
-	apiMux.HandleFunc("GET /batches/{id}/operators", s.handleBatchOperators)
+	apiMux.HandleFunc("GET /batches/{id}/tag-values", s.handleBatchTagValues)
 	apiMux.HandleFunc("DELETE /batches/{id}", s.handleDeleteBatch)
 	apiMux.HandleFunc("PATCH /batches/{id}", s.handlePatchBatch)
 	apiMux.HandleFunc("GET /batches/{id}", s.handleBatchByID)

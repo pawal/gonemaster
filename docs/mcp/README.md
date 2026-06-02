@@ -110,6 +110,10 @@ and union client-side.
 agent can pivot from a known run to the batch (cohort) it belongs to. It is
 empty for ad-hoc single-domain runs.
 
+The same tools include a `public_id` field. Build a shareable public report
+link as `https://<host>/#/result/<public_id>`. It is empty for runs that have
+no public id.
+
 Write tools (registered only when `GONEMASTER_MCP_ALLOW_WRITE=1`):
 
 | Tool | Purpose |

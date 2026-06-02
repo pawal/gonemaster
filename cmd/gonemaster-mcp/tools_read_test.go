@@ -436,6 +436,47 @@ func TestRunOutputsExposeBatchID(t *testing.T) {
 	}
 }
 
+func TestRunOutputsExposePublicID(t *testing.T) {
+	// run_get and latest_for must surface public_id so an agent can build a
+	// shareable report link.
+	ts := newFakeServer(t, fakeOpts{
+		run: &runView{ID: "run_p", Domain: "x.example", PublicID: "Ab3xZ9k0", Status: "succeeded"},
+		runs: []runView{
+			{ID: "run_p", Domain: "x.example", PublicID: "Ab3xZ9k0", Status: "succeeded", FinishedAt: time.Unix(2000, 0)},
+		},
+	})
+	defer ts.Close()
+
+	var got testResult
+	if res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "run_p"}, &got); res.IsError {
+		t.Fatalf("run_get error: %s", errorText(res))
+	}
+	if got.PublicID != "Ab3xZ9k0" {
+		t.Errorf("run_get public_id = %q, want Ab3xZ9k0", got.PublicID)
+	}
+
+	var latest latestForOutput
+	if res := callTool(t, clientFor(t, ts.URL, ""), "latest_for", map[string]any{"domain": "x.example"}, &latest); res.IsError {
+		t.Fatalf("latest_for error: %s", errorText(res))
+	}
+	if len(latest.Runs) != 1 || latest.Runs[0].PublicID != "Ab3xZ9k0" {
+		t.Errorf("latest_for public_id not surfaced: %+v", latest.Runs)
+	}
+}
+
+func TestRunOutputsOmitPublicIDWhenAbsent(t *testing.T) {
+	// A run without a public_id must not invent one.
+	ts := newFakeServer(t, fakeOpts{run: &runView{ID: "run_np", Domain: "x.example", Status: "succeeded"}})
+	defer ts.Close()
+	var got testResult
+	if res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "run_np"}, &got); res.IsError {
+		t.Fatalf("run_get error: %s", errorText(res))
+	}
+	if got.PublicID != "" {
+		t.Errorf("public_id should be empty when the run has none, got %q", got.PublicID)
+	}
+}
+
 func TestRunGetUnauthorizedGivesTokenHint(t *testing.T) {
 	ts := newFakeServer(t, fakeOpts{requireToken: "gm_secret", run: &runView{ID: "r", Domain: "d", Status: "succeeded"}})
 	defer ts.Close()

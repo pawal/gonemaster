@@ -1326,6 +1326,48 @@ func TestSQLJobStoreListRunsSeverityFilter(t *testing.T) {
 	}
 }
 
+func TestSQLJobStoreListRunsEntryTagFilter(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			base := time.Now().UTC().Truncate(time.Millisecond)
+
+			for _, id := range []string{"e1", "e2"} {
+				if _, err := s.Create(Job{ID: id, Domain: id + ".test", Status: JobSucceeded, CreatedAt: base}); err != nil {
+					t.Fatalf("Create: %v", err)
+				}
+			}
+			graduateSQLJob(t, s, Job{ID: "e1", Domain: "e1.test", Status: JobSucceeded, CreatedAt: base, FinishedAt: base},
+				[]engine.LogEntry{{Level: "ERROR", Module: "DNSSEC", Tag: "DS07_NOT_SIGNED"}})
+			graduateSQLJob(t, s, Job{ID: "e2", Domain: "e2.test", Status: JobSucceeded, CreatedAt: base, FinishedAt: base},
+				[]engine.LogEntry{{Level: "WARNING", Module: "Consistency", Tag: "CN04_IPV4_SAME_PREFIX"}})
+
+			t.Run("matches by entry tag", func(t *testing.T) {
+				list := s.ListRuns(RunFilter{EntryTag: "DS07_NOT_SIGNED", Limit: 10})
+				if list.Total != 1 || list.Items[0].ID != "e1" {
+					t.Fatalf("EntryTag=DS07_NOT_SIGNED: total=%d items=%v", list.Total, runIDs(list.Items))
+				}
+			})
+			t.Run("unknown tag matches nothing", func(t *testing.T) {
+				if list := s.ListRuns(RunFilter{EntryTag: "NOPE", Limit: 10}); list.Total != 0 {
+					t.Fatalf("unknown EntryTag should match nothing, got %d", list.Total)
+				}
+			})
+			t.Run("intersect with time window", func(t *testing.T) {
+				past := base.Add(-time.Hour)
+				if list := s.ListRuns(RunFilter{EntryTag: "DS07_NOT_SIGNED", FinishedBefore: past, Limit: 10}); list.Total != 0 {
+					t.Fatalf("EntryTag plus a past finished_before should be empty, got %d", list.Total)
+				}
+			})
+			t.Run("no entry tag returns all", func(t *testing.T) {
+				if list := s.ListRuns(RunFilter{Limit: 10}); list.Total != 2 {
+					t.Fatalf("no EntryTag should return both runs, got %d", list.Total)
+				}
+			})
+		})
+	}
+}
+
 // runIDs extracts run IDs for error messages.
 func runIDs(runs []Run) []string {
 	out := make([]string, len(runs))

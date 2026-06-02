@@ -640,7 +640,8 @@ type RunFilter struct {
 	DomainID       int64
 	Domain         string
 	BatchID        string
-	Tag            string
+	Tag            string // domain tag (join via domain_tags)
+	EntryTag       string // log event tag (presence in entries)
 	Status         JobStatus
 	WorstLevel     string
 	Grade          string

@@ -87,6 +87,46 @@ func TestListRunsFilterByTag(t *testing.T) {
 	}
 }
 
+func TestListRunsFilterByEventTag(t *testing.T) {
+	// event_tag filters runs by the presence of a log-event tag in their
+	// entries. This is distinct from the domain-tag tag= filter above.
+	srv := New(DefaultConfig())
+	seedBatchRuns(t, srv, "batch_evt", []seedRun{
+		{domain: "signed.example", entries: []engine.LogEntry{
+			{Timestamp: 1.0, Module: "DNSSEC", Testcase: "DNSSEC07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
+		}},
+		{domain: "consistent.example", entries: []engine.LogEntry{
+			{Timestamp: 1.0, Module: "Consistency", Testcase: "Consistency04", Tag: "CN04_IPV4_SAME_PREFIX", Level: "WARNING"},
+		}},
+	})
+
+	get := func(query string) RunList {
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodGet, "/api/v1/runs"+query, nil)
+		srv.Handler().ServeHTTP(resp, req)
+		var list RunList
+		_ = json.NewDecoder(resp.Body).Decode(&list)
+		return list
+	}
+
+	// Matches only the run that emitted the tag.
+	if list := get("?event_tag=DS07_NOT_SIGNED"); list.Total != 1 || len(list.Items) != 1 || list.Items[0].Domain != "signed.example" {
+		t.Fatalf("event_tag=DS07_NOT_SIGNED should match only signed.example, got %+v", list)
+	}
+	// A tag no run emitted matches nothing.
+	if list := get("?event_tag=NO_SUCH_TAG"); list.Total != 0 {
+		t.Fatalf("unknown event_tag should match nothing, got %+v", list)
+	}
+	// Without event_tag, both runs are returned (no accidental narrowing).
+	if list := get(""); list.Total != 2 {
+		t.Fatalf("no filter should return both runs, got %d", list.Total)
+	}
+	// event_tag intersects with the finish-time window.
+	if list := get("?event_tag=DS07_NOT_SIGNED&finished_before=2000-01-01T00:00:00Z"); list.Total != 0 {
+		t.Fatalf("event_tag plus a past finished_before should be empty, got %+v", list)
+	}
+}
+
 func TestListRunsInvalidLimit(t *testing.T) {
 	srv := New(DefaultConfig())
 	resp := httptest.NewRecorder()

@@ -31,9 +31,13 @@ func TestRunSearchForwardsFiltersAndMaps(t *testing.T) {
 	if out.Count != 1 || out.Runs[0].RunID != "run_2" || out.Runs[0].Grade != "B" {
 		t.Errorf("mapping wrong: %+v", out)
 	}
-	// Filters must reach the server as query params.
-	if captured.Get("domain") != "x.example" || captured.Get("tag") != "SOATIME" || captured.Get("level") != "WARNING" {
+	// Filters must reach the server as query params. The tool's tag input maps
+	// to the server's event_tag (log-event tag), not the domain-tag filter.
+	if captured.Get("domain") != "x.example" || captured.Get("event_tag") != "SOATIME" || captured.Get("level") != "WARNING" {
 		t.Errorf("filters not forwarded: %v", captured)
+	}
+	if captured.Get("tag") != "" {
+		t.Errorf("tag input must not forward to the domain-tag filter, got tag=%q", captured.Get("tag"))
 	}
 	if captured.Get("limit") != "10" {
 		t.Errorf("limit = %q, want 10", captured.Get("limit"))

@@ -46,7 +46,7 @@ func registerRunSearch(srv *mcp.Server, api *apiClient) {
 			}
 		}
 		setIf("domain", in.Domain)
-		setIf("tag", in.Tag)
+		setIf("event_tag", in.Tag)
 		setIf("status", in.Status)
 		setIf("level", in.Level)
 		setIf("grade", in.Grade)

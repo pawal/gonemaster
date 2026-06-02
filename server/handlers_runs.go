@@ -7,11 +7,12 @@ import (
 )
 
 // handleListRuns handles GET /api/v1/runs.
-// Accepts: tag, domain, batch, status, level, finished_after, finished_before, limit, offset.
+// Accepts: tag, event_tag, domain, batch, status, level, finished_after, finished_before, limit, offset.
 func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 	filter := RunFilter{Limit: 100}
 	q := r.URL.Query()
 	filter.Tag = strings.TrimSpace(q.Get("tag"))
+	filter.EntryTag = strings.TrimSpace(q.Get("event_tag"))
 	filter.Domain = strings.TrimSpace(q.Get("domain"))
 	filter.BatchID = strings.TrimSpace(q.Get("batch"))
 	if v := strings.TrimSpace(q.Get("status")); v != "" {

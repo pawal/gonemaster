@@ -66,12 +66,12 @@ gonemaster-client entries query --tag tld --module DNSSEC --latest
 
 Admin API equivalents:
 
-```http
-GET /api/v1/tags
-GET /api/v1/tags/tld/domains
-GET /api/v1/tags/tld/summary
-GET /api/v1/domains?tag=tld&level=ERROR
-GET /api/v1/entries?tag=tld&module=DNSSEC&latest=true
+```bash
+curl -s http://localhost:8080/api/v1/tags
+curl -s http://localhost:8080/api/v1/tags/tld/domains
+curl -s http://localhost:8080/api/v1/tags/tld/summary
+curl -s "http://localhost:8080/api/v1/domains?tag=tld&level=ERROR"
+curl -s "http://localhost:8080/api/v1/entries?tag=tld&module=DNSSEC&latest=true"
 ```
 
 ## Default Profiles
@@ -84,9 +84,11 @@ ambiguous request and asks the caller to choose a profile explicitly.
 
 API entry points:
 
-```http
-PUT /api/v1/tags/{name}/profile
-DELETE /api/v1/tags/{name}/profile
+```bash
+curl -s -X PUT http://localhost:8080/api/v1/tags/{name}/profile \
+  -H "Content-Type: application/json" \
+  -d '{"profile": "default"}'
+curl -s -X DELETE http://localhost:8080/api/v1/tags/{name}/profile
 ```
 
 ## Cohorts
@@ -105,6 +107,6 @@ opening batch deletion previews.
 
 API entry point:
 
-```http
-GET /api/v1/tags/{name}/batches
+```bash
+curl -s http://localhost:8080/api/v1/tags/{name}/batches
 ```

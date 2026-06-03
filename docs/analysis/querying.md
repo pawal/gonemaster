@@ -55,11 +55,11 @@ The admin API lives under `/api/v1/` and must stay private.
 
 Common requests:
 
-```http
-GET /api/v1/tags/tld/summary
-GET /api/v1/domains?tag=tld&level=ERROR&limit=100
-GET /api/v1/runs?domain=example.com&limit=20
-GET /api/v1/entries?tag=tld&module=DNSSEC&latest=true&limit=500
+```bash
+curl -s http://localhost:8080/api/v1/tags/tld/summary
+curl -s "http://localhost:8080/api/v1/domains?tag=tld&level=ERROR&limit=100"
+curl -s "http://localhost:8080/api/v1/runs?domain=example.com&limit=20"
+curl -s "http://localhost:8080/api/v1/entries?tag=tld&module=DNSSEC&latest=true&limit=500"
 ```
 
 Common `entries` filters:

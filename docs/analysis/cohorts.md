@@ -43,8 +43,10 @@ Only `analysis_enabled` cohorts receive materialized rows. Only
 2. Create a cohort for that tag in the admin UI under
    **Settings > Analysis > Cohorts**, or use the admin API:
 
-   ```http
-   POST /api/v1/analysis/cohorts
+   ```bash
+   curl -s -X POST http://localhost:8080/api/v1/analysis/cohorts \
+     -H "Content-Type: application/json" \
+     -d '{"source_tag": "tld", "label": "TLDs", "analysis_enabled": true}'
    ```
 
 3. Run a snapshot-intent batch for the source tag.
@@ -74,8 +76,8 @@ request.
 
 Cohort state is visible in the admin UI and through:
 
-```http
-GET /api/v1/analysis/status
+```bash
+curl -s http://localhost:8080/api/v1/analysis/status
 ```
 
 Materialization statuses:
@@ -86,9 +88,9 @@ Materialization statuses:
 
 Repair actions:
 
-```http
-POST /api/v1/analysis/cohorts/{id}/rebuild
-POST /api/v1/analysis/cohorts/{id}/clear
+```bash
+curl -s -X POST http://localhost:8080/api/v1/analysis/cohorts/{id}/rebuild
+curl -s -X POST http://localhost:8080/api/v1/analysis/cohorts/{id}/clear
 ```
 
 Rebuild clears and reprojects matching runs. Clear removes materialized rows and

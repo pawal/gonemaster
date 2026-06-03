@@ -2,6 +2,24 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.5.1] - 2026-06-03
+
+Updated the MCP server to cover more queries, and added documentation on how to analyze data: https://pawal.codeberg.page/gonemaster/mcp/analysis-examples/
+
+### Added
+
+- mcp: expose public_id and batch_id on run_get, run_search, and latest_for
+- server: add batch_list endpoint and MCP tool for batch discovery
+- server: make run_search tag filter match log-event tags via event_tag
+- server: add cohort_tag_values rollup and MCP tool, drop cohort_operators
+- server: add batch operators rollup endpoint and cohort_operators MCP tool
+- dnssec15: align CDS consistency with RFC 9975
+- dnssec15: emit DS15_CDS_NON_MUST_DIGEST when CDS uses inert digest types
+
+### Changed
+
+- doc-site: some updates to the documentation to make it look better
+
 ## [v1.5.0] - 2026-06-01
 
 **NEW:** MCP server for AI agents, see documentation here: https://pawal.codeberg.page/gonemaster/mcp/

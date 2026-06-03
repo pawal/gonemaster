@@ -2,7 +2,16 @@
 
 Gonemaster can be used as a bulk DNS analysis platform: run large domain sets,
 track results over time, and query the data through `gonemaster-client`, the
-admin API, or SQL.
+admin API, SQL, or an MCP-capable agent.
+
+## Choose an Access Path
+
+| Path | Best for |
+|---|---|
+| `gonemaster-client` | Scripted exports, CSV pipelines. |
+| Admin API (`/api/v1/`) | Programmatic integration. |
+| SQL (sqlite / postgres / mariadb) | Ad-hoc joins, JSON arg lookups, large result sets. |
+| MCP (`gonemaster-mcp`) | Agent-driven exploration where the next question depends on the previous answer. See [../mcp/analysis-examples.md](../mcp/analysis-examples.md) and the bridge overview in [../mcp/README.md](../mcp/README.md). |
 
 ## Choose a Backend
 

@@ -128,3 +128,11 @@ After configuring the client, call the `ping` tool. A healthy open-mode setup
 reports `reachable: true` and `auth_mode: open`. In token mode a correct token
 reports `authenticated: true`; a missing or wrong token reports
 `authenticated: false` with a hint to set `GONEMASTER_TOKEN`.
+
+## See also
+
+- [analysis-examples.md](analysis-examples.md) - worked examples driving
+  cohort discovery, failure-tag ranking, and ASN concentration analysis
+  through the read tools.
+- [../analysis/querying.md](../analysis/querying.md) - the same questions
+  answered through `gonemaster-client`, the admin API, and SQL.

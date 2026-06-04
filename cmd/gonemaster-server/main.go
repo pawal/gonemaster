@@ -108,8 +108,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			{flag: "--sourceaddr6 IPADDR", detail: "Override resolver.source6 (IPv6 source address)"},
 		})
 		printUsageGroup(errOut, "Database", []usageLine{
-			{flag: "--db-driver DRIVER", detail: "Storage backend: sqlite (or leave empty for in-memory) (env: GONEMASTER_DB_DRIVER)"},
-			{flag: "--db-dsn DSN", detail: "SQLite: file path e.g. /var/lib/gonemaster/jobs.db (env: GONEMASTER_DB_DSN)"},
+			{flag: "--db-driver DRIVER", detail: "Storage backend: memory (default), sqlite, postgres, or mariadb (env: GONEMASTER_DB_DRIVER)"},
+			{flag: "--db-dsn DSN", detail: "SQLite file path (e.g. /var/lib/gonemaster/jobs.db) or postgres/mariadb connection string (env: GONEMASTER_DB_DSN)"},
 			{flag: "--db-retention-days N", detail: "Delete completed jobs older than N days (0 = keep forever) (env: GONEMASTER_DB_RETENTION_DAYS)"},
 			{flag: "--db-purge-interval N", detail: "Retention purge sweep interval in seconds (default 3600) (env: GONEMASTER_DB_PURGE_INTERVAL)"},
 		})
@@ -151,7 +151,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
-	fs.StringVar(&dbDriver, "db-driver", "", "Storage backend: sqlite (empty = in-memory)")
+	fs.StringVar(&dbDriver, "db-driver", "", "Storage backend: memory (default), sqlite, postgres, or mariadb")
 	fs.StringVar(&dbDSN, "db-dsn", "", "Database file path or connection string (optional)")
 	fs.IntVar(&dbRetentionDays, "db-retention-days", 0, "Delete completed jobs older than N days (0 = keep forever)")
 	fs.IntVar(&dbPurgeInterval, "db-purge-interval", 0, "Retention purge sweep interval in seconds (default 3600)")

@@ -378,6 +378,7 @@ type nsState struct {
 	fakeDS          map[string][]dns.RR
 	blacklisted     map[bool]bool
 	fastFail        fastFailTracker
+	latency         latencyTracker
 	queryFunc       func(ctx context.Context, name string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error)
 	axfrFunc        func(ctx context.Context, domain string, callback func(dns.RR) bool, class string) error
 }

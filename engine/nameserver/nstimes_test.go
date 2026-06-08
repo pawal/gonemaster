@@ -1,9 +1,13 @@
 package nameserver
 
 import (
+	"context"
+	"fmt"
 	"math"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
 func TestComputeTimingStatsEmpty(t *testing.T) {
@@ -92,6 +96,41 @@ func TestCacheStoreRecordQueryTime(t *testing.T) {
 	}
 	if len(timings["ns2.example.com/192.0.2.2"]) != 1 {
 		t.Fatalf("expected 1 entry for ns2, got %d", len(timings["ns2.example.com/192.0.2.2"]))
+	}
+}
+
+// TestQueryNetworkRecordsTimeoutBudget is the step-9 verification: a query that
+// times out must produce a QueryTimings entry for that nameserver. Before this
+// change RecordQueryTime fired only on a successful response, so time spent
+// waiting on slow or dead servers - the dominant cost of a slow run - was
+// invisible to --nstimes and the server's nameserver_timings. The hook returns
+// a timeout-pattern error after a short delay so the recorded budget is
+// positive and attributable to the nameserver.
+func TestQueryNetworkRecordsTimeoutBudget(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
+
+	store := NewCacheStore()
+	ns, err := NewWithCache(store, "ns.example", "192.0.2.253", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		time.Sleep(3 * time.Millisecond)
+		return packet.Packet{}, fmt.Errorf("read timeout")
+	})
+
+	if _, err := ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{BlacklistingDisabled: true}); err == nil {
+		t.Fatalf("expected timeout error")
+	}
+
+	const key = "ns.example/192.0.2.253"
+	got := store.QueryTimings()[key]
+	if len(got) == 0 {
+		t.Fatalf("expected a QueryTimings entry for %q from the timed-out query, got none: %+v", key, store.QueryTimings())
+	}
+	if got[0] <= 0 {
+		t.Errorf("expected a positive recorded timeout budget, got %v", got[0])
 	}
 }
 

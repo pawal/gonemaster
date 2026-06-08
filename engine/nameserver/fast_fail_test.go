@@ -5,10 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"syscall"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
 
 func TestIsTimeoutPatternErrorClassifies(t *testing.T) {
@@ -203,5 +205,90 @@ func TestFastFailIgnoresOuterContextCancellation(t *testing.T) {
 
 	if ns.state.fastFail.shouldSkip(false, 2) {
 		t.Fatalf("fast-fail must not engage on outer-context cancellation")
+	}
+}
+
+// recordingTrace is a concurrency-safe QueryTrace test double that captures
+// every attempt and decision event for later assertions. The engine fires
+// these events from multiple goroutines in a real run, so the double locks
+// even though the tests here drive it serially.
+type recordingTrace struct {
+	mu        sync.Mutex
+	attempts  []querytrace.AttemptEvent
+	decisions []querytrace.DecisionEvent
+}
+
+func (r *recordingTrace) AttemptDone(ev querytrace.AttemptEvent) {
+	r.mu.Lock()
+	r.attempts = append(r.attempts, ev)
+	r.mu.Unlock()
+}
+
+func (r *recordingTrace) Decision(ev querytrace.DecisionEvent) {
+	r.mu.Lock()
+	r.decisions = append(r.decisions, ev)
+	r.mu.Unlock()
+}
+
+// decisionsOfKind returns the captured decisions matching kind.
+func (r *recordingTrace) decisionsOfKind(kind querytrace.DecisionKind) []querytrace.DecisionEvent {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	var out []querytrace.DecisionEvent
+	for _, d := range r.decisions {
+		if d.Kind == kind {
+			out = append(out, d)
+		}
+	}
+	return out
+}
+
+// TestQueryEmitsFastFailDecision is the step-4 verification. With fast-fail set
+// to engage after 3 consecutive timeouts, the run's QueryTrace must see exactly
+// one DecisionFastFailBlocked event - emitted on the threshold-tripping query -
+// and the next query (a fresh cache miss) must be suppressed by fast-fail,
+// emitting a DecisionSkippedFastFail rather than issuing a network attempt. The
+// error cache and blacklist paths are disabled so only fast-fail can fire,
+// matching the isolation in TestFastFailEngagesOnDialTimeouts above.
+func TestQueryEmitsFastFailDecision(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.FastFailTimeoutCount = 3
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
+	opts := &QueryOptions{BlacklistingDisabled: true}
+
+	rec := &recordingTrace{}
+	ctx = querytrace.WithContext(ctx, rec)
+
+	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.242", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+
+	var calls int
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: context.DeadlineExceeded}
+	})
+
+	// Three failing queries with distinct qnames (so the per-query cache does
+	// not short-circuit) trip fast-fail on the third.
+	for _, qname := range []string{"a.example", "b.example", "c.example"} {
+		_, _ = ns.QueryWithOptions(ctx, qname, "A", opts)
+	}
+	if got := rec.decisionsOfKind(querytrace.DecisionFastFailBlocked); len(got) != 1 {
+		t.Fatalf("expected exactly 1 fast-fail block decision after 3 timeouts, got %d: %+v", len(got), got)
+	}
+	if calls != 3 {
+		t.Fatalf("expected 3 hook calls before fast-fail engages, got %d", calls)
+	}
+
+	// The fourth query is a fresh cache miss; fast-fail must suppress it - no
+	// new hook call, and a skipped-fast-fail decision instead.
+	_, _ = ns.QueryWithOptions(ctx, "d.example", "A", opts)
+	if calls != 3 {
+		t.Fatalf("expected fast-fail to suppress the 4th network call, got %d hook calls", calls)
+	}
+	if got := rec.decisionsOfKind(querytrace.DecisionSkippedFastFail); len(got) == 0 {
+		t.Fatalf("expected a skipped-fast-fail decision on the suppressed query, got none")
 	}
 }

@@ -15,6 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/querytrace"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
@@ -210,11 +211,15 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 
 	usevc := resolveUseVC(opts)
 	fastFailThreshold := resolveFastFailTimeoutCount(prof)
-	if d := ns.shouldSkipQuery(prof, opts, qname, qtype, qclass, cacheKey, usevc, fastFailThreshold); d != nil {
+	latencyBudget := resolveLatencyBudget(prof)
+	if d := ns.shouldSkipQuery(prof, opts, qname, qtype, qclass, cacheKey, usevc, fastFailThreshold, latencyBudget); d != nil {
 		if d.useCtxLogger {
 			logSystem(ctx, d.tag, d.args)
 		} else {
 			logSystemWithLogger(runLog, d.tag, d.args)
+		}
+		if kind, ok := skipDecisionKind(d.tag); ok {
+			traceDecision(ctx, ns.decisionEvent(kind, qname, qtype, usevc))
 		}
 		if ns.state != nil {
 			ns.state.cache.set(cacheKey, nil)
@@ -271,7 +276,9 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		// job: if the outer ctx is cancelled the err may wrap a context error
 		// even though the nameserver itself never had a chance to respond.
 		outerCtxOK := ctx == nil || ctx.Err() == nil
-		ns.state.fastFail.observeResult(usevc, outerCtxOK && isTimeoutPatternError(err), fastFailThreshold)
+		if ns.state.fastFail.observeResult(usevc, outerCtxOK && isTimeoutPatternError(err), fastFailThreshold) {
+			traceDecision(ctx, ns.decisionEvent(querytrace.DecisionFastFailBlocked, qname, qtype, usevc))
+		}
 	}
 
 	blacklistingDisabled := opts != nil && opts.BlacklistingDisabled
@@ -285,6 +292,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			}
 			logargs.SetNS(blArgs, ns.NameString(), ns.AddressString())
 			logSystemWithLogger(runLog, "BLACKLISTING", blArgs)
+			traceDecision(ctx, ns.decisionEvent(querytrace.DecisionBlacklisted, qname, qtype, usevc))
 		}
 	}
 	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
@@ -293,6 +301,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			// blackout this exact query for the rest of the run.
 			if !isTimeoutPatternError(err) || ns.state.fastFail.sawConsecutiveTimeouts(usevc) {
 				ns.state.errorCache.set(cacheKey, errorCacheTTL)
+				traceDecision(ctx, ns.decisionEvent(querytrace.DecisionErrorCached, qname, qtype, usevc))
 			}
 		}
 	}
@@ -420,7 +429,25 @@ func resolveTTLWithBudget(baseSeconds int, prof *profile.Profile, opts *QueryOpt
 	return baseTTL
 }
 
+// queryNetwork times the query, recording timed-out budget into per-NS timings
+// and feeding the per-address latency budget.
 func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error) {
+	start := time.Now()
+	resp, err := ns.queryNetworkRaw(ctx, qname, qtype, qclass, opts)
+	elapsed := time.Since(start)
+	attributable := ctx == nil || ctx.Err() == nil
+	if ns.cache != nil && err != nil && attributable && isTimeoutPatternError(err) {
+		ns.cache.RecordQueryTime(ns.NameString()+"/"+ns.AddressString(), elapsed)
+	}
+	if ns.state != nil && attributable {
+		if ns.state.latency.observe(elapsed, resolveLatencyBudget(profile.FromContext(ctx))) {
+			traceDecision(ctx, ns.decisionEvent(querytrace.DecisionLatencyBudgetBlocked, qname, qtype, resolveUseVC(opts)))
+		}
+	}
+	return resp, err
+}
+
+func (ns Nameserver) queryNetworkRaw(ctx context.Context, qname string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error) {
 	if ns.state != nil && ns.state.queryFunc != nil {
 		resp, err := ns.state.queryFunc(ctx, qname, qtype, qclass, opts)
 		resp.Log = loggerFromContextOrFallback(ctx, ns.log)
@@ -649,6 +676,42 @@ func resolveEDNSSize(opts *QueryOptions, dnssec bool) uint16 {
 	return 0
 }
 
+// traceDecision reports a control decision to the run's QueryTrace, if any.
+func traceDecision(ctx context.Context, ev querytrace.DecisionEvent) {
+	if t := querytrace.FromContext(ctx); t != nil {
+		t.Decision(ev)
+	}
+}
+
+// decisionEvent builds a DecisionEvent for this nameserver and query.
+func (ns Nameserver) decisionEvent(kind querytrace.DecisionKind, qname, qtype string, usevc bool) querytrace.DecisionEvent {
+	return querytrace.DecisionEvent{
+		Kind:     kind,
+		NSName:   ns.NameString(),
+		NSAddr:   ns.AddressString(),
+		QName:    qname,
+		QType:    qtype,
+		Protocol: errorCacheProtocol(usevc),
+	}
+}
+
+// skipDecisionKind maps a shouldSkipQuery tag to its trace DecisionKind.
+func skipDecisionKind(tag string) (querytrace.DecisionKind, bool) {
+	switch tag {
+	case "FAST_FAIL_SKIP":
+		return querytrace.DecisionSkippedFastFail, true
+	case "ERROR_CACHE_SKIP":
+		return querytrace.DecisionSkippedErrorCache, true
+	case "IS_BLACKLISTED":
+		return querytrace.DecisionSkippedBlacklist, true
+	case "REACHABILITY_CACHE_SKIP":
+		return querytrace.DecisionSkippedReachability, true
+	case "LATENCY_BUDGET_SKIP":
+		return querytrace.DecisionSkippedLatencyBudget, true
+	}
+	return "", false
+}
+
 // skipDecision is the verdict from shouldSkipQuery.
 type skipDecision struct {
 	tag          string
@@ -659,7 +722,7 @@ type skipDecision struct {
 // shouldSkipQuery picks the highest-priority "do not issue this network
 // query" signal that fires, or returns nil. Priority order is pinned by
 // TestSkipShortCircuitPriorityOrder.
-func (ns Nameserver) shouldSkipQuery(prof *profile.Profile, opts *QueryOptions, qname string, qtype string, qclass string, cacheKey string, usevc bool, fastFailThreshold int) *skipDecision {
+func (ns Nameserver) shouldSkipQuery(prof *profile.Profile, opts *QueryOptions, qname string, qtype string, qclass string, cacheKey string, usevc bool, fastFailThreshold int, latencyBudget time.Duration) *skipDecision {
 	skipArgs := func(extra map[string]any) map[string]any {
 		args := map[string]any{
 			"query_name":  qname,
@@ -720,6 +783,15 @@ func (ns Nameserver) shouldSkipQuery(prof *profile.Profile, opts *QueryOptions, 
 			useCtxLogger: false,
 		}
 	}
+	if ns.state != nil && ns.state.latency.shouldSkip(latencyBudget) {
+		return &skipDecision{
+			tag: "LATENCY_BUDGET_SKIP",
+			args: skipArgs(map[string]any{
+				"protocol": errorCacheProtocol(usevc),
+			}),
+			useCtxLogger: false,
+		}
+	}
 	return nil
 }
 
@@ -734,6 +806,18 @@ func resolveFastFailTimeoutCount(prof *profile.Profile) int {
 		return 0
 	}
 	return prof.Resolver.Defaults.FastFailTimeoutCount
+}
+
+// resolveLatencyBudget returns the per-address cumulative latency budget, or 0
+// when disabled.
+func resolveLatencyBudget(prof *profile.Profile) time.Duration {
+	if prof == nil {
+		prof = profile.Effective()
+	}
+	if prof == nil || prof.Resolver.Defaults.NameserverMaxTotalMS <= 0 {
+		return 0
+	}
+	return time.Duration(prof.Resolver.Defaults.NameserverMaxTotalMS) * time.Millisecond
 }
 
 func resolveNameserverConcurrencyLimit(prof *profile.Profile) int {

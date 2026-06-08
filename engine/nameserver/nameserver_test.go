@@ -1485,11 +1485,11 @@ func TestQueryLogsIPBlocked(t *testing.T) {
 	t.Fatalf("expected IPV4_BLOCKED log entry")
 }
 
-// TestSkipShortCircuitPriorityOrder pins the relative priority of the four
+// TestSkipShortCircuitPriorityOrder pins the relative priority of the five
 // "give up on this server" mechanisms: reachability beats error-cache beats
-// blacklisting beats fast-fail. Refactors of QueryWithOptions's early-return
-// ladder must not change which tag wins when multiple short-circuits would
-// fire on the same query.
+// blacklisting beats fast-fail beats the latency budget. Refactors of
+// QueryWithOptions's early-return ladder must not change which tag wins when
+// multiple short-circuits would fire on the same query.
 func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 	t.Run("blacklist beats fast-fail", func(t *testing.T) {
 		ctx, prof := testContext(t)
@@ -1506,7 +1506,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		ns.state.blacklisted[false] = true
 
 		_, _ = ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{BlacklistingDisabled: false})
-		assertOnlyTagFired(t, log, "IS_BLACKLISTED", []string{"FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP", "ERROR_CACHE_SKIP"})
+		assertOnlyTagFired(t, log, "IS_BLACKLISTED", []string{"FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP", "ERROR_CACHE_SKIP", "LATENCY_BUDGET_SKIP"})
 	})
 
 	t.Run("error-cache beats blacklist", func(t *testing.T) {
@@ -1527,7 +1527,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		ns.state.blacklisted[false] = true
 
 		_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
-		assertOnlyTagFired(t, log, "ERROR_CACHE_SKIP", []string{"IS_BLACKLISTED", "FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP"})
+		assertOnlyTagFired(t, log, "ERROR_CACHE_SKIP", []string{"IS_BLACKLISTED", "FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP", "LATENCY_BUDGET_SKIP"})
 	})
 
 	t.Run("reachability beats error-cache", func(t *testing.T) {
@@ -1553,7 +1553,27 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		ns.state.errorCache.set(key, 60*time.Second)
 
 		_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
-		assertOnlyTagFired(t, log, "REACHABILITY_CACHE_SKIP", []string{"ERROR_CACHE_SKIP", "IS_BLACKLISTED", "FAST_FAIL_SKIP"})
+		assertOnlyTagFired(t, log, "REACHABILITY_CACHE_SKIP", []string{"ERROR_CACHE_SKIP", "IS_BLACKLISTED", "FAST_FAIL_SKIP", "LATENCY_BUDGET_SKIP"})
+	})
+
+	t.Run("fast-fail beats latency-budget", func(t *testing.T) {
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.ErrorCacheTTL = 0
+		prof.Resolver.Defaults.FastFailTimeoutCount = 1
+		prof.Resolver.Defaults.NameserverMaxTotalMS = 1
+		log := logger.FromContext(ctx)
+
+		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.183", nil)
+		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		// Trip both fast-fail and the latency budget up front; fast-fail is
+		// checked first, so its tag must win.
+		ns.state.fastFail.observeResult(false, true, 1)
+		ns.state.latency.observe(time.Second, time.Millisecond)
+
+		_, _ = ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{BlacklistingDisabled: true})
+		assertOnlyTagFired(t, log, "FAST_FAIL_SKIP", []string{"LATENCY_BUDGET_SKIP", "IS_BLACKLISTED", "REACHABILITY_CACHE_SKIP", "ERROR_CACHE_SKIP"})
 	})
 }
 

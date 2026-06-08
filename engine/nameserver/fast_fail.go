@@ -66,9 +66,11 @@ func (t *fastFailTracker) sawConsecutiveTimeouts(useTCP bool) bool {
 	return state.blocked || state.consecutiveTimeouts >= 2
 }
 
-func (t *fastFailTracker) observeResult(useTCP bool, timeoutPattern bool, threshold int) {
+// observeResult records an attempt outcome and reports whether this call just
+// transitioned the nameserver/protocol into the blocked state.
+func (t *fastFailTracker) observeResult(useTCP bool, timeoutPattern bool, threshold int) bool {
 	if t == nil || threshold <= 0 {
-		return
+		return false
 	}
 
 	t.mu.Lock()
@@ -78,15 +80,17 @@ func (t *fastFailTracker) observeResult(useTCP bool, timeoutPattern bool, thresh
 	if !timeoutPattern {
 		state.consecutiveTimeouts = 0
 		state.blocked = false
-		return
+		return false
 	}
 
 	if state.blocked {
-		return
+		return false
 	}
 	state.consecutiveTimeouts++
 	if state.consecutiveTimeouts >= threshold {
 		state.consecutiveTimeouts = 0
 		state.blocked = true
+		return true
 	}
+	return false
 }

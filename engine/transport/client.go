@@ -2,8 +2,10 @@ package transport
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -12,6 +14,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
 
 const defaultTimeout = 5 * time.Second
@@ -175,6 +178,8 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 
 	c.ApplyProfileDefaults(profile.FromContext(ctx))
 	prepared := c.prepareMessage(msg)
+	trace := querytrace.FromContext(ctx)
+	qname, qtype := questionNameType(prepared)
 	attempts := 1
 	if c.Retries > 0 {
 		attempts = 1 + c.Retries
@@ -189,7 +194,7 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 			}
 		}
 
-		response, rtt, err := c.exchangeOnce(ctx, server, prepared, c.UseTCP, false)
+		response, rtt, err := c.tracedExchangeOnce(ctx, trace, server, prepared, qname, qtype, c.UseTCP, false, i+1)
 		if err != nil {
 			if ctx != nil {
 				if cerr := ctx.Err(); cerr != nil {
@@ -202,7 +207,7 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 		}
 
 		if !c.UseTCP && response.Truncated && c.Fallback {
-			response, rtt, err = c.exchangeOnce(ctx, server, prepared, true, true)
+			response, rtt, err = c.tracedExchangeOnce(ctx, trace, server, prepared, qname, qtype, true, true, i+1)
 			if err != nil {
 				if ctx != nil {
 					if cerr := ctx.Err(); cerr != nil {
@@ -226,6 +231,75 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 		lastErr = fmt.Errorf("no response")
 	}
 	return packet.Packet{}, lastErr
+}
+
+// tracedExchangeOnce wraps exchangeOnce, reporting one AttemptEvent per attempt
+// (including timeouts) when tracing is enabled.
+func (c *Client) tracedExchangeOnce(ctx context.Context, trace querytrace.QueryTrace, server string, msg *dns.Msg, qname, qtype string, useTCP, fromUDPFallback bool, attempt int) (*dns.Msg, time.Duration, error) {
+	if trace == nil {
+		return c.exchangeOnce(ctx, server, msg, useTCP, fromUDPFallback)
+	}
+
+	start := time.Now()
+	response, rtt, err := c.exchangeOnce(ctx, server, msg, useTCP, fromUDPFallback)
+
+	protocol := "udp"
+	if useTCP {
+		protocol = "tcp"
+	}
+	trace.AttemptDone(querytrace.AttemptEvent{
+		NSAddr:   server,
+		QName:    qname,
+		QType:    qtype,
+		Protocol: protocol,
+		Attempt:  attempt,
+		Elapsed:  time.Since(start),
+		Outcome:  classifyOutcome(err),
+		Err:      errString(err),
+	})
+	return response, rtt, err
+}
+
+// questionNameType extracts the query name and type string from a message's
+// first question, mirroring the access pattern in engine/packet.
+func questionNameType(msg *dns.Msg) (string, string) {
+	if msg == nil || len(msg.Question) == 0 {
+		return "", ""
+	}
+	q := msg.Question[0]
+	return q.Header().Name, dns.TypeToString[dns.RRToType(q)]
+}
+
+// classifyOutcome maps an exchange error to a trace Outcome.
+func classifyOutcome(err error) querytrace.Outcome {
+	if err == nil {
+		return querytrace.OutcomeOK
+	}
+	if isTimeoutErr(err) {
+		return querytrace.OutcomeTimeout
+	}
+	return querytrace.OutcomeError
+}
+
+func isTimeoutErr(err error) bool {
+	if err == nil {
+		return false
+	}
+	var netErr net.Error
+	if errors.As(err, &netErr) && netErr.Timeout() {
+		return true
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	return strings.Contains(strings.ToLower(err.Error()), "timeout")
+}
+
+func errString(err error) string {
+	if err == nil {
+		return ""
+	}
+	return err.Error()
 }
 
 func (c *Client) exchangeOnce(ctx context.Context, server string, msg *dns.Msg, useTCP bool, fromUDPFallback bool) (*dns.Msg, time.Duration, error) {

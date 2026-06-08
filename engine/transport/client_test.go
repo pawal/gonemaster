@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"net"
 	"net/netip"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +15,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
 
 func TestBuildQueryWithClass(t *testing.T) {
@@ -802,5 +804,135 @@ func TestExchangeReturnsPromptlyOnContextCancel(t *testing.T) {
 	}
 	if elapsed > 700*time.Millisecond {
 		t.Fatalf("expected cancellation to stop exchange promptly, took %v (err=%v)", elapsed, err)
+	}
+}
+
+// recordingTrace is a QueryTrace that captures every event for assertions. It
+// guards its slices with a mutex because the transport layer may fire events
+// from multiple goroutines; the tests below are single-threaded but the engine
+// is not, and we want the test double to model the real contract.
+type recordingTrace struct {
+	mu        sync.Mutex
+	attemptEv []querytrace.AttemptEvent
+	decisions []querytrace.DecisionEvent
+}
+
+func (r *recordingTrace) AttemptDone(ev querytrace.AttemptEvent) {
+	r.mu.Lock()
+	r.attemptEv = append(r.attemptEv, ev)
+	r.mu.Unlock()
+}
+
+func (r *recordingTrace) Decision(ev querytrace.DecisionEvent) {
+	r.mu.Lock()
+	r.decisions = append(r.decisions, ev)
+	r.mu.Unlock()
+}
+
+func (r *recordingTrace) attempts() []querytrace.AttemptEvent {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	out := make([]querytrace.AttemptEvent, len(r.attemptEv))
+	copy(out, r.attemptEv)
+	return out
+}
+
+// TestExchangeEmitsAttemptEventPerTimeout is the step-3 verification: a
+// nameserver that accepts UDP packets but never answers must produce exactly
+// one timeout AttemptEvent per attempt in the (1 + retries) budget. This
+// per-attempt timeout timing is something the nameserver layer's aggregate
+// per-Exchange recording cannot break down, so the trace is where individual
+// attempt latency becomes visible.
+func TestExchangeEmitsAttemptEventPerTimeout(t *testing.T) {
+	// Black-hole server: reads the query, never writes a reply.
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {})
+	defer shutdown()
+
+	rec := &recordingTrace{}
+	ctx := querytrace.WithContext(context.Background(), rec)
+
+	client := &Client{}
+	client.SetUseTCP(false)
+	client.SetFallback(false)
+	client.SetRetries(2) // attempts = 1 + 2 = 3
+	client.SetTimeout(100 * time.Millisecond)
+	client.SetRetrans(50 * time.Millisecond)
+
+	_, err := client.Exchange(ctx, addr, BuildQuery("timeout.example.", dns.TypeSOA))
+	if err == nil {
+		t.Fatal("expected a timeout error from a non-responding server, got nil")
+	}
+
+	events := rec.attempts()
+	if len(events) != 3 {
+		t.Fatalf("expected 3 attempt events (1 + 2 retries), got %d: %+v", len(events), events)
+	}
+	for i, ev := range events {
+		if ev.Outcome != querytrace.OutcomeTimeout {
+			t.Errorf("attempt %d: expected OutcomeTimeout, got %q (err %q)", i+1, ev.Outcome, ev.Err)
+		}
+		if ev.Attempt != i+1 {
+			t.Errorf("event index %d: expected Attempt=%d, got %d", i, i+1, ev.Attempt)
+		}
+		if ev.Protocol != "udp" {
+			t.Errorf("attempt %d: expected protocol udp, got %q", i+1, ev.Protocol)
+		}
+		if ev.NSAddr != addr {
+			t.Errorf("attempt %d: expected NSAddr %q, got %q", i+1, addr, ev.NSAddr)
+		}
+		if ev.QType != "SOA" {
+			t.Errorf("attempt %d: expected QType SOA, got %q", i+1, ev.QType)
+		}
+		if ev.Elapsed <= 0 {
+			t.Errorf("attempt %d: expected positive Elapsed for a timed-out attempt, got %v", i+1, ev.Elapsed)
+		}
+	}
+}
+
+// TestExchangeEmitsAttemptEventOnSuccess confirms a single successful query
+// emits exactly one OutcomeOK event (no spurious retries are traced) and that
+// the query name/type are reported correctly.
+func TestExchangeEmitsAttemptEventOnSuccess(t *testing.T) {
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		writeSimpleAResponse(w, req)
+	})
+	defer shutdown()
+
+	rec := &recordingTrace{}
+	ctx := querytrace.WithContext(context.Background(), rec)
+
+	client := &Client{}
+	client.SetRetries(2)
+	client.SetTimeout(time.Second)
+
+	if _, err := client.Exchange(ctx, addr, BuildQuery("ok.example.", dns.TypeA)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	events := rec.attempts()
+	if len(events) != 1 {
+		t.Fatalf("expected exactly 1 attempt event on success, got %d: %+v", len(events), events)
+	}
+	if events[0].Outcome != querytrace.OutcomeOK {
+		t.Errorf("expected OutcomeOK, got %q (err %q)", events[0].Outcome, events[0].Err)
+	}
+	if events[0].QType != "A" {
+		t.Errorf("expected QType A, got %q", events[0].QType)
+	}
+}
+
+// TestExchangeWithoutTraceDoesNotPanic confirms the nil-trace path (tracing
+// disabled) is a no-op and changes nothing about a normal exchange.
+func TestExchangeWithoutTraceDoesNotPanic(t *testing.T) {
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		writeSimpleAResponse(w, req)
+	})
+	defer shutdown()
+
+	client := &Client{}
+	client.SetTimeout(time.Second)
+
+	if _, err := client.Exchange(context.Background(), addr, BuildQuery("notrace.example.", dns.TypeA)); err != nil {
+		t.Fatalf("unexpected error with tracing disabled: %v", err)
 	}
 }

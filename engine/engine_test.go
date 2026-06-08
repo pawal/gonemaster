@@ -64,6 +64,28 @@ func TestEffectiveProfileAppliesSourceAddrOverrides(t *testing.T) {
 	}
 }
 
+// TestEffectiveProfileDebugOverride checks that the Debug request override maps
+// to resolver.defaults.debug, and that it stays false by default. This is the
+// flag --debug-queries sets, which gates query tracing.
+func TestEffectiveProfileDebugOverride(t *testing.T) {
+	def, err := EffectiveProfile(RunRequest{})
+	if err != nil {
+		t.Fatalf("effective profile (default): %v", err)
+	}
+	if def.Resolver.Defaults.Debug {
+		t.Fatalf("resolver.defaults.debug should default to false")
+	}
+
+	enabled := true
+	got, err := EffectiveProfile(RunRequest{Debug: &enabled})
+	if err != nil {
+		t.Fatalf("effective profile (debug): %v", err)
+	}
+	if !got.Resolver.Defaults.Debug {
+		t.Fatalf("resolver.defaults.debug = false, want true after Debug override")
+	}
+}
+
 func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
 	p1, err := profile.Default()
 	if err != nil {

@@ -16,6 +16,7 @@ import (
 	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/querytrace"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	address "codeberg.org/pawal/gonemaster/engine/test/address"
 	"codeberg.org/pawal/gonemaster/engine/test/basic"
@@ -85,6 +86,10 @@ type RunRequest struct {
 	ASNCache *asnlookup.Cache
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
+	// Debug sets resolver.defaults.debug, enabling query-lifecycle tracing.
+	Debug *bool
+	// QueryTrace, when set, receives query-lifecycle events for the run.
+	QueryTrace querytrace.QueryTrace
 	// Context controls cancellation and timeouts for the run.
 	Context context.Context
 	// Runner, when set, supplies the per-run container to Run.
@@ -372,6 +377,11 @@ func buildProfile(req RunRequest, module string, testcases []string) (*profile.P
 			return nil, false, err
 		}
 	}
+	if req.Debug != nil {
+		if err := p.Set("resolver.defaults.debug", *req.Debug); err != nil {
+			return nil, false, err
+		}
+	}
 	if req.ErrorCacheTTL != nil {
 		if err := p.Set("resolver.defaults.error_cache_ttl", *req.ErrorCacheTTL); err != nil {
 			return nil, false, err
@@ -495,6 +505,9 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		ctx = transport.WithLimiter(ctx, runner.Limiter)
 	}
 	ctx = ns.WithCache(ctx, runner.NameserverCache)
+	if req.QueryTrace != nil {
+		ctx = querytrace.WithContext(ctx, req.QueryTrace)
+	}
 	ctx = nsdiscovery.WithCache(ctx, nsdiscovery.NewCache())
 	if req.ASNCache != nil {
 		ctx = asnlookup.WithCache(ctx, req.ASNCache)

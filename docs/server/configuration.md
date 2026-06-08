@@ -200,6 +200,42 @@ For deterministic ordered output, use a profile with:
 }
 ```
 
+## Bounding Slow Nameservers
+
+By default the engine waits out slow or unresponsive nameservers, and the verdict
+reflects that slowness. Two profile settings can cap the wall-clock cost:
+
+- `resolver.defaults.fast_fail_timeout_count` skips a nameserver after this many
+  consecutive timeouts on a protocol (default 3, 0 disables). It only reacts to
+  silence.
+- `resolver.defaults.nameserver_max_total_ms` skips a nameserver address once the
+  cumulative time spent querying it in a run exceeds this many milliseconds
+  (default 0 = disabled). Unlike fast-fail it also bounds slow-but-responding
+  servers, whose successes keep resetting the consecutive-timeout count.
+
+The latency budget trades query coverage for speed: once an address is skipped
+the run gathers less data about its zone, which can lower the grade for very slow
+zones. It is therefore off by default. A conservative starting point is 60000 to
+120000 ms (60-120 s); lower values such as 30000 ms engage sooner and affect more
+zones.
+
+Apply it process-wide through `profile_path`:
+
+```json
+{
+  "resolver": {
+    "defaults": {
+      "nameserver_max_total_ms": 60000
+    }
+  }
+}
+```
+
+Or scope it to specific runs by saving a stored profile with the same sparse
+override (Admin UI, Profiles) and selecting it for a job or batch, for example a
+profile applied to the TLD cohort. Each run records its effective profile, so you
+can confirm the value took effect.
+
 ## Result Display Settings
 
 The config file can hide score and nameserver timing UI elements:

@@ -170,6 +170,9 @@ Example stored profile config:
 Stored profiles can be referenced from jobs, batches, public profiles, and tag
 defaults. The server validates stored profile JSON on create and update.
 
+See the [Profile Settings Reference](../profile-settings.md) for every
+`resolver.defaults` knob, its default, range, and CLI flag.
+
 ## Profile Compatibility
 
 Stored profiles record the engine schema version used when they were last

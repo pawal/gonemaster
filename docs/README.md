@@ -17,6 +17,7 @@ The [architecture overview](architecture.md) is a one-sitting tour of the system
 | Integrate with Nagios or Icinga | [nagios.md](nagios.md) |
 | Drive gonemaster from an AI agent (MCP) | [mcp/](mcp/README.md) |
 | Call the engine from Go | [dev.md](dev.md) |
+| Tune resolver behavior (timeouts, slow-NS limits) | [profile-settings.md](profile-settings.md) |
 
 ## Server
 

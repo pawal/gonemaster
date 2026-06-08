@@ -21,6 +21,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/cachefile"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/engine/querytrace"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/scoring"
 )
@@ -101,6 +102,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var undelegatedNSSpecs repeatableStringFlag
 	var undelegatedDSSpecs repeatableStringFlag
 	var nstimes bool
+	var debugQueries bool
 	var badkeysUpdate bool
 	var badkeysPath string
 	var badkeysPathSet bool
@@ -130,6 +132,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--json-stream", detail: "Stream JSON log entries"},
 			{flag: "--count", detail: "Print count summary by level and message tag"},
 			{flag: "--nstimes", detail: "Print per-nameserver query timing statistics"},
+			{flag: "--debug-queries", detail: "Trace per-attempt DNS queries (incl. timeouts) and print a summary"},
 			{flag: "--no-progress", detail: "Disable progress indicator"},
 			{flag: "--score", detail: "Print score/grade summary after the run"},
 			{flag: "--no-score", detail: "Suppress score output"},
@@ -212,6 +215,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&noProgress, "no-progress", false, "Disable progress indicator (optional)")
 	fs.BoolVar(&count, "count", false, "Print count summary by level and message tag (optional)")
 	fs.BoolVar(&nstimes, "nstimes", false, "Print per-nameserver query timing statistics (optional)")
+	fs.BoolVar(&debugQueries, "debug-queries", false, "Trace per-attempt DNS queries incl. timeouts and print a summary (optional)")
 	fs.BoolVar(&listTests, "list-tests", false, "List all available test cases (optional)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.BoolVar(&badkeysUpdate, "badkeys-update", false, "Download badkeys blocklist and exit (optional)")
@@ -490,12 +494,21 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 
+	var queryCollector *querytrace.Collector
+	var debugFlag *bool
+	if debugQueries {
+		queryCollector = querytrace.NewCollector()
+		enabled := true
+		debugFlag = &enabled
+	}
+
 	req := engine.RunRequest{
 		Domain:           domain,
 		Module:           module,
 		Testcases:        []string(testcases),
 		Profile:          profile,
 		MinLevel:         engineMinLevel,
+		Debug:            debugFlag,
 		IPv4:             ipv4Override,
 		IPv6:             ipv6Override,
 		Parallel:         parallelOverride,
@@ -510,6 +523,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		PositiveCacheTTL: positiveCacheOverride,
 		NegativeCacheTTL: negativeCacheOverride,
 		BadkeysPath:      badkeysPathOverride,
+	}
+	if queryCollector != nil {
+		req.QueryTrace = queryCollector
 	}
 	var stopController *stopLevelController
 	var stopCapture *entryCaptureReporter
@@ -823,6 +839,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 				return 2
 			}
 		}
+		if queryCollector != nil {
+			if writeErr := writeQueryTrace(humanWriter, queryCollector); writeErr != nil {
+				fmt.Fprintln(errOut, writeErr.Error())
+				return 2
+			}
+		}
 		if scoreEnabled {
 			// Stop the spinner before writing score so no leftover spinner
 			// character prefixes the output.
@@ -852,7 +874,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var encodeErr error
 	if nstimes && packetCacheStore != nil {
 		wrapped := struct {
-			Entries           []engine.LogEntry            `json:"entries"`
+			Entries           []engine.LogEntry             `json:"entries"`
 			NameserverTimings []nameserver.NameserverTiming `json:"nameserver_timings"`
 		}{
 			Entries:           displayEntries,

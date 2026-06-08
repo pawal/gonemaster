@@ -326,12 +326,8 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	callbacks := []func(*logger.Entry) error{
 		queryCounter.Callback,
 	}
-	cleanup, err := applyProfileOverrides(&req, s.store, job.ProfileID, job.Overrides, s.cfg.ProfilePath)
-	if err != nil {
+	if err := applyProfileOverrides(&req, s.store, job.ProfileID, job.Overrides, s.cfg.ProfilePath); err != nil {
 		return nil, jobQueryStats{}, nil, "", err
-	}
-	if cleanup != nil {
-		defer cleanup()
 	}
 	effectiveProfile, err := engine.EffectiveProfile(req)
 	if err != nil {
@@ -508,73 +504,60 @@ func chainLogCallbacks(callbacks ...func(*logger.Entry) error) func(*logger.Entr
 	}
 }
 
-func applyProfileOverrides(req *engine.RunRequest, store JobStore, profileID *int64, overrides map[string]any, baseProfile string) (func(), error) {
+func applyProfileOverrides(req *engine.RunRequest, store JobStore, profileID *int64, overrides map[string]any, baseProfile string) error {
 	if req == nil {
-		return nil, nil
+		return nil
 	}
 	if profileID == nil && len(overrides) == 0 {
 		if baseProfile != "" {
 			req.Profile = baseProfile
 		}
-		return nil, nil
+		return nil
 	}
 	base := profile.New()
 	if baseProfile != "" {
 		data, err := os.ReadFile(baseProfile)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		base, err = profile.FromYAML(string(data))
 		if err != nil {
-			return nil, err
+			return err
 		}
 	}
 	if profileID != nil {
 		if store == nil {
-			return nil, fmt.Errorf("profile %d not found", *profileID)
+			return fmt.Errorf("profile %d not found", *profileID)
 		}
 		stored, ok := store.GetProfile(*profileID)
 		if !ok {
-			return nil, fmt.Errorf("profile %d not found", *profileID)
+			return fmt.Errorf("profile %d not found", *profileID)
 		}
 		storedProfile, err := profile.FromJSON(stored.Config)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if err := base.Merge(storedProfile); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	if len(overrides) > 0 {
 		payload, err := json.Marshal(overrides)
 		if err != nil {
-			return nil, err
+			return err
 		}
 		overrideProfile, err := profile.FromJSON(string(payload))
 		if err != nil {
-			return nil, err
+			return err
 		}
 		if err := base.Merge(overrideProfile); err != nil {
-			return nil, err
+			return err
 		}
 	}
 	merged, err := base.ToJSON()
 	if err != nil {
-		return nil, err
+		return err
 	}
-	tmp, err := os.CreateTemp("", "gonemaster-profile-*.json")
-	if err != nil {
-		return nil, err
-	}
-	if _, err := tmp.Write([]byte(merged)); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmp.Name())
-		return nil, err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmp.Name())
-		return nil, err
-	}
-	req.Profile = tmp.Name()
-	return func() { _ = os.Remove(tmp.Name()) }, nil
+	req.ProfileData = merged
+	return nil
 }

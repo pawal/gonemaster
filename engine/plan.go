@@ -1,7 +1,6 @@
 package engine
 
 import (
-	"os"
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -173,15 +172,11 @@ func PlannedTestcases(req RunRequest) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	if req.Profile != "" {
-		data, err := os.ReadFile(req.Profile)
-		if err != nil {
-			return nil, err
-		}
-		override, err := profile.FromYAML(string(data))
-		if err != nil {
-			return nil, err
-		}
+	override, err := req.profileOverride()
+	if err != nil {
+		return nil, err
+	}
+	if override != nil {
 		if err := p.Merge(override); err != nil {
 			return nil, err
 		}

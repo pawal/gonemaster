@@ -47,6 +47,9 @@ type RunRequest struct {
 	Testcases []string
 	// Profile is an optional path to a profile file that overrides defaults.
 	Profile string
+	// ProfileData is optional inline profile content (YAML/JSON) that
+	// overrides defaults; takes precedence over Profile, no filesystem read.
+	ProfileData string
 	// MinLevel controls minimum emitted output level (for example "INFO").
 	MinLevel string
 	// IPv4 overrides net.ipv4 when non-nil.
@@ -338,20 +341,33 @@ func normalizeRequest(req RunRequest) (string, []string, error) {
 	return module, testcases, nil
 }
 
+// profileOverride parses the request's profile override, preferring inline
+// ProfileData over the Profile file path. Returns nil when neither is set.
+func (req RunRequest) profileOverride() (*profile.Profile, error) {
+	switch {
+	case req.ProfileData != "":
+		return profile.FromYAML(req.ProfileData)
+	case req.Profile != "":
+		data, err := os.ReadFile(req.Profile)
+		if err != nil {
+			return nil, err
+		}
+		return profile.FromYAML(string(data))
+	default:
+		return nil, nil
+	}
+}
+
 func buildProfile(req RunRequest, module string, testcases []string) (*profile.Profile, bool, error) {
 	p, err := profile.Default()
 	if err != nil {
 		return nil, false, err
 	}
-	if req.Profile != "" {
-		data, err := os.ReadFile(req.Profile)
-		if err != nil {
-			return nil, false, err
-		}
-		override, err := profile.FromYAML(string(data))
-		if err != nil {
-			return nil, false, err
-		}
+	override, err := req.profileOverride()
+	if err != nil {
+		return nil, false, err
+	}
+	if override != nil {
 		if err := p.Merge(override); err != nil {
 			return nil, false, err
 		}

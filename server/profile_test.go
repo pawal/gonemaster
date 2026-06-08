@@ -10,20 +10,16 @@ import (
 
 func TestApplyProfileOverridesWithBase(t *testing.T) {
 	base := `{"net":{"ipv4":false}}`
-	baseFile, err := os.CreateTemp("", "gm-profile-*.json")
+	baseFile, err := os.CreateTemp(t.TempDir(), "gm-profile-*.json")
 	if err != nil {
 		t.Fatalf("temp file: %v", err)
 	}
 	if _, err := baseFile.WriteString(base); err != nil {
-		_ = baseFile.Close()
-		_ = os.Remove(baseFile.Name())
 		t.Fatalf("write base: %v", err)
 	}
 	if err := baseFile.Close(); err != nil {
-		_ = os.Remove(baseFile.Name())
 		t.Fatalf("close base: %v", err)
 	}
-	defer os.Remove(baseFile.Name())
 
 	overrides := map[string]any{
 		"resolver": map[string]any{
@@ -34,23 +30,19 @@ func TestApplyProfileOverridesWithBase(t *testing.T) {
 	}
 
 	req := engine.RunRequest{Domain: "example.com"}
-	cleanup, err := applyProfileOverrides(&req, nil, nil, overrides, baseFile.Name())
-	if err != nil {
+	if err := applyProfileOverrides(&req, nil, nil, overrides, baseFile.Name()); err != nil {
 		t.Fatalf("apply overrides: %v", err)
 	}
-	if cleanup == nil {
-		t.Fatalf("expected cleanup function")
-	}
-	defer cleanup()
 
-	if req.Profile == "" {
-		t.Fatalf("expected profile path set")
+	// The merged profile must be carried inline; the engine should never be
+	// pointed at a temp file (which breaks on read-only filesystems).
+	if req.ProfileData == "" {
+		t.Fatalf("expected inline profile data to be set")
 	}
-	payload, err := os.ReadFile(req.Profile)
-	if err != nil {
-		t.Fatalf("read profile: %v", err)
+	if req.Profile != "" {
+		t.Fatalf("expected no profile file path, got %q", req.Profile)
 	}
-	merged, err := profile.FromYAML(string(payload))
+	merged, err := profile.FromYAML(req.ProfileData)
 	if err != nil {
 		t.Fatalf("parse merged: %v", err)
 	}
@@ -72,31 +64,28 @@ func TestApplyProfileOverridesWithBase(t *testing.T) {
 
 func TestApplyProfileOverridesBaseOnly(t *testing.T) {
 	base := `{"net":{"ipv6":false}}`
-	baseFile, err := os.CreateTemp("", "gm-profile-*.json")
+	baseFile, err := os.CreateTemp(t.TempDir(), "gm-profile-*.json")
 	if err != nil {
 		t.Fatalf("temp file: %v", err)
 	}
 	if _, err := baseFile.WriteString(base); err != nil {
-		_ = baseFile.Close()
-		_ = os.Remove(baseFile.Name())
 		t.Fatalf("write base: %v", err)
 	}
 	if err := baseFile.Close(); err != nil {
-		_ = os.Remove(baseFile.Name())
 		t.Fatalf("close base: %v", err)
 	}
-	defer os.Remove(baseFile.Name())
 
+	// With no stored profile and no overrides the base profile is passed
+	// through by path (read-only access is fine) and nothing is merged.
 	req := engine.RunRequest{Domain: "example.com"}
-	cleanup, err := applyProfileOverrides(&req, nil, nil, nil, baseFile.Name())
-	if err != nil {
+	if err := applyProfileOverrides(&req, nil, nil, nil, baseFile.Name()); err != nil {
 		t.Fatalf("apply overrides: %v", err)
 	}
-	if cleanup != nil {
-		t.Fatalf("expected nil cleanup for base-only profile")
-	}
 	if req.Profile != baseFile.Name() {
-		t.Fatalf("expected profile path to be base file")
+		t.Fatalf("expected profile path to be base file, got %q", req.Profile)
+	}
+	if req.ProfileData != "" {
+		t.Fatalf("expected no inline profile data for base-only profile")
 	}
 }
 
@@ -119,20 +108,18 @@ func TestApplyProfileOverridesWithStoredProfileAndOverrides(t *testing.T) {
 	}
 
 	req := engine.RunRequest{Domain: "example.com"}
-	cleanup, err := applyProfileOverrides(&req, store, &stored.ID, overrides, "")
-	if err != nil {
+	if err := applyProfileOverrides(&req, store, &stored.ID, overrides, ""); err != nil {
 		t.Fatalf("apply overrides: %v", err)
 	}
-	if cleanup == nil {
-		t.Fatal("expected cleanup function")
-	}
-	defer cleanup()
 
-	payload, err := os.ReadFile(req.Profile)
-	if err != nil {
-		t.Fatalf("read profile: %v", err)
+	// The stored DB profile plus overrides are merged in memory; no file.
+	if req.ProfileData == "" {
+		t.Fatalf("expected inline profile data to be set")
 	}
-	merged, err := profile.FromYAML(string(payload))
+	if req.Profile != "" {
+		t.Fatalf("expected no profile file path, got %q", req.Profile)
+	}
+	merged, err := profile.FromYAML(req.ProfileData)
 	if err != nil {
 		t.Fatalf("parse merged: %v", err)
 	}

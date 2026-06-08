@@ -80,6 +80,9 @@ type ResolverDefaults struct {
 	FastFailTimeoutCount int `json:"fast_fail_timeout_count"`
 	// NameserverConcurrency limits concurrent queries per nameserver address. 0 disables.
 	NameserverConcurrency int `json:"nameserver_concurrency"`
+	// NameserverMaxTotalMS caps cumulative milliseconds spent per nameserver
+	// address per run; the address is skipped once exceeded. 0 disables.
+	NameserverMaxTotalMS int `json:"nameserver_max_total_ms"`
 }
 
 // NetSettings holds IP stack enablement flags.

@@ -214,6 +214,17 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.NameserverConcurrency
 		},
 	},
+	"resolver.defaults.nameserver_max_total_ms": {
+		typ: propNum,
+		min: intPtr(0),
+		max: intPtr(600000),
+		setter: func(p *Profile, value any) {
+			p.Resolver.Defaults.NameserverMaxTotalMS = value.(int)
+		},
+		getter: func(p *Profile) any {
+			return p.Resolver.Defaults.NameserverMaxTotalMS
+		},
+	},
 	"resolver.source4": {
 		typ:          propStr,
 		defaultValue: "",

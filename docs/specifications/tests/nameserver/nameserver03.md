@@ -85,7 +85,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver03.md`](../../upstream/tests/Nameserver-TP/nameserver03.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes failure semantics when AXFR starts with SOA. Gonemaster: emits explicit tags for both transfer availability (`AXFR_AVAILABLE`) and transfer errors (`AXFR_FAILURE`).
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.

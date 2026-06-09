@@ -158,7 +158,6 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 
 ## Differences From Upstream
-- Upstream reference: [`connectivity02.md`](../../upstream/tests/Connectivity-TP/connectivity02.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not explicitly define this detail. Gonemaster: emits additional per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) when transport is disabled.
   - Upstream: does not explicitly define this detail. Gonemaster: Owner-name validation checks the first answer record owner for the queried rrtype.

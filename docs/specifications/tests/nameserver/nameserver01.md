@@ -122,7 +122,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver01.md`](../../upstream/tests/Nameserver-TP/nameserver01.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes evaluation over the retrieved nameserver IP set. Gonemaster: iterates the raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) list without testcase-local deduplication, so duplicate `name/ip` entries can be evaluated more than once.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.

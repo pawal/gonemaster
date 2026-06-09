@@ -54,7 +54,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone08.md`](../../upstream/tests/Zone-TP/zone08.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes a high-level authoritative MX/CNAME check. Gonemaster: performs explicit per-MX exchange CNAME probes and emits explicit positive/negative tags (`MX_RECORD_IS_CNAME` / `MX_RECORD_IS_NOT_CNAME`).
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.

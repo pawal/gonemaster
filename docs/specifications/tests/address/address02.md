@@ -100,7 +100,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 
 ## Differences From Upstream
-- Upstream reference: [`address02.md`](../../upstream/tests/Address-TP/address02.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes overall success/failure semantics only. Gonemaster: emits explicit diagnostic tags for pass, fail, and no-response PTR paths.
   - Upstream: does not specify PTR CNAME follow-up behavior. Gonemaster: follows one PTR CNAME hop before final PTR evaluation.

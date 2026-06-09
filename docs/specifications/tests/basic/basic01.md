@@ -247,7 +247,6 @@ For each remaining label (BFS from "." down toward child):
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json`. |
 
 ## Differences From Upstream
-- Upstream reference: [`basic01.md`](../../upstream/tests/Basic-TP/basic01.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: documents `B01_NO_CHILD` for the non-existing-child outcome. Gonemaster: also emits `B01_CHILD_NOT_EXIST` in fake-address mode.
   - Upstream: testcase summary does not list transport debug tags or `LOOP_PROTECTION`. Gonemaster: emits `IPV4_*`, `IPV6_*`, and `LOOP_PROTECTION`.

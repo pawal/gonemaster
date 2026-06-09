@@ -46,7 +46,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
 
 ## Differences From Upstream
-- Upstream reference: [`syntax03.md`](../../upstream/tests/Syntax-TP/syntax03.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream file has a textual typo in "Test case identifier" (`SYNTAX02` instead of `SYNTAX03`).
   - Upstream: does not explicitly define this detail. Gonemaster: Runtime behavior matches `SYNTAX03` semantics.

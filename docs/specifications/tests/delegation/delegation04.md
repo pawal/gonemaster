@@ -102,7 +102,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 
 ## Differences From Upstream
-- Upstream reference: [`delegation04.md`](../../upstream/tests/Delegation-TP/delegation04.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: says uniquely obtained address records are evaluated. Gonemaster: deduplicates by NS name, so distinct IPs under one NS name are not independently evaluated.
   - Upstream: describes pass/fail outcome semantics without explicit per-response message protocol. Gonemaster: emits per-response `IS_NOT_AUTHORITATIVE` findings and emits `ARE_AUTHORITATIVE` only when no other testcase findings were emitted.

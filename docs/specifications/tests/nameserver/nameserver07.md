@@ -67,7 +67,6 @@ Status: Final
 | `UPWARD_REFERRAL_IRRELEVANT` | `INFO` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver07.md`](../../upstream/tests/Nameserver-TP/nameserver07.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: says to exit when tested zone is root. Gonemaster: emits explicit `UPWARD_REFERRAL_IRRELEVANT` before ending testcase.
   - Upstream: describes evaluation over nameserver IP set. Gonemaster: deduplicates by `name/ip` and emits positive summary tag `NO_UPWARD_REFERRAL` when included nameservers have no findings.

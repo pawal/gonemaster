@@ -53,7 +53,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec06.md`](../../upstream/tests/DNSSEC-TP/dnssec06.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes testcase outcome in pass/fail terms without a concrete message-tag model. Gonemaster: emits explicit per-response tags (`EXTRA_PROCESSING_OK` and `EXTRA_PROCESSING_BROKEN`) with record counters.
   - Upstream: states this testcase should run only after successful `DNSSEC07` signing detection. Gonemaster: `DNSSEC06` function itself has no local gate; ordering/gating is enforced by module runner (`All`) which runs `DNSSEC07` first and short-circuits on `DS07_NOT_SIGNED`.

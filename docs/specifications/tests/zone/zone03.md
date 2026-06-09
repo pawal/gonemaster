@@ -56,7 +56,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone03.md`](../../upstream/tests/Zone-TP/zone03.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes `retry >= refresh` as testcase failure. Gonemaster: emits `REFRESH_LOWER_THAN_RETRY` with default severity `INFO`.
   - Upstream: does not define explicit result tag for retrieval failure. Gonemaster: emits `NO_RESPONSE_SOA_QUERY`.

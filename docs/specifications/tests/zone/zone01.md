@@ -177,7 +177,6 @@ SOA MNAME is never used for authoritative nameserver discovery and is not part o
 | `Z01_MNAME_UNEXPECTED_RCODE` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone01.md`](../../upstream/tests/Zone-TP/zone01.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not describe testcase boundary debug markers in testcase outputs. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
   - Upstream: describes MNAME non-resolve handling per MNAME name. Gonemaster: uses a cumulative `foundIP` counter across all MNAME names, which can suppress `Z01_MNAME_NOT_RESOLVE` for later unresolved MNAME values after any earlier MNAME resolved.

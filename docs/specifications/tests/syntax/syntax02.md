@@ -51,7 +51,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
 
 ## Differences From Upstream
-- Upstream reference: [`syntax02.md`](../../upstream/tests/Syntax-TP/syntax02.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: No material behavioral difference identified. Gonemaster: Matches upstream behavior for this testcase.
 - Potential upstream report:

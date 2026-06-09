@@ -123,7 +123,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver05.md`](../../upstream/tests/Nameserver-TP/nameserver05.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: models an `AAAA OK` set of nameserver IPs and uses that set for the final positive condition. Gonemaster: final `AAAA_WELL_PROCESSED` condition is also global (no AAAA issues anywhere), but emitted `servers` contains all included nameservers, not only nameservers with successful AAAA records.
   - Upstream: describes iterating nameserver IP set. Gonemaster: deduplicates nameservers by `name/ip` before evaluation.

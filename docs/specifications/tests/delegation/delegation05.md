@@ -120,7 +120,6 @@ emit TEST_CASE_END
 | `UNEXPECTED_RCODE` | `WARNING` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 
 ## Differences From Upstream
-- Upstream reference: [`delegation05.md`](../../upstream/tests/Delegation-TP/delegation05.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: special-procedure text is generic about disabled transports. Gonemaster: explicitly emits `IPV4_DISABLED`/`IPV6_DISABLED` only in the in-bailiwick per-NS-IP branch.
   - Upstream: describes recursive sibling/out-of-bailiwick branch as DNS lookup followed by CNAME check. Gonemaster: does that CNAME check, but does not emit `NO_RESPONSE` or `UNEXPECTED_RCODE` in that branch.

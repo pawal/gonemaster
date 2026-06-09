@@ -64,7 +64,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone07.md`](../../upstream/tests/Zone-TP/zone07.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: specification text in `zone07.md` includes unrelated SOA minimum/RIPE-203 wording. Gonemaster: implementation has no such check in `zone07`.
   - Upstream: procedural text focuses on CNAME-failure condition. Gonemaster: emits additional explicit outcome tags (`MNAME_IS_NOT_CNAME`, `MNAME_HAS_NO_ADDRESS`).

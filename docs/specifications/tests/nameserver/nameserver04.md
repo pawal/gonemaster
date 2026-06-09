@@ -64,7 +64,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver04.md`](../../upstream/tests/Nameserver-TP/nameserver04.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: states any answer must come from the queried IP. Gonemaster: only evaluates mismatch when response metadata `AnswerFrom` can be parsed as an IP address.
   - Upstream: describes failure-only semantics. Gonemaster: emits a positive summary tag `SAME_SOURCE_IP` when no mismatches are found among included nameservers.

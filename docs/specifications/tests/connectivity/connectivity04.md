@@ -128,7 +128,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 
 ## Differences From Upstream
-- Upstream reference: [`connectivity04.md`](../../upstream/tests/Connectivity-TP/connectivity04.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not explicitly define this detail. Gonemaster: emits additional debug observability tags (`CN04_ASN_INFOS_RAW`, `CN04_ASN_INFOS_ANNOUNCE_IN`).
   - Upstream: does not explicitly define this detail. Gonemaster: Multiple nameserver names sharing the same IP are collapsed to one first-seen nameserver name before prefix grouping.

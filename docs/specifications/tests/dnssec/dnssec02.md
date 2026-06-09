@@ -203,7 +203,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec02.md`](../../upstream/tests/DNSSEC-TP/dnssec02.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: explicitly describes a dedicated undelegated DS input branch in testcase flow. Gonemaster: `DNSSEC02` implementation uses parent DS discovery path directly and has no separate testcase-local undelegated DS branch.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.

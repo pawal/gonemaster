@@ -137,7 +137,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec15.md`](../../upstream/tests/DNSSEC-TP/dnssec15.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: CDS/CDNSKEY matching is described as "derived from the same DNSKEY" (or both delete). Gonemaster: mismatch check pairs records when both the key tag and the DNSSEC algorithm match (or both records use algorithm `0`), without deeper digest/material derivation checks. Key tag alone is insufficient because two keys with different algorithms can share a key tag.
   - Upstream: does not explicitly specify testcase boundary and transport-disabled debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.

@@ -86,7 +86,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json`. |
 
 ## Differences From Upstream
-- Upstream reference: [`basic03.md`](../../upstream/tests/Basic-TP/basic03.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not define a skip marker for this path. Gonemaster: emits `HAS_NAMESERVER_NO_WWW_A_TEST` when `Basic03` is skipped because `Basic02` succeeded.
   - Upstream: outcome text says testcase fails when no response contains an `A` record. Gonemaster: default levels make `HAS_A_RECORDS` the error path and keep `NO_A_RECORDS` at `DEBUG`.

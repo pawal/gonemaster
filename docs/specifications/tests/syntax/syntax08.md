@@ -63,7 +63,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
 
 ## Differences From Upstream
-- Upstream reference: [`syntax08.md`](../../upstream/tests/Syntax-TP/syntax08.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream text describes hostname length checks, but Gonemaster only checks character set, numeric TLD, and discouraged double dash.
   - Upstream describes dependency on de-escaped output from `syntax05`; Gonemaster runs independently of `syntax05` output values.

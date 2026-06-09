@@ -137,7 +137,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec09.md`](../../upstream/tests/DNSSEC-TP/dnssec09.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: procedure text describes evaluating SOA RRSIG records. Gonemaster: iterates all answer-section RRSIG records and does not explicitly filter by `TypeCovered == SOA` before DS09 classification.
   - Upstream: describes validity checks against test execution time. Gonemaster: uses the DNSKEY response packet timestamp (`packetTime(dnskeyResp)`) as the reference time.

@@ -166,7 +166,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 
 ## Differences From Upstream
-- Upstream reference: [`delegation01.md`](../../upstream/tests/Delegation-TP/delegation01.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes delegation-side IPv4/IPv6 checks before child-side IPv4/IPv6 checks. Gonemaster: performs child-side family checks first, then delegation-side family checks.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.

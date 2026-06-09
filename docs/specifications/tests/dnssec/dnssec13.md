@@ -77,7 +77,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec13.md`](../../upstream/tests/DNSSEC-TP/dnssec13.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes checking RRSIG records for each queried RRset. Gonemaster: for each query type, checks answer-section RRSIG algorithms without explicitly filtering on `TypeCovered` for that query type.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.

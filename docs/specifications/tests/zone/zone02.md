@@ -57,7 +57,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone02.md`](../../upstream/tests/Zone-TP/zone02.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: specifies a fixed minimum of `14400` seconds. Gonemaster: uses profile-configurable minimum (`Zone02.SOARefreshMinimumValue`).
   - Upstream: describes this condition as testcase failure when below threshold. Gonemaster: emits `REFRESH_MINIMUM_VALUE_LOWER` with default severity `NOTICE` (profile-controlled), not a hardcoded fail outcome.

@@ -147,7 +147,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec08.md`](../../upstream/tests/DNSSEC-TP/dnssec08.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: procedure text describes evaluation of DNSKEY RRSIG records (covering the DNSKEY RRset). Gonemaster: evaluates all answer-section RRSIG records and does not explicitly filter on `TypeCovered == DNSKEY` before classification.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.

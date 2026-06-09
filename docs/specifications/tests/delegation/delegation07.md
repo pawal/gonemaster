@@ -89,7 +89,6 @@ emit TEST_CASE_END
 | `TOTAL_NAME_MISMATCH` | `ERROR` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 
 ## Differences From Upstream
-- Upstream reference: [`delegation07.md`](../../upstream/tests/Delegation-TP/delegation07.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes a parent-to-child containment check for NS names. Gonemaster: performs two-way comparison and emits both parent-extra and child-extra findings.
   - Upstream: describes set comparison semantics. Gonemaster: uses count-based comparison (`+1/-1`) so repeated names can affect classification.

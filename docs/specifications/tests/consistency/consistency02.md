@@ -77,7 +77,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 
 ## Differences From Upstream
-- Upstream reference: [`consistency02.md`](../../upstream/tests/Consistency-TP/consistency02.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not explicitly define this detail. Gonemaster: emits `SOA_RNAME` detail entries for each observed RNAME value.
   - Upstream: does not explicitly define this detail. Gonemaster: Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.

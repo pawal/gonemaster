@@ -174,7 +174,7 @@ The child zone operator cannot fix a parent-zone signing failure, so DNSSEC21 re
   - Upstream: no testcase verifies the parent's RRSIG over the DS RRset that delegates the child. Existing upstream DNSSEC testcases cover only signatures published *inside* the zone under test (DNSKEY, SOA, NSEC/NSEC3 at child apex; DS digest match against child DNSKEY).
   - Gonemaster: implements parent-side DS RRSIG verification, surfacing parent-zone signing failures (e.g., broken key rollovers at the registry) that today are invisible when the child zone is the test target.
 - Potential upstream report:
-  - `yes` (see [issue draft](../../../../plans/upstream-issue-parent-ds-rrsig-validation.md))
+  - `yes`
 
 ## Edge Cases And Limitations
 - Root zone (no parent): the testcase emits `DS21_NO_PARENT_ZONE` at DEBUG and exits without findings.

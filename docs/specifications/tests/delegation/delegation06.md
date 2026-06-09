@@ -68,7 +68,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 
 ## Differences From Upstream
-- Upstream reference: [`delegation06.md`](../../upstream/tests/Delegation-TP/delegation06.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: says uniquely obtained address records are evaluated. Gonemaster: deduplicates by NS name, so distinct IPs under one NS name are not independently evaluated.
   - Upstream: describes testcase success when SOA exists. Gonemaster: emits explicit `SOA_EXISTS` only when no other testcase findings were emitted.

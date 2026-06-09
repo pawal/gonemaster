@@ -127,7 +127,6 @@ After classification, emit in fixed order:
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 
 ## Differences From Upstream
-- Upstream reference: [`address01.md`](../../upstream/tests/Address-TP/address01.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not define a strict order for category tag emission. Gonemaster: emits `A01_GLOBALLY_REACHABLE_ADDR`/`A01_NO_GLOBALLY_REACHABLE_ADDR` before other category tags.
   - Upstream: does not require a specific `servers` presentation order. Gonemaster: deduplicates and lexicographically sorts `servers` values before emission.

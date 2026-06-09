@@ -91,7 +91,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 
 ## Differences From Upstream
-- Upstream reference: [`delegation03.md`](../../upstream/tests/Delegation-TP/delegation03.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes adding one A/AAAA record with any address when conditions are met. Gonemaster: adds one record using the first available NS address from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) for each family.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.

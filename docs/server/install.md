@@ -26,8 +26,7 @@ downloads before installing.
 
 A Forgejo package registry hosted on Codeberg is on the roadmap; once enabled
 it will support `apt install` / `dnf install` against a registry URL without
-manual download. The implementation tasks are tracked in
-[plans/packaging.md](../../plans/packaging.md).
+manual download.
 
 ## Install
 

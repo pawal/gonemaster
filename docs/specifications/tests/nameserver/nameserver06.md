@@ -53,7 +53,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver06.md`](../../upstream/tests/Nameserver-TP/nameserver06.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes failure when any nameserver name does not resolve. Gonemaster: distinguishes partial failure (`CAN_NOT_BE_RESOLVED`) from complete failure (`NO_RESOLUTION`) and also emits explicit success (`CAN_BE_RESOLVED`).
   - Upstream: special requirements mention transport-disable handling. Gonemaster: has no direct transport-disabled branch in this testcase; it uses resolved data produced by methods.

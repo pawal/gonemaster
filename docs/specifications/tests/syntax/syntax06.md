@@ -90,7 +90,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
 
 ## Differences From Upstream
-- Upstream reference: [`syntax06.md`](../../upstream/tests/Syntax-TP/syntax06.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream outcome table lists `RNAME_MAIL_DOMAIN_INVALID`, `RNAME_MAIL_DOMAIN_LOCALHOST`, and `RNAME_MAIL_ILLEGAL_CNAME` as `WARNING`; Gonemaster profile still maps `RNAME_MAIL_DOMAIN_INVALID` to `NOTICE`.
   - Upstream: does not explicitly define this detail. Gonemaster: Transport skip tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted but not listed in upstream metadata summary.

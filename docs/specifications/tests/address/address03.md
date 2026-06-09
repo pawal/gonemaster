@@ -111,7 +111,6 @@ Module-level gating (in AddressAll):
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ADDRESS`). |
 
 ## Differences From Upstream
-- Upstream reference: [`address03.md`](../../upstream/tests/Address-TP/address03.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes consuming `ADDRESS02` outcome data as input. Gonemaster: performs fresh PTR lookups inside `Address03`.
   - Upstream: states `ADDRESS03` depends on `ADDRESS02` success. Gonemaster: enforces gating in `AddressAll` by requiring `NAMESERVERS_IP_WITH_REVERSE` from `Address02`.

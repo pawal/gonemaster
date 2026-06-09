@@ -58,7 +58,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
 
 ## Differences From Upstream
-- Upstream reference: [`syntax04.md`](../../upstream/tests/Syntax-TP/syntax04.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream text describes hostname-length checks (label <= 63, name <= 255), but Gonemaster only checks character set, numeric TLD, and discouraged double dash.
 - Potential upstream report:

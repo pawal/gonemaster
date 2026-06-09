@@ -102,7 +102,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec14.md`](../../upstream/tests/DNSSEC-TP/dnssec14.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes mutually exclusive key-size outcomes (ordered `else if`). Gonemaster: evaluates size checks with independent `if` branches, so a single key can emit both `DNSKEY_TOO_SMALL_FOR_ALGO` and `DNSKEY_SMALLER_THAN_REC`.
   - Upstream: default level table lists `NO_RESPONSE_DNSKEY` as `WARNING`. Gonemaster: default level is `ERROR` in `share/profile.json`.

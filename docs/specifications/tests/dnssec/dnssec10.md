@@ -345,7 +345,6 @@ After the per-nameserver phase, with:
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec10.md`](../../upstream/tests/DNSSEC-TP/dnssec10.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: summary for `DS10_INCONSISTENT_NSEC_NSEC3` describes two separate lists (`ns_list_nsec`, `ns_list_nsec3`). Gonemaster: emits a single combined `servers` argument.
   - Upstream: most DS10 tags are documented with `servers`. Gonemaster: `DS10_ALGO_NOT_SUPPORTED_BY_ZM` uses `addresses` while other DS10 tags use `servers`.

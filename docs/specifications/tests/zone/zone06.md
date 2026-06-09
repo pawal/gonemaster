@@ -64,7 +64,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone06.md`](../../upstream/tests/Zone-TP/zone06.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes querying over a [`AllNameservers`](../../nameserver-resolution.md#allnameservers)-derived nameserver IP set. Gonemaster: retrieval helper iterates [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) child nameserver addresses only.
   - Upstream: describes fixed bounds (`300` to `86400`) as failure criteria. Gonemaster: uses profile-configurable bounds and notice-level findings for out-of-range cases under default profile.

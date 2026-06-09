@@ -192,7 +192,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec01.md`](../../upstream/tests/DNSSEC-TP/dnssec01.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
   - Upstream: Summary argument list omits `ds_algo_descr` for some DS01 tags. Gonemaster: includes `ds_algo_descr` for all emitted `DS01_DS_ALGO_*` classification tags.

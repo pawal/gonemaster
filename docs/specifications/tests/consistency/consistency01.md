@@ -118,7 +118,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 
 ## Differences From Upstream
-- Upstream reference: [`consistency01.md`](../../upstream/tests/Consistency-TP/consistency01.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream documents `MULTIPLE_SOA_SERIALS_OK`; Gonemaster does not emit that tag.
   - Upstream: does not explicitly define this detail. Gonemaster: Serial variation delta uses integer subtraction on the first and last serial values after lexicographic string-key sorting.

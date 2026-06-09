@@ -86,7 +86,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver15.md`](../../upstream/tests/Nameserver-TP/nameserver15.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes a conceptual "Sending Version Query" set then removal based on TXT data. Gonemaster: computes equivalent behavior via per-server `noVersion` state (set only when no non-empty version string was revealed).
   - Upstream: states nameserver IP collection semantics. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output and emits deduplicated sorted `servers` aggregates.

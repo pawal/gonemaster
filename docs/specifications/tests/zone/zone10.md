@@ -69,7 +69,6 @@ Status: Final
 | `WRONG_SOA` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone10.md`](../../upstream/tests/Zone-TP/zone10.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: checks wrong-owner condition before multiplicity wording in procedure. Gonemaster: emits `MULTIPLE_SOA` first when SOA answer count is greater than one, and only checks `WRONG_SOA` in single-SOA branch.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.

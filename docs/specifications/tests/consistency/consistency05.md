@@ -154,7 +154,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 
 ## Differences From Upstream
-- Upstream reference: [`consistency05.md`](../../upstream/tests/Consistency-TP/consistency05.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not explicitly define this detail. Gonemaster: In-bailiwick processing queries all discovered in-bailiwick child servers and emits one `NO_RESPONSE` or `CHILD_NS_FAILED` entry per failing nameserver before final mismatch classification.
   - Upstream: does not explicitly define this detail. Gonemaster: Referral handling explicitly falls back to recursive lookup for the same qtype and owner.

@@ -132,7 +132,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver02.md`](../../upstream/tests/Nameserver-TP/nameserver02.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: outcome table focuses on per-server error findings. Gonemaster: emits additional summary tag `EDNS0_SUPPORT` when all included nameservers pass.
   - Upstream: describes iterating the nameserver IP set. Gonemaster: deduplicates nameservers by `name/ip` before evaluation.

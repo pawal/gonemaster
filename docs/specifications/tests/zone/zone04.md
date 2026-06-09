@@ -57,7 +57,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone04.md`](../../upstream/tests/Zone-TP/zone04.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: specifies a fixed minimum of `3600` seconds. Gonemaster: uses profile-configurable minimum (`Zone04.SOARetryMinimumValue`).
   - Upstream: describes below-threshold `retry` as testcase failure. Gonemaster: emits `RETRY_MINIMUM_VALUE_LOWER` with default severity `NOTICE` (profile-controlled), not a hardcoded fail outcome.

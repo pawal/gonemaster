@@ -79,7 +79,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver10.md`](../../upstream/tests/Nameserver-TP/nameserver10.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: says input is nameserver IP set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output, but aggregate `addresses` values are sorted and deduplicated by IP.
   - Upstream: summary assumes this testcase is relevant only after EDNSv0 success. Gonemaster: implements that gating explicitly by only evaluating EDNSv1 when EDNSv0 response exists and has `NOERROR`.

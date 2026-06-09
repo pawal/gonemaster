@@ -119,7 +119,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec04.md`](../../upstream/tests/DNSSEC-TP/dnssec04.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes fixed lifetime policy points (12h and 180d). Gonemaster: uses profile-controlled thresholds via `test_cases_vars.dnssec04.*` (defaults match 12h/180d/180d).
   - Upstream: is outcome-oriented and does not enumerate this detailed tag model. Gonemaster: emits explicit diagnostics (`RRSIG_EXPIRATION`, `REMAINING_*`, `DURATION_*`, plus testcase boundary tags).

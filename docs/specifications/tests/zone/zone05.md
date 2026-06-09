@@ -65,7 +65,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone05.md`](../../upstream/tests/Zone-TP/zone05.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: specifies a fixed minimum of `604800` seconds. Gonemaster: uses profile-configurable minimum (`Zone05.SOAExpireMinimumValue`).
   - Upstream: describes below-threshold or lower-than-refresh cases as testcase failure. Gonemaster: emits warning-level findings (`EXPIRE_MINIMUM_VALUE_LOWER`, `EXPIRE_LOWER_THAN_REFRESH`) under default profile.

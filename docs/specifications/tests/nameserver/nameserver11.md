@@ -88,7 +88,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver11.md`](../../upstream/tests/Nameserver-TP/nameserver11.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: assumes nameserver IP evaluation set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output, then emits deduplicated/sorted `addresses` aggregates.
   - Upstream: defines baseline gate before unknown-option probe. Gonemaster: implements this gate exactly and silently skips nameservers failing baseline checks.

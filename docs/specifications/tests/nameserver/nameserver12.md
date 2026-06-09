@@ -74,7 +74,6 @@ Status: Final
 | `Z_FLAGS_NOTCLEAR` | `WARNING` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver12.md`](../../upstream/tests/Nameserver-TP/nameserver12.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes iterating nameserver IP set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output (no testcase-local deduplication).
   - Upstream: describes ignored disabled transports in prose. Gonemaster: emits explicit `IPV4_DISABLED` / `IPV6_DISABLED` tags.

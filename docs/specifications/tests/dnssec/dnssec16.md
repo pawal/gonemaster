@@ -175,7 +175,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec16.md`](../../upstream/tests/DNSSEC-TP/dnssec16.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes this testcase as producing no output when no CDS is found. Gonemaster: emits only `TEST_CASE_START`, `TEST_CASE_END`, and, if any transport is disabled, `IPV4_DISABLED` and/or `IPV6_DISABLED` in that case.
   - Upstream: signature checks are described at RRset/signature level. Gonemaster: the checks for `DS16_DNSKEY_NOT_SIGNED_BY_CDS` and `DS16_CDS_NOT_SIGNED_BY_CDS` are implemented as keytag-presence checks in RRSIG sets, not full per-signature validation.

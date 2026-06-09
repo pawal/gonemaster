@@ -92,7 +92,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 
 ## Differences From Upstream
-- Upstream reference: [`delegation02.md`](../../upstream/tests/Delegation-TP/delegation02.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: specifies duplicate-IP evaluation for delegation side and child side only. Gonemaster: adds a third evaluation over the combined delegation+child set, with `SAME_IP_ADDRESS` or `DISTINCT_IP_ADDRESS`.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.

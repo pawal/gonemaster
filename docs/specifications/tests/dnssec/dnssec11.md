@@ -166,7 +166,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec11.md`](../../upstream/tests/DNSSEC-TP/dnssec11.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes normal parent lookup through z.Parent(ctx) and undelegated behavior from test-type inputs. Gonemaster: uses the [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers) abstraction plus a fake-DS shortcut via nameserver `FakeDSRecords`.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.

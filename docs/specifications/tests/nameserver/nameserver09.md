@@ -153,7 +153,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver09.md`](../../upstream/tests/Nameserver-TP/nameserver09.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: specifies compare-and-fail semantics without explicit per-branch message taxonomy. Gonemaster: emits granular per-server branch tags (`CASE_QUERY_*`) plus testcase summary tags (`CASE_QUERIES_RESULTS_OK` / `CASE_QUERIES_RESULTS_DIFFER`).
   - Upstream: describes evaluation over nameserver IP set. Gonemaster: deduplicates nameservers by `name/ip`.

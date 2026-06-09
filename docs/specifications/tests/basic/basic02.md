@@ -151,7 +151,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json`. |
 
 ## Differences From Upstream
-- Upstream reference: [`basic02.md`](../../upstream/tests/Basic-TP/basic02.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: summary focuses on B02-class outcome tags. Gonemaster: also emits explicit transport debug tags (`IPV4_*`, `IPV6_*`) during SOA probes.
   - Upstream: does not describe probe execution ordering details. Gonemaster: executes probes in parallel but keeps deterministic result ordering by task index.

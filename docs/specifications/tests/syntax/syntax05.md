@@ -53,7 +53,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.SYNTAX`). |
 
 ## Differences From Upstream
-- Upstream reference: [`syntax05.md`](../../upstream/tests/Syntax-TP/syntax05.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream text describes iterating over [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers)/[`ApexNameservers`](../../nameserver-resolution.md#apexnameservers) nameserver sets directly; Gonemaster uses `z.QueryOne` abstraction.
   - Upstream text says de-escaped output from this testcase is used by `SYNTAX08`; Gonemaster does not pass state from `Syntax05` to `Syntax08`.

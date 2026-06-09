@@ -201,7 +201,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 
 ## Differences From Upstream
-- Upstream reference: [`dnssec07.md`](../../upstream/tests/DNSSEC-TP/dnssec07.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: summary text states that if no DNSKEY records are found then no messages are output. Gonemaster: emits not-signed findings (`DS07_NOT_SIGNED_ON_SERVER`, `DS07_NOT_SIGNED`) in that case when child responses are otherwise usable.
   - Upstream: parent DS-positive condition is described as requiring DS plus RRSIG covering DS. Gonemaster: parent DS-positive check is driven by presence of an `RRSIG` covering `DS` for child owner and does not explicitly assert DS RR presence in the same branch.

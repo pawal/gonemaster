@@ -67,7 +67,6 @@ Status: Final
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.NAMESERVER`). |
 
 ## Differences From Upstream
-- Upstream reference: [`nameserver08.md`](../../upstream/tests/Nameserver-TP/nameserver08.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes a failure condition; messaging detail is not defined. Gonemaster: emits consolidated `QNAME_CASE_SENSITIVE` and `QNAME_CASE_INSENSITIVE` tags with server lists.
   - Upstream: describes querying unique nameserver IPs. Gonemaster: deduplicates by `name/ip` and then queries.

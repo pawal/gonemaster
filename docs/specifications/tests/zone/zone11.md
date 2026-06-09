@@ -142,7 +142,6 @@ emit TEST_CASE_END
 | `Z11_UNABLE_TO_CHECK_FOR_SPF` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
 ## Differences From Upstream
-- Upstream reference: [`zone11.md`](../../upstream/tests/Zone-TP/zone11.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: defines SPF syntax against RFC7208 ABNF semantics. Gonemaster: uses local `spfSyntaxOk`/`spfTermOk` checks, which are intentionally narrower and implementation-defined.
   - Upstream: does not explicitly define testcase boundary markers. Gonemaster: runtime emits shared `TEST_CASE_START`/`TEST_CASE_END`, but these markers are not part of current Zone11 metadata inventory.

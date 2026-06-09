@@ -136,7 +136,6 @@ emit TEST_CASE_END
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONNECTIVITY`). |
 
 ## Differences From Upstream
-- Upstream reference: [`connectivity03.md`](../../upstream/tests/Connectivity-TP/connectivity03.md)
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not explicitly define this detail. Gonemaster: emits additional per-IP debug observability tags (`ASN_INFOS_RAW`, `ASN_INFOS_ANNOUNCE_BY`, `ASN_INFOS_ANNOUNCE_IN`).
   - Upstream: does not explicitly define this detail. Gonemaster: Diversity summary tags are computed from IPs that returned ASN data; IPs with `EMPTY_ASN_SET`/`ERROR_ASN_DATABASE` do not contribute ASN values to summary classification.

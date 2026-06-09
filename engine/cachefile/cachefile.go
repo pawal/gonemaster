@@ -302,7 +302,8 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *a
 type SaveOption func(*saveConfig)
 
 type saveConfig struct {
-	compress bool
+	compress   bool
+	maxEntries int
 }
 
 func newSaveConfig(opts []SaveOption) *saveConfig {
@@ -317,6 +318,13 @@ func newSaveConfig(opts []SaveOption) *saveConfig {
 // gzip stream containing the same JSON document as the uncompressed form.
 func WithCompression() SaveOption {
 	return func(c *saveConfig) { c.compress = true }
+}
+
+// WithMaxEntries makes Save fail before writing if the exported file would
+// contain more than n entries. A value of 0 (the default) disables the
+// guardrail.
+func WithMaxEntries(n int) SaveOption {
+	return func(c *saveConfig) { c.maxEntries = n }
 }
 
 // gzipMagic identifies a gzip stream by its first two bytes (RFC 1952 §2.3.1).
@@ -338,6 +346,9 @@ func Save(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *a
 	payload, err := Export(ns, rec, asn)
 	if err != nil {
 		return err
+	}
+	if cfg.maxEntries > 0 && len(payload.Entries) > cfg.maxEntries {
+		return fmt.Errorf("packet cache has %d entries, exceeds max-entries=%d", len(payload.Entries), cfg.maxEntries)
 	}
 	data, err := json.MarshalIndent(payload, "", "  ")
 	if err != nil {

@@ -24,6 +24,14 @@ same JSON document. The CLI selects compression in two ways:
 of the file (`1f 8b`, the gzip magic per RFC 1952) and decompresses
 transparently. Files saved without compression are read as plain JSON.
 
+## Limits
+
+`gonemaster --save FILE --save-max-entries N` (or
+`cachefile.WithMaxEntries(n)`) refuses to write the file if the exported
+cache would contain more than `N` entries, counted across all kinds. The
+check runs before the file is written, so a rejected save never leaves a
+partial file behind. The default of `0` disables the guardrail.
+
 ## File layout
 
 A single JSON object:

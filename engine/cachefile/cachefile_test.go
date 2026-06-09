@@ -712,6 +712,65 @@ func TestCachefileRestoreCorruptedGzip(t *testing.T) {
 	}
 }
 
+func TestCachefileSaveMaxEntriesUnderLimitPasses(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns) // 2 entries
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := Save(path, ns, nil, nil, WithMaxEntries(5)); err != nil {
+		t.Fatalf("save under limit: %v", err)
+	}
+	if _, err := os.Stat(path); err != nil {
+		t.Fatalf("expected file to exist when under limit: %v", err)
+	}
+}
+
+func TestCachefileSaveMaxEntriesOverLimitFails(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns) // 2 entries
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	err := Save(path, ns, nil, nil, WithMaxEntries(1))
+	if err == nil {
+		t.Fatalf("expected error when entry count exceeds max")
+	}
+	if !strings.Contains(err.Error(), "max-entries=1") {
+		t.Fatalf("expected max-entries error, got %v", err)
+	}
+	if _, statErr := os.Stat(path); statErr == nil {
+		t.Fatalf("expected file NOT to be written when over limit")
+	}
+}
+
+func TestCachefileSaveMaxEntriesZeroMeansUnlimited(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns)
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := Save(path, ns, nil, nil, WithMaxEntries(0)); err != nil {
+		t.Fatalf("save with WithMaxEntries(0) should be unlimited: %v", err)
+	}
+}
+
+func TestCachefileSaveMaxEntriesCountsAllKinds(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	rec := &recursor.Recursor{}
+	asn := asnlookup.NewCache()
+	seedNameserverCache(t, ns) // 2
+	seedRecursorCache(t, rec)  // 2
+	seedASNCache(t, asn)       // 2
+	// Total = 6 entries. Limit at 5 should reject.
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	err := Save(path, ns, rec, asn, WithMaxEntries(5))
+	if err == nil {
+		t.Fatalf("expected error when combined entry count of all kinds exceeds max")
+	}
+	if !strings.Contains(err.Error(), "6 entries") {
+		t.Fatalf("expected message to mention total of 6 entries, got %v", err)
+	}
+}
+
 func TestCachefileCompressedFileIsSmallerForRepetitiveData(t *testing.T) {
 	ns := nameserver.NewCacheStore()
 	// Seed many duplicate-looking entries to give gzip something to compress.

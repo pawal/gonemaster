@@ -95,6 +95,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var savePacketCachePath string
 	var restorePacketCachePath string
 	var savePacketCacheCompress bool
+	var savePacketCacheMaxEntries int
 	var noProgress bool
 	var count bool
 	var listTests bool
@@ -142,6 +143,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		printUsageGroup(errOut, "Cache", []usageLine{
 			{flag: "--save PATH", detail: "Write DNS packet cache to file after the run"},
 			{flag: "--save-compress", detail: "Gzip-compress the saved cache file (also implied by a .gz path)"},
+			{flag: "--save-max-entries N", detail: "Refuse to save if the cache file would contain more than N entries"},
 			{flag: "--restore PATH", detail: "Prime DNS packet cache from file before the run (gzip auto-detected)"},
 		})
 		printUsageGroup(errOut, "Resolver/Profile Overrides", []usageLine{
@@ -213,6 +215,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.StringVar(&savePacketCachePath, "save", "", "Write DNS packet cache to file after the run (optional)")
 	fs.StringVar(&restorePacketCachePath, "restore", "", "Prime DNS packet cache from file before the run (optional)")
 	fs.BoolVar(&savePacketCacheCompress, "save-compress", false, "Gzip-compress the saved cache file (optional; implied by .gz path)")
+	fs.IntVar(&savePacketCacheMaxEntries, "save-max-entries", 0, "Refuse to save if the cache file would contain more than N entries (0 = unlimited)")
 	fs.Var(&undelegatedNSSpecs, "ns", "Undelegated nameserver as name[/ip] (repeatable)")
 	fs.Var(&undelegatedDSSpecs, "ds", "Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
 	fs.BoolVar(&noProgress, "no-progress", false, "Disable progress indicator (optional)")
@@ -330,6 +333,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if savePacketCacheCompress && strings.TrimSpace(savePacketCachePath) == "" {
 		fmt.Fprintln(errOut, "--save-compress requires --save")
+		return 2
+	}
+	if savePacketCacheMaxEntries < 0 {
+		fmt.Fprintln(errOut, "--save-max-entries must be >= 0")
+		return 2
+	}
+	if savePacketCacheMaxEntries > 0 && strings.TrimSpace(savePacketCachePath) == "" {
+		fmt.Fprintln(errOut, "--save-max-entries requires --save")
 		return 2
 	}
 
@@ -781,6 +792,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		var saveOpts []cachefile.SaveOption
 		if savePacketCacheCompress {
 			saveOpts = append(saveOpts, cachefile.WithCompression())
+		}
+		if savePacketCacheMaxEntries > 0 {
+			saveOpts = append(saveOpts, cachefile.WithMaxEntries(savePacketCacheMaxEntries))
 		}
 		if saveErr := cachefile.Save(savePacketCachePath, packetCacheStore, packetCacheRecursor, asnCache, saveOpts...); saveErr != nil {
 			fmt.Fprintln(errOut, saveErr.Error())

@@ -97,6 +97,7 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"--count",
 		"--save PATH",
 		"--save-compress",
+		"--save-max-entries N",
 		"--sourceaddr4 IPADDR",
 		"--sourceaddr6 IPADDR",
 	}
@@ -504,6 +505,113 @@ func TestRunSaveCompressRejectsWithoutSave(t *testing.T) {
 	}
 	if !strings.Contains(errOut.String(), "--save-compress requires --save") {
 		t.Fatalf("expected save-compress validation error, got %q", errOut.String())
+	}
+}
+
+func TestRunSaveMaxEntriesUnderLimitSucceeds(t *testing.T) {
+	dir := t.TempDir()
+	savePath := filepath.Join(dir, "saved-cache.json")
+	fixture := samplePacketCacheFile(t)
+
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor, req.ASNCache); importErr != nil {
+			t.Fatalf("import fixture: %v", importErr)
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() { runEngine = previous })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "10"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if _, err := os.Stat(savePath); err != nil {
+		t.Fatalf("expected save file to exist when under limit: %v", err)
+	}
+}
+
+func TestRunSaveMaxEntriesZeroMeansUnlimited(t *testing.T) {
+	dir := t.TempDir()
+	savePath := filepath.Join(dir, "saved-cache.json")
+	fixture := samplePacketCacheFile(t)
+
+	original := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor, req.ASNCache); importErr != nil {
+			t.Fatalf("import fixture: %v", importErr)
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() { runEngine = original })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "0"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("--save-max-entries 0 should mean unlimited, got exit %d (stderr=%q)", code, errOut.String())
+	}
+}
+
+func TestRunSaveMaxEntriesOverLimitFails(t *testing.T) {
+	dir := t.TempDir()
+	savePath := filepath.Join(dir, "saved-cache.json")
+	fixture := samplePacketCacheFile(t)
+
+	original := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		twoEntryFixture := fixture
+		extra := fixture.Entries[0]
+		extra.Key = "fixture.key.2"
+		twoEntryFixture.Entries = append(twoEntryFixture.Entries, extra)
+		if importErr := cachefile.Import(twoEntryFixture, req.NameserverCache, req.Recursor, req.ASNCache); importErr != nil {
+			t.Fatalf("import fixture: %v", importErr)
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() { runEngine = original })
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "1"}, &out, &errOut)
+	if code == 0 {
+		t.Fatalf("expected non-zero exit when entry count exceeds --save-max-entries")
+	}
+	if !strings.Contains(errOut.String(), "max-entries=1") {
+		t.Fatalf("expected max-entries error message, got %q", errOut.String())
+	}
+	if _, err := os.Stat(savePath); err == nil {
+		t.Fatalf("expected save file NOT to be written when over limit")
+	}
+}
+
+func TestRunSaveMaxEntriesRejectsWithoutSave(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--save-max-entries", "5"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--save-max-entries requires --save") {
+		t.Fatalf("expected save-max-entries validation error, got %q", errOut.String())
+	}
+}
+
+func TestRunSaveMaxEntriesRejectsNegative(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--save", "out.json", "--save-max-entries", "-1"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--save-max-entries must be >= 0") {
+		t.Fatalf("expected negative-rejection error, got %q", errOut.String())
 	}
 }
 

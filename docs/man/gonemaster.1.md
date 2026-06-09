@@ -110,6 +110,9 @@ Results are printed with severity levels and can be output in several formats.
 **--save-compress**
 : Gzip-compress the saved cache file. Implied when *PATH* ends in `.gz`. Has no effect without **--save**.
 
+**--save-max-entries** *N*
+: Refuse to write the saved cache file if it would contain more than *N* entries across all kinds (nameserver + recursor + ASN). The file is not created when the limit is exceeded. `0` (the default) disables the guardrail. Requires **--save**.
+
 **--restore** *PATH*
 : Prime DNS packet cache from file before the run. A gzip-compressed file is decompressed transparently (detected by magic bytes, regardless of file name).
 

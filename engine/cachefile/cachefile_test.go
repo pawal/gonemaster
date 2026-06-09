@@ -578,3 +578,176 @@ func TestCachefileASNStrictRejectsMalformed(t *testing.T) {
 		t.Fatal("expected error for unknown code")
 	}
 }
+
+func TestCachefileSaveCompressedRoundTrip(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	rec := &recursor.Recursor{}
+	seedNameserverCache(t, ns)
+	seedRecursorCache(t, rec)
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := Save(path, ns, rec, nil, WithCompression()); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
+		t.Fatalf("expected gzip magic bytes in saved file, got %x", data[:min(len(data), 8)])
+	}
+
+	restoredNS := nameserver.NewCacheStore()
+	restoredRec := &recursor.Recursor{}
+	if err := Restore(path, restoredNS, restoredRec, nil, WithStrict()); err != nil {
+		t.Fatalf("strict restore of compressed file: %v", err)
+	}
+	if entries, _ := restoredNS.ExportEntries(); len(entries) != 2 {
+		t.Fatalf("expected 2 restored ns entries, got %d", len(entries))
+	}
+	if entries, _ := restoredRec.ExportCacheEntries(); len(entries) != 2 {
+		t.Fatalf("expected 2 restored recursor entries, got %d", len(entries))
+	}
+}
+
+func TestCachefileSaveGzSuffixImpliesCompression(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns)
+
+	path := filepath.Join(t.TempDir(), "cache.json.gz")
+	if err := Save(path, ns, nil, nil); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
+		t.Fatalf("expected gzip magic bytes for .gz path even without WithCompression(), got %x", data[:min(len(data), 8)])
+	}
+	if err := Restore(path, nameserver.NewCacheStore(), nil, nil); err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+}
+
+func TestCachefileSaveGzSuffixCaseInsensitive(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns)
+
+	path := filepath.Join(t.TempDir(), "cache.JSON.GZ")
+	if err := Save(path, ns, nil, nil); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read file: %v", err)
+	}
+	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
+		t.Fatalf("expected gzip magic bytes for upper-case .GZ path, got %x", data[:min(len(data), 8)])
+	}
+}
+
+func TestCachefileRestoreSniffsGzipRegardlessOfName(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns)
+
+	// Write with explicit compression but a non-.gz name.
+	path := filepath.Join(t.TempDir(), "cache.bin")
+	if err := Save(path, ns, nil, nil, WithCompression()); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if err := Restore(path, nameserver.NewCacheStore(), nil, nil, WithStrict()); err != nil {
+		t.Fatalf("restore should sniff gzip magic regardless of file name: %v", err)
+	}
+}
+
+func TestCachefileRestorePlainStillWorks(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns)
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := Save(path, ns, nil, nil); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
+		t.Fatalf("expected plain JSON without gzip magic, got %x", data[:8])
+	}
+	if err := Restore(path, nameserver.NewCacheStore(), nil, nil, WithStrict()); err != nil {
+		t.Fatalf("restore plain: %v", err)
+	}
+}
+
+func TestCachefileRestoreCorruptedGzip(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns)
+
+	path := filepath.Join(t.TempDir(), "cache.json.gz")
+	if err := Save(path, ns, nil, nil); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	// Corrupt the gzip body (keep the magic so we still try to decompress).
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	if len(data) < 32 {
+		t.Fatalf("file too small to corrupt safely: %d bytes", len(data))
+	}
+	// Flip several bytes well past the gzip header to break the deflate body.
+	data[len(data)-8]++
+	data[len(data)-16]++
+	if err := os.WriteFile(path, data, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	if err := Restore(path, nameserver.NewCacheStore(), nil, nil); err == nil {
+		t.Fatalf("expected error on corrupted gzip body")
+	}
+}
+
+func TestCachefileCompressedFileIsSmallerForRepetitiveData(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	// Seed many duplicate-looking entries to give gzip something to compress.
+	msg := buildPackedMsg(t, "example.com.", 1)
+	var entries []nameserver.Entry
+	for i := 0; i < 200; i++ {
+		entries = append(entries, nameserver.Entry{
+			Address:    "192.0.2.53",
+			Key:        fmt.Sprintf("example.com./A/IN/%d", i),
+			Message:    msg,
+			AnswerFrom: "192.0.2.53:53",
+		})
+	}
+	if err := ns.ImportEntries(entries); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	dir := t.TempDir()
+	plain := filepath.Join(dir, "cache.json")
+	gz := filepath.Join(dir, "cache.json.gz")
+	if err := Save(plain, ns, nil, nil); err != nil {
+		t.Fatalf("save plain: %v", err)
+	}
+	if err := Save(gz, ns, nil, nil, WithCompression()); err != nil {
+		t.Fatalf("save gzip: %v", err)
+	}
+
+	plainStat, err := os.Stat(plain)
+	if err != nil {
+		t.Fatalf("stat plain: %v", err)
+	}
+	gzStat, err := os.Stat(gz)
+	if err != nil {
+		t.Fatalf("stat gz: %v", err)
+	}
+	if gzStat.Size() >= plainStat.Size() {
+		t.Fatalf("expected gzip to be smaller than plain (got plain=%d, gz=%d)", plainStat.Size(), gzStat.Size())
+	}
+}

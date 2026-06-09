@@ -105,10 +105,13 @@ Results are printed with severity levels and can be output in several formats.
 ### Cache
 
 **--save** *PATH*
-: Write DNS packet cache to file after the run.
+: Write DNS packet cache to file after the run. If *PATH* ends in `.gz` the file is gzip-compressed automatically.
+
+**--save-compress**
+: Gzip-compress the saved cache file. Implied when *PATH* ends in `.gz`. Has no effect without **--save**.
 
 **--restore** *PATH*
-: Prime DNS packet cache from file before the run.
+: Prime DNS packet cache from file before the run. A gzip-compressed file is decompressed transparently (detected by magic bytes, regardless of file name).
 
 **--error-cache-ttl** *SECONDS*
 : Skip query retry after network errors for this duration.
@@ -193,6 +196,12 @@ Save and restore the DNS cache for faster re-runs:
 
     gonemaster --save cache.bin example.com
     gonemaster --restore cache.bin --testcase dnssec20 example.com
+
+Save a gzip-compressed cache (either form works):
+
+    gonemaster --save cache.json.gz example.com
+    gonemaster --save cache.bin --save-compress example.com
+    gonemaster --restore cache.json.gz example.com
 
 ## SEE ALSO
 

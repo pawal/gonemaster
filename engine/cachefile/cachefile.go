@@ -4,11 +4,14 @@
 package cachefile
 
 import (
+	"bytes"
+	"compress/gzip"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -295,12 +298,43 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *a
 	return nil
 }
 
-// Save writes the caches to path as JSON.
-func Save(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Cache) error {
+// SaveOption configures Save behaviour.
+type SaveOption func(*saveConfig)
+
+type saveConfig struct {
+	compress bool
+}
+
+func newSaveConfig(opts []SaveOption) *saveConfig {
+	c := &saveConfig{}
+	for _, opt := range opts {
+		opt(c)
+	}
+	return c
+}
+
+// WithCompression gzip-compresses the on-disk file. The output is a single
+// gzip stream containing the same JSON document as the uncompressed form.
+func WithCompression() SaveOption {
+	return func(c *saveConfig) { c.compress = true }
+}
+
+// gzipMagic identifies a gzip stream by its first two bytes (RFC 1952 §2.3.1).
+var gzipMagic = []byte{0x1f, 0x8b}
+
+// hasGzipSuffix reports whether path has a case-insensitive .gz suffix.
+func hasGzipSuffix(path string) bool {
+	return strings.HasSuffix(strings.ToLower(path), ".gz")
+}
+
+// Save writes the caches to path as JSON. With WithCompression() (or a path
+// ending in .gz) the JSON is wrapped in a single gzip stream.
+func Save(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Cache, opts ...SaveOption) error {
 	target := strings.TrimSpace(path)
 	if target == "" {
 		return fmt.Errorf("packet cache save path is required")
 	}
+	cfg := newSaveConfig(opts)
 	payload, err := Export(ns, rec, asn)
 	if err != nil {
 		return err
@@ -310,10 +344,24 @@ func Save(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *a
 		return err
 	}
 	data = append(data, '\n')
+
+	if cfg.compress || hasGzipSuffix(target) {
+		var buf bytes.Buffer
+		gz := gzip.NewWriter(&buf)
+		if _, werr := gz.Write(data); werr != nil {
+			return werr
+		}
+		if cerr := gz.Close(); cerr != nil {
+			return cerr
+		}
+		return os.WriteFile(target, buf.Bytes(), 0o644)
+	}
 	return os.WriteFile(target, data, 0o644)
 }
 
-// Restore reads path and imports its entries into the caches.
+// Restore reads path and imports its entries into the caches. A gzip stream
+// is decompressed transparently (detected by magic bytes, regardless of file
+// name).
 func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Cache, opts ...Option) error {
 	cfg := newConfig(opts)
 
@@ -321,7 +369,12 @@ func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, asn
 	if source == "" {
 		return fmt.Errorf("packet cache restore path is required")
 	}
-	data, err := os.ReadFile(source)
+	raw, err := os.ReadFile(source)
+	if err != nil {
+		return err
+	}
+
+	data, err := maybeDecompress(raw)
 	if err != nil {
 		return err
 	}
@@ -335,6 +388,24 @@ func Restore(path string, ns *nameserver.CacheStore, rec *recursor.Recursor, asn
 		return err
 	}
 	return Import(payload, ns, rec, asn, opts...)
+}
+
+// maybeDecompress returns the gzip-decompressed payload if data starts with
+// the gzip magic bytes; otherwise it returns data unchanged.
+func maybeDecompress(data []byte) ([]byte, error) {
+	if len(data) < 2 || !bytes.HasPrefix(data, gzipMagic) {
+		return data, nil
+	}
+	gz, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, fmt.Errorf("gzip header: %w", err)
+	}
+	defer gz.Close()
+	out, err := io.ReadAll(gz)
+	if err != nil {
+		return nil, fmt.Errorf("gzip body: %w", err)
+	}
+	return out, nil
 }
 
 // checksumFor computes the SHA-256 checksum of the file with Checksum blanked.

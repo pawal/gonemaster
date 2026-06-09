@@ -94,6 +94,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var negativeCacheTTLSet bool
 	var savePacketCachePath string
 	var restorePacketCachePath string
+	var savePacketCacheCompress bool
 	var noProgress bool
 	var count bool
 	var listTests bool
@@ -140,7 +141,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		})
 		printUsageGroup(errOut, "Cache", []usageLine{
 			{flag: "--save PATH", detail: "Write DNS packet cache to file after the run"},
-			{flag: "--restore PATH", detail: "Prime DNS packet cache from file before the run"},
+			{flag: "--save-compress", detail: "Gzip-compress the saved cache file (also implied by a .gz path)"},
+			{flag: "--restore PATH", detail: "Prime DNS packet cache from file before the run (gzip auto-detected)"},
 		})
 		printUsageGroup(errOut, "Resolver/Profile Overrides", []usageLine{
 			{flag: "--no-ipv4", detail: "Disable IPv4 queries"},
@@ -210,6 +212,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.IntVar(&negativeCacheTTL, "negative-cache-ttl", 0, "Seconds to cache negative DNS responses (optional)")
 	fs.StringVar(&savePacketCachePath, "save", "", "Write DNS packet cache to file after the run (optional)")
 	fs.StringVar(&restorePacketCachePath, "restore", "", "Prime DNS packet cache from file before the run (optional)")
+	fs.BoolVar(&savePacketCacheCompress, "save-compress", false, "Gzip-compress the saved cache file (optional; implied by .gz path)")
 	fs.Var(&undelegatedNSSpecs, "ns", "Undelegated nameserver as name[/ip] (repeatable)")
 	fs.Var(&undelegatedDSSpecs, "ds", "Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
 	fs.BoolVar(&noProgress, "no-progress", false, "Disable progress indicator (optional)")
@@ -323,6 +326,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if hasPacketCacheFlags && listTests {
 		fmt.Fprintln(errOut, "--save/--restore cannot be combined with --list-tests")
+		return 2
+	}
+	if savePacketCacheCompress && strings.TrimSpace(savePacketCachePath) == "" {
+		fmt.Fprintln(errOut, "--save-compress requires --save")
 		return 2
 	}
 
@@ -771,7 +778,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		}
 	}
 	if packetCacheStore != nil && strings.TrimSpace(savePacketCachePath) != "" {
-		if saveErr := cachefile.Save(savePacketCachePath, packetCacheStore, packetCacheRecursor, asnCache); saveErr != nil {
+		var saveOpts []cachefile.SaveOption
+		if savePacketCacheCompress {
+			saveOpts = append(saveOpts, cachefile.WithCompression())
+		}
+		if saveErr := cachefile.Save(savePacketCachePath, packetCacheStore, packetCacheRecursor, asnCache, saveOpts...); saveErr != nil {
 			fmt.Fprintln(errOut, saveErr.Error())
 			return 2
 		}

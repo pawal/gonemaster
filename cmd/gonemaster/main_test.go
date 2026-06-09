@@ -96,6 +96,7 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"--stop-level LEVEL",
 		"--count",
 		"--save PATH",
+		"--save-compress",
 		"--sourceaddr4 IPADDR",
 		"--sourceaddr6 IPADDR",
 	}
@@ -433,6 +434,76 @@ func TestRunSavePacketCacheWritesFile(t *testing.T) {
 	}
 	if payload.Entries[0].Kind != cachefile.KindNameserver || payload.Entries[0].Key != "fixture.key" {
 		t.Fatalf("unexpected saved entry: %+v", payload.Entries[0])
+	}
+}
+
+func TestRunSaveCompressWritesGzip(t *testing.T) {
+	dir := t.TempDir()
+	savePath := filepath.Join(dir, "saved-cache.json")
+	fixture := samplePacketCacheFile(t)
+
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor, req.ASNCache); importErr != nil {
+			t.Fatalf("import fixture: %v", importErr)
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() {
+		runEngine = previous
+	})
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--json", "--save", savePath, "--save-compress"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+
+	data, err := os.ReadFile(savePath)
+	if err != nil {
+		t.Fatalf("read saved cache file: %v", err)
+	}
+	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
+		t.Fatalf("expected gzip magic in saved file with --save-compress, got first bytes %x", data[:min(len(data), 8)])
+	}
+
+	// And restoring through the CLI must work on the same file.
+	restorePrev := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.NameserverCache == nil {
+			t.Fatalf("expected nameserver cache in request")
+		}
+		entries, exportErr := req.NameserverCache.ExportEntries()
+		if exportErr != nil {
+			t.Fatalf("export cache: %v", exportErr)
+		}
+		if len(entries) != 1 || entries[0].Key != "fixture.key" {
+			t.Fatalf("expected 1 restored entry with key fixture.key, got %+v", entries)
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() { runEngine = restorePrev })
+
+	out.Reset()
+	errOut.Reset()
+	code = run([]string{"--domain", "example.com", "--json", "--restore", savePath}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("restore: expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+}
+
+func TestRunSaveCompressRejectsWithoutSave(t *testing.T) {
+	stubRunEngine(t, nil)
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--save-compress"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--save-compress requires --save") {
+		t.Fatalf("expected save-compress validation error, got %q", errOut.String())
 	}
 }
 

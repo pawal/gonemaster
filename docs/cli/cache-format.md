@@ -10,6 +10,20 @@ and consumed by `gonemaster --restore`. It covers:
 
 The format is implemented by [`engine/cachefile`](../../engine/cachefile/cachefile.go).
 
+## Compression
+
+Cache files can optionally be stored as a single gzip stream wrapping the
+same JSON document. The CLI selects compression in two ways:
+
+- `gonemaster --save FILE.gz` - any save path with a case-insensitive `.gz`
+  suffix is gzip-compressed automatically.
+- `gonemaster --save FILE --save-compress` - explicit opt-in; useful when
+  the file name does not end in `.gz`.
+
+`--restore` does not need a matching flag: it sniffs the leading two bytes
+of the file (`1f 8b`, the gzip magic per RFC 1952) and decompresses
+transparently. Files saved without compression are read as plain JSON.
+
 ## File layout
 
 A single JSON object:

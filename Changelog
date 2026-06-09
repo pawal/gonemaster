@@ -2,6 +2,25 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.5.2] - 2026-06-09
+
+Added nameserver_max_total_ms for slow-runnings queries (fixes large slow runs for problematic namservers) - not enabled by default. Documention fixes. Added gzip to --save cache files.
+
+### Added
+
+- cli: --save-compress can now save cache files gzip compressed
+- cli: --restore will automatically recognize gzip compressed save files
+- cli: add --debug-queries flag with per-nameserver trace summary
+- nameserver01: will require ANSWER records with RA to flag a recursor
+- profile: add nameserver_max_total_ms latency budget knob
+- nameserver: add per-address latency cap (based on the nameserver_max_total_ms knob)
+- gonemaster-server: list all db drivers in --help
+
+### Changed
+
+- server: fixed bug when using saved profiles
+- docs: fixed stale links and fixed Hugo linking problems
+
 ## [v1.5.1] - 2026-06-03
 
 Updated the MCP server to cover more queries, and added documentation on how to analyze data: https://pawal.codeberg.page/gonemaster/mcp/analysis-examples/

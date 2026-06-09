@@ -1,21 +1,33 @@
 {{- $dest := .Destination -}}
 {{- $isExternal := or (hasPrefix $dest "http://") (hasPrefix $dest "https://") (hasPrefix $dest "//") -}}
-{{- if and (not $isExternal) (strings.Contains $dest ".md") -}}
+{{- if and (not $isExternal) (not (hasPrefix $dest "#")) -}}
   {{- $parts := split $dest "#" -}}
   {{- $path := index $parts 0 -}}
   {{- $frag := cond (gt (len $parts) 1) (printf "#%s" (index $parts 1)) "" -}}
-  {{- if strings.HasSuffix $path "README.md" -}}
-    {{- $dir := strings.TrimSuffix "README.md" $path -}}
-    {{- $target := .Page.GetPage $dir -}}
-    {{- if $target -}}
-      {{- $dest = printf "%s%s" $target.RelPermalink $frag -}}
+  {{- if strings.Contains $path ".md" -}}
+    {{- if strings.HasSuffix $path "README.md" -}}
+      {{- $dir := strings.TrimSuffix "README.md" $path -}}
+      {{- $target := .Page.GetPage $dir -}}
+      {{- if $target -}}
+        {{- $dest = printf "%s%s" $target.RelPermalink $frag -}}
+      {{- else -}}
+        {{- $dest = printf "%s%s" $dir $frag -}}
+      {{- end -}}
     {{- else -}}
-      {{- $dest = printf "%s%s" $dir $frag -}}
+      {{- $target := .Page.GetPage $path -}}
+      {{- if $target -}}
+        {{- $dest = printf "%s%s" $target.RelPermalink $frag -}}
+      {{- end -}}
     {{- end -}}
-  {{- else -}}
-    {{- $target := .Page.GetPage $path -}}
-    {{- if $target -}}
-      {{- $dest = printf "%s%s" $target.RelPermalink $frag -}}
+  {{- else if .Page.File -}}
+    {{- /* Non-.md repo-relative link. The site publishes only docs/, so a path
+           that resolves outside docs/ is project source: point it at the source
+           repo. The markdown keeps generic relative paths that also resolve when
+           browsing the repo locally. Untracked upstream zonemaster* checkouts are
+           never rewritten. */ -}}
+    {{- $repoPath := path.Join "docs" .Page.File.Dir $path -}}
+    {{- if and (ne $repoPath ".") (not (hasPrefix $repoPath "docs/")) (not (hasPrefix $repoPath "zonemaster")) -}}
+      {{- $dest = printf "https://codeberg.org/pawal/gonemaster/src/branch/main/%s%s" $repoPath $frag -}}
     {{- end -}}
   {{- end -}}
 {{- end -}}

@@ -20,13 +20,23 @@
       {{- end -}}
     {{- end -}}
   {{- else if .Page.File -}}
-    {{- /* Non-.md repo-relative link. The site publishes only docs/, so a path
-           that resolves outside docs/ is project source: point it at the source
-           repo. The markdown keeps generic relative paths that also resolve when
-           browsing the repo locally. Untracked upstream zonemaster* checkouts are
-           never rewritten. */ -}}
+    {{- /* Non-.md repo-relative link. The markdown keeps generic relative paths
+           that also resolve when browsing the repo locally. Untracked upstream
+           zonemaster* checkouts are never rewritten. */ -}}
     {{- $repoPath := path.Join "docs" .Page.File.Dir $path -}}
-    {{- if and (ne $repoPath ".") (not (hasPrefix $repoPath "docs/")) (not (hasPrefix $repoPath "zonemaster")) -}}
+    {{- if and (hasPrefix $repoPath "docs/") (not (strings.Contains $repoPath "zonemaster")) -}}
+      {{- /* Stays inside docs/: resolve to its published site URL. A section or
+             page resolves via GetPage; a published data file mirrors the docs/
+             path under the site root. */ -}}
+      {{- $target := .Page.GetPage $path -}}
+      {{- if $target -}}
+        {{- $dest = printf "%s%s" $target.RelPermalink $frag -}}
+      {{- else -}}
+        {{- $dest = printf "%s%s" (relURL (strings.TrimPrefix "docs/" $repoPath)) $frag -}}
+      {{- end -}}
+    {{- else if and (ne $repoPath ".") (not (hasPrefix $repoPath "docs/")) (not (hasPrefix $repoPath "zonemaster")) -}}
+      {{- /* Escapes docs/: project source the site does not publish. Point it at
+             the source repo. */ -}}
       {{- $dest = printf "https://codeberg.org/pawal/gonemaster/src/branch/main/%s%s" $repoPath $frag -}}
     {{- end -}}
   {{- end -}}

@@ -24,14 +24,14 @@ Status: Final
 2. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 3. For each nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `A`, then skip this nameserver.
-   - Initialize counters: `responseCount`, `nxdomainCount`, `hasSeenRA`, `allNxdomainAA=true`, and `isNoRecursor=true`.
+   - Initialize counters: `responseCount`, `nxdomainCount`, `hasRAWithAnswer`, `allNxdomainAA=true`, and `isNoRecursor=true`.
    - For each probe name:
      - Query `A`.
      - If no DNS message is returned, emit `NO_RESPONSE` (`ns`, `domain`), set `isNoRecursor=false`, and continue.
      - Increment `responseCount`.
-     - If response has `RA=1`, set `hasSeenRA=true`.
+     - If the response has `RA=1` **and** at least one record in the ANSWER section, set `hasRAWithAnswer=true`. The `RA` bit alone is advisory: many authoritative-only nameservers leak `RA=1` while returning a referral (no ANSWER records), which is not recursion.
      - If response `RCODE` is `NXDOMAIN`, increment `nxdomainCount`. If the response does not have `AA=1`, set `allNxdomainAA=false`.
-   - If `hasSeenRA=true`, record server as recursor and set `isNoRecursor=false`.
+   - If `hasRAWithAnswer=true`, record server as recursor and set `isNoRecursor=false`.
    - Else if `responseCount>0` and `nxdomainCount==responseCount` and `allNxdomainAA==false`, record server as recursor and set `isNoRecursor=false`.
    - If `isNoRecursor` is still true, record server as non-recursor.
 4. After all parallel tasks, emit a single consolidated `IS_A_RECURSOR` with `servers` list (if any), and a single consolidated `NO_RECURSOR` with `servers` list (if any).
@@ -52,7 +52,7 @@ probes = [
 For each nameserver (parallel; fan-out = resolver.defaults.parallel):
 
    transport disabled for A  -> IPV4_DISABLED / IPV6_DISABLED, skip
-   init responseCount=0, nxdomainCount=0, hasSeenRA=false,
+   init responseCount=0, nxdomainCount=0, hasRAWithAnswer=false,
         allNxdomainAA=true, isNoRecursor=true
 
    for each probe in probes:
@@ -61,11 +61,11 @@ For each nameserver (parallel; fan-out = resolver.defaults.parallel):
       |                              isNoRecursor=false; continue
       +- otherwise:
             responseCount += 1
-            resp.RA  -> hasSeenRA=true
+            resp.RA AND len(ANSWER) > 0 -> hasRAWithAnswer=true
             RCODE == NXDOMAIN -> nxdomainCount += 1
                                  !AA -> allNxdomainAA=false
 
-   hasSeenRA == true
+   hasRAWithAnswer == true
       -> recursorSet[ns]; isNoRecursor=false
    else if responseCount > 0
               AND nxdomainCount == responseCount
@@ -87,7 +87,7 @@ emit TEST_CASE_END
 | --- | --- |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
-| `IS_A_RECURSOR` | Nameserver set `RA=1` on at least one probe response, or all received probe responses were `NXDOMAIN` without all having `AA=1`. |
+| `IS_A_RECURSOR` | Nameserver returned `RA=1` together with at least one record in the ANSWER section on any probe response, or all received probe responses were `NXDOMAIN` without all having `AA=1`. |
 | `NO_RECURSOR` | Nameserver produced responses but did not match recursor criteria and had no `NO_RESPONSE` for probes. |
 | `NO_RESPONSE` | A probe query returned no DNS message. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -134,3 +134,4 @@ emit TEST_CASE_END
 - Up to three `NO_RESPONSE` entries can be emitted per nameserver (one per probe name).
 - If transport is disabled for a nameserver, no recursor classification tags are emitted for that nameserver.
 - A nameserver that claims to be authoritative for the root zone (responds with `AA=1` and `NXDOMAIN` to all probes) is not classified as a recursor, since the `NXDOMAIN` responses come from fake authoritative data rather than recursive resolution.
+- A nameserver that returns a referral (no records in the ANSWER section, e.g. `NOERROR` with root NS records in the AUTHORITY section) and sets `RA=1` on the response is not classified as a recursor. Some authoritative-only daemons leak the `RA` bit; without ANSWER records there is no recursion evidence.

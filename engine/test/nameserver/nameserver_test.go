@@ -87,24 +87,27 @@ func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
 	}
 }
 
-func TestNameserver01NxdomainWithRAAndAAIsRecursor(t *testing.T) {
+func TestNameserver01RAWithAnswerIsRecursor(t *testing.T) {
 	setupTest(t)
 
 	origM4and5 := authoritativeNS
 	t.Cleanup(func() { authoritativeNS = origM4and5 })
 
-	// Server returns NXDOMAIN with both RA=1 and AA=1.
-	// RA takes precedence - should still be classified as a recursor.
-	nsRAandAA := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	// Server returns NOERROR with RA=1 and a real ANSWER record for the
+	// out-of-bailiwick probe. That is recursion: the server resolved a name
+	// it has no authority over and returned data.
+	nsRAAnswer := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qname string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeNameError
-		msg.Authoritative = true
+		msg.Rcode = dns.RcodeSuccess
 		msg.RecursionAvailable = true
+		a := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+		a.Addr = netip.MustParseAddr("203.0.113.1")
+		msg.Answer = []dns.RR{a}
 		return packet.Packet{Msg: msg}
 	})
 
 	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{nsRAandAA}, nil
+		return []ens.Nameserver{nsRAAnswer}, nil
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
@@ -113,7 +116,85 @@ func TestNameserver01NxdomainWithRAAndAAIsRecursor(t *testing.T) {
 		t.Fatalf("nameserver01: %v", err)
 	}
 	if !hasEntryTag(entries, "IS_A_RECURSOR") {
-		t.Fatalf("expected IS_A_RECURSOR when RA is set even with AA")
+		t.Fatalf("expected IS_A_RECURSOR when RA is set and ANSWER section is non-empty")
+	}
+}
+
+func TestNameserver01RAReferralIsNotRecursor(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	// Authoritative-only server that returns NOERROR + RA=1 + empty
+	// ANSWER + non-empty AUTHORITY (a referral). This is the leaked-RA
+	// pattern observed against ns1.kptc.kp in the cohort: a referral,
+	// not recursion. The new rule must NOT flag this as a recursor.
+	nsRAReferral := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qname string, _ string, _ *ens.QueryOptions) packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		msg.RecursionAvailable = true
+		_ = qname
+		nsRR := &dns.NS{Hdr: dns.Header{Name: ".", Class: dns.ClassINET, TTL: 3600}}
+		nsRR.Ns = "a.root-servers.net."
+		msg.Ns = []dns.RR{nsRR}
+		return packet.Packet{Msg: msg}
+	})
+
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{nsRAReferral}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver01(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver01: %v", err)
+	}
+	if hasEntryTag(entries, "IS_A_RECURSOR") {
+		t.Fatalf("did not expect IS_A_RECURSOR for RA-only referral response")
+	}
+	if !hasEntryTag(entries, "NO_RECURSOR") {
+		t.Fatalf("expected NO_RECURSOR for RA-only referral response")
+	}
+}
+
+func TestNameserver01RAOnSomeAnswerIsRecursor(t *testing.T) {
+	setupTest(t)
+
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	// One probe gets a recursive answer (RA=1 + real ANSWER record); the
+	// other two get authoritative-style NXDOMAIN responses. A single
+	// recursive response is enough to classify the server as a recursor.
+	queries := 0
+	nsMixed := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qname string, _ string, _ *ens.QueryOptions) packet.Packet {
+		queries++
+		msg := new(dns.Msg)
+		if queries == 1 {
+			msg.Rcode = dns.RcodeSuccess
+			msg.RecursionAvailable = true
+			a := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			a.Addr = netip.MustParseAddr("203.0.113.1")
+			msg.Answer = []dns.RR{a}
+			return packet.Packet{Msg: msg}
+		}
+		msg.Rcode = dns.RcodeNameError
+		msg.Authoritative = true
+		return packet.Packet{Msg: msg}
+	})
+
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{nsMixed}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver01(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("nameserver01: %v", err)
+	}
+	if !hasEntryTag(entries, "IS_A_RECURSOR") {
+		t.Fatalf("expected IS_A_RECURSOR when one probe response has RA=1 and ANSWER records")
 	}
 }
 

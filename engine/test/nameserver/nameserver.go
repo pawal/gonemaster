@@ -387,7 +387,7 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				responseCount := 0
 				nxdomainCount := 0
 				isNoRecursor := true
-				hasSeenRA := false
+				hasRAWithAnswer := false
 				allNxdomainAA := true
 
 				for _, name := range nonExistentNames {
@@ -403,8 +403,11 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 
 					responseCount++
-					if resp.RA() {
-						hasSeenRA = true
+					// RA alone is advisory; require a non-empty ANSWER
+					// section so referral-only responses with a leaking
+					// RA bit are not misclassified as recursion.
+					if resp.RA() && len(resp.Answer()) > 0 {
+						hasRAWithAnswer = true
 					}
 					if resp.Rcode() == "NXDOMAIN" {
 						nxdomainCount++
@@ -414,7 +417,7 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 				}
 
-				if hasSeenRA {
+				if hasRAWithAnswer {
 					outcomes[i].isRecursor = true
 					isNoRecursor = false
 				} else if responseCount > 0 && nxdomainCount == responseCount && !allNxdomainAA {

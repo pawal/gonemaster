@@ -1,14 +1,37 @@
 <script>
+  import { untrack } from "svelte";
   import { t } from "../i18n.js";
   import { createJob, lookupDomain } from "../api.js";
   import { validateDomain, emptyNsRow, emptyDsRow, buildJobOpts } from "./validate.js";
 
-  let { disabled = false, focusSignal = 0, onjobcreated } = $props();
+  let { disabled = false, focusSignal = 0, prefillDomain = "", prefillSignal = 0, onjobcreated } = $props();
 
   let inputEl;
   $effect(() => {
     // Re-runs whenever focusSignal changes; 0 means "don't focus" (e.g. share-link load).
     if (focusSignal > 0) inputEl?.focus();
+  });
+
+  // When the results callout asks to test the parent zone: fill the domain,
+  // flash it so the action is visible, and run the test in one go. We only act
+  // when prefillSignal actually advances, so re-runs from submit()'s own state
+  // writes (submitting, disabled, ...) cannot resubmit in a loop. The body is
+  // untracked for the same reason.
+  let lastPrefillSignal = 0;
+  $effect(() => {
+    if (prefillSignal > 0 && prefillSignal !== lastPrefillSignal) {
+      lastPrefillSignal = prefillSignal;
+      untrack(() => {
+        domain = prefillDomain;
+        if (inputEl) {
+          inputEl.focus();
+          inputEl.classList.remove("domain-prefill-flash");
+          void inputEl.offsetWidth; // reflow so the animation restarts each time
+          inputEl.classList.add("domain-prefill-flash");
+        }
+        submit();
+      });
+    }
   });
 
   const DNSSEC_ALGORITHMS = [
@@ -56,6 +79,10 @@
 
   async function handleSubmit(e) {
     e.preventDefault();
+    submit();
+  }
+
+  async function submit() {
     if (disabled) return;
     const err = validateDomain(domain);
     if (err) { errorKey = err; errorExtra = {}; return; }

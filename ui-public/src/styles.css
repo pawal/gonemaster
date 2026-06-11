@@ -179,6 +179,18 @@ select:focus {
   border-color: transparent;
 }
 
+/* Brief ring pulse when the domain input is prefilled from the results
+   callout (applied via JS classList, so it must be global, not scoped). */
+.domain-prefill-flash {
+  animation: domain-prefill-flash 1.1s ease-out;
+}
+
+@keyframes domain-prefill-flash {
+  0%   { box-shadow: 0 0 0 0 var(--accent-2); }
+  30%  { box-shadow: 0 0 0 5px var(--accent-2); }
+  100% { box-shadow: 0 0 0 10px transparent; }
+}
+
 button {
   border: none;
   border-radius: 6px;

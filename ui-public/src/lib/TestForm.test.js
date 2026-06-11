@@ -245,4 +245,42 @@ describe("TestForm", () => {
     );
     resolve(okResponse({ public_id: "x" }));
   });
+
+  // ── Prefill from results callout ────────────────────────────────────────────
+
+  it("prefills, flashes, and submits the test in one go when prefillSignal is bumped", async () => {
+    global.fetch.mockResolvedValue(okResponse({ public_id: "abc12345" }));
+    const onjobcreated = vi.fn();
+    const { rerender } = render(TestForm, { props: { prefillDomain: "eosc.ch", prefillSignal: 0, onjobcreated } });
+    const input = screen.getByLabelText("Domain");
+    expect(input.value).toBe("");
+    await rerender({ prefillDomain: "eosc.ch", prefillSignal: 1, onjobcreated });
+    await waitFor(() => expect(input.value).toBe("eosc.ch"));
+    expect(input.classList.contains("domain-prefill-flash")).toBe(true);
+    // One press: the test starts automatically, no separate Test click.
+    await waitFor(() => expect(onjobcreated).toHaveBeenCalledWith({ publicID: "abc12345" }));
+    expect(global.fetch).toHaveBeenCalled();
+  });
+
+  // Regression: the prefill effect must depend only on prefillSignal. Earlier
+  // it tracked submit()'s reads (domain, disabled, ...), so the running->done
+  // `disabled` flip re-fired it and resubmitted in an endless loop.
+  it("submits once per prefillSignal bump and does not resubmit when disabled toggles", async () => {
+    global.fetch.mockResolvedValue(okResponse({ public_id: "abc12345" }));
+    const onjobcreated = vi.fn();
+    const { rerender } = render(TestForm, {
+      props: { prefillDomain: "eosc.ch", prefillSignal: 1, disabled: false, onjobcreated },
+    });
+    await waitFor(() => expect(onjobcreated).toHaveBeenCalledTimes(1));
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+
+    // Mimic the phase running->done transition that flips `disabled`.
+    await rerender({ prefillDomain: "eosc.ch", prefillSignal: 1, disabled: true, onjobcreated });
+    await rerender({ prefillDomain: "eosc.ch", prefillSignal: 1, disabled: false, onjobcreated });
+    // Let any stray effect run; there must be no second submission.
+    await Promise.resolve();
+
+    expect(global.fetch).toHaveBeenCalledTimes(1);
+    expect(onjobcreated).toHaveBeenCalledTimes(1);
+  });
 });

@@ -16,6 +16,15 @@
   const initialView = parseHash(window.location.hash).view;
   let focusSignal = $state(initialView === "home" ? 1 : 0);
 
+  // Bumped when a result callout asks to test the parent zone: prefills and
+  // flashes the domain input so the user can confirm with Test.
+  let prefillDomain = $state("");
+  let prefillSignal = $state(0);
+  function onTestParent(parent) {
+    prefillDomain = parent;
+    prefillSignal += 1;
+  }
+
   // ── Phase ───────────────────────────────────────────────────────────────────
   // "idle"    - form shown, no results
   // "running" - form disabled, Progress shown below
@@ -258,7 +267,7 @@
     </div>
   </header>
 
-  <TestForm disabled={phase === "running"} {focusSignal} onjobcreated={onJobCreated} />
+  <TestForm disabled={phase === "running"} {focusSignal} {prefillDomain} {prefillSignal} onjobcreated={onJobCreated} />
 
   {#if phase === "running"}
     <Progress
@@ -275,6 +284,7 @@
         finishedAt={jobFinishedAt}
         {scoringEnabled}
         {nameserverTimingsEnabled}
+        ontestparent={onTestParent}
       />
     {:else}
       <ExpiredResult onnewtest={resetToIdle} />

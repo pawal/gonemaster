@@ -33,7 +33,7 @@
     return LEVELS.filter((l) => counts[l]).map((l) => ({ level: l, count: counts[l] }));
   }
 
-  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false, nameserverTimingsEnabled = true } = $props();
+  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false, nameserverTimingsEnabled = true, ontestparent } = $props();
 
   let finishedStr = $derived((() => {
     if (!finishedAt) return "";
@@ -103,6 +103,20 @@
   let overallLevel = $derived(worstLevel(entries));
   let bannerCls = $derived(bannerClass(overallLevel));
   let statusKey = $derived(`pub.result_status_${bannerCls}`);
+
+  // "Not a DNS zone" callout. Suggest the parent only when the engine found
+  // exactly one real, non-root parent zone (never root, never a missing TLD).
+  let noZone = $derived((() => {
+    const child = entries.find((e) => e.tag === "B01_NO_CHILD");
+    if (!child) return null;
+    const tested = child.args?.domain_child || domain;
+    const parents = entries
+      .filter((e) => e.tag === "B01_PARENT_FOUND")
+      .map((e) => (e.args?.domain || "").replace(/\.$/, ""))
+      .filter((d) => d && d !== ".");
+    const parent = parents.length === 1 ? parents[0] : null;
+    return { tested, parent };
+  })());
 
   // ── Scoring helpers ──────────────────────────────────────────────────────────
 
@@ -210,6 +224,23 @@
   {:else if loading}
     <p data-testid="results-loading">{$t("pub.progress_queued")}</p>
   {:else}
+    {#if noZone}
+      <div class="no-zone-callout" data-testid="no-zone-callout" role="alert">
+        <span class="no-zone-icon" aria-hidden="true">⚠</span>
+        <div class="no-zone-content">
+          <p class="no-zone-heading">{$t("pub.no_zone_heading")}</p>
+          <p class="no-zone-body">{$t("pub.no_zone_body", { domain: noZone.tested })}</p>
+          {#if noZone.parent}
+            <button
+              type="button"
+              class="no-zone-action"
+              data-testid="no-zone-test-parent"
+              onclick={() => ontestparent?.(noZone.parent)}
+            >{$t("pub.no_zone_test_parent", { parent: noZone.parent })}</button>
+          {/if}
+        </div>
+      </div>
+    {/if}
     {#if scoringEnabled && score && domain}
       <div class="score-card" data-testid="score-card">
         <div class="score-left">
@@ -445,3 +476,42 @@
     {/if}
   {/if}
 </div>
+
+<style>
+  /* Prominent alert when the tested name is not a DNS zone. Mirrors the
+     .status-banner.error palette (kept on both themes, like that banner). */
+  .no-zone-callout {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding: 16px 18px;
+    border-radius: var(--radius);
+    background: #fff7ed;
+    border: 1px solid #fdba74;
+    border-left: 4px solid #ea580c;
+    color: #9a3412;
+  }
+  .no-zone-icon {
+    flex-shrink: 0;
+    font-size: 1.4rem;
+    line-height: 1.3;
+  }
+  .no-zone-content {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .no-zone-heading {
+    margin: 0;
+    font-weight: 700;
+    font-size: var(--text-base);
+  }
+  .no-zone-body {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+  .no-zone-action {
+    margin-top: 6px;
+    align-self: flex-start;
+  }
+</style>

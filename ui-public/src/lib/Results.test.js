@@ -29,6 +29,16 @@ const entry = (module, level, message = "msg", testcase = "tc") => ({
   message,
 });
 
+const taggedEntry = (tag, args, level = "INFO") => ({
+  timestamp: 0,
+  module: "BASIC",
+  testcase: "Basic01",
+  tag,
+  level,
+  args,
+  message: "msg",
+});
+
 describe("Results", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
@@ -407,5 +417,63 @@ describe("Results", () => {
     await waitFor(() => expect(screen.getByText("swedish msg")).toBeTruthy());
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(fetch.mock.calls[1][0]).toContain("locale=sv");
+  });
+
+  // ── Not-a-DNS-zone callout ──────────────────────────────────────────────────
+
+  it("shows the callout and calls ontestparent with the found parent zone", async () => {
+    const ontestparent = vi.fn();
+    global.fetch.mockResolvedValue(resultResp([
+      taggedEntry("B01_NO_CHILD", { domain_child: "resources.eosc.ch", domain_super: "eosc.ch" }, "ERROR"),
+      taggedEntry("B01_PARENT_FOUND", { domain: "eosc.ch" }),
+    ]));
+    render(Results, { props: { publicID: "abc12345", domain: "resources.eosc.ch", ontestparent } });
+    await waitFor(() => expect(screen.getByTestId("no-zone-callout")).toBeTruthy());
+    // Body names the tested domain.
+    expect(screen.getByTestId("no-zone-callout").textContent).toContain("resources.eosc.ch");
+    const btn = screen.getByTestId("no-zone-test-parent");
+    expect(btn.textContent).toContain("eosc.ch");
+    await fireEvent.click(btn);
+    expect(ontestparent).toHaveBeenCalledWith("eosc.ch");
+  });
+
+  // A bare unknown label or a bad TLD both report the root as the found
+  // parent (verified against the live engine), so the root must be filtered.
+  it("shows the callout without a parent button when the found parent is the root", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      taggedEntry("B01_NO_CHILD", { domain_child: "skjsfsdkf", domain_super: "." }, "ERROR"),
+      taggedEntry("B01_PARENT_FOUND", { domain: "." }),
+    ]));
+    render(Results, { props: { publicID: "abc12345", domain: "skjsfsdkf" } });
+    await waitFor(() => expect(screen.getByTestId("no-zone-callout")).toBeTruthy());
+    expect(screen.queryByTestId("no-zone-test-parent")).toBeNull();
+  });
+
+  it("shows the callout without a parent button when no parent zone was found at all", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      taggedEntry("B01_NO_CHILD", { domain_child: "example.skjsfsdkf", domain_super: "skjsfsdkf" }, "ERROR"),
+      taggedEntry("B01_PARENT_NOT_FOUND", {}),
+    ]));
+    render(Results, { props: { publicID: "abc12345", domain: "example.skjsfsdkf" } });
+    await waitFor(() => expect(screen.getByTestId("no-zone-callout")).toBeTruthy());
+    expect(screen.queryByTestId("no-zone-test-parent")).toBeNull();
+  });
+
+  it("shows the callout without a parent button when the parent is ambiguous", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      taggedEntry("B01_NO_CHILD", { domain_child: "x.example", domain_super: "example" }, "ERROR"),
+      taggedEntry("B01_PARENT_FOUND", { domain: "a.example" }),
+      taggedEntry("B01_PARENT_FOUND", { domain: "b.example" }),
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("no-zone-callout")).toBeTruthy());
+    expect(screen.queryByTestId("no-zone-test-parent")).toBeNull();
+  });
+
+  it("does not show the callout when there is no B01_NO_CHILD finding", async () => {
+    global.fetch.mockResolvedValue(resultResp([entry("Module::A", "INFO")]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
+    expect(screen.queryByTestId("no-zone-callout")).toBeNull();
   });
 });

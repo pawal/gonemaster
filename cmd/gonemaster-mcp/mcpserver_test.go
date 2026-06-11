@@ -5,11 +5,55 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
+
+func TestServerInstructions(t *testing.T) {
+	ro := serverInstructions(false)
+	if ro == "" {
+		t.Fatal("expected non-empty instructions")
+	}
+	for _, want := range []string{"test_domain", "run_diff", "cohort_tag_values", "spec_get_testcase"} {
+		if !strings.Contains(ro, want) {
+			t.Errorf("read-only instructions missing %q", want)
+		}
+	}
+	if strings.Contains(ro, "batch_enqueue") {
+		t.Error("read-only instructions must not mention the write tool batch_enqueue")
+	}
+
+	rw := serverInstructions(true)
+	if !strings.Contains(rw, "batch_enqueue") || !strings.Contains(rw, "batch_cancel") {
+		t.Error("write-enabled instructions should describe the write tools")
+	}
+}
+
+// TestServerInstructionsReachClient proves the instructions are delivered to a
+// connected client in the initialize result, not just stored server-side.
+func TestServerInstructionsReachClient(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	clientT, serverT := mcp.NewInMemoryTransports()
+	srv := newMCPServer(clientFor(t, "http://localhost:0", ""), false)
+	go func() { _ = srv.Run(ctx, serverT) }()
+
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
+	session, err := client.Connect(ctx, clientT, nil)
+	if err != nil {
+		t.Fatalf("client connect: %v", err)
+	}
+	defer session.Close()
+
+	got := session.InitializeResult().Instructions
+	if got != serverInstructions(false) {
+		t.Errorf("client instructions = %q, want server instructions", got)
+	}
+}
 
 func TestNormalizeBaseURL(t *testing.T) {
 	cases := []struct {

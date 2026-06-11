@@ -233,7 +233,7 @@ ui-csp-check:
 	fi
 	@echo "OK - no inline styles found."
 
-test: ui-test ui-public-test test-go spec-check ui-csp-check
+test: ui-test ui-public-test ui-analysis-test test-go spec-check ui-csp-check
 
 install:
 	@if [ "$(CMD)" = "all" ]; then \

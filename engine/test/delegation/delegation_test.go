@@ -392,6 +392,111 @@ func TestDelegation03ReferralSizeOK(t *testing.T) {
 	}
 }
 
+// referralNSNames builds n distinct long delegation NS names so the
+// synthesized referral packet grows past the size thresholds.
+func referralNSNames(n int) []dnsname.Name {
+	names := make([]dnsname.Name, n)
+	for i := range names {
+		label := strings.Repeat("a", 60) + string(rune('a'+i%26)) + string(rune('a'+i/26))
+		names[i] = dnsname.New(label + ".example")
+	}
+	return names
+}
+
+func TestDelegation03ReferralSizeLarge(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM1 := parentZone
+	origM2 := glueNames
+	origM4 := glueNameservers
+	t.Cleanup(func() {
+		parentZone = origM1
+		glueNames = origM2
+		glueNameservers = origM4
+	})
+
+	parentZone = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		parent := zone.Zone{Name: dnsname.New(".")}
+		return &parent, nil
+	}
+	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return referralNSNames(5), nil
+	}
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
+		return []nameserver.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Delegation03(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("delegation03: %v", err)
+	}
+	entry := firstEntryByTag(entries, "REFERRAL_SIZE_LARGE")
+	if entry == nil {
+		t.Fatalf("expected REFERRAL_SIZE_LARGE")
+	}
+	size, ok := entry.Args["size"].(int)
+	if !ok {
+		t.Fatalf("expected int size arg, got %#v", entry.Args["size"])
+	}
+	if size <= 512 || size > 1232 {
+		t.Fatalf("expected size in (512, 1232], got %d", size)
+	}
+}
+
+func TestDelegation03ReferralSizeTooLarge(t *testing.T) {
+	nameserver.EmptyCache()
+	t.Cleanup(nameserver.EmptyCache)
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM1 := parentZone
+	origM2 := glueNames
+	origM4 := glueNameservers
+	t.Cleanup(func() {
+		parentZone = origM1
+		glueNames = origM2
+		glueNameservers = origM4
+	})
+
+	parentZone = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		parent := zone.Zone{Name: dnsname.New(".")}
+		return &parent, nil
+	}
+	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return referralNSNames(16), nil
+	}
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
+		return []nameserver.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Delegation03(context.Background(), &z)
+	if err != nil {
+		t.Fatalf("delegation03: %v", err)
+	}
+	entry := firstEntryByTag(entries, "REFERRAL_SIZE_TOO_LARGE")
+	if entry == nil {
+		t.Fatalf("expected REFERRAL_SIZE_TOO_LARGE")
+	}
+	size, ok := entry.Args["size"].(int)
+	if !ok {
+		t.Fatalf("expected int size arg, got %#v", entry.Args["size"])
+	}
+	if size <= 1232 {
+		t.Fatalf("expected size > 1232, got %d", size)
+	}
+}
+
 func TestDelegation04Authoritative(t *testing.T) {
 	nameserver.EmptyCache()
 	t.Cleanup(nameserver.EmptyCache)

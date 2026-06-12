@@ -130,13 +130,21 @@ Description:
 
 Once the parent delegation and your own zone's nameserver list are combined, two or more different nameserver names end up on the same IP. That IP is a single point of failure - an outage there takes all those nameservers offline together.
 
+## Tag REFERRAL_SIZE_LARGE
+
+Header: Referral packet needs EDNS over UDP
+
+Description:
+
+The parent zone's referral response for your domain is larger than the classic 512-byte limit for a plain DNS-over-UDP answer, but still fits within the 1232-byte EDNS payload size that modern resolvers advertise. In practice this is fine: any EDNS-capable resolver receives the referral in a single UDP packet. It is worth noting only if you also need to serve very old resolvers that do not support EDNS. Shorter nameserver names or a smaller nameserver set reduce the size if you want to stay under 512 bytes.
+
 ## Tag REFERRAL_SIZE_TOO_LARGE
 
 Header: Referral packet too large for UDP
 
 Description:
 
-The parent zone's referral response for your domain is larger than the 512-byte limit for a standard DNS-over-UDP answer. Every first lookup of your domain forces resolvers to retry over TCP, which is slower and can fail outright against firewalls that only allow DNS on UDP. Shorter nameserver names or a smaller nameserver set both help.
+The parent zone's referral response for your domain is larger than the 1232-byte EDNS payload size that resolvers commonly advertise. A response this large can be truncated and force resolvers to retry over TCP, which is slower and can fail outright against firewalls that only allow DNS on UDP, and it risks IP fragmentation. Shorter nameserver names or a smaller nameserver set both help.
 
 ## Tag IS_NOT_AUTHORITATIVE
 

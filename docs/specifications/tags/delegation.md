@@ -42,6 +42,7 @@ _Do not edit by hand - regenerate with the command above._
 | `NO_NS_CNAME` | `INFO` | [delegation05](../tests/delegation/delegation05.md) | yes |
 | `NO_RESPONSE` | `DEBUG` | [delegation05](../tests/delegation/delegation05.md) | yes |
 | `NS_IS_CNAME` | `ERROR` | [delegation05](../tests/delegation/delegation05.md) | yes |
+| `REFERRAL_SIZE_LARGE` | `NOTICE` | [delegation03](../tests/delegation/delegation03.md) | yes |
 | `REFERRAL_SIZE_OK` | `INFO` | [delegation03](../tests/delegation/delegation03.md) | yes |
 | `REFERRAL_SIZE_TOO_LARGE` | `WARNING` | [delegation03](../tests/delegation/delegation03.md) | yes |
 | `SAME_IP_ADDRESS` | `ERROR` | [delegation02](../tests/delegation/delegation02.md) | yes |

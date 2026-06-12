@@ -215,6 +215,7 @@
             "NOT_ENOUGH_NS_CHILD": "ERROR",
             "NOT_ENOUGH_NS_DEL": "ERROR",
             "NS_IS_CNAME": "ERROR",
+            "REFERRAL_SIZE_LARGE": "NOTICE",
             "REFERRAL_SIZE_OK": "INFO",
             "REFERRAL_SIZE_TOO_LARGE": "WARNING",
             "SAME_IP_ADDRESS": "ERROR",

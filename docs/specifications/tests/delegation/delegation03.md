@@ -3,7 +3,7 @@
 Status: Final
 
 ## Purpose
-- Check whether a synthesized maximal referral response can fit within the 512-byte non-EDNS UDP DNS payload limit.
+- Check how large a synthesized maximal referral response is relative to the 512-byte non-EDNS UDP payload limit and the 1232-byte EDNS payload size, and grade it accordingly.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -14,7 +14,7 @@ Status: Final
   - Delegation addressed NS from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers).
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
-  - Size limit is fixed by `constants.UDPPayloadLimit` (512).
+  - Size thresholds are fixed by `constants.UDPPayloadLimit` (512) and `constants.EDNSUDPPayloadDNSSECDefault` (1232).
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
@@ -29,8 +29,9 @@ Status: Final
    - Add one `AAAA` glue record to additional section, using the first IPv6 nameserver.
 9. Pack wire format with compression enabled and measure packet size.
 10. Emit one of:
-    - `REFERRAL_SIZE_TOO_LARGE` when packed size `> 512`.
-    - `REFERRAL_SIZE_OK` otherwise.
+    - `REFERRAL_SIZE_TOO_LARGE` when packed size `> 1232`.
+    - `REFERRAL_SIZE_LARGE` when packed size `> 512` and `<= 1232`.
+    - `REFERRAL_SIZE_OK` otherwise (packed size `<= 512`).
 11. Emit `TEST_CASE_END`.
 
 ### Synthetic Referral Build and Size Check (steps 2-11)
@@ -59,8 +60,9 @@ additional section, AAAA:
      -> add one AAAA RR using nssV6[0]
 
 pack msg with compression; size = len(packed)
-   size >  constants.UDPPayloadLimit (512) -> REFERRAL_SIZE_TOO_LARGE (size)
-   size <= 512                             -> REFERRAL_SIZE_OK        (size)
+   size >  constants.EDNSUDPPayloadDNSSECDefault (1232) -> REFERRAL_SIZE_TOO_LARGE (size)
+   size >  constants.UDPPayloadLimit (512)              -> REFERRAL_SIZE_LARGE     (size)
+   size <= 512                                          -> REFERRAL_SIZE_OK        (size)
 
 emit TEST_CASE_END
 ```
@@ -69,8 +71,9 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `REFERRAL_SIZE_OK` | Synthesized packed referral size is within UDP 512-byte limit. |
-| `REFERRAL_SIZE_TOO_LARGE` | Synthesized packed referral size exceeds UDP 512-byte limit. |
+| `REFERRAL_SIZE_OK` | Synthesized packed referral size is within the 512-byte non-EDNS UDP limit. |
+| `REFERRAL_SIZE_LARGE` | Synthesized packed referral size exceeds 512 bytes but fits within the 1232-byte EDNS payload size. |
+| `REFERRAL_SIZE_TOO_LARGE` | Synthesized packed referral size exceeds the 1232-byte EDNS payload size. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -78,6 +81,7 @@ emit TEST_CASE_END
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
 | `REFERRAL_SIZE_OK` | `size` | `int` | Packed referral size in bytes. |
+| `REFERRAL_SIZE_LARGE` | `size` | `int` | Packed referral size in bytes. |
 | `REFERRAL_SIZE_TOO_LARGE` | `size` | `int` | Packed referral size in bytes. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Delegation03`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Delegation03`). |
@@ -86,6 +90,7 @@ emit TEST_CASE_END
 | Tag | Level | Notes |
 | --- | --- | --- |
 | `REFERRAL_SIZE_OK` | `INFO` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
+| `REFERRAL_SIZE_LARGE` | `NOTICE` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `REFERRAL_SIZE_TOO_LARGE` | `WARNING` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.DELEGATION`). |

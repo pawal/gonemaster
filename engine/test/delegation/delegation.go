@@ -149,6 +149,7 @@ func Metadata() map[string][]string {
 		},
 		"delegation03": {
 			"REFERRAL_SIZE_TOO_LARGE",
+			"REFERRAL_SIZE_LARGE",
 			"REFERRAL_SIZE_OK",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
@@ -436,11 +437,16 @@ func Delegation03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 	size := len(msg.Data)
-	if size > constants.UDPPayloadLimit {
+	switch {
+	case size > constants.EDNSUDPPayloadDNSSECDefault:
 		if err := appendLog(ctx, &results, testcase, "REFERRAL_SIZE_TOO_LARGE", map[string]any{"size": size}); err != nil {
 			return results, err
 		}
-	} else {
+	case size > constants.UDPPayloadLimit:
+		if err := appendLog(ctx, &results, testcase, "REFERRAL_SIZE_LARGE", map[string]any{"size": size}); err != nil {
+			return results, err
+		}
+	default:
 		if err := appendLog(ctx, &results, testcase, "REFERRAL_SIZE_OK", map[string]any{"size": size}); err != nil {
 			return results, err
 		}

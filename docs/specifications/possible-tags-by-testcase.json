@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 80,
-    "unique_tag_count": 519
+    "unique_tag_count": 523
   },
   "modules": {
     "address": {
@@ -25,10 +25,16 @@
         "A01_LOCAL_USE_ADDR",
         "A01_NO_GLOBALLY_REACHABLE_ADDR",
         "A01_NO_NAME_SERVERS_FOUND",
+        "CNAME_CHAIN_TOO_LONG",
+        "CNAME_TARGET_UNRESOLVED",
+        "CNAME_TOO_MANY_RECORDS",
         "TEST_CASE_END",
         "TEST_CASE_START"
       ],
       "address02": [
+        "CNAME_CHAIN_TOO_LONG",
+        "CNAME_TARGET_UNRESOLVED",
+        "CNAME_TOO_MANY_RECORDS",
         "NAMESERVERS_IP_WITH_REVERSE",
         "NAMESERVER_IP_WITHOUT_REVERSE",
         "NO_RESPONSE_PTR_QUERY",
@@ -36,6 +42,9 @@
         "TEST_CASE_START"
       ],
       "address03": [
+        "CNAME_CHAIN_TOO_LONG",
+        "CNAME_TARGET_UNRESOLVED",
+        "CNAME_TOO_MANY_RECORDS",
         "NAMESERVER_IP_PTR_MATCH",
         "NAMESERVER_IP_PTR_MISMATCH",
         "NAMESERVER_IP_WITHOUT_REVERSE",
@@ -59,6 +68,9 @@
         "B01_PARENT_UNDETERMINED",
         "B01_ROOT_HAS_NO_PARENT",
         "B01_SERVER_ZONE_ERROR",
+        "CNAME_CHAIN_TOO_LONG",
+        "CNAME_TARGET_UNRESOLVED",
+        "CNAME_TOO_MANY_RECORDS",
         "IPV4_DISABLED",
         "IPV4_ENABLED",
         "IPV6_DISABLED",
@@ -112,6 +124,9 @@
         "CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP",
         "CN01_WRONG_NS_RECORD_UDP",
         "CN01_WRONG_SOA_RECORD_UDP",
+        "CNAME_CHAIN_TOO_LONG",
+        "CNAME_TARGET_UNRESOLVED",
+        "CNAME_TOO_MANY_RECORDS",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",
@@ -266,6 +281,7 @@
         "TEST_CASE_START"
       ],
       "delegation03": [
+        "REFERRAL_SIZE_LARGE",
         "REFERRAL_SIZE_OK",
         "REFERRAL_SIZE_TOO_LARGE",
         "TEST_CASE_END",

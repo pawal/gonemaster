@@ -2,6 +2,15 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.5.3] - 2026-06-12
+
+### Added
+
+- public-ui: if the user tests "www.example.com", the UI will help the user to test the parent domain.
+- delegation03: grades referral size by EDNS limit with a NOTICE band
+- make: run analysis-ui tests as part of make test
+- mcp: send server-level instructions describing test and analysis tools
+
 ## [v1.5.2] - 2026-06-09
 
 Added nameserver_max_total_ms for slow-runnings queries (fixes large slow runs for problematic namservers) - not enabled by default. Documention fixes. Added gzip to --save cache files.

@@ -10,7 +10,6 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -42,8 +41,6 @@ func mixedRecordsPacket(zoneName string, nsNames []string) packet.Packet {
 // TestGlueNameserversReturnsGlueFromZone verifies that GlueNameservers
 // returns nameserver objects (name + IP) for the zone's glue.
 func TestGlueNameserversReturnsGlueFromZone(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -102,8 +99,6 @@ func TestGlueNameserversNilZoneReturnsError(t *testing.T) {
 // TestApexNameserversReturnsApexNameservers verifies that ApexNameservers
 // resolves nameserver objects from the child zone's apex NS RRset.
 func TestApexNameserversReturnsApexNameservers(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -189,8 +184,6 @@ func TestAllNSNamesUnionSorted(t *testing.T) {
 // TestAllNSNamesEmptyInputs verifies that when neither glue nor apex NS
 // queries return any names, the union is an empty slice.
 func TestAllNSNamesEmptyInputs(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -220,8 +213,6 @@ func TestAllNSNamesEmptyInputs(t *testing.T) {
 // TestAllNSNamesOnlyGlueWhenApexReturnsNoNS verifies that when glue names
 // exist but apex NS lookups return empty, the union equals the glue set.
 func TestAllNSNamesOnlyGlueWhenApexReturnsNoNS(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -264,8 +255,6 @@ func TestAllNSNamesOnlyGlueWhenApexReturnsNoNS(t *testing.T) {
 // in both the glue set and the apex set, differing only by case, collapse to
 // a single lowercased entry.
 func TestAllNSNamesOverlapDedupedCaseInsensitively(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -307,8 +296,6 @@ func TestAllNSNamesPropagatesError(t *testing.T) {
 // TestAllNameserversUnionSorted verifies that AllNameservers returns the
 // deduplicated, sorted union of glue and apex nameservers.
 func TestAllNameserversUnionSorted(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
@@ -348,8 +335,6 @@ func TestAllNameserversUnionSorted(t *testing.T) {
 
 // TestAllNameserversEmptyInputs verifies the empty-input branch.
 func TestAllNameserversEmptyInputs(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -380,8 +365,6 @@ func TestAllNameserversEmptyInputs(t *testing.T) {
 // nameservers exist but apex returns no NS servers, the union equals the
 // glue set.
 func TestAllNameserversOnlyGlueWhenApexHasNoServers(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -414,8 +397,6 @@ func TestAllNameserversOnlyGlueWhenApexHasNoServers(t *testing.T) {
 // TestAllNameserversDedupesByNameserverString verifies that a name+IP pair
 // appearing identically in both glue and apex sets yields one entry.
 func TestAllNameserversDedupesByNameserverString(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true

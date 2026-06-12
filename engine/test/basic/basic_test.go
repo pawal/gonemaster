@@ -54,8 +54,6 @@ func TestBasic01Root(t *testing.T) {
 }
 
 func TestBasic01Undelegated(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -83,8 +81,6 @@ func TestBasic01Undelegated(t *testing.T) {
 }
 
 func TestBasic01ParentFoundTypedArgs(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -212,8 +208,6 @@ func TestBasic01EmitsCNAMETagOnNSLookup(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			nameserver.EmptyCache()
-			defer nameserver.EmptyCache()
 			ctx, _, _ := testhelpers.Context(t)
 
 			r := &recursor.Recursor{}
@@ -280,8 +274,6 @@ func entryTags(entries []*logger.Entry) []string {
 }
 
 func TestBasic02NoDelegation(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -303,8 +295,6 @@ func TestBasic02NoDelegation(t *testing.T) {
 }
 
 func TestBasic02AuthResponseSOA(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -361,8 +351,6 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 }
 
 func TestBasic02ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	baseCtx, prof, _ := testhelpers.Context(t)
 	prof.Resolver.Defaults.Parallel = 2
 
@@ -514,8 +502,6 @@ func TestBasic02ParallelQueries(t *testing.T) {
 }
 
 func TestBasic02UnexpectedRcode(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -560,8 +546,6 @@ func TestBasic02UnexpectedRcode(t *testing.T) {
 }
 
 func TestBasic02NoIPAddress(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -609,8 +593,6 @@ func TestBasic02NoIPAddress(t *testing.T) {
 }
 
 func TestBasic03HasARecords(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -677,8 +659,6 @@ func TestBasic03HasARecords(t *testing.T) {
 }
 
 func TestBasic03NoARecords(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -745,8 +725,6 @@ func TestBasic03NoARecords(t *testing.T) {
 }
 
 func TestBasic03NoResponses(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -806,8 +784,6 @@ func TestBasic03NoResponses(t *testing.T) {
 }
 
 func TestBasic03ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	baseCtx, prof, _ := testhelpers.Context(t)
 	prof.Resolver.Defaults.Parallel = 2
 
@@ -958,8 +934,6 @@ func TestBasic03ParallelQueries(t *testing.T) {
 }
 
 func TestBasic03ParallelOutputStable(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	runBasic03 := func(parallel int) []*logger.Entry {
 		ctx, prof, _ := testhelpers.Context(t)
@@ -1057,8 +1031,6 @@ func TestBasic03ParallelOutputStable(t *testing.T) {
 }
 
 func TestBasic01NoChild(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -1134,8 +1106,6 @@ func TestBasic01NoChild(t *testing.T) {
 }
 
 func TestBasic01InconsistentDelegation(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -1239,8 +1209,6 @@ func TestBasic01InconsistentDelegation(t *testing.T) {
 // B01_PARENT_NXDOMAIN_HIDES_DELEGATION and still recognize the child as
 // delegated (B01_CHILD_FOUND) so downstream test cases run.
 func TestBasic01ParentNXDomainHidesDelegation(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -1340,8 +1308,6 @@ func TestBasic01ParentNXDomainHidesDelegation(t *testing.T) {
 // NXDOMAIN+AA at every probed name including the child. The contradiction
 // probe must NOT fire, and Basic01 must emit the plain B01_NO_CHILD.
 func TestBasic01ParentNXDomainNoDelegation(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -1428,8 +1394,6 @@ func TestBasic01ParentNXDomainNoDelegation(t *testing.T) {
 // broken NS, and no B01_INCONSISTENT_DELEGATION is emitted because the
 // broken NS is no longer in aaNXDomain.
 func TestBasic01MixedNXDomainContradiction(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -1558,8 +1522,6 @@ func TestBasic01MixedNXDomainContradiction(t *testing.T) {
 // is replayed offline (no_network=true, IPv6 disabled in the profile) so
 // the test never touches the network.
 func TestBasic01ParentNXDomainHidesDelegationFromRecordedCache(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.NoNetwork = true
@@ -1624,8 +1586,6 @@ func TestBasic01ParentNXDomainHidesDelegationFromRecordedCache(t *testing.T) {
 }
 
 func TestBasic01ChildAlias(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}
@@ -1694,8 +1654,6 @@ func TestBasic01ChildAlias(t *testing.T) {
 }
 
 func TestBasic01InconsistentAlias(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &recursor.Recursor{}

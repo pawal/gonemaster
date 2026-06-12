@@ -348,8 +348,6 @@ func TestFakeDelegationToSelf(t *testing.T) {
 }
 
 func TestApplyUndelegatedDelegationEmitsFakeDelegationToSelf(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, _, log := testhelpers.Context(t)
 

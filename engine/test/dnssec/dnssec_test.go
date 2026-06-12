@@ -28,8 +28,7 @@ import (
 )
 
 func TestDNSSEC01AlgoOK(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -51,7 +50,7 @@ func TestDNSSEC01AlgoOK(t *testing.T) {
 		return false
 	}
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DS" {
 			return packet.Packet{}
 		}
@@ -63,7 +62,7 @@ func TestDNSSEC01AlgoOK(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC01(context.Background(), &z)
+	entries, err := DNSSEC01(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
@@ -73,8 +72,7 @@ func TestDNSSEC01AlgoOK(t *testing.T) {
 }
 
 func TestDNSSEC01DigestGOST12(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -96,7 +94,7 @@ func TestDNSSEC01DigestGOST12(t *testing.T) {
 		return false
 	}
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.31", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.31", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DS" {
 			return packet.Packet{}
 		}
@@ -108,7 +106,7 @@ func TestDNSSEC01DigestGOST12(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC01(context.Background(), &z)
+	entries, err := DNSSEC01(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
@@ -118,8 +116,7 @@ func TestDNSSEC01DigestGOST12(t *testing.T) {
 }
 
 func TestDNSSEC01DigestSM3(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -141,7 +138,7 @@ func TestDNSSEC01DigestSM3(t *testing.T) {
 		return false
 	}
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.32", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.32", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DS" {
 			return packet.Packet{}
 		}
@@ -153,7 +150,7 @@ func TestDNSSEC01DigestSM3(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC01(context.Background(), &z)
+	entries, err := DNSSEC01(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
@@ -163,8 +160,7 @@ func TestDNSSEC01DigestSM3(t *testing.T) {
 }
 
 func TestDNSSEC01Algo2Missing(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -186,7 +182,7 @@ func TestDNSSEC01Algo2Missing(t *testing.T) {
 		return false
 	}
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.10", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.10", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DS" {
 			return packet.Packet{}
 		}
@@ -198,7 +194,7 @@ func TestDNSSEC01Algo2Missing(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC01(context.Background(), &z)
+	entries, err := DNSSEC01(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
@@ -208,8 +204,7 @@ func TestDNSSEC01Algo2Missing(t *testing.T) {
 }
 
 func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -245,7 +240,7 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 		t.Fatalf("new child zone: %v", err)
 	}
 
-	parentNS, err := nameserver.NewWithContext(context.Background(), "ns1.root", "192.0.2.1", r.Client())
+	parentNS, err := nameserver.NewWithContext(ctx, "ns1.root", "192.0.2.1", r.Client())
 	if err != nil {
 		t.Fatalf("new parent nameserver: %v", err)
 	}
@@ -270,7 +265,7 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 		return true
 	}
 
-	entries, err := DNSSEC01(context.Background(), &child)
+	entries, err := DNSSEC01(ctx, &child)
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
@@ -304,8 +299,7 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 }
 
 func TestDNSSEC01ParallelParentQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -350,13 +344,13 @@ func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 		}
 	}
 
-	parent1, err := nameserver.New("ns-parent1.example", "192.0.2.80", nil)
+	parent1, err := nameserver.NewWithContext(ctx, "ns-parent1.example", "192.0.2.80", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	parent1.SetQueryHook(hook("parent1"))
 
-	parent2, err := nameserver.New("ns-parent2.example", "192.0.2.81", nil)
+	parent2, err := nameserver.NewWithContext(ctx, "ns-parent2.example", "192.0.2.81", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -367,7 +361,7 @@ func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -429,8 +423,7 @@ func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 }
 
 func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -445,14 +438,14 @@ func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	parentNS := newNameserver(t, "ns-parent.example", "192.0.2.2", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "ns-parent.example", "192.0.2.2", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DS" {
 			return packet.Packet{}
 		}
 		return dsPacket(qname, 9999, 8, 2)
 	})
 
-	childNS := newNameserver(t, "ns-child.example", "192.0.2.3", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns-child.example", "192.0.2.3", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -475,7 +468,7 @@ func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC02(context.Background(), &z)
+	entries, err := DNSSEC02(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec02: %v", err)
 	}
@@ -488,8 +481,7 @@ func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
 }
 
 func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -514,14 +506,14 @@ func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 		t.Fatal("expected DS from DNSKEY")
 	}
 
-	parentNS := newNameserver(t, "ns-parent.example", "192.0.2.11", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "ns-parent.example", "192.0.2.11", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DS" {
 			return packet.Packet{}
 		}
 		return dsPacketFromDS(qname, ds)
 	})
 
-	childNS := newNameserver(t, "ns-child.example", "192.0.2.12", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns-child.example", "192.0.2.12", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -539,7 +531,7 @@ func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC02(context.Background(), &z)
+	entries, err := DNSSEC02(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec02: %v", err)
 	}
@@ -549,8 +541,7 @@ func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 }
 
 func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -577,7 +568,7 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 		t.Fatal("expected DS from DNSKEY")
 	}
 
-	parentNS := newNameserver(t, "ns-parent.example", "192.0.2.100", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "ns-parent.example", "192.0.2.100", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DS" {
 			return packet.Packet{}
 		}
@@ -605,13 +596,13 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 		}
 	}
 
-	child1, err := nameserver.New("ns-child1.example", "192.0.2.101", nil)
+	child1, err := nameserver.NewWithContext(ctx, "ns-child1.example", "192.0.2.101", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	child1.SetQueryHook(hook("child1"))
 
-	child2, err := nameserver.New("ns-child2.example", "192.0.2.102", nil)
+	child2, err := nameserver.NewWithContext(ctx, "ns-child2.example", "192.0.2.102", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -628,7 +619,7 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -687,8 +678,7 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 }
 
 func TestDNSSEC03NoNSEC3(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -699,7 +689,7 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 		authoritativeNS = origM45
 	})
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.4", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.4", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
@@ -720,7 +710,7 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC03(context.Background(), &z)
+	entries, err := DNSSEC03(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec03: %v", err)
 	}
@@ -744,8 +734,7 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 }
 
 func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -756,7 +745,7 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 		authoritativeNS = origM45
 	})
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.13", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.13", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
@@ -785,7 +774,7 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC03(context.Background(), &z)
+	entries, err := DNSSEC03(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec03: %v", err)
 	}
@@ -812,8 +801,7 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 }
 
 func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -857,13 +845,13 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.201", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.201", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.202", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.202", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -874,7 +862,7 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -936,6 +924,7 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 }
 
 func TestDNSSEC04ExpiredRRSIG(t *testing.T) {
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -979,7 +968,7 @@ func TestDNSSEC04ExpiredRRSIG(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC04(context.Background(), &z)
+	entries, err := DNSSEC04(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec04: %v", err)
 	}
@@ -1005,6 +994,7 @@ func TestDNSSEC04ExpiredRRSIG(t *testing.T) {
 }
 
 func TestDNSSEC04DurationOK(t *testing.T) {
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1048,7 +1038,7 @@ func TestDNSSEC04DurationOK(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC04(context.Background(), &z)
+	entries, err := DNSSEC04(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec04: %v", err)
 	}
@@ -1058,6 +1048,7 @@ func TestDNSSEC04DurationOK(t *testing.T) {
 }
 
 func TestDNSSEC04ParallelQueries(t *testing.T) {
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1124,7 +1115,7 @@ func TestDNSSEC04ParallelQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -1163,8 +1154,7 @@ func TestDNSSEC04ParallelQueries(t *testing.T) {
 }
 
 func TestDNSSEC05AlgoOK(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1177,7 +1167,7 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 		zoneNameservers = origZone
 	})
 
-	newNameserver(t, "ns1.example", "192.0.2.20", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.20", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -1206,7 +1196,7 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC05(context.Background(), &z)
+	entries, err := DNSSEC05(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
@@ -1216,8 +1206,7 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 }
 
 func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1230,7 +1219,7 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 		zoneNameservers = origZone
 	})
 
-	newNameserver(t, "ns1.example", "192.0.2.33", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.33", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -1259,7 +1248,7 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC05(context.Background(), &z)
+	entries, err := DNSSEC05(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
@@ -1269,8 +1258,7 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 }
 
 func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1283,7 +1271,7 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 		zoneNameservers = origZone
 	})
 
-	newNameserver(t, "ns1.example", "192.0.2.34", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.34", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -1312,7 +1300,7 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC05(context.Background(), &z)
+	entries, err := DNSSEC05(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
@@ -1322,8 +1310,7 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 }
 
 func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1361,8 +1348,8 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 		}
 	}
 
-	newNameserver(t, "ns1.example", "192.0.2.220", handler("ns1"))
-	newNameserver(t, "ns2.example", "192.0.2.221", handler("ns2"))
+	newNameserver(t, ctx, "ns1.example", "192.0.2.220", handler("ns1"))
+	newNameserver(t, ctx, "ns2.example", "192.0.2.221", handler("ns2"))
 
 	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{
@@ -1386,7 +1373,7 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -1448,8 +1435,7 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 }
 
 func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1462,7 +1448,7 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 		zoneNameservers = origZone
 	})
 
-	newNameserver(t, "ns2.example", "192.0.2.21", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns2.example", "192.0.2.21", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -1486,7 +1472,7 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC05(context.Background(), &z)
+	entries, err := DNSSEC05(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
@@ -1496,8 +1482,7 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 }
 
 func TestDNSSEC05NoResponse(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1510,7 +1495,7 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 		zoneNameservers = origZone
 	})
 
-	newNameserver(t, "ns3.example", "192.0.2.22", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns3.example", "192.0.2.22", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -1534,7 +1519,7 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC05(context.Background(), &z)
+	entries, err := DNSSEC05(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
@@ -1544,6 +1529,7 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 }
 
 func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1571,7 +1557,7 @@ func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC06(context.Background(), &z)
+	entries, err := DNSSEC06(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec06: %v", err)
 	}
@@ -1591,6 +1577,7 @@ func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
 }
 
 func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1617,7 +1604,7 @@ func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC06(context.Background(), &z)
+	entries, err := DNSSEC06(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec06: %v", err)
 	}
@@ -1637,8 +1624,7 @@ func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
 }
 
 func TestDNSSEC07SignedZone(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1666,7 +1652,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
-	newNameserver(t, "ns1.example", "192.0.2.40", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.40", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "SOA":
 			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
@@ -1684,7 +1670,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	ds.Digest = "DEADBEEF"
 	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
-	newNameserver(t, "ns-parent.example", "192.0.2.41", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns-parent.example", "192.0.2.41", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return answerPacket(qname, dns.TypeDS, ds, dsSig)
 		}
@@ -1704,7 +1690,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 		return []nsdiscovery.NSItem{}, nil
 	}
 	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns, _ := nameserver.New("ns-parent.example", "192.0.2.41", nil)
+		ns, _ := nameserver.NewWithContext(ctx, "ns-parent.example", "192.0.2.41", nil)
 		return []nameserver.Nameserver{ns}, nil
 	}
 
@@ -1712,7 +1698,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC07(context.Background(), &z)
+	entries, err := DNSSEC07(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
@@ -1759,8 +1745,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 }
 
 func TestDNSSEC07ParallelChildQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1817,13 +1802,13 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.60", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.60", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.61", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.61", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -1851,7 +1836,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -1916,8 +1901,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 }
 
 func TestDNSSEC07ParallelParentQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1947,7 +1931,7 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
-	newNameserver(t, "ns-child.example", "192.0.2.62", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns-child.example", "192.0.2.62", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "SOA":
 			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
@@ -1999,13 +1983,13 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 		}
 	}
 
-	parent1, err := nameserver.New("ns-parent1.example", "192.0.2.70", nil)
+	parent1, err := nameserver.NewWithContext(ctx, "ns-parent1.example", "192.0.2.70", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	parent1.SetQueryHook(hook("parent1"))
 
-	parent2, err := nameserver.New("ns-parent2.example", "192.0.2.71", nil)
+	parent2, err := nameserver.NewWithContext(ctx, "ns-parent2.example", "192.0.2.71", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -2020,7 +2004,7 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 		t.Fatalf("zone new: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -2078,8 +2062,7 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 }
 
 func TestDNSSEC07NotSigned(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2106,7 +2089,7 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 	key.Algorithm = 8
 	key.PublicKey = "AwEAAc=="
 
-	newNameserver(t, "ns2.example", "192.0.2.42", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns2.example", "192.0.2.42", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "SOA":
 			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
@@ -2137,7 +2120,7 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC07(context.Background(), &z)
+	entries, err := DNSSEC07(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
@@ -2164,8 +2147,7 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 }
 
 func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2195,7 +2177,7 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 	key.Algorithm = 8
 	key.PublicKey = "AwEAAc=="
 
-	newNameserver(t, "ns-noresp.example", "192.0.2.170", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns-noresp.example", "192.0.2.170", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "SOA":
 			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
@@ -2206,7 +2188,7 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 		}
 	})
 
-	newNameserver(t, "ns-noauth.example", "192.0.2.171", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns-noauth.example", "192.0.2.171", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "SOA":
 			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
@@ -2219,7 +2201,7 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 		}
 	})
 
-	newNameserver(t, "ns-rcode.example", "192.0.2.172", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns-rcode.example", "192.0.2.172", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "SOA":
 			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
@@ -2264,7 +2246,7 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC07(context.Background(), &z)
+	entries, err := DNSSEC07(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
@@ -2308,8 +2290,7 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 }
 
 func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2337,7 +2318,7 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
-	newNameserver(t, "ns1.example", "192.0.2.180", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.180", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "SOA":
 			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
@@ -2356,14 +2337,14 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 
 	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
-	newNameserver(t, "ns-parent-no-ds.example", "192.0.2.181", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns-parent-no-ds.example", "192.0.2.181", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return answerPacket(qname, dns.TypeDS, ds)
 		}
 		return packet.Packet{}
 	})
 
-	newNameserver(t, "ns-parent-with-ds.example", "192.0.2.182", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns-parent-with-ds.example", "192.0.2.182", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return answerPacket(qname, dns.TypeDS, ds, dsSig)
 		}
@@ -2383,8 +2364,8 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 		return []nsdiscovery.NSItem{}, nil
 	}
 	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		nsNoDS, _ := nameserver.New("ns-parent-no-ds.example", "192.0.2.181", nil)
-		nsWithDS, _ := nameserver.New("ns-parent-with-ds.example", "192.0.2.182", nil)
+		nsNoDS, _ := nameserver.NewWithContext(ctx, "ns-parent-no-ds.example", "192.0.2.181", nil)
+		nsWithDS, _ := nameserver.NewWithContext(ctx, "ns-parent-with-ds.example", "192.0.2.182", nil)
 		return []nameserver.Nameserver{nsNoDS, nsWithDS}, nil
 	}
 
@@ -2392,7 +2373,7 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC07(context.Background(), &z)
+	entries, err := DNSSEC07(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
@@ -2419,8 +2400,7 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 }
 
 func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2448,7 +2428,7 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
-	newNameserver(t, "ns1.example", "192.0.2.180", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.180", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "SOA":
 			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
@@ -2465,13 +2445,13 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 	ds.DigestType = 2
 	ds.Digest = "DEADBEEF"
 
-	newNameserver(t, "ns-parent-a.example", "192.0.2.181", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns-parent-a.example", "192.0.2.181", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return answerPacket(qname, dns.TypeDS, ds)
 		}
 		return packet.Packet{}
 	})
-	newNameserver(t, "ns-parent-b.example", "192.0.2.182", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns-parent-b.example", "192.0.2.182", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return answerPacket(qname, dns.TypeDS, ds)
 		}
@@ -2491,8 +2471,8 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 		return []nsdiscovery.NSItem{}, nil
 	}
 	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		nsA, _ := nameserver.New("ns-parent-a.example", "192.0.2.181", nil)
-		nsB, _ := nameserver.New("ns-parent-b.example", "192.0.2.182", nil)
+		nsA, _ := nameserver.NewWithContext(ctx, "ns-parent-a.example", "192.0.2.181", nil)
+		nsB, _ := nameserver.NewWithContext(ctx, "ns-parent-b.example", "192.0.2.182", nil)
 		return []nameserver.Nameserver{nsA, nsB}, nil
 	}
 
@@ -2500,7 +2480,7 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC07(context.Background(), &z)
+	entries, err := DNSSEC07(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
@@ -2513,8 +2493,6 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 }
 
 func TestDNSSECAllParallelOutputStable(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2564,7 +2542,7 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 			t.Fatalf("set test_cases: %v", err)
 		}
 
-		nameserver.EmptyCache()
+		ctx := testCtx()
 		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
 		key.Flags = dns.FlagZONE
 		key.Protocol = 3
@@ -2580,14 +2558,14 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 				return packet.Packet{}
 			}
 		}
-		newNameserver(t, "ns1.example", "192.0.2.160", handler)
-		newNameserver(t, "ns2.example", "192.0.2.161", handler)
+		newNameserver(t, ctx, "ns1.example", "192.0.2.160", handler)
+		newNameserver(t, ctx, "ns2.example", "192.0.2.161", handler)
 
 		z, err := zone.New("example")
 		if err != nil {
 			t.Fatalf("zone new: %v", err)
 		}
-		entries, err := All(context.Background(), &z)
+		entries, err := All(ctx, &z)
 		if err != nil {
 			t.Fatalf("dnssec all: %v", err)
 		}
@@ -2617,8 +2595,7 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 }
 
 func TestDNSSEC08MissingRRSIG(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2637,7 +2614,7 @@ func TestDNSSEC08MissingRRSIG(t *testing.T) {
 	key.Algorithm = 8
 	key.PublicKey = "AwEAAc=="
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.50", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.50", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -2652,7 +2629,7 @@ func TestDNSSEC08MissingRRSIG(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC08(context.Background(), &z)
+	entries, err := DNSSEC08(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec08: %v", err)
 	}
@@ -2662,8 +2639,7 @@ func TestDNSSEC08MissingRRSIG(t *testing.T) {
 }
 
 func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2684,7 +2660,7 @@ func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
 	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(time.Hour).Unix(), now.Add(2*time.Hour).Unix())
 
-	ns := newNameserver(t, "ns2.example", "192.0.2.51", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns2.example", "192.0.2.51", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -2701,7 +2677,7 @@ func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC08(context.Background(), &z)
+	entries, err := DNSSEC08(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec08: %v", err)
 	}
@@ -2711,8 +2687,7 @@ func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
 }
 
 func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2733,7 +2708,7 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 	key.PublicKey = "AwEAAc=="
 	sig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
 
-	ns := newNameserver(t, "ns3.example", "192.0.2.52", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns3.example", "192.0.2.52", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -2750,7 +2725,7 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC08(context.Background(), &z)
+	entries, err := DNSSEC08(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec08: %v", err)
 	}
@@ -2760,8 +2735,7 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 }
 
 func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2803,13 +2777,13 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 		}
 	}
 
-	child1, err := nameserver.New("ns1.example", "192.0.2.101", nil)
+	child1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.101", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	child1.SetQueryHook(hook("child1"))
 
-	child2, err := nameserver.New("ns2.example", "192.0.2.102", nil)
+	child2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.102", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -2823,7 +2797,7 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -2882,8 +2856,7 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 }
 
 func TestDNSSEC09MissingRRSIG(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2902,7 +2875,7 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 	key.Algorithm = 8
 	key.PublicKey = "AwEAAc=="
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.60", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.60", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, key)
@@ -2921,7 +2894,7 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC09(context.Background(), &z)
+	entries, err := DNSSEC09(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec09: %v", err)
 	}
@@ -2931,8 +2904,7 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 }
 
 func TestDNSSEC09ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -2978,13 +2950,13 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 		}
 	}
 
-	child1, err := nameserver.New("ns1.example", "192.0.2.111", nil)
+	child1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.111", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	child1.SetQueryHook(hook("child1"))
 
-	child2, err := nameserver.New("ns2.example", "192.0.2.112", nil)
+	child2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.112", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -2998,7 +2970,7 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -3057,8 +3029,7 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 }
 
 func TestDNSSEC10MissingSignature(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -3080,7 +3051,7 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 	nsec.NextDomain = dnsutil.Fqdn("next.example")
 	nsec.TypeBitMap = []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeNSEC, dns.TypeRRSIG}
 
-	newNameserver(t, "ns1.example", "192.0.2.70", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.70", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, key)
@@ -3125,7 +3096,7 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC10(context.Background(), &z)
+	entries, err := DNSSEC10(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec10: %v", err)
 	}
@@ -3135,8 +3106,7 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 }
 
 func TestDNSSEC10ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -3178,13 +3148,13 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.201", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.201", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.202", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.202", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -3212,7 +3182,7 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -3278,8 +3248,7 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 // not produce DS10_NSEC3PARAM_MISMATCHES_APEX, and the retired
 // DS10_ERR_MULT_NSEC3PARAM tag must never appear.
 func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -3312,7 +3281,7 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 	param2.SaltLength = 2
 	param2.Salt = "abcd"
 
-	newNameserver(t, "ns1.example", "192.0.2.80", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.80", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, key)
@@ -3357,7 +3326,7 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC10(context.Background(), &z)
+	entries, err := DNSSEC10(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec10: %v", err)
 	}
@@ -3373,8 +3342,7 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 // DS10_NSEC3PARAM_MISMATCHES_APEX (proving the apex-owner check loops over
 // every RR in the RRset, not just the first one).
 func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -3402,7 +3370,7 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 	offApexParam := &dns.NSEC3PARAM{Hdr: dns.Header{Name: offApex, Class: dns.ClassINET, TTL: 60}}
 	offApexParam.Hash = 1
 
-	newNameserver(t, "ns1.example", "192.0.2.81", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.81", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, key)
@@ -3447,7 +3415,7 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC10(context.Background(), &z)
+	entries, err := DNSSEC10(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec10: %v", err)
 	}
@@ -3544,8 +3512,7 @@ func emptyNSEC3PARAMResponse(qname string, apex string) packet.Packet {
 // DS10_INCONSISTENT_NSEC must not, and the zone must still register as having
 // NSEC evidence (DS10_HAS_NSEC).
 func TestDNSSEC10NonstandardNSECResponseEmitted(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	log := logger.New()
@@ -3567,7 +3534,7 @@ func TestDNSSEC10NonstandardNSECResponseEmitted(t *testing.T) {
 	key.Algorithm = 8
 	key.PublicKey = "AwEAAc=="
 
-	newNameserver(t, "ns1.example", "192.0.2.90", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.90", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, key)
@@ -3597,7 +3564,7 @@ func TestDNSSEC10NonstandardNSECResponseEmitted(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC10(context.Background(), &z)
+	entries, err := DNSSEC10(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec10: %v", err)
 	}
@@ -3633,8 +3600,7 @@ func TestDNSSEC10NonstandardNSECResponseEmitted(t *testing.T) {
 // new tag stays silent when every nameserver returns NSEC in the answer
 // section (the conventional shape).
 func TestDNSSEC10NonstandardNSECResponseNotEmittedForStandard(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	log := logger.New()
@@ -3656,7 +3622,7 @@ func TestDNSSEC10NonstandardNSECResponseNotEmittedForStandard(t *testing.T) {
 	key.Algorithm = 8
 	key.PublicKey = "AwEAAc=="
 
-	newNameserver(t, "ns1.example", "192.0.2.91", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.91", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, key)
@@ -3686,7 +3652,7 @@ func TestDNSSEC10NonstandardNSECResponseNotEmittedForStandard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC10(context.Background(), &z)
+	entries, err := DNSSEC10(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec10: %v", err)
 	}
@@ -3705,8 +3671,7 @@ func TestDNSSEC10NonstandardNSECResponseNotEmittedForStandard(t *testing.T) {
 // (DS10_INCONSISTENT_NSEC absent), but the non-standard tag must call out
 // only the nameserver that used the authority-section shape.
 func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	log := logger.New()
@@ -3728,7 +3693,7 @@ func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
 	key.Algorithm = 8
 	key.PublicKey = "AwEAAc=="
 
-	newNameserver(t, "ns1.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, key)
@@ -3740,7 +3705,7 @@ func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
 			return packet.Packet{}
 		}
 	})
-	newNameserver(t, "ns2.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns2.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, key)
@@ -3775,7 +3740,7 @@ func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC10(context.Background(), &z)
+	entries, err := DNSSEC10(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec10: %v", err)
 	}
@@ -3801,8 +3766,7 @@ func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
 }
 
 func TestDNSSEC11ParallelParentQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -3852,13 +3816,13 @@ func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 		}
 	}
 
-	parent1, err := nameserver.New("ns-parent1.example", "192.0.2.80", nil)
+	parent1, err := nameserver.NewWithContext(ctx, "ns-parent1.example", "192.0.2.80", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	parent1.SetQueryHook(hook("parent1", true))
 
-	parent2, err := nameserver.New("ns-parent2.example", "192.0.2.81", nil)
+	parent2, err := nameserver.NewWithContext(ctx, "ns-parent2.example", "192.0.2.81", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -3878,7 +3842,7 @@ func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -3923,8 +3887,7 @@ func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 }
 
 func TestDNSSEC11ParallelChildQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -3978,13 +3941,13 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 		}
 	}
 
-	child1, err := nameserver.New("ns-child1.example", "192.0.2.90", nil)
+	child1, err := nameserver.NewWithContext(ctx, "ns-child1.example", "192.0.2.90", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	child1.SetQueryHook(hook("child1", true))
 
-	child2, err := nameserver.New("ns-child2.example", "192.0.2.91", nil)
+	child2, err := nameserver.NewWithContext(ctx, "ns-child2.example", "192.0.2.91", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -4004,7 +3967,7 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -4049,8 +4012,7 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 }
 
 func TestDNSSEC11InconsistentDS(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4071,13 +4033,13 @@ func TestDNSSEC11InconsistentDS(t *testing.T) {
 	ds.DigestType = 1
 	ds.Digest = "DEADBEEF"
 
-	nsWithDS := newNameserver(t, "ns1.example", "192.0.2.80", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	nsWithDS := newNameserver(t, ctx, "ns1.example", "192.0.2.80", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS(qname, ds)
 		}
 		return packet.Packet{}
 	})
-	nsWithoutDS := newNameserver(t, "ns2.example", "192.0.2.81", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	nsWithoutDS := newNameserver(t, ctx, "ns2.example", "192.0.2.81", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS(qname, nil)
 		}
@@ -4098,7 +4060,7 @@ func TestDNSSEC11InconsistentDS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC11(context.Background(), &z)
+	entries, err := DNSSEC11(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec11: %v", err)
 	}
@@ -4114,8 +4076,7 @@ func TestDNSSEC11InconsistentDS(t *testing.T) {
 }
 
 func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4136,13 +4097,13 @@ func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 	ds.DigestType = 1
 	ds.Digest = "FEEDBEEF"
 
-	parentNS := newNameserver(t, "ns1.example", "192.0.2.82", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "ns1.example", "192.0.2.82", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS(qname, ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "nschild.example", "192.0.2.83", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "nschild.example", "192.0.2.83", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "SOA":
 			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
@@ -4167,7 +4128,7 @@ func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC11(context.Background(), &z)
+	entries, err := DNSSEC11(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec11: %v", err)
 	}
@@ -4177,8 +4138,7 @@ func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 }
 
 func TestDNSSEC13AlgoNotSigned(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4210,7 +4170,7 @@ func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 		return rr
 	}
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.90", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.90", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return answerPacket(qname, dns.TypeDNSKEY, key, makeRRSIG(qname, dns.TypeDNSKEY))
@@ -4231,7 +4191,7 @@ func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC13(context.Background(), &z)
+	entries, err := DNSSEC13(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec13: %v", err)
 	}
@@ -4247,8 +4207,7 @@ func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 }
 
 func TestDNSSEC13ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4306,13 +4265,13 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.121", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.121", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.122", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.122", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -4326,7 +4285,7 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -4388,8 +4347,7 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 }
 
 func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4410,7 +4368,7 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 		t.Fatalf("generate key: %v", err)
 	}
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.91", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.91", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DNSKEY" {
 			return dnskeyPacket(qname, key)
 		}
@@ -4425,7 +4383,7 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC14(context.Background(), &z)
+	entries, err := DNSSEC14(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec14: %v", err)
 	}
@@ -4435,8 +4393,7 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 }
 
 func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4480,13 +4437,13 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.131", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.131", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.132", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.132", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -4500,7 +4457,7 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -4539,8 +4496,7 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 }
 
 func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4553,7 +4509,7 @@ func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.141", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.141", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -4568,7 +4524,7 @@ func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC14(context.Background(), &z)
+	entries, err := DNSSEC14(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec14: %v", err)
 	}
@@ -4591,8 +4547,7 @@ func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
 }
 
 func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4605,7 +4560,7 @@ func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.142", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.142", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DNSKEY" {
 			return answerPacket(qname, dns.TypeDNSKEY)
 		}
@@ -4620,7 +4575,7 @@ func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC14(context.Background(), &z)
+	entries, err := DNSSEC14(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec14: %v", err)
 	}
@@ -4643,8 +4598,7 @@ func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
 }
 
 func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4659,7 +4613,7 @@ func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
 
 	profile.Effective().Net.IPv4 = false
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.143", nil)
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.143", nil)
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
@@ -4668,7 +4622,7 @@ func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC14(context.Background(), &z)
+	entries, err := DNSSEC14(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec14: %v", err)
 	}
@@ -4691,8 +4645,7 @@ func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
 }
 
 func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4705,7 +4658,7 @@ func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS)
@@ -4724,7 +4677,7 @@ func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC15(context.Background(), &z)
+	entries, err := DNSSEC15(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec15: %v", err)
 	}
@@ -4734,8 +4687,7 @@ func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 }
 
 func TestDNSSEC15ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4781,13 +4733,13 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.231", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.231", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.232", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.232", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -4801,7 +4753,7 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -4870,8 +4822,7 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 // Before the filter was added, this scenario produced
 // DS15_INCONSISTENT_CDS. After the filter it must not.
 func TestDNSSEC15IgnoresNonMUSTCDSDigest(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4896,7 +4847,7 @@ func TestDNSSEC15IgnoresNonMUSTCDSDigest(t *testing.T) {
 	cdsSHA1.DigestType = 1
 	cdsSHA1.Digest = "ABCD"
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.241", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.241", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cdsSHA256, cdsSHA1)
@@ -4906,7 +4857,7 @@ func TestDNSSEC15IgnoresNonMUSTCDSDigest(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.242", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.242", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cdsSHA256)
@@ -4924,7 +4875,7 @@ func TestDNSSEC15IgnoresNonMUSTCDSDigest(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC15(context.Background(), &z)
+	entries, err := DNSSEC15(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec15: %v", err)
 	}
@@ -4952,8 +4903,7 @@ func TestDNSSEC15IgnoresNonMUSTCDSDigest(t *testing.T) {
 // record that uses a MUST digest type, the filter must not mask the
 // divergence: DS15_INCONSISTENT_CDS is still required.
 func TestDNSSEC15InconsistencyOnMUSTCDSDigest(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -4978,7 +4928,7 @@ func TestDNSSEC15InconsistencyOnMUSTCDSDigest(t *testing.T) {
 	cdsB.DigestType = 2
 	cdsB.Digest = "CAFEBABE"
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.243", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.243", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cdsA)
@@ -4988,7 +4938,7 @@ func TestDNSSEC15InconsistencyOnMUSTCDSDigest(t *testing.T) {
 		return packet.Packet{}
 	})
 
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.244", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.244", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cdsB)
@@ -5006,7 +4956,7 @@ func TestDNSSEC15InconsistencyOnMUSTCDSDigest(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC15(context.Background(), &z)
+	entries, err := DNSSEC15(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec15: %v", err)
 	}
@@ -5022,8 +4972,7 @@ func TestDNSSEC15InconsistencyOnMUSTCDSDigest(t *testing.T) {
 // same key. Before this fix the keytag-only match silently treated them
 // as paired and did not emit DS15_MISMATCH_CDS_CDNSKEY.
 func TestDNSSEC15MismatchOnAlgorithmDifference(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -5052,7 +5001,7 @@ func TestDNSSEC15MismatchOnAlgorithmDifference(t *testing.T) {
 		t.Fatalf("test setup invalid: CDS and CDNSKEY must have differing algorithms")
 	}
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.245", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.245", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cds)
@@ -5070,7 +5019,7 @@ func TestDNSSEC15MismatchOnAlgorithmDifference(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC15(context.Background(), &z)
+	entries, err := DNSSEC15(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec15: %v", err)
 	}
@@ -5080,8 +5029,7 @@ func TestDNSSEC15MismatchOnAlgorithmDifference(t *testing.T) {
 }
 
 func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -5100,7 +5048,7 @@ func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 	cds.DigestType = 1
 	cds.Digest = "DEADBEEF"
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cds)
@@ -5119,7 +5067,7 @@ func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC16(context.Background(), &z)
+	entries, err := DNSSEC16(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec16: %v", err)
 	}
@@ -5129,8 +5077,7 @@ func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 }
 
 func TestDNSSEC16ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -5176,13 +5123,13 @@ func TestDNSSEC16ParallelQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.241", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.241", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.242", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.242", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -5196,7 +5143,7 @@ func TestDNSSEC16ParallelQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -5255,8 +5202,7 @@ func TestDNSSEC16ParallelQueries(t *testing.T) {
 }
 
 func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -5275,7 +5221,7 @@ func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {
 	cdnskey.Algorithm = 8
 	cdnskey.PublicKey = "AwEAAc=="
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.94", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.94", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDNSKEY":
 			return answerPacket(qname, dns.TypeCDNSKEY, cdnskey)
@@ -5294,7 +5240,7 @@ func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC17(context.Background(), &z)
+	entries, err := DNSSEC17(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec17: %v", err)
 	}
@@ -5304,8 +5250,7 @@ func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {
 }
 
 func TestDNSSEC17ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -5351,13 +5296,13 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.243", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.243", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.244", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.244", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -5371,7 +5316,7 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -5430,8 +5375,7 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 }
 
 func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -5475,13 +5419,13 @@ func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
 	cdsSig := rrsigRecord("example", dns.TypeCDS, badKeytag, 1, 2)
 	cdnskeySig := rrsigRecord("example", dns.TypeCDNSKEY, badKeytag, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.95", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.95", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS(qname, ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.96", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.96", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cds, cdsSig)
@@ -5505,7 +5449,7 @@ func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec18: %v", err)
 	}
@@ -5518,8 +5462,7 @@ func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
 }
 
 func TestDNSSEC18ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -5565,7 +5508,7 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 	cdsSig := rrsigRecord("example", dns.TypeCDS, badKeytag, 1, 2)
 	cdnskeySig := rrsigRecord("example", dns.TypeCDNSKEY, badKeytag, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.250", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.250", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS(qname, ds)
 		}
@@ -5599,13 +5542,13 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 		}
 	}
 
-	child1, err := nameserver.New("ns1.example", "192.0.2.251", nil)
+	child1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.251", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	child1.SetQueryHook(hook("ns1"))
 
-	child2, err := nameserver.New("ns2.example", "192.0.2.252", nil)
+	child2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.252", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -5622,7 +5565,7 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -5684,8 +5627,6 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 }
 
 func TestDNSSEC18ParallelOutputStable(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -5706,7 +5647,7 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 			t.Fatalf("set parallel: %v", err)
 		}
 
-		nameserver.EmptyCache()
+		ctx := testCtx()
 
 		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
 		key.Flags = dns.FlagZONE
@@ -5737,7 +5678,7 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 		cdsSig := rrsigRecord("example", dns.TypeCDS, badKeytag, 1, 2)
 		cdnskeySig := rrsigRecord("example", dns.TypeCDNSKEY, badKeytag, 1, 2)
 
-		parentNS := newNameserver(t, "pns1.example", "192.0.2.253", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.253", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if qtype == "DS" {
 				return dsPacketFromDS(qname, ds)
 			}
@@ -5757,8 +5698,8 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 			}
 		}
 
-		child1 := newNameserver(t, "ns1.example", "192.0.2.254", childHook)
-		child2 := newNameserver(t, "ns2.example", "192.0.2.255", childHook)
+		child1 := newNameserver(t, ctx, "ns1.example", "192.0.2.254", childHook)
+		child2 := newNameserver(t, ctx, "ns2.example", "192.0.2.255", childHook)
 
 		parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return []nameserver.Nameserver{parentNS}, nil
@@ -5771,7 +5712,7 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 		}
 
 		z := zone.Zone{Name: dnsname.New("example")}
-		entries, err := DNSSEC18(context.Background(), &z)
+		entries, err := DNSSEC18(ctx, &z)
 		if err != nil {
 			t.Fatalf("dnssec18: %v", err)
 		}
@@ -5837,17 +5778,17 @@ func makeSEPKey(owner string, pubKey string) *dns.DNSKEY {
 }
 
 // dnssec18Setup initialises common test state and returns an env ready for DNSSEC18.
-func dnssec18Setup(t *testing.T) {
+func dnssec18Setup(t *testing.T) context.Context {
 	t.Helper()
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
+	return ctx
 }
 
 func TestDNSSEC18CDSMatchesDS(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	key := makeSEPKey("example", "AwEAAc==")
 	keytag := key.KeyTag()
@@ -5868,13 +5809,13 @@ func TestDNSSEC18CDSMatchesDS(t *testing.T) {
 	cdsSig := rrsigRecord("example", dns.TypeCDS, keytag, 1, 2)
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.70", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.70", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.71", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.71", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cds, cdsSig)
@@ -5890,7 +5831,7 @@ func TestDNSSEC18CDSMatchesDS(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -5912,7 +5853,7 @@ func TestDNSSEC18CDSMatchesDS(t *testing.T) {
 }
 
 func TestDNSSEC18CDSRolloverSignaled(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	key := makeSEPKey("example", "AwEAAc==")
 	keytag := key.KeyTag()
@@ -5935,13 +5876,13 @@ func TestDNSSEC18CDSRolloverSignaled(t *testing.T) {
 	cdsSig := rrsigRecord("example", dns.TypeCDS, keytag, 1, 2)
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.72", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.72", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.73", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.73", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cds, cdsSig)
@@ -5957,7 +5898,7 @@ func TestDNSSEC18CDSRolloverSignaled(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -5983,7 +5924,7 @@ func TestDNSSEC18CDSRolloverSignaled(t *testing.T) {
 }
 
 func TestDNSSEC18CDNSKEYMatchesDS(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	// Use ToCDNSKEY so the digest computation is guaranteed to match ToDS.
 	key := makeSEPKey("example", "AwEAAc==")
@@ -5995,13 +5936,13 @@ func TestDNSSEC18CDNSKEYMatchesDS(t *testing.T) {
 	cdnskeySig := rrsigRecord("example", dns.TypeCDNSKEY, keytag, 1, 2)
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.74", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.74", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", parentDS)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.75", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.75", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS) // no CDS
@@ -6017,7 +5958,7 @@ func TestDNSSEC18CDNSKEYMatchesDS(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6039,7 +5980,7 @@ func TestDNSSEC18CDNSKEYMatchesDS(t *testing.T) {
 }
 
 func TestDNSSEC18CDNSKEYRolloverSignaled(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	// key1 is the current KSK (DS at parent).
 	key1 := makeSEPKey("example", "AwEAAc==")
@@ -6054,13 +5995,13 @@ func TestDNSSEC18CDNSKEYRolloverSignaled(t *testing.T) {
 	cdnskeySig := rrsigRecord("example", dns.TypeCDNSKEY, keytag1, 1, 2)
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.76", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.76", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", parentDS)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.77", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.77", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS)
@@ -6076,7 +6017,7 @@ func TestDNSSEC18CDNSKEYRolloverSignaled(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6089,7 +6030,7 @@ func TestDNSSEC18CDNSKEYRolloverSignaled(t *testing.T) {
 }
 
 func TestDNSSEC18RolloverEvidenceMultiKSK(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	// key1 has DS at parent; key2 is a new SEP awaiting DS publication.
 	key1 := makeSEPKey("example", "AwEAAc==")
@@ -6105,13 +6046,13 @@ func TestDNSSEC18RolloverEvidenceMultiKSK(t *testing.T) {
 
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.78", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.78", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.79", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.79", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS)
@@ -6128,7 +6069,7 @@ func TestDNSSEC18RolloverEvidenceMultiKSK(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6152,7 +6093,7 @@ func TestDNSSEC18RolloverEvidenceMultiKSK(t *testing.T) {
 }
 
 func TestDNSSEC18RolloverEvidenceDoubleSig(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	// Both keys sign the DNSKEY RRset: classic double-signature phase.
 	key1 := makeSEPKey("example", "AwEAAc==")
@@ -6170,13 +6111,13 @@ func TestDNSSEC18RolloverEvidenceDoubleSig(t *testing.T) {
 	dnskeyRRSIG1 := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
 	dnskeyRRSIG2 := rrsigRecord("example", dns.TypeDNSKEY, keytag2, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.80", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.80", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.81", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.81", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS)
@@ -6192,7 +6133,7 @@ func TestDNSSEC18RolloverEvidenceDoubleSig(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6207,7 +6148,7 @@ func TestDNSSEC18RolloverEvidenceDoubleSig(t *testing.T) {
 }
 
 func TestDNSSEC18RolloverEvidenceDSWithoutDNSKEY(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	// Parent still has DS for old key but child DNSKEY RRset no longer contains it.
 	keyOld := makeSEPKey("example", "AwEAAc==")
@@ -6223,13 +6164,13 @@ func TestDNSSEC18RolloverEvidenceDSWithoutDNSKEY(t *testing.T) {
 
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytagNew, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.82", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.82", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.83", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.83", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS)
@@ -6246,7 +6187,7 @@ func TestDNSSEC18RolloverEvidenceDSWithoutDNSKEY(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6261,7 +6202,7 @@ func TestDNSSEC18RolloverEvidenceDSWithoutDNSKEY(t *testing.T) {
 }
 
 func TestDNSSEC18RolloverEvidenceDNSKEYWithoutDS(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	// Old key still in DS; new key published in DNSKEY but DS not yet updated.
 	keyOld := makeSEPKey("example", "AwEAAc==")
@@ -6277,13 +6218,13 @@ func TestDNSSEC18RolloverEvidenceDNSKEYWithoutDS(t *testing.T) {
 
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytagOld, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.84", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.84", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.85", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.85", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS)
@@ -6300,7 +6241,7 @@ func TestDNSSEC18RolloverEvidenceDNSKEYWithoutDS(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6315,7 +6256,7 @@ func TestDNSSEC18RolloverEvidenceDNSKEYWithoutDS(t *testing.T) {
 }
 
 func TestDNSSEC18NoCDSCDNSKEYButRolloverEvidence(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	// No CDS/CDNSKEY published but multi-KSK is visible: on-demand publication model.
 	key1 := makeSEPKey("example", "AwEAAc==")
@@ -6330,13 +6271,13 @@ func TestDNSSEC18NoCDSCDNSKEYButRolloverEvidence(t *testing.T) {
 
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.86", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.86", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.87", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.87", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS)
@@ -6352,7 +6293,7 @@ func TestDNSSEC18NoCDSCDNSKEYButRolloverEvidence(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6369,7 +6310,7 @@ func TestDNSSEC18NoCDSCDNSKEYButRolloverEvidence(t *testing.T) {
 // containing only DELETE sentinels (Algorithm == 0) skips MATCHES_DS and
 // ROLLOVER_SIGNALED in favour of DNSSEC16/17.
 func TestDNSSEC18CDSDeleteOnlySkipsContentComparison(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	key := makeSEPKey("example", "AwEAAc==")
 	keytag := key.KeyTag()
@@ -6390,13 +6331,13 @@ func TestDNSSEC18CDSDeleteOnlySkipsContentComparison(t *testing.T) {
 	cdsSig := rrsigRecord("example", dns.TypeCDS, keytag, 1, 2)
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.88", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.88", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.89", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.89", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cdsDelete, cdsSig)
@@ -6412,7 +6353,7 @@ func TestDNSSEC18CDSDeleteOnlySkipsContentComparison(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6428,7 +6369,7 @@ func TestDNSSEC18CDSDeleteOnlySkipsContentComparison(t *testing.T) {
 // both the current DS keytag and an incoming keytag emits ROLLOVER_SIGNALED
 // (the canonical bootstrap state).
 func TestDNSSEC18CDSBothOldAndNewKeyMidRollover(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	keyOld := makeSEPKey("example", "AwEAAc==")
 	keytagOld := keyOld.KeyTag()
@@ -6456,13 +6397,13 @@ func TestDNSSEC18CDSBothOldAndNewKeyMidRollover(t *testing.T) {
 	cdsSig := rrsigRecord("example", dns.TypeCDS, keytagOld, 1, 2)
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytagOld, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.90", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.90", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return dsPacketFromDS("example", ds)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.91", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.91", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS, cdsOld, cdsNew, cdsSig)
@@ -6478,7 +6419,7 @@ func TestDNSSEC18CDSBothOldAndNewKeyMidRollover(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6498,7 +6439,7 @@ func TestDNSSEC18CDSBothOldAndNewKeyMidRollover(t *testing.T) {
 // TestDNSSEC18NoCDSCDNSKEYButOnlyDoubleSig verifies the umbrella tag fires when
 // the only step-15 evidence is DOUBLE_SIG.
 func TestDNSSEC18NoCDSCDNSKEYButOnlyDoubleSig(t *testing.T) {
-	dnssec18Setup(t)
+	ctx := dnssec18Setup(t)
 
 	// Both keys are SEP and both sign DNSKEY: DOUBLE_SIG fires.
 	// Both keys are also covered by parent DS, so DNSKEY_WITHOUT_DS and
@@ -6526,13 +6467,13 @@ func TestDNSSEC18NoCDSCDNSKEYButOnlyDoubleSig(t *testing.T) {
 	dnskeyRRSIG1 := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
 	dnskeyRRSIG2 := rrsigRecord("example", dns.TypeDNSKEY, keytag2, 1, 2)
 
-	parentNS := newNameserver(t, "pns1.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "pns1.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
 			return answerPacket(qname, dns.TypeDS, ds1, ds2)
 		}
 		return packet.Packet{}
 	})
-	childNS := newNameserver(t, "ns1.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	childNS := newNameserver(t, ctx, "ns1.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "CDS":
 			return answerPacket(qname, dns.TypeCDS)
@@ -6548,7 +6489,7 @@ func TestDNSSEC18NoCDSCDNSKEYButOnlyDoubleSig(t *testing.T) {
 	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(context.Background(), &z)
+	entries, err := DNSSEC18(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
@@ -6568,8 +6509,7 @@ func TestDNSSEC18NoCDSCDNSKEYButOnlyDoubleSig(t *testing.T) {
 }
 
 func TestDNSSEC19CleanZone(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -6586,7 +6526,7 @@ func TestDNSSEC19CleanZone(t *testing.T) {
 		t.Fatalf("set badkeys.path: %v", err)
 	}
 
-	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -6608,7 +6548,7 @@ func TestDNSSEC19CleanZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC19(context.Background(), &z)
+	entries, err := DNSSEC19(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec19: %v", err)
 	}
@@ -6622,8 +6562,7 @@ func TestDNSSEC19CleanZone(t *testing.T) {
 }
 
 func TestDNSSEC19BlocklistedKey(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -6643,7 +6582,7 @@ func TestDNSSEC19BlocklistedKey(t *testing.T) {
 		t.Fatalf("set badkeys.path: %v", err)
 	}
 
-	newNameserver(t, "ns1.example", "192.0.2.202", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.202", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -6665,7 +6604,7 @@ func TestDNSSEC19BlocklistedKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC19(context.Background(), &z)
+	entries, err := DNSSEC19(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec19: %v", err)
 	}
@@ -6690,8 +6629,7 @@ func TestDNSSEC19BlocklistedKey(t *testing.T) {
 }
 
 func TestDNSSEC19NoDNSKEY(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -6708,7 +6646,7 @@ func TestDNSSEC19NoDNSKEY(t *testing.T) {
 		t.Fatalf("set badkeys.path: %v", err)
 	}
 
-	newNameserver(t, "ns1.example", "192.0.2.203", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.203", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -6730,7 +6668,7 @@ func TestDNSSEC19NoDNSKEY(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC19(context.Background(), &z)
+	entries, err := DNSSEC19(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec19: %v", err)
 	}
@@ -6744,8 +6682,7 @@ func TestDNSSEC19NoDNSKEY(t *testing.T) {
 }
 
 func TestDNSSEC19NoResponse(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -6762,7 +6699,7 @@ func TestDNSSEC19NoResponse(t *testing.T) {
 		t.Fatalf("set badkeys.path: %v", err)
 	}
 
-	newNameserver(t, "ns1.example", "192.0.2.204", func(_ string, _ string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.204", func(_ string, _ string, _ *nameserver.QueryOptions) packet.Packet {
 		return packet.Packet{}
 	})
 
@@ -6781,7 +6718,7 @@ func TestDNSSEC19NoResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC19(context.Background(), &z)
+	entries, err := DNSSEC19(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec19: %v", err)
 	}
@@ -6795,8 +6732,7 @@ func TestDNSSEC19NoResponse(t *testing.T) {
 }
 
 func TestDNSSEC19TransportDisabled(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -6816,7 +6752,7 @@ func TestDNSSEC19TransportDisabled(t *testing.T) {
 		t.Fatalf("set badkeys.path: %v", err)
 	}
 
-	newNameserver(t, "ns1.example", "192.0.2.205", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.205", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype != "DNSKEY" {
 			return packet.Packet{}
 		}
@@ -6838,7 +6774,7 @@ func TestDNSSEC19TransportDisabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC19(context.Background(), &z)
+	entries, err := DNSSEC19(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec19: %v", err)
 	}
@@ -6848,10 +6784,14 @@ func TestDNSSEC19TransportDisabled(t *testing.T) {
 	}
 }
 
-func newNameserver(t *testing.T, name string, ip string, handler func(qname string, qtype string, opts *nameserver.QueryOptions) packet.Packet) nameserver.Nameserver {
+func testCtx() context.Context {
+	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
+}
+
+func newNameserver(t *testing.T, ctx context.Context, name string, ip string, handler func(qname string, qtype string, opts *nameserver.QueryOptions) packet.Packet) nameserver.Nameserver {
 	t.Helper()
 
-	ns, err := nameserver.New(name, ip, nil)
+	ns, err := nameserver.NewWithContext(ctx, name, ip, nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -7031,8 +6971,7 @@ func dnssec19P256Key(owner string) *dns.DNSKEY {
 // --- DNSSEC20 tests ---
 
 func TestDNSSEC20BitmapOK(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -7045,7 +6984,7 @@ func TestDNSSEC20BitmapOK(t *testing.T) {
 		zoneNameservers = origZone
 	})
 
-	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, dnssec19P256Key(qname))
@@ -7080,7 +7019,7 @@ func TestDNSSEC20BitmapOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC20(context.Background(), &z)
+	entries, err := DNSSEC20(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec20: %v", err)
 	}
@@ -7094,8 +7033,7 @@ func TestDNSSEC20BitmapOK(t *testing.T) {
 }
 
 func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -7108,7 +7046,7 @@ func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
 		zoneNameservers = origZone
 	})
 
-	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, dnssec19P256Key(qname))
@@ -7139,7 +7077,7 @@ func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC20(context.Background(), &z)
+	entries, err := DNSSEC20(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec20: %v", err)
 	}
@@ -7160,8 +7098,7 @@ func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
 }
 
 func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -7178,7 +7115,7 @@ func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
 	apexHash := dnsutil.NSEC3Name("example.", "", 0)
 	nsec3Owner := apexHash + ".example."
 
-	newNameserver(t, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.201", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
 			return dnskeyPacket(qname, dnssec19P256Key(qname))
@@ -7216,7 +7153,7 @@ func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC20(context.Background(), &z)
+	entries, err := DNSSEC20(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec20: %v", err)
 	}
@@ -7237,8 +7174,7 @@ func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
 }
 
 func TestDNSSEC20NoDNSSEC(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -7251,7 +7187,7 @@ func TestDNSSEC20NoDNSSEC(t *testing.T) {
 		zoneNameservers = origZone
 	})
 
-	newNameserver(t, "ns1.example", "192.0.2.201", func(_ string, _ string, _ *nameserver.QueryOptions) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.201", func(_ string, _ string, _ *nameserver.QueryOptions) packet.Packet {
 		return packet.Packet{}
 	})
 
@@ -7268,7 +7204,7 @@ func TestDNSSEC20NoDNSSEC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC20(context.Background(), &z)
+	entries, err := DNSSEC20(ctx, &z)
 	if err != nil {
 		t.Fatalf("dnssec20: %v", err)
 	}
@@ -7470,24 +7406,24 @@ func resetDNSSEC21Mocks(t *testing.T) {
 	})
 }
 
-func dnssec21Setup(t *testing.T) {
+func dnssec21Setup(t *testing.T) context.Context {
 	t.Helper()
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 	resetDNSSEC21Mocks(t)
+	return ctx
 }
 
 func TestDNSSEC21Verified(t *testing.T) {
-	dnssec21Setup(t)
+	ctx := dnssec21Setup(t)
 
 	f := newDNSSEC21Fixture(t)
 	dsResp := f.signedDSResponse(t, f.parentKey, f.parentPriv)
 	dnskeyResp := f.parentDNSKEYResponse(f.parentKey)
 
-	parentNS := newNameserver(t, "ns1.parent", "192.0.2.221", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "ns1.parent", "192.0.2.221", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DS":
 			return dsResp
@@ -7502,7 +7438,7 @@ func TestDNSSEC21Verified(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC21(context.Background(), &z)
+	entries, err := DNSSEC21(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
@@ -7517,7 +7453,7 @@ func TestDNSSEC21Verified(t *testing.T) {
 }
 
 func TestDNSSEC21RRSIGNotVerifiable(t *testing.T) {
-	dnssec21Setup(t)
+	ctx := dnssec21Setup(t)
 
 	f := newDNSSEC21Fixture(t)
 	// Sign the DS RRset with a key that is NOT published at the parent.
@@ -7535,7 +7471,7 @@ func TestDNSSEC21RRSIGNotVerifiable(t *testing.T) {
 	dsResp := f.signedDSResponseForcedKeytag(t, otherKey, otherPriv, f.parentKey.KeyTag())
 	dnskeyResp := f.parentDNSKEYResponse(f.parentKey)
 
-	parentNS := newNameserver(t, "ns1.parent", "192.0.2.222", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "ns1.parent", "192.0.2.222", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DS":
 			return dsResp
@@ -7550,7 +7486,7 @@ func TestDNSSEC21RRSIGNotVerifiable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC21(context.Background(), &z)
+	entries, err := DNSSEC21(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
@@ -7566,13 +7502,13 @@ func TestDNSSEC21RRSIGNotVerifiable(t *testing.T) {
 }
 
 func TestDNSSEC21NoParentDNSKEY(t *testing.T) {
-	dnssec21Setup(t)
+	ctx := dnssec21Setup(t)
 
 	f := newDNSSEC21Fixture(t)
 	dsResp := f.signedDSResponse(t, f.parentKey, f.parentPriv)
 	emptyDNSKEY := f.emptyDNSKEYResponse()
 
-	parentNS := newNameserver(t, "ns1.parent", "192.0.2.223", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "ns1.parent", "192.0.2.223", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DS":
 			return dsResp
@@ -7587,7 +7523,7 @@ func TestDNSSEC21NoParentDNSKEY(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC21(context.Background(), &z)
+	entries, err := DNSSEC21(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
@@ -7600,10 +7536,10 @@ func TestDNSSEC21NoParentDNSKEY(t *testing.T) {
 }
 
 func TestDNSSEC21NoDSRRSIG(t *testing.T) {
-	dnssec21Setup(t)
+	ctx := dnssec21Setup(t)
 
 	f := newDNSSEC21Fixture(t)
-	parentNS := newNameserver(t, "ns1.parent", "192.0.2.224", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "ns1.parent", "192.0.2.224", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DS":
 			return f.unsignedDSResponse()
@@ -7618,7 +7554,7 @@ func TestDNSSEC21NoDSRRSIG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC21(context.Background(), &z)
+	entries, err := DNSSEC21(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
@@ -7628,7 +7564,7 @@ func TestDNSSEC21NoDSRRSIG(t *testing.T) {
 }
 
 func TestDNSSEC21RootZone(t *testing.T) {
-	dnssec21Setup(t)
+	ctx := dnssec21Setup(t)
 
 	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
@@ -7641,7 +7577,7 @@ func TestDNSSEC21RootZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC21(context.Background(), &z)
+	entries, err := DNSSEC21(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
@@ -7651,11 +7587,11 @@ func TestDNSSEC21RootZone(t *testing.T) {
 }
 
 func TestDNSSEC21UnsignedDelegation(t *testing.T) {
-	dnssec21Setup(t)
+	ctx := dnssec21Setup(t)
 
 	f := newDNSSEC21Fixture(t)
 	emptyDS := f.emptyDSResponse()
-	parentNS := newNameserver(t, "ns1.parent", "192.0.2.225", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+	parentNS := newNameserver(t, ctx, "ns1.parent", "192.0.2.225", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DS":
 			return emptyDS
@@ -7670,7 +7606,7 @@ func TestDNSSEC21UnsignedDelegation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC21(context.Background(), &z)
+	entries, err := DNSSEC21(ctx, &z)
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}

@@ -264,8 +264,6 @@ func TestZoneParentMissingRecursor(t *testing.T) {
 }
 
 func TestZoneGlueNamesFromParent(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 
 	parentNS := newHookedNameserver(context.Background(), t, "ns.parent.example", "192.0.2.10", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
@@ -307,8 +305,6 @@ func TestZoneGlueNamesFromParent(t *testing.T) {
 }
 
 func TestZoneGlueAddressesFromParent(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 
 	parentNS := newHookedNameserver(context.Background(), t, "ns.parent.example", "192.0.2.11", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
@@ -365,8 +361,6 @@ func TestZoneNSNamesRootSorted(t *testing.T) {
 }
 
 func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 
 	ns1 := newHookedNameserver(context.Background(), t, "ns1.example", "192.0.2.20", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
@@ -404,8 +398,6 @@ func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
 }
 
 func TestZoneQueryPersistentAcceptsAuthority(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 
 	ns := newHookedNameserver(context.Background(), t, "ns1.example", "192.0.2.31", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
@@ -435,8 +427,6 @@ func TestZoneQueryPersistentAcceptsAuthority(t *testing.T) {
 }
 
 func TestZoneIsInZone(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 
 	ns := newHookedNameserver(context.Background(), t, "ns1.example", "192.0.2.30", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
@@ -473,8 +463,6 @@ func TestZoneIsInZone(t *testing.T) {
 // every authoritative server and unions the NS RRsets (deduplicated,
 // case-folded, sorted), unlike NSNames which stops at the first answer.
 func TestZoneApexNSNamesUnionsAcrossServers(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true

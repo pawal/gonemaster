@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -25,8 +24,6 @@ import (
 // for an undelegated zone with clean glue, AllNameservers and ZoneNameservers
 // return the same nameserver set.
 func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -93,8 +90,6 @@ func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 // when the zone's nameservers are out-of-bailiwick, both functions still
 // return the same set in undelegated mode.
 func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -151,8 +146,6 @@ func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) 
 // undelegated zone with no fake addresses produces the same empty result
 // from both functions.
 func TestAllNameserversVsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true

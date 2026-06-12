@@ -21,8 +21,7 @@ import (
 )
 
 func TestDelegation01Counts(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -46,17 +45,17 @@ func TestDelegation01Counts(t *testing.T) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
-		ns2 := newNameserver(t, "ns2.example", "2001:db8::1", nil)
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
+		ns2 := newNameserver(t, ctx, "ns2.example", "2001:db8::1", nil)
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
 	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.2", nil)
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.2", nil)
 		return []nameserver.Nameserver{ns1}, nil
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation01(context.Background(), &z)
+	entries, err := Delegation01(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation01: %v", err)
 	}
@@ -148,8 +147,7 @@ func TestDelegation01Counts(t *testing.T) {
 }
 
 func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -180,19 +178,19 @@ func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
 	}
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{
-			newNameserver(t, "ns1.example", "192.0.2.1", nil),
-			newNameserver(t, "ns2.example", "192.0.2.2", nil),
+			newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil),
+			newNameserver(t, ctx, "ns2.example", "192.0.2.2", nil),
 		}, nil
 	}
 	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{
-			newNameserver(t, "ns2.example", "192.0.2.22", nil),
-			newNameserver(t, "ns1.example", "192.0.2.11", nil),
+			newNameserver(t, ctx, "ns2.example", "192.0.2.22", nil),
+			newNameserver(t, ctx, "ns1.example", "192.0.2.11", nil),
 		}, nil
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation01(context.Background(), &z)
+	entries, err := Delegation01(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation01: %v", err)
 	}
@@ -226,8 +224,7 @@ func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
 }
 
 func TestDelegation01NoIPv4ChildNoLegacyKeys(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -252,17 +249,17 @@ func TestDelegation01NoIPv4ChildNoLegacyKeys(t *testing.T) {
 	}
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{
-			newNameserver(t, "ns1.example", "192.0.2.1", nil),
+			newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil),
 		}, nil
 	}
 	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{
-			newNameserver(t, "ns1.example", "2001:db8::53", nil),
+			newNameserver(t, ctx, "ns1.example", "2001:db8::53", nil),
 		}, nil
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation01(context.Background(), &z)
+	entries, err := Delegation01(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation01: %v", err)
 	}
@@ -285,8 +282,7 @@ func TestDelegation01NoIPv4ChildNoLegacyKeys(t *testing.T) {
 }
 
 func TestDelegation02DuplicateIPs(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -300,17 +296,17 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	})
 
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
-		ns2 := newNameserver(t, "ns2.example", "192.0.2.1", nil)
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
+		ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.1", nil)
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
 	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns3 := newNameserver(t, "ns3.example", "192.0.2.2", nil)
+		ns3 := newNameserver(t, ctx, "ns3.example", "192.0.2.2", nil)
 		return []nameserver.Nameserver{ns3}, nil
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation02(context.Background(), &z)
+	entries, err := Delegation02(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation02: %v", err)
 	}
@@ -354,8 +350,7 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 }
 
 func TestDelegation03ReferralSizeOK(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -378,12 +373,12 @@ func TestDelegation03ReferralSizeOK(t *testing.T) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
 		return []nameserver.Nameserver{ns1}, nil
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation03(context.Background(), &z)
+	entries, err := Delegation03(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation03: %v", err)
 	}
@@ -404,8 +399,7 @@ func referralNSNames(n int) []dnsname.Name {
 }
 
 func TestDelegation03ReferralSizeLarge(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -428,12 +422,12 @@ func TestDelegation03ReferralSizeLarge(t *testing.T) {
 		return referralNSNames(5), nil
 	}
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
 		return []nameserver.Nameserver{ns1}, nil
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation03(context.Background(), &z)
+	entries, err := Delegation03(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation03: %v", err)
 	}
@@ -451,8 +445,7 @@ func TestDelegation03ReferralSizeLarge(t *testing.T) {
 }
 
 func TestDelegation03ReferralSizeTooLarge(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -475,12 +468,12 @@ func TestDelegation03ReferralSizeTooLarge(t *testing.T) {
 		return referralNSNames(16), nil
 	}
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
 		return []nameserver.Nameserver{ns1}, nil
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation03(context.Background(), &z)
+	entries, err := Delegation03(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation03: %v", err)
 	}
@@ -498,8 +491,7 @@ func TestDelegation03ReferralSizeTooLarge(t *testing.T) {
 }
 
 func TestDelegation04Authoritative(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -513,7 +505,7 @@ func TestDelegation04Authoritative(t *testing.T) {
 	})
 
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "SOA") {
 				return soaPacket("example", true)
 			}
@@ -526,7 +518,7 @@ func TestDelegation04Authoritative(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation04(context.Background(), &z)
+	entries, err := Delegation04(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation04: %v", err)
 	}
@@ -544,8 +536,7 @@ func TestDelegation04Authoritative(t *testing.T) {
 }
 
 func TestDelegation04NotAuthoritative(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -559,7 +550,7 @@ func TestDelegation04NotAuthoritative(t *testing.T) {
 	})
 
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "SOA") {
 				return soaPacket("example", false)
 			}
@@ -572,7 +563,7 @@ func TestDelegation04NotAuthoritative(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation04(context.Background(), &z)
+	entries, err := Delegation04(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation04: %v", err)
 	}
@@ -582,8 +573,7 @@ func TestDelegation04NotAuthoritative(t *testing.T) {
 }
 
 func TestDelegation04ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -618,13 +608,13 @@ func TestDelegation04ParallelQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.1", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.2", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -638,7 +628,7 @@ func TestDelegation04ParallelQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -697,8 +687,7 @@ func TestDelegation04ParallelQueries(t *testing.T) {
 }
 
 func TestDelegation05InBailiwickCNAME(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -717,7 +706,7 @@ func TestDelegation05InBailiwickCNAME(t *testing.T) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "A") && strings.EqualFold(qname, "ns1.example") {
 				return cnamePacket(qname, "alias.example")
 			}
@@ -730,7 +719,7 @@ func TestDelegation05InBailiwickCNAME(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation05(context.Background(), &z)
+	entries, err := Delegation05(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation05: %v", err)
 	}
@@ -753,8 +742,7 @@ func TestDelegation05InBailiwickCNAME(t *testing.T) {
 }
 
 func TestDelegation05ParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -792,13 +780,13 @@ func TestDelegation05ParallelQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.1", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1"))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.2", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -815,7 +803,7 @@ func TestDelegation05ParallelQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -882,8 +870,7 @@ func TestDelegation05ParallelQueries(t *testing.T) {
 }
 
 func TestDelegation05OutOfBailiwickNoCNAME(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -914,7 +901,7 @@ func TestDelegation05OutOfBailiwickNoCNAME(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation05(context.Background(), &z)
+	entries, err := Delegation05(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation05: %v", err)
 	}
@@ -924,8 +911,7 @@ func TestDelegation05OutOfBailiwickNoCNAME(t *testing.T) {
 }
 
 func TestDelegation06SOANotExists(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -939,7 +925,7 @@ func TestDelegation06SOANotExists(t *testing.T) {
 	})
 
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "SOA") {
 				return noAnswerPacket()
 			}
@@ -952,7 +938,7 @@ func TestDelegation06SOANotExists(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation06(context.Background(), &z)
+	entries, err := Delegation06(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation06: %v", err)
 	}
@@ -962,8 +948,7 @@ func TestDelegation06SOANotExists(t *testing.T) {
 }
 
 func TestDelegation06SOAExists(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -977,7 +962,7 @@ func TestDelegation06SOAExists(t *testing.T) {
 	})
 
 	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 			if strings.EqualFold(qtype, "SOA") {
 				return soaPacket("example", true)
 			}
@@ -990,7 +975,7 @@ func TestDelegation06SOAExists(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation06(context.Background(), &z)
+	entries, err := Delegation06(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation06: %v", err)
 	}
@@ -1000,8 +985,7 @@ func TestDelegation06SOAExists(t *testing.T) {
 }
 
 func TestDelegation07NameMismatch(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1022,7 +1006,7 @@ func TestDelegation07NameMismatch(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation07(context.Background(), &z)
+	entries, err := Delegation07(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation07: %v", err)
 	}
@@ -1035,8 +1019,7 @@ func TestDelegation07NameMismatch(t *testing.T) {
 }
 
 func TestDelegation07NamesMatch(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1057,7 +1040,7 @@ func TestDelegation07NamesMatch(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Delegation07(context.Background(), &z)
+	entries, err := Delegation07(ctx, &z)
 	if err != nil {
 		t.Fatalf("delegation07: %v", err)
 	}
@@ -1078,8 +1061,6 @@ func TestDelegation07NamesMatch(t *testing.T) {
 }
 
 func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -1158,10 +1139,14 @@ func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
 	}
 }
 
-func newNameserver(t *testing.T, name string, ip string, handler func(qname string, qtype string, opts *nameserver.QueryOptions) packet.Packet) nameserver.Nameserver {
+func testCtx() context.Context {
+	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
+}
+
+func newNameserver(t *testing.T, ctx context.Context, name string, ip string, handler func(qname string, qtype string, opts *nameserver.QueryOptions) packet.Packet) nameserver.Nameserver {
 	t.Helper()
 
-	ns, err := nameserver.New(name, ip, nil)
+	ns, err := nameserver.NewWithContext(ctx, name, ip, nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}

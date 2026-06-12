@@ -320,8 +320,6 @@ func TestAddress03PTRMismatch(t *testing.T) {
 }
 
 func TestAddress02ParallelPTRQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	baseCtx, prof, _ := testhelpers.Context(t)
 	prof.Resolver.Defaults.Parallel = 2
 
@@ -432,8 +430,6 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 }
 
 func TestAddress03ParallelPTRQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	baseCtx, prof, _ := testhelpers.Context(t)
 	prof.Resolver.Defaults.Parallel = 2
 
@@ -539,8 +535,6 @@ func testContext(t *testing.T) context.Context {
 
 func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname string, qtype string) packet.Packet) *zone.Zone {
 	t.Helper()
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
@@ -564,8 +558,6 @@ func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname s
 
 func newZoneWithFakeAddresses(t *testing.T, zoneName string, data map[string][]string) *zone.Zone {
 	t.Helper()
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(zoneName, data); err != nil {

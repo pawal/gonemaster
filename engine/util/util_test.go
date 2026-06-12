@@ -10,7 +10,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -95,8 +94,6 @@ func TestInfoAddsEntry(t *testing.T) {
 }
 
 func TestNSNameAndZoneHelpers(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 
 	ns, err := NS("ns1.example", "192.0.2.1")
 	if err != nil {

@@ -24,8 +24,7 @@ import (
 )
 
 func TestConnectivity01IPv6Disabled(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -34,8 +33,8 @@ func TestConnectivity01IPv6Disabled(t *testing.T) {
 	origMethod := authoritativeNS
 	t.Cleanup(func() { authoritativeNS = origMethod })
 
-	ns4 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
-	ns6 := newNameserver(t, "ns2.example", "2001:db8::1", nil)
+	ns4 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
+	ns6 := newNameserver(t, ctx, "ns2.example", "2001:db8::1", nil)
 	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns4, ns6}, nil
 	}
@@ -43,7 +42,7 @@ func TestConnectivity01IPv6Disabled(t *testing.T) {
 	profile.Effective().Net.IPv6 = false
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Connectivity01(context.Background(), &z)
+	entries, err := Connectivity01(ctx, &z)
 	if err != nil {
 		t.Fatalf("connectivity01: %v", err)
 	}
@@ -68,8 +67,7 @@ func TestConnectivity01IPv6Disabled(t *testing.T) {
 // Connectivity01 emits the matching CNAME_* tag. authoritativeNS is stubbed to
 // return a resolvable nameserver so the rest of the testcase proceeds normally.
 func TestConnectivity01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -82,7 +80,7 @@ func TestConnectivity01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
 		zoneNameservers = origZone
 	})
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.1", nil)
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
 	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
 	}
@@ -100,7 +98,7 @@ func TestConnectivity01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Connectivity01(context.Background(), &z)
+	entries, err := Connectivity01(ctx, &z)
 	if err != nil {
 		t.Fatalf("connectivity01: %v", err)
 	}
@@ -115,17 +113,16 @@ func TestConnectivity01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
 }
 
 func TestConnectivityLoopNoResponse(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.1", nil)
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
 	results := []*logger.Entry{}
 
-	if err := connectivityLoop(context.Background(), "Connectivity01", dnsname.New("example"), []nameserver.Nameserver{ns}, &results); err != nil {
+	if err := connectivityLoop(ctx, "Connectivity01", dnsname.New("example"), []nameserver.Nameserver{ns}, &results); err != nil {
 		t.Fatalf("connectivity loop: %v", err)
 	}
 	if !hasEntryTag(results, "CN01_NO_RESPONSE_UDP") {
@@ -134,14 +131,13 @@ func TestConnectivityLoopNoResponse(t *testing.T) {
 }
 
 func TestConnectivityLoopWrongSOAOwner(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
 
-	ns := newNameserver(t, "ns1.example", "192.0.2.1", func(qname string, qtype string) packet.Packet {
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(qname string, qtype string) packet.Packet {
 		switch strings.ToUpper(qtype) {
 		case "SOA":
 			return soaPacket("wrong.example", "ns1.example", "hostmaster.example")
@@ -153,7 +149,7 @@ func TestConnectivityLoopWrongSOAOwner(t *testing.T) {
 	})
 
 	results := []*logger.Entry{}
-	if err := connectivityLoop(context.Background(), "Connectivity01", dnsname.New("example"), []nameserver.Nameserver{ns}, &results); err != nil {
+	if err := connectivityLoop(ctx, "Connectivity01", dnsname.New("example"), []nameserver.Nameserver{ns}, &results); err != nil {
 		t.Fatalf("connectivity loop: %v", err)
 	}
 	if !hasEntryTag(results, "CN01_WRONG_SOA_RECORD_UDP") {
@@ -162,8 +158,7 @@ func TestConnectivityLoopWrongSOAOwner(t *testing.T) {
 }
 
 func TestConnectivity03SameASNSet(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -176,8 +171,8 @@ func TestConnectivity03SameASNSet(t *testing.T) {
 		lookupASN = origLookup
 	})
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", nil)
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", nil)
 	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
@@ -199,7 +194,7 @@ func TestConnectivity03SameASNSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
 	}
-	entries, err := Connectivity03(context.Background(), &z)
+	entries, err := Connectivity03(ctx, &z)
 	if err != nil {
 		t.Fatalf("connectivity03: %v", err)
 	}
@@ -242,8 +237,7 @@ func TestConnectivity03SameASNSet(t *testing.T) {
 }
 
 func TestConnectivityLoopParallelQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -269,19 +263,19 @@ func TestConnectivityLoopParallelQueries(t *testing.T) {
 		return packet.Packet{}, nil
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.1", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook)
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.2", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns2.SetQueryHook(hook)
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -348,8 +342,7 @@ func TestConnectivityLoopParallelQueries(t *testing.T) {
 }
 
 func TestConnectivity03ParallelASNLookups(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -364,8 +357,8 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", nil)
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", nil)
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", nil)
 	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
 	}
@@ -398,7 +391,7 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -449,8 +442,7 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 }
 
 func TestConnectivity04SinglePrefix(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -500,7 +492,7 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
 	}
-	entries, err := Connectivity04(context.Background(), &z)
+	entries, err := Connectivity04(ctx, &z)
 	if err != nil {
 		t.Fatalf("connectivity04: %v", err)
 	}
@@ -597,10 +589,14 @@ func stringSliceFromArgs(t *testing.T, args map[string]any, key string) []string
 	return nil
 }
 
-func newNameserver(t *testing.T, name string, ip string, handler func(qname string, qtype string) packet.Packet) nameserver.Nameserver {
+func testCtx() context.Context {
+	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
+}
+
+func newNameserver(t *testing.T, ctx context.Context, name string, ip string, handler func(qname string, qtype string) packet.Packet) nameserver.Nameserver {
 	t.Helper()
 
-	ns, err := nameserver.New(name, ip, nil)
+	ns, err := nameserver.NewWithContext(ctx, name, ip, nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}

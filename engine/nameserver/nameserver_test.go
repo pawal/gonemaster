@@ -22,7 +22,7 @@ import (
 )
 
 func TestFakeDSResponse(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.1", nil)
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestFakeDSResponse(t *testing.T) {
 }
 
 func TestFakeDelegationNS(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.1", nil)
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -214,6 +214,112 @@ func TestCacheStoreIsolation(t *testing.T) {
 	}
 }
 
+// TestTwoRunsDoNotShareCache pins run isolation for the error cache: a
+// forced error recorded on one store must not blackout the same address
+// on an independent store. The answer-cache half of this invariant is
+// pinned by TestCacheStoreIsolation above.
+func TestTwoRunsDoNotShareCache(t *testing.T) {
+	cacheA := NewCacheStore()
+	cacheB := NewCacheStore()
+	addr := "192.0.2.32"
+
+	nsA, err := NewWithCache(cacheA, "ns.example", addr, nil)
+	if err != nil {
+		t.Fatalf("new nameserver A: %v", err)
+	}
+	nsB, err := NewWithCache(cacheB, "ns.example", addr, nil)
+	if err != nil {
+		t.Fatalf("new nameserver B: %v", err)
+	}
+	if nsA.state.errorCache == nsB.state.errorCache {
+		t.Fatalf("independent stores must not share error cache pointers")
+	}
+
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 60
+
+	nsA.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, fmt.Errorf("network error")
+	})
+	opts := &QueryOptions{BlacklistingDisabled: true}
+
+	if _, err := nsA.QueryWithOptions(ctx, "example", "A", opts); err == nil {
+		t.Fatalf("expected error on store A's query")
+	}
+
+	key, _, _, err := buildCacheKey("example", "A", "IN", opts)
+	if err != nil {
+		t.Fatalf("build cache key: %v", err)
+	}
+	if skip, _ := nsA.state.errorCache.shouldSkip(key); !skip {
+		t.Fatalf("expected store A's error cache to engage")
+	}
+	if skip, _ := nsB.state.errorCache.shouldSkip(key); skip {
+		t.Fatalf("store A's error must not blackout the address on store B")
+	}
+
+	var callsB int
+	nsB.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		callsB++
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	})
+	if _, err := nsB.QueryWithOptions(ctx, "example", "A", opts); err != nil {
+		t.Fatalf("store B's query must run unaffected: %v", err)
+	}
+	if callsB != 1 {
+		t.Fatalf("expected store B's query to reach the network, got %d calls", callsB)
+	}
+}
+
+// TestIntraRunSharesPerAddressAcrossObjects pins the perf guarantee that
+// the answer cache is keyed per (store, address), not per Nameserver
+// object: two objects with different names on the same IP share one
+// query cache, so a repeat query is a hit even though the object cache
+// missed. A per-instance fallback store would break this.
+func TestIntraRunSharesPerAddressAcrossObjects(t *testing.T) {
+	cache := NewCacheStore()
+	addr := "192.0.2.33"
+
+	ns1, err := NewWithCache(cache, "ns1.example", addr, nil)
+	if err != nil {
+		t.Fatalf("new nameserver 1: %v", err)
+	}
+	ns2, err := NewWithCache(cache, "ns2.example", addr, nil)
+	if err != nil {
+		t.Fatalf("new nameserver 2: %v", err)
+	}
+	if ns1.state.cache != ns2.state.cache {
+		t.Fatalf("expected both objects to share the per-address query cache")
+	}
+
+	var calls int
+	hook := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		calls++
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg}, nil
+	}
+	ns1.SetQueryHook(hook)
+	ns2.SetQueryHook(hook)
+
+	if _, err := ns1.QueryWithOptions(context.Background(), "example", "A", nil); err != nil {
+		t.Fatalf("query on object 1: %v", err)
+	}
+	if _, err := ns2.QueryWithOptions(context.Background(), "example", "A", nil); err != nil {
+		t.Fatalf("query on object 2: %v", err)
+	}
+	if calls != 1 {
+		t.Fatalf("expected object 2's repeat query to hit the shared cache, got %d network calls", calls)
+	}
+
+	metrics := cache.QueryMetrics()
+	if metrics.Hits != 1 || metrics.Misses != 1 {
+		t.Fatalf("unexpected query cache metrics: %+v", metrics)
+	}
+}
+
 func TestDefaultProfileErrorCacheTTLIsNonZero(t *testing.T) {
 	prof, err := profile.Default()
 	if err != nil {
@@ -354,7 +460,7 @@ func TestErrorCacheDebouncesSingleTimeout(t *testing.T) {
 // query live. Asserted directly on errorCache because the query cache
 // otherwise shadows the same key.
 func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.31", nil)
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.31", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -700,7 +806,7 @@ func TestQueryCacheDoesNotStoreCauseCancelledQueries(t *testing.T) {
 }
 
 func TestContextCanceledDoesNotBlacklist(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.200", nil)
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.200", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -1057,7 +1163,7 @@ func TestReachabilityCacheUnitObserveSuccessClearsPending(t *testing.T) {
 }
 
 func TestQueryIPv4Disabled(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.11", nil)
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.11", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -1084,7 +1190,7 @@ func TestQueryIPv4Disabled(t *testing.T) {
 }
 
 func TestClientForOptionsDefaults(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.12", nil)
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.12", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -1122,7 +1228,7 @@ func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
 	prof.Resolver.Source4 = "192.0.2.88"
 	prof.Resolver.Source6 = "2001:db8::88"
 
-	ns4, err := New("ns4.example", "192.0.2.30", nil)
+	ns4, err := NewWithCache(NewCacheStore(), "ns4.example", "192.0.2.30", nil)
 	if err != nil {
 		t.Fatalf("new ipv4 nameserver: %v", err)
 	}
@@ -1134,7 +1240,7 @@ func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
 		t.Fatalf("client4.SourceIP = %q, want 192.0.2.88", client4.SourceIP)
 	}
 
-	ns6, err := New("ns6.example", "2001:db8::30", nil)
+	ns6, err := NewWithCache(NewCacheStore(), "ns6.example", "2001:db8::30", nil)
 	if err != nil {
 		t.Fatalf("new ipv6 nameserver: %v", err)
 	}
@@ -1147,7 +1253,7 @@ func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
 	}
 
 	explicit := &transport.Client{SourceIP: "192.0.2.199"}
-	nsExplicit, err := New("ns-explicit.example", "192.0.2.31", explicit)
+	nsExplicit, err := NewWithCache(NewCacheStore(), "ns-explicit.example", "192.0.2.31", explicit)
 	if err != nil {
 		t.Fatalf("new explicit nameserver: %v", err)
 	}
@@ -1161,7 +1267,7 @@ func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
 }
 
 func TestAXFRHook(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.22", nil)
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.22", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -1201,7 +1307,7 @@ func TestAXFRHook(t *testing.T) {
 }
 
 func TestAXFRNoNetwork(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.23", nil)
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.23", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -1219,7 +1325,7 @@ func TestAXFRNoNetwork(t *testing.T) {
 }
 
 func TestAXFRIPv4Disabled(t *testing.T) {
-	ns, err := New("ns.example", "192.0.2.24", nil)
+	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.24", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}

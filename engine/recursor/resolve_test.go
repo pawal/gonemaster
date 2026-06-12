@@ -58,8 +58,7 @@ func TestAddFakeAddressesDedupAndRemove(t *testing.T) {
 }
 
 func TestRootServersSorted(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{
@@ -71,7 +70,7 @@ func TestRootServersSorted(t *testing.T) {
 		client: &transport.Client{},
 	}
 
-	servers, err := r.RootServers(context.Background())
+	servers, err := r.RootServers(ctx)
 	if err != nil {
 		t.Fatalf("root servers: %v", err)
 	}
@@ -148,8 +147,7 @@ func TestCacheStoreBoundsCacheSize(t *testing.T) {
 }
 
 func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -164,7 +162,7 @@ func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
 	}
 
 	var rootCalls int32
-	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -177,7 +175,7 @@ func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
 	})
 
 	var customCalls int32
-	customNS, err := nameserver.NewWithContext(context.Background(), "custom.test", "192.0.2.2", r.client)
+	customNS, err := nameserver.NewWithContext(ctx, "custom.test", "192.0.2.2", r.client)
 	if err != nil {
 		t.Fatalf("new custom nameserver: %v", err)
 	}
@@ -189,7 +187,6 @@ func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
 		return packetWithA(name, netip.MustParseAddr("192.0.2.2")), nil
 	})
 
-	ctx := context.Background()
 	respCustom, err := r.RecurseWithNameservers(ctx, "example", "A", "IN", []nameserver.Nameserver{customNS})
 	if err != nil {
 		t.Fatalf("custom recurse: %v", err)
@@ -225,8 +222,7 @@ func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
 }
 
 func TestRecurseInflightLookupCoalescing(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -240,7 +236,7 @@ func TestRecurseInflightLookupCoalescing(t *testing.T) {
 		t.Fatalf("add fake root: %v", err)
 	}
 
-	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -259,7 +255,7 @@ func TestRecurseInflightLookupCoalescing(t *testing.T) {
 		return packetWithA(name, netip.MustParseAddr("192.0.2.111")), nil
 	})
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	var wg sync.WaitGroup
@@ -312,8 +308,7 @@ func TestRecurseInflightLookupCoalescing(t *testing.T) {
 }
 
 func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -327,7 +322,7 @@ func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
 		t.Fatalf("add fake root: %v", err)
 	}
 
-	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -346,7 +341,7 @@ func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
 		return packetWithA(name, netip.MustParseAddr("192.0.2.112")), nil
 	})
 
-	leaderCtx, leaderCancel := context.WithTimeout(context.Background(), 2*time.Second)
+	leaderCtx, leaderCancel := context.WithTimeout(ctx, 2*time.Second)
 	defer leaderCancel()
 
 	leaderDone := make(chan struct{})
@@ -362,7 +357,7 @@ func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
 		t.Fatalf("expected leader recurse query to start")
 	}
 
-	waiterCtx, waiterCancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	waiterCtx, waiterCancel := context.WithTimeout(ctx, 50*time.Millisecond)
 	defer waiterCancel()
 	_, waitErr := r.Recurse(waiterCtx, "example", "A", "IN")
 	if !errors.Is(waitErr, context.DeadlineExceeded) {
@@ -384,8 +379,7 @@ func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
 }
 
 func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -397,7 +391,7 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 		t.Fatalf("add fake root: %v", err)
 	}
 
-	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -425,7 +419,7 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 		}
 	})
 
-	arpaNS, err := nameserver.NewWithContext(context.Background(), "ns.arpa.test", "192.0.2.2", r.client)
+	arpaNS, err := nameserver.NewWithContext(ctx, "ns.arpa.test", "192.0.2.2", r.client)
 	if err != nil {
 		t.Fatalf("new arpa nameserver: %v", err)
 	}
@@ -451,7 +445,7 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 		return packet.Packet{Msg: msg}, nil
 	})
 
-	parent, _, err := r.Parent(context.Background(), "arpa")
+	parent, _, err := r.Parent(ctx, "arpa")
 	if err != nil {
 		t.Fatalf("parent: %v", err)
 	}
@@ -461,8 +455,7 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 }
 
 func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -474,7 +467,7 @@ func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
 		t.Fatalf("add fake root: %v", err)
 	}
 
-	rootNS, err := nameserver.NewWithContext(context.Background(), "a.root.test", "192.0.2.1", r.client)
+	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -502,7 +495,7 @@ func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
 		return packet.Packet{Msg: msg}, nil
 	})
 
-	parent, _, err := r.Parent(context.Background(), "arpa")
+	parent, _, err := r.Parent(ctx, "arpa")
 	if err != nil {
 		t.Fatalf("parent: %v", err)
 	}
@@ -512,8 +505,7 @@ func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
 }
 
 func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	msg := new(dns.Msg)
 	nsRR2 := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
@@ -527,7 +519,7 @@ func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
 
 	resp := packet.Packet{Msg: msg}
 	r := &Recursor{client: &transport.Client{}}
-	queryers, err := r.getNSFrom(context.Background(), resp, nil)
+	queryers, err := r.getNSFrom(ctx, resp, nil)
 	if err != nil {
 		t.Fatalf("getNSFrom: %v", err)
 	}
@@ -545,8 +537,7 @@ func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
 }
 
 func TestGetNSFromIgnoresOutOfBailiwickAndUnrelatedGlue(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	msg := new(dns.Msg)
 	nsRR4 := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
@@ -565,7 +556,7 @@ func TestGetNSFromIgnoresOutOfBailiwickAndUnrelatedGlue(t *testing.T) {
 	resp := packet.Packet{Msg: msg}
 	r := &Recursor{client: &transport.Client{}}
 	state := &recurseState{}
-	queryers, err := r.getNSFrom(context.Background(), resp, state)
+	queryers, err := r.getNSFrom(ctx, resp, state)
 	if err != nil {
 		t.Fatalf("getNSFrom: %v", err)
 	}
@@ -601,8 +592,6 @@ func TestLazyNameserverMissingRecursor(t *testing.T) {
 }
 
 func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	baseCtx, prof, _ := testhelpers.Context(t)
 
 	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
@@ -661,8 +650,6 @@ func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
 }
 
 func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	baseCtx, prof, _ := testhelpers.Context(t)
 
 	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
@@ -768,8 +755,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 }
 
 func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	r := &Recursor{client: &transport.Client{}}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -778,7 +764,7 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 		t.Fatalf("add fake root: %v", err)
 	}
 
-	rootNS, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -793,7 +779,7 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 		}
 	})
 
-	ns4, err := nameserver.New("ns.example", "192.0.2.30", r.client)
+	ns4, err := nameserver.NewWithContext(ctx, "ns.example", "192.0.2.30", r.client)
 	if err != nil {
 		t.Fatalf("new ns4: %v", err)
 	}
@@ -801,7 +787,7 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 		return packetWithA(name, netip.MustParseAddr("192.0.2.31")), nil
 	})
 
-	ns6, err := nameserver.New("ns.example", "2001:db8::30", r.client)
+	ns6, err := nameserver.NewWithContext(ctx, "ns.example", "2001:db8::30", r.client)
 	if err != nil {
 		t.Fatalf("new ns6: %v", err)
 	}
@@ -812,7 +798,7 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 	state := &recurseState{glue: map[string]map[netip.Addr]bool{}}
 	lns := lazyNameserver{name: "ns.example", recursor: r, state: state}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
 	start := make(chan struct{})
@@ -846,8 +832,7 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 }
 
 func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
+	ctx := testCtx()
 
 	r := &Recursor{client: &transport.Client{}}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -856,7 +841,7 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 		t.Fatalf("add fake root: %v", err)
 	}
 
-	rootNS, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -871,7 +856,7 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 		}
 	})
 
-	ns4, err := nameserver.New("ns.example", "192.0.2.40", r.client)
+	ns4, err := nameserver.NewWithContext(ctx, "ns.example", "192.0.2.40", r.client)
 	if err != nil {
 		t.Fatalf("new ns4: %v", err)
 	}
@@ -879,7 +864,7 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 		return packetWithA(name, netip.MustParseAddr("192.0.2.41")), nil
 	})
 
-	ns6, err := nameserver.New("ns.example", "2001:db8::40", r.client)
+	ns6, err := nameserver.NewWithContext(ctx, "ns.example", "2001:db8::40", r.client)
 	if err != nil {
 		t.Fatalf("new ns6: %v", err)
 	}
@@ -901,7 +886,7 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 	state := &recurseState{glue: map[string]map[netip.Addr]bool{}}
 	lns := lazyNameserver{name: "ns.example", recursor: r, state: state}
 
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx, cancel := context.WithTimeout(ctx, time.Second)
 	defer cancel()
 
 	start := make(chan struct{})
@@ -912,7 +897,7 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 		defer wg.Done()
 		<-start
 		for range 20 {
-			if _, err := r.getNSFrom(context.Background(), resp, state); err != nil {
+			if _, err := r.getNSFrom(ctx, resp, state); err != nil {
 				errCh <- err
 				return
 			}
@@ -1366,9 +1351,6 @@ func TestGetAddressesForUnorderedSequential(t *testing.T) {
 	if err := prof.Set("resolver.defaults.parallel", 2); err != nil {
 		t.Fatalf("set parallel: %v", err)
 	}
-
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 
 	r, err := New()
 	if err != nil {
@@ -1840,4 +1822,8 @@ type countingQueryer struct {
 func (q *countingQueryer) QueryWithClass(_ context.Context, _ string, _ string, _ string) (packet.Packet, error) {
 	q.count.Add(1)
 	return q.resp, q.err
+}
+
+func testCtx() context.Context {
+	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
 }

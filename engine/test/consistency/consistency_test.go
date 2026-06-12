@@ -21,8 +21,7 @@ import (
 )
 
 func TestConsistency01MultipleSerials(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -35,13 +34,13 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "SOA") {
 			return soaPacket("example", 1, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "SOA") {
 			return soaPacket("example", 2, "ns2.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
@@ -56,7 +55,7 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency01(context.Background(), &z)
+	entries, err := Consistency01(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency01: %v", err)
 	}
@@ -86,8 +85,7 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 }
 
 func TestConsistency02MultipleRnames(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -100,13 +98,13 @@ func TestConsistency02MultipleRnames(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "SOA") {
 			return soaPacket("example", 1, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "SOA") {
 			return soaPacket("example", 1, "ns2.example", "admin.example", 3600, 600, 86400, 60)
 		}
@@ -121,7 +119,7 @@ func TestConsistency02MultipleRnames(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency02(context.Background(), &z)
+	entries, err := Consistency02(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency02: %v", err)
 	}
@@ -144,8 +142,7 @@ func TestConsistency02MultipleRnames(t *testing.T) {
 }
 
 func TestConsistency03MultipleTimeSets(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -158,13 +155,13 @@ func TestConsistency03MultipleTimeSets(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "SOA") {
 			return soaPacket("example", 1, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "SOA") {
 			return soaPacket("example", 1, "ns2.example", "hostmaster.example", 7200, 600, 86400, 60)
 		}
@@ -179,7 +176,7 @@ func TestConsistency03MultipleTimeSets(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency03(context.Background(), &z)
+	entries, err := Consistency03(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency03: %v", err)
 	}
@@ -202,8 +199,7 @@ func TestConsistency03MultipleTimeSets(t *testing.T) {
 }
 
 func TestConsistency04MultipleNSSets(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -216,13 +212,13 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "NS") {
 			return nsPacket("example", []string{"ns1.example"})
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "NS") {
 			return nsPacket("example", []string{"ns1.example", "ns2.example"})
 		}
@@ -237,7 +233,7 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency04(context.Background(), &z)
+	entries, err := Consistency04(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency04: %v", err)
 	}
@@ -265,8 +261,7 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 }
 
 func TestConsistency04OneNSSetTypedServers(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -279,13 +274,13 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "NS") {
 			return nsPacket("example", []string{"ns1.example", "ns2.example"})
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "NS") {
 			return nsPacket("example", []string{"ns1.example", "ns2.example"})
 		}
@@ -300,7 +295,7 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency04(context.Background(), &z)
+	entries, err := Consistency04(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency04: %v", err)
 	}
@@ -321,8 +316,7 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 }
 
 func TestConsistency04ParallelNSQueries(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -358,13 +352,13 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.New("ns1.example", "192.0.2.1", nil)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
 	ns1.SetQueryHook(hook("ns1", []string{"ns1.example"}))
 
-	ns2, err := nameserver.New("ns2.example", "192.0.2.2", nil)
+	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}
@@ -378,7 +372,7 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
 	defer cancel()
 
 	done := make(chan struct{})
@@ -429,8 +423,7 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 }
 
 func TestConsistency05AddressesMatch(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -449,7 +442,7 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
 	}
 
-	authNS := newNameserver(t, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
+	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
 		switch strings.ToUpper(qtype) {
 		case "A":
 			switch strings.ToLower(qname) {
@@ -496,7 +489,7 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(context.Background(), &z)
+	entries, err := Consistency05(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
@@ -506,8 +499,7 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 }
 
 func TestConsistency05ChildZoneLame(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -532,7 +524,7 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	}
 
-	authNS := newNameserver(t, "auth.example", "192.0.2.53", func(_ string, _ string) packet.Packet {
+	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(_ string, _ string) packet.Packet {
 		return nonAAPacket()
 	})
 
@@ -545,7 +537,7 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(context.Background(), &z)
+	entries, err := Consistency05(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
@@ -571,8 +563,7 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 }
 
 func TestConsistency05InBailiwickMismatch(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -591,7 +582,7 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
 
-	authNS := newNameserver(t, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
+	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "A") && strings.EqualFold(qname, "ns1.example") {
 			return addrPacket(qname, "A", "192.0.2.2")
 		}
@@ -615,7 +606,7 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(context.Background(), &z)
+	entries, err := Consistency05(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
@@ -657,8 +648,7 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 }
 
 func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -677,7 +667,7 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	}
 
-	newNameserver(t, "ns1.example", "192.0.2.1", func(qname string, qtype string) packet.Packet {
+	newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(qname string, qtype string) packet.Packet {
 		if strings.EqualFold(qname, "example") && strings.EqualFold(qtype, "NS") {
 			return nsPacket(qname, []string{"ns2.example"})
 		}
@@ -712,7 +702,7 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(context.Background(), &z)
+	entries, err := Consistency05(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
@@ -728,8 +718,7 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 }
 
 func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -770,7 +759,7 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(context.Background(), &z)
+	entries, err := Consistency05(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
@@ -797,8 +786,7 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 }
 
 func TestConsistency06MultipleMnames(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
+	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
 
 	util.SetLogger(logger.New())
@@ -811,13 +799,13 @@ func TestConsistency06MultipleMnames(t *testing.T) {
 		apexNameservers = origM5
 	})
 
-	ns1 := newNameserver(t, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "SOA") {
 			return soaPacket("example", 1, "mname1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
 		if strings.EqualFold(qtype, "SOA") {
 			return soaPacket("example", 1, "mname2.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
@@ -832,7 +820,7 @@ func TestConsistency06MultipleMnames(t *testing.T) {
 	}
 
 	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency06(context.Background(), &z)
+	entries, err := Consistency06(ctx, &z)
 	if err != nil {
 		t.Fatalf("consistency06: %v", err)
 	}
@@ -854,10 +842,14 @@ func TestConsistency06MultipleMnames(t *testing.T) {
 	}
 }
 
-func newNameserver(t *testing.T, name string, ip string, handler func(qname string, qtype string) packet.Packet) nameserver.Nameserver {
+func testCtx() context.Context {
+	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
+}
+
+func newNameserver(t *testing.T, ctx context.Context, name string, ip string, handler func(qname string, qtype string) packet.Packet) nameserver.Nameserver {
 	t.Helper()
 
-	ns, err := nameserver.New(name, ip, nil)
+	ns, err := nameserver.NewWithContext(ctx, name, ip, nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}

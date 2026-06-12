@@ -153,8 +153,6 @@ func TestSyntax05NoResponseSOAQuery(t *testing.T) {
 }
 
 func TestSyntax06ParallelMailServers(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
 	baseCtx, prof, _ := testhelpers.Context(t)
 	prof.Resolver.Defaults.Parallel = 2
 
@@ -482,8 +480,6 @@ func testContext(t *testing.T) context.Context {
 
 func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname string, qtype string) packet.Packet) *zone.Zone {
 	t.Helper()
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	r := &recursor.Recursor{}
 	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {

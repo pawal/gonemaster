@@ -239,6 +239,7 @@ func TestRecurseIgnoresRootReferral(t *testing.T) {
 }
 
 func TestRecurseFollowsOutOfBailiwickCNAME(t *testing.T) {
+	ctx := testCtx()
 	r := &Recursor{
 		client:       &transport.Client{},
 		recurseCache: map[string]map[string]map[string]*recurseCacheEntry{},
@@ -251,7 +252,7 @@ func TestRecurseFollowsOutOfBailiwickCNAME(t *testing.T) {
 		t.Fatalf("add fake root: %v", err)
 	}
 
-	rootNS, err := nameserver.New("root.test", "192.0.2.53", r.client)
+	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
 	if err != nil {
 		t.Fatalf("new root nameserver: %v", err)
 	}
@@ -268,7 +269,7 @@ func TestRecurseFollowsOutOfBailiwickCNAME(t *testing.T) {
 		},
 	}
 
-	resp, _, err := r.recurse(context.Background(), "www.example.com", "A", "IN", state)
+	resp, _, err := r.recurse(ctx, "www.example.com", "A", "IN", state)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -486,9 +487,6 @@ func TestResolveCNAMELoopReturnsUnresolved(t *testing.T) {
 // nameserver address resolution during CNAME following, causing false
 // NO_RESPONSE_PTR_QUERY results for classless IN-ADDR.ARPA delegations.
 func TestResolveCNAMEDoesNotShareInProgress(t *testing.T) {
-	nameserver.EmptyCache()
-	defer nameserver.EmptyCache()
-
 	ctx, _, _ := testhelpers.Context(t)
 
 	r := &Recursor{

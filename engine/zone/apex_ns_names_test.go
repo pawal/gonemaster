@@ -95,8 +95,6 @@ func apexMixedRecordsPacket(zoneName string, nsNames []string) packet.Packet {
 // TestZoneGlueNamesReturnsGlueFromZone verifies that GlueNames returns the
 // names registered via the recursor's fake glue for an undelegated zone.
 func TestZoneGlueNamesReturnsGlueFromZone(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -341,8 +339,6 @@ func TestZoneApexNSNamesDedupAndSort(t *testing.T) {
 // undelegated zone with apex servers returning distinct NS sets, ApexNSNames
 // returns the union while GlueNames returns only the configured glue.
 func TestZoneApexNSNamesUndelegatedUsesApexRecords(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -403,8 +399,6 @@ func TestZoneApexNSNamesUndelegatedUsesApexRecords(t *testing.T) {
 // random NS-name list and returns ApexNSNames's output as a string slice.
 func runZoneApexNSNamesProperty(t *testing.T, names []string) []string {
 	t.Helper()
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true

@@ -10,7 +10,6 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -63,8 +62,6 @@ func hasNoDuplicates(names []string) bool {
 // as a string slice.
 func runAllNSNamesProperty(t *testing.T, glueNames []string, apexNames []string) []string {
 	t.Helper()
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = true
@@ -131,8 +128,6 @@ func TestAllNameserversPropertyAlwaysSortedAndDedupedByString(t *testing.T) {
 		rng := rand.New(rand.NewSource(seed))
 		glue := randomNameSet(rng, 1+rng.Intn(4))
 
-		nameserver.EmptyCache()
-
 		ctx, prof, _ := testhelpers.Context(t)
 		prof.Net.IPv4 = true
 		prof.Net.IPv6 = true
@@ -176,10 +171,7 @@ func TestAllNameserversPropertyAlwaysSortedAndDedupedByString(t *testing.T) {
 			}
 			seen[s] = true
 		}
-
-		nameserver.EmptyCache()
 	}
-	t.Cleanup(nameserver.EmptyCache)
 }
 
 // TestDelegationNameserversNoNilNamesInOutput runs several seeded scenarios
@@ -188,8 +180,6 @@ func TestAllNameserversPropertyAlwaysSortedAndDedupedByString(t *testing.T) {
 func TestDelegationNameserversNoNilNamesInOutput(t *testing.T) {
 	letters := []byte("abcdefghijklmnopqrstuvwxyz")
 	for trial := 0; trial < 20; trial++ {
-		nameserver.EmptyCache()
-
 		seed := int64(trial * 11)
 		rng := rand.New(rand.NewSource(seed))
 		size := 1 + rng.Intn(5)
@@ -231,9 +221,6 @@ func TestDelegationNameserversNoNilNamesInOutput(t *testing.T) {
 			}
 		}
 	}
-	t.Cleanup(func() {
-		nameserver.EmptyCache()
-	})
 }
 
 // TestNSItemStringStableForSort verifies that NSItem.String() is a

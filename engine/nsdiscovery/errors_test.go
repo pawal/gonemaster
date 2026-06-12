@@ -8,7 +8,6 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/recursor/recursortest"
 	"codeberg.org/pawal/gonemaster/engine/zone"
@@ -64,8 +63,6 @@ func TestDelegationNameserversErrorWhenNilZone(t *testing.T) {
 }
 
 func TestDelegationNameserversReturnsEmptyWhenAllDelegationServersUnreachable(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, NewCache())
@@ -95,8 +92,6 @@ func TestDelegationNameserversReturnsEmptyWhenAllDelegationServersUnreachable(t 
 // that error in Err (rather than silently dropping it). This is the data
 // the consuming testcases turn into a CNAME_* tag.
 func TestGetOOBIPsAttachesCNAMEErrorToAddressLessItem(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, _, _ := testhelpers.Context(t)
 
@@ -146,8 +141,6 @@ func TestZoneNameserversErrorWhenNilZone(t *testing.T) {
 }
 
 func TestZoneNameserversReturnsEmptyWhenDelegationEmpty(t *testing.T) {
-	nameserver.EmptyCache()
-	t.Cleanup(nameserver.EmptyCache)
 
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, NewCache())

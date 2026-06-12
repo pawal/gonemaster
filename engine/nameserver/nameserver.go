@@ -60,14 +60,10 @@ type QueryOptions struct {
 	BlacklistingDisabled bool
 }
 
-// New creates a Nameserver from a name and IP address.
-func New(name string, address string, client *transport.Client) (Nameserver, error) {
-	return newWithCache(context.TODO(), defaultCache, name, address, client)
-}
-
-// NewWithContext creates a Nameserver using a cache store from ctx.
+// NewWithContext creates a Nameserver using the cache store from ctx.
+// The ctx must carry a store installed via WithCache.
 func NewWithContext(ctx context.Context, name string, address string, client *transport.Client) (Nameserver, error) {
-	return newWithCache(ctx, CacheFromContextOrDefault(ctx), name, address, client)
+	return newWithCache(ctx, CacheFromContext(ctx), name, address, client)
 }
 
 // NewWithCache creates a Nameserver using the supplied cache store.
@@ -77,7 +73,7 @@ func NewWithCache(cache *CacheStore, name string, address string, client *transp
 
 func newWithCache(ctx context.Context, cache *CacheStore, name string, address string, client *transport.Client) (Nameserver, error) {
 	if cache == nil {
-		cache = defaultCache
+		return Nameserver{}, fmt.Errorf("nameserver: nil cache store; use NewWithContext with a ctx carrying WithCache, or NewWithCache with a non-nil store")
 	}
 	runLog := logger.FromContext(ctx)
 	addr, err := netip.ParseAddr(address)

@@ -808,26 +808,13 @@ func (c *CacheStore) SetWaiterJoinHookForAddr(addr string, f func()) {
 	qc.mu.Unlock()
 }
 
-var defaultCache = NewCacheStore()
-
-// DefaultCache returns the fallback cache store.
-func DefaultCache() *CacheStore {
-	return defaultCache
-}
-
-// EmptyCache clears the default nameserver cache store.
-func EmptyCache() {
-	defaultCache.Empty()
-}
-
 func (ns *Nameserver) ensureState() {
 	if ns == nil || ns.state != nil {
 		return
 	}
 	cache := ns.cache
 	if cache == nil {
-		cache = defaultCache
-		ns.cache = cache
+		panic("nameserver: ensureState on a Nameserver with nil cache; construct via NewWithContext or NewWithCache")
 	}
 	addrKey := ns.Address.String()
 	ns.state = &nsState{

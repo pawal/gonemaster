@@ -93,19 +93,7 @@ func TestInfoAddsEntry(t *testing.T) {
 	}
 }
 
-func TestNSNameAndZoneHelpers(t *testing.T) {
-
-	ns, err := NS("ns1.example", "192.0.2.1")
-	if err != nil {
-		t.Fatalf("ns helper: %v", err)
-	}
-	if ns.Name.String() != "ns1.example" {
-		t.Fatalf("unexpected ns name %q", ns.Name.String())
-	}
-	if ns.Address.String() != "192.0.2.1" {
-		t.Fatalf("unexpected ns address %q", ns.Address.String())
-	}
-
+func TestNameAndZoneHelpers(t *testing.T) {
 	name := Name("Example.COM.")
 	if name.String() != "Example.COM" {
 		t.Fatalf("unexpected name %q", name.String())

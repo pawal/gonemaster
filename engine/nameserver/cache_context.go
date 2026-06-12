@@ -20,11 +20,3 @@ func CacheFromContext(ctx context.Context) *CacheStore {
 	cache, _ := ctx.Value(cacheContextKey{}).(*CacheStore)
 	return cache
 }
-
-// CacheFromContextOrDefault returns the cache store stored in ctx or the default store.
-func CacheFromContextOrDefault(ctx context.Context) *CacheStore {
-	if cache := CacheFromContext(ctx); cache != nil {
-		return cache
-	}
-	return defaultCache
-}

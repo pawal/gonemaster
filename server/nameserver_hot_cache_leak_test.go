@@ -148,8 +148,11 @@ func TestHotCacheHeapGrowthWithForcedGC(t *testing.T) {
 		// Touch several unique addresses per job (simulating per-domain nameservers).
 		for k := range addrsPerJob {
 			idx := job*addrsPerJob + k
-			addr := fmt.Sprintf("10.%d.%d.%d", (idx/65536)%256, (idx/256)%256, idx%256+1)
-			ns, _ := nameserver.NewWithCache(runCache, fmt.Sprintf("ns%d-%d.example", job, k), addr, nil)
+			addr := fmt.Sprintf("10.%d.%d.%d", (idx/62500)%250, (idx/250)%250, idx%250+1)
+			ns, err := nameserver.NewWithCache(runCache, fmt.Sprintf("ns%d-%d.example", job, k), addr, nil)
+			if err != nil {
+				t.Fatalf("new nameserver %d-%d: %v", job, k, err)
+			}
 			ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 				return dummyPacket(addr), nil
 			})
@@ -245,8 +248,11 @@ func TestHotCacheHeapGrowthWithoutForcedGC(t *testing.T) {
 
 		for k := range addrsPerJob {
 			idx := job*addrsPerJob + k
-			addr := fmt.Sprintf("10.%d.%d.%d", (idx/65536)%256, (idx/256)%256, idx%256+1)
-			ns, _ := nameserver.NewWithCache(runCache, fmt.Sprintf("ns%d-%d.example", job, k), addr, nil)
+			addr := fmt.Sprintf("10.%d.%d.%d", (idx/62500)%250, (idx/250)%250, idx%250+1)
+			ns, err := nameserver.NewWithCache(runCache, fmt.Sprintf("ns%d-%d.example", job, k), addr, nil)
+			if err != nil {
+				t.Fatalf("new nameserver %d-%d: %v", job, k, err)
+			}
 			ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 				return dummyPacket(addr), nil
 			})

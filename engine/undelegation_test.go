@@ -197,7 +197,7 @@ func TestBuildUndelegatedDSData(t *testing.T) {
 }
 
 func TestApplyUndelegatedDS(t *testing.T) {
-	ctx := context.Background()
+	ctx, _, _ := testhelpers.Context(t)
 	ns1, err := nameserver.NewWithContext(ctx, "a.gtld-servers.net", "192.5.6.30", nil)
 	if err != nil {
 		t.Fatalf("new nameserver 1: %v", err)
@@ -329,7 +329,8 @@ func TestBuildUndelegatedFakeDelegationOutOfBailiwickNoFillEmitsNoIP(t *testing.
 }
 
 func TestFakeDelegationToSelf(t *testing.T) {
-	ns, err := nameserver.NewWithContext(context.Background(), "ns1.example.com", "192.0.2.1", nil)
+	ctx, _, _ := testhelpers.Context(t)
+	ns, err := nameserver.NewWithContext(ctx, "ns1.example.com", "192.0.2.1", nil)
 	if err != nil {
 		t.Fatalf("new nameserver: %v", err)
 	}

@@ -8,7 +8,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -48,11 +47,6 @@ func SetLogger(l *logger.Logger) {
 // Info creates a log entry using the logger stored in ctx.
 func Info(ctx context.Context, tag string, args map[string]any) (*logger.Entry, error) {
 	return LoggerFromContext(ctx).Add(tag, args, "", "")
-}
-
-// NS creates a nameserver object for the given name and address.
-func NS(name string, address string) (nameserver.Nameserver, error) {
-	return nameserver.NewWithContext(context.Background(), name, address, nil)
 }
 
 // Name creates a DNSName object for the given domain.

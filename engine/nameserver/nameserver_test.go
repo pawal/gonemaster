@@ -15,6 +15,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -318,6 +319,33 @@ func TestIntraRunSharesPerAddressAcrossObjects(t *testing.T) {
 	if metrics.Hits != 1 || metrics.Misses != 1 {
 		t.Fatalf("unexpected query cache metrics: %+v", metrics)
 	}
+}
+
+// TestNilCacheConstructionIsLoudError pins the contract that constructing
+// a Nameserver without a cache store fails loudly instead of silently
+// binding to a process-global store.
+func TestNilCacheConstructionIsLoudError(t *testing.T) {
+	if _, err := NewWithCache(nil, "ns.example", "192.0.2.34", nil); err == nil {
+		t.Fatalf("expected error from NewWithCache with nil store")
+	}
+	if _, err := NewWithContext(context.Background(), "ns.example", "192.0.2.34", nil); err == nil {
+		t.Fatalf("expected error from NewWithContext with a cache-less ctx")
+	}
+}
+
+// TestEnsureStateOnZeroValueNameserverPanics guards the invariant that a
+// zero-value Nameserver is never queried; a query must panic rather than
+// bind to a global store.
+func TestEnsureStateOnZeroValueNameserverPanics(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatalf("expected panic from querying a zero-value Nameserver")
+		}
+	}()
+	ns := Nameserver{Name: dnsname.New("ns.example"), Address: netip.MustParseAddr("192.0.2.35")}
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, nil
+	})
 }
 
 func TestDefaultProfileErrorCacheTTLIsNonZero(t *testing.T) {
@@ -1348,7 +1376,7 @@ func TestAXFRIPv4Disabled(t *testing.T) {
 	}
 }
 
-func TestEmptyCache(t *testing.T) {
+func TestCacheStoreEmpty(t *testing.T) {
 	cache := NewCacheStore()
 	ns, err := NewWithCache(cache, "ns.example", "192.0.2.25", nil)
 	if err != nil {

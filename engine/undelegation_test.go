@@ -349,6 +349,8 @@ func TestFakeDelegationToSelf(t *testing.T) {
 }
 
 func TestApplyUndelegatedDelegationEmitsFakeDelegationToSelf(t *testing.T) {
+	// Timeout-bound (TEST-NET queries); per-test ctx state, safe to overlap.
+	t.Parallel()
 
 	ctx, _, log := testhelpers.Context(t)
 

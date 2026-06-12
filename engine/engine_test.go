@@ -87,6 +87,8 @@ func TestEffectiveProfileDebugOverride(t *testing.T) {
 }
 
 func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
+	// Timeout-bound; safe to overlap: all run state is per-Runner.
+	t.Parallel()
 	p1, err := profile.Default()
 	if err != nil {
 		t.Fatalf("profile default: %v", err)
@@ -150,6 +152,8 @@ func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
 }
 
 func TestRunEmitsStartupTags(t *testing.T) {
+	// Timeout-bound; safe to overlap: all run state is per-Runner.
+	t.Parallel()
 	p, err := profile.Default()
 	if err != nil {
 		t.Fatalf("profile default: %v", err)

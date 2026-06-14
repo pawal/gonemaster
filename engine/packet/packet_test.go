@@ -190,6 +190,35 @@ func TestEdnsHelpersFromExplicitOPTRecord(t *testing.T) {
 	}
 }
 
+func TestCookie(t *testing.T) {
+	t.Run("present", func(t *testing.T) {
+		msg := new(dns.Msg)
+		msg.Pseudo = []dns.RR{&dns.COOKIE{Cookie: "0011223344556677aabbccddeeff0011"}}
+		cookie := New(msg).Cookie()
+		if cookie == nil {
+			t.Fatalf("expected COOKIE option, got nil")
+		}
+		if cookie.Cookie != "0011223344556677aabbccddeeff0011" {
+			t.Fatalf("unexpected cookie value: %q", cookie.Cookie)
+		}
+	})
+
+	t.Run("absent", func(t *testing.T) {
+		msg := new(dns.Msg)
+		if New(msg).Cookie() != nil {
+			t.Fatalf("expected nil COOKIE option when none present")
+		}
+	})
+
+	t.Run("non-cookie options ignored", func(t *testing.T) {
+		msg := new(dns.Msg)
+		msg.Pseudo = []dns.RR{&dns.NSID{Nsid: "beef"}}
+		if New(msg).Cookie() != nil {
+			t.Fatalf("expected nil COOKIE option when only NSID present")
+		}
+	})
+}
+
 func TestPacketBasicHelpers(t *testing.T) {
 	msg := new(dns.Msg)
 	msg.ID = 1234

@@ -210,6 +210,16 @@ func (p Packet) EdnsData() []dns.RR {
 	return nil
 }
 
+// Cookie returns the DNS Cookie EDNS0 option (RFC 7873) from the response, or nil.
+func (p Packet) Cookie() *dns.COOKIE {
+	for _, opt := range p.EdnsData() {
+		if c, ok := opt.(*dns.COOKIE); ok {
+			return c
+		}
+	}
+	return nil
+}
+
 // DO reports whether the EDNS DO bit is set.
 func (p Packet) DO() bool {
 	if p.Msg == nil {

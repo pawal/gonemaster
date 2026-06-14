@@ -42,6 +42,34 @@ Status: Final
 12. Emit `N17_NO_RESPONSE` with sorted unique `servers` when non-empty.
 13. Emit `TEST_CASE_END`.
 
+Per-nameserver decision flow:
+
+```
+per nameserver (parallel):
+ +- transport disabled (IPv4/IPv6)        -> IPV4_DISABLED / IPV6_DISABLED, skip
+ +- otherwise
+       |
+       v
+   query 1: UDP-pinned SOA + COOKIE(client cookie)
+    +- no response / TC=1                  -> N17_NO_RESPONSE
+    +- RCODE != NOERROR                    -> no cookie verdict (graded by basic/N16)
+    +- NOERROR, no COOKIE option           -> N17_NO_COOKIE
+    +- COOKIE len not in {8} U [16,40] B   -> N17_COOKIE_MALFORMED (cookie_bytes)
+    +- client portion != our cookie        -> N17_COOKIE_MALFORMED (cookie_bytes)
+    +- COOKIE == 8 B (client cookie only)  -> N17_COOKIE_CLIENT_ONLY
+    +- well-formed full cookie (16-40 B)   -> N17_COOKIE_SUPPORTED
+                                              |
+                                              v
+        query 2: UDP-pinned SOA + COOKIE(returned full cookie)
+         +- NOERROR                         -> N17_COOKIE_ROUNDTRIP_OK
+         +- BADCOOKIE
+              |
+              v
+           query 2b: retry with the fresh Server Cookie from the BADCOOKIE reply
+            +- NOERROR                      -> N17_COOKIE_ROUNDTRIP_OK (cookie rotation)
+            +- BADCOOKIE                    -> N17_COOKIE_SELF_REJECT
+```
+
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |

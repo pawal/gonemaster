@@ -61,6 +61,7 @@ const TESTCASE_TITLES: Record<string, string> = {
   nameserver13: "Truncated EDNS responses include OPT record",
   nameserver15: "Name server does not reveal software version",
   nameserver16: "EDNS NSID option support",
+  nameserver17: "DNS Cookie support",
   syntax01: "No illegal characters in the domain name",
   syntax02: "No hyphen at the start or end of the domain name",
   syntax03: "No double hyphen in position 3 and 4 of the domain name",

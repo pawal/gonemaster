@@ -2249,6 +2249,34 @@ msgstr ""
 "Die folgenden Nameserver haben bei einer NSID-Abfrage (RFC 5001) den "
 "unerwarteten RCODE \"{rcode}\" zurückgegeben. Nameserver: \"{servers}\"."
 
+msgctxt "NAMESERVER:N17_COOKIE_SUPPORTED"
+msgid "The following name server(s) returned a well-formed DNS Cookie (RFC 7873): \"{servers}\"."
+msgstr "Die folgenden Nameserver haben ein wohlgeformtes DNS Cookie (RFC 7873) zurückgegeben: \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_NO_COOKIE"
+msgid "The following name server(s) did not return a DNS Cookie (RFC 7873): \"{servers}\"."
+msgstr "Die folgenden Nameserver haben kein DNS Cookie (RFC 7873) zurückgegeben: \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_ROUNDTRIP_OK"
+msgid "The following name server(s) did not reject the Server Cookie they issued on a follow-up query (RFC 7873): \"{servers}\"."
+msgstr "Die folgenden Nameserver haben das von ihnen ausgestellte Server Cookie bei einer Folgeabfrage nicht abgelehnt (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_CLIENT_ONLY"
+msgid "The following name server(s) echoed only the Client Cookie and returned no Server Cookie (RFC 7873): \"{servers}\"."
+msgstr "Die folgenden Nameserver haben nur das Client Cookie zurückgespiegelt und kein Server Cookie zurückgegeben (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_MALFORMED"
+msgid "The following name server(s) returned a malformed DNS Cookie of {cookie_bytes} bytes (RFC 7873 allows 8 or 16 to 40): \"{servers}\"."
+msgstr "Die folgenden Nameserver haben ein fehlerhaftes DNS Cookie mit {cookie_bytes} Byte zurückgegeben (RFC 7873 erlaubt 8 oder 16 bis 40): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_SELF_REJECT"
+msgid "The following name server(s) rejected with BADCOOKIE, even after a retry, a Server Cookie they had just issued (RFC 7873): \"{servers}\"."
+msgstr "Die folgenden Nameserver haben mit BADCOOKIE, selbst nach einem erneuten Versuch, ein gerade von ihnen ausgestelltes Server Cookie abgelehnt (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_NO_RESPONSE"
+msgid "The following name server(s) did not respond to a DNS Cookie probe (RFC 7873): \"{servers}\"."
+msgstr "Die folgenden Nameserver haben auf eine DNS-Cookie-Abfrage (RFC 7873) nicht geantwortet: \"{servers}\"."
+
 msgctxt "NAMESERVER:QNAME_CASE_INSENSITIVE"
 msgid "The following nameservers do not preserve original case of the queried name ({domain}): {servers}."
 msgstr "Die folgenden Nameserver bewahren die ursprüngliche Groß-/Kleinschreibung des abgefragten Namens ({domain}) nicht: {servers}."

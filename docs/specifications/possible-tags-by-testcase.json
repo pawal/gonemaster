@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 80,
-    "unique_tag_count": 523
+    "testcase_count": 81,
+    "unique_tag_count": 530
   },
   "modules": {
     "address": {
@@ -802,6 +802,19 @@
         "N16_NO_NSID_REVEALED",
         "N16_NO_RESPONSE",
         "N16_UNEXPECTED_RCODE",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
+      ],
+      "nameserver17": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "N17_COOKIE_CLIENT_ONLY",
+        "N17_COOKIE_MALFORMED",
+        "N17_COOKIE_ROUNDTRIP_OK",
+        "N17_COOKIE_SELF_REJECT",
+        "N17_COOKIE_SUPPORTED",
+        "N17_NO_COOKIE",
+        "N17_NO_RESPONSE",
         "TEST_CASE_END",
         "TEST_CASE_START"
       ]

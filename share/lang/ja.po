@@ -1666,6 +1666,34 @@ msgstr ""
 "次のネームサーバーは NSID クエリ (RFC 5001) に対して"
 "予期しない RCODE \"{rcode}\" を返しました。応答元: \"{servers}\"。"
 
+msgctxt "NAMESERVER:N17_COOKIE_SUPPORTED"
+msgid "The following name server(s) returned a well-formed DNS Cookie (RFC 7873): \"{servers}\"."
+msgstr "次のネームサーバーは整形式の DNS Cookie (RFC 7873) を返しました: \"{servers}\"。"
+
+msgctxt "NAMESERVER:N17_NO_COOKIE"
+msgid "The following name server(s) did not return a DNS Cookie (RFC 7873): \"{servers}\"."
+msgstr "次のネームサーバーは DNS Cookie (RFC 7873) を返しませんでした: \"{servers}\"。"
+
+msgctxt "NAMESERVER:N17_COOKIE_ROUNDTRIP_OK"
+msgid "The following name server(s) did not reject the Server Cookie they issued on a follow-up query (RFC 7873): \"{servers}\"."
+msgstr "次のネームサーバーは、自身が発行した Server Cookie を後続のクエリで拒否しませんでした (RFC 7873): \"{servers}\"。"
+
+msgctxt "NAMESERVER:N17_COOKIE_CLIENT_ONLY"
+msgid "The following name server(s) echoed only the Client Cookie and returned no Server Cookie (RFC 7873): \"{servers}\"."
+msgstr "次のネームサーバーは Client Cookie のみを返し、Server Cookie を返しませんでした (RFC 7873): \"{servers}\"。"
+
+msgctxt "NAMESERVER:N17_COOKIE_MALFORMED"
+msgid "The following name server(s) returned a malformed DNS Cookie of {cookie_bytes} bytes (RFC 7873 allows 8 or 16 to 40): \"{servers}\"."
+msgstr "次のネームサーバーは {cookie_bytes} バイトの不正な DNS Cookie を返しました (RFC 7873 では 8 または 16-40 が許可されています): \"{servers}\"。"
+
+msgctxt "NAMESERVER:N17_COOKIE_SELF_REJECT"
+msgid "The following name server(s) rejected with BADCOOKIE, even after a retry, a Server Cookie they had just issued (RFC 7873): \"{servers}\"."
+msgstr "次のネームサーバーは、再試行後も、自身が発行したばかりの Server Cookie を BADCOOKIE で拒否しました (RFC 7873): \"{servers}\"。"
+
+msgctxt "NAMESERVER:N17_NO_RESPONSE"
+msgid "The following name server(s) did not respond to a DNS Cookie probe (RFC 7873): \"{servers}\"."
+msgstr "次のネームサーバーは DNS Cookie プローブ (RFC 7873) に応答しませんでした: \"{servers}\"。"
+
 msgctxt "NAMESERVER:NO_RECURSOR"
 msgid "The following nameservers are not recursors: {servers}."
 msgstr "以下のネームサーバーは再帰リゾルバではありません: {servers}。"

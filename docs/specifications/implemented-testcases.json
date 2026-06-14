@@ -7,7 +7,7 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 80
+    "testcase_count": 81
   },
   "module_order": [
     "basic",
@@ -91,7 +91,8 @@
       "nameserver12",
       "nameserver13",
       "nameserver15",
-      "nameserver16"
+      "nameserver16",
+      "nameserver17"
     ],
     "syntax": [
       "syntax01",
@@ -139,7 +140,7 @@
     "consistency06": "Check SOA MNAME consistency across nameservers for the tested zone.",
     "delegation01": "Validate that delegation-side and child-side nameserver sets meet minimum-count requirements overall and per IP family.",
     "delegation02": "Detect nameserver IP-address reuse within delegation data, within child data, and across the combined delegation+child addressed NS set.",
-    "delegation03": "Check whether a synthesized maximal referral response can fit within the 512-byte non-EDNS UDP DNS payload limit.",
+    "delegation03": "Check how large a synthesized maximal referral response is relative to the 512-byte non-EDNS UDP payload limit and the 1232-byte EDNS payload size, and grade it accordingly.",
     "delegation04": "Verify whether nameservers from delegation and child sources answer authoritatively for SOA queries.",
     "delegation05": "Verify that NS names used for the tested zone are not aliases (CNAME targets).",
     "delegation06": "Verify SOA RRset existence on nameservers collected from delegation and child sources.",
@@ -179,6 +180,7 @@
     "nameserver13": "Check truncated EDNS responses for missing OPT records.",
     "nameserver15": "Detect whether authoritative nameservers reveal software version data through CHAOS-class TXT queries.",
     "nameserver16": "Query authoritative nameservers with an EDNS NSID option request (RFC 5001, option code 3) and report which servers provide NSID values and what those values contain.",
+    "nameserver17": "Probe each authoritative nameserver for DNS Cookie (RFC 7873 / RFC 9018) support and verify the returned Server Cookie is well-formed and accepted by the issuing server.",
     "syntax01": "Validate that the tested domain name contains only allowed DNS hostname characters.",
     "syntax02": "Validate that no domain label starts or ends with a hyphen (`-`).",
     "syntax03": "Validate that domain labels do not contain a double hyphen in positions 3 and 4, except ACE labels (`xn--...`).",

@@ -2770,6 +2770,34 @@ msgstr ""
 "\"{rcode}\" som svar på en NSID-förfrågan (RFC 5001). Namnservrar: "
 "\"{servers}\"."
 
+msgctxt "NAMESERVER:N17_COOKIE_SUPPORTED"
+msgid "The following name server(s) returned a well-formed DNS Cookie (RFC 7873): \"{servers}\"."
+msgstr "Följande namnservrar returnerade en korrekt DNS Cookie (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_NO_COOKIE"
+msgid "The following name server(s) did not return a DNS Cookie (RFC 7873): \"{servers}\"."
+msgstr "Följande namnservrar returnerade ingen DNS Cookie (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_ROUNDTRIP_OK"
+msgid "The following name server(s) did not reject the Server Cookie they issued on a follow-up query (RFC 7873): \"{servers}\"."
+msgstr "Följande namnservrar avvisade inte den Server Cookie de utfärdat vid en uppföljande fråga (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_CLIENT_ONLY"
+msgid "The following name server(s) echoed only the Client Cookie and returned no Server Cookie (RFC 7873): \"{servers}\"."
+msgstr "Följande namnservrar speglade endast Client Cookie och returnerade ingen Server Cookie (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_MALFORMED"
+msgid "The following name server(s) returned a malformed DNS Cookie of {cookie_bytes} bytes (RFC 7873 allows 8 or 16 to 40): \"{servers}\"."
+msgstr "Följande namnservrar returnerade en felaktig DNS Cookie på {cookie_bytes} byte (RFC 7873 tillåter 8 eller 16-40): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_SELF_REJECT"
+msgid "The following name server(s) rejected with BADCOOKIE, even after a retry, a Server Cookie they had just issued (RFC 7873): \"{servers}\"."
+msgstr "Följande namnservrar avvisade med BADCOOKIE, även efter ett nytt försök, en Server Cookie de just hade utfärdat (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_NO_RESPONSE"
+msgid "The following name server(s) did not respond to a DNS Cookie probe (RFC 7873): \"{servers}\"."
+msgstr "Följande namnservrar svarade inte på en DNS Cookie-förfrågan (RFC 7873): \"{servers}\"."
+
 msgctxt "NAMESERVER:QNAME_CASE_INSENSITIVE"
 msgid "The following nameservers do not preserve original case of the queried name ({domain}): {servers}."
 msgstr "Följande namnservrar bevarar inte skillnaden mellan versaler och gemener från frågan ({domain}): {servers}."

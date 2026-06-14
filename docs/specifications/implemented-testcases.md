@@ -12,7 +12,7 @@ Notes:
 
 ## Summary
 - Modules: 9
-- Implemented testcases: 80
+- Implemented testcases: 81
 
 ## Regeneration
 
@@ -49,7 +49,7 @@ make spec-export-implemented
 ### delegation (7)
 - delegation01 - Validate that delegation-side and child-side nameserver sets meet minimum-count requirements overall and per IP family.
 - delegation02 - Detect nameserver IP-address reuse within delegation data, within child data, and across the combined delegation+child addressed NS set.
-- delegation03 - Check whether a synthesized maximal referral response can fit within the 512-byte non-EDNS UDP DNS payload limit.
+- delegation03 - Check how large a synthesized maximal referral response is relative to the 512-byte non-EDNS UDP payload limit and the 1232-byte EDNS payload size, and grade it accordingly.
 - delegation04 - Verify whether nameservers from delegation and child sources answer authoritatively for SOA queries.
 - delegation05 - Verify that NS names used for the tested zone are not aliases (CNAME targets).
 - delegation06 - Verify SOA RRset existence on nameservers collected from delegation and child sources.
@@ -77,7 +77,7 @@ make spec-export-implemented
 - dnssec20 - Verify that the NSEC/NSEC3 apex type bitmap accurately reflects the RR types actually present in the zone.
 - dnssec21 - Verify that the parent zone correctly signs the DS RRset that delegates the child zone.
 
-### nameserver (15)
+### nameserver (16)
 - nameserver01 - Detect whether authoritative nameservers also behave as recursors.
 - nameserver02 - Validate EDNS(0) handling on authoritative nameservers.
 - nameserver03 - Check whether nameservers allow AXFR zone transfer.
@@ -93,6 +93,7 @@ make spec-export-implemented
 - nameserver13 - Check truncated EDNS responses for missing OPT records.
 - nameserver15 - Detect whether authoritative nameservers reveal software version data through CHAOS-class TXT queries.
 - nameserver16 - Query authoritative nameservers with an EDNS NSID option request (RFC 5001, option code 3) and report which servers provide NSID values and what those values contain.
+- nameserver17 - Probe each authoritative nameserver for DNS Cookie (RFC 7873 / RFC 9018) support and verify the returned Server Cookie is well-formed and accepted by the issuing server.
 
 ### syntax (8)
 - syntax01 - Validate that the tested domain name contains only allowed DNS hostname characters.

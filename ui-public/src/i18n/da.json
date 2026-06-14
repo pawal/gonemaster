@@ -149,6 +149,7 @@
   "pub.tc.nameserver13": "Trunkerede EDNS-svar inkluderer OPT-post",
   "pub.tc.nameserver15": "Navneserveren afslører ikke softwareversion",
   "pub.tc.nameserver16": "Understøttelse af EDNS NSID-option",
+  "pub.tc.nameserver17": "Understøttelse af DNS Cookie",
   "pub.tc.syntax01": "Ingen ugyldige tegn i domænenavnet",
   "pub.tc.syntax02": "Ingen bindestreg i begyndelsen eller slutningen af domænenavnet",
   "pub.tc.syntax03": "Ingen dobbelt bindestreg i position 3 og 4 i domænenavnet",

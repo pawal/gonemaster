@@ -90,6 +90,12 @@ Description:
 
 NSID is an EDNS option that lets a nameserver identify which specific instance answered a query - useful when several servers share the same name behind an anycast address. This check requests the NSID and reports which servers provide one and what it says.
 
+## Testcase nameserver17
+
+Description:
+
+DNS Cookies (RFC 7873) are a lightweight anti-spoofing and anti-amplification feature for authoritative servers. This check sends a Client Cookie, inspects the Server Cookie that comes back, and confirms the server accepts the cookie it just issued.
+
 ## Tag IS_A_RECURSOR
 
 Header: Nameserver acts as open recursor
@@ -345,3 +351,59 @@ Header: Unexpected response code for NSID request
 Description:
 
 A nameserver returned an unusual response code when asked for its NSID. The server is reachable but is mishandling a straightforward EDNS option request, which usually indicates older or non-standard software.
+
+## Tag N17_COOKIE_SUPPORTED
+
+Header: DNS Cookie supported
+
+Description:
+
+A nameserver returned a valid DNS Cookie, a modern anti-spoofing and anti-amplification feature (RFC 7873). This is good posture and helps the server resist off-path forgery and abuse.
+
+## Tag N17_NO_COOKIE
+
+Header: No DNS Cookie
+
+Description:
+
+A nameserver did not return a DNS Cookie. This is common and not an error; the feature is simply not enabled, or a middlebox stripped it.
+
+## Tag N17_COOKIE_ROUNDTRIP_OK
+
+Header: DNS Cookie round-trip works
+
+Description:
+
+A nameserver did not reject the Server Cookie it had issued when the check sent it back on a follow-up query. This shows the server handles its own cookies consistently.
+
+## Tag N17_COOKIE_CLIENT_ONLY
+
+Header: Incomplete DNS Cookie
+
+Description:
+
+A nameserver reflected the Client Cookie but did not generate its own Server Cookie half. That is a non-conformant DNS Cookie implementation and provides none of the anti-spoofing benefit.
+
+## Tag N17_COOKIE_MALFORMED
+
+Header: Malformed DNS Cookie
+
+Description:
+
+A nameserver returned a DNS Cookie of an invalid size. A cookie must be 8 bytes, or 16 to 40 bytes; anything else can break strict clients that validate it.
+
+## Tag N17_COOKIE_SELF_REJECT
+
+Header: DNS Cookie rejected by issuer
+
+Description:
+
+A nameserver refused with BADCOOKIE a Server Cookie it had just issued, even after the check retried with the fresh cookie. That degrades legitimate clients and points to inconsistent cookie secrets.
+
+## Tag N17_NO_RESPONSE
+
+Header: No response to DNS Cookie probe
+
+Description:
+
+A nameserver did not answer the DNS Cookie probe at all. The cookie capability cannot be assessed for that server.

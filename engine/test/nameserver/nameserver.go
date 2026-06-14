@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"net"
@@ -191,6 +192,15 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
+	if util.ShouldRunTest(ctx, "nameserver17") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Nameserver17(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
 
 	return results, nil
 }
@@ -341,6 +351,19 @@ func Metadata() map[string][]string {
 			"N16_NO_NSID_REVEALED",
 			"N16_NO_RESPONSE",
 			"N16_UNEXPECTED_RCODE",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"nameserver17": {
+			"N17_COOKIE_CLIENT_ONLY",
+			"N17_COOKIE_MALFORMED",
+			"N17_COOKIE_ROUNDTRIP_OK",
+			"N17_COOKIE_SELF_REJECT",
+			"N17_COOKIE_SUPPORTED",
+			"N17_NO_COOKIE",
+			"N17_NO_RESPONSE",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -2092,6 +2115,252 @@ func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// Nameserver17 runs the NAMESERVER17 test case (DNS Cookie, RFC 7873 / RFC 9018).
+func Nameserver17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Nameserver17"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	clientCookieHex, err := newClientCookie()
+	if err != nil {
+		return results, err
+	}
+
+	nss, err := authoritativeNS(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	type n17Outcome struct {
+		server         string
+		supported      bool
+		noCookie       bool
+		clientOnly     bool
+		malformed      bool
+		malformedBytes int
+		roundtripOK    bool
+		selfReject     bool
+		noResponse     bool
+	}
+
+	var outcomes []n17Outcome
+	if len(nss) > 0 {
+		outcomes = make([]n17Outcome, len(nss))
+		tasks := make([]runner.Task, len(nss))
+		for i, server := range nss {
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := n17Outcome{server: server.String()}
+
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, err := cookieQuery(ctx, server, z.Name.String(), clientCookieHex)
+				if err != nil || resp.Msg == nil || resp.TC() {
+					// Truncated/no response: inconclusive, no TCP fallback.
+					outcome.noResponse = true
+					outcomes[i] = outcome
+					return nil
+				}
+				if resp.Rcode() != "NOERROR" {
+					// RCODE anomalies are graded by basic/N16, not here.
+					outcomes[i] = outcome
+					return nil
+				}
+
+				tag, fullCookieHex, cookieBytes := classifyCookie(resp, clientCookieHex)
+				switch tag {
+				case "N17_NO_COOKIE":
+					outcome.noCookie = true
+				case "N17_COOKIE_CLIENT_ONLY":
+					outcome.clientOnly = true
+				case "N17_COOKIE_MALFORMED":
+					outcome.malformed = true
+					outcome.malformedBytes = cookieBytes
+				case "N17_COOKIE_SUPPORTED":
+					outcome.supported = true
+					if cookieRoundTripOK(ctx, server, z.Name.String(), fullCookieHex) {
+						outcome.roundtripOK = true
+					} else {
+						outcome.selfReject = true
+					}
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+	}
+
+	var supported, noCookie, clientOnly, roundtripOK, selfReject, noResponse []string
+	malformed := map[int][]string{}
+	for _, outcome := range outcomes {
+		if outcome.server == "" {
+			continue
+		}
+		switch {
+		case outcome.supported:
+			supported = append(supported, outcome.server)
+		case outcome.noCookie:
+			noCookie = append(noCookie, outcome.server)
+		case outcome.clientOnly:
+			clientOnly = append(clientOnly, outcome.server)
+		case outcome.malformed:
+			malformed[outcome.malformedBytes] = append(malformed[outcome.malformedBytes], outcome.server)
+		case outcome.noResponse:
+			noResponse = append(noResponse, outcome.server)
+		}
+		if outcome.roundtripOK {
+			roundtripOK = append(roundtripOK, outcome.server)
+		}
+		if outcome.selfReject {
+			selfReject = append(selfReject, outcome.server)
+		}
+	}
+
+	if len(supported) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(supported))
+		if err := appendLog(ctx, &results, testcase, "N17_COOKIE_SUPPORTED", args); err != nil {
+			return results, err
+		}
+	}
+	if len(noCookie) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(noCookie))
+		if err := appendLog(ctx, &results, testcase, "N17_NO_COOKIE", args); err != nil {
+			return results, err
+		}
+	}
+	if len(roundtripOK) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(roundtripOK))
+		if err := appendLog(ctx, &results, testcase, "N17_COOKIE_ROUNDTRIP_OK", args); err != nil {
+			return results, err
+		}
+	}
+	if len(clientOnly) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(clientOnly))
+		if err := appendLog(ctx, &results, testcase, "N17_COOKIE_CLIENT_ONLY", args); err != nil {
+			return results, err
+		}
+	}
+	if len(malformed) > 0 {
+		sizes := make([]int, 0, len(malformed))
+		for size := range malformed {
+			sizes = append(sizes, size)
+		}
+		sort.Ints(sizes)
+		for _, size := range sizes {
+			args := map[string]any{"cookie_bytes": size}
+			setTypedServersFromNames(args, sortedStrings(malformed[size]))
+			if err := appendLog(ctx, &results, testcase, "N17_COOKIE_MALFORMED", args); err != nil {
+				return results, err
+			}
+		}
+	}
+	if len(selfReject) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(selfReject))
+		if err := appendLog(ctx, &results, testcase, "N17_COOKIE_SELF_REJECT", args); err != nil {
+			return results, err
+		}
+	}
+	if len(noResponse) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(noResponse))
+		if err := appendLog(ctx, &results, testcase, "N17_NO_RESPONSE", args); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// newClientCookie returns a random 8-byte Client Cookie (RFC 7873) as hex.
+func newClientCookie() (string, error) {
+	var b [8]byte
+	if _, err := rand.Read(b[:]); err != nil {
+		return "", err
+	}
+	return hex.EncodeToString(b[:]), nil
+}
+
+// cookieQuery sends a UDP-pinned SOA query carrying one COOKIE option.
+func cookieQuery(ctx context.Context, server ns.Nameserver, qname string, cookieHex string) (packet.Packet, error) {
+	useVC := false
+	return server.QueryWithOptions(ctx, qname, "SOA", &ns.QueryOptions{
+		UseVC: &useVC,
+		EDNSDetails: &transport.EDNSDetails{
+			Data: []dns.EDNS0{&dns.COOKIE{Cookie: cookieHex}},
+		},
+	})
+}
+
+// validCookieLen reports a well-formed COOKIE length: 8, or 16-40 (RFC 7873 5.2.2).
+func validCookieLen(n int) bool {
+	return n == 8 || (n >= 16 && n <= 40)
+}
+
+// classifyCookie returns the query-1 tag, the full cookie hex (only when
+// supported), and the observed COOKIE option length in bytes.
+func classifyCookie(resp packet.Packet, clientCookieHex string) (tag string, fullCookieHex string, cookieBytes int) {
+	cookie := resp.Cookie()
+	if cookie == nil {
+		return "N17_NO_COOKIE", "", 0
+	}
+	cookieHex := strings.ToLower(cookie.Cookie)
+	cookieBytes = len(cookieHex) / 2
+	if !validCookieLen(cookieBytes) {
+		return "N17_COOKIE_MALFORMED", "", cookieBytes
+	}
+	// Guard the slice and require the client portion to echo ours.
+	if len(cookieHex) < 16 || cookieHex[:16] != strings.ToLower(clientCookieHex) {
+		return "N17_COOKIE_MALFORMED", "", cookieBytes
+	}
+	if cookieBytes == 8 {
+		return "N17_COOKIE_CLIENT_ONLY", "", cookieBytes
+	}
+	return "N17_COOKIE_SUPPORTED", cookieHex, cookieBytes
+}
+
+// cookieRoundTripOK re-queries with the issued cookie. A BADCOOKIE reply is
+// retried once with the fresh Server Cookie it carries (RFC 7873 5.3); the server
+// self-rejects only when both attempts return BADCOOKIE.
+func cookieRoundTripOK(ctx context.Context, server ns.Nameserver, qname string, fullCookieHex string) bool {
+	resp, err := cookieQuery(ctx, server, qname, fullCookieHex)
+	if err != nil || resp.Msg == nil {
+		return true
+	}
+	if resp.Msg.Rcode != dns.RcodeBadCookie {
+		return true
+	}
+	retryCookieHex := fullCookieHex
+	if c := resp.Cookie(); c != nil && len(c.Cookie) >= 16 {
+		retryCookieHex = strings.ToLower(c.Cookie)
+	}
+	retry, err := cookieQuery(ctx, server, qname, retryCookieHex)
+	if err != nil || retry.Msg == nil {
+		return true
+	}
+	return retry.Msg.Rcode != dns.RcodeBadCookie
 }
 
 func normalizedAnswer(resp packet.Packet) string {

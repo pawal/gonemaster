@@ -77,6 +77,7 @@ var testcaseDescriptions = map[string]string{
 	"NAMESERVER13": "Truncated EDNS responses include OPT record",
 	"NAMESERVER15": "Name server does not reveal software version",
 	"NAMESERVER16": "EDNS NSID option support",
+	"NAMESERVER17": "DNS Cookie (RFC 7873) support",
 
 	// SYNTAX
 	"SYNTAX01": "No illegal characters in the domain name",

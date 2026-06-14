@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net/netip"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -1207,5 +1208,521 @@ func TestNameserver16NoNSID(t *testing.T) {
 	}
 	if servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("unexpected server payload for N16_NO_NSID_REVEALED: %#v", servers[0])
+	}
+}
+
+// cookieServer16 is a 16-byte (32-hex) server cookie used to build 24-byte
+// (RFC 9018 v1) well-formed full cookies in the nameserver17 tests.
+const cookieServer16 = "aabbccddeeff00112233445566778899"
+
+func cookieFromOpts(opts *ens.QueryOptions) string {
+	if opts == nil || opts.EDNSDetails == nil {
+		return ""
+	}
+	for _, o := range opts.EDNSDetails.Data {
+		if c, ok := o.(*dns.COOKIE); ok {
+			return c.Cookie
+		}
+	}
+	return ""
+}
+
+func clientPortion(cookieHex string) string {
+	if len(cookieHex) >= 16 {
+		return cookieHex[:16]
+	}
+	return cookieHex
+}
+
+func soaPacketWithCookieRcode(owner string, rcode int, cookieHex string) packet.Packet {
+	msg := soaMsg(owner)
+	msg.UDPSize = 1232
+	msg.Rcode = uint16(rcode)
+	if cookieHex != "" {
+		msg.Pseudo = append(msg.Pseudo, &dns.COOKIE{Cookie: cookieHex})
+	}
+	return packet.Packet{Msg: msg}
+}
+
+func TestNameserver17Supported(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		c := cookieFromOpts(opts)
+		if len(c) == 16 { // query 1: return a well-formed 24-byte full cookie
+			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(c)+cookieServer16)
+		}
+		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, c) // query 2: accept it
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	if !hasEntryTag(entries, "N17_COOKIE_SUPPORTED") {
+		t.Fatalf("expected N17_COOKIE_SUPPORTED")
+	}
+	if !hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
+		t.Fatalf("expected N17_COOKIE_ROUNDTRIP_OK")
+	}
+	entry := firstEntryByTag(entries, "N17_COOKIE_SUPPORTED")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed server list for N17_COOKIE_SUPPORTED, got %#v", entry.Args["servers"])
+	}
+}
+
+func TestNameserver17NoCookie(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	calls := 0
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		calls++
+		return soaPacket("example") // NOERROR, no COOKIE option
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	if !hasEntryTag(entries, "N17_NO_COOKIE") {
+		t.Fatalf("expected N17_NO_COOKIE")
+	}
+	if hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
+		t.Fatalf("did not expect a round-trip query for a cookieless response")
+	}
+	if calls != 1 {
+		t.Fatalf("expected exactly one query (no round-trip), got %d", calls)
+	}
+}
+
+func TestNameserver17NonNoerrorQuery1(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeRefused
+		return packet.Packet{Msg: msg}
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	for _, tag := range []string{"N17_NO_COOKIE", "N17_COOKIE_SUPPORTED", "N17_COOKIE_MALFORMED", "N17_COOKIE_CLIENT_ONLY", "N17_NO_RESPONSE"} {
+		if hasEntryTag(entries, tag) {
+			t.Fatalf("RCODE anomaly must not produce a cookie verdict, got %s", tag)
+		}
+	}
+}
+
+func TestNameserver17ClientOnly(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(cookieFromOpts(opts)))
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	if !hasEntryTag(entries, "N17_COOKIE_CLIENT_ONLY") {
+		t.Fatalf("expected N17_COOKIE_CLIENT_ONLY")
+	}
+}
+
+func TestNameserver17Malformed(t *testing.T) {
+	t.Run("invalid length", func(t *testing.T) {
+		ctx := setupTest(t)
+		origM4and5 := authoritativeNS
+		t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+			if strings.ToUpper(qtype) != "SOA" {
+				return packet.Packet{}
+			}
+			// 12-byte cookie: client (8) + 4-byte server tail = invalid length.
+			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(cookieFromOpts(opts))+"aabbccdd")
+		})
+		authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+			return []ens.Nameserver{ns1}, nil
+		}
+
+		z := zone.Zone{Name: dnsname.New("example")}
+		entries, err := Nameserver17(ctx, &z)
+		if err != nil {
+			t.Fatalf("nameserver17: %v", err)
+		}
+		entry := firstEntryByTag(entries, "N17_COOKIE_MALFORMED")
+		if entry == nil {
+			t.Fatalf("expected N17_COOKIE_MALFORMED")
+		}
+		if entry.Args["cookie_bytes"] != 12 {
+			t.Fatalf("expected cookie_bytes=12, got %#v", entry.Args["cookie_bytes"])
+		}
+	})
+
+	t.Run("wrong client echo", func(t *testing.T) {
+		ctx := setupTest(t)
+		origM4and5 := authoritativeNS
+		t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+			if strings.ToUpper(qtype) != "SOA" {
+				return packet.Packet{}
+			}
+			// Valid length (24 B) but the client portion does not echo ours.
+			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, "ffffffffffffffff"+cookieServer16)
+		})
+		authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+			return []ens.Nameserver{ns1}, nil
+		}
+
+		z := zone.Zone{Name: dnsname.New("example")}
+		entries, err := Nameserver17(ctx, &z)
+		if err != nil {
+			t.Fatalf("nameserver17: %v", err)
+		}
+		if !hasEntryTag(entries, "N17_COOKIE_MALFORMED") {
+			t.Fatalf("expected N17_COOKIE_MALFORMED for a wrong client-cookie echo")
+		}
+	})
+}
+
+func TestNameserver17SelfRejectAfterRetry(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	calls := 0
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		c := cookieFromOpts(opts)
+		client := clientPortion(c)
+		if len(c) == 16 { // query 1: well-formed cookie
+			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, client+cookieServer16)
+		}
+		// query 2 and the corroborating retry both reject, each time issuing a
+		// fresh server cookie so the retry is a real exchange (distinct cache key).
+		calls++
+		fresh := fmt.Sprintf("%016x%016x", uint64(calls), uint64(calls))
+		return soaPacketWithCookieRcode("example", dns.RcodeBadCookie, client+fresh)
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	if !hasEntryTag(entries, "N17_COOKIE_SELF_REJECT") {
+		t.Fatalf("expected N17_COOKIE_SELF_REJECT")
+	}
+	if hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
+		t.Fatalf("did not expect N17_COOKIE_ROUNDTRIP_OK on a double BADCOOKIE")
+	}
+	if calls != 2 {
+		t.Fatalf("expected query 2 plus one corroborating retry, got %d round-trip queries", calls)
+	}
+}
+
+func TestNameserver17RotationNotFlagged(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	const freshA = "11111111111111112222222222222222"
+	calls := 0
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		c := cookieFromOpts(opts)
+		client := clientPortion(c)
+		if len(c) == 16 { // query 1
+			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, client+cookieServer16)
+		}
+		calls++
+		if calls == 1 { // query 2: stale secret, BADCOOKIE with a fresh cookie
+			return soaPacketWithCookieRcode("example", dns.RcodeBadCookie, client+freshA)
+		}
+		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, client+freshA) // retry accepted
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	if !hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
+		t.Fatalf("expected N17_COOKIE_ROUNDTRIP_OK after a successful retry")
+	}
+	if hasEntryTag(entries, "N17_COOKIE_SELF_REJECT") {
+		t.Fatalf("rotation must not be flagged as a self-reject")
+	}
+}
+
+func TestNameserver17NoResponse(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+		return packet.Packet{} // no response
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	if !hasEntryTag(entries, "N17_NO_RESPONSE") {
+		t.Fatalf("expected N17_NO_RESPONSE")
+	}
+}
+
+func TestNameserver17Truncated(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	calls := 0
+	sawTCP := false
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		calls++
+		if opts != nil && opts.UseVC != nil && *opts.UseVC {
+			sawTCP = true
+		}
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		msg.Truncated = true
+		return packet.Packet{Msg: msg}
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	if !hasEntryTag(entries, "N17_NO_RESPONSE") {
+		t.Fatalf("expected N17_NO_RESPONSE for a truncated probe")
+	}
+	if calls != 1 {
+		t.Fatalf("expected a single probe with no follow-up, got %d", calls)
+	}
+	if sawTCP {
+		t.Fatalf("truncated cookie probe must not fall back to TCP")
+	}
+}
+
+func TestNameserver17OversizedCookieSafe(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		// 41-byte cookie (client + 33-byte server tail): exceeds the 40-byte max.
+		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(cookieFromOpts(opts))+strings.Repeat("a", 66))
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	entry := firstEntryByTag(entries, "N17_COOKIE_MALFORMED")
+	if entry == nil {
+		t.Fatalf("expected N17_COOKIE_MALFORMED for an oversized cookie")
+	}
+	if entry.Args["cookie_bytes"] != 41 {
+		t.Fatalf("expected cookie_bytes=41, got %#v", entry.Args["cookie_bytes"])
+	}
+}
+
+func TestNameserver17UndersizedCookieSafe(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		// 4-byte cookie (8 hex): shorter than a Client Cookie; must not panic.
+		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, "aabbccdd")
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	entry := firstEntryByTag(entries, "N17_COOKIE_MALFORMED")
+	if entry == nil {
+		t.Fatalf("expected N17_COOKIE_MALFORMED for an undersized cookie")
+	}
+	if entry.Args["cookie_bytes"] != 4 {
+		t.Fatalf("expected cookie_bytes=4, got %#v", entry.Args["cookie_bytes"])
+	}
+}
+
+func TestNameserver17ClientCookieStable(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	var mu sync.Mutex
+	var seen []string
+	record := func(opts *ens.QueryOptions) {
+		mu.Lock()
+		defer mu.Unlock()
+		seen = append(seen, cookieFromOpts(opts))
+	}
+	handler := func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		record(opts)
+		return soaPacket("example") // cookieless: keeps each server to a single probe
+	}
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", handler)
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.18", handler)
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	if _, err := Nameserver17(ctx, &z); err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	if len(seen) != 2 {
+		t.Fatalf("expected one probe per nameserver, got %d", len(seen))
+	}
+	for _, c := range seen {
+		if len(c) != 16 {
+			t.Fatalf("expected an 8-byte (16-hex) Client Cookie, got %q", c)
+		}
+	}
+	if seen[0] != seen[1] {
+		t.Fatalf("expected the same Client Cookie across probes, got %q and %q", seen[0], seen[1])
+	}
+}
+
+func TestValidCookieLen(t *testing.T) {
+	cases := []struct {
+		n    int
+		want bool
+	}{
+		{4, false}, {8, true}, {12, false}, {15, false}, {16, true}, {24, true}, {40, true}, {41, false},
+	}
+	for _, tc := range cases {
+		if got := validCookieLen(tc.n); got != tc.want {
+			t.Errorf("validCookieLen(%d) = %v, want %v", tc.n, got, tc.want)
+		}
+	}
+}
+
+func TestClassifyCookie(t *testing.T) {
+	const client = "0011223344556677" // 8-byte Client Cookie
+
+	mk := func(cookieHex string) packet.Packet {
+		msg := new(dns.Msg)
+		if cookieHex != "" {
+			msg.Pseudo = []dns.RR{&dns.COOKIE{Cookie: cookieHex}}
+		}
+		return packet.Packet{Msg: msg}
+	}
+
+	cases := []struct {
+		name      string
+		cookie    string
+		wantTag   string
+		wantBytes int
+	}{
+		{"no cookie", "", "N17_NO_COOKIE", 0},
+		{"client only", client, "N17_COOKIE_CLIENT_ONLY", 8},
+		{"undersized 4B", "aabbccdd", "N17_COOKIE_MALFORMED", 4},
+		{"malformed 12B", client + "aabbccdd", "N17_COOKIE_MALFORMED", 12},
+		{"supported 16B", client + "aabbccddeeff0011", "N17_COOKIE_SUPPORTED", 16},
+		{"supported 24B", client + cookieServer16, "N17_COOKIE_SUPPORTED", 24},
+		{"supported 40B", client + strings.Repeat("a", 64), "N17_COOKIE_SUPPORTED", 40},
+		{"oversized 41B", client + strings.Repeat("a", 66), "N17_COOKIE_MALFORMED", 41},
+		{"wrong echo", "ffffffffffffffff" + cookieServer16, "N17_COOKIE_MALFORMED", 24},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tag, full, n := classifyCookie(mk(tc.cookie), client)
+			if tag != tc.wantTag {
+				t.Fatalf("tag = %q, want %q", tag, tc.wantTag)
+			}
+			if n != tc.wantBytes {
+				t.Fatalf("cookie bytes = %d, want %d", n, tc.wantBytes)
+			}
+			if tc.wantTag == "N17_COOKIE_SUPPORTED" && full != tc.cookie {
+				t.Fatalf("full cookie = %q, want %q", full, tc.cookie)
+			}
+		})
 	}
 }

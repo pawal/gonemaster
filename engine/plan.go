@@ -67,6 +67,7 @@ var moduleTestcases = map[string][]string{
 		"nameserver13",
 		"nameserver15",
 		"nameserver16",
+		"nameserver17",
 	},
 	"zone": {
 		"zone01",

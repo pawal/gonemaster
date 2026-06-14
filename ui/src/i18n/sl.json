@@ -280,6 +280,7 @@
   "tc.nameserver13": "Okrnjeni odgovori EDNS vključujejo zapis OPT",
   "tc.nameserver15": "Imenski strežnik ne razkriva različice programske opreme",
   "tc.nameserver16": "Podpora možnosti EDNS NSID",
+  "tc.nameserver17": "Podpora za DNS Cookie",
   "tc.syntax01": "Brez nedovoljenih znakov v imenu domene",
   "tc.syntax02": "Brez vezaja na začetku ali koncu imena domene",
   "tc.syntax03": "Brez dvojnega vezaja na mestih 3 in 4 imena domene",

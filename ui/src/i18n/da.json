@@ -280,6 +280,7 @@
   "tc.nameserver13": "Trunkerede EDNS-svar inkluderer OPT-post",
   "tc.nameserver15": "Navneserveren afslører ikke softwareversion",
   "tc.nameserver16": "Understøttelse af EDNS NSID-option",
+  "tc.nameserver17": "Understøttelse af DNS Cookie",
   "tc.syntax01": "Ingen ugyldige tegn i domænenavnet",
   "tc.syntax02": "Ingen bindestreg i begyndelsen eller slutningen af domænenavnet",
   "tc.syntax03": "Ingen dobbelt bindestreg i position 3 og 4 i domænenavnet",

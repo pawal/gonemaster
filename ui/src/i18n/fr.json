@@ -280,6 +280,7 @@
   "tc.nameserver13": "Les réponses EDNS tronquées incluent l'enregistrement OPT",
   "tc.nameserver15": "Le serveur de noms ne divulgue pas la version du logiciel",
   "tc.nameserver16": "Prise en charge de l'option EDNS NSID",
+  "tc.nameserver17": "Prise en charge des DNS Cookies",
   "tc.syntax01": "Pas de caractères illégaux dans le nom de domaine",
   "tc.syntax02": "Pas de tiret au début ou à la fin du nom de domaine",
   "tc.syntax03": "Pas de double tiret en positions 3 et 4 du nom de domaine",

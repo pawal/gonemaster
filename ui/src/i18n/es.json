@@ -280,6 +280,7 @@
   "tc.nameserver13": "Las respuestas EDNS truncadas incluyen el registro OPT",
   "tc.nameserver15": "El servidor de nombres no revela la versión del software",
   "tc.nameserver16": "Soporte de la opción EDNS NSID",
+  "tc.nameserver17": "Soporte de DNS Cookie",
   "tc.syntax01": "Sin caracteres ilegales en el nombre de dominio",
   "tc.syntax02": "Sin guión al inicio o al final del nombre de dominio",
   "tc.syntax03": "Sin doble guión en las posiciones 3 y 4 del nombre de dominio",

@@ -280,6 +280,7 @@
   "tc.nameserver13": "Trunkerade EDNS-svar inkluderar OPT-post",
   "tc.nameserver15": "Namnservern avslöjar inte programvaruversion",
   "tc.nameserver16": "Stöd för EDNS NSID-alternativ",
+  "tc.nameserver17": "Stöd för DNS Cookie",
   "tc.syntax01": "Inga otillåtna tecken i domännamnet",
   "tc.syntax02": "Inget bindestreck i början eller slutet av domännamnet",
   "tc.syntax03": "Inget dubbelt bindestreck i position 3 och 4 i domännamnet",

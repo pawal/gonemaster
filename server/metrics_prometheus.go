@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -339,20 +340,12 @@ func writePromSample(buf *bytes.Buffer, name string, labels map[string]string, v
 }
 
 func sortedStringKeys(values map[string]int64) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(values))
 	return keys
 }
 
 func sortedStringKeysFromMap(values map[string]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(values))
 	return keys
 }
 

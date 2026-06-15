@@ -1,9 +1,10 @@
 package server
 
 import (
+	"maps"
 	"net/http"
 	"net/url"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -599,17 +600,9 @@ func (s *Server) handlePublicAnalysisTestcaseDetail(w http.ResponseWriter, r *ht
 		return
 	}
 
-	domains := make([]string, 0, len(domainSet))
-	for d := range domainSet {
-		domains = append(domains, d)
-	}
-	sort.Strings(domains)
+	domains := slices.Sorted(maps.Keys(domainSet))
 
-	tags := make([]string, 0, len(tagSet))
-	for tag := range tagSet {
-		tags = append(tags, tag)
-	}
-	sort.Strings(tags)
+	tags := slices.Sorted(maps.Keys(tagSet))
 
 	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisTestcaseDetail{

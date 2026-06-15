@@ -3,9 +3,9 @@ package nsdiscovery
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/netip"
 	"slices"
-	"sort"
 	"strings"
 
 	dns "codeberg.org/miekg/dns"
@@ -451,11 +451,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 			seen[strings.ToLower(ns.String())] = ns
 		}
 
-		keys := make([]string, 0, len(seen))
-		for key := range seen {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(seen))
 		out := make([]nameserver.Nameserver, 0, len(keys))
 		for _, key := range keys {
 			out = append(out, seen[key])
@@ -512,11 +508,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 		}
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]nameserver.Nameserver, 0, len(keys))
 	for _, key := range keys {

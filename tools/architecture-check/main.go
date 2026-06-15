@@ -7,10 +7,11 @@ import (
 	"flag"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 )
@@ -274,10 +275,6 @@ func sliceSubsection(doc, heading string) string {
 }
 
 func sortedKeys(s map[string]bool) []string {
-	out := make([]string, 0, len(s))
-	for k := range s {
-		out = append(out, k)
-	}
-	sort.Strings(out)
+	out := slices.Sorted(maps.Keys(s))
 	return out
 }

@@ -3,8 +3,9 @@ package basic
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/netip"
-	"sort"
+	"slices"
 	"strings"
 
 	dns "codeberg.org/miekg/dns"
@@ -571,18 +572,10 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(nxdomainHidesDelegation) > 0 {
-		parents := make([]string, 0, len(nxdomainHidesDelegation))
-		for parent := range nxdomainHidesDelegation {
-			parents = append(parents, parent)
-		}
-		sort.Strings(parents)
+		parents := slices.Sorted(maps.Keys(nxdomainHidesDelegation))
 		for _, parent := range parents {
 			perNS := nxdomainHidesDelegation[parent]
-			endpoints := make([]string, 0, len(perNS))
-			for endpoint := range perNS {
-				endpoints = append(endpoints, endpoint)
-			}
-			sort.Strings(endpoints)
+			endpoints := slices.Sorted(maps.Keys(perNS))
 			for _, endpoint := range endpoints {
 				args := withEndpointKeyArgs(endpoint, map[string]any{
 					"query_name":   perNS[endpoint],
@@ -1147,11 +1140,7 @@ func setTypedEndpointsFromSet(args map[string]any, items map[string]bool) {
 		return
 	}
 
-	values := make([]string, 0, len(items))
-	for key := range items {
-		values = append(values, key)
-	}
-	sort.Strings(values)
+	values := slices.Sorted(maps.Keys(items))
 
 	servers := make([]logargs.Server, 0, len(values))
 	addressSet := map[string]bool{}
@@ -1173,11 +1162,7 @@ func setTypedEndpointsFromSet(args map[string]any, items map[string]bool) {
 	}
 
 	if len(addressSet) > 0 {
-		addresses := make([]string, 0, len(addressSet))
-		for address := range addressSet {
-			addresses = append(addresses, address)
-		}
-		sort.Strings(addresses)
+		addresses := slices.Sorted(maps.Keys(addressSet))
 		args["addresses"] = addresses
 	}
 }

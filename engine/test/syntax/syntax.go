@@ -3,8 +3,10 @@ package syntax
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/mail"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 
@@ -318,11 +320,7 @@ func Syntax04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		seen[strings.ToLower(name.String())] = name
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	if len(keys) > 0 {
 		tasks := make([]runner.Task, len(keys))
@@ -434,11 +432,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		uniqueNS[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(uniqueNS))
-	for key := range uniqueNS {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(uniqueNS))
 
 	var nss []nameserver.Nameserver
 	for _, key := range keys {
@@ -665,11 +659,7 @@ func Syntax06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if invalidExchanges == 0 {
-		keys := make([]string, 0, len(rnameCandidates))
-		for key := range rnameCandidates {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(rnameCandidates))
 		for _, rname := range keys {
 			if err := appendLog(ctx, &results, testcase, "RNAME_RFC822_VALID", map[string]any{"rname": rname}); err != nil {
 				return results, err

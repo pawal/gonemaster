@@ -3,7 +3,9 @@ package zone
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 
@@ -154,11 +156,7 @@ func (z *Zone) GlueNames(ctx context.Context) ([]dnsname.Name, error) {
 		seen[nsName.String()] = nsName
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 	var names []dnsname.Name
 	for _, key := range keys {
 		names = append(names, seen[key])
@@ -243,11 +241,7 @@ func (z *Zone) NSNames(ctx context.Context) ([]dnsname.Name, error) {
 			name := dnsname.New(strings.ToLower(ns.Name.String()))
 			seen[name.String()] = name
 		}
-		keys := make([]string, 0, len(seen))
-		for key := range seen {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(seen))
 		var names []dnsname.Name
 		for _, key := range keys {
 			names = append(names, seen[key])
@@ -287,11 +281,7 @@ func (z *Zone) NSNames(ctx context.Context) ([]dnsname.Name, error) {
 		nsName := dnsname.New(strings.ToLower(nsRR.Ns))
 		seen[nsName.String()] = nsName
 	}
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 	var names []dnsname.Name
 	for _, key := range keys {
 		names = append(names, seen[key])
@@ -330,11 +320,7 @@ func (z *Zone) ApexNSNames(ctx context.Context) ([]dnsname.Name, error) {
 		}
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 	out := make([]dnsname.Name, 0, len(keys))
 	for _, key := range keys {
 		out = append(out, seen[key])

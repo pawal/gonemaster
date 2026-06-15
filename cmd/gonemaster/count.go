@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"maps"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -84,11 +85,7 @@ func (r *countReporter) SummaryLines() []string {
 	lines = append(lines, fmt.Sprintf("=======\t%s\t=====", strings.Repeat("=", tagWidth)))
 	for _, level := range levels {
 		levelTags := tagCount[level]
-		tags := make([]string, 0, len(levelTags))
-		for tag := range levelTags {
-			tags = append(tags, tag)
-		}
-		sort.Strings(tags)
+		tags := slices.Sorted(maps.Keys(levelTags))
 		for _, tag := range tags {
 			lines = append(lines, fmt.Sprintf("%7s\t%-*s\t%5d", level, tagWidth, tag, levelTags[tag]))
 		}

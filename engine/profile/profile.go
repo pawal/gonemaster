@@ -4,7 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	"codeberg.org/pawal/gonemaster/share"
 )
@@ -368,10 +369,6 @@ func mustDefault() *Profile {
 }
 
 func propertyNames() []string {
-	keys := make([]string, 0, len(propertyDefs))
-	for key := range propertyDefs {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(propertyDefs))
 	return keys
 }

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"maps"
 	"reflect"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 )
@@ -150,11 +150,7 @@ func (e *Entry) ArgString() string {
 	}
 
 	printable := e.PrintableArgs()
-	keys := make([]string, 0, len(printable))
-	for key := range printable {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(printable))
 
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {

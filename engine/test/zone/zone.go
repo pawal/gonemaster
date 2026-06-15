@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/netip"
 	"regexp"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -2228,11 +2230,7 @@ func nameserversFromNSItems(ctx context.Context, z *zonepkg.Zone, items []nsdisc
 		seen[strings.ToLower(ns.String())] = ns
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]nameserver.Nameserver, 0, len(keys))
 	for _, key := range keys {
@@ -2385,11 +2383,7 @@ func splitEndpoint(value string) (string, string) {
 }
 
 func sortedKeys(values map[string][]string) []string {
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(values))
 	return keys
 }
 

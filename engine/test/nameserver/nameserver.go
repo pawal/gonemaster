@@ -5,8 +5,10 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"maps"
 	"net"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 
@@ -1408,11 +1410,7 @@ func Nameserver10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(unexpectedRcode) > 0 {
-		keys := make([]string, 0, len(unexpectedRcode))
-		for key := range unexpectedRcode {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(unexpectedRcode))
 		for _, rcode := range keys {
 			args := map[string]any{
 				"rcode": rcode,
@@ -1568,11 +1566,7 @@ func Nameserver11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(unexpectedRcode) > 0 {
-		keys := make([]string, 0, len(unexpectedRcode))
-		for key := range unexpectedRcode {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(unexpectedRcode))
 		for _, rcode := range keys {
 			args := map[string]any{
 				"rcode": rcode,
@@ -1888,18 +1882,10 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(txtData) > 0 {
-		stringsList := make([]string, 0, len(txtData))
-		for value := range txtData {
-			stringsList = append(stringsList, value)
-		}
-		sort.Strings(stringsList)
+		stringsList := slices.Sorted(maps.Keys(txtData))
 		for _, value := range stringsList {
 			queries := txtData[value]
-			queryNames := make([]string, 0, len(queries))
-			for queryName := range queries {
-				queryNames = append(queryNames, queryName)
-			}
-			sort.Strings(queryNames)
+			queryNames := slices.Sorted(maps.Keys(queries))
 			for _, queryName := range queryNames {
 				list := sortedStrings(queries[queryName])
 				args := map[string]any{
@@ -1915,11 +1901,7 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(errorOnVersionQuery) > 0 {
-		queryNames := make([]string, 0, len(errorOnVersionQuery))
-		for queryName := range errorOnVersionQuery {
-			queryNames = append(queryNames, queryName)
-		}
-		sort.Strings(queryNames)
+		queryNames := slices.Sorted(maps.Keys(errorOnVersionQuery))
 		for _, queryName := range queryNames {
 			list := sortedStrings(errorOnVersionQuery[queryName])
 			args := map[string]any{
@@ -2064,11 +2046,7 @@ func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(nsidData) > 0 {
-		valueList := make([]string, 0, len(nsidData))
-		for value := range nsidData {
-			valueList = append(valueList, value)
-		}
-		sort.Strings(valueList)
+		valueList := slices.Sorted(maps.Keys(nsidData))
 		for _, value := range valueList {
 			list := sortedStrings(nsidData[value])
 			args := map[string]any{
@@ -2098,11 +2076,7 @@ func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(unexpectedRcode) > 0 {
-		keys := make([]string, 0, len(unexpectedRcode))
-		for key := range unexpectedRcode {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(unexpectedRcode))
 		for _, rcode := range keys {
 			list := sortedStrings(unexpectedRcode[rcode])
 			args := map[string]any{
@@ -2286,11 +2260,7 @@ func Nameserver17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 	if len(malformed) > 0 {
-		sizes := make([]int, 0, len(malformed))
-		for size := range malformed {
-			sizes = append(sizes, size)
-		}
-		sort.Ints(sizes)
+		sizes := slices.Sorted(maps.Keys(malformed))
 		for _, size := range sizes {
 			args := map[string]any{"cookie_bytes": size}
 			setTypedServersFromNames(args, sortedStrings(malformed[size]))
@@ -2559,11 +2529,7 @@ func nameserversFromNSItems(ctx context.Context, z *zone.Zone, items []nsdiscove
 		seen[strings.ToLower(server.String())] = server
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]ns.Nameserver, 0, len(keys))
 	for _, key := range keys {

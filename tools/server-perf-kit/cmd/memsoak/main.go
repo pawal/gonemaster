@@ -12,13 +12,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"net/http/httptest"
 	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 	"runtime"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -554,11 +555,7 @@ func cloneStatusCounts(src map[string]int) map[string]int {
 	if len(src) == 0 {
 		return map[string]int{}
 	}
-	keys := make([]string, 0, len(src))
-	for key := range src {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(src))
 	out := make(map[string]int, len(src))
 	for _, key := range keys {
 		out[key] = src[key]

@@ -3,7 +3,9 @@ package connectivity
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/netip"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -587,11 +589,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 		}
 	}
 
-	versions := make([]int, 0, len(prefixes))
-	for version := range prefixes {
-		versions = append(versions, version)
-	}
-	sort.Ints(versions)
+	versions := slices.Sorted(maps.Keys(prefixes))
 
 	for _, version := range versions {
 		prefixMap := prefixes[version]
@@ -599,11 +597,7 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 			continue
 		}
 
-		prefixKeys := make([]string, 0, len(prefixMap))
-		for key := range prefixMap {
-			prefixKeys = append(prefixKeys, key)
-		}
-		sort.Strings(prefixKeys)
+		prefixKeys := slices.Sorted(maps.Keys(prefixMap))
 
 		var combined []string
 		for _, prefix := range prefixKeys {
@@ -956,11 +950,7 @@ func nameserversFromNSItems(ctx context.Context, z *zone.Zone, items []nsdiscove
 		seen[strings.ToLower(ns.String())] = ns
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]nameserver.Nameserver, 0, len(keys))
 	for _, key := range keys {

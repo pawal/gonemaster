@@ -16,8 +16,10 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -339,11 +341,7 @@ func addCoverageToken(token string, out map[string]bool) {
 }
 
 func sortedStringKeys(m map[string][]string) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(m))
 	return keys
 }
 

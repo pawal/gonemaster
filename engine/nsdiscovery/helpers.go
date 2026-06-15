@@ -2,7 +2,9 @@ package nsdiscovery
 
 import (
 	"context"
+	"maps"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 
@@ -157,11 +159,7 @@ func uniqueSortedItems(items []NSItem) []NSItem {
 	for _, item := range items {
 		seen[item.String()] = item
 	}
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]NSItem, 0, len(keys))
 	for _, key := range keys {
@@ -175,11 +173,7 @@ func uniqueSortedNameservers(items []nameserver.Nameserver) []nameserver.Nameser
 	for _, item := range items {
 		seen[strings.ToLower(item.String())] = item
 	}
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 	out := make([]nameserver.Nameserver, 0, len(keys))
 	for _, key := range keys {
 		out = append(out, seen[key])
@@ -188,11 +182,7 @@ func uniqueSortedNameservers(items []nameserver.Nameserver) []nameserver.Nameser
 }
 
 func firstKey(m map[string][]nameserver.Nameserver) string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(m))
 	return keys[0]
 }
 

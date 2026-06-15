@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 
@@ -37,11 +38,7 @@ func (c *CacheStore) ExportEntries() ([]Entry, error) {
 	maps.Copy(cacheByAddress, c.cacheByAddress)
 	c.mu.Unlock()
 
-	addresses := make([]string, 0, len(cacheByAddress))
-	for address := range cacheByAddress {
-		addresses = append(addresses, address)
-	}
-	sort.Strings(addresses)
+	addresses := slices.Sorted(maps.Keys(cacheByAddress))
 
 	entries := make([]Entry, 0)
 	for _, address := range addresses {

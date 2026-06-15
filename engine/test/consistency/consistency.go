@@ -3,6 +3,8 @@ package consistency
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -275,11 +277,7 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	serialKeys := make([]string, 0, len(serials))
-	for key := range serials {
-		serialKeys = append(serialKeys, key)
-	}
-	sort.Strings(serialKeys)
+	serialKeys := slices.Sorted(maps.Keys(serials))
 
 	for _, serial := range serialKeys {
 		nsList := uniqueSortedValues(serials[serial])
@@ -785,11 +783,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		childNSNames[name.String()] = name
 	}
 
-	childKeys := make([]string, 0, len(childNSNames))
-	for key := range childNSNames {
-		childKeys = append(childKeys, key)
-	}
-	sort.Strings(childKeys)
+	childKeys := slices.Sorted(maps.Keys(childNSNames))
 
 	for _, key := range childKeys {
 		nsName := childNSNames[key]
@@ -947,11 +941,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	oobMismatch := []string{}
-	glueKeys := make([]string, 0, len(extendedGlue))
-	for key := range extendedGlue {
-		glueKeys = append(glueKeys, key)
-	}
-	sort.Strings(glueKeys)
+	glueKeys := slices.Sorted(maps.Keys(extendedGlue))
 
 	for _, glueName := range glueKeys {
 		glueStrings := append([]string{}, extendedGlue[glueName]...)
@@ -1220,11 +1210,7 @@ func appendChildNSNamesFromServers(ctx context.Context, z *zone.Zone, names []dn
 		}
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]dnsname.Name, 0, len(keys))
 	for _, key := range keys {
@@ -1351,11 +1337,7 @@ func addrKey(rr dns.RR) string {
 }
 
 func sortedKeys(m map[string]bool) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(m))
 	return keys
 }
 

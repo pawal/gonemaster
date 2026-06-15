@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
+	"maps"
 	"slices"
 	"sort"
 	"strconv"
@@ -829,11 +830,7 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	tagKeys := make([]string, 0, len(sets))
-	for tag := range sets {
-		tagKeys = append(tagKeys, tag)
-	}
-	sort.Strings(tagKeys)
+	tagKeys := slices.Sorted(maps.Keys(sets))
 	for _, tag := range tagKeys {
 		values := sets[tag]
 		digestKeys := make([]int, 0, len(values))
@@ -1024,11 +1021,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			nss[ns.String()] = ns
 		}
 
-		keys := make([]string, 0, len(nss))
-		for key := range nss {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(nss))
 
 		type childOutcome struct {
 			nsIP                    string
@@ -1707,11 +1700,7 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		saltKeys := make([]int, 0, len(nsec3SaltLength))
-		for salt := range nsec3SaltLength {
-			saltKeys = append(saltKeys, salt)
-		}
-		sort.Ints(saltKeys)
+		saltKeys := slices.Sorted(maps.Keys(nsec3SaltLength))
 		for _, salt := range saltKeys {
 			if salt == 0 {
 				args := map[string]any{}
@@ -2044,11 +2033,7 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	tagKeys := make([]string, 0, len(sets))
-	for tag := range sets {
-		tagKeys = append(tagKeys, tag)
-	}
-	sort.Strings(tagKeys)
+	tagKeys := slices.Sorted(maps.Keys(sets))
 	for _, tag := range tagKeys {
 		algoMap := sets[tag]
 		algoKeys := make([]int, 0, len(algoMap))
@@ -2421,11 +2406,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(errorRcodeDNSKEY) > 0 {
-		rcodeKeys := make([]string, 0, len(errorRcodeDNSKEY))
-		for rcode := range errorRcodeDNSKEY {
-			rcodeKeys = append(rcodeKeys, rcode)
-		}
-		sort.Strings(rcodeKeys)
+		rcodeKeys := slices.Sorted(maps.Keys(errorRcodeDNSKEY))
 		for _, rcode := range rcodeKeys {
 			args := map[string]any{
 				"rcode": rcode,
@@ -2543,11 +2524,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nss[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(nss))
-	for key := range nss {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nss))
 
 	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
@@ -2842,11 +2819,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nss[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(nss))
-	for key := range nss {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nss))
 
 	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
@@ -3792,11 +3765,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 	if len(nsecNodataWrongSOA) > 0 {
-		keys := make([]string, 0, len(nsecNodataWrongSOA))
-		for key := range nsecNodataWrongSOA {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(nsecNodataWrongSOA))
 		for _, key := range keys {
 			args := map[string]any{
 				"domain": key,
@@ -3843,11 +3812,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 	if len(nsec3NodataWrongSOA) > 0 {
-		keys := make([]string, 0, len(nsec3NodataWrongSOA))
-		for key := range nsec3NodataWrongSOA {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(nsec3NodataWrongSOA))
 		for _, key := range keys {
 			args := map[string]any{
 				"domain": key,
@@ -4210,11 +4175,7 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nss[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(nss))
-	for key := range nss {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nss))
 
 	isUndelegated := hasFakeAddresses(z)
 	if isUndelegated && len(keys) > 0 {
@@ -4352,11 +4313,7 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			childNSS[ns.String()] = ns
 		}
 
-		childKeys := make([]string, 0, len(childNSS))
-		for key := range childNSS {
-			childKeys = append(childKeys, key)
-		}
-		sort.Strings(childKeys)
+		childKeys := slices.Sorted(maps.Keys(childNSS))
 
 		var ordered []nameserver.Nameserver
 		ipAlreadyProcessed = map[string]bool{}
@@ -4509,11 +4466,7 @@ func DNSSEC13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nss[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(nss))
-	for key := range nss {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nss))
 
 	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
@@ -4699,11 +4652,7 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nss[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(nss))
-	for key := range nss {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nss))
 	var ordered []nameserver.Nameserver
 	for _, key := range keys {
 		ordered = append(ordered, nss[key])
@@ -4872,11 +4821,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nss[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(nss))
-	for key := range nss {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nss))
 	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
 	for _, key := range keys {
@@ -5142,11 +5087,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nss[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(nss))
-	for key := range nss {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nss))
 
 	testingTime := time.Now().UTC()
 	var ordered []nameserver.Nameserver
@@ -5662,11 +5603,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nss[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(nss))
-	for key := range nss {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nss))
 
 	testingTime := time.Now().UTC()
 	var ordered []nameserver.Nameserver
@@ -6152,11 +6089,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		nss[ns.String()] = ns
 	}
 
-	keys := make([]string, 0, len(nss))
-	for key := range nss {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nss))
 
 	var ordered []nameserver.Nameserver
 	ipAlreadyProcessed := map[string]bool{}
@@ -6257,11 +6190,7 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			childNSS[ns.String()] = ns
 		}
 
-		childKeys := make([]string, 0, len(childNSS))
-		for key := range childNSS {
-			childKeys = append(childKeys, key)
-		}
-		sort.Strings(childKeys)
+		childKeys := slices.Sorted(maps.Keys(childNSS))
 
 		var ordered []nameserver.Nameserver
 		ipAlreadyProcessed = map[string]bool{}
@@ -6733,11 +6662,7 @@ func DNSSEC19(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		merged[strings.ToLower(ns.String())] = ns
 	}
 
-	keys := make([]string, 0, len(merged))
-	for key := range merged {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(merged))
 
 	ordered := make([]nameserver.Nameserver, 0, len(keys))
 	for _, key := range keys {
@@ -7233,11 +7158,7 @@ func mapKeysSorted(values map[string]bool) []string {
 	if len(values) == 0 {
 		return nil
 	}
-	keys := make([]string, 0, len(values))
-	for key := range values {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(values))
 	return keys
 }
 
@@ -7260,11 +7181,7 @@ func rrsetInconsistent(rrsets map[string][]dns.RR) bool {
 	if len(rrsets) == 0 {
 		return false
 	}
-	keys := make([]string, 0, len(rrsets))
-	for key := range rrsets {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(rrsets))
 
 	first := true
 	var signature string
@@ -7829,11 +7746,7 @@ func nameserversFromNSItems(ctx context.Context, z *zone.Zone, items []nsdiscove
 		seen[strings.ToLower(ns.String())] = ns
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]nameserver.Nameserver, 0, len(keys))
 	for _, key := range keys {
@@ -8089,11 +8002,7 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	// Emit mismatch tags per type.
-	mismatchTypes := make([]string, 0, len(nsecMismatchServers)+len(nsec3MismatchServers))
-	for t := range nsecMismatchServers {
-		mismatchTypes = append(mismatchTypes, t)
-	}
-	sort.Strings(mismatchTypes)
+	mismatchTypes := slices.Sorted(maps.Keys(nsecMismatchServers))
 	for _, rrtype := range mismatchTypes {
 		args := map[string]any{"query_type": rrtype}
 		setTypedServersFromNames(args, nsecMismatchServers[rrtype])
@@ -8102,11 +8011,7 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	nsec3MismatchTypes := make([]string, 0, len(nsec3MismatchServers))
-	for t := range nsec3MismatchServers {
-		nsec3MismatchTypes = append(nsec3MismatchTypes, t)
-	}
-	sort.Strings(nsec3MismatchTypes)
+	nsec3MismatchTypes := slices.Sorted(maps.Keys(nsec3MismatchServers))
 	for _, rrtype := range nsec3MismatchTypes {
 		args := map[string]any{"query_type": rrtype}
 		setTypedServersFromNames(args, nsec3MismatchServers[rrtype])

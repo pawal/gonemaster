@@ -2,7 +2,9 @@ package recursor
 
 import (
 	"fmt"
+	"maps"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 
@@ -50,18 +52,10 @@ func (r *Recursor) ExportCacheEntries() ([]CacheEntry, error) {
 	flat := make([]flatEntry, 0)
 	for _, key := range keys {
 		byType := r.recurseCache[key]
-		types := make([]string, 0, len(byType))
-		for qtype := range byType {
-			types = append(types, qtype)
-		}
-		sort.Strings(types)
+		types := slices.Sorted(maps.Keys(byType))
 		for _, qtype := range types {
 			byClass := byType[qtype]
-			classes := make([]string, 0, len(byClass))
-			for qclass := range byClass {
-				classes = append(classes, qclass)
-			}
-			sort.Strings(classes)
+			classes := slices.Sorted(maps.Keys(byClass))
 			for _, qclass := range classes {
 				entry := byClass[qclass]
 				if entry == nil || entry.resp == nil || entry.resp.Msg == nil {

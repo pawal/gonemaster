@@ -257,8 +257,8 @@ func newHumanLayout(locale string) humanLayout {
 		secondsLabel: seconds,
 		levelLabel:   level,
 		messageLabel: message,
-		secondsWidth: maxInt(defaultSecondsColumnWidth, terminalCellWidth(seconds)),
-		levelWidth:   maxInt(defaultLevelColumnWidth, terminalCellWidth(level)),
+		secondsWidth: max(defaultSecondsColumnWidth, terminalCellWidth(seconds)),
+		levelWidth:   max(defaultLevelColumnWidth, terminalCellWidth(level)),
 	}
 }
 
@@ -270,7 +270,7 @@ func writeHumanHeaderWithLayout(out io.Writer, layout humanLayout) error {
 		return err
 	}
 
-	messageWidth := maxInt(7, terminalCellWidth(layout.messageLabel))
+	messageWidth := max(7, terminalCellWidth(layout.messageLabel))
 	divider := strings.Repeat("=", layout.secondsWidth) +
 		" " + strings.Repeat("=", layout.levelWidth) +
 		" " + strings.Repeat("=", messageWidth)
@@ -290,13 +290,6 @@ func translatedHeaderLabel(locale string, tag string, fallback string) string {
 		return fallback
 	}
 	return value
-}
-
-func maxInt(a int, b int) int {
-	if a > b {
-		return a
-	}
-	return b
 }
 
 func padRightDisplay(s string, width int) string {

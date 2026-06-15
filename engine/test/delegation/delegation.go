@@ -3,6 +3,8 @@ package delegation
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -591,11 +593,7 @@ func Delegation05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	for _, ns := range append(list4, list5...) {
 		allNS[ns.String()] = ns
 	}
-	keys := make([]string, 0, len(allNS))
-	for key := range allNS {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(allNS))
 
 	for _, nsName := range nsNames {
 		if z.Name.IsInBailiwick(nsName) {
@@ -871,11 +869,7 @@ func setTypedEndpointsFromNameservers(args map[string]any, nss []nameserver.Name
 		return
 	}
 
-	addresses := make([]string, 0, len(addressSet))
-	for address := range addressSet {
-		addresses = append(addresses, address)
-	}
-	sort.Strings(addresses)
+	addresses := slices.Sorted(maps.Keys(addressSet))
 	args["addresses"] = addresses
 }
 
@@ -915,11 +909,7 @@ func findDupNS(ctx context.Context, testcase string, duplicateTag string, distin
 	}
 
 	var results []*logger.Entry
-	keys := make([]string, 0, len(ips))
-	for key := range ips {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(ips))
 	for _, ip := range keys {
 		if len(ips[ip]) > 1 {
 			args := map[string]any{

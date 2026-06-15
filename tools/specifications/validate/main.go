@@ -5,9 +5,11 @@ import (
 	"errors"
 	"flag"
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"sort"
 	"strings"
 
@@ -324,19 +326,11 @@ func scanAppendLogTags(root string) (map[string][]string, error) {
 }
 
 func sortedModuleKeys(modules map[string]map[string][]string) []string {
-	keys := make([]string, 0, len(modules))
-	for key := range modules {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(modules))
 	return keys
 }
 
 func sortedTestcaseKeys(testcases map[string][]string) []string {
-	keys := make([]string, 0, len(testcases))
-	for key := range testcases {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(testcases))
 	return keys
 }

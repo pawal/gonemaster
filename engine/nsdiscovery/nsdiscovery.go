@@ -3,7 +3,8 @@ package nsdiscovery
 import (
 	"context"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
@@ -79,11 +80,7 @@ func AllNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver,
 		seen[strings.ToLower(ns.String())] = ns
 	}
 
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]nameserver.Nameserver, 0, len(keys))
 	for _, key := range keys {
@@ -93,11 +90,7 @@ func AllNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver,
 }
 
 func sortedNames(seen map[string]dnsname.Name) []dnsname.Name {
-	keys := make([]string, 0, len(seen))
-	for key := range seen {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(seen))
 
 	out := make([]dnsname.Name, 0, len(keys))
 	for _, key := range keys {

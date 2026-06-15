@@ -3,9 +3,10 @@ package engine
 import (
 	"context"
 	"fmt"
+	"maps"
 	"net/netip"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -370,11 +371,7 @@ func buildUndelegatedFakeDelegation(ctx context.Context, zoneName dnsname.Name, 
 		out[nameKey] = append(out[nameKey], item.IP)
 	}
 
-	names := make([]string, 0, len(out))
-	for name := range out {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(out))
 
 	for _, name := range names {
 		if len(out[name]) > 0 {

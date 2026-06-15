@@ -3,7 +3,8 @@ package nsdiscovery
 import (
 	"context"
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 	"strings"
 	"sync"
 
@@ -349,11 +350,7 @@ func parentNSIPs(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, er
 		}
 	}
 
-	keys := make([]string, 0, len(nsByIP))
-	for key := range nsByIP {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(nsByIP))
 
 	out := make([]nameserver.Nameserver, 0, len(keys))
 	for _, key := range keys {

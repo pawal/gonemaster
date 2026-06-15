@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"maps"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -29,11 +29,7 @@ func normalizeStopLevel(value string) (string, error) {
 
 func stopLevelNames() []string {
 	levels := logger.Levels()
-	names := make([]string, 0, len(levels))
-	for name := range levels {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(levels))
 	return names
 }
 

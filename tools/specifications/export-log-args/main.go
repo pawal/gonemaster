@@ -949,11 +949,7 @@ func cloneShapes(in map[string]map[string]struct{}) map[string]map[string]struct
 }
 
 func sortedSet(in map[string]struct{}) []string {
-	out := make([]string, 0, len(in))
-	for item := range in {
-		out = append(out, item)
-	}
-	sort.Strings(out)
+	out := slices.Sorted(maps.Keys(in))
 	return out
 }
 

@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"io"
+	"maps"
 	"reflect"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -67,11 +69,7 @@ func formatRawArgs(args map[string]any) string {
 	if len(args) == 0 {
 		return ""
 	}
-	keys := make([]string, 0, len(args))
-	for key := range args {
-		keys = append(keys, key)
-	}
-	sort.Strings(keys)
+	keys := slices.Sorted(maps.Keys(args))
 
 	parts := make([]string, 0, len(keys))
 	for _, key := range keys {
@@ -103,11 +101,7 @@ func formatRawArgValue(value any) string {
 		if endpoint, ok := endpointFromMap(v); ok {
 			return endpoint
 		}
-		keys := make([]string, 0, len(v))
-		for key := range v {
-			keys = append(keys, key)
-		}
-		sort.Strings(keys)
+		keys := slices.Sorted(maps.Keys(v))
 		parts := make([]string, 0, len(keys))
 		for _, key := range keys {
 			parts = append(parts, key+"="+formatRawArgValue(v[key]))

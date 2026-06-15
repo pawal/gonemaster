@@ -3,6 +3,8 @@ package address
 import (
 	"context"
 	"fmt"
+	"maps"
+	"slices"
 	"sort"
 	"strings"
 
@@ -165,11 +167,7 @@ func Address01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		ipGroups[item.Address.String()] = append(ipGroups[item.Address.String()], item)
 	}
 
-	ipKeys := make([]string, 0, len(ipGroups))
-	for key := range ipGroups {
-		ipKeys = append(ipKeys, key)
-	}
-	sort.Strings(ipKeys)
+	ipKeys := slices.Sorted(maps.Keys(ipGroups))
 
 	var documentationAddr []string
 	var localUseAddr []string

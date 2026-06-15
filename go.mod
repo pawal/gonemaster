@@ -1,6 +1,6 @@
 module codeberg.org/pawal/gonemaster
 
-go 1.25.0
+go 1.26.0
 
 require (
 	codeberg.org/miekg/dns v0.6.81

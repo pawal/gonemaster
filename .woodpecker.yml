@@ -23,7 +23,7 @@ steps:
       - npm --prefix ui run build
 
   spec_check:
-    image: golang:1.25
+    image: golang:1.26
     commands:
       - go run ./tools/specifications/validate
       - go run ./tools/specifications/generate-tag-catalog --check
@@ -31,19 +31,19 @@ steps:
       - go run ./tools/i18n/check-placeholders
 
   architecture_check:
-    image: golang:1.25
+    image: golang:1.26
     commands:
       - go run ./tools/architecture-check
 
   go_test:
-    image: golang:1.25
+    image: golang:1.26
     depends_on:
       - ui_checks
     commands:
       - go test ./...
 
   integration_test:
-    image: golang:1.25
+    image: golang:1.26
     depends_on:
       - go_test
     environment:
@@ -55,7 +55,7 @@ steps:
       - go test ./server/... -count=1 -timeout 120s
 
   build_server_with_ui:
-    image: golang:1.25
+    image: golang:1.26
     depends_on:
       - ui_checks
     commands:
@@ -98,7 +98,7 @@ steps:
       - npm --prefix ui run build
 
   build_artifacts:
-    image: golang:1.25
+    image: golang:1.26
     depends_on:
       - ui_build
     commands:

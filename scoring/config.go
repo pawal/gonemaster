@@ -86,21 +86,21 @@ func DefaultConfig() Config {
 			"CRITICAL": 0, // CRITICAL triggers an automatic F override, not a numeric penalty
 		},
 		CategoryWeights: map[string]float64{
-			"dnssec":           1.5,
+			"dnssec":            1.5,
 			"nameserver_health": 1.2,
-			"connectivity":     1.0,
-			"zone_consistency": 0.8,
+			"connectivity":      1.0,
+			"zone_consistency":  0.8,
 		},
 		ModuleCategories: map[string]string{
-			"DNSSEC":      "dnssec",
-			"NAMESERVER":  "nameserver_health",
-			"BASIC":       "nameserver_health",
-			"DELEGATION":  "nameserver_health",
+			"DNSSEC":       "dnssec",
+			"NAMESERVER":   "nameserver_health",
+			"BASIC":        "nameserver_health",
+			"DELEGATION":   "nameserver_health",
 			"CONNECTIVITY": "connectivity",
-			"ADDRESS":     "connectivity",
-			"CONSISTENCY": "zone_consistency",
-			"ZONE":        "zone_consistency",
-			"SYNTAX":      "zone_consistency",
+			"ADDRESS":      "connectivity",
+			"CONSISTENCY":  "zone_consistency",
+			"ZONE":         "zone_consistency",
+			"SYNTAX":       "zone_consistency",
 		},
 		TagPenalties: map[string]int{
 			// DS07_NOT_SIGNED: zone has no DNSKEY records on any nameserver -

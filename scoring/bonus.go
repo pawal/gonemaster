@@ -76,7 +76,7 @@ func noWarningsOrErrors(entries []Entry) bool {
 // dnssecEnabled returns:
 //   - true  when DS07_SIGNED is present (zone has a signed DS)
 //   - false when DS07_NOT_SIGNED is present, or when the test was not run
-//            (cannot confirm → treated as not met for A+ purposes)
+//     (cannot confirm → treated as not met for A+ purposes)
 func dnssecEnabled(tags map[string]bool) *bool {
 	if tags["DS07_SIGNED"] {
 		return boolPtr(true)
@@ -86,7 +86,7 @@ func dnssecEnabled(tags map[string]bool) *bool {
 
 // strongAlgorithm returns:
 //   - false when any deprecated or not-recommended algorithm tag is present,
-//            or when DS05 was not run (cannot confirm → not met for A+)
+//     or when DS05 was not run (cannot confirm → not met for A+)
 //   - true  when DS05_ALGO_OK is present and no weak-algorithm tags exist
 func strongAlgorithm(tags map[string]bool) *bool {
 	weakTags := []string{
@@ -107,9 +107,9 @@ func strongAlgorithm(tags map[string]bool) *bool {
 
 // nsec3NonOptout returns:
 //   - nil   when DS03_NSEC3_OPT_OUT_ENABLED_TLD is present (TLD using
-//            opt-out is expected behaviour; criterion is not applicable)
+//     opt-out is expected behaviour; criterion is not applicable)
 //   - false when DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD is present, or when
-//            DS03 was not run (cannot confirm → not met for A+)
+//     DS03 was not run (cannot confirm → not met for A+)
 //   - true  when DS03_NSEC3_OPT_OUT_DISABLED or DS03_NO_NSEC3 is present
 func nsec3NonOptout(tags map[string]bool) *bool {
 	if tags["DS03_NSEC3_OPT_OUT_ENABLED_TLD"] {
@@ -128,9 +128,9 @@ func nsec3NonOptout(tags map[string]bool) *bool {
 //   - nil   for TLD zones (parent does not consume CDS/CDNSKEY; not applicable)
 //   - true  when any DS15 "HAS_CDS" or "HAS_CDNSKEY" tag is present
 //   - nil   when DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE is present (on-demand
-//            publication model; absence is intentional, should not block A+)
+//     publication model; absence is intentional, should not block A+)
 //   - false when DS15_NO_CDS_CDNSKEY is present, or when DS15 was not run
-//            (cannot confirm → not met for A+)
+//     (cannot confirm → not met for A+)
 func cdsCDNSKEYPublished(domain string, tags map[string]bool) *bool {
 	if isTLDZone(domain) {
 		return nil
@@ -156,14 +156,14 @@ func cdsCDNSKEYPublished(domain string, tags map[string]bool) *bool {
 
 // ipv6AllNameservers returns:
 //   - false when IPV6_DISABLED or CN01_IPV6_DISABLED is present (IPv6 disabled
-//            in the profile for some or all nameservers)
+//     in the profile for some or all nameservers)
 //   - true  when IPv6 ASN tags are present (implies NSes have IPv6 addresses
-//            and ASN lookups succeeded) and no IPv6-disabled tags are present
+//     and ASN lookups succeeded) and no IPv6-disabled tags are present
 //   - nil   when the available tags are insufficient to determine the outcome;
-//            since the engine does not emit per-nameserver IPv6 success tags,
-//            nil means "could not confirm" and is treated as not applicable
-//            rather than as a hard failure - operators may disable this
-//            criterion in environments where IPv6 is not available
+//     since the engine does not emit per-nameserver IPv6 success tags,
+//     nil means "could not confirm" and is treated as not applicable
+//     rather than as a hard failure - operators may disable this
+//     criterion in environments where IPv6 is not available
 func ipv6AllNameservers(tags map[string]bool) *bool {
 	if tags["IPV6_DISABLED"] || tags["CN01_IPV6_DISABLED"] {
 		return boolPtr(false)
@@ -183,7 +183,7 @@ func ipv6AllNameservers(tags map[string]bool) *bool {
 // asDiversity returns:
 //   - true  when IPV4_DIFFERENT_ASN or IPV6_DIFFERENT_ASN is present
 //   - false when only ONE_ASN or SAME_ASN tags are present (non-diverse), or
-//            when AS lookup was not run (cannot confirm → not met for A+)
+//     when AS lookup was not run (cannot confirm → not met for A+)
 func asDiversity(tags map[string]bool) *bool {
 	if tags["IPV4_DIFFERENT_ASN"] || tags["IPV6_DIFFERENT_ASN"] {
 		return boolPtr(true)

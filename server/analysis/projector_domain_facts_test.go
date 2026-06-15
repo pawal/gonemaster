@@ -341,11 +341,11 @@ func TestProjectorProjectRunDomainFactsIdempotent(t *testing.T) {
 	first := append([]serverpkg.AnalysisRunDomainFact(nil), store.domainFacts[projectionKey(11, run.ID)]...)
 
 	want := map[string]bool{
-		factCategoryDNSKEYAlgorithm + "/8":            true,
-		factCategoryDNSKEYAlgorithm + "/13":           true,
+		factCategoryDNSKEYAlgorithm + "/8":              true,
+		factCategoryDNSKEYAlgorithm + "/13":             true,
 		factCategoryDNSSECPosture + "/" + factKeySigned: true,
-		factCategoryGrade + "/A":                      true,
-		factCategorySeverity + "/OK":                  true,
+		factCategoryGrade + "/A":                        true,
+		factCategorySeverity + "/OK":                    true,
 	}
 	if len(first) != len(want) {
 		t.Fatalf("expected %d domain-fact rows, got %d: %+v", len(want), len(first), first)

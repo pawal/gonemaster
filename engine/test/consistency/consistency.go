@@ -15,8 +15,8 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
@@ -36,7 +36,7 @@ var (
 	allNSNames      = nsdiscovery.AllNSNames
 	allNameservers  = nsdiscovery.AllNameservers
 	queryParentAll  = defaultQueryParentAll
-	recurse        = defaultRecurse
+	recurse         = defaultRecurse
 )
 
 // All runs the Consistency test cases in order.

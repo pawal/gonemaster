@@ -480,4 +480,3 @@ func (s *SQLJobStore) CountUnprojectedSnapshotRuns(cohortID int64, batchID strin
 	}
 	return count, nil
 }
-

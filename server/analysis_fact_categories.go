@@ -16,11 +16,11 @@ const (
 	FactCategoryGrade           = "grade"
 	FactCategoryDNSKEYAlgorithm = "dnskey_algo"
 
-	FactKeySigned     = "signed"
-	FactKeyUnsigned   = "unsigned"
-	FactKeyNSEC       = "nsec"
-	FactKeyNSEC3      = "nsec3"
-	FactKeyNSECMixed  = "mixed"
+	FactKeySigned    = "signed"
+	FactKeyUnsigned  = "unsigned"
+	FactKeyNSEC      = "nsec"
+	FactKeyNSEC3     = "nsec3"
+	FactKeyNSECMixed = "mixed"
 )
 
 // factCategoryDisplay carries the UI-side metadata for one category:

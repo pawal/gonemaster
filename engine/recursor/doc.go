@@ -11,4 +11,3 @@ import "errors"
 // reached via parallel recursion can distinguish a race-loss cancellation
 // from a job-level cancellation by inspecting context.Cause(ctx).
 var ErrRaceLost = errors.New("recursor: parallel race lost")
-

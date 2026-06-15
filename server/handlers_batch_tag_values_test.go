@@ -174,12 +174,12 @@ func TestHandleBatchTagValuesValidation(t *testing.T) {
 	seedBatchRuns(t, srv, "batch_val", []seedRun{{domain: "alpha", entries: []engine.LogEntry{nsidEntry("A")}}})
 
 	bad := []string{
-		"batch_val/tag-values",                                       // missing tag and arg
-		"batch_val/tag-values?arg=nsid",                              // missing tag
-		"batch_val/tag-values?tag=N16_HAS_NSID",                      // missing arg
-		"batch_val/tag-values?tag=N16_HAS_NSID&arg=nsid&min_count=0", // min_count below 1
-		"batch_val/tag-values?tag=N16_HAS_NSID&arg=nsid&min_count=x", // min_count not an int
-		"batch_val/tag-values?tag=N16_HAS_NSID&arg=nsid&limit=0",     // limit below 1
+		"batch_val/tag-values",                                                 // missing tag and arg
+		"batch_val/tag-values?arg=nsid",                                        // missing tag
+		"batch_val/tag-values?tag=N16_HAS_NSID",                                // missing arg
+		"batch_val/tag-values?tag=N16_HAS_NSID&arg=nsid&min_count=0",           // min_count below 1
+		"batch_val/tag-values?tag=N16_HAS_NSID&arg=nsid&min_count=x",           // min_count not an int
+		"batch_val/tag-values?tag=N16_HAS_NSID&arg=nsid&limit=0",               // limit below 1
 		"batch_val/tag-values?tag=N16_HAS_NSID&arg=nsid&weight_by_score=maybe", // bad bool
 	}
 	for _, q := range bad {

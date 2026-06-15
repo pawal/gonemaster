@@ -258,11 +258,11 @@ func TestApplyDatabaseSettingsScoringConfig(t *testing.T) {
 
 	// Verify the live store uses the updated config by graduating a job.
 	job := Job{
-		ID:        "job-sc-test",
-		Domain:    "example.com",
-		Status:    JobSucceeded,
-		CreatedAt: time.Now().UTC(),
-		StartedAt: time.Now().UTC(),
+		ID:         "job-sc-test",
+		Domain:     "example.com",
+		Status:     JobSucceeded,
+		CreatedAt:  time.Now().UTC(),
+		StartedAt:  time.Now().UTC(),
 		FinishedAt: time.Now().UTC(),
 	}
 	job.PublicID = GeneratePublicID()

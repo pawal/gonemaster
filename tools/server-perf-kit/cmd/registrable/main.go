@@ -133,4 +133,3 @@ func stripPort(hostport string) string {
 	}
 	return h
 }
-

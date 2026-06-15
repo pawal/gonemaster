@@ -133,7 +133,7 @@ func TestRunJSONWithNSTimes(t *testing.T) {
 	}
 
 	var result struct {
-		Entries           []any                      `json:"entries"`
+		Entries           []any                         `json:"entries"`
 		NameserverTimings []nameserver.NameserverTiming `json:"nameserver_timings"`
 	}
 	if err := json.Unmarshal(out.Bytes(), &result); err != nil {

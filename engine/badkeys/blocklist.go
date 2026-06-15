@@ -19,9 +19,9 @@ const blockSize = 16 // 15-byte BKHASH120 + 1-byte source ID
 
 // Blocklist holds the loaded blocklist data and metadata.
 type Blocklist struct {
-	Data     []byte            // raw blocklist.dat content (sorted 16-byte blocks)
-	Sources  map[int]string    // source ID → blocklist name
-	Entries  int               // number of 16-byte blocks
+	Data    []byte         // raw blocklist.dat content (sorted 16-byte blocks)
+	Sources map[int]string // source ID → blocklist name
+	Entries int            // number of 16-byte blocks
 }
 
 // LoadBlocklist finds and loads the blocklist using the search path:

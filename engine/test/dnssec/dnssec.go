@@ -5,8 +5,8 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math/big"
 	"maps"
+	"math/big"
 	"slices"
 	"sort"
 	"strconv"
@@ -21,8 +21,8 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
@@ -3166,43 +3166,43 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	groups := nameserversByIP(nss)
 	if len(groups) > 0 {
 		type nsOutcome struct {
-			groupList                   []string
-			ignoredNS                   bool
-			withDNSKEY                  bool
-			withoutDNSKEY               bool
-			erroneousMultipleNSEC       bool
-			erroneousMultipleNSEC3      bool
-			nsecInAnswer                bool
-			nsec3paramInAnswer          bool
-			nsecIncorrectTypeList       bool
-			nsec3IncorrectTypeList      bool
-			nsecMismatchesApex          bool
-			nsec3MismatchesApex         bool
-			nsec3paramMismatchesApex    bool
-			nsecMissingSignature        bool
-			nsec3MissingSignature       bool
-			nsecNodataWrongSOA          bool
-			nsec3NodataWrongSOA         bool
-			nsecNodataMissingSOA        bool
-			nsec3NodataMissingSOA       bool
-			nsecErroneousAnswer         bool
-			nsec3paramErroneousAnswer   bool
-			nsecNsec3Nodata             bool
-			nsecNsecNodata              bool
-			nsec3paramNsecNodata        bool
-			nsecRRSIGVerifyError        map[uint16]bool
-			nsec3RRSIGVerifyError       map[uint16]bool
-			nsecRRSIGExpired            map[uint16]bool
-			nsec3RRSIGExpired           map[uint16]bool
-			nsecRRSIGNotYetValid        map[uint16]bool
-			nsec3RRSIGNotYetValid       map[uint16]bool
-			nsecRRSIGNoDNSKEY           map[uint16]bool
-			nsec3RRSIGNoDNSKEY          map[uint16]bool
-			nsecRRSIGVerified           bool
-			nsec3RRSIGVerified          bool
-			nsecResponseError           bool
-			nsec3paramResponseError     bool
-			algoNotSupportedByZM        map[uint16]map[uint8]bool
+			groupList                 []string
+			ignoredNS                 bool
+			withDNSKEY                bool
+			withoutDNSKEY             bool
+			erroneousMultipleNSEC     bool
+			erroneousMultipleNSEC3    bool
+			nsecInAnswer              bool
+			nsec3paramInAnswer        bool
+			nsecIncorrectTypeList     bool
+			nsec3IncorrectTypeList    bool
+			nsecMismatchesApex        bool
+			nsec3MismatchesApex       bool
+			nsec3paramMismatchesApex  bool
+			nsecMissingSignature      bool
+			nsec3MissingSignature     bool
+			nsecNodataWrongSOA        bool
+			nsec3NodataWrongSOA       bool
+			nsecNodataMissingSOA      bool
+			nsec3NodataMissingSOA     bool
+			nsecErroneousAnswer       bool
+			nsec3paramErroneousAnswer bool
+			nsecNsec3Nodata           bool
+			nsecNsecNodata            bool
+			nsec3paramNsecNodata      bool
+			nsecRRSIGVerifyError      map[uint16]bool
+			nsec3RRSIGVerifyError     map[uint16]bool
+			nsecRRSIGExpired          map[uint16]bool
+			nsec3RRSIGExpired         map[uint16]bool
+			nsecRRSIGNotYetValid      map[uint16]bool
+			nsec3RRSIGNotYetValid     map[uint16]bool
+			nsecRRSIGNoDNSKEY         map[uint16]bool
+			nsec3RRSIGNoDNSKEY        map[uint16]bool
+			nsecRRSIGVerified         bool
+			nsec3RRSIGVerified        bool
+			nsecResponseError         bool
+			nsec3paramResponseError   bool
+			algoNotSupportedByZM      map[uint16]map[uint8]bool
 		}
 
 		outcomes := make([]nsOutcome, len(groups))

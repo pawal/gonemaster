@@ -144,7 +144,6 @@ func TestPublicAnalysisCohortsEndpoint(t *testing.T) {
 	}
 }
 
-
 func TestPublicAnalysisOverviewRedactsInternalFields(t *testing.T) {
 	srv := New(DefaultConfig())
 	seedCohort(t, srv, AnalysisCohort{

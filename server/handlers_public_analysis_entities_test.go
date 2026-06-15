@@ -271,9 +271,9 @@ func TestPublicAnalysisASNsSortByNameserverAndPrefixCounts(t *testing.T) {
 	f.seedEndpoint("r3", "c.example", "ns3.example", "203.0.113.10", "ipv4", ts, 64600, "203.0.113.0/24")
 
 	cases := []struct {
-		name     string
-		sort     string
-		wantTop  int64
+		name    string
+		sort    string
+		wantTop int64
 	}{
 		{"nameserver_count_desc", "nameserver_count_desc", 64600},
 		{"nameserver_count_asc", "nameserver_count_asc", 64500},
@@ -365,4 +365,3 @@ func TestPublicAnalysisListEndpointsRedactsInternalIDs(t *testing.T) {
 		}
 	}
 }
-

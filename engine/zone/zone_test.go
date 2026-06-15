@@ -267,7 +267,7 @@ func TestZoneParentMissingRecursor(t *testing.T) {
 
 func TestZoneGlueNamesFromParent(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	parentNS := newHookedNameserver(ctx, t,"ns.parent.example", "192.0.2.10", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	parentNS := newHookedNameserver(ctx, t, "ns.parent.example", "192.0.2.10", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		nsRR1 := &dns.NS{Hdr: dns.Header{Name: "child.example.", Class: dns.ClassINET}}
@@ -308,7 +308,7 @@ func TestZoneGlueNamesFromParent(t *testing.T) {
 
 func TestZoneGlueAddressesFromParent(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	parentNS := newHookedNameserver(ctx, t,"ns.parent.example", "192.0.2.11", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	parentNS := newHookedNameserver(ctx, t, "ns.parent.example", "192.0.2.11", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		aRR := &dns.A{Hdr: dns.Header{Name: "ns1.child.example.", Class: dns.ClassINET}}
@@ -365,7 +365,7 @@ func TestZoneNSNamesRootSorted(t *testing.T) {
 
 func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	ns1 := newHookedNameserver(ctx, t,"ns1.example", "192.0.2.20", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns1 := newHookedNameserver(ctx, t, "ns1.example", "192.0.2.20", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		nsRR := &dns.NS{Hdr: dns.Header{Name: "other.example.", Class: dns.ClassINET}}
@@ -373,7 +373,7 @@ func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
 		msg.Answer = []dns.RR{nsRR}
 		return packet.Packet{Msg: msg}, nil
 	})
-	ns2 := newHookedNameserver(ctx, t,"ns2.example", "192.0.2.21", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns2 := newHookedNameserver(ctx, t, "ns2.example", "192.0.2.21", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		nsRR := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
@@ -402,7 +402,7 @@ func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
 
 func TestZoneQueryPersistentAcceptsAuthority(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	ns := newHookedNameserver(ctx, t,"ns1.example", "192.0.2.31", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns := newHookedNameserver(ctx, t, "ns1.example", "192.0.2.31", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		nsRR := &dns.NS{Hdr: dns.Header{Name: "child.example.", Class: dns.ClassINET}}
@@ -431,7 +431,7 @@ func TestZoneQueryPersistentAcceptsAuthority(t *testing.T) {
 
 func TestZoneIsInZone(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	ns := newHookedNameserver(ctx, t,"ns1.example", "192.0.2.30", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns := newHookedNameserver(ctx, t, "ns1.example", "192.0.2.30", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Authoritative = true

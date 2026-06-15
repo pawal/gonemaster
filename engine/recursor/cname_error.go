@@ -62,4 +62,3 @@ func IgnoreCNAMEError(err error) error {
 	}
 	return err
 }
-

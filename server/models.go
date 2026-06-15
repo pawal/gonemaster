@@ -421,19 +421,19 @@ type Batch struct {
 // (cohort_id, batch_id); the slug is a separate human-readable handle that
 // is unique within a cohort.
 type AnalysisCohortSnapshot struct {
-	ID          int64     `json:"id"`
-	CohortID    int64     `json:"cohort_id"`
-	BatchID     string    `json:"batch_id"`
-	Slug        string    `json:"slug"`
-	Label       string    `json:"label,omitempty"`
-	Description string    `json:"description,omitempty"`
-	ProfileID   *int64    `json:"profile_id,omitempty"`
-	ProfileName string    `json:"profile_name,omitempty"`
-	CapturedAt  time.Time `json:"captured_at"`
-	FirstRunAt  time.Time `json:"first_run_at"`
-	LastRunAt   time.Time `json:"last_run_at"`
-	RunCount    int       `json:"run_count"`
-	DomainCount int       `json:"domain_count"`
+	ID              int64     `json:"id"`
+	CohortID        int64     `json:"cohort_id"`
+	BatchID         string    `json:"batch_id"`
+	Slug            string    `json:"slug"`
+	Label           string    `json:"label,omitempty"`
+	Description     string    `json:"description,omitempty"`
+	ProfileID       *int64    `json:"profile_id,omitempty"`
+	ProfileName     string    `json:"profile_name,omitempty"`
+	CapturedAt      time.Time `json:"captured_at"`
+	FirstRunAt      time.Time `json:"first_run_at"`
+	LastRunAt       time.Time `json:"last_run_at"`
+	RunCount        int       `json:"run_count"`
+	DomainCount     int       `json:"domain_count"`
 	Status          string    `json:"status"`
 	IsDefault       bool      `json:"is_default"`
 	IsPublic        bool      `json:"is_public"`

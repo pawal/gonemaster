@@ -1,5 +1,5 @@
-codeberg.org/miekg/dns v0.6.76 h1:UU0IYOKWXYQOCh26MTyZIp+88s603sH8RCPiyvifD94=
-codeberg.org/miekg/dns v0.6.76/go.mod h1:58Y3ZTg6Z5ZEm/ZAAwHehbZfrD4u5mE4RByHoPEMyKk=
+codeberg.org/miekg/dns v0.6.81 h1:j935E0GitRX7NPyK1p3FhvOAz0mmd7jp7OW7oHjCEIo=
+codeberg.org/miekg/dns v0.6.81/go.mod h1:58Y3ZTg6Z5ZEm/ZAAwHehbZfrD4u5mE4RByHoPEMyKk=
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
 github.com/dustin/go-humanize v1.0.1 h1:GzkhY7T5VNhEkwH0PVJgjz+fX1rhBrR7pRT3mDkpeCY=

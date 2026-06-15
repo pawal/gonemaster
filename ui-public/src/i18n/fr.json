@@ -153,6 +153,8 @@
   "pub.tc_desc.nameserver17": "Les DNS Cookies (RFC 7873) sont une fonction légère de protection contre l'usurpation et l'amplification pour les serveurs faisant autorité. Ce test envoie un Client Cookie, examine le Server Cookie renvoyé et confirme que le serveur accepte le cookie qu'il vient d'émettre.",
   "pub.tag.nameserver.N17_COOKIE_SUPPORTED.header": "DNS Cookie pris en charge",
   "pub.tag.nameserver.N17_COOKIE_SUPPORTED.desc": "Un serveur de noms a renvoyé un DNS Cookie valide, une fonction moderne de protection contre l'usurpation et l'amplification (RFC 7873). C'est une bonne configuration qui aide le serveur à résister aux falsifications hors chemin et aux abus.",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.header": "DNS Cookie imposé",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.desc": "Un serveur de noms exige des DNS Cookies : il a répondu à une sonde sans Server Cookie par un BADCOOKIE accompagné d'un Server Cookie frais et bien formé, puis a accepté ce cookie lors d'une nouvelle tentative (RFC 7873). C'est la configuration de cookie la plus solide et elle offre la meilleure protection contre les falsifications hors chemin et les abus d'amplification.",
   "pub.tag.nameserver.N17_NO_COOKIE.header": "Pas de DNS Cookie",
   "pub.tag.nameserver.N17_NO_COOKIE.desc": "Un serveur de noms n'a pas renvoyé de DNS Cookie. C'est courant et ce n'est pas une erreur ; la fonction n'est simplement pas activée, ou un boîtier intermédiaire l'a supprimée.",
   "pub.tag.nameserver.N17_COOKIE_ROUNDTRIP_OK.header": "Aller-retour du DNS Cookie fonctionnel",

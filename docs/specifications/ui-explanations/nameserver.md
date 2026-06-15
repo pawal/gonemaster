@@ -360,6 +360,14 @@ Description:
 
 A nameserver returned a valid DNS Cookie, a modern anti-spoofing and anti-amplification feature (RFC 7873). This is good posture and helps the server resist off-path forgery and abuse.
 
+## Tag N17_COOKIE_ENFORCED
+
+Header: DNS Cookie enforced
+
+Description:
+
+A nameserver requires DNS Cookies: it answered a probe without a Server Cookie with BADCOOKIE and a fresh, well-formed Server Cookie, then accepted that cookie on retry (RFC 7873). This is the strongest cookie posture and gives the best protection against off-path forgery and amplification abuse.
+
 ## Tag N17_NO_COOKIE
 
 Header: No DNS Cookie

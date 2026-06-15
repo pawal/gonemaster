@@ -153,6 +153,8 @@
   "pub.tc_desc.nameserver17": "DNS Cookie (RFC 7873) は、権威サーバー向けの軽量ななりすまし対策および増幅攻撃対策機能です。このチェックは Client Cookie を送信し、返ってきた Server Cookie を検査して、サーバーが発行したばかりの Cookie を受け入れることを確認します。",
   "pub.tag.nameserver.N17_COOKIE_SUPPORTED.header": "DNS Cookie 対応",
   "pub.tag.nameserver.N17_COOKIE_SUPPORTED.desc": "ネームサーバーが有効な DNS Cookie を返しました。これは最新のなりすまし対策および増幅攻撃対策機能 (RFC 7873) です。望ましい設定であり、オフパスの偽造や悪用への耐性を高めます。",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.header": "DNS Cookie 必須",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.desc": "ネームサーバーが DNS Cookie を必須としています。Server Cookie のないプローブに対して BADCOOKIE と新しい整形式の Server Cookie を返し、再試行時にその Cookie を受け入れました (RFC 7873)。これは最も強力な Cookie 設定であり、オフパスの偽造や増幅攻撃に対する最善の保護を提供します。",
   "pub.tag.nameserver.N17_NO_COOKIE.header": "DNS Cookie なし",
   "pub.tag.nameserver.N17_NO_COOKIE.desc": "ネームサーバーが DNS Cookie を返しませんでした。これはよくあることでエラーではありません。機能が有効になっていないか、ミドルボックスが削除した可能性があります。",
   "pub.tag.nameserver.N17_COOKIE_ROUNDTRIP_OK.header": "DNS Cookie の往復が機能",

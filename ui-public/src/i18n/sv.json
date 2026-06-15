@@ -153,6 +153,8 @@
   "pub.tc_desc.nameserver17": "DNS Cookies (RFC 7873) är en resurssnål funktion mot förfalskning och förstärkningsattacker för auktoritativa servrar. Den här kontrollen skickar en Client Cookie, granskar den Server Cookie som returneras och bekräftar att servern accepterar den cookie den nyss utfärdade.",
   "pub.tag.nameserver.N17_COOKIE_SUPPORTED.header": "DNS Cookie stöds",
   "pub.tag.nameserver.N17_COOKIE_SUPPORTED.desc": "En namnserver returnerade en giltig DNS Cookie, en modern funktion mot förfalskning och förstärkningsattacker (RFC 7873). Det är en bra konfiguration som hjälper servern att motstå off-path-förfalskning och missbruk.",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.header": "DNS Cookie krävs",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.desc": "En namnserver kräver DNS Cookies: den besvarade en sond utan Server Cookie med BADCOOKIE och en ny, korrekt utformad Server Cookie, och accepterade sedan den vid ett nytt försök (RFC 7873). Det är den starkaste cookie-konfigurationen och ger bäst skydd mot off-path-förfalskning och förstärkningsattacker.",
   "pub.tag.nameserver.N17_NO_COOKIE.header": "Ingen DNS Cookie",
   "pub.tag.nameserver.N17_NO_COOKIE.desc": "En namnserver returnerade ingen DNS Cookie. Det är vanligt och inget fel; funktionen är helt enkelt inte aktiverad, eller så har en mellanlåda tagit bort den.",
   "pub.tag.nameserver.N17_COOKIE_ROUNDTRIP_OK.header": "DNS Cookie-tur och retur fungerar",

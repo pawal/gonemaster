@@ -153,6 +153,8 @@
   "pub.tc_desc.nameserver17": "DNS Cookies (RFC 7873) sind eine ressourcenschonende Funktion gegen Spoofing und Verstärkungsangriffe für autoritative Server. Diese Prüfung sendet ein Client Cookie, untersucht das zurückgegebene Server Cookie und bestätigt, dass der Server das soeben ausgestellte Cookie akzeptiert.",
   "pub.tag.nameserver.N17_COOKIE_SUPPORTED.header": "DNS Cookie unterstützt",
   "pub.tag.nameserver.N17_COOKIE_SUPPORTED.desc": "Ein Nameserver hat ein gültiges DNS Cookie zurückgegeben, eine moderne Funktion gegen Spoofing und Verstärkungsangriffe (RFC 7873). Das ist eine gute Konfiguration und hilft dem Server, Off-Path-Fälschungen und Missbrauch zu widerstehen.",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.header": "DNS Cookie erzwungen",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.desc": "Ein Nameserver verlangt DNS Cookies: Er hat eine Abfrage ohne Server Cookie mit BADCOOKIE und einem frischen, wohlgeformten Server Cookie beantwortet und dieses Cookie beim erneuten Versuch akzeptiert (RFC 7873). Das ist die stärkste Cookie-Konfiguration und bietet den besten Schutz vor Off-Path-Fälschungen und Verstärkungsangriffen.",
   "pub.tag.nameserver.N17_NO_COOKIE.header": "Kein DNS Cookie",
   "pub.tag.nameserver.N17_NO_COOKIE.desc": "Ein Nameserver hat kein DNS Cookie zurückgegeben. Das ist häufig und kein Fehler; die Funktion ist schlicht nicht aktiviert oder wurde von einer Middlebox entfernt.",
   "pub.tag.nameserver.N17_COOKIE_ROUNDTRIP_OK.header": "DNS-Cookie-Rücklauf funktioniert",

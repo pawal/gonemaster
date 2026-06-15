@@ -826,5 +826,7 @@
   "pub.tag.nameserver.N17_COOKIE_SELF_REJECT.header": "DNS Cookie rejected by issuer",
   "pub.tag.nameserver.N17_COOKIE_SELF_REJECT.desc": "A nameserver refused with BADCOOKIE a Server Cookie it had just issued, even after the check retried with the fresh cookie. That degrades legitimate clients and points to inconsistent cookie secrets.",
   "pub.tag.nameserver.N17_NO_RESPONSE.header": "No response to DNS Cookie probe",
-  "pub.tag.nameserver.N17_NO_RESPONSE.desc": "A nameserver did not answer the DNS Cookie probe at all. The cookie capability cannot be assessed for that server."
+  "pub.tag.nameserver.N17_NO_RESPONSE.desc": "A nameserver did not answer the DNS Cookie probe at all. The cookie capability cannot be assessed for that server.",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.header": "DNS Cookie enforced",
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.desc": "A nameserver requires DNS Cookies: it answered a probe without a Server Cookie with BADCOOKIE and a fresh, well-formed Server Cookie, then accepted that cookie on retry (RFC 7873). This is the strongest cookie posture and gives the best protection against off-path forgery and amplification abuse."
 }

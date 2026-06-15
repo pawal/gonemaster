@@ -54,6 +54,7 @@ _Do not edit by hand - regenerate with the command above._
 | `N16_NO_RESPONSE` | `WARNING` | [nameserver16](../tests/nameserver/nameserver16.md) | yes |
 | `N16_UNEXPECTED_RCODE` | `WARNING` | [nameserver16](../tests/nameserver/nameserver16.md) | yes |
 | `N17_COOKIE_CLIENT_ONLY` | `WARNING` | [nameserver17](../tests/nameserver/nameserver17.md) | yes |
+| `N17_COOKIE_ENFORCED` | `INFO` | [nameserver17](../tests/nameserver/nameserver17.md) | yes |
 | `N17_COOKIE_MALFORMED` | `WARNING` | [nameserver17](../tests/nameserver/nameserver17.md) | yes |
 | `N17_COOKIE_ROUNDTRIP_OK` | `INFO` | [nameserver17](../tests/nameserver/nameserver17.md) | yes |
 | `N17_COOKIE_SELF_REJECT` | `WARNING` | [nameserver17](../tests/nameserver/nameserver17.md) | yes |

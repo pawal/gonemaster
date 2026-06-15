@@ -2745,6 +2745,10 @@ msgctxt "NAMESERVER:N17_COOKIE_SUPPORTED"
 msgid "The following name server(s) returned a well-formed DNS Cookie (RFC 7873): \"{servers}\"."
 msgstr "Følgende navneservere returnerede en korrekt udformet DNS Cookie (RFC 7873): \"{servers}\"."
 
+msgctxt "NAMESERVER:N17_COOKIE_ENFORCED"
+msgid "The following name server(s) enforce DNS Cookies and returned a well-formed Server Cookie (RFC 7873): \"{servers}\"."
+msgstr "Følgende navneservere kræver DNS Cookies og returnerede en korrekt udformet Server Cookie (RFC 7873): \"{servers}\"."
+
 msgctxt "NAMESERVER:N17_NO_COOKIE"
 msgid "The following name server(s) did not return a DNS Cookie (RFC 7873): \"{servers}\"."
 msgstr "Følgende navneservere returnerede ingen DNS Cookie (RFC 7873): \"{servers}\"."

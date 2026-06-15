@@ -1506,6 +1506,87 @@ func TestNameserver17RotationNotFlagged(t *testing.T) {
 	}
 }
 
+// TestNameserver17RequireServerCookie covers the strongest cookie posture: an
+// enforcing server (e.g. BIND require-server-cookie) answers our client-only
+// cookie with BADCOOKIE plus a fresh, well-formed Server Cookie, then accepts
+// the full cookie on the round-trip. That must report N17_COOKIE_ENFORCED (not
+// the plain N17_COOKIE_SUPPORTED) together with N17_COOKIE_ROUNDTRIP_OK.
+func TestNameserver17RequireServerCookie(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		c := cookieFromOpts(opts)
+		if len(c) == 16 { // query 1: client-only cookie rejected with a fresh Server Cookie
+			return soaPacketWithCookieRcode("example", dns.RcodeBadCookie, clientPortion(c)+cookieServer16)
+		}
+		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, c) // query 2: accepts the full cookie
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	if !hasEntryTag(entries, "N17_COOKIE_ENFORCED") {
+		t.Fatalf("expected N17_COOKIE_ENFORCED for a require-server-cookie server")
+	}
+	if !hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
+		t.Fatalf("expected N17_COOKIE_ROUNDTRIP_OK after the enforcing server accepted its own cookie")
+	}
+	if hasEntryTag(entries, "N17_COOKIE_SUPPORTED") {
+		t.Fatalf("an enforcing server must report N17_COOKIE_ENFORCED, not N17_COOKIE_SUPPORTED")
+	}
+	entry := firstEntryByTag(entries, "N17_COOKIE_ENFORCED")
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("expected typed server list for N17_COOKIE_ENFORCED, got %#v", entry.Args["servers"])
+	}
+}
+
+// TestNameserver17BadCookieWithoutServerCookie pins the narrow carve-out: a
+// BADCOOKIE reply that does NOT carry a well-formed Server Cookie (here only the
+// Client Cookie is echoed) is not the enforcing signal and must stay a generic
+// RCODE anomaly (graded by basic/N16) - no cookie verdict and no round-trip.
+func TestNameserver17BadCookieWithoutServerCookie(t *testing.T) {
+	ctx := setupTest(t)
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	calls := 0
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}
+		}
+		calls++
+		return soaPacketWithCookieRcode("example", dns.RcodeBadCookie, clientPortion(cookieFromOpts(opts)))
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver17(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver17: %v", err)
+	}
+	for _, tag := range []string{"N17_COOKIE_ENFORCED", "N17_COOKIE_SUPPORTED", "N17_COOKIE_CLIENT_ONLY", "N17_COOKIE_MALFORMED", "N17_NO_COOKIE", "N17_COOKIE_ROUNDTRIP_OK"} {
+		if hasEntryTag(entries, tag) {
+			t.Fatalf("a BADCOOKIE without a well-formed Server Cookie must not produce %s", tag)
+		}
+	}
+	if calls != 1 {
+		t.Fatalf("expected a single query 1 with no round-trip, got %d", calls)
+	}
+}
+
 func TestNameserver17NoResponse(t *testing.T) {
 	ctx := setupTest(t)
 	origM4and5 := authoritativeNS

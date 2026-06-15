@@ -498,6 +498,7 @@
             "N16_NO_RESPONSE": "WARNING",
             "N16_UNEXPECTED_RCODE": "WARNING",
             "N17_COOKIE_CLIENT_ONLY": "WARNING",
+            "N17_COOKIE_ENFORCED": "INFO",
             "N17_COOKIE_MALFORMED": "WARNING",
             "N17_COOKIE_ROUNDTRIP_OK": "INFO",
             "N17_COOKIE_SELF_REJECT": "WARNING",

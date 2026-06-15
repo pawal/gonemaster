@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 81,
-    "unique_tag_count": 530
+    "unique_tag_count": 531
   },
   "modules": {
     "address": {
@@ -809,6 +809,7 @@
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "N17_COOKIE_CLIENT_ONLY",
+        "N17_COOKIE_ENFORCED",
         "N17_COOKIE_MALFORMED",
         "N17_COOKIE_ROUNDTRIP_OK",
         "N17_COOKIE_SELF_REJECT",

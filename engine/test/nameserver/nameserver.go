@@ -358,6 +358,7 @@ func Metadata() map[string][]string {
 		},
 		"nameserver17": {
 			"N17_COOKIE_CLIENT_ONLY",
+			"N17_COOKIE_ENFORCED",
 			"N17_COOKIE_MALFORMED",
 			"N17_COOKIE_ROUNDTRIP_OK",
 			"N17_COOKIE_SELF_REJECT",
@@ -2139,6 +2140,7 @@ func Nameserver17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	type n17Outcome struct {
 		server         string
 		supported      bool
+		enforced       bool
 		noCookie       bool
 		clientOnly     bool
 		malformed      bool
@@ -2172,7 +2174,19 @@ func Nameserver17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 				if resp.Rcode() != "NOERROR" {
-					// RCODE anomalies are graded by basic/N16, not here.
+					// An enforcing server answers a client-only cookie with
+					// BADCOOKIE plus a fresh, well-formed Server Cookie. Only
+					// that case counts; other anomalies are graded by basic/N16.
+					if resp.Msg.Rcode == dns.RcodeBadCookie {
+						if tag, fullCookieHex, _ := classifyCookie(resp, clientCookieHex); tag == "N17_COOKIE_SUPPORTED" {
+							outcome.enforced = true
+							if cookieRoundTripOK(ctx, server, z.Name.String(), fullCookieHex) {
+								outcome.roundtripOK = true
+							} else {
+								outcome.selfReject = true
+							}
+						}
+					}
 					outcomes[i] = outcome
 					return nil
 				}
@@ -2208,7 +2222,7 @@ func Nameserver17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
-	var supported, noCookie, clientOnly, roundtripOK, selfReject, noResponse []string
+	var supported, enforced, noCookie, clientOnly, roundtripOK, selfReject, noResponse []string
 	malformed := map[int][]string{}
 	for _, outcome := range outcomes {
 		if outcome.server == "" {
@@ -2217,6 +2231,8 @@ func Nameserver17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		switch {
 		case outcome.supported:
 			supported = append(supported, outcome.server)
+		case outcome.enforced:
+			enforced = append(enforced, outcome.server)
 		case outcome.noCookie:
 			noCookie = append(noCookie, outcome.server)
 		case outcome.clientOnly:
@@ -2238,6 +2254,13 @@ func Nameserver17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		args := map[string]any{}
 		setTypedServersFromNames(args, sortedStrings(supported))
 		if err := appendLog(ctx, &results, testcase, "N17_COOKIE_SUPPORTED", args); err != nil {
+			return results, err
+		}
+	}
+	if len(enforced) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(enforced))
+		if err := appendLog(ctx, &results, testcase, "N17_COOKIE_ENFORCED", args); err != nil {
 			return results, err
 		}
 	}

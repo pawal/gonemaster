@@ -35,6 +35,18 @@ steps:
     commands:
       - go run ./tools/architecture-check
 
+  gofmt_check:
+    image: golang:1.26
+    commands:
+      - |
+        set -eu
+        unformatted=$(gofmt -l $(git ls-files '*.go'))
+        if [ -n "$unformatted" ]; then
+          echo "These files are not gofmt-clean:"
+          echo "$unformatted"
+          exit 1
+        fi
+
   go_test:
     image: golang:1.26
     depends_on:

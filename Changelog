@@ -2,6 +2,30 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.5.4] - 2026-06-16
+
+Added Nameserver17 test case, for testing DNS Cookies. Some engine fixes.
+
+### Added
+
+- nameserver17: detect enforcing servers as N17_COOKIE_ENFORCED
+- ui-public: add nameserver17 DNS Cookie title and tag explanations
+- ui-public: add N17_COOKIE_ENFORCED tag explanation
+- admin-ui, analysis-ui: add nameserver17 DNS Cookie testcase title
+- nameserver17: add spec, tag catalog, and i18n strings for DNS Cookie
+- engine: add nameserver17 DNS Cookie (RFC 7873) testcase
+
+### Changed
+
+- ci: fail the build when sources are not gofmt-clean
+- gofmt: reformat sources with the Go 1.26 toolchain
+- modernize map-key sorting with slices.Sorted(maps.Keys()) and builtin max
+- build: require Go 1.26 and bump CI images to golang:1.26
+- deps: bump codeberg.org/miekg/dns to v0.6.81
+- ui-public: improve Swedish translations
+- engine: run the timeout-bound root tests in parallel
+- engine: migrate nameserver tests onto per-run cache stores
+
 ## [v1.5.3] - 2026-06-12
 
 ### Added

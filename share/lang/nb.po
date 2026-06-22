@@ -721,6 +721,10 @@ msgstr ""
 "foreldresonen ({parent_servers}) samsvarer ikke med tilsvarende "
 "adresseposter i barnesonen ({zone_servers})."
 
+msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
+msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
+msgstr "Navnetjenere serverer sonens NS-poster med {count} forskjellige TTL-verdier."
+
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."
 msgstr "Fant {count} NS-parametervarianter."

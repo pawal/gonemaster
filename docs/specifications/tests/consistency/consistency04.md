@@ -4,6 +4,7 @@ Status: Final
 
 ## Purpose
 - Check NS RRset consistency across nameservers for the tested zone.
+- Detect when the apex NS RRset is served with inconsistent TTLs across nameservers.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -23,16 +24,18 @@ Status: Final
    - Query NS for zone apex.
    - No response message -> emit `NO_RESPONSE`.
    - Response without usable NS records for zone apex -> emit `NO_RESPONSE_NS_QUERY`.
-   - Otherwise extract lowercase NS targets, sort them, and store as one NS-set key for that nameserver.
+   - Otherwise extract lowercase NS targets, sort them, and store as one NS-set key for that nameserver, and record the NS RRset TTL (minimum of the NS record TTLs) for that nameserver.
 4. If exactly one NS-set key exists, emit `ONE_NS_SET`.
 5. If multiple NS-set keys exist:
    - Emit `MULTIPLE_NS_SET`.
    - Emit `NS_SET` once per NS-set key with the NS target set (`ns_set_servers`) and contributing nameserver endpoints (`servers`).
-6. Emit `TEST_CASE_END`.
+6. If more than one distinct apex NS RRset TTL was observed across nameservers, emit `INCONSISTENT_NS_TTL` with the distinct-value `count` and the `ttl_min`/`ttl_max` bounds.
+7. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
+| `INCONSISTENT_NS_TTL` | Authoritative nameservers serve the apex NS RRset with more than one distinct TTL. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver/rrtype. |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver/rrtype. |
 | `MULTIPLE_NS_SET` | At least two distinct NS target sets were observed. |
@@ -46,6 +49,9 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
+| `INCONSISTENT_NS_TTL` | `count` | `int` | Number of distinct apex NS RRset TTLs observed across nameservers. |
+| `INCONSISTENT_NS_TTL` | `ttl_min` | `int` | Smallest observed apex NS RRset TTL (seconds). |
+| `INCONSISTENT_NS_TTL` | `ttl_max` | `int` | Largest observed apex NS RRset TTL (seconds). |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`NS`). |
@@ -66,6 +72,7 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
+| `INCONSISTENT_NS_TTL` | `NOTICE` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `MULTIPLE_NS_SET` | `NOTICE` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
@@ -78,10 +85,10 @@ Status: Final
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: does not explicitly define this detail. Gonemaster: Equality is based on sorted NS target names only; TTL/class/owner equality is not compared as separate criteria.
+  - NS-set equality is based on sorted NS target names only. The upstream `consistency04` specification text additionally lists TTL as part of NS-set equality, but the upstream implementation compares NS target names only and ignores TTL; Gonemaster keeps name-set equality name-only and reports differing apex NS RRset TTLs separately via `INCONSISTENT_NS_TTL` (`NOTICE`).
   - Upstream: does not explicitly define this detail. Gonemaster: Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.
 - Potential upstream report:
-  - `no`
+  - `yes` (reported upstream: the upstream `consistency04` spec lists TTL as part of NS-set equality, but the implementation never compares the RR TTL).
 
 ## Edge Cases And Limitations
 - If no usable NS set is obtained, neither `ONE_NS_SET` nor `MULTIPLE_NS_SET` is emitted.

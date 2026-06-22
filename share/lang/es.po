@@ -780,6 +780,10 @@ msgstr ""
 "no calza entre los datos \"glue\" en el padre ({parent_servers}) y todas "
 "las direcciones equivalentes en el hijo ({zone_servers})."
 
+msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
+msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
+msgstr "Los servidores de nombres sirven los registros NS de la zona con {count} valores de TTL distintos."
+
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."
 msgstr "Se encontraron {count} grupo(s) de NS."

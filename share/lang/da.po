@@ -738,6 +738,10 @@ msgstr ""
 "data hos forældrezonen ({parent_servers}) og enhver tilsvarende record i "
 "barnezonen ({zone_servers})."
 
+msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
+msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
+msgstr "Navneservere udleverer zonens NS-poster med {count} forskellige TTL-værdier."
+
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."
 msgstr "Fandt {count} NS-sæt."

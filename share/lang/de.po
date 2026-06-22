@@ -650,6 +650,10 @@ msgstr ""
 "({parent_servers}) und entsprechenden Adressdatensätzen in der "
 "untergeordneten Zone ({zone_servers}) auf."
 
+msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
+msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
+msgstr "Nameserver liefern die NS-Records der Zone mit {count} unterschiedlichen TTL-Werten aus."
+
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."
 msgstr "{count} NS-Menge(n) gefunden."

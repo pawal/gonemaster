@@ -430,6 +430,9 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
+	if hasEntryTag(entries, "INCONSISTENT_NS_TTL") {
+		t.Fatalf("did not expect INCONSISTENT_NS_TTL when all servers share one TTL")
+	}
 }
 
 func TestConsistency04ParallelNSQueries(t *testing.T) {
@@ -536,6 +539,67 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 	}
 	if order[0] != "ns1.example" || order[1] != "ns2.example" {
 		t.Fatalf("expected deterministic log order, got %v", order)
+	}
+}
+
+// Two servers serving the same NS names but with different apex NS RRset TTLs must
+// raise INCONSISTENT_NS_TTL with the observed min/max bounds, while the name-set
+// comparison still reports a single consistent NS set.
+func TestConsistency04InconsistentNSTTL(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+		if strings.EqualFold(qtype, "NS") {
+			return nsPacketTTL("example", []string{"ns1.example", "ns2.example"}, 3600)
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+		if strings.EqualFold(qtype, "NS") {
+			return nsPacketTTL("example", []string{"ns1.example", "ns2.example"}, 86400)
+		}
+		return packet.Packet{}
+	})
+
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns2}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency04(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency04: %v", err)
+	}
+
+	if !hasEntryTag(entries, "ONE_NS_SET") {
+		t.Fatalf("expected ONE_NS_SET for matching NS names")
+	}
+	entry := firstEntryByTag(entries, "INCONSISTENT_NS_TTL")
+	if entry == nil {
+		t.Fatalf("expected INCONSISTENT_NS_TTL for differing apex NS RRset TTLs")
+	}
+	if got := entry.Args["count"]; got != 2 {
+		t.Fatalf("expected count=2, got %#v", got)
+	}
+	if got := entry.Args["ttl_min"]; got != 3600 {
+		t.Fatalf("expected ttl_min=3600, got %#v", got)
+	}
+	if got := entry.Args["ttl_max"]; got != 86400 {
+		t.Fatalf("expected ttl_max=86400, got %#v", got)
 	}
 }
 
@@ -1091,11 +1155,15 @@ func soaPacket(owner string, serial uint32, mname string, rname string, refresh 
 }
 
 func nsPacket(owner string, nsNames []string) packet.Packet {
+	return nsPacketTTL(owner, nsNames, 60)
+}
+
+func nsPacketTTL(owner string, nsNames []string, ttl uint32) packet.Packet {
 	msg := new(dns.Msg)
 	msg.Rcode = dns.RcodeSuccess
 	msg.Authoritative = true
 	for _, nsName := range nsNames {
-		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: ttl}}
 		nsRR.Ns = dnsutil.Fqdn(nsName)
 		msg.Answer = append(msg.Answer, nsRR)
 	}

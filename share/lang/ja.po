@@ -629,6 +629,10 @@ msgstr ""
 "({parent_servers}) と子ゾーンの対応アドレスレコード ({zone_servers}) "
 "が一致しません。"
 
+msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
+msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
+msgstr "ネームサーバーがゾーンの NS レコードを {count} 種類の異なる TTL 値で応答しています。"
+
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."
 msgstr "{count} 個の NS セットが見つかりました。"

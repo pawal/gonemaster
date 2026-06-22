@@ -858,6 +858,10 @@ msgstr ""
 "trouvées ({parent_servers}) dans la zone parente sont différentes de "
 "celles trouvées ({zone_servers}) sur les serveurs de noms de la zone."
 
+msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
+msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
+msgstr "Les serveurs de noms servent les enregistrements NS de la zone avec {count} valeurs de TTL distinctes."
+
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."
 msgstr ""

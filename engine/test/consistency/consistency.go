@@ -144,6 +144,7 @@ func Metadata() map[string][]string {
 			"ONE_NS_SET",
 			"MULTIPLE_NS_SET",
 			"NS_SET",
+			"INCONSISTENT_NS_TTL",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -647,6 +648,7 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	nsnamesAndIP := map[string]bool{}
 	nsSets := map[string][]string{}
+	ttlValues := map[uint32][]string{}
 	order := []string{}
 	queryType := "NS"
 
@@ -662,6 +664,8 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	type nsSetOutcome struct {
 		key    string
 		setKey string
+		ttl    uint32
+		hasTTL bool
 		skip   bool
 	}
 
@@ -712,12 +716,18 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				}
 
 				var names []string
+				var minTTL uint32
+				haveTTL := false
 				for _, rr := range records {
 					nsRR, ok := rr.(*dns.NS)
 					if !ok {
 						continue
 					}
 					names = append(names, strings.ToLower(nsRR.Ns))
+					if !haveTTL || nsRR.Hdr.TTL < minTTL {
+						minTTL = nsRR.Hdr.TTL
+						haveTTL = true
+					}
 				}
 				if len(names) == 0 {
 					if _, err := buf.Add("NO_RESPONSE_NS_QUERY", withNameserverArgs(ns, nil)); err != nil {
@@ -729,6 +739,8 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				sort.Strings(names)
 
 				outcome.setKey = strings.Join(names, ";")
+				outcome.ttl = minTTL
+				outcome.hasTTL = haveTTL
 				outcomes[i] = outcome
 				return nil
 			}
@@ -749,6 +761,9 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				order = append(order, outcome.setKey)
 			}
 			nsSets[outcome.setKey] = append(nsSets[outcome.setKey], outcome.key)
+			if outcome.hasTTL {
+				ttlValues[outcome.ttl] = append(ttlValues[outcome.ttl], outcome.key)
+			}
 		}
 	}
 
@@ -771,6 +786,17 @@ func Consistency04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if err := appendLog(ctx, &results, testcase, "NS_SET", args); err != nil {
 				return results, err
 			}
+		}
+	}
+
+	if len(ttlValues) > 1 {
+		ttls := slices.Sorted(maps.Keys(ttlValues))
+		if err := appendLog(ctx, &results, testcase, "INCONSISTENT_NS_TTL", map[string]any{
+			"count":   len(ttls),
+			"ttl_min": int(ttls[0]),
+			"ttl_max": int(ttls[len(ttls)-1]),
+		}); err != nil {
+			return results, err
 		}
 	}
 

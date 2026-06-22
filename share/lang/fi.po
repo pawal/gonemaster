@@ -768,6 +768,10 @@ msgstr ""
 "alemman vyöhykkeen mahdollisten vastaavien osoitetietueiden välillä "
 "({zone_servers})."
 
+msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
+msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
+msgstr "Nimipalvelimet palvelevat vyöhykkeen NS-tietueita {count} eri TTL-arvolla."
+
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."
 msgstr "NS-joukkoja löydetty {count} kpl."

@@ -15,6 +15,7 @@ _Do not edit by hand - regenerate with the command above._
 | `CHILD_NS_FAILED` | `DEBUG` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `CHILD_ZONE_LAME` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `EXTRA_ADDRESS_CHILD` | `NOTICE` | [consistency05](../tests/consistency/consistency05.md) | yes |
+| `INCONSISTENT_NS_TTL` | `NOTICE` | [consistency04](../tests/consistency/consistency04.md) | yes |
 | `IN_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `IPV4_DISABLED` | `DEBUG2` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |
 | `IPV6_DISABLED` | `DEBUG2` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |

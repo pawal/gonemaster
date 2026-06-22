@@ -158,6 +158,7 @@
             "CHILD_NS_FAILED": "DEBUG",
             "CHILD_ZONE_LAME": "ERROR",
             "EXTRA_ADDRESS_CHILD": "NOTICE",
+            "INCONSISTENT_NS_TTL": "NOTICE",
             "IN_BAILIWICK_ADDR_MISMATCH": "ERROR",
             "IPV4_DISABLED": "DEBUG2",
             "IPV6_DISABLED": "DEBUG2",

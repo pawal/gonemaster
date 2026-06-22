@@ -199,6 +199,7 @@
             "ENOUGH_NS_DEL": "INFO",
             "EXTRA_NAME_CHILD": "NOTICE",
             "EXTRA_NAME_PARENT": "ERROR",
+            "IN_BAILIWICK_GLUE_MISSING": "ERROR",
             "IPV4_DISABLED": "DEBUG2",
             "IPV6_DISABLED": "DEBUG2",
             "IS_NOT_AUTHORITATIVE": "WARNING",

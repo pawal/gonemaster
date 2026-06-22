@@ -2267,6 +2267,10 @@ msgstr ""
 "Forældrezonen har en eller flera navneservere som ikke findes hos barnezonen "
 "({extra})."
 
+msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
+msgid "In-bailiwick nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
+msgstr "In-bailiwick-navneserveren {ns} har ingen glue-adresserecord (A eller AAAA) i delegeringen fra forældrezonen."
+
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr "Navneserveren {ns}/{address} svarede ikke autoritativt på {proto} port 53."

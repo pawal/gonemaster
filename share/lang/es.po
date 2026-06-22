@@ -2363,6 +2363,10 @@ msgid "Parent has nameserver(s) not listed at the child ({extra})."
 msgstr ""
 "El padre tiene servidores de nombres que no aparecen en el hijo ({extra})."
 
+msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
+msgid "In-bailiwick nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
+msgstr "El servidor de nombres dependiente (in-bailiwick) {ns} no tiene ningún registro glue de dirección (A o AAAA) en la delegación de la zona padre."
+
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr ""

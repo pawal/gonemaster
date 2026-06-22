@@ -2790,6 +2790,10 @@ msgstr ""
 "Les serveurs de noms de la zone parente retournent des serveurs faisant "
 "autorité ({extra}) qui ne le sont pas par les serveurs de noms de la zone."
 
+msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
+msgid "In-bailiwick nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
+msgstr "Le serveur de noms \"in-bailiwick\" {ns} n'a aucun enregistrement de colle (A ou AAAA) dans la délégation de la zone parente."
+
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr ""

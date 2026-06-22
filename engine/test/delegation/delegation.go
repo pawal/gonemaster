@@ -39,10 +39,11 @@ var (
 	apexNSNames = func(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 		return z.ApexNSNames(ctx)
 	}
-	glueNameservers = nsdiscovery.GlueNameservers
-	apexNameservers = nsdiscovery.ApexNameservers
-	allNSNames      = nsdiscovery.AllNSNames
-	recurse         = defaultRecurse
+	glueNameservers       = nsdiscovery.GlueNameservers
+	apexNameservers       = nsdiscovery.ApexNameservers
+	allNSNames            = nsdiscovery.AllNSNames
+	delegationNameservers = nsdiscovery.DelegationNameservers
+	recurse               = defaultRecurse
 )
 
 // All runs the Delegation test cases in order.
@@ -136,6 +137,7 @@ func Metadata() map[string][]string {
 			"NO_IPV4_NS_DEL",
 			"NO_IPV6_NS_CHILD",
 			"NO_IPV6_NS_DEL",
+			"IN_BAILIWICK_GLUE_MISSING",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -338,7 +340,50 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	delItems, err := delegationNameservers(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	for _, name := range missingInBailiwickGlue(delItems, z.Name) {
+		if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_GLUE_MISSING", map[string]any{
+			"ns": logargs.EndpointName(name),
+		}); err != nil {
+			return results, err
+		}
+	}
+
 	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// missingInBailiwickGlue returns in-bailiwick delegation NS names the parent
+// referral ships without any A/AAAA glue. Uses the raw referral glue from
+// DelegationNameservers, not z.Glue, which masks the defect via the recursor.
+func missingInBailiwickGlue(items []nsdiscovery.NSItem, zoneName dnsname.Name) []string {
+	hasGlue := map[string]bool{}
+	seen := map[string]bool{}
+	var order []string
+	for _, item := range items {
+		if !zoneName.IsInBailiwick(item.Name) {
+			continue
+		}
+		name := item.Name.String()
+		if !seen[name] {
+			seen[name] = true
+			order = append(order, name)
+		}
+		if item.HasAddress {
+			hasGlue[name] = true
+		}
+	}
+
+	var missing []string
+	for _, name := range order {
+		if !hasGlue[name] {
+			missing = append(missing, name)
+		}
+	}
+	sort.Strings(missing)
+	return missing
 }
 
 // Delegation02 runs the DELEGATION02 test case.

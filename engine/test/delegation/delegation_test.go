@@ -2,6 +2,7 @@ package delegation
 
 import (
 	"context"
+	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
@@ -23,6 +25,7 @@ import (
 func TestDelegation01Counts(t *testing.T) {
 	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
+	stubNoDelegationGlueGap(t)
 
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
@@ -149,6 +152,7 @@ func TestDelegation01Counts(t *testing.T) {
 func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
 	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
+	stubNoDelegationGlueGap(t)
 
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
@@ -226,6 +230,7 @@ func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
 func TestDelegation01NoIPv4ChildNoLegacyKeys(t *testing.T) {
 	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
+	stubNoDelegationGlueGap(t)
 
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
@@ -278,6 +283,109 @@ func TestDelegation01NoIPv4ChildNoLegacyKeys(t *testing.T) {
 	}
 	if _, ok := entry.Args["addresses"]; ok {
 		t.Fatalf("did not expect addresses for NO_IPV4_NS_CHILD: %#v", entry.Args["addresses"])
+	}
+}
+
+// stubDelegation01Counts neutralises Delegation01's count-section method calls
+// so a test can focus on the in-bailiwick glue check. The four count sources
+// return empty, which only affects the count tags, not the glue check.
+func stubDelegation01Counts(t *testing.T) {
+	origM2 := glueNames
+	origM3 := apexNSNames
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		glueNames = origM2
+		apexNSNames = origM3
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+	emptyNames := func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) { return nil, nil }
+	emptyNS := func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) { return nil, nil }
+	glueNames = emptyNames
+	apexNSNames = emptyNames
+	glueNameservers = emptyNS
+	apexNameservers = emptyNS
+}
+
+// collectArgValues returns the string value of arg key for every entry that
+// carries the given tag, preserving emission order.
+func collectArgValues(entries []*logger.Entry, tag string, key string) []string {
+	var out []string
+	for _, entry := range entries {
+		if entry == nil || entry.Tag != tag {
+			continue
+		}
+		if v, ok := entry.Args[key].(string); ok {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// TestDelegation01InBailiwickGlueMissing verifies that an in-bailiwick
+// delegation NS name shipped by the parent without A/AAAA glue is flagged,
+// while an in-bailiwick name that does carry glue and an out-of-bailiwick name
+// (resolved elsewhere) are not.
+func TestDelegation01InBailiwickGlueMissing(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubDelegation01Counts(t)
+
+	origDel := delegationNameservers
+	t.Cleanup(func() { delegationNameservers = origDel })
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
+			{Name: dnsname.New("ns1.example")},
+			{Name: dnsname.New("ns2.example"), Address: netip.MustParseAddr("192.0.2.1"), HasAddress: true},
+			{Name: dnsname.New("ns.example.net")},
+		}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Delegation01(ctx, &z)
+	if err != nil {
+		t.Fatalf("delegation01: %v", err)
+	}
+
+	flagged := collectArgValues(entries, "IN_BAILIWICK_GLUE_MISSING", "ns")
+	if len(flagged) != 1 || flagged[0] != "ns1.example" {
+		t.Fatalf("expected only ns1.example flagged for missing glue, got %v", flagged)
+	}
+}
+
+// TestDelegation01InBailiwickGluePresent verifies that no glue-missing tag is
+// emitted when every in-bailiwick delegation NS name carries glue.
+func TestDelegation01InBailiwickGluePresent(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubDelegation01Counts(t)
+
+	origDel := delegationNameservers
+	t.Cleanup(func() { delegationNameservers = origDel })
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
+			{Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.1"), HasAddress: true},
+			{Name: dnsname.New("ns2.example"), Address: netip.MustParseAddr("2001:db8::1"), HasAddress: true},
+		}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Delegation01(ctx, &z)
+	if err != nil {
+		t.Fatalf("delegation01: %v", err)
+	}
+
+	if hasEntryTag(entries, "IN_BAILIWICK_GLUE_MISSING") {
+		t.Fatalf("did not expect IN_BAILIWICK_GLUE_MISSING when all in-bailiwick names carry glue")
 	}
 }
 
@@ -1141,6 +1249,17 @@ func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
 
 func testCtx() context.Context {
 	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
+}
+
+// stubNoDelegationGlueGap neutralises Delegation01's in-bailiwick glue check
+// by returning no delegation items, so the count-focused tests are unaffected
+// by it. The dedicated glue tests stub delegationNameservers themselves.
+func stubNoDelegationGlueGap(t *testing.T) {
+	orig := delegationNameservers
+	t.Cleanup(func() { delegationNameservers = orig })
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	}
 }
 
 func newNameserver(t *testing.T, ctx context.Context, name string, ip string, handler func(qname string, qtype string, opts *nameserver.QueryOptions) packet.Packet) nameserver.Nameserver {

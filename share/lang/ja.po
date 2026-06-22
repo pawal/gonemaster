@@ -809,6 +809,10 @@ msgctxt "DELEGATION:EXTRA_NAME_PARENT"
 msgid "Parent has nameserver(s) not listed at the child ({extra})."
 msgstr "親ゾーンには、子ゾーンに記載されていないネームサーバーがあります ({extra})。"
 
+msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
+msgid "In-bailiwick nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
+msgstr "in-bailiwick ネームサーバー {ns} には、親ゾーンの委任にグルーアドレスレコード (A または AAAA) がありません。"
+
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr "ネームサーバー {ns}/{address} の {proto}/53 での応答は権威応答ではありません。"

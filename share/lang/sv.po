@@ -2291,6 +2291,10 @@ msgstr ""
 "Delegeringen i föräldrazonen har en eller flera namnservrar (NS) som inte "
 "listas i dotterzonen ({extra})."
 
+msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
+msgid "In-bailiwick nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
+msgstr "In-bailiwick-namnservern {ns} saknar glue-adresspost (A eller AAAA) i delegeringen från föräldrazonen."
+
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
 msgstr "Namnservern '{ns}/{address}' svarade inte auktoritativt på {proto} port 53."

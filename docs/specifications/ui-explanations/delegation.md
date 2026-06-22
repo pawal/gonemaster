@@ -193,3 +193,11 @@ Header: Parent and zone list different nameservers
 Description:
 
 The set of nameservers in the parent zone's delegation and the set of nameservers your zone itself publishes have no names in common. Resolvers and validators that compare the two will treat your domain as misconfigured; depending on which side a resolver trusts, it may pick an entirely different server than what you currently run.
+
+## Tag IN_BAILIWICK_GLUE_MISSING
+
+Header: Nameserver inside the zone is missing its glue
+
+Description:
+
+One of your nameservers has a name inside your own domain (for example ns1.example.com serving example.com), but the parent zone's referral does not include its IP address as glue. This is a chicken-and-egg failure: to look up the nameserver's address a resolver must first ask that very nameserver, which it cannot reach without the address. The parent must publish the glue address for every in-domain nameserver, or the delegation is unresolvable.

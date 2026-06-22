@@ -828,5 +828,7 @@
   "pub.tag.nameserver.N17_NO_RESPONSE.header": "No response to DNS Cookie probe",
   "pub.tag.nameserver.N17_NO_RESPONSE.desc": "A nameserver did not answer the DNS Cookie probe at all. The cookie capability cannot be assessed for that server.",
   "pub.tag.nameserver.N17_COOKIE_ENFORCED.header": "DNS Cookie enforced",
-  "pub.tag.nameserver.N17_COOKIE_ENFORCED.desc": "A nameserver requires DNS Cookies: it answered a probe without a Server Cookie with BADCOOKIE and a fresh, well-formed Server Cookie, then accepted that cookie on retry (RFC 7873). This is the strongest cookie posture and gives the best protection against off-path forgery and amplification abuse."
+  "pub.tag.nameserver.N17_COOKIE_ENFORCED.desc": "A nameserver requires DNS Cookies: it answered a probe without a Server Cookie with BADCOOKIE and a fresh, well-formed Server Cookie, then accepted that cookie on retry (RFC 7873). This is the strongest cookie posture and gives the best protection against off-path forgery and amplification abuse.",
+  "pub.tag.delegation.IN_BAILIWICK_GLUE_MISSING.header": "Nameserver inside the zone is missing its glue",
+  "pub.tag.delegation.IN_BAILIWICK_GLUE_MISSING.desc": "One of your nameservers has a name inside your own domain (for example ns1.example.com serving example.com), but the parent zone's referral does not include its IP address as glue. This is a chicken-and-egg failure: to look up the nameserver's address a resolver must first ask that very nameserver, which it cannot reach without the address. The parent must publish the glue address for every in-domain nameserver, or the delegation is unresolvable."
 }

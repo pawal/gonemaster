@@ -277,12 +277,25 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	serialKeys := slices.Sorted(maps.Keys(serials))
+	// RFC 1982 ordering; a lexical string sort mis-ranks "9" vs "100" and the wrap boundary.
+	type serialView struct {
+		value uint32
+		label string
+	}
+	observed := make([]serialView, 0, len(serials))
+	for label := range serials {
+		value, err := strconv.ParseUint(label, 10, 32)
+		if err != nil {
+			continue
+		}
+		observed = append(observed, serialView{value: uint32(value), label: label})
+	}
+	sort.Slice(observed, func(i, j int) bool { return observed[i].value < observed[j].value })
 
-	for _, serial := range serialKeys {
-		nsList := uniqueSortedValues(serials[serial])
+	for _, view := range observed {
+		nsList := uniqueSortedValues(serials[view.label])
 		args := map[string]any{
-			"serial": serial,
+			"serial": view.label,
 		}
 		setTypedServersFromNames(args, strings.Join(nsList, ";"))
 		if err := appendLog(ctx, &results, testcase, "SOA_SERIAL", args); err != nil {
@@ -290,30 +303,47 @@ func Consistency01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if len(serialKeys) == 1 {
+	if len(observed) == 1 {
 		if err := appendLog(ctx, &results, testcase, "ONE_SOA_SERIAL", map[string]any{
-			"serial": serialKeys[0],
+			"serial": observed[0].label,
 		}); err != nil {
 			return results, err
 		}
-	} else if len(serialKeys) > 0 {
+	} else if len(observed) > 1 {
 		if err := appendLog(ctx, &results, testcase, "MULTIPLE_SOA_SERIALS", map[string]any{
-			"count": len(serialKeys),
+			"count": len(observed),
 		}); err != nil {
 			return results, err
 		}
 
-		minVal, errMin := strconv.ParseInt(serialKeys[0], 10, 64)
-		maxVal, errMax := strconv.ParseInt(serialKeys[len(serialKeys)-1], 10, 64)
-		if errMin == nil && errMax == nil {
-			if maxVal-minVal > int64(constants.SerialMaxVariation) {
-				if err := appendLog(ctx, &results, testcase, "SOA_SERIAL_VARIATION", map[string]any{
-					"serial_min":    serialKeys[0],
-					"serial_max":    serialKeys[len(serialKeys)-1],
-					"max_variation": constants.SerialMaxVariation,
-				}); err != nil {
-					return results, err
+		newest, oldest := observed[0], observed[0]
+		for _, view := range observed[1:] {
+			if util.SerialGT(view.value, newest.value) {
+				newest = view
+			}
+			if util.SerialGT(oldest.value, view.value) {
+				oldest = view
+			}
+		}
+		// Wrap-safe forward distance from oldest to newest.
+		variation := newest.value - oldest.value
+		if uint64(variation) > uint64(constants.SerialMaxVariation) {
+			args := map[string]any{
+				"serial_min":    oldest.label,
+				"serial_max":    newest.label,
+				"max_variation": constants.SerialMaxVariation,
+			}
+			// Lagging servers: those not serving the newest serial.
+			var behind []string
+			for _, view := range observed {
+				if view.value == newest.value {
+					continue
 				}
+				behind = append(behind, serials[view.label]...)
+			}
+			setTypedServerListAtKey(args, "servers_behind", strings.Join(uniqueSortedValues(behind), ";"))
+			if err := appendLog(ctx, &results, testcase, "SOA_SERIAL_VARIATION", args); err != nil {
+				return results, err
 			}
 		}
 	}

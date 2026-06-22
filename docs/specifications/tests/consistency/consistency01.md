@@ -27,11 +27,11 @@ Status: Final
    - Response without usable SOA record for zone apex -> emit `NO_RESPONSE_SOA_QUERY`.
    - Otherwise store serial value for that nameserver.
 4. Group successful responses by serial value.
-5. Emit `SOA_SERIAL` once per serial with sorted `servers`.
+5. Emit `SOA_SERIAL` once per serial (ordered numerically) with sorted `servers`.
 6. If exactly one serial exists, emit `ONE_SOA_SERIAL`.
 7. If multiple serials exist:
    - Emit `MULTIPLE_SOA_SERIALS`.
-   - Compute numeric delta using first/last sorted serial keys and, when delta exceeds `SerialMaxVariation`, emit `SOA_SERIAL_VARIATION`.
+   - Select the oldest and newest serial using RFC 1982 serial arithmetic, compute the wrap-safe forward distance between them, and when it exceeds `SerialMaxVariation` emit `SOA_SERIAL_VARIATION` with the lagging nameservers in `servers_behind`.
 8. Emit `TEST_CASE_END`.
 
 ### Per-NS SOA Probe and Serial Aggregation (steps 2-8)
@@ -53,14 +53,15 @@ For each nameserver (parallel; fan-out = resolver.defaults.parallel):
    otherwise                             -> serial = soa.Serial (as string)
                                             serials[serial] += "name/ip"
 
-After all tasks (serialKeys sorted lexicographically):
-  emit one SOA_SERIAL per serial key  (serial, servers)
+After all tasks (serials ordered numerically):
+  emit one SOA_SERIAL per serial  (serial, servers)
 
-  len(serialKeys) == 1                  -> ONE_SOA_SERIAL (serial)
-  len(serialKeys) > 1                   -> MULTIPLE_SOA_SERIALS (count)
-      if int(serialKeys[last]) - int(serialKeys[0]) > SerialMaxVariation
+  len(serials) == 1                  -> ONE_SOA_SERIAL (serial)
+  len(serials) > 1                   -> MULTIPLE_SOA_SERIALS (count)
+      oldest/newest via RFC 1982 (util.SerialGT); variation = newest - oldest (wrap-safe)
+      if variation > SerialMaxVariation
                                         -> SOA_SERIAL_VARIATION
-                                           (serial_min, serial_max, max_variation)
+                                           (serial_min, serial_max, max_variation, servers_behind)
 
 emit TEST_CASE_END
 ```
@@ -97,9 +98,10 @@ emit TEST_CASE_END
 | `ONE_SOA_SERIAL` | `serial` | `string` | The single observed SOA serial value. |
 | `SOA_SERIAL` | `serial` | `string` | One observed SOA serial value. |
 | `SOA_SERIAL` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) serving that serial. |
-| `SOA_SERIAL_VARIATION` | `serial_min` | `string` | Lowest serial key used in variation check. |
-| `SOA_SERIAL_VARIATION` | `serial_max` | `string` | Highest serial key used in variation check. |
+| `SOA_SERIAL_VARIATION` | `serial_min` | `string` | Oldest serial (RFC 1982) used in variation check. |
+| `SOA_SERIAL_VARIATION` | `serial_max` | `string` | Newest serial (RFC 1982) used in variation check. |
 | `SOA_SERIAL_VARIATION` | `max_variation` | `int` | Allowed maximum variation threshold. |
+| `SOA_SERIAL_VARIATION` | `servers_behind` | `array<object>` | Nameservers serving an older serial than the newest observed. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency01`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency01`). |
 
@@ -120,19 +122,19 @@ emit TEST_CASE_END
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
   - Upstream documents `MULTIPLE_SOA_SERIALS_OK`; Gonemaster does not emit that tag.
-  - Upstream: does not explicitly define this detail. Gonemaster: Serial variation delta uses integer subtraction on the first and last serial values after lexicographic string-key sorting.
+  - Upstream sorts serial values lexically as strings and subtracts the first from the last, which mis-ranks differing-length serials and the 32-bit wrap boundary. Gonemaster orders serials and selects the oldest/newest using RFC 1982 serial arithmetic, and reports the lagging nameservers in `servers_behind`.
 - Potential upstream report:
-  - `no`
+  - `yes` (reported upstream: the upstream string-sort plus integer-subtraction variation check is incorrect for differing-length serials and for serials near the 32-bit wrap boundary).
 
 ## Implementation Notes
 
 The following behaviors are implementation choices, not mandated by protocol:
 
-- **String-key sort for variation delta**: When multiple distinct serials are observed, the variation delta is computed by sorting the serial values as strings (lexicographically) and subtracting the first from the last.  Lexicographic ordering differs from numeric ordering when serials have different digit counts (e.g., `"9"` sorts after `"10"` lexicographically, so the min/max assignment and resulting delta can differ from a numerically sorted result).  This only affects `SOA_SERIAL_VARIATION` emission when `SerialMaxVariation > 0`; with the default of `0` any difference between serials is flagged regardless of this sort order.
+- **RFC 1982 serial ordering**: Observed serials are parsed to 32-bit integers and ordered numerically; the oldest and newest are selected with RFC 1982 serial-number arithmetic (`util.SerialGT`), and the variation is the wrap-safe forward distance between them. With the default `SerialMaxVariation` of `0` any difference between serials is flagged. Serials that fail to parse as 32-bit integers are skipped from the variation check.
 - **Deduplication by `name/ip`**: Nameservers are deduplicated using their full `name/ip` identity string.  Two entries with the same IP but different names are treated as distinct sources.  The protocol defines no deduplication rule for testcase purposes; this choice is implementation-defined.
 - **Sorted `servers` in `SOA_SERIAL`**: Nameserver identities in `SOA_SERIAL` arguments are sorted before joining.  Deterministic ordering is an implementation choice for reproducible output.
 
 ## Edge Cases And Limitations
 - If no usable SOA serial is obtained from any nameserver, no serial-summary tag (`ONE_SOA_SERIAL`/`MULTIPLE_SOA_SERIALS`) is emitted.
 - Nameserver deduplication is by `name/ip`; same IP with different names is treated as separate sources.
-- Variation check behavior is sensitive to string-key ordering of serial values.
+- Serials that do not parse as 32-bit unsigned integers are skipped from the variation check.

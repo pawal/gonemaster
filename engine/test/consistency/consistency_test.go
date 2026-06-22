@@ -84,6 +84,123 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 	}
 }
 
+// Serials 9 and 100 must be ordered numerically: a lexicographic string sort ranks
+// "100" before "9" and computes a negative delta, which previously hid the variation
+// entirely. The oldest must be 9, the newest 100, and ns1 (serving 9) is the laggard.
+func TestConsistency01LexicalTrapSerialVariation(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+		if strings.EqualFold(qtype, "SOA") {
+			return soaPacket("example", 9, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+		if strings.EqualFold(qtype, "SOA") {
+			return soaPacket("example", 100, "ns2.example", "hostmaster.example", 3600, 600, 86400, 60)
+		}
+		return packet.Packet{}
+	})
+
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns2}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency01(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency01: %v", err)
+	}
+
+	entry := firstEntryByTag(entries, "SOA_SERIAL_VARIATION")
+	if entry == nil {
+		t.Fatalf("expected SOA_SERIAL_VARIATION for serials 9 and 100 (numeric ordering)")
+	}
+	if got := entry.Args["serial_min"]; got != "9" {
+		t.Fatalf("expected serial_min=9 (oldest), got %#v", got)
+	}
+	if got := entry.Args["serial_max"]; got != "100" {
+		t.Fatalf("expected serial_max=100 (newest), got %#v", got)
+	}
+	behind := serverEndpointsAtKey(entry.Args, "servers_behind")
+	if len(behind) != 1 || behind[0] != "ns1.example/192.0.2.1" {
+		t.Fatalf("expected servers_behind to name ns1.example/192.0.2.1, got %v", behind)
+	}
+}
+
+// Near the 32-bit wrap boundary serial 1 is newer than 4294967294 under RFC 1982,
+// so newest/oldest selection and the wrap-safe distance must treat 1 as the newest.
+func TestConsistency01SerialWraparound(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
+		if strings.EqualFold(qtype, "SOA") {
+			return soaPacket("example", 4294967294, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
+		}
+		return packet.Packet{}
+	})
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
+		if strings.EqualFold(qtype, "SOA") {
+			return soaPacket("example", 1, "ns2.example", "hostmaster.example", 3600, 600, 86400, 60)
+		}
+		return packet.Packet{}
+	})
+
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns1}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns2}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency01(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency01: %v", err)
+	}
+
+	entry := firstEntryByTag(entries, "SOA_SERIAL_VARIATION")
+	if entry == nil {
+		t.Fatalf("expected SOA_SERIAL_VARIATION across the wrap boundary")
+	}
+	if got := entry.Args["serial_min"]; got != "4294967294" {
+		t.Fatalf("expected serial_min=4294967294 (oldest under RFC 1982), got %#v", got)
+	}
+	if got := entry.Args["serial_max"]; got != "1" {
+		t.Fatalf("expected serial_max=1 (newest under RFC 1982), got %#v", got)
+	}
+	behind := serverEndpointsAtKey(entry.Args, "servers_behind")
+	if len(behind) != 1 || behind[0] != "ns1.example/192.0.2.1" {
+		t.Fatalf("expected servers_behind to name ns1.example/192.0.2.1 (serving the older serial), got %v", behind)
+	}
+}
+
 func TestConsistency02MultipleRnames(t *testing.T) {
 	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)

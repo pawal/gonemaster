@@ -879,3 +879,16 @@ func TestHelpIncludesGradeFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestRunAllowNonGlobalFlag(t *testing.T) {
+	// --allow-non-global sets the RunRequest override that disables the guard.
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+	var out, errOut bytes.Buffer
+	if code := run([]string{"-H", "example.com", "--allow-non-global"}, &out, &errOut); code != 0 {
+		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if captured.AllowNonGlobalTargets == nil || !*captured.AllowNonGlobalTargets {
+		t.Fatalf("expected AllowNonGlobalTargets true, got %#v", captured.AllowNonGlobalTargets)
+	}
+}

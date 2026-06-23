@@ -161,6 +161,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var disableIPv4 bool
 	var disableIPv6 bool
 	var forceIPv6 bool
+	var allowNonGlobal bool
 	var sourceAddr4 string
 	var sourceAddr6 string
 	var sourceAddr4Set bool
@@ -196,6 +197,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "  --no-ipv4         Disable IPv4 queries")
 		fmt.Fprintln(errOut, "  --no-ipv6         Disable IPv6 queries")
 		fmt.Fprintln(errOut, "  --force-ipv6      Force IPv6 queries")
+		fmt.Fprintln(errOut, "  --allow-non-global Allow querying private/non-globally-reachable nameserver addresses")
 		fmt.Fprintln(errOut, "  --source-addr4    Override resolver.source4 (IPv4 source address)")
 		fmt.Fprintln(errOut, "  --source-addr6    Override resolver.source6 (IPv6 source address)")
 		fmt.Fprintln(errOut, "  --ns              Undelegated nameserver: name or name/ip (repeatable)")
@@ -240,6 +242,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&disableIPv6, "disable-ipv6", false, "Disable IPv6 queries (optional)")
 	fs.BoolVar(&forceIPv6, "force-ipv6", false, "Force IPv6 queries (optional)")
 	fs.BoolVar(&forceIPv6, "ipv6", false, "Force IPv6 queries (optional)")
+	fs.BoolVar(&allowNonGlobal, "allow-non-global", false, "Allow querying private/non-globally-reachable nameserver addresses (optional)")
 	fs.StringVar(&sourceAddr4, "source-addr4", "", "Override resolver.source4 (IPv4 source address) (optional)")
 	fs.StringVar(&sourceAddr6, "source-addr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.StringVar(&sourceAddr4, "sourceaddr4", "", "Override resolver.source4 (IPv4 source address) (optional)")
@@ -318,6 +321,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if (noIPv6 || disableIPv6) && forceIPv6 {
 		fmt.Fprintln(errOut, "--no-ipv6/--disable-ipv6 cannot be combined with --force-ipv6/--ipv6")
 		return 3
+	}
+	var allowNonGlobalOverride *bool
+	if allowNonGlobal {
+		value := true
+		allowNonGlobalOverride = &value
 	}
 	var sourceAddr4Override *string
 	if sourceAddr4Set {
@@ -401,6 +409,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		Profile:                mergedProfilePath,
 		IPv4:                   ipv4Override,
 		IPv6:                   ipv6Override,
+		AllowNonGlobalTargets:  allowNonGlobalOverride,
 		SourceAddr4:            sourceAddr4Override,
 		SourceAddr6:            sourceAddr6Override,
 		UndelegatedNameservers: undelegatedNS,

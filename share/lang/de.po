@@ -2938,6 +2938,10 @@ msgctxt "SYSTEM:MODULE_END"
 msgid "Module {module} finished running."
 msgstr "Modul {module} wurde abgeschlossen."
 
+msgctxt "SYSTEM:NON_GLOBAL_QUERY_BLOCKED"
+msgid "Query to {ns} skipped: {address} is a private or non-globally-reachable address."
+msgstr "Abfrage an {ns} übersprungen: {address} ist eine private oder nicht global erreichbare Adresse."
+
 msgctxt "SYSTEM:NO_NETWORK"
 msgid "Both IPv4 and IPv6 are disabled."
 msgstr "Sowohl IPv4 als auch IPv6 sind deaktiviert."

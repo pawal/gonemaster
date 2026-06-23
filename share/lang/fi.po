@@ -3529,6 +3529,10 @@ msgctxt "SYSTEM:MODULE_END"
 msgid "Module {module} finished running."
 msgstr "Moduulin {module} ajo päättyi."
 
+msgctxt "SYSTEM:NON_GLOBAL_QUERY_BLOCKED"
+msgid "Query to {ns} skipped: {address} is a private or non-globally-reachable address."
+msgstr "Kysely palvelimelle {ns} ohitettiin: {address} on yksityinen tai ei globaalisti tavoitettava osoite."
+
 msgctxt "SYSTEM:NO_NETWORK"
 msgid "Both IPv4 and IPv6 are disabled."
 msgstr "Sekä IPv4 että IPv6 ovat pois käytöstä."

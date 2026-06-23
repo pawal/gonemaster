@@ -3404,6 +3404,10 @@ msgctxt "SYSTEM:MODULE_END"
 msgid "Module {module} finished running."
 msgstr "Modul {module} je končal."
 
+msgctxt "SYSTEM:NON_GLOBAL_QUERY_BLOCKED"
+msgid "Query to {ns} skipped: {address} is a private or non-globally-reachable address."
+msgstr "Poizvedba do {ns} preskočena: {address} je zaseben ali globalno nedosegljiv naslov."
+
 msgctxt "SYSTEM:NO_NETWORK"
 msgid "Both IPv4 and IPv6 are disabled."
 msgstr "IPv6 in IPv4 sta onemogočena."

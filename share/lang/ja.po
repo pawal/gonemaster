@@ -1387,6 +1387,10 @@ msgctxt "SYSTEM:MODULE_END"
 msgid "Module {module} finished running."
 msgstr "モジュール {module} の実行が完了しました。"
 
+msgctxt "SYSTEM:NON_GLOBAL_QUERY_BLOCKED"
+msgid "Query to {ns} skipped: {address} is a private or non-globally-reachable address."
+msgstr "{ns} へのクエリをスキップしました: {address} はプライベートまたはグローバルに到達できないアドレスです。"
+
 msgctxt "SYSTEM:NO_NETWORK"
 msgid "Both IPv4 and IPv6 are disabled."
 msgstr "IPv4 と IPv6 の両方が無効です。"

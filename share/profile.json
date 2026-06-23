@@ -582,6 +582,7 @@
             "MODULE_ERROR": "CRITICAL",
             "MODULE_VERSION": "DEBUG",
             "MODULE_END": "DEBUG",
+            "NON_GLOBAL_QUERY_BLOCKED": "NOTICE",
             "NO_NETWORK": "CRITICAL",
             "NO_SUCH_NAME": "DEBUG2",
             "NO_SUCH_RECORD": "DEBUG2",

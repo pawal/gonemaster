@@ -3472,6 +3472,10 @@ msgctxt "SYSTEM:MODULE_END"
 msgid "Module {module} finished running."
 msgstr "Modulen '{module}' avslutades."
 
+msgctxt "SYSTEM:NON_GLOBAL_QUERY_BLOCKED"
+msgid "Query to {ns} skipped: {address} is a private or non-globally-reachable address."
+msgstr "Fråga till {ns} hoppades över: {address} är en privat eller inte globalt nåbar adress."
+
 msgctxt "SYSTEM:NO_NETWORK"
 msgid "Both IPv4 and IPv6 are disabled."
 msgstr "Både IPv4 och IPv6 är inaktiverade."

@@ -56,6 +56,8 @@ type RunRequest struct {
 	IPv4 *bool
 	// IPv6 overrides net.ipv6 when non-nil.
 	IPv6 *bool
+	// AllowNonGlobalTargets overrides net.allow_non_global_targets when non-nil.
+	AllowNonGlobalTargets *bool
 	// Parallel overrides resolver.defaults.parallel when non-nil.
 	Parallel *int
 	// Unordered overrides resolver.defaults.unordered when non-nil.
@@ -384,6 +386,11 @@ func buildProfile(req RunRequest, module string, testcases []string) (*profile.P
 			return nil, false, err
 		}
 	}
+	if req.AllowNonGlobalTargets != nil {
+		if err := p.Set("net.allow_non_global_targets", *req.AllowNonGlobalTargets); err != nil {
+			return nil, false, err
+		}
+	}
 	if req.Parallel != nil {
 		if err := p.Set("resolver.defaults.parallel", *req.Parallel); err != nil {
 			return nil, false, err
@@ -638,6 +645,10 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 	}
 	req.UndelegatedNameservers = normalizedNameservers
 	req.UndelegatedDSInfo = normalizedDSInfo
+
+	if allowed := operatorPinnedTargets(req.UndelegatedNameservers); allowed != nil {
+		ctx = profile.WithAllowedTargets(ctx, allowed)
+	}
 
 	r := req.Recursor
 	if r == nil {

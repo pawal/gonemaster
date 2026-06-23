@@ -205,6 +205,19 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		return packet.Packet{}, fmt.Errorf("external query for %s %s attempted to %s while running with no_network", qname, qtype, ns.String())
 	}
 
+	// Guard real outbound queries against non-globally-reachable targets.
+	if ns.state == nil || ns.state.queryFunc == nil {
+		if !prof.Net.AllowNonGlobalTargets && !profile.IsAllowedTarget(ctx, ns.Address) && !constants.IsQueryable(ns.Address) {
+			blockArgs := map[string]any{"address": ns.Address.String()}
+			logargs.SetNS(blockArgs, ns.NameString(), ns.AddressString())
+			logSystemWithLogger(runLog, "NON_GLOBAL_QUERY_BLOCKED", blockArgs)
+			if ns.state != nil {
+				ns.state.cache.set(cacheKey, nil)
+			}
+			return packet.Packet{}, nil
+		}
+	}
+
 	usevc := resolveUseVC(opts)
 	fastFailThreshold := resolveFastFailTimeoutCount(prof)
 	latencyBudget := resolveLatencyBudget(prof)

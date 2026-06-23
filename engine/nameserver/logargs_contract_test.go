@@ -36,9 +36,10 @@ func TestContract_IPV4BlockedArgs(t *testing.T) {
 }
 
 func TestContract_ExternalQueryArgs(t *testing.T) {
-	log := logger.New()
-	ctx := logger.WithContext(context.Background(), log)
-	ctx = WithCache(ctx, NewCacheStore())
+	ctx, prof := testContext(t)
+	// Exercise the real query path against a loopback stand-in address.
+	prof.Net.AllowNonGlobalTargets = true
+	log := logger.FromContext(ctx)
 
 	ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
 	if err != nil {

@@ -35,6 +35,26 @@ type UndelegatedNameserver struct {
 	IP string
 }
 
+// operatorPinnedTargets returns the explicitly supplied undelegated NS
+// addresses, which are exempt from the non-global query guard.
+func operatorPinnedTargets(nameservers []UndelegatedNameserver) map[netip.Addr]struct{} {
+	set := map[netip.Addr]struct{}{}
+	for _, ns := range nameservers {
+		if ns.IP == "" {
+			continue
+		}
+		addr, err := netip.ParseAddr(ns.IP)
+		if err != nil {
+			continue
+		}
+		set[addr.Unmap()] = struct{}{}
+	}
+	if len(set) == 0 {
+		return nil
+	}
+	return set
+}
+
 // UndelegatedDSInfo represents one undelegated DS input row.
 type UndelegatedDSInfo struct {
 	// KeyTag is the DS key tag value.

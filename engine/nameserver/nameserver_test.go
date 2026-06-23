@@ -1409,7 +1409,9 @@ func TestCacheStoreEmpty(t *testing.T) {
 }
 
 func TestQueryLogging(t *testing.T) {
-	ctx, _ := testContext(t)
+	ctx, prof := testContext(t)
+	// Exercise the real query path against a loopback stand-in address.
+	prof.Net.AllowNonGlobalTargets = true
 	log := logger.FromContext(ctx)
 
 	ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
@@ -1627,6 +1629,9 @@ func TestQueryLogsIPBlocked(t *testing.T) {
 func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 	t.Run("blacklist beats fast-fail", func(t *testing.T) {
 		ctx, prof := testContext(t)
+		// Isolate the skip ladder from the non-global address guard; these
+		// subtests use non-global stand-in addresses the guard would block.
+		prof.Net.AllowNonGlobalTargets = true
 		prof.Resolver.Defaults.ErrorCacheTTL = 0
 		prof.Resolver.Defaults.FastFailTimeoutCount = 1
 		log := logger.FromContext(ctx)
@@ -1645,6 +1650,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 
 	t.Run("error-cache beats blacklist", func(t *testing.T) {
 		ctx, prof := testContext(t)
+		prof.Net.AllowNonGlobalTargets = true
 		prof.Resolver.Defaults.ErrorCacheTTL = 60
 		prof.Resolver.Defaults.FastFailTimeoutCount = 0
 		log := logger.FromContext(ctx)
@@ -1669,6 +1675,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		t.Cleanup(clearReachabilityCache)
 
 		ctx, prof := testContext(t)
+		prof.Net.AllowNonGlobalTargets = true
 		prof.Resolver.Defaults.NegativeCacheTTL = 60
 		prof.Resolver.Defaults.ErrorCacheTTL = 60
 		log := logger.FromContext(ctx)
@@ -1692,6 +1699,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 
 	t.Run("fast-fail beats latency-budget", func(t *testing.T) {
 		ctx, prof := testContext(t)
+		prof.Net.AllowNonGlobalTargets = true
 		prof.Resolver.Defaults.ErrorCacheTTL = 0
 		prof.Resolver.Defaults.FastFailTimeoutCount = 1
 		prof.Resolver.Defaults.NameserverMaxTotalMS = 1
@@ -1821,4 +1829,84 @@ func testContext(t *testing.T) (context.Context, *profile.Profile) {
 	ctx = logger.WithContext(ctx, log)
 	ctx = WithCache(ctx, NewCacheStore())
 	return ctx, prof
+}
+
+func TestNonGlobalQueryGuard(t *testing.T) {
+	const blockTag = "NON_GLOBAL_QUERY_BLOCKED"
+	hasTag := func(log *logger.Logger, tag string) bool {
+		for _, e := range log.Entries() {
+			if e != nil && e.Tag == tag {
+				return true
+			}
+		}
+		return false
+	}
+	timeout := 10 * time.Millisecond
+	opts := &QueryOptions{Timeout: &timeout}
+
+	// Guard on (default): a discovered non-global address is not dialed. The
+	// guard logs NON_GLOBAL_QUERY_BLOCKED and never emits EXTERNAL_QUERY. The
+	// v4-mapped form locks the Unmap step.
+	for _, addr := range []string{"192.168.0.1", "10.0.0.1", "::ffff:127.0.0.1"} {
+		ctx, _ := testContext(t)
+		log := logger.FromContext(ctx)
+		ns, err := NewWithContext(ctx, "ns.example", addr, nil)
+		if err != nil {
+			t.Fatalf("new nameserver %s: %v", addr, err)
+		}
+		resp, err := ns.QueryWithOptions(ctx, "example.com", "SOA", opts)
+		if err != nil {
+			t.Errorf("%s: expected nil error from blocked query, got %v", addr, err)
+		}
+		if resp.Msg != nil {
+			t.Errorf("%s: expected empty packet from blocked query", addr)
+		}
+		if !hasTag(log, blockTag) {
+			t.Errorf("%s: expected %s to be logged", addr, blockTag)
+		}
+		if hasTag(log, "EXTERNAL_QUERY") {
+			t.Errorf("%s: blocked query must not emit EXTERNAL_QUERY", addr)
+		}
+	}
+
+	// Guard disabled (net.allow_non_global_targets=true): the same non-global
+	// addresses are no longer blocked; the query is attempted (EXTERNAL_QUERY
+	// logged before the dial) and the block tag is never emitted.
+	for _, addr := range []string{"127.0.0.1", "10.0.0.1", "::ffff:192.168.0.1"} {
+		ctx, prof := testContext(t)
+		prof.Net.AllowNonGlobalTargets = true
+		log := logger.FromContext(ctx)
+		ns, err := NewWithContext(ctx, "ns.example", addr, nil)
+		if err != nil {
+			t.Fatalf("new nameserver %s: %v", addr, err)
+		}
+		_, _ = ns.QueryWithOptions(ctx, "example.com", "SOA", opts)
+		if hasTag(log, blockTag) {
+			t.Errorf("%s: guard disabled, did not expect %s", addr, blockTag)
+		}
+		if !hasTag(log, "EXTERNAL_QUERY") {
+			t.Errorf("%s: guard disabled, expected the query to be attempted", addr)
+		}
+	}
+
+	// Operator allow-set (e.g. a pinned undelegated address) is exempt even
+	// while the guard is on.
+	{
+		ctx, _ := testContext(t)
+		ctx = profile.WithAllowedTargets(ctx, map[netip.Addr]struct{}{
+			netip.MustParseAddr("127.0.0.1"): {},
+		})
+		log := logger.FromContext(ctx)
+		ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
+		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		_, _ = ns.QueryWithOptions(ctx, "example.com", "SOA", opts)
+		if hasTag(log, blockTag) {
+			t.Errorf("allow-set: did not expect %s", blockTag)
+		}
+		if !hasTag(log, "EXTERNAL_QUERY") {
+			t.Errorf("allow-set: expected the query to be attempted")
+		}
+	}
 }

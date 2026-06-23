@@ -393,3 +393,35 @@ func TestApplyUndelegatedDelegationEmitsFakeDelegationToSelf(t *testing.T) {
 		t.Fatalf("expected FAKE_DELEGATION_TO_SELF log entry")
 	}
 }
+
+func TestOperatorPinnedTargets(t *testing.T) {
+	// Only nameservers with an explicitly supplied (pinned) IP are exempt from
+	// the non-global query guard. A name without an IP (resolved later) and an
+	// unparseable IP contribute nothing. Keys are stored unmapped.
+	in := []UndelegatedNameserver{
+		{Name: "ns1.example", IP: "192.168.0.10"},
+		{Name: "ns2.example", IP: "::ffff:10.0.0.5"},
+		{Name: "ns3.example"},          // no pinned IP -> resolved later, not exempt
+		{Name: "ns4.example", IP: "x"}, // unparseable -> ignored
+	}
+	got := operatorPinnedTargets(in)
+	if got == nil {
+		t.Fatalf("expected a non-empty allow-set")
+	}
+	if _, ok := got[netip.MustParseAddr("192.168.0.10")]; !ok {
+		t.Errorf("expected pinned 192.168.0.10 in allow-set")
+	}
+	if _, ok := got[netip.MustParseAddr("10.0.0.5")]; !ok {
+		t.Errorf("expected v4-mapped pin to be stored unmapped as 10.0.0.5")
+	}
+	if len(got) != 2 {
+		t.Errorf("expected exactly 2 pinned targets, got %d: %v", len(got), got)
+	}
+
+	if operatorPinnedTargets(nil) != nil {
+		t.Errorf("expected nil allow-set for no input")
+	}
+	if operatorPinnedTargets([]UndelegatedNameserver{{Name: "ns.example"}}) != nil {
+		t.Errorf("expected nil allow-set when no IP is pinned")
+	}
+}

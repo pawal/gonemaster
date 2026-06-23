@@ -276,3 +276,24 @@ func logHasDomain(log *logger.Logger, domain string) bool {
 	}
 	return false
 }
+
+func TestBuildProfileAllowNonGlobalTargets(t *testing.T) {
+	// The --allow-non-global override flows into the effective profile; a nil
+	// override leaves the shipped default (guard on).
+	tru := true
+	p, _, err := buildProfile(RunRequest{Domain: "example.com", AllowNonGlobalTargets: &tru}, "", nil)
+	if err != nil {
+		t.Fatalf("buildProfile: %v", err)
+	}
+	if !p.Net.AllowNonGlobalTargets {
+		t.Errorf("expected net.allow_non_global_targets true when overridden")
+	}
+
+	def, _, err := buildProfile(RunRequest{Domain: "example.com"}, "", nil)
+	if err != nil {
+		t.Fatalf("buildProfile default: %v", err)
+	}
+	if def.Net.AllowNonGlobalTargets {
+		t.Errorf("expected net.allow_non_global_targets false by default")
+	}
+}

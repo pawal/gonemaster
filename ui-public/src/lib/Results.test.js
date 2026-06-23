@@ -94,6 +94,23 @@ describe("Results", () => {
     );
   });
 
+  it("renders the explanation header for a blocked non-global query", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      {
+        timestamp: 0,
+        module: "System",
+        testcase: "",
+        tag: "NON_GLOBAL_QUERY_BLOCKED",
+        level: "NOTICE",
+        message: "Query to ns1.example/192.168.0.1 skipped",
+      },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() =>
+      expect(screen.getByText("Query skipped for a non-public address")).toBeInTheDocument()
+    );
+  });
+
   it("shows per-level count badges in module summary", async () => {
     global.fetch.mockResolvedValue(resultResp([
       entry("Module::Alpha", "WARNING", "w msg"),

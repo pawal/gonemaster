@@ -1277,3 +1277,27 @@ func TestRunNSTimesOutputsTable(t *testing.T) {
 		t.Fatalf("expected grand total in output, got %q", output)
 	}
 }
+
+func TestRunAllowNonGlobalFlag(t *testing.T) {
+	// --allow-non-global sets the RunRequest override; absent, it stays nil so
+	// the profile/server default governs.
+	var captured engine.RunRequest
+	stubRunEngine(t, &captured)
+	var out, errOut bytes.Buffer
+	if code := run([]string{"--allow-non-global", "example.com"}, &out, &errOut); code != 0 {
+		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if captured.AllowNonGlobalTargets == nil || !*captured.AllowNonGlobalTargets {
+		t.Fatalf("expected AllowNonGlobalTargets override true, got %#v", captured.AllowNonGlobalTargets)
+	}
+
+	captured = engine.RunRequest{}
+	out.Reset()
+	errOut.Reset()
+	if code := run([]string{"example.com"}, &out, &errOut); code != 0 {
+		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if captured.AllowNonGlobalTargets != nil {
+		t.Fatalf("expected AllowNonGlobalTargets unset by default, got %#v", captured.AllowNonGlobalTargets)
+	}
+}

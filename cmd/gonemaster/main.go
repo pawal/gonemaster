@@ -66,6 +66,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var noIPv4 bool
 	var noIPv6 bool
 	var forceIPv6 bool
+	var allowNonGlobal bool
 	var parallel int
 	var parallelSet bool
 	var unordered bool
@@ -150,6 +151,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--no-ipv4", detail: "Disable IPv4 queries"},
 			{flag: "--no-ipv6", detail: "Disable IPv6 queries"},
 			{flag: "--ipv6", detail: "Force IPv6 queries"},
+			{flag: "--allow-non-global", detail: "Allow querying private/non-globally-reachable nameserver addresses"},
 			{flag: "--parallel N", detail: "Override resolver.defaults.parallel"},
 			{flag: "--unordered", detail: "Allow unordered resolver behavior"},
 			{flag: "--ordered", detail: "Force ordered resolver behavior"},
@@ -199,6 +201,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&noIPv4, "no-ipv4", false, "Disable IPv4 queries (optional)")
 	fs.BoolVar(&noIPv6, "no-ipv6", false, "Disable IPv6 queries (optional)")
 	fs.BoolVar(&forceIPv6, "ipv6", false, "Force IPv6 queries (optional)")
+	fs.BoolVar(&allowNonGlobal, "allow-non-global", false, "Allow querying private/non-globally-reachable nameserver addresses (optional)")
 	fs.IntVar(&parallel, "parallel", 0, "Override resolver.defaults.parallel (optional)")
 	fs.BoolVar(&unordered, "unordered", false, "Allow unordered resolver behavior (optional, override profile)")
 	fs.BoolVar(&ordered, "ordered", false, "Force ordered resolver behavior (optional, override profile)")
@@ -393,6 +396,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		value := true
 		ipv6Override = &value
 	}
+	var allowNonGlobalOverride *bool
+	if allowNonGlobal {
+		value := true
+		allowNonGlobalOverride = &value
+	}
 	var parallelOverride *int
 	if parallelSet {
 		if parallel < 1 {
@@ -521,26 +529,27 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	req := engine.RunRequest{
-		Domain:           domain,
-		Module:           module,
-		Testcases:        []string(testcases),
-		Profile:          profile,
-		MinLevel:         engineMinLevel,
-		Debug:            debugFlag,
-		IPv4:             ipv4Override,
-		IPv6:             ipv6Override,
-		Parallel:         parallelOverride,
-		Unordered:        unorderedOverride,
-		ErrorCacheTTL:    errorCacheOverride,
-		Timeout:          timeoutOverride,
-		Retry:            retryOverride,
-		Retrans:          retransOverride,
-		Fallback:         fallbackOverride,
-		SourceAddr4:      sourceAddr4Override,
-		SourceAddr6:      sourceAddr6Override,
-		PositiveCacheTTL: positiveCacheOverride,
-		NegativeCacheTTL: negativeCacheOverride,
-		BadkeysPath:      badkeysPathOverride,
+		Domain:                domain,
+		Module:                module,
+		Testcases:             []string(testcases),
+		Profile:               profile,
+		MinLevel:              engineMinLevel,
+		Debug:                 debugFlag,
+		IPv4:                  ipv4Override,
+		IPv6:                  ipv6Override,
+		AllowNonGlobalTargets: allowNonGlobalOverride,
+		Parallel:              parallelOverride,
+		Unordered:             unorderedOverride,
+		ErrorCacheTTL:         errorCacheOverride,
+		Timeout:               timeoutOverride,
+		Retry:                 retryOverride,
+		Retrans:               retransOverride,
+		Fallback:              fallbackOverride,
+		SourceAddr4:           sourceAddr4Override,
+		SourceAddr6:           sourceAddr6Override,
+		PositiveCacheTTL:      positiveCacheOverride,
+		NegativeCacheTTL:      negativeCacheOverride,
+		BadkeysPath:           badkeysPathOverride,
 	}
 	if queryCollector != nil {
 		req.QueryTrace = queryCollector

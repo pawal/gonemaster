@@ -78,6 +78,9 @@ Results are printed with severity levels and can be output in several formats.
 **--ipv6**
 : Force IPv6 queries.
 
+**--allow-non-global**
+: Allow querying private / non-globally-reachable nameserver addresses. Off by default; such targets are skipped with a NON_GLOBAL_QUERY_BLOCKED notice. Use for internal or split-horizon zones.
+
 **--parallel** *N*
 : Number of parallel queries per nameserver.
 

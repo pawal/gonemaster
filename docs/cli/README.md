@@ -132,6 +132,7 @@ The flag groups below follow `gonemaster --help`.
 | `--no-ipv4` | bool | Disable IPv4 queries. |
 | `--no-ipv6` | bool | Disable IPv6 queries. |
 | `--ipv6` | bool | Force IPv6 queries. |
+| `--allow-non-global` | bool | Allow querying private / non-globally-reachable nameserver addresses. Off by default: such targets are skipped with a `NON_GLOBAL_QUERY_BLOCKED` notice. Use for internal/split-horizon zones. |
 | `--parallel N` | int | Override resolver parallelism. |
 | `--unordered` | bool | Allow unordered resolver behavior. |
 | `--ordered` | bool | Force ordered resolver behavior. |

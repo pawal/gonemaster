@@ -123,6 +123,9 @@ variables, CLI flags. Later sources override earlier ones.
 **--public-api-allow-private-undelegated-ip**
 : Allow undelegated nameserver IPs in loopback / link-local / private / CGNAT / multicast / broadcast ranges on POST /pub/api/v1/jobs (default: refused). Internet-facing deployments must leave this off so the public API cannot be used as an internal-network SSRF probe via the engine's outbound DNS queries. Enable on private/internal deployments that legitimately need to test such targets.
 
+**--public-api-allow-non-global-targets**
+: Permit querying non-globally-reachable nameserver addresses (default: off). When off, the engine guard is clamped on for every job so no caller-selected profile can relax it, covering private addresses learned from glue or DNS resolution that the admission check above cannot see. Enable on private/internal deployments. Complements, and does not replace, **--public-api-allow-private-undelegated-ip**; a public instance that runs private undelegated tests must set both.
+
 ### Output
 
 **--min-level** *LEVEL*
@@ -168,6 +171,9 @@ variables, CLI flags. Later sources override earlier ones.
 
 **GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP**
 : Equivalent to **--public-api-allow-private-undelegated-ip**.
+
+**GONEMASTER_PUBLIC_API_ALLOW_NON_GLOBAL_TARGETS**
+: Equivalent to **--public-api-allow-non-global-targets**.
 
 **GONEMASTER_TRUSTED_PROXY_CIDRS**
 : Equivalent to **--trusted-proxy-cidrs**.

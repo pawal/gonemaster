@@ -39,6 +39,7 @@ gonemaster-server --dump-config
 | `write_timeout` | Per-connection write timeout (default 60s). Must exceed `public_api.analysis_request_timeout`. |
 | `idle_timeout` | Idle keep-alive timeout (default 60s). |
 | `public_api.allow_private_undelegated_ip` | Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated NS targets on the public API. Default `false`; enable on private/internal deployments. |
+| `public_api.allow_non_global_targets` | Permit querying non-globally-reachable nameserver addresses. Default `false`, which clamps the engine guard on for every job so no caller-selected profile can relax it; set `true` on private/internal deployments. Complements (does not replace) `allow_private_undelegated_ip`: that flag is admission-time input validation, this is the query-time guard. A public instance that wants to run private undelegated tests must set both. |
 
 ## Environment Variables
 
@@ -57,6 +58,7 @@ gonemaster-server --dump-config
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX` | `public_api.rate_limit_max` |
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW` | `public_api.rate_limit_window` |
 | `GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP` | `public_api.allow_private_undelegated_ip` |
+| `GONEMASTER_PUBLIC_API_ALLOW_NON_GLOBAL_TARGETS` | `public_api.allow_non_global_targets` |
 | `GONEMASTER_TRUSTED_PROXY_CIDRS` | `trusted_proxy_cidrs` (comma-separated) |
 | `GONEMASTER_READ_TIMEOUT` | `read_timeout` |
 | `GONEMASTER_WRITE_TIMEOUT` | `write_timeout` |
@@ -135,7 +137,8 @@ Database and public API flags are covered in [database.md](database.md) and
     "rate_limit_enabled": true,
     "rate_limit_max": 10,
     "rate_limit_window": "10m",
-    "allow_private_undelegated_ip": false
+    "allow_private_undelegated_ip": false,
+    "allow_non_global_targets": false
   },
   "trusted_proxy_cidrs": ["127.0.0.1/32"],
   "read_timeout": "30s",

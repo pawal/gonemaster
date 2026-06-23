@@ -127,6 +127,29 @@ gonemaster-server --public-api-allow-private-undelegated-ip
 or set `public_api.allow_private_undelegated_ip: true` in the config file.
 The toggle is also exposed live on the admin Settings page.
 
+## Query-time guard for non-global targets
+
+The check above validates only the IPs a caller *submits*. It cannot see
+addresses the engine learns later from parent glue or from resolving a
+nameserver name. A second, deeper guard runs at query time: the engine refuses
+to dial any non-globally-reachable address (loopback, RFC1918, CGNAT,
+link-local, ULA, documentation, benchmarking, and similar IANA special-purpose
+ranges) and emits a `NON_GLOBAL_QUERY_BLOCKED` notice instead.
+
+This guard is on by default and clamped for every public job, so a
+caller-selected profile cannot relax it. Operator-pinned undelegated IPs
+(accepted per the section above) are exempt. To permit non-global query targets
+on a private/internal deployment:
+
+```sh
+gonemaster-server --public-api-allow-non-global-targets
+```
+
+or set `public_api.allow_non_global_targets: true` (also on the admin Settings
+page). A public instance that runs private undelegated tests must enable both
+`allow_private_undelegated_ip` (to accept the input) and
+`allow_non_global_targets` (to permit the query).
+
 ## Caching
 
 Result reads are idempotent and the public ID is unguessable, so a CDN or

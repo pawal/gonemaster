@@ -50,6 +50,15 @@ These are part of the profile but configured elsewhere:
 
 - `net.ipv4` / `net.ipv6` - enable or disable an IP stack (CLI `--no-ipv4`,
   `--no-ipv6`, `--ipv6`).
+- `net.allow_non_global_targets` - default `false`. When `false` (the default), the
+  engine refuses to query nameserver addresses that are private, loopback, or otherwise
+  not globally reachable (loopback, RFC1918, CGNAT, link-local, ULA, documentation,
+  benchmarking, and similar IANA special-purpose ranges), even when learned from glue or
+  DNS resolution, and emits a `NON_GLOBAL_QUERY_BLOCKED` notice instead. Set `true` (CLI
+  `--allow-non-global`) on private/internal instances that test such zones. Addresses an
+  operator pins explicitly via `--ns name/IP` (undelegated tests) are always queried
+  regardless of this flag. Note: enabling the guard by default is a behavior change -
+  delegated tests against a private nameserver now need `--allow-non-global`.
 - `test_levels` - the severity level emitted per message tag, per module.
   Largely generated; see the [test specifications](specifications/).
 - `test_cases_vars` - per-testcase thresholds (for example SOA timer minimums).

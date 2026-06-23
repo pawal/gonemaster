@@ -36,3 +36,10 @@ func IsGloballyReachable(block *SpecialIPBlock) bool {
 	}
 	return strings.Contains(block.GloballyReachable, "True")
 }
+
+// IsQueryable reports whether a DNS query may be sent to ip.
+func IsQueryable(ip netip.Addr) bool {
+	ip = ip.Unmap()
+	block := FindSpecialAddress(ip)
+	return block == nil || IsGloballyReachable(block)
+}

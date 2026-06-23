@@ -86,6 +86,7 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyInt("public-api-rate-limit-max", "GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX", &cfg.PublicAPI.RateLimitMax)
 	applyDuration("public-api-rate-limit-window", "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", &cfg.PublicAPI.RateLimitWindow)
 	applyBool("public-api-allow-private-undelegated-ip", "GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP", &cfg.PublicAPI.AllowPrivateUndelegatedIP)
+	applyBool("public-api-allow-non-global-targets", "GONEMASTER_PUBLIC_API_ALLOW_NON_GLOBAL_TARGETS", &cfg.PublicAPI.AllowNonGlobalTargets)
 	if !flagsSet["trusted-proxy-cidrs"] {
 		if v := getenv("GONEMASTER_TRUSTED_PROXY_CIDRS"); v != "" {
 			cfg.TrustedProxyCIDRs = strings.Split(v, ",")

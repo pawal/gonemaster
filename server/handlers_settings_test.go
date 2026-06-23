@@ -599,3 +599,35 @@ func TestFeaturesEndpointReflectsConfig(t *testing.T) {
 		t.Fatal("expected show_nameserver_timings_admin=false when disabled in config")
 	}
 }
+
+func TestPutSettingsAllowNonGlobalTargets(t *testing.T) {
+	// The query-guard server policy is a settable admin setting that hot-reloads
+	// into the running config and is reported by GET /settings.
+	srv := New(DefaultConfig())
+	if srv.cfg.PublicAPI.AllowNonGlobalTargets {
+		t.Fatal("expected AllowNonGlobalTargets default false")
+	}
+
+	body := `{"allow_non_global_targets": true}`
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	if !srv.cfg.PublicAPI.AllowNonGlobalTargets {
+		t.Fatal("expected AllowNonGlobalTargets true after PUT")
+	}
+
+	getResp := httptest.NewRecorder()
+	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
+	srv.Handler().ServeHTTP(getResp, getReq)
+	var settings map[string]settingEntry
+	if err := json.NewDecoder(getResp.Body).Decode(&settings); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if _, ok := settings["allow_non_global_targets"]; !ok {
+		t.Fatal("missing setting allow_non_global_targets")
+	}
+}

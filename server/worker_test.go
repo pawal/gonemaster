@@ -789,3 +789,53 @@ func TestRunJobPersistsNameserverTimingsForDelegatedNameserversOnly(t *testing.T
 		t.Fatalf("second nameserver = %q, want ns2.example.com", result.NameserverTimings[1].Nameserver)
 	}
 }
+
+func TestRunEngineForJobClampsNonGlobalGuard(t *testing.T) {
+	// An override that enables non-global queries is clamped off unless the
+	// instance permits it; the clamp is the typed RunRequest override, so it
+	// wins over the merged profile in the effective profile.
+	overrides := map[string]any{"net": map[string]any{"allow_non_global_targets": true}}
+	makeJob := func() Job {
+		return Job{ID: "job-clamp", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC(), Overrides: overrides}
+	}
+
+	// Default instance: the guard is enforced and the override is clamped off.
+	srv := New(DefaultConfig())
+	var captured engine.RunRequest
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) { captured = req; return nil, nil }
+	_, _, _, effective, err := srv.runEngineForJob(makeJob(), context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if captured.AllowNonGlobalTargets == nil || *captured.AllowNonGlobalTargets {
+		t.Fatalf("expected guard clamped on (false), got %#v", captured.AllowNonGlobalTargets)
+	}
+	p, err := profile.FromJSON(effective)
+	if err != nil {
+		t.Fatalf("parse effective profile: %v", err)
+	}
+	if p.Net.AllowNonGlobalTargets {
+		t.Fatal("expected effective net.allow_non_global_targets false (clamped)")
+	}
+
+	// Instance permits non-global targets: no clamp, the override is honored.
+	cfgAllow := DefaultConfig()
+	cfgAllow.PublicAPI.AllowNonGlobalTargets = true
+	srvAllow := New(cfgAllow)
+	var capturedAllow engine.RunRequest
+	srvAllow.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) { capturedAllow = req; return nil, nil }
+	_, _, _, effectiveAllow, err := srvAllow.runEngineForJob(makeJob(), context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob (allow): %v", err)
+	}
+	if capturedAllow.AllowNonGlobalTargets != nil {
+		t.Fatalf("expected no clamp when instance permits, got %#v", capturedAllow.AllowNonGlobalTargets)
+	}
+	pAllow, err := profile.FromJSON(effectiveAllow)
+	if err != nil {
+		t.Fatalf("parse effective profile (allow): %v", err)
+	}
+	if !pAllow.Net.AllowNonGlobalTargets {
+		t.Fatal("expected effective net.allow_non_global_targets true (override honored)")
+	}
+}

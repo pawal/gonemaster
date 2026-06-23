@@ -72,6 +72,10 @@ type PublicAPIConfig struct {
 	// link-local / private / CGNAT / multicast / broadcast ranges. Default
 	// false; set true on private/internal deployments that need it.
 	AllowPrivateUndelegatedIP bool `json:"allow_private_undelegated_ip,omitempty"`
+	// AllowNonGlobalTargets permits querying non-globally-reachable addresses.
+	// Default false: the engine guard is clamped on for every job. Set true on
+	// private/internal deployments that test such zones.
+	AllowNonGlobalTargets bool `json:"allow_non_global_targets,omitempty"`
 }
 
 // Duration is a time.Duration that marshals/unmarshals as a string (e.g. "5m").
@@ -179,6 +183,7 @@ type PublicAPIFileConfig struct {
 	RateLimitWindow           *string `json:"rate_limit_window,omitempty"`
 	AnalysisRequestTimeout    *string `json:"analysis_request_timeout,omitempty"`
 	AllowPrivateUndelegatedIP *bool   `json:"allow_private_undelegated_ip,omitempty"`
+	AllowNonGlobalTargets     *bool   `json:"allow_non_global_targets,omitempty"`
 }
 
 // DatabaseFileConfig holds optional database configuration from JSON.
@@ -427,6 +432,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 		}
 		if file.PublicAPI.AllowPrivateUndelegatedIP != nil {
 			c.PublicAPI.AllowPrivateUndelegatedIP = *file.PublicAPI.AllowPrivateUndelegatedIP
+		}
+		if file.PublicAPI.AllowNonGlobalTargets != nil {
+			c.PublicAPI.AllowNonGlobalTargets = *file.PublicAPI.AllowNonGlobalTargets
 		}
 	}
 	if file.Analysis != nil {

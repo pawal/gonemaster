@@ -60,6 +60,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var pubAPIRateLimitMax int
 	var pubAPIRateLimitWindow time.Duration
 	var pubAPIAllowPrivateUndelegatedIP bool
+	var pubAPIAllowNonGlobalTargets bool
 	var trustedProxyCIDRs string
 	var readTimeout time.Duration
 	var writeTimeout time.Duration
@@ -159,6 +160,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.IntVar(&pubAPIRateLimitMax, "public-api-rate-limit-max", 0, "Max job submissions per IP per window (default 10)")
 	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
 	fs.BoolVar(&pubAPIAllowPrivateUndelegatedIP, "public-api-allow-private-undelegated-ip", false, "Allow private/loopback IPs as undelegated NS targets on the public API (default off)")
+	fs.BoolVar(&pubAPIAllowNonGlobalTargets, "public-api-allow-non-global-targets", false, "Permit querying non-globally-reachable addresses; off clamps the engine guard on for every job (default off)")
 	fs.StringVar(&trustedProxyCIDRs, "trusted-proxy-cidrs", "", "Comma-separated CIDRs allowed to set X-Forwarded-For (default empty = trust nothing)")
 	fs.StringVar(&adminTokenHashes, "admin-token-hashes", "", "Comma-separated admin token hashes (label=sha256:...) gating /api/v1 (default empty = open mode)")
 	fs.DurationVar(&readTimeout, "read-timeout", 0, "Per-connection read timeout (default 30s)")
@@ -350,6 +352,9 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	}
 	if flagsSet["public-api-allow-private-undelegated-ip"] {
 		cfg.PublicAPI.AllowPrivateUndelegatedIP = pubAPIAllowPrivateUndelegatedIP
+	}
+	if flagsSet["public-api-allow-non-global-targets"] {
+		cfg.PublicAPI.AllowNonGlobalTargets = pubAPIAllowNonGlobalTargets
 	}
 	if flagsSet["trusted-proxy-cidrs"] {
 		cfg.TrustedProxyCIDRs = strings.Split(trustedProxyCIDRs, ",")
@@ -552,6 +557,7 @@ func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string
 		"public-api-rate-limit-max":     "rate_limit_max",
 		"public-api-rate-limit-window":  "rate_limit_window",
 		"public-api-allow-private-undelegated-ip": "allow_private_undelegated_ip",
+		"public-api-allow-non-global-targets":     "allow_non_global_targets",
 		"trusted-proxy-cidrs":                     "trusted_proxy_cidrs",
 		"read-timeout":                            "read_timeout",
 		"write-timeout":                           "write_timeout",

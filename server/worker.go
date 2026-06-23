@@ -293,6 +293,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		disabled := false
 		req.IPv6 = &disabled
 	}
+	// Clamp the guard on unless the instance permits non-global targets.
+	if !s.cfg.PublicAPI.AllowNonGlobalTargets {
+		block := false
+		req.AllowNonGlobalTargets = &block
+	}
 	if s.cfg.PositiveCacheTTL != nil {
 		req.PositiveCacheTTL = s.cfg.PositiveCacheTTL
 	}

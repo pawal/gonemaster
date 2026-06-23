@@ -719,3 +719,20 @@ func TestBonus_DS15HasCDSWinsOverDS18RolloverEvidence(t *testing.T) {
 		t.Errorf("expected cds_cdnskey_published = true (DS15_HAS_* wins), got %v", v)
 	}
 }
+
+func TestSystemTagsAreScoreNeutral(t *testing.T) {
+	// SYSTEM-module entries (such as the non-global query guard skip) are not
+	// mapped to any scoring category, so they must never change score or grade.
+	base := []Entry{{Module: "BASIC", Tag: "B01_OK", Level: "NOTICE"}}
+	withGuard := append(append([]Entry{}, base...),
+		Entry{Module: "System", Tag: "NON_GLOBAL_QUERY_BLOCKED", Level: "NOTICE"})
+
+	rBase := Compute("example.se", base, cfg)
+	rGuard := Compute("example.se", withGuard, cfg)
+	if rBase.Score != rGuard.Score {
+		t.Errorf("SYSTEM tag changed score: %d vs %d", rBase.Score, rGuard.Score)
+	}
+	if rBase.Grade != rGuard.Grade {
+		t.Errorf("SYSTEM tag changed grade: %s vs %s", rBase.Grade, rGuard.Grade)
+	}
+}

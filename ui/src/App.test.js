@@ -1557,6 +1557,21 @@ describe("App", () => {
 
       unmount();
     });
+
+    it("renders the non-global query targets toggle in the Public API group", async () => {
+      global.fetch.mockImplementation(settingsMock);
+      const { unmount } = render(App);
+      await openSettingsTab();
+
+      await waitFor(() => {
+        expect(screen.getByLabelText(/non-global query targets/i)).toBeInTheDocument();
+      });
+
+      const toggle = screen.getByLabelText(/non-global query targets/i);
+      expect(toggle.type).toBe("checkbox");
+
+      unmount();
+    });
   });
 
   // Regression tests: both entry points into per-tab data loading

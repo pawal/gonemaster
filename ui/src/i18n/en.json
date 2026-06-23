@@ -222,6 +222,8 @@
   "settings_help_rate_limit_window": "Sliding window duration for rate limiting (e.g. 10m).",
   "settings_label_allow_private_undelegated_ip": "Allow private undelegated IPs",
   "settings_help_allow_private_undelegated_ip": "Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated nameserver targets on the public API. Leave off for internet-facing deployments; turn on only for private/internal instances that need to test such targets.",
+  "settings_label_allow_non_global_targets": "Allow non-global query targets",
+  "settings_help_allow_non_global_targets": "Permit querying nameserver addresses that are private, loopback, or otherwise not globally reachable. Leave off for internet-facing deployments; turn on only for private or internal instances. Operator-supplied undelegated addresses are always allowed.",
   "settings_group_general": "General",
   "settings_group_resolver": "Resolver & Profile",
   "settings_group_database": "Database",

@@ -534,6 +534,8 @@
   "settings_help_rate_limit_window": "Duración de la ventana deslizante para la limitación de tasa (ej. 10m).",
   "settings_label_allow_private_undelegated_ip": "Permitir IPs privadas no delegadas",
   "settings_help_allow_private_undelegated_ip": "Permite IPs loopback / link-local / privadas / CGNAT / multicast / broadcast como destinos de servidores de nombres no delegados en la API pública. Déjelo desactivado para despliegues expuestos a internet; actívelo solo en instancias privadas/internas que necesiten probar tales destinos.",
+  "settings_label_allow_non_global_targets": "Permitir destinos de consulta no globales",
+  "settings_help_allow_non_global_targets": "Permitir consultas a direcciones de servidores de nombres privadas, loopback o de otro modo no accesibles globalmente. Déjelo desactivado en despliegues expuestos a Internet; actívelo solo en instancias privadas o internas. Las direcciones no delegadas indicadas por el operador siempre se permiten.",
   "settings_group_general": "General",
   "settings_group_resolver": "Resolver y perfil",
   "settings_group_database": "Base de datos",

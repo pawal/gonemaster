@@ -222,6 +222,8 @@
   "settings_help_rate_limit_window": "Gleitendes Zeitfenster für das Rate-Limiting (z. B. 10m).",
   "settings_label_allow_private_undelegated_ip": "Private undelegierte IPs erlauben",
   "settings_help_allow_private_undelegated_ip": "Loopback-, Link-Local-, private, CGNAT-, Multicast- und Broadcast-IPs als undelegierte Nameserver-Ziele in der öffentlichen API erlauben. Für internet-zugängliche Deployments deaktiviert lassen; nur für private oder interne Instanzen aktivieren, die solche Ziele testen müssen.",
+  "settings_label_allow_non_global_targets": "Nicht global erreichbare Abfrageziele zulassen",
+  "settings_help_allow_non_global_targets": "Abfragen an Nameserver-Adressen erlauben, die privat, Loopback oder anderweitig nicht global erreichbar sind. Bei öffentlich erreichbaren Installationen ausgeschaltet lassen; nur für private oder interne Instanzen einschalten. Vom Betreiber angegebene undelegierte Adressen sind immer erlaubt.",
   "settings_group_general": "Allgemein",
   "settings_group_resolver": "Resolver & Profil",
   "settings_group_database": "Datenbank",

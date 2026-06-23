@@ -534,6 +534,8 @@
   "settings_help_rate_limit_window": "Glidande tidsfönster för hastighetsbegränsning (t.ex. 10m).",
   "settings_label_allow_private_undelegated_ip": "Tillåt privata odelegerade IP-adresser",
   "settings_help_allow_private_undelegated_ip": "Tillåt loopback / link-local / privata / CGNAT / multicast / broadcast IP-adresser som odelegerade namnservermål på det publika API:et. Lämna avstängt för internet-exponerade installationer; slå endast på för privata/interna instanser som behöver testa sådana mål.",
+  "settings_label_allow_non_global_targets": "Tillåt icke-globala måladresser",
+  "settings_help_allow_non_global_targets": "Tillåt frågor till namnserveradresser som är privata, loopback eller på annat sätt inte globalt nåbara. Lämna av för internetvända installationer; slå på endast för privata eller interna instanser. Operatörsangivna odelegerade adresser tillåts alltid.",
   "settings_group_general": "Allmänt",
   "settings_group_resolver": "Resolver & profil",
   "settings_group_database": "Databas",

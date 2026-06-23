@@ -267,6 +267,15 @@ var propertyDefs = map[string]propertyDef{
 			return p.Net.IPv6
 		},
 	},
+	"net.allow_non_global_targets": {
+		typ: propBool,
+		setter: func(p *Profile, value any) {
+			p.Net.AllowNonGlobalTargets = value.(bool)
+		},
+		getter: func(p *Profile) any {
+			return p.Net.AllowNonGlobalTargets
+		},
+	},
 	"no_network": {
 		typ: propBool,
 		setter: func(p *Profile, value any) {

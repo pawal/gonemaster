@@ -92,6 +92,8 @@ type NetSettings struct {
 	IPv4 bool `json:"ipv4"`
 	// IPv6 enables IPv6 transport when true.
 	IPv6 bool `json:"ipv6"`
+	// AllowNonGlobalTargets permits querying non-globally-reachable addresses.
+	AllowNonGlobalTargets bool `json:"allow_non_global_targets"`
 }
 
 // ASNDBSettings holds ASN lookup defaults.

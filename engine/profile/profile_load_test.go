@@ -185,3 +185,43 @@ func TestToJSONIncludesSetProperties(t *testing.T) {
 		t.Fatalf("did not expect unrelated resolver properties")
 	}
 }
+
+func TestNetAllowNonGlobalTargets(t *testing.T) {
+	// The shipped default keeps the guard on: non-global targets are not allowed.
+	def, err := Default()
+	if err != nil {
+		t.Fatalf("default profile: %v", err)
+	}
+	if def.Net.AllowNonGlobalTargets {
+		t.Fatalf("expected net.allow_non_global_targets to default to false")
+	}
+
+	// The property loads from JSON and is readable via Get and the struct field.
+	p, err := FromJSON(`{"net":{"allow_non_global_targets":true}}`)
+	if err != nil {
+		t.Fatalf("FromJSON: %v", err)
+	}
+	value, err := p.Get("net.allow_non_global_targets")
+	if err != nil {
+		t.Fatalf("get net.allow_non_global_targets: %v", err)
+	}
+	if value != true {
+		t.Fatalf("expected net.allow_non_global_targets true, got %#v", value)
+	}
+	if !p.Net.AllowNonGlobalTargets {
+		t.Fatalf("expected struct field AllowNonGlobalTargets true")
+	}
+
+	// It survives a ToJSON round-trip.
+	raw, err := p.ToJSON()
+	if err != nil {
+		t.Fatalf("ToJSON: %v", err)
+	}
+	rt, err := FromJSON(raw)
+	if err != nil {
+		t.Fatalf("FromJSON round-trip: %v", err)
+	}
+	if !rt.Net.AllowNonGlobalTargets {
+		t.Fatalf("expected round-tripped net.allow_non_global_targets true")
+	}
+}

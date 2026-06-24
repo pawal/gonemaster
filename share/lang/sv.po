@@ -3140,6 +3140,14 @@ msgstr ""
 "Namnservern {ns}/{address} ger fel 'owner name' i svaret ({owner} istället för {query_name}) "
 "på SOA-fråga."
 
+msgctxt "ZONE:APEX_DNAME"
+msgid "Nameserver {ns}/{address} returns a DNAME record at the zone apex."
+msgstr "Namnservern {ns}/{address} returnerar en DNAME-post vid zon-apex."
+
+msgctxt "ZONE:SOA_AND_CNAME"
+msgid "Nameserver {ns}/{address} returns a CNAME record at the zone apex alongside the SOA record."
+msgstr "Namnservern {ns}/{address} returnerar en CNAME-post vid zon-apex tillsammans med SOA-posten."
+
 msgctxt "ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR"
 msgid ""
 "SOA MNAME name server \"{ns}\" resolves to a localhost IP address "

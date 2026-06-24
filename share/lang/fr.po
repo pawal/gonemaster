@@ -3709,6 +3709,16 @@ msgstr ""
 "Le serveur de noms {ns}/{address} répond aux requêtes de type \"SOA\" avec un nom de "
 "domaine erroné ({owner} au lieu de {query_name})."
 
+msgctxt "ZONE:APEX_DNAME"
+msgid "Nameserver {ns}/{address} returns a DNAME record at the zone apex."
+msgstr "Le serveur de noms {ns}/{address} renvoie un enregistrement DNAME à l'apex de la zone."
+
+msgctxt "ZONE:SOA_AND_CNAME"
+msgid "Nameserver {ns}/{address} returns a CNAME record at the zone apex alongside the SOA record."
+msgstr ""
+"Le serveur de noms {ns}/{address} renvoie un enregistrement CNAME à l'apex de la zone "
+"en même temps que l'enregistrement SOA."
+
 msgctxt "ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR"
 msgid ""
 "SOA MNAME name server \"{ns}\" resolves to a localhost IP address "

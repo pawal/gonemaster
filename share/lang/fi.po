@@ -3194,6 +3194,14 @@ msgstr ""
 "Nimipalvelin {ns}/{address} vastaa SOA-kyselyihin väärällä omistajan nimellä ({owner}, "
 "ei {query_name})."
 
+msgctxt "ZONE:APEX_DNAME"
+msgid "Nameserver {ns}/{address} returns a DNAME record at the zone apex."
+msgstr "Nimipalvelin {ns}/{address} palauttaa DNAME-tietueen vyöhykkeen apexissa."
+
+msgctxt "ZONE:SOA_AND_CNAME"
+msgid "Nameserver {ns}/{address} returns a CNAME record at the zone apex alongside the SOA record."
+msgstr "Nimipalvelin {ns}/{address} palauttaa CNAME-tietueen vyöhykkeen apexissa SOA-tietueen rinnalla."
+
 msgctxt "ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR"
 msgid ""
 "SOA MNAME name server \"{ns}\" resolves to a localhost IP address "

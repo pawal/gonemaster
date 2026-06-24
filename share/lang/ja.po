@@ -1870,6 +1870,14 @@ msgstr ""
 "ネームサーバー {ns}/{address} は SOA クエリに誤った owner 名 "
 "({query_name} ではなく {owner}) で応答しました。"
 
+msgctxt "ZONE:APEX_DNAME"
+msgid "Nameserver {ns}/{address} returns a DNAME record at the zone apex."
+msgstr "ネームサーバー {ns}/{address} はゾーン apex に DNAME レコードを返します。"
+
+msgctxt "ZONE:SOA_AND_CNAME"
+msgid "Nameserver {ns}/{address} returns a CNAME record at the zone apex alongside the SOA record."
+msgstr "ネームサーバー {ns}/{address} はゾーン apex において SOA レコードと共存する CNAME レコードを返します。"
+
 msgctxt "ZONE:NO_RESPONSE"
 msgid "Nameserver {ns} did not respond."
 msgstr "ネームサーバー {ns} は応答しませんでした。"

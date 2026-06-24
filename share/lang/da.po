@@ -3107,6 +3107,14 @@ msgstr ""
 "Navneserveren {ns}/{address} returnerede et ugyldigt ejernavn ({owner} i stedet for "
 "{query_name}) på SOA forespørgsler."
 
+msgctxt "ZONE:APEX_DNAME"
+msgid "Nameserver {ns}/{address} returns a DNAME record at the zone apex."
+msgstr "Navneserveren {ns}/{address} returnerede en DNAME record ved zone-apex."
+
+msgctxt "ZONE:SOA_AND_CNAME"
+msgid "Nameserver {ns}/{address} returns a CNAME record at the zone apex alongside the SOA record."
+msgstr "Navneserveren {ns}/{address} returnerede en CNAME record ved zone-apex sammen med SOA recorden."
+
 msgctxt "ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR"
 msgid ""
 "SOA MNAME name server \"{ns}\" resolves to a localhost IP address "

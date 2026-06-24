@@ -3071,6 +3071,14 @@ msgstr ""
 "Domenski strežnik {ns}/{address} v odgovoru na SOA poizvedbe navaja napačno domeno "
 "({owner}, namesto {query_name})."
 
+msgctxt "ZONE:APEX_DNAME"
+msgid "Nameserver {ns}/{address} returns a DNAME record at the zone apex."
+msgstr "Domenski strežnik {ns}/{address} vrne DNAME zapis na apexu cone."
+
+msgctxt "ZONE:SOA_AND_CNAME"
+msgid "Nameserver {ns}/{address} returns a CNAME record at the zone apex alongside the SOA record."
+msgstr "Domenski strežnik {ns}/{address} vrne CNAME zapis na apexu cone skupaj z zapisom SOA."
+
 msgctxt "ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR"
 msgid ""
 "SOA MNAME name server \"{ns}\" resolves to a localhost IP address "

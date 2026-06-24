@@ -2608,6 +2608,14 @@ msgstr ""
 "Nameserver {ns}/{address} antwortet auf SOA-Abfragen mit einem falschen "
 "Owner-Namen ({owner} statt {query_name})."
 
+msgctxt "ZONE:APEX_DNAME"
+msgid "Nameserver {ns}/{address} returns a DNAME record at the zone apex."
+msgstr "Nameserver {ns}/{address} liefert einen DNAME-Record am Zonen-Apex."
+
+msgctxt "ZONE:SOA_AND_CNAME"
+msgid "Nameserver {ns}/{address} returns a CNAME record at the zone apex alongside the SOA record."
+msgstr "Nameserver {ns}/{address} liefert am Zonen-Apex einen CNAME-Record zusammen mit dem SOA-Record."
+
 msgctxt "ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR"
 msgid ""
 "SOA MNAME name server \"{ns}\" resolves to a localhost IP address "

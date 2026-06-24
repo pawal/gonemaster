@@ -3088,6 +3088,14 @@ msgstr ""
 "Navnetjener {ns}/{address} svarte med feil \"owner name\", ({owner}), istedenfor "
 "{query_name} på SOA-spørring."
 
+msgctxt "ZONE:APEX_DNAME"
+msgid "Nameserver {ns}/{address} returns a DNAME record at the zone apex."
+msgstr "Navnetjener {ns}/{address} returnerte en DNAME-post på sonens apex."
+
+msgctxt "ZONE:SOA_AND_CNAME"
+msgid "Nameserver {ns}/{address} returns a CNAME record at the zone apex alongside the SOA record."
+msgstr "Navnetjener {ns}/{address} returnerte en CNAME-post på sonens apex ved siden av SOA-posten."
+
 msgctxt "ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR"
 msgid ""
 "SOA MNAME name server \"{ns}\" resolves to a localhost IP address "

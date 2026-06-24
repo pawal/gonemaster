@@ -11,6 +11,7 @@ _Do not edit by hand - regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
+| `APEX_DNAME` | `NOTICE` | [zone10](../tests/zone/zone10.md) | yes |
 | `EXPIRE_LOWER_THAN_REFRESH` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
 | `EXPIRE_MINIMUM_VALUE_LOWER` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
 | `EXPIRE_MINIMUM_VALUE_OK` | `INFO` | [zone05](../tests/zone/zone05.md) | yes |
@@ -33,6 +34,7 @@ _Do not edit by hand - regenerate with the command above._
 | `REFRESH_MINIMUM_VALUE_OK` | `INFO` | [zone02](../tests/zone/zone02.md) | yes |
 | `RETRY_MINIMUM_VALUE_LOWER` | `NOTICE` | [zone04](../tests/zone/zone04.md) | yes |
 | `RETRY_MINIMUM_VALUE_OK` | `INFO` | [zone04](../tests/zone/zone04.md) | yes |
+| `SOA_AND_CNAME` | `ERROR` | [zone10](../tests/zone/zone10.md) | yes |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK` | `INFO` | [zone06](../tests/zone/zone06.md) | yes |

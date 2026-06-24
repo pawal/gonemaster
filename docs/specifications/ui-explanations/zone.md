@@ -58,7 +58,7 @@ This check asks every authoritative nameserver for your zone's MX records and ve
 
 Description:
 
-This check asks each nameserver for the zone's SOA record and confirms the reply contains exactly one SOA with the correct owner name. Multiple SOAs, missing SOAs, or SOAs for a different name point at serious misconfiguration that will break tools relying on the SOA for zone identity.
+This check asks each nameserver for the zone's SOA record and confirms the reply contains exactly one SOA with the correct owner name. Multiple SOAs, missing SOAs, or SOAs for a different name point at serious misconfiguration that will break tools relying on the SOA for zone identity. When a single correct SOA is present the check also looks for a CNAME or DNAME at the zone apex: a CNAME alongside the SOA is illegal, while a DNAME is legal but reported for visibility.
 
 ## Testcase zone11
 
@@ -77,6 +77,22 @@ CSYNC is an optional record at the zone apex that lets the registry automaticall
 Description:
 
 SPF records can reference other records using mechanisms such as `include` and `a`, each of which costs a DNS lookup when a receiving mail server evaluates the policy. RFC 7208 imposes a limit of ten lookups per evaluation. This check walks the SPF references and flags policies that exceed the limit, loop back on themselves, or rely on the deprecated `ptr` mechanism.
+
+## Tag APEX_DNAME
+
+Header: DNAME at zone apex
+
+Description:
+
+A nameserver returned a DNAME record at your zone apex alongside the SOA. A DNAME at the apex is legal - per RFC 6672 it redirects only names strictly below the owner, not the owner itself, so your SOA and NS records are unaffected. This notice is informational; it tells you the apex subtree is being aliased somewhere else, which is the standard "rename a whole subtree" deployment pattern.
+
+## Tag SOA_AND_CNAME
+
+Header: CNAME at zone apex alongside SOA
+
+Description:
+
+A nameserver returned both a CNAME and a SOA record at your zone apex. The DNS standard (RFC 1034 section 3.6.2) forbids a CNAME from coexisting with any other record type at the same owner name, and the apex always carries at least a SOA and NS. This is an illegal zone configuration: resolvers and DNS tools that encounter it will behave unpredictably - some will follow the CNAME and ignore the SOA, others will refuse to answer at all.
 
 ## Tag EXPIRE_LOWER_THAN_REFRESH
 

@@ -182,6 +182,45 @@ func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 	}
 }
 
+// TestAddress02ReverseThroughCNAME locks in handling of a reverse (PTR) lookup
+// whose path goes through a CNAME, as permitted by RFC 2181 section 10.2. The
+// reverse name is a CNAME to a target that carries the PTR. Address02 must
+// follow the CNAME and report NAMESERVERS_IP_WITH_REVERSE, not
+// NAMESERVER_IP_WITHOUT_REVERSE or NO_RESPONSE_PTR_QUERY. The target is kept
+// in-bailiwick so the fake recursor resolves it without cross-zone delegation.
+func TestAddress02ReverseThroughCNAME(t *testing.T) {
+	ctx := testContext(t)
+	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
+	const cnameTarget = "host.1.2.0.192.in-addr.arpa."
+
+	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+			return nsPacket(".", "a.root.")
+		}
+		if strings.EqualFold(qname, ptrName) && strings.EqualFold(qtype, "PTR") {
+			return cnamePacket(qname, cnameTarget)
+		}
+		if strings.EqualFold(qname, cnameTarget) && strings.EqualFold(qtype, "PTR") {
+			return ptrPacket(cnameTarget, "a.root.")
+		}
+		return packet.Packet{}
+	})
+
+	entries, err := Address02(ctx, z)
+	if err != nil {
+		t.Fatalf("address02: %v", err)
+	}
+	if !hasEntryTag(entries, "NAMESERVERS_IP_WITH_REVERSE") {
+		t.Fatalf("expected NAMESERVERS_IP_WITH_REVERSE for a PTR reached through a CNAME")
+	}
+	if hasEntryTag(entries, "NAMESERVER_IP_WITHOUT_REVERSE") {
+		t.Fatalf("did not expect NAMESERVER_IP_WITHOUT_REVERSE")
+	}
+	if hasEntryTag(entries, "NO_RESPONSE_PTR_QUERY") {
+		t.Fatalf("did not expect NO_RESPONSE_PTR_QUERY")
+	}
+}
+
 // TestAddress02CNAMEFailure locks in the decided behavior for Address02: a
 // *recursor.CNAMEError from glue/apex NS resolution is logged as a CNAME_*
 // tag and the testcase continues (no abort), while any non-CNAME error still
@@ -588,6 +627,15 @@ func ptrPacket(owner string, targets ...string) packet.Packet {
 		ptrRR.Ptr = dnsutil.Fqdn(target)
 		msg.Answer = append(msg.Answer, ptrRR)
 	}
+	return packet.Packet{Msg: msg}
+}
+
+func cnamePacket(owner string, target string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	cnameRR := &dns.CNAME{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	cnameRR.Target = dnsutil.Fqdn(target)
+	msg.Answer = []dns.RR{cnameRR}
 	return packet.Packet{Msg: msg}
 }
 

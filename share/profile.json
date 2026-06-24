@@ -602,6 +602,7 @@
             "UNKNOWN_MODULE": "CRITICAL"
         },
         "ZONE": {
+            "APEX_DNAME": "NOTICE",
             "EXPIRE_LOWER_THAN_REFRESH": "WARNING",
             "EXPIRE_MINIMUM_VALUE_LOWER": "WARNING",
             "EXPIRE_MINIMUM_VALUE_OK": "INFO",
@@ -622,6 +623,7 @@
             "REFRESH_MINIMUM_VALUE_OK": "INFO",
             "RETRY_MINIMUM_VALUE_LOWER": "NOTICE",
             "RETRY_MINIMUM_VALUE_OK": "INFO",
+            "SOA_AND_CNAME": "ERROR",
             "SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER": "NOTICE",
             "SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER": "NOTICE",
             "SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK": "INFO",

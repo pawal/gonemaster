@@ -2389,37 +2389,68 @@ func (s *SQLJobStore) ListSettings() map[string]string {
 
 // ── Purge ─────────────────────────────────────────────────────────────────────
 
+// purgeBatchSize limits runs deleted per transaction to avoid long lock holds on MariaDB/MySQL.
+var purgeBatchSize = 500
+
 // PurgeOlderThan deletes terminal runs whose finished_at is before cutoff,
 // along with their entries. Returns the number of runs deleted.
 func (s *SQLJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
-	ph := s.ph(1)
 	statuses := "'succeeded','failed','canceled','expired'"
 	cutoffVal := s.dialect.TimestampVal(cutoff)
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return 0, fmt.Errorf("purge begin tx: %w", err)
+	var total int64
+	for {
+		rows, err := s.db.Query(
+			fmt.Sprintf(
+				`SELECT id FROM runs WHERE finished_at < %s AND status IN (%s) LIMIT %d`,
+				s.ph(1), statuses, purgeBatchSize,
+			),
+			cutoffVal,
+		)
+		if err != nil {
+			return total, fmt.Errorf("purge select: %w", err)
+		}
+		var ids []string
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return total, fmt.Errorf("purge scan: %w", err)
+			}
+			ids = append(ids, id)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return total, fmt.Errorf("purge rows: %w", err)
+		}
+		if len(ids) == 0 {
+			break
+		}
+
+		args := make([]any, len(ids))
+		for i, id := range ids {
+			args[i] = id
+		}
+		inPH := s.phRange(1, len(ids))
+
+		tx, err := s.db.Begin()
+		if err != nil {
+			return total, fmt.Errorf("purge begin tx: %w", err)
+		}
+		if _, err := tx.Exec(`DELETE FROM entries WHERE run_id IN (`+inPH+`)`, args...); err != nil {
+			_ = tx.Rollback()
+			return total, fmt.Errorf("purge entries: %w", err)
+		}
+		res, err := tx.Exec(`DELETE FROM runs WHERE id IN (`+inPH+`)`, args...)
+		if err != nil {
+			_ = tx.Rollback()
+			return total, fmt.Errorf("purge runs: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return total, fmt.Errorf("purge commit: %w", err)
+		}
+		n, _ := res.RowsAffected()
+		total += n
 	}
-	_, err = tx.Exec(
-		`DELETE FROM entries WHERE run_id IN `+
-			`(SELECT id FROM runs WHERE finished_at < `+ph+` AND status IN (`+statuses+`))`,
-		cutoffVal,
-	)
-	if err != nil {
-		_ = tx.Rollback()
-		return 0, fmt.Errorf("purge entries: %w", err)
-	}
-	res, err := tx.Exec(
-		`DELETE FROM runs WHERE finished_at < `+ph+` AND status IN (`+statuses+`)`,
-		cutoffVal,
-	)
-	if err != nil {
-		_ = tx.Rollback()
-		return 0, fmt.Errorf("purge runs: %w", err)
-	}
-	if err := tx.Commit(); err != nil {
-		return 0, fmt.Errorf("purge commit: %w", err)
-	}
-	n, _ := res.RowsAffected()
-	return n, nil
+	return total, nil
 }

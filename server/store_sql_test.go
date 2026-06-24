@@ -1714,6 +1714,38 @@ func TestSQLJobStorePurgeDeletesAssociatedEntries(t *testing.T) {
 	}
 }
 
+func TestSQLJobStorePurgeDeletesInBatches(t *testing.T) {
+	// Override batch size so that 5 runs require 3 iterations (2+2+1).
+	old := purgeBatchSize
+	purgeBatchSize = 2
+	t.Cleanup(func() { purgeBatchSize = old })
+
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cutoff := time.Now().UTC()
+			old := cutoff.Add(-24 * time.Hour)
+
+			for i := 0; i < 5; i++ {
+				id := fmt.Sprintf("b%d", i)
+				job := Job{ID: id, Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("create %s: %v", id, err)
+				}
+				graduateSQLJob(t, s, job, nil)
+			}
+
+			n, err := s.PurgeOlderThan(cutoff)
+			if err != nil {
+				t.Fatalf("purge: %v", err)
+			}
+			if n != 5 {
+				t.Fatalf("expected 5 purged, got %d", n)
+			}
+		})
+	}
+}
+
 func TestSQLJobStorePurgeReturnsZeroWhenNothingMatches(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {

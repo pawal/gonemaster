@@ -239,6 +239,162 @@ func TestZone10WrongSOAUsesQueryName(t *testing.T) {
 	}
 }
 
+func TestZone10ApexCNAME(t *testing.T) {
+	ctx := setupTest(t)
+
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return soaPacket("example", 1, 1, 1, 1, 1)
+		case "CNAME":
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			cname := &dns.CNAME{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET, TTL: 300}}
+			cname.Target = "other.example."
+			msg.Answer = []dns.RR{cname}
+			return packet.Packet{Msg: msg}
+		}
+		return packet.Packet{}
+	})
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone10(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone10: %v", err)
+	}
+	if !hasEntryTag(entries, "SOA_AND_CNAME") {
+		t.Fatalf("expected SOA_AND_CNAME, got %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "APEX_DNAME") {
+		t.Fatalf("unexpected APEX_DNAME")
+	}
+}
+
+func TestZone10ApexDNAME(t *testing.T) {
+	ctx := setupTest(t)
+
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return soaPacket("example", 1, 1, 1, 1, 1)
+		case "DNAME":
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			dname := &dns.DNAME{}
+			dname.Hdr = dns.Header{Name: "example.", Class: dns.ClassINET, TTL: 300}
+			dname.Target = "other.example."
+			msg.Answer = []dns.RR{dname}
+			return packet.Packet{Msg: msg}
+		}
+		return packet.Packet{}
+	})
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone10(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone10: %v", err)
+	}
+	if !hasEntryTag(entries, "APEX_DNAME") {
+		t.Fatalf("expected APEX_DNAME, got %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "SOA_AND_CNAME") {
+		t.Fatalf("unexpected SOA_AND_CNAME")
+	}
+}
+
+func TestZone10ApexDNAMEAndCNAME(t *testing.T) {
+	ctx := setupTest(t)
+
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return soaPacket("example", 1, 1, 1, 1, 1)
+		case "CNAME":
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			cname := &dns.CNAME{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET, TTL: 300}}
+			cname.Target = "other.example."
+			msg.Answer = []dns.RR{cname}
+			return packet.Packet{Msg: msg}
+		case "DNAME":
+			msg := new(dns.Msg)
+			msg.Authoritative = true
+			msg.Rcode = dns.RcodeSuccess
+			dname := &dns.DNAME{}
+			dname.Hdr = dns.Header{Name: "example.", Class: dns.ClassINET, TTL: 300}
+			dname.Target = "other.example."
+			msg.Answer = []dns.RR{dname}
+			return packet.Packet{Msg: msg}
+		}
+		return packet.Packet{}
+	})
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone10(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone10: %v", err)
+	}
+	if !hasEntryTag(entries, "SOA_AND_CNAME") {
+		t.Fatalf("expected SOA_AND_CNAME for DNAME+CNAME collision, got %v", entryTags(entries))
+	}
+	if !hasEntryTag(entries, "APEX_DNAME") {
+		t.Fatalf("expected APEX_DNAME for DNAME+CNAME collision, got %v", entryTags(entries))
+	}
+}
+
+func TestZone10CleanApex(t *testing.T) {
+	ctx := setupTest(t)
+
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "SOA" {
+			return soaPacket("example", 1, 1, 1, 1, 1)
+		}
+		return packet.Packet{}
+	})
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example")}
+	entries, err := Zone10(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone10: %v", err)
+	}
+	if hasEntryTag(entries, "SOA_AND_CNAME") {
+		t.Fatalf("unexpected SOA_AND_CNAME on clean apex")
+	}
+	if hasEntryTag(entries, "APEX_DNAME") {
+		t.Fatalf("unexpected APEX_DNAME on clean apex")
+	}
+	if !hasEntryTag(entries, "ONE_SOA") {
+		t.Fatalf("expected ONE_SOA on clean apex")
+	}
+}
+
 func TestZone09MXQueryDisablesFallback(t *testing.T) {
 	ctx := setupTest(t)
 

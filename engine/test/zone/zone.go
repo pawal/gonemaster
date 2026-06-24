@@ -308,10 +308,12 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"zone10": {
+			"APEX_DNAME",
 			"MULTIPLE_SOA",
 			"NO_RESPONSE",
 			"NO_SOA_IN_RESPONSE",
 			"ONE_SOA",
+			"SOA_AND_CNAME",
 			"WRONG_SOA",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
@@ -1299,6 +1301,20 @@ func Zone10(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 								"owner":      owner,
 								"query_name": expected,
 							})); err != nil {
+								return err
+							}
+						}
+						// RFC 1034 s3.6.2: CNAME may not coexist with other data at the same owner.
+						cnameResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CNAME", nil)
+						if cnameResp.Msg != nil && len(cnameResp.GetRecordsForName("CNAME", z.Name, "answer")) > 0 {
+							if _, err := buf.Add("SOA_AND_CNAME", withNameserverArgs(ns, nil)); err != nil {
+								return err
+							}
+						}
+						// RFC 6672: DNAME at apex legally coexists with SOA/NS (redirects only names below owner).
+						dnameResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNAME", nil)
+						if dnameResp.Msg != nil && len(dnameResp.GetRecordsForName("DNAME", z.Name, "answer")) > 0 {
+							if _, err := buf.Add("APEX_DNAME", withNameserverArgs(ns, nil)); err != nil {
 								return err
 							}
 						}

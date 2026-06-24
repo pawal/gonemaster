@@ -128,7 +128,7 @@ For each remaining label (BFS from "." down toward child):
             for each parent observed in aaNXDomain / aaCNAME / cnameWithReferral
             / aaNodata / aaDname:
               -> B01_INCONSISTENT_DELEGATION (domain_parent, domain_child, servers)
-     delegationFound empty AND aaSOA empty
+     delegationFound empty AND aaSOA empty AND aaDname empty
        +- fake-addresses                   -> B01_CHILD_NOT_EXIST (domain)
        +- otherwise                        -> B01_NO_CHILD (domain_child, domain_super)
 
@@ -149,7 +149,7 @@ For each remaining label (BFS from "." down toward child):
 | `B01_CHILD_FOUND` | Child existence is confirmed (root, undelegated, delegation, or authoritative SOA path). |
 | `B01_INCONSISTENT_ALIAS` | More than one DNAME target was observed for child aliasing. |
 | `B01_INCONSISTENT_DELEGATION` | Parent-side responses for child delegation are inconsistent. |
-| `B01_NO_CHILD` | No delegation/SOA evidence exists in normal mode (non-fake-address). |
+| `B01_NO_CHILD` | No delegation/SOA/DNAME evidence exists in normal mode (non-fake-address). Mutually exclusive with `B01_CHILD_IS_ALIAS`. |
 | `B01_PARENT_DISREGARDED` | Fake-address (undelegated) mode is active, so parent search is skipped. |
 | `B01_PARENT_FOUND` | At least one parent zone candidate is identified. |
 | `B01_PARENT_NOT_FOUND` | No parent zone candidate was identified from any probed nameserver response. |

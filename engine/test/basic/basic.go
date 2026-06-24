@@ -91,6 +91,16 @@ func CanContinue(ctx context.Context, z *zone.Zone, results []*logger.Entry) boo
 	return true
 }
 
+// IsDNAMEAlias reports whether the results indicate the domain is a DNAME alias with no zone of its own.
+func IsDNAMEAlias(results []*logger.Entry) bool {
+	for _, e := range results {
+		if e != nil && e.Tag == "B01_CHILD_IS_ALIAS" {
+			return true
+		}
+	}
+	return false
+}
+
 // Metadata returns the set of tags emitted by Basic test cases.
 func Metadata() map[string][]string {
 	return map[string][]string{
@@ -626,7 +636,7 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if len(delegationFound) == 0 && len(aaSOA) == 0 {
+	if len(delegationFound) == 0 && len(aaSOA) == 0 && len(aaDname) == 0 {
 		if rec.HasFakeAddresses(z.Name.String()) {
 			if err := appendLog(ctx, &results, testcase, "B01_CHILD_NOT_EXIST", map[string]any{
 				"domain": z.Name.String(),

@@ -737,12 +737,14 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 		entries, err = runModule("Basic", basic.All)
 		if err == nil {
 			if !basic.CanContinue(ctx, &z, entries) {
-				entry, addErr := util.Info(ctx, "CANNOT_CONTINUE", map[string]any{"domain": z.Name.String()})
-				if addErr != nil {
-					return nil, addErr
-				}
-				if entry != nil {
-					entries = append(entries, entry)
+				if !basic.IsDNAMEAlias(entries) {
+					entry, addErr := util.Info(ctx, "CANNOT_CONTINUE", map[string]any{"domain": z.Name.String()})
+					if addErr != nil {
+						return nil, addErr
+					}
+					if entry != nil {
+						entries = append(entries, entry)
+					}
 				}
 				return entries, nil
 			}

@@ -2,6 +2,25 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.5.5] - 2026-06-24
+
+New non-global query guard skips queries to private/special-use nameserver addresses by default and tags them `NON_GLOBAL_QUERY_BLOCKED`. Private/internal deployments must opt in via `net.allow_non_global_targets` (profile), `--allow-non-global` (CLI/Nagios), or the admin UI toggle. Several test case improvements: zone10 apex CNAME/DNAME detection, delegation01 missing in-bailiwick glue, consistency01/04 SOA and NS TTL consistency, and basic01 DNAME alias handling.
+
+### Added
+
+- engine: non-global query guard - skip queries to private/special-use NS addresses by default; `net.allow_non_global_targets` profile flag, `--allow-non-global` CLI/Nagios flag, admin-ui policy toggle, and server public-api policy clamp to opt in
+- zone10: detect CNAME at apex (SOA_AND_CNAME, ERROR) and DNAME at apex (APEX_DNAME, NOTICE)
+- basic01: suppress B01_NO_CHILD for DNAME alias targets, add IsDNAMEAlias
+- delegation01: flag in-bailiwick NS names with missing required glue (IN_BAILIWICK_GLUE_MISSING)
+- consistency04: flag inconsistent apex NS RRset TTLs across nameservers
+- consistency01: RFC 1982 SOA serial ordering and lagging server reporting
+- scoring: lock system module tags as score-neutral
+
+### Changed
+
+- server: batch purge uses batched deletes to avoid InnoDB lock wait timeouts
+- deps: bump npm dependencies to fix high-severity vulnerabilities
+
 ## [v1.5.4] - 2026-06-16
 
 Added Nameserver17 test case, for testing DNS Cookies. Some engine fixes.

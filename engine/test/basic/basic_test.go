@@ -1628,8 +1628,8 @@ func TestBasic01ChildAlias(t *testing.T) {
 	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
 		t.Fatalf("expected B01_PARENT_FOUND")
 	}
-	if !hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("expected B01_NO_CHILD")
+	if hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("did not expect B01_NO_CHILD for DNAME alias")
 	}
 	if !hasEntryTag(entries, "B01_CHILD_IS_ALIAS") {
 		t.Fatalf("expected B01_CHILD_IS_ALIAS")
@@ -1707,8 +1707,8 @@ func TestBasic01InconsistentAlias(t *testing.T) {
 	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
 		t.Fatalf("expected B01_PARENT_FOUND")
 	}
-	if !hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("expected B01_NO_CHILD")
+	if hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("did not expect B01_NO_CHILD for DNAME alias")
 	}
 	if !hasEntryTag(entries, "B01_CHILD_IS_ALIAS") {
 		t.Fatalf("expected B01_CHILD_IS_ALIAS")
@@ -1736,6 +1736,73 @@ func TestBasic01InconsistentAlias(t *testing.T) {
 	}
 	if inconsistentAlias.Args["domain"] != "example" {
 		t.Fatalf("expected domain=example, got %#v", inconsistentAlias.Args["domain"])
+	}
+}
+
+// TestBasic01DNAMEAliasNoCritical verifies that a domain published only as a
+// DNAME alias in the parent - with no NS delegation and no SOA of its own -
+// does not produce a CRITICAL entry and does not emit B01_NO_CHILD or
+// B02_NO_DELEGATION. The regression target is xn--mori-qsa.nz (maori.nz),
+// which is a DNAME alias with a valid DNAME target but no zone of its own.
+func TestBasic01DNAMEAliasNoCritical(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"a.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add root hints: %v", err)
+	}
+
+	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new root nameserver: %v", err)
+	}
+	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name := strings.ToLower(qname)
+		kind := strings.ToUpper(qtype)
+		switch {
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.root"), nil
+		case name == "." && kind == "NS":
+			return nsPacket(".", "a.root"), nil
+		case name == "example" && kind == "SOA":
+			return emptyAnswerPacket(), nil
+		case name == "example" && kind == "DNAME":
+			return dnameAnswerPacket("example", "target.example"), nil
+		}
+		return packet.Packet{}, nil
+	})
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	entries, err := All(ctx, &z)
+	if err != nil {
+		t.Fatalf("All: %v", err)
+	}
+
+	if !hasEntryTag(entries, "B01_CHILD_IS_ALIAS") {
+		t.Fatalf("expected B01_CHILD_IS_ALIAS")
+	}
+	if hasEntryTag(entries, "B01_NO_CHILD") {
+		t.Fatalf("did not expect B01_NO_CHILD for DNAME alias")
+	}
+	if hasEntryTag(entries, "B02_NO_DELEGATION") {
+		t.Fatalf("did not expect B02_NO_DELEGATION for DNAME alias")
+	}
+	if !IsDNAMEAlias(entries) {
+		t.Fatalf("expected IsDNAMEAlias to return true")
+	}
+	if CanContinue(ctx, &z, entries) {
+		t.Fatalf("expected CanContinue to return false for DNAME alias (no further tests needed)")
+	}
+	for _, e := range entries {
+		if e != nil && strings.ToUpper(e.Level()) == "CRITICAL" {
+			t.Fatalf("unexpected CRITICAL entry: %s", e.Tag)
+		}
 	}
 }
 

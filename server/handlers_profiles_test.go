@@ -10,6 +10,7 @@ import (
 	"slices"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine"
 	engineprofile "codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -449,6 +450,7 @@ func TestProfileCompatibilityMissingTestCase(t *testing.T) {
 	// Profile explicitly sets test_cases with only "address01" - all other default
 	// test cases are missing.
 	profile := createProfile(t, srv, `{"name":"narrow","config":{"test_cases":["address01"]}}`)
+	markProfileStale(t, srv, profile.ID)
 
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
@@ -562,6 +564,7 @@ func TestProfileCompatibilityMissingTestLevels(t *testing.T) {
 	levelsPayload := map[string]map[string]string{chosenModule: partialLevels}
 	levelsJSON, _ := json.Marshal(levelsPayload)
 	profile := createProfile(t, srv, `{"name":"partial-levels","config":{"test_levels":`+string(levelsJSON)+`}}`)
+	markProfileStale(t, srv, profile.ID)
 
 	resp = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
@@ -668,6 +671,22 @@ func TestCheckProfileCompatibilityMissingTestCase(t *testing.T) {
 	}
 }
 
+func TestCheckProfileCompatibilityReviewedSuppressesIssues(t *testing.T) {
+	defaultP, err := engineprofile.Default()
+	if err != nil {
+		t.Fatalf("Default: %v", err)
+	}
+	// Same narrow config as the missing-test-case case, but reviewed against the
+	// current engine version: the omission is intentional, so no issues surface.
+	result := checkProfileCompatibility(`{"test_cases":["address01"]}`, engine.VersionFull(), defaultP)
+	if !result.Compatible {
+		t.Fatalf("expected compatible=true when reviewed against current version, got: %+v", result.Issues)
+	}
+	if len(result.Issues) != 0 {
+		t.Fatalf("expected 0 issues when reviewed, got %d", len(result.Issues))
+	}
+}
+
 func TestCheckProfileCompatibilityInvalidConfig(t *testing.T) {
 	defaultP, err := engineprofile.Default()
 	if err != nil {
@@ -711,6 +730,35 @@ func patchProfile(t *testing.T, srv *Server, id int64, body string) Profile {
 	return profile
 }
 
+// markProfileStale sets a profile's schema_version to an old value so the
+// compatibility check treats it as not yet reviewed against the current engine.
+func markProfileStale(t *testing.T, srv *Server, id int64) {
+	t.Helper()
+	stored, ok := srv.store.GetProfile(id)
+	if !ok {
+		t.Fatalf("markProfileStale: profile %d not found", id)
+	}
+	stored.SchemaVersion = "old-version"
+	if err := srv.store.UpdateProfile(stored); err != nil {
+		t.Fatalf("markProfileStale: %v", err)
+	}
+}
+
+func fetchCompatibility(t *testing.T, srv *Server, id int64) CompatibilityResult {
+	t.Helper()
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/"+itoa(id)+"/compatibility", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("fetchCompatibility: expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var result CompatibilityResult
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		t.Fatalf("fetchCompatibility decode: %v", err)
+	}
+	return result
+}
+
 func TestPatchProfileMarkReviewed(t *testing.T) {
 	srv := New(DefaultConfig())
 	profile := createProfile(t, srv, `{"name":"mark-rev","config":{"net":{"ipv4":true}}}`)
@@ -729,6 +777,27 @@ func TestPatchProfileMarkReviewed(t *testing.T) {
 	// Config must be unchanged.
 	if _, ok := updated.Config["net"]; !ok {
 		t.Fatalf("expected config preserved after mark_reviewed, got %#v", updated.Config)
+	}
+}
+
+func TestPatchProfileMarkReviewedClearsCompatibility(t *testing.T) {
+	srv := New(DefaultConfig())
+	// Profile pins a narrow test_cases list - many defaults are intentionally absent.
+	profile := createProfile(t, srv, `{"name":"rev-clears","config":{"test_cases":["address01"]}}`)
+	markProfileStale(t, srv, profile.ID)
+
+	if before := fetchCompatibility(t, srv, profile.ID); before.Compatible {
+		t.Fatalf("expected stale subset profile to be incompatible before review, got: %+v", before)
+	}
+
+	patchProfile(t, srv, profile.ID, `{"op":"mark_reviewed"}`)
+
+	after := fetchCompatibility(t, srv, profile.ID)
+	if !after.Compatible {
+		t.Fatalf("expected profile compatible after mark_reviewed, got issues: %+v", after.Issues)
+	}
+	if len(after.Issues) != 0 {
+		t.Fatalf("expected 0 issues after mark_reviewed, got %d", len(after.Issues))
 	}
 }
 

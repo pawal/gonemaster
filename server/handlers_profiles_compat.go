@@ -151,6 +151,12 @@ func checkProfileCompatibility(configJSON, schemaVersion string, defaultP *engin
 		return result
 	}
 
+	// A profile reviewed against the current engine version is compatible;
+	// any test_cases/test_levels it omits are intentional.
+	if schemaVersion == currentVersion {
+		return result
+	}
+
 	// Check test_cases: if the stored profile explicitly sets test_cases,
 	// compare against default's test_cases.
 	if storedRaw, _ := storedP.Get("test_cases"); storedRaw != nil {

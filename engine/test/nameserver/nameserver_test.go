@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"context"
+	"encoding/hex"
 	"fmt"
 	"math/rand"
 	"net/netip"
@@ -9,6 +10,7 @@ import (
 	"sync"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
@@ -1208,6 +1210,100 @@ func TestNameserver16NoNSID(t *testing.T) {
 	}
 	if servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("unexpected server payload for N16_NO_NSID_REVEALED: %#v", servers[0])
+	}
+}
+
+// binaryNSID is the raw 16-byte NSID from a real dig capture of a server that
+// returns opaque binary (e.g. Google Cloud DNS). Most bytes are not printable
+// ASCII, so the old string(decoded) path lost them to U+FFFD on JSON marshal.
+var binaryNSID = []byte{
+	0xa7, 0x62, 0xa8, 0xce, 0x20, 0x22, 0xe8, 0xc1,
+	0x01, 0xb7, 0xed, 0x73, 0xc2, 0x63, 0x0c, 0x51,
+}
+
+// binaryNSIDDigForm is dig's presentation of binaryNSID: space-separated hex
+// bytes followed by the printable-ASCII rendering ('.' for non-printable).
+const binaryNSIDDigForm = `a7 62 a8 ce 20 22 e8 c1 01 b7 ed 73 c2 63 0c 51 (".b.. ".....s.c.Q")`
+
+func TestNSIDValue(t *testing.T) {
+	cases := []struct {
+		name   string
+		raw    []byte
+		want   string
+		wantOK bool
+	}{
+		{"printable ascii label", []byte("gpdns-fra"), "gpdns-fra", true},
+		{"printable utf8 label", []byte("café-1"), "café-1", true},
+		{"trailing whitespace trimmed", []byte("ns1.example  \n"), "ns1.example", true},
+		{"binary opaque", binaryNSID, binaryNSIDDigForm, true},
+		{"single invalid utf8 byte", []byte{0xff}, `ff (".")`, true},
+		{"embedded control char", []byte("ns1\x01"), `6e 73 31 01 ("ns1.")`, true},
+		{"empty", []byte{}, "", false},
+		{"whitespace only", []byte("   "), "", false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, ok := nsidValue(tc.raw)
+			if ok != tc.wantOK {
+				t.Fatalf("ok = %v, want %v", ok, tc.wantOK)
+			}
+			if got != tc.want {
+				t.Fatalf("value = %q, want %q", got, tc.want)
+			}
+			// The whole point of the fix: output is always valid UTF-8, so no
+			// byte is silently replaced by U+FFFD when the run is marshaled.
+			if !utf8.ValidString(got) {
+				t.Fatalf("value %q is not valid UTF-8", got)
+			}
+		})
+	}
+}
+
+// TestNameserver16BinaryNSID confirms an opaque binary NSID reaches the
+// N16_HAS_NSID arg in dig's lossless hex+ASCII form rather than as mojibake.
+func TestNameserver16BinaryNSID(t *testing.T) {
+	ctx := setupTest(t)
+
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		if strings.ToUpper(qtype) == "SOA" {
+			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{
+				&dns.NSID{Nsid: hex.EncodeToString(binaryNSID)},
+			})
+		}
+		return packet.Packet{}
+	})
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver16(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver16: %v", err)
+	}
+
+	var hasNSID *logger.Entry
+	for _, item := range entries {
+		if item != nil && item.Tag == "N16_HAS_NSID" {
+			hasNSID = item
+			break
+		}
+	}
+	if hasNSID == nil {
+		t.Fatalf("expected N16_HAS_NSID entry")
+	}
+	nsid, ok := hasNSID.Args["nsid"].(string)
+	if !ok {
+		t.Fatalf("nsid arg is not a string: %#v", hasNSID.Args["nsid"])
+	}
+	if nsid != binaryNSIDDigForm {
+		t.Fatalf("nsid arg = %q, want %q", nsid, binaryNSIDDigForm)
+	}
+	if !utf8.ValidString(nsid) {
+		t.Fatalf("nsid arg %q is not valid UTF-8 (would lose bytes on marshal)", nsid)
 	}
 }
 

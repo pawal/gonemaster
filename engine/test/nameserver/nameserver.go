@@ -11,6 +11,8 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	dns "codeberg.org/miekg/dns"
 
@@ -2001,8 +2003,7 @@ func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				for _, opt := range resp.EdnsData() {
 					if nsid, ok := opt.(*dns.NSID); ok {
 						if decoded, err := hex.DecodeString(nsid.Nsid); err == nil {
-							value := strings.TrimSpace(string(decoded))
-							if value != "" {
+							if value, ok := nsidValue(decoded); ok {
 								outcome.hasNSID = true
 								outcome.nsidValue = value
 							}
@@ -2090,6 +2091,54 @@ func Nameserver16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// nsidValue renders opaque NSID bytes for display, false when empty.
+func nsidValue(raw []byte) (string, bool) {
+	s := strings.TrimSpace(string(raw))
+	if s == "" {
+		return "", false
+	}
+	if isPrintableUTF8(s) {
+		return s, true
+	}
+	return nsidHexASCII(raw), true
+}
+
+// isPrintableUTF8 reports valid UTF-8 with only printable runes.
+func isPrintableUTF8(s string) bool {
+	if !utf8.ValidString(s) {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsPrint(r) {
+			return false
+		}
+	}
+	return true
+}
+
+// nsidHexASCII renders bytes in dig's form: hex bytes then a quoted ASCII view.
+func nsidHexASCII(raw []byte) string {
+	h := hex.EncodeToString(raw)
+	var b strings.Builder
+	b.Grow(len(h) + len(raw) + 4)
+	for i := range raw {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(h[i*2 : i*2+2])
+	}
+	b.WriteString(` ("`)
+	for _, c := range raw {
+		if c >= 0x20 && c <= 0x7e {
+			b.WriteByte(c)
+		} else {
+			b.WriteByte('.')
+		}
+	}
+	b.WriteString(`")`)
+	return b.String()
 }
 
 // Nameserver17 runs the NAMESERVER17 test case (DNS Cookie, RFC 7873 / RFC 9018).

@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"maps"
 	"net"
 	"net/netip"
@@ -205,6 +206,15 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
+	if util.ShouldRunTest(ctx, "nameserver18") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Nameserver18(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
 
 	return results, nil
 }
@@ -369,6 +379,18 @@ func Metadata() map[string][]string {
 			"N17_COOKIE_SUPPORTED",
 			"N17_NO_COOKIE",
 			"N17_NO_RESPONSE",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"nameserver18": {
+			"N18_EXTENDED_ERROR_REPORTED",
+			"N18_FILTERED_RESPONSE",
+			"N18_NO_EXTENDED_ERROR",
+			"N18_NO_RESPONSE",
+			"N18_RESOLVER_BEHAVIOR_REPORTED",
+			"N18_SERVER_ERROR_REPORTED",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -2440,6 +2462,204 @@ func parseAnswerFrom(value string) (netip.Addr, bool) {
 		return netip.Addr{}, false
 	}
 	return addr, true
+}
+
+// Nameserver18 runs the NAMESERVER18 test case (Extended DNS Errors, RFC 8914).
+func Nameserver18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Nameserver18"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	nss, err := authoritativeNS(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	type edeObserved struct {
+		code uint16
+		text string
+	}
+	type n18Outcome struct {
+		server     string
+		noResponse bool
+		clean      bool // NOERROR carrying no EDE
+		edes       []edeObserved
+	}
+
+	var outcomes []n18Outcome
+	if len(nss) > 0 {
+		outcomes = make([]n18Outcome, len(nss))
+		tasks := make([]runner.Task, len(nss))
+		for i, server := range nss {
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := n18Outcome{server: server.String()}
+
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, server, "SOA"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				// DO=0 apex SOA: deduplicates against existing SOA queries (no extra traffic).
+				resp, err := server.Query(ctx, z.Name.String(), "SOA")
+				if err != nil || resp.Msg == nil {
+					outcome.noResponse = true
+					outcomes[i] = outcome
+					return nil
+				}
+
+				edes := resp.ExtendedErrors()
+				if len(edes) == 0 {
+					// Only NOERROR-with-no-EDE is "clean"; a non-NOERROR without EDE is
+					// left to basic/N16 (3.4).
+					outcome.clean = resp.Rcode() == "NOERROR"
+					outcomes[i] = outcome
+					return nil
+				}
+				for _, ede := range edes {
+					outcome.edes = append(outcome.edes, edeObserved{code: ede.InfoCode, text: sanitizeExtraText(ede.ExtraText)})
+				}
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+	}
+
+	type edeKey struct {
+		code uint16
+		text string
+	}
+	var noResponse, clean []string
+	edeServers := map[edeKey][]string{}
+	for _, outcome := range outcomes {
+		if outcome.server == "" {
+			continue
+		}
+		if outcome.noResponse {
+			noResponse = append(noResponse, outcome.server)
+			continue
+		}
+		if outcome.clean {
+			clean = append(clean, outcome.server)
+		}
+		for _, e := range outcome.edes {
+			key := edeKey{code: e.code, text: e.text}
+			edeServers[key] = append(edeServers[key], outcome.server)
+		}
+	}
+
+	keys := make([]edeKey, 0, len(edeServers))
+	for key := range edeServers {
+		keys = append(keys, key)
+	}
+	sort.Slice(keys, func(a, b int) bool {
+		if keys[a].code != keys[b].code {
+			return keys[a].code < keys[b].code
+		}
+		return keys[a].text < keys[b].text
+	})
+	for _, key := range keys {
+		args := map[string]any{
+			"info_code":  int(key.code),
+			"info_name":  edeName(key.code),
+			"extra_text": key.text,
+		}
+		setTypedServersFromNames(args, sortedStrings(edeServers[key]))
+		if err := appendLog(ctx, &results, testcase, edeTagForCode(key.code), args); err != nil {
+			return results, err
+		}
+	}
+
+	if len(clean) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(clean))
+		if err := appendLog(ctx, &results, testcase, "N18_NO_EXTENDED_ERROR", args); err != nil {
+			return results, err
+		}
+	}
+
+	if len(noResponse) > 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, sortedStrings(noResponse))
+		if err := appendLog(ctx, &results, testcase, "N18_NO_RESPONSE", args); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// edeTagForCode classifies an EDE info-code (RFC 8914) by what its presence implies
+// about a directly-queried authoritative server.
+func edeTagForCode(code uint16) string {
+	switch code {
+	case dns.ExtendedErrorProhibited, // 18
+		dns.ExtendedErrorNotAuthoritative, // 20
+		dns.ExtendedErrorNotSupported:     // 21
+		return "N18_SERVER_ERROR_REPORTED"
+	case dns.ExtendedErrorForgedAnswer, // 4
+		dns.ExtendedErrorBlocked,  // 15
+		dns.ExtendedErrorCensored, // 16
+		dns.ExtendedErrorFiltered: // 17
+		return "N18_FILTERED_RESPONSE"
+	case dns.ExtendedErrorUnsupportedDNSKEYAlgorithm, // 1
+		dns.ExtendedErrorUnsupportedDSDigestType,     // 2
+		dns.ExtendedErrorStaleAnswer,                 // 3
+		dns.ExtendedErrorDNSSECIndeterminate,         // 5
+		dns.ExtendedErrorDNSBogus,                    // 6
+		dns.ExtendedErrorSignatureExpired,            // 7
+		dns.ExtendedErrorSignatureNotYetValid,        // 8
+		dns.ExtendedErrorDNSKEYMissing,               // 9
+		dns.ExtendedErrorRRSIGsMissing,               // 10
+		dns.ExtendedErrorNoZoneKeyBitSet,             // 11
+		dns.ExtendedErrorNSECMissing,                 // 12
+		dns.ExtendedErrorCachedError,                 // 13
+		dns.ExtendedErrorStaleNXDOMAINAnswer,         // 19
+		dns.ExtendedErrorNoReachableAuthority,        // 22
+		dns.ExtendedErrorNetworkError,                // 23
+		dns.ExtendedErrorSignatureExpiredBeforeValid, // 25
+		dns.ExtendedErrorUnsupportedNSEC3IterValue,   // 27
+		dns.ExtendedErrorSynthesized,                 // 29
+		33:                                           // Negative Trust Anchor (RFC 7646); no named constant in v0.6.81
+		return "N18_RESOLVER_BEHAVIOR_REPORTED"
+	default:
+		// 0, 14, 24, 26, 28, 30, 31, 32, unassigned (>=34), private-use: benign annotation.
+		return "N18_EXTENDED_ERROR_REPORTED"
+	}
+}
+
+// edeName renders the EDE info-code name, falling back to "code N" for codes the
+// library registry does not name (draft-assigned and private-use codes).
+func edeName(code uint16) string {
+	if s, ok := dns.ExtendedErrorToString[code]; ok {
+		return s
+	}
+	return fmt.Sprintf("code %d", code)
+}
+
+// sanitizeExtraText makes free-form EDE EXTRA-TEXT safe for storage/UI: valid UTF-8,
+// no trailing NUL, trimmed, capped at 256 bytes with a truncation marker.
+func sanitizeExtraText(s string) string {
+	s = strings.ToValidUTF8(s, "")
+	s = strings.TrimSuffix(s, "\x00") // RFC 8914: EXTRA-TEXT MAY be NUL-terminated
+	s = strings.TrimSpace(s)
+	const maxLen = 256
+	if len(s) > maxLen {
+		s = strings.ToValidUTF8(s[:maxLen], "") + "..."
+	}
+	return s
 }
 
 func sortedStrings(values []string) []string {

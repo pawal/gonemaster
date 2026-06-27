@@ -7,7 +7,7 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 81
+    "testcase_count": 82
   },
   "module_order": [
     "basic",
@@ -92,7 +92,8 @@
       "nameserver13",
       "nameserver15",
       "nameserver16",
-      "nameserver17"
+      "nameserver17",
+      "nameserver18"
     ],
     "syntax": [
       "syntax01",
@@ -181,6 +182,7 @@
     "nameserver15": "Detect whether authoritative nameservers reveal software version data through CHAOS-class TXT queries.",
     "nameserver16": "Query authoritative nameservers with an EDNS NSID option request (RFC 5001, option code 3) and report which servers provide NSID values and what those values contain.",
     "nameserver17": "Probe each authoritative nameserver for DNS Cookie (RFC 7873 / RFC 9018) support and verify the returned Server Cookie is well-formed and accepted by the issuing server.",
+    "nameserver18": "Query each authoritative nameserver for the zone and report any EDNS Extended DNS Error (RFC 8914, option code 15) option found in the response, classified by what the observed info-code implies about a directly-queried authoritative server.",
     "syntax01": "Validate that the tested domain name contains only allowed DNS hostname characters.",
     "syntax02": "Validate that no domain label starts or ends with a hyphen (`-`).",
     "syntax03": "Validate that domain labels do not contain a double hyphen in positions 3 and 4, except ACE labels (`xn--...`).",
@@ -198,7 +200,7 @@
     "zone07": "Validate SOA MNAME alias/address behavior",
     "zone08": "Validate that MX exchange hostnames are not aliases (CNAME).",
     "zone09": "Validate MX presence and consistency across authoritative nameservers, including null-MX and domain-class exceptions (root/TLD/.arpa).",
-    "zone10": "Validate SOA answer-shape correctness on nameservers: response presence, SOA presence, owner name correctness, and multiplicity.",
+    "zone10": "Validate SOA answer-shape correctness on nameservers: response presence, SOA presence, owner name correctness, and multiplicity. When a single correct SOA is present, also check for CNAME or DNAME at the zone apex.",
     "zone11": "Validate SPF policy publication at zone apex",
     "zone12": "Check existence and RFC 7477 compliance of the CSYNC RR at the zone apex.",
     "zone13": "Validate that the SPF policy at the zone apex does not exceed the DNS lookup limit defined in RFC 7208 Section 4.6.4.",

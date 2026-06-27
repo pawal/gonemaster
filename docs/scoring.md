@@ -61,6 +61,12 @@ Some tags warrant a penalty disproportionate to their log level. The
 | `NO_IPV6_NS_DEL`            | NOTICE  | **20**   | Delegation has no IPv6 addresses   |
 | `N15_SOFTWARE_VERSION`       | NOTICE  | **0**    | Cosmetic - zone works correctly    |
 | `N16_HAS_NSID`               | NOTICE  | **0**    | Informational - explicit NSID reply|
+| `N18_NO_EXTENDED_ERROR`      | INFO    | **0**    | Diagnostic - EDE enrichment (RFC 8914)|
+| `N18_EXTENDED_ERROR_REPORTED`| NOTICE  | **0**    | Diagnostic - EDE enrichment (RFC 8914)|
+| `N18_SERVER_ERROR_REPORTED`  | WARNING | **0**    | Diagnostic - explained by other tests |
+| `N18_RESOLVER_BEHAVIOR_REPORTED`| WARNING | **0**  | Diagnostic - gates A+ only             |
+| `N18_FILTERED_RESPONSE`      | WARNING | **0**    | Diagnostic - gates A+ only             |
+| `N18_NO_RESPONSE`            | WARNING | **0**    | Diagnostic - reachability via other tests|
 
 Setting a tag penalty to 0 suppresses it entirely.
 
@@ -225,7 +231,13 @@ or the `scoring_config_path` server config key.
     "NO_IPV6_NS_CHILD":           20,
     "NO_IPV6_NS_DEL":             20,
     "N15_SOFTWARE_VERSION":        0,
-    "N16_HAS_NSID":                0
+    "N16_HAS_NSID":                0,
+    "N18_NO_EXTENDED_ERROR":          0,
+    "N18_EXTENDED_ERROR_REPORTED":    0,
+    "N18_SERVER_ERROR_REPORTED":      0,
+    "N18_RESOLVER_BEHAVIOR_REPORTED": 0,
+    "N18_FILTERED_RESPONSE":          0,
+    "N18_NO_RESPONSE":                0
   },
   "grade_bands": [
     { "grade": "A", "min_score": 90 },

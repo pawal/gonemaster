@@ -277,6 +277,7 @@ var nameserverTests = map[string]func(context.Context, *zone.Zone) ([]*logger.En
 	"nameserver15": nameserver.Nameserver15,
 	"nameserver16": nameserver.Nameserver16,
 	"nameserver17": nameserver.Nameserver17,
+	"nameserver18": nameserver.Nameserver18,
 }
 
 func dnssecTestcaseNames() []string {

@@ -2810,6 +2810,30 @@ msgctxt "NAMESERVER:N17_NO_RESPONSE"
 msgid "The following name server(s) did not respond to a DNS Cookie probe (RFC 7873): \"{servers}\"."
 msgstr "Följande namnservrar svarade inte på en DNS Cookie-förfrågan (RFC 7873): \"{servers}\"."
 
+msgctxt "NAMESERVER:N18_NO_EXTENDED_ERROR"
+msgid "The following name server(s) responded without an Extended DNS Error (RFC 8914): \"{servers}\"."
+msgstr "Följande namnservrar svarade utan Extended DNS Error (RFC 8914): \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_EXTENDED_ERROR_REPORTED"
+msgid "The following name server(s) returned Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "Följande namnservrar returnerade Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returnerat från namnservrar \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_SERVER_ERROR_REPORTED"
+msgid "The following name server(s) reported a server-side problem via Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "Följande namnservrar rapporterade ett serverfel via Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returnerat från namnservrar \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_RESOLVER_BEHAVIOR_REPORTED"
+msgid "The following name server(s) returned an Extended DNS Error (RFC 8914) {info_code} ({info_name}) normally produced by a recursive resolver, which may indicate a resolver is answering on an authoritative address or an unusual server configuration: \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "Följande namnservrar returnerade en Extended DNS Error (RFC 8914) {info_code} ({info_name}) som normalt produceras av en rekursiv resolver, vilket kan tyda på att en resolver svarar på en auktoritativ adress eller på en ovanlig serverkonfiguration: \"{extra_text}\". Returnerat från namnservrar \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_FILTERED_RESPONSE"
+msgid "The following name server(s) returned a filtering Extended DNS Error (RFC 8914) {info_code} ({info_name}), indicating a policy middlebox in the path: \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "Följande namnservrar returnerade en filtrerande Extended DNS Error (RFC 8914) {info_code} ({info_name}), vilket tyder på en filtrerande mellanliggande enhet i sökvägen: \"{extra_text}\". Returnerat från namnservrar \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_NO_RESPONSE"
+msgid "The following name server(s) did not respond to an Extended DNS Error probe (RFC 8914): \"{servers}\"."
+msgstr "Följande namnservrar svarade inte på en Extended DNS Error-förfrågan (RFC 8914): \"{servers}\"."
+
 msgctxt "NAMESERVER:QNAME_CASE_INSENSITIVE"
 msgid "The following nameservers do not preserve original case of the queried name ({domain}): {servers}."
 msgstr "Följande namnservrar bevarar inte skillnaden mellan versaler och gemener från frågan ({domain}): {servers}."

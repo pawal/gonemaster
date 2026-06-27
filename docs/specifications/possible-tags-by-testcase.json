@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 81,
-    "unique_tag_count": 531
+    "testcase_count": 82,
+    "unique_tag_count": 541
   },
   "modules": {
     "address": {
@@ -216,6 +216,7 @@
         "TEST_CASE_START"
       ],
       "consistency04": [
+        "INCONSISTENT_NS_TTL",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "MULTIPLE_NS_SET",
@@ -257,6 +258,7 @@
         "ENOUGH_IPV6_NS_DEL",
         "ENOUGH_NS_CHILD",
         "ENOUGH_NS_DEL",
+        "IN_BAILIWICK_GLUE_MISSING",
         "NOT_ENOUGH_IPV4_NS_CHILD",
         "NOT_ENOUGH_IPV4_NS_DEL",
         "NOT_ENOUGH_IPV6_NS_CHILD",
@@ -818,6 +820,18 @@
         "N17_NO_RESPONSE",
         "TEST_CASE_END",
         "TEST_CASE_START"
+      ],
+      "nameserver18": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "N18_EXTENDED_ERROR_REPORTED",
+        "N18_FILTERED_RESPONSE",
+        "N18_NO_EXTENDED_ERROR",
+        "N18_NO_RESPONSE",
+        "N18_RESOLVER_BEHAVIOR_REPORTED",
+        "N18_SERVER_ERROR_REPORTED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
       ]
     },
     "syntax": {
@@ -973,10 +987,12 @@
         "Z09_UNEXPECTED_RCODE_MX"
       ],
       "zone10": [
+        "APEX_DNAME",
         "MULTIPLE_SOA",
         "NO_RESPONSE",
         "NO_SOA_IN_RESPONSE",
         "ONE_SOA",
+        "SOA_AND_CNAME",
         "TEST_CASE_END",
         "TEST_CASE_START",
         "WRONG_SOA"

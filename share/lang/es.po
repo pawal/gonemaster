@@ -2905,6 +2905,30 @@ msgctxt "NAMESERVER:N17_NO_RESPONSE"
 msgid "The following name server(s) did not respond to a DNS Cookie probe (RFC 7873): \"{servers}\"."
 msgstr "Los siguientes servidores de nombre no respondieron a una sonda de DNS Cookie (RFC 7873): \"{servers}\"."
 
+msgctxt "NAMESERVER:N18_NO_EXTENDED_ERROR"
+msgid "The following name server(s) responded without an Extended DNS Error (RFC 8914): \"{servers}\"."
+msgstr "Los siguientes servidores de nombre respondieron sin un Extended DNS Error (RFC 8914): \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_EXTENDED_ERROR_REPORTED"
+msgid "The following name server(s) returned Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "Los siguientes servidores de nombre devolvieron el Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Devuelto por los servidores de nombre \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_SERVER_ERROR_REPORTED"
+msgid "The following name server(s) reported a server-side problem via Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "Los siguientes servidores de nombre informaron de un problema del lado del servidor mediante Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Devuelto por los servidores de nombre \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_RESOLVER_BEHAVIOR_REPORTED"
+msgid "The following name server(s) returned an Extended DNS Error (RFC 8914) {info_code} ({info_name}) normally produced by a recursive resolver, which may indicate a resolver is answering on an authoritative address or an unusual server configuration: \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "Los siguientes servidores de nombre devolvieron un Extended DNS Error (RFC 8914) {info_code} ({info_name}) que normalmente produce un resolver recursivo, lo que puede indicar que un resolver responde en una dirección autoritativa o una configuración de servidor inusual: \"{extra_text}\". Devuelto por los servidores de nombre \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_FILTERED_RESPONSE"
+msgid "The following name server(s) returned a filtering Extended DNS Error (RFC 8914) {info_code} ({info_name}), indicating a policy middlebox in the path: \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "Los siguientes servidores de nombre devolvieron un Extended DNS Error (RFC 8914) de filtrado {info_code} ({info_name}), lo que indica un middlebox de filtrado en la ruta: \"{extra_text}\". Devuelto por los servidores de nombre \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_NO_RESPONSE"
+msgid "The following name server(s) did not respond to an Extended DNS Error probe (RFC 8914): \"{servers}\"."
+msgstr "Los siguientes servidores de nombre no respondieron a una sonda de Extended DNS Error (RFC 8914): \"{servers}\"."
+
 msgctxt "NAMESERVER:QNAME_CASE_INSENSITIVE"
 msgid "The following nameservers do not preserve original case of the queried name ({domain}): {servers}."
 msgstr "Los siguientes servidores de nombres no conservan la mezcla de mayúsculas y minúsculas de la consulta original ({domain}): {servers}."

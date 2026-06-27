@@ -9,12 +9,12 @@
   ],
   "summary": {
     "file_count": 112,
-    "log_call_count": 698,
-    "unique_tag_count": 494,
+    "log_call_count": 705,
+    "unique_tag_count": 500,
     "unique_key_count": 85,
     "ns_string_call_count": 0,
     "packed_list_only_key_count": 0,
-    "unresolved_log_call_count": 127
+    "unresolved_log_call_count": 129
   },
   "keys": {
     "aa": {
@@ -33,13 +33,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         }
       ]
@@ -60,13 +60,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         }
       ]
@@ -87,13 +87,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "int"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "int"
         }
       ]
@@ -116,6 +116,7 @@
         "EXTRA_PROCESSING_OK",
         "NAMESERVER_IP_PTR_MISMATCH",
         "NAMESERVER_IP_WITHOUT_REVERSE",
+        "NON_GLOBAL_QUERY_BLOCKED",
         "NS_CREATED",
         "QUERY",
         "Z01_MNAME_HAS_LOCALHOST_ADDR",
@@ -134,7 +135,7 @@
         "engine/test/dnssec/dnssec.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 26,
+      "occurrences": 27,
       "samples": [
         {
           "tag": "CACHE_CREATED",
@@ -151,26 +152,26 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 480,
+          "line": 493,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "string"
         },
         {
-          "tag": "NAMESERVER_IP_WITHOUT_REVERSE",
-          "file": "engine/test/address/address.go",
-          "line": 317,
-          "shape": "unknown"
+          "tag": "NON_GLOBAL_QUERY_BLOCKED",
+          "file": "engine/nameserver/nameserver.go",
+          "line": 213,
+          "shape": "string"
         },
         {
           "tag": "NS_CREATED",
@@ -317,13 +318,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "int"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "int"
         }
       ]
@@ -425,13 +426,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "int"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "int"
         }
       ]
@@ -451,7 +452,7 @@
         {
           "tag": "LOOP_PROTECTION",
           "file": "engine/test/basic/basic.go",
-          "line": 320,
+          "line": 330,
           "shape": "string"
         }
       ]
@@ -472,13 +473,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         }
       ]
@@ -587,7 +588,7 @@
         {
           "tag": "LOOP_PROTECTION",
           "file": "engine/test/basic/basic.go",
-          "line": 320,
+          "line": 330,
           "shape": "string"
         }
       ]
@@ -607,7 +608,7 @@
         {
           "tag": "PACKET_BIG",
           "file": "engine/nameserver/nameserver.go",
-          "line": 320,
+          "line": 333,
           "shape": "string"
         }
       ]
@@ -836,19 +837,19 @@
         {
           "tag": "B01_CHILD_FOUND",
           "file": "engine/test/basic/basic.go",
-          "line": 163,
+          "line": 173,
           "shape": "string"
         },
         {
           "tag": "B01_CHILD_FOUND",
           "file": "engine/test/basic/basic.go",
-          "line": 178,
+          "line": 188,
           "shape": "string"
         },
         {
           "tag": "B01_CHILD_FOUND",
           "file": "engine/test/basic/basic.go",
-          "line": 592,
+          "line": 602,
           "shape": "string"
         },
         {
@@ -903,37 +904,37 @@
         {
           "tag": "B01_CHILD_IS_ALIAS",
           "file": "engine/test/basic/basic.go",
-          "line": 658,
+          "line": 668,
           "shape": "string"
         },
         {
           "tag": "B01_INCONSISTENT_DELEGATION",
           "file": "engine/test/basic/basic.go",
-          "line": 622,
+          "line": 632,
           "shape": "string"
         },
         {
           "tag": "B01_NO_CHILD",
           "file": "engine/test/basic/basic.go",
-          "line": 638,
+          "line": 648,
           "shape": "string"
         },
         {
           "tag": "B01_PARENT_FOUND",
           "file": "engine/test/basic/basic.go",
-          "line": 553,
+          "line": 563,
           "shape": "string"
         },
         {
           "tag": "B01_PARENT_NXDOMAIN_HIDES_DELEGATION",
           "file": "engine/test/basic/basic.go",
-          "line": 584,
+          "line": 594,
           "shape": "string"
         },
         {
           "tag": "B01_PARENT_UNDETERMINED",
           "file": "engine/test/basic/basic.go",
-          "line": 564,
+          "line": 574,
           "shape": "string"
         }
       ]
@@ -953,7 +954,7 @@
         {
           "tag": "B01_NO_CHILD",
           "file": "engine/test/basic/basic.go",
-          "line": 638,
+          "line": 648,
           "shape": "string"
         }
       ]
@@ -977,31 +978,31 @@
         {
           "tag": "B01_CHILD_IS_ALIAS",
           "file": "engine/test/basic/basic.go",
-          "line": 658,
+          "line": 668,
           "shape": "unknown"
         },
         {
           "tag": "B01_INCONSISTENT_DELEGATION",
           "file": "engine/test/basic/basic.go",
-          "line": 622,
+          "line": 632,
           "shape": "unknown"
         },
         {
           "tag": "B01_PARENT_FOUND",
           "file": "engine/test/basic/basic.go",
-          "line": 553,
+          "line": 563,
           "shape": "unknown"
         },
         {
           "tag": "B01_PARENT_NXDOMAIN_HIDES_DELEGATION",
           "file": "engine/test/basic/basic.go",
-          "line": 584,
+          "line": 594,
           "shape": "unknown"
         },
         {
           "tag": "B01_PARENT_UNDETERMINED",
           "file": "engine/test/basic/basic.go",
-          "line": 564,
+          "line": 574,
           "shape": "unknown"
         }
       ]
@@ -1136,13 +1137,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "string"
         },
         {
@@ -1154,7 +1155,7 @@
         {
           "tag": "MODULE_ERROR",
           "file": "engine/engine.go",
-          "line": 665,
+          "line": 677,
           "shape": "string"
         }
       ]
@@ -1199,19 +1200,19 @@
         {
           "tag": "EXPIRE_LOWER_THAN_REFRESH",
           "file": "engine/test/zone/zone.go",
-          "line": 775,
+          "line": 777,
           "shape": "unknown"
         },
         {
           "tag": "EXPIRE_MINIMUM_VALUE_LOWER",
           "file": "engine/test/zone/zone.go",
-          "line": 767,
+          "line": 769,
           "shape": "unknown"
         },
         {
           "tag": "EXPIRE_MINIMUM_VALUE_OK",
           "file": "engine/test/zone/zone.go",
-          "line": 783,
+          "line": 785,
           "shape": "unknown"
         },
         {
@@ -1274,19 +1275,19 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 480,
+          "line": 493,
           "shape": "string"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "string"
         },
         {
@@ -1360,13 +1361,13 @@
         {
           "tag": "SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER",
           "file": "engine/test/zone/zone.go",
-          "line": 828,
+          "line": 830,
           "shape": "unknown"
         },
         {
           "tag": "SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK",
           "file": "engine/test/zone/zone.go",
-          "line": 842,
+          "line": 844,
           "shape": "unknown"
         }
       ]
@@ -1386,7 +1387,7 @@
         {
           "tag": "LOOP_PROTECTION",
           "file": "engine/test/basic/basic.go",
-          "line": 320,
+          "line": 330,
           "shape": "string"
         }
       ]
@@ -1743,7 +1744,7 @@
         {
           "tag": "Z13_SPF_LOOKUP_COUNT_EXCEEDED",
           "file": "engine/test/zone/zone.go",
-          "line": 1800,
+          "line": 1816,
           "shape": "unknown"
         }
       ]
@@ -1789,7 +1790,7 @@
         {
           "tag": "Z13_SPF_LOOKUP_LOOP",
           "file": "engine/test/zone/zone.go",
-          "line": 1772,
+          "line": 1788,
           "shape": "unknown"
         }
       ]
@@ -1810,13 +1811,13 @@
         {
           "tag": "SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER",
           "file": "engine/test/zone/zone.go",
-          "line": 835,
+          "line": 837,
           "shape": "unknown"
         },
         {
           "tag": "SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK",
           "file": "engine/test/zone/zone.go",
-          "line": 842,
+          "line": 844,
           "shape": "unknown"
         }
       ]
@@ -1839,31 +1840,31 @@
         {
           "tag": "Z09_MX_DATA",
           "file": "engine/test/zone/zone.go",
-          "line": 1186,
+          "line": 1188,
           "shape": "unknown"
         },
         {
           "tag": "Z09_MX_DATA",
           "file": "engine/test/zone/zone.go",
-          "line": 1235,
+          "line": 1237,
           "shape": "unknown"
         },
         {
           "tag": "Z09_NON_AUTH_MX_RESPONSE",
           "file": "engine/test/zone/zone.go",
-          "line": 1137,
+          "line": 1139,
           "shape": "unknown"
         },
         {
           "tag": "Z09_NO_RESPONSE_MX_QUERY",
           "file": "engine/test/zone/zone.go",
-          "line": 1117,
+          "line": 1119,
           "shape": "unknown"
         },
         {
           "tag": "Z09_UNEXPECTED_RCODE_MX",
           "file": "engine/test/zone/zone.go",
-          "line": 1128,
+          "line": 1130,
           "shape": "unknown"
         }
       ]
@@ -1999,19 +2000,19 @@
         {
           "tag": "MNAME_HAS_NO_ADDRESS",
           "file": "engine/test/zone/zone.go",
-          "line": 920,
+          "line": 922,
           "shape": "unknown"
         },
         {
           "tag": "MNAME_IS_CNAME",
           "file": "engine/test/zone/zone.go",
-          "line": 905,
+          "line": 907,
           "shape": "unknown"
         },
         {
           "tag": "MNAME_IS_NOT_CNAME",
           "file": "engine/test/zone/zone.go",
-          "line": 911,
+          "line": 913,
           "shape": "unknown"
         },
         {
@@ -2044,13 +2045,13 @@
         {
           "tag": "MODULE_END",
           "file": "engine/engine.go",
-          "line": 667,
+          "line": 679,
           "shape": "unknown"
         },
         {
           "tag": "MODULE_ERROR",
           "file": "engine/engine.go",
-          "line": 665,
+          "line": 677,
           "shape": "unknown"
         }
       ]
@@ -2082,7 +2083,7 @@
         {
           "tag": "B02_NS_NO_IP_ADDR",
           "file": "engine/test/basic/basic.go",
-          "line": 867,
+          "line": 877,
           "shape": "unknown"
         },
         {
@@ -2147,13 +2148,13 @@
         {
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 541,
+          "line": 554,
           "shape": "string"
         },
         {
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 541,
+          "line": 554,
           "shape": "unknown"
         },
         {
@@ -2250,25 +2251,25 @@
         {
           "tag": "BLACKLISTING",
           "file": "engine/nameserver/nameserver.go",
-          "line": 290,
+          "line": 303,
           "shape": "unknown"
         },
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 480,
+          "line": 493,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         },
         {
@@ -2286,7 +2287,7 @@
         {
           "tag": "NO_SUCH_RECORD",
           "file": "engine/packet/packet.go",
-          "line": 270,
+          "line": 281,
           "shape": "string"
         },
         {
@@ -2324,25 +2325,25 @@
         {
           "tag": "BLACKLISTING",
           "file": "engine/nameserver/nameserver.go",
-          "line": 290,
+          "line": 303,
           "shape": "unknown"
         },
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 480,
+          "line": 493,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         },
         {
@@ -2360,7 +2361,7 @@
         {
           "tag": "NO_SUCH_RECORD",
           "file": "engine/packet/packet.go",
-          "line": 270,
+          "line": 281,
           "shape": "unknown"
         },
         {
@@ -2401,25 +2402,25 @@
         {
           "tag": "BLACKLISTING",
           "file": "engine/nameserver/nameserver.go",
-          "line": 290,
+          "line": 303,
           "shape": "unknown"
         },
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_QUERY",
           "file": "engine/nameserver/nameserver.go",
-          "line": 480,
+          "line": 493,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         },
         {
@@ -2437,7 +2438,7 @@
         {
           "tag": "NO_SUCH_RECORD",
           "file": "engine/packet/packet.go",
-          "line": 270,
+          "line": 281,
           "shape": "unknown"
         },
         {
@@ -2464,13 +2465,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         }
       ]
@@ -2496,37 +2497,37 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         },
         {
           "tag": "N16_HAS_NSID",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 2056,
+          "line": 2079,
           "shape": "unknown"
         },
         {
           "tag": "N16_NO_NSID_REVEALED",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 2065,
+          "line": 2088,
           "shape": "unknown"
         },
         {
           "tag": "N16_NO_RESPONSE",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 2073,
+          "line": 2096,
           "shape": "unknown"
         },
         {
           "tag": "N16_UNEXPECTED_RCODE",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 2086,
+          "line": 2109,
           "shape": "unknown"
         }
       ]
@@ -2547,13 +2548,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         }
       ]
@@ -2581,13 +2582,13 @@
         {
           "tag": "EXPIRE_LOWER_THAN_REFRESH",
           "file": "engine/test/zone/zone.go",
-          "line": 775,
+          "line": 777,
           "shape": "unknown"
         },
         {
           "tag": "EXPIRE_MINIMUM_VALUE_OK",
           "file": "engine/test/zone/zone.go",
-          "line": 783,
+          "line": 785,
           "shape": "unknown"
         },
         {
@@ -2599,25 +2600,25 @@
         {
           "tag": "REFRESH_HIGHER_THAN_RETRY",
           "file": "engine/test/zone/zone.go",
-          "line": 673,
+          "line": 675,
           "shape": "unknown"
         },
         {
           "tag": "REFRESH_LOWER_THAN_RETRY",
           "file": "engine/test/zone/zone.go",
-          "line": 666,
+          "line": 668,
           "shape": "unknown"
         },
         {
           "tag": "REFRESH_MINIMUM_VALUE_LOWER",
           "file": "engine/test/zone/zone.go",
-          "line": 616,
+          "line": 618,
           "shape": "unknown"
         },
         {
           "tag": "REFRESH_MINIMUM_VALUE_OK",
           "file": "engine/test/zone/zone.go",
-          "line": 623,
+          "line": 625,
           "shape": "unknown"
         },
         {
@@ -2644,13 +2645,13 @@
         {
           "tag": "EXPIRE_MINIMUM_VALUE_LOWER",
           "file": "engine/test/zone/zone.go",
-          "line": 767,
+          "line": 769,
           "shape": "unknown"
         },
         {
           "tag": "EXPIRE_MINIMUM_VALUE_OK",
           "file": "engine/test/zone/zone.go",
-          "line": 783,
+          "line": 785,
           "shape": "unknown"
         }
       ]
@@ -2671,13 +2672,13 @@
         {
           "tag": "REFRESH_MINIMUM_VALUE_LOWER",
           "file": "engine/test/zone/zone.go",
-          "line": 616,
+          "line": 618,
           "shape": "unknown"
         },
         {
           "tag": "REFRESH_MINIMUM_VALUE_OK",
           "file": "engine/test/zone/zone.go",
-          "line": 623,
+          "line": 625,
           "shape": "unknown"
         }
       ]
@@ -2698,13 +2699,13 @@
         {
           "tag": "RETRY_MINIMUM_VALUE_LOWER",
           "file": "engine/test/zone/zone.go",
-          "line": 716,
+          "line": 718,
           "shape": "unknown"
         },
         {
           "tag": "RETRY_MINIMUM_VALUE_OK",
           "file": "engine/test/zone/zone.go",
-          "line": 723,
+          "line": 725,
           "shape": "unknown"
         }
       ]
@@ -2736,25 +2737,25 @@
         {
           "tag": "REFRESH_HIGHER_THAN_RETRY",
           "file": "engine/test/zone/zone.go",
-          "line": 673,
+          "line": 675,
           "shape": "unknown"
         },
         {
           "tag": "REFRESH_LOWER_THAN_RETRY",
           "file": "engine/test/zone/zone.go",
-          "line": 666,
+          "line": 668,
           "shape": "unknown"
         },
         {
           "tag": "RETRY_MINIMUM_VALUE_LOWER",
           "file": "engine/test/zone/zone.go",
-          "line": 716,
+          "line": 718,
           "shape": "unknown"
         },
         {
           "tag": "RETRY_MINIMUM_VALUE_OK",
           "file": "engine/test/zone/zone.go",
-          "line": 723,
+          "line": 725,
           "shape": "unknown"
         },
         {
@@ -2947,7 +2948,7 @@
         {
           "tag": "PACKET_BIG",
           "file": "engine/nameserver/nameserver.go",
-          "line": 320,
+          "line": 333,
           "shape": "unknown"
         },
         {
@@ -3006,13 +3007,13 @@
         {
           "tag": "Z13_SPF_MACRO_TARGET",
           "file": "engine/test/zone/zone.go",
-          "line": 1781,
+          "line": 1797,
           "shape": "unknown"
         },
         {
           "tag": "Z13_SPF_RECURSIVE_ERROR",
           "file": "engine/test/zone/zone.go",
-          "line": 1790,
+          "line": 1806,
           "shape": "unknown"
         }
       ]
@@ -3033,13 +3034,13 @@
         {
           "tag": "EMPTY_RETURN",
           "file": "engine/nameserver/nameserver.go",
-          "line": 512,
+          "line": 525,
           "shape": "unknown"
         },
         {
           "tag": "EXTERNAL_RESPONSE",
           "file": "engine/nameserver/nameserver.go",
-          "line": 514,
+          "line": 527,
           "shape": "unknown"
         }
       ]
@@ -3064,7 +3065,7 @@
         "engine/test/syntax/syntax.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 116,
+      "occurrences": 117,
       "samples": [
         {
           "tag": "TEST_CASE_END",
@@ -3075,7 +3076,7 @@
         {
           "tag": "TEST_CASE_END",
           "file": "engine/test/basic/basic.go",
-          "line": 992,
+          "line": 1002,
           "shape": "unknown"
         },
         {
@@ -3099,19 +3100,19 @@
         {
           "tag": "TEST_CASE_START",
           "file": "engine/test/basic/basic.go",
-          "line": 158,
+          "line": 168,
           "shape": "string"
         },
         {
           "tag": "TEST_CASE_START",
           "file": "engine/test/basic/basic.go",
-          "line": 679,
+          "line": 689,
           "shape": "string"
         },
         {
           "tag": "TEST_CASE_START",
           "file": "engine/test/basic/basic.go",
-          "line": 893,
+          "line": 903,
           "shape": "string"
         }
       ]
@@ -3151,7 +3152,7 @@
         {
           "tag": "IS_REDIRECT",
           "file": "engine/packet/packet.go",
-          "line": 303,
+          "line": 314,
           "shape": "unknown"
         }
       ]
@@ -3286,7 +3287,7 @@
         {
           "tag": "LOOP_PROTECTION",
           "file": "engine/test/basic/basic.go",
-          "line": 320,
+          "line": 330,
           "shape": "unknown"
         }
       ]
@@ -3296,127 +3297,133 @@
     {
       "tag": "AAAA_BAD_RDATA",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 876,
+      "line": 900,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"length\": 0,\n})"
     },
     {
       "tag": "AAAA_QUERY_DROPPED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 855,
+      "line": 879,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "AAAA_UNEXPECTED_RCODE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 863,
+      "line": 887,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"rcode\": resp.Rcode(),\n})"
+    },
+    {
+      "tag": "APEX_DNAME",
+      "file": "engine/test/zone/zone.go",
+      "line": 1317,
+      "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "AXFR_AVAILABLE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 699,
+      "line": 723,
       "args_expr": "args"
     },
     {
       "tag": "AXFR_FAILURE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 693,
+      "line": 717,
       "args_expr": "args"
     },
     {
       "tag": "A_UNEXPECTED_RCODE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 844,
+      "line": 868,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"rcode\": resp.Rcode(),\n})"
     },
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 238,
+      "line": 248,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tzoneName,\n\t\"query_type\":\t\"SOA\",\n})"
     },
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 249,
+      "line": 259,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tzoneName,\n\t\"query_type\":\t\"NS\",\n})"
     },
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 337,
+      "line": 347,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tintermediate.String(),\n\t\"query_type\":\t\"SOA\",\n})"
     },
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 353,
+      "line": 363,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tintermediate.String(),\n\t\"query_type\":\t\"NS\",\n})"
     },
     {
       "tag": "B01_SERVER_ZONE_ERROR",
       "file": "engine/test/basic/basic.go",
-      "line": 534,
+      "line": 544,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_name\":\tintermediate.String(),\n\t\"query_type\":\t\"SOA\",\n})"
     },
     {
       "tag": "B02_NS_BROKEN",
       "file": "engine/test/basic/basic.go",
-      "line": 857,
+      "line": 867,
       "args_expr": "withEndpointKeyArgs(ns, nil)"
     },
     {
       "tag": "B02_NS_NOT_AUTH",
       "file": "engine/test/basic/basic.go",
-      "line": 862,
+      "line": 872,
       "args_expr": "withEndpointKeyArgs(ns, nil)"
     },
     {
       "tag": "B02_NS_NO_RESPONSE",
       "file": "engine/test/basic/basic.go",
-      "line": 872,
+      "line": 882,
       "args_expr": "withEndpointKeyArgs(ns, nil)"
     },
     {
       "tag": "B02_UNEXPECTED_RCODE",
       "file": "engine/test/basic/basic.go",
-      "line": 877,
+      "line": 887,
       "args_expr": "withEndpointKeyArgs(ns, map[string]any{\n\t\"rcode\": rcode,\n})"
     },
     {
       "tag": "BREAKS_ON_EDNS",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 568,
+      "line": 592,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "CASE_QUERY_DIFFERENT_ANSWER",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1238,
+      "line": 1262,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n})"
     },
     {
       "tag": "CASE_QUERY_DIFFERENT_RC",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1258,
+      "line": 1282,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n\t\"rcode1\":\tp1.Rcode(),\n\t\"rcode2\":\tp2.Rcode(),\n})"
     },
     {
       "tag": "CASE_QUERY_NO_ANSWER",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1270,
+      "line": 1294,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"domain\":\tfirstNonEmpty(random1, p1, random2),\n})"
     },
     {
       "tag": "CASE_QUERY_SAME_ANSWER",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1229,
+      "line": 1253,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n})"
     },
     {
       "tag": "CASE_QUERY_SAME_RC",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1248,
+      "line": 1272,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n\t\"rcode\":\tp1.Rcode(),\n})"
     },
     {
@@ -3428,25 +3435,25 @@
     {
       "tag": "DIFFERENT_SOURCE_IP",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 749,
+      "line": 773,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"source\": resp.AnswerFrom,\n})"
     },
     {
       "tag": "EDNS_RESPONSE_WITHOUT_EDNS",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 546,
+      "line": 570,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "EDNS_VERSION_ERROR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 553,
+      "line": 577,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "HAS_A_RECORDS",
       "file": "engine/test/basic/basic.go",
-      "line": 950,
+      "line": 960,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"domain\": queryName,\n})"
     },
     {
@@ -3458,19 +3465,19 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 769,
+      "line": 779,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"SOA\"})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 924,
+      "line": 934,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"A\"})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 1010,
+      "line": 1020,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3500,7 +3507,7 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 2504,
+      "line": 2773,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3512,31 +3519,31 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1987,
+      "line": 2003,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 2011,
+      "line": 2027,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 783,
+      "line": 793,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"SOA\"})"
     },
     {
       "tag": "IPV4_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 937,
+      "line": 947,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"A\"})"
     },
     {
       "tag": "IPV4_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 1034,
+      "line": 1044,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3548,19 +3555,19 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 761,
+      "line": 771,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"SOA\"})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 917,
+      "line": 927,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"A\"})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 1020,
+      "line": 1030,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3590,7 +3597,7 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 2494,
+      "line": 2763,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3602,37 +3609,37 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 1977,
+      "line": 1993,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 2001,
+      "line": 2017,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 778,
+      "line": 788,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"SOA\"})"
     },
     {
       "tag": "IPV6_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 932,
+      "line": 942,
       "args_expr": "withNameserverArgs(ns, map[string]any{\"query_type\": \"A\"})"
     },
     {
       "tag": "IPV6_ENABLED",
       "file": "engine/test/basic/basic.go",
-      "line": 1043,
+      "line": 1053,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IS_A_RECURSOR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 481,
+      "line": 505,
       "args_expr": "args"
     },
     {
@@ -3644,13 +3651,13 @@
     {
       "tag": "MISSING_OPT_IN_TRUNCATED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1727,
+      "line": 1751,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "MULTIPLE_SOA",
       "file": "engine/test/zone/zone.go",
-      "line": 1289,
+      "line": 1291,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"count\": len(records),\n})"
     },
     {
@@ -3662,31 +3669,31 @@
     {
       "tag": "NO_A_RECORDS",
       "file": "engine/test/basic/basic.go",
-      "line": 956,
+      "line": 966,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"domain\": queryName,\n})"
     },
     {
       "tag": "NO_EDNS_SUPPORT",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 538,
+      "line": 562,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NO_EDNS_SUPPORT",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1646,
+      "line": 1670,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NO_EDNS_SUPPORT",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1723,
+      "line": 1747,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NO_RECURSOR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 487,
+      "line": 511,
       "args_expr": "args"
     },
     {
@@ -3740,31 +3747,31 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 422,
+      "line": 446,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": name,\n})"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 575,
+      "line": 599,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 835,
+      "line": 859,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1661,
+      "line": 1685,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1738,
+      "line": 1762,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
@@ -3776,7 +3783,7 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/zone/zone.go",
-      "line": 1280,
+      "line": 1282,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3848,44 +3855,50 @@
     {
       "tag": "NO_SOA_IN_RESPONSE",
       "file": "engine/test/zone/zone.go",
-      "line": 1307,
+      "line": 1323,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_UPWARD_REFERRAL",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1069,
+      "line": 1093,
       "args_expr": "args"
     },
     {
       "tag": "NS_ERROR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 560,
+      "line": 584,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NS_ERROR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1656,
+      "line": 1680,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NS_ERROR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1733,
+      "line": 1757,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "QNAME_CASE_INSENSITIVE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1165,
+      "line": 1189,
       "args_expr": "args"
     },
     {
       "tag": "QNAME_CASE_SENSITIVE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1158,
+      "line": 1182,
       "args_expr": "args"
+    },
+    {
+      "tag": "SOA_AND_CNAME",
+      "file": "engine/test/zone/zone.go",
+      "line": 1310,
+      "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "SOA_NOT_EXISTS",
@@ -3902,73 +3915,73 @@
     {
       "tag": "UPWARD_REFERRAL",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1063,
+      "line": 1087,
       "args_expr": "args"
     },
     {
       "tag": "WRONG_SOA",
       "file": "engine/test/zone/zone.go",
-      "line": 1298,
+      "line": 1300,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"owner\":\towner,\n\t\"query_name\":\texpected,\n})"
     },
     {
       "tag": "Z01_MNAME_MISSING_SOA_RECORD",
       "file": "engine/test/zone/zone.go",
-      "line": 525,
+      "line": 527,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "Z01_MNAME_NOT_AUTHORITATIVE",
       "file": "engine/test/zone/zone.go",
-      "line": 508,
+      "line": 510,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "Z01_MNAME_NO_RESPONSE",
       "file": "engine/test/zone/zone.go",
-      "line": 499,
+      "line": 501,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "Z01_MNAME_UNEXPECTED_RCODE",
       "file": "engine/test/zone/zone.go",
-      "line": 519,
+      "line": 521,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"rcode\": resp.Rcode(),\n})"
     },
     {
       "tag": "Z12_MULTIPLE_CSYNC",
       "file": "engine/test/zone/zone.go",
-      "line": 1621,
+      "line": 1637,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"count\": len(outcome.csyncRRs),\n})"
     },
     {
       "tag": "Z12_SERIAL_MISMATCH",
       "file": "engine/test/zone/zone.go",
-      "line": 1634,
+      "line": 1650,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"csync_serial\":\tcsync.CSYNC.Serial,\n\t\"soa_serial\":\toutcome.soaSerial,\n})"
     },
     {
       "tag": "Z14_DUPLICATE_SCHEME_HASH",
       "file": "engine/test/zone/zone.go",
-      "line": 2628,
+      "line": 2644,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"scheme\":\tk.scheme,\n\t\"hash\":\t\tk.hash,\n})"
     },
     {
       "tag": "Z14_SERIAL_MISMATCH",
       "file": "engine/test/zone/zone.go",
-      "line": 2659,
+      "line": 2675,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"zonemd_serial\":\tr.serial,\n\t\"soa_serial\":\t\toutcome.soaSerial,\n})"
     },
     {
       "tag": "Z14_UNSUPPORTED_HASH",
       "file": "engine/test/zone/zone.go",
-      "line": 2643,
+      "line": 2659,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"hash\": r.hash,\n})"
     },
     {
       "tag": "Z_FLAGS_NOTCLEAR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1650,
+      "line": 1674,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
@@ -3980,13 +3993,13 @@
     {
       "tag": "d.tag",
       "file": "engine/nameserver/nameserver.go",
-      "line": 213,
+      "line": 226,
       "args_expr": "d.args"
     },
     {
       "tag": "d.tag",
       "file": "engine/nameserver/nameserver.go",
-      "line": 215,
+      "line": 228,
       "args_expr": "d.args"
     },
     {

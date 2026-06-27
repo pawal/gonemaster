@@ -220,6 +220,17 @@ func (p Packet) Cookie() *dns.COOKIE {
 	return nil
 }
 
+// ExtendedErrors returns all EDE options (RFC 8914) in the response.
+func (p Packet) ExtendedErrors() []*dns.EDE {
+	var out []*dns.EDE
+	for _, opt := range p.EdnsData() {
+		if ede, ok := opt.(*dns.EDE); ok {
+			out = append(out, ede)
+		}
+	}
+	return out
+}
+
 // DO reports whether the EDNS DO bit is set.
 func (p Packet) DO() bool {
 	if p.Msg == nil {

@@ -1710,6 +1710,30 @@ msgctxt "NAMESERVER:N17_NO_RESPONSE"
 msgid "The following name server(s) did not respond to a DNS Cookie probe (RFC 7873): \"{servers}\"."
 msgstr "次のネームサーバーは DNS Cookie プローブ (RFC 7873) に応答しませんでした: \"{servers}\"。"
 
+msgctxt "NAMESERVER:N18_NO_EXTENDED_ERROR"
+msgid "The following name server(s) responded without an Extended DNS Error (RFC 8914): \"{servers}\"."
+msgstr "次のネームサーバーは Extended DNS Error (RFC 8914) なしで応答しました: \"{servers}\"。"
+
+msgctxt "NAMESERVER:N18_EXTENDED_ERROR_REPORTED"
+msgid "The following name server(s) returned Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "次のネームサーバーは Extended DNS Error (RFC 8914) {info_code} ({info_name}) を返しました: \"{extra_text}\"。ネームサーバー \"{servers}\" から返されました。"
+
+msgctxt "NAMESERVER:N18_SERVER_ERROR_REPORTED"
+msgid "The following name server(s) reported a server-side problem via Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "次のネームサーバーは Extended DNS Error (RFC 8914) {info_code} ({info_name}) を通じてサーバー側の問題を報告しました: \"{extra_text}\"。ネームサーバー \"{servers}\" から返されました。"
+
+msgctxt "NAMESERVER:N18_RESOLVER_BEHAVIOR_REPORTED"
+msgid "The following name server(s) returned an Extended DNS Error (RFC 8914) {info_code} ({info_name}) normally produced by a recursive resolver, which may indicate a resolver is answering on an authoritative address or an unusual server configuration: \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "次のネームサーバーは、通常は再帰リゾルバーが生成する Extended DNS Error (RFC 8914) {info_code} ({info_name}) を返しました。これは、リゾルバーが権威アドレスで応答しているか、サーバー構成が異常である可能性を示します: \"{extra_text}\"。ネームサーバー \"{servers}\" から返されました。"
+
+msgctxt "NAMESERVER:N18_FILTERED_RESPONSE"
+msgid "The following name server(s) returned a filtering Extended DNS Error (RFC 8914) {info_code} ({info_name}), indicating a policy middlebox in the path: \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "次のネームサーバーはフィルタリングを示す Extended DNS Error (RFC 8914) {info_code} ({info_name}) を返しました。これは経路上にフィルタリングを行う中間装置（ミドルボックス）があることを示します: \"{extra_text}\"。ネームサーバー \"{servers}\" から返されました。"
+
+msgctxt "NAMESERVER:N18_NO_RESPONSE"
+msgid "The following name server(s) did not respond to an Extended DNS Error probe (RFC 8914): \"{servers}\"."
+msgstr "次のネームサーバーは Extended DNS Error プローブ (RFC 8914) に応答しませんでした: \"{servers}\"。"
+
 msgctxt "NAMESERVER:NO_RECURSOR"
 msgid "The following nameservers are not recursors: {servers}."
 msgstr "以下のネームサーバーは再帰リゾルバではありません: {servers}。"

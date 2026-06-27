@@ -1903,3 +1903,249 @@ func TestClassifyCookie(t *testing.T) {
 		})
 	}
 }
+
+// ns18Server builds a fake nameserver whose SOA reply carries the given rcode and EDE options.
+func ns18Server(t *testing.T, ctx context.Context, name, ip string, rcode uint16, edes ...*dns.EDE) ens.Nameserver {
+	t.Helper()
+	return newNameserver(t, ctx, name, ip, func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+		if !strings.EqualFold(qtype, "SOA") {
+			return packet.Packet{}
+		}
+		msg := new(dns.Msg)
+		msg.Rcode = rcode
+		if rcode == dns.RcodeSuccess {
+			msg.Authoritative = true
+			msg.Answer = []dns.RR{soaRecord(name)}
+		}
+		for _, ede := range edes {
+			msg.Pseudo = append(msg.Pseudo, ede)
+		}
+		return packet.Packet{Msg: msg}
+	})
+}
+
+// runNameserver18 stubs the authoritative set and runs the testcase against zone "example".
+func runNameserver18(t *testing.T, ctx context.Context, servers ...ens.Nameserver) []*logger.Entry {
+	t.Helper()
+	orig := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = orig })
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return servers, nil
+	}
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver18(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver18: %v", err)
+	}
+	return entries
+}
+
+func entryTags(entries []*logger.Entry) []string {
+	var out []string
+	for _, e := range entries {
+		if e != nil {
+			out = append(out, e.Tag)
+		}
+	}
+	return out
+}
+
+func countTag(entries []*logger.Entry, tag string) int {
+	var n int
+	for _, e := range entries {
+		if e != nil && e.Tag == tag {
+			n++
+		}
+	}
+	return n
+}
+
+func TestNameserver18NoEDE(t *testing.T) {
+	ctx := setupTest(t)
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess))
+	if !hasEntryTag(entries, "N18_NO_EXTENDED_ERROR") {
+		t.Fatalf("expected N18_NO_EXTENDED_ERROR, got %v", entryTags(entries))
+	}
+}
+
+func TestNameserver18ServerError(t *testing.T) {
+	ctx := setupTest(t)
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: "lame"}))
+	e := firstEntryByTag(entries, "N18_SERVER_ERROR_REPORTED")
+	if e == nil {
+		t.Fatalf("expected N18_SERVER_ERROR_REPORTED, got %v", entryTags(entries))
+	}
+	if e.Args["info_code"] != 20 {
+		t.Fatalf("info_code = %v, want 20", e.Args["info_code"])
+	}
+	if e.Args["info_name"] != "Not Authoritative" {
+		t.Fatalf("info_name = %v, want \"Not Authoritative\"", e.Args["info_name"])
+	}
+	if e.Args["extra_text"] != "lame" {
+		t.Fatalf("extra_text = %v, want \"lame\"", e.Args["extra_text"])
+	}
+	servers, ok := e.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.1" {
+		t.Fatalf("servers = %#v", e.Args["servers"])
+	}
+}
+
+func TestNameserver18ResolverRoleConfusion(t *testing.T) {
+	ctx := setupTest(t)
+	// Stale Answer (3) is a resolver/cache code, observable at DO=0.
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 3}))
+	if !hasEntryTag(entries, "N18_RESOLVER_BEHAVIOR_REPORTED") {
+		t.Fatalf("expected N18_RESOLVER_BEHAVIOR_REPORTED, got %v", entryTags(entries))
+	}
+}
+
+func TestNameserver18Filtered(t *testing.T) {
+	ctx := setupTest(t)
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 15}))
+	if !hasEntryTag(entries, "N18_FILTERED_RESPONSE") {
+		t.Fatalf("expected N18_FILTERED_RESPONSE, got %v", entryTags(entries))
+	}
+}
+
+func TestNameserver18BenignAnnotation(t *testing.T) {
+	ctx := setupTest(t)
+	// Not Ready (14) is a named, benign/transient annotation.
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 14}))
+	e := firstEntryByTag(entries, "N18_EXTENDED_ERROR_REPORTED")
+	if e == nil {
+		t.Fatalf("expected N18_EXTENDED_ERROR_REPORTED, got %v", entryTags(entries))
+	}
+	if e.Args["info_name"] != "Not Ready" {
+		t.Fatalf("info_name = %v, want \"Not Ready\"", e.Args["info_name"])
+	}
+}
+
+func TestNameserver18UnnamedCode(t *testing.T) {
+	ctx := setupTest(t)
+	// 49152 is private-use: permanently unnamed in any IANA-tracking library, so this
+	// proves the "code N" fallback regardless of the dns library version.
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 49152}))
+	e := firstEntryByTag(entries, "N18_EXTENDED_ERROR_REPORTED")
+	if e == nil {
+		t.Fatalf("expected N18_EXTENDED_ERROR_REPORTED, got %v", entryTags(entries))
+	}
+	if e.Args["info_name"] != "code 49152" {
+		t.Fatalf("info_name = %v, want \"code 49152\"", e.Args["info_name"])
+	}
+}
+
+func TestNameserver18MultipleEDE(t *testing.T) {
+	ctx := setupTest(t)
+	// One response carrying two EDE options of different classes -> two findings.
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess,
+		&dns.EDE{InfoCode: 20}, &dns.EDE{InfoCode: 15}))
+	if !hasEntryTag(entries, "N18_SERVER_ERROR_REPORTED") || !hasEntryTag(entries, "N18_FILTERED_RESPONSE") {
+		t.Fatalf("expected both server-error and filtered tags, got %v", entryTags(entries))
+	}
+}
+
+func TestNameserver18MultipleServersSameCode(t *testing.T) {
+	ctx := setupTest(t)
+	s1 := ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: "x"})
+	s2 := ns18Server(t, ctx, "ns2.example", "192.0.2.2", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: "x"})
+	entries := runNameserver18(t, ctx, s1, s2)
+	if n := countTag(entries, "N18_SERVER_ERROR_REPORTED"); n != 1 {
+		t.Fatalf("expected exactly 1 N18_SERVER_ERROR_REPORTED, got %d (%v)", n, entryTags(entries))
+	}
+	e := firstEntryByTag(entries, "N18_SERVER_ERROR_REPORTED")
+	servers, ok := e.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected both servers listed, got %#v", e.Args["servers"])
+	}
+}
+
+func TestNameserver18NonNoerrorWithEDE(t *testing.T) {
+	ctx := setupTest(t)
+	// EDE rides on REFUSED; it is captured, and the clean tag must NOT appear.
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeRefused, &dns.EDE{InfoCode: 18}))
+	if !hasEntryTag(entries, "N18_SERVER_ERROR_REPORTED") {
+		t.Fatalf("expected N18_SERVER_ERROR_REPORTED, got %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "N18_NO_EXTENDED_ERROR") {
+		t.Fatalf("did not expect N18_NO_EXTENDED_ERROR on a REFUSED+EDE response")
+	}
+}
+
+func TestNameserver18NonNoerrorNoEDE(t *testing.T) {
+	ctx := setupTest(t)
+	// REFUSED without EDE is left to other testcases: no clean tag, no observed-EDE tag.
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeRefused))
+	for _, tag := range []string{"N18_NO_EXTENDED_ERROR", "N18_SERVER_ERROR_REPORTED", "N18_EXTENDED_ERROR_REPORTED", "N18_FILTERED_RESPONSE", "N18_RESOLVER_BEHAVIOR_REPORTED"} {
+		if hasEntryTag(entries, tag) {
+			t.Fatalf("did not expect %s for REFUSED without EDE, got %v", tag, entryTags(entries))
+		}
+	}
+}
+
+func TestNameserver18NoResponse(t *testing.T) {
+	ctx := setupTest(t)
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+		return packet.Packet{}
+	})
+	entries := runNameserver18(t, ctx, ns1)
+	if !hasEntryTag(entries, "N18_NO_RESPONSE") {
+		t.Fatalf("expected N18_NO_RESPONSE, got %v", entryTags(entries))
+	}
+}
+
+func TestNameserver18ExtraTextSanitized(t *testing.T) {
+	ctx := setupTest(t)
+	// Invalid UTF-8 bytes, an over-length payload, and a trailing NUL.
+	raw := "start" + string([]byte{0xff, 0xfe}) + strings.Repeat("a", 300) + "\x00"
+	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: raw}))
+	e := firstEntryByTag(entries, "N18_SERVER_ERROR_REPORTED")
+	if e == nil {
+		t.Fatalf("expected N18_SERVER_ERROR_REPORTED, got %v", entryTags(entries))
+	}
+	text, ok := e.Args["extra_text"].(string)
+	if !ok {
+		t.Fatalf("extra_text not a string: %#v", e.Args["extra_text"])
+	}
+	if !utf8.ValidString(text) {
+		t.Fatalf("extra_text is not valid UTF-8: %q", text)
+	}
+	if strings.ContainsRune(text, 0) {
+		t.Fatalf("extra_text still contains NUL: %q", text)
+	}
+	if !strings.HasSuffix(text, "...") {
+		t.Fatalf("over-length extra_text should be marked truncated, got %q", text)
+	}
+	if len(text) > 259 { // 256-byte cap + "..."
+		t.Fatalf("extra_text not capped: len=%d", len(text))
+	}
+}
+
+func TestEdeTagForCode(t *testing.T) {
+	cases := []struct {
+		code uint16
+		want string
+	}{
+		{18, "N18_SERVER_ERROR_REPORTED"},
+		{20, "N18_SERVER_ERROR_REPORTED"},
+		{21, "N18_SERVER_ERROR_REPORTED"},
+		{4, "N18_FILTERED_RESPONSE"},
+		{15, "N18_FILTERED_RESPONSE"},
+		{16, "N18_FILTERED_RESPONSE"},
+		{17, "N18_FILTERED_RESPONSE"},
+		{3, "N18_RESOLVER_BEHAVIOR_REPORTED"},
+		{6, "N18_RESOLVER_BEHAVIOR_REPORTED"},
+		{33, "N18_RESOLVER_BEHAVIOR_REPORTED"}, // Negative Trust Anchor (RFC 7646)
+		{0, "N18_EXTENDED_ERROR_REPORTED"},
+		{14, "N18_EXTENDED_ERROR_REPORTED"},
+		{30, "N18_EXTENDED_ERROR_REPORTED"},
+		{31, "N18_EXTENDED_ERROR_REPORTED"},    // Rate Limited (benign)
+		{32, "N18_EXTENDED_ERROR_REPORTED"},    // Over Quota (benign)
+		{34, "N18_EXTENDED_ERROR_REPORTED"},    // unassigned
+		{49152, "N18_EXTENDED_ERROR_REPORTED"}, // private-use
+	}
+	for _, tc := range cases {
+		if got := edeTagForCode(tc.code); got != tc.want {
+			t.Errorf("edeTagForCode(%d) = %q, want %q", tc.code, got, tc.want)
+		}
+	}
+}

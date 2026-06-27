@@ -12,7 +12,7 @@ Notes:
 
 ## Summary
 - Modules: 9
-- Implemented testcases: 81
+- Implemented testcases: 82
 
 ## Regeneration
 
@@ -77,7 +77,7 @@ make spec-export-implemented
 - dnssec20 - Verify that the NSEC/NSEC3 apex type bitmap accurately reflects the RR types actually present in the zone.
 - dnssec21 - Verify that the parent zone correctly signs the DS RRset that delegates the child zone.
 
-### nameserver (16)
+### nameserver (17)
 - nameserver01 - Detect whether authoritative nameservers also behave as recursors.
 - nameserver02 - Validate EDNS(0) handling on authoritative nameservers.
 - nameserver03 - Check whether nameservers allow AXFR zone transfer.
@@ -94,6 +94,7 @@ make spec-export-implemented
 - nameserver15 - Detect whether authoritative nameservers reveal software version data through CHAOS-class TXT queries.
 - nameserver16 - Query authoritative nameservers with an EDNS NSID option request (RFC 5001, option code 3) and report which servers provide NSID values and what those values contain.
 - nameserver17 - Probe each authoritative nameserver for DNS Cookie (RFC 7873 / RFC 9018) support and verify the returned Server Cookie is well-formed and accepted by the issuing server.
+- nameserver18 - Query each authoritative nameserver for the zone and report any EDNS Extended DNS Error (RFC 8914, option code 15) option found in the response, classified by what the observed info-code implies about a directly-queried authoritative server.
 
 ### syntax (8)
 - syntax01 - Validate that the tested domain name contains only allowed DNS hostname characters.
@@ -115,7 +116,7 @@ make spec-export-implemented
 - zone07 - Validate SOA MNAME alias/address behavior
 - zone08 - Validate that MX exchange hostnames are not aliases (CNAME).
 - zone09 - Validate MX presence and consistency across authoritative nameservers, including null-MX and domain-class exceptions (root/TLD/.arpa).
-- zone10 - Validate SOA answer-shape correctness on nameservers: response presence, SOA presence, owner name correctness, and multiplicity.
+- zone10 - Validate SOA answer-shape correctness on nameservers: response presence, SOA presence, owner name correctness, and multiplicity. When a single correct SOA is present, also check for CNAME or DNAME at the zone apex.
 - zone11 - Validate SPF policy publication at zone apex
 - zone12 - Check existence and RFC 7477 compliance of the CSYNC RR at the zone apex.
 - zone13 - Validate that the SPF policy at the zone apex does not exceed the DNS lookup limit defined in RFC 7208 Section 4.6.4.

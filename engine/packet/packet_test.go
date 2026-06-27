@@ -219,6 +219,52 @@ func TestCookie(t *testing.T) {
 	})
 }
 
+// TestExtendedErrors covers the EDE accessor: no options, a single EDE, several EDE options
+// (RFC 8914 allows more than one), and a response whose only EDNS option is not an EDE.
+func TestExtendedErrors(t *testing.T) {
+	t.Run("none present", func(t *testing.T) {
+		msg := new(dns.Msg)
+		if got := New(msg).ExtendedErrors(); got != nil {
+			t.Fatalf("expected nil when no EDE present, got %v", got)
+		}
+	})
+
+	t.Run("single", func(t *testing.T) {
+		msg := new(dns.Msg)
+		msg.Pseudo = []dns.RR{&dns.EDE{InfoCode: dns.ExtendedErrorProhibited, ExtraText: "no"}}
+		got := New(msg).ExtendedErrors()
+		if len(got) != 1 {
+			t.Fatalf("expected 1 EDE option, got %d", len(got))
+		}
+		if got[0].InfoCode != dns.ExtendedErrorProhibited || got[0].ExtraText != "no" {
+			t.Fatalf("unexpected EDE: code=%d text=%q", got[0].InfoCode, got[0].ExtraText)
+		}
+	})
+
+	t.Run("multiple preserved in order", func(t *testing.T) {
+		msg := new(dns.Msg)
+		msg.Pseudo = []dns.RR{
+			&dns.EDE{InfoCode: dns.ExtendedErrorNotAuthoritative},
+			&dns.EDE{InfoCode: dns.ExtendedErrorFiltered},
+		}
+		got := New(msg).ExtendedErrors()
+		if len(got) != 2 {
+			t.Fatalf("expected 2 EDE options, got %d", len(got))
+		}
+		if got[0].InfoCode != dns.ExtendedErrorNotAuthoritative || got[1].InfoCode != dns.ExtendedErrorFiltered {
+			t.Fatalf("EDE order not preserved: %d, %d", got[0].InfoCode, got[1].InfoCode)
+		}
+	})
+
+	t.Run("non-EDE options ignored", func(t *testing.T) {
+		msg := new(dns.Msg)
+		msg.Pseudo = []dns.RR{&dns.NSID{Nsid: "beef"}, &dns.COOKIE{Cookie: "00112233"}}
+		if got := New(msg).ExtendedErrors(); got != nil {
+			t.Fatalf("expected nil when no EDE present, got %v", got)
+		}
+	})
+}
+
 func TestPacketBasicHelpers(t *testing.T) {
 	msg := new(dns.Msg)
 	msg.ID = 1234

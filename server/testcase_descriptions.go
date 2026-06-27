@@ -78,6 +78,7 @@ var testcaseDescriptions = map[string]string{
 	"NAMESERVER15": "Name server does not reveal software version",
 	"NAMESERVER16": "EDNS NSID option support",
 	"NAMESERVER17": "DNS Cookie (RFC 7873) support",
+	"NAMESERVER18": "Extended DNS Errors (RFC 8914)",
 
 	// SYNTAX
 	"SYNTAX01": "No illegal characters in the domain name",

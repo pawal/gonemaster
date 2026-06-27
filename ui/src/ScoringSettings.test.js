@@ -326,4 +326,80 @@ describe("ScoringSettings", () => {
       expect(screen.getByText(/Invalid JSON/i)).toBeInTheDocument();
     });
   });
+
+  // ── default reconciliation ────────────────────────────────────────────────────
+
+  const reconcileMock = (stored, defaults, configOverrides = {}) =>
+    (url) => {
+      const path = typeof url === "string" ? url : String(url?.url || url);
+      if (path.includes("/scoring-config/defaults")) {
+        return Promise.resolve(jsonResponse(defaults));
+      }
+      return Promise.resolve(jsonResponse(configResponse(Object.assign({ config: stored }, configOverrides))));
+    };
+
+  it("surfaces default tag and module entries missing from a saved config", async () => {
+    const stored = defaultConfig(); // DS07_NOT_SIGNED, DNSSEC, NAMESERVER
+    const defaults = defaultConfig();
+    defaults.tag_penalties = { ...defaults.tag_penalties, N18_NO_RESPONSE: 0, N18_FILTERED_RESPONSE: 0 };
+    defaults.module_categories = { ...defaults.module_categories, BASIC: "nameserver_health" };
+
+    global.fetch.mockImplementation(reconcileMock(stored, defaults, { source: "database" }));
+    render(ScoringSettings);
+
+    await waitFor(() => {
+      expect(screen.getByText(/3 new default scoring entries/)).toBeInTheDocument();
+    });
+    expect(screen.getByText("N18_NO_RESPONSE = 0")).toBeInTheDocument();
+    expect(screen.getByText("N18_FILTERED_RESPONSE = 0")).toBeInTheDocument();
+    expect(screen.getByText("BASIC → nameserver_health")).toBeInTheDocument();
+  });
+
+  it("add missing defaults appends rows, enables save, and clears the banner", async () => {
+    const stored = defaultConfig();
+    const defaults = defaultConfig();
+    defaults.tag_penalties = { ...defaults.tag_penalties, N18_NO_RESPONSE: 0 };
+
+    global.fetch.mockImplementation(reconcileMock(stored, defaults, { source: "database" }));
+    render(ScoringSettings);
+
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Add missing defaults" })).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Save" })).toBeDisabled();
+
+    await fireEvent.click(screen.getByRole("button", { name: "Add missing defaults" }));
+
+    await waitFor(() => {
+      expect(screen.getByDisplayValue("N18_NO_RESPONSE")).toBeInTheDocument();
+    });
+    expect(screen.getByRole("button", { name: "Save" })).not.toBeDisabled();
+    expect(screen.queryByText(/new default scoring entries/)).toBeNull();
+  });
+
+  it("shows no banner when the saved config already has every default entry", async () => {
+    const cfg = defaultConfig();
+    global.fetch.mockImplementation(reconcileMock(cfg, defaultConfig(), { source: "database" }));
+    render(ScoringSettings);
+
+    await waitFor(() => {
+      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/new default scoring entries/)).toBeNull();
+    expect(screen.queryByRole("button", { name: "Add missing defaults" })).toBeNull();
+  });
+
+  it("does not surface missing defaults when readonly", async () => {
+    const stored = defaultConfig();
+    const defaults = defaultConfig();
+    defaults.tag_penalties = { ...defaults.tag_penalties, N18_NO_RESPONSE: 0 };
+
+    global.fetch.mockImplementation(reconcileMock(stored, defaults, { source: "cli_flag", readonly: true }));
+    render(ScoringSettings);
+
+    await waitFor(() => {
+      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("button", { name: "Add missing defaults" })).toBeNull();
+  });
 });

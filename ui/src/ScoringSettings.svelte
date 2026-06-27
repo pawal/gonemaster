@@ -31,6 +31,10 @@
   // Working copy - primitive fields bound directly.
   let draft = $state(null);
 
+  // Current compiled defaults, used to surface default entries missing from a
+  // saved config (e.g. new tag penalties shipped with a new testcase).
+  let defaultsConfig = $state(null);
+
   // Map fields displayed as ordered arrays.
   let tagRows = $state([]);    // [{tag, penalty}]
   let moduleRows = $state([]); // [{module, category}]
@@ -95,6 +99,25 @@
     )
   );
 
+  // Default entries absent from the current config (matched case-insensitively).
+  let missingDefaults = $derived.by(() => {
+    if (readonly || !defaultsConfig) return { tags: [], modules: [] };
+    const haveTags = new Set(
+      tagRows.map((r) => String(r.tag).trim().toLowerCase()).filter(Boolean)
+    );
+    const tags = Object.entries(defaultsConfig.tag_penalties || {})
+      .filter(([tag]) => !haveTags.has(tag.toLowerCase()))
+      .map(([tag, penalty]) => ({ tag, penalty }));
+    const haveModules = new Set(
+      moduleRows.map((r) => String(r.module).trim().toLowerCase()).filter(Boolean)
+    );
+    const modules = Object.entries(defaultsConfig.module_categories || {})
+      .filter(([module]) => !haveModules.has(module.toLowerCase()))
+      .map(([module, category]) => ({ module, category }));
+    return { tags, modules };
+  });
+  let missingCount = $derived(missingDefaults.tags.length + missingDefaults.modules.length);
+
   // ── load ──────────────────────────────────────────────────────────────────────
 
   async function loadConfig() {
@@ -107,6 +130,11 @@
       loaded = cloneConfig(resp.config);
       draft = cloneConfig(resp.config);
       configToRows(resp.config);
+      try {
+        defaultsConfig = await apiFetch("/scoring-config/defaults");
+      } catch (_) {
+        defaultsConfig = null;
+      }
     } catch (e) {
       loadError = e.message;
     } finally {
@@ -177,6 +205,18 @@
 
   // ── tag rows ──────────────────────────────────────────────────────────────────
 
+  // Append default entries missing from the config; operator reviews and saves.
+  function addMissingDefaults() {
+    if (missingDefaults.tags.length) {
+      tagRows = [...tagRows, ...missingDefaults.tags.map((m) => ({ tag: m.tag, penalty: m.penalty }))];
+    }
+    if (missingDefaults.modules.length) {
+      moduleRows = [...moduleRows, ...missingDefaults.modules.map((m) => ({ module: m.module, category: m.category }))];
+      showModuleMapping = true;
+    }
+    clearNotice();
+  }
+
   function addTagRow() {
     tagRows = [...tagRows, { tag: "", penalty: 0 }];
   }
@@ -217,6 +257,24 @@
     {$t("scoring_config_source_label")}:
     <span class="source-badge">{sourceLabel(source)}</span>
   </div>
+
+  {#if missingCount > 0}
+    <div class="defaults-banner" role="status">
+      <strong>{$t("scoring_defaults_available", { count: missingCount })}</strong>
+      <p class="defaults-banner-hint">{$t("scoring_defaults_available_hint")}</p>
+      <ul class="defaults-list">
+        {#each missingDefaults.tags as m}
+          <li><code>{m.tag} = {m.penalty}</code></li>
+        {/each}
+        {#each missingDefaults.modules as m}
+          <li><code>{m.module} → {m.category}</code></li>
+        {/each}
+      </ul>
+      <button type="button" class="btn-add" onclick={addMissingDefaults}>
+        {$t("scoring_add_missing_defaults")}
+      </button>
+    </div>
+  {/if}
 
   <!-- Severity, Category, Grade Bands, Bonus - single table so value column aligns across all sections -->
   <table class="config-table">
@@ -509,6 +567,27 @@
     font-size: 0.85em;
     opacity: 0.75;
     margin-bottom: 12px;
+  }
+  .defaults-banner {
+    border: 1px solid #fcd34d;
+    background: #fef9ee;
+    border-radius: 8px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    max-width: 480px;
+  }
+  .defaults-banner-hint {
+    margin: 6px 0 8px;
+    font-size: 0.85em;
+    color: var(--muted, #777);
+  }
+  .defaults-list {
+    margin: 0 0 10px;
+    padding-left: 1.2em;
+    font-size: 0.85em;
+  }
+  .defaults-list li {
+    margin: 2px 0;
   }
   .source-badge {
     font-weight: 500;

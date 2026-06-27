@@ -150,6 +150,7 @@
   "pub.tc.nameserver15": "Imenski strežnik ne razkriva različice programske opreme",
   "pub.tc.nameserver16": "Podpora možnosti EDNS NSID",
   "pub.tc.nameserver17": "Podpora za DNS Cookie",
+  "pub.tc.nameserver18": "Extended DNS Errors (EDE)",
   "pub.tc.syntax01": "Brez nedovoljenih znakov v imenu domene",
   "pub.tc.syntax02": "Brez vezaja na začetku ali koncu imena domene",
   "pub.tc.syntax03": "Brez dvojnega vezaja na mestih 3 in 4 imena domene",

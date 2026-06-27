@@ -96,6 +96,12 @@ Description:
 
 DNS Cookies (RFC 7873) are a lightweight anti-spoofing and anti-amplification feature for authoritative servers. This check sends a Client Cookie, inspects the Server Cookie that comes back, and confirms the server accepts the cookie it just issued.
 
+## Testcase nameserver18
+
+Description:
+
+Extended DNS Errors (RFC 8914) let a server attach a short, machine-readable reason to its answer. This check reads any such reason returned by your authoritative servers and reports what it says, flagging the few cases that point to a real problem: a server refusing or disowning the zone, a filtering device in the path, or a host behaving like a recursive resolver.
+
 ## Tag IS_A_RECURSOR
 
 Header: Nameserver acts as open recursor
@@ -415,3 +421,51 @@ Header: No response to DNS Cookie probe
 Description:
 
 A nameserver did not answer the DNS Cookie probe at all. The cookie capability cannot be assessed for that server.
+
+## Tag N18_NO_EXTENDED_ERROR
+
+Header: No extended error
+
+Description:
+
+A nameserver answered cleanly without attaching an Extended DNS Error (RFC 8914). This is the normal, healthy case.
+
+## Tag N18_EXTENDED_ERROR_REPORTED
+
+Header: Server sent an extended error
+
+Description:
+
+A nameserver attached an informational Extended DNS Error (RFC 8914) to its answer. This is usually not a zone fault, but it is worth seeing what the server reported.
+
+## Tag N18_SERVER_ERROR_REPORTED
+
+Header: Server reported a problem
+
+Description:
+
+A nameserver reported, via an Extended DNS Error (RFC 8914), that it is prohibited, not authoritative, or does not support the query. For a server listed for your domain this is a real configuration problem.
+
+## Tag N18_RESOLVER_BEHAVIOR_REPORTED
+
+Header: Resolver-style error from this server
+
+Description:
+
+A host listed as authoritative returned an Extended DNS Error (RFC 8914) of a kind normally produced by a recursive resolver. This may mean a resolver is answering on an authoritative address, or simply an unusual server configuration.
+
+## Tag N18_FILTERED_RESPONSE
+
+Header: Filtering detected
+
+Description:
+
+An Extended DNS Error (RFC 8914) indicates that a blocking or filtering policy device sits between us and the nameserver, so its answers cannot be fully trusted.
+
+## Tag N18_NO_RESPONSE
+
+Header: No response
+
+Description:
+
+A nameserver did not answer the Extended DNS Error probe at all.

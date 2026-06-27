@@ -150,6 +150,7 @@
   "pub.tc.nameserver15": "Navnetjeneren avslører ikke programvareversjon",
   "pub.tc.nameserver16": "Støtte for EDNS NSID-opsjon",
   "pub.tc.nameserver17": "Støtte for DNS Cookie",
+  "pub.tc.nameserver18": "Extended DNS Errors (EDE)",
   "pub.tc.syntax01": "Ingen ugyldige tegn i domenenavnet",
   "pub.tc.syntax02": "Ingen bindestrek i begynnelsen eller slutten av domenenavnet",
   "pub.tc.syntax03": "Ingen dobbel bindestrek i posisjon 3 og 4 i domenenavnet",

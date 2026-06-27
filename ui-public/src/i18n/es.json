@@ -150,6 +150,7 @@
   "pub.tc.nameserver15": "El servidor de nombres no revela la versión del software",
   "pub.tc.nameserver16": "Soporte de la opción EDNS NSID",
   "pub.tc.nameserver17": "Soporte de DNS Cookie",
+  "pub.tc.nameserver18": "Extended DNS Errors (EDE)",
   "pub.tc.syntax01": "Sin caracteres ilegales en el nombre de dominio",
   "pub.tc.syntax02": "Sin guión al inicio o al final del nombre de dominio",
   "pub.tc.syntax03": "Sin doble guión en las posiciones 3 y 4 del nombre de dominio",

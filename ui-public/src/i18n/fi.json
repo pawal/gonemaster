@@ -150,6 +150,7 @@
   "pub.tc.nameserver15": "Nimipalvelin ei paljasta ohjelmistoversiota",
   "pub.tc.nameserver16": "EDNS NSID -option tuki",
   "pub.tc.nameserver17": "DNS Cookie -tuki",
+  "pub.tc.nameserver18": "Extended DNS Errors (EDE)",
   "pub.tc.syntax01": "Ei kiellettyjä merkkejä verkkotunnuksessa",
   "pub.tc.syntax02": "Ei yhdysviivaa verkkotunnuksen alussa tai lopussa",
   "pub.tc.syntax03": "Ei kaksoisyhdysviivaa kohdissa 3 ja 4 verkkotunnuksessa",

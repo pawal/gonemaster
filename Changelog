@@ -2,6 +2,23 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.5.6] - 2026-06-27
+
+Added Nameserver18 test case for Extended DNS Errors (EDE, RFC 8914), reported as score-neutral diagnostics. The admin UI can now pull new default scoring entries into a saved configuration. Some engine and server fixes.
+
+### Added
+
+- engine: add nameserver18 Extended DNS Errors (EDE, RFC 8914) testcase
+- nameserver18: classify observed EDE codes into server-error, resolver-behavior, filtered, and benign findings
+- nameserver18: add spec, tag catalog, zero-penalty scoring defaults, and i18n strings
+- admin-ui, ui-public, analysis-ui: add nameserver18 Extended DNS Errors testcase title and tag explanations
+- admin-ui: add default scoring entries missing from a saved scoring configuration (e.g. the new N18 tag penalties)
+
+### Changed
+
+- server: gate profile compatibility on schema_version so mark-as-reviewed clears the warning
+- engine: render opaque NSID as dig-style hex so bytes survive JSON (fixes #87)
+
 ## [v1.5.5] - 2026-06-24
 
 New non-global query guard skips queries to private/special-use nameserver addresses by default and tags them `NON_GLOBAL_QUERY_BLOCKED`. Private/internal deployments must opt in via `net.allow_non_global_targets` (profile), `--allow-non-global` (CLI/Nagios), or the admin UI toggle. Several test case improvements: zone10 apex CNAME/DNAME detection, delegation01 missing in-bailiwick glue, consistency01/04 SOA and NS TTL consistency, and basic01 DNAME alias handling.

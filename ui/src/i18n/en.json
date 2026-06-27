@@ -678,6 +678,7 @@
   "tc.nameserver15": "Name server does not reveal software version",
   "tc.nameserver16": "EDNS NSID option support",
   "tc.nameserver17": "DNS Cookie support",
+  "tc.nameserver18": "Extended DNS Errors (EDE)",
   "tc.syntax01": "No illegal characters in the domain name",
   "tc.syntax02": "No hyphen at the start or end of the domain name",
   "tc.syntax03": "No double hyphen in position 3 and 4 of the domain name",

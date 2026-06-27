@@ -281,6 +281,7 @@
   "tc.nameserver15": "Navnetjeneren avslører ikke programvareversjon",
   "tc.nameserver16": "Støtte for EDNS NSID-opsjon",
   "tc.nameserver17": "Støtte for DNS Cookie",
+  "tc.nameserver18": "Extended DNS Errors (EDE)",
   "tc.syntax01": "Ingen ugyldige tegn i domenenavnet",
   "tc.syntax02": "Ingen bindestrek i begynnelsen eller slutten av domenenavnet",
   "tc.syntax03": "Ingen dobbel bindestrek i posisjon 3 og 4 i domenenavnet",

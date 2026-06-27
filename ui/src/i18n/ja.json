@@ -281,6 +281,7 @@
   "tc.nameserver15": "ネームサーバーがソフトウェアバージョンを公開しない",
   "tc.nameserver16": "EDNS NSIDオプションのサポート",
   "tc.nameserver17": "DNS Cookie のサポート",
+  "tc.nameserver18": "Extended DNS Errors (EDE)",
   "tc.syntax01": "ドメイン名に不正な文字がない",
   "tc.syntax02": "ドメイン名の先頭または末尾にハイフンがない",
   "tc.syntax03": "ドメイン名の3番目と4番目の位置にダブルハイフンがない",

@@ -678,6 +678,7 @@
   "tc.nameserver15": "Nameserver offenbart keine Software-Version",
   "tc.nameserver16": "EDNS-NSID-Option-Unterstützung",
   "tc.nameserver17": "DNS-Cookie-Unterstützung",
+  "tc.nameserver18": "Extended DNS Errors (EDE)",
   "tc.syntax01": "Keine unzulässigen Zeichen im Domainnamen",
   "tc.syntax02": "Kein Bindestrich am Anfang oder Ende des Domainnamens",
   "tc.syntax03": "Kein doppelter Bindestrich an Position 3 und 4 des Domainnamens",

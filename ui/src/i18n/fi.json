@@ -281,6 +281,7 @@
   "tc.nameserver15": "Nimipalvelin ei paljasta ohjelmistoversiota",
   "tc.nameserver16": "EDNS NSID -option tuki",
   "tc.nameserver17": "DNS Cookie -tuki",
+  "tc.nameserver18": "Extended DNS Errors (EDE)",
   "tc.syntax01": "Ei kiellettyjä merkkejä verkkotunnuksessa",
   "tc.syntax02": "Ei yhdysviivaa verkkotunnuksen alussa tai lopussa",
   "tc.syntax03": "Ei kaksoisyhdysviivaa kohdissa 3 ja 4 verkkotunnuksessa",

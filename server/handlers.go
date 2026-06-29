@@ -932,7 +932,7 @@ func (s *Server) handleJobsPurge(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]int64{"purged_jobs": n})
 }
 
-var sitemapLangs = []string{"da", "de", "en", "es", "fi", "fr", "ja", "nb", "sl", "sv"}
+var sitemapLangs = []string{"cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "sl", "sv"}
 
 func resolvePublicURL(configured string, r *http.Request) string {
 	if configured != "" {

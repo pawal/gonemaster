@@ -93,6 +93,7 @@
     fr: "Français",
     ja: "日本語",
     nb: "Norsk bokmål",
+    nl: "Nederlands",
     sl: "Slovenščina",
     sv: "Svenska"
   };

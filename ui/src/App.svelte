@@ -84,6 +84,7 @@
   // in localStorage, and auto-detect from the browser language on first visit.
   const localeKey = "gonemaster.ui.locale.v1";
   const localeDisplayNames = {
+    cs: "Čeština",
     da: "Dansk",
     de: "Deutsch",
     en: "English",

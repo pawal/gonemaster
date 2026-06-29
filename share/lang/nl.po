@@ -1,0 +1,2360 @@
+msgid ""
+msgstr ""
+"Project-Id-Version: 1.0.0\n"
+"Report-Msgid-Bugs-To: pawal@amplitut.de\n"
+"POT-Creation-Date: 2024-12-12 09:02+0100\n"
+"PO-Revision-Date: 2026-06-29 00:00+0000\n"
+"Last-Translator: pawal@amplitut.de\n"
+"Language-Team: Gonemaster Team\n"
+"Language: nl\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+msgid "Ambiguous downcasing of character \"{unicode_name}\" in the domain name. Use all lower case instead."
+msgstr "Dubbelzinnige omzetting naar kleine letters van teken \"{unicode_name}\" in de domeinnaam. Gebruik in plaats daarvan alleen kleine letters."
+
+msgid "Domain name is too long (more than 253 characters with no final dot)."
+msgstr "Domeinnaam is te lang (meer dan 253 tekens zonder afsluitende punt)."
+
+msgid "Domain name is empty."
+msgstr "Domeinnaam is leeg."
+
+msgid "Domain name starts with dot."
+msgstr "Domeinnaam begint met een punt."
+
+msgid "Domain name has an ASCII label (\"{label}\") with a character not permitted."
+msgstr "Domeinnaam heeft een ASCII-label (\"{label}\") met een niet-toegestaan teken."
+
+msgid "Domain name has a non-ASCII label (\"{label}\") which is not a valid U-label."
+msgstr "Domeinnaam heeft een niet-ASCII-label (\"{label}\") dat geen geldig U-label is."
+
+msgid "Domain name has repeated dots."
+msgstr "Domeinnaam heeft herhaalde punten."
+
+msgid "Domain name has a label that is too long (more than 63 characters), \"{label}\"."
+msgstr "Domeinnaam heeft een label dat te lang is (meer dan 63 tekens), \"{label}\"."
+
+msgctxt "ADDRESS:NAMESERVER_IP_WITHOUT_REVERSE"
+msgid "Nameserver {ns} has an IP address ({address}) without PTR configured."
+msgstr "Naamserver {ns} heeft een IP-adres ({address}) zonder geconfigureerde PTR."
+
+msgctxt "ADDRESS:NAMESERVER_IP_PTR_MISMATCH"
+msgid "Nameserver {ns} has an IP address ({address}) with mismatched PTR result ({ptr_names})."
+msgstr "Naamserver {ns} heeft een IP-adres ({address}) met een niet-overeenkomend PTR-resultaat ({ptr_names})."
+
+msgctxt "ADDRESS:NAMESERVERS_IP_WITH_REVERSE"
+msgid "Reverse DNS entry exists for each Nameserver IP address."
+msgstr "Voor elk IP-adres van een naamserver bestaat er een reverse DNS-vermelding."
+
+msgctxt "ADDRESS:NAMESERVER_IP_PTR_MATCH"
+msgid "Every reverse DNS entry matches name server name."
+msgstr "Elke reverse DNS-vermelding komt overeen met de naam van de naamserver."
+
+msgctxt "ADDRESS:NO_RESPONSE_PTR_QUERY"
+msgid "No response from nameserver(s) on PTR query ({domain})."
+msgstr "Geen antwoord van naamserver(s) op PTR-query ({domain})."
+
+msgctxt "ADDRESS:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "BASIC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "CONNECTIVITY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "CONSISTENCY:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "DELEGATION:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "DNSSEC:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "NAMESERVER:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "SYNTAX:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "ZONE:TEST_CASE_END"
+msgid "TEST_CASE_END {testcase}."
+msgstr "TEST_CASE_END {testcase}."
+
+msgctxt "ADDRESS:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "BASIC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "CONNECTIVITY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "CONSISTENCY:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "DELEGATION:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "DNSSEC:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "NAMESERVER:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "SYNTAX:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "ZONE:TEST_CASE_START"
+msgid "TEST_CASE_START {testcase}."
+msgstr "TEST_CASE_START {testcase}."
+
+msgctxt "BASIC:A_QUERY_NO_RESPONSES"
+msgid "Nameservers did not respond to A query."
+msgstr "Naamservers reageerden niet op de A-query."
+
+msgctxt "BASIC:B01_CHILD_IS_ALIAS"
+msgid "\"{domain_child}\" is not a zone. It is an alias for \"{domain_target}\". Run a test for \"{domain_target}\" instead. Returned from name servers \"{servers}\"."
+msgstr "\"{domain_child}\" is geen zone. Het is een alias voor \"{domain_target}\". Voer in plaats daarvan een test uit voor \"{domain_target}\". Geretourneerd door naamservers \"{servers}\"."
+
+msgctxt "BASIC:B01_CHILD_FOUND"
+msgid "The zone \"{domain}\" is found."
+msgstr "De zone \"{domain}\" is gevonden."
+
+msgctxt "BASIC:B01_INCONSISTENT_ALIAS"
+msgid "The alias for \"{domain}\" is inconsistent between name servers."
+msgstr "De alias voor \"{domain}\" is inconsistent tussen naamservers."
+
+msgctxt "BASIC:B01_INCONSISTENT_DELEGATION"
+msgid "The name servers for parent zone \"{domain_parent}\" give inconsistent delegation of \"{domain_child}\". Returned from name servers \"{servers}\"."
+msgstr "De naamservers voor de bovenliggende zone \"{domain_parent}\" geven een inconsistente delegatie van \"{domain_child}\". Geretourneerd door naamservers \"{servers}\"."
+
+msgctxt "BASIC:B01_NO_CHILD"
+msgid "\"{domain_child}\" does not exist as a DNS zone. Try to test \"{domain_super}\" instead."
+msgstr "\"{domain_child}\" bestaat niet als DNS-zone. Probeer in plaats daarvan \"{domain_super}\" te testen."
+
+msgctxt "BASIC:B01_PARENT_DISREGARDED"
+msgid "This is a test of an undelegated domain so finding the parent zone is disregarded."
+msgstr "Dit is een test van een niet-gedelegeerd domein, dus het vinden van de bovenliggende zone wordt buiten beschouwing gelaten."
+
+msgctxt "BASIC:B01_PARENT_FOUND"
+msgid "The parent zone is \"{domain}\" as returned from name servers \"{servers}\"."
+msgstr "De bovenliggende zone is \"{domain}\", zoals geretourneerd door naamservers \"{servers}\"."
+
+msgctxt "BASIC:B01_PARENT_NOT_FOUND"
+msgid "The parent zone cannot be found."
+msgstr "De bovenliggende zone kan niet worden gevonden."
+
+msgctxt "BASIC:B01_PARENT_NXDOMAIN_HIDES_DELEGATION"
+msgid "Parent nameserver \"{ns}/{address}\" returns NXDOMAIN for \"{query_name}\" but also has a delegation for \"{domain_child}\". This violates RFC 8020. The zone is still testable through the delegation, but the parent operator should fix this."
+msgstr "Bovenliggende naamserver \"{ns}/{address}\" retourneert NXDOMAIN voor \"{query_name}\", maar heeft ook een delegatie voor \"{domain_child}\". Dit is in strijd met RFC 8020. De zone is nog steeds testbaar via de delegatie, maar de beheerder van de bovenliggende zone zou dit moeten oplossen."
+
+msgctxt "BASIC:B01_PARENT_UNDETERMINED"
+msgid "The parent zone cannot be determined on name servers \"{servers}\"."
+msgstr "De bovenliggende zone kan niet worden bepaald op naamservers \"{servers}\"."
+
+msgctxt "BASIC:B01_ROOT_HAS_NO_PARENT"
+msgid "This is a test of the root zone which has no parent zone."
+msgstr "Dit is een test van de rootzone, die geen bovenliggende zone heeft."
+
+msgctxt "BASIC:B01_SERVER_ZONE_ERROR"
+msgid "Unexpected response on query for \"{query_name}\" with query type \"{query_type}\" to \"{ns}/{address}\"."
+msgstr "Onverwacht antwoord op de query voor \"{query_name}\" met querytype \"{query_type}\" naar \"{ns}/{address}\"."
+
+msgctxt "BASIC:B02_AUTH_RESPONSE_SOA"
+msgid "Authoritative answer on SOA query for \"{domain}\" is returned by name servers \"{servers}\"."
+msgstr "Autoritatief antwoord op de SOA-query voor \"{domain}\" wordt geretourneerd door naamservers \"{servers}\"."
+
+msgctxt "BASIC:B02_NO_DELEGATION"
+msgid "There is no delegation (name servers) for \"{domain}\" which means it does not exist as a zone."
+msgstr "Er is geen delegatie (naamservers) voor \"{domain}\", wat betekent dat het niet als zone bestaat."
+
+msgctxt "BASIC:B02_NO_WORKING_NS"
+msgid "There is no working name server for \"{domain}\" so it is unreachable."
+msgstr "Er is geen werkende naamserver voor \"{domain}\", dus het is onbereikbaar."
+
+msgctxt "BASIC:B02_NS_BROKEN"
+msgid "Broken response from name server \"{ns}\" on an SOA query."
+msgstr "Onjuist antwoord van naamserver \"{ns}\" op een SOA-query."
+
+msgctxt "BASIC:B02_NS_NOT_AUTH"
+msgid "Name server \"{ns}\" does not give an authoritative answer on an SOA query."
+msgstr "Naamserver \"{ns}\" geeft geen autoritatief antwoord op een SOA-query."
+
+msgctxt "BASIC:B02_NS_NO_IP_ADDR"
+msgid "Name server \"{ns}\" cannot be resolved into an IP address."
+msgstr "Naamserver \"{ns}\" kan niet worden herleid naar een IP-adres."
+
+msgctxt "BASIC:B02_NS_NO_RESPONSE"
+msgid "Name server \"{ns}\" does not respond to an SOA query."
+msgstr "Naamserver \"{ns}\" reageert niet op een SOA-query."
+
+msgctxt "BASIC:B02_UNEXPECTED_RCODE"
+msgid "Name server \"{ns}\" responds with an unexpected RCODE name (\"{rcode}\") on an SOA query."
+msgstr "Naamserver \"{ns}\" reageert met een onverwachte RCODE-naam (\"{rcode}\") op een SOA-query."
+
+msgctxt "ADDRESS:CNAME_CHAIN_TOO_LONG"
+msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
+msgstr "De CNAME-keten voor {query_name} overschrijdt de maximaal toegestane lengte."
+
+msgctxt "BASIC:CNAME_CHAIN_TOO_LONG"
+msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
+msgstr "De CNAME-keten voor {query_name} overschrijdt de maximaal toegestane lengte."
+
+msgctxt "CONNECTIVITY:CNAME_CHAIN_TOO_LONG"
+msgid "CNAME chain for {query_name} exceeds the maximum allowed length."
+msgstr "De CNAME-keten voor {query_name} overschrijdt de maximaal toegestane lengte."
+
+msgctxt "ADDRESS:CNAME_TARGET_UNRESOLVED"
+msgid "CNAME target {cname_target} for {query_name} could not be resolved."
+msgstr "Het CNAME-doel {cname_target} voor {query_name} kan niet worden herleid."
+
+msgctxt "BASIC:CNAME_TARGET_UNRESOLVED"
+msgid "CNAME target {cname_target} for {query_name} could not be resolved."
+msgstr "Het CNAME-doel {cname_target} voor {query_name} kon niet worden herleid."
+
+msgctxt "CONNECTIVITY:CNAME_TARGET_UNRESOLVED"
+msgid "CNAME target {cname_target} for {query_name} could not be resolved."
+msgstr "Het CNAME-doel {cname_target} voor {query_name} kon niet worden herleid."
+
+msgctxt "ADDRESS:CNAME_TOO_MANY_RECORDS"
+msgid "Too many CNAME records in the answer for {query_name}."
+msgstr "Te veel CNAME-records in het antwoord voor {query_name}."
+
+msgctxt "BASIC:CNAME_TOO_MANY_RECORDS"
+msgid "Too many CNAME records in the answer for {query_name}."
+msgstr "Te veel CNAME-records in het antwoord voor {query_name}."
+
+msgctxt "CONNECTIVITY:CNAME_TOO_MANY_RECORDS"
+msgid "Too many CNAME records in the answer for {query_name}."
+msgstr "Te veel CNAME-records in het antwoord voor {query_name}."
+
+msgctxt "BASIC:HAS_A_RECORDS"
+msgid "Nameserver {ns}/{address} returned \"A\" record(s) for {domain}."
+msgstr "Naamserver {ns}/{address} retourneerde \"A\"-record(s) voor {domain}."
+
+msgctxt "BASIC:HAS_NAMESERVER_NO_WWW_A_TEST"
+msgid "Functional nameserver found. \"A\" query for www.{zname} test skipped."
+msgstr "Functionele naamserver gevonden. \"A\"-query voor www.{zname} test overgeslagen."
+
+msgctxt "BASIC:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is uitgeschakeld, \"{query_type}\"-query wordt niet verzonden naar {ns}/{address}."
+
+msgctxt "CONNECTIVITY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is uitgeschakeld; \"{query_type}\"-query wordt niet naar {ns}/{address} gestuurd."
+
+msgctxt "CONSISTENCY:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is uitgeschakeld, \"{query_type}\"-query wordt niet verstuurd naar {ns}/{address}."
+
+msgctxt "DELEGATION:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is uitgeschakeld, er wordt geen \"{query_type}\"-query naar {ns}/{address} gestuurd."
+
+msgctxt "DNSSEC:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is uitgeschakeld, \"{query_type}\"-query wordt niet naar {ns}/{address} gestuurd."
+
+msgctxt "NAMESERVER:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is uitgeschakeld, \"{query_type}\"-query wordt niet naar {ns}/{address} gestuurd."
+
+msgctxt "SYNTAX:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is uitgeschakeld, \"{query_type}\"-query wordt niet verzonden naar {ns}/{address}."
+
+msgctxt "ZONE:IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is uitgeschakeld, \"{query_type}\"-query wordt niet verzonden naar {ns}/{address}."
+
+msgctxt "SYSTEM:SKIP_IPV4_DISABLED"
+msgid "IPv4 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is uitgeschakeld, \"{query_type}\"-query wordt niet verstuurd naar {ns}/{address}."
+
+msgctxt "BASIC:IPV4_ENABLED"
+msgid "IPv4 is enabled, can send \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv4 is ingeschakeld, \"{query_type}\"-query kan worden verzonden naar {ns}/{address}."
+
+msgctxt "BASIC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is uitgeschakeld, \"{query_type}\"-query wordt niet verzonden naar {ns}/{address}."
+
+msgctxt "CONNECTIVITY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is uitgeschakeld; \"{query_type}\"-query wordt niet naar {ns}/{address} gestuurd."
+
+msgctxt "CONSISTENCY:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is uitgeschakeld, \"{query_type}\"-query wordt niet verstuurd naar {ns}/{address}."
+
+msgctxt "DELEGATION:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is uitgeschakeld, er wordt geen \"{query_type}\"-query naar {ns}/{address} gestuurd."
+
+msgctxt "DNSSEC:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is uitgeschakeld, \"{query_type}\"-query wordt niet naar {ns}/{address} gestuurd."
+
+msgctxt "NAMESERVER:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is uitgeschakeld, \"{query_type}\"-query wordt niet naar {ns}/{address} gestuurd."
+
+msgctxt "SYNTAX:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is uitgeschakeld, \"{query_type}\"-query wordt niet verzonden naar {ns}/{address}."
+
+msgctxt "ZONE:IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is uitgeschakeld, \"{query_type}\"-query wordt niet verzonden naar {ns}/{address}."
+
+msgctxt "SYSTEM:SKIP_IPV6_DISABLED"
+msgid "IPv6 is disabled, not sending \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is uitgeschakeld, \"{query_type}\"-query wordt niet verstuurd naar {ns}/{address}."
+
+msgctxt "SYSTEM:ERROR_CACHE_SKIP"
+msgid "Skipping {query_type} query to {query_name} ({query_class}) at {address} over {protocol} for {ttl_seconds}s after network error."
+msgstr "{query_type}-query naar {query_name} ({query_class}) op {address} via {protocol} wordt {ttl_seconds}s overgeslagen na een netwerkfout."
+
+msgctxt "BASIC:IPV6_ENABLED"
+msgid "IPv6 is enabled, can send \"{query_type}\" query to {ns}/{address}."
+msgstr "IPv6 is ingeschakeld, \"{query_type}\"-query kan worden verzonden naar {ns}/{address}."
+
+msgctxt "BASIC:NO_A_RECORDS"
+msgid "Nameserver {ns}/{address} did not return \"A\" record(s) for {domain}."
+msgstr "Naamserver {ns}/{address} retourneerde geen \"A\"-record(s) voor {domain}."
+
+msgctxt "CONNECTIVITY:CN01_IPV4_DISABLED"
+msgid "IPv4 is disabled. No DNS queries are sent to these name servers: \"{servers}\"."
+msgstr "IPv4 is uitgeschakeld. Er worden geen DNS-query's naar deze naamservers gestuurd: \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN01_IPV6_DISABLED"
+msgid "IPv6 is disabled. No DNS queries are sent to these name servers: \"{servers}\"."
+msgstr "IPv6 is uitgeschakeld. Er worden geen DNS-query's naar deze naamservers gestuurd: \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN01_MISSING_NS_RECORD_UDP"
+msgid "Nameserver {ns}/{address} responds to a NS query with no NS records in the answer section over UDP."
+msgstr "Naamserver {ns}/{address} beantwoordt een NS-query over UDP zonder NS-records in de antwoordsectie."
+
+msgctxt "CONNECTIVITY:CN01_MISSING_SOA_RECORD_UDP"
+msgid "Nameserver {ns}/{address} responds to a SOA query with no SOA records in the answer section over UDP."
+msgstr "Naamserver {ns}/{address} beantwoordt een SOA-query over UDP zonder SOA-records in de antwoordsectie."
+
+msgctxt "CONNECTIVITY:CN01_NO_RESPONSE_NS_QUERY_UDP"
+msgid "Nameserver {ns}/{address} does not respond to NS queries over UDP."
+msgstr "Naamserver {ns}/{address} reageert niet op NS-query's over UDP."
+
+msgctxt "CONNECTIVITY:CN01_NO_RESPONSE_SOA_QUERY_UDP"
+msgid "Nameserver {ns}/{address} does not respond to SOA queries over UDP."
+msgstr "Naamserver {ns}/{address} reageert niet op SOA-query's over UDP."
+
+msgctxt "CONNECTIVITY:CN01_NO_RESPONSE_UDP"
+msgid "Nameserver {ns}/{address} does not respond to any queries over UDP."
+msgstr "Naamserver {ns}/{address} reageert op geen enkele query over UDP."
+
+msgctxt "CONNECTIVITY:CN01_NS_RECORD_NOT_AA_UDP"
+msgid "Nameserver {ns}/{address} does not give an authoritative response on an NS query over UDP."
+msgstr "Naamserver {ns}/{address} geeft geen autoritatief antwoord op een NS-query over UDP."
+
+msgctxt "CONNECTIVITY:CN01_OK_UDP"
+msgid "The following nameservers respond correctly to SOA and NS queries over UDP: \"{servers}\"."
+msgstr "De volgende naamservers reageren correct op SOA- en NS-query's over UDP: \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN01_SOA_RECORD_NOT_AA_UDP"
+msgid "Nameserver {ns}/{address} does not give an authoritative response on an SOA query over UDP."
+msgstr "Naamserver {ns}/{address} geeft geen autoritatief antwoord op een SOA-query over UDP."
+
+msgctxt "CONNECTIVITY:CN01_UNEXPECTED_RCODE_NS_QUERY_UDP"
+msgid "Nameserver {ns}/{address} responds with an unexpected RCODE ({rcode}) on an NS query over UDP."
+msgstr "Naamserver {ns}/{address} reageert met een onverwachte RCODE ({rcode}) op een NS-query over UDP."
+
+msgctxt "CONNECTIVITY:CN01_UNEXPECTED_RCODE_SOA_QUERY_UDP"
+msgid "Nameserver {ns}/{address} responds with an unexpected RCODE ({rcode}) on an SOA query over UDP."
+msgstr "Naamserver {ns}/{address} reageert met een onverwachte RCODE ({rcode}) op een SOA-query over UDP."
+
+msgctxt "CONNECTIVITY:CN01_WRONG_NS_RECORD_UDP"
+msgid "Nameserver {ns}/{address} responds with a wrong owner name ({domain_found} instead of {domain_expected}) on NS queries over UDP."
+msgstr "Naamserver {ns}/{address} reageert met een verkeerde eigenaarsnaam ({domain_found} in plaats van {domain_expected}) op NS-query's over UDP."
+
+msgctxt "CONNECTIVITY:CN01_WRONG_SOA_RECORD_UDP"
+msgid "Nameserver {ns}/{address} responds with a wrong owner name ({domain_found} instead of {domain_expected}) on SOA queries over UDP."
+msgstr "Naamserver {ns}/{address} reageert met een verkeerde eigenaarsnaam ({domain_found} in plaats van {domain_expected}) op SOA-query's over UDP."
+
+msgctxt "CONNECTIVITY:CN04_ERROR_PREFIX_DATABASE"
+msgid "Prefix database error for IP address {address}."
+msgstr "Fout in de prefixdatabase voor IP-adres {address}."
+
+msgctxt "CONNECTIVITY:CN04_IPV4_DIFFERENT_PREFIX"
+msgid "The following name server(s) are announced in unique IPv4 prefix(es): \"{servers}\""
+msgstr "De volgende naamserver(s) worden aangekondigd in een unieke IPv4-prefix(es): \"{servers}\""
+
+msgctxt "CONNECTIVITY:CN04_IPV4_SAME_PREFIX"
+msgid "The following name server(s) are announced in the same IPv4 prefix ({prefixes}): \"{servers}\""
+msgstr "De volgende naamserver(s) worden aangekondigd in dezelfde IPv4-prefix ({prefixes}): \"{servers}\""
+
+msgctxt "CONNECTIVITY:CN04_IPV4_SINGLE_PREFIX"
+msgid "All name server(s) IPv4 address(es) are announced in the same IPv4 prefix."
+msgstr "Alle IPv4-adres(sen) van de naamserver(s) worden aangekondigd in dezelfde IPv4-prefix."
+
+msgctxt "CONNECTIVITY:CN04_IPV6_DIFFERENT_PREFIX"
+msgid "The following name server(s) are announced in unique IPv6 prefix(es): \"{servers}\""
+msgstr "De volgende naamserver(s) worden aangekondigd in een unieke IPv6-prefix(es): \"{servers}\""
+
+msgctxt "CONNECTIVITY:CN04_IPV6_SAME_PREFIX"
+msgid "The following name server(s) are announced in the same IPv6 prefix ({prefixes}): \"{servers}\""
+msgstr "De volgende naamserver(s) worden aangekondigd in dezelfde IPv6-prefix ({prefixes}): \"{servers}\""
+
+msgctxt "CONNECTIVITY:CN04_IPV6_SINGLE_PREFIX"
+msgid "All name server(s) IPv6 address(es) are announced in the same IPv6 prefix."
+msgstr "Alle IPv6-adres(sen) van de naamserver(s) worden aangekondigd in dezelfde IPv6-prefix."
+
+msgctxt "CONNECTIVITY:ERROR_ASN_DATABASE"
+msgid "ASN Database error. No data to analyze for {address}."
+msgstr "Fout in de ASN-database. Geen gegevens om te analyseren voor {address}."
+
+msgctxt "CONNECTIVITY:EMPTY_ASN_SET"
+msgid "AS database returned no informations for IP address {address}."
+msgstr "De AS-database gaf geen informatie terug voor IP-adres {address}."
+
+msgctxt "CONNECTIVITY:IPV4_SAME_ASN"
+msgid "All authoritative nameservers have their IPv4 addresses in the same AS set ({asns})."
+msgstr "Alle autoritatieve naamservers hebben hun IPv4-adressen in dezelfde AS-set ({asns})."
+
+msgctxt "CONNECTIVITY:IPV4_ONE_ASN"
+msgid "All authoritative nameservers have their IPv4 addresses in the same AS ({asn})."
+msgstr "Alle autoritatieve naamservers hebben hun IPv4-adressen in hetzelfde AS ({asn})."
+
+msgctxt "CONNECTIVITY:IPV4_DIFFERENT_ASN"
+msgid "At least two IPv4 addresses of the authoritative nameservers are announced by different AS sets. A merged list of all AS: ({asns})."
+msgstr "Minstens twee IPv4-adressen van de autoritatieve naamservers worden aangekondigd door verschillende AS-sets. Een samengevoegde lijst van alle AS: ({asns})."
+
+msgctxt "CONNECTIVITY:IPV6_SAME_ASN"
+msgid "All authoritative nameservers have their IPv6 addresses in the same AS set ({asns})."
+msgstr "Alle autoritatieve naamservers hebben hun IPv6-adressen in dezelfde AS-set ({asns})."
+
+msgctxt "CONNECTIVITY:IPV6_ONE_ASN"
+msgid "All authoritative nameservers have their IPv6 addresses in the same AS ({asn})."
+msgstr "Alle autoritatieve naamservers hebben hun IPv6-adressen in hetzelfde AS ({asn})."
+
+msgctxt "CONNECTIVITY:IPV6_DIFFERENT_ASN"
+msgid "At least two IPv6 addresses of the authoritative nameservers are announced by different AS sets. A merged list of all AS: ({asns})."
+msgstr "Minstens twee IPv6-adressen van de autoritatieve naamservers worden aangekondigd door verschillende AS-sets. Een samengevoegde lijst van alle AS: ({asns})."
+
+msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_BY"
+msgid "Name server IP address \"{address}\" is announced by ASN {asns}."
+msgstr "IP-adres \"{address}\" van de naamserver wordt aangekondigd door ASN {asns}."
+
+msgctxt "CONSISTENCY:ADDRESSES_MATCH"
+msgid "Glue records are consistent between glue and authoritative data."
+msgstr "Glue-records zijn consistent tussen glue en autoritatieve data."
+
+msgctxt "CONSISTENCY:CHILD_NS_FAILED"
+msgid "Unexpected or erroneous reply from {ns}/{address}."
+msgstr "Onverwacht of foutief antwoord van {ns}/{address}."
+
+msgctxt "CONSISTENCY:CHILD_ZONE_LAME"
+msgid "Lame delegation."
+msgstr "Lame delegation."
+
+msgctxt "CONSISTENCY:EXTRA_ADDRESS_CHILD"
+msgid "Child has extra nameserver IP address(es) not listed at parent ({addresses})."
+msgstr "De onderliggende zone heeft extra naamserver-IP-adres(sen) die niet bij de bovenliggende zone staan vermeld ({addresses})."
+
+msgctxt "CONSISTENCY:IN_BAILIWICK_ADDR_MISMATCH"
+msgid "In-bailiwick name server listed at parent has a mismatch between glue data at parent ({parent_servers}) and any equivalent address record in child zone ({zone_servers})."
+msgstr "Een in-bailiwick-naamserver die bij de bovenliggende zone staat vermeld, heeft een verschil tussen de glue-data bij de bovenliggende zone ({parent_servers}) en een eventueel overeenkomend adresrecord in de onderliggende zone ({zone_servers})."
+
+msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
+msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
+msgstr "Naamservers leveren de NS-records van de zone met {count} verschillende TTL-waarden."
+
+msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
+msgid "Found {count} NS set(s)."
+msgstr "{count} set(s) naamservers gevonden."
+
+msgctxt "CONSISTENCY:MULTIPLE_SOA_MNAMES"
+msgid "Saw {count} SOA mname."
+msgstr "{count} SOA-mname gezien."
+
+msgctxt "CONSISTENCY:MULTIPLE_SOA_RNAMES"
+msgid "Found {count} SOA rname(s)."
+msgstr "{count} SOA-rname(s) gevonden."
+
+msgctxt "CONSISTENCY:MULTIPLE_SOA_SERIALS"
+msgid "Found {count} SOA serial number(s)."
+msgstr "{count} SOA-serienummer(s) gevonden."
+
+msgctxt "CONSISTENCY:MULTIPLE_SOA_TIME_PARAMETER_SET"
+msgid "Found {count} SOA time parameter set(s)."
+msgstr "{count} set(s) SOA-tijdparameters gevonden."
+
+msgctxt "CONSISTENCY:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond."
+msgstr "Naamserver {ns} reageerde niet."
+
+msgctxt "DNSSEC:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond."
+msgstr "Naamserver {ns} heeft niet geantwoord."
+
+msgctxt "ZONE:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond."
+msgstr "Naamserver {ns} reageerde niet."
+
+msgctxt "CONSISTENCY:NO_RESPONSE_NS_QUERY"
+msgid "No response from nameserver {ns}/{address} on NS queries."
+msgstr "Geen antwoord van naamserver {ns}/{address} op NS-query's."
+
+msgctxt "CONSISTENCY:NO_RESPONSE_SOA_QUERY"
+msgid "No response from nameserver {ns}/{address} on SOA queries."
+msgstr "Geen antwoord van naamserver {ns}/{address} op SOA-query's."
+
+msgctxt "CONSISTENCY:NS_SET"
+msgid "Saw NS set ({ns_set_servers}) on following nameserver set : {servers}."
+msgstr "NS-set ({ns_set_servers}) gezien op de volgende set naamservers : {servers}."
+
+msgctxt "CONSISTENCY:ONE_NS_SET"
+msgid "A single NS set was found ({servers})."
+msgstr "Eén set naamservers gevonden ({servers})."
+
+msgctxt "CONSISTENCY:ONE_SOA_MNAME"
+msgid "A single SOA mname value was seen ({mname})."
+msgstr "Eén SOA-mname-waarde gezien ({mname})."
+
+msgctxt "CONSISTENCY:ONE_SOA_RNAME"
+msgid "A single SOA rname value was found ({rname})."
+msgstr "Eén SOA-rname-waarde gevonden ({rname})."
+
+msgctxt "CONSISTENCY:ONE_SOA_SERIAL"
+msgid "A single SOA serial number was found ({serial})."
+msgstr "Eén SOA-serienummer gevonden ({serial})."
+
+msgctxt "CONSISTENCY:ONE_SOA_TIME_PARAMETER_SET"
+msgid "A single SOA time parameter set was seen (REFRESH={refresh},RETRY={retry},EXPIRE={expire},MINIMUM={minimum})."
+msgstr "Eén set SOA-tijdparameters gezien (REFRESH={refresh},RETRY={retry},EXPIRE={expire},MINIMUM={minimum})."
+
+msgctxt "CONSISTENCY:OUT_OF_BAILIWICK_ADDR_MISMATCH"
+msgid "Out-of-bailiwick name server listed at parent with glue record has a mismatch between the glue at the parent ({parent_servers}) and any equivalent address record found in authoritative zone ({zone_servers})."
+msgstr "Een out-of-bailiwick-naamserver die met een glue-record bij de bovenliggende zone staat vermeld, heeft een verschil tussen de glue bij de bovenliggende zone ({parent_servers}) en een eventueel overeenkomend adresrecord dat in de autoritatieve zone is gevonden ({zone_servers})."
+
+msgctxt "CONSISTENCY:SOA_RNAME"
+msgid "Found SOA rname {rname} on following nameserver set : {servers}."
+msgstr "SOA-rname {rname} gevonden op de volgende set naamservers : {servers}."
+
+msgctxt "CONSISTENCY:SOA_SERIAL"
+msgid "Saw SOA serial number {serial} on following nameserver set : {servers}."
+msgstr "SOA-serienummer {serial} gezien op de volgende set naamservers : {servers}."
+
+msgctxt "CONSISTENCY:SOA_SERIAL_VARIATION"
+msgid "Difference between the smaller serial ({serial_min}) and the bigger one ({serial_max}) is greater than the maximum allowed ({max_variation})."
+msgstr "Het verschil tussen het kleinere serienummer ({serial_min}) en het grotere ({serial_max}) is groter dan het maximaal toegestane ({max_variation})."
+
+msgctxt "CONSISTENCY:SOA_TIME_PARAMETER_SET"
+msgid "Saw SOA time parameter set (REFRESH={refresh}, RETRY={retry}, EXPIRE={expire}, MINIMUM={minimum}) on following nameserver set : {servers}."
+msgstr "Set SOA-tijdparameters gezien (REFRESH={refresh}, RETRY={retry}, EXPIRE={expire}, MINIMUM={minimum}) op de volgende set naamservers : {servers}."
+
+msgctxt "DNSSEC:DNSKEY_SMALLER_THAN_REC"
+msgid "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a size ({keysize}) smaller than the recommended one ({keysizerec})."
+msgstr "DNSKEY met tag {keytag} die algoritme {algo_num} ({algo_descr}) gebruikt, heeft een formaat ({keysize}) dat kleiner is dan het aanbevolen formaat ({keysizerec})."
+
+msgctxt "DNSSEC:DNSKEY_TOO_SMALL_FOR_ALGO"
+msgid "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a size ({keysize}) smaller than the minimum one ({keysizemin})."
+msgstr "DNSKEY met tag {keytag} die algoritme {algo_num} ({algo_descr}) gebruikt, heeft een formaat ({keysize}) dat kleiner is dan het minimale formaat ({keysizemin})."
+
+msgctxt "DNSSEC:DNSKEY_TOO_LARGE_FOR_ALGO"
+msgid "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a size ({keysize}) larger than the maximum one ({keysizemax})."
+msgstr "DNSKEY met tag {keytag} die algoritme {algo_num} ({algo_descr}) gebruikt, heeft een formaat ({keysize}) dat groter is dan het maximale formaat ({keysizemax})."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_DEPRECATED"
+msgid "The DS record with keytag {keytag} uses a deprecated digest algorithm {ds_algo_num} ({ds_algo_descr}). Fetched from parent name servers \"{servers}\"."
+msgstr "Het DS-record met keytag {keytag} gebruikt een verouderd digest-algoritme {ds_algo_num} ({ds_algo_descr}). Opgehaald van bovenliggende naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_2_MISSING"
+msgid "No DS record created by digest algorithm 2 (SHA-256) is present for zone {domain}."
+msgstr "Er is geen DS-record aangemaakt met digest-algoritme 2 (SHA-256) aanwezig voor zone {domain}."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_NOT_DS"
+msgid "DS record for zone {domain} with keytag {keytag} was created by digest algorithm {ds_algo_num} ({ds_algo_mnemo}) which is not meant for DS. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DS-record voor zone {domain} met keytag {keytag} is aangemaakt met digest-algoritme {ds_algo_num} ({ds_algo_mnemo}), dat niet bedoeld is voor DS. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_RESERVED"
+msgid "DS record for zone {domain} with keytag {keytag} was created with an unassigned digest algorithm (algorithm number {ds_algo_num}). Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DS-record voor zone {domain} met keytag {keytag} is aangemaakt met een niet-toegewezen digest-algoritme (algoritmenummer {ds_algo_num}). Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}) by this installation of Zonemaster. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie van Zonemaster. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}) by this installation of Zonemaster. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie van Zonemaster. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}) by this installation of Zonemaster. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie van Zonemaster. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_DNSKEY_NOT_FOR_ZONE_SIGNING"
+msgid "Flags field of DNSKEY record with tag {keytag} has not ZONE bit set although DS with same tag is present in parent. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Het flags-veld van het DNSKEY-record met tag {keytag} heeft de ZONE-bit niet ingesteld, hoewel een DS met dezelfde tag aanwezig is in de bovenliggende zone. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_DNSKEY_NOT_SEP"
+msgid "Flags field of DNSKEY record with tag {keytag} has not SEP bit set although DS with same tag is present in parent. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Het flags-veld van het DNSKEY-record met tag {keytag} heeft de SEP-bit niet ingesteld, hoewel een DS met dezelfde tag aanwezig is in de bovenliggende zone. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS"
+msgid "The DNSKEY RRset has not been signed by any DNSKEY matched by a DS record. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is niet ondertekend door een DNSKEY die overeenkomt met een DS-record. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_NO_DNSKEY_FOR_DS"
+msgid "The DNSKEY record with tag {keytag} that the DS refers to does not exist in the DNSKEY RRset. Fetched from the nameservers with IP \"{addresses}\"."
+msgstr "Het DNSKEY-record met tag {keytag} waarnaar de DS verwijst, bestaat niet in de DNSKEY-RRset. Opgehaald van de naamservers met IP \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_NO_MATCHING_DNSKEY_RRSIG"
+msgid "The DNSKEY RRset is not signed by the DNSKEY with tag {keytag} that the DS record refers to. Fetched from the nameservers with IP \"{addresses}\"."
+msgstr "De DNSKEY-RRset is niet ondertekend door de DNSKEY met tag {keytag} waarnaar het DS-record verwijst. Opgehaald van de naamservers met IP \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_NO_MATCH_DS_DNSKEY"
+msgid "The DS record does not match the DNSKEY with tag {keytag} by algorithm or digest. Fetched from the nameservers with IP \"{addresses}\"."
+msgstr "Het DS-record komt qua algoritme of digest niet overeen met de DNSKEY met tag {keytag}. Opgehaald van de naamservers met IP \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_NO_VALID_DNSKEY_FOR_ANY_DS"
+msgid "There is no valid DNSKEY matched by any of the DS records. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Er is geen geldige DNSKEY die overeenkomt met een van de DS-records. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is ondertekend met een RRSIG met tag {keytag} die niet kan worden gevalideerd door de bijbehorende DNSKEY. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS02_MATCH_DS_DNSKEY"
+msgid "The DS record matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "Het DS-record komt overeen met de DNSKEY en de DNSKEY-RRSIG is geldig. Gevonden op de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is ondertekend met een RRSIG met tag {keytag} die niet kan worden gevalideerd door de bijbehorende DNSKEY. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS03_ERROR_RESPONSE_NSEC_QUERY"
+msgid "The following servers give erroneous response to NSEC query. Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers geven een foutief antwoord op een NSEC-query. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_ERR_MULT_NSEC3"
+msgid "Multiple NSEC3 records when one is expected. Fetched from name servers \"{servers}\"."
+msgstr "Meerdere NSEC3-records terwijl er een wordt verwacht. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_ERR_MULT_NSEC3"
+msgid "Multiple NSEC3 records when one is expected. Fetched from name servers \"{servers}\"."
+msgstr "Meerdere NSEC3-records terwijl er een wordt verwacht. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_ILLEGAL_HASH_ALGO"
+msgid "The following servers respond with an illegal hash algorithm for NSEC3 ({algo_num}). Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met een ongeldig hash-algoritme voor NSEC3 ({algo_num}). Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_ILLEGAL_ITERATION_VALUE"
+msgid "The following servers respond with the NSEC3 iteration value {int}. The recommended practice is to set this value to 0. Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met de NSEC3-iteratiewaarde {int}. De aanbevolen praktijk is om deze waarde op 0 te zetten. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_ILLEGAL_SALT_LENGTH"
+msgid "The following servers respond with a non-empty salt in NSEC3 ({int} octets). The recommended practice is to use an empty salt. Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met een niet-lege salt in NSEC3 ({int} octetten). De aanbevolen praktijk is om een lege salt te gebruiken. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_INCONSISTENT_HASH_ALGO"
+msgid "Inconsistent hash algorithm in NSEC3 in responses for the child zone from different name servers."
+msgstr "Inconsistent hash-algoritme in NSEC3 in antwoorden voor de onderliggende zone van verschillende naamservers."
+
+msgctxt "DNSSEC:DS03_INCONSISTENT_ITERATION"
+msgid "Inconsistent NSEC3 iteration value in responses for the child zone from different name servers."
+msgstr "Inconsistente NSEC3-iteratiewaarde in antwoorden voor de onderliggende zone van verschillende naamservers."
+
+msgctxt "DNSSEC:DS03_INCONSISTENT_NSEC3_FLAGS"
+msgid "Inconsistent NSEC3 flag list in responses for the child zone from different name servers."
+msgstr "Inconsistente NSEC3-flaglijst in antwoorden voor de onderliggende zone van verschillende naamservers."
+
+msgctxt "DNSSEC:DS03_INCONSISTENT_SALT_LENGTH"
+msgid "Inconsistent salt length in NSEC3 in responses for the child zone from different name servers."
+msgstr "Inconsistente salt-lengte in NSEC3 in antwoorden voor de onderliggende zone van verschillende naamservers."
+
+msgctxt "DNSSEC:DS03_LEGAL_EMPTY_SALT"
+msgid "The following servers respond with a legal empty salt in NSEC3. Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met een geldige lege salt in NSEC3. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_LEGAL_HASH_ALGO"
+msgid "The following servers respond with a legal hash algorithm in NSEC3. Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met een geldig hash-algoritme in NSEC3. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_LEGAL_ITERATION_VALUE"
+msgid "The following servers respond with NSEC3 iteration value set to zero (as recommended). Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met de NSEC3-iteratiewaarde op nul (zoals aanbevolen). Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_NO_DNSSEC_SUPPORT"
+msgid "The zone is not DNSSEC signed or not properly DNSSEC signed. Testing for NSEC3 has been skipped. Fetched from name servers \"{servers}\"."
+msgstr "De zone is niet DNSSEC-ondertekend of niet correct DNSSEC-ondertekend. De test voor NSEC3 is overgeslagen. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_NO_NSEC3"
+msgid "The zone does not use NSEC3. Testing for NSEC3 has been skipped. Fetched from name servers \"{servers}\"."
+msgstr "De zone gebruikt geen NSEC3. De test voor NSEC3 is overgeslagen. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_NO_RESPONSE_NSEC_QUERY"
+msgid "The following servers do not respond to NSEC query. Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden niet op een NSEC-query. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_NSEC3_OPT_OUT_DISABLED"
+msgid "The following servers respond with NSEC3 opt-out disabled (as recommended). Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met NSEC3 opt-out uitgeschakeld (zoals aanbevolen). Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD"
+msgid "The following servers respond with NSEC3 opt-out enabled. The recommended practice is to disable opt-out. Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met NSEC3 opt-out ingeschakeld. De aanbevolen praktijk is om opt-out uit te schakelen. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_NSEC3_OPT_OUT_ENABLED_TLD"
+msgid "The following servers respond with NSEC3 opt-out enabled. Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met NSEC3 opt-out ingeschakeld. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_SERVER_NO_DNSSEC_SUPPORT"
+msgid "The following name servers do not support DNSSEC or have not been properly configured. Testing for NSEC3 has been skipped on those servers. Fetched from name servers \"{servers}\"."
+msgstr "De volgende naamservers ondersteunen geen DNSSEC of zijn niet correct geconfigureerd. De test voor NSEC3 is op die servers overgeslagen. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_SERVER_NO_NSEC3"
+msgid "The following name servers do not use NSEC3, but others do. Testing for NSEC3 has been skipped on the following servers. Fetched from name servers \"{servers}\"."
+msgstr "De volgende naamservers gebruiken geen NSEC3, maar andere wel. De test voor NSEC3 is op de volgende servers overgeslagen. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS03_UNASSIGNED_FLAG_USED"
+msgid "The following servers respond with an NSEC3 record where an unassigned flag is used (bit {int}). Fetched from name servers \"{servers}\"."
+msgstr "De volgende servers antwoorden met een NSEC3-record waarin een niet-toegewezen flag wordt gebruikt (bit {int}). Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS08_DNSKEY_RRSIG_EXPIRED"
+msgid "RRSIG with keytag {keytag} and covering type DNSKEY has already expired. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "RRSIG met keytag {keytag} die type DNSKEY dekt, is al verlopen. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_DNSKEY_RRSIG_NOT_YET_VALID"
+msgid "RRSIG with keytag {keytag} and covering type DNSKEY has inception date in the future. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "RRSIG met keytag {keytag} die type DNSKEY dekt, heeft een ingangsdatum in de toekomst. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_MISSING_RRSIG_IN_RESPONSE"
+msgid "The DNSKEY RRset is not signed, which is against expectation. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is niet ondertekend, wat tegen de verwachting in is. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_NO_MATCHING_DNSKEY"
+msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which does not match any DNSKEY record. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is ondertekend met een RRSIG met tag {keytag} die met geen enkel DNSKEY-record overeenkomt. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_DNSKEY_RRSIG_VALID"
+msgid "The DNSKEY RRset has valid RRSIG records. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset heeft geldige RRSIG-records. Gevonden op de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_MISSING_RRSIG_IN_RESPONSE"
+msgid "The SOA RRset is not signed, which is against expectation. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De SOA-RRset is niet ondertekend, wat tegen de verwachting in is. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_NO_MATCHING_DNSKEY"
+msgid "The SOA RRset is signed with an RRSIG with tag {keytag} which does not match any DNSKEY record. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De SOA-RRset is ondertekend met een RRSIG met tag {keytag} die met geen enkel DNSKEY-record overeenkomt. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The SOA RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De SOA-RRset is ondertekend met een RRSIG met tag {keytag} die niet kan worden gevalideerd door de bijbehorende DNSKEY. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_SOA_RRSIG_EXPIRED"
+msgid "RRSIG with keytag {keytag} and covering type SOA has already expired. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "RRSIG met keytag {keytag} die type SOA dekt, is al verlopen. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_SOA_RRSIG_NOT_YET_VALID"
+msgid "RRSIG with keytag {keytag} and covering type SOA has inception date in the future. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "RRSIG met keytag {keytag} die type SOA dekt, heeft een ingangsdatum in de toekomst. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_SOA_RRSIG_VALID"
+msgid "The SOA RRset has valid RRSIG records. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "De SOA-RRset heeft geldige RRSIG-records. Gevonden op de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS10_ALGO_NOT_SUPPORTED_BY_ZM"
+msgid "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}) by this installation of Zonemaster. Fetched from name servers \"{addresses}\"."
+msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie van Zonemaster. Opgehaald van naamservers \"{addresses}\"."
+
+msgctxt "DNSSEC:DS10_ERR_MULT_NSEC"
+msgid "Multiple NSEC records when one is expected. Fetched from name servers \"{servers}\"."
+msgstr "Meerdere NSEC-records terwijl er een wordt verwacht. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_EXPECTED_NSEC_NSEC3_MISSING"
+msgid "The server responded with DNSKEY but not with expected NSEC or NSEC3. Fetched from name servers \"{servers}\"."
+msgstr "De server antwoordde met DNSKEY maar niet met de verwachte NSEC of NSEC3. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_HAS_NSEC"
+msgid "The zone has NSEC records. Fetched from name servers \"{servers}\"."
+msgstr "De zone heeft NSEC-records. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_HAS_NSEC3"
+msgid "The zone has NSEC3 records. Fetched from name servers \"{servers}\"."
+msgstr "De zone heeft NSEC3-records. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_INCONSISTENT_NSEC"
+msgid "Inconsistent responses from zone with NSEC. Fetched from name servers \"{servers}\"."
+msgstr "Inconsistente antwoorden van zone met NSEC. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_INCONSISTENT_NSEC3"
+msgid "Inconsistent responses from zone with NSEC3. Fetched from name servers \"{servers}\"."
+msgstr "Inconsistente antwoorden van zone met NSEC3. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_INCONSISTENT_NSEC_NSEC3"
+msgid "The zone is inconsistent on NSEC and NSEC3. Fetched from name servers \"{servers}\"."
+msgstr "De zone is inconsistent wat betreft NSEC en NSEC3. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_MIXED_NSEC_NSEC3"
+msgid "The zone responds with both NSEC and NSEC3, where only one of them is expected. Fetched from name servers \"{servers}\"."
+msgstr "De zone antwoordt met zowel NSEC als NSEC3, terwijl er slechts een van beide wordt verwacht. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NONSTANDARD_NSEC_RESPONSE"
+msgid "NSEC query returned NSEC in the authority section instead of the answer section (RFC 4470 / RFC 9824). Fetched from name servers \"{servers}\"."
+msgstr "NSEC-query gaf NSEC terug in de authority-sectie in plaats van in de answer-sectie (RFC 4470 / RFC 9824). Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3PARAM_GIVES_ERR_ANSWER"
+msgid "Unexpected DNS record in the answer section on an NSEC3PARAM query. Fetched from name servers \"{servers}\"."
+msgstr "Onverwacht DNS-record in de answer-sectie bij een NSEC3PARAM-query. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3PARAM_MISMATCHES_APEX"
+msgid "The returned NSEC3PARAM record has an unexpected non-apex owner name. Fetched from name servers \"{servers}\"."
+msgstr "Het teruggegeven NSEC3PARAM-record heeft een onverwachte owner name die niet de apex is. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3PARAM_QUERY_RESPONSE_ERR"
+msgid "No response or error in response on query for NSEC3PARAM. Fetched from name servers \"{servers}\"."
+msgstr "Geen antwoord of fout in het antwoord op een query voor NSEC3PARAM. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_ERR_TYPE_LIST"
+msgid "NSEC3 record for the zone apex with incorrect type list. Fetched from name servers \"{servers}\"."
+msgstr "NSEC3-record voor de zone-apex met een onjuiste typelijst. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_MISMATCHES_APEX"
+msgid "The returned NSEC3 record unexpectedly does not match the zone name. Fetched from name servers \"{servers}\"."
+msgstr "Het teruggegeven NSEC3-record komt onverwacht niet overeen met de zonenaam. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_MISSING_SIGNATURE"
+msgid "Missing RRSIG (signature) for the NSEC3 record or records. Fetched from name servers \"{servers}\"."
+msgstr "Ontbrekende RRSIG (handtekening) voor het NSEC3-record of de NSEC3-records. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_NODATA_MISSING_SOA"
+msgid "Missing SOA record in NODATA response with NSEC3. Fetched from name servers \"{servers}\"."
+msgstr "Ontbrekend SOA-record in een NODATA-antwoord met NSEC3. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_NODATA_WRONG_SOA"
+msgid "Wrong owner name (\"{domain}\") on SOA record in NODATA response with NSEC3. Fetched from name servers \"{servers}\"."
+msgstr "Verkeerde owner name (\"{domain}\") op het SOA-record in een NODATA-antwoord met NSEC3. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_NO_VERIFIED_SIGNATURE"
+msgid "The RRSIG (signature) for the NSEC3 record cannot be verified. Fetched from name servers \"{servers}\"."
+msgstr "De RRSIG (handtekening) voor het NSEC3-record kan niet worden geverifieerd. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_RRSIG_EXPIRED"
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC3 record has expired. Fetched from name servers \"{servers}\"."
+msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC3-record is verlopen. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_RRSIG_NOT_YET_VALID"
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC3 record it not yet valid. Fetched from name servers \"{servers}\"."
+msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC3-record is nog niet geldig. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_RRSIG_NO_DNSKEY"
+msgid "There is no DNSKEY record matching the RRSIG (signature) with tag {keytag} for the NSEC3 record. Fetched from name servers \"{servers}\"."
+msgstr "Er is geen DNSKEY-record dat overeenkomt met de RRSIG (handtekening) met tag {keytag} voor het NSEC3-record. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC3_RRSIG_VERIFY_ERROR"
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC3 record cannot be verified. Fetched from name servers \"{servers}\"."
+msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC3-record kan niet worden geverifieerd. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_ERR_TYPE_LIST"
+msgid "NSEC record for the zone apex with incorrect type list. Fetched from name servers \"{servers}\"."
+msgstr "NSEC-record voor de zone-apex met een onjuiste typelijst. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_GIVES_ERR_ANSWER"
+msgid "Unexpected DNS record in the answer section on an NSEC query. Fetched from name servers \"{servers}\"."
+msgstr "Onverwacht DNS-record in de answer-sectie bij een NSEC-query. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_MISMATCHES_APEX"
+msgid "The returned NSEC record has an unexpected non-apex owner name. Fetched from name servers \"{servers}\"."
+msgstr "Het teruggegeven NSEC-record heeft een onverwachte owner name die niet de apex is. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_MISSING_SIGNATURE"
+msgid "Missing RRSIG (signature) for the NSEC record or records. Fetched from name servers \"{servers}\"."
+msgstr "Ontbrekende RRSIG (handtekening) voor het NSEC-record of de NSEC-records. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_NODATA_MISSING_SOA"
+msgid "Missing SOA record in NODATA response with NSEC. Fetched from name servers \"{servers}\"."
+msgstr "Ontbrekend SOA-record in een NODATA-antwoord met NSEC. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_NODATA_WRONG_SOA"
+msgid "Wrong owner name (\"{domain}\") on SOA record in NODATA response with NSEC. Fetched from name servers \"{servers}\"."
+msgstr "Verkeerde owner name (\"{domain}\") op het SOA-record in een NODATA-antwoord met NSEC. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_NO_VERIFIED_SIGNATURE"
+msgid "There is no RRSIG (signature) for the NSEC record that can be verified. Fetched from name servers \"{servers}\"."
+msgstr "Er is geen RRSIG (handtekening) voor het NSEC-record die kan worden geverifieerd. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_QUERY_RESPONSE_ERR"
+msgid "No response or error in response on query for NSEC. Fetched from name servers \"{servers}\"."
+msgstr "Geen antwoord of fout in het antwoord op een query voor NSEC. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_RRSIG_EXPIRED"
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC record has expired. Fetched from name servers \"{servers}\"."
+msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC-record is verlopen. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_RRSIG_NOT_YET_VALID"
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC record it not yet valid. Fetched from name servers \"{servers}\"."
+msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC-record is nog niet geldig. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_RRSIG_NO_DNSKEY"
+msgid "There is no DNSKEY record matching the RRSIG (signature) with tag {keytag} for the NSEC record. Fetched from name servers \"{servers}\"."
+msgstr "Er is geen DNSKEY-record dat overeenkomt met de RRSIG (handtekening) met tag {keytag} voor het NSEC-record. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_NSEC_RRSIG_VERIFY_ERROR"
+msgid "The RRSIG (signature) with tag {keytag} for the NSEC record cannot be verified. Fetched from name servers \"{servers}\"."
+msgstr "De RRSIG (handtekening) met tag {keytag} voor het NSEC-record kan niet worden geverifieerd. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_SERVER_NO_DNSSEC"
+msgid "The following name servers do not support DNSSEC or have not been properly configured. Testing for NSEC and NSEC3 has been skipped on these servers. Fetched from name servers \"{servers}\"."
+msgstr "De volgende naamservers ondersteunen geen DNSSEC of zijn niet correct geconfigureerd. De test voor NSEC en NSEC3 is op deze servers overgeslagen. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS10_ZONE_NO_DNSSEC"
+msgid "The zone is not DNSSEC signed or not properly DNSSEC signed. Testing for NSEC and NSEC3 has been skipped. Fetched from name servers \"{servers}\"."
+msgstr "De zone is niet DNSSEC-ondertekend of niet correct DNSSEC-ondertekend. De test voor NSEC en NSEC3 is overgeslagen. Opgehaald van naamservers \"{servers}\"."
+
+msgctxt "DNSSEC:DS11_INCONSISTENT_DS"
+msgid "Parent name servers are inconsistent on the existence of DS."
+msgstr "Bovenliggende naamservers zijn inconsistent over het bestaan van DS."
+
+msgctxt "DNSSEC:DS11_INCONSISTENT_SIGNED_ZONE"
+msgid "Name servers for the child zone are inconsistent on whether the zone is signed or not."
+msgstr "Naamservers voor de onderliggende zone zijn inconsistent over de vraag of de zone ondertekend is of niet."
+
+msgctxt "DNSSEC:DS11_UNDETERMINED_DS"
+msgid "It cannot be determined if the parent zone has DS for the child zone or not."
+msgstr "Het kan niet worden vastgesteld of de bovenliggende zone DS voor de onderliggende zone heeft of niet."
+
+msgctxt "DNSSEC:DS11_UNDETERMINED_SIGNED_ZONE"
+msgid "It cannot be determined if the child zone is signed or not."
+msgstr "Het kan niet worden vastgesteld of de onderliggende zone ondertekend is of niet."
+
+msgctxt "DNSSEC:DS11_PARENT_WITHOUT_DS"
+msgid "No DS record for the child zone found on parent nameservers with IP addresses \"{addresses}\"."
+msgstr "Geen DS-record voor de onderliggende zone gevonden op bovenliggende naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS11_PARENT_WITH_DS"
+msgid "DS record for the child zone found on parent nameservers with IP addresses \"{addresses}\"."
+msgstr "DS-record voor de onderliggende zone gevonden op bovenliggende naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS11_NS_WITH_SIGNED_ZONE"
+msgid "Signed child zone found on nameservers with IP addresses \"{addresses}\"."
+msgstr "Ondertekende onderliggende zone gevonden op naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS11_NS_WITH_UNSIGNED_ZONE"
+msgid "Unsigned child zone found on nameservers with IP addresses \"{addresses}\"."
+msgstr "Niet-ondertekende onderliggende zone gevonden op naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS11_DS_BUT_UNSIGNED_ZONE"
+msgid "The child zone is unsigned, but the parent zone has DS record."
+msgstr "De onderliggende zone is niet ondertekend, maar de bovenliggende zone heeft een DS-record."
+
+msgctxt "DNSSEC:DS11_CONSISTENT_SIGNED"
+msgid "Parent DS and child DNSKEY are consistent - the zone is signed."
+msgstr "DS in de bovenliggende zone en DNSKEY in de onderliggende zone zijn consistent - de zone is ondertekend."
+
+msgctxt "DNSSEC:DS11_NO_PARENT_DS"
+msgid "No DS records found at the parent - the zone is unsigned from the parent view."
+msgstr "Geen DS-records gevonden bij de bovenliggende zone - de zone is niet ondertekend vanuit het oogpunt van de bovenliggende zone."
+
+msgctxt "DNSSEC:DS13_ALGO_NOT_SIGNED_DNSKEY"
+msgid "The DNSKEY RRset is not signed by algorithm {algo_num} ({algo_mnemo}) present in the DNSKEY RRset. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is niet ondertekend met algoritme {algo_num} ({algo_mnemo}) dat aanwezig is in de DNSKEY-RRset. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS13_ALGO_NOT_SIGNED_NS"
+msgid "The NS RRset is not signed by algorithm {algo_num} ({algo_mnemo}) present in the DNSKEY RRset. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De NS-RRset is niet ondertekend met algoritme {algo_num} ({algo_mnemo}) dat aanwezig is in de DNSKEY-RRset. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS13_ALGO_NOT_SIGNED_SOA"
+msgid "The SOA RRset is not signed by algorithm {algo_num} ({algo_mnemo}) present in the DNSKEY RRset. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De SOA-RRset is niet ondertekend met algoritme {algo_num} ({algo_mnemo}) dat aanwezig is in de DNSKEY-RRset. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS13_ALL_ALGOS_SIGNED"
+msgid "All DNSKEY algorithms have RRSIG coverage in DNSKEY, SOA, and NS answers."
+msgstr "Alle DNSKEY-algoritmen hebben RRSIG-dekking in de DNSKEY-, SOA- en NS-antwoorden."
+
+msgctxt "DNSSEC:DS15_CDS_NON_MUST_DIGEST"
+msgid "CDS records with non-mandatory digest types are found on nameservers that resolve to IP addresses ({addresses}); parents ignore them."
+msgstr "CDS-records met niet-verplichte digesttypen zijn gevonden op naamservers die herleiden naar IP-adressen ({addresses}); bovenliggende zones negeren ze."
+
+msgctxt "DNSSEC:DS15_HAS_CDNSKEY_NO_CDS"
+msgid "CDNSKEY RRset is found on nameservers that resolve to IP addresses ({addresses}), but no CDS RRset."
+msgstr "Een CDNSKEY-RRset is gevonden op naamservers die herleiden naar IP-adressen ({addresses}), maar geen CDS-RRset."
+
+msgctxt "DNSSEC:DS15_HAS_CDS_AND_CDNSKEY"
+msgid "CDNSKEY and CDS RRsets are found on nameservers that resolve to IP addresses ({addresses})."
+msgstr "CDNSKEY- en CDS-RRsets zijn gevonden op naamservers die herleiden naar IP-adressen ({addresses})."
+
+msgctxt "DNSSEC:DS15_HAS_CDS_NO_CDNSKEY"
+msgid "CDS RRset is found on nameservers that resolve to IP addresses ({addresses}), but no CDNSKEY RRset."
+msgstr "Een CDS-RRset is gevonden op naamservers die herleiden naar IP-adressen ({addresses}), maar geen CDNSKEY-RRset."
+
+msgctxt "DNSSEC:DS15_INCONSISTENT_CDNSKEY"
+msgid "All servers do not have the same CDNSKEY RRset."
+msgstr "Niet alle servers hebben dezelfde CDNSKEY-RRset."
+
+msgctxt "DNSSEC:DS15_INCONSISTENT_CDS"
+msgid "All servers do not have the same CDS RRset."
+msgstr "Niet alle servers hebben dezelfde CDS-RRset."
+
+msgctxt "DNSSEC:DS15_MISMATCH_CDS_CDNSKEY"
+msgid "Both CDS and CDNSKEY RRsets are found on nameservers that resolve to IP addresses ({addresses}) but they do not match."
+msgstr "Zowel CDS- als CDNSKEY-RRsets zijn gevonden op naamservers die herleiden naar IP-adressen ({addresses}), maar ze komen niet overeen."
+
+msgctxt "DNSSEC:DS15_NO_CDS_CDNSKEY"
+msgid "No CDS or CDNSKEY RRsets are found on any name server."
+msgstr "Geen CDS- of CDNSKEY-RRsets gevonden op enige naamserver."
+
+msgctxt "DNSSEC:DS16_CDS_INVALID_RRSIG"
+msgid "The CDS RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDS-RRset is ondertekend met een RRSIG met tag {keytag}, maar de RRSIG komt niet overeen met de DNSKEY met dezelfde key tag. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_CDS_MATCHES_NON_SEP_DNSKEY"
+msgid "The CDS record with tag {keytag} matches a DNSKEY record with SEP bit (bit 15) unset. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Het CDS-record met tag {keytag} komt overeen met een DNSKEY-record waarvan de SEP-bit (bit 15) niet is gezet. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_CDS_MATCHES_NON_ZONE_DNSKEY"
+msgid "The CDS record with tag {keytag} matches a DNSKEY record with zone bit (bit 7) unset. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Het CDS-record met tag {keytag} komt overeen met een DNSKEY-record waarvan de zone-bit (bit 7) niet is gezet. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_CDS_MATCHES_NO_DNSKEY"
+msgid "The CDS record with tag {keytag} does not match any DNSKEY record. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Het CDS-record met tag {keytag} komt met geen enkel DNSKEY-record overeen. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_CDS_NOT_SIGNED_BY_CDS"
+msgid "The CDS RRset is not signed by the DNSKEY that the CDS record with tag {keytag} points to. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDS-RRset is niet ondertekend door de DNSKEY waarnaar het CDS-record met tag {keytag} verwijst. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_CDS_SIGNED_BY_UNKNOWN_DNSKEY"
+msgid "The CDS RRset is signed by RRSIG with tag {keytag} but that is not in the DNSKEY RRset. Fetched from the nameservers with P addresses \"{addresses}\"."
+msgstr "De CDS-RRset is ondertekend met een RRSIG met tag {keytag}, maar die staat niet in de DNSKEY-RRset. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_CDS_UNSIGNED"
+msgid "The CDS RRset is not signed. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDS-RRset is niet ondertekend. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_CDS_WITHOUT_DNSKEY"
+msgid "A CDS RRset exists, but no DNSKEY record exists. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Er bestaat een CDS-RRset, maar er bestaat geen DNSKEY-record. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_DELETE_CDS"
+msgid "A single \"delete\" CDS record is found on the nameservers with IP addresses \"{addresses}\"."
+msgstr "Een enkel \"delete\"-CDS-record is gevonden op de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_DNSKEY_NOT_SIGNED_BY_CDS"
+msgid "The DNSKEY RRset is not signed by the DNSKEY that the CDS record with tag {keytag} points to. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is niet ondertekend door de DNSKEY waarnaar het CDS-record met tag {keytag} verwijst. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS16_MIXED_DELETE_CDS"
+msgid "The CDS RRset is a mixture between \"delete\" record and other records. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDS-RRset is een mengeling van een \"delete\"-record en andere records. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_CDNSKEY_INVALID_RRSIG"
+msgid "The CDNSKEY RRset is signed with an RRSIG with tag {keytag}, but the RRSIG does not match the DNSKEY with the same key tag. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDNSKEY-RRset is ondertekend met een RRSIG met tag {keytag}, maar de RRSIG komt niet overeen met de DNSKEY met dezelfde key tag. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_CDNSKEY_IS_NON_SEP"
+msgid "The CDNSKEY record with tag {keytag} has the SEP bit (bit 15) unset. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Bij het CDNSKEY-record met tag {keytag} is de SEP-bit (bit 15) niet gezet. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_CDNSKEY_IS_NON_ZONE"
+msgid "The CDNSKEY record with tag {keytag} has the zone bit (bit 7) unset. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Bij het CDNSKEY-record met tag {keytag} is de zone-bit (bit 7) niet gezet. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_CDNSKEY_MATCHES_NO_DNSKEY"
+msgid "The CDNSKEY record with tag {keytag} does not match any DNSKEY record. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Het CDNSKEY-record met tag {keytag} komt met geen enkel DNSKEY-record overeen. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_CDNSKEY_NOT_SIGNED_BY_CDNSKEY"
+msgid "The CDNSKEY RRset is not signed by the DNSKEY that the CDNSKEY record with tag {keytag} points to. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDNSKEY-RRset is niet ondertekend door de DNSKEY waarnaar het CDNSKEY-record met tag {keytag} verwijst. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_CDNSKEY_SIGNED_BY_UNKNOWN_DNSKEY"
+msgid "The CDNSKEY RRset is signed by RRSIG with tag {keytag} but that is not in the DNSKEY RRset. Fetched from the nameservers with P addresses \"{addresses}\"."
+msgstr "De CDNSKEY-RRset is ondertekend met een RRSIG met tag {keytag}, maar die staat niet in de DNSKEY-RRset. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_CDNSKEY_UNSIGNED"
+msgid "The CDNSKEY RRset is not signed. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDNSKEY-RRset is niet ondertekend. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_CDNSKEY_WITHOUT_DNSKEY"
+msgid "A CDNSKEY RRset exists, but no DNSKEY record exists. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "Er bestaat een CDNSKEY-RRset, maar er bestaat geen DNSKEY-record. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_DELETE_CDNSKEY"
+msgid "A single \"delete\" CDNSKEY record is found on the nameservers with IP addresses \"{addresses}\"."
+msgstr "Een enkel \"delete\"-CDNSKEY-record is gevonden op de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_DNSKEY_NOT_SIGNED_BY_CDNSKEY"
+msgid "The DNSKEY RRset is not signed by the DNSKEY that the CDNSKEY record with tag {keytag} points to. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De DNSKEY-RRset is niet ondertekend door de DNSKEY waarnaar het CDNSKEY-record met tag {keytag} verwijst. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS17_MIXED_DELETE_CDNSKEY"
+msgid "The CDNSKEY RRset is a mixture between \"delete\" record and other records. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDNSKEY-RRset is een mengeling van een \"delete\"-record en andere records. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS18_NO_MATCH_CDS_RRSIG_DS"
+msgid "The CDS RRset is not signed with a DNSKEY record that a DS record points to. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDS-RRset is niet ondertekend met een DNSKEY-record waarnaar een DS-record verwijst. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS18_NO_MATCH_CDNSKEY_RRSIG_DS"
+msgid "The CDNSKEY RRset is not signed with a DNSKEY record that a DS record points to. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDNSKEY-RRset is niet ondertekend met een DNSKEY-record waarnaar een DS-record verwijst. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS18_MATCH_CDNSKEY_RRSIG_DS"
+msgid "The CDNSKEY RRset is signed by a DS-linked DNSKEY. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDNSKEY-RRset is ondertekend door een DNSKEY waaraan een DS is gekoppeld. Gevonden op de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS18_MATCH_CDS_RRSIG_DS"
+msgid "The CDS RRset is signed by a DS-linked DNSKEY. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "De CDS-RRset is ondertekend door een DNSKEY waaraan een DS is gekoppeld. Gevonden op de naamservers met IP-adressen \"{addresses}\"."
+
+msgctxt "DNSSEC:DS18_CDS_MATCHES_DS"
+msgid "The CDS RRset content matches the parent DS RRset. No key change signaled."
+msgstr "De inhoud van de CDS-RRset komt overeen met de DS-RRset van de bovenliggende zone. Geen sleutelwijziging gesignaleerd."
+
+msgctxt "DNSSEC:DS18_CDS_ROLLOVER_SIGNALED"
+msgid "The CDS RRset content differs from the parent DS RRset, signaling a key change. CDS keytags: {cds_keytags}. DS keytags: {ds_keytags}."
+msgstr "De inhoud van de CDS-RRset verschilt van de DS-RRset van de bovenliggende zone, wat een sleutelwijziging signaleert. CDS-key tags: {cds_keytags}. DS-key tags: {ds_keytags}."
+
+msgctxt "DNSSEC:DS18_CDNSKEY_MATCHES_DS"
+msgid "The CDNSKEY RRset content matches the parent DS RRset. No key change signaled."
+msgstr "De inhoud van de CDNSKEY-RRset komt overeen met de DS-RRset van de bovenliggende zone. Geen sleutelwijziging gesignaleerd."
+
+msgctxt "DNSSEC:DS18_CDNSKEY_ROLLOVER_SIGNALED"
+msgid "The CDNSKEY RRset content differs from the parent DS RRset, signaling a key change. CDNSKEY keytags: {cdnskey_keytags}. DS keytags: {ds_keytags}."
+msgstr "De inhoud van de CDNSKEY-RRset verschilt van de DS-RRset van de bovenliggende zone, wat een sleutelwijziging signaleert. CDNSKEY-key tags: {cdnskey_keytags}. DS-key tags: {ds_keytags}."
+
+msgctxt "DNSSEC:DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE"
+msgid "No CDS or CDNSKEY RRset found, but other rollover evidence is present. The operator likely uses on-demand CDS/CDNSKEY publication."
+msgstr "Geen CDS- of CDNSKEY-RRset gevonden, maar er zijn andere aanwijzingen voor een sleutelvervanging aanwezig. De operator gebruikt waarschijnlijk on-demand publicatie van CDS/CDNSKEY."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG"
+msgid "The DNSKEY RRset is signed by more than one KSK keytag ({keytags}). A double-signature rollover phase may be in progress."
+msgstr "De DNSKEY-RRset is ondertekend door meer dan een KSK-key tag ({keytags}). Mogelijk is een sleutelvervanging met dubbele ondertekening in uitvoering."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS"
+msgid "Child SEP DNSKEY keytag(s) {keytags} have no matching DS record at the parent. A new KSK may be waiting for the parent DS to be updated."
+msgstr "Voor de SEP-DNSKEY-key tag(s) {keytags} in de onderliggende zone bestaat geen bijbehorend DS-record bij de bovenliggende zone. Mogelijk wacht een nieuwe KSK totdat de DS bij de bovenliggende zone wordt bijgewerkt."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY"
+msgid "Parent DS keytag(s) {keytags} have no matching DNSKEY at the child. The old KSK may have been removed from the child zone."
+msgstr "Voor de DS-key tag(s) {keytags} in de bovenliggende zone bestaat geen bijbehorende DNSKEY in de onderliggende zone. Mogelijk is de oude KSK uit de onderliggende zone verwijderd."
+
+msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_MULTI_KSK"
+msgid "Multiple SEP-flagged DNSKEYs found at the child zone (keytags: {keytags}). A KSK rollover may be in progress."
+msgstr "Meerdere DNSKEY's met SEP-vlag gevonden in de onderliggende zone (key tags: {keytags}). Mogelijk is een KSK-sleutelvervanging in uitvoering."
+
+msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA modulus vulnerable to Fermat factorization (close primes) on name server(s) {servers}."
+msgstr "DNSKEY met key tag {keytag} en algoritme {algo_descr} ({algo_num}) heeft een RSA-modulus die kwetsbaar is voor Fermat-factorisatie (dicht bij elkaar liggende priemgetallen) op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS19_BADKEY_PATTERN"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA modulus with suspicious repeating byte pattern on name server(s) {servers}."
+msgstr "DNSKEY met key tag {keytag} en algoritme {algo_descr} ({algo_num}) heeft een RSA-modulus met een verdacht herhalend bytepatroon op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS19_BADKEY_ROCA"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) is vulnerable to ROCA attack (CVE-2017-15361) on name server(s) {servers}."
+msgstr "DNSKEY met key tag {keytag} en algoritme {algo_descr} ({algo_num}) is kwetsbaar voor de ROCA-aanval (CVE-2017-15361) op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS19_BADKEY_RSA_INVALID"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has invalid RSA parameters ({subtest}) on name server(s) {servers}."
+msgstr "DNSKEY met key tag {keytag} en algoritme {algo_descr} ({algo_num}) heeft ongeldige RSA-parameters ({subtest}) op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS19_BADKEY_SMALL_D"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA private exponent recoverable via Wiener's attack on name server(s) {servers}."
+msgstr "DNSKEY met key tag {keytag} en algoritme {algo_descr} ({algo_num}) heeft een privé-RSA-exponent die te herstellen is via de aanval van Wiener op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS19_BADKEY_SMALL_FACTORS"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA modulus with small prime factors on name server(s) {servers}."
+msgstr "DNSKEY met key tag {keytag} en algoritme {algo_descr} ({algo_num}) heeft een RSA-modulus met kleine priemfactoren op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS19_BLOCKLIST_NOT_FOUND"
+msgid "Badkeys blocklist data not found. Blocklist check skipped. Run 'gonemaster --badkeys-update' to download the blocklist."
+msgstr "Badkeys-blokkeerlijstgegevens niet gevonden. Blokkeerlijstcontrole overgeslagen. Voer 'gonemaster --badkeys-update' uit om de blokkeerlijst te downloaden."
+
+msgctxt "DNSSEC:DS19_KEY_OK"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) passed all badkey checks on name server(s) {servers}."
+msgstr "DNSKEY met key tag {keytag} en algoritme {algo_descr} ({algo_num}) is geslaagd voor alle badkey-controles op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS19_NO_DNSKEY"
+msgid "No DNSKEY records found at zone apex on name server(s) {servers}."
+msgstr "Geen DNSKEY-records gevonden bij de zone-apex op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS19_NO_RESPONSE"
+msgid "No name server produced a usable DNSKEY response for badkey checking on name server(s) {servers}."
+msgstr "Geen naamserver leverde een bruikbaar DNSKEY-antwoord voor de badkey-controle op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS20_BITMAP_OK"
+msgid "NSEC/NSEC3 type bitmap at the zone apex correctly includes all observed RR types on name server(s) {servers}."
+msgstr "De NSEC/NSEC3-typebitmap bij de zone-apex bevat correct alle waargenomen RR-typen op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS20_NO_BITMAP"
+msgid "No NSEC or NSEC3 type bitmap could be obtained for the zone apex on name server(s) {servers}."
+msgstr "Er kon geen NSEC- of NSEC3-typebitmap voor de zone-apex worden verkregen op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS20_NO_DNSSEC"
+msgid "No nameserver returned a usable DNSKEY; NSEC/NSEC3 bitmap check skipped on name server(s) {servers}."
+msgstr "Geen naamserver gaf een bruikbare DNSKEY terug; NSEC/NSEC3-bitmapcontrole overgeslagen op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC3 type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR-type {query_type} bestaat bij de zone-apex maar ontbreekt in de NSEC3-typebitmap op naamserver(s) {servers}. Dit maakt cache poisoning mogelijk via agressieve negatieve caching volgens RFC 8198."
+
+msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
+msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
+msgstr "RR-type {query_type} bestaat bij de zone-apex maar ontbreekt in de NSEC-typebitmap op naamserver(s) {servers}. Dit maakt cache poisoning mogelijk via agressieve negatieve caching volgens RFC 8198."
+
+msgctxt "DNSSEC:DS21_ALGO_NOT_SUPPORTED"
+msgid "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
+msgstr "De DS-RRSIG van de bovenliggende zone met key tag {keytag} gebruikt het niet-ondersteunde algoritme {algo_num} ({algo_mnemo}); verificatie wordt overgeslagen op bovenliggende naamserver(s) {addresses}."
+
+msgctxt "DNSSEC:DS21_DS_RRSIG_EXPIRED"
+msgid "Parent DS RRSIG with keytag {keytag} has expired on parent name server(s) {addresses}."
+msgstr "De DS-RRSIG van de bovenliggende zone met key tag {keytag} is verlopen op bovenliggende naamserver(s) {addresses}."
+
+msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "Parent DS RRSIG with keytag {keytag} cannot be verified by any matching parent DNSKEY on parent name server(s) {addresses}."
+msgstr "De DS-RRSIG van de bovenliggende zone met key tag {keytag} kan niet worden geverifieerd met een overeenkomende DNSKEY van de bovenliggende zone op bovenliggende naamserver(s) {addresses}."
+
+msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_VERIFIABLE"
+msgid "Parent returned a signed DS RRset, but no covering RRSIG could be verified against the parent DNSKEY on parent name server(s) {addresses}. Validating resolvers will fail to resolve the child zone."
+msgstr "De bovenliggende zone gaf een ondertekende DS-RRset terug, maar er kon geen dekkende RRSIG worden geverifieerd tegen de DNSKEY van de bovenliggende zone op bovenliggende naamserver(s) {addresses}. Valideerende resolvers zullen de onderliggende zone niet kunnen herleiden."
+
+msgctxt "DNSSEC:DS21_DS_RRSIG_NOT_YET_VALID"
+msgid "Parent DS RRSIG with keytag {keytag} has an inception time in the future on parent name server(s) {addresses}."
+msgstr "De DS-RRSIG van de bovenliggende zone met key tag {keytag} heeft een inceptietijd in de toekomst op bovenliggende naamserver(s) {addresses}."
+
+msgctxt "DNSSEC:DS21_DS_RRSIG_VERIFIED"
+msgid "Parent DS RRset is correctly signed and verifies against the parent DNSKEY on parent name server(s) {addresses}."
+msgstr "De DS-RRset van de bovenliggende zone is correct ondertekend en verifieert tegen de DNSKEY van de bovenliggende zone op bovenliggende naamserver(s) {addresses}."
+
+msgctxt "DNSSEC:DS21_NO_DNSKEY_FOR_DS_RRSIG"
+msgid "Parent DS RRSIG references DNSKEY keytag {keytag}, but no matching DNSKEY is published at the parent apex on parent name server(s) {addresses}."
+msgstr "De DS-RRSIG van de bovenliggende zone verwijst naar DNSKEY-key tag {keytag}, maar er is geen overeenkomende DNSKEY gepubliceerd bij de apex van de bovenliggende zone op bovenliggende naamserver(s) {addresses}."
+
+msgctxt "DNSSEC:DS21_NO_DS_RRSIG"
+msgid "Parent returned the DS RRset without any covering RRSIG on parent name server(s) {addresses}."
+msgstr "De bovenliggende zone gaf de DS-RRset terug zonder enige dekkende RRSIG op bovenliggende naamserver(s) {addresses}."
+
+msgctxt "DNSSEC:DS21_NO_PARENT_ZONE"
+msgid "No parent zone is available; DNSSEC21 cannot run."
+msgstr "Er is geen bovenliggende zone beschikbaar; DNSSEC21 kan niet worden uitgevoerd."
+
+msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
+msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
+msgstr "De bovenliggende zone gaf geen autoritatief DNSKEY-antwoord terug, dus de verificatie van de DS-RRSIG is overgeslagen op bovenliggende naamserver(s) {addresses}."
+
+msgctxt "NAMESERVER:NO_EDNS_SUPPORT"
+msgid "Nameserver {ns}/{address} does not support EDNS0 (replies with FORMERR)."
+msgstr "Naamserver {ns}/{address} ondersteunt geen EDNS0 (antwoordt met FORMERR)."
+
+msgctxt "NAMESERVER:NO_RECURSOR"
+msgid "The following nameservers are not recursors: {servers}."
+msgstr "De volgende naamservers zijn geen recursors: {servers}."
+
+msgctxt "NAMESERVER:NO_RESOLUTION"
+msgid "No nameserver was successfully resolved to an IP address."
+msgstr "Geen enkele naamserver kon worden herleid naar een IP-adres."
+
+msgctxt "NAMESERVER:NO_RESPONSE"
+msgid "No response from {ns} asking for {domain}."
+msgstr "Geen antwoord van {ns} bij het opvragen van {domain}."
+
+msgctxt "NAMESERVER:NO_UPWARD_REFERRAL"
+msgid "None of the following nameservers returns an upward referral : {servers}."
+msgstr "Geen van de volgende naamservers geeft een verwijzing naar boven (upward referral) terug: {servers}."
+
+msgctxt "NAMESERVER:NS_ERROR"
+msgid "Erroneous response from nameserver {ns}/{address}."
+msgstr "Foutief antwoord van naamserver {ns}/{address}."
+
+msgctxt "NAMESERVER:N10_EDNS_RESPONSE_ERROR"
+msgid "Expected RCODE but received erroneous response to an EDNS version 1 query. Fetched from the nameservers with IP addresses {addresses}"
+msgstr "RCODE verwacht, maar foutief antwoord ontvangen op een query met EDNS-versie 1. Opgehaald van de naamservers met IP-adressen {addresses}"
+
+msgctxt "NAMESERVER:N10_NO_RESPONSE_EDNS1_QUERY"
+msgid "No response to an EDNS version 1 query. Fetched from the nameservers with IP addresses {addresses}"
+msgstr "Geen antwoord op een query met EDNS-versie 1. Opgehaald van de naamservers met IP-adressen {addresses}"
+
+msgctxt "NAMESERVER:N10_UNEXPECTED_RCODE"
+msgid "Erroneous RCODE (\"{rcode}\") in response to an EDNS version 1 query. Fetched from the nameservers with IP addresses {addresses}"
+msgstr "Foutieve RCODE (\"{rcode}\") in antwoord op een query met EDNS-versie 1. Opgehaald van de naamservers met IP-adressen {addresses}"
+
+msgctxt "NAMESERVER:N11_NO_EDNS"
+msgid "The DNS response, on query with unknown EDNS option-code, does not contain any EDNS from name servers \"{addresses}\"."
+msgstr "Het DNS-antwoord op een query met onbekende EDNS-optiecode bevat geen EDNS van naamservers \"{addresses}\"."
+
+msgctxt "NAMESERVER:N11_NO_RESPONSE"
+msgid "There is no response on query with unknown EDNS option-code from name servers \"{addresses}\"."
+msgstr "Er is geen antwoord op een query met onbekende EDNS-optiecode van naamservers \"{addresses}\"."
+
+msgctxt "NAMESERVER:N11_RETURNS_UNKNOWN_OPTION_CODE"
+msgid "The DNS response contains an unknown EDNS option-code. Returned from name servers \"{addresses}\"."
+msgstr "Het DNS-antwoord bevat een onbekende EDNS-optiecode. Teruggegeven door naamservers \"{addresses}\"."
+
+msgctxt "NAMESERVER:N11_UNEXPECTED_ANSWER_SECTION"
+msgid "The DNS response, on query with unknown EDNS option-code, does not contain the expected SOA record in the answer section from name servers \"{addresses}\"."
+msgstr "Het DNS-antwoord op een query met onbekende EDNS-optiecode bevat niet het verwachte SOA-record in de answer-sectie van naamservers \"{addresses}\"."
+
+msgctxt "NAMESERVER:N11_UNEXPECTED_RCODE"
+msgid "The DNS response, on query with unknown EDNS option-code, has unexpected RCODE name \"{rcode}\" from name servers \"{addresses}\"."
+msgstr "Het DNS-antwoord op een query met onbekende EDNS-optiecode heeft een onverwachte RCODE-naam \"{rcode}\" van naamservers \"{addresses}\"."
+
+msgctxt "NAMESERVER:N11_UNSET_AA"
+msgid "The DNS response, on query with unknown EDNS option-code, is unexpectedly not authoritative from name servers \"{addresses}\"."
+msgstr "Het DNS-antwoord op een query met onbekende EDNS-optiecode is onverwacht niet autoritatief van naamservers \"{addresses}\"."
+
+msgctxt "NAMESERVER:N15_ERROR_ON_VERSION_QUERY"
+msgid "The following name server(s) do not respond or respond with SERVFAIL to software version query \"{query_name}\". Returned from name servers: \"{servers}\""
+msgstr "De volgende naamserver(s) reageren niet of reageren met SERVFAIL op de softwareversie-query \"{query_name}\". Teruggegeven door naamservers: \"{servers}\""
+
+msgctxt "NAMESERVER:N15_NO_VERSION_REVEALED"
+msgid "The following name server(s) do not reveal the software version. Returned from name servers \"{servers}\""
+msgstr "De volgende naamserver(s) maken de softwareversie niet bekend. Teruggegeven door naamservers \"{servers}\""
+
+msgctxt "NAMESERVER:N15_SOFTWARE_VERSION"
+msgid "The following name server(s) respond to software version query \"{query_name}\" with string \"{string}\". Returned from name servers: \"{servers}\""
+msgstr "De volgende naamserver(s) antwoorden op de softwareversie-query \"{query_name}\" met de tekst \"{string}\". Teruggegeven door naamservers: \"{servers}\""
+
+msgctxt "NAMESERVER:N15_WRONG_CLASS"
+msgid "The following name server(s) do not return CH class record(s) on CH class query. Returned from name servers \"{servers}\""
+msgstr "De volgende naamserver(s) geven geen record(s) van klasse CH terug op een query van klasse CH. Teruggegeven door naamservers \"{servers}\""
+
+msgctxt "NAMESERVER:N16_HAS_NSID"
+msgid "The following name server(s) responded to an NSID query (RFC 5001) with NSID value \"{nsid}\". Returned from name servers \"{servers}\""
+msgstr "De volgende naamserver(s) reageerden op een NSID-query (RFC 5001) met NSID-waarde \"{nsid}\". Teruggegeven door naamservers \"{servers}\""
+
+msgctxt "NAMESERVER:N16_NO_NSID_REVEALED"
+msgid "The following name server(s) did not include an NSID option in response to an NSID query (RFC 5001). Returned from name servers \"{servers}\""
+msgstr "De volgende naamserver(s) namen geen NSID-optie op in het antwoord op een NSID-query (RFC 5001). Teruggegeven door naamservers \"{servers}\""
+
+msgctxt "NAMESERVER:N16_NO_RESPONSE"
+msgid "The following name server(s) did not respond to an NSID query (RFC 5001). Returned from name servers \"{servers}\""
+msgstr "De volgende naamserver(s) reageerden niet op een NSID-query (RFC 5001). Teruggegeven door naamservers \"{servers}\""
+
+msgctxt "NAMESERVER:N16_UNEXPECTED_RCODE"
+msgid "The following name server(s) returned an unexpected RCODE \"{rcode}\" in response to an NSID query (RFC 5001). Returned from name servers: \"{servers}\""
+msgstr "De volgende naamserver(s) gaven een onverwachte RCODE \"{rcode}\" terug in antwoord op een NSID-query (RFC 5001). Teruggegeven door naamservers: \"{servers}\""
+
+msgctxt "NAMESERVER:N17_COOKIE_SUPPORTED"
+msgid "The following name server(s) returned a well-formed DNS Cookie (RFC 7873): \"{servers}\"."
+msgstr "De volgende naamserver(s) gaven een correct opgebouwde DNS Cookie (RFC 7873) terug: \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_ENFORCED"
+msgid "The following name server(s) enforce DNS Cookies and returned a well-formed Server Cookie (RFC 7873): \"{servers}\"."
+msgstr "De volgende naamserver(s) handhaven DNS Cookies en gaven een correct opgebouwde Server Cookie (RFC 7873) terug: \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_NO_COOKIE"
+msgid "The following name server(s) did not return a DNS Cookie (RFC 7873): \"{servers}\"."
+msgstr "De volgende naamserver(s) gaven geen DNS Cookie (RFC 7873) terug: \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_ROUNDTRIP_OK"
+msgid "The following name server(s) did not reject the Server Cookie they issued on a follow-up query (RFC 7873): \"{servers}\"."
+msgstr "De volgende naamserver(s) weigerden bij een vervolgquery niet de Server Cookie die zij hadden uitgegeven (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_CLIENT_ONLY"
+msgid "The following name server(s) echoed only the Client Cookie and returned no Server Cookie (RFC 7873): \"{servers}\"."
+msgstr "De volgende naamserver(s) gaven alleen de Client Cookie terug en gaven geen Server Cookie terug (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_MALFORMED"
+msgid "The following name server(s) returned a malformed DNS Cookie of {cookie_bytes} bytes (RFC 7873 allows 8 or 16 to 40): \"{servers}\"."
+msgstr "De volgende naamserver(s) gaven een onjuist opgebouwde DNS Cookie van {cookie_bytes} bytes terug (RFC 7873 staat 8 of 16 tot 40 toe): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_COOKIE_SELF_REJECT"
+msgid "The following name server(s) rejected with BADCOOKIE, even after a retry, a Server Cookie they had just issued (RFC 7873): \"{servers}\"."
+msgstr "De volgende naamserver(s) wezen, zelfs na een nieuwe poging, met BADCOOKIE een Server Cookie af die zij zojuist zelf hadden uitgegeven (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N17_NO_RESPONSE"
+msgid "The following name server(s) did not respond to a DNS Cookie probe (RFC 7873): \"{servers}\"."
+msgstr "De volgende naamserver(s) reageerden niet op een DNS Cookie-probe (RFC 7873): \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_NO_EXTENDED_ERROR"
+msgid "The following name server(s) responded without an Extended DNS Error (RFC 8914): \"{servers}\"."
+msgstr "De volgende naamserver(s) antwoordden zonder Extended DNS Error (RFC 8914): \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_EXTENDED_ERROR_REPORTED"
+msgid "The following name server(s) returned Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "De volgende naamserver(s) gaven Extended DNS Error (RFC 8914) {info_code} ({info_name}) terug: \"{extra_text}\". Teruggegeven door naamservers \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_SERVER_ERROR_REPORTED"
+msgid "The following name server(s) reported a server-side problem via Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "De volgende naamserver(s) meldden een probleem aan serverzijde via Extended DNS Error (RFC 8914) {info_code} ({info_name}): \"{extra_text}\". Teruggegeven door naamservers \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_RESOLVER_BEHAVIOR_REPORTED"
+msgid "The following name server(s) returned an Extended DNS Error (RFC 8914) {info_code} ({info_name}) normally produced by a recursive resolver, which may indicate a resolver is answering on an authoritative address or an unusual server configuration: \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "De volgende naamserver(s) gaven een Extended DNS Error (RFC 8914) {info_code} ({info_name}) terug die normaal door een recursieve resolver wordt geproduceerd, wat kan duiden op een resolver die antwoordt op een autoritatief adres of op een ongebruikelijke serverconfiguratie: \"{extra_text}\". Teruggegeven door naamservers \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_FILTERED_RESPONSE"
+msgid "The following name server(s) returned a filtering Extended DNS Error (RFC 8914) {info_code} ({info_name}), indicating a policy middlebox in the path: \"{extra_text}\". Returned from name servers \"{servers}\"."
+msgstr "De volgende naamserver(s) gaven een filterende Extended DNS Error (RFC 8914) {info_code} ({info_name}) terug, wat duidt op een policy-middlebox in het pad: \"{extra_text}\". Teruggegeven door naamservers \"{servers}\"."
+
+msgctxt "NAMESERVER:N18_NO_RESPONSE"
+msgid "The following name server(s) did not respond to an Extended DNS Error probe (RFC 8914): \"{servers}\"."
+msgstr "De volgende naamserver(s) reageerden niet op een Extended DNS Error-probe (RFC 8914): \"{servers}\"."
+
+msgctxt "NAMESERVER:QNAME_CASE_INSENSITIVE"
+msgid "The following nameservers do not preserve original case of the queried name ({domain}): {servers}."
+msgstr "De volgende naamservers behouden niet de oorspronkelijke hoofdletters/kleine letters van de opgevraagde naam ({domain}): {servers}."
+
+msgctxt "NAMESERVER:QNAME_CASE_SENSITIVE"
+msgid "The following nameservers preserve original case of queried names ({domain}): {servers}."
+msgstr "De volgende naamservers behouden de oorspronkelijke hoofdletters/kleine letters van opgevraagde namen ({domain}): {servers}."
+
+msgctxt "NAMESERVER:SAME_SOURCE_IP"
+msgid "All nameservers reply with same IP used to query them."
+msgstr "Alle naamservers antwoorden met hetzelfde IP-adres dat is gebruikt om ze op te vragen."
+
+msgctxt "NAMESERVER:UPWARD_REFERRAL"
+msgid "The following nameservers return an upward referral: {servers}."
+msgstr "De volgende naamservers geven een verwijzing naar boven (upward referral) terug: {servers}."
+
+msgctxt "NAMESERVER:UPWARD_REFERRAL_IRRELEVANT"
+msgid "Upward referral tests skipped for root zone."
+msgstr "Tests voor verwijzing naar boven (upward referral) overgeslagen voor de rootzone."
+
+msgctxt "NAMESERVER:Z_FLAGS_NOTCLEAR"
+msgid "Nameserver {ns}/{address} has one or more unknown EDNS Z flag bits set."
+msgstr "Naamserver {ns}/{address} heeft een of meer onbekende EDNS Z-vlagbits gezet."
+
+msgctxt "SYNTAX:DISCOURAGED_DOUBLE_DASH"
+msgid "Domain name ({domain}) has a label ({label}) with a double hyphen ('--') in position 3 and 4 (with a prefix which is not 'xn--')."
+msgstr "Domeinnaam ({domain}) heeft een label ({label}) met een dubbel koppelteken ('--') op positie 3 en 4 (met een prefix die niet 'xn--' is)."
+
+msgctxt "SYNTAX:INITIAL_HYPHEN"
+msgid "Domain name ({domain}) has a label ({label}) starting with an hyphen ('-')."
+msgstr "Domeinnaam ({domain}) heeft een label ({label}) dat begint met een koppelteken ('-')."
+
+msgctxt "SYNTAX:MNAME_DISCOURAGED_DOUBLE_DASH"
+msgid "SOA MNAME ({domain}) has a label ({label}) with a double hyphen ('--') in position 3 and 4 (with a prefix which is not 'xn--')."
+msgstr "SOA MNAME ({domain}) heeft een label ({label}) met een dubbel koppelteken ('--') op positie 3 en 4 (met een prefix die niet 'xn--' is)."
+
+msgctxt "SYNTAX:MNAME_NON_ALLOWED_CHARS"
+msgid "Found illegal characters in SOA MNAME ({domain})."
+msgstr "Ongeldige tekens gevonden in SOA MNAME ({domain})."
+
+msgctxt "SYNTAX:MNAME_NUMERIC_TLD"
+msgid "SOA MNAME ({domain}) within a 'numeric only' TLD ({tld})."
+msgstr "SOA MNAME ({domain}) binnen een 'alleen numerieke' TLD ({tld})."
+
+msgctxt "SYNTAX:MNAME_SYNTAX_OK"
+msgid "SOA MNAME ({domain}) syntax is valid."
+msgstr "De syntaxis van SOA MNAME ({domain}) is geldig."
+
+msgctxt "SYNTAX:MX_DISCOURAGED_DOUBLE_DASH"
+msgid "Domain name MX ({domain}) has a label ({label}) with a double hyphen ('--') in position 3 and 4 (with a prefix which is not 'xn--')."
+msgstr "Domeinnaam-MX ({domain}) heeft een label ({label}) met een dubbel koppelteken ('--') op positie 3 en 4 (met een prefix die niet 'xn--' is)."
+
+msgctxt "SYNTAX:MX_NON_ALLOWED_CHARS"
+msgid "Found illegal characters in MX ({domain})."
+msgstr "Ongeldige tekens gevonden in MX ({domain})."
+
+msgctxt "SYNTAX:MX_NUMERIC_TLD"
+msgid "Domain name MX ({domain}) within a 'numeric only' TLD ({tld})."
+msgstr "Domeinnaam-MX ({domain}) binnen een 'alleen numerieke' TLD ({tld})."
+
+msgctxt "SYNTAX:MX_SYNTAX_OK"
+msgid "Domain name MX ({domain}) syntax is valid."
+msgstr "De syntaxis van domeinnaam-MX ({domain}) is geldig."
+
+msgctxt "SYNTAX:NAMESERVER_DISCOURAGED_DOUBLE_DASH"
+msgid "Nameserver ({domain}) has a label ({label}) with a double hyphen ('--') in position 3 and 4 (with a prefix which is not 'xn--')."
+msgstr "Naamserver ({domain}) heeft een label ({label}) met een dubbel koppelteken ('--') op positie 3 en 4 (met een prefix die niet 'xn--' is)."
+
+msgctxt "SYNTAX:NAMESERVER_NON_ALLOWED_CHARS"
+msgid "Found illegal characters in the nameserver ({domain})."
+msgstr "Ongeldige tekens gevonden in de naamserver ({domain})."
+
+msgctxt "SYNTAX:NAMESERVER_NUMERIC_TLD"
+msgid "Nameserver ({domain}) within a 'numeric only' TLD ({tld})."
+msgstr "Naamserver ({domain}) binnen een 'alleen numerieke' TLD ({tld})."
+
+msgctxt "SYNTAX:NAMESERVER_SYNTAX_OK"
+msgid "The following nameservers have valid syntax: {servers}."
+msgstr "De volgende naamservers hebben een geldige syntaxis: {servers}."
+
+msgctxt "SYNTAX:NON_ALLOWED_CHARS"
+msgid "Found illegal characters in the domain name ({domain})."
+msgstr "Ongeldige tekens gevonden in de domeinnaam ({domain})."
+
+msgctxt "SYNTAX:NO_DOUBLE_DASH"
+msgid "Domain name ({domain}) has no label with a double hyphen ('--') in position 3 and 4 (with a prefix which is not 'xn--')."
+msgstr "Domeinnaam ({domain}) heeft geen label met een dubbel koppelteken ('--') op positie 3 en 4 (met een prefix die niet 'xn--' is)."
+
+msgctxt "SYNTAX:NO_ENDING_HYPHENS"
+msgid "Neither end of any label in the domain name ({domain}) has a hyphen."
+msgstr "Geen van beide uiteinden van enig label in de domeinnaam ({domain}) heeft een koppelteken."
+
+msgctxt "SYNTAX:NO_RESPONSE_MX_QUERY"
+msgid "No response from nameserver(s) on MX queries."
+msgstr "Geen antwoord van naamserver(s) op MX-query's."
+
+msgctxt "ZONE:NO_RESPONSE_MX_QUERY"
+msgid "No response from nameserver(s) on MX queries."
+msgstr "Geen antwoord van naamserver(s) op MX-query's."
+
+msgctxt "SYNTAX:NO_RESPONSE_SOA_QUERY"
+msgid "No response from nameserver(s) on SOA queries."
+msgstr "Geen antwoord van naamserver(s) op SOA-query's."
+
+msgctxt "ZONE:NO_RESPONSE_SOA_QUERY"
+msgid "No response from nameserver(s) on SOA queries."
+msgstr "Geen antwoord van naamserver(s) op SOA-query's."
+
+msgctxt "SYNTAX:ONLY_ALLOWED_CHARS"
+msgid "No illegal characters in the domain name ({domain})."
+msgstr "Geen ongeldige tekens in de domeinnaam ({domain})."
+
+msgctxt "SYNTAX:RNAME_MAIL_DOMAIN_INVALID"
+msgid "The SOA RNAME mail domain ({domain}) cannot be resolved to a mail server with an IP address."
+msgstr "Het SOA RNAME-maildomein ({domain}) kan niet worden herleid naar een mailserver met een IP-adres."
+
+msgctxt "SYNTAX:RNAME_MAIL_DOMAIN_LOCALHOST"
+msgid "The SOA RNAME mail domain ({domain}) resolved to a mail server with localhost ({localhost}) IP address."
+msgstr "Het SOA RNAME-maildomein ({domain}) werd herleid naar een mailserver met het localhost-IP-adres ({localhost})."
+
+msgctxt "SYNTAX:RNAME_MAIL_ILLEGAL_CNAME"
+msgid "The SOA RNAME mail domain ({domain}) refers to an address which is an alias (CNAME)."
+msgstr "Het SOA RNAME-maildomein ({domain}) verwijst naar een adres dat een alias (CNAME) is."
+
+msgctxt "SYNTAX:RNAME_MISUSED_AT_SIGN"
+msgid "Misused '@' character found in SOA RNAME field ({rname})."
+msgstr "Onjuist gebruikt '@'-teken gevonden in het SOA RNAME-veld ({rname})."
+
+msgctxt "SYNTAX:RNAME_NO_AT_SIGN"
+msgid "There is no misused '@' character in the SOA RNAME field ({rname})."
+msgstr "Er is geen onjuist gebruikt '@'-teken in het SOA RNAME-veld ({rname})."
+
+msgctxt "SYNTAX:RNAME_RFC822_INVALID"
+msgid "Illegal character(s) found in SOA RNAME field ({rname})."
+msgstr "Ongeldige tekens gevonden in het SOA RNAME-veld ({rname})."
+
+msgctxt "SYNTAX:RNAME_RFC822_VALID"
+msgid "The SOA RNAME field ({rname}) is compliant with RFC2822."
+msgstr "Het SOA RNAME-veld ({rname}) voldoet aan RFC2822."
+
+msgctxt "SYNTAX:TERMINAL_HYPHEN"
+msgid "Domain name ({domain}) has a label ({label}) ending with a hyphen ('-')."
+msgstr "Domeinnaam ({domain}) heeft een label ({label}) dat eindigt met een koppelteken ('-')."
+
+msgctxt "ZONE:RETRY_MINIMUM_VALUE_LOWER"
+msgid "SOA 'retry' value ({retry}) is less than the recommended one ({required_retry})."
+msgstr "SOA 'retry'-waarde ({retry}) is lager dan de aanbevolen waarde ({required_retry})."
+
+msgctxt "ZONE:RETRY_MINIMUM_VALUE_OK"
+msgid "SOA 'retry' value ({retry}) is at least equal to the minimum recommended value ({required_retry})."
+msgstr "SOA 'retry'-waarde ({retry}) is ten minste gelijk aan de aanbevolen minimumwaarde ({required_retry})."
+
+msgctxt "ZONE:MNAME_IS_CNAME"
+msgid "SOA 'mname' value ({mname}) refers to a NS which is an alias (CNAME)."
+msgstr "SOA 'mname'-waarde ({mname}) verwijst naar een NS die een alias (CNAME) is."
+
+msgctxt "ZONE:MNAME_IS_NOT_CNAME"
+msgid "SOA 'mname' value ({mname}) refers to a NS which is not an alias (CNAME)."
+msgstr "SOA 'mname'-waarde ({mname}) verwijst naar een NS die geen alias (CNAME) is."
+
+msgctxt "ZONE:REFRESH_MINIMUM_VALUE_LOWER"
+msgid "SOA 'refresh' value ({refresh}) is less than the recommended one ({required_refresh})."
+msgstr "SOA 'refresh'-waarde ({refresh}) is lager dan de aanbevolen waarde ({required_refresh})."
+
+msgctxt "ZONE:REFRESH_MINIMUM_VALUE_OK"
+msgid "SOA 'refresh' value ({refresh}) is at least equal to the minimum recommended value ({required_refresh})."
+msgstr "SOA 'refresh'-waarde ({refresh}) is ten minste gelijk aan de aanbevolen minimumwaarde ({required_refresh})."
+
+msgctxt "ZONE:EXPIRE_LOWER_THAN_REFRESH"
+msgid "SOA 'expire' value ({expire}) is lower than the SOA 'refresh' value ({refresh})."
+msgstr "SOA 'expire'-waarde ({expire}) is lager dan de SOA 'refresh'-waarde ({refresh})."
+
+msgctxt "ZONE:SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER"
+msgid "SOA 'minimum' value ({minimum}) is higher than the recommended one ({highest_minimum})."
+msgstr "SOA 'minimum'-waarde ({minimum}) is hoger dan de aanbevolen waarde ({highest_minimum})."
+
+msgctxt "ZONE:SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER"
+msgid "SOA 'minimum' value ({minimum}) is less than the recommended one ({lowest_minimum})."
+msgstr "SOA 'minimum'-waarde ({minimum}) is lager dan de aanbevolen waarde ({lowest_minimum})."
+
+msgctxt "ZONE:SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK"
+msgid "SOA 'minimum' value ({minimum}) is between the recommended ones ({lowest_minimum}/{highest_minimum})."
+msgstr "SOA 'minimum'-waarde ({minimum}) ligt tussen de aanbevolen waarden ({lowest_minimum}/{highest_minimum})."
+
+msgctxt "ZONE:EXPIRE_MINIMUM_VALUE_LOWER"
+msgid "SOA 'expire' value ({expire}) is less than the recommended one ({required_expire})."
+msgstr "SOA 'expire'-waarde ({expire}) is lager dan de aanbevolen waarde ({required_expire})."
+
+msgctxt "ZONE:REFRESH_LOWER_THAN_RETRY"
+msgid "SOA 'refresh' value ({refresh}) is lower than the SOA 'retry' value ({retry})."
+msgstr "SOA 'refresh'-waarde ({refresh}) is lager dan de SOA 'retry'-waarde ({retry})."
+
+msgctxt "ZONE:REFRESH_HIGHER_THAN_RETRY"
+msgid "SOA 'refresh' value ({refresh}) is higher than the SOA 'retry' value ({retry})."
+msgstr "SOA 'refresh'-waarde ({refresh}) is hoger dan de SOA 'retry'-waarde ({retry})."
+
+msgctxt "ZONE:MX_RECORD_IS_CNAME"
+msgid "MX record for the domain is pointing to a CNAME."
+msgstr "MX-record voor het domein verwijst naar een CNAME."
+
+msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
+msgid "MX record for the domain is not pointing to a CNAME."
+msgstr "MX-record voor het domein verwijst niet naar een CNAME."
+
+msgctxt "ZONE:MULTIPLE_SOA"
+msgid "Nameserver {ns}/{address} responds with multiple ({count}) SOA records on SOA queries."
+msgstr "Naamserver {ns}/{address} antwoordt met meerdere ({count}) SOA-records op SOA-query's."
+
+msgctxt "ZONE:NO_SOA_IN_RESPONSE"
+msgid "Response from nameserver {ns}/{address} on SOA queries does not contain SOA record."
+msgstr "Antwoord van naamserver {ns}/{address} op SOA-query's bevat geen SOA-record."
+
+msgctxt "ZONE:MNAME_HAS_NO_ADDRESS"
+msgid "No IP address found for SOA 'mname' nameserver ({mname})."
+msgstr "Geen IP-adres gevonden voor SOA 'mname'-naamserver ({mname})."
+
+msgctxt "ZONE:ONE_SOA"
+msgid "A unique SOA record is returned by all nameservers of the zone."
+msgstr "Een uniek SOA-record wordt door alle naamservers van de zone teruggegeven."
+
+msgctxt "ZONE:EXPIRE_MINIMUM_VALUE_OK"
+msgid "SOA 'expire' value ({expire}) is higher than the minimum recommended value ({required_expire}) and not lower than the 'refresh' value ({refresh})."
+msgstr "SOA 'expire'-waarde ({expire}) is hoger dan de aanbevolen minimumwaarde ({required_expire}) en niet lager dan de 'refresh'-waarde ({refresh})."
+
+msgctxt "ZONE:WRONG_SOA"
+msgid "Nameserver {ns}/{address} responds with a wrong owner name ({owner} instead of {query_name}) on SOA queries."
+msgstr "Naamserver {ns}/{address} antwoordt met een verkeerde owner name ({owner} in plaats van {query_name}) op SOA-query's."
+
+msgctxt "ZONE:APEX_DNAME"
+msgid "Nameserver {ns}/{address} returns a DNAME record at the zone apex."
+msgstr "Naamserver {ns}/{address} geeft een DNAME-record terug op de zone-apex."
+
+msgctxt "ZONE:SOA_AND_CNAME"
+msgid "Nameserver {ns}/{address} returns a CNAME record at the zone apex alongside the SOA record."
+msgstr "Naamserver {ns}/{address} geeft een CNAME-record terug op de zone-apex naast het SOA-record."
+
+msgctxt "ZONE:Z01_MNAME_HAS_LOCALHOST_ADDR"
+msgid "SOA MNAME name server \"{ns}\" resolves to a localhost IP address ({address})."
+msgstr "SOA MNAME-naamserver \"{ns}\" herleidt naar een localhost-IP-adres ({address})."
+
+msgctxt "ZONE:Z01_MNAME_IS_DOT"
+msgid "SOA MNAME is specified as \".\" which usually means \"no server\". Fetched from name servers \"{addresses}\"."
+msgstr "SOA MNAME is opgegeven als \".\", wat meestal \"geen server\" betekent. Opgehaald van naamservers \"{addresses}\"."
+
+msgctxt "ZONE:Z01_MNAME_IS_LOCALHOST"
+msgid "SOA MNAME name server is \"localhost\", which is invalid. Fetched from name servers \"{addresses}\"."
+msgstr "SOA MNAME-naamserver is \"localhost\", wat ongeldig is. Opgehaald van naamservers \"{addresses}\"."
+
+msgctxt "ZONE:Z01_MNAME_IS_MASTER"
+msgid "SOA MNAME name server(s) \"{servers}\" appears to be master."
+msgstr "SOA MNAME-naamserver(s) \"{servers}\" lijkt master te zijn."
+
+msgctxt "ZONE:Z01_MNAME_MISSING_SOA_RECORD"
+msgid "SOA MNAME name server \"{ns}/{address}\" responds to an SOA query with no SOA records in the answer section."
+msgstr "SOA MNAME-naamserver \"{ns}/{address}\" antwoordt op een SOA-query zonder SOA-records in de answer-sectie."
+
+msgctxt "ZONE:Z01_MNAME_NO_RESPONSE"
+msgid "SOA MNAME name server \"{ns}/{address}\" does not respond to an SOA query."
+msgstr "SOA MNAME-naamserver \"{ns}/{address}\" reageert niet op een SOA-query."
+
+msgctxt "ZONE:Z01_MNAME_NOT_AUTHORITATIVE"
+msgid "SOA MNAME name server \"{ns}/{address}\" is not authoritative for the zone."
+msgstr "SOA MNAME-naamserver \"{ns}/{address}\" is niet autoritatief voor de zone."
+
+msgctxt "ZONE:Z01_MNAME_NOT_IN_NS_LIST"
+msgid "SOA MNAME name server \"{ns}\" is not listed as NS record for the zone."
+msgstr "SOA MNAME-naamserver \"{ns}\" staat niet vermeld als NS-record voor de zone."
+
+msgctxt "ZONE:Z01_MNAME_NOT_MASTER"
+msgid "SOA MNAME name server(s) \"{servers}\" do not have the highest SOA SERIAL (expected \"{soaserial}\" but got \"{soaserial_list}\")"
+msgstr "SOA MNAME-naamserver(s) \"{servers}\" hebben niet de hoogste SOA SERIAL (verwacht \"{soaserial}\" maar kreeg \"{soaserial_list}\")"
+
+msgctxt "ZONE:Z01_MNAME_NOT_RESOLVE"
+msgid "SOA MNAME name server \"{ns}\" cannot be resolved into an IP address."
+msgstr "SOA MNAME-naamserver \"{ns}\" kan niet worden herleid naar een IP-adres."
+
+msgctxt "ZONE:Z01_MNAME_UNEXPECTED_RCODE"
+msgid "SOA MNAME name server \"{ns}/{address}\" gives unexpected RCODE name (\"{rcode}\") in response to an SOA query."
+msgstr "SOA MNAME-naamserver \"{ns}/{address}\" geeft een onverwachte RCODE-naam (\"{rcode}\") in antwoord op een SOA-query."
+
+msgctxt "ZONE:Z09_INCONSISTENT_MX"
+msgid "Some name servers return an MX RRset while others return none."
+msgstr "Sommige naamservers geven een MX-RRset terug terwijl andere er geen teruggeven."
+
+msgctxt "ZONE:Z09_INCONSISTENT_MX_DATA"
+msgid "The MX RRset data is inconsistent between the name servers."
+msgstr "De MX-RRset-gegevens zijn inconsistent tussen de naamservers."
+
+msgctxt "ZONE:Z09_MISSING_MAIL_TARGET"
+msgid "The child zone has no mail target (no MX)."
+msgstr "De onderliggende zone heeft geen mailbestemming (geen MX)."
+
+msgctxt "ZONE:Z09_MX_DATA"
+msgid "Mail targets in the MX RRset \"{mail_targets}\" returned from name servers \"{addresses}\"."
+msgstr "Mailbestemmingen in de MX-RRset \"{mail_targets}\" teruggegeven door naamservers \"{addresses}\"."
+
+msgctxt "ZONE:Z09_MX_FOUND"
+msgid "MX RRset was returned by name servers \"{addresses}\"."
+msgstr "MX-RRset werd teruggegeven door naamservers \"{addresses}\"."
+
+msgctxt "ZONE:Z09_NON_AUTH_MX_RESPONSE"
+msgid "Non-authoritative response on MX query from name servers \"{addresses}\"."
+msgstr "Niet-autoritatief antwoord op MX-query van naamservers \"{addresses}\"."
+
+msgctxt "ZONE:Z09_NO_MX_FOUND"
+msgid "No MX RRset was returned by name servers \"{addresses}\"."
+msgstr "Geen MX-RRset werd teruggegeven door naamservers \"{addresses}\"."
+
+msgctxt "ZONE:Z09_NO_RESPONSE_MX_QUERY"
+msgid "No response on MX query from name servers \"{addresses}\"."
+msgstr "Geen antwoord op MX-query van naamservers \"{addresses}\"."
+
+msgctxt "ZONE:Z09_NULL_MX_NON_ZERO_PREF"
+msgid "The zone has a Null MX with non-zero preference."
+msgstr "De zone heeft een Null MX met een preferentie die niet nul is."
+
+msgctxt "ZONE:Z09_NULL_MX_WITH_OTHER_MX"
+msgid "The zone has a Null MX mixed with other MX records."
+msgstr "De zone heeft een Null MX gemengd met andere MX-records."
+
+msgctxt "ZONE:Z09_ROOT_EMAIL_DOMAIN"
+msgid "Root zone with an unexpected MX RRset (non-Null MX)."
+msgstr "Rootzone met een onverwachte MX-RRset (geen Null MX)."
+
+msgctxt "ZONE:Z09_TLD_EMAIL_DOMAIN"
+msgid "The zone is a TLD and has an unexpected MX RRset (non-Null MX)."
+msgstr "De zone is een TLD en heeft een onverwachte MX-RRset (geen Null MX)."
+
+msgctxt "ZONE:Z09_UNEXPECTED_RCODE_MX"
+msgid "Unexpected RCODE value ({rcode}) on the MX query from name servers \"{addresses}\"."
+msgstr "Onverwachte RCODE-waarde ({rcode}) op de MX-query van naamservers \"{addresses}\"."
+
+msgctxt "ZONE:Z11_INCONSISTENT_SPF_POLICIES"
+msgid "One or more name servers do not publish the same SPF policy as the others."
+msgstr "Een of meer naamservers publiceren niet hetzelfde SPF-beleid als de andere."
+
+msgctxt "ZONE:Z11_DIFFERENT_SPF_POLICIES_FOUND"
+msgid "The following name servers returned the same SPF policy, but other name servers returned a different policy. Name servers: {addresses}."
+msgstr "De volgende naamservers gaven hetzelfde SPF-beleid terug, maar andere naamservers gaven een afwijkend beleid terug. Naamservers: {addresses}."
+
+msgctxt "ZONE:Z11_NO_SPF_FOUND"
+msgid "No SPF policy was found for {domain}."
+msgstr "Geen SPF-beleid gevonden voor {domain}."
+
+msgctxt "ZONE:Z11_UNABLE_TO_CHECK_FOR_SPF"
+msgid "None of the zone's name servers responded with an authoritative response to queries for SPF policies."
+msgstr "Geen van de naamservers van de zone gaf een autoritatief antwoord op query's voor SPF-beleid."
+
+msgctxt "ZONE:Z12_CSYNC_FOUND"
+msgid "CSYNC record found at zone apex on the following nameservers with SOA serial {serial}, flags {flags}, and type bitmap {type_bitmap}: {servers}."
+msgstr "CSYNC-record gevonden op de zone-apex op de volgende naamservers met SOA-serienummer {serial}, flags {flags}, en type-bitmap {type_bitmap}: {servers}."
+
+msgctxt "ZONE:Z12_INCONSISTENT_CSYNC"
+msgid "CSYNC record content differs across authoritative name servers."
+msgstr "De inhoud van het CSYNC-record verschilt tussen de autoritatieve naamservers."
+
+msgctxt "ZONE:Z12_MIXED_PRESENCE"
+msgid "CSYNC record is present on some name servers but absent on others."
+msgstr "CSYNC-record is aanwezig op sommige naamservers maar afwezig op andere."
+
+msgctxt "ZONE:Z12_MULTIPLE_CSYNC"
+msgid "{count} CSYNC records found at zone apex on name server {ns}/{address}."
+msgstr "{count} CSYNC-records gevonden op de zone-apex op naamserver {ns}/{address}."
+
+msgctxt "ZONE:Z12_NO_CSYNC"
+msgid "No CSYNC record found at zone apex on name servers: {servers}."
+msgstr "Geen CSYNC-record gevonden op de zone-apex op naamservers: {servers}."
+
+msgctxt "ZONE:Z12_SERIAL_MISMATCH"
+msgid "CSYNC SOA serial {csync_serial} fails RFC 7477 serial precondition against current SOA serial {soa_serial} on name server {ns}."
+msgstr "CSYNC SOA-serienummer {csync_serial} voldoet niet aan de RFC 7477-serienummervoorwaarde ten opzichte van het huidige SOA-serienummer {soa_serial} op naamserver {ns}."
+
+msgctxt "ZONE:Z13_NO_SPF_FOUND"
+msgid "No SPF record found for {domain}; skipping DNS lookup count check."
+msgstr "Geen SPF-record gevonden voor {domain}; controle van het aantal DNS-lookups wordt overgeslagen."
+
+msgctxt "ZONE:Z13_SPF_LOOKUP_COUNT_EXCEEDED"
+msgid "The SPF policy for {domain} requires {count} DNS lookups, exceeding the configured limit of {limit} (RFC 7208 Section 4.6.4)."
+msgstr "Het SPF-beleid voor {domain} vereist {count} DNS-lookups, wat de geconfigureerde limiet van {limit} overschrijdt (RFC 7208 Section 4.6.4)."
+
+msgctxt "ZONE:Z13_SPF_LOOKUP_COUNT_OK"
+msgid "The SPF policy for {domain} requires {count} DNS lookups, within the allowed limit."
+msgstr "Het SPF-beleid voor {domain} vereist {count} DNS-lookups, binnen de toegestane limiet."
+
+msgctxt "ZONE:Z13_SPF_LOOKUP_LOOP"
+msgid "The SPF policy for {domain} contains a recursive loop: {loop_domain} was visited more than once during include/redirect resolution."
+msgstr "Het SPF-beleid voor {domain} bevat een recursieve lus: {loop_domain} werd meer dan eens bezocht tijdens het herleiden van include/redirect."
+
+msgctxt "ZONE:Z13_SPF_MACRO_TARGET"
+msgid "The SPF policy for {domain} references {target} via include or redirect, but the target contains SPF macros that can only be expanded at SMTP time (RFC 7208 Section 7); its DNS lookup count is not audited."
+msgstr "Het SPF-beleid voor {domain} verwijst naar {target} via include of redirect, maar het doel bevat SPF-macro's die alleen op SMTP-tijdstip kunnen worden uitgevouwen (RFC 7208 Section 7); het aantal DNS-lookups wordt niet gecontroleerd."
+
+msgctxt "ZONE:Z13_SPF_PTR_DEPRECATED"
+msgid "The SPF policy for {domain} uses the deprecated ptr mechanism (RFC 7208 Section 5.5)."
+msgstr "Het SPF-beleid voor {domain} gebruikt het verouderde ptr-mechanisme (RFC 7208 Section 5.5)."
+
+msgctxt "ZONE:Z13_SPF_RECURSIVE_ERROR"
+msgid "The SPF policy for {domain} references {target} via include or redirect, but that target could not be resolved."
+msgstr "Het SPF-beleid voor {domain} verwijst naar {target} via include of redirect, maar dat doel kon niet worden herleid."
+
+msgctxt "ZONE:Z13_UNABLE_TO_CHECK"
+msgid "None of the zone's name servers responded with an authoritative response to queries for SPF policies; unable to check DNS lookup count."
+msgstr "Geen van de naamservers van de zone gaf een autoritatief antwoord op query's voor SPF-beleid; het aantal DNS-lookups kan niet worden gecontroleerd."
+
+msgctxt "ZONE:Z14_DUPLICATE_SCHEME_HASH"
+msgid "ZONEMD records at zone apex on name server {ns} contain duplicate (Scheme, Hash) pair: scheme {scheme}, hash {hash}."
+msgstr "ZONEMD-records op de zone-apex op naamserver {ns} bevatten een dubbel (Scheme, Hash)-paar: scheme {scheme}, hash {hash}."
+
+msgctxt "ZONE:Z14_INCONSISTENT_ZONEMD"
+msgid "ZONEMD record content differs across authoritative name servers."
+msgstr "De inhoud van het ZONEMD-record verschilt tussen de autoritatieve naamservers."
+
+msgctxt "ZONE:Z14_MIXED_PRESENCE"
+msgid "ZONEMD record is present on some name servers but absent on others."
+msgstr "ZONEMD-record is aanwezig op sommige naamservers maar afwezig op andere."
+
+msgctxt "ZONE:Z14_NO_ZONEMD"
+msgid "No ZONEMD record found at zone apex on name servers: {servers}."
+msgstr "Geen ZONEMD-record gevonden op de zone-apex op naamservers: {servers}."
+
+msgctxt "ZONE:Z14_SERIAL_MISMATCH"
+msgid "ZONEMD serial {zonemd_serial} does not match current SOA serial {soa_serial} on name server {ns}."
+msgstr "ZONEMD-serienummer {zonemd_serial} komt niet overeen met het huidige SOA-serienummer {soa_serial} op naamserver {ns}."
+
+msgctxt "ZONE:Z14_UNSUPPORTED_HASH"
+msgid "ZONEMD record on name server {ns} uses hash algorithm {hash}, which is outside the IANA-assigned set verifiable by standard tooling (1 = SHA-384, 2 = SHA-512)."
+msgstr "ZONEMD-record op naamserver {ns} gebruikt hash-algoritme {hash}, dat buiten de door IANA toegewezen set valt die met standaardtools verifieerbaar is (1 = SHA-384, 2 = SHA-512)."
+
+msgctxt "ZONE:Z14_ZONEMD_FOUND"
+msgid "ZONEMD record found at zone apex: serial {serial}, scheme {scheme}, hash algorithm {hash}, digest {digest}. Name servers: {servers}."
+msgstr "ZONEMD-record gevonden op de zone-apex: serienummer {serial}, scheme {scheme}, hash-algoritme {hash}, digest {digest}. Naamservers: {servers}."
+
+msgctxt "SYSTEM:CANNOT_CONTINUE"
+msgid "Not enough data about {domain} was found to be able to run tests."
+msgstr "Er is niet genoeg data over {domain} gevonden om tests te kunnen uitvoeren."
+
+msgctxt "SYSTEM:DEPENDENCY_VERSION"
+msgid "Using prerequisite module {name} version {version}."
+msgstr "Vereiste module {name} versie {version} wordt gebruikt."
+
+msgctxt "SYSTEM:GLOBAL_VERSION"
+msgid "Using version {version} of the Gonemaster engine."
+msgstr "Versie {version} van de Gonemaster-engine wordt gebruikt."
+
+msgctxt "SYSTEM:IPV6_AUTO_DISABLED"
+msgid "IPv6 automatically disabled: {reason}."
+msgstr "IPv6 automatisch uitgeschakeld: {reason}."
+
+msgctxt "SYSTEM:LOGGER_CALLBACK_ERROR"
+msgid "Logger callback died with error: {exception}"
+msgstr "Logger-callback gecrasht met fout: {exception}"
+
+msgctxt "SYSTEM:MODULE_ERROR"
+msgid "Fatal error in {module}: {msg}"
+msgstr "Fatale fout in {module}: {msg}"
+
+msgctxt "SYSTEM:MODULE_VERSION"
+msgid "Using module {module} version {version}."
+msgstr "Module {module} versie {version} wordt gebruikt."
+
+msgctxt "SYSTEM:MODULE_END"
+msgid "Module {module} finished running."
+msgstr "Module {module} is klaar met uitvoeren."
+
+msgctxt "SYSTEM:NON_GLOBAL_QUERY_BLOCKED"
+msgid "Query to {ns} skipped: {address} is a private or non-globally-reachable address."
+msgstr "Query naar {ns} overgeslagen: {address} is een privé- of niet-globaal-bereikbaar adres."
+
+msgctxt "SYSTEM:NO_NETWORK"
+msgid "Both IPv4 and IPv6 are disabled."
+msgstr "Zowel IPv4 als IPv6 is uitgeschakeld."
+
+msgctxt "SYSTEM:UNKNOWN_METHOD"
+msgid "Request to run unknown method {testcase} in module {module}."
+msgstr "Verzoek om onbekende methode {testcase} uit te voeren in module {module}."
+
+msgctxt "SYSTEM:UNKNOWN_MODULE"
+msgid "Request to run {testcase} in unknown module {module}. Known modules: {module_list}."
+msgstr "Verzoek om {testcase} uit te voeren in onbekende module {module}. Bekende modules: {module_list}."
+
+msgctxt "SYSTEM:FAKE_DELEGATION_TO_SELF"
+msgid "Name server {ns} not adding fake delegation for domain {domain} to itself."
+msgstr "Naamserver {ns} voegt geen nep-delegatie voor domein {domain} naar zichzelf toe."
+
+msgctxt "SYSTEM:FAKE_DELEGATION_IN_ZONE_NO_IP"
+msgid "The fake delegation of domain {domain} includes an in-zone name server {ns} without mandatory glue (without IP address)."
+msgstr "De nep-delegatie van domein {domain} bevat een in-zone-naamserver {ns} zonder verplichte glue (zonder IP-adres)."
+
+msgctxt "SYSTEM:FAKE_DELEGATION_NO_IP"
+msgid "The fake delegation of domain {domain} includes a name server {ns} that cannot be resolved to any IP address."
+msgstr "De nep-delegatie van domein {domain} bevat een naamserver {ns} die niet naar een IP-adres kan worden herleid."
+
+msgctxt "SYSTEM:PACKET_BIG"
+msgid "Big packet size ({size}) (try with \"{command}\")."
+msgstr "Grote pakketgrootte ({size}) (probeer met \"{command}\")."
+
+msgctxt "ADDRESS:A01_ADDR_NOT_GLOBALLY_REACHABLE"
+msgid "IP address(es) not listed as globally reachable: \"{servers}\"."
+msgstr "IP-adres(sen) niet vermeld als wereldwijd bereikbaar: \"{servers}\"."
+
+msgctxt "ADDRESS:A01_DOCUMENTATION_ADDR"
+msgid "IP address(es) intended for documentation purposes: \"{servers}\"."
+msgstr "IP-adres(sen) bedoeld voor documentatiedoeleinden: \"{servers}\"."
+
+msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
+msgid "All tested nameservers in {servers} are globally reachable."
+msgstr "Alle geteste naamservers in {servers} zijn wereldwijd bereikbaar."
+
+msgctxt "ADDRESS:A01_NO_GLOBALLY_REACHABLE_ADDR"
+msgid "None of the name servers IP addresses are listed as globally reachable."
+msgstr "Geen van de IP-adressen van de naamservers is vermeld als wereldwijd bereikbaar."
+
+msgctxt "ADDRESS:A01_NO_NAME_SERVERS_FOUND"
+msgid "No name servers found."
+msgstr "Geen naamservers gevonden."
+
+msgctxt "BASIC:B01_CHILD_NOT_EXIST"
+msgid "The zone \"{domain}\" does not exist as a zone."
+msgstr "De zone \"{domain}\" bestaat niet als zone."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_OK"
+msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {servers}."
+msgstr "DS-record met key tag {keytag} en digest-algoritme {ds_algo_num} ({ds_algo_descr}) is acceptabel. Opgehaald van naamservers {servers}."
+
+msgctxt "DNSSEC:DS01_ROOT_N_NO_UNDEL_DS"
+msgid "No undelegated DS records provided for the root zone."
+msgstr "Geen ongedelegeerde DS-records opgegeven voor de rootzone."
+
+msgctxt "DNSSEC:DS01_UNDEL_N_NO_UNDEL_DS"
+msgid "No undelegated DS records provided for this test."
+msgstr "Geen ongedelegeerde DS-records opgegeven voor deze test."
+
+msgctxt "DNSSEC:DS05_ALGO_OK"
+msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {servers}."
+msgstr "DNSKEY met key tag {keytag} gebruikt algoritme {algo_num} ({algo_descr}, {algo_mnemo}), wat acceptabel is. Opgehaald van naamservers {servers}."
+
+msgctxt "DNSSEC:DS07_DS_FOR_SIGNED_ZONE"
+msgid "DS records are published in the parent zone for the signed zone."
+msgstr "Er zijn DS-records gepubliceerd in de bovenliggende zone voor de ondertekende zone."
+
+msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
+msgid "DS records found on parent name servers {servers}."
+msgstr "DS-records gevonden op bovenliggende naamservers {servers}."
+
+msgctxt "DNSSEC:DS07_NOT_SIGNED"
+msgid "The zone is not signed."
+msgstr "De zone is niet ondertekend."
+
+msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
+msgid "The parent zone has no DS record for the signed child zone."
+msgstr "De bovenliggende zone heeft geen DS-record voor de ondertekende onderliggende zone."
+
+msgctxt "DNSSEC:DS07_SIGNED"
+msgid "The zone is signed with DNSSEC."
+msgstr "De zone is ondertekend met DNSSEC."
+
+msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
+msgid "Signed responses received from name servers {servers}."
+msgstr "Ondertekende antwoorden ontvangen van naamservers {servers}."
+
+msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
+msgid "No SPF policy found for {domain}, which is not a mail domain."
+msgstr "Geen SPF-beleid gevonden voor {domain}, dat geen maildomein is."
+
+msgctxt "ZONE:Z11_NULL_SPF_NON_MAIL_DOMAIN"
+msgid "Null SPF policy found for {domain}, which is not a mail domain."
+msgstr "Null SPF-beleid gevonden voor {domain}, dat geen maildomein is."
+
+msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
+msgid "SPF syntax is correct for {domain}."
+msgstr "SPF-syntaxis is correct voor {domain}."
+
+msgctxt "SYSTEM:CLI_HEADER_SECONDS"
+msgid "Seconds"
+msgstr "Seconden"
+
+msgctxt "SYSTEM:CLI_HEADER_LEVEL"
+msgid "Level"
+msgstr "Niveau"
+
+msgctxt "SYSTEM:CLI_HEADER_MESSAGE"
+msgid "Message"
+msgstr "Bericht"
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_ANNOUNCE_IN"
+msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."
+msgstr "IP-adres \"{address}\" van de naamserver wordt aangekondigd in prefix \"{prefixes}\"."
+
+msgctxt "CONNECTIVITY:CN04_ASN_INFOS_RAW"
+msgid "The ASN data for name server IP address \"{address}\" is \"{data}\"."
+msgstr "De ASN-gegevens voor IP-adres \"{address}\" van de naamserver zijn \"{data}\"."
+
+msgctxt "CONSISTENCY:SOA_MNAME"
+msgid "Found SOA mname {mname} on following nameserver set : {servers}."
+msgstr "SOA-mname {mname} gevonden op de volgende set naamservers : {servers}."
+
+msgctxt "BASIC:LOOP_PROTECTION"
+msgid "Loop protection triggered in {caller} for child zone {child_zone_name} at zone {zone_name} (query name {intermediate_query_name})."
+msgstr "Lusbeveiliging geactiveerd in {caller} voor onderliggende zone {child_zone_name} bij zone {zone_name} (querynaam {intermediate_query_name})."
+
+msgctxt "CONNECTIVITY:CN02_MISSING_NS_RECORD_TCP"
+msgid "Nameserver {ns}/{address} responds to a NS query with no NS records in the answer section over TCP."
+msgstr "Naamserver {ns}/{address} beantwoordt een NS-query over TCP zonder NS-records in de antwoordsectie."
+
+msgctxt "CONNECTIVITY:CN02_MISSING_SOA_RECORD_TCP"
+msgid "Nameserver {ns}/{address} responds to a SOA query with no SOA records in the answer section over TCP."
+msgstr "Naamserver {ns}/{address} beantwoordt een SOA-query over TCP zonder SOA-records in de antwoordsectie."
+
+msgctxt "CONNECTIVITY:CN02_NO_RESPONSE_NS_QUERY_TCP"
+msgid "Nameserver {ns}/{address} does not respond to NS queries over TCP."
+msgstr "Naamserver {ns}/{address} reageert niet op NS-query's over TCP."
+
+msgctxt "CONNECTIVITY:CN02_NO_RESPONSE_SOA_QUERY_TCP"
+msgid "Nameserver {ns}/{address} does not respond to SOA queries over TCP."
+msgstr "Naamserver {ns}/{address} reageert niet op SOA-query's over TCP."
+
+msgctxt "CONNECTIVITY:CN02_NO_RESPONSE_TCP"
+msgid "Nameserver {ns}/{address} does not respond to any queries over TCP."
+msgstr "Naamserver {ns}/{address} reageert op geen enkele query over TCP."
+
+msgctxt "CONNECTIVITY:CN02_NS_RECORD_NOT_AA_TCP"
+msgid "Nameserver {ns}/{address} does not give an authoritative response on an NS query over TCP."
+msgstr "Naamserver {ns}/{address} geeft geen autoritatief antwoord op een NS-query over TCP."
+
+msgctxt "CONNECTIVITY:CN02_SOA_RECORD_NOT_AA_TCP"
+msgid "Nameserver {ns}/{address} does not give an authoritative response on an SOA query over TCP."
+msgstr "Naamserver {ns}/{address} geeft geen autoritatief antwoord op een SOA-query over TCP."
+
+msgctxt "CONNECTIVITY:CN02_UNEXPECTED_RCODE_NS_QUERY_TCP"
+msgid "Nameserver {ns}/{address} responds with an unexpected RCODE ({rcode}) on an NS query over TCP."
+msgstr "Naamserver {ns}/{address} reageert met een onverwachte RCODE ({rcode}) op een NS-query over TCP."
+
+msgctxt "CONNECTIVITY:CN02_UNEXPECTED_RCODE_SOA_QUERY_TCP"
+msgid "Nameserver {ns}/{address} responds with an unexpected RCODE ({rcode}) on an SOA query over TCP."
+msgstr "Naamserver {ns}/{address} reageert met een onverwachte RCODE ({rcode}) op een SOA-query over TCP."
+
+msgctxt "CONNECTIVITY:CN02_WRONG_NS_RECORD_TCP"
+msgid "Nameserver {ns}/{address} responds with a wrong owner name ({domain_found} instead of {domain_expected}) on NS queries over TCP."
+msgstr "Naamserver {ns}/{address} reageert met een verkeerde eigenaarsnaam ({domain_found} in plaats van {domain_expected}) op NS-query's over TCP."
+
+msgctxt "CONNECTIVITY:CN02_WRONG_SOA_RECORD_TCP"
+msgid "Nameserver {ns}/{address} responds with a wrong owner name ({domain_found} instead of {domain_expected}) on SOA queries over TCP."
+msgstr "Naamserver {ns}/{address} reageert met een verkeerde eigenaarsnaam ({domain_found} in plaats van {domain_expected}) op SOA-query's over TCP."
+
+msgctxt "CONNECTIVITY:CN02_OK_TCP"
+msgid "The following nameservers respond correctly to SOA and NS queries over TCP: \"{servers}\"."
+msgstr "De volgende naamservers reageren correct op SOA- en NS-query's over TCP: \"{servers}\"."
+
+msgctxt "CONNECTIVITY:ASN_INFOS_ANNOUNCE_IN"
+msgid "Name server IP address \"{address}\" is announced in prefix \"{prefixes}\"."
+msgstr "IP-adres \"{address}\" van de naamserver wordt aangekondigd in prefix \"{prefixes}\"."
+
+msgctxt "CONNECTIVITY:ASN_INFOS_RAW"
+msgid "The ASN data for name server IP address \"{address}\" is \"{data}\"."
+msgstr "De ASN-gegevens voor IP-adres \"{address}\" van de naamserver zijn \"{data}\"."
+
+msgctxt "CONNECTIVITY:CN04_EMPTY_PREFIX_SET"
+msgid "Prefix database returned no information for IP address {address}."
+msgstr "De prefixdatabase gaf geen informatie terug voor IP-adres {address}."
+
+msgctxt "DNSSEC:DURATION_LONG"
+msgid "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of {duration} seconds, which is too long."
+msgstr "RRSIG met key tag {keytag} en dekkend(e) type(n) {types} heeft een duur van {duration} seconden, wat te lang is."
+
+msgctxt "DNSSEC:DURATION_OK"
+msgid "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of {duration} seconds, which is just fine."
+msgstr "RRSIG met key tag {keytag} en dekkend(e) type(n) {types} heeft een duur van {duration} seconden, wat prima is."
+
+msgctxt "DNSSEC:EXTRA_PROCESSING_BROKEN"
+msgid "Server at {address} sent {keys} DNSKEY records, and {sigs} RRSIG records."
+msgstr "De server op {address} stuurde {keys} DNSKEY-records en {sigs} RRSIG-records."
+
+msgctxt "DNSSEC:EXTRA_PROCESSING_OK"
+msgid "Server at {address} sent {keys} DNSKEY records and {sigs} RRSIG records."
+msgstr "De server op {address} stuurde {keys} DNSKEY-records en {sigs} RRSIG-records."
+
+msgctxt "DNSSEC:KEY_SIZE_OK"
+msgid "All keys from the DNSKEY RRset have the correct size."
+msgstr "Alle sleutels uit de DNSKEY-RRset hebben de juiste grootte."
+
+msgctxt "DNSSEC:NO_RESPONSE_DNSKEY"
+msgid "Nameserver {ns}/{address} responded with no DNSKEY record(s)."
+msgstr "Naamserver {ns}/{address} antwoordde zonder DNSKEY-record(s)."
+
+msgctxt "DNSSEC:REMAINING_LONG"
+msgid "RRSIG with keytag {keytag} and covering type(s) {types} has a remaining validity of {duration} seconds, which is too long."
+msgstr "RRSIG met key tag {keytag} en dekkend(e) type(n) {types} heeft een resterende geldigheid van {duration} seconden, wat te lang is."
+
+msgctxt "DNSSEC:REMAINING_SHORT"
+msgid "RRSIG with keytag {keytag} and covering type(s) {types} has a remaining validity of {duration} seconds, which is too short."
+msgstr "RRSIG met key tag {keytag} en dekkend(e) type(n) {types} heeft een resterende geldigheid van {duration} seconden, wat te kort is."
+
+msgctxt "DNSSEC:RRSIG_EXPIRATION"
+msgid "RRSIG with keytag {keytag} and covering type(s) {types} expires at : {date}."
+msgstr "RRSIG met key tag {keytag} en dekkend(e) type(n) {types} verloopt op: {date}."
+
+msgctxt "DNSSEC:RRSIG_EXPIRED"
+msgid "RRSIG with keytag {keytag} and covering type(s) {types} has already expired (expiration is: {expiration})."
+msgstr "RRSIG met key tag {keytag} en dekkend(e) type(n) {types} is al verlopen (verloop is: {expiration})."
+
+msgctxt "DELEGATION:ARE_AUTHORITATIVE"
+msgid "All these nameservers are confirmed to be authoritative : {servers}."
+msgstr "Van al deze naamservers is bevestigd dat ze autoritatief zijn: {servers}."
+
+msgctxt "DELEGATION:CHILD_DISTINCT_NS_IP"
+msgid "All the IP addresses used by the nameservers in child are unique."
+msgstr "Alle IP-adressen die door de naamservers in de onderliggende zone worden gebruikt, zijn uniek."
+
+msgctxt "DELEGATION:CHILD_NS_SAME_IP"
+msgid "IP {address} in child refers to multiple nameservers ({servers})."
+msgstr "IP {address} in de onderliggende zone verwijst naar meerdere naamservers ({servers})."
+
+msgctxt "DELEGATION:DEL_DISTINCT_NS_IP"
+msgid "All the IP addresses used by the nameservers in parent are unique."
+msgstr "Alle IP-adressen die door de naamservers in de bovenliggende zone worden gebruikt, zijn uniek."
+
+msgctxt "DELEGATION:DEL_NS_SAME_IP"
+msgid "IP {address} in parent refers to multiple nameservers ({servers})."
+msgstr "IP {address} in de bovenliggende zone verwijst naar meerdere naamservers ({servers})."
+
+msgctxt "DELEGATION:DISTINCT_IP_ADDRESS"
+msgid "All the IP addresses used by the nameservers are unique."
+msgstr "Alle IP-adressen die door de naamservers worden gebruikt, zijn uniek."
+
+msgctxt "DELEGATION:ENOUGH_IPV4_NS_CHILD"
+msgid "Child lists enough ({count}) nameservers that resolve to IPv4 addresses. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De onderliggende zone vermeldt voldoende ({count}) naamservers die herleiden naar IPv4-adressen. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:ENOUGH_IPV4_NS_DEL"
+msgid "Delegation lists enough ({count}) nameservers that resolve to IPv4 addresses. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De delegatie vermeldt voldoende ({count}) naamservers die herleiden naar IPv4-adressen. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:ENOUGH_IPV6_NS_CHILD"
+msgid "Child lists enough ({count}) nameservers that resolve to IPv6 addresses. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De onderliggende zone vermeldt voldoende ({count}) naamservers die herleiden naar IPv6-adressen. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:ENOUGH_IPV6_NS_DEL"
+msgid "Delegation lists enough ({count}) nameservers that resolve to IPv6 addresses. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De delegatie vermeldt voldoende ({count}) naamservers die herleiden naar IPv6-adressen. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:ENOUGH_NS_CHILD"
+msgid "Child lists enough ({count}) nameservers. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De onderliggende zone vermeldt voldoende ({count}) naamservers. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:ENOUGH_NS_DEL"
+msgid "Delegation lists enough ({count}) nameservers. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De delegatie vermeldt voldoende ({count}) naamservers. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:EXTRA_NAME_CHILD"
+msgid "Child has nameserver(s) not listed at parent ({extra})."
+msgstr "De onderliggende zone heeft naamserver(s) die niet in de bovenliggende zone zijn vermeld ({extra})."
+
+msgctxt "DELEGATION:EXTRA_NAME_PARENT"
+msgid "Parent has nameserver(s) not listed at the child ({extra})."
+msgstr "De bovenliggende zone heeft naamserver(s) die niet in de onderliggende zone zijn vermeld ({extra})."
+
+msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
+msgid "In-bailiwick nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
+msgstr "In-bailiwick naamserver {ns} heeft geen glue-adresrecord (A of AAAA) in de verwijzing (referral) van de bovenliggende zone."
+
+msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
+msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."
+msgstr "Het antwoord van naamserver {ns}/{address} is niet autoritatief op {proto} poort 53."
+
+msgctxt "DELEGATION:NAMES_MATCH"
+msgid "All of the nameserver names are listed both at parent and child."
+msgstr "Alle namen van de naamservers zijn zowel in de bovenliggende als in de onderliggende zone vermeld."
+
+msgctxt "DELEGATION:NO_RESPONSE"
+msgid "Nameserver {ns} did not respond to a query for name {query_name} and type {query_type}."
+msgstr "Naamserver {ns} reageerde niet op een query voor naam {query_name} en type {query_type}."
+
+msgctxt "DELEGATION:NOT_ENOUGH_IPV4_NS_CHILD"
+msgid "Child does not list enough ({count}) nameservers that resolve to IPv4 addresses. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De onderliggende zone vermeldt onvoldoende ({count}) naamservers die herleiden naar IPv4-adressen. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:NOT_ENOUGH_IPV4_NS_DEL"
+msgid "Delegation does not list enough ({count}) nameservers that resolve to IPv4 addresses. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De delegatie vermeldt onvoldoende ({count}) naamservers die herleiden naar IPv4-adressen. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:NOT_ENOUGH_IPV6_NS_CHILD"
+msgid "Child does not list enough ({count}) nameservers that resolve to IPv6 addresses. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De onderliggende zone vermeldt onvoldoende ({count}) naamservers die herleiden naar IPv6-adressen. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:NOT_ENOUGH_IPV6_NS_DEL"
+msgid "Delegation does not list enough ({count}) nameservers that resolve to IPv6 addresses. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De delegatie vermeldt onvoldoende ({count}) naamservers die herleiden naar IPv6-adressen. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:NOT_ENOUGH_NS_CHILD"
+msgid "Child does not list enough ({count}) nameservers. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De onderliggende zone vermeldt onvoldoende ({count}) naamservers. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:NOT_ENOUGH_NS_DEL"
+msgid "Delegation does not list enough ({count}) nameservers. Lower limit set to {minimum}. Name servers: {servers}"
+msgstr "De delegatie vermeldt onvoldoende ({count}) naamservers. Ondergrens ingesteld op {minimum}. Naamservers: {servers}"
+
+msgctxt "DELEGATION:NO_IPV4_NS_CHILD"
+msgid "Child lists no nameserver that resolves to an IPv4 address. If any were present, the minimum allowed would be {minimum}."
+msgstr "De onderliggende zone vermeldt geen naamserver die herleidt naar een IPv4-adres. Als er een aanwezig was, zou het toegestane minimum {minimum} zijn."
+
+msgctxt "DELEGATION:NO_IPV4_NS_DEL"
+msgid "Delegation lists no nameserver that resolves to an IPv4 address. If any were present, the minimum allowed would be {minimum}."
+msgstr "De delegatie vermeldt geen naamserver die herleidt naar een IPv4-adres. Als er een aanwezig was, zou het toegestane minimum {minimum} zijn."
+
+msgctxt "DELEGATION:NO_IPV6_NS_CHILD"
+msgid "Child lists no nameserver that resolves to an IPv6 address. If any were present, the minimum allowed would be {minimum}."
+msgstr "De onderliggende zone vermeldt geen naamserver die herleidt naar een IPv6-adres. Als er een aanwezig was, zou het toegestane minimum {minimum} zijn."
+
+msgctxt "DELEGATION:NO_IPV6_NS_DEL"
+msgid "Delegation lists no nameserver that resolves to an IPv6 address. If any were present, the minimum allowed would be {minimum}."
+msgstr "De delegatie vermeldt geen naamserver die herleidt naar een IPv6-adres. Als er een aanwezig was, zou het toegestane minimum {minimum} zijn."
+
+msgctxt "DELEGATION:NS_IS_CNAME"
+msgid "Nameserver {ns} RR points to CNAME."
+msgstr "De NS-record van naamserver {ns} verwijst naar een CNAME."
+
+msgctxt "DELEGATION:NO_NS_CNAME"
+msgid "No nameserver points to CNAME alias."
+msgstr "Geen enkele naamserver verwijst naar een CNAME-alias."
+
+msgctxt "DELEGATION:REFERRAL_SIZE_LARGE"
+msgid "The smallest possible legal referral packet is larger than 512 but within 1232 octets (it is {size}); it needs EDNS to be returned over UDP."
+msgstr "Het kleinst mogelijke geldige verwijzingspakket (referral) is groter dan 512 maar binnen 1232 octetten (het is {size}); EDNS is vereist om het over UDP terug te sturen."
+
+msgctxt "DELEGATION:REFERRAL_SIZE_TOO_LARGE"
+msgid "The smallest possible legal referral packet is larger than 512 octets (it is {size})."
+msgstr "Het kleinst mogelijke geldige verwijzingspakket (referral) is groter dan 512 octetten (het is {size})."
+
+msgctxt "DELEGATION:REFERRAL_SIZE_OK"
+msgid "The smallest possible legal referral packet is smaller than 513 octets (it is {size})."
+msgstr "Het kleinst mogelijke geldige verwijzingspakket (referral) is kleiner dan 513 octetten (het is {size})."
+
+msgctxt "DELEGATION:SAME_IP_ADDRESS"
+msgid "IP {address} refers to multiple nameservers ({servers})."
+msgstr "IP {address} verwijst naar meerdere naamservers ({servers})."
+
+msgctxt "DELEGATION:SOA_EXISTS"
+msgid "All the nameservers have SOA record."
+msgstr "Alle naamservers hebben een SOA-record."
+
+msgctxt "DELEGATION:SOA_NOT_EXISTS"
+msgid "Empty NOERROR response to SOA query was received from {ns}/{address}."
+msgstr "Er is een leeg NOERROR-antwoord op de SOA-query ontvangen van {ns}/{address}."
+
+msgctxt "DELEGATION:TOTAL_NAME_MISMATCH"
+msgid "None of the nameservers listed at the parent are listed at the child."
+msgstr "Geen van de naamservers die in de bovenliggende zone zijn vermeld, is in de onderliggende zone vermeld."
+
+msgctxt "DELEGATION:UNEXPECTED_RCODE"
+msgid "Nameserver {ns} answered query for name {query_name} and type {query_type} with RCODE {rcode}."
+msgstr "Naamserver {ns} beantwoordde de query voor naam {query_name} en type {query_type} met RCODE {rcode}."
+
+msgctxt "NAMESERVER:AAAA_BAD_RDATA"
+msgid "Nameserver {ns}/{address} answered AAAA query with an unexpected RDATA length ({length} instead of 16)."
+msgstr "Naamserver {ns}/{address} beantwoordde een AAAA-query met een onverwachte RDATA-lengte ({length} in plaats van 16)."
+
+msgctxt "NAMESERVER:AAAA_QUERY_DROPPED"
+msgid "Nameserver {ns}/{address} dropped AAAA query."
+msgstr "Naamserver {ns}/{address} liet een AAAA-query vallen."
+
+msgctxt "NAMESERVER:AAAA_UNEXPECTED_RCODE"
+msgid "Nameserver {ns}/{address} answered AAAA query with an unexpected rcode ({rcode})."
+msgstr "Naamserver {ns}/{address} beantwoordde een AAAA-query met een onverwachte rcode ({rcode})."
+
+msgctxt "NAMESERVER:AAAA_WELL_PROCESSED"
+msgid "The following nameservers answer AAAA queries without problems : {servers}."
+msgstr "De volgende naamservers beantwoorden AAAA-query's zonder problemen: {servers}."
+
+msgctxt "NAMESERVER:A_UNEXPECTED_RCODE"
+msgid "Nameserver {ns}/{address} answered A query with an unexpected rcode ({rcode})."
+msgstr "Naamserver {ns}/{address} beantwoordde een A-query met een onverwachte rcode ({rcode})."
+
+msgctxt "NAMESERVER:AXFR_AVAILABLE"
+msgid "The following nameservers allow zone transfer using AXFR: {servers}."
+msgstr "De volgende naamservers staan zoneoverdracht via AXFR toe: {servers}."
+
+msgctxt "NAMESERVER:AXFR_FAILURE"
+msgid "AXFR not available on the following nameservers: {servers}."
+msgstr "AXFR niet beschikbaar op de volgende naamservers: {servers}."
+
+msgctxt "NAMESERVER:BREAKS_ON_EDNS"
+msgid "No response from {ns}/{address} when EDNS is used in query asking for {domain}."
+msgstr "Geen antwoord van {ns}/{address} wanneer EDNS wordt gebruikt in de query bij het opvragen van {domain}."
+
+msgctxt "NAMESERVER:CAN_BE_RESOLVED"
+msgid "All nameservers succeeded to resolve to an IP address."
+msgstr "Alle naamservers konden worden herleid naar een IP-adres."
+
+msgctxt "NAMESERVER:CAN_NOT_BE_RESOLVED"
+msgid "The following nameservers failed to resolve to an IP address : {servers}."
+msgstr "De volgende naamservers konden niet worden herleid naar een IP-adres: {servers}."
+
+msgctxt "NAMESERVER:CASE_QUERIES_RESULTS_DIFFER"
+msgid "When asked for {query_type} records on \"{domain}\" with different cases, all servers do not reply consistently."
+msgstr "Bij het opvragen van {query_type}-records voor \"{domain}\" met verschillende hoofdletters/kleine letters antwoorden niet alle servers consistent."
+
+msgctxt "NAMESERVER:CASE_QUERIES_RESULTS_OK"
+msgid "When asked for {query_type} records on \"{domain}\" with different cases, all servers reply consistently."
+msgstr "Bij het opvragen van {query_type}-records voor \"{domain}\" met verschillende hoofdletters/kleine letters antwoorden alle servers consistent."
+
+msgctxt "NAMESERVER:CASE_QUERY_DIFFERENT_ANSWER"
+msgid "When asked for {query_type} records on \"{query1}\" and \"{query2}\", nameserver {ns}/{address} returns different answers."
+msgstr "Bij het opvragen van {query_type}-records voor \"{query1}\" en \"{query2}\" geeft naamserver {ns}/{address} verschillende antwoorden terug."
+
+msgctxt "NAMESERVER:CASE_QUERY_DIFFERENT_RC"
+msgid "When asked for {query_type} records on \"{query1}\" and \"{query2}\", nameserver {ns}/{address} returns different RCODE (\"{rcode1}\" vs \"{rcode2}\")."
+msgstr "Bij het opvragen van {query_type}-records voor \"{query1}\" en \"{query2}\" geeft naamserver {ns}/{address} een verschillende RCODE terug (\"{rcode1}\" versus \"{rcode2}\")."
+
+msgctxt "NAMESERVER:CASE_QUERY_NO_ANSWER"
+msgid "When asked for {query_type} records on \"{domain}\", nameserver {ns}/{address} returns nothing."
+msgstr "Bij het opvragen van {query_type}-records voor \"{domain}\" geeft naamserver {ns}/{address} niets terug."
+
+msgctxt "NAMESERVER:CASE_QUERY_SAME_ANSWER"
+msgid "When asked for {query_type} records on \"{query1}\" and \"{query2}\", nameserver {ns}/{address} returns same answers."
+msgstr "Bij het opvragen van {query_type}-records voor \"{query1}\" en \"{query2}\" geeft naamserver {ns}/{address} dezelfde antwoorden terug."
+
+msgctxt "NAMESERVER:CASE_QUERY_SAME_RC"
+msgid "When asked for {query_type} records on \"{query1}\" and \"{query2}\", nameserver {ns}/{address} returns same RCODE \"{rcode}\"."
+msgstr "Bij het opvragen van {query_type}-records voor \"{query1}\" en \"{query2}\" geeft naamserver {ns}/{address} dezelfde RCODE \"{rcode}\" terug."
+
+msgctxt "NAMESERVER:DIFFERENT_SOURCE_IP"
+msgid "Nameserver {ns}/{address} replies on a SOA query with a different source address ({source})."
+msgstr "Naamserver {ns}/{address} antwoordt op een SOA-query met een ander bronadres ({source})."
+
+msgctxt "NAMESERVER:EDNS0_SUPPORT"
+msgid "The following nameservers support EDNS0 : {servers}."
+msgstr "De volgende naamservers ondersteunen EDNS0: {servers}."
+
+msgctxt "NAMESERVER:EDNS_RESPONSE_WITHOUT_EDNS"
+msgid "Response without EDNS from {ns}/{address} on query with EDNS0 asking for {domain}."
+msgstr "Antwoord zonder EDNS van {ns}/{address} op een query met EDNS0 bij het opvragen van {domain}."
+
+msgctxt "NAMESERVER:EDNS_VERSION_ERROR"
+msgid "Incorrect version of EDNS (expected 0) in response from {ns}/{address} on query with EDNS (version 0) asking for {domain}."
+msgstr "Onjuiste versie van EDNS (0 verwacht) in het antwoord van {ns}/{address} op een query met EDNS (versie 0) bij het opvragen van {domain}."
+
+msgctxt "NAMESERVER:IS_A_RECURSOR"
+msgid "The following nameservers are recursors: {servers}."
+msgstr "De volgende naamservers zijn recursors: {servers}."
+
+msgctxt "NAMESERVER:MISSING_OPT_IN_TRUNCATED"
+msgid "Nameserver {ns}/{address} replies on an EDNS query with a truncated response without EDNS."
+msgstr "Naamserver {ns}/{address} antwoordt op een EDNS-query met een afgekapt antwoord zonder EDNS."
+
+msgctxt "SYNTAX:NO_RESPONSE"
+msgid "No response from {ns} asking for {domain}."
+msgstr "Geen antwoord van {ns} bij het opvragen van {domain}."

@@ -74,7 +74,7 @@
   // ── Locale ──────────────────────────────────────────────────────────────────
   const localeKey = "gonemaster.public.locale.v1";
   const localeDisplayNames = {
-    en: "English", sv: "Svenska", da: "Dansk", de: "Deutsch", fi: "Suomi",
+    en: "English", sv: "Svenska", da: "Dansk", de: "Deutsch", cs: "Čeština", fi: "Suomi",
     fr: "Français", es: "Español", nb: "Norsk", sl: "Slovenščina", ja: "日本語",
   };
   const localeLabel = (code) => localeDisplayNames[code] || code;

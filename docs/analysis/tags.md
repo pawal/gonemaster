@@ -29,7 +29,8 @@ gonemaster-client tags add-domains municipalities-se stockholm.se malmo.se goteb
 ```
 
 Deleting a tag removes the memberships. It does not delete domains, runs,
-entries, batches, or cohort snapshots.
+entries, batches, or cohort snapshots. Deletion is refused with `409` while an
+analysis cohort is built on the tag; delete the cohort first.
 
 ## Batch Use
 
@@ -109,4 +110,22 @@ API entry point:
 
 ```bash
 curl -s http://localhost:8080/api/v1/tags/{name}/batches
+```
+
+## Purging Runs
+
+Deletes all terminal-status runs (and their entries) for domains in a tag, for
+example to reclaim disk space before re-running a full batch. Active or queued
+jobs are never touched, and tag memberships, domains, and captured cohort
+snapshots are preserved. The admin UI tag detail view exposes this as a
+two-step confirmation next to "Run all domains".
+
+```bash
+curl -s -X POST http://localhost:8080/api/v1/tags/{name}/purge
+```
+
+The response reports how many runs were removed:
+
+```json
+{"purged_runs": 1500}
 ```

@@ -701,6 +701,8 @@ paths:
           description: Tag deleted
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
 
   /tags/{name}/domains:
     get:
@@ -840,6 +842,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/TagSummary'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags/{name}/purge:
+    post:
+      tags: [Tags]
+      summary: Purge completed runs for a tag
+      description: >
+        Deletes all terminal-status runs (and their entries) for domains in the
+        tag. Active or queued jobs are never touched. Useful before re-running a
+        full batch to reclaim disk space.
+      operationId: purgeTagRuns
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Number of runs purged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  purged_runs:
+                    type: integer
+                    format: int64
         '404':
           $ref: '#/components/responses/ErrorResponse'
 

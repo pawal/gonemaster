@@ -2,6 +2,17 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- server: add `POST /api/v1/tags/{name}/purge` to delete all completed runs and entries for a tag while leaving active jobs, tag memberships, and captured cohort snapshots intact
+- admin-ui: add a tag detail "Purge runs" action with two-step confirmation
+
+### Changed
+
+- server: refuse `DELETE /api/v1/tags/{name}` with `409` while an analysis cohort is built on the tag
+
 ## [v1.5.7] - 2026-06-30
 
 Adds Czech (cs) and Dutch (nl) locales. Removes the deprecated resolver profile properties `igntc`, `recurse`, and `usevc`. Nameserver15 escapes unprintable bytes in reported software-version strings.

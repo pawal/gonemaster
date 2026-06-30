@@ -50,6 +50,14 @@ type propertyDef struct {
 	getter       func(*Profile) any
 }
 
+// deprecatedProperties are profile keys removed from the schema but still
+// accepted and ignored when loading stored profiles.
+var deprecatedProperties = map[string]bool{
+	"resolver.defaults.igntc":   true,
+	"resolver.defaults.recurse": true,
+	"resolver.defaults.usevc":   true,
+}
+
 var propertyDefs = map[string]propertyDef{
 	"cache": {
 		typ:          propMap,
@@ -72,15 +80,6 @@ var propertyDefs = map[string]propertyDef{
 			return p.Resolver.Defaults.Debug
 		},
 	},
-	"resolver.defaults.igntc": {
-		typ: propBool,
-		setter: func(p *Profile, value any) {
-			p.Resolver.Defaults.IgnTC = value.(bool)
-		},
-		getter: func(p *Profile) any {
-			return p.Resolver.Defaults.IgnTC
-		},
-	},
 	"resolver.defaults.fallback": {
 		typ: propBool,
 		setter: func(p *Profile, value any) {
@@ -88,15 +87,6 @@ var propertyDefs = map[string]propertyDef{
 		},
 		getter: func(p *Profile) any {
 			return p.Resolver.Defaults.Fallback
-		},
-	},
-	"resolver.defaults.recurse": {
-		typ: propBool,
-		setter: func(p *Profile, value any) {
-			p.Resolver.Defaults.Recurse = value.(bool)
-		},
-		getter: func(p *Profile) any {
-			return p.Resolver.Defaults.Recurse
 		},
 	},
 	"resolver.defaults.retrans": {
@@ -139,15 +129,6 @@ var propertyDefs = map[string]propertyDef{
 		},
 		getter: func(p *Profile) any {
 			return p.Resolver.Defaults.Unordered
-		},
-	},
-	"resolver.defaults.usevc": {
-		typ: propBool,
-		setter: func(p *Profile, value any) {
-			p.Resolver.Defaults.UseVC = value.(bool)
-		},
-		getter: func(p *Profile) any {
-			return p.Resolver.Defaults.UseVC
 		},
 	},
 	"resolver.defaults.timeout": {

@@ -34,31 +34,11 @@ func TestBuildQueryWithClass(t *testing.T) {
 	}
 }
 
-func TestApplyProfileDefaultsRecurse(t *testing.T) {
-	prof, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
-	prof.Resolver.Defaults.Recurse = true
-	prof.Resolver.Defaults.UseVC = true
-
-	client := &Client{}
-	client.ApplyProfileDefaults(prof)
-
-	if !client.RecursionDesired {
-		t.Fatalf("expected recursion enabled from defaults")
-	}
-	if !client.UseTCP {
-		t.Fatalf("expected TCP enabled from defaults")
-	}
-}
-
 func TestApplyProfileDefaultsDoesNotOverrideExplicit(t *testing.T) {
 	prof, err := profile.Default()
 	if err != nil {
 		t.Fatalf("profile default: %v", err)
 	}
-	prof.Resolver.Defaults.Recurse = false
 
 	client := &Client{}
 	client.SetRecursionDesired(true)

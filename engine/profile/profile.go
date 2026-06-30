@@ -52,12 +52,8 @@ type ResolverSettings struct {
 type ResolverDefaults struct {
 	// Debug enables resolver debug behavior.
 	Debug bool `json:"debug"`
-	// IgnTC ignores TC and avoids retrying over TCP when true.
-	IgnTC bool `json:"igntc"`
 	// Fallback enables UDP-to-TCP fallback on truncation.
 	Fallback bool `json:"fallback"`
-	// Recurse sets the RD bit on outbound queries.
-	Recurse bool `json:"recurse"`
 	// Retrans sets the retransmission interval in seconds.
 	Retrans int `json:"retrans"`
 	// Retry sets the number of retry attempts.
@@ -66,8 +62,6 @@ type ResolverDefaults struct {
 	Parallel int `json:"parallel"`
 	// Unordered allows unordered resolver result handling.
 	Unordered bool `json:"unordered"`
-	// UseVC forces TCP queries by default.
-	UseVC bool `json:"usevc"`
 	// Timeout sets the per-query timeout in seconds.
 	Timeout int `json:"timeout"`
 	// ErrorCacheTTL sets the duration (seconds) to skip queries after network errors.
@@ -339,6 +333,9 @@ func fromDataMap(data map[string]any) (*Profile, error) {
 	p := New()
 	for path := range paths {
 		if _, ok := propertyDefs[path]; !ok {
+			if deprecatedProperties[path] {
+				continue
+			}
 			return nil, fmt.Errorf("unknown property %q", path)
 		}
 		value, ok := getNestedValue(data, path)

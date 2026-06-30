@@ -22,8 +22,7 @@ func TestFromJSONParsesValues(t *testing.T) {
 	const profileJSON = `{
 		"resolver": {
 			"defaults": {
-				"usevc": true,
-				"recurse": false,
+				"unordered": true,
 				"retry": 123,
 				"retrans": 234,
 				"positive_cache_ttl": 30,
@@ -62,9 +61,9 @@ func TestFromJSONParsesValues(t *testing.T) {
 		t.Fatalf("from json: %v", err)
 	}
 
-	value, err := p.Get("resolver.defaults.usevc")
+	value, err := p.Get("resolver.defaults.unordered")
 	if err != nil || value != true {
-		t.Fatalf("expected usevc true, got %#v (err=%v)", value, err)
+		t.Fatalf("expected unordered true, got %#v (err=%v)", value, err)
 	}
 	value, err = p.Get("resolver.defaults.retry")
 	if err != nil || value != 123 {
@@ -111,6 +110,24 @@ func TestFromJSONParsesValues(t *testing.T) {
 func TestFromJSONRejectsUnknown(t *testing.T) {
 	if _, err := FromJSON(`{"net":1}`); err == nil {
 		t.Fatalf("expected error for unknown property")
+	}
+}
+
+func TestFromJSONIgnoresRemovedResolverDefaults(t *testing.T) {
+	const profileJSON = `{"resolver":{"defaults":{"igntc":true,"recurse":true,"usevc":true,"retry":4}}}`
+
+	p, err := FromJSON(profileJSON)
+	if err != nil {
+		t.Fatalf("from json: %v", err)
+	}
+	for _, key := range []string{"resolver.defaults.igntc", "resolver.defaults.recurse", "resolver.defaults.usevc"} {
+		if _, err := p.Get(key); err == nil {
+			t.Fatalf("expected %q to be unknown after removal", key)
+		}
+	}
+	value, err := p.Get("resolver.defaults.retry")
+	if err != nil || value != 4 {
+		t.Fatalf("expected retry 4 alongside removed keys, got %#v (err=%v)", value, err)
 	}
 }
 

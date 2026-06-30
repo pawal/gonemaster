@@ -44,13 +44,11 @@ type Client struct {
 	// SourcePort selects the local source port.
 	SourcePort int
 
-	useTCPSpecified           bool
-	timeoutSpecified          bool
-	retriesSpecified          bool
-	retransSpecified          bool
-	fallbackSpecified         bool
-	ednsSizeSpecified         bool
-	recursionDesiredSpecified bool
+	timeoutSpecified  bool
+	retriesSpecified  bool
+	retransSpecified  bool
+	fallbackSpecified bool
+	ednsSizeSpecified bool
 }
 
 // EDNSDetails captures explicit EDNS settings and overrides.
@@ -90,10 +88,9 @@ func BuildQueryWithClass(name string, qtype, qclass uint16) *dns.Msg {
 	return msg
 }
 
-// SetUseTCP marks UseTCP as explicitly configured.
+// SetUseTCP sets whether queries use TCP.
 func (c *Client) SetUseTCP(value bool) {
 	c.UseTCP = value
-	c.useTCPSpecified = true
 }
 
 // SetTimeout marks Timeout as explicitly configured.
@@ -126,10 +123,9 @@ func (c *Client) SetEDNSSize(value uint16) {
 	c.ednsSizeSpecified = true
 }
 
-// SetRecursionDesired marks RecursionDesired as explicitly configured.
+// SetRecursionDesired sets the RD bit on outbound queries.
 func (c *Client) SetRecursionDesired(value bool) {
 	c.RecursionDesired = value
-	c.recursionDesiredSpecified = true
 }
 
 // ApplyProfileDefaults sets unset fields using the effective profile defaults.
@@ -149,14 +145,8 @@ func (c *Client) ApplyProfileDefaults(p *profile.Profile) {
 	if !c.retransSpecified && c.Retrans == 0 {
 		c.Retrans = time.Duration(defaults.Retrans) * time.Second
 	}
-	if !c.useTCPSpecified {
-		c.UseTCP = defaults.UseVC
-	}
 	if !c.fallbackSpecified {
 		c.Fallback = defaults.Fallback
-	}
-	if !c.recursionDesiredSpecified {
-		c.RecursionDesired = defaults.Recurse
 	}
 	if !c.ednsSizeSpecified && c.EDNSSize == 0 {
 		if c.DNSSEC {

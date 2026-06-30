@@ -1223,9 +1223,7 @@ func TestClientForOptionsDefaults(t *testing.T) {
 		t.Fatalf("new nameserver: %v", err)
 	}
 
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.Recurse = true
-	prof.Resolver.Defaults.UseVC = true
+	ctx, _ := testContext(t)
 
 	client, err := ns.clientForOptions(ctx, nil)
 	if err != nil {

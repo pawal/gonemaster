@@ -207,6 +207,46 @@ func TestDeleteTagBlockedByCohort(t *testing.T) {
 	}
 }
 
+// --- POST /api/v1/tags/{name}/purge ------------------------------------------
+
+func TestTagPurge(t *testing.T) {
+	srv := New(DefaultConfig())
+	createTag(t, srv, "tld", "")
+	d := makeGraduatedJob(t, srv, "se", JobSucceeded)
+	if err := srv.store.TagDomains("tld", []int64{d.ID}); err != nil {
+		t.Fatalf("tag domain: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags/tld/purge", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+	}
+	var out struct {
+		PurgedRuns int64 `json:"purged_runs"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.PurgedRuns != 1 {
+		t.Fatalf("expected purged_runs=1, got %d", out.PurgedRuns)
+	}
+	if list := srv.store.ListRunsByDomain(d.ID, 10, 0); list.Total != 0 {
+		t.Fatalf("expected runs purged, got %d", list.Total)
+	}
+}
+
+func TestTagPurgeNotFound(t *testing.T) {
+	srv := New(DefaultConfig())
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags/ghost/purge", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", resp.Code)
+	}
+}
+
 // --- POST /api/v1/tags/{name}/domains ----------------------------------------
 
 func TestAddTagDomains(t *testing.T) {

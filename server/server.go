@@ -280,6 +280,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /spec/testcases", s.handleSpecTestcases)
 
 	apiMux.HandleFunc("GET /tags/{name}/summary", s.handleTagSummary)
+	apiMux.HandleFunc("POST /tags/{name}/purge", s.handleTagPurge)
 	apiMux.HandleFunc("GET /tags/{name}/batches", s.handleTagBatches)
 	apiMux.HandleFunc("/tags/{name}/profile", s.handleTagProfile)
 	apiMux.HandleFunc("/tags/{name}/domains", s.handleTagDomains)

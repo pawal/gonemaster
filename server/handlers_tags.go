@@ -128,6 +128,24 @@ func (s *Server) handleDeleteTag(w http.ResponseWriter, name string) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// handleTagPurge handles POST /api/v1/tags/{name}/purge.
+func (s *Server) handleTagPurge(w http.ResponseWriter, r *http.Request) {
+	if !s.enforceCSRF(w, r) {
+		return
+	}
+	name := r.PathValue("name")
+	if _, ok := s.store.GetTag(name); !ok {
+		writeError(w, http.StatusNotFound, "not_found", "tag not found", nil)
+		return
+	}
+	n, err := s.store.PurgeByTag(name)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "purge_error", err.Error(), nil)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{"purged_runs": n})
+}
+
 // handleTagDomains routes POST and DELETE on /api/v1/tags/{name}/domains.
 func (s *Server) handleTagDomains(w http.ResponseWriter, r *http.Request) {
 	name := r.PathValue("name")

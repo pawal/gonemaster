@@ -19,6 +19,7 @@ Adds Czech (cs) and Dutch (nl) locales. Removes the deprecated resolver profile 
 ### Fixed
 
 - nameserver15: escape unprintable bytes in software-version strings before logging so control characters and invalid UTF-8 cannot reach logs or the UIs verbatim
+- build: review the `fsevents` install script via `allowScripts` in the UI `package.json` files so `npm install` no longer warns under npm 11.17+
 
 ## [v1.5.6] - 2026-06-27
 

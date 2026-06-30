@@ -62,6 +62,8 @@
   let tagRunAllSubmitting = $state(false);
   let tagDeleteConfirm = $state(false);
   let tagDeleting = $state(false);
+  let tagPurgeConfirm = $state(false);
+  let tagPurging = $state(false);
 
   let tagProfileDraftId = $state(
     selectedTag?.default_profile_id ? String(selectedTag.default_profile_id) : ""
@@ -263,6 +265,24 @@
     }
   }
 
+  async function purgeTagRuns() {
+    if (!selectedTag) return;
+    tagPurging = true;
+    try {
+      const response = await apiFetch(`/tags/${encodeURIComponent(selectedTag.name)}/purge`, {
+        method: "POST",
+      });
+      tagPurgeConfirm = false;
+      setStatus($t("tag_purge_success", { count: response.purged_runs ?? 0 }), "ok");
+      await loadTagSummary();
+      await loadTagDomains();
+    } catch (error) {
+      setStatus($t("tag_purge_error", { error: error.message || "unknown error" }), "warn");
+    } finally {
+      tagPurging = false;
+    }
+  }
+
   async function saveTagProfile() {
     if (!selectedTag || !tagProfileSelectedID || !tagProfileDirty) return;
     tagProfileUpdating = true;
@@ -357,6 +377,7 @@
     tagBatchesOffset = 0;
     tagDomainLevelFilter = "";
     tagDeleteConfirm = false;
+    tagPurgeConfirm = false;
     tagProfileDraftId = selectedTag?.default_profile_id ? String(selectedTag.default_profile_id) : "";
     if (name == null) {
       tagSummary = null;
@@ -403,6 +424,12 @@
       <button class="secondary" onclick={runAllFromTag} disabled={tagRunAllSubmitting}>
         {tagRunAllSubmitting ? $t("submitting") : $t("tag_run_all_button")}
       </button>
+      {#if tagPurgeConfirm}
+        <button class="warn" onclick={purgeTagRuns} disabled={tagPurging}>{tagPurging ? $t("submitting") : $t("tag_purge_confirm_button")}</button>
+        <button class="ghost" onclick={() => { tagPurgeConfirm = false; }}>{$t("tag_purge_cancel_button")}</button>
+      {:else}
+        <button class="ghost" onclick={() => { tagPurgeConfirm = true; }}>{$t("tag_purge_button")}</button>
+      {/if}
       {#if tagDeleteConfirm}
         <button class="warn" onclick={deleteTag} disabled={tagDeleting}>{tagDeleting ? $t("submitting") : $t("tag_delete_confirm_button")}</button>
         <button class="ghost" onclick={() => { tagDeleteConfirm = false; }}>{$t("tag_delete_cancel_button")}</button>

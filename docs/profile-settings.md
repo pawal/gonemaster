@@ -24,9 +24,6 @@ accepted bounds.
 | `retry` | `2` | count (1-255) | `--retry` | Retries after the initial attempt. |
 | `retrans` | `3` | seconds (1-255) | `--retrans` | Interval between attempts; also the effective per-attempt UDP budget when below `timeout`. |
 | `fallback` | `true` | bool | `--fallback` / `--no-fallback` | Retry truncated UDP responses over TCP. |
-| `igntc` | `false` | bool | - | Ignore TC; do not retry truncated responses over TCP. |
-| `recurse` | `false` | bool | - | Set the RD bit on outbound queries. |
-| `usevc` | `false` | bool | - | Force queries over TCP. |
 | `parallel` | `8` | count (1-255) | `--parallel` | Concurrent resolver workers. |
 | `unordered` | `true` | bool | `--unordered` / `--ordered` | Allow unordered result handling. For deterministic output use `false` with `parallel: 1`. |
 | `error_cache_ttl` | `30` | seconds (0-86400) | `--error-cache-ttl` | Skip a query for this long after a network error (debounced). Capped by the per-query timeout/retry budget. |
@@ -36,6 +33,11 @@ accepted bounds.
 | `nameserver_concurrency` | `0` | count (0-256) | - | Maximum concurrent queries to one nameserver address. `0` is unlimited. |
 | `nameserver_max_total_ms` | `0` | milliseconds (0-600000) | - | Skip a nameserver address once cumulative query time in a run exceeds this. `0` disables. Unlike fast-fail it also bounds slow-but-responding servers. See [Bounding Slow Nameservers](server/configuration.md#bounding-slow-nameservers). |
 | `debug` | `false` | bool | `--debug-queries` | Emit a per-attempt query trace (including timeouts) and the control decisions taken. No overhead when off. |
+
+The `igntc`, `recurse`, and `usevc` keys are no longer profile properties. Stored
+profiles that still contain them load without error and the keys are ignored;
+per-query transport (TCP and the RD bit) is decided by the engine and individual
+testcases.
 
 Source addresses live alongside the defaults, under `resolver`:
 

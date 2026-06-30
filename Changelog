@@ -2,6 +2,24 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.5.7] - 2026-06-30
+
+Adds Czech (cs) and Dutch (nl) locales. Removes the deprecated resolver profile properties `igntc`, `recurse`, and `usevc`. Nameserver15 escapes unprintable bytes in reported software-version strings.
+
+### Added
+
+- i18n: add Czech (cs) engine message catalog and locale across admin-ui and ui-public
+- i18n: add Dutch (nl) engine message catalog and locale across admin-ui and ui-public
+
+### Changed
+
+- engine: remove deprecated resolver profile properties `igntc`, `recurse`, and `usevc`; stored profiles carrying them load without error and the keys are ignored
+- docs: refresh dnssec10 and nameserver test specifications and the upstream-divergence notes after upstream comparison; mark the nameserver13 query-type and recursor cache-context divergences resolved
+
+### Fixed
+
+- nameserver15: escape unprintable bytes in software-version strings before logging so control characters and invalid UTF-8 cannot reach logs or the UIs verbatim
+
 ## [v1.5.6] - 2026-06-27
 
 Added Nameserver18 test case for Extended DNS Errors (EDE, RFC 8914), reported as score-neutral diagnostics. The admin UI can now pull new default scoring entries into a saved configuration. Some engine and server fixes.

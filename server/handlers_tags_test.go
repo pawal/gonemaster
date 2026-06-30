@@ -186,6 +186,27 @@ func TestDeleteTagNotFound(t *testing.T) {
 	}
 }
 
+func TestDeleteTagBlockedByCohort(t *testing.T) {
+	srv := New(DefaultConfig())
+	createTag(t, srv, "tld", "")
+	if _, err := srv.store.UpsertAnalysisCohort(AnalysisCohort{
+		SourceType: "tag", SourceTag: "tld", Label: "TLDs",
+	}); err != nil {
+		t.Fatalf("UpsertAnalysisCohort: %v", err)
+	}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/tags/tld", nil)
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d: %s", resp.Code, resp.Body)
+	}
+	// Tag must still exist.
+	if _, ok := srv.store.GetTag("tld"); !ok {
+		t.Fatal("expected tag to survive a blocked delete")
+	}
+}
+
 // --- POST /api/v1/tags/{name}/domains ----------------------------------------
 
 func TestAddTagDomains(t *testing.T) {

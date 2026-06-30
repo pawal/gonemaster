@@ -114,6 +114,13 @@ func (s *Server) handleDeleteTag(w http.ResponseWriter, name string) {
 		writeError(w, http.StatusNotFound, "not_found", "tag not found", nil)
 		return
 	}
+	// Refuse if an analysis cohort is built on this tag; the cohort must be
+	// deleted first so its materialized snapshots are cleaned up.
+	if cohort, ok := s.store.GetAnalysisCohortBySource("tag", name); ok {
+		writeError(w, http.StatusConflict, "tag_in_use",
+			"tag is the source for analysis cohort "+cohort.Label+"; delete the cohort first", nil)
+		return
+	}
 	if err := s.store.DeleteTag(name); err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return

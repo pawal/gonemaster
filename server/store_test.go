@@ -492,6 +492,99 @@ func TestInMemoryJobStorePurgeOlderThanReturnsZeroWhenEmpty(t *testing.T) {
 	}
 }
 
+func TestInMemoryJobStorePurgeByTagDeletesTaggedRuns(t *testing.T) {
+	store := NewInMemoryJobStore()
+	now := time.Now().UTC()
+
+	// Two domains tagged "tld", one untagged domain.
+	for _, name := range []string{"se", "dk", "other.example"} {
+		id := name
+		job := Job{ID: id, Domain: name, Status: JobSucceeded, CreatedAt: now, FinishedAt: now}
+		if _, err := store.Create(job); err != nil {
+			t.Fatalf("create %s: %v", id, err)
+		}
+		if err := store.GraduateJob(job, []engine.LogEntry{
+			{Module: "DNS", Tag: "TAG", Level: "NOTICE", Timestamp: 1.0},
+		}); err != nil {
+			t.Fatalf("graduate %s: %v", id, err)
+		}
+	}
+	if err := store.CreateTag("tld", ""); err != nil {
+		t.Fatalf("CreateTag: %v", err)
+	}
+	for _, name := range []string{"se", "dk"} {
+		d, ok := store.GetDomainByName(name)
+		if !ok {
+			t.Fatalf("domain %s not found", name)
+		}
+		if err := store.TagDomains("tld", []int64{d.ID}); err != nil {
+			t.Fatalf("TagDomains %s: %v", name, err)
+		}
+	}
+
+	n, err := store.PurgeByTag("tld")
+	if err != nil {
+		t.Fatalf("purge by tag: %v", err)
+	}
+	if n != 2 {
+		t.Fatalf("expected 2 purged, got %d", n)
+	}
+	// Tagged runs (and their entries) are gone.
+	for _, id := range []string{"se", "dk"} {
+		if _, ok := store.GetRun(id); ok {
+			t.Fatalf("expected run %s to be deleted", id)
+		}
+		if _, ok := store.GetResult(id); ok {
+			t.Fatalf("expected entries for %s to be deleted", id)
+		}
+	}
+	// The untagged domain's run survives.
+	if _, ok := store.GetRun("other.example"); !ok {
+		t.Fatal("expected untagged run to survive purge by tag")
+	}
+}
+
+func TestInMemoryJobStorePurgeByTagPreservesActiveJobs(t *testing.T) {
+	store := NewInMemoryJobStore()
+
+	d, err := store.GetOrCreateDomain("se")
+	if err != nil {
+		t.Fatalf("GetOrCreateDomain: %v", err)
+	}
+	job := Job{ID: "q1", Domain: "se", Status: JobQueued, CreatedAt: time.Now().UTC()}
+	if _, err := store.Create(job); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := store.CreateTag("tld", ""); err != nil {
+		t.Fatalf("CreateTag: %v", err)
+	}
+	if err := store.TagDomains("tld", []int64{d.ID}); err != nil {
+		t.Fatalf("TagDomains: %v", err)
+	}
+
+	n, err := store.PurgeByTag("tld")
+	if err != nil {
+		t.Fatalf("purge by tag: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("expected 0 purged, got %d", n)
+	}
+	if list := store.List(JobFilter{Limit: 100}); list.Total != 1 {
+		t.Fatalf("expected queued job preserved, got %d", list.Total)
+	}
+}
+
+func TestInMemoryJobStorePurgeByTagReturnsZeroForUnknownTag(t *testing.T) {
+	store := NewInMemoryJobStore()
+	n, err := store.PurgeByTag("nope")
+	if err != nil {
+		t.Fatalf("purge by tag: %v", err)
+	}
+	if n != 0 {
+		t.Fatalf("expected 0 for unknown tag, got %d", n)
+	}
+}
+
 func TestInMemoryJobStoreCreateSetsPublicID(t *testing.T) {
 	store := NewInMemoryJobStore()
 	created, err := store.Create(Job{ID: "j1", Domain: "example.com", Status: JobQueued})

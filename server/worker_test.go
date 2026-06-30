@@ -215,6 +215,9 @@ func (s *spyJobStore) ListSettings() map[string]string {
 func (s *spyJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 	return s.inner.PurgeOlderThan(cutoff)
 }
+func (s *spyJobStore) PurgeByTag(tag string) (int64, error) {
+	return s.inner.PurgeByTag(tag)
+}
 
 func (s *spyJobStore) ListAnalysisCohorts() []AnalysisCohort {
 	return s.inner.ListAnalysisCohorts()

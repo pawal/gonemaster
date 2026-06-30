@@ -1761,6 +1761,132 @@ func TestSQLJobStorePurgeReturnsZeroWhenNothingMatches(t *testing.T) {
 	}
 }
 
+// ---- PurgeByTag ------------------------------------------------------------
+
+func TestSQLJobStorePurgeByTagDeletesTaggedRunsAndEntries(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC()
+
+			// Two tagged domains plus one untagged domain, all graduated.
+			for _, name := range []string{"se", "dk", "other.example"} {
+				job := Job{ID: name, Domain: name, Status: JobSucceeded, CreatedAt: now, FinishedAt: now}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("create %s: %v", name, err)
+				}
+				graduateSQLJob(t, s, job, []engine.LogEntry{
+					{Module: "DNSSEC", Tag: "OK", Level: "INFO"},
+				})
+			}
+			if err := s.CreateTag("tld", ""); err != nil {
+				t.Fatalf("CreateTag: %v", err)
+			}
+			for _, name := range []string{"se", "dk"} {
+				d, ok := s.GetDomainByName(name)
+				if !ok {
+					t.Fatalf("domain %s not found", name)
+				}
+				if err := s.TagDomains("tld", []int64{d.ID}); err != nil {
+					t.Fatalf("TagDomains %s: %v", name, err)
+				}
+			}
+
+			n, err := s.PurgeByTag("tld")
+			if err != nil {
+				t.Fatalf("purge by tag: %v", err)
+			}
+			if n != 2 {
+				t.Fatalf("expected 2 purged, got %d", n)
+			}
+			for _, id := range []string{"se", "dk"} {
+				if _, ok := s.GetRun(id); ok {
+					t.Fatalf("expected run %s deleted", id)
+				}
+				if _, ok := s.GetResult(id); ok {
+					t.Fatalf("expected entries for %s deleted", id)
+				}
+			}
+			if _, ok := s.GetRun("other.example"); !ok {
+				t.Fatal("expected untagged run to survive")
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgeByTagPreservesActiveJobs(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+
+			d, err := s.GetOrCreateDomain("se")
+			if err != nil {
+				t.Fatalf("GetOrCreateDomain: %v", err)
+			}
+			job := Job{ID: "q1", Domain: "se", Status: JobQueued, CreatedAt: time.Now().UTC()}
+			if _, err := s.Create(job); err != nil {
+				t.Fatalf("create: %v", err)
+			}
+			if err := s.CreateTag("tld", ""); err != nil {
+				t.Fatalf("CreateTag: %v", err)
+			}
+			if err := s.TagDomains("tld", []int64{d.ID}); err != nil {
+				t.Fatalf("TagDomains: %v", err)
+			}
+
+			n, err := s.PurgeByTag("tld")
+			if err != nil {
+				t.Fatalf("purge by tag: %v", err)
+			}
+			if n != 0 {
+				t.Fatalf("expected 0 purged, got %d", n)
+			}
+			if list := s.List(JobFilter{Limit: 10}); list.Total != 1 {
+				t.Fatalf("expected queued job preserved, got %d", list.Total)
+			}
+		})
+	}
+}
+
+func TestSQLJobStorePurgeByTagDeletesInBatches(t *testing.T) {
+	old := purgeBatchSize
+	purgeBatchSize = 2
+	t.Cleanup(func() { purgeBatchSize = old })
+
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			now := time.Now().UTC()
+			if err := s.CreateTag("tld", ""); err != nil {
+				t.Fatalf("CreateTag: %v", err)
+			}
+			for i := 0; i < 5; i++ {
+				name := fmt.Sprintf("d%d.example", i)
+				job := Job{ID: name, Domain: name, Status: JobSucceeded, CreatedAt: now, FinishedAt: now}
+				if _, err := s.Create(job); err != nil {
+					t.Fatalf("create %s: %v", name, err)
+				}
+				graduateSQLJob(t, s, job, nil)
+				d, ok := s.GetDomainByName(name)
+				if !ok {
+					t.Fatalf("domain %s not found", name)
+				}
+				if err := s.TagDomains("tld", []int64{d.ID}); err != nil {
+					t.Fatalf("TagDomains %s: %v", name, err)
+				}
+			}
+
+			n, err := s.PurgeByTag("tld")
+			if err != nil {
+				t.Fatalf("purge by tag: %v", err)
+			}
+			if n != 5 {
+				t.Fatalf("expected 5 purged, got %d", n)
+			}
+		})
+	}
+}
+
 // ---- Recovery --------------------------------------------------------------
 
 func TestRecoverJobsRunningToFailed(t *testing.T) {

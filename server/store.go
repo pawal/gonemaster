@@ -191,6 +191,9 @@ type JobStore interface {
 	// PurgeOlderThan deletes terminal runs whose finished_at is before cutoff,
 	// along with their entries. Returns the number of runs deleted.
 	PurgeOlderThan(cutoff time.Time) (int64, error)
+
+	// PurgeByTag deletes terminal runs (and entries) for domains in tag.
+	PurgeByTag(tag string) (int64, error)
 }
 
 // InMemoryJobStore stores all data in memory.
@@ -1666,6 +1669,33 @@ func (s *InMemoryJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 			continue
 		}
 		if run.FinishedAt.IsZero() || !run.FinishedAt.Before(cutoff) {
+			continue
+		}
+		delete(s.runPublicIDs, run.PublicID)
+		delete(s.entries, id)
+		delete(s.runs, id)
+		count++
+	}
+	return count, nil
+}
+
+// PurgeByTag deletes terminal runs (and entries) for domains in tag.
+func (s *InMemoryJobStore) PurgeByTag(tag string) (int64, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	domainIDs := s.tagDomains[tag]
+	if len(domainIDs) == 0 {
+		return 0, nil
+	}
+	tagged := make(map[int64]bool, len(domainIDs))
+	for _, id := range domainIDs {
+		tagged[id] = true
+	}
+
+	var count int64
+	for id, run := range s.runs {
+		if !isTerminalStatus(run.Status) || !tagged[run.DomainID] {
 			continue
 		}
 		delete(s.runPublicIDs, run.PublicID)

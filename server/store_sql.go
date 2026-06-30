@@ -2454,3 +2454,66 @@ func (s *SQLJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 	}
 	return total, nil
 }
+
+// PurgeByTag deletes terminal runs (and entries) for domains in tag.
+func (s *SQLJobStore) PurgeByTag(tag string) (int64, error) {
+	statuses := "'succeeded','failed','canceled','expired'"
+
+	var total int64
+	for {
+		rows, err := s.db.Query(
+			fmt.Sprintf(
+				`SELECT r.id FROM runs r
+				 JOIN domain_tags dt ON dt.domain_id = r.domain_id
+				 WHERE dt.tag = %s AND r.status IN (%s) LIMIT %d`,
+				s.ph(1), statuses, purgeBatchSize,
+			),
+			tag,
+		)
+		if err != nil {
+			return total, fmt.Errorf("purge by tag select: %w", err)
+		}
+		var ids []string
+		for rows.Next() {
+			var id string
+			if err := rows.Scan(&id); err != nil {
+				rows.Close()
+				return total, fmt.Errorf("purge by tag scan: %w", err)
+			}
+			ids = append(ids, id)
+		}
+		rows.Close()
+		if err := rows.Err(); err != nil {
+			return total, fmt.Errorf("purge by tag rows: %w", err)
+		}
+		if len(ids) == 0 {
+			break
+		}
+
+		args := make([]any, len(ids))
+		for i, id := range ids {
+			args[i] = id
+		}
+		inPH := s.phRange(1, len(ids))
+
+		tx, err := s.db.Begin()
+		if err != nil {
+			return total, fmt.Errorf("purge by tag begin tx: %w", err)
+		}
+		if _, err := tx.Exec(`DELETE FROM entries WHERE run_id IN (`+inPH+`)`, args...); err != nil {
+			_ = tx.Rollback()
+			return total, fmt.Errorf("purge by tag entries: %w", err)
+		}
+		res, err := tx.Exec(`DELETE FROM runs WHERE id IN (`+inPH+`)`, args...)
+		if err != nil {
+			_ = tx.Rollback()
+			return total, fmt.Errorf("purge by tag runs: %w", err)
+		}
+		if err := tx.Commit(); err != nil {
+			return total, fmt.Errorf("purge by tag commit: %w", err)
+		}
+		n, _ := res.RowsAffected()
+		total += n
+	}
+	return total, nil
+}

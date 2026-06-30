@@ -204,6 +204,9 @@ func (s *countingJobStore) ListSettings() map[string]string {
 func (s *countingJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 	return s.inner.PurgeOlderThan(cutoff)
 }
+func (s *countingJobStore) PurgeByTag(tag string) (int64, error) {
+	return s.inner.PurgeByTag(tag)
+}
 
 func (s *countingJobStore) ListAnalysisCohorts() []AnalysisCohort {
 	return s.inner.ListAnalysisCohorts()

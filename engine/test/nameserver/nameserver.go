@@ -1854,7 +1854,7 @@ func Nameserver15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						if txt.Header().Class != dns.ClassCHAOS {
 							outcome.wrongClass = true
 						}
-						stringValue := strings.TrimSpace(strings.Join(txt.Txt, ""))
+						stringValue := strings.TrimSpace(escapeUnprintable(strings.Join(txt.Txt, "")))
 						if stringValue != "" {
 							if outcome.txtData[stringValue] == nil {
 								outcome.txtData[stringValue] = map[string]bool{}
@@ -2660,6 +2660,23 @@ func sanitizeExtraText(s string) string {
 		s = strings.ToValidUTF8(s[:maxLen], "") + "..."
 	}
 	return s
+}
+
+// escapeUnprintable keeps printable ASCII, escapes backslash and every other byte as "\NNN".
+func escapeUnprintable(s string) string {
+	var b strings.Builder
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		switch {
+		case c == '\\':
+			b.WriteString(`\\`)
+		case c >= 0x20 && c <= 0x7e:
+			b.WriteByte(c)
+		default:
+			fmt.Fprintf(&b, `\%03d`, c)
+		}
+	}
+	return b.String()
 }
 
 func sortedStrings(values []string) []string {

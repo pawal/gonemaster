@@ -33,7 +33,7 @@ Status: Final
      - Else extract TXT RRs whose owner name matches query name.
      - For each TXT RR:
        - If RR class is not CHAOS, mark wrong-class for nameserver.
-       - Concatenate TXT strings, trim leading/trailing whitespace.
+       - Concatenate TXT strings, escape unprintable bytes (backslash to `\\`, any byte outside printable ASCII `0x20-0x7e` to `\NNN`), then trim leading/trailing whitespace.
        - If resulting string is non-empty, store `(string, query_name, nameserver)` as revealed data.
    - If no non-empty string was revealed for this nameserver, mark nameserver for no-version-revealed.
 5. Emit `N15_SOFTWARE_VERSION` for each unique `(string, query_name)` pair with sorted unique `servers`.
@@ -66,7 +66,7 @@ Status: Final
 | `N15_ERROR_ON_VERSION_QUERY` | `query_name` | `string` | Version query name (`version.bind` or `version.server`). |
 | `N15_ERROR_ON_VERSION_QUERY` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
 | `N15_NO_VERSION_REVEALED` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
-| `N15_SOFTWARE_VERSION` | `string` | `string` | Revealed trimmed software/version string. |
+| `N15_SOFTWARE_VERSION` | `string` | `string` | Revealed software/version string, with unprintable bytes escaped and surrounding whitespace trimmed. |
 | `N15_SOFTWARE_VERSION` | `query_name` | `string` | Query name producing the string (`version.bind` or `version.server`). |
 | `N15_SOFTWARE_VERSION` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
 | `N15_WRONG_CLASS` | `servers` | `array<object>` | Structured sorted unique nameserver identities (`{ns,address}` object). |
@@ -90,6 +90,8 @@ Status: Final
   - Upstream: describes a conceptual "Sending Version Query" set then removal based on TXT data. Gonemaster: computes equivalent behavior via per-server `noVersion` state (set only when no non-empty version string was revealed).
   - Upstream: states nameserver IP collection semantics. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output and emits deduplicated sorted `servers` aggregates.
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+- Resolved upstream issues:
+  - Upstream v9.0.0 ([engine #1528](https://github.com/zonemaster/zonemaster-engine/pull/1528)) hardened this testcase by escaping unprintable bytes in version strings (`escape_unprintable`) before logging, so control characters, invalid UTF-8, and injection sequences in `version.bind`/`version.server` answers cannot reach logs or UIs verbatim. Gonemaster applies the same escaping (backslash to `\\`, any byte outside `0x20-0x7e` to `\NNN`). Gonemaster's non-empty check was never affected by the related Perl falsiness fix in that PR (a `"0"` version string is retained).
 - Potential upstream report:
   - `no`
 
@@ -97,3 +99,4 @@ Status: Final
 - Nameservers with no baseline SOA response are silently ignored for `N15_*` findings.
 - A nameserver can appear in both `N15_ERROR_ON_VERSION_QUERY` and `N15_SOFTWARE_VERSION` (different query names).
 - Empty or whitespace-only TXT strings are ignored for software-version revelation.
+- Unprintable bytes are escaped before the whitespace trim, so a control byte at the edge of a version string is preserved as `\NNN` rather than stripped.

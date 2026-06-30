@@ -2149,3 +2149,23 @@ func TestEdeTagForCode(t *testing.T) {
 		}
 	}
 }
+
+func TestEscapeUnprintable(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		{"BIND 9.18.1", "BIND 9.18.1"}, // plain ASCII unchanged
+		{"a b", "a b"},                 // space preserved
+		{`a\b`, `a\\b`},                // backslash doubled
+		{"a\tb", `a\009b`},             // TAB escaped
+		{"a\nb", `a\010b`},             // LF escaped
+		{"\x7f", `\127`},               // DEL escaped
+		{"\xff", `\255`},               // high byte escaped
+		{"\xc3\x28", `\195(`},          // invalid UTF-8 escaped per byte
+	}
+	for _, tc := range cases {
+		if got := escapeUnprintable(tc.in); got != tc.want {
+			t.Errorf("escapeUnprintable(%q) = %q, want %q", tc.in, got, tc.want)
+		}
+	}
+}

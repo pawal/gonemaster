@@ -966,6 +966,94 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	}
 }
 
+// A glueless out-of-bailiwick delegation must yield ADDRESSES_MATCH, not a
+// spurious OUT_OF_BAILIWICK_ADDR_MISMATCH. gonemaster only compares glue the
+// parent actually returns, so an empty parent side never fabricates localhost
+// glue. Mirrors upstream consistency05 scenarios ADDRESSES-MATCH-8/9
+// (zonemaster-engine#1537).
+func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
+	addrHandler := func(name, v4, v6 string) func(string, string) packet.Packet {
+		return func(qname, qtype string) packet.Packet {
+			if !strings.EqualFold(qname, name) {
+				return packet.Packet{}
+			}
+			switch strings.ToUpper(qtype) {
+			case "A":
+				return addrPacket(qname, "A", v4)
+			case "AAAA":
+				return addrPacket(qname, "AAAA", v6)
+			}
+			return packet.Packet{}
+		}
+	}
+
+	scenarios := []struct {
+		name string
+		zone string
+		ns41 string
+		ns42 string
+	}{
+		{"ADDRESSES-MATCH-8", "child.a.b.addresses-match-8.consistency05.xa", "ns41.child.a.b.addresses-match-8.consistency05.xb", "ns42.child.a.b.addresses-match-8.consistency05.xb"},
+		{"ADDRESSES-MATCH-9", "child.addresses-match-9.consistency05.xa", "ns41.child.addresses-match-9.consistency05.xb", "ns42.child.addresses-match-9.consistency05.xb"},
+	}
+
+	for _, sc := range scenarios {
+		t.Run(sc.name, func(t *testing.T) {
+			ctx := testCtx()
+			t.Cleanup(profile.ResetEffective)
+
+			util.SetLogger(logger.New())
+			t.Cleanup(func() { util.SetLogger(nil) })
+
+			origNames := allNSNames
+			origNS := allNameservers
+			origParent := queryParentAll
+			origRecurse := recurse
+			t.Cleanup(func() {
+				allNSNames = origNames
+				allNameservers = origNS
+				queryParentAll = origParent
+				recurse = origRecurse
+			})
+
+			// Child NS names are out-of-bailiwick under the xb tree.
+			allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+				return []dnsname.Name{dnsname.New(sc.ns41), dnsname.New(sc.ns42)}, nil
+			}
+
+			ns41 := newNameserver(t, ctx, sc.ns41, "127.14.5.41", addrHandler(sc.ns41, "127.14.5.41", "fda1:b2:c3:0:127:14:5:41"))
+			ns42 := newNameserver(t, ctx, sc.ns42, "127.14.5.42", addrHandler(sc.ns42, "127.14.5.42", "fda1:b2:c3:0:127:14:5:42"))
+			allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns41, ns42}, nil
+			}
+
+			// Glueless delegation: the parent returns NS records but no glue.
+			queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+				if strings.EqualFold(qtype, "NS") {
+					return []packet.Packet{nsPacket(name, []string{sc.ns41, sc.ns42})}, nil
+				}
+				return []packet.Packet{}, nil
+			}
+
+			recurse = func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
+				return packet.Packet{}, nil
+			}
+
+			z := zone.Zone{Name: dnsname.New(sc.zone)}
+			entries, err := Consistency05(ctx, &z)
+			if err != nil {
+				t.Fatalf("consistency05: %v", err)
+			}
+			if !hasEntryTag(entries, "ADDRESSES_MATCH") {
+				t.Fatalf("expected ADDRESSES_MATCH for glueless OOB delegation")
+			}
+			if hasEntryTag(entries, "OUT_OF_BAILIWICK_ADDR_MISMATCH") {
+				t.Fatalf("unexpected OUT_OF_BAILIWICK_ADDR_MISMATCH for glueless OOB delegation")
+			}
+		})
+	}
+}
+
 func TestConsistency06MultipleMnames(t *testing.T) {
 	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)

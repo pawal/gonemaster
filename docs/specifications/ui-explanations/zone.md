@@ -148,7 +148,7 @@ Header: Inconsistent MX data
 
 Description:
 
-Nameservers agreed on the set of MX targets but returned different data about them (such as different preference values). Mail servers that follow the MX preference order to pick the primary mail host will pick differently depending on which nameserver they queried, leading to unpredictable routing.
+Name servers returned different MX data (mail targets and/or preference values). Each divergent group of name servers is listed with the mail targets it returned. Mail senders can therefore see different MX data depending on which name server they query, leading to unpredictable routing.
 
 ## Tag Z09_NON_AUTH_MX_RESPONSE
 

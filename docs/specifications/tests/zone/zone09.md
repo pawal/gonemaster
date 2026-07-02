@@ -34,19 +34,25 @@ Status: Final
    - `Z09_NON_AUTH_MX_RESPONSE` when non-authoritative responses exist.
 5. If both “no MX” and “MX RRset” buckets are non-empty, emit:
    - `Z09_INCONSISTENT_MX`
-   - `Z09_NO_MX_FOUND`
-   - `Z09_MX_FOUND`
+   - `Z09_NO_MX_FOUND` (`servers`: name servers by host name and IP)
+   - `Z09_MX_FOUND` (`servers`: name servers by host name and IP)
 6. If MX RRset bucket is non-empty:
-   - Compare RRset content across IPs using normalized lowercase wire-text ordering.
-   - If inconsistent RRset content, emit `Z09_INCONSISTENT_MX_DATA` and emit one or more `Z09_MX_DATA` entries grouped by nameserver-name view.
-   - If consistent RRset content:
+   - Compute a per-server key from the MX RDATA: the set of
+     `preference SP lower(mail-target)` pairs, sorted. This key is the data
+     compared for consistency.
+   - Group the responding servers by that key.
+   - If more than one distinct key exists, emit `Z09_INCONSISTENT_MX_DATA`
+     once per distinct key, each with `servers` (that key's name servers by
+     host name and IP) and `mail_targets` (that key's mail targets).
+   - If exactly one key exists:
      - evaluate null-MX conditions:
        - `Z09_NULL_MX_WITH_OTHER_MX` when `.` mailtarget is mixed with other MX RRs;
        - `Z09_NULL_MX_NON_ZERO_PREF` when null-MX preference is not zero;
      - if no null-MX:
        - emit `Z09_ROOT_EMAIL_DOMAIN` for root zone;
        - emit `Z09_TLD_EMAIL_DOMAIN` for TLD zone;
-       - otherwise emit `Z09_MX_DATA`.
+       - otherwise emit `Z09_MX_DATA` with `servers` (name servers by host name
+         and IP) and `mail_targets`.
 7. If MX RRset bucket is empty and “no MX” bucket is non-empty:
    - If zone is NOT root, TLD, or under `.arpa`: emit `Z09_MISSING_MAIL_TARGET`.
    - Otherwise (zone is root, TLD, or under `.arpa`): emit no tag.
@@ -83,17 +89,16 @@ Aggregate operational tags (independent of branch below):
 Mixed presence:
    noMXSet non-empty AND mxSet non-empty
       -> Z09_INCONSISTENT_MX (no args)
-         Z09_NO_MX_FOUND     (addresses = noMXSet)
-         Z09_MX_FOUND        (addresses = mxSet keys)
+         Z09_NO_MX_FOUND     (servers = noMXSet endpoints)
+         Z09_MX_FOUND        (servers = mxSet endpoints)
 
-mxSet non-empty (per-IP RRset content compared by lowercase wire-text):
+mxSet non-empty (servers grouped by MX RDATA key: pref + lower(target), sorted):
 
-   content differs across IPs
-      -> Z09_INCONSISTENT_MX_DATA (no args)
-         per child NS name (allNSOrder):
-            Z09_MX_DATA (addresses = name's IPs, mail_targets)
+   more than one distinct RDATA key
+      -> per RDATA variant:
+            Z09_INCONSISTENT_MX_DATA (servers = variant endpoints, mail_targets)
 
-   content consistent:
+   exactly one RDATA key:
       examine first IP's MX records:
          any MX with target == "." -> hasNullMX = true
             len(records) > 1       -> Z09_NULL_MX_WITH_OTHER_MX (no args)
@@ -101,7 +106,7 @@ mxSet non-empty (per-IP RRset content compared by lowercase wire-text):
       !hasNullMX:
          z.Name == "."             -> Z09_ROOT_EMAIL_DOMAIN (no args)
          nextHigherIsRoot(z.Name)  -> Z09_TLD_EMAIL_DOMAIN  (no args)
-         otherwise                 -> Z09_MX_DATA (addresses = mxSet IPs, mail_targets)
+         otherwise                 -> Z09_MX_DATA (servers = mxSet endpoints, mail_targets)
 
 mxSet empty AND noMXSet non-empty:
    z.Name != "." AND not TLD AND not under .arpa
@@ -117,7 +122,7 @@ emit TEST_CASE_END
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 | `Z09_INCONSISTENT_MX` | Some authoritative nameserver IPs return MX RRset while others return none. |
-| `Z09_INCONSISTENT_MX_DATA` | Authoritative MX RRset content differs across responding nameserver IPs. |
+| `Z09_INCONSISTENT_MX_DATA` | MX RDATA differs across responding name servers; emitted once per distinct RDATA variant. |
 | `Z09_MISSING_MAIL_TARGET` | No authoritative MX RRset was found and zone is not exempt (non-root, non-TLD, non-`.arpa`). |
 | `Z09_MX_DATA` | MX mailtarget data is reported for one reporting group. |
 | `Z09_MX_FOUND` | At least one authoritative nameserver IP returned MX RRset. |
@@ -136,13 +141,14 @@ emit TEST_CASE_END
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Zone09`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Zone09`). |
 | `Z09_INCONSISTENT_MX` | `-` | `-` | No arguments. |
-| `Z09_INCONSISTENT_MX_DATA` | `-` | `-` | No arguments. |
+| `Z09_INCONSISTENT_MX_DATA` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) returning this RDATA variant. |
+| `Z09_INCONSISTENT_MX_DATA` | `mail_targets` | `array<string>` | Structured MX exchange hostname list for this RDATA variant. |
 | `Z09_MISSING_MAIL_TARGET` | `-` | `-` | No arguments. |
-| `Z09_MX_DATA` | `addresses` | `array<string>` | Structured nameserver IP list for this data group. |
+| `Z09_MX_DATA` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) for this data group. |
 | `Z09_MX_DATA` | `mail_targets` | `array<string>` | Structured MX exchange hostname list. |
-| `Z09_MX_FOUND` | `addresses` | `array<string>` | Structured nameserver IPs that returned MX RRset. |
+| `Z09_MX_FOUND` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) that returned MX RRset. |
 | `Z09_NON_AUTH_MX_RESPONSE` | `addresses` | `array<string>` | Structured nameserver IPs reported as non-authoritative (see limitation below). |
-| `Z09_NO_MX_FOUND` | `addresses` | `array<string>` | Structured nameserver IPs with no MX RRset. |
+| `Z09_NO_MX_FOUND` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) with no MX RRset. |
 | `Z09_NO_RESPONSE_MX_QUERY` | `addresses` | `array<string>` | Structured nameserver IPs with no MX response. |
 | `Z09_NULL_MX_NON_ZERO_PREF` | `-` | `-` | No arguments. |
 | `Z09_NULL_MX_WITH_OTHER_MX` | `-` | `-` | No arguments. |
@@ -181,4 +187,4 @@ emit TEST_CASE_END
 ## Edge Cases And Limitations
 - `Z09_NON_AUTH_MX_RESPONSE` currently reports the wrong source IP list due implementation behavior described above.
 - Query results for transport-disabled nameservers are skipped; helper debug tags for skipped transports are outside this testcase metadata contract.
-- `Z09_MX_DATA` can be emitted multiple times in the inconsistent-data branch and once in the consistent-data branch.
+- `Z09_INCONSISTENT_MX_DATA` is emitted once per distinct MX RDATA variant. `Z09_MX_DATA` is emitted once, only in the consistent-data branch.

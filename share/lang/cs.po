@@ -480,8 +480,8 @@ msgid "Child has extra nameserver IP address(es) not listed at parent ({addresse
 msgstr "Podřízená strana má další IP adresy jmenných serverů, které nejsou uvedeny u nadřazené strany ({addresses})."
 
 msgctxt "CONSISTENCY:IN_BAILIWICK_ADDR_MISMATCH"
-msgid "In-bailiwick name server listed at parent has a mismatch between glue data at parent ({parent_servers}) and any equivalent address record in child zone ({zone_servers})."
-msgstr "Jmenný server v bailiwicku uvedený u nadřazené strany má nesoulad mezi GLUE daty u nadřazené strany ({parent_servers}) a jakýmkoli odpovídajícím adresním záznamem v podřízené zóně ({zone_servers})."
+msgid "In-domain name server listed at parent has a mismatch between glue data at parent ({parent_servers}) and any equivalent address record in child zone ({zone_servers})."
+msgstr "Jmenný server v doméně uvedený u nadřazené strany má nesoulad mezi GLUE daty u nadřazené strany ({parent_servers}) a jakýmkoli odpovídajícím adresním záznamem v podřízené zóně ({zone_servers})."
 
 msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
 msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
@@ -552,8 +552,8 @@ msgid "A single SOA time parameter set was seen (REFRESH={refresh},RETRY={retry}
 msgstr "Byla zjištěna jediná sada časových parametrů SOA (REFRESH={refresh},RETRY={retry},EXPIRE={expire},MINIMUM={minimum})."
 
 msgctxt "CONSISTENCY:OUT_OF_BAILIWICK_ADDR_MISMATCH"
-msgid "Out-of-bailiwick name server listed at parent with glue record has a mismatch between the glue at the parent ({parent_servers}) and any equivalent address record found in authoritative zone ({zone_servers})."
-msgstr "Jmenný server mimo bailiwick uvedený u nadřazené strany s GLUE záznamem má nesoulad mezi GLUE u nadřazené strany ({parent_servers}) a jakýmkoli odpovídajícím adresním záznamem nalezeným v autoritativní zóně ({zone_servers})."
+msgid "Not-in-domain name server listed at parent with glue record has a mismatch between the glue at the parent ({parent_servers}) and any equivalent address record found in authoritative zone ({zone_servers})."
+msgstr "Jmenný server mimo doménu uvedený u nadřazené strany s GLUE záznamem má nesoulad mezi GLUE u nadřazené strany ({parent_servers}) a jakýmkoli odpovídajícím adresním záznamem nalezeným v autoritativní zóně ({zone_servers})."
 
 msgctxt "CONSISTENCY:SOA_RNAME"
 msgid "Found SOA rname {rname} on following nameserver set : {servers}."
@@ -2168,8 +2168,8 @@ msgid "Parent has nameserver(s) not listed at the child ({extra})."
 msgstr "Nadřazená zóna má jmenný server/servery neuvedené v podřízené zóně ({extra})."
 
 msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
-msgid "In-bailiwick nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
-msgstr "Jmenný server {ns} v rámci bailiwick nemá GLUE adresní záznam (A nebo AAAA) v odkazu z nadřazené zóny."
+msgid "In-domain nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
+msgstr "Jmenný server {ns} v rámci domény nemá GLUE adresní záznam (A nebo AAAA) v odkazu z nadřazené zóny."
 
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."

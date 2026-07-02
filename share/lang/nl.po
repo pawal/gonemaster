@@ -480,8 +480,8 @@ msgid "Child has extra nameserver IP address(es) not listed at parent ({addresse
 msgstr "De onderliggende zone heeft extra naamserver-IP-adres(sen) die niet bij de bovenliggende zone staan vermeld ({addresses})."
 
 msgctxt "CONSISTENCY:IN_BAILIWICK_ADDR_MISMATCH"
-msgid "In-bailiwick name server listed at parent has a mismatch between glue data at parent ({parent_servers}) and any equivalent address record in child zone ({zone_servers})."
-msgstr "Een in-bailiwick-naamserver die bij de bovenliggende zone staat vermeld, heeft een verschil tussen de glue-data bij de bovenliggende zone ({parent_servers}) en een eventueel overeenkomend adresrecord in de onderliggende zone ({zone_servers})."
+msgid "In-domain name server listed at parent has a mismatch between glue data at parent ({parent_servers}) and any equivalent address record in child zone ({zone_servers})."
+msgstr "Een in-domain-naamserver die bij de bovenliggende zone staat vermeld, heeft een verschil tussen de glue-data bij de bovenliggende zone ({parent_servers}) en een eventueel overeenkomend adresrecord in de onderliggende zone ({zone_servers})."
 
 msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
 msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
@@ -552,8 +552,8 @@ msgid "A single SOA time parameter set was seen (REFRESH={refresh},RETRY={retry}
 msgstr "Eén set SOA-tijdparameters gezien (REFRESH={refresh},RETRY={retry},EXPIRE={expire},MINIMUM={minimum})."
 
 msgctxt "CONSISTENCY:OUT_OF_BAILIWICK_ADDR_MISMATCH"
-msgid "Out-of-bailiwick name server listed at parent with glue record has a mismatch between the glue at the parent ({parent_servers}) and any equivalent address record found in authoritative zone ({zone_servers})."
-msgstr "Een out-of-bailiwick-naamserver die met een glue-record bij de bovenliggende zone staat vermeld, heeft een verschil tussen de glue bij de bovenliggende zone ({parent_servers}) en een eventueel overeenkomend adresrecord dat in de autoritatieve zone is gevonden ({zone_servers})."
+msgid "Not-in-domain name server listed at parent with glue record has a mismatch between the glue at the parent ({parent_servers}) and any equivalent address record found in authoritative zone ({zone_servers})."
+msgstr "Een not-in-domain-naamserver die met een glue-record bij de bovenliggende zone staat vermeld, heeft een verschil tussen de glue bij de bovenliggende zone ({parent_servers}) en een eventueel overeenkomend adresrecord dat in de autoritatieve zone is gevonden ({zone_servers})."
 
 msgctxt "CONSISTENCY:SOA_RNAME"
 msgid "Found SOA rname {rname} on following nameserver set : {servers}."
@@ -2168,8 +2168,8 @@ msgid "Parent has nameserver(s) not listed at the child ({extra})."
 msgstr "De bovenliggende zone heeft naamserver(s) die niet in de onderliggende zone zijn vermeld ({extra})."
 
 msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
-msgid "In-bailiwick nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
-msgstr "In-bailiwick naamserver {ns} heeft geen glue-adresrecord (A of AAAA) in de verwijzing (referral) van de bovenliggende zone."
+msgid "In-domain nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
+msgstr "In-domain naamserver {ns} heeft geen glue-adresrecord (A of AAAA) in de verwijzing (referral) van de bovenliggende zone."
 
 msgctxt "DELEGATION:IS_NOT_AUTHORITATIVE"
 msgid "Nameserver {ns}/{address} response is not authoritative on {proto} port 53."

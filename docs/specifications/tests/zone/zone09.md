@@ -83,8 +83,6 @@ Aggregate operational tags (independent of branch below):
    noResponseMX       non-empty -> Z09_NO_RESPONSE_MX_QUERY (addresses)
    unexpectedRcodeMX  non-empty -> Z09_UNEXPECTED_RCODE_MX  (rcode, addresses) per rcode
    nonAuthoritativeMX non-empty -> Z09_NON_AUTH_MX_RESPONSE (addresses)
-      (note: this tag currently carries the noResponseMX list, not the
-       nonAuthoritativeMX list; see Differences From Upstream)
 
 Mixed presence:
    noMXSet non-empty AND mxSet non-empty
@@ -147,7 +145,7 @@ emit TEST_CASE_END
 | `Z09_MX_DATA` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) for this data group. |
 | `Z09_MX_DATA` | `mail_targets` | `array<string>` | Structured MX exchange hostname list. |
 | `Z09_MX_FOUND` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) that returned MX RRset. |
-| `Z09_NON_AUTH_MX_RESPONSE` | `addresses` | `array<string>` | Structured nameserver IPs reported as non-authoritative (see limitation below). |
+| `Z09_NON_AUTH_MX_RESPONSE` | `addresses` | `array<string>` | Structured nameserver IPs reported as non-authoritative. |
 | `Z09_NO_MX_FOUND` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) with no MX RRset. |
 | `Z09_NO_RESPONSE_MX_QUERY` | `addresses` | `array<string>` | Structured nameserver IPs with no MX response. |
 | `Z09_NULL_MX_NON_ZERO_PREF` | `-` | `-` | No arguments. |
@@ -178,13 +176,11 @@ emit TEST_CASE_END
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: defines `Z09_NON_AUTH_MX_RESPONSE` from the non-authoritative MX set. Gonemaster: currently populates `addresses` for this tag from the no-response set (`noResponseMX`), not the non-authoritative set (`nonAuthoritativeMX`).
   - Upstream: describes name server IP set processing. Gonemaster: deduplicates probing by IP before classification and separately keeps name-group reporting views.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
 - Potential upstream report:
   - `no`
 
 ## Edge Cases And Limitations
-- `Z09_NON_AUTH_MX_RESPONSE` currently reports the wrong source IP list due implementation behavior described above.
 - Query results for transport-disabled nameservers are skipped; helper debug tags for skipped transports are outside this testcase metadata contract.
 - `Z09_INCONSISTENT_MX_DATA` is emitted once per distinct MX RDATA variant. `Z09_MX_DATA` is emitted once, only in the consistent-data branch.

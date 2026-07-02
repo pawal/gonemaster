@@ -1696,28 +1696,28 @@ msgid "Some name servers return an MX RRset while others return none."
 msgstr "Sommige naamservers geven een MX-RRset terug terwijl andere er geen teruggeven."
 
 msgctxt "ZONE:Z09_INCONSISTENT_MX_DATA"
-msgid "The MX RRset data is inconsistent between the name servers."
-msgstr "De MX-RRset-gegevens zijn inconsistent tussen de naamservers."
+msgid "The MX RRset differs between name servers: \"{servers}\" return the mail targets \"{mail_targets}\"."
+msgstr "De MX-RRset verschilt tussen de naamservers: \"{servers}\" geven de mailbestemmingen \"{mail_targets}\" terug."
 
 msgctxt "ZONE:Z09_MISSING_MAIL_TARGET"
 msgid "The child zone has no mail target (no MX)."
 msgstr "De onderliggende zone heeft geen mailbestemming (geen MX)."
 
 msgctxt "ZONE:Z09_MX_DATA"
-msgid "Mail targets in the MX RRset \"{mail_targets}\" returned from name servers \"{addresses}\"."
-msgstr "Mailbestemmingen in de MX-RRset \"{mail_targets}\" teruggegeven door naamservers \"{addresses}\"."
+msgid "Mail targets in the MX RRset \"{mail_targets}\" returned from name servers \"{servers}\"."
+msgstr "Mailbestemmingen in de MX-RRset \"{mail_targets}\" teruggegeven door naamservers \"{servers}\"."
 
 msgctxt "ZONE:Z09_MX_FOUND"
-msgid "MX RRset was returned by name servers \"{addresses}\"."
-msgstr "MX-RRset werd teruggegeven door naamservers \"{addresses}\"."
+msgid "MX RRset was returned by name servers \"{servers}\"."
+msgstr "MX-RRset werd teruggegeven door naamservers \"{servers}\"."
 
 msgctxt "ZONE:Z09_NON_AUTH_MX_RESPONSE"
 msgid "Non-authoritative response on MX query from name servers \"{addresses}\"."
 msgstr "Niet-autoritatief antwoord op MX-query van naamservers \"{addresses}\"."
 
 msgctxt "ZONE:Z09_NO_MX_FOUND"
-msgid "No MX RRset was returned by name servers \"{addresses}\"."
-msgstr "Geen MX-RRset werd teruggegeven door naamservers \"{addresses}\"."
+msgid "No MX RRset was returned by name servers \"{servers}\"."
+msgstr "Geen MX-RRset werd teruggegeven door naamservers \"{servers}\"."
 
 msgctxt "ZONE:Z09_NO_RESPONSE_MX_QUERY"
 msgid "No response on MX query from name servers \"{addresses}\"."

@@ -1696,28 +1696,28 @@ msgid "Some name servers return an MX RRset while others return none."
 msgstr "Některé jmenné servery vracejí MX RRset, zatímco jiné nevracejí žádný."
 
 msgctxt "ZONE:Z09_INCONSISTENT_MX_DATA"
-msgid "The MX RRset data is inconsistent between the name servers."
-msgstr "Data MX RRset jsou mezi jmennými servery nekonzistentní."
+msgid "The MX RRset differs between name servers: \"{servers}\" return the mail targets \"{mail_targets}\"."
+msgstr "MX RRset se mezi jmennými servery liší: \"{servers}\" vracejí poštovní cíle \"{mail_targets}\"."
 
 msgctxt "ZONE:Z09_MISSING_MAIL_TARGET"
 msgid "The child zone has no mail target (no MX)."
 msgstr "Podřízená zóna nemá žádný poštovní cíl (žádné MX)."
 
 msgctxt "ZONE:Z09_MX_DATA"
-msgid "Mail targets in the MX RRset \"{mail_targets}\" returned from name servers \"{addresses}\"."
-msgstr "Poštovní cíle v MX RRset \"{mail_targets}\" vrácené z jmenných serverů \"{addresses}\"."
+msgid "Mail targets in the MX RRset \"{mail_targets}\" returned from name servers \"{servers}\"."
+msgstr "Poštovní cíle v MX RRset \"{mail_targets}\" vrácené z jmenných serverů \"{servers}\"."
 
 msgctxt "ZONE:Z09_MX_FOUND"
-msgid "MX RRset was returned by name servers \"{addresses}\"."
-msgstr "MX RRset byl vrácen jmennými servery \"{addresses}\"."
+msgid "MX RRset was returned by name servers \"{servers}\"."
+msgstr "MX RRset byl vrácen jmennými servery \"{servers}\"."
 
 msgctxt "ZONE:Z09_NON_AUTH_MX_RESPONSE"
 msgid "Non-authoritative response on MX query from name servers \"{addresses}\"."
 msgstr "Neautoritativní odpověď na MX dotaz od jmenných serverů \"{addresses}\"."
 
 msgctxt "ZONE:Z09_NO_MX_FOUND"
-msgid "No MX RRset was returned by name servers \"{addresses}\"."
-msgstr "Žádný MX RRset nebyl vrácen jmennými servery \"{addresses}\"."
+msgid "No MX RRset was returned by name servers \"{servers}\"."
+msgstr "Žádný MX RRset nebyl vrácen jmennými servery \"{servers}\"."
 
 msgctxt "ZONE:Z09_NO_RESPONSE_MX_QUERY"
 msgid "No response on MX query from name servers \"{addresses}\"."

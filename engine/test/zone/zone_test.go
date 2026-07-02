@@ -514,12 +514,218 @@ func TestZone09MXDataUsesTypedMailTargets(t *testing.T) {
 	if !ok || len(targets) != 1 || targets[0] != "mail.example" {
 		t.Fatalf("expected typed mail_targets [mail.example], got %#v", mxData.Args["mail_targets"])
 	}
-	addresses, ok := mxData.Args["addresses"].([]string)
-	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.1" {
-		t.Fatalf("expected typed addresses [192.0.2.1], got %#v", mxData.Args["addresses"])
+	// Z09_MX_DATA now reports name servers by host name and IP (servers),
+	// not IP addresses alone, so the addresses key must be gone.
+	if _, ok := mxData.Args["addresses"]; ok {
+		t.Fatalf("Z09_MX_DATA should not emit addresses anymore: %#v", mxData.Args)
+	}
+	servers, ok := mxData.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one typed server, got %#v", mxData.Args["servers"])
+	}
+	if addr, _ := servers[0]["address"].(string); addr != "192.0.2.1" {
+		t.Fatalf("expected server address 192.0.2.1, got %#v", servers[0])
+	}
+	if ns, _ := servers[0]["ns"].(string); ns == "" {
+		t.Fatalf("expected server host name to be present, got %#v", servers[0])
 	}
 	if _, ok := mxData.Args["mailtarget_list"]; ok {
 		t.Fatalf("legacy key mailtarget_list should not be present: %#v", mxData.Args)
+	}
+}
+
+// mxRR is a single MX record (preference + mail target) for mxPacket.
+type mxRR struct {
+	pref   uint16
+	target string
+}
+
+// mxPacket builds an authoritative MX answer for owner at the given TTL.
+func mxPacket(owner string, ttl uint32, rrs ...mxRR) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeMX)
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	for _, r := range rrs {
+		mx := &dns.MX{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: ttl}}
+		mx.Mx = dnsutil.Fqdn(r.target)
+		mx.Preference = r.pref
+		msg.Answer = append(msg.Answer, mx)
+	}
+	return packet.Packet{Msg: msg}
+}
+
+// TestEncodeMXRRSetRDATA verifies the MX consistency key: it is built from
+// RDATA (preference + mail target) only, is independent of TTL and record
+// order, is case-insensitive on the target, and distinguishes genuine RDATA
+// differences (preference or target).
+func TestEncodeMXRRSetRDATA(t *testing.T) {
+	mk := func(ttl uint32, pref uint16, target string) dns.RR {
+		mx := &dns.MX{Hdr: dns.Header{Name: "example.com.", Class: dns.ClassINET, TTL: ttl}}
+		mx.Mx = target
+		mx.Preference = pref
+		return mx
+	}
+
+	base := []dns.RR{mk(3600, 10, "mx1.example."), mk(3600, 20, "mx2.example.")}
+
+	// TTL is not part of the key.
+	ttlDiff := []dns.RR{mk(300, 10, "mx1.example."), mk(300, 20, "mx2.example.")}
+	if encodeMXRRSetRDATA(base) != encodeMXRRSetRDATA(ttlDiff) {
+		t.Errorf("TTL difference must not change the key")
+	}
+
+	// Record order is not part of the key.
+	reordered := []dns.RR{mk(3600, 20, "mx2.example."), mk(3600, 10, "mx1.example.")}
+	if encodeMXRRSetRDATA(base) != encodeMXRRSetRDATA(reordered) {
+		t.Errorf("record order must not change the key")
+	}
+
+	// Target comparison is case-insensitive.
+	mixedCase := []dns.RR{mk(3600, 10, "MX1.Example."), mk(3600, 20, "mx2.EXAMPLE.")}
+	if encodeMXRRSetRDATA(base) != encodeMXRRSetRDATA(mixedCase) {
+		t.Errorf("target case must not change the key")
+	}
+
+	// A different preference is a real difference.
+	prefDiff := []dns.RR{mk(3600, 15, "mx1.example."), mk(3600, 20, "mx2.example.")}
+	if encodeMXRRSetRDATA(base) == encodeMXRRSetRDATA(prefDiff) {
+		t.Errorf("preference difference must change the key")
+	}
+
+	// A different mail target is a real difference.
+	targetDiff := []dns.RR{mk(3600, 10, "mx9.example."), mk(3600, 20, "mx2.example.")}
+	if encodeMXRRSetRDATA(base) == encodeMXRRSetRDATA(targetDiff) {
+		t.Errorf("target difference must change the key")
+	}
+}
+
+// TestZone09MXConsistentDespiteTTLDifference verifies that two name servers
+// serving identical MX RDATA (preference + target) but different TTLs are
+// treated as consistent: no Z09_INCONSISTENT_MX_DATA, one Z09_MX_DATA. TTL is
+// not RRset data and must not drive the consistency comparison.
+func TestZone09MXConsistentDespiteTTLDifference(t *testing.T) {
+	ctx := setupTest(t)
+
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
+
+	handler := func(ttl uint32) func(string, string, *ens.QueryOptions) packet.Packet {
+		return func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+			switch qtype {
+			case "SOA":
+				return soaPacket("example.com", 1, 1, 1, 1, 1)
+			case "MX":
+				return mxPacket("example.com", ttl, mxRR{10, "mail.example."})
+			default:
+				return packet.Packet{}
+			}
+		}
+	}
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", handler(300))
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", handler(3600))
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone09(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+
+	var mxData *logger.Entry
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == "Z09_INCONSISTENT_MX_DATA" {
+			t.Fatalf("TTL-only difference must not be reported as inconsistent MX data")
+		}
+		if entry.Tag == "Z09_MX_DATA" {
+			mxData = entry
+		}
+	}
+	if mxData == nil {
+		t.Fatalf("expected a single consistent Z09_MX_DATA")
+	}
+	servers, ok := mxData.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected both name servers in Z09_MX_DATA, got %#v", mxData.Args["servers"])
+	}
+}
+
+// TestZone09MXInconsistentDataPerVariant verifies that differing MX RDATA
+// yields one self-contained Z09_INCONSISTENT_MX_DATA per RDATA variant, each
+// carrying its own servers (host name + IP) and mail targets, and no
+// Z09_MX_DATA.
+func TestZone09MXInconsistentDataPerVariant(t *testing.T) {
+	ctx := setupTest(t)
+
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
+
+	handler := func(target string) func(string, string, *ens.QueryOptions) packet.Packet {
+		return func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+			switch qtype {
+			case "SOA":
+				return soaPacket("example.com", 1, 1, 1, 1, 1)
+			case "MX":
+				return mxPacket("example.com", 300, mxRR{10, target})
+			default:
+				return packet.Packet{}
+			}
+		}
+	}
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", handler("mail1.example."))
+	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", handler("mail2.example."))
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone09(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+
+	// Map each variant's mail target to the addresses that returned it.
+	byTarget := map[string][]string{}
+	inconsistent := 0
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == "Z09_MX_DATA" {
+			t.Fatalf("inconsistent branch must not emit Z09_MX_DATA")
+		}
+		if entry.Tag != "Z09_INCONSISTENT_MX_DATA" {
+			continue
+		}
+		inconsistent++
+		targets, ok := entry.Args["mail_targets"].([]string)
+		if !ok || len(targets) != 1 {
+			t.Fatalf("expected one mail target per variant, got %#v", entry.Args["mail_targets"])
+		}
+		servers, ok := entry.Args["servers"].([]map[string]any)
+		if !ok || len(servers) != 1 {
+			t.Fatalf("expected one server per variant, got %#v", entry.Args["servers"])
+		}
+		if ns, _ := servers[0]["ns"].(string); ns == "" {
+			t.Fatalf("expected server host name in Z09_INCONSISTENT_MX_DATA, got %#v", servers[0])
+		}
+		addr, _ := servers[0]["address"].(string)
+		byTarget[targets[0]] = append(byTarget[targets[0]], addr)
+	}
+
+	if inconsistent != 2 {
+		t.Fatalf("expected 2 Z09_INCONSISTENT_MX_DATA entries (one per variant), got %d", inconsistent)
+	}
+	if got := byTarget["mail1.example"]; len(got) != 1 || got[0] != "192.0.2.1" {
+		t.Fatalf("expected mail1.example from 192.0.2.1, got %#v", got)
+	}
+	if got := byTarget["mail2.example"]; len(got) != 1 || got[0] != "192.0.2.2" {
+		t.Fatalf("expected mail2.example from 192.0.2.2, got %#v", got)
 	}
 }
 

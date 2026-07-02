@@ -1003,6 +1003,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 	allNS := map[string][]string{}
 	var allNSOrder []string
+	ipToNS := map[string]string{}
 
 	nss, err := authoritativeNS(ctx, z)
 	if err != nil {
@@ -1027,6 +1028,20 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			allNSOrder = append(allNSOrder, nsName)
 		}
 		allNS[nsName] = append(allNS[nsName], ns.Address.String())
+		ipToNS[ns.Address.String()] = nsName
+	}
+
+	// Map IPs to "ns-name/ip" endpoints for name-server reporting.
+	endpointsFor := func(ips []string) []string {
+		out := make([]string, 0, len(ips))
+		for _, ip := range sortedStrings(ips) {
+			if name := ipToNS[ip]; name != "" {
+				out = append(out, name+"/"+ip)
+			} else {
+				out = append(out, ip)
+			}
+		}
+		return out
 	}
 
 	var outcomes []mxOutcome
@@ -1146,60 +1161,47 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 		argsNoMX := map[string]any{}
-		setTypedAddresses(argsNoMX, noMXSet)
+		setTypedServersFromEndpoints(argsNoMX, endpointsFor(noMXSet))
 		if err := appendLog(ctx, &results, testcase, "Z09_NO_MX_FOUND", argsNoMX); err != nil {
 			return results, err
 		}
 		argsFound := map[string]any{}
-		setTypedAddresses(argsFound, mapKeys(mxSet))
+		setTypedServersFromEndpoints(argsFound, endpointsFor(mapKeys(mxSet)))
 		if err := appendLog(ctx, &results, testcase, "Z09_MX_FOUND", argsFound); err != nil {
 			return results, err
 		}
 	}
 
 	if len(mxSet) > 0 {
-		var dataJSON string
-		first := true
-
+		// Group servers by MX RDATA, ignoring TTL and record order.
+		variants := map[string][]string{}
+		variantTargets := map[string][]string{}
+		var variantOrder []string
 		for _, ip := range sortedStrings(mxSetOrder) {
 			records := mxSet[ip]
-			if first {
-				dataJSON = encodeLowercaseRRSet(records)
-				first = false
-			} else {
-				nextData := encodeLowercaseRRSet(records)
-				if nextData != dataJSON {
-					if err := appendLog(ctx, &results, testcase, "Z09_INCONSISTENT_MX_DATA", map[string]any{}); err != nil {
-						return results, err
-					}
-					for _, nsName := range allNSOrder {
-						ips := allNS[nsName]
-						if len(ips) == 0 {
-							continue
-						}
-						records := mxSet[ips[0]]
-						if len(records) == 0 {
-							continue
-						}
-						args := map[string]any{
-							"mail_targets": mxExchangeList(records),
-						}
-						setTypedAddresses(args, ips)
-						if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", args); err != nil {
-							return results, err
-						}
-					}
-					break
+			key := encodeMXRRSetRDATA(records)
+			if _, ok := variants[key]; !ok {
+				variantOrder = append(variantOrder, key)
+				variantTargets[key] = mxExchangeList(records)
+			}
+			variants[key] = append(variants[key], ip)
+		}
+		sort.Strings(variantOrder)
+
+		if len(variantOrder) > 1 {
+			// One self-contained WARNING per RDATA variant.
+			for _, key := range variantOrder {
+				args := map[string]any{
+					"mail_targets": variantTargets[key],
+				}
+				setTypedServersFromEndpoints(args, endpointsFor(variants[key]))
+				if err := appendLog(ctx, &results, testcase, "Z09_INCONSISTENT_MX_DATA", args); err != nil {
+					return results, err
 				}
 			}
-		}
-
-		if !hasEntryTag(results, "Z09_INCONSISTENT_MX_DATA") {
+		} else {
+			firstIP := mxSetOrder[0]
 			hasNullMX := false
-			firstIP := ""
-			if len(mxSetOrder) > 0 {
-				firstIP = mxSetOrder[0]
-			}
 			for _, rr := range mxSet[firstIP] {
 				mx, ok := rr.(*dns.MX)
 				if !ok {
@@ -1233,7 +1235,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					args := map[string]any{
 						"mail_targets": mxExchangeList(mxSet[firstIP]),
 					}
-					setTypedAddresses(args, mxSetOrder)
+					setTypedServersFromEndpoints(args, endpointsFor(mxSetOrder))
 					if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", args); err != nil {
 						return results, err
 					}
@@ -2281,10 +2283,15 @@ func nsStrings(servers []nameserver.Nameserver) []string {
 	return values
 }
 
-func encodeLowercaseRRSet(records []dns.RR) string {
+// encodeMXRRSetRDATA keys an MX RRset by RDATA only (preference + target), TTL excluded.
+func encodeMXRRSetRDATA(records []dns.RR) string {
 	var data []string
 	for _, rr := range records {
-		data = append(data, strings.ToLower(rr.String()))
+		mx, ok := rr.(*dns.MX)
+		if !ok {
+			continue
+		}
+		data = append(data, fmt.Sprintf("%d %s", mx.Preference, strings.ToLower(dnsname.New(mx.Mx).String())))
 	}
 	sort.Strings(data)
 	encoded, _ := json.Marshal(data)

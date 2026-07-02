@@ -137,7 +137,7 @@
     "consistency02": "Check SOA RNAME consistency across nameservers for the tested zone.",
     "consistency03": "Check consistency of SOA timer fields (`refresh`, `retry`, `expire`, `minimum`) across nameservers.",
     "consistency04": "Check NS RRset consistency across nameservers for the tested zone.",
-    "consistency05": "Compare delegation glue addresses against child authoritative address data for in-bailiwick nameservers.",
+    "consistency05": "Compare delegation glue addresses against child authoritative address data for in-domain nameservers.",
     "consistency06": "Check SOA MNAME consistency across nameservers for the tested zone.",
     "delegation01": "Validate that delegation-side and child-side nameserver sets meet minimum-count requirements overall and per IP family.",
     "delegation02": "Detect nameserver IP-address reuse within delegation data, within child data, and across the combined delegation+child addressed NS set.",

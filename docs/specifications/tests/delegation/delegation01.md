@@ -4,7 +4,7 @@ Status: Final
 
 ## Purpose
 - Validate that delegation-side and child-side nameserver sets meet minimum-count requirements overall and per IP family.
-- Flag any in-bailiwick delegation NS name that the parent referral ships without the required A/AAAA glue.
+- Flag any in-domain delegation NS name that the parent referral ships without the required A/AAAA glue.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -14,7 +14,7 @@ Status: Final
   - Child NS names from [`z.ApexNSNames(ctx)`](../../nameserver-resolution.md#apexnsnames).
   - Delegation nameserver addresses from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers).
   - Child nameserver addresses from [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
-  - Raw delegation items from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers), which carry in-bailiwick NS names without an address when the referral has no glue for them.
+  - Raw delegation items from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers), which carry in-domain NS names without an address when the referral has no glue for them.
 - Profile/config knobs that affect behavior:
   - No direct profile knob in this testcase.
   - Minimum required nameserver count is fixed by `constants.MinimumNumberOfNameservers`.
@@ -33,17 +33,17 @@ Status: Final
 5. Get delegation addressed NS ([`GlueNameservers`](../../nameserver-resolution.md#gluenameservers)), split by IP family, count unique NS names per family, and emit per family:
    - IPv4: `ENOUGH_IPV4_NS_DEL`, `NOT_ENOUGH_IPV4_NS_DEL`, or `NO_IPV4_NS_DEL`.
    - IPv6: `ENOUGH_IPV6_NS_DEL`, `NOT_ENOUGH_IPV6_NS_DEL`, or `NO_IPV6_NS_DEL`.
-6. Get raw delegation items ([`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers)). For each in-bailiwick NS name that has no address in any item (the referral shipped no glue for it), emit `IN_BAILIWICK_GLUE_MISSING` (one per name, sorted). Out-of-bailiwick names are out of scope here.
+6. Get raw delegation items ([`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers)). For each in-domain NS name that has no address in any item (the referral shipped no glue for it), emit `IN_BAILIWICK_GLUE_MISSING` (one per name, sorted). Not-in-domain names are out of scope here.
 7. Emit `TEST_CASE_END`.
 
-### In-Bailiwick Glue Presence Check (step 6)
+### In-Domain Glue Presence Check (step 6)
 
-A delegation NS name that lies inside the zone (in-bailiwick) can only be reached if the parent referral carries its address as glue; otherwise a resolver holding only the referral cannot resolve the name (the address lives inside the very zone the name serves). The raw referral view from `DelegationNameservers` is used here rather than [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers), because the latter resolves the name through the recursor and would mask the missing glue.
+A delegation NS name that lies inside the zone (in-domain) can only be reached if the parent referral carries its address as glue; otherwise a resolver holding only the referral cannot resolve the name (the address lives inside the very zone the name serves). The raw referral view from `DelegationNameservers` is used here rather than [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers), because the latter resolves the name through the recursor and would mask the missing glue.
 
 {{% expand "Show diagram" %}}
 ```
 items = DelegationNameservers(z)
-for each in-bailiwick NS name with no addressed item:
+for each in-domain NS name with no addressed item:
    IN_BAILIWICK_GLUE_MISSING (ns)
 ```
 {{% /expand %}}
@@ -89,7 +89,7 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 | `ENOUGH_IPV6_NS_DEL` | Delegation side has at least minimum number of NS names with IPv6 addresses. |
 | `ENOUGH_NS_CHILD` | Child NS name count is at least minimum. |
 | `ENOUGH_NS_DEL` | Delegation NS name count is at least minimum. |
-| `IN_BAILIWICK_GLUE_MISSING` | An in-bailiwick delegation NS name has no A/AAAA glue in the parent referral. |
+| `IN_BAILIWICK_GLUE_MISSING` | An in-domain delegation NS name has no A/AAAA glue in the parent referral. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | Child side has IPv4-addressed NS names, but fewer than minimum. |
 | `NOT_ENOUGH_IPV4_NS_DEL` | Delegation side has IPv4-addressed NS names, but fewer than minimum. |
 | `NOT_ENOUGH_IPV6_NS_CHILD` | Child side has IPv6-addressed NS names, but fewer than minimum. |
@@ -124,7 +124,7 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 | `ENOUGH_NS_DEL` | `count` | `int` | Number of delegation NS names. |
 | `ENOUGH_NS_DEL` | `minimum` | `int` | Required minimum NS count. |
 | `ENOUGH_NS_DEL` | `servers` | `array<object>` | Structured delegation nameserver names as `{ns}` items. |
-| `IN_BAILIWICK_GLUE_MISSING` | `ns` | `string` | The in-bailiwick delegation NS name that lacks glue. |
+| `IN_BAILIWICK_GLUE_MISSING` | `ns` | `string` | The in-domain delegation NS name that lacks glue. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `count` | `int` | Number of unique child NS names with IPv4 addresses. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `minimum` | `int` | Required minimum NS count. |
 | `NOT_ENOUGH_IPV4_NS_CHILD` | `servers` | `array<object>` | Structured child `{ns,address}` object items considered for IPv4. |
@@ -185,13 +185,13 @@ Per side <SIDE> in {CHILD (ApexNameservers), DEL (GlueNameservers)}:
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes delegation-side IPv4/IPv6 checks before child-side IPv4/IPv6 checks. Gonemaster: performs child-side family checks first, then delegation-side family checks.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
-  - Upstream: only counts NS names with at least one address in aggregate, so a single in-bailiwick name missing its glue is absorbed into the count and never flagged. Gonemaster: additionally flags each such name with `IN_BAILIWICK_GLUE_MISSING`.
+  - Upstream: only counts NS names with at least one address in aggregate, so a single in-domain name missing its glue is absorbed into the count and never flagged. Gonemaster: additionally flags each such name with `IN_BAILIWICK_GLUE_MISSING`.
 - Potential upstream report:
-  - `yes` (feature proposal: per-name in-bailiwick glue presence)
+  - `yes` (feature proposal: per-name in-domain glue presence)
 
 ## Edge Cases And Limitations
 - Per-family counts are by unique NS name, not by count of IP addresses.
 - A single NS name can contribute to both IPv4 and IPv6 counts when it has both address families.
 - Any method error aborts testcase execution and can prevent later tags from being emitted.
 - The glue-presence check uses the raw parent referral (`DelegationNameservers`), not `GlueNameservers`, so a name resolvable only via the recursor still counts as missing glue.
-- Out-of-bailiwick NS names are out of scope for the glue-presence check; their resolvability is covered by other testcases.
+- Not-in-domain NS names are out of scope for the glue-presence check; their resolvability is covered by other testcases.

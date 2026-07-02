@@ -813,7 +813,7 @@ or shaped by pragmatic compromise.
 | Item | State | Source of truth |
 |---|---|---|
 | Intentional upstream gaps | `dnssec12` (scope-deferred) and `nameserver14` (upstream numbering hole). | [docs/specifications/known-intentional-gaps.md](specifications/known-intentional-gaps.md). |
-| Behaviour divergences from upstream | Several open and tracked (zone07, nameserver13, recursor cache and bailiwick handling). | [docs/specifications/known-behavior-divergences.md](specifications/known-behavior-divergences.md). |
+| Behaviour divergences from upstream | Several open and tracked (zone07, nameserver13, recursor cache and in-domain glue handling). | [docs/specifications/known-behavior-divergences.md](specifications/known-behavior-divergences.md). |
 
 These files are the source of truth for missing or divergent
 testcase behaviour.

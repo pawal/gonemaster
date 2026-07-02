@@ -23,9 +23,9 @@ Status: Final
 4. Add NS records for all names from [`z.GlueNames`](../../nameserver-resolution.md#gluenames) into the authority section.
 5. Get parent zone from `z.Parent(ctx)`; if parent is missing, return an error.
 6. Read delegation addressed NS from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers).
-7. If IPv4 delegation NS list is non-empty and all names are in-bailiwick of parent:
+7. If IPv4 delegation NS list is non-empty and all names are in-domain of parent:
    - Add one `A` glue record to additional section, using the first IPv4 nameserver.
-8. If IPv6 delegation NS list is non-empty and all names are in-bailiwick of parent:
+8. If IPv6 delegation NS list is non-empty and all names are in-domain of parent:
    - Add one `AAAA` glue record to additional section, using the first IPv6 nameserver.
 9. Pack wire format with compression enabled and measure packet size.
 10. Emit one of:
@@ -51,12 +51,12 @@ delNS = GlueNameservers
 
 additional section, A:
    nssV4 = filterByIPVersion(delNS, IPv4)
-   nssV4 non-empty AND every NS name in nssV4 is in-bailiwick(parent.Name)
+   nssV4 non-empty AND every NS name in nssV4 is in-domain(parent.Name)
      -> add one A RR using nssV4[0]
 
 additional section, AAAA:
    nssV6 = filterByIPVersion(delNS, IPv6)
-   nssV6 non-empty AND every NS name in nssV6 is in-bailiwick(parent.Name)
+   nssV6 non-empty AND every NS name in nssV6 is in-domain(parent.Name)
      -> add one AAAA RR using nssV6[0]
 
 pack msg with compression; size = len(packed)
@@ -104,5 +104,5 @@ emit TEST_CASE_END
 
 ## Edge Cases And Limitations
 - This testcase does not send network queries; it evaluates synthesized packet size only.
-- When a family has any out-of-bailiwick NS name relative to parent, no additional-section record is added for that family.
+- When a family has any not-in-domain NS name relative to parent, no additional-section record is added for that family.
 - A missing parent zone object is treated as a hard error instead of a logged result tag.

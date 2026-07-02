@@ -47,8 +47,8 @@ name+address pairs. The child's claim about itself.
 func ApexNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error)
 ```
 
-Equivalent to `z.NS(ctx)` with a nil-zone guard. For in-bailiwick names
-this resolves via the zone's own glue; out-of-bailiwick names are
+Equivalent to `z.NS(ctx)` with a nil-zone guard. For in-domain names
+this resolves via the zone's own glue; not-in-domain names are
 resolved via the recursor.
 
 Source: `engine/nsdiscovery/nsdiscovery.go`.
@@ -101,16 +101,16 @@ Source: `engine/nsdiscovery/nsdiscovery.go`.
 ## DelegationNameservers
 
 Parent-queried delegation view of the zone's nameservers, with
-bailiwick-aware address resolution. Appropriate for delegation
+domain-aware address resolution. Appropriate for delegation
 consistency checks that need the parent's authoritative answer.
 
 ```go
 func DelegationNameservers(ctx context.Context, z *zone.Zone) ([]NSItem, error)
 ```
 
-Returns `NSItem` values pairing names with addresses from in-bailiwick
-glue (if present) and out-of-bailiwick recursive resolution (for
-non-bailiwick names). Result is sorted and deduplicated.
+Returns `NSItem` values pairing names with addresses from in-domain
+glue (if present) and not-in-domain recursive resolution (for
+not-in-domain names). Result is sorted and deduplicated.
 
 An unreachable delegation chain returns an empty slice with a nil
 error; callers must check `len()`.
@@ -119,8 +119,8 @@ Source: `engine/nsdiscovery/delegation.go`.
 
 ## ZoneNameservers
 
-Authoritative AA NS at the apex, paired with in-bailiwick and
-out-of-bailiwick addresses via recursion.
+Authoritative AA NS at the apex, paired with in-domain and
+not-in-domain addresses via recursion.
 
 ```go
 func ZoneNameservers(ctx context.Context, z *zone.Zone) ([]NSItem, error)

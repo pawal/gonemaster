@@ -660,6 +660,103 @@ func TestExchangeFallbackTCPOnTruncatedUDP(t *testing.T) {
 	}
 }
 
+// TestExchangeDefaultQueryHasNoEDNSAndRDUnset checks that a default query is
+// sent without an EDNS OPT and with RD unset, per DNSQueryAndResponseDefaults.
+// In particular the 4096-byte receive-buffer bump in prepareWireMessage must
+// not leak an OPT onto the wire.
+func TestExchangeDefaultQueryHasNoEDNSAndRDUnset(t *testing.T) {
+	hdrCh := make(chan dns.MsgHeader, 1)
+	serverAddr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		select {
+		case hdrCh <- req.MsgHeader:
+		default:
+		}
+		writeSimpleAResponse(w, req)
+	})
+	defer shutdown()
+
+	client := &Client{}
+	client.SetUseTCP(false)
+	client.SetRetries(0)
+	client.SetTimeout(1 * time.Second)
+
+	if _, err := client.Exchange(context.Background(), serverAddr, BuildQuery("default-no-edns.example", dns.TypeA)); err != nil {
+		t.Fatalf("expected successful UDP response, got %v", err)
+	}
+
+	var hdr dns.MsgHeader
+	select {
+	case hdr = <-hdrCh:
+	case <-time.After(time.Second):
+		t.Fatal("server did not receive the query")
+	}
+
+	if hdr.UDPSize != 0 {
+		t.Fatalf("expected no EDNS OPT on default query, got advertised UDP size %d", hdr.UDPSize)
+	}
+	if hdr.Security {
+		t.Fatalf("expected DO bit unset on default query")
+	}
+	if hdr.Version != 0 {
+		t.Fatalf("expected EDNS version 0 on default query, got %d", hdr.Version)
+	}
+	if hdr.RecursionDesired {
+		t.Fatalf("expected RD bit unset on default query")
+	}
+}
+
+// TestExchangeTruncatedUDPFallsBackToPlainTCPExactlyOnce checks that a
+// truncated UDP response triggers exactly one plain-TCP requery, with no
+// EDNS upgrade and no EDNS-on-TC UDP requery (DNSQueryAndResponseDefaults).
+func TestExchangeTruncatedUDPFallsBackToPlainTCPExactlyOnce(t *testing.T) {
+	tcpHdrCh := make(chan dns.MsgHeader, 1)
+	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		select {
+		case tcpHdrCh <- req.MsgHeader:
+		default:
+		}
+		writeSimpleAResponse(w, req)
+	}, nil)
+	defer shutdownTCP()
+
+	var udpQueries atomic.Int32
+	defer startUDPServerOnAddr(t, serverAddr, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		udpQueries.Add(1)
+		resp := new(dns.Msg)
+		dnsutil.SetReply(resp, req)
+		resp.Truncated = true
+		_, _ = resp.WriteTo(w)
+	})()
+
+	client := &Client{}
+	client.SetUseTCP(false)
+	client.SetFallback(true)
+	client.SetRetries(0)
+	client.SetTimeout(1 * time.Second)
+	client.SetRetrans(40 * time.Millisecond)
+
+	if _, err := client.Exchange(context.Background(), serverAddr, BuildQuery("tc-plain-tcp-fallback.example", dns.TypeA)); err != nil {
+		t.Fatalf("expected TCP fallback success after truncated UDP, got %v", err)
+	}
+
+	if got := listener.accepts.Load(); got != 1 {
+		t.Fatalf("expected exactly one TCP fallback attempt, got %d", got)
+	}
+	if got := udpQueries.Load(); got != 1 {
+		t.Fatalf("expected exactly one UDP query (no EDNS-on-TC requery), got %d", got)
+	}
+
+	var tcpHdr dns.MsgHeader
+	select {
+	case tcpHdr = <-tcpHdrCh:
+	case <-time.After(time.Second):
+		t.Fatal("TCP server did not receive the fallback query")
+	}
+	if tcpHdr.UDPSize != 0 || tcpHdr.Security {
+		t.Fatalf("expected plain TCP fallback query without EDNS, got UDPSize=%d security=%t", tcpHdr.UDPSize, tcpHdr.Security)
+	}
+}
+
 func TestExchangeAcceptsOversizedUDPWithoutTCPFallback(t *testing.T) {
 	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 		writeSimpleAResponse(w, req)

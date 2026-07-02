@@ -1150,7 +1150,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 
 	if len(nonAuthoritativeMX) > 0 {
 		args := map[string]any{}
-		setTypedAddresses(args, noResponseMX)
+		setTypedAddresses(args, nonAuthoritativeMX)
 		if err := appendLog(ctx, &results, testcase, "Z09_NON_AUTH_MX_RESPONSE", args); err != nil {
 			return results, err
 		}

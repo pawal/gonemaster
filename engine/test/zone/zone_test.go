@@ -729,6 +729,55 @@ func TestZone09MXInconsistentDataPerVariant(t *testing.T) {
 	}
 }
 
+// TestZone09NonAuthMXResponseReportsResponders verifies Z09_NON_AUTH_MX_RESPONSE
+// reports the name servers that actually returned a non-authoritative MX
+// response, not the (here empty) no-response set.
+func TestZone09NonAuthMXResponseReportsResponders(t *testing.T) {
+	ctx := setupTest(t)
+
+	origMethod4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origMethod4and5 })
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return soaPacket("example.com", 1, 1, 1, 1, 1)
+		case "MX":
+			msg := new(dns.Msg)
+			dnsutil.SetQuestion(msg, dnsutil.Fqdn("example.com"), dns.TypeMX)
+			msg.Authoritative = false
+			msg.Rcode = dns.RcodeSuccess
+			return packet.Packet{Msg: msg}
+		default:
+			return packet.Packet{}
+		}
+	})
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone09(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+
+	var nonAuth *logger.Entry
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "Z09_NON_AUTH_MX_RESPONSE" {
+			nonAuth = entry
+			break
+		}
+	}
+	if nonAuth == nil {
+		t.Fatalf("expected Z09_NON_AUTH_MX_RESPONSE")
+	}
+	addrs, ok := nonAuth.Args["addresses"].([]string)
+	if !ok || len(addrs) != 1 || addrs[0] != "192.0.2.1" {
+		t.Fatalf("expected non-authoritative responder [192.0.2.1], got %#v", nonAuth.Args["addresses"])
+	}
+}
+
 func TestZone11SpfSyntaxError(t *testing.T) {
 	ctx := setupTest(t)
 

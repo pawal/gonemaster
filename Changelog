@@ -12,6 +12,9 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - server: refuse `DELETE /api/v1/tags/{name}` with `409` while an analysis cohort is built on the tag
+- engine, i18n, docs: adopt RFC 9499 "in-domain" terminology in place of "bailiwick" in log messages and documentation
+- zone09: compare MX records by RDATA and report inconsistent MX by name server host name; reword `Z09_INCONSISTENT_MX_DATA`
+- zone09: `Z09_NON_AUTH_MX_RESPONSE` now reports the IP addresses of the non-authoritative responders
 
 ## [v1.5.7] - 2026-06-30
 

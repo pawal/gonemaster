@@ -398,6 +398,8 @@ type CacheStore struct {
 	queryMetrics      cacheMetrics
 	errorMetrics      cacheMetrics
 	queryTimes        map[string][]time.Duration
+	axfrMu            sync.Mutex
+	axfrCache         map[string]*axfrRecord
 }
 
 // NewCacheStore creates an empty nameserver cache store.

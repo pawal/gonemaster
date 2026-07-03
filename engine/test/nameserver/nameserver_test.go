@@ -398,6 +398,90 @@ func TestNameserver03AXFRAvailable(t *testing.T) {
 	}
 }
 
+// axfrRestoreContext builds a context with a controllable AXFR cache and a
+// no-network profile so a restored transfer must be replayed from cache.
+func axfrRestoreContext(t *testing.T, store *ens.CacheStore) context.Context {
+	t.Helper()
+	t.Cleanup(profile.ResetEffective)
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+	prof, err := profile.Default()
+	if err != nil {
+		t.Fatalf("profile default: %v", err)
+	}
+	prof.NoNetwork = true
+	ctx := ens.WithCache(context.Background(), store)
+	return profile.WithContext(ctx, prof)
+}
+
+func packSOAWire(t *testing.T, owner string) []byte {
+	t.Helper()
+	m := new(dns.Msg)
+	m.Answer = []dns.RR{soaRecord(owner)}
+	if err := m.Pack(); err != nil {
+		t.Fatalf("pack soa: %v", err)
+	}
+	return append([]byte(nil), m.Data...)
+}
+
+func TestNameserver03AXFRRestoredAvailable(t *testing.T) {
+	store := ens.NewCacheStore()
+	if err := store.ImportAXFREntries([]ens.AXFREntry{
+		{Address: "192.0.2.4", Name: "example", QClass: "IN", RRs: [][]byte{packSOAWire(t, "example")}},
+	}); err != nil {
+		t.Fatalf("import axfr: %v", err)
+	}
+	ctx := axfrRestoreContext(t, store)
+
+	origM := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM })
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.4", nil) // no AXFR hook
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver03(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver03: %v", err)
+	}
+	if !hasEntryTag(entries, "AXFR_AVAILABLE") {
+		t.Fatalf("expected AXFR_AVAILABLE from restored cache offline")
+	}
+	if hasEntryTag(entries, "AXFR_FAILURE") {
+		t.Fatalf("did not expect AXFR_FAILURE")
+	}
+}
+
+func TestNameserver03AXFRRestoredFailure(t *testing.T) {
+	store := ens.NewCacheStore()
+	if err := store.ImportAXFREntries([]ens.AXFREntry{
+		{Address: "192.0.2.4", Name: "example", QClass: "IN", NoTransfer: true},
+	}); err != nil {
+		t.Fatalf("import axfr: %v", err)
+	}
+	ctx := axfrRestoreContext(t, store)
+
+	origM := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM })
+	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.4", nil)
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver03(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver03: %v", err)
+	}
+	if !hasEntryTag(entries, "AXFR_FAILURE") {
+		t.Fatalf("expected AXFR_FAILURE from restored no-transfer entry offline")
+	}
+	if hasEntryTag(entries, "AXFR_AVAILABLE") {
+		t.Fatalf("did not expect AXFR_AVAILABLE")
+	}
+}
+
 func TestNameserver04DifferentSourceIP(t *testing.T) {
 	ctx := setupTest(t)
 

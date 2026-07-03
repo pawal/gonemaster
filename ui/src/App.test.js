@@ -244,6 +244,61 @@ describe("App", () => {
     unmount();
   });
 
+  it("stops auto-refresh once a watched single job completes", async () => {
+    const intervalCallbacks = [];
+    vi.spyOn(global, "setInterval").mockImplementation((fn) => {
+      intervalCallbacks.push(fn);
+      return intervalCallbacks.length;
+    });
+    vi.spyOn(global, "clearInterval").mockImplementation(() => {});
+
+    let jobCallCount = 0;
+    const queuedJob = {
+      id: "job_autostop",
+      domain: "autostop.example",
+      status: "queued",
+      progress: 0,
+      created_at: "2026-02-03T00:00:00Z"
+    };
+    const doneJob = { ...queuedJob, status: "succeeded", progress: 100 };
+
+    global.fetch.mockImplementation((url, options = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
+      if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) {
+        jobCallCount++;
+        return jsonResponse(jobCallCount >= 2 ? doneJob : queuedJob);
+      }
+      if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [queuedJob], total: 1 });
+      return jsonResponse({});
+    });
+
+    const { unmount } = render(App);
+
+    const input = await screen.findByPlaceholderText("example.com");
+    await fireEvent.input(input, { target: { value: "autostop.example" } });
+    await fireEvent.click(screen.getByText("Run Single Job"));
+
+    // Wait for the job to be created and watched, with auto-refresh on and a
+    // poller scheduled.
+    await waitFor(() => {
+      expect(screen.getByText(/Created job:/)).toBeInTheDocument();
+    });
+    expect(screen.getByText("Auto refresh: on")).toBeInTheDocument();
+    expect(intervalCallbacks.length).toBeGreaterThan(0);
+
+    // The poller fetches the job again; it is now complete.
+    const poller = intervalCallbacks[intervalCallbacks.length - 1];
+    await poller();
+
+    // The auto-stop effect must switch auto-refresh off once the job is done.
+    await waitFor(() => {
+      expect(screen.getByText("Auto refresh: off")).toBeInTheDocument();
+    });
+
+    unmount();
+  });
+
   it("refreshes admin profile selectors after creating a non-public profile in settings", async () => {
     let profiles = [
       {

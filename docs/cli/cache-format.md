@@ -32,6 +32,33 @@ cache would contain more than `N` entries, counted across all kinds. The
 check runs before the file is written, so a rejected save never leaves a
 partial file behind. The default of `0` disables the guardrail.
 
+### Performance and scaling
+
+Save and restore are both linear in the number of entries. The
+[`cachefile` benchmarks](../../engine/cachefile/cachefile_bench_test.go)
+(`go test ./engine/cachefile -bench BenchmarkCachefile`) give
+representative figures for a nameserver-only cache on an Apple M4:
+
+| Entries | Save (plain) | Save (gzip) | Restore |
+|---------|--------------|-------------|---------|
+| 1,000   | ~5 ms        | ~5 ms       | ~8 ms   |
+| 10,000  | ~30 ms       | ~42 ms      | ~63 ms  |
+| 100,000 | ~180 ms      | ~240 ms     | ~405 ms |
+
+On-disk size is roughly 150-400 bytes per entry for plain JSON (a typical
+cached response base64-encoded), so 100,000 entries is on the order of
+15-25 MB uncompressed. `gzip` compresses this several-fold; the exact ratio
+depends on how many distinct responses the cache holds (many identical
+responses compress dramatically, a diverse cache much less), and it adds
+roughly a third to save time.
+
+The practical ceiling is memory, not CPU or disk: `Restore` decodes the
+entire file and materializes every packet in memory before the run starts,
+so peak memory scales with the file size (restoring 100,000 entries
+allocates on the order of hundreds of MB). For very large caches, prefer
+`--save-compress` for the on-disk footprint and `--save-max-entries` to
+bound growth, or split the cache across multiple files.
+
 ## File layout
 
 A single JSON object:

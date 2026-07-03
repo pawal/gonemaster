@@ -1,6 +1,6 @@
 <script>
-  import { t } from "./i18n.js";
-  import { apiCall } from "./lib/api.js";
+  import { t } from "../i18n.js";
+  import { apiCall } from "../lib/api.js";
 
   let {
     open = false,

@@ -1,7 +1,7 @@
 <script>
   import { onMount } from "svelte";
-  import { t } from "./i18n.js";
-  import { apiCall } from "./lib/api.js";
+  import { t } from "../i18n.js";
+  import { apiCall } from "../lib/api.js";
 
   let { apiBase = "/api/v1", onprofileschanged } = $props();
 

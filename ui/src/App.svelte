@@ -15,8 +15,8 @@
     encodeStateToURLParams,
     serializeStateForStorage,
   } from "./lib/persistence.js";
-  import AnalysisCohorts from "./AnalysisCohorts.svelte";
-  import BatchDeleteModal from "./BatchDeleteModal.svelte";
+  import AnalysisCohorts from "./panels/AnalysisCohorts.svelte";
+  import BatchDeleteModal from "./components/BatchDeleteModal.svelte";
   import StatusBanner from "./components/StatusBanner.svelte";
   import ThemeToggle from "./components/ThemeToggle.svelte";
   import JobInspector from "./components/JobInspector.svelte";

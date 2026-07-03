@@ -1,8 +1,8 @@
 <script>
   import { t } from "../i18n.js";
-  import ProfileSettings from "../ProfileSettings.svelte";
-  import ServerSettings from "../ServerSettings.svelte";
-  import ScoringSettings from "../ScoringSettings.svelte";
+  import ProfileSettings from "./ProfileSettings.svelte";
+  import ServerSettings from "./ServerSettings.svelte";
+  import ScoringSettings from "./ScoringSettings.svelte";
 
   let {
     settingsSubTab = "system",

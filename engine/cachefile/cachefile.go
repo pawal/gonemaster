@@ -184,30 +184,8 @@ func Export(ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Ca
 func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Cache, opts ...Option) error {
 	cfg := newConfig(opts)
 
-	if strings.TrimSpace(file.Format) == "" {
-		return fmt.Errorf("packet cache format is required")
-	}
-	if file.Format != Format {
-		return fmt.Errorf("unsupported packet cache format %q", file.Format)
-	}
-	if file.Version != Version {
-		return fmt.Errorf("unsupported packet cache version %d", file.Version)
-	}
-
-	if strings.TrimSpace(file.Checksum) == "" {
-		if cfg.strict {
-			return fmt.Errorf("packet cache checksum is missing")
-		}
-		cfg.warn("packet cache checksum is missing")
-	} else {
-		want := strings.ToLower(strings.TrimSpace(file.Checksum))
-		got, err := checksumFor(file)
-		if err != nil {
-			return err
-		}
-		if got != want {
-			return fmt.Errorf("packet cache checksum mismatch: want %s, got %s", want, got)
-		}
+	if err := validateHeaderAndChecksum(file, cfg); err != nil {
+		return err
 	}
 
 	var nsEntries []nameserver.Entry
@@ -417,6 +395,86 @@ func maybeDecompress(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("gzip body: %w", err)
 	}
 	return out, nil
+}
+
+// validateHeaderAndChecksum checks format, version, and checksum. A missing
+// checksum warns in lenient mode and errors in strict mode.
+func validateHeaderAndChecksum(file File, cfg *config) error {
+	if strings.TrimSpace(file.Format) == "" {
+		return fmt.Errorf("packet cache format is required")
+	}
+	if file.Format != Format {
+		return fmt.Errorf("unsupported packet cache format %q", file.Format)
+	}
+	if file.Version != Version {
+		return fmt.Errorf("unsupported packet cache version %d", file.Version)
+	}
+	if strings.TrimSpace(file.Checksum) == "" {
+		if cfg.strict {
+			return fmt.Errorf("packet cache checksum is missing")
+		}
+		cfg.warn("packet cache checksum is missing")
+		return nil
+	}
+	want := strings.ToLower(strings.TrimSpace(file.Checksum))
+	got, err := checksumFor(file)
+	if err != nil {
+		return err
+	}
+	if got != want {
+		return fmt.Errorf("packet cache checksum mismatch: want %s, got %s", want, got)
+	}
+	return nil
+}
+
+// Load parses path (gzip auto-detected) and validates it without applying the
+// entries to any cache. Honors WithStrict / WithWarnf.
+func Load(path string, opts ...Option) (File, error) {
+	cfg := newConfig(opts)
+
+	source := strings.TrimSpace(path)
+	if source == "" {
+		return File{}, fmt.Errorf("packet cache path is required")
+	}
+	raw, err := os.ReadFile(source)
+	if err != nil {
+		return File{}, err
+	}
+	data, err := maybeDecompress(raw)
+	if err != nil {
+		return File{}, err
+	}
+	if err := reportUnknownFields(data, cfg); err != nil {
+		return File{}, err
+	}
+	var payload File
+	if err := json.Unmarshal(data, &payload); err != nil {
+		return File{}, err
+	}
+	if err := validateHeaderAndChecksum(payload, cfg); err != nil {
+		return File{}, err
+	}
+	return payload, nil
+}
+
+// Stats summarizes the entries in a parsed cache file.
+type Stats struct {
+	Total     int
+	ByKind    map[string]int // entries per kind
+	ByAddress map[string]int // nameserver entries per address
+}
+
+// Stats counts entries by kind and, for nameserver entries, by address.
+func (f File) Stats() Stats {
+	s := Stats{ByKind: map[string]int{}, ByAddress: map[string]int{}}
+	for _, e := range f.Entries {
+		s.Total++
+		s.ByKind[e.Kind]++
+		if e.Kind == KindNameserver {
+			s.ByAddress[e.Address]++
+		}
+	}
+	return s
 }
 
 // checksumFor computes the SHA-256 checksum of the file with Checksum blanked.

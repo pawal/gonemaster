@@ -202,10 +202,13 @@ failed lookups.
 
 ## Strict vs. lenient parsing
 
-`Import` and `Restore` accept functional options:
+`Import`, `Restore`, and `Load` accept functional options:
 
 - `WithStrict()` - turn every non-fatal warning into an error.
 - `WithWarnf(fn)` - route non-fatal warnings to a callback.
+
+On the CLI, `--cache-strict` selects `WithStrict()` for both `--restore` and
+`--cache-stats`.
 
 In **lenient** mode (default) the following produce warnings but keep
 processing:

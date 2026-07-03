@@ -117,7 +117,13 @@ Results are printed with severity levels and can be output in several formats.
 : Refuse to write the saved cache file if it would contain more than *N* entries across all kinds (nameserver + recursor + ASN). The file is not created when the limit is exceeded. `0` (the default) disables the guardrail. Requires **--save**.
 
 **--restore** *PATH*
-: Prime DNS packet cache from file before the run. A gzip-compressed file is decompressed transparently (detected by magic bytes, regardless of file name).
+: Prime DNS packet cache from file before the run. A gzip-compressed file is decompressed transparently (detected by magic bytes, regardless of file name). When **--restore** is used, a `packet cache: H hits, M misses` summary is printed after a human-readable run.
+
+**--cache-stats** *PATH*
+: Print statistics for a saved cache file (size, per-kind entry counts, per-address nameserver counts) and exit. Does not run a test. Cannot be combined with **--save** or **--restore**.
+
+**--cache-strict**
+: Treat cache-file warnings (unknown fields, unknown kinds, missing checksum) as errors. Applies to **--restore** and **--cache-stats**. Malformed entries (bad base64, invalid address, checksum mismatch) are always errors regardless of this flag.
 
 **--error-cache-ttl** *SECONDS*
 : Skip query retry after network errors for this duration.
@@ -208,6 +214,10 @@ Save a gzip-compressed cache (either form works):
     gonemaster --save cache.json.gz example.com
     gonemaster --save cache.bin --save-compress example.com
     gonemaster --restore cache.json.gz example.com
+
+Inspect a saved cache file without running a test:
+
+    gonemaster --cache-stats cache.json.gz
 
 ## SEE ALSO
 

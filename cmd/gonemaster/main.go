@@ -97,6 +97,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var restorePacketCachePath string
 	var savePacketCacheCompress bool
 	var savePacketCacheMaxEntries int
+	var cacheStatsPath string
+	var cacheStrict bool
 	var noProgress bool
 	var count bool
 	var listTests bool
@@ -146,6 +148,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--save-compress", detail: "Gzip-compress the saved cache file (also implied by a .gz path)"},
 			{flag: "--save-max-entries N", detail: "Refuse to save if the cache file would contain more than N entries"},
 			{flag: "--restore PATH", detail: "Prime DNS packet cache from file before the run (gzip auto-detected)"},
+			{flag: "--cache-stats PATH", detail: "Print statistics for a saved cache file and exit"},
+			{flag: "--cache-strict", detail: "Fail on unknown fields/kinds or a missing checksum when restoring or inspecting"},
 		})
 		printUsageGroup(errOut, "Resolver/Profile Overrides", []usageLine{
 			{flag: "--no-ipv4", detail: "Disable IPv4 queries"},
@@ -219,6 +223,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.StringVar(&restorePacketCachePath, "restore", "", "Prime DNS packet cache from file before the run (optional)")
 	fs.BoolVar(&savePacketCacheCompress, "save-compress", false, "Gzip-compress the saved cache file (optional; implied by .gz path)")
 	fs.IntVar(&savePacketCacheMaxEntries, "save-max-entries", 0, "Refuse to save if the cache file would contain more than N entries (0 = unlimited)")
+	fs.StringVar(&cacheStatsPath, "cache-stats", "", "Print statistics for a saved cache file and exit (optional)")
+	fs.BoolVar(&cacheStrict, "cache-strict", false, "Treat cache-file warnings (unknown fields/kinds, missing checksum) as errors (optional)")
 	fs.Var(&undelegatedNSSpecs, "ns", "Undelegated nameserver as name[/ip] (repeatable)")
 	fs.Var(&undelegatedDSSpecs, "ds", "Undelegated DS as keytag,algorithm,digtype,digest (repeatable)")
 	fs.BoolVar(&noProgress, "no-progress", false, "Disable progress indicator (optional)")
@@ -346,6 +352,14 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, "--save-max-entries requires --save")
 		return 2
 	}
+	if strings.TrimSpace(cacheStatsPath) != "" && hasPacketCacheFlags {
+		fmt.Fprintln(errOut, "--cache-stats cannot be combined with --save/--restore")
+		return 2
+	}
+	if cacheStrict && strings.TrimSpace(restorePacketCachePath) == "" && strings.TrimSpace(cacheStatsPath) == "" {
+		fmt.Fprintln(errOut, "--cache-strict requires --restore or --cache-stats")
+		return 2
+	}
 
 	if showVersion {
 		fmt.Fprintf(out, "Gonemaster version %s\n", engine.VersionFull())
@@ -367,6 +381,23 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		}
 		if err := badkeys.Update(dir, out); err != nil {
 			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		return 0
+	}
+
+	if strings.TrimSpace(cacheStatsPath) != "" {
+		var loadOpts []cachefile.Option
+		if cacheStrict {
+			loadOpts = append(loadOpts, cachefile.WithStrict())
+		}
+		file, loadErr := cachefile.Load(cacheStatsPath, loadOpts...)
+		if loadErr != nil {
+			fmt.Fprintln(errOut, loadErr.Error())
+			return 2
+		}
+		if writeErr := printCacheStats(out, cacheStatsPath, file); writeErr != nil {
+			fmt.Fprintln(errOut, writeErr.Error())
 			return 2
 		}
 		return 0
@@ -680,7 +711,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			asnCache = asnlookup.NewCache()
 		}
 		if strings.TrimSpace(restorePacketCachePath) != "" {
-			if restoreErr := cachefile.Restore(restorePacketCachePath, packetCacheStore, packetCacheRecursor, asnCache); restoreErr != nil {
+			var restoreOpts []cachefile.Option
+			if cacheStrict {
+				restoreOpts = append(restoreOpts, cachefile.WithStrict())
+			}
+			if restoreErr := cachefile.Restore(restorePacketCachePath, packetCacheStore, packetCacheRecursor, asnCache, restoreOpts...); restoreErr != nil {
 				fmt.Fprintln(errOut, restoreErr.Error())
 				return 2
 			}
@@ -869,6 +904,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		}
 		if nstimes && packetCacheStore != nil {
 			if writeErr := writeNSTimes(humanWriter, packetCacheStore.QueryTimings()); writeErr != nil {
+				fmt.Fprintln(errOut, writeErr.Error())
+				return 2
+			}
+		}
+		if strings.TrimSpace(restorePacketCachePath) != "" && packetCacheStore != nil {
+			if _, writeErr := fmt.Fprintln(humanWriter, restoredCacheSummary(packetCacheStore.QueryMetrics())); writeErr != nil {
 				fmt.Fprintln(errOut, writeErr.Error())
 				return 2
 			}

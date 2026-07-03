@@ -17,6 +17,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/cachefile"
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -612,6 +613,140 @@ func TestRunSaveMaxEntriesRejectsNegative(t *testing.T) {
 	}
 	if !strings.Contains(errOut.String(), "--save-max-entries must be >= 0") {
 		t.Fatalf("expected negative-rejection error, got %q", errOut.String())
+	}
+}
+
+// writeSavedCache writes a real cache file (with checksum) holding 3
+// nameserver entries across 2 addresses. Returns the path.
+func writeSavedCache(t *testing.T, dir, name string, compress bool) string {
+	t.Helper()
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, "example.com.", dns.TypeA)
+	msg.Response = true
+	if err := msg.Pack(); err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	ns := nameserver.NewCacheStore()
+	if err := ns.ImportEntries([]nameserver.Entry{
+		{Address: "192.0.2.1", Key: "k1", Message: msg.Data, AnswerFrom: "192.0.2.1:53"},
+		{Address: "192.0.2.1", Key: "k2", NoMessage: true},
+		{Address: "192.0.2.2", Key: "k3", Message: msg.Data},
+	}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	path := filepath.Join(dir, name)
+	var opts []cachefile.SaveOption
+	if compress {
+		opts = append(opts, cachefile.WithCompression())
+	}
+	if err := cachefile.Save(path, ns, nil, nil, opts...); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	return path
+}
+
+func TestRunCacheStatsPrintsReport(t *testing.T) {
+	stubRunEngine(t, nil)
+	path := writeSavedCache(t, t.TempDir(), "cache.json", false)
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"--cache-stats", path}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	got := out.String()
+	for _, want := range []string{"entries:  3 total", "nameserver  3", "by address (nameserver):", "192.0.2.1", "192.0.2.2", "plain"} {
+		if !strings.Contains(got, want) {
+			t.Fatalf("expected %q in output, got %q", want, got)
+		}
+	}
+}
+
+func TestRunCacheStatsGzipReportsCompression(t *testing.T) {
+	stubRunEngine(t, nil)
+	path := writeSavedCache(t, t.TempDir(), "cache.json.gz", true)
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"--cache-stats", path}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "gzip") {
+		t.Fatalf("expected gzip label in output, got %q", out.String())
+	}
+}
+
+func TestRunCacheStatsStrictRejectsUnknownField(t *testing.T) {
+	stubRunEngine(t, nil)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cache.json")
+	blob := []byte(`{"format":"gonemaster.packet-cache","version":2,"mystery":1,"entries":[]}`)
+	if err := os.WriteFile(path, blob, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var out, errOut bytes.Buffer
+	code := run([]string{"--cache-stats", path, "--cache-strict"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "unknown field") {
+		t.Fatalf("expected unknown-field error, got %q", errOut.String())
+	}
+}
+
+func TestRunRestoreStrictRejectsUnknownField(t *testing.T) {
+	stubRunEngine(t, nil)
+	dir := t.TempDir()
+	path := filepath.Join(dir, "cache.json")
+	blob := []byte(`{"format":"gonemaster.packet-cache","version":2,"mystery":1,"entries":[]}`)
+	if err := os.WriteFile(path, blob, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	var out, errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--json", "--restore", path, "--cache-strict"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "unknown field") {
+		t.Fatalf("expected unknown-field error, got %q", errOut.String())
+	}
+}
+
+func TestRunCacheStrictRequiresRestoreOrStats(t *testing.T) {
+	stubRunEngine(t, nil)
+	var out, errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--cache-strict"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--cache-strict requires --restore or --cache-stats") {
+		t.Fatalf("expected cache-strict validation error, got %q", errOut.String())
+	}
+}
+
+func TestRunCacheStatsRejectsWithSave(t *testing.T) {
+	stubRunEngine(t, nil)
+	var out, errOut bytes.Buffer
+	code := run([]string{"--cache-stats", "a.json", "--save", "b.json"}, &out, &errOut)
+	if code != 2 {
+		t.Fatalf("expected exit 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "--cache-stats cannot be combined with --save/--restore") {
+		t.Fatalf("expected cache-stats conflict error, got %q", errOut.String())
+	}
+}
+
+func TestRunRestorePrintsCacheSummary(t *testing.T) {
+	stubRunEngine(t, nil)
+	path := writeSavedCache(t, t.TempDir(), "cache.json", false)
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"--domain", "example.com", "--restore", path}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
+	}
+	if !strings.Contains(out.String(), "packet cache: 0 hits, 0 misses") {
+		t.Fatalf("expected packet-cache summary, got %q", out.String())
 	}
 }
 

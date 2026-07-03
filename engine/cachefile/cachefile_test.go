@@ -771,6 +771,100 @@ func TestCachefileSaveMaxEntriesCountsAllKinds(t *testing.T) {
 	}
 }
 
+func TestCachefileLoadRoundTrip(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	rec := &recursor.Recursor{}
+	asn := asnlookup.NewCache()
+	seedNameserverCache(t, ns) // 2
+	seedRecursorCache(t, rec)  // 2
+	seedASNCache(t, asn)       // 2
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := Save(path, ns, rec, asn); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	file, err := Load(path, WithStrict())
+	if err != nil {
+		t.Fatalf("load: %v", err)
+	}
+	if len(file.Entries) != 6 {
+		t.Fatalf("expected 6 entries, got %d", len(file.Entries))
+	}
+	// Load must not touch any cache.
+	if entries, _ := ns.ExportEntries(); len(entries) != 2 {
+		t.Fatalf("source cache changed by Load: %d ns entries", len(entries))
+	}
+}
+
+func TestCachefileLoadGzipAndStrict(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns)
+
+	path := filepath.Join(t.TempDir(), "cache.json.gz")
+	if err := Save(path, ns, nil, nil); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	if _, err := Load(path, WithStrict()); err != nil {
+		t.Fatalf("load gzip: %v", err)
+	}
+}
+
+func TestCachefileLoadStrictRejectsUnknownField(t *testing.T) {
+	blob := []byte(`{"format":"gonemaster.packet-cache","version":2,"mystery":1,"entries":[]}`)
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := os.WriteFile(path, blob, 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if _, err := Load(path, WithStrict()); err == nil {
+		t.Fatalf("expected strict-mode error for unknown field")
+	}
+}
+
+func TestCachefileLoadRejectsChecksumMismatch(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns)
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := Save(path, ns, nil, nil); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read: %v", err)
+	}
+	corrupted := strings.Replace(string(data), "192.0.2.53", "198.51.100.1", 1)
+	if err := os.WriteFile(path, []byte(corrupted), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+	if _, err := Load(path); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
+		t.Fatalf("expected checksum mismatch, got %v", err)
+	}
+}
+
+func TestCachefileStats(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	rec := &recursor.Recursor{}
+	asn := asnlookup.NewCache()
+	seedNameserverCache(t, ns) // 2, both on 192.0.2.53
+	seedRecursorCache(t, rec)  // 2
+	seedASNCache(t, asn)       // 2
+
+	file, err := Export(ns, rec, asn)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	s := file.Stats()
+	if s.Total != 6 {
+		t.Fatalf("expected total 6, got %d", s.Total)
+	}
+	if s.ByKind[KindNameserver] != 2 || s.ByKind[KindRecursor] != 2 || s.ByKind[KindASN] != 2 {
+		t.Fatalf("unexpected by-kind counts: %+v", s.ByKind)
+	}
+	if s.ByAddress["192.0.2.53"] != 2 {
+		t.Fatalf("expected 2 ns entries on 192.0.2.53, got %d", s.ByAddress["192.0.2.53"])
+	}
+}
+
 func TestCachefileCompressedFileIsSmallerForRepetitiveData(t *testing.T) {
 	ns := nameserver.NewCacheStore()
 	// Seed many duplicate-looking entries to give gzip something to compress.

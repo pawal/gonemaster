@@ -64,6 +64,8 @@ Additional output controls:
 - `--output PATH` writes selected output to a file.
 - `--save PATH` writes the DNS packet cache after the run.
 - `--restore PATH` primes the DNS packet cache before the run.
+- `--cache-stats PATH` prints statistics for a saved cache file and exits.
+- `--cache-strict` treats cache-file warnings (unknown fields/kinds, missing checksum) as errors when restoring or inspecting.
 
 See [cache-format.md](cache-format.md) for the packet cache file schema.
 
@@ -123,7 +125,11 @@ The flag groups below follow `gonemaster --help`.
 | Flag | Type | Details |
 |---|---|---|
 | `--save PATH` | string | Save DNS packet cache after the run. |
+| `--save-compress` | bool | Gzip-compress the saved cache file (also implied by a `.gz` path). |
+| `--save-max-entries N` | int | Refuse to save if the cache file would contain more than N entries (0 = unlimited). |
 | `--restore PATH` | string | Restore DNS packet cache before the run. |
+| `--cache-stats PATH` | string | Print statistics for a saved cache file and exit. |
+| `--cache-strict` | bool | Treat cache-file warnings (unknown fields/kinds, missing checksum) as errors. |
 
 ### Resolver/Profile Overrides
 
@@ -204,6 +210,12 @@ Save and replay a DNS packet cache:
 ```sh
 gonemaster --domain example.com --save /tmp/gonemaster-cache.json
 gonemaster --domain example.com --restore /tmp/gonemaster-cache.json
+```
+
+Inspect a saved cache file without running a test:
+
+```sh
+gonemaster --cache-stats /tmp/gonemaster-cache.json
 ```
 
 Show per-nameserver query timing statistics:

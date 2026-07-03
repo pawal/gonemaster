@@ -32,6 +32,8 @@ const (
 	KindRecursor = "recursor"
 	// KindASN tags ASN lookup cache entries.
 	KindASN = "asn"
+	// KindAXFR tags zone-transfer cache entries.
+	KindAXFR = "axfr"
 )
 
 // File is the portable representation of the unified packet cache.
@@ -64,6 +66,10 @@ type Entry struct {
 	Prefix string `json:"prefix,omitempty"`
 	Raw    string `json:"raw,omitempty"`
 	Code   string `json:"code,omitempty"`
+
+	// AXFR-kind fields (reuse Address / Name / QClass).
+	RRs        []string `json:"rrs,omitempty"`
+	NoTransfer bool     `json:"no_transfer,omitempty"`
 
 	// Common fields.
 	Message   string `json:"message,omitempty"`
@@ -135,6 +141,24 @@ func Export(ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Ca
 			}
 			out.Entries = append(out.Entries, entry)
 		}
+
+		axfrEntries, err := ns.ExportAXFREntries()
+		if err != nil {
+			return File{}, err
+		}
+		for _, e := range axfrEntries {
+			entry := Entry{
+				Kind:       KindAXFR,
+				Address:    e.Address,
+				Name:       e.Name,
+				QClass:     e.QClass,
+				NoTransfer: e.NoTransfer,
+			}
+			for _, rr := range e.RRs {
+				entry.RRs = append(entry.RRs, base64.StdEncoding.EncodeToString(rr))
+			}
+			out.Entries = append(out.Entries, entry)
+		}
 	}
 
 	if rec != nil {
@@ -191,6 +215,7 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *a
 	var nsEntries []nameserver.Entry
 	var recEntries []recursor.CacheEntry
 	var asnEntries []asnlookup.CacheEntry
+	var axfrEntries []nameserver.AXFREntry
 
 	for idx, entry := range file.Entries {
 		switch entry.Kind {
@@ -233,6 +258,21 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *a
 				Raw:    entry.Raw,
 				Code:   entry.Code,
 			})
+		case KindAXFR:
+			axfrEntry := nameserver.AXFREntry{
+				Address:    entry.Address,
+				Name:       entry.Name,
+				QClass:     entry.QClass,
+				NoTransfer: entry.NoTransfer,
+			}
+			for _, s := range entry.RRs {
+				wire, err := base64.StdEncoding.DecodeString(s)
+				if err != nil {
+					return fmt.Errorf("entry %d: decode rr: %w", idx, err)
+				}
+				axfrEntry.RRs = append(axfrEntry.RRs, wire)
+			}
+			axfrEntries = append(axfrEntries, axfrEntry)
 		case "":
 			if cfg.strict {
 				return fmt.Errorf("entry %d: kind is required", idx)
@@ -269,6 +309,14 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *a
 			return fmt.Errorf("asn cache entries present but asn cache is nil")
 		}
 		if err := asn.ImportEntries(asnEntries); err != nil {
+			return err
+		}
+	}
+	if len(axfrEntries) > 0 {
+		if ns == nil {
+			return fmt.Errorf("axfr cache entries present but nameserver cache is nil")
+		}
+		if err := ns.ImportAXFREntries(axfrEntries); err != nil {
 			return err
 		}
 	}
@@ -512,6 +560,8 @@ var knownEntryFields = map[string]bool{
 	"prefix":      true,
 	"raw":         true,
 	"code":        true,
+	"rrs":         true,
+	"no_transfer": true,
 }
 
 func reportUnknownFields(data []byte, cfg *config) error {

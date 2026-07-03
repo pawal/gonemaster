@@ -865,6 +865,119 @@ func TestCachefileStats(t *testing.T) {
 	}
 }
 
+func buildAXFRRRBase64(t *testing.T, owner string) string {
+	t.Helper()
+	m := new(dns.Msg)
+	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	soa.Ns = dnsutil.Fqdn("ns1." + owner)
+	soa.Mbox = dnsutil.Fqdn("hostmaster." + owner)
+	soa.Serial = 1
+	m.Answer = []dns.RR{soa}
+	if err := m.Pack(); err != nil {
+		t.Fatalf("pack soa: %v", err)
+	}
+	return base64.StdEncoding.EncodeToString(m.Data)
+}
+
+func TestCachefileAXFRRoundTrip(t *testing.T) {
+	file := File{Format: Format, Version: Version, Entries: []Entry{
+		{Kind: KindAXFR, Address: "192.0.2.53", Name: "example.com", QClass: "IN", RRs: []string{buildAXFRRRBase64(t, "example.com")}},
+		{Kind: KindAXFR, Address: "2001:db8::1", Name: "fail.example", QClass: "IN", NoTransfer: true},
+	}}
+	file.Checksum, _ = checksumFor(file)
+
+	ns := nameserver.NewCacheStore()
+	if err := Import(file, ns, nil, nil); err != nil {
+		t.Fatalf("import: %v", err)
+	}
+
+	out, err := ns.ExportAXFREntries()
+	if err != nil {
+		t.Fatalf("re-export: %v", err)
+	}
+	if len(out) != 2 {
+		t.Fatalf("expected 2 axfr entries, got %d", len(out))
+	}
+	var available, failed int
+	for _, e := range out {
+		if e.NoTransfer {
+			failed++
+		} else if len(e.RRs) == 1 {
+			available++
+		}
+	}
+	if available != 1 || failed != 1 {
+		t.Fatalf("expected 1 available + 1 failed, got %d/%d", available, failed)
+	}
+}
+
+func TestCachefileMixedRoundTripWithAXFR(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	rec := &recursor.Recursor{}
+	asn := asnlookup.NewCache()
+	seedNameserverCache(t, ns) // 2 query entries
+	seedRecursorCache(t, rec)  // 2
+	seedASNCache(t, asn)       // 2
+
+	wire, err := base64.StdEncoding.DecodeString(buildAXFRRRBase64(t, "zone.example"))
+	if err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if err := ns.ImportAXFREntries([]nameserver.AXFREntry{
+		{Address: "192.0.2.9", Name: "zone.example", QClass: "IN", RRs: [][]byte{wire}},
+	}); err != nil {
+		t.Fatalf("seed axfr: %v", err)
+	}
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := Save(path, ns, rec, asn); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	restoredNS := nameserver.NewCacheStore()
+	if err := Restore(path, restoredNS, &recursor.Recursor{}, asnlookup.NewCache(), WithStrict()); err != nil {
+		t.Fatalf("strict restore: %v", err)
+	}
+	axfr, err := restoredNS.ExportAXFREntries()
+	if err != nil {
+		t.Fatalf("re-export axfr: %v", err)
+	}
+	if len(axfr) != 1 {
+		t.Fatalf("expected 1 restored axfr entry, got %d", len(axfr))
+	}
+	if q, _ := restoredNS.ExportEntries(); len(q) != 2 {
+		t.Fatalf("expected 2 restored query entries, got %d", len(q))
+	}
+}
+
+func TestCachefileAXFRRejectsMalformed(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+
+	bad := File{Format: Format, Version: Version, Entries: []Entry{
+		{Kind: KindAXFR, Address: "192.0.2.1", Name: "e.com", RRs: []string{"!!!"}},
+	}}
+	bad.Checksum, _ = checksumFor(bad)
+	if err := Import(bad, ns, nil, nil); err == nil {
+		t.Fatalf("expected base64 decode error")
+	}
+
+	both := File{Format: Format, Version: Version, Entries: []Entry{
+		{Kind: KindAXFR, Address: "192.0.2.1", Name: "e.com", RRs: []string{buildAXFRRRBase64(t, "e.com")}, NoTransfer: true},
+	}}
+	both.Checksum, _ = checksumFor(both)
+	if err := Import(both, ns, nil, nil); err == nil {
+		t.Fatalf("expected error for both rrs and no_transfer")
+	}
+
+	neither := File{Format: Format, Version: Version, Entries: []Entry{
+		{Kind: KindAXFR, Address: "192.0.2.1", Name: "e.com"},
+	}}
+	neither.Checksum, _ = checksumFor(neither)
+	if err := Import(neither, ns, nil, nil); err == nil {
+		t.Fatalf("expected error for neither rrs nor no_transfer")
+	}
+}
+
 func TestCachefileCompressedFileIsSmallerForRepetitiveData(t *testing.T) {
 	ns := nameserver.NewCacheStore()
 	// Seed many duplicate-looking entries to give gzip something to compress.

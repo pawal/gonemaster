@@ -109,6 +109,7 @@ fields:
 - `"nameserver"` - one cached response for a specific nameserver IP.
 - `"recursor"`   - one cached response for the internal recursor.
 - `"asn"`        - one cached ASN lookup result for a queried IP.
+- `"axfr"`       - one cached zone-transfer result for a nameserver IP.
 
 Unknown `kind` values are warnings in lenient mode (the entry is skipped)
 and errors in strict mode.
@@ -200,6 +201,51 @@ ASN entries are stored on hit and on miss (`EMPTY_ASN_SET`,
 `ERROR_ASN_DATABASE`), so a restored cache avoids both successful and
 failed lookups.
 
+### `kind: "axfr"`
+
+An AXFR result is a stream of resource records rather than a single message,
+so it has its own shape. An available transfer stores the ordered records in
+`rrs`; each element is a base64 (std) single-record DNS message (the fork has
+no standalone RR codec).
+
+```json
+{
+  "kind": "axfr",
+  "address": "192.0.2.53",
+  "name": "example.com",
+  "qclass": "IN",
+  "rrs": ["<base64 single-record DNS message>"]
+}
+```
+
+A refused or errored transfer is stored with `no_transfer` and no `rrs`, so a
+restored run reproduces `AXFR_FAILURE` offline:
+
+```json
+{
+  "kind": "axfr",
+  "address": "192.0.2.53",
+  "name": "example.com",
+  "qclass": "IN",
+  "no_transfer": true
+}
+```
+
+| Field         | Type    | Required                      | Description                                             |
+|---------------|---------|-------------------------------|---------------------------------------------------------|
+| `address`     | string  | yes                           | Nameserver IP (IPv4 or IPv6). Parsed with `netip`.      |
+| `name`        | string  | yes                           | Transferred zone name.                                  |
+| `qclass`      | string  | no                            | DNS class (defaults to `IN`).                           |
+| `rrs`         | array   | required unless `no_transfer` | Ordered base64 single-record DNS messages.             |
+| `no_transfer` | boolean | no                            | `true` for a refused/errored transfer (no `rrs`).       |
+
+An entry must carry either `rrs` or `no_transfer`, never both and never
+neither. Only the records streamed by the consumer are captured, so an
+available entry typically holds just the leading SOA.
+
+`axfr` is an additive kind: `version` stays `2`, and older binaries skip
+unknown-kind entries in lenient mode.
+
 ## Strict vs. lenient parsing
 
 `Import`, `Restore`, and `Load` accept functional options:
@@ -221,7 +267,8 @@ processing:
 In **strict** mode the same conditions are hard errors.
 
 Any base64 decode failure, DNS unpack failure, invalid IP address, version
-mismatch, or checksum mismatch is always a hard error regardless of mode.
+mismatch, or checksum mismatch is always a hard error regardless of mode. So
+is an `axfr` entry that carries both `rrs` and `no_transfer`, or neither.
 
 ## Minimal example
 

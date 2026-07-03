@@ -37,46 +37,45 @@
 
   // Recent-jobs filter state owned at App level so it survives tab unmounts
   // and feeds the URL/storage persistence wiring.
-  let severityFilter = "all";
-  let jobSort = "started_at_desc";
-  let jobBatchFilter = "";
-  let recentDomainFilter = "";
-  let recentPageSize = 20;
-  let recentCursor = 0;
+  let severityFilter = $state("all");
+  let jobSort = $state("started_at_desc");
+  let jobBatchFilter = $state("");
+  let recentDomainFilter = $state("");
+  let recentPageSize = $state(20);
+  let recentCursor = $state(0);
 
-  let selectedJobId = "";
-  let selectedJob = null;
-  let selectedJobResult = null;
-  let selectedRun = null;
-  let resultLocale = "en";
-  let jobLoading = false;
-  let autoRefreshJob = true;
+  let selectedJobId = $state("");
+  let selectedJob = $state(null);
+  let selectedJobResult = $state(null);
+  let selectedRun = $state(null);
+  let resultLocale = $state("en");
+  let jobLoading = $state(false);
+  let autoRefreshJob = $state(true);
   let jobPoller = null;
-  let jobInspectorHighlight = false;
+  let jobInspectorHighlight = $state(false);
   let jobInspectorHighlightTimer = null;
 
   // Batches tab state at App level: persisted filter state plus the
   // selected-batch pointer (used by URL/storage routing).
-  let selectedBatchId = "";
-  let batchSort = "started_at_desc";
-  let batchPageSize = 20;
-  let batchCursor = 0;
-  let batchStatusFilter = "";
-  let batchDomainFilter = "";
-  let batchDeleteModalOpen = false;
-  let batchDeleteModalId = "";
-  let batchDeletedCounter = 0;
-  let autoRefreshMetrics = true;
-  let metricsWindow = "1h";
-  let metricsDomainLimit = 10;
-  let metricsBatchLimit = 10;
-  let persistenceReady = false;
-  let persistenceSignature = "";
+  let selectedBatchId = $state("");
+  let batchSort = $state("started_at_desc");
+  let batchPageSize = $state(20);
+  let batchCursor = $state(0);
+  let batchStatusFilter = $state("");
+  let batchDomainFilter = $state("");
+  let batchDeleteModalOpen = $state(false);
+  let batchDeleteModalId = $state("");
+  let batchDeletedCounter = $state(0);
+  let autoRefreshMetrics = $state(true);
+  let metricsWindow = $state("1h");
+  let metricsDomainLimit = $state(10);
+  let metricsBatchLimit = $state(10);
+  let persistenceReady = $state(false);
   let initialized = false;
   // Server-controlled feature flag: whether scoring UI is shown. Defaults to
   // true so scoring is visible before the features response arrives.
-  let scoringEnabled = true;
-  let nameserverTimingsEnabled = true;
+  let scoringEnabled = $state(true);
+  let nameserverTimingsEnabled = $state(true);
   let notifyOnJobComplete = false;
   let pendingPermission = null;
 
@@ -97,12 +96,12 @@
     sl: "Slovenščina",
     sv: "Svenska"
   };
-  let availableLocales = ["en"];
+  let availableLocales = $state(["en"]);
   const localeLabel = (code) => localeDisplayNames[code] || code;
 
   const apiPrefix = "/api/v1";
 
-  let activeTab = "single";
+  let activeTab = $state("single");
   const tabs = [
     { id: "single", labelKey: "tab_single" },
     { id: "recent", labelKey: "tab_recent" },
@@ -114,22 +113,22 @@
     { id: "settings", labelKey: "tab_settings" }
   ];
 
-  let settingsSubTab = "system";
+  let settingsSubTab = $state("system");
   const settingsSubTabs = [
     { id: "system", labelKey: "settings_subtab_system" },
     { id: "profiles", labelKey: "settings_subtab_profiles" },
     { id: "scoring", labelKey: "settings_subtab_scoring" }
   ];
 
-  let selectedDomain = null;
-  let availableTags = [];
+  let selectedDomain = $state(null);
+  let availableTags = $state([]);
   let tagsLoaded = false;
-  let availableProfiles = [];
+  let availableProfiles = $state([]);
   let profilesLoaded = false;
-  let profilesLoading = false;
+  let profilesLoading = $state(false);
   // Tags tab state owned at the App level (cross-tab pointers + cohort map).
-  let tagCohortByName = new Map();
-  let selectedTag = null;
+  let tagCohortByName = $state(new Map());
+  let selectedTag = $state(null);
   const apiFetch = async (path, options) => {
     try {
       return await apiCall(apiPrefix, path, options);
@@ -642,23 +641,25 @@
     jobPoller = setInterval(() => loadJob(selectedJobId, { silent: true }), 5000);
   };
 
-  $: {
+  $effect(() => {
     autoRefreshJob;
     selectedJobId;
     startJobPolling();
-  }
+  });
 
-  $: if (
-    autoRefreshJob &&
-    selectedJob &&
-    selectedJob.id === selectedJobId &&
-    (progressPercent(selectedJob) === 100 || isResultReadyStatus(selectedJob.status))
-  ) {
-    autoRefreshJob = false;
-    jobInspectorHighlight = false;
-  }
+  $effect(() => {
+    if (
+      autoRefreshJob &&
+      selectedJob &&
+      selectedJob.id === selectedJobId &&
+      (progressPercent(selectedJob) === 100 || isResultReadyStatus(selectedJob.status))
+    ) {
+      autoRefreshJob = false;
+      jobInspectorHighlight = false;
+    }
+  });
 
-  $: persistenceSignature = [
+  const persistenceSignature = $derived([
     activeTab,
     jobSort,
     severityFilter,
@@ -672,11 +673,13 @@
     String(batchCursor),
     batchStatusFilter,
     batchDomainFilter
-  ].join("|");
+  ].join("|"));
 
-  $: if (persistenceReady && persistenceSignature) {
-    persistState();
-  }
+  $effect(() => {
+    if (persistenceReady && persistenceSignature) {
+      persistState();
+    }
+  });
 
   const initializeApp = () => {
     if (initialized || typeof window === "undefined") return;
@@ -720,7 +723,7 @@
     loadDataForTab(activeTab);
   };
 
-  let initialAnimationDone = false;
+  let initialAnimationDone = $state(false);
 
   onMount(() => {
     initializeApp();

@@ -59,7 +59,7 @@ const TESTCASE_TITLES: Record<string, string> = {
   nameserver11: "Behaviour against unknown EDNS option codes",
   nameserver12: "Behaviour against unknown EDNS Z flags",
   nameserver13: "Truncated EDNS responses include OPT record",
-  nameserver15: "Name server does not reveal software version",
+  nameserver15: "Name server software version disclosure",
   nameserver16: "EDNS NSID option support",
   nameserver17: "DNS Cookie support",
   nameserver18: "Extended DNS Errors (EDE)",

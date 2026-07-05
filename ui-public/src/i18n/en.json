@@ -474,7 +474,7 @@
   "pub.tag.zone.Z09_INCONSISTENT_MX.header": "Inconsistent MX sets across nameservers",
   "pub.tag.zone.Z09_INCONSISTENT_MX.desc": "Different nameservers returned different MX record sets for your zone, so mail delivery depends on which server a sending mail server happens to ask. Messages aimed at your domain may be routed to different destinations depending on the sender's resolver path.",
   "pub.tag.zone.Z09_INCONSISTENT_MX_DATA.header": "Inconsistent MX data",
-  "pub.tag.zone.Z09_INCONSISTENT_MX_DATA.desc": "Nameservers agreed on the set of MX targets but returned different data about them (such as different preference values). Mail servers that follow the MX preference order to pick the primary mail host will pick differently depending on which nameserver they queried, leading to unpredictable routing.",
+  "pub.tag.zone.Z09_INCONSISTENT_MX_DATA.desc": "Name servers returned different MX data (mail targets and/or preference values). Each divergent group of name servers is listed with the mail targets it returned. Mail senders can therefore see different MX data depending on which name server they query, leading to unpredictable routing.",
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.header": "MX answer not authoritative",
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.desc": "A nameserver returned MX data for your zone without the \"authoritative answer\" flag set. Resolvers that validate the AA flag will not trust the answer, and sending mail servers may retry elsewhere or reject the delivery outright.",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.header": "No response to MX query",

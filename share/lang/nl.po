@@ -1324,20 +1324,20 @@ msgid "The DNS response, on query with unknown EDNS option-code, is unexpectedly
 msgstr "Het DNS-antwoord op een query met onbekende EDNS-optiecode is onverwacht niet autoritatief van naamservers \"{addresses}\"."
 
 msgctxt "NAMESERVER:N15_ERROR_ON_VERSION_QUERY"
-msgid "The following name server(s) do not respond or respond with SERVFAIL to software version query \"{query_name}\". Returned from name servers: \"{servers}\""
-msgstr "De volgende naamserver(s) reageren niet of reageren met SERVFAIL op de softwareversie-query \"{query_name}\". Teruggegeven door naamservers: \"{servers}\""
+msgid "The following name server(s) did not answer the software version query \"{query_name}\" (no response or SERVFAIL). Returned from name servers: \"{servers}\""
+msgstr "De volgende naamserver(s) hebben niet geantwoord op de softwareversie-query \"{query_name}\" (geen antwoord of SERVFAIL). Teruggegeven door naamservers: \"{servers}\""
 
 msgctxt "NAMESERVER:N15_NO_VERSION_REVEALED"
-msgid "The following name server(s) do not reveal the software version. Returned from name servers \"{servers}\""
-msgstr "De volgende naamserver(s) maken de softwareversie niet bekend. Teruggegeven door naamservers \"{servers}\""
+msgid "The following name server(s) do not disclose their software version. Returned from name servers: \"{servers}\""
+msgstr "De volgende naamserver(s) onthullen hun softwareversie niet. Teruggegeven door naamservers: \"{servers}\""
 
 msgctxt "NAMESERVER:N15_SOFTWARE_VERSION"
-msgid "The following name server(s) respond to software version query \"{query_name}\" with string \"{string}\". Returned from name servers: \"{servers}\""
-msgstr "De volgende naamserver(s) antwoorden op de softwareversie-query \"{query_name}\" met de tekst \"{string}\". Teruggegeven door naamservers: \"{servers}\""
+msgid "The following name server(s) disclose their software version in the reply to query \"{query_name}\": \"{string}\". This is informational only; some operators prefer to hide it. Returned from name servers: \"{servers}\""
+msgstr "De volgende naamserver(s) onthullen hun softwareversie in het antwoord op query \"{query_name}\": \"{string}\". Dit is louter informatief; sommige beheerders verbergen deze liever. Teruggegeven door naamservers: \"{servers}\""
 
 msgctxt "NAMESERVER:N15_WRONG_CLASS"
-msgid "The following name server(s) do not return CH class record(s) on CH class query. Returned from name servers \"{servers}\""
-msgstr "De volgende naamserver(s) geven geen record(s) van klasse CH terug op een query van klasse CH. Teruggegeven door naamservers \"{servers}\""
+msgid "The following name server(s) answered a CHAOS (CH) class query with a record in the wrong class. Returned from name servers: \"{servers}\""
+msgstr "De volgende naamserver(s) hebben een query van klasse CHAOS (CH) beantwoord met een record van de verkeerde klasse. Teruggegeven door naamservers: \"{servers}\""
 
 msgctxt "NAMESERVER:N16_HAS_NSID"
 msgid "The following name server(s) responded to an NSID query (RFC 5001) with NSID value \"{nsid}\". Returned from name servers \"{servers}\""

@@ -1324,20 +1324,20 @@ msgid "The DNS response, on query with unknown EDNS option-code, is unexpectedly
 msgstr "DNS odpověď na dotaz s neznámým EDNS option-code není neočekávaně autoritativní od jmenných serverů \"{addresses}\"."
 
 msgctxt "NAMESERVER:N15_ERROR_ON_VERSION_QUERY"
-msgid "The following name server(s) do not respond or respond with SERVFAIL to software version query \"{query_name}\". Returned from name servers: \"{servers}\""
-msgstr "Následující jmenné servery neodpovídají nebo odpovídají s SERVFAIL na dotaz na verzi softwaru \"{query_name}\". Vráceno od jmenných serverů: \"{servers}\""
+msgid "The following name server(s) did not answer the software version query \"{query_name}\" (no response or SERVFAIL). Returned from name servers: \"{servers}\""
+msgstr "Následující jmenné servery neodpověděly na dotaz na verzi softwaru \"{query_name}\" (žádná odpověď nebo SERVFAIL). Vráceno od jmenných serverů: \"{servers}\""
 
 msgctxt "NAMESERVER:N15_NO_VERSION_REVEALED"
-msgid "The following name server(s) do not reveal the software version. Returned from name servers \"{servers}\""
-msgstr "Následující jmenné servery neprozrazují verzi softwaru. Vráceno od jmenných serverů \"{servers}\""
+msgid "The following name server(s) do not disclose their software version. Returned from name servers: \"{servers}\""
+msgstr "Následující jmenné servery neprozrazují svou verzi softwaru. Vráceno od jmenných serverů: \"{servers}\""
 
 msgctxt "NAMESERVER:N15_SOFTWARE_VERSION"
-msgid "The following name server(s) respond to software version query \"{query_name}\" with string \"{string}\". Returned from name servers: \"{servers}\""
-msgstr "Následující jmenné servery odpovídají na dotaz na verzi softwaru \"{query_name}\" řetězcem \"{string}\". Vráceno od jmenných serverů: \"{servers}\""
+msgid "The following name server(s) disclose their software version in the reply to query \"{query_name}\": \"{string}\". This is informational only; some operators prefer to hide it. Returned from name servers: \"{servers}\""
+msgstr "Následující jmenné servery prozrazují svou verzi softwaru v odpovědi na dotaz \"{query_name}\": \"{string}\". Jde pouze o informaci; někteří operátoři ji raději skrývají. Vráceno od jmenných serverů: \"{servers}\""
 
 msgctxt "NAMESERVER:N15_WRONG_CLASS"
-msgid "The following name server(s) do not return CH class record(s) on CH class query. Returned from name servers \"{servers}\""
-msgstr "Následující jmenné servery nevracejí záznamy třídy CH na dotaz třídy CH. Vráceno od jmenných serverů \"{servers}\""
+msgid "The following name server(s) answered a CHAOS (CH) class query with a record in the wrong class. Returned from name servers: \"{servers}\""
+msgstr "Následující jmenné servery odpověděly na dotaz třídy CHAOS (CH) záznamem v nesprávné třídě. Vráceno od jmenných serverů: \"{servers}\""
 
 msgctxt "NAMESERVER:N16_HAS_NSID"
 msgid "The following name server(s) responded to an NSID query (RFC 5001) with NSID value \"{nsid}\". Returned from name servers \"{servers}\""

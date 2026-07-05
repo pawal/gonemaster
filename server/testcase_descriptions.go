@@ -75,7 +75,7 @@ var testcaseDescriptions = map[string]string{
 	"NAMESERVER11": "Behaviour against unknown EDNS option codes",
 	"NAMESERVER12": "Behaviour against unknown EDNS Z flags",
 	"NAMESERVER13": "Truncated EDNS responses include OPT record",
-	"NAMESERVER15": "Name server does not reveal software version",
+	"NAMESERVER15": "Name server software version disclosure",
 	"NAMESERVER16": "EDNS NSID option support",
 	"NAMESERVER17": "DNS Cookie (RFC 7873) support",
 	"NAMESERVER18": "Extended DNS Errors (RFC 8914)",

@@ -278,7 +278,7 @@
   "tc.nameserver11": "Obnašanje ob neznanih kodah možnosti EDNS",
   "tc.nameserver12": "Obnašanje ob neznanih zastavicah Z EDNS",
   "tc.nameserver13": "Okrnjeni odgovori EDNS vključujejo zapis OPT",
-  "tc.nameserver15": "Imenski strežnik ne razkriva različice programske opreme",
+  "tc.nameserver15": "Razkritje različice programske opreme imenskega strežnika",
   "tc.nameserver16": "Podpora možnosti EDNS NSID",
   "tc.nameserver17": "Podpora za DNS Cookie",
   "tc.nameserver18": "Extended DNS Errors (EDE)",

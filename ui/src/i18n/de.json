@@ -683,7 +683,7 @@
   "tc.nameserver11": "Verhalten bei unbekannten EDNS-Optionscodes",
   "tc.nameserver12": "Verhalten bei unbekannten EDNS-Z-Flags",
   "tc.nameserver13": "Abgeschnittene EDNS-Antworten enthalten OPT-Record",
-  "tc.nameserver15": "Nameserver offenbart keine Software-Version",
+  "tc.nameserver15": "Preisgabe der Softwareversion durch Nameserver",
   "tc.nameserver16": "EDNS-NSID-Option-Unterstützung",
   "tc.nameserver17": "DNS-Cookie-Unterstützung",
   "tc.nameserver18": "Extended DNS Errors (EDE)",

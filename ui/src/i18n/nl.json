@@ -683,7 +683,7 @@
   "tc.nameserver11": "Gedrag bij onbekende EDNS-optiecodes",
   "tc.nameserver12": "Gedrag bij onbekende EDNS Z-vlaggen",
   "tc.nameserver13": "Afgekapte EDNS-antwoorden bevatten een OPT-record",
-  "tc.nameserver15": "Naamserver onthult de softwareversie niet",
+  "tc.nameserver15": "Onthulling van de softwareversie door de naamserver",
   "tc.nameserver16": "Ondersteuning van EDNS NSID-optie",
   "tc.nameserver17": "Ondersteuning voor DNS Cookie",
   "tc.nameserver18": "Extended DNS Errors (EDE)",

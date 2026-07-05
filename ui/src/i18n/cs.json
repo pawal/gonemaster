@@ -683,7 +683,7 @@
   "tc.nameserver11": "Chování při neznámých kódech voleb EDNS",
   "tc.nameserver12": "Chování při neznámých příznacích EDNS Z",
   "tc.nameserver13": "Zkrácené EDNS odpovědi obsahují OPT záznam",
-  "tc.nameserver15": "Jmenný server neprozrazuje verzi softwaru",
+  "tc.nameserver15": "Prozrazení verze softwaru jmenným serverem",
   "tc.nameserver16": "Podpora možnosti EDNS NSID",
   "tc.nameserver17": "Podpora DNS Cookie",
   "tc.nameserver18": "Rozšířené chyby DNS (EDE)",

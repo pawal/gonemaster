@@ -278,7 +278,7 @@
   "tc.nameserver11": "未知のEDNSオプションコードに対する動作",
   "tc.nameserver12": "未知のEDNS Zフラグに対する動作",
   "tc.nameserver13": "切り捨てられたEDNS応答にOPTレコードが含まれる",
-  "tc.nameserver15": "ネームサーバーがソフトウェアバージョンを公開しない",
+  "tc.nameserver15": "ネームサーバーによるソフトウェアバージョンの公開",
   "tc.nameserver16": "EDNS NSIDオプションのサポート",
   "tc.nameserver17": "DNS Cookie のサポート",
   "tc.nameserver18": "Extended DNS Errors (EDE)",

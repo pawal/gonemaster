@@ -683,7 +683,7 @@
   "tc.nameserver11": "Behaviour against unknown EDNS option codes",
   "tc.nameserver12": "Behaviour against unknown EDNS Z flags",
   "tc.nameserver13": "Truncated EDNS responses include OPT record",
-  "tc.nameserver15": "Name server does not reveal software version",
+  "tc.nameserver15": "Name server software version disclosure",
   "tc.nameserver16": "EDNS NSID option support",
   "tc.nameserver17": "DNS Cookie support",
   "tc.nameserver18": "Extended DNS Errors (EDE)",

@@ -278,7 +278,7 @@
   "tc.nameserver11": "Oppførsel ved ukjente EDNS-opsjonskoder",
   "tc.nameserver12": "Oppførsel ved ukjente EDNS Z-flagg",
   "tc.nameserver13": "Trunkerte EDNS-svar inkluderer OPT-post",
-  "tc.nameserver15": "Navnetjeneren avslører ikke programvareversjon",
+  "tc.nameserver15": "Navnetjenerens avsløring av programvareversjon",
   "tc.nameserver16": "Støtte for EDNS NSID-opsjon",
   "tc.nameserver17": "Støtte for DNS Cookie",
   "tc.nameserver18": "Extended DNS Errors (EDE)",

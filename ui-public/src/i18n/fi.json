@@ -147,7 +147,7 @@
   "pub.tc.nameserver11": "Käyttäytyminen tuntemattomilla EDNS-optiokodeilla",
   "pub.tc.nameserver12": "Käyttäytyminen tuntemattomilla EDNS Z -lipuilla",
   "pub.tc.nameserver13": "Katkaistuissa EDNS-vastauksissa on OPT-tietue",
-  "pub.tc.nameserver15": "Nimipalvelin ei paljasta ohjelmistoversiota",
+  "pub.tc.nameserver15": "Nimipalvelimen ohjelmistoversion paljastaminen",
   "pub.tc.nameserver16": "EDNS NSID -option tuki",
   "pub.tc.nameserver17": "DNS Cookie -tuki",
   "pub.tc.nameserver18": "Extended DNS Errors (EDE)",

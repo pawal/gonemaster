@@ -334,6 +334,30 @@ Description:
 
 A nameserver sent a truncated response but left out the EDNS OPT record the standard requires. Without it, the resolver cannot confirm that the server still supports EDNS and may not know whether to retry over TCP, which causes timeouts and stalled lookups.
 
+## Tag N15_SOFTWARE_VERSION
+
+Header: Software version disclosed
+
+Description:
+
+A nameserver answered the CHAOS-class version query and returned its software name and version. This is informational and carries no penalty; it only records what the server reveals. Operators who prefer not to advertise a potentially targetable version string can configure the server to withhold it.
+
+## Tag N15_NO_VERSION_REVEALED
+
+Header: Software version withheld
+
+Description:
+
+A nameserver returned no software version in response to the CHAOS-class version query. Withholding the version is a common hardening choice and is reported here for information only, with no penalty.
+
+## Tag N15_ERROR_ON_VERSION_QUERY
+
+Header: No answer to version query
+
+Description:
+
+A nameserver did not answer the CHAOS-class version query, either staying silent or replying with SERVFAIL. This usually means the version is deliberately withheld and is reported for information only, with no penalty.
+
 ## Tag N15_WRONG_CLASS
 
 Header: Wrong class in version reply

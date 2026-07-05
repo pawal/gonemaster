@@ -147,7 +147,7 @@
   "pub.tc.nameserver11": "Comportamiento ante códigos de opción EDNS desconocidos",
   "pub.tc.nameserver12": "Comportamiento ante flags Z de EDNS desconocidos",
   "pub.tc.nameserver13": "Las respuestas EDNS truncadas incluyen el registro OPT",
-  "pub.tc.nameserver15": "El servidor de nombres no revela la versión del software",
+  "pub.tc.nameserver15": "Divulgación de la versión de software del servidor de nombres",
   "pub.tc.nameserver16": "Soporte de la opción EDNS NSID",
   "pub.tc.nameserver17": "Soporte de DNS Cookie",
   "pub.tc.nameserver18": "Extended DNS Errors (EDE)",

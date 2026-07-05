@@ -147,7 +147,7 @@
   "pub.tc.nameserver11": "Behaviour against unknown EDNS option codes",
   "pub.tc.nameserver12": "Behaviour against unknown EDNS Z flags",
   "pub.tc.nameserver13": "Truncated EDNS responses include OPT record",
-  "pub.tc.nameserver15": "Name server does not reveal software version",
+  "pub.tc.nameserver15": "Name server software version disclosure",
   "pub.tc.nameserver16": "EDNS NSID option support",
   "pub.tc.nameserver17": "DNS Cookie support",
   "pub.tc.nameserver18": "Extended DNS Errors (EDE)",
@@ -850,5 +850,11 @@
   "pub.tag.nameserver.N18_FILTERED_RESPONSE.header": "Filtering detected",
   "pub.tag.nameserver.N18_FILTERED_RESPONSE.desc": "An Extended DNS Error (RFC 8914) indicates that a blocking or filtering policy device sits between us and the nameserver, so its answers cannot be fully trusted.",
   "pub.tag.nameserver.N18_NO_RESPONSE.header": "No response",
-  "pub.tag.nameserver.N18_NO_RESPONSE.desc": "A nameserver did not answer the Extended DNS Error probe at all."
+  "pub.tag.nameserver.N18_NO_RESPONSE.desc": "A nameserver did not answer the Extended DNS Error probe at all.",
+  "pub.tag.nameserver.N15_SOFTWARE_VERSION.header": "Software version disclosed",
+  "pub.tag.nameserver.N15_SOFTWARE_VERSION.desc": "A nameserver answered the CHAOS-class version query and returned its software name and version. This is informational and carries no penalty; it only records what the server reveals. Operators who prefer not to advertise a potentially targetable version string can configure the server to withhold it.",
+  "pub.tag.nameserver.N15_NO_VERSION_REVEALED.header": "Software version withheld",
+  "pub.tag.nameserver.N15_NO_VERSION_REVEALED.desc": "A nameserver returned no software version in response to the CHAOS-class version query. Withholding the version is a common hardening choice and is reported here for information only, with no penalty.",
+  "pub.tag.nameserver.N15_ERROR_ON_VERSION_QUERY.header": "No answer to version query",
+  "pub.tag.nameserver.N15_ERROR_ON_VERSION_QUERY.desc": "A nameserver did not answer the CHAOS-class version query, either staying silent or replying with SERVFAIL. This usually means the version is deliberately withheld and is reported for information only, with no penalty."
 }

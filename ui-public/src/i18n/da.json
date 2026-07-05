@@ -147,7 +147,7 @@
   "pub.tc.nameserver11": "Adfærd ved ukendte EDNS-optionskoder",
   "pub.tc.nameserver12": "Adfærd ved ukendte EDNS Z-flag",
   "pub.tc.nameserver13": "Trunkerede EDNS-svar inkluderer OPT-post",
-  "pub.tc.nameserver15": "Navneserveren afslører ikke softwareversion",
+  "pub.tc.nameserver15": "Navneserverens afsløring af softwareversion",
   "pub.tc.nameserver16": "Understøttelse af EDNS NSID-option",
   "pub.tc.nameserver17": "Understøttelse af DNS Cookie",
   "pub.tc.nameserver18": "Extended DNS Errors (EDE)",

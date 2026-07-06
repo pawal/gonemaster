@@ -1461,4 +1461,105 @@ describe("App", () => {
       unmount();
     });
   });
+
+  // Routing: in-panel drill-downs now push a hash route, so the browser Back
+  // button returns from a detail view to its list, and switching tabs resets
+  // the drill-down instead of silently re-entering it.
+  describe("hash routing and back-button navigation", () => {
+    const domainsMock = (url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/runs")) return jsonResponse({ items: [], total: 0 });
+      if (value.includes("/api/v1/domains")) {
+        return jsonResponse({
+          items: [{ id: 7, name: "example.com", tags: [], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
+          total: 1,
+        });
+      }
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({ items: [], total: 0 });
+    };
+
+    it("clicking a domain row pushes a hash route and Back returns to the list", async () => {
+      global.fetch.mockImplementation(domainsMock);
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
+      await fireEvent.click(await screen.findByText("example.com"));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/domains/example.com");
+        expect(screen.getByText("← Back to domains")).toBeInTheDocument();
+      });
+
+      window.history.back();
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/domains");
+        expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("switching to another tab clears an open domain detail", async () => {
+      global.fetch.mockImplementation(domainsMock);
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
+      await fireEvent.click(await screen.findByText("example.com"));
+      await waitFor(() => expect(screen.getByText("← Back to domains")).toBeInTheDocument());
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Recent Tests" }));
+      await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/domains");
+        expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("clicking a tag row pushes a hash route and Back returns to the list", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/summary")) return jsonResponse({ ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.match(/\/tags\/[^/]+\/domains/)) return jsonResponse({ items: [], total: 0 });
+        if (value.match(/\/tags\/[^/]+\/batches/)) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/analysis/cohorts")) return jsonResponse([]);
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "TLD", domain_count: 2, default_profile_id: null }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+      await fireEvent.click(await screen.findByText("tld"));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/tags/tld");
+        expect(screen.getByText("← Back to tags")).toBeInTheDocument();
+      });
+
+      window.history.back();
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/tags");
+        expect(screen.queryByText("← Back to tags")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Tags" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("redirects the legacy #/settings/analysis bookmark to the Cohorts tab", async () => {
+      window.history.replaceState(null, "", "/#/settings/analysis");
+      global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Cohorts" })).toHaveAttribute("aria-selected", "true");
+        expect(window.location.hash).toBe("#/cohorts");
+      });
+      unmount();
+    });
+  });
 });

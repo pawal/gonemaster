@@ -44,40 +44,44 @@ describe("DomainsPanel", () => {
     expect(screen.getByText("alpha.test")).toBeInTheDocument();
   });
 
-  it("renders the detail view when a domain is selected", async () => {
+  it("renders the detail view when a domain name is routed", async () => {
     render(DomainsPanel, {
       props: {
         apiFetch,
-        selectedDomain: sampleDomains().items[0],
+        routeDomainName: "example.com",
       },
     });
     expect(await screen.findByRole("heading", { name: "example.com" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Back to domains/i })).toBeInTheDocument();
   });
 
-  it("loads runs when mounted with a domain selected", async () => {
+  it("loads runs when mounted with a routed domain name", async () => {
     render(DomainsPanel, {
-      props: { apiFetch, selectedDomain: sampleDomains().items[0] },
+      props: { apiFetch, routeDomainName: "example.com" },
     });
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith(expect.stringMatching(/^\/domains\/1\/runs/));
     });
   });
 
-  it("clicking Back returns the panel to the list view", async () => {
+  it("clicking Back clears the selection and requests navigation to the list", async () => {
+    const onCloseDomain = vi.fn();
     render(DomainsPanel, {
-      props: { apiFetch, selectedDomain: sampleDomains().items[0] },
+      props: { apiFetch, routeDomainName: "example.com", onCloseDomain },
     });
     await screen.findByRole("heading", { name: "example.com" });
     await fireEvent.click(screen.getByRole("button", { name: /Back to domains/i }));
+    expect(onCloseDomain).toHaveBeenCalled();
     // List view shows the search input.
     expect(await screen.findByPlaceholderText(/Search/i)).toBeInTheDocument();
   });
 
-  it("opens the detail view when a row in the list is clicked", async () => {
-    render(DomainsPanel, { props: { apiFetch, selectedDomain: null } });
+  it("opens the detail view and requests navigation when a row is clicked", async () => {
+    const onOpenDomain = vi.fn();
+    render(DomainsPanel, { props: { apiFetch, routeDomainName: null, onOpenDomain } });
     const row = (await screen.findByText("example.com")).closest("tr");
     await fireEvent.click(row);
+    expect(onOpenDomain).toHaveBeenCalledWith("example.com");
     // Detail header should appear.
     expect(await screen.findByRole("heading", { name: "example.com" })).toBeInTheDocument();
   });
@@ -87,7 +91,7 @@ describe("DomainsPanel", () => {
     render(DomainsPanel, {
       props: {
         apiFetch,
-        selectedDomain: sampleDomains().items[0],
+        routeDomainName: "example.com",
         onNavigateJob,
       },
     });

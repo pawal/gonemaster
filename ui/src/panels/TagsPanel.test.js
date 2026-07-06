@@ -52,17 +52,17 @@ describe("TagsPanel", () => {
     });
   });
 
-  it("renders the detail view when a tag is selected", async () => {
+  it("renders the detail view when a tag name is routed", async () => {
     render(TagsPanel, {
-      props: { apiFetch, selectedTag: sampleTags()[0] },
+      props: { apiFetch, routeTagName: "tld" },
     });
     expect(await screen.findByRole("heading", { level: 2, name: /tld/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Back to tags/i })).toBeInTheDocument();
   });
 
-  it("loads tag summary, domains, and batches when a tag is selected on mount", async () => {
+  it("loads tag summary, domains, and batches when a tag name is routed", async () => {
     render(TagsPanel, {
-      props: { apiFetch, selectedTag: sampleTags()[0] },
+      props: { apiFetch, routeTagName: "tld" },
     });
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/tags/tld/summary"));
@@ -73,7 +73,7 @@ describe("TagsPanel", () => {
 
   it("shows an explicit confirm step before deleting a tag", async () => {
     render(TagsPanel, {
-      props: { apiFetch, selectedTag: sampleTags()[0] },
+      props: { apiFetch, routeTagName: "tld" },
     });
     await screen.findByRole("heading", { level: 2, name: /tld/ });
     await fireEvent.click(screen.getByRole("button", { name: /^Delete tag$/i }));
@@ -84,7 +84,7 @@ describe("TagsPanel", () => {
     const onSetTab = vi.fn();
     const tagCohortByName = new Map([["tld", { source_tag: "tld", label: "TLD cohort" }]]);
     render(TagsPanel, {
-      props: { apiFetch, selectedTag: sampleTags()[0], tagCohortByName, onSetTab },
+      props: { apiFetch, routeTagName: "tld", tagCohortByName, onSetTab },
     });
     await screen.findByText(/TLD cohort/);
     await fireEvent.click(screen.getByRole("button", { name: /TLD cohort/ }));

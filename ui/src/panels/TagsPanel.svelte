@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { t } from "../i18n.js";
   import {
     sortItems,
@@ -16,7 +16,9 @@
     apiFetch,
     setStatus = () => {},
     clearStatus = () => {},
-    selectedTag = $bindable(null),
+    routeTagName = null,
+    onOpenTag = () => {},
+    onCloseTag = () => {},
     availableProfiles = [],
     profilesLoading = false,
     tagCohortByName = new Map(),
@@ -28,6 +30,8 @@
     onTagProfileChanged = () => {},
     onTagsListChanged = () => {},
   } = $props();
+
+  let selectedTag = $state(null);
 
   let tagsList = $state([]);
   let tagsListLoading = $state(false);
@@ -65,9 +69,7 @@
   let tagPurgeConfirm = $state(false);
   let tagPurging = $state(false);
 
-  let tagProfileDraftId = $state(
-    selectedTag?.default_profile_id ? String(selectedTag.default_profile_id) : ""
-  );
+  let tagProfileDraftId = $state("");
   let tagProfileUpdating = $state(false);
   let tagProfileClearing = $state(false);
 
@@ -238,6 +240,7 @@
       selectedTag = null;
       tagProfileDraftId = "";
       tagDeleteConfirm = false;
+      onCloseTag();
       await loadTagsList();
       onTagsListChanged();
     } catch (error) {
@@ -365,10 +368,26 @@
   function navigateToTagDetail(tag) {
     clearStatus();
     selectedTag = tag;
+    onOpenTag(tag.name);
   }
 
-  // React to selectedTag changes (from row clicks here, App-level navigateToTagDetail,
-  // popstate, or our back button).
+  // Resolve selectedTag from the routed tag name (row click, deep link, or
+  // browser back/forward). The list dep re-resolves a deep link once loaded.
+  $effect(() => {
+    const name = routeTagName;
+    const list = tagsList;
+    untrack(() => {
+      if (name === (selectedTag?.name ?? null)) return;
+      if (!name) {
+        selectedTag = null;
+        return;
+      }
+      const match = (list || []).find((tg) => tg.name === name);
+      if (match) selectedTag = match;
+    });
+  });
+
+  // React to selectedTag changes to load or reset the tag detail.
   $effect(() => {
     const name = selectedTag?.name ?? null;
     if (name === lastSelectedTagName) return;
@@ -397,7 +416,7 @@
 
 <div class="card reveal delay-34 panel-mt" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags">
   {#if selectedTag}
-    <button class="secondary small" onclick={() => { selectedTag = null; tagProfileDraftId = ""; }}>{$t("back_to_tags")}</button>
+    <button class="secondary small" onclick={() => { selectedTag = null; tagProfileDraftId = ""; onCloseTag(); }}>{$t("back_to_tags")}</button>
     <h2 class="mt-half">{$t("batch_tag_label")}: {selectedTag.name}</h2>
     {#if tagCohortByName.has(selectedTag.name)}
       <p class="small heading-tight">

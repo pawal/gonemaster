@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { t } from "../i18n.js";
   import { formatTimestampLocal } from "../lib/format.js";
   import {
@@ -25,13 +25,19 @@
   let {
     apiFetch,
     setStatus = () => {},
-    selectedDomain = $bindable(null),
+    routeDomainName = null,
+    routeRunId = null,
+    onOpenDomain = () => {},
+    onCloseDomain = () => {},
+    onOpenRun = () => {},
     availableTags = [],
     scoringEnabled = false,
     nameserverTimingsEnabled = false,
     resultLocale = "",
     onNavigateJob = () => {},
   } = $props();
+
+  let selectedDomain = $state(null);
 
   let domains = $state([]);
   let domainsLoading = $state(false);
@@ -192,10 +198,35 @@
 
   const navigateToDomainDetail = (d) => {
     selectedDomain = d;
+    onOpenDomain(d.name);
   };
 
-  // React to selectedDomain changes from outside (e.g. App-level navigateToDomainByName,
-  // popstate restoring an in-history detail view, or our back button).
+  // Resolve selectedDomain from the routed domain name (row click, cross-panel
+  // navigation, deep link, or browser back/forward). The list dep re-resolves a
+  // deep link once the list has loaded.
+  async function syncDomainFromRoute(name, list) {
+    if (name === (selectedDomain?.name ?? null)) return;
+    if (!name) {
+      selectedDomain = null;
+      return;
+    }
+    let match = (list || []).find((d) => d.name === name);
+    if (!match) {
+      try {
+        const data = await apiFetch(`/domains?name=${encodeURIComponent(name)}&limit=20`);
+        match = (data?.items ?? []).find((d) => d.name === name) ?? null;
+      } catch (_) {}
+    }
+    if (match) selectedDomain = match;
+  }
+
+  $effect(() => {
+    const name = routeDomainName;
+    const list = domains;
+    untrack(() => { syncDomainFromRoute(name, list); });
+  });
+
+  // Load or reset the run list when the selected domain changes.
   $effect(() => {
     const id = selectedDomain?.id ?? null;
     if (id === lastLoadedDomainId) return;
@@ -233,7 +264,7 @@
 <div class="card reveal delay-34 panel-mt" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains">
   {#if selectedDomain}
     <div>
-      <button class="secondary small" onclick={() => { selectedDomain = null; }}>{$t("back_to_domains")}</button>
+      <button class="secondary small" onclick={() => { selectedDomain = null; onCloseDomain(); }}>{$t("back_to_domains")}</button>
       <div class="header-with-meta">
         <h2 class="mono m-zero">{selectedDomain.name}</h2>
         {#if selectedDomain.tags && selectedDomain.tags.length > 0}

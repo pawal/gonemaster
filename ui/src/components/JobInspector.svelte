@@ -1,6 +1,6 @@
 <script>
   import { t } from "../i18n.js";
-  import { formatTimestampLocal, prettyProfileJSON, formatJobTotalRuntime as formatJobTotalRuntimeRaw } from "../lib/format.js";
+  import { formatTimestampLocal, prettyProfileJSON, formatDurationMs, formatJobTotalRuntime as formatJobTotalRuntimeRaw } from "../lib/format.js";
   import { progressPercent, isResultReadyStatus, isActiveJobStatus } from "../lib/jobUtils.js";
   import RunResultView from "./RunResultView.svelte";
 
@@ -70,11 +70,11 @@
       <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
       {#if selectedRun}
         <span>{$t("col_duration")}</span>
-        <strong>{selectedRun.duration_ms != null ? selectedRun.duration_ms + " ms" : "-"}</strong>
+        <strong>{selectedRun.duration_ms != null ? formatDurationMs(selectedRun.duration_ms) : "-"}</strong>
         <span>{$t("col_entries")}</span>
         <strong>{selectedRun.entry_count ?? 0}</strong>
         <span>{$t("col_worst_level")}</span>
-        <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "-"}</span></strong>
+        <strong>{#if selectedRun.worst_level}<span class="badge level-{selectedRun.worst_level.toLowerCase()}">{selectedRun.worst_level}</span>{:else}-{/if}</strong>
       {/if}
     </div>
     {#if selectedJob.error}

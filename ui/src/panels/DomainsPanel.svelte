@@ -1,7 +1,7 @@
 <script>
   import { onMount, untrack } from "svelte";
   import { t } from "../i18n.js";
-  import { formatTimestampLocal } from "../lib/format.js";
+  import { formatTimestampLocal, formatDurationMs } from "../lib/format.js";
   import {
     sortItems,
     nextTableSort,
@@ -321,7 +321,7 @@
                 <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "-"}</td>
                 <td><span class="badge level-{(run.worst_level || 'info').toLowerCase()}">{run.worst_level || "INFO"}</span></td>
                 {#if scoringEnabled}<td>{#if hasScore(run)}<GradeChip grade={chipGrade(run)} score={chipScore(run)} />{:else}-{/if}</td>{/if}
-                <td>{run.duration_ms != null ? run.duration_ms + "ms" : "-"}</td>
+                <td>{run.duration_ms != null ? formatDurationMs(run.duration_ms) : "-"}</td>
                 <td>{run.entry_count ?? 0}</td>
               </tr>
             {/each}

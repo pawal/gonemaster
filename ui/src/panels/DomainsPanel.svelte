@@ -333,7 +333,7 @@
             disabled={domainRunsOffset === 0}
             onclick={() => { domainRunsOffset = Math.max(0, domainRunsOffset - domainRunsLimit); loadDomainRuns(); }}
           >{$t("prev_page")}</button>
-          <span class="muted small">{domainRunsOffset + 1}–{Math.min(domainRunsOffset + domainRunsLimit, domainRunsTotal)} / {domainRunsTotal}</span>
+          <span class="muted small">{domainRunsOffset + 1}-{Math.min(domainRunsOffset + domainRunsLimit, domainRunsTotal)} / {domainRunsTotal}</span>
           <button
             class="secondary small"
             disabled={domainRunsOffset + domainRunsLimit >= domainRunsTotal}
@@ -418,7 +418,7 @@
           disabled={domainsOffset === 0}
           onclick={() => { domainsOffset = Math.max(0, domainsOffset - domainsLimit); loadDomains(); }}
         >{$t("prev_page")}</button>
-        <span class="muted small">{domainsOffset + 1}–{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
+        <span class="muted small">{domainsOffset + 1}-{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
         <button
           class="secondary small"
           disabled={domainsOffset + domainsLimit >= domainsTotal}

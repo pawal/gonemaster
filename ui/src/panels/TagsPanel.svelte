@@ -605,7 +605,7 @@
         <button class="secondary small" disabled={tagDomainsOffset === 0}
           onclick={() => { tagDomainsOffset = Math.max(0, tagDomainsOffset - tagDomainsLimit); loadTagDomains(); }}
         >{$t("prev_page")}</button>
-        <span class="muted small">{tagDomainsOffset + 1}–{Math.min(tagDomainsOffset + tagDomainsLimit, tagDomainsTotal)} / {tagDomainsTotal}</span>
+        <span class="muted small">{tagDomainsOffset + 1}-{Math.min(tagDomainsOffset + tagDomainsLimit, tagDomainsTotal)} / {tagDomainsTotal}</span>
         <button class="secondary small" disabled={tagDomainsOffset + tagDomainsLimit >= tagDomainsTotal}
           onclick={() => { tagDomainsOffset += tagDomainsLimit; loadTagDomains(); }}
         >{$t("next_page")}</button>

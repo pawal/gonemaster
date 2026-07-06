@@ -732,6 +732,25 @@ button:hover:not(:disabled) {
   letter-spacing: 0.02em;
 }
 
+.pill {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs);
+  background: var(--surface-2);
+  color: var(--on-surface-2);
+}
+.pill.default {
+  background: rgba(202, 138, 4, 0.14);
+  color: var(--grade-c);
+  border: 1px solid rgba(202, 138, 4, 0.30);
+}
+.pill.snapshot-intent {
+  background: rgba(3, 105, 161, 0.10);
+  color: var(--accent-2);
+  border: 1px solid rgba(3, 105, 161, 0.25);
+}
+
 .tag-cohort-chip {
   padding: 1px 8px;
   font-family: var(--sans, inherit);

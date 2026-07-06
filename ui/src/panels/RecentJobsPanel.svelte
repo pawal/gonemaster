@@ -246,7 +246,7 @@
           <div class="list-item-main">
             <div class="job-headline">
               <span class="mono job-id-link">{job.id}</span>
-              <span class="small">{job.domain} – {job.status}</span>
+              <span class="small">{job.domain} - {job.status}</span>
               {#if jobSeverityRows(job).length}
                 {#each jobSeverityRows(job) as entry (entry.level)}
                   <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>

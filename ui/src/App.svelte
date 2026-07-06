@@ -382,6 +382,16 @@
     }, 6000);
     setStatus($t("job_created", { id: jobId }), "ok");
     recentCursor = 0;
+    navigate("single", { jobId });
+    loadJob(jobId);
+  };
+
+  // Manual job-id entry: reflect the id in the URL and load it. selectedJobId
+  // is already bound to the typed value, so the route-sync effect would skip
+  // the load; load explicitly here.
+  const handleJobIdSubmit = (jobId) => {
+    if (status.message) clearStatus();
+    navigate("single", { jobId });
     loadJob(jobId);
   };
 
@@ -723,6 +733,7 @@
         {scoringEnabled}
         {nameserverTimingsEnabled}
         onRefresh={() => loadJob()}
+        onSubmitJobId={handleJobIdSubmit}
         onLoadResult={() => loadJobResult()}
         onNavigateDomain={navigateToDomainByName}
       />

@@ -1614,6 +1614,45 @@ describe("App", () => {
       unmount();
     });
 
+    it("writes a single-job deep link when a job is created", async () => {
+      const job = { id: "job_created_1", domain: "example.com", status: "running", created_at: "2026-02-03T00:00:00Z", progress: 10 };
+      global.fetch.mockImplementation((url, options = {}) => {
+        if (url === "/api/v1/jobs" && options.method === "POST") return jsonResponse(job);
+        if (url === `/api/v1/jobs/${job.id}`) return jsonResponse(job);
+        return jsonResponse({ items: [] });
+      });
+      const { unmount } = render(App);
+
+      await fireEvent.input(await screen.findByPlaceholderText("example.com"), { target: { value: "example.com" } });
+      await fireEvent.click(screen.getByText("Run Single Job"));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/single/job_created_1");
+      });
+      unmount();
+    });
+
+    it("writes the hash and loads the job when a job id is entered manually", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value === "/api/v1/jobs/job_typed") return jsonResponse({ id: "job_typed", domain: "typed.example", status: "running", created_at: "2026-02-03T00:00:00Z", progress: 5 });
+        return jsonResponse({ items: [] });
+      });
+      const { unmount } = render(App);
+
+      const input = await screen.findByLabelText("Job ID");
+      await fireEvent.input(input, { target: { value: "job_typed" } });
+      await fireEvent.change(input);
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/single/job_typed");
+        expect(calls.some((v) => v === "/api/v1/jobs/job_typed")).toBe(true);
+      });
+      unmount();
+    });
+
     it("redirects the legacy #/settings/analysis bookmark to the Cohorts tab", async () => {
       window.history.replaceState(null, "", "/#/settings/analysis");
       global.fetch.mockImplementation(() => jsonResponse({ items: [] }));

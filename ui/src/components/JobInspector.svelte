@@ -25,6 +25,7 @@
     scoringEnabled = false,
     nameserverTimingsEnabled = false,
     onRefresh = () => {},
+    onSubmitJobId = () => {},
     onLoadResult = () => {},
     onNavigateDomain = () => {},
   } = $props();
@@ -50,7 +51,7 @@
   <h2>{selectedJob && isResultReadyStatus(selectedJob.status) ? $t("run_inspector_heading") : $t("job_inspector_heading")}</h2>
   <div class="stack">
     <label for="job-id">{$t("job_id_label")}</label>
-    <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} onchange={onRefresh} />
+    <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} onchange={() => onSubmitJobId(selectedJobId)} />
   </div>
   <div class="row">
     <button onclick={onRefresh} disabled={jobLoading}>{jobLoading ? $t("loading") : $t("refresh")}</button>

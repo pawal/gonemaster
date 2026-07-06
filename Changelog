@@ -2,12 +2,16 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.5.8] - 2026-07-06
+
+Adds a tag run-purge endpoint and admin UI action, plus AXFR zone-transfer caching in the packet cache with new `--cache-stats` and `--cache-strict` CLI flags. Adopts RFC 9499 "in-domain" terminology in place of "bailiwick". Reworks Zone09 MX consistency reporting and renames nameserver15 to software version disclosure.
 
 ### Added
 
 - server: add `POST /api/v1/tags/{name}/purge` to delete all completed runs and entries for a tag while leaving active jobs, tag memberships, and captured cohort snapshots intact
 - admin-ui: add a tag detail "Purge runs" action with two-step confirmation
+- engine: cache and replay AXFR zone transfers per run and persist AXFR entries in the packet cache file
+- gonemaster: add `--cache-stats` to print statistics for a saved cache file, `--cache-strict` to treat cache-file warnings as errors, and a restored-run cache hit/miss summary
 
 ### Changed
 
@@ -15,6 +19,8 @@ All notable changes to all gonemaster components will be documented in this file
 - engine, i18n, docs: adopt RFC 9499 "in-domain" terminology in place of "bailiwick" in log messages and documentation
 - zone09: compare MX records by RDATA and report inconsistent MX by name server host name; reword `Z09_INCONSISTENT_MX_DATA`
 - zone09: `Z09_NON_AUTH_MX_RESPONSE` now reports the IP addresses of the non-authoritative responders
+- nameserver15: rename testcase to "software version disclosure" and clarify its software-version log messages across the engine, admin-ui, ui-public, and analysis-ui
+- admin-ui: convert `App.svelte` to Svelte 5 runes mode
 
 ## [v1.5.7] - 2026-06-30
 

@@ -145,7 +145,9 @@
       const data = await apiFetch(`/domains/${selectedDomain.id}/runs?${params}`);
       domainRuns = data?.items ?? [];
       domainRunsTotal = data?.total ?? 0;
-      if (domainRuns.length > 0 && domainRunsOffset === 0) {
+      // Auto-load the newest run's result only when no specific run is routed;
+      // a routed run id is loaded by its own effect.
+      if (domainRuns.length > 0 && domainRunsOffset === 0 && !routeRunId) {
         loadDomainRunResult(domainRuns[0].id);
       }
     } catch (error) {
@@ -201,6 +203,11 @@
     onOpenDomain(d.name);
   };
 
+  const openRun = (runId) => {
+    loadDomainRunResult(runId);
+    if (selectedDomain?.name) onOpenRun(selectedDomain.name, runId);
+  };
+
   // Resolve selectedDomain from the routed domain name (row click, cross-panel
   // navigation, deep link, or browser back/forward). The list dep re-resolves a
   // deep link once the list has loaded.
@@ -240,6 +247,15 @@
       domainRunsOffset = 0;
       loadDomainRuns();
     }
+  });
+
+  // Load the routed run result (deep link or back/forward between runs).
+  $effect(() => {
+    const runId = routeRunId;
+    untrack(() => {
+      if (!runId || runId === selectedDomainRunId) return;
+      loadDomainRunResult(runId);
+    });
   });
 
   // Reload the open run result when locale changes.
@@ -365,10 +381,10 @@
             {#each sortedDomainRuns as run}
               <tr
                 class={`row-clickable ${selectedDomainRunId === run.id ? "run-row-selected" : ""}`}
-                onclick={() => loadDomainRunResult(run.id)}
+                onclick={() => openRun(run.id)}
                 role="button"
                 tabindex="0"
-                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") loadDomainRunResult(run.id); }}
+                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openRun(run.id); } }}
               >
                 <td class="run-id-cell" title={run.id}>{run.id}</td>
                 <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "-"}</td>

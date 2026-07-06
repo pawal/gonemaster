@@ -1550,6 +1550,70 @@ describe("App", () => {
       unmount();
     });
 
+    it("restores a domain detail deep link on reload", async () => {
+      window.history.replaceState(null, "", "/#/domains/example.com");
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        return domainsMock(url);
+      });
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "example.com" })).toBeInTheDocument();
+        expect(calls.some((v) => v.includes("/api/v1/domains/7/runs"))).toBe(true);
+      });
+      expect(window.location.hash).toBe("#/domains/example.com");
+      unmount();
+    });
+
+    it("restores a specific run deep link on reload", async () => {
+      window.history.replaceState(null, "", "/#/domains/example.com/runs/run_seven");
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/runs")) {
+          return jsonResponse({ items: [{ id: "run_seven", finished_at: "2026-03-15T10:00:00Z", worst_level: "WARNING", duration_ms: 500, entry_count: 2 }], total: 1 });
+        }
+        if (value.includes("/api/v1/jobs/run_seven/result")) {
+          return jsonResponse({ job_id: "run_seven", summary: { levels: {} }, raw: { entries: [] } });
+        }
+        return domainsMock(url);
+      });
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(calls.some((v) => v.includes("/api/v1/jobs/run_seven/result"))).toBe(true);
+      });
+      expect(window.location.hash).toBe("#/domains/example.com/runs/run_seven");
+      unmount();
+    });
+
+    it("restores a tag detail deep link on reload", async () => {
+      window.history.replaceState(null, "", "/#/tags/tld");
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/summary")) return jsonResponse({ ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.match(/\/tags\/[^/]+\/domains/)) return jsonResponse({ items: [], total: 0 });
+        if (value.match(/\/tags\/[^/]+\/batches/)) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/analysis/cohorts")) return jsonResponse([]);
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "TLD", domain_count: 2, default_profile_id: null }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { level: 2, name: /tld/ })).toBeInTheDocument();
+        expect(calls.some((v) => v.includes("/api/v1/tags/tld/summary"))).toBe(true);
+      });
+      expect(window.location.hash).toBe("#/tags/tld");
+      unmount();
+    });
+
     it("redirects the legacy #/settings/analysis bookmark to the Cohorts tab", async () => {
       window.history.replaceState(null, "", "/#/settings/analysis");
       global.fetch.mockImplementation(() => jsonResponse({ items: [] }));

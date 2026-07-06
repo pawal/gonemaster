@@ -496,7 +496,7 @@
 
   // Restore the route and persisted filter state synchronously so panels mount
   // with the correct state on first render, before onMount runs.
-  if (typeof window !== "undefined") {
+  const restoreInitialState = () => {
     syncFromLocation();
     const urlState = readStateFromURL();
     applyPersistedState(urlState || readStateFromStorage());
@@ -504,7 +504,8 @@
     batchCursor = normalizeCursor(batchCursor);
     recentPageSize = normalizeRecentPageSize(recentPageSize);
     recentCursor = normalizeCursor(recentCursor);
-  }
+  };
+  if (typeof window !== "undefined") restoreInitialState();
 
   $effect(() => {
     autoRefreshJob;

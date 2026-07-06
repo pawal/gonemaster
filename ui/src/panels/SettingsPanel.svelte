@@ -10,6 +10,23 @@
     onSetSubTab = () => {},
     onProfilesChanged = () => {},
   } = $props();
+
+  // Roving arrow-key navigation for the ARIA tablist.
+  const handleTabKeydown = (e) => {
+    const ids = settingsSubTabs.map((s) => s.id);
+    const idx = ids.indexOf(settingsSubTab);
+    if (idx < 0) return;
+    let next = idx;
+    if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (idx + 1) % ids.length;
+    else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (idx - 1 + ids.length) % ids.length;
+    else if (e.key === "Home") next = 0;
+    else if (e.key === "End") next = ids.length - 1;
+    else return;
+    e.preventDefault();
+    const nextId = ids[next];
+    onSetSubTab(nextId);
+    document.getElementById(`settings-subtab-${nextId}`)?.focus();
+  };
 </script>
 
 <div class="grid panel-settings" id="panel-settings" role="tabpanel" aria-labelledby="tab-settings">
@@ -22,7 +39,9 @@
         id={`settings-subtab-${subTab.id}`}
         aria-selected={settingsSubTab === subTab.id}
         aria-controls={`settings-subpanel-${subTab.id}`}
+        tabindex={settingsSubTab === subTab.id ? 0 : -1}
         onclick={() => onSetSubTab(subTab.id)}
+        onkeydown={handleTabKeydown}
       >
         {$t(subTab.labelKey)}
       </button>

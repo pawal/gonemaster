@@ -227,7 +227,7 @@
       {$t("next")}
     </button>
     <span class="small">
-      {$t("showing_jobs", { shown: jobs.length, total: recentTotal, offset: recentOffset || 0 })}
+      {$t("showing_jobs", { shown: filteredJobs.length, total: recentTotal, offset: recentOffset || 0 })}
     </span>
   </div>
   <div class="list">

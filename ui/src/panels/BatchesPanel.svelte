@@ -202,31 +202,13 @@
   async function loadRecentBatchOptions() {
     recentBatchLoading = true;
     try {
-      const collected = [];
-      const seen = new Set();
-      let cursor = 0;
-      let pages = 0;
-      const maxItems = 20;
-      const maxPages = 5;
-      while (collected.length < maxItems && pages < maxPages) {
-        const params = new URLSearchParams({ limit: "100", sort: "created_at_desc" });
-        if (cursor > 0) params.set("cursor", String(cursor));
-        const list = await apiFetch(`/jobs?${params.toString()}`);
-        const items = list?.items || [];
-        for (const item of items) {
-          const batchID = String(item?.batch_id || "").trim();
-          if (!batchID || seen.has(batchID)) continue;
-          seen.add(batchID);
-          collected.push({ id: batchID, createdAt: item?.created_at || "" });
-          if (collected.length >= maxItems) break;
-        }
-        if (!list?.next_cursor) break;
-        const nextCursor = normalizeCursor(list.next_cursor);
-        if (nextCursor <= cursor) break;
-        cursor = nextCursor;
-        pages++;
-      }
-      recentBatchOptions = collected;
+      const list = await apiFetch("/batches?limit=20");
+      const items = list?.items || [];
+      recentBatchOptions = items.map((b) => ({
+        id: b.batch_id,
+        createdAt: b.created_at || "",
+        tag: b.tag || "",
+      }));
       syncSelectedRecentBatch();
     } catch (error) {
       setStatus($t("error_load_batches", { error: error.message }), "warn");
@@ -237,7 +219,7 @@
 
   async function loadBatch(batchId = selectedBatchId, options = {}) {
     if (!batchId) return;
-    const { resetCursor = false } = options;
+    const { resetCursor = false, silent = false } = options;
     if (resetCursor) batchCursor = 0;
     batchLoading = true;
     try {
@@ -259,7 +241,9 @@
       }
     } catch (error) {
       setStatus($t("error_load_batch", { error: error.message }), "warn");
-      selectedBatch = null;
+      // Keep the currently shown batch on a transient auto-refresh failure;
+      // only clear on an explicit (non-silent) load.
+      if (!silent) selectedBatch = null;
     } finally {
       batchLoading = false;
     }
@@ -268,38 +252,9 @@
   async function loadActiveBatches() {
     activeBatchesLoading = true;
     try {
-      const batchIds = [];
-      const seen = new Set();
-      let cursor = 0;
-      let pages = 0;
-      while (batchIds.length < 10 && pages < 3) {
-        const params = new URLSearchParams({ limit: "100", sort: "created_at_desc" });
-        if (cursor > 0) params.set("cursor", String(cursor));
-        const list = await apiFetch(`/jobs?${params.toString()}`);
-        const items = list?.items || [];
-        for (const item of items) {
-          const bid = String(item?.batch_id || "").trim();
-          if (!bid || seen.has(bid)) continue;
-          seen.add(bid);
-          batchIds.push(bid);
-          if (batchIds.length >= 10) break;
-        }
-        if (!list?.next_cursor) break;
-        const next = normalizeCursor(list.next_cursor);
-        if (next <= cursor) break;
-        cursor = next;
-        pages++;
-      }
-      const summaries = await Promise.all(
-        batchIds.map(async (id) => {
-          try {
-            return await apiFetch(`/batches/${id}?limit=1&sort=started_at_desc`);
-          } catch (_) {
-            return null;
-          }
-        })
-      );
-      activeBatches = summaries.filter((b) => b && hasActiveBatchJobs(b));
+      const list = await apiFetch("/batches?limit=20");
+      const items = list?.items || [];
+      activeBatches = items.filter((b) => b.status === "running");
     } catch (_) {
       // Silently ignore - active batches is supplementary.
     } finally {
@@ -385,7 +340,7 @@
   // Polling: inspector and active-batches.
   $effect(() => {
     if (!autoRefreshBatch || !selectedBatchId) return;
-    const handle = setInterval(() => loadBatch(), 7000);
+    const handle = setInterval(() => loadBatch(selectedBatchId, { silent: true }), 7000);
     return () => clearInterval(handle);
   });
   $effect(() => {
@@ -532,7 +487,7 @@ example.org`}
                 {batch.batch_id}{#if batch.tag} <span class="small">({batch.tag})</span>{/if}
               </div>
               <div class="small">
-                {$t("total_label")}: {batch.total} · {formatBatchStatusCounts(batch.status_counts)} · {formatBatchTotalRuntime(batch)}
+                {$t("total_label")}: {batch.total} · {batch.completion}% · {formatBatchTotalRuntime(batch)}
               </div>
             </div>
           </div>

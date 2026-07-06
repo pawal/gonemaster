@@ -23,6 +23,7 @@ describe("BatchesPanel", () => {
 
   beforeEach(() => {
     apiFetch = vi.fn().mockImplementation((path) => {
+      if (path.startsWith("/batches?")) return Promise.resolve({ items: [], total: 0 });
       if (path.startsWith("/jobs?")) return Promise.resolve({ items: [] });
       if (path === "/metrics?window=1h&include=health") return Promise.resolve({ health: { queue_paused: false } });
       if (path === "/jobs/batch") return Promise.resolve({ batch_id: "batch_new" });
@@ -45,12 +46,39 @@ describe("BatchesPanel", () => {
 
   afterEach(() => cleanup());
 
-  it("loads recent batches and active batches on mount", async () => {
+  it("loads recent and active batches from the batches endpoint on mount", async () => {
     render(BatchesPanel, { props: baseProps({ apiFetch }) });
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/jobs?"));
+      expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/batches?"));
       expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/metrics?"));
     });
+    // The old client-side /jobs scan is gone.
+    expect(apiFetch).not.toHaveBeenCalledWith(expect.stringContaining("/jobs?"));
+  });
+
+  it("shows running batches in the active list and populates the recent dropdown", async () => {
+    const listFetch = vi.fn().mockImplementation((path) => {
+      if (path.startsWith("/batches?")) {
+        return Promise.resolve({
+          items: [
+            { batch_id: "batch_run", tag: "tld", status: "running", total: 10, completed: 4, completion: 40, created_at: "2026-04-01T00:00:00Z" },
+            { batch_id: "batch_done", tag: "", status: "done", total: 5, completed: 5, completion: 100, created_at: "2026-03-31T00:00:00Z" },
+          ],
+          total: 2,
+        });
+      }
+      if (path === "/metrics?window=1h&include=health") return Promise.resolve({ health: { queue_paused: false } });
+      return Promise.resolve({ items: [] });
+    });
+    render(BatchesPanel, { props: baseProps({ apiFetch: listFetch }) });
+
+    // Active list shows only the running batch (its completion % is unique to it).
+    expect(await screen.findByText(/40%/)).toBeInTheDocument();
+    expect(screen.queryByText(/100%/)).not.toBeInTheDocument();
+    // Recent dropdown lists both batches as options.
+    const options = screen.getByLabelText(/Recent batches/i).querySelectorAll("option");
+    const values = Array.from(options).map((o) => o.value).filter(Boolean);
+    expect(values).toEqual(expect.arrayContaining(["batch_run", "batch_done"]));
   });
 
   it("submits a batch from the domains form and selects the new id", async () => {

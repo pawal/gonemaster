@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BatchesPanel from "./BatchesPanel.svelte";
 
@@ -88,5 +88,45 @@ describe("BatchesPanel", () => {
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     await fireEvent.click(screen.getByRole("button", { name: /Delete batch/i }));
     expect(onOpenBatchDelete).toHaveBeenCalledWith("batch_existing");
+  });
+
+  it("shows severity pills and a grade chip on graduated batch job rows and navigates on click", async () => {
+    const onNavigateJob = vi.fn();
+    const gradedFetch = vi.fn().mockImplementation((path) => {
+      if (path.startsWith("/batches/")) {
+        return Promise.resolve({
+          batch_id: "batch_graded",
+          tag: "",
+          total: 1,
+          status_counts: { succeeded: 1 },
+          items: [{
+            id: "job_done",
+            domain: "graded.example",
+            status: "succeeded",
+            progress: 100,
+            severity_totals: { NOTICE: 0, WARNING: 2, ERROR: 1, CRITICAL: 0 },
+            grade: "C",
+            score: 71,
+          }],
+          created_at: "2026-04-01T00:00:00Z",
+          next_cursor: "",
+          prev_cursor: "",
+          offset: 0,
+        });
+      }
+      return Promise.resolve({ items: [] });
+    });
+    render(BatchesPanel, {
+      props: baseProps({ apiFetch: gradedFetch, selectedBatchId: "batch_graded", scoringEnabled: true, onNavigateJob }),
+    });
+
+    const row = (await screen.findByText("job_done")).closest(".list-item");
+    expect(row).not.toBeNull();
+    expect(within(row).getByText(/WARNING 2/)).toBeInTheDocument();
+    expect(within(row).getByText(/ERROR 1/)).toBeInTheDocument();
+    expect(within(row).getByText("C")).toBeInTheDocument();
+
+    await fireEvent.click(row);
+    expect(onNavigateJob).toHaveBeenCalledWith("job_done");
   });
 });

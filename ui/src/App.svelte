@@ -800,6 +800,7 @@
       {apiFetch}
       {setStatus}
       {ensureNotificationPermission}
+      {scoringEnabled}
       bind:selectedBatchId
       bind:batchSort
       bind:batchPageSize

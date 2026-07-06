@@ -9,11 +9,14 @@
   } from "../lib/format.js";
   import { progressPercent, hasActiveBatchJobs, normalizeStatus } from "../lib/jobUtils.js";
   import { normalizePageSize, normalizeCursor } from "../lib/persistence.js";
+  import { moduleLevels, hasScore, chipGrade, chipScore } from "../lib/result.js";
+  import GradeChip from "../components/GradeChip.svelte";
 
   let {
     apiFetch,
     setStatus = () => {},
     ensureNotificationPermission = () => Promise.resolve("denied"),
+    scoringEnabled = false,
     selectedBatchId = $bindable(""),
     batchSort = $bindable("started_at_desc"),
     batchPageSize = $bindable(20),
@@ -79,6 +82,11 @@
     node.style.width = value;
     return { update(v) { node.style.width = v; } };
   };
+
+  const jobSeverityRows = (job) =>
+    moduleLevels
+      .map((level) => ({ level, count: Number(job?.severity_totals?.[level] || 0) }))
+      .filter((entry) => entry.count > 0);
 
   // ── Snapshot checkbox derivations ────────────────────────────────────────
   const batchCohortForTag = $derived(batchFromTag ? tagCohortByName.get(batchFromTag) : null);
@@ -673,10 +681,28 @@ example.org`}
             <div class="small">{$t("no_batch_jobs")}</div>
           {:else}
             {#each selectedBatch.items as item (item.id)}
-              <div class="list-item">
+              <div
+                class="list-item clickable"
+                onclick={() => onNavigateJob(item.id)}
+                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onNavigateJob(item.id); } }}
+                role="button"
+                tabindex="0"
+              >
                 <div class="list-item-main">
-                  <div class="mono">{item.id}</div>
-                  <div class="small">{item.domain} - {item.status}</div>
+                  <div class="job-headline">
+                    <span class="mono job-id-link">{item.id}</span>
+                    <span class="small">{item.domain} - {item.status}</span>
+                    {#if jobSeverityRows(item).length}
+                      {#each jobSeverityRows(item) as entry (entry.level)}
+                        <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
+                      {/each}
+                    {:else if item.severity_totals !== undefined}
+                      <span class="level-pill severity-info">INFO</span>
+                    {/if}
+                    {#if scoringEnabled && hasScore(item)}
+                      <GradeChip grade={chipGrade(item)} score={chipScore(item)} />
+                    {/if}
+                  </div>
                   {#if jobProfileName(item)}
                     <div class="small">{$t("job_profile_label")}: <span class="mono">{jobProfileName(item)}</span></div>
                   {/if}
@@ -685,7 +711,6 @@ example.org`}
                     <span class="progress-value">{progressPercent(item)}%</span>
                   </div>
                 </div>
-                <button class="ghost" type="button" onclick={() => onNavigateJob(item.id)}>{$t("inspect")}</button>
               </div>
             {/each}
           {/if}

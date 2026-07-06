@@ -4,6 +4,7 @@
   import { progressPercent, hasRunningOrQueuedJobs } from "../lib/jobUtils.js";
   import { hasScore, chipGrade, chipScore, moduleLevels } from "../lib/result.js";
   import { normalizePageSize, normalizeCursor } from "../lib/persistence.js";
+  import GradeChip from "../components/GradeChip.svelte";
 
   let {
     apiFetch,
@@ -254,10 +255,7 @@
                 <span class="level-pill severity-info">INFO</span>
               {/if}
               {#if scoringEnabled && hasScore(job)}
-                <span class="grade-chip">
-                  <span class="grade-chip-letter" data-grade={chipGrade(job)}>{chipGrade(job)}</span>
-                  <span class="grade-chip-score">{chipScore(job)}</span>
-                </span>
+                <GradeChip grade={chipGrade(job)} score={chipScore(job)} />
               {/if}
             </div>
             {#if job.batch_id}

@@ -655,6 +655,7 @@
   "profile_library_mark_all_reviewed": "Marcar todos como revisados",
   "col_score": "Puntuación",
   "pub.score_aplus_criteria": "Criterios A+",
+  "pub.score_label": "DNS Quality Score",
   "pub.score_aplus_achieved": "Conseguido",
   "pub.score_aplus_missing": "{n} incumplido(s)",
   "pub.score_bonus_dnssec_enabled": "DNSSEC habilitado",

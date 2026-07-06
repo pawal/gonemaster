@@ -655,6 +655,7 @@
   "profile_library_mark_all_reviewed": "すべて確認済みとしてマーク",
   "col_score": "スコア",
   "pub.score_aplus_criteria": "A+の基準",
+  "pub.score_label": "DNS Quality Score",
   "pub.score_aplus_achieved": "達成",
   "pub.score_aplus_missing": "{n}件未達",
   "pub.score_bonus_dnssec_enabled": "DNSSEC有効",

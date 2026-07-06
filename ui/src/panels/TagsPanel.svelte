@@ -11,6 +11,7 @@
     compareTimestamp,
     compareSeverity,
   } from "../lib/sort.js";
+  import GradeChip from "../components/GradeChip.svelte";
 
   let {
     apiFetch,
@@ -594,7 +595,7 @@
             >
               <td class="mono">{d.name}</td>
               <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
-              {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}-{/if}</td>{/if}
+              {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<GradeChip grade={d.latest_grade} score={d.latest_score} />{:else}-{/if}</td>{/if}
               <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "-"}</td>
             </tr>
           {/each}

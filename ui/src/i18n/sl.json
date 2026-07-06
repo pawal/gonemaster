@@ -655,6 +655,7 @@
   "profile_library_mark_all_reviewed": "Označi vse kot pregledano",
   "col_score": "Ocena",
   "pub.score_aplus_criteria": "Merila A+",
+  "pub.score_label": "DNS Quality Score",
   "pub.score_aplus_achieved": "Doseženo",
   "pub.score_aplus_missing": "{n} neizpolnjeno",
   "pub.score_bonus_dnssec_enabled": "DNSSEC omogočen",

@@ -655,6 +655,7 @@
   "profile_library_mark_all_reviewed": "Markera alla som granskade",
   "col_score": "Betyg",
   "pub.score_aplus_criteria": "A+-kriterier",
+  "pub.score_label": "DNS Quality Score",
   "pub.score_aplus_achieved": "Uppnått",
   "pub.score_aplus_missing": "{n} saknas",
   "pub.score_bonus_dnssec_enabled": "DNSSEC aktiverat",

@@ -715,6 +715,7 @@
   "result_status_error": "Fehler gefunden",
   "result_status_critical": "Kritische Probleme gefunden",
   "pub.score_aplus_criteria": "A+-Kriterien",
+  "pub.score_label": "DNS-Qualitätsbewertung",
   "pub.score_aplus_achieved": "Erreicht",
   "pub.score_aplus_missing": "{n} nicht erfüllt",
   "pub.score_bonus_dnssec_enabled": "DNSSEC aktiviert",

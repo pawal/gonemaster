@@ -715,6 +715,7 @@
   "result_status_error": "Fouten gevonden",
   "result_status_critical": "Kritieke problemen gevonden",
   "pub.score_aplus_criteria": "A+-criteria",
+  "pub.score_label": "DNS-kwaliteitsscore",
   "pub.score_aplus_achieved": "Behaald",
   "pub.score_aplus_missing": "{n} niet voldaan",
   "pub.score_bonus_dnssec_enabled": "DNSSEC ingeschakeld",

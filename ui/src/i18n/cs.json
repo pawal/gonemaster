@@ -715,6 +715,7 @@
   "result_status_error": "Nalezeny chyby",
   "result_status_critical": "Nalezeny kritické problémy",
   "pub.score_aplus_criteria": "Kritéria pro A+",
+  "pub.score_label": "Skóre kvality DNS",
   "pub.score_aplus_achieved": "Splněno",
   "pub.score_aplus_missing": "{n} nesplněno",
   "pub.score_bonus_dnssec_enabled": "DNSSEC zapnuto",

@@ -2,16 +2,7 @@
   import { t } from "../i18n.js";
   import { formatTimestampLocal, prettyProfileJSON, formatJobTotalRuntime as formatJobTotalRuntimeRaw } from "../lib/format.js";
   import { progressPercent, isResultReadyStatus, isActiveJobStatus } from "../lib/jobUtils.js";
-  import {
-    CAT_ORDER,
-    CAT_LABELS,
-    BONUS_HIDDEN,
-    hasScore,
-    chipGrade,
-    chipScore,
-    resultScore,
-  } from "../lib/result.js";
-  import RunResultBody from "./RunResultBody.svelte";
+  import RunResultView from "./RunResultView.svelte";
 
   let {
     selectedJobId = $bindable(""),
@@ -84,42 +75,6 @@
         <strong>{selectedRun.entry_count ?? 0}</strong>
         <span>{$t("col_worst_level")}</span>
         <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "-"}</span></strong>
-        {#if scoringEnabled && hasScore(selectedRun)}
-          {@const rs = resultScore(selectedJobResult)}
-          <span>{$t("col_score")}</span>
-          <strong>
-            <span class="grade-chip-wrap">
-              <span class="grade-chip">
-                <span class="grade-chip-letter" data-grade={chipGrade(selectedRun)}>{chipGrade(selectedRun)}</span>
-                <span class="grade-chip-score">{chipScore(selectedRun)}/100</span>
-              </span>
-              {#if rs}
-                <span class="grade-chip-tooltip">
-                  {#each CAT_ORDER.filter(c => c in (rs.categories ?? {})) as cat}
-                    <div class="grade-tip-row">
-                      <span class="grade-tip-cat">{CAT_LABELS[cat]}</span>
-                      <span class="grade-tip-score">{rs.categories[cat].tested === false ? "-" : rs.categories[cat].score}</span>
-                    </div>
-                  {/each}
-                  {#if rs.bonus?.criteria}
-                    {@const bonusCriteria = Object.entries(rs.bonus.criteria).filter(([k]) => !BONUS_HIDDEN.has(k))}
-                    {#if bonusCriteria.length}
-                      <hr class="grade-tip-divider">
-                      <div class="grade-tip-bonus">
-                        {#each bonusCriteria as [key, val]}
-                          <div class="grade-tip-criterion">
-                            <span class="grade-tip-icon {val === true ? 'met' : val === false ? 'unmet' : ''}">{val === true ? '✓' : val === false ? '✗' : '–'}</span>
-                            <span>{$t(`pub.score_bonus_${key}`)}</span>
-                          </div>
-                        {/each}
-                      </div>
-                    {/if}
-                  {/if}
-                </span>
-              {/if}
-            </span>
-          </strong>
-        {/if}
       {/if}
     </div>
     {#if selectedJob.error}
@@ -134,7 +89,7 @@
   {/if}
   {#if selectedJobResult}
     <div class="stack">
-      <RunResultBody result={selectedJobResult} {nameserverTimingsEnabled} />
+      <RunResultView result={selectedJobResult} {scoringEnabled} {nameserverTimingsEnabled} />
     </div>
   {/if}
   {#if selectedJob && !selectedJobResult && isResultReadyStatus(selectedJob.status)}

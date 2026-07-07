@@ -2,6 +2,10 @@
   import { onMount, onDestroy } from "svelte";
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
+  import { formatTimestampLocal } from "../lib/format.js";
+  import { href, navigate } from "../lib/router.svelte.js";
+  import InlineNotice from "../components/InlineNotice.svelte";
+  import ConfirmDialog from "../components/ConfirmDialog.svelte";
 
   let { apiBase = "/api/v1", onDeleteBatch = null, refreshSignal = 0 } = $props();
 
@@ -10,6 +14,39 @@
   let cohorts = $state([]);
   let noticeMessage = $state("");
   let noticeTone = $state("");
+  let confirmState = $state(null);
+
+  const confirmProps = $derived.by(() => {
+    const s = confirmState;
+    if (!s) return null;
+    if (s.kind === "delete-cohort") {
+      return {
+        title: $t("analysis_cohorts_delete_confirm", { tag: s.cohort.source_tag }),
+        confirmLabel: $t("analysis_cohorts_delete"),
+      };
+    }
+    if (s.kind === "retire-snapshot") {
+      return {
+        title: $t("analysis_snapshots_retire_confirm", { slug: s.snap.slug }),
+        confirmLabel: $t("analysis_snapshots_retire"),
+      };
+    }
+    return {
+      title: $t("analysis_snapshots_purge_confirm", { slug: s.snap.slug }),
+      confirmLabel: $t("analysis_snapshots_purge"),
+      confirmPhrase: s.snap.slug,
+      phrasePrompt: $t("batch_delete_typed_confirm_label", { id: s.snap.slug }),
+    };
+  });
+
+  const runConfirm = async () => {
+    const s = confirmState;
+    confirmState = null;
+    if (!s) return;
+    if (s.kind === "delete-cohort") await performDeleteCohort(s.cohort);
+    else if (s.kind === "retire-snapshot") await performRetireSnapshot(s.cohort, s.snap);
+    else if (s.kind === "purge-snapshot") await performPurgeSnapshot(s.cohort, s.snap);
+  };
   let busyCohortId = $state(null);
   let creating = $state(false);
   let draft = $state(emptyDraft());
@@ -212,11 +249,9 @@
     }
   }
 
-  async function deleteCohort(cohort) {
-    if (typeof window !== "undefined" &&
-        !window.confirm($t("analysis_cohorts_delete_confirm", { tag: cohort.source_tag }))) {
-      return;
-    }
+  const deleteCohort = (cohort) => { confirmState = { kind: "delete-cohort", cohort }; };
+
+  async function performDeleteCohort(cohort) {
     busyCohortId = cohort.id;
     try {
       await apiFetch(`/analysis/cohorts/${cohort.id}`, { method: "DELETE" });
@@ -425,11 +460,10 @@
   const setSnapshotDefault = (cohort, snap) =>
     patchSnapshot(cohort, snap, { is_default: true }, "analysis_snapshots_default_set");
 
-  const retireSnapshot = async (cohort, snap) => {
-    if (typeof window !== "undefined" &&
-        !window.confirm($t("analysis_snapshots_retire_confirm", { slug: snap.slug }))) return;
-    await patchSnapshot(cohort, snap, { status: "retired", is_public: false }, "analysis_snapshots_retired");
-  };
+  const retireSnapshot = (cohort, snap) => { confirmState = { kind: "retire-snapshot", cohort, snap }; };
+
+  const performRetireSnapshot = (cohort, snap) =>
+    patchSnapshot(cohort, snap, { status: "retired", is_public: false }, "analysis_snapshots_retired");
 
   const restoreSnapshot = (cohort, snap) =>
     patchSnapshot(cohort, snap, { status: "captured", is_public: true }, "analysis_snapshots_restored");
@@ -451,9 +485,9 @@
     }
   }
 
-  async function purgeSnapshot(cohort, snap) {
-    if (typeof window !== "undefined" &&
-        !window.confirm($t("analysis_snapshots_purge_confirm", { slug: snap.slug }))) return;
+  const purgeSnapshot = (cohort, snap) => { confirmState = { kind: "purge-snapshot", cohort, snap }; };
+
+  async function performPurgeSnapshot(cohort, snap) {
     const key = snapshotKey(cohort.id, snap.slug);
     busySnapshotKey = key;
     try {
@@ -551,9 +585,8 @@
   function formatTimestamp(value) {
     if (!value) return "";
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "";
-    if (parsed.getUTCFullYear() <= 1) return "";
-    return parsed.toLocaleString("sv-SE");
+    if (Number.isNaN(parsed.getTime()) || parsed.getUTCFullYear() <= 1) return "";
+    return formatTimestampLocal(value);
   }
 
   function formatSnapshotCapturedAt(snap) {
@@ -643,7 +676,7 @@
 <div class="small subtitle">{$t("analysis_cohorts_subtitle")}</div>
 
 {#if !backendStatus.backend_supported}
-  <div class="notice notice-warn" role="alert">
+  <div class="inline-notice inline-notice-warn" role="alert">
     <strong>{$t("analysis_cohorts_backend_warning_title")}</strong>
     <div class="small notice-detail">
       {backendStatus.unsupported_message || $t("analysis_cohorts_backend_warning_body")}
@@ -651,11 +684,7 @@
   </div>
 {/if}
 
-{#if noticeMessage}
-  <div class={`notice notice-${noticeTone === "ok" ? "ok" : "warn"}`} role="status" aria-live="polite">
-    {noticeMessage}
-  </div>
-{/if}
+<InlineNotice message={noticeMessage} tone={noticeTone} />
 
 {#if loading}
   <p class="small">{$t("analysis_cohorts_loading")}</p>
@@ -797,7 +826,7 @@
                       <p class="small">{$t("analysis_snapshots_empty")}</p>
                     {:else}
                       {#if mixed}
-                        <div class="notice notice-warn" role="alert">
+                        <div class="inline-notice inline-notice-warn" role="alert">
                           {$t("analysis_snapshots_mixed_profile_banner")}
                         </div>
                       {/if}
@@ -832,7 +861,12 @@
                               <td>{snap.run_count} / {snap.domain_count}</td>
                               <td>
                                 {#if snap.batch_id}
-                                  <span class="mono source-batch-id" title={snap.batch_id}>{shortID(snap.batch_id)}</span>
+                                  <a
+                                    class="mono source-batch-id"
+                                    href={href("batches", { batchId: snap.batch_id })}
+                                    title={snap.batch_id}
+                                    onclick={(e) => { e.preventDefault(); navigate("batches", { batchId: snap.batch_id }); }}
+                                  >{shortID(snap.batch_id)}</a>
                                 {:else}
                                   <span class="muted">-</span>
                                 {/if}
@@ -992,7 +1026,7 @@
                 />
                 <span class="mono">{b.id}</span>
                 <span class="muted small">
-                  {b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : ""}
+                  {b.created_at ? formatTimestampLocal(b.created_at) : ""}
                   {b.snapshot_intent ? `(${$t("batch_snapshot_intent_pill")})` : ""}
                 </span>
               </label>
@@ -1017,6 +1051,16 @@
     </div>
   </section>
 {/if}
+
+<ConfirmDialog
+  open={confirmState !== null}
+  title={confirmProps?.title ?? ""}
+  confirmLabel={confirmProps?.confirmLabel ?? ""}
+  confirmPhrase={confirmProps?.confirmPhrase ?? ""}
+  phrasePrompt={confirmProps?.phrasePrompt ?? ""}
+  onConfirm={runConfirm}
+  onCancel={() => (confirmState = null)}
+/>
 
 <style>
   .subtitle { margin-bottom: 12px; }
@@ -1131,18 +1175,18 @@
   }
 
   .badge-status-ok {
-    background: #d6f1d0;
-    color: #1e5b1e;
+    background: rgba(22, 163, 74, 0.16);
+    color: #16a34a;
   }
 
   .badge-status-warn {
-    background: #fee2e2;
-    color: #991b1b;
+    background: rgba(220, 38, 38, 0.16);
+    color: #dc2626;
   }
 
   .badge-status-neutral {
     background: var(--surface-2);
-    color: var(--ink-2);
+    color: var(--on-surface-2);
   }
 
   .materialization-main {

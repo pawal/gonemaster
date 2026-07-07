@@ -264,19 +264,19 @@ describe("AnalysisCohorts", () => {
   });
 
   it("deletes a cohort after confirming and removes it from the table", async () => {
-    global.confirm = vi.fn(() => true);
     const handles = installFetch();
     render(AnalysisCohorts);
 
     await screen.findByText("gov");
     const govRow = screen.getByText("gov").closest("tr");
-    const deleteButton = within(govRow).getByRole("button", { name: /^Delete$/ });
-    await fireEvent.click(deleteButton);
+    await fireEvent.click(within(govRow).getByRole("button", { name: /^Delete$/ }));
+
+    const dialog = await screen.findByRole("dialog");
+    await fireEvent.click(within(dialog).getByRole("button", { name: /^Delete$/ }));
 
     await waitFor(() => {
       expect(screen.queryByText("gov")).toBeNull();
     });
-    expect(global.confirm).toHaveBeenCalled();
     expect(handles.getCohorts().some((c) => c.source_tag === "gov")).toBe(false);
   });
 
@@ -437,8 +437,26 @@ describe("AnalysisCohorts", () => {
     });
   });
 
+  it("links a snapshot's source batch to the batches route", async () => {
+    const snapshotsByCohort = {
+      1: [{
+        id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
+        profile_name: "strict", run_count: 3, domain_count: 3, batch_id: "batch_src",
+        status: "captured", is_public: true, is_default: false
+      }],
+    };
+    installSnapshotFetch({ snapshotsByCohort });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+
+    const link = await screen.findByText("batch_src");
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("#/batches/batch_src");
+  });
+
   it("retires a snapshot via POST status=retired after confirming", async () => {
-    global.confirm = vi.fn(() => true);
     const snapshotsByCohort = {
       1: [{
         id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
@@ -453,12 +471,14 @@ describe("AnalysisCohorts", () => {
     await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
     await fireEvent.click(await screen.findByRole("button", { name: /^Retire$/i }));
 
+    const dialog = await screen.findByRole("dialog");
+    await fireEvent.click(within(dialog).getByRole("button", { name: /^Retire$/i }));
+
     await waitFor(() => expect(handles.snapshotPatches).toHaveLength(1));
     expect(handles.snapshotPatches[0].body).toEqual({ status: "retired", is_public: false });
   });
 
   it("purges a snapshot via DELETE?purge=true after confirming", async () => {
-    global.confirm = vi.fn(() => true);
     const snapshotsByCohort = {
       1: [{
         id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
@@ -472,6 +492,11 @@ describe("AnalysisCohorts", () => {
     const tldRow = (await screen.findByText("tld")).closest("tr");
     await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
     await fireEvent.click(await screen.findByRole("button", { name: /^Purge snapshot$/i }));
+
+    // Purge is irreversible: the dialog requires typing the snapshot slug.
+    const dialog = await screen.findByRole("dialog");
+    await fireEvent.input(within(dialog).getByRole("textbox"), { target: { value: "2026-04-20" } });
+    await fireEvent.click(within(dialog).getByRole("button", { name: /^Purge snapshot$/i }));
 
     await waitFor(() => expect(handles.snapshotDeletes).toHaveLength(1));
     expect(handles.snapshotDeletes[0]).toEqual({ id: 1, slug: "2026-04-20", purge: true });

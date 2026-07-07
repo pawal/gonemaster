@@ -211,12 +211,6 @@
       const params = batchQueryParams();
       const batch = await apiFetch(`/batches/${batchId}?${params.toString()}`);
       selectedBatch = batch;
-      if (batch?.tag) {
-        const idx = recentBatchOptions.findIndex((o) => o.id === batchId);
-        if (idx >= 0 && !recentBatchOptions[idx].tag) {
-          recentBatchOptions = recentBatchOptions.map((o, i) => i === idx ? { ...o, tag: batch.tag } : o);
-        }
-      }
       if (autoRefreshBatch && !hasActiveBatchJobs(batch)) {
         autoRefreshBatch = false;
       }

@@ -249,7 +249,21 @@ header {
   cursor: pointer;
 }
 
-.theme-toggle:hover:not(:disabled) {
+.shortcuts-hint-btn {
+  flex-shrink: 0;
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--muted);
+  box-shadow: none;
+  padding: 6px 11px;
+  font-size: 1rem;
+  line-height: 1;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.theme-toggle:hover:not(:disabled),
+.shortcuts-hint-btn:hover:not(:disabled) {
   transform: none;
   box-shadow: none;
   background: var(--surface);

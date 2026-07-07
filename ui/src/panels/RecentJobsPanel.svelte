@@ -149,6 +149,7 @@
       <label for="recent-domain-filter">{$t("domain_contains_label")}</label>
       <input
         id="recent-domain-filter"
+        data-shortcut-filter
         type="text"
         placeholder="example.com"
         bind:value={recentDomainFilter}
@@ -220,7 +221,7 @@
       <div class="small">{severityFilter === "all" ? $t("no_jobs") : $t("no_jobs_severity")}</div>
     {:else}
       {#each jobs as job (job.id)}
-        <div class="list-item clickable" onclick={() => onNavigateJob(job.id)} onkeydown={(e) => {
+        <div class="list-item clickable" data-shortcut-row onclick={() => onNavigateJob(job.id)} onkeydown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             onNavigateJob(job.id);

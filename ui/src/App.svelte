@@ -1,6 +1,7 @@
 <script>
-  import { onMount, untrack } from "svelte";
+  import { onMount, untrack, tick } from "svelte";
   import { t, locale, loadCatalog } from "./i18n.js";
+  import { resolveShortcut } from "./lib/shortcuts.js";
   import { router, navigate, syncFromLocation, canonicalize } from "./lib/router.svelte.js";
   import { dirtyGuard } from "./lib/dirty.svelte.js";
   import { apiCall } from "./lib/api.js";
@@ -34,6 +35,7 @@
   import { initThemeFromStorage } from "./lib/theme.svelte.js";
   import { auth, refreshWhoami, markUnauthenticated, logout } from "./lib/auth.svelte.js";
   import LoginPanel from "./components/LoginPanel.svelte";
+  import ShortcutsHelp from "./components/ShortcutsHelp.svelte";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -270,6 +272,54 @@
   };
   const goToDomainDetail = () => navigate("domains");
   const goToTagList = () => navigate("tags");
+
+  // Keyboard shortcuts; pendingG/gTimer are non-reactive on purpose.
+  let helpOpen = $state(false);
+  let pendingG = false;
+  let gTimer = null;
+
+  const clearG = () => {
+    pendingG = false;
+    if (gTimer) { clearTimeout(gTimer); gTimer = null; }
+  };
+  const armG = () => {
+    pendingG = true;
+    if (gTimer) clearTimeout(gTimer);
+    gTimer = setTimeout(() => { pendingG = false; gTimer = null; }, 1200);
+  };
+
+  const focusFilter = () => {
+    document.querySelector("[data-shortcut-filter]")?.focus();
+  };
+
+  const moveRow = (dir) => {
+    const rows = Array.from(document.querySelectorAll("[data-shortcut-row]"));
+    if (rows.length === 0) return;
+    const idx = rows.indexOf(document.activeElement);
+    const next = idx === -1 ? (dir > 0 ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, idx + dir));
+    rows[next]?.focus();
+  };
+
+  const handleShortcut = (event) => {
+    // An open modal owns the keyboard; it closes itself on Esc.
+    if (!helpOpen && document.querySelector('[aria-modal="true"]')) return;
+    const action = resolveShortcut(event, { pendingG, overlayOpen: helpOpen });
+    switch (action.type) {
+      case "help-toggle": event.preventDefault(); helpOpen = !helpOpen; break;
+      case "close": event.preventDefault(); helpOpen = false; break;
+      case "set-g": event.preventDefault(); armG(); break;
+      case "clear-g": clearG(); break;
+      case "navigate": event.preventDefault(); clearG(); setTab(action.tab); break;
+      case "new-scan":
+        event.preventDefault();
+        setTab("single");
+        tick().then(() => document.getElementById("single-domain")?.focus());
+        break;
+      case "focus-filter": event.preventDefault(); focusFilter(); break;
+      case "row-next": event.preventDefault(); moveRow(1); break;
+      case "row-prev": event.preventDefault(); moveRow(-1); break;
+    }
+  };
 
 
   const loadJob = async (jobId = selectedJobId, options = {}) => {
@@ -657,6 +707,7 @@
     persistenceReady = true;
     window.addEventListener("hashchange", syncFromLocation);
     window.addEventListener("popstate", syncFromLocation);
+    window.addEventListener("keydown", handleShortcut);
   };
 
   let initialAnimationDone = $state(false);
@@ -674,8 +725,10 @@
       if (jobPoller) clearInterval(jobPoller);
       if (batchWatchPoller) clearInterval(batchWatchPoller);
       if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
+      if (gTimer) clearTimeout(gTimer);
       window.removeEventListener("hashchange", syncFromLocation);
       window.removeEventListener("popstate", syncFromLocation);
+      window.removeEventListener("keydown", handleShortcut);
     };
   });
 </script>
@@ -707,6 +760,13 @@
         </select>
       {/if}
       <ThemeToggle />
+      <button
+        type="button"
+        class="shortcuts-hint-btn"
+        onclick={() => (helpOpen = true)}
+        title={$t("shortcuts_open_hint")}
+        aria-label={$t("shortcuts_open_hint")}
+      >?</button>
       {#if auth.mode === "token"}
         <button type="button" class="logout-btn" onclick={doLogout}>{$t("auth_logout")}</button>
       {/if}
@@ -899,6 +959,8 @@
   onDeleted={handleBatchDeleted}
   setStatus={setStatus}
 />
+
+<ShortcutsHelp open={helpOpen} onClose={() => (helpOpen = false)} />
 
 {/if}
 

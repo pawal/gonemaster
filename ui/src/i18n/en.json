@@ -443,6 +443,7 @@
   "refresh": "Refresh",
   "retry": "Retry",
   "loading": "Loading...",
+  "settings_discard_confirm": "You have unsaved changes. Discard them?",
   "enabled": "Enabled",
   "disabled": "Disabled",
   "time_never": "never",

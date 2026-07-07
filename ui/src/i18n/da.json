@@ -50,6 +50,7 @@
   "refresh": "Opdater",
   "retry": "Prøv igen",
   "loading": "Indlæser...",
+  "settings_discard_confirm": "Du har ugemte ændringer. Kassér dem?",
   "enabled": "Aktiveret",
   "disabled": "Deaktiveret",
   "time_never": "aldrig",

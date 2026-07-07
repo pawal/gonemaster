@@ -50,6 +50,7 @@
   "refresh": "Uppdatera",
   "retry": "Försök igen",
   "loading": "Laddar...",
+  "settings_discard_confirm": "Du har osparade ändringar. Vill du kasta dem?",
   "enabled": "Aktiverad",
   "disabled": "Inaktiverad",
   "time_never": "aldrig",

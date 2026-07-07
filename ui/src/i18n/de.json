@@ -443,6 +443,7 @@
   "refresh": "Aktualisieren",
   "retry": "Wiederholen",
   "loading": "Wird geladen...",
+  "settings_discard_confirm": "Sie haben ungespeicherte Änderungen. Verwerfen?",
   "enabled": "Aktiviert",
   "disabled": "Deaktiviert",
   "time_never": "nie",

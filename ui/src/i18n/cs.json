@@ -443,6 +443,7 @@
   "refresh": "Obnovit",
   "retry": "Zkusit znovu",
   "loading": "Načítání...",
+  "settings_discard_confirm": "Máte neuložené změny. Zahodit je?",
   "enabled": "Povoleno",
   "disabled": "Zakázáno",
   "time_never": "nikdy",

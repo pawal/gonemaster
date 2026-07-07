@@ -50,6 +50,7 @@
   "refresh": "Päivitä",
   "retry": "Yritä uudelleen",
   "loading": "Ladataan...",
+  "settings_discard_confirm": "Sinulla on tallentamattomia muutoksia. Hylätäänkö ne?",
   "enabled": "Käytössä",
   "disabled": "Ei käytössä",
   "time_never": "ei koskaan",

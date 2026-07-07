@@ -1,7 +1,8 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
+  import { dirtyGuard } from "../lib/dirty.svelte.js";
   import InlineNotice from "../components/InlineNotice.svelte";
 
   let { apiBase = "/api/v1" } = $props();
@@ -99,6 +100,9 @@
       )
     )
   );
+
+  $effect(() => { dirtyGuard.register(hasChanges, $t("settings_discard_confirm")); });
+  onDestroy(() => dirtyGuard.clear());
 
   // Default entries absent from the current config (matched case-insensitively).
   let missingDefaults = $derived.by(() => {

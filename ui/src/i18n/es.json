@@ -50,6 +50,7 @@
   "refresh": "Actualizar",
   "retry": "Reintentar",
   "loading": "Cargando...",
+  "settings_discard_confirm": "Tiene cambios sin guardar. ¿Descartarlos?",
   "enabled": "Activado",
   "disabled": "Desactivado",
   "time_never": "nunca",

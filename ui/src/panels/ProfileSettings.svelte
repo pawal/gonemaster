@@ -1,8 +1,9 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
   import { formatTimestampLocal } from "../lib/format.js";
+  import { dirtyGuard } from "../lib/dirty.svelte.js";
   import InlineNotice from "../components/InlineNotice.svelte";
   import ConfirmDialog from "../components/ConfirmDialog.svelte";
 
@@ -342,6 +343,9 @@
           : $t("profile_created"),
         "ok"
       );
+      // The draft is persisted now; mark the editor clean so the re-select
+      // and the unsaved-changes guard don't prompt to discard.
+      workspace = { ...workspace, savedRawSignature: rawDraftSignature(draft), savedSignature: normalized.signature };
       await loadProfiles({ selectKey: `profile:${saved.id}`, preserveNotice: true });
       if (workspace.type === "edit") {
         await loadCompatibility(saved.id);
@@ -414,6 +418,9 @@
     ? rawDraftSignature(draft) !== String(workspace.savedRawSignature || "")
     : false);
   let canSave = $derived(isEditableWorkspace && hasDirtyChanges && !draftValidation.error && !saving);
+
+  $effect(() => { dirtyGuard.register(hasDirtyChanges, $t("settings_discard_confirm")); });
+  onDestroy(() => dirtyGuard.clear());
 
   onMount(() => {
     loadProfiles();

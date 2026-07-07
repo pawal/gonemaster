@@ -443,6 +443,7 @@
   "refresh": "Vernieuwen",
   "retry": "Opnieuw proberen",
   "loading": "Laden...",
+  "settings_discard_confirm": "Je hebt niet-opgeslagen wijzigingen. Weggooien?",
   "enabled": "Ingeschakeld",
   "disabled": "Uitgeschakeld",
   "time_never": "nooit",

@@ -2,6 +2,7 @@
   import { onMount, untrack } from "svelte";
   import { t, locale, loadCatalog } from "./i18n.js";
   import { router, navigate, syncFromLocation, canonicalize } from "./lib/router.svelte.js";
+  import { dirtyGuard } from "./lib/dirty.svelte.js";
   import { apiCall } from "./lib/api.js";
   import {
     isResultReadyStatus,
@@ -256,8 +257,8 @@
     }
   };
 
-  const setTab = (tab) => navigate(tab);
-  const setSettingsSubTab = (subTab) => navigate("settings", { settingsSub: subTab });
+  const setTab = (tab) => { if (!dirtyGuard.confirmLeave()) return; navigate(tab); };
+  const setSettingsSubTab = (subTab) => { if (!dirtyGuard.confirmLeave()) return; navigate("settings", { settingsSub: subTab }); };
   const navigateToJob = (jobId) => {
     if (!jobId) return;
     if (status.message) clearStatus();

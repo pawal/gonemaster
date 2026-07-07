@@ -50,6 +50,7 @@
   "refresh": "更新",
   "retry": "再試行",
   "loading": "読み込み中...",
+  "settings_discard_confirm": "保存されていない変更があります。破棄しますか?",
   "enabled": "有効",
   "disabled": "無効",
   "time_never": "なし",

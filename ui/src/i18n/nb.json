@@ -50,6 +50,7 @@
   "refresh": "Oppdater",
   "retry": "Prøv igjen",
   "loading": "Laster...",
+  "settings_discard_confirm": "Du har ulagrede endringer. Forkaste dem?",
   "enabled": "Aktivert",
   "disabled": "Deaktivert",
   "time_never": "aldri",

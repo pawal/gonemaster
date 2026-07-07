@@ -50,6 +50,7 @@
   "refresh": "Osveži",
   "retry": "Poskusi znova",
   "loading": "Nalaganje...",
+  "settings_discard_confirm": "Imate neshranjene spremembe. Jih zavržete?",
   "enabled": "Omogočeno",
   "disabled": "Onemogočeno",
   "time_never": "nikoli",

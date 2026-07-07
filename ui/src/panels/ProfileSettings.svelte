@@ -3,6 +3,7 @@
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
   import { formatTimestampLocal } from "../lib/format.js";
+  import InlineNotice from "../components/InlineNotice.svelte";
 
   let { apiBase = "/api/v1", onprofileschanged } = $props();
 
@@ -421,11 +422,7 @@
     </div>
   </div>
 
-  {#if noticeMessage}
-    <div class={`inline-notice inline-notice-${noticeTone === "ok" ? "ok" : "warn"}`} role="status" aria-live="polite">
-      {noticeMessage}
-    </div>
-  {/if}
+  <InlineNotice message={noticeMessage} tone={noticeTone} />
 
   <div class="profile-layout">
     <aside class="profile-library">
@@ -743,25 +740,6 @@
   .workspace-empty p {
     margin: 4px 0 0;
     color: var(--muted);
-  }
-
-  .inline-notice {
-    border: 1px solid transparent;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 0.85rem;
-  }
-
-  .inline-notice-ok {
-    background: #e7f8ee;
-    border-color: #a7f3d0;
-    color: #065f46;
-  }
-
-  .inline-notice-warn {
-    background: #fef3c7;
-    border-color: #fcd34d;
-    color: #92400e;
   }
 
   .profile-layout {

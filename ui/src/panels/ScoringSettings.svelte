@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
+  import InlineNotice from "../components/InlineNotice.svelte";
 
   let { apiBase = "/api/v1" } = $props();
 
@@ -239,14 +240,10 @@
 <h2>{$t("settings_scoring_heading")}</h2>
 
 {#if readonly}
-  <div class="notice notice-warn" role="alert">{$t("scoring_config_readonly_notice")}</div>
+  <div class="inline-notice inline-notice-warn" role="alert">{$t("scoring_config_readonly_notice")}</div>
 {/if}
 
-{#if noticeMessage}
-  <div class={`notice notice-${noticeTone === "ok" ? "ok" : "warn"}`} role="status" aria-live="polite">
-    {noticeMessage}
-  </div>
-{/if}
+<InlineNotice message={noticeMessage} tone={noticeTone} />
 
 {#if loading}
   <p>{$t("scoring_config_loading")}</p>
@@ -692,20 +689,6 @@
   .import-actions {
     display: flex;
     gap: 8px;
-  }
-  .notice {
-    padding: 8px 12px;
-    border-radius: 4px;
-    margin-bottom: 12px;
-    font-size: 0.9em;
-  }
-  .notice-ok {
-    background: var(--notice-ok-bg, #e8f5e9);
-    color: var(--notice-ok-color, #2e7d32);
-  }
-  .notice-warn {
-    background: var(--notice-warn-bg, #fff3e0);
-    color: var(--notice-warn-color, #e65100);
   }
   .error {
     color: var(--error-color, #c62828);

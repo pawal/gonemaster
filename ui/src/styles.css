@@ -1143,6 +1143,25 @@ button.link-button:hover:not(:disabled) {
   font-weight: 500;
 }
 
+/* Inline form notices: subtle tint + tone-colored left border, readable in
+   both themes (text uses --ink, background is a translucent tint). */
+.inline-notice {
+  padding: 8px 12px;
+  border-radius: 6px;
+  margin-bottom: 12px;
+  font-size: 0.9em;
+  color: var(--ink);
+  border-left: 3px solid transparent;
+}
+.inline-notice-ok {
+  background: rgba(22, 163, 74, 0.12);
+  border-left-color: #16a34a;
+}
+.inline-notice-warn {
+  background: rgba(202, 138, 4, 0.16);
+  border-left-color: #ca8a04;
+}
+
 /* Row and identifier links read as row text; underline only on hover. */
 .data-table td a,
 .kv a,

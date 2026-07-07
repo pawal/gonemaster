@@ -16,7 +16,7 @@
   let {
     apiFetch,
     setStatus = () => {},
-    ensureNotificationPermission = () => Promise.resolve("denied"),
+    onWatchBatch = () => {},
     scoringEnabled = false,
     routeBatchId = null,
     onOpenBatch = () => {},
@@ -65,7 +65,6 @@
   let queuePaused = $state(false);
   let queuePauseToggling = $state(false);
 
-  let notifyOnBatchComplete = false;
   let lastBatchDeletedCounter;
 
   const formatBatchStatusCounts = (statusCounts) => formatBatchStatusCountsRaw(statusCounts, normalizeStatus);
@@ -174,8 +173,7 @@
       });
       createdBatchId = response.batch_id;
       autoRefreshBatch = true;
-      notifyOnBatchComplete = true;
-      ensureNotificationPermission();
+      onWatchBatch(response.batch_id);
       setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
       onOpenBatch(response.batch_id);
     } catch (error) {
@@ -218,10 +216,6 @@
         if (idx >= 0 && !recentBatchOptions[idx].tag) {
           recentBatchOptions = recentBatchOptions.map((o, i) => i === idx ? { ...o, tag: batch.tag } : o);
         }
-      }
-      if (notifyOnBatchComplete && !hasActiveBatchJobs(batch)) {
-        notifyOnBatchComplete = false;
-        sendBatchNotification(batch);
       }
       if (autoRefreshBatch && !hasActiveBatchJobs(batch)) {
         autoRefreshBatch = false;
@@ -278,18 +272,6 @@
     const parsed = Number(cursor);
     batchCursor = Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
     await loadBatch(selectedBatchId);
-  }
-
-  async function sendBatchNotification(batch) {
-    const permission = await ensureNotificationPermission();
-    if (permission !== "granted") return;
-    const title = $t("notify_batch_done_title");
-    const body = $t("notify_batch_done_body", { id: batch.batch_id });
-    try {
-      new Notification(title, { body });
-    } catch (err) {
-      console.warn("[notify] Notification constructor failed:", err);
-    }
   }
 
   // Reload the list and the inspected batch when the modal deletes a batch.

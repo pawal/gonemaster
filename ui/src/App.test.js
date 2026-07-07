@@ -988,13 +988,16 @@ describe("App", () => {
         expect(screen.getByText("job_bn")).toBeInTheDocument();
       });
 
-      // Fire the batch poller
+      // Fire all registered pollers (the App-level batch watch plus panel
+      // refreshes) a few times so the completion check runs against the done
+      // batch, flushing microtasks between rounds.
       expect(intervalCallbacks.length).toBeGreaterThan(0);
-      const poller = intervalCallbacks[intervalCallbacks.length - 1];
-      await poller();
-
-      // Flush microtasks so the async sendBatchNotification completes
-      await new Promise((r) => setTimeout(r, 0));
+      for (let round = 0; round < 3; round++) {
+        for (const cb of intervalCallbacks) {
+          await cb();
+        }
+        await new Promise((r) => setTimeout(r, 0));
+      }
 
       await waitFor(() => {
         expect(NotificationMock).toHaveBeenCalledWith(

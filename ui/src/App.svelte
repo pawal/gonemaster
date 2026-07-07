@@ -7,6 +7,7 @@
   import {
     isResultReadyStatus,
     progressPercent,
+    hasActiveBatchJobs,
   } from "./lib/jobUtils.js";
   import {
     persistedStateKey,
@@ -503,6 +504,47 @@
     jobPoller = setInterval(() => loadJob(selectedJobId, { silent: true }), 5000);
   };
 
+  // App-level batch completion watch: survives leaving the Batches tab so the
+  // browser notification still fires when a submitted batch finishes.
+  let watchedBatchId = "";
+  let batchWatchPoller = null;
+
+  const stopBatchWatch = () => {
+    if (batchWatchPoller) clearInterval(batchWatchPoller);
+    batchWatchPoller = null;
+    watchedBatchId = "";
+  };
+
+  const sendBatchNotification = async (batch) => {
+    const permission = await ensureNotificationPermission();
+    if (permission !== "granted") return;
+    try {
+      new Notification($t("notify_batch_done_title"), { body: $t("notify_batch_done_body", { id: batch.batch_id }) });
+    } catch (err) {
+      console.warn("[notify] Notification constructor failed:", err);
+    }
+  };
+
+  const watchBatch = (batchId) => {
+    const id = (batchId || "").trim();
+    if (!id) return;
+    watchedBatchId = id;
+    ensureNotificationPermission();
+    if (batchWatchPoller) clearInterval(batchWatchPoller);
+    const check = async () => {
+      if (!watchedBatchId) return;
+      try {
+        const batch = await apiFetch(`/batches/${watchedBatchId}?limit=1`);
+        if (!hasActiveBatchJobs(batch)) {
+          stopBatchWatch();
+          sendBatchNotification(batch);
+        }
+      } catch (_) {}
+    };
+    batchWatchPoller = setInterval(check, 7000);
+    check();
+  };
+
   // Restore the route and persisted filter state synchronously so panels mount
   // with the correct state on first render, before onMount runs.
   const restoreInitialState = () => {
@@ -630,6 +672,7 @@
     return () => {
       clearTimeout(revealTimer);
       if (jobPoller) clearInterval(jobPoller);
+      if (batchWatchPoller) clearInterval(batchWatchPoller);
       if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
       window.removeEventListener("hashchange", syncFromLocation);
       window.removeEventListener("popstate", syncFromLocation);
@@ -804,7 +847,7 @@
     <BatchesPanel
       {apiFetch}
       {setStatus}
-      {ensureNotificationPermission}
+      onWatchBatch={watchBatch}
       {scoringEnabled}
       routeBatchId={router.route.batchId}
       onOpenBatch={openBatch}

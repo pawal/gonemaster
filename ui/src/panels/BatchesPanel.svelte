@@ -11,6 +11,7 @@
   import { normalizePageSize, normalizeCursor } from "../lib/persistence.js";
   import { moduleLevels, hasScore, chipGrade, chipScore } from "../lib/result.js";
   import GradeChip from "../components/GradeChip.svelte";
+  import { href } from "../lib/router.svelte.js";
 
   let {
     apiFetch,
@@ -459,7 +460,11 @@
               >
                 <div class="list-item-main">
                   <div class="job-headline">
-                    <span class="mono job-id-link">{item.id}</span>
+                    <a
+                      class="mono job-id-link"
+                      href={href("single", { jobId: item.id })}
+                      onclick={(e) => { e.preventDefault(); e.stopPropagation(); onNavigateJob(item.id); }}
+                    >{item.id}</a>
                     <span class="small">{item.domain} - {item.status}</span>
                     {#if jobSeverityRows(item).length}
                       {#each jobSeverityRows(item) as entry (entry.level)}
@@ -615,7 +620,7 @@ example.org`}
               role="button"
               tabindex="0"
             >
-              <td class="mono">{b.batch_id}</td>
+              <td class="mono"><a href={href("batches", { batchId: b.batch_id })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenBatch(b.batch_id); }}>{b.batch_id}</a></td>
               <td>{b.tag || "-"}</td>
               <td>{b.status}{#if b.completion != null} · {b.completion}%{/if}</td>
               <td>{b.created_at ? formatTimestampLocal(b.created_at) : "-"}</td>

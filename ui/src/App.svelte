@@ -738,6 +738,7 @@
         onSubmitJobId={handleJobIdSubmit}
         onLoadResult={() => loadJobResult()}
         onNavigateDomain={navigateToDomainByName}
+        onNavigateBatch={openBatch}
       />
     </div>
   {:else if activeTab === "recent"}
@@ -756,6 +757,7 @@
       bind:recentPageSize
       bind:recentCursor
       onNavigateJob={navigateToJob}
+      onNavigateBatch={openBatch}
     />
   {:else if activeTab === "domains"}
     <DomainsPanel

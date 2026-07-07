@@ -2,6 +2,7 @@
   import { t } from "../i18n.js";
   import { formatTimestampLocal, prettyProfileJSON, formatDurationMs, formatJobTotalRuntime as formatJobTotalRuntimeRaw } from "../lib/format.js";
   import { progressPercent, isResultReadyStatus, isActiveJobStatus } from "../lib/jobUtils.js";
+  import { href } from "../lib/router.svelte.js";
   import RunResultView from "./RunResultView.svelte";
 
   let {
@@ -19,6 +20,7 @@
     onSubmitJobId = () => {},
     onLoadResult = () => {},
     onNavigateDomain = () => {},
+    onNavigateBatch = () => {},
   } = $props();
 
   const formatJobTotalRuntime = (job) => formatJobTotalRuntimeRaw(job, isActiveJobStatus);
@@ -62,6 +64,10 @@
       </div>
       <span>{$t("domain_label")}</span>
       <button class="ghost btn-text-mono" type="button" onclick={() => onNavigateDomain(selectedJob.domain)}>{selectedJob.domain}</button>
+      {#if selectedJob.batch_id}
+        <span>{$t("batch_id_label")}</span>
+        <strong><a class="mono" href={href("batches", { batchId: selectedJob.batch_id })} onclick={(e) => { e.preventDefault(); onNavigateBatch(selectedJob.batch_id); }}>{selectedJob.batch_id}</a></strong>
+      {/if}
       {#if resolvedProfileName}
         <span>{$t("job_profile_label")}</span>
         <strong class="mono">{resolvedProfileName}</strong>

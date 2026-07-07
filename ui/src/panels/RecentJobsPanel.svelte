@@ -5,6 +5,7 @@
   import { hasScore, chipGrade, chipScore, moduleLevels } from "../lib/result.js";
   import { normalizePageSize, normalizeCursor } from "../lib/persistence.js";
   import GradeChip from "../components/GradeChip.svelte";
+  import { href } from "../lib/router.svelte.js";
 
   let {
     apiFetch,
@@ -21,6 +22,7 @@
     recentPageSize = $bindable(20),
     recentCursor = $bindable(0),
     onNavigateJob = () => {},
+    onNavigateBatch = () => {},
   } = $props();
 
   let jobs = $state([]);
@@ -245,7 +247,11 @@
         }} role="button" tabindex="0">
           <div class="list-item-main">
             <div class="job-headline">
-              <span class="mono job-id-link">{job.id}</span>
+              <a
+                class="mono job-id-link"
+                href={href("single", { jobId: job.id })}
+                onclick={(e) => { e.preventDefault(); e.stopPropagation(); onNavigateJob(job.id); }}
+              >{job.id}</a>
               <span class="small">{job.domain} - {job.status}</span>
               {#if jobSeverityRows(job).length}
                 {#each jobSeverityRows(job) as entry (entry.level)}
@@ -259,7 +265,10 @@
               {/if}
             </div>
             {#if job.batch_id}
-              <div class="small mono">{$t("batch_prefix")} {job.batch_id}</div>
+              <div class="small mono">{$t("batch_prefix")} <a
+                href={href("batches", { batchId: job.batch_id })}
+                onclick={(e) => { e.preventDefault(); e.stopPropagation(); onNavigateBatch(job.batch_id); }}
+              >{job.batch_id}</a></div>
             {/if}
             {#if jobProfileName(job)}
               <div class="small">{$t("job_profile_label")}: <span class="mono">{jobProfileName(job)}</span></div>

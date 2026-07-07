@@ -12,6 +12,7 @@
     compareSeverity,
   } from "../lib/sort.js";
   import GradeChip from "../components/GradeChip.svelte";
+  import { href } from "../lib/router.svelte.js";
 
   let {
     apiFetch,
@@ -481,7 +482,7 @@
               tabindex="0"
             >
               <td class="mono">
-                {b.id}
+                <a href={href("batches", { batchId: b.id })} onclick={(e) => { if (e.target.closest("[data-row-action]")) return; e.preventDefault(); e.stopPropagation(); onOpenBatchFromTagRow(b.id); }}>{b.id}</a>
                 {#if b.snapshot_intent}<span class="pill snapshot-intent ml-quarter">{$t("batch_snapshot_intent_pill")}</span>{/if}
               </td>
               <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "-"}</td>
@@ -593,7 +594,7 @@
               tabindex="0"
               onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") onNavigateDomainDetail(d); }}
             >
-              <td class="mono">{d.name}</td>
+              <td class="mono"><a href={href("domains", { domainName: d.name })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); onNavigateDomainDetail(d); }}>{d.name}</a></td>
               <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
               {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<GradeChip grade={d.latest_grade} score={d.latest_score} />{:else}-{/if}</td>{/if}
               <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "-"}</td>
@@ -673,7 +674,7 @@
               tabindex="0"
               onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
             >
-              <td class="mono">{tag.name}</td>
+              <td class="mono"><a href={href("tags", { tagName: tag.name })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); navigateToTagDetail(tag); }}>{tag.name}</a></td>
               <td>
                 {#if tagCohortByName.has(tag.name)}
                   <button

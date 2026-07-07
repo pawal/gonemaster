@@ -92,4 +92,25 @@ describe("RecentJobsPanel", () => {
     await fireEvent.click(screen.getByRole("button", { name: /Apply filters/i }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
   });
+
+  it("renders the job id as a real anchor to the single-job route", async () => {
+    const onNavigateJob = vi.fn();
+    render(RecentJobsPanel, { props: baseProps({ onNavigateJob }) });
+    const link = await screen.findByText("job_a");
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("#/single/job_a");
+    await fireEvent.click(link);
+    expect(onNavigateJob).toHaveBeenCalledWith("job_a");
+  });
+
+  it("links a job's batch id to the batches route", async () => {
+    const onNavigateBatch = vi.fn();
+    const withBatch = () => ({ items: [{ id: "job_a", domain: "example.com", status: "succeeded", progress: 100, batch_id: "batch_x", severity_totals: {} }], total: 1, offset: 0 });
+    render(RecentJobsPanel, { props: baseProps({ apiFetch: vi.fn().mockResolvedValue(withBatch()), onNavigateBatch }) });
+    const link = await screen.findByText("batch_x");
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("#/batches/batch_x");
+    await fireEvent.click(link);
+    expect(onNavigateBatch).toHaveBeenCalledWith("batch_x");
+  });
 });

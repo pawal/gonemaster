@@ -1143,6 +1143,19 @@ button.link-button:hover:not(:disabled) {
   font-weight: 500;
 }
 
+/* Row and identifier links read as row text; underline only on hover. */
+.data-table td a,
+.kv a,
+.list-item a {
+  color: inherit;
+  text-decoration: none;
+}
+.data-table td a:hover,
+.kv a:hover,
+.list-item a:hover {
+  text-decoration: underline;
+}
+
 .list-item.clickable {
   cursor: pointer;
 }

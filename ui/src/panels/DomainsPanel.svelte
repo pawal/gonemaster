@@ -15,6 +15,7 @@
   import { hasScore, chipGrade, chipScore } from "../lib/result.js";
   import RunResultView from "../components/RunResultView.svelte";
   import GradeChip from "../components/GradeChip.svelte";
+  import { href } from "../lib/router.svelte.js";
 
   let {
     apiFetch,
@@ -317,7 +318,7 @@
                 tabindex="0"
                 onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openRun(run.id); } }}
               >
-                <td class="run-id-cell" title={run.id}>{run.id}</td>
+                <td class="run-id-cell" title={run.id}><a href={href("domains", { domainName: selectedDomain.name, runId: run.id })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); openRun(run.id); }}>{run.id}</a></td>
                 <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "-"}</td>
                 <td><span class="badge level-{(run.worst_level || 'info').toLowerCase()}">{run.worst_level || "INFO"}</span></td>
                 {#if scoringEnabled}<td>{#if hasScore(run)}<GradeChip grade={chipGrade(run)} score={chipScore(run)} />{:else}-{/if}</td>{/if}
@@ -402,7 +403,7 @@
               tabindex="0"
               onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
             >
-              <td class="mono">{d.name}</td>
+              <td class="mono"><a href={href("domains", { domainName: d.name })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); navigateToDomainDetail(d); }}>{d.name}</a></td>
               <td>{d.tags ? d.tags.join(", ") : ""}</td>
               <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
               {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<GradeChip grade={d.latest_grade} score={d.latest_score} />{:else}-{/if}</td>{/if}

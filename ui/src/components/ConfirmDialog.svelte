@@ -15,8 +15,8 @@
   } = $props();
 
   let typed = $state("");
-  let confirmEl;
-  let phraseEl;
+  let confirmEl = $state(null);
+  let phraseEl = $state(null);
 
   const canConfirm = $derived(!confirmPhrase || typed.trim() === confirmPhrase);
 
@@ -40,6 +40,7 @@
     <div
       class="modal-card confirm-card"
       role="dialog"
+      tabindex="-1"
       aria-modal="true"
       aria-label={title}
       onclick={(e) => e.stopPropagation()}

@@ -318,7 +318,7 @@
   });
 </script>
 
-<div class="grid panel-mt" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches">
+<div class="grid panel-mt batches-panel-grid" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches">
 {#if selectedBatchId}
   <div class="card reveal delay-22 grid-span-full">
     <button class="secondary small" onclick={() => onCloseBatch()}>{$t("back_to_batches")}</button>
@@ -469,7 +469,7 @@
     {/if}
   </div>
 {:else}
-  <div class="card reveal delay-22">
+  <div class="card reveal delay-22 batch-form-card">
     <h2>{$t("batch_jobs_heading")}</h2>
     <div class="toolbar-row no-wrap mb-half">
       <button
@@ -555,7 +555,7 @@ example.org`}
     {/if}
   </div>
 
-  <div class="card reveal delay-26 grid-span-full" data-testid="batches-list-card">
+  <div class="card reveal delay-26 batch-list-card" data-testid="batches-list-card">
     <div class="row row-toolbar-end">
       <h2 class="m-zero">{$t("batches_list_heading")}</h2>
       <button

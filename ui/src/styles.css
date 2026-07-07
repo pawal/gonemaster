@@ -278,6 +278,21 @@ header {
   grid-column: 1 / -1;
 }
 
+/* Batches list view: compact create form beside the wide batches table. */
+.batches-panel-grid {
+  align-items: start;
+  grid-template-columns: minmax(320px, 360px) minmax(0, 1fr);
+}
+
+@media (max-width: 1180px) {
+  .batches-panel-grid {
+    grid-template-columns: 1fr;
+  }
+  .batches-panel-grid .batch-form-card {
+    max-width: 480px;
+  }
+}
+
 .card {
   background: var(--card);
   border-radius: var(--radius);

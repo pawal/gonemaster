@@ -1,6 +1,7 @@
 <script>
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
+  import { formatTimestampLocal } from "../lib/format.js";
 
   let {
     open = false,
@@ -63,14 +64,6 @@
     !submitting && preview && preview.exists && typed.trim() === batchId
   );
 
-  const formatDate = (s) => {
-    if (!s) return "";
-    try {
-      return new Date(s).toISOString().slice(0, 19).replace("T", " ");
-    } catch {
-      return s;
-    }
-  };
 </script>
 
 {#if open}
@@ -104,7 +97,7 @@
             <div><strong>{$t("batch_tag_label")}:</strong> {preview.tag}</div>
           {/if}
           {#if preview.created_at}
-            <div><strong>{$t("col_created_at")}:</strong> {formatDate(preview.created_at)}</div>
+            <div><strong>{$t("col_created_at")}:</strong> {formatTimestampLocal(preview.created_at)}</div>
           {/if}
           {#if preview.snapshot_intent}
             <div><span class="pill snapshot-intent">{$t("batch_snapshot_intent_pill")}</span></div>
@@ -139,7 +132,7 @@
                 <code class="mono">{snap.snapshot_slug}</code>
                 {#if snap.snapshot_label} - {snap.snapshot_label}{/if}
                 {#if snap.is_default}
-                  <span class="pill default">{$t("batch_delete_default_pill")}</span>
+                  <span class="pill default ml-quarter">{$t("batch_delete_default_pill")}</span>
                 {/if}
               </li>
             {/each}
@@ -199,8 +192,8 @@
     padding: 1rem;
   }
   .modal-card {
-    background: var(--bg, #fff);
-    color: var(--fg, #111);
+    background: var(--surface, #fff);
+    color: var(--ink, #111);
     border-radius: 8px;
     padding: 1.5rem;
     max-width: 640px;
@@ -256,19 +249,5 @@
     box-sizing: border-box;
     padding: 0.4rem 0.5rem;
     margin-top: 0.25rem;
-  }
-  .pill {
-    display: inline-block;
-    padding: 0.1rem 0.5rem;
-    border-radius: 999px;
-    font-size: 0.75rem;
-    background: var(--pill-bg, #eee);
-    margin-left: 0.25rem;
-  }
-  .pill.default {
-    background: #fce8b2;
-  }
-  .pill.snapshot-intent {
-    background: #cfe9ff;
   }
 </style>

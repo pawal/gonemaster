@@ -46,4 +46,35 @@ describe("SettingsPanel", () => {
     expect(document.getElementById("settings-subpanel-system")).toBeNull();
     expect(document.getElementById("settings-subpanel-profiles")).toBeNull();
   });
+
+  it("gives only the active tab a tabindex of 0 (roving tabindex)", () => {
+    render(SettingsPanel, { props: { settingsSubTab: "profiles", settingsSubTabs } });
+    expect(screen.getByRole("tab", { name: /Profiles/i })).toHaveAttribute("tabindex", "0");
+    expect(screen.getByRole("tab", { name: /System/i })).toHaveAttribute("tabindex", "-1");
+  });
+
+  it("moves to the next sub-tab on ArrowRight and wraps at the end", async () => {
+    const onSetSubTab = vi.fn();
+    render(SettingsPanel, { props: { settingsSubTab: "system", settingsSubTabs, onSetSubTab } });
+    await fireEvent.keyDown(screen.getByRole("tab", { name: /System/i }), { key: "ArrowRight" });
+    expect(onSetSubTab).toHaveBeenCalledWith("profiles");
+
+    cleanup();
+    onSetSubTab.mockClear();
+    render(SettingsPanel, { props: { settingsSubTab: "scoring", settingsSubTabs, onSetSubTab } });
+    await fireEvent.keyDown(screen.getByRole("tab", { name: /Scoring/i }), { key: "ArrowRight" });
+    expect(onSetSubTab).toHaveBeenCalledWith("system");
+  });
+
+  it("moves to the previous sub-tab on ArrowLeft and to the ends on Home/End", async () => {
+    const onSetSubTab = vi.fn();
+    render(SettingsPanel, { props: { settingsSubTab: "profiles", settingsSubTabs, onSetSubTab } });
+    const profiles = screen.getByRole("tab", { name: /Profiles/i });
+    await fireEvent.keyDown(profiles, { key: "ArrowLeft" });
+    expect(onSetSubTab).toHaveBeenCalledWith("system");
+    await fireEvent.keyDown(profiles, { key: "End" });
+    expect(onSetSubTab).toHaveBeenCalledWith("scoring");
+    await fireEvent.keyDown(profiles, { key: "Home" });
+    expect(onSetSubTab).toHaveBeenCalledWith("system");
+  });
 });

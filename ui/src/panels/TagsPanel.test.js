@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TagsPanel from "./TagsPanel.svelte";
 
@@ -42,6 +42,27 @@ describe("TagsPanel", () => {
     expect(screen.getByText("gov")).toBeInTheDocument();
   });
 
+  it("distinguishes a load error from an empty list and offers a retry", async () => {
+    let attempt = 0;
+    const failing = vi.fn().mockImplementation((path) => {
+      if (path === "/tags") {
+        attempt += 1;
+        if (attempt === 1) return Promise.reject(new Error("boom"));
+        return Promise.resolve([]);
+      }
+      return Promise.resolve({ items: [], total: 0 });
+    });
+    render(TagsPanel, { props: { apiFetch: failing } });
+
+    // Error state, not the "no tags" empty state.
+    const retry = await screen.findByRole("button", { name: /Retry/i });
+    expect(screen.queryByText(/No tags/i)).toBeNull();
+
+    // Retrying succeeds and now shows the genuine empty state.
+    await fireEvent.click(retry);
+    expect(await screen.findByText(/No tags/i)).toBeInTheDocument();
+  });
+
   it("creates a new tag when the form is submitted", async () => {
     render(TagsPanel, { props: { apiFetch } });
     await screen.findByText("tld");
@@ -52,17 +73,17 @@ describe("TagsPanel", () => {
     });
   });
 
-  it("renders the detail view when a tag is selected", async () => {
+  it("renders the detail view when a tag name is routed", async () => {
     render(TagsPanel, {
-      props: { apiFetch, selectedTag: sampleTags()[0] },
+      props: { apiFetch, routeTagName: "tld" },
     });
     expect(await screen.findByRole("heading", { level: 2, name: /tld/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Back to tags/i })).toBeInTheDocument();
   });
 
-  it("loads tag summary, domains, and batches when a tag is selected on mount", async () => {
+  it("loads tag summary, domains, and batches when a tag name is routed", async () => {
     render(TagsPanel, {
-      props: { apiFetch, selectedTag: sampleTags()[0] },
+      props: { apiFetch, routeTagName: "tld" },
     });
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/tags/tld/summary"));
@@ -73,18 +94,30 @@ describe("TagsPanel", () => {
 
   it("shows an explicit confirm step before deleting a tag", async () => {
     render(TagsPanel, {
-      props: { apiFetch, selectedTag: sampleTags()[0] },
+      props: { apiFetch, routeTagName: "tld" },
     });
     await screen.findByRole("heading", { level: 2, name: /tld/ });
     await fireEvent.click(screen.getByRole("button", { name: /^Delete tag$/i }));
     expect(await screen.findByRole("button", { name: /Confirm delete/i })).toBeInTheDocument();
   });
 
+  it("requires typing the tag name before purging runs (typed confirm)", async () => {
+    render(TagsPanel, { props: { apiFetch, routeTagName: "tld" } });
+    await screen.findByRole("heading", { level: 2, name: /tld/ });
+    await fireEvent.click(screen.getByRole("button", { name: /^Purge runs$/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    const confirm = within(dialog).getByRole("button", { name: /Confirm purge/i });
+    expect(confirm).toBeDisabled();
+    await fireEvent.input(within(dialog).getByRole("textbox"), { target: { value: "tld" } });
+    expect(confirm).not.toBeDisabled();
+  });
+
   it("invokes onSetTab when the cohort link is clicked", async () => {
     const onSetTab = vi.fn();
     const tagCohortByName = new Map([["tld", { source_tag: "tld", label: "TLD cohort" }]]);
     render(TagsPanel, {
-      props: { apiFetch, selectedTag: sampleTags()[0], tagCohortByName, onSetTab },
+      props: { apiFetch, routeTagName: "tld", tagCohortByName, onSetTab },
     });
     await screen.findByText(/TLD cohort/);
     await fireEvent.click(screen.getByRole("button", { name: /TLD cohort/ }));

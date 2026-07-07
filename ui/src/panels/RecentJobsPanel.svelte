@@ -4,6 +4,8 @@
   import { progressPercent, hasRunningOrQueuedJobs } from "../lib/jobUtils.js";
   import { hasScore, chipGrade, chipScore, moduleLevels } from "../lib/result.js";
   import { normalizePageSize, normalizeCursor } from "../lib/persistence.js";
+  import GradeChip from "../components/GradeChip.svelte";
+  import { href } from "../lib/router.svelte.js";
 
   let {
     apiFetch,
@@ -20,6 +22,7 @@
     recentPageSize = $bindable(20),
     recentCursor = $bindable(0),
     onNavigateJob = () => {},
+    onNavigateBatch = () => {},
   } = $props();
 
   let jobs = $state([]);
@@ -37,23 +40,6 @@
       .map((level) => ({ level, count: Number(job?.severity_totals?.[level] || 0) }))
       .filter((entry) => entry.count > 0);
 
-  const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
-
-  const matchesSeverityFilter = (job) => {
-    if (severityFilter === "warnings_plus") {
-      return (
-        jobSeverityTotal(job, "WARNING") > 0 ||
-        jobSeverityTotal(job, "ERROR") > 0 ||
-        jobSeverityTotal(job, "CRITICAL") > 0
-      );
-    }
-    if (severityFilter === "errors_only") {
-      return jobSeverityTotal(job, "ERROR") > 0 || jobSeverityTotal(job, "CRITICAL") > 0;
-    }
-    return true;
-  };
-
-  const filteredJobs = $derived(jobs.filter((job) => matchesSeverityFilter(job)));
 
   const normalizeOptionalProfileID = (value) => {
     const parsed = Number(value);
@@ -163,6 +149,7 @@
       <label for="recent-domain-filter">{$t("domain_contains_label")}</label>
       <input
         id="recent-domain-filter"
+        data-shortcut-filter
         type="text"
         placeholder="example.com"
         bind:value={recentDomainFilter}
@@ -231,12 +218,10 @@
   </div>
   <div class="list">
     {#if jobs.length === 0}
-      <div class="small">{$t("no_jobs")}</div>
-    {:else if filteredJobs.length === 0}
-      <div class="small">{$t("no_jobs_severity")}</div>
+      <div class="small">{severityFilter === "all" ? $t("no_jobs") : $t("no_jobs_severity")}</div>
     {:else}
-      {#each filteredJobs as job (job.id)}
-        <div class="list-item clickable" onclick={() => onNavigateJob(job.id)} onkeydown={(e) => {
+      {#each jobs as job (job.id)}
+        <div class="list-item clickable" data-shortcut-row onclick={() => onNavigateJob(job.id)} onkeydown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();
             onNavigateJob(job.id);
@@ -244,8 +229,12 @@
         }} role="button" tabindex="0">
           <div class="list-item-main">
             <div class="job-headline">
-              <span class="mono job-id-link">{job.id}</span>
-              <span class="small">{job.domain} – {job.status}</span>
+              <a
+                class="mono job-id-link"
+                href={href("single", { jobId: job.id })}
+                onclick={(e) => { e.preventDefault(); e.stopPropagation(); onNavigateJob(job.id); }}
+              >{job.id}</a>
+              <span class="small">{job.domain} - {job.status}</span>
               {#if jobSeverityRows(job).length}
                 {#each jobSeverityRows(job) as entry (entry.level)}
                   <span class={`level-pill severity-${entry.level.toLowerCase()}`}>{entry.level} {entry.count}</span>
@@ -254,14 +243,14 @@
                 <span class="level-pill severity-info">INFO</span>
               {/if}
               {#if scoringEnabled && hasScore(job)}
-                <span class="grade-chip">
-                  <span class="grade-chip-letter" data-grade={chipGrade(job)}>{chipGrade(job)}</span>
-                  <span class="grade-chip-score">{chipScore(job)}</span>
-                </span>
+                <GradeChip grade={chipGrade(job)} score={chipScore(job)} />
               {/if}
             </div>
             {#if job.batch_id}
-              <div class="small mono">{$t("batch_prefix")} {job.batch_id}</div>
+              <div class="small mono">{$t("batch_prefix")} <a
+                href={href("batches", { batchId: job.batch_id })}
+                onclick={(e) => { e.preventDefault(); e.stopPropagation(); onNavigateBatch(job.batch_id); }}
+              >{job.batch_id}</a></div>
             {/if}
             {#if jobProfileName(job)}
               <div class="small">{$t("job_profile_label")}: <span class="mono">{jobProfileName(job)}</span></div>

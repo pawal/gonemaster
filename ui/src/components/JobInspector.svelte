@@ -1,17 +1,9 @@
 <script>
   import { t } from "../i18n.js";
-  import { formatTimestampLocal, prettyProfileJSON, formatJobTotalRuntime as formatJobTotalRuntimeRaw } from "../lib/format.js";
+  import { formatTimestampLocal, prettyProfileJSON, formatDurationMs, formatJobTotalRuntime as formatJobTotalRuntimeRaw } from "../lib/format.js";
   import { progressPercent, isResultReadyStatus, isActiveJobStatus } from "../lib/jobUtils.js";
-  import {
-    CAT_ORDER,
-    CAT_LABELS,
-    BONUS_HIDDEN,
-    hasScore,
-    chipGrade,
-    chipScore,
-    resultScore,
-  } from "../lib/result.js";
-  import RunResultBody from "./RunResultBody.svelte";
+  import { href } from "../lib/router.svelte.js";
+  import RunResultView from "./RunResultView.svelte";
 
   let {
     selectedJobId = $bindable(""),
@@ -25,8 +17,10 @@
     scoringEnabled = false,
     nameserverTimingsEnabled = false,
     onRefresh = () => {},
+    onSubmitJobId = () => {},
     onLoadResult = () => {},
     onNavigateDomain = () => {},
+    onNavigateBatch = () => {},
   } = $props();
 
   const formatJobTotalRuntime = (job) => formatJobTotalRuntimeRaw(job, isActiveJobStatus);
@@ -50,7 +44,7 @@
   <h2>{selectedJob && isResultReadyStatus(selectedJob.status) ? $t("run_inspector_heading") : $t("job_inspector_heading")}</h2>
   <div class="stack">
     <label for="job-id">{$t("job_id_label")}</label>
-    <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} onchange={onRefresh} />
+    <input id="job-id" type="text" placeholder="job_123" bind:value={selectedJobId} onchange={() => onSubmitJobId(selectedJobId)} />
   </div>
   <div class="row">
     <button onclick={onRefresh} disabled={jobLoading}>{jobLoading ? $t("loading") : $t("refresh")}</button>
@@ -70,6 +64,10 @@
       </div>
       <span>{$t("domain_label")}</span>
       <button class="ghost btn-text-mono" type="button" onclick={() => onNavigateDomain(selectedJob.domain)}>{selectedJob.domain}</button>
+      {#if selectedJob.batch_id}
+        <span>{$t("batch_id_label")}</span>
+        <strong><a class="mono" href={href("batches", { batchId: selectedJob.batch_id })} onclick={(e) => { e.preventDefault(); onNavigateBatch(selectedJob.batch_id); }}>{selectedJob.batch_id}</a></strong>
+      {/if}
       {#if resolvedProfileName}
         <span>{$t("job_profile_label")}</span>
         <strong class="mono">{resolvedProfileName}</strong>
@@ -78,47 +76,11 @@
       <strong>{formatTimestampLocal(selectedJob.created_at)}</strong>
       {#if selectedRun}
         <span>{$t("col_duration")}</span>
-        <strong>{selectedRun.duration_ms != null ? selectedRun.duration_ms + " ms" : "-"}</strong>
+        <strong>{selectedRun.duration_ms != null ? formatDurationMs(selectedRun.duration_ms) : "-"}</strong>
         <span>{$t("col_entries")}</span>
         <strong>{selectedRun.entry_count ?? 0}</strong>
         <span>{$t("col_worst_level")}</span>
-        <strong><span class="badge level-{(selectedRun.worst_level || '').toLowerCase()}">{selectedRun.worst_level || "-"}</span></strong>
-        {#if scoringEnabled && hasScore(selectedRun)}
-          {@const rs = resultScore(selectedJobResult)}
-          <span>{$t("col_score")}</span>
-          <strong>
-            <span class="grade-chip-wrap">
-              <span class="grade-chip">
-                <span class="grade-chip-letter" data-grade={chipGrade(selectedRun)}>{chipGrade(selectedRun)}</span>
-                <span class="grade-chip-score">{chipScore(selectedRun)}/100</span>
-              </span>
-              {#if rs}
-                <span class="grade-chip-tooltip">
-                  {#each CAT_ORDER.filter(c => c in (rs.categories ?? {})) as cat}
-                    <div class="grade-tip-row">
-                      <span class="grade-tip-cat">{CAT_LABELS[cat]}</span>
-                      <span class="grade-tip-score">{rs.categories[cat].tested === false ? "-" : rs.categories[cat].score}</span>
-                    </div>
-                  {/each}
-                  {#if rs.bonus?.criteria}
-                    {@const bonusCriteria = Object.entries(rs.bonus.criteria).filter(([k]) => !BONUS_HIDDEN.has(k))}
-                    {#if bonusCriteria.length}
-                      <hr class="grade-tip-divider">
-                      <div class="grade-tip-bonus">
-                        {#each bonusCriteria as [key, val]}
-                          <div class="grade-tip-criterion">
-                            <span class="grade-tip-icon {val === true ? 'met' : val === false ? 'unmet' : ''}">{val === true ? '✓' : val === false ? '✗' : '–'}</span>
-                            <span>{$t(`pub.score_bonus_${key}`)}</span>
-                          </div>
-                        {/each}
-                      </div>
-                    {/if}
-                  {/if}
-                </span>
-              {/if}
-            </span>
-          </strong>
-        {/if}
+        <strong>{#if selectedRun.worst_level}<span class="badge level-{selectedRun.worst_level.toLowerCase()}">{selectedRun.worst_level}</span>{:else}-{/if}</strong>
       {/if}
     </div>
     {#if selectedJob.error}
@@ -133,7 +95,7 @@
   {/if}
   {#if selectedJobResult}
     <div class="stack">
-      <RunResultBody result={selectedJobResult} {nameserverTimingsEnabled} />
+      <RunResultView result={selectedJobResult} {scoringEnabled} {nameserverTimingsEnabled} />
     </div>
   {/if}
   {#if selectedJob && !selectedJobResult && isResultReadyStatus(selectedJob.status)}

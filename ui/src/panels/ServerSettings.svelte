@@ -1,7 +1,9 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
+  import { dirtyGuard } from "../lib/dirty.svelte.js";
+  import InlineNotice from "../components/InlineNotice.svelte";
 
   let { apiBase = "/api/v1" } = $props();
 
@@ -113,6 +115,9 @@
 
   let hasChanges = $derived(Object.keys(editedValues).some((k) => isEdited(k)));
 
+  $effect(() => { dirtyGuard.register(hasChanges, $t("settings_discard_confirm")); });
+  onDestroy(() => dirtyGuard.clear());
+
   function sourceLabel(source) {
     const map = {
       default: $t("settings_server_source_default"),
@@ -162,11 +167,7 @@
 <h2>{$t("settings_server_heading")}</h2>
 <div class="small subtitle">{$t("settings_server_subtitle")}</div>
 
-{#if noticeMessage}
-  <div class={`notice notice-${noticeTone === "ok" ? "ok" : "warn"}`} role="status" aria-live="polite">
-    {noticeMessage}
-  </div>
-{/if}
+<InlineNotice message={noticeMessage} tone={noticeTone} />
 
 {#if loading}
   <p>{$t("settings_server_loading")}</p>
@@ -199,7 +200,7 @@
                   disabled={ro}
                   onchange={() => handleToggle(s.key)}
                 />
-                {val ? "Enabled" : "Disabled"}
+                {val ? $t("enabled") : $t("disabled")}
               </label>
             {:else if s.type === "select"}
               <select
@@ -332,20 +333,6 @@
     margin-top: 16px;
     display: flex;
     gap: 8px;
-  }
-  .notice {
-    padding: 8px 12px;
-    border-radius: 4px;
-    margin-bottom: 12px;
-    font-size: 0.9em;
-  }
-  .notice-ok {
-    background: var(--notice-ok-bg, #e8f5e9);
-    color: var(--notice-ok-color, #2e7d32);
-  }
-  .notice-warn {
-    background: var(--notice-warn-bg, #fff3e0);
-    color: var(--notice-warn-color, #e65100);
   }
   .error {
     color: var(--error-color, #c62828);

@@ -643,6 +643,7 @@ type RunFilter struct {
 	Tag            string // domain tag (join via domain_tags)
 	EntryTag       string // log event tag (presence in entries)
 	Status         JobStatus
+	Severity       JobSeverityFilter // min-severity filter (warnings_plus, errors_only)
 	WorstLevel     string
 	Grade          string
 	FinishedAfter  time.Time

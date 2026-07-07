@@ -1,7 +1,11 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, onDestroy } from "svelte";
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
+  import { formatTimestampLocal } from "../lib/format.js";
+  import { dirtyGuard } from "../lib/dirty.svelte.js";
+  import InlineNotice from "../components/InlineNotice.svelte";
+  import ConfirmDialog from "../components/ConfirmDialog.svelte";
 
   let { apiBase = "/api/v1", onprofileschanged } = $props();
 
@@ -11,6 +15,7 @@
   let saving = $state(false);
   let applyingFix = $state(false);
   let deletingProfileId = $state(null);
+  let deleteTarget = $state(null);
   let defaultProfile = $state(null);
   let compatibility = $state(null);
   let compatSummaries = $state([]);
@@ -62,13 +67,6 @@
   const makeCopyName = (name) => {
     const base = String(name || "").trim();
     return base ? `${base} copy` : "copy";
-  };
-
-  const formatTimestampLocal = (value) => {
-    if (!value) return "unknown";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "unknown";
-    return parsed.toLocaleString("sv-SE");
   };
 
   const usageCount = (profileId) => Number(usageCounts[profileId] || 0);
@@ -149,7 +147,7 @@
       await loadProfiles({ selectKey: `profile:${editingProfileId}`, preserveNotice: true });
       onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
-      setNotice($t("profile_compat_fix_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_compat_fix_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       applyingFix = false;
     }
@@ -163,7 +161,7 @@
       await loadProfiles({ preserveNotice: true });
       onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
-      setNotice($t("profile_compat_fix_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_compat_fix_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       markingAllReviewed = false;
     }
@@ -300,7 +298,7 @@
         clearNotice();
       }
     } catch (error) {
-      setNotice($t("profile_load_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       loading = false;
     }
@@ -345,23 +343,30 @@
           : $t("profile_created"),
         "ok"
       );
+      // The draft is persisted now; mark the editor clean so the re-select
+      // and the unsaved-changes guard don't prompt to discard.
+      workspace = { ...workspace, savedRawSignature: rawDraftSignature(draft), savedSignature: normalized.signature };
       await loadProfiles({ selectKey: `profile:${saved.id}`, preserveNotice: true });
       if (workspace.type === "edit") {
         await loadCompatibility(saved.id);
       }
       onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
-      setNotice($t("profile_save_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_save_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       saving = false;
     }
   };
 
-  const deleteProfile = async (profile) => {
+  const requestDeleteProfile = (profile) => {
     if (!profile || profile.id <= 0 || deletingProfileId !== null) return;
-    if (!window.confirm($t("profile_delete_confirm", { name: profile.name }))) {
-      return;
-    }
+    deleteTarget = profile;
+  };
+
+  const confirmDeleteProfile = async () => {
+    const profile = deleteTarget;
+    if (!profile) return;
+    deleteTarget = null;
     deletingProfileId = profile.id;
     try {
       await apiFetch(`/profiles/${profile.id}`, { method: "DELETE" });
@@ -372,7 +377,7 @@
       await loadProfiles({ selectKey: defaultProfileKey, preserveNotice: true });
       onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
-      setNotice($t("profile_delete_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_delete_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       deletingProfileId = null;
     }
@@ -414,6 +419,9 @@
     : false);
   let canSave = $derived(isEditableWorkspace && hasDirtyChanges && !draftValidation.error && !saving);
 
+  $effect(() => { dirtyGuard.register(hasDirtyChanges, $t("settings_discard_confirm")); });
+  onDestroy(() => dirtyGuard.clear());
+
   onMount(() => {
     loadProfiles();
   });
@@ -427,11 +435,7 @@
     </div>
   </div>
 
-  {#if noticeMessage}
-    <div class={`inline-notice inline-notice-${noticeTone === "ok" ? "ok" : "warn"}`} role="status" aria-live="polite">
-      {noticeMessage}
-    </div>
-  {/if}
+  <InlineNotice message={noticeMessage} tone={noticeTone} />
 
   <div class="profile-layout">
     <aside class="profile-library">
@@ -525,7 +529,7 @@
                     class="ghost mini-button"
                     type="button"
                     disabled={deletingProfileId === profile.id}
-                    onclick={(e) => { e.stopPropagation(); deleteProfile(profile); }}
+                    onclick={(e) => { e.stopPropagation(); requestDeleteProfile(profile); }}
                   >
                     {deletingProfileId === profile.id ? $t("submitting") : $t("profile_delete_button")}
                   </button>
@@ -713,7 +717,7 @@
               class="ghost"
               type="button"
               disabled={deletingProfileId === selectedStoredProfile.id}
-              onclick={() => deleteProfile(selectedStoredProfile)}
+              onclick={() => requestDeleteProfile(selectedStoredProfile)}
             >
               {deletingProfileId === selectedStoredProfile.id ? $t("submitting") : $t("profile_delete_button")}
             </button>
@@ -728,6 +732,15 @@
     </section>
   </div>
 </section>
+
+<ConfirmDialog
+  open={deleteTarget !== null}
+  title={$t("profile_delete_confirm", { name: deleteTarget?.name ?? "" })}
+  confirmLabel={$t("profile_delete_button")}
+  busy={deletingProfileId !== null}
+  onConfirm={confirmDeleteProfile}
+  onCancel={() => (deleteTarget = null)}
+/>
 
 <style>
   .settings-section {
@@ -749,25 +762,6 @@
   .workspace-empty p {
     margin: 4px 0 0;
     color: var(--muted);
-  }
-
-  .inline-notice {
-    border: 1px solid transparent;
-    border-radius: 10px;
-    padding: 10px 12px;
-    font-size: 0.85rem;
-  }
-
-  .inline-notice-ok {
-    background: #e7f8ee;
-    border-color: #a7f3d0;
-    color: #065f46;
-  }
-
-  .inline-notice-warn {
-    background: #fef3c7;
-    border-color: #fcd34d;
-    color: #92400e;
   }
 
   .profile-layout {

@@ -74,14 +74,22 @@ describe("RecentJobsPanel", () => {
     expect(onNavigateJob).toHaveBeenCalledWith("job_a");
   });
 
-  it("hides jobs that don't match the active severity filter", async () => {
+  it("renders exactly the jobs the server returns (severity filtering is server-side)", async () => {
+    // The server already applied the filter, so the panel must not drop rows.
     const apiFetch = vi.fn().mockResolvedValue(sampleJobs());
     render(RecentJobsPanel, {
       props: baseProps({ apiFetch, severityFilter: "errors_only" }),
     });
-    await screen.findByText("job_b");
-    // job_a has only WARNING; with errors_only it should be filtered out.
-    expect(screen.queryByText("job_a")).toBeNull();
+    expect(await screen.findByText("job_a")).toBeInTheDocument();
+    expect(screen.getByText("job_b")).toBeInTheDocument();
+  });
+
+  it("shows the severity-specific empty message when a filter returns nothing", async () => {
+    const apiFetch = vi.fn().mockResolvedValue({ items: [], total: 0, offset: 0 });
+    render(RecentJobsPanel, {
+      props: baseProps({ apiFetch, severityFilter: "warnings_plus" }),
+    });
+    expect(await screen.findByText(/No jobs match the selected severity filter/i)).toBeInTheDocument();
   });
 
   it("re-queries when Apply filters is clicked", async () => {
@@ -91,5 +99,26 @@ describe("RecentJobsPanel", () => {
     apiFetch.mockClear();
     await fireEvent.click(screen.getByRole("button", { name: /Apply filters/i }));
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
+  });
+
+  it("renders the job id as a real anchor to the single-job route", async () => {
+    const onNavigateJob = vi.fn();
+    render(RecentJobsPanel, { props: baseProps({ onNavigateJob }) });
+    const link = await screen.findByText("job_a");
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("#/single/job_a");
+    await fireEvent.click(link);
+    expect(onNavigateJob).toHaveBeenCalledWith("job_a");
+  });
+
+  it("links a job's batch id to the batches route", async () => {
+    const onNavigateBatch = vi.fn();
+    const withBatch = () => ({ items: [{ id: "job_a", domain: "example.com", status: "succeeded", progress: 100, batch_id: "batch_x", severity_totals: {} }], total: 1, offset: 0 });
+    render(RecentJobsPanel, { props: baseProps({ apiFetch: vi.fn().mockResolvedValue(withBatch()), onNavigateBatch }) });
+    const link = await screen.findByText("batch_x");
+    expect(link.tagName).toBe("A");
+    expect(link.getAttribute("href")).toBe("#/batches/batch_x");
+    await fireEvent.click(link);
+    expect(onNavigateBatch).toHaveBeenCalledWith("batch_x");
   });
 });

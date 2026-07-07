@@ -96,12 +96,12 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByText("Job Inspector")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Recent Tests" })).toBeNull();
-    expect(screen.queryByText("Batch Inspector")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Batches" })).toBeNull();
     expect(container.querySelector("nav.sidebar")).toBeInTheDocument();
     expect(container.querySelector("section[role='tabpanel']")).toBeNull();
 
     await openBatchTab();
-    expect(screen.getByText("Batch Inspector")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Batches" })).toBeInTheDocument();
 
     await openSettingsTab("Profiles");
     expect(screen.getByText("Profile Library")).toBeInTheDocument();
@@ -129,8 +129,7 @@ describe("App", () => {
     unmount();
   });
 
-  it("refreshes batch inspector when opening batch tab with selected batch id", async () => {
-    let batchCalls = 0;
+  it("opens a batch detail from the batches list and deep-links it", async () => {
     const batch = {
       batch_id: "batch_refresh",
       total: 1,
@@ -149,12 +148,14 @@ describe("App", () => {
 
     global.fetch.mockImplementation((url) => {
       const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      if (value.includes("/api/v1/jobs?")) {
-        return jsonResponse({ items: [], total: 0 });
+      if (value.includes("/api/v1/batches?")) {
+        return jsonResponse({ items: [{ batch_id: "batch_refresh", tag: "", status: "running", total: 1, completed: 0, completion: 0, created_at: "2026-02-03T00:00:00Z" }], total: 1 });
       }
       if (value.includes("/api/v1/batches/batch_refresh")) {
-        batchCalls += 1;
         return jsonResponse(batch);
+      }
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
       }
       return jsonResponse({});
     });
@@ -162,19 +163,13 @@ describe("App", () => {
     const { unmount } = render(App);
 
     await openBatchTab();
-    await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_refresh" } });
-    await fireEvent.change(screen.getByLabelText("Batch ID"));
+    const row = (await screen.findByText("batch_refresh")).closest("tr");
+    await fireEvent.click(row);
+
     await screen.findByText("job_batch_refresh");
-
-    const callsAfterInitialLoad = batchCalls;
-    await openRecentTab();
-    await openBatchTab();
-
     await waitFor(() => {
-      expect(batchCalls).toBeGreaterThan(callsAfterInitialLoad);
+      expect(window.location.hash).toBe("#/batches/batch_refresh");
     });
-
-    expect(screen.getByRole("button", { name: /auto refresh: off/i })).toBeInTheDocument();
     unmount();
   });
 
@@ -393,6 +388,9 @@ describe("App", () => {
       if (value.includes("/api/v1/jobs?")) {
         return jsonResponse({ items: [], total: 0 });
       }
+      if (value.includes("/api/v1/batches?")) {
+        return jsonResponse({ items: [{ batch_id: "batch_1", tag: "", status: "done", total: 0, completed: 0, completion: 0, created_at: "2026-02-03T00:00:00Z" }], total: 1 });
+      }
       if (value.includes("/api/v1/batches/")) {
         return jsonResponse({
           batch_id: "batch_1",
@@ -414,9 +412,8 @@ describe("App", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
 
     await openBatchTab();
-    await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_1" } });
-    await fireEvent.change(screen.getByLabelText("Batch ID"));
-    await fireEvent.change(screen.getByLabelText("Status"), { target: { value: "failed" } });
+    await fireEvent.click((await screen.findByText("batch_1")).closest("tr"));
+    await fireEvent.change(await screen.findByLabelText("Status"), { target: { value: "failed" } });
     await fireEvent.input(screen.getByLabelText("Domain contains"), { target: { value: "beta" } });
     await fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
 
@@ -425,10 +422,10 @@ describe("App", () => {
       expect(params.get("r_sort")).toBe("domain_desc");
       expect(params.get("r_sev")).toBe("warnings_plus");
       expect(params.get("r_batch")).toBe("batch_recent");
-      expect(params.get("b_id")).toBe("batch_1");
       expect(params.get("b_status")).toBe("failed");
       expect(params.get("b_domain")).toBe("beta");
-      expect(window.location.hash).toBe("#/batches");
+      expect(params.get("b_id")).toBeNull();
+      expect(window.location.hash).toBe("#/batches/batch_1");
     });
 
     unmount();
@@ -492,7 +489,8 @@ describe("App", () => {
       ).toBe(true);
     });
 
-    expect(screen.getByLabelText("Batch ID")).toHaveValue("batch_url_1");
+    expect(screen.getByRole("heading", { name: "batch_url_1" })).toBeInTheDocument();
+    expect(window.location.hash).toBe("#/batches/batch_url_1");
     expect(screen.getByLabelText("Sort")).toHaveValue("created_at_asc");
     expect(screen.getByLabelText("Page size")).toHaveValue("50");
     expect(screen.getByLabelText("Status")).toHaveValue("failed");
@@ -990,13 +988,16 @@ describe("App", () => {
         expect(screen.getByText("job_bn")).toBeInTheDocument();
       });
 
-      // Fire the batch poller
+      // Fire all registered pollers (the App-level batch watch plus panel
+      // refreshes) a few times so the completion check runs against the done
+      // batch, flushing microtasks between rounds.
       expect(intervalCallbacks.length).toBeGreaterThan(0);
-      const poller = intervalCallbacks[intervalCallbacks.length - 1];
-      await poller();
-
-      // Flush microtasks so the async sendBatchNotification completes
-      await new Promise((r) => setTimeout(r, 0));
+      for (let round = 0; round < 3; round++) {
+        for (const cb of intervalCallbacks) {
+          await cb();
+        }
+        await new Promise((r) => setTimeout(r, 0));
+      }
 
       await waitFor(() => {
         expect(NotificationMock).toHaveBeenCalledWith(
@@ -1295,8 +1296,8 @@ describe("App", () => {
         await waitFor(() => {
           expect(screen.getByRole("tab", { name: "Batch Jobs", selected: true })).toBeInTheDocument();
         });
-        const input = await screen.findByLabelText("Batch ID");
-        expect(input.value).toBe("batch_a");
+        expect(await screen.findByRole("heading", { name: "batch_a" })).toBeInTheDocument();
+        expect(window.location.hash).toBe("#/batches/batch_a");
         unmount();
       });
     });
@@ -1458,6 +1459,307 @@ describe("App", () => {
         expect(chip).not.toBeNull();
         expect(chip.textContent.trim()).toBe("TLD");
       });
+      unmount();
+    });
+  });
+
+  // Routing: in-panel drill-downs now push a hash route, so the browser Back
+  // button returns from a detail view to its list, and switching tabs resets
+  // the drill-down instead of silently re-entering it.
+  describe("hash routing and back-button navigation", () => {
+    const domainsMock = (url) => {
+      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      if (value.includes("/runs")) return jsonResponse({ items: [], total: 0 });
+      if (value.includes("/api/v1/domains")) {
+        return jsonResponse({
+          items: [{ id: 7, name: "example.com", tags: [], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
+          total: 1,
+        });
+      }
+      if (value.includes("/api/v1/tags")) return jsonResponse([]);
+      return jsonResponse({ items: [], total: 0 });
+    };
+
+    it("clicking a domain row pushes a hash route and Back returns to the list", async () => {
+      global.fetch.mockImplementation(domainsMock);
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
+      await fireEvent.click(await screen.findByText("example.com"));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/domains/example.com");
+        expect(screen.getByText("← Back to domains")).toBeInTheDocument();
+      });
+
+      window.history.back();
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/domains");
+        expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("switching to another tab clears an open domain detail", async () => {
+      global.fetch.mockImplementation(domainsMock);
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
+      await fireEvent.click(await screen.findByText("example.com"));
+      await waitFor(() => expect(screen.getByText("← Back to domains")).toBeInTheDocument());
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Recent Tests" }));
+      await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/domains");
+        expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("clicking a tag row pushes a hash route and Back returns to the list", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/summary")) return jsonResponse({ ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.match(/\/tags\/[^/]+\/domains/)) return jsonResponse({ items: [], total: 0 });
+        if (value.match(/\/tags\/[^/]+\/batches/)) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/analysis/cohorts")) return jsonResponse([]);
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "TLD", domain_count: 2, default_profile_id: null }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
+      await fireEvent.click(await screen.findByText("tld"));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/tags/tld");
+        expect(screen.getByText("← Back to tags")).toBeInTheDocument();
+      });
+
+      window.history.back();
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/tags");
+        expect(screen.queryByText("← Back to tags")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Tags" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("restores a domain detail deep link on reload", async () => {
+      window.history.replaceState(null, "", "/#/domains/example.com");
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        return domainsMock(url);
+      });
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { name: "example.com" })).toBeInTheDocument();
+        expect(calls.some((v) => v.includes("/api/v1/domains/7/runs"))).toBe(true);
+      });
+      expect(window.location.hash).toBe("#/domains/example.com");
+      unmount();
+    });
+
+    it("restores a specific run deep link on reload", async () => {
+      window.history.replaceState(null, "", "/#/domains/example.com/runs/run_seven");
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/runs")) {
+          return jsonResponse({ items: [{ id: "run_seven", finished_at: "2026-03-15T10:00:00Z", worst_level: "WARNING", duration_ms: 500, entry_count: 2 }], total: 1 });
+        }
+        if (value.includes("/api/v1/jobs/run_seven/result")) {
+          return jsonResponse({ job_id: "run_seven", summary: { levels: {} }, raw: { entries: [] } });
+        }
+        return domainsMock(url);
+      });
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(calls.some((v) => v.includes("/api/v1/jobs/run_seven/result"))).toBe(true);
+      });
+      expect(window.location.hash).toBe("#/domains/example.com/runs/run_seven");
+      unmount();
+    });
+
+    it("restores a tag detail deep link on reload", async () => {
+      window.history.replaceState(null, "", "/#/tags/tld");
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value.includes("/summary")) return jsonResponse({ ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
+        if (value.match(/\/tags\/[^/]+\/domains/)) return jsonResponse({ items: [], total: 0 });
+        if (value.match(/\/tags\/[^/]+\/batches/)) return jsonResponse({ items: [], total: 0 });
+        if (value.includes("/api/v1/analysis/cohorts")) return jsonResponse([]);
+        if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "TLD", domain_count: 2, default_profile_id: null }]);
+        return jsonResponse({ items: [], total: 0 });
+      });
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(screen.getByRole("heading", { level: 2, name: /tld/ })).toBeInTheDocument();
+        expect(calls.some((v) => v.includes("/api/v1/tags/tld/summary"))).toBe(true);
+      });
+      expect(window.location.hash).toBe("#/tags/tld");
+      unmount();
+    });
+
+    it("writes a single-job deep link when a job is created", async () => {
+      const job = { id: "job_created_1", domain: "example.com", status: "running", created_at: "2026-02-03T00:00:00Z", progress: 10 };
+      global.fetch.mockImplementation((url, options = {}) => {
+        if (url === "/api/v1/jobs" && options.method === "POST") return jsonResponse(job);
+        if (url === `/api/v1/jobs/${job.id}`) return jsonResponse(job);
+        return jsonResponse({ items: [] });
+      });
+      const { unmount } = render(App);
+
+      await fireEvent.input(await screen.findByPlaceholderText("example.com"), { target: { value: "example.com" } });
+      await fireEvent.click(screen.getByText("Run Single Job"));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/single/job_created_1");
+      });
+      unmount();
+    });
+
+    it("writes the hash and loads the job when a job id is entered manually", async () => {
+      const calls = [];
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        calls.push(value);
+        if (value === "/api/v1/jobs/job_typed") return jsonResponse({ id: "job_typed", domain: "typed.example", status: "running", created_at: "2026-02-03T00:00:00Z", progress: 5 });
+        return jsonResponse({ items: [] });
+      });
+      const { unmount } = render(App);
+
+      const input = await screen.findByLabelText("Job ID");
+      await fireEvent.input(input, { target: { value: "job_typed" } });
+      await fireEvent.change(input);
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/single/job_typed");
+        expect(calls.some((v) => v === "/api/v1/jobs/job_typed")).toBe(true);
+      });
+      unmount();
+    });
+
+    it("clicking a batch row pushes a hash route and Back returns to the list", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/batches?")) {
+          return jsonResponse({ items: [{ batch_id: "batch_z", tag: "", status: "done", total: 2, completed: 2, completion: 100, created_at: "2026-05-01T00:00:00Z" }], total: 1 });
+        }
+        if (value.includes("/api/v1/batches/batch_z")) {
+          return jsonResponse({ batch_id: "batch_z", total: 2, status_counts: { succeeded: 2 }, items: [], created_at: "2026-05-01T00:00:00Z" });
+        }
+        return jsonResponse({ items: [], total: 0 });
+      });
+      const { unmount } = render(App);
+
+      await openBatchTab();
+      await fireEvent.click((await screen.findByText("batch_z")).closest("tr"));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/batches/batch_z");
+        expect(screen.getByText("← Back to batches")).toBeInTheDocument();
+      });
+
+      window.history.back();
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/batches");
+        expect(screen.queryByText("← Back to batches")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Batches" })).toBeInTheDocument();
+      });
+      unmount();
+    });
+
+    it("redirects the legacy #/settings/analysis bookmark to the Cohorts tab", async () => {
+      window.history.replaceState(null, "", "/#/settings/analysis");
+      global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
+      const { unmount } = render(App);
+
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Cohorts" })).toHaveAttribute("aria-selected", "true");
+        expect(window.location.hash).toBe("#/cohorts");
+      });
+      unmount();
+    });
+  });
+
+  // Keyboard shortcuts: the global keydown handler is wired in App; here we
+  // verify the end-to-end effects (overlay, focus, navigation) and that a
+  // keystroke inside an input never triggers a shortcut.
+  describe("keyboard shortcuts", () => {
+    const benignFetch = () => global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
+    const helpDialog = () => screen.queryByRole("dialog", { name: "Keyboard shortcuts help" });
+
+    it("opens the help overlay on '?' and closes it on Escape", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      expect(helpDialog()).toBeNull();
+      await fireEvent.keyDown(document.body, { key: "?" });
+      expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts help" })).toBeInTheDocument();
+
+      await fireEvent.keyDown(document.body, { key: "Escape" });
+      await waitFor(() => expect(helpDialog()).toBeNull());
+      unmount();
+    });
+
+    it("opens the help overlay from the header affordance", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("button", { name: "Keyboard shortcuts (?)" }));
+      expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts help" })).toBeInTheDocument();
+      unmount();
+    });
+
+    it("focuses the domain field on 'n'", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      const input = await screen.findByPlaceholderText("example.com");
+      input.blur();
+      await fireEvent.keyDown(document.body, { key: "n" });
+      await waitFor(() => expect(input).toHaveFocus());
+      unmount();
+    });
+
+    it("navigates tabs via the g-prefix sequence (g then r)", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      await fireEvent.keyDown(document.body, { key: "g" });
+      await fireEvent.keyDown(document.body, { key: "r" });
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Recent Tests" })).toHaveAttribute("aria-selected", "true");
+        expect(window.location.hash).toBe("#/recent");
+      });
+      unmount();
+    });
+
+    it("does not trigger a shortcut while typing in an input", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      const input = await screen.findByPlaceholderText("example.com");
+      input.focus();
+      await fireEvent.keyDown(input, { key: "?" });
+      // '?' typed into a field must not open the overlay.
+      expect(helpDialog()).toBeNull();
       unmount();
     });
   });

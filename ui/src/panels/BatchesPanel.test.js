@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import BatchesPanel from "./BatchesPanel.svelte";
 
@@ -9,7 +9,6 @@ const baseProps = (overrides = {}) => ({
   ],
   batchStatuses: ["", "queued", "running", "succeeded"],
   listPageSizes: [10, 20, 50, 100],
-  selectedBatchId: "",
   batchSort: "started_at_desc",
   batchPageSize: 20,
   batchStatusFilter: "",
@@ -23,6 +22,7 @@ describe("BatchesPanel", () => {
 
   beforeEach(() => {
     apiFetch = vi.fn().mockImplementation((path) => {
+      if (path.startsWith("/batches?")) return Promise.resolve({ items: [], total: 0 });
       if (path.startsWith("/jobs?")) return Promise.resolve({ items: [] });
       if (path === "/metrics?window=1h&include=health") return Promise.resolve({ health: { queue_paused: false } });
       if (path === "/jobs/batch") return Promise.resolve({ batch_id: "batch_new" });
@@ -45,12 +45,41 @@ describe("BatchesPanel", () => {
 
   afterEach(() => cleanup());
 
-  it("loads recent batches and active batches on mount", async () => {
+  it("loads recent and active batches from the batches endpoint on mount", async () => {
     render(BatchesPanel, { props: baseProps({ apiFetch }) });
     await waitFor(() => {
-      expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/jobs?"));
+      expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/batches?"));
       expect(apiFetch).toHaveBeenCalledWith(expect.stringContaining("/metrics?"));
     });
+    // The old client-side /jobs scan is gone.
+    expect(apiFetch).not.toHaveBeenCalledWith(expect.stringContaining("/jobs?"));
+  });
+
+  it("lists all batches in a table and navigates to a batch on row click", async () => {
+    const onOpenBatch = vi.fn();
+    const listFetch = vi.fn().mockImplementation((path) => {
+      if (path.startsWith("/batches?")) {
+        return Promise.resolve({
+          items: [
+            { batch_id: "batch_run", tag: "tld", status: "running", total: 10, completed: 4, completion: 40, created_at: "2026-04-01T00:00:00Z" },
+            { batch_id: "batch_done", tag: "", status: "done", total: 5, completed: 5, completion: 100, created_at: "2026-03-31T00:00:00Z" },
+          ],
+          total: 2,
+        });
+      }
+      if (path === "/metrics?window=1h&include=health") return Promise.resolve({ health: { queue_paused: false } });
+      return Promise.resolve({ items: [] });
+    });
+    render(BatchesPanel, { props: baseProps({ apiFetch: listFetch, onOpenBatch }) });
+
+    // Both batches (running and done) appear in the list table.
+    const row = (await screen.findByText("batch_run")).closest("tr");
+    expect(row.textContent).toMatch(/running/);
+    expect(row.textContent).toContain("40%");
+    expect(screen.getByText("batch_done")).toBeInTheDocument();
+
+    await fireEvent.click(row);
+    expect(onOpenBatch).toHaveBeenCalledWith("batch_run");
   });
 
   it("submits a batch from the domains form and selects the new id", async () => {
@@ -73,20 +102,60 @@ describe("BatchesPanel", () => {
     expect(setStatus).toHaveBeenCalledWith(expect.any(String), "warn");
   });
 
-  it("loads the selected batch when mounted with a selectedBatchId", async () => {
-    render(BatchesPanel, { props: baseProps({ apiFetch, selectedBatchId: "batch_existing" }) });
+  it("loads the batch detail when mounted with a routed batch id", async () => {
+    render(BatchesPanel, { props: baseProps({ apiFetch, routeBatchId: "batch_existing" }) });
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith(expect.stringMatching(/^\/batches\/batch_existing\?/));
     });
   });
 
-  it("invokes onOpenBatchDelete when the delete button is clicked", async () => {
+  it("invokes onOpenBatchDelete from the detail delete button", async () => {
     const onOpenBatchDelete = vi.fn();
     render(BatchesPanel, {
-      props: baseProps({ apiFetch, selectedBatchId: "batch_existing", onOpenBatchDelete }),
+      props: baseProps({ apiFetch, routeBatchId: "batch_existing", onOpenBatchDelete }),
     });
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     await fireEvent.click(screen.getByRole("button", { name: /Delete batch/i }));
     expect(onOpenBatchDelete).toHaveBeenCalledWith("batch_existing");
+  });
+
+  it("shows severity pills and a grade chip on graduated batch job rows and navigates on click", async () => {
+    const onNavigateJob = vi.fn();
+    const gradedFetch = vi.fn().mockImplementation((path) => {
+      if (path.startsWith("/batches/")) {
+        return Promise.resolve({
+          batch_id: "batch_graded",
+          tag: "",
+          total: 1,
+          status_counts: { succeeded: 1 },
+          items: [{
+            id: "job_done",
+            domain: "graded.example",
+            status: "succeeded",
+            progress: 100,
+            severity_totals: { NOTICE: 0, WARNING: 2, ERROR: 1, CRITICAL: 0 },
+            grade: "C",
+            score: 71,
+          }],
+          created_at: "2026-04-01T00:00:00Z",
+          next_cursor: "",
+          prev_cursor: "",
+          offset: 0,
+        });
+      }
+      return Promise.resolve({ items: [] });
+    });
+    render(BatchesPanel, {
+      props: baseProps({ apiFetch: gradedFetch, routeBatchId: "batch_graded", scoringEnabled: true, onNavigateJob }),
+    });
+
+    const row = (await screen.findByText("job_done")).closest(".list-item");
+    expect(row).not.toBeNull();
+    expect(within(row).getByText(/WARNING 2/)).toBeInTheDocument();
+    expect(within(row).getByText(/ERROR 1/)).toBeInTheDocument();
+    expect(within(row).getByText("C")).toBeInTheDocument();
+
+    await fireEvent.click(row);
+    expect(onNavigateJob).toHaveBeenCalledWith("job_done");
   });
 });

@@ -1043,6 +1043,9 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 		if filter.WorstLevel != "" && r.WorstLevel != filter.WorstLevel {
 			continue
 		}
+		if !runMatchesSeverity(filter.Severity, r) {
+			continue
+		}
 		if filter.Grade != "" && (r.Grade == nil || *r.Grade != filter.Grade) {
 			continue
 		}
@@ -1851,6 +1854,18 @@ func isValidJobSeverityFilter(value JobSeverityFilter) bool {
 		return true
 	default:
 		return false
+	}
+}
+
+// runMatchesSeverity reports whether a run satisfies a min-severity filter.
+func runMatchesSeverity(sev JobSeverityFilter, r Run) bool {
+	switch sev {
+	case JobSeverityWarningsPlus:
+		return r.SevWarning > 0 || r.SevError > 0 || r.SevCritical > 0
+	case JobSeverityErrorsOnly:
+		return r.SevError > 0 || r.SevCritical > 0
+	default:
+		return true
 	}
 }
 

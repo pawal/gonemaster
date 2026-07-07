@@ -1,7 +1,7 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { t } from "../i18n.js";
-  import { formatTimestampLocal } from "../lib/format.js";
+  import { formatTimestampLocal, formatDateLocal, formatDurationMs } from "../lib/format.js";
   import {
     sortItems,
     nextTableSort,
@@ -12,26 +12,27 @@
     compareTimestamp,
     compareSeverity,
   } from "../lib/sort.js";
-  import {
-    CAT_ORDER,
-    CAT_LABELS,
-    BONUS_HIDDEN,
-    hasScore,
-    chipGrade,
-    chipScore,
-  } from "../lib/result.js";
-  import RunResultBody from "../components/RunResultBody.svelte";
+  import { hasScore, chipGrade, chipScore } from "../lib/result.js";
+  import RunResultView from "../components/RunResultView.svelte";
+  import GradeChip from "../components/GradeChip.svelte";
+  import { href } from "../lib/router.svelte.js";
 
   let {
     apiFetch,
     setStatus = () => {},
-    selectedDomain = $bindable(null),
+    routeDomainName = null,
+    routeRunId = null,
+    onOpenDomain = () => {},
+    onCloseDomain = () => {},
+    onOpenRun = () => {},
     availableTags = [],
     scoringEnabled = false,
     nameserverTimingsEnabled = false,
     resultLocale = "",
     onNavigateJob = () => {},
   } = $props();
+
+  let selectedDomain = $state(null);
 
   let domains = $state([]);
   let domainsLoading = $state(false);
@@ -60,18 +61,6 @@
   let lastLoadedDomainId = null;
 
   const domainLevel = (d) => d?.latest_level || (d?.latest_run_at ? "INFO" : "");
-
-  const GRADE_COLORS = { "A+": "var(--grade-aplus)", "A": "var(--grade-a)", "B": "var(--grade-b)", "C": "var(--grade-c)", "D": "var(--grade-d)", "F": "var(--grade-f)" };
-  const gradeBarColor = (grade) => GRADE_COLORS[grade] ?? "var(--grade-a)";
-  const applyBarStyle = (node, params) => {
-    const apply = ({ pct, color, delay }) => {
-      node.style.setProperty("--bar-pct", `${pct}%`);
-      node.style.setProperty("--bar-color", color);
-      node.style.animationDelay = `${delay}ms`;
-    };
-    apply(params);
-    return { update(p) { apply(p); } };
-  };
 
   const domainSortParam = (state) => {
     const map = { name: "name", latest_level: "latest_level", latest_score: "latest_score", latest_run_at: "latest_run_at", run_count: "run_count" };
@@ -121,7 +110,7 @@
       domains = data?.items ?? [];
       domainsTotal = data?.total ?? 0;
     } catch (error) {
-      setStatus($t("domains_load_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("domains_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       domainsLoading = false;
     }
@@ -139,11 +128,13 @@
       const data = await apiFetch(`/domains/${selectedDomain.id}/runs?${params}`);
       domainRuns = data?.items ?? [];
       domainRunsTotal = data?.total ?? 0;
-      if (domainRuns.length > 0 && domainRunsOffset === 0) {
+      // Auto-load the newest run's result only when no specific run is routed;
+      // a routed run id is loaded by its own effect.
+      if (domainRuns.length > 0 && domainRunsOffset === 0 && !routeRunId) {
         loadDomainRunResult(domainRuns[0].id);
       }
     } catch (error) {
-      setStatus($t("domain_runs_load_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("domain_runs_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       domainRunsLoading = false;
     }
@@ -192,10 +183,40 @@
 
   const navigateToDomainDetail = (d) => {
     selectedDomain = d;
+    onOpenDomain(d.name);
   };
 
-  // React to selectedDomain changes from outside (e.g. App-level navigateToDomainByName,
-  // popstate restoring an in-history detail view, or our back button).
+  const openRun = (runId) => {
+    loadDomainRunResult(runId);
+    if (selectedDomain?.name) onOpenRun(selectedDomain.name, runId);
+  };
+
+  // Resolve selectedDomain from the routed domain name (row click, cross-panel
+  // navigation, deep link, or browser back/forward). The list dep re-resolves a
+  // deep link once the list has loaded.
+  async function syncDomainFromRoute(name, list) {
+    if (name === (selectedDomain?.name ?? null)) return;
+    if (!name) {
+      selectedDomain = null;
+      return;
+    }
+    let match = (list || []).find((d) => d.name === name);
+    if (!match) {
+      try {
+        const data = await apiFetch(`/domains?name=${encodeURIComponent(name)}&limit=20`);
+        match = (data?.items ?? []).find((d) => d.name === name) ?? null;
+      } catch (_) {}
+    }
+    if (match) selectedDomain = match;
+  }
+
+  $effect(() => {
+    const name = routeDomainName;
+    const list = domains;
+    untrack(() => { syncDomainFromRoute(name, list); });
+  });
+
+  // Load or reset the run list when the selected domain changes.
   $effect(() => {
     const id = selectedDomain?.id ?? null;
     if (id === lastLoadedDomainId) return;
@@ -209,6 +230,15 @@
       domainRunsOffset = 0;
       loadDomainRuns();
     }
+  });
+
+  // Load the routed run result (deep link or back/forward between runs).
+  $effect(() => {
+    const runId = routeRunId;
+    untrack(() => {
+      if (!runId || runId === selectedDomainRunId) return;
+      loadDomainRunResult(runId);
+    });
   });
 
   // Reload the open run result when locale changes.
@@ -233,7 +263,7 @@
 <div class="card reveal delay-34 panel-mt" id="panel-domains" role="tabpanel" aria-labelledby="tab-domains">
   {#if selectedDomain}
     <div>
-      <button class="secondary small" onclick={() => { selectedDomain = null; }}>{$t("back_to_domains")}</button>
+      <button class="secondary small" onclick={() => { selectedDomain = null; onCloseDomain(); }}>{$t("back_to_domains")}</button>
       <div class="header-with-meta">
         <h2 class="mono m-zero">{selectedDomain.name}</h2>
         {#if selectedDomain.tags && selectedDomain.tags.length > 0}
@@ -257,59 +287,8 @@
       {#if domainRunResultLoading}
         <p class="muted mt-one">{$t("loading")}</p>
       {:else if selectedDomainRunResult}
-        {@const sc = selectedDomainRunResult?.score}
         <div class="stack mt-1-25">
-          {#if scoringEnabled && sc}
-            {@const sortedCats = CAT_ORDER.filter(c => c in (sc.categories ?? {})).map(c => [c, sc.categories[c]])}
-            <div class="score-card">
-              <div class="score-left">
-                <div class="grade-badge" data-grade={sc.grade}>
-                  <span class="grade-letter">{sc.grade}</span>
-                </div>
-                <div class="score-meta">
-                  <div class="score-number">{sc.score}<span class="score-denom">/100</span></div>
-                  <div class="score-label">DNS Quality Score</div>
-                </div>
-              </div>
-              {#if sortedCats.length}
-                <div class="score-cats">
-                  {#each sortedCats as [cat, res], i}
-                    <div class="score-cat-row" data-untested={res.tested === false ? "" : undefined}>
-                      <span class="score-cat-name">{CAT_LABELS[cat] ?? cat}</span>
-                      <div class="score-cat-bar-track">
-                        <div class="score-cat-bar" use:applyBarStyle={{ pct: res.tested === false ? 0 : res.score, color: gradeBarColor(sc.grade), delay: i * 60 }}></div>
-                      </div>
-                      <span class="score-cat-num">{res.tested === false ? "-" : res.score}</span>
-                    </div>
-                  {/each}
-                </div>
-              {/if}
-            </div>
-            {#if sc.bonus?.criteria}
-              {@const bonusCriteria = Object.entries(sc.bonus.criteria).filter(([k]) => !BONUS_HIDDEN.has(k))}
-              {@const bonusMissing = bonusCriteria.filter(([, v]) => v === false).length}
-              {#if bonusCriteria.length}
-                <details class="score-bonus">
-                  <summary class="score-bonus-summary">
-                    <span class="score-bonus-chevron"></span>
-                    <span class="score-bonus-title">{$t("pub.score_aplus_criteria")}</span>
-                    <span class="score-bonus-status" data-met={sc.bonus.eligible ? "yes" : "no"}>
-                      {sc.bonus.eligible ? $t("pub.score_aplus_achieved") : $t("pub.score_aplus_missing", { n: bonusMissing })}
-                    </span>
-                  </summary>
-                  <div class="score-bonus-list">
-                    {#each bonusCriteria as [key, val]}
-                      <div class="score-bonus-item" data-met={val === null ? "na" : val ? "yes" : "no"}>
-                        <span class="score-bonus-icon">{val === null ? "–" : val ? "✓" : "✗"}</span>
-                        <span>{$t(`pub.score_bonus_${key}`)}</span>
-                      </div>
-                    {/each}
-                  </div>
-                </details>
-              {/if}
-            {/if}
-          {/if}
-          <RunResultBody result={selectedDomainRunResult} {nameserverTimingsEnabled} idPrefix="dm-" />
+          <RunResultView result={selectedDomainRunResult} {scoringEnabled} {nameserverTimingsEnabled} idPrefix="dm-" />
         </div>
       {/if}
 
@@ -334,16 +313,16 @@
             {#each sortedDomainRuns as run}
               <tr
                 class={`row-clickable ${selectedDomainRunId === run.id ? "run-row-selected" : ""}`}
-                onclick={() => loadDomainRunResult(run.id)}
+                onclick={() => openRun(run.id)}
                 role="button"
                 tabindex="0"
-                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") loadDomainRunResult(run.id); }}
+                onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openRun(run.id); } }}
               >
-                <td class="run-id-cell" title={run.id}>{run.id}</td>
-                <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "-"}</td>
+                <td class="run-id-cell" title={run.id}><a href={href("domains", { domainName: selectedDomain.name, runId: run.id })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); openRun(run.id); }}>{run.id}</a></td>
+                <td>{run.finished_at ? formatTimestampLocal(run.finished_at) : "-"}</td>
                 <td><span class="badge level-{(run.worst_level || 'info').toLowerCase()}">{run.worst_level || "INFO"}</span></td>
-                {#if scoringEnabled}<td>{#if hasScore(run)}<span class="grade-chip"><span class="grade-chip-letter" data-grade={chipGrade(run)}>{chipGrade(run)}</span><span class="grade-chip-score">{chipScore(run)}</span></span>{:else}-{/if}</td>{/if}
-                <td>{run.duration_ms != null ? run.duration_ms + "ms" : "-"}</td>
+                {#if scoringEnabled}<td>{#if hasScore(run)}<GradeChip grade={chipGrade(run)} score={chipScore(run)} />{:else}-{/if}</td>{/if}
+                <td>{run.duration_ms != null ? formatDurationMs(run.duration_ms) : "-"}</td>
                 <td>{run.entry_count ?? 0}</td>
               </tr>
             {/each}
@@ -355,7 +334,7 @@
             disabled={domainRunsOffset === 0}
             onclick={() => { domainRunsOffset = Math.max(0, domainRunsOffset - domainRunsLimit); loadDomainRuns(); }}
           >{$t("prev_page")}</button>
-          <span class="muted small">{domainRunsOffset + 1}–{Math.min(domainRunsOffset + domainRunsLimit, domainRunsTotal)} / {domainRunsTotal}</span>
+          <span class="muted small">{domainRunsOffset + 1}-{Math.min(domainRunsOffset + domainRunsLimit, domainRunsTotal)} / {domainRunsTotal}</span>
           <button
             class="secondary small"
             disabled={domainRunsOffset + domainRunsLimit >= domainRunsTotal}
@@ -424,11 +403,11 @@
               tabindex="0"
               onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToDomainDetail(d); }}
             >
-              <td class="mono">{d.name}</td>
+              <td class="mono"><a href={href("domains", { domainName: d.name })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); navigateToDomainDetail(d); }}>{d.name}</a></td>
               <td>{d.tags ? d.tags.join(", ") : ""}</td>
               <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
-              {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}-{/if}</td>{/if}
-              <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "-"}</td>
+              {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<GradeChip grade={d.latest_grade} score={d.latest_score} />{:else}-{/if}</td>{/if}
+              <td>{d.latest_run_at ? formatDateLocal(d.latest_run_at) : "-"}</td>
               <td>{d.run_count ?? 0}</td>
             </tr>
           {/each}
@@ -440,7 +419,7 @@
           disabled={domainsOffset === 0}
           onclick={() => { domainsOffset = Math.max(0, domainsOffset - domainsLimit); loadDomains(); }}
         >{$t("prev_page")}</button>
-        <span class="muted small">{domainsOffset + 1}–{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
+        <span class="muted small">{domainsOffset + 1}-{Math.min(domainsOffset + domainsLimit, domainsTotal)} / {domainsTotal}</span>
         <button
           class="secondary small"
           disabled={domainsOffset + domainsLimit >= domainsTotal}

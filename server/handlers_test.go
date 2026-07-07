@@ -339,6 +339,71 @@ func TestListJobs(t *testing.T) {
 	}
 }
 
+// A severity filter is applied server-side to graduated runs (by their sev_*
+// totals) and excludes in-flight jobs, which have no results yet.
+func TestListJobsFiltersBySeverity(t *testing.T) {
+	srv := New(DefaultConfig())
+	now := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+
+	// One in-flight (queued) job.
+	if _, err := srv.store.Create(Job{ID: "job_queued", Domain: "queued.example", Status: JobQueued, CreatedAt: now}); err != nil {
+		t.Fatalf("create queued: %v", err)
+	}
+	// Three graduated runs: clean (NOTICE only), a WARNING, and an ERROR.
+	graduate := func(id, domain, level string) {
+		job := Job{ID: id, Domain: domain, Status: JobSucceeded, CreatedAt: now, StartedAt: now, FinishedAt: now}
+		if _, err := srv.store.Create(job); err != nil {
+			t.Fatalf("create %s: %v", id, err)
+		}
+		if err := srv.store.GraduateJob(job, []engine.LogEntry{{Level: level}}); err != nil {
+			t.Fatalf("graduate %s: %v", id, err)
+		}
+	}
+	graduate("job_clean", "clean.example", "NOTICE")
+	graduate("job_warn", "warn.example", "WARNING")
+	graduate("job_err", "err.example", "ERROR")
+
+	domainsFor := func(query string) map[string]bool {
+		resp := httptest.NewRecorder()
+		srv.Handler().ServeHTTP(resp, httptest.NewRequest(http.MethodGet, query, nil))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("GET %s: %d %s", query, resp.Code, resp.Body)
+		}
+		var l JobList
+		if err := json.NewDecoder(resp.Body).Decode(&l); err != nil {
+			t.Fatalf("decode %s: %v", query, err)
+		}
+		out := map[string]bool{}
+		for _, it := range l.Items {
+			out[it.Domain] = true
+		}
+		return out
+	}
+
+	wp := domainsFor("/api/v1/jobs?severity=warnings_plus")
+	if !wp["warn.example"] || !wp["err.example"] {
+		t.Fatalf("warnings_plus should include warn and err runs: %v", wp)
+	}
+	if wp["clean.example"] || wp["queued.example"] {
+		t.Fatalf("warnings_plus should exclude clean run and in-flight job: %v", wp)
+	}
+
+	eo := domainsFor("/api/v1/jobs?severity=errors_only")
+	if !eo["err.example"] {
+		t.Fatalf("errors_only should include the err run: %v", eo)
+	}
+	if eo["warn.example"] || eo["clean.example"] || eo["queued.example"] {
+		t.Fatalf("errors_only should exclude warn/clean/in-flight: %v", eo)
+	}
+
+	all := domainsFor("/api/v1/jobs")
+	for _, d := range []string{"queued.example", "clean.example", "warn.example", "err.example"} {
+		if !all[d] {
+			t.Fatalf("unfiltered list should include %s: %v", d, all)
+		}
+	}
+}
+
 func TestListJobsPaginationAndSort(t *testing.T) {
 	srv := New(DefaultConfig())
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)

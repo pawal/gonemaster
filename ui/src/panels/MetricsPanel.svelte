@@ -91,10 +91,12 @@
     return Number(snapshot?.quality?.outcomes?.failed_total || 0);
   };
   const lastLoadedLabel = (value) => {
-    if (!value) return "never";
+    if (!value) return $t("time_never");
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "never";
-    return parsed.toLocaleTimeString("sv-SE");
+    if (Number.isNaN(parsed.getTime())) return $t("time_never");
+    return [parsed.getHours(), parsed.getMinutes(), parsed.getSeconds()]
+      .map((n) => String(n).padStart(2, "0"))
+      .join(":");
   };
   const sparklineBounds = (...seriesList) => {
     const flattened = seriesList.flatMap((series) =>
@@ -181,7 +183,7 @@
       });
       metricsLoadedAt = new Date().toISOString();
     } catch (error) {
-      metricsError = error.message || "unknown error";
+      metricsError = error.message || $t("error_unknown");
       if (!metricsSnapshot) {
         setStatus($t("metrics_load_error", { error: metricsError }), "warn");
       }
@@ -240,7 +242,7 @@
     </div>
   </div>
   <div class="small">
-    {$t("metrics_status_line", { time: lastLoadedLabel(metricsLoadedAt), uptime: formatUptime(metricsSnapshot?.health?.uptime_seconds), version: metricsSnapshot?.server_version || "unknown" })}
+    {$t("metrics_status_line", { time: lastLoadedLabel(metricsLoadedAt), uptime: formatUptime(metricsSnapshot?.health?.uptime_seconds), version: metricsSnapshot?.server_version || $t("value_unknown") })}
   </div>
 
   {#if metricsLoading && !hasMetricsData(metricsSnapshot)}
@@ -267,14 +269,17 @@
         <div class="summary-item" title={$t(metricsCardHelp.queue_depth)}>
           <span class="summary-label">{$t("metric_queue_depth")}</span>
           <span class="summary-count">{formatInteger(metricsSnapshot?.health?.queue_depth)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.queue_depth)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.in_flight_jobs)}>
           <span class="summary-label">{$t("metric_in_flight")}</span>
           <span class="summary-count">{formatInteger(metricsSnapshot?.health?.in_flight_jobs)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.in_flight_jobs)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.jobs_per_minute)}>
           <span class="summary-label">{$t("metric_jobs_per_minute")}</span>
           <span class="summary-count">{formatInteger(Math.round(metricsJobsPerMinute(metricsSnapshot, metricsWindow)))}</span>
+          <span class="sr-only">{$t(metricsCardHelp.jobs_per_minute)}</span>
         </div>
       </div>
     </div>
@@ -285,26 +290,32 @@
         <div class="summary-item" title={$t(metricsCardHelp.dns_lookups_total)}>
           <span class="summary-label">{$t("metric_dns_lookups")}</span>
           <span class="summary-count">{formatCompactInteger((metricsSnapshot?.health?.dns_cache_hits || 0) + (metricsSnapshot?.health?.dns_cache_misses || 0))}</span>
+          <span class="sr-only">{$t(metricsCardHelp.dns_lookups_total)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.dns_cache_hits)}>
           <span class="summary-label">{$t("metric_cache_hits")}</span>
           <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_cache_hits)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.dns_cache_hits)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.dns_cache_misses)}>
           <span class="summary-label">{$t("metric_cache_misses")}</span>
           <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_cache_misses)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.dns_cache_misses)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.dns_cache_hit_rate)}>
           <span class="summary-label">{$t("metric_cache_hit_rate")}</span>
           <span class="summary-count">{formatPercent(metricsCacheHitRate(metricsSnapshot))}</span>
+          <span class="sr-only">{$t(metricsCardHelp.dns_cache_hit_rate)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv4_total)}>
           <span class="summary-label">{$t("metric_ipv4_queries")}</span>
           <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv4_total)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.dns_queries_ipv4_total)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.dns_queries_ipv6_total)}>
           <span class="summary-label">{$t("metric_ipv6_queries")}</span>
           <span class="summary-count">{formatCompactInteger(metricsSnapshot?.health?.dns_queries_ipv6_total)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.dns_queries_ipv6_total)}</span>
         </div>
       </div>
     </div>
@@ -315,18 +326,22 @@
         <div class="summary-item jobs-finished" title={$t(metricsCardHelp.completed_total)}>
           <span class="summary-label">{$t("metric_completed")}</span>
           <span class="summary-count">{formatInteger(metricsSnapshot?.jobs?.completed_total)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.completed_total)}</span>
         </div>
         <div class="summary-item failed-jobs" title={$t(metricsCardHelp.failed_total)}>
           <span class="summary-label">{$t("metric_failed")}</span>
           <span class="summary-count">{formatInteger(metricsFailedJobs(metricsSnapshot))}</span>
+          <span class="sr-only">{$t(metricsCardHelp.failed_total)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.success_rate)}>
           <span class="summary-label">{$t("metric_success_rate")}</span>
           <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.success_rate)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.success_rate)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.failed_rate)}>
           <span class="summary-label">{$t("metric_failure_rate")}</span>
           <span class="summary-count">{formatPercent(metricsSnapshot?.quality?.outcomes?.failed_rate)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.failed_rate)}</span>
         </div>
       </div>
     </div>
@@ -337,10 +352,12 @@
         <div class="summary-item" title={$t(metricsCardHelp.avg_job_duration)}>
           <span class="summary-label">{$t("metric_avg_duration")}</span>
           <span class="summary-count">{formatDurationMs(metricsSnapshot?.quality?.job_duration_ms?.avg)}</span>
+          <span class="sr-only">{$t(metricsCardHelp.avg_job_duration)}</span>
         </div>
         <div class="summary-item" title={$t(metricsCardHelp.api_p90)}>
           <span class="summary-label">{$t("metric_api_p90")}</span>
           <span class="summary-count">{formatDurationMs(metricsTopAPIP90(metricsSnapshot))}</span>
+          <span class="sr-only">{$t(metricsCardHelp.api_p90)}</span>
         </div>
       </div>
     </div>
@@ -352,6 +369,7 @@
           <div class={`summary-item severity-${level.toLowerCase()}`} title={$t("help_severity_card", { level })}>
             <span class="summary-label">{level}</span>
             <span class="summary-count">{formatInteger(severityTotals[level])}</span>
+            <span class="sr-only">{$t("help_severity_card", { level })}</span>
           </div>
         {/each}
       </div>

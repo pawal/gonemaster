@@ -1,10 +1,14 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, untrack, tick } from "svelte";
   import { t, locale, loadCatalog } from "./i18n.js";
+  import { resolveShortcut } from "./lib/shortcuts.js";
+  import { router, navigate, syncFromLocation, canonicalize } from "./lib/router.svelte.js";
+  import { dirtyGuard } from "./lib/dirty.svelte.js";
   import { apiCall } from "./lib/api.js";
   import {
     isResultReadyStatus,
     progressPercent,
+    hasActiveBatchJobs,
   } from "./lib/jobUtils.js";
   import {
     persistedStateKey,
@@ -20,7 +24,6 @@
   import StatusBanner from "./components/StatusBanner.svelte";
   import ThemeToggle from "./components/ThemeToggle.svelte";
   import JobInspector from "./components/JobInspector.svelte";
-  import RunResultBody from "./components/RunResultBody.svelte";
   import MetricsPanel from "./panels/MetricsPanel.svelte";
   import DomainsPanel from "./panels/DomainsPanel.svelte";
   import TagsPanel from "./panels/TagsPanel.svelte";
@@ -32,6 +35,7 @@
   import { initThemeFromStorage } from "./lib/theme.svelte.js";
   import { auth, refreshWhoami, markUnauthenticated, logout } from "./lib/auth.svelte.js";
   import LoginPanel from "./components/LoginPanel.svelte";
+  import ShortcutsHelp from "./components/ShortcutsHelp.svelte";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -55,9 +59,8 @@
   let jobInspectorHighlight = $state(false);
   let jobInspectorHighlightTimer = null;
 
-  // Batches tab state at App level: persisted filter state plus the
-  // selected-batch pointer (used by URL/storage routing).
-  let selectedBatchId = $state("");
+  // Batches tab filter state at App level (persisted); the selected batch
+  // lives in the route (#/batches/<id>).
   let batchSort = $state("started_at_desc");
   let batchPageSize = $state(20);
   let batchCursor = $state(0);
@@ -101,7 +104,7 @@
 
   const apiPrefix = "/api/v1";
 
-  let activeTab = $state("single");
+  const activeTab = $derived(router.route.tab);
   const tabs = [
     { id: "single", labelKey: "tab_single" },
     { id: "recent", labelKey: "tab_recent" },
@@ -113,14 +116,13 @@
     { id: "settings", labelKey: "tab_settings" }
   ];
 
-  let settingsSubTab = $state("system");
+  const settingsSubTab = $derived(router.route.settingsSub ?? "system");
   const settingsSubTabs = [
     { id: "system", labelKey: "settings_subtab_system" },
     { id: "profiles", labelKey: "settings_subtab_profiles" },
     { id: "scoring", labelKey: "settings_subtab_scoring" }
   ];
 
-  let selectedDomain = $state(null);
   let availableTags = $state([]);
   let tagsLoaded = false;
   let availableProfiles = $state([]);
@@ -128,7 +130,6 @@
   let profilesLoading = $state(false);
   // Tags tab state owned at the App level (cross-tab pointers + cohort map).
   let tagCohortByName = $state(new Map());
-  let selectedTag = $state(null);
   const apiFetch = async (path, options) => {
     try {
       return await apiCall(apiPrefix, path, options);
@@ -207,7 +208,6 @@
     if (typeof state.recentDomainFilter === "string") recentDomainFilter = state.recentDomainFilter;
     if (state.recentPageSize !== undefined) recentPageSize = normalizeRecentPageSize(state.recentPageSize);
     if (state.recentCursor !== undefined) recentCursor = normalizeCursor(state.recentCursor);
-    if (typeof state.selectedBatchId === "string") selectedBatchId = state.selectedBatchId;
     if (state.batchSort) batchSort = state.batchSort;
     if (state.batchPageSize !== undefined) batchPageSize = normalizeBatchPageSize(state.batchPageSize);
     if (state.batchCursor !== undefined) batchCursor = normalizeCursor(state.batchCursor);
@@ -225,7 +225,6 @@
       recentDomainFilter: recentDomainFilter.trim(),
       recentPageSize: normalizeRecentPageSize(recentPageSize),
       recentCursor: normalizeCursor(recentCursor),
-      selectedBatchId: selectedBatchId.trim(),
       batchSort,
       batchPageSize: normalizeBatchPageSize(batchPageSize),
       batchCursor: normalizeCursor(batchCursor),
@@ -234,9 +233,9 @@
     };
 
     const params = encodeStateToURLParams(new URLSearchParams(window.location.search), state);
-    const hash = window.location.hash || `#/${activeTab}`;
+    const hash = window.location.hash || "#/single";
     const search = params.toString();
-    window.history.replaceState(window.history.state, "", `${window.location.pathname}${search ? `?${search}` : ""}${hash}`);
+    window.history.replaceState(null, "", `${window.location.pathname}${search ? `?${search}` : ""}${hash}`);
 
     try {
       const storage = typeof window === "undefined" ? null : window.localStorage;
@@ -246,58 +245,8 @@
       // Ignore storage issues in restricted browser contexts.
     }
   };
-  const normalizeTab = (value) => {
-    const tab = String(value || "").replace(/^\/+/, "").toLowerCase();
-    if (tab === "single" || tab === "job" || tab === "jobs" || tab === "home") return "single";
-    if (tab === "recent" || tab === "tests") return "recent";
-    if (tab === "domains" || tab === "domain") return "domains";
-    if (tab === "tags" || tab === "tag") return "tags";
-    if (tab === "cohorts" || tab === "cohort" || tab === "analysis") return "cohorts";
-    if (tab === "batches" || tab === "batch") return "batches";
-    if (tab === "metrics" || tab === "metric") return "metrics";
-    if (tab === "settings" || tab === "setting") return "settings";
-    return "";
-  };
-
-  const normalizeSettingsSubTab = (value) => {
-    const sub = String(value || "").toLowerCase();
-    if (sub === "system" || sub === "profiles" || sub === "scoring") return sub;
-    return "system";
-  };
-
-  const settingsHash = (subTab) => {
-    const sub = normalizeSettingsSubTab(subTab);
-    return sub === "system" ? "#/settings" : `#/settings/${sub}`;
-  };
-
-  const setTab = (tab, { replace = false } = {}) => {
-    const next = normalizeTab(tab) || "single";
-    const changed = activeTab !== next;
-    activeTab = next;
-    const nextHash = next === "settings" ? settingsHash(settingsSubTab) : `#/${next}`;
-    const url = `${window.location.pathname}${window.location.search}${nextHash}`;
-    const state = {
-      tab: next,
-      settingsSubTab: next === "settings" ? settingsSubTab : null,
-      domain: null,
-      tag: null,
-      jobId: null,
-    };
-    if (!changed || replace) {
-      if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
-    } else {
-      window.history.pushState(state, "", url);
-    }
-    if (changed && status.message) {
-      clearStatus();
-    }
-    loadDataForTab(next);
-  };
-
-  // Single source of truth for per-tab data loading. Called from both setTab
-  // (tab click) and initializeApp (first mount / page reload) so the two
-  // entry points can't drift - all new per-tab loads go here, not at the
-  // call sites.
+  // Single source of truth for per-tab data loading. Driven by the route
+  // effect (below) so first mount, tab clicks and back/forward all share it.
   const loadDataForTab = (tab) => {
     if (tab === "single" || tab === "tags" || tab === "batches") {
       loadProfiles();
@@ -311,107 +260,65 @@
     }
   };
 
+  const setTab = (tab) => { if (!dirtyGuard.confirmLeave()) return; navigate(tab); };
+  const setSettingsSubTab = (subTab) => { if (!dirtyGuard.confirmLeave()) return; navigate("settings", { settingsSub: subTab }); };
   const navigateToJob = (jobId) => {
-    selectedJobId = jobId;
-    activeTab = "single";
-    const hash = `#/single/${encodeURIComponent(jobId)}`;
-    window.history.pushState({ tab: "single", domain: null, tag: null, jobId }, "", `${window.location.pathname}${window.location.search}${hash}`);
+    if (!jobId) return;
     if (status.message) clearStatus();
-    loadJob(jobId);
+    navigate("single", { jobId });
   };
-
   const navigateToDomainDetail = (d) => {
-    activeTab = "domains";
-    selectedDomain = d;
-    const hash = `#/domains/${encodeURIComponent(d.name)}`;
-    window.history.pushState({ tab: "domains", domain: d, tag: null, jobId: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
-    if (status.message) clearStatus();
+    if (d?.name) navigate("domains", { domainName: d.name });
+  };
+  const goToDomainDetail = () => navigate("domains");
+  const goToTagList = () => navigate("tags");
+
+  // Keyboard shortcuts; pendingG/gTimer are non-reactive on purpose.
+  let helpOpen = $state(false);
+  let pendingG = false;
+  let gTimer = null;
+
+  const clearG = () => {
+    pendingG = false;
+    if (gTimer) { clearTimeout(gTimer); gTimer = null; }
+  };
+  const armG = () => {
+    pendingG = true;
+    if (gTimer) clearTimeout(gTimer);
+    gTimer = setTimeout(() => { pendingG = false; gTimer = null; }, 1200);
   };
 
-  const navigateToTagDetail = (tag) => {
-    activeTab = "tags";
-    selectedTag = tag;
-    const hash = `#/tags/${encodeURIComponent(tag.name)}`;
-    window.history.pushState({ tab: "tags", domain: null, tag, jobId: null }, "", `${window.location.pathname}${window.location.search}${hash}`);
-    if (status.message) clearStatus();
+  const focusFilter = () => {
+    document.querySelector("[data-shortcut-filter]")?.focus();
   };
 
-  // Guard flag: when popstate fires, a hashchange event also fires for the
-  // same navigation.  updateTabFromHash must skip that duplicate because
-  // onPopState already restored the full state (domain, tag, jobId) from
-  // history - updateTabFromHash would clobber it with nulls.
-  let popStateHandled = false;
-
-  const setSettingsSubTab = (subTab) => {
-    const next = normalizeSettingsSubTab(subTab);
-    const changed = settingsSubTab !== next;
-    settingsSubTab = next;
-    if (activeTab !== "settings") return;
-    const nextHash = settingsHash(next);
-    const url = `${window.location.pathname}${window.location.search}${nextHash}`;
-    const state = { tab: "settings", settingsSubTab: next, domain: null, tag: null, jobId: null };
-    if (!changed) {
-      if (window.location.hash !== nextHash) window.history.replaceState(state, "", url);
-    } else {
-      window.history.pushState(state, "", url);
-    }
+  const moveRow = (dir) => {
+    const rows = Array.from(document.querySelectorAll("[data-shortcut-row]"));
+    if (rows.length === 0) return;
+    const idx = rows.indexOf(document.activeElement);
+    const next = idx === -1 ? (dir > 0 ? 0 : rows.length - 1) : Math.max(0, Math.min(rows.length - 1, idx + dir));
+    rows[next]?.focus();
   };
 
-  const onPopState = (e) => {
-    popStateHandled = true;
-    const state = e.state;
-    if (!state) { updateTabFromHash(); return; }
-    activeTab = state.tab || "single";
-    if (activeTab === "settings") {
-      settingsSubTab = normalizeSettingsSubTab(state.settingsSubTab);
+  const handleShortcut = (event) => {
+    // An open modal owns the keyboard; it closes itself on Esc.
+    if (!helpOpen && document.querySelector('[aria-modal="true"]')) return;
+    const action = resolveShortcut(event, { pendingG, overlayOpen: helpOpen });
+    switch (action.type) {
+      case "help-toggle": event.preventDefault(); helpOpen = !helpOpen; break;
+      case "close": event.preventDefault(); helpOpen = false; break;
+      case "set-g": event.preventDefault(); armG(); break;
+      case "clear-g": clearG(); break;
+      case "navigate": event.preventDefault(); clearG(); setTab(action.tab); break;
+      case "new-scan":
+        event.preventDefault();
+        setTab("single");
+        tick().then(() => document.getElementById("single-domain")?.focus());
+        break;
+      case "focus-filter": event.preventDefault(); focusFilter(); break;
+      case "row-next": event.preventDefault(); moveRow(1); break;
+      case "row-prev": event.preventDefault(); moveRow(-1); break;
     }
-    selectedDomain = state.domain ?? null;
-    selectedTag = state.tag ?? null;
-    if (state.jobId) {
-      selectedJobId = state.jobId;
-      loadJob(state.jobId);
-    }
-  };
-
-  const updateTabFromHash = () => {
-    if (popStateHandled) {
-      popStateHandled = false;
-      return;
-    }
-    const hash = window.location.hash || "";
-    const parts = hash.replace(/^#\/?/, "").split("/");
-    const segment = parts[0];
-    // Legacy redirect: cohort management used to live under
-    // #/settings/analysis. The sub-tab is now a top-level tab, so map
-    // stale bookmarks forward.
-    let next;
-    if (segment === "settings" && (parts[1] || "").toLowerCase() === "analysis") {
-      next = "cohorts";
-    } else {
-      next = normalizeTab(segment) || "single";
-    }
-    activeTab = next;
-    const jobId = (next === "single" && parts[1]) ? decodeURIComponent(parts[1]) : null;
-    if (jobId) {
-      selectedJobId = jobId;
-      loadJob(jobId);
-    }
-    let settingsSub = null;
-    if (next === "settings") {
-      settingsSub = normalizeSettingsSubTab(parts[1]);
-      settingsSubTab = settingsSub;
-    }
-    window.history.replaceState(
-      {
-        tab: next,
-        settingsSubTab: settingsSub,
-        domain: null,
-        tag: null,
-        jobId: jobId || undefined,
-      },
-      "",
-      `${window.location.pathname}${window.location.search}${hash || `#/${next}`}`
-    );
   };
 
 
@@ -465,13 +372,8 @@
     }
   };
 
-  const navigateToDomainByName = async (name) => {
-    try {
-      const data = await apiFetch(`/domains?name=${encodeURIComponent(name)}&limit=20`);
-      const match = (data?.items ?? []).find((d) => d.name === name);
-      if (!match) return;
-      navigateToDomainDetail(match);
-    } catch (_) {}
+  const navigateToDomainByName = (name) => {
+    if (name) navigate("domains", { domainName: name });
   };
 
   const loadDomainTags = async () => {
@@ -529,6 +431,16 @@
     }, 6000);
     setStatus($t("job_created", { id: jobId }), "ok");
     recentCursor = 0;
+    navigate("single", { jobId });
+    loadJob(jobId);
+  };
+
+  // Manual job-id entry: reflect the id in the URL and load it. selectedJobId
+  // is already bound to the typed value, so the route-sync effect would skip
+  // the load; load explicitly here.
+  const handleJobIdSubmit = (jobId) => {
+    if (status.message) clearStatus();
+    navigate("single", { jobId });
     loadJob(jobId);
   };
 
@@ -542,12 +454,13 @@
     }
   };
 
-  const openBatchFromTagRow = async (batchId) => {
+  const openBatch = (batchId) => {
     const id = (batchId || "").trim();
     if (!id) return;
-    selectedBatchId = id;
-    await setTab("batches");
+    batchCursor = 0;
+    navigate("batches", { batchId: id });
   };
+  const openBatchFromTagRow = openBatch;
 
   const openBatchDelete = (batchId) => {
     const id = (batchId || "").trim();
@@ -562,8 +475,8 @@
   };
 
   const handleBatchDeleted = async (deletedId) => {
-    if (selectedBatchId === deletedId) {
-      selectedBatchId = "";
+    if (router.route.batchId === deletedId) {
+      navigate("batches");
     }
     batchDeletedCounter += 1;
   };
@@ -641,6 +554,65 @@
     jobPoller = setInterval(() => loadJob(selectedJobId, { silent: true }), 5000);
   };
 
+  // App-level batch completion watch: survives leaving the Batches tab so the
+  // browser notification still fires when a submitted batch finishes.
+  let watchedBatchId = "";
+  let batchWatchPoller = null;
+
+  const stopBatchWatch = () => {
+    if (batchWatchPoller) clearInterval(batchWatchPoller);
+    batchWatchPoller = null;
+    watchedBatchId = "";
+  };
+
+  const sendBatchNotification = async (batch) => {
+    const permission = await ensureNotificationPermission();
+    if (permission !== "granted") return;
+    try {
+      new Notification($t("notify_batch_done_title"), { body: $t("notify_batch_done_body", { id: batch.batch_id }) });
+    } catch (err) {
+      console.warn("[notify] Notification constructor failed:", err);
+    }
+  };
+
+  const watchBatch = (batchId) => {
+    const id = (batchId || "").trim();
+    if (!id) return;
+    watchedBatchId = id;
+    ensureNotificationPermission();
+    if (batchWatchPoller) clearInterval(batchWatchPoller);
+    const check = async () => {
+      if (!watchedBatchId) return;
+      try {
+        const batch = await apiFetch(`/batches/${watchedBatchId}?limit=1`);
+        if (!hasActiveBatchJobs(batch)) {
+          stopBatchWatch();
+          sendBatchNotification(batch);
+        }
+      } catch (_) {}
+    };
+    batchWatchPoller = setInterval(check, 7000);
+    check();
+  };
+
+  // Restore the route and persisted filter state synchronously so panels mount
+  // with the correct state on first render, before onMount runs.
+  const restoreInitialState = () => {
+    syncFromLocation();
+    const urlState = readStateFromURL();
+    applyPersistedState(urlState || readStateFromStorage());
+    batchPageSize = normalizeBatchPageSize(batchPageSize);
+    batchCursor = normalizeCursor(batchCursor);
+    recentPageSize = normalizeRecentPageSize(recentPageSize);
+    recentCursor = normalizeCursor(recentCursor);
+    // Migrate a legacy ?b_id= bookmark to the #/batches/<id> route.
+    const legacyBatch = urlState?.selectedBatchId;
+    if (legacyBatch && router.route.tab === "batches" && !router.route.batchId) {
+      navigate("batches", { batchId: legacyBatch, replace: true });
+    }
+  };
+  if (typeof window !== "undefined") restoreInitialState();
+
   $effect(() => {
     autoRefreshJob;
     selectedJobId;
@@ -667,7 +639,6 @@
     recentDomainFilter,
     String(recentPageSize),
     String(recentCursor),
-    selectedBatchId,
     batchSort,
     String(batchPageSize),
     String(batchCursor),
@@ -679,6 +650,33 @@
     if (persistenceReady && persistenceSignature) {
       persistState();
     }
+  });
+
+  // Route-driven side effects: per-tab data loading, status clearing on tab
+  // change, and syncing the inspected job id from the route.
+  let lastLoadedTab = null;
+  let routePrimed = false;
+  $effect(() => {
+    const tab = router.route.tab;
+    untrack(() => {
+      if (routePrimed && tab !== lastLoadedTab && status.message) clearStatus();
+      routePrimed = true;
+      if (tab !== lastLoadedTab) {
+        lastLoadedTab = tab;
+        loadDataForTab(tab);
+      }
+    });
+  });
+
+  $effect(() => {
+    const r = router.route;
+    untrack(() => {
+      if (r.tab !== "single") return;
+      const routeJob = r.jobId || "";
+      if (!routeJob || routeJob === selectedJobId) return;
+      selectedJobId = routeJob;
+      loadJob(routeJob);
+    });
   });
 
   const initializeApp = () => {
@@ -705,22 +703,11 @@
     loadProfiles();
     loadFeatures();
 
-    updateTabFromHash();
-    const urlState = readStateFromURL();
-    if (urlState) {
-      applyPersistedState(urlState);
-    } else {
-      const storageState = readStateFromStorage();
-      applyPersistedState(storageState);
-    }
-    batchPageSize = normalizeBatchPageSize(batchPageSize);
-    batchCursor = normalizeCursor(batchCursor);
-    recentPageSize = normalizeRecentPageSize(recentPageSize);
-    recentCursor = normalizeCursor(recentCursor);
+    canonicalize(router.route);
     persistenceReady = true;
-    window.addEventListener("hashchange", updateTabFromHash);
-    window.addEventListener("popstate", onPopState);
-    loadDataForTab(activeTab);
+    window.addEventListener("hashchange", syncFromLocation);
+    window.addEventListener("popstate", syncFromLocation);
+    window.addEventListener("keydown", handleShortcut);
   };
 
   let initialAnimationDone = $state(false);
@@ -736,9 +723,12 @@
     return () => {
       clearTimeout(revealTimer);
       if (jobPoller) clearInterval(jobPoller);
+      if (batchWatchPoller) clearInterval(batchWatchPoller);
       if (jobInspectorHighlightTimer) clearTimeout(jobInspectorHighlightTimer);
-      window.removeEventListener("hashchange", updateTabFromHash);
-      window.removeEventListener("popstate", onPopState);
+      if (gTimer) clearTimeout(gTimer);
+      window.removeEventListener("hashchange", syncFromLocation);
+      window.removeEventListener("popstate", syncFromLocation);
+      window.removeEventListener("keydown", handleShortcut);
     };
   });
 </script>
@@ -770,6 +760,13 @@
         </select>
       {/if}
       <ThemeToggle />
+      <button
+        type="button"
+        class="shortcuts-hint-btn"
+        onclick={() => (helpOpen = true)}
+        title={$t("shortcuts_open_hint")}
+        aria-label={$t("shortcuts_open_hint")}
+      >?</button>
       {#if auth.mode === "token"}
         <button type="button" class="logout-btn" onclick={doLogout}>{$t("auth_logout")}</button>
       {/if}
@@ -842,8 +839,10 @@
         {scoringEnabled}
         {nameserverTimingsEnabled}
         onRefresh={() => loadJob()}
+        onSubmitJobId={handleJobIdSubmit}
         onLoadResult={() => loadJobResult()}
         onNavigateDomain={navigateToDomainByName}
+        onNavigateBatch={openBatch}
       />
     </div>
   {:else if activeTab === "recent"}
@@ -862,12 +861,17 @@
       bind:recentPageSize
       bind:recentCursor
       onNavigateJob={navigateToJob}
+      onNavigateBatch={openBatch}
     />
   {:else if activeTab === "domains"}
     <DomainsPanel
       {apiFetch}
       {setStatus}
-      bind:selectedDomain
+      routeDomainName={router.route.domainName}
+      routeRunId={router.route.runId}
+      onOpenDomain={navigateToDomainByName}
+      onCloseDomain={goToDomainDetail}
+      onOpenRun={(name, runId) => navigate("domains", { domainName: name, runId })}
       {availableTags}
       {scoringEnabled}
       {nameserverTimingsEnabled}
@@ -879,7 +883,9 @@
       {apiFetch}
       {setStatus}
       {clearStatus}
-      bind:selectedTag
+      routeTagName={router.route.tagName}
+      onOpenTag={(name) => navigate("tags", { tagName: name })}
+      onCloseTag={goToTagList}
       {availableProfiles}
       {profilesLoading}
       {tagCohortByName}
@@ -901,8 +907,11 @@
     <BatchesPanel
       {apiFetch}
       {setStatus}
-      {ensureNotificationPermission}
-      bind:selectedBatchId
+      onWatchBatch={watchBatch}
+      {scoringEnabled}
+      routeBatchId={router.route.batchId}
+      onOpenBatch={openBatch}
+      onCloseBatch={() => navigate("batches")}
       bind:batchSort
       bind:batchPageSize
       bind:batchStatusFilter
@@ -950,6 +959,8 @@
   onDeleted={handleBatchDeleted}
   setStatus={setStatus}
 />
+
+<ShortcutsHelp open={helpOpen} onClose={() => (helpOpen = false)} />
 
 {/if}
 

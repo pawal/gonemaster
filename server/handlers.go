@@ -523,10 +523,13 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 	// Graduated jobs (succeeded/failed/canceled/expired) live in the runs table.
 	isActiveOnly := filter.Status == JobQueued || filter.Status == JobRunning || filter.Status == JobPaused
 	isTerminalOnly := !isActiveOnly && filter.Status != ""
+	// A severity filter can only match graduated runs (in-flight jobs have no
+	// results yet), so skip the in-flight source when one is set.
+	hasSeverityFilter := isValidJobSeverityFilter(filter.Severity)
 
 	var allItems []Job
 
-	if !isTerminalOnly {
+	if !isTerminalOnly && !hasSeverityFilter {
 		inFlightFilter := filter
 		inFlightFilter.Limit = 10000
 		inFlightFilter.Offset = 0
@@ -535,10 +538,11 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 
 	if !isActiveOnly {
 		runFilter := RunFilter{
-			Domain:  filter.Domain,
-			BatchID: filter.BatchID,
-			Limit:   10000,
-			Offset:  0,
+			Domain:   filter.Domain,
+			BatchID:  filter.BatchID,
+			Severity: filter.Severity,
+			Limit:    10000,
+			Offset:   0,
 		}
 		if isTerminalOnly {
 			runFilter.Status = filter.Status

@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { t } from "../i18n.js";
   import {
     sortItems,
@@ -11,12 +11,18 @@
     compareTimestamp,
     compareSeverity,
   } from "../lib/sort.js";
+  import GradeChip from "../components/GradeChip.svelte";
+  import ConfirmDialog from "../components/ConfirmDialog.svelte";
+  import { href } from "../lib/router.svelte.js";
+  import { formatTimestampLocal, formatDateLocal } from "../lib/format.js";
 
   let {
     apiFetch,
     setStatus = () => {},
     clearStatus = () => {},
-    selectedTag = $bindable(null),
+    routeTagName = null,
+    onOpenTag = () => {},
+    onCloseTag = () => {},
     availableProfiles = [],
     profilesLoading = false,
     tagCohortByName = new Map(),
@@ -29,8 +35,11 @@
     onTagsListChanged = () => {},
   } = $props();
 
+  let selectedTag = $state(null);
+
   let tagsList = $state([]);
   let tagsListLoading = $state(false);
+  let tagsListError = $state("");
   let tagsListSortState = $state({ key: "", direction: "asc" });
 
   let tagSummary = $state(null);
@@ -65,9 +74,7 @@
   let tagPurgeConfirm = $state(false);
   let tagPurging = $state(false);
 
-  let tagProfileDraftId = $state(
-    selectedTag?.default_profile_id ? String(selectedTag.default_profile_id) : ""
-  );
+  let tagProfileDraftId = $state("");
   let tagProfileUpdating = $state(false);
   let tagProfileClearing = $state(false);
 
@@ -119,8 +126,10 @@
     try {
       const data = await apiFetch("/tags");
       tagsList = Array.isArray(data) ? data : [];
+      tagsListError = "";
     } catch (error) {
-      setStatus($t("tags_load_error", { error: error.message || "unknown error" }), "warn");
+      tagsListError = error.message || $t("error_unknown");
+      setStatus($t("tags_load_error", { error: tagsListError }), "warn");
     } finally {
       tagsListLoading = false;
     }
@@ -152,7 +161,7 @@
       tagDomains = data?.items ?? [];
       tagDomainsTotal = data?.total ?? 0;
     } catch (error) {
-      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_domains_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagDomainsLoading = false;
     }
@@ -169,7 +178,7 @@
       tagBatches = data?.items ?? [];
       tagBatchesTotal = data?.total ?? 0;
     } catch (error) {
-      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_batches_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagBatchesLoading = false;
     }
@@ -187,7 +196,7 @@
         : "batch_snapshot_intent_disabled", { id: batch.id }), "ok");
       await loadTagBatches();
     } catch (error) {
-      setStatus($t("batch_snapshot_intent_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("batch_snapshot_intent_error", { error: error.message || $t("error_unknown") }), "warn");
     }
   }
 
@@ -223,7 +232,7 @@
       await loadTagsList();
       onTagsListChanged();
     } catch (error) {
-      setStatus($t("tag_create_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_create_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagCreating = false;
     }
@@ -238,10 +247,11 @@
       selectedTag = null;
       tagProfileDraftId = "";
       tagDeleteConfirm = false;
+      onCloseTag();
       await loadTagsList();
       onTagsListChanged();
     } catch (error) {
-      setStatus($t("tag_delete_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_delete_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagDeleting = false;
     }
@@ -259,7 +269,7 @@
       setStatus($t("batch_accepted", { id }), "ok");
       onOpenBatchFromTagRow(id);
     } catch (error) {
-      setStatus($t("tag_run_all_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_run_all_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagRunAllSubmitting = false;
     }
@@ -277,7 +287,7 @@
       await loadTagSummary();
       await loadTagDomains();
     } catch (error) {
-      setStatus($t("tag_purge_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_purge_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagPurging = false;
     }
@@ -297,7 +307,7 @@
       setStatus($t("tag_profile_saved", { name: profileNameByID(profileID) }), "ok");
       await loadTagsList();
     } catch (error) {
-      setStatus($t("tag_profile_save_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_profile_save_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagProfileUpdating = false;
     }
@@ -314,7 +324,7 @@
       setStatus($t("tag_profile_cleared"), "ok");
       await loadTagsList();
     } catch (error) {
-      setStatus($t("tag_profile_clear_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_profile_clear_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagProfileClearing = false;
     }
@@ -335,7 +345,7 @@
       await loadTagDomains({ reset: true });
       await loadTagSummary();
     } catch (error) {
-      setStatus($t("tag_domains_add_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_domains_add_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagAddingDomains = false;
     }
@@ -356,7 +366,7 @@
       await loadTagDomains({ reset: true });
       await loadTagSummary();
     } catch (error) {
-      setStatus($t("tag_domains_remove_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_domains_remove_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagRemovingDomains = false;
     }
@@ -365,10 +375,26 @@
   function navigateToTagDetail(tag) {
     clearStatus();
     selectedTag = tag;
+    onOpenTag(tag.name);
   }
 
-  // React to selectedTag changes (from row clicks here, App-level navigateToTagDetail,
-  // popstate, or our back button).
+  // Resolve selectedTag from the routed tag name (row click, deep link, or
+  // browser back/forward). The list dep re-resolves a deep link once loaded.
+  $effect(() => {
+    const name = routeTagName;
+    const list = tagsList;
+    untrack(() => {
+      if (name === (selectedTag?.name ?? null)) return;
+      if (!name) {
+        selectedTag = null;
+        return;
+      }
+      const match = (list || []).find((tg) => tg.name === name);
+      if (match) selectedTag = match;
+    });
+  });
+
+  // React to selectedTag changes to load or reset the tag detail.
   $effect(() => {
     const name = selectedTag?.name ?? null;
     if (name === lastSelectedTagName) return;
@@ -397,7 +423,7 @@
 
 <div class="card reveal delay-34 panel-mt" id="panel-tags" role="tabpanel" aria-labelledby="tab-tags">
   {#if selectedTag}
-    <button class="secondary small" onclick={() => { selectedTag = null; tagProfileDraftId = ""; }}>{$t("back_to_tags")}</button>
+    <button class="secondary small" onclick={() => { selectedTag = null; tagProfileDraftId = ""; onCloseTag(); }}>{$t("back_to_tags")}</button>
     <h2 class="mt-half">{$t("batch_tag_label")}: {selectedTag.name}</h2>
     {#if tagCohortByName.has(selectedTag.name)}
       <p class="small heading-tight">
@@ -424,18 +450,8 @@
       <button class="secondary" onclick={runAllFromTag} disabled={tagRunAllSubmitting}>
         {tagRunAllSubmitting ? $t("submitting") : $t("tag_run_all_button")}
       </button>
-      {#if tagPurgeConfirm}
-        <button class="warn" onclick={purgeTagRuns} disabled={tagPurging}>{tagPurging ? $t("submitting") : $t("tag_purge_confirm_button")}</button>
-        <button class="ghost" onclick={() => { tagPurgeConfirm = false; }}>{$t("tag_purge_cancel_button")}</button>
-      {:else}
-        <button class="ghost" onclick={() => { tagPurgeConfirm = true; }}>{$t("tag_purge_button")}</button>
-      {/if}
-      {#if tagDeleteConfirm}
-        <button class="warn" onclick={deleteTag} disabled={tagDeleting}>{tagDeleting ? $t("submitting") : $t("tag_delete_confirm_button")}</button>
-        <button class="ghost" onclick={() => { tagDeleteConfirm = false; }}>{$t("tag_delete_cancel_button")}</button>
-      {:else}
-        <button class="ghost" onclick={() => { tagDeleteConfirm = true; }}>{$t("tag_delete_button")}</button>
-      {/if}
+      <button class="ghost" onclick={() => { tagPurgeConfirm = true; }} disabled={tagPurging}>{$t("tag_purge_button")}</button>
+      <button class="ghost" onclick={() => { tagDeleteConfirm = true; }} disabled={tagDeleting}>{$t("tag_delete_button")}</button>
     </div>
 
     <h3>{$t("earlier_batches_heading")}</h3>
@@ -461,10 +477,10 @@
               tabindex="0"
             >
               <td class="mono">
-                {b.id}
+                <a href={href("batches", { batchId: b.id })} onclick={(e) => { if (e.target.closest("[data-row-action]")) return; e.preventDefault(); e.stopPropagation(); onOpenBatchFromTagRow(b.id); }}>{b.id}</a>
                 {#if b.snapshot_intent}<span class="pill snapshot-intent ml-quarter">{$t("batch_snapshot_intent_pill")}</span>{/if}
               </td>
-              <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "-"}</td>
+              <td>{b.created_at ? formatTimestampLocal(b.created_at) : "-"}</td>
               <td>{b.domain_count ?? "-"}</td>
               <td class="text-right" data-row-action>
                 <button
@@ -573,10 +589,10 @@
               tabindex="0"
               onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") onNavigateDomainDetail(d); }}
             >
-              <td class="mono">{d.name}</td>
+              <td class="mono"><a href={href("domains", { domainName: d.name })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); onNavigateDomainDetail(d); }}>{d.name}</a></td>
               <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
-              {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<span class="grade-chip"><span class="grade-chip-letter" data-grade={d.latest_grade}>{d.latest_grade}</span><span class="grade-chip-score">{d.latest_score}</span></span>{:else}-{/if}</td>{/if}
-              <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "-"}</td>
+              {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<GradeChip grade={d.latest_grade} score={d.latest_score} />{:else}-{/if}</td>{/if}
+              <td>{d.latest_run_at ? formatDateLocal(d.latest_run_at) : "-"}</td>
             </tr>
           {/each}
         </tbody>
@@ -585,7 +601,7 @@
         <button class="secondary small" disabled={tagDomainsOffset === 0}
           onclick={() => { tagDomainsOffset = Math.max(0, tagDomainsOffset - tagDomainsLimit); loadTagDomains(); }}
         >{$t("prev_page")}</button>
-        <span class="muted small">{tagDomainsOffset + 1}–{Math.min(tagDomainsOffset + tagDomainsLimit, tagDomainsTotal)} / {tagDomainsTotal}</span>
+        <span class="muted small">{tagDomainsOffset + 1}-{Math.min(tagDomainsOffset + tagDomainsLimit, tagDomainsTotal)} / {tagDomainsTotal}</span>
         <button class="secondary small" disabled={tagDomainsOffset + tagDomainsLimit >= tagDomainsTotal}
           onclick={() => { tagDomainsOffset += tagDomainsLimit; loadTagDomains(); }}
         >{$t("next_page")}</button>
@@ -596,6 +612,7 @@
     <textarea
       bind:value={tagAddDomainsInput}
       placeholder={$t("tag_domains_placeholder")}
+      aria-label={$t("tag_add_domains_heading")}
       rows="3"
       class="input-fluid"
     ></textarea>
@@ -607,6 +624,7 @@
     <textarea
       bind:value={tagRemoveDomainsInput}
       placeholder={$t("tag_domains_placeholder")}
+      aria-label={$t("tag_remove_domains_heading")}
       rows="3"
       class="input-fluid"
     ></textarea>
@@ -633,6 +651,11 @@
 
     {#if tagsListLoading}
       <p class="muted">{$t("loading")}</p>
+    {:else if tagsListError}
+      <div class="toolbar-row gap-1">
+        <span class="inline-notice inline-notice-warn">{$t("tags_load_error", { error: tagsListError })}</span>
+        <button class="secondary small" onclick={loadTagsList}>{$t("retry")}</button>
+      </div>
     {:else if tagsList.length === 0}
       <p class="muted">{$t("no_tags")}</p>
     {:else}
@@ -653,7 +676,7 @@
               tabindex="0"
               onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") navigateToTagDetail(tag); }}
             >
-              <td class="mono">{tag.name}</td>
+              <td class="mono"><a href={href("tags", { tagName: tag.name })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); navigateToTagDetail(tag); }}>{tag.name}</a></td>
               <td>
                 {#if tagCohortByName.has(tag.name)}
                   <button
@@ -686,3 +709,25 @@
     {/if}
   {/if}
 </div>
+
+{#if selectedTag}
+  <ConfirmDialog
+    open={tagDeleteConfirm}
+    title={$t("tag_delete_prompt", { name: selectedTag.name })}
+    confirmLabel={$t("tag_delete_confirm_button")}
+    busy={tagDeleting}
+    onConfirm={deleteTag}
+    onCancel={() => (tagDeleteConfirm = false)}
+  />
+  <ConfirmDialog
+    open={tagPurgeConfirm}
+    title={$t("tag_purge_button")}
+    message={$t("tag_purge_warning")}
+    confirmLabel={$t("tag_purge_confirm_button")}
+    confirmPhrase={selectedTag.name}
+    phrasePrompt={$t("batch_delete_typed_confirm_label", { id: selectedTag.name })}
+    busy={tagPurging}
+    onConfirm={purgeTagRuns}
+    onCancel={() => (tagPurgeConfirm = false)}
+  />
+{/if}

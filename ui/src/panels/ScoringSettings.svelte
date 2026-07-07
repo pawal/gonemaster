@@ -178,7 +178,7 @@
       draft = cloneConfig(defaults);
       configToRows(defaults);
     } catch (e) {
-      setNotice($t("scoring_save_error", { error: e.message }), "warn");
+      setNotice($t("scoring_load_error", { error: e.message }), "warn");
     }
   }
 

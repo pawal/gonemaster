@@ -39,6 +39,7 @@
 
   let tagsList = $state([]);
   let tagsListLoading = $state(false);
+  let tagsListError = $state("");
   let tagsListSortState = $state({ key: "", direction: "asc" });
 
   let tagSummary = $state(null);
@@ -125,8 +126,10 @@
     try {
       const data = await apiFetch("/tags");
       tagsList = Array.isArray(data) ? data : [];
+      tagsListError = "";
     } catch (error) {
-      setStatus($t("tags_load_error", { error: error.message || $t("error_unknown") }), "warn");
+      tagsListError = error.message || $t("error_unknown");
+      setStatus($t("tags_load_error", { error: tagsListError }), "warn");
     } finally {
       tagsListLoading = false;
     }
@@ -175,7 +178,7 @@
       tagBatches = data?.items ?? [];
       tagBatchesTotal = data?.total ?? 0;
     } catch (error) {
-      setStatus($t("tag_domains_load_error", { error: error.message || $t("error_unknown") }), "warn");
+      setStatus($t("tag_batches_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagBatchesLoading = false;
     }
@@ -609,6 +612,7 @@
     <textarea
       bind:value={tagAddDomainsInput}
       placeholder={$t("tag_domains_placeholder")}
+      aria-label={$t("tag_add_domains_heading")}
       rows="3"
       class="input-fluid"
     ></textarea>
@@ -620,6 +624,7 @@
     <textarea
       bind:value={tagRemoveDomainsInput}
       placeholder={$t("tag_domains_placeholder")}
+      aria-label={$t("tag_remove_domains_heading")}
       rows="3"
       class="input-fluid"
     ></textarea>
@@ -646,6 +651,11 @@
 
     {#if tagsListLoading}
       <p class="muted">{$t("loading")}</p>
+    {:else if tagsListError}
+      <div class="toolbar-row gap-1">
+        <span class="inline-notice inline-notice-warn">{$t("tags_load_error", { error: tagsListError })}</span>
+        <button class="secondary small" onclick={loadTagsList}>{$t("retry")}</button>
+      </div>
     {:else if tagsList.length === 0}
       <p class="muted">{$t("no_tags")}</p>
     {:else}

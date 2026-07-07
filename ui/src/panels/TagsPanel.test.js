@@ -42,6 +42,27 @@ describe("TagsPanel", () => {
     expect(screen.getByText("gov")).toBeInTheDocument();
   });
 
+  it("distinguishes a load error from an empty list and offers a retry", async () => {
+    let attempt = 0;
+    const failing = vi.fn().mockImplementation((path) => {
+      if (path === "/tags") {
+        attempt += 1;
+        if (attempt === 1) return Promise.reject(new Error("boom"));
+        return Promise.resolve([]);
+      }
+      return Promise.resolve({ items: [], total: 0 });
+    });
+    render(TagsPanel, { props: { apiFetch: failing } });
+
+    // Error state, not the "no tags" empty state.
+    const retry = await screen.findByRole("button", { name: /Retry/i });
+    expect(screen.queryByText(/No tags/i)).toBeNull();
+
+    // Retrying succeeds and now shows the genuine empty state.
+    await fireEvent.click(retry);
+    expect(await screen.findByText(/No tags/i)).toBeInTheDocument();
+  });
+
   it("creates a new tag when the form is submitted", async () => {
     render(TagsPanel, { props: { apiFetch } });
     await screen.findByText("tld");

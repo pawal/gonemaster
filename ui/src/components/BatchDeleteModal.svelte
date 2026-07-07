@@ -1,6 +1,7 @@
 <script>
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
+  import { formatTimestampLocal } from "../lib/format.js";
 
   let {
     open = false,
@@ -63,14 +64,6 @@
     !submitting && preview && preview.exists && typed.trim() === batchId
   );
 
-  const formatDate = (s) => {
-    if (!s) return "";
-    try {
-      return new Date(s).toISOString().slice(0, 19).replace("T", " ");
-    } catch {
-      return s;
-    }
-  };
 </script>
 
 {#if open}
@@ -104,7 +97,7 @@
             <div><strong>{$t("batch_tag_label")}:</strong> {preview.tag}</div>
           {/if}
           {#if preview.created_at}
-            <div><strong>{$t("col_created_at")}:</strong> {formatDate(preview.created_at)}</div>
+            <div><strong>{$t("col_created_at")}:</strong> {formatTimestampLocal(preview.created_at)}</div>
           {/if}
           {#if preview.snapshot_intent}
             <div><span class="pill snapshot-intent">{$t("batch_snapshot_intent_pill")}</span></div>

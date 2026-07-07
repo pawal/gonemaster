@@ -47,6 +47,16 @@
   --grade-c:     #ca8a04;
   --grade-d:     #ea580c;
   --grade-f:     #dc2626;
+
+  /* ── Severity palette (shared by badges, level-pills, entry-levels) ────── */
+  --sev-notice-bg:   #e0f2fe;
+  --sev-notice-fg:   #075985;
+  --sev-warning-bg:  #fef3c7;
+  --sev-warning-fg:  #92400e;
+  --sev-error-bg:    #ffedd5;
+  --sev-error-fg:    #9a3412;
+  --sev-critical-bg: #fee2e2;
+  --sev-critical-fg: #991b1b;
 }
 
 * {
@@ -514,23 +524,23 @@ button:hover:not(:disabled) {
 }
 
 .badge.level-notice {
-  background: #e0f2fe;
-  color: #075985;
+  background: var(--sev-notice-bg);
+  color: var(--sev-notice-fg);
 }
 
 .badge.level-warning {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--sev-warning-bg);
+  color: var(--sev-warning-fg);
 }
 
 .badge.level-error {
-  background: #ffedd5;
-  color: #9a3412;
+  background: var(--sev-error-bg);
+  color: var(--sev-error-fg);
 }
 
 .badge.level-critical {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--sev-critical-bg);
+  color: var(--sev-critical-fg);
 }
 
 .mono {
@@ -791,23 +801,23 @@ button.link-button:hover:not(:disabled) {
 }
 
 .level-pill.severity-notice {
-  background: #e0f2fe;
-  color: #075985;
+  background: var(--sev-notice-bg);
+  color: var(--sev-notice-fg);
 }
 
 .level-pill.severity-warning {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--sev-warning-bg);
+  color: var(--sev-warning-fg);
 }
 
 .level-pill.severity-error {
-  background: #ffedd5;
-  color: #9a3412;
+  background: var(--sev-error-bg);
+  color: var(--sev-error-fg);
 }
 
 .level-pill.severity-critical {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--sev-critical-bg);
+  color: var(--sev-critical-fg);
 }
 
 .module-chevron {
@@ -866,23 +876,23 @@ button.link-button:hover:not(:disabled) {
 }
 
 .entry-level.severity-notice {
-  background: #e0f2fe;
-  color: #075985;
+  background: var(--sev-notice-bg);
+  color: var(--sev-notice-fg);
 }
 
 .entry-level.severity-warning {
-  background: #fef3c7;
-  color: #92400e;
+  background: var(--sev-warning-bg);
+  color: var(--sev-warning-fg);
 }
 
 .entry-level.severity-error {
-  background: #ffedd5;
-  color: #9a3412;
+  background: var(--sev-error-bg);
+  color: var(--sev-error-fg);
 }
 
 .entry-level.severity-critical {
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--sev-critical-bg);
+  color: var(--sev-critical-fg);
 }
 
 .entry-message {
@@ -1141,6 +1151,19 @@ button.link-button:hover:not(:disabled) {
 
 .job-id-link {
   font-weight: 500;
+}
+
+/* Visually hidden but available to assistive tech. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* Inline form notices: subtle tint + tone-colored left border, readable in
@@ -1614,21 +1637,15 @@ pre {
     color: var(--muted);
   }
 
-  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge.level-notice {
-    background: #0f2a38;
-    color: #7dd3fc;
-  }
-  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge.level-warning {
-    background: #2a1f0a;
-    color: #fbbf24;
-  }
-  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge.level-error {
-    background: #2a150a;
-    color: #fb923c;
-  }
-  :root:not([data-theme="light"]):not([data-theme="dark"]) .badge.level-critical {
-    background: #2a0a0a;
-    color: #f87171;
+  :root:not([data-theme="light"]):not([data-theme="dark"]) {
+    --sev-notice-bg: #0f2a38;
+    --sev-notice-fg: #7dd3fc;
+    --sev-warning-bg: #2a1f0a;
+    --sev-warning-fg: #fbbf24;
+    --sev-error-bg: #2a150a;
+    --sev-error-fg: #fb923c;
+    --sev-critical-bg: #2a0a0a;
+    --sev-critical-fg: #f87171;
   }
 
   :root:not([data-theme="light"]):not([data-theme="dark"]) button.secondary {
@@ -1739,21 +1756,15 @@ pre {
   color: var(--muted);
 }
 
-:root[data-theme="dark"] .badge.level-notice {
-  background: #0f2a38;
-  color: #7dd3fc;
-}
-:root[data-theme="dark"] .badge.level-warning {
-  background: #2a1f0a;
-  color: #fbbf24;
-}
-:root[data-theme="dark"] .badge.level-error {
-  background: #2a150a;
-  color: #fb923c;
-}
-:root[data-theme="dark"] .badge.level-critical {
-  background: #2a0a0a;
-  color: #f87171;
+:root[data-theme="dark"] {
+  --sev-notice-bg: #0f2a38;
+  --sev-notice-fg: #7dd3fc;
+  --sev-warning-bg: #2a1f0a;
+  --sev-warning-fg: #fbbf24;
+  --sev-error-bg: #2a150a;
+  --sev-error-fg: #fb923c;
+  --sev-critical-bg: #2a0a0a;
+  --sev-critical-fg: #f87171;
 }
 
 :root[data-theme="dark"] button.secondary {

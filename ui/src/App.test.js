@@ -1697,4 +1697,70 @@ describe("App", () => {
       unmount();
     });
   });
+
+  // Keyboard shortcuts: the global keydown handler is wired in App; here we
+  // verify the end-to-end effects (overlay, focus, navigation) and that a
+  // keystroke inside an input never triggers a shortcut.
+  describe("keyboard shortcuts", () => {
+    const benignFetch = () => global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
+    const helpDialog = () => screen.queryByRole("dialog", { name: "Keyboard shortcuts help" });
+
+    it("opens the help overlay on '?' and closes it on Escape", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      expect(helpDialog()).toBeNull();
+      await fireEvent.keyDown(document.body, { key: "?" });
+      expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts help" })).toBeInTheDocument();
+
+      await fireEvent.keyDown(document.body, { key: "Escape" });
+      await waitFor(() => expect(helpDialog()).toBeNull());
+      unmount();
+    });
+
+    it("opens the help overlay from the header affordance", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      await fireEvent.click(screen.getByRole("button", { name: "Keyboard shortcuts (?)" }));
+      expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts help" })).toBeInTheDocument();
+      unmount();
+    });
+
+    it("focuses the domain field on 'n'", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      const input = await screen.findByPlaceholderText("example.com");
+      input.blur();
+      await fireEvent.keyDown(document.body, { key: "n" });
+      await waitFor(() => expect(input).toHaveFocus());
+      unmount();
+    });
+
+    it("navigates tabs via the g-prefix sequence (g then r)", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      await fireEvent.keyDown(document.body, { key: "g" });
+      await fireEvent.keyDown(document.body, { key: "r" });
+      await waitFor(() => {
+        expect(screen.getByRole("tab", { name: "Recent Tests" })).toHaveAttribute("aria-selected", "true");
+        expect(window.location.hash).toBe("#/recent");
+      });
+      unmount();
+    });
+
+    it("does not trigger a shortcut while typing in an input", async () => {
+      benignFetch();
+      const { unmount } = render(App);
+
+      const input = await screen.findByPlaceholderText("example.com");
+      input.focus();
+      await fireEvent.keyDown(input, { key: "?" });
+      // '?' typed into a field must not open the overlay.
+      expect(helpDialog()).toBeNull();
+      unmount();
+    });
+  });
 });

@@ -1,3 +1,7 @@
+import { translate } from "../i18n.js";
+
+const pad2 = (n) => String(n).padStart(2, "0");
+
 export const formatPercent = (value) => `${(Number(value || 0) * 100).toFixed(1)}%`;
 
 export const formatInteger = (value) => {
@@ -41,7 +45,7 @@ export const formatRate = (value) => {
 
 export const formatUptime = (value) => {
   const seconds = Number(value);
-  if (!Number.isFinite(seconds) || seconds < 0) return "unknown";
+  if (!Number.isFinite(seconds) || seconds < 0) return translate("value_unknown");
   const total = Math.floor(seconds);
   if (total < 60) return `${total}s`;
   if (total < 3600) {
@@ -66,15 +70,23 @@ export const parseTimestamp = (value) => {
   return parsed;
 };
 
+// ISO-style local time, e.g. "2026-07-07 14:30" (deterministic, not locale-dependent).
 export const formatTimestampLocal = (value) => {
   const parsed = parseTimestamp(value);
-  if (!parsed) return "unknown";
-  return parsed.toLocaleString("sv-SE");
+  if (!parsed) return translate("value_unknown");
+  return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())} ${pad2(parsed.getHours())}:${pad2(parsed.getMinutes())}`;
+};
+
+// ISO-style local date only, e.g. "2026-07-07".
+export const formatDateLocal = (value) => {
+  const parsed = parseTimestamp(value);
+  if (!parsed) return translate("value_unknown");
+  return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())}`;
 };
 
 export const formatBatchTotalRuntime = (batch) => {
   const created = parseTimestamp(batch?.created_at);
-  if (!created) return "unknown";
+  if (!created) return translate("value_unknown");
   const finished = parseTimestamp(batch?.finished_at);
   const end = finished || new Date();
   const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - created.getTime()) / 1000));
@@ -83,7 +95,7 @@ export const formatBatchTotalRuntime = (batch) => {
 
 export const formatJobTotalRuntime = (job, isActiveJobStatus) => {
   const started = parseTimestamp(job?.started_at);
-  if (!started) return "not started";
+  if (!started) return translate("time_not_started");
   const finished = parseTimestamp(job?.finished_at);
   const end = finished || new Date();
   const elapsedSeconds = Math.max(0, Math.floor((end.getTime() - started.getTime()) / 1000));

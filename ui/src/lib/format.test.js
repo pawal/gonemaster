@@ -8,6 +8,7 @@ import {
   formatUptime,
   parseTimestamp,
   formatTimestampLocal,
+  formatDateLocal,
   formatBatchTotalRuntime,
   prettyProfileJSON,
   formatSnapshotSlugPreview,
@@ -116,10 +117,19 @@ describe("formatTimestampLocal", () => {
     expect(formatTimestampLocal("garbage")).toBe("unknown");
   });
 
-  it("returns a Swedish-locale date string for valid input", () => {
+  it("returns an ISO-style local date-time string for valid input", () => {
     const out = formatTimestampLocal("2026-01-02T03:04:05Z");
-    expect(typeof out).toBe("string");
-    expect(out).not.toBe("unknown");
+    expect(out).toMatch(/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
+  });
+});
+
+describe("formatDateLocal", () => {
+  it("returns 'unknown' for invalid input", () => {
+    expect(formatDateLocal("")).toBe("unknown");
+  });
+
+  it("returns an ISO-style local date for valid input", () => {
+    expect(formatDateLocal("2026-01-02T03:04:05Z")).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 });
 

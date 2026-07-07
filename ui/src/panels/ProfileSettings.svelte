@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import { t } from "../i18n.js";
   import { apiCall } from "../lib/api.js";
+  import { formatTimestampLocal } from "../lib/format.js";
 
   let { apiBase = "/api/v1", onprofileschanged } = $props();
 
@@ -62,13 +63,6 @@
   const makeCopyName = (name) => {
     const base = String(name || "").trim();
     return base ? `${base} copy` : "copy";
-  };
-
-  const formatTimestampLocal = (value) => {
-    if (!value) return "unknown";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "unknown";
-    return parsed.toLocaleString("sv-SE");
   };
 
   const usageCount = (profileId) => Number(usageCounts[profileId] || 0);
@@ -149,7 +143,7 @@
       await loadProfiles({ selectKey: `profile:${editingProfileId}`, preserveNotice: true });
       onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
-      setNotice($t("profile_compat_fix_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_compat_fix_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       applyingFix = false;
     }
@@ -163,7 +157,7 @@
       await loadProfiles({ preserveNotice: true });
       onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
-      setNotice($t("profile_compat_fix_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_compat_fix_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       markingAllReviewed = false;
     }
@@ -300,7 +294,7 @@
         clearNotice();
       }
     } catch (error) {
-      setNotice($t("profile_load_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       loading = false;
     }
@@ -351,7 +345,7 @@
       }
       onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
-      setNotice($t("profile_save_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_save_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       saving = false;
     }
@@ -372,7 +366,7 @@
       await loadProfiles({ selectKey: defaultProfileKey, preserveNotice: true });
       onprofileschanged?.({ profiles: storedProfiles });
     } catch (error) {
-      setNotice($t("profile_delete_error", { error: error.message || "unknown error" }), "warn");
+      setNotice($t("profile_delete_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       deletingProfileId = null;
     }

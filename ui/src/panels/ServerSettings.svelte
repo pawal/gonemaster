@@ -199,7 +199,7 @@
                   disabled={ro}
                   onchange={() => handleToggle(s.key)}
                 />
-                {val ? "Enabled" : "Disabled"}
+                {val ? $t("enabled") : $t("disabled")}
               </label>
             {:else if s.type === "select"}
               <select

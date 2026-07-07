@@ -91,10 +91,12 @@
     return Number(snapshot?.quality?.outcomes?.failed_total || 0);
   };
   const lastLoadedLabel = (value) => {
-    if (!value) return "never";
+    if (!value) return $t("time_never");
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return "never";
-    return parsed.toLocaleTimeString("sv-SE");
+    if (Number.isNaN(parsed.getTime())) return $t("time_never");
+    return [parsed.getHours(), parsed.getMinutes(), parsed.getSeconds()]
+      .map((n) => String(n).padStart(2, "0"))
+      .join(":");
   };
   const sparklineBounds = (...seriesList) => {
     const flattened = seriesList.flatMap((series) =>
@@ -181,7 +183,7 @@
       });
       metricsLoadedAt = new Date().toISOString();
     } catch (error) {
-      metricsError = error.message || "unknown error";
+      metricsError = error.message || $t("error_unknown");
       if (!metricsSnapshot) {
         setStatus($t("metrics_load_error", { error: metricsError }), "warn");
       }
@@ -240,7 +242,7 @@
     </div>
   </div>
   <div class="small">
-    {$t("metrics_status_line", { time: lastLoadedLabel(metricsLoadedAt), uptime: formatUptime(metricsSnapshot?.health?.uptime_seconds), version: metricsSnapshot?.server_version || "unknown" })}
+    {$t("metrics_status_line", { time: lastLoadedLabel(metricsLoadedAt), uptime: formatUptime(metricsSnapshot?.health?.uptime_seconds), version: metricsSnapshot?.server_version || $t("value_unknown") })}
   </div>
 
   {#if metricsLoading && !hasMetricsData(metricsSnapshot)}

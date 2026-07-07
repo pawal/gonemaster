@@ -198,7 +198,7 @@
       batchesList = list?.items || [];
       batchesListTotal = Number.isFinite(Number(list?.total)) ? Number(list.total) : batchesList.length;
     } catch (error) {
-      if (!silent) setStatus($t("error_load_batches", { error: error.message || "unknown error" }), "warn");
+      if (!silent) setStatus($t("error_load_batches", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       if (!silent) batchesListLoading = false;
     }

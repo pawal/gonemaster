@@ -1,4 +1,4 @@
-import { writable, derived } from "svelte/store";
+import { writable, derived, get } from "svelte/store";
 import en from "./i18n/en.json";
 
 /**
@@ -58,11 +58,19 @@ export const loadCatalog = async (code) => {
  * matching value from `vars`. Extra vars are ignored; missing vars leave the
  * placeholder literal in the output.
  */
-export const t = derived([locale, _version], ([$locale]) => (key, vars = {}) => {
+const lookup = ($locale, key, vars = {}) => {
   const catalog = catalogs[$locale] ?? catalogs.en;
   let str = catalog?.[key] ?? catalogs.en?.[key] ?? key;
   for (const [k, v] of Object.entries(vars)) {
     str = str.replaceAll(`{${k}}`, String(v));
   }
   return str;
-});
+};
+
+export const t = derived([locale, _version], ([$locale]) => (key, vars = {}) => lookup($locale, key, vars));
+
+/**
+ * Non-reactive translation for use in plain .js modules (e.g. formatters)
+ * that cannot subscribe to the `$t` store. Reads the current locale.
+ */
+export const translate = (key, vars = {}) => lookup(get(locale), key, vars);

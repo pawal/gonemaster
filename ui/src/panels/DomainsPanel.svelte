@@ -1,7 +1,7 @@
 <script>
   import { onMount, untrack } from "svelte";
   import { t } from "../i18n.js";
-  import { formatTimestampLocal, formatDurationMs } from "../lib/format.js";
+  import { formatTimestampLocal, formatDateLocal, formatDurationMs } from "../lib/format.js";
   import {
     sortItems,
     nextTableSort,
@@ -110,7 +110,7 @@
       domains = data?.items ?? [];
       domainsTotal = data?.total ?? 0;
     } catch (error) {
-      setStatus($t("domains_load_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("domains_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       domainsLoading = false;
     }
@@ -134,7 +134,7 @@
         loadDomainRunResult(domainRuns[0].id);
       }
     } catch (error) {
-      setStatus($t("domain_runs_load_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("domain_runs_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       domainRunsLoading = false;
     }
@@ -319,7 +319,7 @@
                 onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openRun(run.id); } }}
               >
                 <td class="run-id-cell" title={run.id}><a href={href("domains", { domainName: selectedDomain.name, runId: run.id })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); openRun(run.id); }}>{run.id}</a></td>
-                <td>{run.finished_at ? run.finished_at.slice(0, 16).replace("T", " ") : "-"}</td>
+                <td>{run.finished_at ? formatTimestampLocal(run.finished_at) : "-"}</td>
                 <td><span class="badge level-{(run.worst_level || 'info').toLowerCase()}">{run.worst_level || "INFO"}</span></td>
                 {#if scoringEnabled}<td>{#if hasScore(run)}<GradeChip grade={chipGrade(run)} score={chipScore(run)} />{:else}-{/if}</td>{/if}
                 <td>{run.duration_ms != null ? formatDurationMs(run.duration_ms) : "-"}</td>
@@ -407,7 +407,7 @@
               <td>{d.tags ? d.tags.join(", ") : ""}</td>
               <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
               {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<GradeChip grade={d.latest_grade} score={d.latest_score} />{:else}-{/if}</td>{/if}
-              <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "-"}</td>
+              <td>{d.latest_run_at ? formatDateLocal(d.latest_run_at) : "-"}</td>
               <td>{d.run_count ?? 0}</td>
             </tr>
           {/each}

@@ -13,6 +13,7 @@
   } from "../lib/sort.js";
   import GradeChip from "../components/GradeChip.svelte";
   import { href } from "../lib/router.svelte.js";
+  import { formatTimestampLocal, formatDateLocal } from "../lib/format.js";
 
   let {
     apiFetch,
@@ -124,7 +125,7 @@
       const data = await apiFetch("/tags");
       tagsList = Array.isArray(data) ? data : [];
     } catch (error) {
-      setStatus($t("tags_load_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tags_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagsListLoading = false;
     }
@@ -156,7 +157,7 @@
       tagDomains = data?.items ?? [];
       tagDomainsTotal = data?.total ?? 0;
     } catch (error) {
-      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_domains_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagDomainsLoading = false;
     }
@@ -173,7 +174,7 @@
       tagBatches = data?.items ?? [];
       tagBatchesTotal = data?.total ?? 0;
     } catch (error) {
-      setStatus($t("tag_domains_load_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_domains_load_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagBatchesLoading = false;
     }
@@ -191,7 +192,7 @@
         : "batch_snapshot_intent_disabled", { id: batch.id }), "ok");
       await loadTagBatches();
     } catch (error) {
-      setStatus($t("batch_snapshot_intent_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("batch_snapshot_intent_error", { error: error.message || $t("error_unknown") }), "warn");
     }
   }
 
@@ -227,7 +228,7 @@
       await loadTagsList();
       onTagsListChanged();
     } catch (error) {
-      setStatus($t("tag_create_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_create_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagCreating = false;
     }
@@ -246,7 +247,7 @@
       await loadTagsList();
       onTagsListChanged();
     } catch (error) {
-      setStatus($t("tag_delete_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_delete_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagDeleting = false;
     }
@@ -264,7 +265,7 @@
       setStatus($t("batch_accepted", { id }), "ok");
       onOpenBatchFromTagRow(id);
     } catch (error) {
-      setStatus($t("tag_run_all_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_run_all_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagRunAllSubmitting = false;
     }
@@ -282,7 +283,7 @@
       await loadTagSummary();
       await loadTagDomains();
     } catch (error) {
-      setStatus($t("tag_purge_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_purge_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagPurging = false;
     }
@@ -302,7 +303,7 @@
       setStatus($t("tag_profile_saved", { name: profileNameByID(profileID) }), "ok");
       await loadTagsList();
     } catch (error) {
-      setStatus($t("tag_profile_save_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_profile_save_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagProfileUpdating = false;
     }
@@ -319,7 +320,7 @@
       setStatus($t("tag_profile_cleared"), "ok");
       await loadTagsList();
     } catch (error) {
-      setStatus($t("tag_profile_clear_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_profile_clear_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagProfileClearing = false;
     }
@@ -340,7 +341,7 @@
       await loadTagDomains({ reset: true });
       await loadTagSummary();
     } catch (error) {
-      setStatus($t("tag_domains_add_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_domains_add_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagAddingDomains = false;
     }
@@ -361,7 +362,7 @@
       await loadTagDomains({ reset: true });
       await loadTagSummary();
     } catch (error) {
-      setStatus($t("tag_domains_remove_error", { error: error.message || "unknown error" }), "warn");
+      setStatus($t("tag_domains_remove_error", { error: error.message || $t("error_unknown") }), "warn");
     } finally {
       tagRemovingDomains = false;
     }
@@ -485,7 +486,7 @@
                 <a href={href("batches", { batchId: b.id })} onclick={(e) => { if (e.target.closest("[data-row-action]")) return; e.preventDefault(); e.stopPropagation(); onOpenBatchFromTagRow(b.id); }}>{b.id}</a>
                 {#if b.snapshot_intent}<span class="pill snapshot-intent ml-quarter">{$t("batch_snapshot_intent_pill")}</span>{/if}
               </td>
-              <td>{b.created_at ? b.created_at.slice(0, 19).replace("T", " ") : "-"}</td>
+              <td>{b.created_at ? formatTimestampLocal(b.created_at) : "-"}</td>
               <td>{b.domain_count ?? "-"}</td>
               <td class="text-right" data-row-action>
                 <button
@@ -597,7 +598,7 @@
               <td class="mono"><a href={href("domains", { domainName: d.name })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); onNavigateDomainDetail(d); }}>{d.name}</a></td>
               <td>{#if domainLevel(d)}<span class="badge level-{domainLevel(d).toLowerCase()}">{domainLevel(d)}</span>{:else}-{/if}</td>
               {#if scoringEnabled}<td>{#if d.latest_grade != null && d.latest_score != null}<GradeChip grade={d.latest_grade} score={d.latest_score} />{:else}-{/if}</td>{/if}
-              <td>{d.latest_run_at ? d.latest_run_at.slice(0, 10) : "-"}</td>
+              <td>{d.latest_run_at ? formatDateLocal(d.latest_run_at) : "-"}</td>
             </tr>
           {/each}
         </tbody>

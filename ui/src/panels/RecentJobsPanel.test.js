@@ -74,14 +74,22 @@ describe("RecentJobsPanel", () => {
     expect(onNavigateJob).toHaveBeenCalledWith("job_a");
   });
 
-  it("hides jobs that don't match the active severity filter", async () => {
+  it("renders exactly the jobs the server returns (severity filtering is server-side)", async () => {
+    // The server already applied the filter, so the panel must not drop rows.
     const apiFetch = vi.fn().mockResolvedValue(sampleJobs());
     render(RecentJobsPanel, {
       props: baseProps({ apiFetch, severityFilter: "errors_only" }),
     });
-    await screen.findByText("job_b");
-    // job_a has only WARNING; with errors_only it should be filtered out.
-    expect(screen.queryByText("job_a")).toBeNull();
+    expect(await screen.findByText("job_a")).toBeInTheDocument();
+    expect(screen.getByText("job_b")).toBeInTheDocument();
+  });
+
+  it("shows the severity-specific empty message when a filter returns nothing", async () => {
+    const apiFetch = vi.fn().mockResolvedValue({ items: [], total: 0, offset: 0 });
+    render(RecentJobsPanel, {
+      props: baseProps({ apiFetch, severityFilter: "warnings_plus" }),
+    });
+    expect(await screen.findByText(/No jobs match the selected severity filter/i)).toBeInTheDocument();
   });
 
   it("re-queries when Apply filters is clicked", async () => {

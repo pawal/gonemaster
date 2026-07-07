@@ -40,23 +40,6 @@
       .map((level) => ({ level, count: Number(job?.severity_totals?.[level] || 0) }))
       .filter((entry) => entry.count > 0);
 
-  const jobSeverityTotal = (job, level) => Number(job?.severity_totals?.[level] || 0);
-
-  const matchesSeverityFilter = (job) => {
-    if (severityFilter === "warnings_plus") {
-      return (
-        jobSeverityTotal(job, "WARNING") > 0 ||
-        jobSeverityTotal(job, "ERROR") > 0 ||
-        jobSeverityTotal(job, "CRITICAL") > 0
-      );
-    }
-    if (severityFilter === "errors_only") {
-      return jobSeverityTotal(job, "ERROR") > 0 || jobSeverityTotal(job, "CRITICAL") > 0;
-    }
-    return true;
-  };
-
-  const filteredJobs = $derived(jobs.filter((job) => matchesSeverityFilter(job)));
 
   const normalizeOptionalProfileID = (value) => {
     const parsed = Number(value);
@@ -229,16 +212,14 @@
       {$t("next")}
     </button>
     <span class="small">
-      {$t("showing_jobs", { shown: filteredJobs.length, total: recentTotal, offset: recentOffset || 0 })}
+      {$t("showing_jobs", { shown: jobs.length, total: recentTotal, offset: recentOffset || 0 })}
     </span>
   </div>
   <div class="list">
     {#if jobs.length === 0}
-      <div class="small">{$t("no_jobs")}</div>
-    {:else if filteredJobs.length === 0}
-      <div class="small">{$t("no_jobs_severity")}</div>
+      <div class="small">{severityFilter === "all" ? $t("no_jobs") : $t("no_jobs_severity")}</div>
     {:else}
-      {#each filteredJobs as job (job.id)}
+      {#each jobs as job (job.id)}
         <div class="list-item clickable" onclick={() => onNavigateJob(job.id)} onkeydown={(e) => {
           if (e.key === "Enter" || e.key === " ") {
             e.preventDefault();

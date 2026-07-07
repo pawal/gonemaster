@@ -1476,6 +1476,11 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	if filter.WorstLevel != "" {
 		conds = append(conds, "worst_level = "+addArg(filter.WorstLevel))
 	}
+	if filter.Severity == JobSeverityWarningsPlus {
+		conds = append(conds, "(sev_warning > 0 OR sev_error > 0 OR sev_critical > 0)")
+	} else if filter.Severity == JobSeverityErrorsOnly {
+		conds = append(conds, "(sev_error > 0 OR sev_critical > 0)")
+	}
 	if filter.Grade != "" {
 		conds = append(conds, "grade = "+addArg(filter.Grade))
 	}

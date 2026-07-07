@@ -55,9 +55,8 @@
   let jobInspectorHighlight = $state(false);
   let jobInspectorHighlightTimer = null;
 
-  // Batches tab state at App level: persisted filter state plus the
-  // selected-batch pointer (used by URL/storage routing).
-  let selectedBatchId = $state("");
+  // Batches tab filter state at App level (persisted); the selected batch
+  // lives in the route (#/batches/<id>).
   let batchSort = $state("started_at_desc");
   let batchPageSize = $state(20);
   let batchCursor = $state(0);
@@ -205,7 +204,6 @@
     if (typeof state.recentDomainFilter === "string") recentDomainFilter = state.recentDomainFilter;
     if (state.recentPageSize !== undefined) recentPageSize = normalizeRecentPageSize(state.recentPageSize);
     if (state.recentCursor !== undefined) recentCursor = normalizeCursor(state.recentCursor);
-    if (typeof state.selectedBatchId === "string") selectedBatchId = state.selectedBatchId;
     if (state.batchSort) batchSort = state.batchSort;
     if (state.batchPageSize !== undefined) batchPageSize = normalizeBatchPageSize(state.batchPageSize);
     if (state.batchCursor !== undefined) batchCursor = normalizeCursor(state.batchCursor);
@@ -223,7 +221,6 @@
       recentDomainFilter: recentDomainFilter.trim(),
       recentPageSize: normalizeRecentPageSize(recentPageSize),
       recentCursor: normalizeCursor(recentCursor),
-      selectedBatchId: selectedBatchId.trim(),
       batchSort,
       batchPageSize: normalizeBatchPageSize(batchPageSize),
       batchCursor: normalizeCursor(batchCursor),
@@ -405,12 +402,13 @@
     }
   };
 
-  const openBatchFromTagRow = async (batchId) => {
+  const openBatch = (batchId) => {
     const id = (batchId || "").trim();
     if (!id) return;
-    selectedBatchId = id;
-    await setTab("batches");
+    batchCursor = 0;
+    navigate("batches", { batchId: id });
   };
+  const openBatchFromTagRow = openBatch;
 
   const openBatchDelete = (batchId) => {
     const id = (batchId || "").trim();
@@ -425,8 +423,8 @@
   };
 
   const handleBatchDeleted = async (deletedId) => {
-    if (selectedBatchId === deletedId) {
-      selectedBatchId = "";
+    if (router.route.batchId === deletedId) {
+      navigate("batches");
     }
     batchDeletedCounter += 1;
   };
@@ -514,6 +512,11 @@
     batchCursor = normalizeCursor(batchCursor);
     recentPageSize = normalizeRecentPageSize(recentPageSize);
     recentCursor = normalizeCursor(recentCursor);
+    // Migrate a legacy ?b_id= bookmark to the #/batches/<id> route.
+    const legacyBatch = urlState?.selectedBatchId;
+    if (legacyBatch && router.route.tab === "batches" && !router.route.batchId) {
+      navigate("batches", { batchId: legacyBatch, replace: true });
+    }
   };
   if (typeof window !== "undefined") restoreInitialState();
 
@@ -543,7 +546,6 @@
     recentDomainFilter,
     String(recentPageSize),
     String(recentCursor),
-    selectedBatchId,
     batchSort,
     String(batchPageSize),
     String(batchCursor),
@@ -801,7 +803,9 @@
       {setStatus}
       {ensureNotificationPermission}
       {scoringEnabled}
-      bind:selectedBatchId
+      routeBatchId={router.route.batchId}
+      onOpenBatch={openBatch}
+      onCloseBatch={() => navigate("batches")}
       bind:batchSort
       bind:batchPageSize
       bind:batchStatusFilter

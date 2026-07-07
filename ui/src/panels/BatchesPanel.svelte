@@ -1,5 +1,5 @@
 <script>
-  import { onMount } from "svelte";
+  import { onMount, untrack } from "svelte";
   import { t } from "../i18n.js";
   import {
     formatTimestampLocal,
@@ -17,7 +17,9 @@
     setStatus = () => {},
     ensureNotificationPermission = () => Promise.resolve("denied"),
     scoringEnabled = false,
-    selectedBatchId = $bindable(""),
+    routeBatchId = null,
+    onOpenBatch = () => {},
+    onCloseBatch = () => {},
     batchSort = $bindable("started_at_desc"),
     batchPageSize = $bindable(20),
     batchStatusFilter = $bindable(""),
@@ -46,15 +48,19 @@
   let batchSnapshotIntent = $state(false);
   let batchSnapshotIntentTouched = $state(false);
 
+  let selectedBatchId = $state("");
+
+  // ── List state ───────────────────────────────────────────────────────────
+  let batchesList = $state([]);
+  let batchesListTotal = $state(0);
+  let batchesListOffset = $state(0);
+  let batchesListLoading = $state(false);
+  const batchesListLimit = 20;
+
   // ── Inspector state ──────────────────────────────────────────────────────
   let selectedBatch = $state(null);
   let batchLoading = $state(false);
   let autoRefreshBatch = $state(false);
-  let recentBatchOptions = $state([]);
-  let recentBatchLoading = $state(false);
-  let selectedRecentBatch = $state("");
-  let activeBatches = $state([]);
-  let activeBatchesLoading = $state(false);
   let queuePaused = $state(false);
   let queuePauseToggling = $state(false);
 
@@ -108,25 +114,6 @@
     }
   });
 
-  function formatRecentBatchOption(option) {
-    if (!option || !option.id) return "";
-    const parts = [option.id];
-    if (option.createdAt) {
-      const parsed = new Date(option.createdAt);
-      if (!Number.isNaN(parsed.getTime())) parts.push(parsed.toLocaleString("sv-SE"));
-    }
-    if (option.tag) parts.push(`[${option.tag}]`);
-    return parts.join(" - ");
-  }
-
-  function syncSelectedRecentBatch() {
-    const normalized = selectedBatchId.trim();
-    if (!normalized) {
-      selectedRecentBatch = "";
-      return;
-    }
-    selectedRecentBatch = recentBatchOptions.some((option) => option.id === normalized) ? normalized : "";
-  }
 
   const normalizeDomainInput = (value) => {
     const trimmed = (value || "").trim();
@@ -185,13 +172,11 @@
         body: JSON.stringify(payload),
       });
       createdBatchId = response.batch_id;
-      selectedBatchId = response.batch_id;
       autoRefreshBatch = true;
       notifyOnBatchComplete = true;
       ensureNotificationPermission();
       setStatus($t("batch_accepted", { id: response.batch_id }), "ok");
-      await loadRecentBatchOptions();
-      await loadBatch(response.batch_id, { resetCursor: true });
+      onOpenBatch(response.batch_id);
     } catch (error) {
       setStatus($t("error_create_batch", { error: error.message }), "warn");
     } finally {
@@ -199,21 +184,22 @@
     }
   }
 
-  async function loadRecentBatchOptions() {
-    recentBatchLoading = true;
+  async function loadBatchesList(options = {}) {
+    const { reset = false, silent = false } = options;
+    if (reset) batchesListOffset = 0;
+    if (!silent) batchesListLoading = true;
     try {
-      const list = await apiFetch("/batches?limit=20");
-      const items = list?.items || [];
-      recentBatchOptions = items.map((b) => ({
-        id: b.batch_id,
-        createdAt: b.created_at || "",
-        tag: b.tag || "",
-      }));
-      syncSelectedRecentBatch();
+      const params = new URLSearchParams({
+        limit: String(batchesListLimit),
+        offset: String(batchesListOffset),
+      });
+      const list = await apiFetch(`/batches?${params}`);
+      batchesList = list?.items || [];
+      batchesListTotal = Number.isFinite(Number(list?.total)) ? Number(list.total) : batchesList.length;
     } catch (error) {
-      setStatus($t("error_load_batches", { error: error.message }), "warn");
+      if (!silent) setStatus($t("error_load_batches", { error: error.message || "unknown error" }), "warn");
     } finally {
-      recentBatchLoading = false;
+      if (!silent) batchesListLoading = false;
     }
   }
 
@@ -246,19 +232,6 @@
       if (!silent) selectedBatch = null;
     } finally {
       batchLoading = false;
-    }
-  }
-
-  async function loadActiveBatches() {
-    activeBatchesLoading = true;
-    try {
-      const list = await apiFetch("/batches?limit=20");
-      const items = list?.items || [];
-      activeBatches = items.filter((b) => b.status === "running");
-    } catch (_) {
-      // Silently ignore - active batches is supplementary.
-    } finally {
-      activeBatchesLoading = false;
     }
   }
 
@@ -318,222 +291,63 @@
     }
   }
 
-  // Reload active batches and the inspected batch when the modal deletes a batch.
+  // Reload the list and the inspected batch when the modal deletes a batch.
   $effect(() => {
     const current = batchDeletedCounter;
     if (current === lastBatchDeletedCounter) return;
     const wasInitialized = lastBatchDeletedCounter !== undefined;
     lastBatchDeletedCounter = current;
     if (!wasInitialized) return;
-    loadRecentBatchOptions();
-    loadActiveBatches();
-    if (selectedBatchId) loadBatch(selectedBatchId);
+    loadBatchesList({ silent: true });
+    if (selectedBatchId) loadBatch(selectedBatchId, { silent: true });
   });
 
-  // Sync the recent-batches dropdown when selectedBatchId or the option list changes.
+  // Drive the selected batch from the route: enter detail on a batch id,
+  // return to the list otherwise.
+  let lastRoutedBatchId = null;
   $effect(() => {
-    selectedBatchId;
-    recentBatchOptions;
-    syncSelectedRecentBatch();
+    const id = routeBatchId || "";
+    untrack(() => {
+      if (id === lastRoutedBatchId) return;
+      lastRoutedBatchId = id;
+      selectedBatchId = id;
+      if (id) {
+        loadBatch(id);
+      } else {
+        selectedBatch = null;
+        autoRefreshBatch = false;
+        loadBatchesList();
+      }
+    });
   });
 
-  // Polling: inspector and active-batches.
+  // Poll the inspected batch while auto-refresh is on.
   $effect(() => {
     if (!autoRefreshBatch || !selectedBatchId) return;
     const handle = setInterval(() => loadBatch(selectedBatchId, { silent: true }), 7000);
     return () => clearInterval(handle);
   });
+  // Poll the list and queue status while viewing the list.
   $effect(() => {
     const handle = setInterval(() => {
-      loadActiveBatches();
+      if (!selectedBatchId) loadBatchesList({ silent: true });
       fetchQueueStatus();
     }, 7000);
     return () => clearInterval(handle);
   });
 
   onMount(() => {
-    loadRecentBatchOptions();
-    loadActiveBatches();
     fetchQueueStatus();
-    if (selectedBatchId) loadBatch(selectedBatchId);
   });
 </script>
 
 <div class="grid panel-mt" id="panel-batches" role="tabpanel" aria-labelledby="tab-batches">
-  <div class="card reveal delay-22">
-    <h2>{$t("batch_jobs_heading")}</h2>
-    <div class="toolbar-row no-wrap mb-half">
-      <button
-        class={batchFromTagMode ? "ghost" : "secondary small"}
-        type="button"
-        onclick={() => { batchFromTagMode = false; }}
-      >{$t("batch_domains_mode_label")}</button>
-      <button
-        class={batchFromTagMode ? "secondary small" : "ghost"}
-        type="button"
-        onclick={() => { batchFromTagMode = true; }}
-      >{$t("batch_from_tag_mode_label")}</button>
-    </div>
-    {#if batchFromTagMode}
-      <div class="stack">
-        <label for="batch-from-tag">{$t("batch_from_tag_label")}</label>
-        <select id="batch-from-tag" bind:value={batchFromTag}>
-          <option value="">{$t("tag_filter_all")}</option>
-          {#each availableTags as tag}
-            <option value={tag.name}>{tag.name}{tag.domain_count ? ` (${tag.domain_count})` : ""}</option>
-          {/each}
-        </select>
-      </div>
-    {:else}
-      <div class="stack">
-        <label for="batch-domains">{$t("domains_label")}</label>
-        <textarea
-          id="batch-domains"
-          placeholder={`example.com
-example.org`}
-          bind:value={batchDomains}
-        ></textarea>
-      </div>
-    {/if}
-    <div class="stack">
-      <label for="batch-tags">{$t("batch_tags_label")}</label>
-      <input
-        id="batch-tags"
-        type="text"
-        placeholder={$t("batch_tags_placeholder")}
-        bind:value={batchTags}
-      />
-      <div class="small">{$t("batch_tags_hint")}</div>
-    </div>
-    <div class="stack">
-      <label for="batch-profile">{$t("stored_profile_label")}</label>
-      <select id="batch-profile" bind:value={batchProfileId} disabled={profilesLoading && availableProfiles.length === 0}>
-        <option value="">{$t("stored_profile_auto_option")}</option>
-        {#each availableProfiles as profile}
-          <option value={profile.id}>{profile.name}</option>
-        {/each}
-      </select>
-      <div class="small">{$t("stored_profile_hint")}</div>
-    </div>
-    {#if snapshotCheckboxVisible}
-      <div class="stack batch-snapshot-field">
-        <label class="batch-snapshot-check">
-          <input
-            type="checkbox"
-            bind:checked={batchSnapshotIntent}
-            onchange={() => { batchSnapshotIntentTouched = true; }}
-          />
-          <span>{$t("batch_snapshot_label")}</span>
-        </label>
-        <div class="small">{$t("batch_snapshot_hint")}</div>
-        {#if batchSnapshotIntent}
-          <div class="small mono">
-            {$t("batch_snapshot_slug_preview", { slug: batchSnapshotSlugPreview })}
-          </div>
-        {/if}
-        {#if batchSnapshotPartial}
-          <div class="notice notice-warn" role="status" aria-live="polite">
-            {$t("batch_snapshot_partial_warning")}
-          </div>
-        {/if}
-      </div>
-    {/if}
-    <button class="secondary" onclick={submitBatch} disabled={batchSubmitting}>
-      {batchSubmitting ? $t("submitting") : $t("run_batch")}
-    </button>
-    {#if createdBatchId}
-      <div class="small">{$t("created_batch_prefix")} <span class="mono">{createdBatchId}</span></div>
-    {/if}
-  </div>
-
-  <div class="card reveal delay-26" data-testid="active-batches-card">
-    <div class="row row-toolbar-end">
-      <h2 class="m-zero">{$t("active_batches_heading")}</h2>
-      <button
-        class={queuePaused ? "secondary small" : "ghost small"}
-        type="button"
-        onclick={toggleQueuePause}
-        disabled={queuePauseToggling}
-        aria-busy={queuePauseToggling}
-        title={$t("queue_pause_tooltip")}
-      >
-        {queuePauseToggling ? $t("loading") : queuePaused ? $t("queue_resume_button") : $t("queue_pause_button")}
-      </button>
-    </div>
-    {#if queuePaused}
-      <div class="status-banner warn" role="status" aria-live="polite">{$t("queue_paused_banner")}</div>
-    {/if}
-    {#if activeBatchesLoading && activeBatches.length === 0}
-      <div class="small">{$t("loading")}</div>
-    {:else if activeBatches.length === 0}
-      <div class="small">{$t("no_active_batches")}</div>
-    {:else}
-      <div class="list">
-        {#each activeBatches as batch (batch.batch_id)}
-          <div class="list-item clickable" class:disabled={batchLoading} onclick={() => {
-            if (batchLoading) return;
-            selectedBatchId = batch.batch_id;
-            loadBatch(batch.batch_id, { resetCursor: true });
-          }} onkeydown={(e) => {
-            if (batchLoading) return;
-            if (e.key === "Enter" || e.key === " ") {
-              e.preventDefault();
-              selectedBatchId = batch.batch_id;
-              loadBatch(batch.batch_id, { resetCursor: true });
-            }
-          }} role="button" tabindex="0" aria-disabled={batchLoading}>
-            <div class="list-item-main">
-              <div class="mono">
-                {batch.batch_id}{#if batch.tag} <span class="small">({batch.tag})</span>{/if}
-              </div>
-              <div class="small">
-                {$t("total_label")}: {batch.total} · {batch.completion}% · {formatBatchTotalRuntime(batch)}
-              </div>
-            </div>
-          </div>
-        {/each}
-      </div>
-    {/if}
-  </div>
-
-  <div class="card reveal delay-30">
-    <h2>{$t("batch_inspector_heading")}</h2>
-    <div class="stack">
-      <label for="batch-recent">{$t("recent_batches_label")}</label>
-      <select
-        id="batch-recent"
-        bind:value={selectedRecentBatch}
-        disabled={recentBatchLoading}
-        onchange={async () => {
-          const nextBatchID = selectedRecentBatch.trim();
-          if (!nextBatchID) return;
-          selectedBatchId = nextBatchID;
-          await loadBatch(nextBatchID, { resetCursor: true });
-        }}
-      >
-        <option value="">{recentBatchLoading ? $t("loading_batches") : $t("select_recent_batch")}</option>
-        {#each recentBatchOptions as option}
-          <option value={option.id}>{formatRecentBatchOption(option)}</option>
-        {/each}
-      </select>
-      <div class="small">{$t("latest_batches_hint")}</div>
-      <label for="batch-id">{$t("batch_id_label")}</label>
-      <input
-        id="batch-id"
-        type="text"
-        placeholder="batch_123"
-        bind:value={selectedBatchId}
-        onchange={() => loadBatch(selectedBatchId, { resetCursor: true })}
-      />
-    </div>
+{#if selectedBatchId}
+  <div class="card reveal delay-22 grid-span-full">
+    <button class="secondary small" onclick={() => onCloseBatch()}>{$t("back_to_batches")}</button>
+    <h2 class="mono">{selectedBatchId}</h2>
     <div class="row">
-      <button
-        onclick={async () => {
-          await loadRecentBatchOptions();
-          await loadBatch();
-        }}
-        disabled={batchLoading}
-      >
+      <button onclick={() => loadBatch(selectedBatchId, { resetCursor: true })} disabled={batchLoading}>
         {batchLoading ? $t("loading") : $t("refresh")}
       </button>
       <button class="ghost" type="button" onclick={() => (autoRefreshBatch = !autoRefreshBatch)}>
@@ -673,4 +487,161 @@ example.org`}
       </div>
     {/if}
   </div>
+{:else}
+  <div class="card reveal delay-22">
+    <h2>{$t("batch_jobs_heading")}</h2>
+    <div class="toolbar-row no-wrap mb-half">
+      <button
+        class={batchFromTagMode ? "ghost" : "secondary small"}
+        type="button"
+        onclick={() => { batchFromTagMode = false; }}
+      >{$t("batch_domains_mode_label")}</button>
+      <button
+        class={batchFromTagMode ? "secondary small" : "ghost"}
+        type="button"
+        onclick={() => { batchFromTagMode = true; }}
+      >{$t("batch_from_tag_mode_label")}</button>
+    </div>
+    {#if batchFromTagMode}
+      <div class="stack">
+        <label for="batch-from-tag">{$t("batch_from_tag_label")}</label>
+        <select id="batch-from-tag" bind:value={batchFromTag}>
+          <option value="">{$t("tag_filter_all")}</option>
+          {#each availableTags as tag}
+            <option value={tag.name}>{tag.name}{tag.domain_count ? ` (${tag.domain_count})` : ""}</option>
+          {/each}
+        </select>
+      </div>
+    {:else}
+      <div class="stack">
+        <label for="batch-domains">{$t("domains_label")}</label>
+        <textarea
+          id="batch-domains"
+          placeholder={`example.com
+example.org`}
+          bind:value={batchDomains}
+        ></textarea>
+      </div>
+    {/if}
+    <div class="stack">
+      <label for="batch-tags">{$t("batch_tags_label")}</label>
+      <input
+        id="batch-tags"
+        type="text"
+        placeholder={$t("batch_tags_placeholder")}
+        bind:value={batchTags}
+      />
+      <div class="small">{$t("batch_tags_hint")}</div>
+    </div>
+    <div class="stack">
+      <label for="batch-profile">{$t("stored_profile_label")}</label>
+      <select id="batch-profile" bind:value={batchProfileId} disabled={profilesLoading && availableProfiles.length === 0}>
+        <option value="">{$t("stored_profile_auto_option")}</option>
+        {#each availableProfiles as profile}
+          <option value={profile.id}>{profile.name}</option>
+        {/each}
+      </select>
+      <div class="small">{$t("stored_profile_hint")}</div>
+    </div>
+    {#if snapshotCheckboxVisible}
+      <div class="stack batch-snapshot-field">
+        <label class="batch-snapshot-check">
+          <input
+            type="checkbox"
+            bind:checked={batchSnapshotIntent}
+            onchange={() => { batchSnapshotIntentTouched = true; }}
+          />
+          <span>{$t("batch_snapshot_label")}</span>
+        </label>
+        <div class="small">{$t("batch_snapshot_hint")}</div>
+        {#if batchSnapshotIntent}
+          <div class="small mono">
+            {$t("batch_snapshot_slug_preview", { slug: batchSnapshotSlugPreview })}
+          </div>
+        {/if}
+        {#if batchSnapshotPartial}
+          <div class="notice notice-warn" role="status" aria-live="polite">
+            {$t("batch_snapshot_partial_warning")}
+          </div>
+        {/if}
+      </div>
+    {/if}
+    <button class="secondary" onclick={submitBatch} disabled={batchSubmitting}>
+      {batchSubmitting ? $t("submitting") : $t("run_batch")}
+    </button>
+    {#if createdBatchId}
+      <div class="small">{$t("created_batch_prefix")} <span class="mono">{createdBatchId}</span></div>
+    {/if}
+  </div>
+
+  <div class="card reveal delay-26 grid-span-full" data-testid="batches-list-card">
+    <div class="row row-toolbar-end">
+      <h2 class="m-zero">{$t("batches_list_heading")}</h2>
+      <button
+        class={queuePaused ? "secondary small" : "ghost small"}
+        type="button"
+        onclick={toggleQueuePause}
+        disabled={queuePauseToggling}
+        aria-busy={queuePauseToggling}
+        title={$t("queue_pause_tooltip")}
+      >
+        {queuePauseToggling ? $t("loading") : queuePaused ? $t("queue_resume_button") : $t("queue_pause_button")}
+      </button>
+    </div>
+    {#if queuePaused}
+      <div class="status-banner warn" role="status" aria-live="polite">{$t("queue_paused_banner")}</div>
+    {/if}
+    {#if batchesListLoading && batchesList.length === 0}
+      <p class="muted">{$t("loading")}</p>
+    {:else if batchesList.length === 0}
+      <p class="muted">{$t("no_batches")}</p>
+    {:else}
+      <table class="data-table">
+        <thead>
+          <tr>
+            <th>{$t("batch_id_label")}</th>
+            <th>{$t("batch_tag_label")}</th>
+            <th>{$t("status_label")}</th>
+            <th>{$t("col_created_at")}</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {#each batchesList as b (b.batch_id)}
+            <tr
+              class="row-clickable"
+              onclick={(e) => { if (e.target.closest("[data-row-action]")) return; onOpenBatch(b.batch_id); }}
+              onkeydown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onOpenBatch(b.batch_id); } }}
+              role="button"
+              tabindex="0"
+            >
+              <td class="mono">{b.batch_id}</td>
+              <td>{b.tag || "-"}</td>
+              <td>{b.status}{#if b.completion != null} · {b.completion}%{/if}</td>
+              <td>{b.created_at ? formatTimestampLocal(b.created_at) : "-"}</td>
+              <td class="text-right" data-row-action>
+                <button class="ghost small warn" type="button" data-row-action onclick={() => onOpenBatchDelete(b.batch_id)}>
+                  {$t("batch_delete_button")}
+                </button>
+              </td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+      <div class="pagination">
+        <button
+          class="secondary small"
+          disabled={batchesListOffset === 0}
+          onclick={() => { batchesListOffset = Math.max(0, batchesListOffset - batchesListLimit); loadBatchesList(); }}
+        >{$t("prev_page")}</button>
+        <span class="muted small">{batchesListOffset + 1}-{Math.min(batchesListOffset + batchesListLimit, batchesListTotal)} / {batchesListTotal}</span>
+        <button
+          class="secondary small"
+          disabled={batchesListOffset + batchesListLimit >= batchesListTotal}
+          onclick={() => { batchesListOffset += batchesListLimit; loadBatchesList(); }}
+        >{$t("next_page")}</button>
+      </div>
+    {/if}
+  </div>
+{/if}
 </div>

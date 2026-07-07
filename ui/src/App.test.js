@@ -96,12 +96,12 @@ describe("App", () => {
     expect(screen.getByRole("tab", { name: "Settings" })).toBeInTheDocument();
     expect(screen.getByText("Job Inspector")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Recent Tests" })).toBeNull();
-    expect(screen.queryByText("Batch Inspector")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Batches" })).toBeNull();
     expect(container.querySelector("nav.sidebar")).toBeInTheDocument();
     expect(container.querySelector("section[role='tabpanel']")).toBeNull();
 
     await openBatchTab();
-    expect(screen.getByText("Batch Inspector")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Batches" })).toBeInTheDocument();
 
     await openSettingsTab("Profiles");
     expect(screen.getByText("Profile Library")).toBeInTheDocument();
@@ -129,8 +129,7 @@ describe("App", () => {
     unmount();
   });
 
-  it("refreshes batch inspector when opening batch tab with selected batch id", async () => {
-    let batchCalls = 0;
+  it("opens a batch detail from the batches list and deep-links it", async () => {
     const batch = {
       batch_id: "batch_refresh",
       total: 1,
@@ -149,12 +148,14 @@ describe("App", () => {
 
     global.fetch.mockImplementation((url) => {
       const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      if (value.includes("/api/v1/jobs?")) {
-        return jsonResponse({ items: [], total: 0 });
+      if (value.includes("/api/v1/batches?")) {
+        return jsonResponse({ items: [{ batch_id: "batch_refresh", tag: "", status: "running", total: 1, completed: 0, completion: 0, created_at: "2026-02-03T00:00:00Z" }], total: 1 });
       }
       if (value.includes("/api/v1/batches/batch_refresh")) {
-        batchCalls += 1;
         return jsonResponse(batch);
+      }
+      if (value.includes("/api/v1/jobs?")) {
+        return jsonResponse({ items: [], total: 0 });
       }
       return jsonResponse({});
     });
@@ -162,19 +163,13 @@ describe("App", () => {
     const { unmount } = render(App);
 
     await openBatchTab();
-    await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_refresh" } });
-    await fireEvent.change(screen.getByLabelText("Batch ID"));
+    const row = (await screen.findByText("batch_refresh")).closest("tr");
+    await fireEvent.click(row);
+
     await screen.findByText("job_batch_refresh");
-
-    const callsAfterInitialLoad = batchCalls;
-    await openRecentTab();
-    await openBatchTab();
-
     await waitFor(() => {
-      expect(batchCalls).toBeGreaterThan(callsAfterInitialLoad);
+      expect(window.location.hash).toBe("#/batches/batch_refresh");
     });
-
-    expect(screen.getByRole("button", { name: /auto refresh: off/i })).toBeInTheDocument();
     unmount();
   });
 
@@ -393,6 +388,9 @@ describe("App", () => {
       if (value.includes("/api/v1/jobs?")) {
         return jsonResponse({ items: [], total: 0 });
       }
+      if (value.includes("/api/v1/batches?")) {
+        return jsonResponse({ items: [{ batch_id: "batch_1", tag: "", status: "done", total: 0, completed: 0, completion: 0, created_at: "2026-02-03T00:00:00Z" }], total: 1 });
+      }
       if (value.includes("/api/v1/batches/")) {
         return jsonResponse({
           batch_id: "batch_1",
@@ -414,9 +412,8 @@ describe("App", () => {
     await fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
 
     await openBatchTab();
-    await fireEvent.input(screen.getByLabelText("Batch ID"), { target: { value: "batch_1" } });
-    await fireEvent.change(screen.getByLabelText("Batch ID"));
-    await fireEvent.change(screen.getByLabelText("Status"), { target: { value: "failed" } });
+    await fireEvent.click((await screen.findByText("batch_1")).closest("tr"));
+    await fireEvent.change(await screen.findByLabelText("Status"), { target: { value: "failed" } });
     await fireEvent.input(screen.getByLabelText("Domain contains"), { target: { value: "beta" } });
     await fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
 
@@ -425,10 +422,10 @@ describe("App", () => {
       expect(params.get("r_sort")).toBe("domain_desc");
       expect(params.get("r_sev")).toBe("warnings_plus");
       expect(params.get("r_batch")).toBe("batch_recent");
-      expect(params.get("b_id")).toBe("batch_1");
       expect(params.get("b_status")).toBe("failed");
       expect(params.get("b_domain")).toBe("beta");
-      expect(window.location.hash).toBe("#/batches");
+      expect(params.get("b_id")).toBeNull();
+      expect(window.location.hash).toBe("#/batches/batch_1");
     });
 
     unmount();
@@ -492,7 +489,8 @@ describe("App", () => {
       ).toBe(true);
     });
 
-    expect(screen.getByLabelText("Batch ID")).toHaveValue("batch_url_1");
+    expect(screen.getByRole("heading", { name: "batch_url_1" })).toBeInTheDocument();
+    expect(window.location.hash).toBe("#/batches/batch_url_1");
     expect(screen.getByLabelText("Sort")).toHaveValue("created_at_asc");
     expect(screen.getByLabelText("Page size")).toHaveValue("50");
     expect(screen.getByLabelText("Status")).toHaveValue("failed");
@@ -1295,8 +1293,8 @@ describe("App", () => {
         await waitFor(() => {
           expect(screen.getByRole("tab", { name: "Batch Jobs", selected: true })).toBeInTheDocument();
         });
-        const input = await screen.findByLabelText("Batch ID");
-        expect(input.value).toBe("batch_a");
+        expect(await screen.findByRole("heading", { name: "batch_a" })).toBeInTheDocument();
+        expect(window.location.hash).toBe("#/batches/batch_a");
         unmount();
       });
     });
@@ -1649,6 +1647,37 @@ describe("App", () => {
       await waitFor(() => {
         expect(window.location.hash).toBe("#/single/job_typed");
         expect(calls.some((v) => v === "/api/v1/jobs/job_typed")).toBe(true);
+      });
+      unmount();
+    });
+
+    it("clicking a batch row pushes a hash route and Back returns to the list", async () => {
+      global.fetch.mockImplementation((url) => {
+        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        if (value.includes("/api/v1/batches?")) {
+          return jsonResponse({ items: [{ batch_id: "batch_z", tag: "", status: "done", total: 2, completed: 2, completion: 100, created_at: "2026-05-01T00:00:00Z" }], total: 1 });
+        }
+        if (value.includes("/api/v1/batches/batch_z")) {
+          return jsonResponse({ batch_id: "batch_z", total: 2, status_counts: { succeeded: 2 }, items: [], created_at: "2026-05-01T00:00:00Z" });
+        }
+        return jsonResponse({ items: [], total: 0 });
+      });
+      const { unmount } = render(App);
+
+      await openBatchTab();
+      await fireEvent.click((await screen.findByText("batch_z")).closest("tr"));
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/batches/batch_z");
+        expect(screen.getByText("← Back to batches")).toBeInTheDocument();
+      });
+
+      window.history.back();
+
+      await waitFor(() => {
+        expect(window.location.hash).toBe("#/batches");
+        expect(screen.queryByText("← Back to batches")).not.toBeInTheDocument();
+        expect(screen.getByRole("heading", { name: "Batches" })).toBeInTheDocument();
       });
       unmount();
     });

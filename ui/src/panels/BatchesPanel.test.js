@@ -9,7 +9,6 @@ const baseProps = (overrides = {}) => ({
   ],
   batchStatuses: ["", "queued", "running", "succeeded"],
   listPageSizes: [10, 20, 50, 100],
-  selectedBatchId: "",
   batchSort: "started_at_desc",
   batchPageSize: 20,
   batchStatusFilter: "",
@@ -56,7 +55,8 @@ describe("BatchesPanel", () => {
     expect(apiFetch).not.toHaveBeenCalledWith(expect.stringContaining("/jobs?"));
   });
 
-  it("shows running batches in the active list and populates the recent dropdown", async () => {
+  it("lists all batches in a table and navigates to a batch on row click", async () => {
+    const onOpenBatch = vi.fn();
     const listFetch = vi.fn().mockImplementation((path) => {
       if (path.startsWith("/batches?")) {
         return Promise.resolve({
@@ -70,15 +70,16 @@ describe("BatchesPanel", () => {
       if (path === "/metrics?window=1h&include=health") return Promise.resolve({ health: { queue_paused: false } });
       return Promise.resolve({ items: [] });
     });
-    render(BatchesPanel, { props: baseProps({ apiFetch: listFetch }) });
+    render(BatchesPanel, { props: baseProps({ apiFetch: listFetch, onOpenBatch }) });
 
-    // Active list shows only the running batch (its completion % is unique to it).
-    expect(await screen.findByText(/40%/)).toBeInTheDocument();
-    expect(screen.queryByText(/100%/)).not.toBeInTheDocument();
-    // Recent dropdown lists both batches as options.
-    const options = screen.getByLabelText(/Recent batches/i).querySelectorAll("option");
-    const values = Array.from(options).map((o) => o.value).filter(Boolean);
-    expect(values).toEqual(expect.arrayContaining(["batch_run", "batch_done"]));
+    // Both batches (running and done) appear in the list table.
+    const row = (await screen.findByText("batch_run")).closest("tr");
+    expect(row.textContent).toMatch(/running/);
+    expect(row.textContent).toContain("40%");
+    expect(screen.getByText("batch_done")).toBeInTheDocument();
+
+    await fireEvent.click(row);
+    expect(onOpenBatch).toHaveBeenCalledWith("batch_run");
   });
 
   it("submits a batch from the domains form and selects the new id", async () => {
@@ -101,17 +102,17 @@ describe("BatchesPanel", () => {
     expect(setStatus).toHaveBeenCalledWith(expect.any(String), "warn");
   });
 
-  it("loads the selected batch when mounted with a selectedBatchId", async () => {
-    render(BatchesPanel, { props: baseProps({ apiFetch, selectedBatchId: "batch_existing" }) });
+  it("loads the batch detail when mounted with a routed batch id", async () => {
+    render(BatchesPanel, { props: baseProps({ apiFetch, routeBatchId: "batch_existing" }) });
     await waitFor(() => {
       expect(apiFetch).toHaveBeenCalledWith(expect.stringMatching(/^\/batches\/batch_existing\?/));
     });
   });
 
-  it("invokes onOpenBatchDelete when the delete button is clicked", async () => {
+  it("invokes onOpenBatchDelete from the detail delete button", async () => {
     const onOpenBatchDelete = vi.fn();
     render(BatchesPanel, {
-      props: baseProps({ apiFetch, selectedBatchId: "batch_existing", onOpenBatchDelete }),
+      props: baseProps({ apiFetch, routeBatchId: "batch_existing", onOpenBatchDelete }),
     });
     await waitFor(() => expect(apiFetch).toHaveBeenCalled());
     await fireEvent.click(screen.getByRole("button", { name: /Delete batch/i }));
@@ -145,7 +146,7 @@ describe("BatchesPanel", () => {
       return Promise.resolve({ items: [] });
     });
     render(BatchesPanel, {
-      props: baseProps({ apiFetch: gradedFetch, selectedBatchId: "batch_graded", scoringEnabled: true, onNavigateJob }),
+      props: baseProps({ apiFetch: gradedFetch, routeBatchId: "batch_graded", scoringEnabled: true, onNavigateJob }),
     });
 
     const row = (await screen.findByText("job_done")).closest(".list-item");

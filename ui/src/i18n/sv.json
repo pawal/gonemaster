@@ -338,6 +338,8 @@
   "tag_run_all_button": "Kör alla domäner",
   "tag_run_all_error": "Det gick inte att starta batch: {error}",
   "tag_delete_button": "Ta bort tagg",
+  "tag_delete_prompt": "Ta bort taggen \"{name}\"?",
+  "tag_purge_warning": "Detta raderar permanent alla lagrade körningar för den här taggens domäner.",
   "tag_delete_confirm_button": "Bekräfta borttagning",
   "tag_delete_cancel_button": "Avbryt",
   "tag_deleted": "Tagg borttagen.",

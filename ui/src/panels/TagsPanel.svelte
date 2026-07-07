@@ -12,6 +12,7 @@
     compareSeverity,
   } from "../lib/sort.js";
   import GradeChip from "../components/GradeChip.svelte";
+  import ConfirmDialog from "../components/ConfirmDialog.svelte";
   import { href } from "../lib/router.svelte.js";
   import { formatTimestampLocal, formatDateLocal } from "../lib/format.js";
 
@@ -446,18 +447,8 @@
       <button class="secondary" onclick={runAllFromTag} disabled={tagRunAllSubmitting}>
         {tagRunAllSubmitting ? $t("submitting") : $t("tag_run_all_button")}
       </button>
-      {#if tagPurgeConfirm}
-        <button class="warn" onclick={purgeTagRuns} disabled={tagPurging}>{tagPurging ? $t("submitting") : $t("tag_purge_confirm_button")}</button>
-        <button class="ghost" onclick={() => { tagPurgeConfirm = false; }}>{$t("tag_purge_cancel_button")}</button>
-      {:else}
-        <button class="ghost" onclick={() => { tagPurgeConfirm = true; }}>{$t("tag_purge_button")}</button>
-      {/if}
-      {#if tagDeleteConfirm}
-        <button class="warn" onclick={deleteTag} disabled={tagDeleting}>{tagDeleting ? $t("submitting") : $t("tag_delete_confirm_button")}</button>
-        <button class="ghost" onclick={() => { tagDeleteConfirm = false; }}>{$t("tag_delete_cancel_button")}</button>
-      {:else}
-        <button class="ghost" onclick={() => { tagDeleteConfirm = true; }}>{$t("tag_delete_button")}</button>
-      {/if}
+      <button class="ghost" onclick={() => { tagPurgeConfirm = true; }} disabled={tagPurging}>{$t("tag_purge_button")}</button>
+      <button class="ghost" onclick={() => { tagDeleteConfirm = true; }} disabled={tagDeleting}>{$t("tag_delete_button")}</button>
     </div>
 
     <h3>{$t("earlier_batches_heading")}</h3>
@@ -708,3 +699,25 @@
     {/if}
   {/if}
 </div>
+
+{#if selectedTag}
+  <ConfirmDialog
+    open={tagDeleteConfirm}
+    title={$t("tag_delete_prompt", { name: selectedTag.name })}
+    confirmLabel={$t("tag_delete_confirm_button")}
+    busy={tagDeleting}
+    onConfirm={deleteTag}
+    onCancel={() => (tagDeleteConfirm = false)}
+  />
+  <ConfirmDialog
+    open={tagPurgeConfirm}
+    title={$t("tag_purge_button")}
+    message={$t("tag_purge_warning")}
+    confirmLabel={$t("tag_purge_confirm_button")}
+    confirmPhrase={selectedTag.name}
+    phrasePrompt={$t("batch_delete_typed_confirm_label", { id: selectedTag.name })}
+    busy={tagPurging}
+    onConfirm={purgeTagRuns}
+    onCancel={() => (tagPurgeConfirm = false)}
+  />
+{/if}

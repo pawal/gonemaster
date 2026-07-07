@@ -338,6 +338,8 @@
   "tag_run_all_button": "すべてのドメインを実行",
   "tag_run_all_error": "バッチの開始に失敗しました: {error}",
   "tag_delete_button": "タグを削除",
+  "tag_delete_prompt": "タグ「{name}」を削除しますか?",
+  "tag_purge_warning": "このタグのドメインの保存済みの実行をすべて完全に削除します。",
   "tag_delete_confirm_button": "削除を確認",
   "tag_delete_cancel_button": "キャンセル",
   "tag_deleted": "タグを削除しました。",

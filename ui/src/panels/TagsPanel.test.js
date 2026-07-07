@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import TagsPanel from "./TagsPanel.svelte";
 
@@ -78,6 +78,18 @@ describe("TagsPanel", () => {
     await screen.findByRole("heading", { level: 2, name: /tld/ });
     await fireEvent.click(screen.getByRole("button", { name: /^Delete tag$/i }));
     expect(await screen.findByRole("button", { name: /Confirm delete/i })).toBeInTheDocument();
+  });
+
+  it("requires typing the tag name before purging runs (typed confirm)", async () => {
+    render(TagsPanel, { props: { apiFetch, routeTagName: "tld" } });
+    await screen.findByRole("heading", { level: 2, name: /tld/ });
+    await fireEvent.click(screen.getByRole("button", { name: /^Purge runs$/i }));
+
+    const dialog = await screen.findByRole("dialog");
+    const confirm = within(dialog).getByRole("button", { name: /Confirm purge/i });
+    expect(confirm).toBeDisabled();
+    await fireEvent.input(within(dialog).getByRole("textbox"), { target: { value: "tld" } });
+    expect(confirm).not.toBeDisabled();
   });
 
   it("invokes onSetTab when the cohort link is clicked", async () => {

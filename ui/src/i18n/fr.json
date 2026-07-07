@@ -338,6 +338,8 @@
   "tag_run_all_button": "Exécuter tous les domaines",
   "tag_run_all_error": "Échec du démarrage du lot : {error}",
   "tag_delete_button": "Supprimer l'étiquette",
+  "tag_delete_prompt": "Supprimer le tag \"{name}\" ?",
+  "tag_purge_warning": "Cela supprime définitivement toutes les exécutions enregistrées des domaines de ce tag.",
   "tag_delete_confirm_button": "Confirmer la suppression",
   "tag_delete_cancel_button": "Annuler",
   "tag_deleted": "Étiquette supprimée.",

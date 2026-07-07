@@ -268,6 +268,8 @@
   "tag_run_all_button": "Spustit všechny domény",
   "tag_run_all_error": "Nepodařilo se spustit dávku: {error}",
   "tag_delete_button": "Smazat tag",
+  "tag_delete_prompt": "Smazat značku \"{name}\"?",
+  "tag_purge_warning": "Trvale odstraní všechny uložené běhy pro domény této značky.",
   "tag_delete_confirm_button": "Potvrdit smazání",
   "tag_delete_cancel_button": "Zrušit",
   "tag_deleted": "Tag byl smazán.",

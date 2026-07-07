@@ -338,6 +338,8 @@
   "tag_run_all_button": "Zaženi vse domene",
   "tag_run_all_error": "Napaka pri zagonu serije: {error}",
   "tag_delete_button": "Izbriši oznako",
+  "tag_delete_prompt": "Izbrišem oznako \"{name}\"?",
+  "tag_purge_warning": "To trajno izbriše vse shranjene zagone za domene te oznake.",
   "tag_delete_confirm_button": "Potrdi brisanje",
   "tag_delete_cancel_button": "Prekliči",
   "tag_deleted": "Oznaka izbrisana.",

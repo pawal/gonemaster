@@ -268,6 +268,8 @@
   "tag_run_all_button": "Alle Domains ausführen",
   "tag_run_all_error": "Fehler beim Starten des Batches: {error}",
   "tag_delete_button": "Tag löschen",
+  "tag_delete_prompt": "Tag \"{name}\" löschen?",
+  "tag_purge_warning": "Löscht dauerhaft alle gespeicherten Läufe für die Domains dieses Tags.",
   "tag_delete_confirm_button": "Löschen bestätigen",
   "tag_delete_cancel_button": "Abbrechen",
   "tag_deleted": "Tag gelöscht.",

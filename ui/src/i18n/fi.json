@@ -338,6 +338,8 @@
   "tag_run_all_button": "Suorita kaikki verkkotunnukset",
   "tag_run_all_error": "Erän käynnistäminen epäonnistui: {error}",
   "tag_delete_button": "Poista tunniste",
+  "tag_delete_prompt": "Poistetaanko tunniste \"{name}\"?",
+  "tag_purge_warning": "Tämä poistaa pysyvästi kaikki tämän tunnisteen verkkotunnusten tallennetut ajot.",
   "tag_delete_confirm_button": "Vahvista poisto",
   "tag_delete_cancel_button": "Peruuta",
   "tag_deleted": "Tunniste poistettu.",

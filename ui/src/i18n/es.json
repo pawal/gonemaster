@@ -338,6 +338,8 @@
   "tag_run_all_button": "Ejecutar todos los dominios",
   "tag_run_all_error": "Error al iniciar el lote: {error}",
   "tag_delete_button": "Eliminar etiqueta",
+  "tag_delete_prompt": "¿Eliminar la etiqueta \"{name}\"?",
+  "tag_purge_warning": "Esto elimina permanentemente todas las ejecuciones almacenadas de los dominios de esta etiqueta.",
   "tag_delete_confirm_button": "Confirmar eliminación",
   "tag_delete_cancel_button": "Cancelar",
   "tag_deleted": "Etiqueta eliminada.",

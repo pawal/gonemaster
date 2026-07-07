@@ -338,6 +338,8 @@
   "tag_run_all_button": "Kjør alle domener",
   "tag_run_all_error": "Kunne ikke starte batch: {error}",
   "tag_delete_button": "Slett tagg",
+  "tag_delete_prompt": "Slette taggen \"{name}\"?",
+  "tag_purge_warning": "Dette sletter permanent alle lagrede kjøringer for denne taggens domener.",
   "tag_delete_confirm_button": "Bekreft sletting",
   "tag_delete_cancel_button": "Avbryt",
   "tag_deleted": "Tagg slettet.",

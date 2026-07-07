@@ -338,6 +338,8 @@
   "tag_run_all_button": "Kør alle domæner",
   "tag_run_all_error": "Kunne ikke starte batch: {error}",
   "tag_delete_button": "Slet mærke",
+  "tag_delete_prompt": "Slet tag \"{name}\"?",
+  "tag_purge_warning": "Dette sletter permanent alle gemte kørsler for denne tags domæner.",
   "tag_delete_confirm_button": "Bekræft sletning",
   "tag_delete_cancel_button": "Annuller",
   "tag_deleted": "Mærke slettet.",

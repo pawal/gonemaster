@@ -4,6 +4,7 @@
   import { apiCall } from "../lib/api.js";
   import { formatTimestampLocal } from "../lib/format.js";
   import InlineNotice from "../components/InlineNotice.svelte";
+  import ConfirmDialog from "../components/ConfirmDialog.svelte";
 
   let { apiBase = "/api/v1", onprofileschanged } = $props();
 
@@ -13,6 +14,7 @@
   let saving = $state(false);
   let applyingFix = $state(false);
   let deletingProfileId = $state(null);
+  let deleteTarget = $state(null);
   let defaultProfile = $state(null);
   let compatibility = $state(null);
   let compatSummaries = $state([]);
@@ -352,11 +354,15 @@
     }
   };
 
-  const deleteProfile = async (profile) => {
+  const requestDeleteProfile = (profile) => {
     if (!profile || profile.id <= 0 || deletingProfileId !== null) return;
-    if (!window.confirm($t("profile_delete_confirm", { name: profile.name }))) {
-      return;
-    }
+    deleteTarget = profile;
+  };
+
+  const confirmDeleteProfile = async () => {
+    const profile = deleteTarget;
+    if (!profile) return;
+    deleteTarget = null;
     deletingProfileId = profile.id;
     try {
       await apiFetch(`/profiles/${profile.id}`, { method: "DELETE" });
@@ -516,7 +522,7 @@
                     class="ghost mini-button"
                     type="button"
                     disabled={deletingProfileId === profile.id}
-                    onclick={(e) => { e.stopPropagation(); deleteProfile(profile); }}
+                    onclick={(e) => { e.stopPropagation(); requestDeleteProfile(profile); }}
                   >
                     {deletingProfileId === profile.id ? $t("submitting") : $t("profile_delete_button")}
                   </button>
@@ -704,7 +710,7 @@
               class="ghost"
               type="button"
               disabled={deletingProfileId === selectedStoredProfile.id}
-              onclick={() => deleteProfile(selectedStoredProfile)}
+              onclick={() => requestDeleteProfile(selectedStoredProfile)}
             >
               {deletingProfileId === selectedStoredProfile.id ? $t("submitting") : $t("profile_delete_button")}
             </button>
@@ -719,6 +725,15 @@
     </section>
   </div>
 </section>
+
+<ConfirmDialog
+  open={deleteTarget !== null}
+  title={$t("profile_delete_confirm", { name: deleteTarget?.name ?? "" })}
+  confirmLabel={$t("profile_delete_button")}
+  busy={deletingProfileId !== null}
+  onConfirm={confirmDeleteProfile}
+  onCancel={() => (deleteTarget = null)}
+/>
 
 <style>
   .settings-section {

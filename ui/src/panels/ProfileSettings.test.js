@@ -294,13 +294,15 @@ describe("ProfileSettings", () => {
     const workspace = container.querySelector(".profile-workspace");
     await fireEvent.click(within(workspace).getByRole("button", { name: "Delete" }));
 
+    const dialog = await screen.findByRole("dialog", { name: 'Delete profile "gamma"?' });
+    await fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
+
     await waitFor(() => {
       expect(state.getProfiles().some((profile) => profile.name === "gamma")).toBe(false);
     });
     await waitFor(() => {
       expect(screen.queryByText("gamma")).not.toBeInTheDocument();
     });
-    expect(global.confirm).toHaveBeenCalledWith('Delete profile "gamma"?');
     expect(screen.getByText("Profile deleted.")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "default" })).toBeInTheDocument();
   });
@@ -484,7 +486,8 @@ describe("ProfileSettings", () => {
     const alphaRow = await findLibraryRow("alpha");
     await fireEvent.click(within(alphaRow).getByRole("button", { name: "Delete" }));
 
-    expect(global.confirm).toHaveBeenCalledWith('Delete profile "alpha"?');
+    // Row action opens the shared confirm dialog naming the target profile.
+    expect(await screen.findByRole("dialog", { name: 'Delete profile "alpha"?' })).toBeInTheDocument();
   });
 
   it("duplicates a profile with a copy name", async () => {

@@ -437,6 +437,7 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				responseCount := 0
 				nxdomainCount := 0
 				isNoRecursor := true
+				hasRA := false
 				hasRAWithAnswer := false
 				allNxdomainAA := true
 
@@ -453,11 +454,13 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 
 					responseCount++
-					// RA alone is advisory; require a non-empty ANSWER
-					// section so referral-only responses with a leaking
-					// RA bit are not misclassified as recursion.
-					if resp.RA() && len(resp.Answer()) > 0 {
-						hasRAWithAnswer = true
+					// RA alone is advisory (leaked on referrals); a real
+					// recursive answer also needs ANSWER records.
+					if resp.RA() {
+						hasRA = true
+						if len(resp.Answer()) > 0 {
+							hasRAWithAnswer = true
+						}
 					}
 					if resp.Rcode() == "NXDOMAIN" {
 						nxdomainCount++
@@ -470,7 +473,8 @@ func Nameserver01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if hasRAWithAnswer {
 					outcomes[i].isRecursor = true
 					isNoRecursor = false
-				} else if responseCount > 0 && nxdomainCount == responseCount && !allNxdomainAA {
+				} else if hasRA && responseCount > 0 && nxdomainCount == responseCount && !allNxdomainAA {
+					// NXDOMAIN without AA is recursion evidence only when RA=1.
 					outcomes[i].isRecursor = true
 					isNoRecursor = false
 				}

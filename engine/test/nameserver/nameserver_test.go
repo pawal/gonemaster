@@ -30,9 +30,15 @@ func TestNameserver01RecursorAndNoRecursor(t *testing.T) {
 	origM4and5 := authoritativeNS
 	t.Cleanup(func() { authoritativeNS = origM4and5 })
 
+	// A genuine open recursor advertises recursion available (RA=1); when
+	// asked for a name outside any zone it serves it recurses and returns a
+	// non-authoritative NXDOMAIN. The RA bit is what separates it from an
+	// authoritative-only server that also answers NXDOMAIN (see
+	// TestNameserver01NxdomainWithoutRANotRecursor).
 	nsRecursor := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeNameError
+		msg.RecursionAvailable = true
 		return packet.Packet{Msg: msg}
 	})
 	nsNoRecursor := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
@@ -87,6 +93,41 @@ func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "NO_RECURSOR") {
 		t.Fatalf("expected NO_RECURSOR for server with AA+NXDOMAIN")
+	}
+}
+
+func TestNameserver01NxdomainWithoutRANotRecursor(t *testing.T) {
+	ctx := setupTest(t)
+
+	origM4and5 := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = origM4and5 })
+
+	// Regression for the last.org false positive: Cloudflare-hosted
+	// nameservers answer names outside the zones they serve with a
+	// non-authoritative NXDOMAIN (AA=0) and recursion NOT available (RA=0).
+	// RA=0 proves the server is not recursing (even a globally resolvable
+	// name comes back NXDOMAIN), so it must be classified NO_RECURSOR, not
+	// IS_A_RECURSOR. Before the RA guard, branch 2 flagged this as a recursor.
+	nsCloudflare := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeNameError
+		return packet.Packet{Msg: msg}
+	})
+
+	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{nsCloudflare}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver01(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver01: %v", err)
+	}
+	if hasEntryTag(entries, "IS_A_RECURSOR") {
+		t.Fatalf("did not expect IS_A_RECURSOR for non-authoritative NXDOMAIN with RA=0")
+	}
+	if !hasEntryTag(entries, "NO_RECURSOR") {
+		t.Fatalf("expected NO_RECURSOR for non-authoritative NXDOMAIN with RA=0")
 	}
 }
 
@@ -207,12 +248,14 @@ func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
 	origM4and5 := authoritativeNS
 	t.Cleanup(func() { authoritativeNS = origM4and5 })
 
-	// Server returns NXDOMAIN on all probes, but only some have AA=1.
-	// Since not ALL NXDOMAIN responses are authoritative, classify as recursor.
+	// A recursor (RA=1) returns NXDOMAIN on all probes, but only some have
+	// AA=1. Since not ALL NXDOMAIN responses are authoritative and recursion
+	// is available, classify as recursor.
 	queryCount := 0
 	nsMixed := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeNameError
+		msg.RecursionAvailable = true
 		queryCount++
 		if queryCount <= 2 {
 			msg.Authoritative = true
@@ -260,6 +303,9 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 			}
 			msg := new(dns.Msg)
 			msg.Rcode = dns.RcodeNameError
+			// RA=1 so both servers classify as recursors; this test
+			// exercises parallel fan-out and the consolidated entry.
+			msg.RecursionAvailable = true
 			return packet.Packet{Msg: msg}, nil
 		}
 	}

@@ -1,14 +1,14 @@
-# Gonemaster
+# gonemaster
 
-Gonemaster is a Go implementation of the Zonemaster DNS test engine, with a
-local CLI, an HTTP server, a server automation client, and public analysis
-views for tagged domain cohorts.
+gonemaster is a Go implementation of the Zonemaster DNS test engine, with a
+local CLI, an HTTP server, a server automation client, a Nagios plugin, an
+MCP bridge for AI agents, and public analysis views for tagged domain cohorts.
 
-The Public UI is available here: https://gonemaster.evilbit.de/
+The public UI is available here: https://gonemaster.evilbit.de/
 
-## What Gonemaster Tests
+## What gonemaster Tests
 
-Gonemaster checks the DNS health of a domain by running it through a series of
+gonemaster checks the DNS health of a domain by running it through a series of
 testcases grouped into modules. Each testcase emits log messages that are scored
 into a numeric result and a letter grade. The modules are:
 
@@ -26,7 +26,17 @@ For the full inventory of testcases and what each one checks, see the
 [specifications](https://pawal.codeberg.page/gonemaster/specifications/). Scoring
 and letter grades are described in the [scoring documentation](https://pawal.codeberg.page/gonemaster/scoring/).
 
-## Common Paths
+## Highlights
+
+- Parallel-safe engine runs with per-run state isolation.
+- Text, JSON, JSON stream, and raw log output.
+- Undelegated testing with explicit nameserver and DS input.
+- HTTP server with persistent queue, batches, tags, profiles, and metrics.
+- Public API and public UI that avoid exposing internal job IDs.
+- Public cohort analysis with immutable snapshots.
+- Stored packet cache save/restore for reproducible runs.
+
+## Quick Start
 
 ### Run One Local Test
 
@@ -40,10 +50,17 @@ Direct CLI documentation: [pawal.codeberg.page/gonemaster/cli](https://pawal.cod
 
 ### Start the Server
 
+The server embeds the admin, public, and analysis web UIs; building them
+requires Node.js:
+
 ```console
+make ui-build
 go build -o ./gonemaster-server ./cmd/gonemaster-server
 ./gonemaster-server
 ```
+
+For an API-only server without the embedded UIs (no Node.js required), build
+with `make build-gonemaster-server-noui`.
 
 Server documentation: [pawal.codeberg.page/gonemaster/server](https://pawal.codeberg.page/gonemaster/server/)
 
@@ -69,7 +86,10 @@ Analysis documentation: [pawal.codeberg.page/gonemaster/analysis](https://pawal.
 
 ## Install
 
-Install the local CLI:
+Prebuilt binaries for Linux, macOS, and Windows are published on the
+[releases page](https://codeberg.org/pawal/gonemaster/releases).
+
+Install the local CLI with Go (1.26 or later):
 
 ```console
 go install codeberg.org/pawal/gonemaster/cmd/gonemaster@latest
@@ -80,14 +100,14 @@ Build from source:
 ```console
 git clone https://codeberg.org/pawal/gonemaster.git
 cd gonemaster
-make help
 go test ./...
 go build -o gonemaster ./cmd/gonemaster
 sudo install -m 0755 gonemaster /usr/local/bin/gonemaster
 ```
 
-The Makefile includes common targets such as `build`, `test`, `ui-build`, and
-documentation/specification checks. Run `make help` for the current list.
+The Makefile includes common targets such as `build`, `test`, `ui-build`,
+packaging, and documentation/specification checks. Run `make help` for the
+current list.
 
 ## Documentation
 
@@ -98,21 +118,13 @@ Start with the [architecture overview](https://pawal.codeberg.page/gonemaster/ar
 - [CLI](https://pawal.codeberg.page/gonemaster/cli/) - local test runner
 - [Server](https://pawal.codeberg.page/gonemaster/server/) - HTTP server and queue
 - [Client](https://pawal.codeberg.page/gonemaster/client/) - automation client
+- [Nagios](docs/nagios.md) - Nagios and Icinga plugin
 - [MCP](https://pawal.codeberg.page/gonemaster/mcp/) - Model Context Protocol bridge for AI agents
 - [Analysis](https://pawal.codeberg.page/gonemaster/analysis/) - cohort analysis and snapshots
 - [Specifications](https://pawal.codeberg.page/gonemaster/specifications/) - testcase and tag reference
 - [OpenAPI](docs/openapi.yaml) - machine-readable API spec
+- [Changelog](Changelog) - release history
 - [pkg.go.dev](https://pkg.go.dev/codeberg.org/pawal/gonemaster/engine) - Go package docs; `engine` is the main entry point for embedding gonemaster programmatically
-
-## Highlights
-
-- Parallel-safe engine runs with per-run state isolation.
-- Text, JSON, JSON stream, and raw log output.
-- Undelegated testing with explicit nameserver and DS input.
-- HTTP server with persistent queue, batches, tags, profiles, and metrics.
-- Public API and public UI that avoid exposing internal job IDs.
-- Public cohort analysis with immutable snapshots.
-- Stored packet cache save/restore for reproducible runs.
 
 ## Screenshots
 
@@ -127,3 +139,7 @@ Admin UI:
 Metrics view:
 
 ![Metrics screenshot](docs/metrics.png)
+
+## License
+
+gonemaster is released under a BSD-style license. See [LICENSE](LICENSE).

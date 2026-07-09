@@ -1,4 +1,4 @@
-// Human-readable titles for Zonemaster test cases. Keyed by the lowercase
+// Human-readable titles for gonemaster test cases. Keyed by the lowercase
 // testcase identifier (e.g. "delegation01"). Kept in sync with the canonical
 // titles in ui/src/i18n/en.json (tc.* keys).
 

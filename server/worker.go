@@ -365,11 +365,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 	if len(job.Tests) == 1 {
 		req.Testcases = []string{job.Tests[0]}
 		entries, err := s.runEngine(req)
-		return entries, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), entries), effectiveProfileJSON, err
+		return entries, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), entries), effectiveProfileJSON, err
 	}
 	if len(job.Tests) == 0 {
 		entries, err := s.runEngine(req)
-		return entries, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), entries), effectiveProfileJSON, err
+		return entries, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), entries), effectiveProfileJSON, err
 	}
 
 	var all []engine.LogEntry
@@ -384,11 +384,11 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 			s.updateJobProgress(job.ID, progress)
 		}
 		if err != nil {
-			return all, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), all), effectiveProfileJSON, err
+			return all, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), all), effectiveProfileJSON, err
 		}
 		all = append(all, entries...)
 	}
-	return all, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), all), effectiveProfileJSON, nil
+	return all, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), all), effectiveProfileJSON, nil
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {

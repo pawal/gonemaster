@@ -197,8 +197,8 @@ func cloneNameserverTimings(items []NameserverTiming) []NameserverTiming {
 	return out
 }
 
-func (s *Server) collectNameserverTimings(job Job, queryTimings map[string][]time.Duration, entries []engine.LogEntry) []NameserverTiming {
-	if len(queryTimings) == 0 {
+func (s *Server) collectNameserverTimings(job Job, queryTimings map[string][]time.Duration, queryTimeouts map[string]int, entries []engine.LogEntry) []NameserverTiming {
+	if len(queryTimings) == 0 && len(queryTimeouts) == 0 {
 		return nil
 	}
 

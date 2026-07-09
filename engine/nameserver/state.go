@@ -462,6 +462,9 @@ func (c *CacheStore) RecordQueryTimeout(key string) {
 		return
 	}
 	c.mu.Lock()
+	if c.queryTimeouts == nil {
+		c.queryTimeouts = map[string]int{}
+	}
 	c.queryTimeouts[key]++
 	c.mu.Unlock()
 }
@@ -624,6 +627,7 @@ func (c *CacheStore) SnapshotForRun() *CacheStore {
 		addrLastAccess:    map[string]time.Time{},
 		sharedParent:      c,
 		queryTimes:        map[string][]time.Duration{},
+		queryTimeouts:     map[string]int{},
 	}
 	return snapshot
 }

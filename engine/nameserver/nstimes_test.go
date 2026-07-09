@@ -133,6 +133,22 @@ func TestQueryNetworkRecordsTimeoutSeparately(t *testing.T) {
 	}
 }
 
+// TestRecordQueryTimeoutOnSnapshotStore guards against the nil-map panic that
+// hit the server: SnapshotForRun builds a run-local store, and every timed-out
+// query in that run calls RecordQueryTimeout on it. The count must be recorded
+// without panicking regardless of how the store was constructed.
+func TestRecordQueryTimeoutOnSnapshotStore(t *testing.T) {
+	base := NewCacheStore()
+	run := base.SnapshotForRun()
+
+	run.RecordQueryTimeout("ns.example/192.0.2.1")
+	run.RecordQueryTimeout("ns.example/192.0.2.1")
+
+	if got := run.QueryTimeouts()["ns.example/192.0.2.1"]; got != 2 {
+		t.Fatalf("expected timeout count 2 on snapshot store, got %d", got)
+	}
+}
+
 func TestQueryTimingsReturnsDeepCopy(t *testing.T) {
 	cs := NewCacheStore()
 	cs.RecordQueryTime("key", 10*time.Millisecond)

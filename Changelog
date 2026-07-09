@@ -2,6 +2,33 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+Reworks the admin UI with hash-based deep links, a batches list/detail view, global keyboard shortcuts, unified result rendering, and shared notice/confirm dialogs. Nameserver01 now requires RA=1 before flagging NXDOMAIN-only servers as recursors.
+
+### Added
+
+- admin-ui: hash router with deep links for tabs, settings, jobs, domains, tags, and batches that survive reload and open in new tabs
+- admin-ui: batches list/detail view at `#/batches/<id>` with clickable job rows showing severity pills and grade
+- admin-ui: global keyboard shortcuts with a help overlay, translated into all catalogs
+- admin-ui: dirty-state guard that warns before discarding unsaved settings edits
+- admin-ui: roving arrow-key navigation in the settings tablist
+
+### Changed
+
+- engine: nameserver01 requires RA=1 to flag NXDOMAIN-only servers as recursors
+- admin-ui: unify result rendering into RunResultView with shared ScoreCard and GradeChip
+- admin-ui: consolidate feedback onto a shared InlineNotice and tiered ConfirmDialog confirmations, render timestamps ISO-style, and move the severity palette to CSS vars
+- admin-ui: lay out the batch create form and batches list side-by-side
+- server, admin-ui: make severity filtering server-authoritative and drop the client re-filter
+- docs: restructure README with quick start, releases, nagios/MCP, and license
+
+### Fixed
+
+- admin-ui: fix ReferenceError on batch load from stale recentBatchOptions
+- admin-ui: fix dark-theme modal colors and the empty worst-level badge class
+- admin-ui: fix wrong-key error messages and distinguish tag load-error from empty
+
 ## [v1.5.8] - 2026-07-06
 
 Adds a tag run-purge endpoint and admin UI action, plus AXFR zone-transfer caching in the packet cache with new `--cache-stats` and `--cache-strict` CLI flags. Adopts RFC 9499 "in-domain" terminology in place of "bailiwick". Reworks Zone09 MX consistency reporting and renames nameserver15 to software version disclosure.

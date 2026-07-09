@@ -1939,6 +1939,14 @@ func TestSitemapXML(t *testing.T) {
 					t.Fatalf("sitemap.xml missing hreflang=%q", lang)
 				}
 			}
+			root := strings.TrimSuffix(strings.TrimPrefix(tt.wantLoc, "<loc>"), "</loc>")
+			analysisBase := strings.TrimRight(root, "/")
+			for _, p := range analysisSitemapPaths {
+				wantURL := "<loc>" + analysisBase + p + "</loc>"
+				if !strings.Contains(body, wantURL) {
+					t.Fatalf("sitemap.xml missing analysis URL %q\ngot: %s", wantURL, body)
+				}
+			}
 		})
 	}
 }

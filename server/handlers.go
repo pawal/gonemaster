@@ -938,6 +938,18 @@ func (s *Server) handleJobsPurge(w http.ResponseWriter, r *http.Request) {
 
 var sitemapLangs = []string{"cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"}
 
+// analysisSitemapPaths are the English-only analysis dashboard landing pages.
+var analysisSitemapPaths = []string{
+	"/analysis/",
+	"/analysis/cohorts",
+	"/analysis/domains",
+	"/analysis/nameservers",
+	"/analysis/asns",
+	"/analysis/endpoints",
+	"/analysis/tags",
+	"/analysis/trends",
+}
+
 func resolvePublicURL(configured string, r *http.Request) string {
 	if configured != "" {
 		return configured
@@ -976,6 +988,12 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	}
 	fmt.Fprintf(&b, "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"%s\"/>\n", publicURL)
 	b.WriteString("  </url>\n")
+	analysisBase := strings.TrimRight(publicURL, "/")
+	for _, p := range analysisSitemapPaths {
+		b.WriteString("  <url>\n")
+		fmt.Fprintf(&b, "    <loc>%s%s</loc>\n", analysisBase, p)
+		b.WriteString("  </url>\n")
+	}
 	b.WriteString("</urlset>\n")
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")

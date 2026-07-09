@@ -257,6 +257,7 @@ var zoneTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry, e
 	"zone10": zonetest.Zone10,
 	"zone11": zonetest.Zone11,
 	"zone12": zonetest.Zone12,
+	"zone13": zonetest.Zone13,
 	"zone14": zonetest.Zone14,
 }
 

@@ -2,6 +2,26 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+Reports a stale DS at the parent of an unsigned zone as an error. Adds SEO metadata to the analysis dashboards. Flag timed-out name servers as unreachable.
+
+### Added
+
+- analysis-ui, server: SEO and social metadata for the analysis dashboards - per-route titles, descriptions and canonical URLs, Open Graph and Twitter cards, a favicon, and the dashboard pages listed in `sitemap.xml`
+- engine, admin-ui: track query timeouts separately from response times and surface unreachable/unresolved name servers in the timing view
+- docs, analysis-ui: zone14 and dnssec21 testcase titles and a zone14 result explanation
+
+### Changed
+
+- engine: run dnssec11 for unsigned zones so a stale DS still published at the parent is reported as an error (`DS11_DS_BUT_UNSIGNED_ZONE`) instead of being hidden by the `DS07_NOT_SIGNED` short-circuit
+- server: report a timed-out name server as unreachable in the timing summary
+
+### Fixed
+
+- engine: register zone13 in the zone testcase map so it actually runs; it was implemented but never dispatched
+- engine: initialize `queryTimeouts` in `SnapshotForRun` to prevent a nil-map panic on server runs
+
 ## [v1.5.9] - 2026-07-09
 
 Reworks the admin UI with hash-based deep links, a batches list/detail view, global keyboard shortcuts, unified result rendering, and shared notice/confirm dialogs. Nameserver01 now requires RA=1 before flagging NXDOMAIN-only servers as recursors.

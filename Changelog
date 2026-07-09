@@ -2,7 +2,7 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.5.9] - 2026-07-09
 
 Reworks the admin UI with hash-based deep links, a batches list/detail view, global keyboard shortcuts, unified result rendering, and shared notice/confirm dialogs. Nameserver01 now requires RA=1 before flagging NXDOMAIN-only servers as recursors.
 

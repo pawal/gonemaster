@@ -2254,6 +2254,31 @@ details[open] > .score-bonus-summary > .score-bonus-chevron { transform: rotate(
   color: var(--ink);
 }
 
+.ns-timings-row-unreachable .ns-timings-num,
+.ns-timings-row-unresolved .ns-timings-num {
+  font-style: italic;
+  color: var(--ink-2);
+}
+
+.ns-timings-badge {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-family: var(--sans);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.ns-timings-badge-unreachable,
+.ns-timings-badge-unresolved {
+  background: var(--sev-error-bg);
+  color: var(--sev-error-fg);
+}
+
 @media (max-width: 640px) {
   .ns-timings-summary {
     align-items: flex-start;

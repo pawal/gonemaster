@@ -598,6 +598,8 @@
   "ns_timing_min_ms": "最小",
   "ns_timing_max_ms": "最大",
   "ns_timing_samples": "サンプル数",
+  "ns_timing_status_unreachable": "応答なし",
+  "ns_timing_status_unresolved": "名前解決できません",
   "profile_load_error": "プロファイルの読み込みに失敗しました: {error}",
   "profile_deleted": "プロファイルを削除しました。",
   "profile_delete_error": "プロファイルの削除に失敗しました: {error}",

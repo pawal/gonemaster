@@ -61,4 +61,26 @@ describe("RunResultBody", () => {
     });
     expect(document.querySelector('[data-testid="admin-nameserver-timings"]')).not.toBeNull();
   });
+
+  it("marks a timed-out nameserver as unreachable instead of showing a response time", () => {
+    const resultWithTimings = {
+      ...sampleResult,
+      nameserver_timings: [
+        { nameserver: "ns1", address: "1.2.3.4", avg_ms: 10, min_ms: 5, max_ms: 20, count: 3, status: "ok" },
+        { nameserver: "ns.cocca.fr", address: "2.3.4.5", status: "unreachable" },
+      ],
+    };
+
+    render(RunResultBody, {
+      props: { result: resultWithTimings, nameserverTimingsEnabled: true },
+    });
+
+    const rows = document.querySelectorAll('[data-testid="admin-nameserver-timing-row"]');
+    const dead = [...rows].find((r) => r.textContent.includes("ns.cocca.fr"));
+    expect(dead).toBeTruthy();
+    expect(dead.getAttribute("data-status")).toBe("unreachable");
+    // The infinity marker stands in for the timeout; no fabricated 0/large ms.
+    expect(dead.textContent).toContain("∞");
+    expect(dead.querySelector(".ns-timings-badge-unreachable")).not.toBeNull();
+  });
 });

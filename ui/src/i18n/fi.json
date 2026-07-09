@@ -598,6 +598,8 @@
   "ns_timing_min_ms": "Min",
   "ns_timing_max_ms": "Maks",
   "ns_timing_samples": "Mittauksia",
+  "ns_timing_status_unreachable": "Ei vastaa",
+  "ns_timing_status_unresolved": "Ei nimen selvitystä",
   "profile_load_error": "Profiilien lataaminen epäonnistui: {error}",
   "profile_deleted": "Profiili poistettu.",
   "profile_delete_error": "Profiilin poistaminen epäonnistui: {error}",

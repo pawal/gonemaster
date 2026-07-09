@@ -267,6 +267,8 @@
   "ns_timing_min_ms": "Min",
   "ns_timing_max_ms": "Max",
   "ns_timing_samples": "Vzorky",
+  "ns_timing_status_unreachable": "Žádná odpověď",
+  "ns_timing_status_unresolved": "Nelze přeložit",
   "tags_load_error": "Nepodařilo se načíst tagy: {error}",
   "no_tags": "Nebyly nalezeny žádné tagy.",
   "tag_name_label": "Název",

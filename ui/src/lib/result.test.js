@@ -13,6 +13,10 @@ import {
   resultScore,
   formatSeconds,
   formatTimingMs,
+  nsRowStatus,
+  nsTimingCell,
+  nsSamplesCell,
+  nsStatusLabelKey,
   entryMessage,
   moduleId,
   summaryRows,
@@ -100,6 +104,37 @@ describe("formatSeconds / formatTimingMs", () => {
   it("formatTimingMs rounds to integer string or '0'", () => {
     expect(formatTimingMs(12.7)).toBe("13");
     expect(formatTimingMs(NaN)).toBe("0");
+  });
+});
+
+describe("nameserver timing row status", () => {
+  it("treats unset/ok status as ok", () => {
+    expect(nsRowStatus({})).toBe("ok");
+    expect(nsRowStatus({ status: "ok" })).toBe("ok");
+    expect(nsRowStatus(null)).toBe("ok");
+  });
+
+  it("passes through unreachable and unresolved", () => {
+    expect(nsRowStatus({ status: "unreachable" })).toBe("unreachable");
+    expect(nsRowStatus({ status: "unresolved" })).toBe("unresolved");
+  });
+
+  it("renders timing cells: ms for ok, infinity for unreachable, dash for unresolved", () => {
+    expect(nsTimingCell({ status: "ok" }, 12.7)).toBe("13");
+    expect(nsTimingCell({ status: "unreachable" }, 5000)).toBe("∞");
+    expect(nsTimingCell({ status: "unresolved" }, 0)).toBe("-");
+  });
+
+  it("renders the samples cell: count for ok, 0 for unreachable, dash for unresolved", () => {
+    expect(nsSamplesCell({ status: "ok", count: 4 })).toBe("4");
+    expect(nsSamplesCell({ status: "unreachable" })).toBe("0");
+    expect(nsSamplesCell({ status: "unresolved" })).toBe("-");
+  });
+
+  it("maps status to a badge i18n key, empty for ok", () => {
+    expect(nsStatusLabelKey({ status: "unreachable" })).toBe("ns_timing_status_unreachable");
+    expect(nsStatusLabelKey({ status: "unresolved" })).toBe("ns_timing_status_unresolved");
+    expect(nsStatusLabelKey({ status: "ok" })).toBe("");
   });
 });
 

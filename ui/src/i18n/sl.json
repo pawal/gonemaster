@@ -598,6 +598,8 @@
   "ns_timing_min_ms": "Min",
   "ns_timing_max_ms": "Maks",
   "ns_timing_samples": "Vzorci",
+  "ns_timing_status_unreachable": "Ne odgovarja",
+  "ns_timing_status_unresolved": "Imena ni mogoče razrešiti",
   "profile_load_error": "Nalaganje profilov ni uspelo: {error}",
   "profile_deleted": "Profil izbrisan.",
   "profile_delete_error": "Brisanje profila ni uspelo: {error}",

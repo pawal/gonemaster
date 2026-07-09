@@ -50,6 +50,45 @@ export const formatTimingMs = (value) => {
   return Math.round(numeric).toString();
 };
 
+// nsRowStatus treats any status other than "unreachable"/"unresolved" as ok so
+// old rows (status unset) keep rendering as before.
+export const nsRowStatus = (item) => {
+  if (item?.status === "unreachable" || item?.status === "unresolved") {
+    return item.status;
+  }
+  return "ok";
+};
+
+// nsTimingCell picks the cell content by row status: "∞" for a reachable
+// address that never answered, "-" for a name that never resolved, otherwise
+// the formatted milliseconds.
+export const nsTimingCell = (item, value) => {
+  const s = nsRowStatus(item);
+  if (s === "unreachable") return "∞";
+  if (s === "unresolved") return "-";
+  return formatTimingMs(value);
+};
+
+export const nsSamplesCell = (item) => {
+  const s = nsRowStatus(item);
+  if (s === "unreachable") return "0";
+  if (s === "unresolved") return "-";
+  return `${item?.count ?? 0}`;
+};
+
+// nsStatusLabelKey maps a row status to its i18n badge key, or "" when the row
+// is ok and needs no badge.
+export const nsStatusLabelKey = (item) => {
+  switch (nsRowStatus(item)) {
+    case "unreachable":
+      return "ns_timing_status_unreachable";
+    case "unresolved":
+      return "ns_timing_status_unresolved";
+    default:
+      return "";
+  }
+};
+
 export const entryMessage = (entry) => {
   if (!entry) return "";
   if (entry.message) return entry.message;

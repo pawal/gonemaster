@@ -7,7 +7,10 @@
     bannerClass,
     isNoticeOrAbove,
     formatSeconds,
-    formatTimingMs,
+    nsRowStatus,
+    nsTimingCell,
+    nsSamplesCell,
+    nsStatusLabelKey,
     entryMessage,
     moduleId,
     summaryRows,
@@ -167,13 +170,19 @@
           </thead>
           <tbody>
             {#each nsTimings as item}
-              <tr data-testid="admin-nameserver-timing-row">
-                <td class="ns-timings-name">{item.nameserver}</td>
-                <td class="ns-timings-ip">{item.address}</td>
-                <td class="ns-timings-num ns-timings-avg">{formatTimingMs(item.avg_ms)}</td>
-                <td class="ns-timings-num">{formatTimingMs(item.min_ms)}</td>
-                <td class="ns-timings-num">{formatTimingMs(item.max_ms)}</td>
-                <td class="ns-timings-num">{item.count}</td>
+              {@const status = nsRowStatus(item)}
+              <tr data-testid="admin-nameserver-timing-row" class="ns-timings-row ns-timings-row-{status}" data-status={status}>
+                <td class="ns-timings-name">
+                  <span>{item.nameserver}</span>
+                  {#if nsStatusLabelKey(item)}
+                    <span class="ns-timings-badge ns-timings-badge-{status}">{$t(nsStatusLabelKey(item))}</span>
+                  {/if}
+                </td>
+                <td class="ns-timings-ip">{item.address || "-"}</td>
+                <td class="ns-timings-num ns-timings-avg">{nsTimingCell(item, item.avg_ms)}</td>
+                <td class="ns-timings-num">{nsTimingCell(item, item.min_ms)}</td>
+                <td class="ns-timings-num">{nsTimingCell(item, item.max_ms)}</td>
+                <td class="ns-timings-num">{nsSamplesCell(item)}</td>
               </tr>
             {/each}
           </tbody>

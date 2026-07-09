@@ -598,6 +598,8 @@
   "ns_timing_min_ms": "Min",
   "ns_timing_max_ms": "Maks",
   "ns_timing_samples": "Målinger",
+  "ns_timing_status_unreachable": "Svarer ikke",
+  "ns_timing_status_unresolved": "Intet DNS-oppslag",
   "profile_load_error": "Kunne ikke laste profiler: {error}",
   "profile_deleted": "Profil slettet.",
   "profile_delete_error": "Kunne ikke slette profil: {error}",

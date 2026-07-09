@@ -267,6 +267,8 @@
   "ns_timing_min_ms": "Min.",
   "ns_timing_max_ms": "Max.",
   "ns_timing_samples": "Metingen",
+  "ns_timing_status_unreachable": "Geen antwoord",
+  "ns_timing_status_unresolved": "Kan niet worden herleid",
   "tags_load_error": "Laden van tags mislukt: {error}",
   "no_tags": "Geen tags gevonden.",
   "tag_name_label": "Naam",

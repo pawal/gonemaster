@@ -267,6 +267,8 @@
   "ns_timing_min_ms": "Min",
   "ns_timing_max_ms": "Max",
   "ns_timing_samples": "Stichproben",
+  "ns_timing_status_unreachable": "Keine Antwort",
+  "ns_timing_status_unresolved": "Nicht auflösbar",
   "tags_load_error": "Fehler beim Laden der Tags: {error}",
   "no_tags": "Keine Tags gefunden.",
   "tag_name_label": "Name",

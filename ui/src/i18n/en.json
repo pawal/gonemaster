@@ -267,6 +267,8 @@
   "ns_timing_min_ms": "Min",
   "ns_timing_max_ms": "Max",
   "ns_timing_samples": "Samples",
+  "ns_timing_status_unreachable": "No response",
+  "ns_timing_status_unresolved": "Does not resolve",
   "tags_load_error": "Failed to load tags: {error}",
   "no_tags": "No tags found.",
   "tag_name_label": "Name",

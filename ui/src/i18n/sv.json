@@ -598,6 +598,8 @@
   "ns_timing_min_ms": "Min",
   "ns_timing_max_ms": "Max",
   "ns_timing_samples": "Mätningar",
+  "ns_timing_status_unreachable": "Svarar inte",
+  "ns_timing_status_unresolved": "Inget DNS-uppslag",
   "profile_load_error": "Det gick inte att ladda profiler: {error}",
   "profile_deleted": "Profil borttagen.",
   "profile_delete_error": "Det gick inte att ta bort profil: {error}",

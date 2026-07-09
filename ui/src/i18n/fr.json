@@ -598,6 +598,8 @@
   "ns_timing_min_ms": "Min",
   "ns_timing_max_ms": "Max",
   "ns_timing_samples": "Échantillons",
+  "ns_timing_status_unreachable": "Ne répond pas",
+  "ns_timing_status_unresolved": "Nom non résolu",
   "profile_load_error": "Impossible de charger les profils : {error}",
   "profile_deleted": "Profil supprimé.",
   "profile_delete_error": "Impossible de supprimer le profil : {error}",

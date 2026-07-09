@@ -22,8 +22,9 @@ const noUIPage = `<!doctype html>
 </html>
 `
 
-// Handler returns a minimal info page for API-only builds.
-func Handler() http.Handler {
+// Handler returns a minimal info page for API-only builds. The publicURL
+// argument is accepted for signature parity with the default build.
+func Handler(_ string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.WriteHeader(http.StatusMethodNotAllowed)

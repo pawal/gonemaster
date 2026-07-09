@@ -13,7 +13,7 @@ import (
 func TestHandlerServesIndexHTMLForRoot(t *testing.T) {
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	Handler().ServeHTTP(resp, req)
+	Handler("").ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", resp.Code)
 	}
@@ -26,7 +26,7 @@ func TestHandlerServesIndexHTMLForRoot(t *testing.T) {
 func TestHandlerFallsBackToIndexForUnknownSPARoute(t *testing.T) {
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/cohort/tld/domains", nil)
-	Handler().ServeHTTP(resp, req)
+	Handler("").ServeHTTP(resp, req)
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200 SPA fallback, got %d", resp.Code)
 	}
@@ -38,7 +38,7 @@ func TestHandlerFallsBackToIndexForUnknownSPARoute(t *testing.T) {
 func TestHandlerRejectsNonGetMethods(t *testing.T) {
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodPost, "/", strings.NewReader("body"))
-	Handler().ServeHTTP(resp, req)
+	Handler("").ServeHTTP(resp, req)
 	if resp.Code != http.StatusMethodNotAllowed {
 		t.Fatalf("expected 405, got %d", resp.Code)
 	}
@@ -69,7 +69,7 @@ func TestCleanRequestPath(t *testing.T) {
 }
 
 func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
-	h := Handler()
+	h := Handler("")
 
 	rootReq := httptest.NewRequest(http.MethodGet, "/", nil)
 	rootRR := httptest.NewRecorder()
@@ -99,12 +99,68 @@ func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
 	}
 }
 
+func TestInjectMetaReplacesPlaceholders(t *testing.T) {
+	in := []byte(`<meta property="og:url" content="__ANALYSIS_OG_URL__" />` +
+		`<meta property="og:image" content="__ANALYSIS_OG_IMAGE__" />` +
+		`<link rel="canonical" href="__ANALYSIS_OG_URL__" />`)
+	out := string(injectMeta(in, "https://example.com/analysis/domains", "https://example.com/analysis/gonemaster.svg"))
+
+	if strings.Contains(out, "__ANALYSIS_OG_URL__") || strings.Contains(out, "__ANALYSIS_OG_IMAGE__") {
+		t.Fatalf("placeholders left unreplaced: %s", out)
+	}
+	if !strings.Contains(out, `content="https://example.com/analysis/domains"`) {
+		t.Fatalf("og:url not injected: %s", out)
+	}
+	if !strings.Contains(out, `href="https://example.com/analysis/domains"`) {
+		t.Fatalf("canonical not injected: %s", out)
+	}
+	if !strings.Contains(out, `content="https://example.com/analysis/gonemaster.svg"`) {
+		t.Fatalf("og:image not injected: %s", out)
+	}
+}
+
+func TestServeIndexDoesNotReflectRequestPath(t *testing.T) {
+	// The request path is attacker-controlled; it must never be echoed into the
+	// injected canonical/Open Graph tags or it becomes reflected XSS (the
+	// /analysis CSP permits inline scripts). Only exercised when the SPA is
+	// embedded; the placeholder build serves a static unavailable page instead.
+	if !IsBuilt() {
+		t.Skip("analysis UI dist not built; injection path not exercised")
+	}
+	rr := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, `/%22%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E`, nil)
+	Handler("").ServeHTTP(rr, req)
+	body := rr.Body.String()
+	if strings.Contains(body, "<script>alert(1)") {
+		t.Fatalf("request path reflected into served HTML: %s", body[:min(400, len(body))])
+	}
+	if strings.Contains(body, "__ANALYSIS_OG_URL__") {
+		t.Fatalf("og:url placeholder left unreplaced")
+	}
+}
+
+func TestResolvePublicURL(t *testing.T) {
+	// Configured value wins verbatim.
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	if got := resolvePublicURL("https://canonical.example/", req); got != "https://canonical.example/" {
+		t.Fatalf("configured URL = %q, want https://canonical.example/", got)
+	}
+
+	// Empty config falls back to request host, honouring the forwarded proto.
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	req.Host = "myhost.example.com"
+	req.Header.Set("X-Forwarded-Proto", "https")
+	if got := resolvePublicURL("", req); got != "https://myhost.example.com/" {
+		t.Fatalf("auto-detected URL = %q, want https://myhost.example.com/", got)
+	}
+}
+
 func TestServerMountsAnalysisRoute(t *testing.T) {
 	// The /analysis route returns a 301 redirect to /analysis/ (with slash),
 	// which is mounted in server.go. Exercised via the embedded Handler here:
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/_app/immutable/nothing.js", nil)
-	Handler().ServeHTTP(resp, req)
+	Handler("").ServeHTTP(resp, req)
 	// unknown file under _app should either be a 404 or fall back to the SPA
 	// index; both are acceptable - just make sure we don't crash.
 	if resp.Code != http.StatusOK && resp.Code != http.StatusNotFound {

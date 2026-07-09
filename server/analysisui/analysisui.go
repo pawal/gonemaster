@@ -4,14 +4,21 @@
 package analysisui
 
 import (
+	"bytes"
 	"embed"
 	"fmt"
+	"html"
 	"io/fs"
 	"net/http"
 	"path"
 	"strings"
 	"sync"
+	"time"
 )
+
+// mountPath is where the dashboard is served under; used to build absolute
+// canonical and Open Graph URLs from the request path.
+const mountPath = "/analysis"
 
 //go:embed all:dist
 var distFS embed.FS
@@ -38,8 +45,9 @@ const noEmbeddedUIPage = `<!doctype html>
 
 // Handler serves the embedded analysis dashboard with SPA fallback. Unknown
 // paths under the mount resolve to index.html so the client-side router can
-// handle them.
-func Handler() http.Handler {
+// handle them. publicURL is the canonical base URL of the deployment (e.g.
+// "https://example.com/"); empty means auto-detect from the request.
+func Handler(publicURL string) http.Handler {
 	fsys, err := dist()
 	if err != nil {
 		return unavailableUIHandler()
@@ -54,7 +62,7 @@ func Handler() http.Handler {
 
 		cleanPath := cleanRequestPath(r.URL.Path)
 		if cleanPath == "" || cleanPath == "index.html" {
-			serveIndex(fsys, w, r)
+			serveIndex(fsys, w, r, publicURL)
 			return
 		}
 
@@ -68,8 +76,35 @@ func Handler() http.Handler {
 			return
 		}
 
-		serveIndex(fsys, w, r)
+		serveIndex(fsys, w, r, publicURL)
 	})
+}
+
+func resolvePublicURL(configured string, r *http.Request) string {
+	if configured != "" {
+		return configured
+	}
+	scheme := "http"
+	if r.TLS != nil {
+		scheme = "https"
+	}
+	if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" || proto == "http" {
+		scheme = proto
+	}
+	host := r.Host
+	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
+		host = fwdHost
+	}
+	return scheme + "://" + host + "/"
+}
+
+// injectMeta fills the canonical/Open Graph placeholders in index.html with
+// URLs derived from the request. Non-JS crawlers rely on these; the client
+// refines them per route once the SPA hydrates.
+func injectMeta(data []byte, ogURL, ogImage string) []byte {
+	data = bytes.ReplaceAll(data, []byte("__ANALYSIS_OG_URL__"), []byte(ogURL))
+	data = bytes.ReplaceAll(data, []byte("__ANALYSIS_OG_IMAGE__"), []byte(ogImage))
+	return data
 }
 
 func dist() (fs.FS, error) {
@@ -110,18 +145,25 @@ func isFile(fsys fs.FS, name string) bool {
 	return !info.IsDir()
 }
 
-func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request) {
+func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request, publicURL string) {
 	data, err := fs.ReadFile(fsys, "index.html")
 	if err != nil {
 		serveUnavailableUIPage(w, r)
 		return
 	}
-	w.Header().Set("Cache-Control", "no-cache")
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	if r.Method != http.MethodHead {
-		_, _ = w.Write(data)
+	// Inject only the deployment base, not the request path: the path is
+	// attacker-controlled and would be reflected into an HTML attribute. The
+	// client refines canonical/og:url per route once the SPA hydrates.
+	base := strings.TrimRight(resolvePublicURL(publicURL, r), "/")
+	ogURL := html.EscapeString(base + mountPath + "/")
+	ogImage := html.EscapeString(base + mountPath + "/og-image.png")
+	data = injectMeta(data, ogURL, ogImage)
+	modTime := time.Time{}
+	if info, err := fs.Stat(fsys, "index.html"); err == nil {
+		modTime = info.ModTime()
 	}
+	w.Header().Set("Cache-Control", "no-cache")
+	http.ServeContent(w, r, "index.html", modTime, bytes.NewReader(data))
 }
 
 func serveFile(fileServer http.Handler, w http.ResponseWriter, r *http.Request, name string) {

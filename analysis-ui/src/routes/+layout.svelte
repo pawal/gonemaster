@@ -7,8 +7,15 @@
   import { navItems, isActive, visibleNavItems } from "$lib/nav";
   import type { LayoutData } from "./+layout";
   import { applyTheme, initialTheme, persistTheme, type Theme } from "$lib/theme";
+  import { applyHead } from "$lib/head";
 
   let { children } = $props();
+
+  // Keep the document head in sync with the active route so titles,
+  // descriptions, and the canonical URL reflect the current view.
+  $effect(() => {
+    applyHead(page.route.id, page.params, page.url);
+  });
 
   let theme = $state<Theme>("light");
   let versionGonemaster = $state("");

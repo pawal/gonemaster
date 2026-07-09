@@ -78,6 +78,12 @@ Description:
 
 SPF records can reference other records using mechanisms such as `include` and `a`, each of which costs a DNS lookup when a receiving mail server evaluates the policy. RFC 7208 imposes a limit of ten lookups per evaluation. This check walks the SPF references and flags policies that exceed the limit, loop back on themselves, or rely on the deprecated `ptr` mechanism.
 
+## Testcase zone14
+
+Description:
+
+ZONEMD (RFC 8976) is an optional record at the zone apex that publishes a cryptographic hash of the zone's contents, so a recipient can verify that data received from secondary servers, mirrors, or files on disk has not been altered or truncated. This check looks for ZONEMD records on each authoritative nameserver and verifies that the records agree across servers, that the serial matches the SOA, that there are no duplicate (Scheme, Hash) pairs, and that the hash algorithm is one of the IANA-assigned values that standard tooling can verify.
+
 ## Tag APEX_DNAME
 
 Header: DNAME at zone apex

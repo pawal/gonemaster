@@ -2594,6 +2594,184 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 	}
 }
 
+// stubAllDNSSECDiscovery points both DNSSEC07's and DNSSEC11's nameserver
+// discovery at a fixed parent/child topology so All() can be exercised on an
+// unsigned zone without touching the network. DNSSEC07 finds the child via
+// delegationNameservers/zoneNameservers and never queries the parent for an
+// unsigned zone; DNSSEC11 finds the parent via parentApexNameservers and the
+// child via glueNameservers. parentNameservers and zoneParent are stubbed to
+// no-ops because DNSSEC07 still calls them before deciding the zone is
+// unsigned.
+func stubAllDNSSECDiscovery(t *testing.T, parentNS, childNS nameserver.Nameserver) {
+	t.Helper()
+
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	origParent := parentNameservers
+	origZoneParent := zoneParent
+	origParentApex := parentApexNameservers
+	origGlue := glueNameservers
+	origApex := apexNameservers
+	t.Cleanup(func() {
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+		parentNameservers = origParent
+		zoneParent = origZoneParent
+		parentApexNameservers = origParentApex
+		glueNameservers = origGlue
+		apexNameservers = origApex
+	})
+
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
+			{Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.160"), HasAddress: true},
+		}, nil
+	}
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
+	}
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+	parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	}
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{childNS}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+}
+
+// unsignedChildNameserver serves an authoritative SOA and an authoritative but
+// empty DNSKEY response, i.e. a zone that is not signed.
+func unsignedChildNameserver(t *testing.T, ctx context.Context) nameserver.Nameserver {
+	t.Helper()
+	return newNameserver(t, ctx, "ns1.example", "192.0.2.160", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return answerPacket(qname, dns.TypeSOA, soaRecord(qname))
+		case "DNSKEY":
+			return dnskeyPacket(qname, nil)
+		default:
+			return packet.Packet{}
+		}
+	})
+}
+
+// TestDNSSECAllUnsignedStaleParentDS covers the case this whole change is
+// about: an unsigned child whose parent still publishes a DS. Before the
+// DNSSEC11-before-short-circuit ordering, All() emitted DS07_NOT_SIGNED and
+// returned, so the stale DS was never reported. Now DNSSEC11 runs first and
+// emits DS11_DS_BUT_UNSIGNED_ZONE, while the short-circuit must still block
+// every later testcase (dnssec01 is enabled here but must not run).
+func TestDNSSECAllUnsignedStaleParentDS(t *testing.T) {
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	ctx := testCtx()
+
+	staleDS := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	staleDS.KeyTag = 54321
+	staleDS.Algorithm = 8
+	staleDS.DigestType = 2
+	staleDS.Digest = "DEADBEEF"
+
+	parentNS := newNameserver(t, ctx, "ns.parent", "192.0.2.200", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dsPacketFromDS(qname, staleDS)
+		}
+		return packet.Packet{}
+	})
+	childNS := unsignedChildNameserver(t, ctx)
+	stubAllDNSSECDiscovery(t, parentNS, childNS)
+
+	profile.ResetEffective()
+	if err := profile.Effective().Set("test_cases", []any{"dnssec07", "dnssec11", "dnssec01"}); err != nil {
+		t.Fatalf("set test_cases: %v", err)
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := All(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec all: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS07_NOT_SIGNED") {
+		t.Fatalf("expected DS07_NOT_SIGNED")
+	}
+	if !hasEntryTag(entries, "DS11_DS_BUT_UNSIGNED_ZONE") {
+		t.Fatalf("expected DS11_DS_BUT_UNSIGNED_ZONE for a stale parent DS on an unsigned zone")
+	}
+	// The short-circuit must still fire after DNSSEC11: only dnssec07 and
+	// dnssec11 may run, so exactly two TEST_CASE_START entries, and no dnssec01
+	// output despite it being enabled.
+	if got := countEntryTag(entries, "TEST_CASE_START"); got != 2 {
+		t.Fatalf("expected exactly 2 testcases to run (dnssec07, dnssec11), got %d TEST_CASE_START", got)
+	}
+	if hasEntryTag(entries, "DS01_DS_ALGO_OK") || hasEntryTag(entries, "DS01_PARENT_ZONE_NO_DS") {
+		t.Fatalf("dnssec01 ran despite the DS07_NOT_SIGNED short-circuit")
+	}
+}
+
+// TestDNSSECAllUnsignedNoParentDS is the ordinary unsigned zone: no DS at the
+// parent. DNSSEC11 now runs and emits DS11_NO_PARENT_DS (INFO, no score
+// penalty), the short-circuit still blocks the rest, and no DS-but-unsigned
+// error is raised.
+func TestDNSSECAllUnsignedNoParentDS(t *testing.T) {
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	ctx := testCtx()
+
+	parentNS := newNameserver(t, ctx, "ns.parent", "192.0.2.200", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dsPacketFromDS(qname, nil)
+		}
+		return packet.Packet{}
+	})
+	childNS := unsignedChildNameserver(t, ctx)
+	stubAllDNSSECDiscovery(t, parentNS, childNS)
+
+	profile.ResetEffective()
+	if err := profile.Effective().Set("test_cases", []any{"dnssec07", "dnssec11", "dnssec01"}); err != nil {
+		t.Fatalf("set test_cases: %v", err)
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := All(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec all: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS07_NOT_SIGNED") {
+		t.Fatalf("expected DS07_NOT_SIGNED")
+	}
+	if !hasEntryTag(entries, "DS11_NO_PARENT_DS") {
+		t.Fatalf("expected DS11_NO_PARENT_DS for an unsigned zone with no parent DS")
+	}
+	if hasEntryTag(entries, "DS11_DS_BUT_UNSIGNED_ZONE") {
+		t.Fatalf("did not expect DS11_DS_BUT_UNSIGNED_ZONE when the parent has no DS")
+	}
+	if got := countEntryTag(entries, "TEST_CASE_START"); got != 2 {
+		t.Fatalf("expected exactly 2 testcases to run (dnssec07, dnssec11), got %d TEST_CASE_START", got)
+	}
+}
+
 func TestDNSSEC08MissingRRSIG(t *testing.T) {
 	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
@@ -6816,6 +6994,19 @@ func hasEntryTag(entries []*logger.Entry, tag string) bool {
 		}
 	}
 	return false
+}
+
+func countEntryTag(entries []*logger.Entry, tag string) int {
+	count := 0
+	for _, entry := range entries {
+		if entry == nil {
+			continue
+		}
+		if entry.Tag == tag {
+			count++
+		}
+	}
+	return count
 }
 
 func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {

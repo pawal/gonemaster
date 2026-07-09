@@ -112,6 +112,17 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	// Runs before the DS07_NOT_SIGNED short-circuit so a stale parent DS is caught.
+	if util.ShouldRunTest(ctx, "dnssec11") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC11(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
 	if hasTag(results, "DS07_NOT_SIGNED") {
 		return results, nil
 	}
@@ -204,15 +215,6 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if util.ShouldRunTest(ctx, "dnssec10") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC10(ctx, z)
-		})
-		results = append(results, entries...)
-		if err != nil {
-			return results, err
-		}
-	}
-	if util.ShouldRunTest(ctx, "dnssec11") {
-		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
-			return DNSSEC11(ctx, z)
 		})
 		results = append(results, entries...)
 		if err != nil {

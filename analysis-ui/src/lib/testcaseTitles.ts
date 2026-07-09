@@ -46,6 +46,7 @@ const TESTCASE_TITLES: Record<string, string> = {
   dnssec18: "Validate trust from DS to CDS and CDNSKEY",
   dnssec19: "Check DNSKEY records for known cryptographic weaknesses",
   dnssec20: "NSEC/NSEC3 type bitmap at zone apex matches actual RR types",
+  dnssec21: "Parent zone's DS RRset is signed by a valid DNSKEY",
   nameserver01: "A name server should not be a recursor",
   nameserver02: "Test of EDNS0 support",
   nameserver03: "Test availability of zone transfer (AXFR)",
@@ -84,6 +85,7 @@ const TESTCASE_TITLES: Record<string, string> = {
   zone11: "SPF policy at zone apex",
   zone12: "CSYNC RR at zone apex",
   zone13: "SPF DNS lookup limit compliance",
+  zone14: "ZONEMD record at zone apex",
 };
 
 export function testcaseTitle(testcase: string | undefined | null): string | null {

@@ -903,7 +903,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			}
 		}
 		if nstimes && packetCacheStore != nil {
-			if writeErr := writeNSTimes(humanWriter, packetCacheStore.QueryTimings()); writeErr != nil {
+			if writeErr := writeNSTimes(humanWriter, packetCacheStore.QueryTimings(), packetCacheStore.QueryTimeouts()); writeErr != nil {
 				fmt.Fprintln(errOut, writeErr.Error())
 				return 2
 			}
@@ -953,7 +953,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			NameserverTimings []nameserver.NameserverTiming `json:"nameserver_timings"`
 		}{
 			Entries:           displayEntries,
-			NameserverTimings: nameserver.TimingsFromQueryMap(packetCacheStore.QueryTimings()),
+			NameserverTimings: nameserver.TimingsFromQueryMap(packetCacheStore.QueryTimings(), packetCacheStore.QueryTimeouts()),
 		}
 		encodeErr = enc.Encode(wrapped)
 	} else {

@@ -99,14 +99,14 @@ func TestCacheStoreRecordQueryTime(t *testing.T) {
 	}
 }
 
-// TestQueryNetworkRecordsTimeoutBudget is the step-9 verification: a query that
-// times out must produce a QueryTimings entry for that nameserver. Before this
-// change RecordQueryTime fired only on a successful response, so time spent
-// waiting on slow or dead servers - the dominant cost of a slow run - was
-// invisible to --nstimes and the server's nameserver_timings. The hook returns
-// a timeout-pattern error after a short delay so the recorded budget is
-// positive and attributable to the nameserver.
-func TestQueryNetworkRecordsTimeoutBudget(t *testing.T) {
+// TestQueryNetworkRecordsTimeoutSeparately verifies that a timed-out query is
+// counted as a timeout, not folded into the response-time samples. A server
+// that only ever times out must therefore have no QueryTimings entry (so it is
+// reported as unreachable rather than as a very slow "ok" server) while still
+// showing up in QueryTimeouts so it stays visible in the timings output. The
+// hook returns a timeout-pattern error after a short delay to model a dead
+// server that swallows the query.
+func TestQueryNetworkRecordsTimeoutSeparately(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 
@@ -125,12 +125,11 @@ func TestQueryNetworkRecordsTimeoutBudget(t *testing.T) {
 	}
 
 	const key = "ns.example/192.0.2.253"
-	got := store.QueryTimings()[key]
-	if len(got) == 0 {
-		t.Fatalf("expected a QueryTimings entry for %q from the timed-out query, got none: %+v", key, store.QueryTimings())
+	if got := store.QueryTimings()[key]; len(got) != 0 {
+		t.Fatalf("expected no QueryTimings entry for a timed-out query, got %v", got)
 	}
-	if got[0] <= 0 {
-		t.Errorf("expected a positive recorded timeout budget, got %v", got[0])
+	if got := store.QueryTimeouts()[key]; got == 0 {
+		t.Fatalf("expected a timeout count for %q, got none: %+v", key, store.QueryTimeouts())
 	}
 }
 
@@ -154,13 +153,50 @@ func TestQueryTimingsNilCacheStore(t *testing.T) {
 }
 
 func TestTimingsFromQueryMapEmpty(t *testing.T) {
-	out := TimingsFromQueryMap(nil)
+	out := TimingsFromQueryMap(nil, nil)
 	if len(out) != 0 {
 		t.Fatalf("expected empty slice, got %d entries", len(out))
 	}
-	out = TimingsFromQueryMap(map[string][]time.Duration{})
+	out = TimingsFromQueryMap(map[string][]time.Duration{}, map[string]int{})
 	if len(out) != 0 {
 		t.Fatalf("expected empty slice for empty map, got %d entries", len(out))
+	}
+}
+
+// TestTimingsFromQueryMapTimeoutOnlyKey checks that a nameserver present only
+// in the timeout counts (every query timed out) surfaces as an unreachable row
+// with zero stats, while a server that answered stays "ok".
+func TestTimingsFromQueryMapTimeoutOnlyKey(t *testing.T) {
+	timings := map[string][]time.Duration{
+		"ns1.example.com/192.0.2.1": {10 * time.Millisecond, 20 * time.Millisecond},
+	}
+	timeouts := map[string]int{
+		"ns2.example.com/192.0.2.2": 3,
+		// ns1 also timed out on some queries but answered others: it must
+		// stay "ok", not be demoted to unreachable.
+		"ns1.example.com/192.0.2.1": 1,
+	}
+	out := TimingsFromQueryMap(timings, timeouts)
+	if len(out) != 2 {
+		t.Fatalf("expected 2 entries, got %d: %+v", len(out), out)
+	}
+
+	byKey := map[string]NameserverTiming{}
+	for _, item := range out {
+		byKey[item.Nameserver+"/"+item.Address] = item
+	}
+
+	dead := byKey["ns2.example.com/192.0.2.2"]
+	if dead.Status != NameserverTimingStatusUnreachable {
+		t.Fatalf("expected ns2 unreachable, got %+v", dead)
+	}
+	if dead.Count != 0 || dead.AvgMS != 0 || dead.MaxMS != 0 {
+		t.Fatalf("expected zero stats for unreachable row, got %+v", dead)
+	}
+
+	alive := byKey["ns1.example.com/192.0.2.1"]
+	if alive.Status != NameserverTimingStatusOK || alive.Count != 2 {
+		t.Fatalf("expected ns1 ok with 2 samples, got %+v", alive)
 	}
 }
 
@@ -168,7 +204,7 @@ func TestTimingsFromQueryMapSingle(t *testing.T) {
 	timings := map[string][]time.Duration{
 		"ns1.example.com/192.0.2.1": {10 * time.Millisecond, 20 * time.Millisecond},
 	}
-	out := TimingsFromQueryMap(timings)
+	out := TimingsFromQueryMap(timings, nil)
 	if len(out) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(out))
 	}
@@ -196,7 +232,7 @@ func TestTimingsFromQueryMapSortedByNameThenAddress(t *testing.T) {
 		"ns1.example.com/192.0.2.2": {20 * time.Millisecond},
 		"ns1.example.com/192.0.2.1": {10 * time.Millisecond},
 	}
-	out := TimingsFromQueryMap(timings)
+	out := TimingsFromQueryMap(timings, nil)
 	if len(out) != 3 {
 		t.Fatalf("expected 3 entries, got %d", len(out))
 	}
@@ -216,7 +252,7 @@ func TestTimingsFromQueryMapMalformedKeySkipped(t *testing.T) {
 		"no-slash":                  {10 * time.Millisecond},
 		"ns1.example.com/192.0.2.1": {20 * time.Millisecond},
 	}
-	out := TimingsFromQueryMap(timings)
+	out := TimingsFromQueryMap(timings, nil)
 	if len(out) != 1 {
 		t.Fatalf("expected 1 entry (malformed key skipped), got %d", len(out))
 	}

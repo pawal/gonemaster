@@ -398,6 +398,7 @@ type CacheStore struct {
 	queryMetrics      cacheMetrics
 	errorMetrics      cacheMetrics
 	queryTimes        map[string][]time.Duration
+	queryTimeouts     map[string]int
 	axfrMu            sync.Mutex
 	axfrCache         map[string]*axfrRecord
 }
@@ -413,6 +414,7 @@ func NewCacheStore() *CacheStore {
 		observedErrors:    map[string]*errorCache{},
 		addrLastAccess:    map[string]time.Time{},
 		queryTimes:        map[string][]time.Duration{},
+		queryTimeouts:     map[string]int{},
 	}
 }
 
@@ -449,6 +451,31 @@ func (c *CacheStore) QueryTimings() map[string][]time.Duration {
 		cp := make([]time.Duration, len(v))
 		copy(cp, v)
 		out[k] = cp
+	}
+	return out
+}
+
+// RecordQueryTimeout counts a timed-out query, kept apart from queryTimes so
+// the waited budget never pollutes response-time statistics.
+func (c *CacheStore) RecordQueryTimeout(key string) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	c.queryTimeouts[key]++
+	c.mu.Unlock()
+}
+
+// QueryTimeouts returns a copy of the per-nameserver timed-out query counts.
+func (c *CacheStore) QueryTimeouts() map[string]int {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make(map[string]int, len(c.queryTimeouts))
+	for k, v := range c.queryTimeouts {
+		out[k] = v
 	}
 	return out
 }

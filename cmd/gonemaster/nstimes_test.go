@@ -13,7 +13,7 @@ import (
 
 func TestWriteNSTimesEmpty(t *testing.T) {
 	var buf bytes.Buffer
-	if err := writeNSTimes(&buf, nil); err != nil {
+	if err := writeNSTimes(&buf, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if buf.Len() != 0 {
@@ -34,7 +34,7 @@ func TestWriteNSTimesFormat(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := writeNSTimes(&buf, timings); err != nil {
+	if err := writeNSTimes(&buf, timings, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -79,6 +79,47 @@ func TestWriteNSTimesFormat(t *testing.T) {
 	}
 }
 
+// TestWriteNSTimesUnreachable checks that a nameserver that only ever timed
+// out (present in timeouts, absent from timings) is still listed, rendered
+// with dashes for every stat column instead of a fabricated response time, and
+// left out of the grand-total count.
+func TestWriteNSTimesUnreachable(t *testing.T) {
+	timings := map[string][]time.Duration{
+		"ns1.example.com/192.0.2.1": {10 * time.Millisecond, 20 * time.Millisecond},
+	}
+	timeouts := map[string]int{
+		"ns.cocca.fr/192.0.2.9": 4,
+	}
+
+	var buf bytes.Buffer
+	if err := writeNSTimes(&buf, timings, timeouts); err != nil {
+		t.Fatal(err)
+	}
+	output := buf.String()
+
+	var deadLine string
+	for _, line := range strings.Split(output, "\n") {
+		if strings.Contains(line, "ns.cocca.fr/192.0.2.9") {
+			deadLine = line
+			break
+		}
+	}
+	if deadLine == "" {
+		t.Fatalf("timed-out server missing from output:\n%s", output)
+	}
+	if strings.Count(deadLine, "-") < 7 {
+		t.Fatalf("expected dashes in every stat column for the dead server, got %q", deadLine)
+	}
+
+	// Grand total count must be 2 (ns1's samples only), not inflated by the
+	// four timed-out queries.
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	lastLine := lines[len(lines)-1]
+	if !strings.Contains(lastLine, "Grand total") || !strings.Contains(lastLine, "2") {
+		t.Fatalf("grand total should count only real samples (2): %q", lastLine)
+	}
+}
+
 func TestWriteNSTimesLongNames(t *testing.T) {
 	longName := strings.Repeat("a", 60) + ".example.com/192.0.2.1"
 	timings := map[string][]time.Duration{
@@ -86,7 +127,7 @@ func TestWriteNSTimesLongNames(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := writeNSTimes(&buf, timings); err != nil {
+	if err := writeNSTimes(&buf, timings, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,7 +143,7 @@ func TestWriteNSTimesSortedByName(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := writeNSTimes(&buf, timings); err != nil {
+	if err := writeNSTimes(&buf, timings, nil); err != nil {
 		t.Fatal(err)
 	}
 

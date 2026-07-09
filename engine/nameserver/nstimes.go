@@ -30,8 +30,10 @@ const (
 
 // TimingsFromQueryMap converts a raw query timing map (keyed as "name/address")
 // into a slice of NameserverTiming sorted by nameserver name, address, then
-// median query time ascending.
-func TimingsFromQueryMap(queryTimings map[string][]time.Duration) []NameserverTiming {
+// median query time ascending. Keys present only in timeouts (queries that
+// timed out with no response) surface as unreachable rows so a dead server
+// stays visible without its waited budget masquerading as a response time.
+func TimingsFromQueryMap(queryTimings map[string][]time.Duration, timeouts map[string]int) []NameserverTiming {
 	type entry struct {
 		nameserver string
 		address    string
@@ -68,6 +70,21 @@ func TimingsFromQueryMap(queryTimings map[string][]time.Duration) []NameserverTi
 			StddevMS:   stats.Stddev,
 			Count:      stats.Count,
 			Status:     NameserverTimingStatusOK,
+		})
+	}
+
+	for key := range timeouts {
+		if _, ok := queryTimings[key]; ok {
+			continue
+		}
+		name, address, ok := strings.Cut(key, "/")
+		if !ok {
+			continue
+		}
+		out = append(out, NameserverTiming{
+			Nameserver: name,
+			Address:    address,
+			Status:     NameserverTimingStatusUnreachable,
 		})
 	}
 

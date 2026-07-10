@@ -95,6 +95,20 @@
     }
   }
 
+  function edgeTitle(edge) {
+    if (edge.kind === "ds") {
+      return `DS ${edge.dsKeyTag} -> DNSKEY ${edge.dnskeyKeyTag ?? "?"}: ${edge.status}`;
+    }
+    const detail =
+      edge.status === "valid" && edge.inception && edge.expiration
+        ? $t("pub.dnssec_chain_sig_window", { from: fmtDate(edge.inception), to: fmtDate(edge.expiration) })
+        : edge.status;
+    if (edge.kind === "selfsig") return `DNSKEY ${edge.keyTag} -> DNSKEY RRset: ${detail}`;
+    if (edge.kind === "keysig") return `DNSKEY ${edge.keyTag} -> DNSKEY ${edge.targetTag}: ${detail}`;
+    if (edge.kind === "sig") return `DNSKEY ${edge.keyTag} -> ${edge.rrset} RRset: ${detail}`;
+    return "";
+  }
+
   function nodeLines(node) {
     switch (node.kind) {
       case "ds":
@@ -171,14 +185,22 @@
             {/each}
 
             {#each graph.edges as edge (edge.id)}
-              <line
-                class="chain-edge {edgeClass(edge)}"
-                x1={edge.from.x}
-                y1={edge.from.y}
-                x2={edge.to.x}
-                y2={edge.to.y}
-                marker-end="url(#chain-arrow)"
-              />
+              {#if edge.kind === "selfsig"}
+                <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)">
+                  <title>{edgeTitle(edge)}</title>
+                </path>
+              {:else}
+                <line
+                  class="chain-edge {edgeClass(edge)}"
+                  x1={edge.from.x}
+                  y1={edge.from.y}
+                  x2={edge.to.x}
+                  y2={edge.to.y}
+                  marker-end="url(#chain-arrow)"
+                >
+                  <title>{edgeTitle(edge)}</title>
+                </line>
+              {/if}
             {/each}
 
             {#each graph.nodes as node (node.id)}
@@ -294,7 +316,7 @@
     fill: var(--ink-2);
   }
   .node-ksk .chain-node-box {
-    stroke: var(--grade-a);
+    stroke: var(--accent-2);
     stroke-width: 3;
   }
   .node-zsk .chain-node-box {
@@ -353,7 +375,8 @@
     border: 2px solid var(--border);
   }
   .swatch-ksk {
-    border-color: var(--grade-a);
+    border-color: var(--accent-2);
+    border-width: 3px;
   }
   .swatch-zsk {
     border-color: var(--accent-2);
@@ -362,7 +385,8 @@
     border-color: var(--accent);
   }
   .swatch-sig {
-    border-color: var(--grade-c);
+    border: none;
+    background: linear-gradient(90deg, var(--grade-a), var(--grade-c), var(--grade-f));
   }
   .chain-facts {
     margin: 0;

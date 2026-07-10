@@ -87,9 +87,11 @@ describe("DnssecChain", () => {
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     const svg = screen.getByTestId("chain-svg");
     expect(svg.getAttribute("role")).toBe("img");
-    // DS + KSK + ZSK + DNSKEY rrset = 4 node groups.
-    expect(container.querySelectorAll("g.chain-node").length).toBe(4);
+    // DS + KSK + ZSK = 3 node groups (no abstract DNSKEY-RRset box).
+    expect(container.querySelectorAll("g.chain-node").length).toBe(3);
     expect(container.querySelector("g.node-ksk")).toBeTruthy();
+    // The KSK self-signs the DNSKEY RRset: a loop path is drawn.
+    expect(container.querySelector("path.chain-edge")).toBeTruthy();
     expect(screen.getByTestId("chain-legend")).toBeTruthy();
     expect(screen.getByTestId("chain-facts")).toBeTruthy();
   });

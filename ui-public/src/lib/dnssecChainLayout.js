@@ -2,6 +2,10 @@
 // returns geometry ({width, height, clusters, nodes, edges}) with no DOM
 // dependency, so it is fully unit-testable. The component renders the geometry
 // as SVG; all coordinates are plain numbers used as SVG attributes.
+//
+// The model follows the DNSViz convention: a key that signs the DNSKEY RRset
+// self-signs (a loop) and vouches for the other keys in the set, so KSKs sit in
+// a row above the ZSKs with downward "signs" edges; ZSKs then sign zone data.
 
 const NODE_W = 132;
 const NODE_H = 52;
@@ -10,6 +14,18 @@ const V_GAP = 104;
 const PAD_X = 24;
 const PAD_TOP = 44;
 const PAD_BOTTOM = 16;
+const LOOP_PAD = 36; // right margin so a key self-loop is not clipped
+
+const ALGO = {
+  1: "RSAMD5", 3: "DSA", 5: "RSASHA1", 6: "DSA-NSEC3-SHA1", 7: "RSASHA1-NSEC3-SHA1",
+  8: "RSASHA256", 10: "RSASHA512", 12: "ECC-GOST", 13: "ECDSAP256SHA256",
+  14: "ECDSAP384SHA384", 15: "ED25519", 16: "ED448",
+};
+
+function algoLabel(algo) {
+  const m = ALGO[algo];
+  return m ? `${m} (alg ${algo})` : `alg ${algo}`;
+}
 
 // truncateName shortens a long name with a middle ellipsis. The full name is
 // meant to go into a title/tooltip via titleText.
@@ -27,8 +43,7 @@ function rowWidth(count) {
   return count * NODE_W + (count - 1) * H_GAP;
 }
 
-// place assigns centered x positions to a row of nodes within totalW.
-function place(nodes, y, totalW) {
+function place(nodes, y, totalW, rowIndex) {
   const w = rowWidth(nodes.length);
   const startX = PAD_X + (totalW - w) / 2;
   nodes.forEach((n, i) => {
@@ -36,6 +51,7 @@ function place(nodes, y, totalW) {
     n.y = y;
     n.w = NODE_W;
     n.h = NODE_H;
+    n.rowIndex = rowIndex;
   });
 }
 
@@ -51,7 +67,7 @@ export function layoutChain(chain) {
   const soaSigs = Array.isArray(chain.child?.soa_rrsig) ? chain.child.soa_rrsig : [];
   const links = Array.isArray(chain.links) ? chain.links : [];
 
-  // Row 0: DS nodes, or a dashed ghost when the zone is an island (keys, no DS).
+  // Parent DS nodes, or a dashed ghost when the zone is an island (keys, no DS).
   const dsNodes = [];
   if (dsList.length > 0) {
     for (const ds of dsList) {
@@ -59,51 +75,69 @@ export function layoutChain(chain) {
         id: `ds-${ds.key_tag}`,
         kind: dsSource === "input" ? "ds-input" : "ds",
         keyTag: ds.key_tag,
-        algo: ds.algorithm,
-        digestType: ds.digest_type,
-        titleText: `DS key tag ${ds.key_tag}, algorithm ${ds.algorithm}, digest ${ds.digest_type}`,
+        titleText: `DS ${ds.key_tag}, ${algoLabel(ds.algorithm)}, digest type ${ds.digest_type}`,
       });
     }
   } else {
     dsNodes.push({ id: "ds-ghost", kind: "ds-ghost", titleText: "No DS at the parent" });
   }
 
-  // Row 1: DNSKEY nodes, SEP (KSK) first; a dashed ghost when DS exists but no key.
-  const keyNodes = [];
-  if (keys.length > 0) {
-    const sorted = [...keys].sort((a, b) => (b.sep ? 1 : 0) - (a.sep ? 1 : 0) || a.key_tag - b.key_tag);
-    for (const k of sorted) {
-      keyNodes.push({
-        id: `key-${k.key_tag}`,
-        kind: k.sep ? "ksk" : "zsk",
-        keyTag: k.key_tag,
-        algo: k.algorithm,
-        titleText: `${k.sep ? "KSK" : "ZSK"} key tag ${k.key_tag}, algorithm ${k.algorithm}`,
-      });
+  // Split DNSKEYs into KSK (SEP) and ZSK rows so signing edges read downward.
+  const kskNodes = [];
+  const zskNodes = [];
+  for (const k of [...keys].sort((a, b) => a.key_tag - b.key_tag)) {
+    const bits = k.key_size ? `, ${k.key_size} bits` : "";
+    const node = {
+      id: `key-${k.key_tag}`,
+      keyTag: k.key_tag,
+      titleText: `${k.sep ? "KSK" : "ZSK"} ${k.key_tag}, ${algoLabel(k.algorithm)}${bits}`,
+    };
+    if (k.sep) {
+      node.kind = "ksk";
+      kskNodes.push(node);
+    } else {
+      node.kind = "zsk";
+      zskNodes.push(node);
     }
+  }
+
+  const soaNodes = soaSigs.length > 0
+    ? [{ id: "rrset-soa", kind: "rrset", label: "SOA", titleText: "SOA RRset" }]
+    : [];
+
+  // Assemble the visible rows top to bottom, tagging which carries a label.
+  const rows = [{ label: "parent", nodes: dsNodes }];
+  if (keys.length === 0) {
+    rows.push({ label: "keys", nodes: [{ id: "key-ghost", kind: "key-ghost", titleText: "No DNSKEY at the zone" }] });
   } else {
-    keyNodes.push({ id: "key-ghost", kind: "key-ghost", titleText: "No DNSKEY at the zone" });
+    let keyLabelUsed = false;
+    if (kskNodes.length > 0) {
+      rows.push({ label: "keys", nodes: kskNodes });
+      keyLabelUsed = true;
+    }
+    if (zskNodes.length > 0) {
+      rows.push({ label: keyLabelUsed ? null : "keys", nodes: zskNodes });
+    }
+  }
+  if (soaNodes.length > 0) {
+    rows.push({ label: "signed", nodes: soaNodes });
   }
 
-  // Row 2: signed RRsets. DNSKEY is always shown; SOA only when a signature exists.
-  const rrsetNodes = [{ id: "rrset-dnskey", kind: "rrset", label: "DNSKEY", titleText: "DNSKEY RRset" }];
-  if (soaSigs.length > 0) {
-    rrsetNodes.push({ id: "rrset-soa", kind: "rrset", label: "SOA", titleText: "SOA RRset" });
-  }
+  const totalW = Math.max(...rows.map((r) => rowWidth(r.nodes.length)));
+  rows.forEach((r, i) => place(r.nodes, PAD_TOP + i * V_GAP, totalW, i));
 
-  const rows = [dsNodes, keyNodes, rrsetNodes];
-  const totalW = Math.max(...rows.map((r) => rowWidth(r.length)));
-
-  rows.forEach((row, i) => place(row, PAD_TOP + i * V_GAP, totalW));
-
-  const nodes = [...dsNodes, ...keyNodes, ...rrsetNodes];
+  const nodes = rows.flatMap((r) => r.nodes);
   const byId = new Map(nodes.map((n) => [n.id, n]));
 
-  const clusters = [
-    { id: "parent", labelKey: "pub.dnssec_chain_parent_label", name: truncateName(chain.parent_zone ?? ""), x: PAD_X, y: PAD_TOP - 22 },
-    { id: "keys", labelKey: "pub.dnssec_chain_keys_label", name: truncateName(chain.zone ?? ""), x: PAD_X, y: PAD_TOP + V_GAP - 22 },
-    { id: "signed", labelKey: "pub.dnssec_chain_signed_label", name: "", x: PAD_X, y: PAD_TOP + 2 * V_GAP - 22 },
-  ];
+  const nameFor = (label) => {
+    if (label === "parent") return truncateName(chain.parent_zone ?? "");
+    if (label === "keys") return truncateName(chain.zone ?? "");
+    return "";
+  };
+  const labelKeyFor = (label) => `pub.dnssec_chain_${label === "parent" ? "parent_label" : label === "keys" ? "keys_label" : "signed_label"}`;
+  const clusters = rows
+    .filter((r) => r.label)
+    .map((r) => ({ id: r.label, labelKey: labelKeyFor(r.label), name: nameFor(r.label), x: PAD_X, y: r.nodes[0].y - 22 }));
 
   const edges = [];
 
@@ -111,36 +145,51 @@ export function layoutChain(chain) {
   for (const link of links) {
     const from = byId.get(`ds-${link.ds_key_tag}`);
     if (!from) continue;
-    let toId;
-    if (link.status === "no_dnskey") {
-      toId = byId.has("key-ghost") ? "key-ghost" : `key-${link.dnskey_key_tag}`;
-    } else {
-      toId = `key-${link.dnskey_key_tag}`;
-    }
+    const toId = link.status === "no_dnskey" && byId.has("key-ghost") ? "key-ghost" : `key-${link.dnskey_key_tag}`;
     const to = byId.get(toId);
     if (!to) continue;
     edges.push({
       id: `link-${link.ds_key_tag}-${link.dnskey_key_tag ?? "none"}`,
       kind: "ds",
       status: link.status,
+      dsKeyTag: link.ds_key_tag,
+      dnskeyKeyTag: link.dnskey_key_tag,
       from: edgePoint(from, "bottom"),
       to: edgePoint(to, "top"),
     });
   }
 
-  // Key -> signed-RRset edges, colored by signature state.
+  // Keys that sign the DNSKEY RRset self-loop and vouch for lower-row keys.
   for (const sig of dnskeySigs) {
-    const from = byId.get(`key-${sig.key_tag}`);
-    const to = byId.get("rrset-dnskey");
-    if (!from || !to) continue;
+    const signer = byId.get(`key-${sig.key_tag}`);
+    if (!signer) continue;
     edges.push({
-      id: `sig-dnskey-${sig.key_tag}`,
-      kind: "sig",
+      id: `self-${sig.key_tag}`,
+      kind: "selfsig",
       status: sig.state,
-      from: edgePoint(from, "bottom"),
-      to: edgePoint(to, "top"),
+      keyTag: sig.key_tag,
+      inception: sig.inception,
+      expiration: sig.expiration,
+      d: selfLoopPath(signer),
     });
+    for (const target of nodes) {
+      if ((target.kind !== "ksk" && target.kind !== "zsk") || target.id === signer.id) continue;
+      if (target.rowIndex <= signer.rowIndex) continue;
+      edges.push({
+        id: `keysig-${sig.key_tag}-${target.keyTag}`,
+        kind: "keysig",
+        status: sig.state,
+        keyTag: sig.key_tag,
+        targetTag: target.keyTag,
+        inception: sig.inception,
+        expiration: sig.expiration,
+        from: edgePoint(signer, "bottom"),
+        to: edgePoint(target, "top"),
+      });
+    }
   }
+
+  // Keys that sign zone data point at the SOA RRset.
   for (const sig of soaSigs) {
     const from = byId.get(`key-${sig.key_tag}`);
     const to = byId.get("rrset-soa");
@@ -149,17 +198,36 @@ export function layoutChain(chain) {
       id: `sig-soa-${sig.key_tag}`,
       kind: "sig",
       status: sig.state,
+      keyTag: sig.key_tag,
+      rrset: "SOA",
+      inception: sig.inception,
+      expiration: sig.expiration,
       from: edgePoint(from, "bottom"),
       to: edgePoint(to, "top"),
     });
   }
 
-  const width = totalW + 2 * PAD_X;
-  const height = PAD_TOP + 2 * V_GAP + NODE_H + PAD_BOTTOM;
+  const hasLoop = edges.some((e) => e.kind === "selfsig");
+  const width = totalW + 2 * PAD_X + (hasLoop ? LOOP_PAD : 0);
+  const height = PAD_TOP + (rows.length - 1) * V_GAP + NODE_H + PAD_BOTTOM;
   return { width, height, clusters, nodes, edges };
 }
 
 function edgePoint(node, side) {
   const cx = node.x + node.w / 2;
-  return { x: cx, y: side === "top" ? node.y : node.y + node.h };
+  return { x: round(cx), y: side === "top" ? node.y : node.y + node.h };
+}
+
+// selfLoopPath draws a small loop off the node's top-right corner, ending on the
+// right edge with the arrowhead pointing back into the node.
+function selfLoopPath(node) {
+  const sx = node.x + node.w * 0.66;
+  const sy = node.y;
+  const ex = node.x + node.w;
+  const ey = node.y + node.h * 0.3;
+  return `M ${round(sx)} ${round(sy)} C ${round(sx + 22)} ${round(sy - 28)}, ${round(ex + 30)} ${round(ey - 24)}, ${round(ex)} ${round(ey)}`;
+}
+
+function round(n) {
+  return Math.round(n * 10) / 10;
 }

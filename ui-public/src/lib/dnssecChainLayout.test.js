@@ -56,7 +56,7 @@ describe("layoutChain", () => {
     expect(layoutChain(undefined)).toBeNull();
   });
 
-  it("builds nodes for a secure chain with SEP key first", () => {
+  it("builds nodes with the KSK row above the ZSK row", () => {
     const g = layoutChain(secureChain());
     expect(g).not.toBeNull();
 
@@ -64,23 +64,25 @@ describe("layoutChain", () => {
     expect(ds).toHaveLength(1);
     expect(ds[0].keyTag).toBe(1000);
 
-    const keys = g.nodes.filter((n) => n.kind === "ksk" || n.kind === "zsk");
-    expect(keys).toHaveLength(2);
-    expect(keys[0].kind).toBe("ksk"); // SEP first
+    const ksk = g.nodes.find((n) => n.kind === "ksk");
+    const zsk = g.nodes.find((n) => n.kind === "zsk");
+    expect(ksk).toBeTruthy();
+    expect(zsk).toBeTruthy();
+    // KSK sits in a row above the ZSK.
+    expect(ksk.rowIndex).toBeLessThan(zsk.rowIndex);
 
-    const rrset = g.nodes.filter((n) => n.kind === "rrset");
-    expect(rrset).toHaveLength(1); // DNSKEY only, no SOA sig
-    expect(rrset[0].label).toBe("DNSKEY");
+    // No abstract DNSKEY-RRset node: signing is shown with edges, not a box.
+    expect(g.nodes.some((n) => n.id === "rrset-dnskey")).toBe(false);
   });
 
   it("labels the parent and key clusters with their zone names", () => {
     const g = layoutChain(secureChain());
     const parent = g.clusters.find((c) => c.id === "parent");
     const keys = g.clusters.find((c) => c.id === "keys");
-    const signed = g.clusters.find((c) => c.id === "signed");
     expect(parent.name).toBe("com");
     expect(keys.name).toBe("example.com");
-    expect(signed.name).toBe("");
+    // No signed-records row without a zone-data signature.
+    expect(g.clusters.some((c) => c.id === "signed")).toBe(false);
   });
 
   it("keeps the root parent name as a dot, not an em dash", () => {
@@ -90,13 +92,20 @@ describe("layoutChain", () => {
     expect(parent.name).toBe(".");
   });
 
-  it("produces a matching DS edge and a valid signature edge", () => {
+  it("produces a matching DS edge and a self-signing KSK loop", () => {
     const g = layoutChain(secureChain());
     const dsEdge = g.edges.find((e) => e.kind === "ds");
     expect(dsEdge.status).toBe("match");
+    expect(dsEdge.dnskeyKeyTag).toBe(1000);
 
-    const sigEdge = g.edges.find((e) => e.kind === "sig");
-    expect(sigEdge.status).toBe("valid");
+    // The KSK signs the DNSKEY RRset: a self-loop plus a "signs" edge to the ZSK.
+    const selfLoop = g.edges.find((e) => e.kind === "selfsig" && e.keyTag === 1000);
+    expect(selfLoop).toBeTruthy();
+    expect(selfLoop.status).toBe("valid");
+    expect(typeof selfLoop.d).toBe("string");
+
+    const keySig = g.edges.find((e) => e.kind === "keysig" && e.keyTag === 1000 && e.targetTag === 2000);
+    expect(keySig).toBeTruthy();
   });
 
   it("keeps all node coordinates within the viewBox", () => {

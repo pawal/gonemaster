@@ -118,9 +118,20 @@ type Job struct {
 	MinLevel      string                         `json:"-"`
 	IPv4Disabled  bool                           `json:"-"`
 	IPv6Disabled  bool                           `json:"-"`
+	// Origin records the creation site; empty behaves like admin.
+	Origin string `json:"-"`
 	// NameserverTimings carries per-run timing summaries into graduation.
 	NameserverTimings []NameserverTiming `json:"-"`
+	// DNSSECChainJSON carries the extracted chain summary into graduation.
+	DNSSECChainJSON string `json:"-"`
 }
+
+// Job origin values, stored in config_json. Empty is treated as admin.
+const (
+	JobOriginPublic = "public"
+	JobOriginAdmin  = "admin"
+	JobOriginBatch  = "batch"
+)
 
 // NameserverTiming holds timing stats for one tested authoritative nameserver.
 // Defined in engine/nameserver and re-exported here for server consumers.
@@ -759,6 +770,8 @@ type JobResult struct {
 	// Score holds the full scoring result. Populated by GetResult; nil when
 	// the run has no entries or scoring is not available.
 	Score *scoring.Result `json:"score,omitempty"`
+	// HasDNSSECChain marks that a stored chain summary exists for this run.
+	HasDNSSECChain bool `json:"has_dnssec_chain,omitempty"`
 }
 
 // JobResultRaw contains the raw log entries for a job.

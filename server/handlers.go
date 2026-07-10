@@ -118,6 +118,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 			Progress:    0,
 			ProfileID:   cloneInt64Ptr(resolvedProfile.ID),
 			ProfileName: resolvedProfile.Name,
+			Origin:      JobOriginBatch,
 		}
 		created, err := s.store.Create(job)
 		if err != nil {
@@ -429,6 +430,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		ProfileName:   resolvedProfile.Name,
 		IPv4Disabled:  req.IPv4Disabled,
 		IPv6Disabled:  req.IPv6Disabled,
+		Origin:        JobOriginAdmin,
 	}
 	created, err := s.store.Create(job)
 	if err != nil {

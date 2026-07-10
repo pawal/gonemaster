@@ -154,6 +154,7 @@ type jobConfigJSON struct {
 	MinLevel      string                         `json:"min_level,omitempty"`
 	IPv4Disabled  bool                           `json:"ipv4_disabled,omitempty"`
 	IPv6Disabled  bool                           `json:"ipv6_disabled,omitempty"`
+	Origin        string                         `json:"origin,omitempty"`
 }
 
 func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
@@ -207,6 +208,7 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 		MinLevel:      cfg.MinLevel,
 		IPv4Disabled:  cfg.IPv4Disabled,
 		IPv6Disabled:  cfg.IPv6Disabled,
+		Origin:        cfg.Origin,
 	}, nil
 }
 
@@ -224,6 +226,7 @@ func (s *SQLJobStore) Create(job Job) (Job, error) {
 		MinLevel:      job.MinLevel,
 		IPv4Disabled:  job.IPv4Disabled,
 		IPv6Disabled:  job.IPv6Disabled,
+		Origin:        job.Origin,
 	}
 	configJSON, err := toNullJSON(cfg)
 	if err != nil {
@@ -299,6 +302,7 @@ func (s *SQLJobStore) Update(job Job) error {
 		MinLevel:      job.MinLevel,
 		IPv4Disabled:  job.IPv4Disabled,
 		IPv6Disabled:  job.IPv6Disabled,
+		Origin:        job.Origin,
 	}
 	configJSON, err := toNullJSON(cfg)
 	if err != nil {

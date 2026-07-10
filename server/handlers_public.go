@@ -160,6 +160,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		ProfileName:   resolvedProfile.Name,
 		IPv4Disabled:  req.IPv4Disabled,
 		IPv6Disabled:  req.IPv6Disabled,
+		Origin:        JobOriginPublic,
 	}
 	created, err := s.store.Create(job)
 	if err != nil {

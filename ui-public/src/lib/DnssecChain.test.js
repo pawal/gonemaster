@@ -22,7 +22,7 @@ function secureChain() {
         { key_tag: 2000, algorithm: 13, flags: 256, sep: false, servers: ["203.0.113.1"] },
       ],
       dnskey_rrsig: [{ key_tag: 1000, algorithm: 13, state: "valid", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] }],
-      soa_rrsig: [],
+      signed: [],
       servers_disagreeing: [],
     },
     links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] }],

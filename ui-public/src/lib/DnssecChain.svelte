@@ -71,9 +71,11 @@
     ...(chain?.child?.dnskey_rrsig ?? [])
       .filter((s) => s.state === "valid" && s.inception && s.expiration)
       .map((s) => ({ rrset: "DNSKEY", s })),
-    ...(chain?.child?.soa_rrsig ?? [])
-      .filter((s) => s.state === "valid" && s.inception && s.expiration)
-      .map((s) => ({ rrset: "SOA", s })),
+    ...(chain?.child?.signed ?? []).flatMap((entry) =>
+      (entry.rrsig ?? [])
+        .filter((s) => s.state === "valid" && s.inception && s.expiration)
+        .map((s) => ({ rrset: entry.type, s }))
+    ),
   ]);
 
   function edgeClass(edge) {

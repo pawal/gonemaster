@@ -20,7 +20,7 @@ function secureChain(overrides = {}) {
         { key_tag: 2000, algorithm: 13, flags: 256, sep: false, servers: ["203.0.113.1"] },
       ],
       dnskey_rrsig: [{ key_tag: 1000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }],
-      soa_rrsig: [],
+      signed: [],
     },
     links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] }],
     ...overrides,
@@ -130,13 +130,18 @@ describe("layoutChain", () => {
     expect(g.height).toBe(one.height);
   });
 
-  it("adds a SOA node and edge when a SOA signature exists", () => {
+  it("adds a node and edge per signed RRset (SOA, CDS)", () => {
     const chain = secureChain();
-    chain.child.soa_rrsig = [{ key_tag: 2000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }];
+    chain.child.signed = [
+      { type: "SOA", rrsig: [{ key_tag: 2000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }] },
+      { type: "CDS", rrsig: [{ key_tag: 1000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }] },
+    ];
     const g = layoutChain(chain);
-    const soa = g.nodes.find((n) => n.id === "rrset-soa");
-    expect(soa).toBeTruthy();
-    expect(g.edges.some((e) => e.id === "sig-soa-2000")).toBe(true);
+    expect(g.nodes.some((n) => n.id === "rrset-SOA" && n.label === "SOA")).toBe(true);
+    expect(g.nodes.some((n) => n.id === "rrset-CDS" && n.label === "CDS")).toBe(true);
+    // ZSK signs SOA, KSK signs CDS.
+    expect(g.edges.some((e) => e.id === "sig-SOA-2000")).toBe(true);
+    expect(g.edges.some((e) => e.id === "sig-CDS-1000")).toBe(true);
   });
 
   it("draws a ghost DS node for an island (keys, no DS)", () => {
@@ -153,7 +158,7 @@ describe("layoutChain", () => {
   it("draws a ghost DNSKEY node when DS exists but no key", () => {
     const chain = secureChain({
       status: "broken",
-      child: { dnskeys: [], dnskey_rrsig: [], soa_rrsig: [] },
+      child: { dnskeys: [], dnskey_rrsig: [], signed: [] },
       links: [{ ds_key_tag: 1000, status: "no_dnskey", servers: ["192.0.2.1"] }],
     });
     const g = layoutChain(chain);

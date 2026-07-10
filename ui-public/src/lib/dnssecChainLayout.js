@@ -64,7 +64,7 @@ export function layoutChain(chain) {
   const dsSource = chain.parent?.ds_source ?? "none";
   const keys = Array.isArray(chain.child?.dnskeys) ? chain.child.dnskeys : [];
   const dnskeySigs = Array.isArray(chain.child?.dnskey_rrsig) ? chain.child.dnskey_rrsig : [];
-  const soaSigs = Array.isArray(chain.child?.soa_rrsig) ? chain.child.soa_rrsig : [];
+  const signed = Array.isArray(chain.child?.signed) ? chain.child.signed : [];
   const links = Array.isArray(chain.links) ? chain.links : [];
 
   // Parent DS nodes, or a dashed ghost when the zone is an island (keys, no DS).
@@ -101,9 +101,12 @@ export function layoutChain(chain) {
     }
   }
 
-  const soaNodes = soaSigs.length > 0
-    ? [{ id: "rrset-soa", kind: "rrset", label: "SOA", titleText: "SOA RRset" }]
-    : [];
+  const signedNodes = signed.map((s) => ({
+    id: `rrset-${s.type}`,
+    kind: "rrset",
+    label: s.type,
+    titleText: `${s.type} RRset`,
+  }));
 
   // Assemble the visible rows top to bottom, tagging which carries a label.
   const rows = [{ label: "parent", nodes: dsNodes }];
@@ -119,8 +122,8 @@ export function layoutChain(chain) {
       rows.push({ label: keyLabelUsed ? null : "keys", nodes: zskNodes });
     }
   }
-  if (soaNodes.length > 0) {
-    rows.push({ label: "signed", nodes: soaNodes });
+  if (signedNodes.length > 0) {
+    rows.push({ label: "signed", nodes: signedNodes });
   }
 
   const totalW = Math.max(...rows.map((r) => rowWidth(r.nodes.length)));
@@ -189,22 +192,25 @@ export function layoutChain(chain) {
     }
   }
 
-  // Keys that sign zone data point at the SOA RRset.
-  for (const sig of soaSigs) {
-    const from = byId.get(`key-${sig.key_tag}`);
-    const to = byId.get("rrset-soa");
-    if (!from || !to) continue;
-    edges.push({
-      id: `sig-soa-${sig.key_tag}`,
-      kind: "sig",
-      status: sig.state,
-      keyTag: sig.key_tag,
-      rrset: "SOA",
-      inception: sig.inception,
-      expiration: sig.expiration,
-      from: edgePoint(from, "bottom"),
-      to: edgePoint(to, "top"),
-    });
+  // Keys that sign zone data point at each signed RRset.
+  for (const entry of signed) {
+    const to = byId.get(`rrset-${entry.type}`);
+    if (!to) continue;
+    for (const sig of entry.rrsig ?? []) {
+      const from = byId.get(`key-${sig.key_tag}`);
+      if (!from) continue;
+      edges.push({
+        id: `sig-${entry.type}-${sig.key_tag}`,
+        kind: "sig",
+        status: sig.state,
+        keyTag: sig.key_tag,
+        rrset: entry.type,
+        inception: sig.inception,
+        expiration: sig.expiration,
+        from: edgePoint(from, "bottom"),
+        to: edgePoint(to, "top"),
+      });
+    }
   }
 
   const hasLoop = edges.some((e) => e.kind === "selfsig");

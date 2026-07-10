@@ -556,6 +556,30 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /runs/{id}/dnssec-chain:
+    get:
+      tags: [Runs]
+      summary: Get the stored DNSSEC chain summary for a run
+      description: >
+        Returns the per-run DNSSEC authentication-chain summary extracted at
+        run end. Only runs created through the public UI ever have chain data.
+      operationId: getRunDNSSECChain
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DNSSEC chain summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DNSSECChain'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
   /spec/testcases:
     get:
       tags: [Spec]
@@ -1725,6 +1749,30 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /pub/api/v1/jobs/{public_id}/dnssec-chain:
+    get:
+      tags: [Public]
+      summary: Get the DNSSEC chain summary for a public run
+      description: >
+        Returns the stored DNSSEC authentication-chain summary, fetched lazily
+        by the public UI when the chain section is first expanded. Gated by the
+        `show_dnssec_chain_public` operator flag: when the flag is off, or the
+        id is unknown, the endpoint answers 404 `not_found` (indistinguishable,
+        fail-safe). A run that exists without chain data answers 404
+        `no_chain_data` and is not cached.
+      operationId: getPublicJobDNSSECChain
+      parameters:
+        - $ref: '#/components/parameters/PublicIDPath'
+      responses:
+        '200':
+          description: DNSSEC chain summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DNSSECChain'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
   /pub/api/v1/locales:
     get:
       tags: [Public]
@@ -2653,6 +2701,47 @@ components:
               additionalProperties: true
         raw:
           $ref: '#/components/schemas/JobResultRaw'
+        has_dnssec_chain:
+          type: boolean
+          description: >
+            True when a stored DNSSEC chain summary exists for this run and can
+            be fetched from the dnssec-chain endpoint. Omitted (false) for runs
+            without chain data or when the public flag is off.
+
+    DNSSECChain:
+      type: object
+      description: >
+        Per-run DNSSEC authentication-chain summary. The blob is versioned via
+        its own `version` field and evolves additively, so this schema is
+        intentionally loose. Served verbatim from storage.
+      properties:
+        version:
+          type: integer
+          description: Schema version of the chain document.
+        zone:
+          type: string
+        parent_zone:
+          type: string
+        delegation:
+          type: string
+          enum: [normal, undelegated]
+        status:
+          type: string
+          enum: [secure, broken, island, unsigned, indeterminate]
+        truncated:
+          type: boolean
+        parent:
+          type: object
+          additionalProperties: true
+        child:
+          type: object
+          additionalProperties: true
+        links:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+      additionalProperties: true
 
     JobResultRaw:
       type: object
@@ -2992,6 +3081,8 @@ components:
         show_score_public:
           type: boolean
         show_nameserver_timings_public:
+          type: boolean
+        show_dnssec_chain_public:
           type: boolean
 
     FeatureFlags:

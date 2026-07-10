@@ -39,6 +39,10 @@
   }
 
   let graph = $derived(phase === "loaded" && chain ? layoutChain(chain) : null);
+  // Reference edges (CDS/CDNSKEY -> DNSKEY) draw after the nodes so they are
+  // not hidden behind the key boxes they span.
+  let mainEdges = $derived(graph ? graph.edges.filter((e) => e.kind !== "ref") : []);
+  let refEdges = $derived(graph ? graph.edges.filter((e) => e.kind === "ref") : []);
 
   let dsSummary = $derived(
     (chain?.parent?.ds ?? [])
@@ -192,7 +196,7 @@
               <text class="chain-cluster-label" x={cl.x} y={cl.y}>{$t(cl.labelKey)}{#if cl.name}<tspan class="chain-cluster-name"> · {cl.name}</tspan>{/if}</text>
             {/each}
 
-            {#each graph.edges as edge (edge.id)}
+            {#each mainEdges as edge (edge.id)}
               {#if edge.kind === "selfsig"}
                 <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)">
                   <title>{edgeTitle(edge)}</title>
@@ -221,6 +225,19 @@
                   <text class="chain-node-label chain-node-sub" x={node.x + node.w / 2} y={node.y + 38} text-anchor="middle">{lines[1]}</text>
                 {/if}
               </g>
+            {/each}
+
+            {#each refEdges as edge (edge.id)}
+              <line
+                class="chain-edge {edgeClass(edge)}"
+                x1={edge.from.x}
+                y1={edge.from.y}
+                x2={edge.to.x}
+                y2={edge.to.y}
+                marker-end="url(#chain-arrow)"
+              >
+                <title>{edgeTitle(edge)}</title>
+              </line>
             {/each}
           </svg>
         </div>
@@ -366,9 +383,9 @@
   }
   .edge-ref {
     stroke: var(--ink-2);
-    stroke-width: 1.5;
-    stroke-dasharray: 3 3;
-    opacity: 0.6;
+    stroke-width: 1.75;
+    stroke-dasharray: 4 3;
+    opacity: 0.85;
   }
   .chain-legend {
     display: flex;

@@ -224,3 +224,27 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	writeJSON(w, http.StatusOK, result)
 }
+
+// handlePublicGetDNSSECChain handles GET /pub/api/v1/jobs/{publicID}/dnssec-chain.
+// Flag-off and unknown id answer 404 not_found; a run without a blob answers
+// 404 no_chain_data with no cache header so a re-run is not masked.
+func (s *Server) handlePublicGetDNSSECChain(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.ShowDNSSECChainPublic {
+		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
+		return
+	}
+	publicID := r.PathValue("publicID")
+	job, ok := s.store.GetByPublicID(publicID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
+		return
+	}
+	chain, ok := s.store.GetRunDNSSECChain(job.ID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "no_chain_data", "no DNSSEC chain data for this run", nil)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	_, _ = w.Write([]byte(chain))
+}

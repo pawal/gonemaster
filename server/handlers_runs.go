@@ -111,3 +111,16 @@ func (s *Server) handleGetRunResult(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, result)
 }
+
+// handleGetRunDNSSECChain handles GET /api/v1/runs/{id}/dnssec-chain.
+// Admins see stored data directly; only public runs ever have a blob.
+func (s *Server) handleGetRunDNSSECChain(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("id")
+	chain, ok := s.store.GetRunDNSSECChain(id)
+	if !ok {
+		writeError(w, http.StatusNotFound, "not_found", "no DNSSEC chain data for this run", nil)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	_, _ = w.Write([]byte(chain))
+}

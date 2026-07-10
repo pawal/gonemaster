@@ -64,6 +64,15 @@ function joinLines(lines) {
   return lines.filter(Boolean).join("\n");
 }
 
+// sigInline renders a signature's state and validity window on one line.
+function sigInline(sig) {
+  let s = sig.state;
+  if (sig.inception && sig.expiration) {
+    s += `, ${fmtDate(sig.inception)} to ${fmtDate(sig.expiration)}`;
+  }
+  return s;
+}
+
 // sigTitle builds the multi-line hover text for one RRSIG.
 function sigTitle(headline, sig) {
   const lines = [headline, `Signing key: ${sig.key_tag}`, `Algorithm: ${algoLabel(sig.algorithm)}`];
@@ -118,6 +127,8 @@ export function layoutChain(chain) {
   // Parent DS nodes, or a dashed ghost when the zone is an island (keys, no DS).
   const dsNodes = [];
   if (dsList.length > 0) {
+    const dsRRSIG = Array.isArray(chain.parent?.ds_rrsig) ? chain.parent.ds_rrsig : [];
+    const dsSigLines = dsRRSIG.map((r) => `DS RRset signature (key ${r.key_tag}): ${sigInline(r)}`);
     for (const ds of dsList) {
       const input = dsSource === "input";
       dsNodes.push({
@@ -129,6 +140,7 @@ export function layoutChain(chain) {
           `Algorithm: ${algoLabel(ds.algorithm)}`,
           `Digest type: ${digestLabel(ds.digest_type)}`,
           ds.digest ? `Digest: ${shortHex(ds.digest)}` : null,
+          ...dsSigLines,
           serversLine(ds.servers),
         ]),
       });
@@ -142,6 +154,9 @@ export function layoutChain(chain) {
   const zskNodes = [];
   for (const k of [...keys].sort((a, b) => a.key_tag - b.key_tag)) {
     const words = flagWords(k);
+    const signsSet = dnskeySigs
+      .filter((s) => s.key_tag === k.key_tag)
+      .map((s) => `Signs DNSKEY RRset: ${sigInline(s)}`);
     const node = {
       id: `key-${k.key_tag}`,
       keyTag: k.key_tag,
@@ -150,6 +165,7 @@ export function layoutChain(chain) {
         `Algorithm: ${algoLabel(k.algorithm)}`,
         `Flags: ${k.flags}${words ? ` (${words})` : ""}`,
         k.key_size ? `Key size: ${k.key_size} bits` : null,
+        ...signsSet,
         serversLine(k.servers),
       ]),
     };
@@ -163,14 +179,14 @@ export function layoutChain(chain) {
   }
 
   const signedNodes = signed.map((s) => {
-    const sigParts = (s.rrsig ?? []).map((r) => `key ${r.key_tag} (${r.state})`);
+    const sigLines = (s.rrsig ?? []).map((r) => `Signature by key ${r.key_tag}: ${sigInline(r)}`);
     return {
       id: `rrset-${s.type}`,
       kind: "rrset",
       label: s.type,
       titleText: joinLines([
         `${s.type} RRset`,
-        sigParts.length ? `Signed by: ${sigParts.join(", ")}` : null,
+        ...sigLines,
         s.refs?.length ? `Names key: ${s.refs.join(", ")}` : null,
       ]),
     };

@@ -1,7 +1,7 @@
 <script>
   import { t } from "../i18n.js";
   import { getDnssecChain } from "../api.js";
-  import { layoutChain, fmtDate } from "./dnssecChainLayout.js";
+  import { layoutChain } from "./dnssecChainLayout.js";
 
   let { publicID, domain = "" } = $props();
 
@@ -66,16 +66,38 @@
     (chain?.parent?.ds?.length ?? 0) > 0 && (chain?.child?.dnskeys?.length ?? 0) === 0
   );
 
-  let sigWindows = $derived([
-    ...(chain?.child?.dnskey_rrsig ?? [])
-      .filter((s) => s.state === "valid" && s.inception && s.expiration)
-      .map((s) => ({ rrset: "DNSKEY", s })),
-    ...(chain?.child?.signed ?? []).flatMap((entry) =>
-      (entry.rrsig ?? [])
-        .filter((s) => s.state === "valid" && s.inception && s.expiration)
-        .map((s) => ({ rrset: entry.type, s }))
-    ),
-  ]);
+  // Custom hover tooltip: the native SVG <title> has a browser-controlled
+  // delay; this one appears immediately and is positioned via the JS DOM API.
+  let tipEl = $state(null);
+  let tipText = $state("");
+  let tipShown = $state(false);
+
+  function showTip(e, text) {
+    if (!text) return;
+    tipText = text;
+    tipShown = true;
+    positionTip(e);
+  }
+  function positionTip(e) {
+    if (!tipEl) return;
+    const pad = 14;
+    const r = tipEl.getBoundingClientRect();
+    let x = e.clientX + pad;
+    let y = e.clientY + pad;
+    if (x + r.width > window.innerWidth) x = e.clientX - r.width - pad;
+    if (y + r.height > window.innerHeight) y = e.clientY - r.height - pad;
+    tipEl.style.left = `${Math.max(4, x)}px`;
+    tipEl.style.top = `${Math.max(4, y)}px`;
+  }
+  function hideTip() {
+    tipShown = false;
+  }
+  function onSvgMove(e) {
+    const el = e.target.closest?.("[data-tip]");
+    const text = el?.dataset?.tip;
+    if (text) showTip(e, text);
+    else hideTip();
+  }
 
   function edgeClass(edge) {
     if (edge.kind === "ref") {
@@ -163,6 +185,8 @@
             role="img"
             aria-label={$t("pub.dnssec_chain_aria", { domain })}
             data-testid="chain-svg"
+            onmousemove={onSvgMove}
+            onmouseleave={hideTip}
           >
             <defs>
               <marker id="chain-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -176,9 +200,7 @@
 
             {#each mainEdges as edge (edge.id)}
               {#if edge.kind === "selfsig"}
-                <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)">
-                  <title>{edge.title}</title>
-                </path>
+                <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={edge.title}></path>
               {:else}
                 <line
                   class="chain-edge {edgeClass(edge)}"
@@ -187,16 +209,14 @@
                   x2={edge.to.x}
                   y2={edge.to.y}
                   marker-end="url(#chain-arrow)"
-                >
-                  <title>{edge.title}</title>
-                </line>
+                  data-tip={edge.title}
+                ></line>
               {/if}
             {/each}
 
             {#each graph.nodes as node (node.id)}
               {@const lines = nodeLines(node)}
-              <g class="chain-node node-{node.kind}">
-                <title>{node.titleText}</title>
+              <g class="chain-node node-{node.kind}" data-tip={node.titleText}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
                 <text class="chain-node-label chain-node-title" x={node.x + node.w / 2} y={node.y + 21} text-anchor="middle">{lines[0]}</text>
                 {#if lines[1]}
@@ -206,12 +226,11 @@
             {/each}
 
             {#each refEdges as edge (edge.id)}
-              <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)">
-                <title>{edge.title}</title>
-              </path>
+              <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={edge.title}></path>
             {/each}
           </svg>
         </div>
+        <div bind:this={tipEl} class="chain-tip" class:chain-tip-shown={tipShown} aria-hidden="true">{tipText}</div>
 
         <div class="chain-legend" data-testid="chain-legend">
           <span class="chain-legend-item"><span class="chain-swatch swatch-ksk"></span>{$t("pub.dnssec_chain_legend_ksk")}</span>
@@ -225,9 +244,6 @@
         <li>{$t("pub.dnssec_chain_parent_label")}: {chain?.parent_zone || "-"}</li>
         <li>DS: {dsSummary}</li>
         <li>{$t("pub.dnssec_chain_keys_label")}: {keySummary}</li>
-        {#each sigWindows as item, i (i)}
-          <li>{item.rrset} tag {item.s.key_tag}: {$t("pub.dnssec_chain_sig_window", { from: fmtDate(item.s.inception), to: fmtDate(item.s.expiration) })}</li>
-        {/each}
       </ul>
     {/if}
   </div>
@@ -396,5 +412,28 @@
     color: var(--ink-2);
     font-size: 0.85rem;
     line-height: 1.5;
+  }
+  .chain-tip {
+    position: fixed;
+    left: 0;
+    top: 0;
+    z-index: 50;
+    max-width: 340px;
+    padding: 0.5rem 0.65rem;
+    border-radius: 6px;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    font-size: 0.78rem;
+    line-height: 1.45;
+    white-space: pre-line;
+    pointer-events: none;
+    visibility: hidden;
+    opacity: 0;
+  }
+  .chain-tip-shown {
+    visibility: visible;
+    opacity: 1;
   }
 </style>

@@ -110,6 +110,21 @@ describe("DnssecChain", () => {
     expect(container.querySelectorAll("path.edge-ref").length).toBe(2);
   });
 
+  it("shows a custom tooltip immediately on hover", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const ksk = container.querySelector("g.node-ksk");
+    await fireEvent.mouseMove(ksk, { clientX: 120, clientY: 120 });
+
+    const tip = container.querySelector(".chain-tip");
+    expect(tip.classList.contains("chain-tip-shown")).toBe(true);
+    expect(tip.textContent).toContain("KSK");
+    expect(tip.textContent).toContain("Algorithm:");
+  });
+
   it("shows the unavailable note on a 404 and never an SVG", async () => {
     fetch.mockResolvedValue(jsonResponse({}, 404));
     const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });

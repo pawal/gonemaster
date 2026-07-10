@@ -127,6 +127,9 @@ type JobStore interface {
 	// GetResult reconstructs a JobResult from the runs+entries tables.
 	GetResult(jobID string) (JobResult, bool)
 
+	// GetRunDNSSECChain returns the stored chain summary JSON for a run.
+	GetRunDNSSECChain(runID string) (string, bool)
+
 	// Domain management.
 	GetOrCreateDomain(name string) (Domain, error)
 	GetDomain(id int64) (Domain, bool)
@@ -210,6 +213,7 @@ type InMemoryJobStore struct {
 	runs         map[string]Run     // runID → Run
 	runPublicIDs map[string]string  // publicID → runID
 	entries      map[string][]Entry // runID → []Entry
+	dnssecChains map[string]string  // runID → chain summary JSON
 	entryCounter int64
 
 	// Domain registry.
@@ -253,6 +257,7 @@ func NewInMemoryJobStore() *InMemoryJobStore {
 		runs:            map[string]Run{},
 		runPublicIDs:    map[string]string{},
 		entries:         map[string][]Entry{},
+		dnssecChains:    map[string]string{},
 		domains:         map[string]*Domain{},
 		domainsByID:     map[int64]*Domain{},
 		tags:            map[string]Tag{},
@@ -594,12 +599,23 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 		s.runPublicIDs[run.PublicID] = run.ID
 	}
 	s.entries[run.ID] = stored
+	if job.DNSSECChainJSON != "" {
+		s.dnssecChains[run.ID] = job.DNSSECChainJSON
+	}
 
 	// Remove job from queue.
 	delete(s.publicIDs, job.PublicID)
 	delete(s.jobs, job.ID)
 
 	return nil
+}
+
+// GetRunDNSSECChain returns the stored chain summary JSON for a run.
+func (s *InMemoryJobStore) GetRunDNSSECChain(runID string) (string, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	chain, ok := s.dnssecChains[runID]
+	return chain, ok
 }
 
 // GetResult reconstructs a JobResult from the run and its entries.
@@ -616,7 +632,11 @@ func (s *InMemoryJobStore) GetResult(jobID string) (JobResult, bool) {
 		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
 	}
 	sr := scoring.Compute(run.Domain, scoringEntries, s.scoringCfg)
-	return buildJobResult(run, entries, &sr), true
+	result := buildJobResult(run, entries, &sr)
+	if _, ok := s.dnssecChains[jobID]; ok {
+		result.HasDNSSECChain = true
+	}
+	return result, true
 }
 
 // GetOrCreateDomain returns the domain for name, creating it if necessary.
@@ -1459,6 +1479,7 @@ func (s *InMemoryJobStore) DeleteBatch(batchID string) ([]int64, error) {
 			delete(s.runPublicIDs, r.PublicID)
 		}
 		delete(s.entries, id)
+		delete(s.dnssecChains, id)
 		delete(s.runs, id)
 	}
 	for id, job := range s.jobs {
@@ -1676,6 +1697,7 @@ func (s *InMemoryJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 		}
 		delete(s.runPublicIDs, run.PublicID)
 		delete(s.entries, id)
+		delete(s.dnssecChains, id)
 		delete(s.runs, id)
 		count++
 	}
@@ -1703,6 +1725,7 @@ func (s *InMemoryJobStore) PurgeByTag(tag string) (int64, error) {
 		}
 		delete(s.runPublicIDs, run.PublicID)
 		delete(s.entries, id)
+		delete(s.dnssecChains, id)
 		delete(s.runs, id)
 		count++
 	}

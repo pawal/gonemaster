@@ -60,6 +60,10 @@ func (s *spyJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
 }
 
+func (s *spyJobStore) GetRunDNSSECChain(runID string) (string, bool) {
+	return s.inner.GetRunDNSSECChain(runID)
+}
+
 func (s *spyJobStore) GetOrCreateDomain(name string) (Domain, error) {
 	return s.inner.GetOrCreateDomain(name)
 }

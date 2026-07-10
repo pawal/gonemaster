@@ -49,6 +49,10 @@ func (s *countingJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
 }
 
+func (s *countingJobStore) GetRunDNSSECChain(runID string) (string, bool) {
+	return s.inner.GetRunDNSSECChain(runID)
+}
+
 func (s *countingJobStore) GetOrCreateDomain(name string) (Domain, error) {
 	return s.inner.GetOrCreateDomain(name)
 }

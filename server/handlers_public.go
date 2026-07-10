@@ -57,6 +57,7 @@ func publicProfileView(profile StoredProfile) PublicProfileView {
 type publicInfoResponse struct {
 	ShowScorePublic             bool `json:"show_score_public"`
 	ShowNameserverTimingsPublic bool `json:"show_nameserver_timings_public"`
+	ShowDNSSECChainPublic       bool `json:"show_dnssec_chain_public"`
 }
 
 // handlePublicInfo handles GET /pub/api/v1/info.
@@ -67,6 +68,7 @@ func (s *Server) handlePublicInfo(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, publicInfoResponse{
 		ShowScorePublic:             s.cfg.ShowScorePublic,
 		ShowNameserverTimingsPublic: s.cfg.ShowNameserverTimingsPublic,
+		ShowDNSSECChainPublic:       s.cfg.ShowDNSSECChainPublic,
 	})
 }
 
@@ -214,6 +216,9 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 	}
 	if !s.cfg.ShowNameserverTimingsPublic {
 		result.NameserverTimings = nil
+	}
+	if !s.cfg.ShowDNSSECChainPublic {
+		result.HasDNSSECChain = false
 	}
 	// Let a CDN absorb repeat reads; short window so show_* flips propagate.
 	w.Header().Set("Cache-Control", "public, max-age=300")

@@ -134,7 +134,7 @@ describe("layoutChain", () => {
     const chain = secureChain();
     chain.child.signed = [
       { type: "SOA", rrsig: [{ key_tag: 2000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }] },
-      { type: "CDS", rrsig: [{ key_tag: 1000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }] },
+      { type: "CDS", rrsig: [{ key_tag: 1000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }], refs: [1000] },
     ];
     const g = layoutChain(chain);
     expect(g.nodes.some((n) => n.id === "rrset-SOA" && n.label === "SOA")).toBe(true);
@@ -142,6 +142,10 @@ describe("layoutChain", () => {
     // ZSK signs SOA, KSK signs CDS.
     expect(g.edges.some((e) => e.id === "sig-SOA-2000")).toBe(true);
     expect(g.edges.some((e) => e.id === "sig-CDS-1000")).toBe(true);
+    // CDS names the KSK (key tag 1000): a grey reference edge points to it.
+    const ref = g.edges.find((e) => e.kind === "ref" && e.id === "ref-CDS-1000");
+    expect(ref).toBeTruthy();
+    expect(ref.targetTag).toBe(1000);
   });
 
   it("draws a ghost DS node for an island (keys, no DS)", () => {

@@ -79,6 +79,9 @@
   ]);
 
   function edgeClass(edge) {
+    if (edge.kind === "ref") {
+      return "edge-ref";
+    }
     if (edge.kind === "ds") {
       return edge.status === "match" ? "edge-ok" : "edge-bad";
     }
@@ -98,6 +101,9 @@
   }
 
   function edgeTitle(edge) {
+    if (edge.kind === "ref") {
+      return `${edge.rrset} -> DNSKEY ${edge.targetTag}`;
+    }
     if (edge.kind === "ds") {
       return `DS ${edge.dsKeyTag} -> DNSKEY ${edge.dnskeyKeyTag ?? "?"}: ${edge.status}`;
     }
@@ -357,6 +363,12 @@
   .edge-neutral {
     stroke: var(--ink-2);
     stroke-dasharray: 5 4;
+  }
+  .edge-ref {
+    stroke: var(--ink-2);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 3;
+    opacity: 0.6;
   }
   .chain-legend {
     display: flex;

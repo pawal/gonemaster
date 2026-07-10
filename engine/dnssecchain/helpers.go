@@ -44,6 +44,40 @@ func dedupeByAddress(nss []nameserver.Nameserver) []nameserver.Nameserver {
 	return out
 }
 
+// cdsRefs returns the DNSKEY key tags named by the CDS records in resp.
+func cdsRefs(resp packet.Packet, zone dnsname.Name) []uint16 {
+	var out []uint16
+	for _, rr := range resp.GetRecordsForName("CDS", zone, "answer") {
+		if cds, ok := rr.(*dns.CDS); ok {
+			out = append(out, cds.KeyTag)
+		}
+	}
+	return out
+}
+
+// cdnskeyRefs returns the DNSKEY key tags named by the CDNSKEY records in resp.
+func cdnskeyRefs(resp packet.Packet, zone dnsname.Name) []uint16 {
+	var out []uint16
+	for _, rr := range resp.GetRecordsForName("CDNSKEY", zone, "answer") {
+		if ck, ok := rr.(*dns.CDNSKEY); ok {
+			out = append(out, ck.KeyTag())
+		}
+	}
+	return out
+}
+
+func sortedKeytags(set map[uint16]bool) []uint16 {
+	if len(set) == 0 {
+		return nil
+	}
+	out := make([]uint16, 0, len(set))
+	for kt := range set {
+		out = append(out, kt)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
+}
+
 func dsRecords(resp packet.Packet, zone dnsname.Name) []*dns.DS {
 	var out []*dns.DS
 	for _, rr := range resp.GetRecordsForName("DS", zone, "answer") {

@@ -64,12 +64,13 @@ func Extract(ctx context.Context, in Input) *Summary {
 			ParentZone: in.ParentZone.String(),
 			Delegation: DelegationNormal,
 		},
-		zone:      in.Zone,
-		at:        at,
-		dsIndex:   map[string]int{},
-		keyIndex:  map[string]int{},
-		childKeys: map[uint16]*dns.DNSKEY{},
-		signed:    map[string][]RRSIG{},
+		zone:       in.Zone,
+		at:         at,
+		dsIndex:    map[string]int{},
+		keyIndex:   map[string]int{},
+		childKeys:  map[uint16]*dns.DNSKEY{},
+		signed:     map[string][]RRSIG{},
+		signedRefs: map[string]map[uint16]bool{},
 	}
 
 	e.extractParent(cctx, in)
@@ -90,10 +91,11 @@ type extractor struct {
 	zone    dnsname.Name
 	at      time.Time
 
-	dsIndex   map[string]int         // DS identity -> index into summary.Parent.DS
-	keyIndex  map[string]int         // DNSKEY identity -> index into summary.Child.DNSKEYs
-	childKeys map[uint16]*dns.DNSKEY // keytag -> key object, for digest comparison
-	signed    map[string][]RRSIG     // RRset type -> covering signatures
+	dsIndex    map[string]int             // DS identity -> index into summary.Parent.DS
+	keyIndex   map[string]int             // DNSKEY identity -> index into summary.Child.DNSKEYs
+	childKeys  map[uint16]*dns.DNSKEY     // keytag -> key object, for digest comparison
+	signed     map[string][]RRSIG         // RRset type -> covering signatures
+	signedRefs map[string]map[uint16]bool // RRset type -> referenced DNSKEY key tags
 }
 
 // cacheOnlyContext clones the profile with NoNetwork set and swaps in a fresh
@@ -213,6 +215,11 @@ func (e *extractor) extractChild(ctx context.Context, in Input) {
 				state := sigState(sig, rrset, keyRRs, e.at)
 				e.addSignedRRSIG(zt.name, sig, state, ip)
 			}
+			if zt.refs != nil {
+				for _, kt := range zt.refs(zresp, e.zone) {
+					e.addSignedRef(zt.name, kt)
+				}
+			}
 		}
 	}
 	e.summary.Child.ServersDisagreeing = disagreeing(sigByIP)
@@ -224,11 +231,12 @@ func (e *extractor) extractChild(ctx context.Context, in Input) {
 var zoneDataTypes = []struct {
 	name   string
 	rrtype uint16
+	refs   func(packet.Packet, dnsname.Name) []uint16
 }{
-	{"SOA", dns.TypeSOA},
-	{"NSEC3PARAM", dns.TypeNSEC3PARAM},
-	{"CDS", dns.TypeCDS},
-	{"CDNSKEY", dns.TypeCDNSKEY},
+	{"SOA", dns.TypeSOA, nil},
+	{"NSEC3PARAM", dns.TypeNSEC3PARAM, nil},
+	{"CDS", dns.TypeCDS, cdsRefs},
+	{"CDNSKEY", dns.TypeCDNSKEY, cdnskeyRefs},
 }
 
 func (e *extractor) addSignedRRSIG(rrtype string, sig *dns.RRSIG, state, server string) {
@@ -237,11 +245,21 @@ func (e *extractor) addSignedRRSIG(rrtype string, sig *dns.RRSIG, state, server 
 	e.signed[rrtype] = dst
 }
 
+func (e *extractor) addSignedRef(rrtype string, keytag uint16) {
+	if e.signedRefs[rrtype] == nil {
+		e.signedRefs[rrtype] = map[uint16]bool{}
+	}
+	e.signedRefs[rrtype][keytag] = true
+}
+
 func (e *extractor) buildSigned() {
 	for _, zt := range zoneDataTypes {
-		if sigs := e.signed[zt.name]; len(sigs) > 0 {
-			e.summary.Child.Signed = append(e.summary.Child.Signed, SignedRRset{Type: zt.name, RRSIG: sigs})
+		sigs := e.signed[zt.name]
+		refs := sortedKeytags(e.signedRefs[zt.name])
+		if len(sigs) == 0 && len(refs) == 0 {
+			continue
 		}
+		e.summary.Child.Signed = append(e.summary.Child.Signed, SignedRRset{Type: zt.name, RRSIG: sigs, Refs: refs})
 	}
 }
 

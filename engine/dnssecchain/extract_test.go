@@ -315,6 +315,14 @@ func TestExtractSignedRRsets(t *testing.T) {
 			t.Errorf("%s: expected 1 valid RRSIG, got %+v", s.Type, s.RRSIG)
 		}
 	}
+	// The CDS record names the KSK by tag; SOA carries no ref.
+	cdsEntry := got.Child.Signed[1]
+	if len(cdsEntry.Refs) != 1 || cdsEntry.Refs[0] != childKSK.key.KeyTag() {
+		t.Errorf("CDS refs = %v, want [%d]", cdsEntry.Refs, childKSK.key.KeyTag())
+	}
+	if len(got.Child.Signed[0].Refs) != 0 {
+		t.Errorf("SOA should carry no refs, got %v", got.Child.Signed[0].Refs)
+	}
 }
 
 func TestExtractDigestMismatch(t *testing.T) {

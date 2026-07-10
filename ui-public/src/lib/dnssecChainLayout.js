@@ -211,6 +211,19 @@ export function layoutChain(chain) {
         to: edgePoint(to, "top"),
       });
     }
+    // CDS/CDNSKEY name a DNSKEY by tag: draw a grey reference edge to that key.
+    for (const tag of entry.refs ?? []) {
+      const key = byId.get(`key-${tag}`);
+      if (!key) continue;
+      edges.push({
+        id: `ref-${entry.type}-${tag}`,
+        kind: "ref",
+        rrset: entry.type,
+        targetTag: tag,
+        from: edgePoint(to, "top"),
+        to: edgePoint(key, "bottom"),
+      });
+    }
   }
 
   const hasLoop = edges.some((e) => e.kind === "selfsig");

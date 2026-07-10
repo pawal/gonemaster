@@ -85,10 +85,12 @@ type Child struct {
 }
 
 // SignedRRset is one apex RRset the zone publishes together with the signatures
-// covering it (for example SOA, NSEC3PARAM, CDS, CDNSKEY).
+// covering it (for example SOA, NSEC3PARAM, CDS, CDNSKEY). Refs lists the
+// DNSKEY key tags the RRset points at (CDS/CDNSKEY name a key by tag).
 type SignedRRset struct {
-	Type  string  `json:"type"`
-	RRSIG []RRSIG `json:"rrsig"`
+	Type  string   `json:"type"`
+	RRSIG []RRSIG  `json:"rrsig"`
+	Refs  []uint16 `json:"refs,omitempty"`
 }
 
 // DS is one delegation-signer record in the union across parent servers.

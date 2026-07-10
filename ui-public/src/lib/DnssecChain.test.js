@@ -182,4 +182,46 @@ describe("DnssecChain", () => {
 
     await waitFor(() => expect(screen.getByTestId("chain-provided-ds")).toBeTruthy());
   });
+
+  it("shows the no-DNSKEY callout only with positive server evidence", async () => {
+    // DS present and zero keys, but no server answered without keys: the
+    // child cache was simply cold, so "the zone serves no DNSKEY" is unproven.
+    const cold = secureChain();
+    cold.status = "indeterminate";
+    cold.child.dnskeys = [];
+    cold.child.dnskey_rrsig = [];
+    cold.child.servers_without_dnskey = [];
+    fetch.mockResolvedValue(jsonResponse(cold));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-indeterminate")).toBeTruthy());
+    expect(screen.queryByTestId("chain-no-dnskey")).toBeNull();
+
+    cleanup();
+    const proven = secureChain();
+    proven.status = "broken";
+    proven.child.dnskeys = [];
+    proven.child.dnskey_rrsig = [];
+    proven.child.servers_without_dnskey = ["203.0.113.1"];
+    fetch.mockResolvedValue(jsonResponse(proven));
+    const second = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(second.container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-no-dnskey")).toBeTruthy());
+    expect(screen.queryByTestId("chain-indeterminate")).toBeNull();
+  });
+
+  it("lists the DNSKEY signature validity window in the facts", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-facts")).toBeTruthy());
+    const facts = screen.getByTestId("chain-facts").textContent;
+    // inception 1700000000 -> 2023-11-14, expiration 1800000000 -> 2027-01-15.
+    expect(facts).toContain("2023-11-14");
+    expect(facts).toContain("2027-01-15");
+    expect(facts).toContain("RRSIG DNSKEY (1000)");
+  });
 });

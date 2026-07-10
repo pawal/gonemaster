@@ -1,16 +1,13 @@
 <script>
   import { t } from "../i18n.js";
   import { getDnssecChain } from "../api.js";
-  import { layoutChain, algoMnemonic, digestMnemonic } from "./dnssecChainLayout.js";
+  import { layoutChain, algoMnemonic, digestMnemonic, fmtDate } from "./dnssecChainLayout.js";
 
   let { publicID, domain = "" } = $props();
 
   // phase: idle | loading | loaded | empty | error
   let phase = $state("idle");
   let chain = $state.raw(null);
-  // loaded gates re-fetching on success/empty; error intentionally does not,
-  // so the retry button can re-run load().
-  let loaded = false;
 
   async function load() {
     if (phase === "loading") return;
@@ -19,7 +16,6 @@
       const res = await getDnssecChain(publicID);
       if (res.status === 404) {
         phase = "empty";
-        loaded = true;
         return;
       }
       if (!res.ok) {
@@ -28,14 +24,14 @@
       }
       chain = await res.json();
       phase = "loaded";
-      loaded = true;
     } catch (_) {
       phase = "error";
     }
   }
 
   function onToggle(e) {
-    if (e.target.open && !loaded && phase !== "loading") load();
+    // Error re-fires on next open so the retry path is not one-shot.
+    if (e.target.open && (phase === "idle" || phase === "error")) load();
   }
 
   let graph = $derived(phase === "loaded" && chain ? layoutChain(chain) : null);
@@ -61,9 +57,21 @@
   );
   let providedDS = $derived(chain?.parent?.ds_source === "input");
   let unsigned = $derived(chain?.status === "unsigned");
+  let indeterminate = $derived(chain?.status === "indeterminate");
   let noDS = $derived(chain?.parent?.ds_source === "none" && (chain?.child?.dnskeys?.length ?? 0) > 0);
+  // Claiming "serves no DNSKEY" needs a server that answered without keys.
   let noDNSKEY = $derived(
-    (chain?.parent?.ds?.length ?? 0) > 0 && (chain?.child?.dnskeys?.length ?? 0) === 0
+    (chain?.parent?.ds?.length ?? 0) > 0 &&
+      (chain?.child?.dnskeys?.length ?? 0) === 0 &&
+      (chain?.child?.servers_without_dnskey?.length ?? 0) > 0
+  );
+  let sigWindows = $derived(
+    (chain?.child?.dnskey_rrsig ?? []).map((s) => ({
+      keyTag: s.key_tag,
+      from: fmtDate(s.inception),
+      to: fmtDate(s.expiration),
+      state: s.state,
+    }))
   );
 
   // Custom hover tooltip: the native SVG <title> has a browser-controlled
@@ -169,6 +177,9 @@
         {#if noDNSKEY}
           <p class="dnssec-chain-callout callout-bad" data-testid="chain-no-dnskey">{$t("pub.dnssec_chain_no_dnskey")}</p>
         {/if}
+        {#if indeterminate}
+          <p class="dnssec-chain-callout callout-info" data-testid="chain-indeterminate">{$t("pub.dnssec_chain_indeterminate")}</p>
+        {/if}
         {#if disagree}
           <p class="dnssec-chain-callout callout-warn" data-testid="chain-disagree">{$t("pub.dnssec_chain_disagree")}</p>
         {/if}
@@ -216,7 +227,7 @@
 
             {#each graph.nodes as node (node.id)}
               {@const lines = nodeLines(node)}
-              <g class="chain-node node-{node.kind}" data-tip={node.titleText}>
+              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} data-tip={node.titleText}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
                 <text class="chain-node-label chain-node-title" x={node.x + node.w / 2} y={node.y + 21} text-anchor="middle">{lines[0]}</text>
                 {#if lines[1]}
@@ -244,6 +255,11 @@
         <li>{$t("pub.dnssec_chain_parent_label")}: {chain?.parent_zone || "-"}</li>
         <li>DS: {dsSummary}</li>
         <li>{$t("pub.dnssec_chain_keys_label")}: {keySummary}</li>
+        {#each sigWindows as sw (sw.keyTag + "-" + sw.from)}
+          <li>
+            RRSIG DNSKEY ({sw.keyTag}): {$t("pub.dnssec_chain_sig_window", { from: sw.from, to: sw.to })}{sw.state !== "valid" ? ` - ${sw.state}` : ""}
+          </li>
+        {/each}
       </ul>
     {/if}
   </div>
@@ -340,6 +356,9 @@
   .node-ds-input .chain-node-box {
     stroke: var(--ink-2);
     stroke-dasharray: 4 3;
+  }
+  .node-unmatched .chain-node-box {
+    stroke: var(--grade-f);
   }
   .node-ds-ghost .chain-node-box,
   .node-key-ghost .chain-node-box {

@@ -38,6 +38,17 @@ export async function getResult(publicID, locale = "en") {
 }
 
 /**
+ * Fetch the DNSSEC chain summary for a completed job. Returns the raw Response
+ * so the caller can distinguish 404 (no chain data) from a successful payload.
+ * The payload is locale-free (structural), so no locale parameter is sent.
+ * @param {string} publicID
+ * @returns {Promise<Response>}
+ */
+export async function getDnssecChain(publicID) {
+  return fetch(`${API_BASE}/jobs/${encodeURIComponent(publicID)}/dnssec-chain`);
+}
+
+/**
  * Fetch the list of available locale codes from the server.
  * @returns {Promise<Response>}
  */

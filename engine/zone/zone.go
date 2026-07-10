@@ -379,6 +379,24 @@ func (z *Zone) NS(ctx context.Context) ([]nameserver.Nameserver, error) {
 	return append([]nameserver.Nameserver{}, z.ns...), nil
 }
 
+// CachedParent returns the memoized parent zone; the bool is false when parent
+// resolution has not run. Never triggers a lookup.
+func (z *Zone) CachedParent() (*Zone, bool) {
+	if z == nil {
+		return nil, false
+	}
+	return z.parent, z.parentSet
+}
+
+// CachedNS returns the memoized nameserver set; the bool is false when NS
+// resolution has not run. Never triggers a lookup.
+func (z *Zone) CachedNS() ([]nameserver.Nameserver, bool) {
+	if z == nil || !z.nsSet {
+		return nil, false
+	}
+	return append([]nameserver.Nameserver{}, z.ns...), true
+}
+
 // GlueAddresses returns glue A/AAAA records from the parent.
 func (z *Zone) GlueAddresses(ctx context.Context) ([]dns.RR, error) {
 	if z.glueAddressesSet {

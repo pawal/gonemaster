@@ -23,6 +23,16 @@ func AlgorithmSupported(algo uint8) bool {
 	}
 }
 
+// DigestSupported reports whether the DS digest type is a known IANA type.
+func DigestSupported(digest uint8) bool {
+	switch digest {
+	case 1, 2, 3, 4:
+		return true
+	default:
+		return false
+	}
+}
+
 // KeySize returns the RSA modulus size in bits, or 0 when not derivable.
 func KeySize(key *dns.DNSKEY) int {
 	if key == nil || key.PublicKey == "" {

@@ -7644,14 +7644,7 @@ func containsDS(records []*dns.DS, candidate *dns.DS) bool {
 	return false
 }
 
-func dsDigestSupported(digest uint8) bool {
-	switch digest {
-	case 1, 2, 3, 4:
-		return true
-	default:
-		return false
-	}
-}
+var dsDigestSupported = dnssecutil.DigestSupported
 
 // cdsDigestMUST: digest types designated MUST in the IANA "Implement for
 // DNSSEC Delegation" column. RFC 9975 restricts CDS consistency checks to

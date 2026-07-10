@@ -69,6 +69,7 @@
   "pub.dnssec_chain_unsigned": "Tato zóna není podepsána pomocí DNSSEC.",
   "pub.dnssec_chain_no_ds": "Nadřazená zóna nezveřejňuje žádný záznam DS, takže resolvery nemohou tuto zónu ověřit.",
   "pub.dnssec_chain_no_dnskey": "Nadřazená zóna zveřejňuje záznamy DS, ale zóna neposkytuje žádné záznamy DNSKEY.",
+  "pub.dnssec_chain_indeterminate": "Během tohoto testu nebylo uloženo dost dat pro vyhodnocení řetězu důvěry.",
   "pub.dnssec_chain_disagree": "Jmenné servery vrátily různé záznamy DNSSEC - zobrazuje se nejčastější odpověď.",
   "pub.dnssec_chain_aria": "Diagram řetězu důvěry DNSSEC pro {domain}",
   "pub.dnssec_chain_parent_label": "Nadřazená zóna",

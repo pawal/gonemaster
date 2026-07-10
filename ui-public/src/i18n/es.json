@@ -69,6 +69,7 @@
   "pub.dnssec_chain_unsigned": "Esta zona no está firmada con DNSSEC.",
   "pub.dnssec_chain_no_ds": "La zona padre no publica ningún registro DS, por lo que los resolutores no pueden validar esta zona.",
   "pub.dnssec_chain_no_dnskey": "La zona padre publica registros DS, pero la zona no sirve ningún registro DNSKEY.",
+  "pub.dnssec_chain_indeterminate": "No se recopilaron suficientes datos durante esta prueba para evaluar la cadena de confianza.",
   "pub.dnssec_chain_disagree": "Los servidores de nombres devolvieron registros DNSSEC diferentes - se muestra la respuesta más común.",
   "pub.dnssec_chain_aria": "Diagrama de la cadena de confianza DNSSEC para {domain}",
   "pub.dnssec_chain_parent_label": "Zona padre",

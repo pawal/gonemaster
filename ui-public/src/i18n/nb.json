@@ -69,6 +69,7 @@
   "pub.dnssec_chain_unsigned": "Denne sonen er ikke signert med DNSSEC.",
   "pub.dnssec_chain_no_ds": "Foreldresonen publiserer ingen DS-post, så resolvere kan ikke validere denne sonen.",
   "pub.dnssec_chain_no_dnskey": "Foreldresonen publiserer DS-poster, men sonen leverer ingen DNSKEY-poster.",
+  "pub.dnssec_chain_indeterminate": "Det ble ikke samlet inn nok data under denne testen til å vurdere tillitskjeden.",
   "pub.dnssec_chain_disagree": "Navneservere returnerte forskjellige DNSSEC-poster - viser det vanligste svaret.",
   "pub.dnssec_chain_aria": "Diagram over DNSSEC-tillitskjeden for {domain}",
   "pub.dnssec_chain_parent_label": "Foreldresone",

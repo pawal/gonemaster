@@ -69,6 +69,7 @@
   "pub.dnssec_chain_unsigned": "このゾーンは DNSSEC で署名されていません。",
   "pub.dnssec_chain_no_ds": "親ゾーンは DS レコードを公開していないため、リゾルバーはこのゾーンを検証できません。",
   "pub.dnssec_chain_no_dnskey": "親ゾーンは DS レコードを公開していますが、ゾーンは DNSKEY レコードを提供していません。",
+  "pub.dnssec_chain_indeterminate": "このテストでは信頼チェーンを評価するのに十分なデータが収集されませんでした。",
   "pub.dnssec_chain_disagree": "ネームサーバーが異なる DNSSEC レコードを返しました - 最も一般的な回答を表示しています。",
   "pub.dnssec_chain_aria": "{domain} の DNSSEC 信頼チェーンの図",
   "pub.dnssec_chain_parent_label": "親ゾーン",

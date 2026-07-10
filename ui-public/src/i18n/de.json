@@ -69,6 +69,7 @@
   "pub.dnssec_chain_unsigned": "Diese Zone ist nicht mit DNSSEC signiert.",
   "pub.dnssec_chain_no_ds": "Die übergeordnete Zone veröffentlicht keinen DS-Record, daher können Resolver diese Zone nicht validieren.",
   "pub.dnssec_chain_no_dnskey": "Die übergeordnete Zone veröffentlicht DS-Records, aber die Zone liefert keine DNSKEY-Records.",
+  "pub.dnssec_chain_indeterminate": "Während dieses Tests wurden nicht genügend Daten gesammelt, um die Vertrauenskette zu bewerten.",
   "pub.dnssec_chain_disagree": "Die Nameserver lieferten unterschiedliche DNSSEC-Records - die häufigste Antwort wird angezeigt.",
   "pub.dnssec_chain_aria": "Diagramm der DNSSEC-Vertrauenskette für {domain}",
   "pub.dnssec_chain_parent_label": "Übergeordnete Zone",

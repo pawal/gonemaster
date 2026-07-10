@@ -69,6 +69,7 @@
   "pub.dnssec_chain_unsigned": "Deze zone is niet ondertekend met DNSSEC.",
   "pub.dnssec_chain_no_ds": "De bovenliggende zone publiceert geen DS-record, dus resolvers kunnen deze zone niet valideren.",
   "pub.dnssec_chain_no_dnskey": "De bovenliggende zone publiceert DS-records, maar de zone levert geen DNSKEY-records.",
+  "pub.dnssec_chain_indeterminate": "Tijdens deze test zijn niet genoeg gegevens verzameld om de vertrouwensketen te beoordelen.",
   "pub.dnssec_chain_disagree": "Naamservers gaven verschillende DNSSEC-records terug - het meest voorkomende antwoord wordt getoond.",
   "pub.dnssec_chain_aria": "Diagram van de DNSSEC-vertrouwensketen voor {domain}",
   "pub.dnssec_chain_parent_label": "Bovenliggende zone",

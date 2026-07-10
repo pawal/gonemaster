@@ -69,6 +69,7 @@
   "pub.dnssec_chain_unsigned": "This zone is not signed with DNSSEC.",
   "pub.dnssec_chain_no_ds": "The parent zone publishes no DS record, so resolvers cannot validate this zone.",
   "pub.dnssec_chain_no_dnskey": "The parent publishes DS records, but the zone serves no DNSKEY records.",
+  "pub.dnssec_chain_indeterminate": "Not enough data was collected during this test to evaluate the chain of trust.",
   "pub.dnssec_chain_disagree": "Nameservers returned different DNSSEC records - showing the most common answer.",
   "pub.dnssec_chain_aria": "Diagram of the DNSSEC chain of trust for {domain}",
   "pub.dnssec_chain_parent_label": "Parent zone",

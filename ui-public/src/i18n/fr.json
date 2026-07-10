@@ -69,6 +69,7 @@
   "pub.dnssec_chain_unsigned": "Cette zone n'est pas signée avec DNSSEC.",
   "pub.dnssec_chain_no_ds": "La zone parente ne publie aucun enregistrement DS, les résolveurs ne peuvent donc pas valider cette zone.",
   "pub.dnssec_chain_no_dnskey": "La zone parente publie des enregistrements DS, mais la zone ne fournit aucun enregistrement DNSKEY.",
+  "pub.dnssec_chain_indeterminate": "Pas assez de données ont été collectées pendant ce test pour évaluer la chaîne de confiance.",
   "pub.dnssec_chain_disagree": "Les serveurs de noms ont renvoyé des enregistrements DNSSEC différents - affichage de la réponse la plus fréquente.",
   "pub.dnssec_chain_aria": "Schéma de la chaîne de confiance DNSSEC pour {domain}",
   "pub.dnssec_chain_parent_label": "Zone parente",

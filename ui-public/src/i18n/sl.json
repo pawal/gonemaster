@@ -69,6 +69,7 @@
   "pub.dnssec_chain_unsigned": "Ta cona ni podpisana z DNSSEC.",
   "pub.dnssec_chain_no_ds": "Nadrejena cona ne objavlja zapisa DS, zato razreševalniki te cone ne morejo potrditi.",
   "pub.dnssec_chain_no_dnskey": "Nadrejena cona objavlja zapise DS, vendar cona ne streže zapisov DNSKEY.",
+  "pub.dnssec_chain_indeterminate": "Med tem preskusom ni bilo zbranih dovolj podatkov za oceno verige zaupanja.",
   "pub.dnssec_chain_disagree": "Imenski strežniki so vrnili različne zapise DNSSEC - prikazan je najpogostejši odgovor.",
   "pub.dnssec_chain_aria": "Diagram verige zaupanja DNSSEC za {domain}",
   "pub.dnssec_chain_parent_label": "Nadrejena cona",

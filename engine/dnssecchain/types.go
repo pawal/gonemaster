@@ -1,9 +1,5 @@
-// Package dnssecchain extracts a per-run DNSSEC authentication-chain summary
-// from responses already cached during a run. Extraction is strictly
-// cache-only: it clones the run profile with NoNetwork=true and reads only
-// entries the run's testcases already populated, so it never issues a query.
-// Validity is evaluated at the run start time (packet timestamps are honored
-// against warm cache entries), matching what the testcases observed.
+// Package dnssecchain extracts a per-run DNSSEC chain summary from responses
+// already cached during the run; it never issues a query.
 package dnssecchain
 
 // Version is the schema version of the emitted Summary. Changes are additive.
@@ -129,6 +125,7 @@ type RRSIG struct {
 // Link is one DS-to-DNSKEY edge. DNSKEYKeyTag is omitted when no key matches.
 type Link struct {
 	DSKeyTag     uint16   `json:"ds_key_tag"`
+	DSDigestType uint8    `json:"ds_digest_type"`
 	DNSKEYKeyTag uint16   `json:"dnskey_key_tag,omitempty"`
 	Status       string   `json:"status"`
 	Servers      []string `json:"servers"`

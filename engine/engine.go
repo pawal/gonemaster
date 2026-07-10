@@ -807,10 +807,7 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 	return entries, nil
 }
 
-// emitDNSSECChain extracts the per-run DNSSEC chain summary from cached
-// responses and hands it to the sink. It is a no-op when no sink is set, and
-// extraction itself never issues a query. Inputs come from the memoized zone
-// state, which is unrecoverable once the run returns.
+// emitDNSSECChain hands the cache-only chain summary to the sink, if any.
 func emitDNSSECChain(ctx context.Context, req RunRequest, z *zone.Zone) {
 	if req.DNSSECChainSink == nil || z == nil {
 		return

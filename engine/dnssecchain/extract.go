@@ -40,11 +40,9 @@ type Input struct {
 	At         time.Time
 }
 
-// Extract builds the chain summary from cached responses. It returns nil when
-// no DNSSEC evidence was cached (cold cache, non-DNSSEC run). It never issues a
-// query: the run profile is cloned with NoNetwork=true so any cache miss errors
-// inside the nameserver layer, and a discard logger keeps cache peeks out of
-// the run's entries and query counter.
+// Extract builds the chain summary from cached responses, returning nil when
+// no DNSSEC evidence was cached. NoNetwork plus a discard logger keep it
+// strictly cache-only.
 func Extract(ctx context.Context, in Input) *Summary {
 	prof := profile.FromContext(ctx)
 	if prof == nil {
@@ -68,7 +66,7 @@ func Extract(ctx context.Context, in Input) *Summary {
 		at:         at,
 		dsIndex:    map[string]int{},
 		keyIndex:   map[string]int{},
-		childKeys:  map[uint16]*dns.DNSKEY{},
+		childKeys:  map[uint16][]*dns.DNSKEY{},
 		signed:     map[string][]RRSIG{},
 		signedRefs: map[string]map[uint16]bool{},
 	}
@@ -93,7 +91,7 @@ type extractor struct {
 
 	dsIndex    map[string]int             // DS identity -> index into summary.Parent.DS
 	keyIndex   map[string]int             // DNSKEY identity -> index into summary.Child.DNSKEYs
-	childKeys  map[uint16]*dns.DNSKEY     // keytag -> key object, for digest comparison
+	childKeys  map[uint16][]*dns.DNSKEY   // keytag -> key objects, for digest comparison
 	signed     map[string][]RRSIG         // RRset type -> covering signatures
 	signedRefs map[string]map[uint16]bool // RRset type -> referenced DNSKEY key tags
 }
@@ -107,9 +105,8 @@ func cacheOnlyContext(ctx context.Context, prof *profile.Profile) context.Contex
 	return logger.WithContext(out, logger.New())
 }
 
-var dnssecOn = true
-
 func query(ctx context.Context, ns nameserver.Nameserver, name string, qtype string) (packet.Packet, bool) {
+	dnssecOn := true
 	resp, err := ns.QueryWithOptions(ctx, name, qtype, &nameserver.QueryOptions{DNSSEC: &dnssecOn})
 	if err != nil || resp.Msg == nil {
 		return packet.Packet{}, false
@@ -273,36 +270,47 @@ func (e *extractor) hasEvidence() bool {
 
 func (e *extractor) buildLinks() {
 	for _, ds := range e.summary.Parent.DS {
-		key, ok := e.childKeys[ds.KeyTag]
-		if !ok {
-			e.summary.Links = append(e.summary.Links, Link{
-				DSKeyTag: ds.KeyTag,
-				Status:   LinkNoDNSKEY,
-				Servers:  ds.Servers,
-			})
-			continue
-		}
-		keyServers := e.serversForKey(ds.KeyTag)
-		if !dsDigestSupported(ds.DigestType) {
+		keys := e.childKeys[ds.KeyTag]
+		if len(keys) == 0 {
 			e.summary.Links = append(e.summary.Links, Link{
 				DSKeyTag:     ds.KeyTag,
-				DNSKEYKeyTag: ds.KeyTag,
-				Status:       LinkUnsupportedDigest,
-				Servers:      keyServers,
+				DSDigestType: ds.DigestType,
+				Status:       LinkNoDNSKEY,
+				Servers:      ds.Servers,
 			})
 			continue
-		}
-		status := LinkDigestMismatch
-		if tmp := key.ToDS(ds.DigestType); tmp != nil && strings.EqualFold(tmp.Digest, ds.Digest) {
-			status = LinkMatch
 		}
 		e.summary.Links = append(e.summary.Links, Link{
 			DSKeyTag:     ds.KeyTag,
+			DSDigestType: ds.DigestType,
 			DNSKEYKeyTag: ds.KeyTag,
-			Status:       status,
-			Servers:      keyServers,
+			Status:       dsLinkStatus(ds, keys),
+			Servers:      e.serversForKey(ds.KeyTag),
 		})
 	}
+}
+
+// dsLinkStatus compares the DS digest against every key with its tag; a nil
+// ToDS counts as unsupported digest, never as a mismatch.
+func dsLinkStatus(ds DS, keys []*dns.DNSKEY) string {
+	if !dnssecutil.DigestSupported(ds.DigestType) {
+		return LinkUnsupportedDigest
+	}
+	sawDigest := false
+	for _, key := range keys {
+		tmp := key.ToDS(ds.DigestType)
+		if tmp == nil {
+			continue
+		}
+		sawDigest = true
+		if strings.EqualFold(tmp.Digest, ds.Digest) {
+			return LinkMatch
+		}
+	}
+	if !sawDigest {
+		return LinkUnsupportedDigest
+	}
+	return LinkDigestMismatch
 }
 
 func (e *extractor) rollup() string {
@@ -318,6 +326,10 @@ func (e *extractor) rollup() string {
 	case !hasDS && hasKeys:
 		return StatusIsland
 	case hasDS && !hasKeys:
+		// Broken needs positive child evidence; a cold child cache is not proof.
+		if len(e.summary.Child.ServersQueried) == 0 {
+			return StatusIndeterminate
+		}
 		return StatusBroken
 	default:
 		if !e.hasMatchingLink() {
@@ -387,9 +399,7 @@ func (e *extractor) addDNSKEY(key *dns.DNSKEY, server string) {
 		e.summary.Child.DNSKEYs[idx].Servers = append(e.summary.Child.DNSKEYs[idx].Servers, server)
 		return
 	}
-	if _, ok := e.childKeys[keytag]; !ok {
-		e.childKeys[keytag] = key
-	}
+	e.childKeys[keytag] = append(e.childKeys[keytag], key)
 	e.keyIndex[id] = len(e.summary.Child.DNSKEYs)
 	e.summary.Child.DNSKEYs = append(e.summary.Child.DNSKEYs, DNSKEY{
 		KeyTag:    keytag,
@@ -398,7 +408,7 @@ func (e *extractor) addDNSKEY(key *dns.DNSKEY, server string) {
 		SEP:       key.Flags&dns.FlagSEP != 0,
 		ZoneKey:   key.Flags&dns.FlagZONE != 0,
 		Revoked:   key.Flags&revokeFlag != 0,
-		KeySize:   dnssecutil.KeySize(key),
+		KeySize:   keySizeBits(key),
 		Servers:   []string{server},
 	})
 }

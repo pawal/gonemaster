@@ -700,3 +700,102 @@ func TestExtractCapsTruncate(t *testing.T) {
 		t.Error("expected truncated = true when a cap is hit")
 	}
 }
+
+func TestDSLinkStatusMatchesAnyKeyWithTag(t *testing.T) {
+	// Key tags are a 16-bit checksum and can collide between distinct keys.
+	// The DS below is derived from the second candidate; matching must try
+	// every key with the tag instead of only the first one seen.
+	k1 := genKey(t, testZone, true)
+	k2 := genKey(t, testZone, true)
+	real := k2.key.ToDS(dns.SHA256)
+	if real == nil {
+		t.Fatal("ToDS returned nil")
+	}
+	ds := DS{KeyTag: real.KeyTag, Algorithm: real.Algorithm, DigestType: real.DigestType, Digest: strings.ToLower(real.Digest)}
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{k1.key, k2.key}); got != LinkMatch {
+		t.Errorf("status = %q, want %q", got, LinkMatch)
+	}
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{k1.key}); got != LinkDigestMismatch {
+		t.Errorf("status = %q, want %q", got, LinkDigestMismatch)
+	}
+}
+
+func TestDSLinkStatusGOSTDigestUnsupported(t *testing.T) {
+	// Digest type 3 (GOST) is a known IANA type but the DNS library cannot
+	// compute it (ToDS returns nil). That must classify as unsupported_digest,
+	// never as digest_mismatch: we cannot prove a mismatch we cannot compute.
+	k := genKey(t, testZone, true)
+	ds := DS{KeyTag: k.key.KeyTag(), Algorithm: k.key.Algorithm, DigestType: 3, Digest: "abcd"}
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{k.key}); got != LinkUnsupportedDigest {
+		t.Errorf("status = %q, want %q", got, LinkUnsupportedDigest)
+	}
+}
+
+func TestExtractKeySizeAndLinkDigestType(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+	in := buildInput(t, ctx, fixtureOpts{})
+	got := Extract(ctx, in)
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	// The fixture keys are ECDSA P-256: key_size must be the curve size, not
+	// a bogus value from parsing the EC point as an RSA modulus.
+	for _, k := range got.Child.DNSKEYs {
+		if k.KeySize != 256 {
+			t.Errorf("key %d size = %d, want 256", k.KeyTag, k.KeySize)
+		}
+	}
+	// Links carry the DS digest type so the UI can tell dual-digest DS
+	// records for the same key tag apart.
+	link, ok := findLink(got, got.Parent.DS[0].KeyTag)
+	if !ok {
+		t.Fatal("expected a link for the DS")
+	}
+	if link.DSDigestType != got.Parent.DS[0].DigestType {
+		t.Errorf("link ds_digest_type = %d, want %d", link.DSDigestType, got.Parent.DS[0].DigestType)
+	}
+}
+
+func TestExtractIndeterminateWithoutChildEvidence(t *testing.T) {
+	// DS cached at the parent but no child DNSKEY answer cached at all: there
+	// is no positive evidence about the child, so the roll-up must be
+	// indeterminate rather than claiming the chain is broken.
+	ctx, _, _ := testhelpers.Context(t)
+
+	childKSK := genKey(t, testZone, true)
+	ds := childKSK.key.ToDS(dns.SHA256)
+	if ds == nil {
+		t.Fatal("ToDS returned nil")
+	}
+	dsSig := signRRset(t, childKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+
+	parentHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dnssecAnswer(testZone, dns.TypeDS, ds, dsSig)
+		}
+		return packet.Packet{}
+	}
+	childNS := hookedNS(t, ctx, "ns1."+testZone, "203.0.113.1", func(_, _ string, _ *nameserver.QueryOptions) packet.Packet {
+		return packet.Packet{}
+	})
+	parentNS := hookedNS(t, ctx, "ns1."+testParent, "192.0.2.1", parentHook)
+	warm(t, ctx, parentNS, testZone, "DS")
+	// The child cache is deliberately left cold.
+
+	got := Extract(ctx, Input{
+		Zone:       dnsname.New(testZone),
+		ParentZone: dnsname.New(testParent),
+		ChildNS:    []nameserver.Nameserver{childNS},
+		ParentNS:   []nameserver.Nameserver{parentNS},
+		At:         fixedAt,
+	})
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	if got.Status != StatusIndeterminate {
+		t.Errorf("status = %q, want %q", got.Status, StatusIndeterminate)
+	}
+	if len(got.Child.ServersQueried) != 0 {
+		t.Errorf("expected no child servers queried, got %v", got.Child.ServersQueried)
+	}
+}

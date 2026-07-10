@@ -242,12 +242,25 @@ func disagreeing(sigByIP map[string]string) []string {
 	return out
 }
 
-func dsDigestSupported(digest uint8) bool {
-	switch digest {
-	case 1, 2, 3, 4:
-		return true
+// keySizeBits returns the key size in bits, or 0 when not derivable. RSA sizes
+// come from the modulus; fixed-size algorithms are mapped directly.
+func keySizeBits(key *dns.DNSKEY) int {
+	if key == nil {
+		return 0
+	}
+	switch key.Algorithm {
+	case dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.RSAMD5:
+		return dnssecutil.KeySize(key)
+	case dns.ECDSAP256SHA256:
+		return 256
+	case dns.ECDSAP384SHA384:
+		return 384
+	case dns.ED25519:
+		return 256
+	case dns.ED448:
+		return 456
 	default:
-		return false
+		return 0
 	}
 }
 

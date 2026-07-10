@@ -96,6 +96,20 @@ describe("DnssecChain", () => {
     expect(screen.getByTestId("chain-facts")).toBeTruthy();
   });
 
+  it("draws grey reference edges from CDS/CDNSKEY to the named key", async () => {
+    const chain = secureChain();
+    chain.child.signed = [
+      { type: "CDS", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000] },
+      { type: "CDNSKEY", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000] },
+    ];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(container.querySelectorAll("line.edge-ref").length).toBe(2);
+  });
+
   it("shows the unavailable note on a 404 and never an SVG", async () => {
     fetch.mockResolvedValue(jsonResponse({}, 404));
     const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });

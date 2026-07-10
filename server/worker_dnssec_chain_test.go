@@ -102,3 +102,68 @@ func TestMarshalDNSSECChain(t *testing.T) {
 		t.Errorf("oversized summary: expected drop, got %d bytes", len(got))
 	}
 }
+
+func TestRunEngineForJobKeepsChainWithMostEvidence(t *testing.T) {
+	// A multi-testcase job invokes the sink once per engine run. A later run
+	// without parent evidence (its testcase never resolved the parent zone)
+	// must not overwrite an earlier summary that has it.
+	srv := New(DefaultConfig())
+	rich := &dnssecchain.Summary{
+		Version: dnssecchain.Version,
+		Zone:    "example.com",
+		Status:  dnssecchain.StatusSecure,
+		Parent:  dnssecchain.Parent{DSSource: dnssecchain.DSSourceParent, ServersQueried: []string{"192.0.2.1"}},
+		Child:   dnssecchain.Child{ServersQueried: []string{"203.0.113.1"}},
+	}
+	poor := &dnssecchain.Summary{
+		Version: dnssecchain.Version,
+		Zone:    "example.com",
+		Status:  dnssecchain.StatusIsland,
+		Parent:  dnssecchain.Parent{DSSource: dnssecchain.DSSourceNone},
+		Child:   dnssecchain.Child{ServersQueried: []string{"203.0.113.1"}},
+	}
+	summaries := []*dnssecchain.Summary{rich, poor}
+	i := 0
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		if req.DNSSECChainSink != nil && i < len(summaries) {
+			req.DNSSECChainSink(summaries[i])
+			i++
+		}
+		return nil, nil
+	}
+
+	job := chainJob("job-multi", JobOriginPublic)
+	job.Tests = []string{"dnssec05", "zone01"}
+	art, err := srv.runEngineForJob(job, context.Background())
+	if err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if !strings.Contains(art.dnssecChainJSON, `"status":"secure"`) {
+		t.Errorf("expected the richer summary to be kept, got %s", art.dnssecChainJSON)
+	}
+}
+
+func TestChainEvidenceScoreOrdering(t *testing.T) {
+	full := &dnssecchain.Summary{
+		Parent: dnssecchain.Parent{ServersQueried: []string{"192.0.2.1"}},
+		Child:  dnssecchain.Child{ServersQueried: []string{"203.0.113.1"}},
+	}
+	childOnly := &dnssecchain.Summary{
+		Child: dnssecchain.Child{ServersQueried: []string{"203.0.113.1"}},
+	}
+	input := &dnssecchain.Summary{
+		Parent: dnssecchain.Parent{DSSource: dnssecchain.DSSourceInput},
+	}
+	if !(chainEvidenceScore(full) > chainEvidenceScore(childOnly)) {
+		t.Error("full evidence must outrank child-only evidence")
+	}
+	if !(chainEvidenceScore(childOnly) > chainEvidenceScore(nil)) {
+		t.Error("any summary must outrank nil")
+	}
+	if !(chainEvidenceScore(input) > chainEvidenceScore(childOnly)) {
+		t.Error("undelegated input DS counts as parent evidence")
+	}
+	if !(chainEvidenceScore(nil) < 0) {
+		t.Error("nil must never replace an existing summary")
+	}
+}

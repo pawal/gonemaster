@@ -365,10 +365,14 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, er
 	}
 	req.LogCallback = chainLogCallbacks(callbacks...)
 
-	// Collect the per-run DNSSEC chain only for public jobs when the flag is on.
+	// Public jobs only; multi-testcase jobs keep the summary with most evidence.
 	var chainSummary *dnssecchain.Summary
 	if job.Origin == JobOriginPublic && s.cfg.ShowDNSSECChainPublic {
-		req.DNSSECChainSink = func(sm *dnssecchain.Summary) { chainSummary = sm }
+		req.DNSSECChainSink = func(sm *dnssecchain.Summary) {
+			if chainEvidenceScore(sm) >= chainEvidenceScore(chainSummary) {
+				chainSummary = sm
+			}
+		}
 	}
 
 	collectStats := func() jobQueryStats {
@@ -385,22 +389,16 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, er
 
 	var entries []engine.LogEntry
 	var runErr error
-	switch {
-	case len(job.Tests) == 1:
-		req.Testcases = []string{job.Tests[0]}
+	if total := len(job.Tests); total <= 1 {
+		req.Testcases = job.Tests
 		entries, runErr = s.runEngine(req)
-	case len(job.Tests) == 0:
-		entries, runErr = s.runEngine(req)
-	default:
-		total := len(job.Tests)
+	} else {
 		for i, testcase := range job.Tests {
 			runReq := req
 			runReq.Testcases = []string{testcase}
 			part, err := s.runEngine(runReq)
-			if total > 0 {
-				progress := int(math.Round((float64(i+1) / float64(total)) * 100))
-				s.updateJobProgress(job.ID, progress)
-			}
+			progress := int(math.Round((float64(i+1) / float64(total)) * 100))
+			s.updateJobProgress(job.ID, progress)
 			if err != nil {
 				runErr = err
 				break
@@ -417,6 +415,21 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, er
 		dnssecChainJSON:  s.marshalDNSSECChain(chainSummary),
 	}
 	return art, runErr
+}
+
+// chainEvidenceScore ranks summaries: parent evidence outweighs child evidence.
+func chainEvidenceScore(sm *dnssecchain.Summary) int {
+	if sm == nil {
+		return -1
+	}
+	score := 0
+	if len(sm.Parent.ServersQueried) > 0 || sm.Parent.DSSource == dnssecchain.DSSourceInput {
+		score += 2
+	}
+	if len(sm.Child.ServersQueried) > 0 {
+		score++
+	}
+	return score
 }
 
 // marshalDNSSECChain serializes the chain summary, dropping it when nil or

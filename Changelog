@@ -4,10 +4,11 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
-Reports a stale DS at the parent of an unsigned zone as an error. Adds SEO metadata to the analysis dashboards. Flag timed-out name servers as unreachable.
+Reports a stale DS at the parent of an unsigned zone as an error. Adds a DNSSEC chain-of-trust graph to the public result page. Adds SEO metadata to the analysis dashboards. Flag timed-out name servers as unreachable.
 
 ### Added
 
+- engine, server, ui-public: a per-run DNSSEC chain-of-trust summary (no extra queries, public-UI runs only) rendered on request as an SVG graph in the public result page, gated by `show_dnssec_chain_public`. Older and non-public runs have no chain data.
 - analysis-ui, server: SEO and social metadata for the analysis dashboards - per-route titles, descriptions and canonical URLs, Open Graph and Twitter cards, a favicon, and the dashboard pages listed in `sitemap.xml`
 - engine, admin-ui: track query timeouts separately from response times and surface unreachable/unresolved name servers in the timing view
 - docs, analysis-ui: zone14 and dnssec21 testcase titles and a zone14 result explanation

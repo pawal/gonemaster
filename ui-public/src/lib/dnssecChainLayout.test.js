@@ -73,6 +73,23 @@ describe("layoutChain", () => {
     expect(rrset[0].label).toBe("DNSKEY");
   });
 
+  it("labels the parent and key clusters with their zone names", () => {
+    const g = layoutChain(secureChain());
+    const parent = g.clusters.find((c) => c.id === "parent");
+    const keys = g.clusters.find((c) => c.id === "keys");
+    const signed = g.clusters.find((c) => c.id === "signed");
+    expect(parent.name).toBe("com");
+    expect(keys.name).toBe("example.com");
+    expect(signed.name).toBe("");
+  });
+
+  it("keeps the root parent name as a dot, not an em dash", () => {
+    const chain = secureChain({ parent_zone: "." });
+    const g = layoutChain(chain);
+    const parent = g.clusters.find((c) => c.id === "parent");
+    expect(parent.name).toBe(".");
+  });
+
   it("produces a matching DS edge and a valid signature edge", () => {
     const g = layoutChain(secureChain());
     const dsEdge = g.edges.find((e) => e.kind === "ds");

@@ -70,9 +70,6 @@ func Extract(ctx context.Context, in Input) *Summary {
 		keyIndex:  map[string]int{},
 		childKeys: map[uint16]*dns.DNSKEY{},
 	}
-	if e.summary.ParentZone == "." {
-		e.summary.ParentZone = ""
-	}
 
 	e.extractParent(cctx, in)
 	e.extractChild(cctx, in)

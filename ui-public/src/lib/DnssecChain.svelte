@@ -43,12 +43,12 @@
   let dsSummary = $derived(
     (chain?.parent?.ds ?? [])
       .map((d) => `DS ${d.key_tag} (${d.algorithm}/${d.digest_type})`)
-      .join(", ") || "—"
+      .join(", ") || "-"
   );
   let keySummary = $derived(
     (chain?.child?.dnskeys ?? [])
       .map((k) => `${k.sep ? "KSK" : "ZSK"} ${k.key_tag} (${k.algorithm})`)
-      .join(", ") || "—"
+      .join(", ") || "-"
   );
 
   let disagree = $derived(
@@ -67,11 +67,14 @@
     return new Date(sec * 1000).toISOString().slice(0, 10);
   }
 
-  let sigWindows = $derived(
-    (chain?.child?.dnskey_rrsig ?? [])
+  let sigWindows = $derived([
+    ...(chain?.child?.dnskey_rrsig ?? [])
       .filter((s) => s.state === "valid" && s.inception && s.expiration)
-      .map((s) => $t("pub.dnssec_chain_sig_window", { from: fmtDate(s.inception), to: fmtDate(s.expiration) }))
-  );
+      .map((s) => ({ rrset: "DNSKEY", s })),
+    ...(chain?.child?.soa_rrsig ?? [])
+      .filter((s) => s.state === "valid" && s.inception && s.expiration)
+      .map((s) => ({ rrset: "SOA", s })),
+  ]);
 
   function edgeClass(edge) {
     if (edge.kind === "ds") {
@@ -98,13 +101,13 @@
       case "ds-input":
         return ["DS", `tag ${node.keyTag}`];
       case "ds-ghost":
-        return ["DS", "—"];
+        return ["DS", ""];
       case "ksk":
         return ["KSK", `tag ${node.keyTag}`];
       case "zsk":
         return ["ZSK", `tag ${node.keyTag}`];
       case "key-ghost":
-        return ["DNSKEY", "—"];
+        return ["DNSKEY", ""];
       case "rrset":
         return [node.label, ""];
       default:
@@ -164,7 +167,7 @@
             </defs>
 
             {#each graph.clusters as cl (cl.id)}
-              <text class="chain-cluster-label" x={cl.x} y={cl.y}>{$t(cl.labelKey)}</text>
+              <text class="chain-cluster-label" x={cl.x} y={cl.y}>{$t(cl.labelKey)}{#if cl.name}<tspan class="chain-cluster-name"> · {cl.name}</tspan>{/if}</text>
             {/each}
 
             {#each graph.edges as edge (edge.id)}
@@ -201,11 +204,11 @@
       {/if}
 
       <ul class="chain-facts" data-testid="chain-facts">
-        <li>{$t("pub.dnssec_chain_parent_label")}: {chain?.parent_zone || "—"}</li>
+        <li>{$t("pub.dnssec_chain_parent_label")}: {chain?.parent_zone || "-"}</li>
         <li>DS: {dsSummary}</li>
         <li>{$t("pub.dnssec_chain_keys_label")}: {keySummary}</li>
-        {#each sigWindows as w, i (i)}
-          <li>{w}</li>
+        {#each sigWindows as item, i (i)}
+          <li>{item.rrset} tag {item.s.key_tag}: {$t("pub.dnssec_chain_sig_window", { from: fmtDate(item.s.inception), to: fmtDate(item.s.expiration) })}</li>
         {/each}
       </ul>
     {/if}
@@ -267,6 +270,12 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+  }
+  .chain-cluster-name {
+    fill: var(--ink);
+    font-weight: 400;
+    text-transform: none;
+    letter-spacing: 0;
   }
   .chain-node-box {
     fill: var(--surface);

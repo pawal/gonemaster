@@ -6,9 +6,9 @@
 const NODE_W = 132;
 const NODE_H = 52;
 const H_GAP = 20;
-const V_GAP = 84;
+const V_GAP = 104;
 const PAD_X = 24;
-const PAD_TOP = 44; // room for the cluster label above the first row
+const PAD_TOP = 44;
 const PAD_BOTTOM = 16;
 
 // truncateName shortens a long name with a middle ellipsis. The full name is
@@ -100,9 +100,9 @@ export function layoutChain(chain) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
 
   const clusters = [
-    { id: "parent", labelKey: "pub.dnssec_chain_parent_label", x: PAD_X, y: PAD_TOP - 22 },
-    { id: "keys", labelKey: "pub.dnssec_chain_keys_label", x: PAD_X, y: PAD_TOP + V_GAP - 22 },
-    { id: "signed", labelKey: "pub.dnssec_chain_signed_label", x: PAD_X, y: PAD_TOP + 2 * V_GAP - 22 },
+    { id: "parent", labelKey: "pub.dnssec_chain_parent_label", name: truncateName(chain.parent_zone ?? ""), x: PAD_X, y: PAD_TOP - 22 },
+    { id: "keys", labelKey: "pub.dnssec_chain_keys_label", name: truncateName(chain.zone ?? ""), x: PAD_X, y: PAD_TOP + V_GAP - 22 },
+    { id: "signed", labelKey: "pub.dnssec_chain_signed_label", name: "", x: PAD_X, y: PAD_TOP + 2 * V_GAP - 22 },
   ];
 
   const edges = [];

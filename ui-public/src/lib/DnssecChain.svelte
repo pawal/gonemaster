@@ -228,16 +228,9 @@
             {/each}
 
             {#each refEdges as edge (edge.id)}
-              <line
-                class="chain-edge {edgeClass(edge)}"
-                x1={edge.from.x}
-                y1={edge.from.y}
-                x2={edge.to.x}
-                y2={edge.to.y}
-                marker-end="url(#chain-arrow)"
-              >
+              <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)">
                 <title>{edgeTitle(edge)}</title>
-              </line>
+              </path>
             {/each}
           </svg>
         </div>

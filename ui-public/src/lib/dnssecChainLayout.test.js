@@ -142,10 +142,12 @@ describe("layoutChain", () => {
     // ZSK signs SOA, KSK signs CDS.
     expect(g.edges.some((e) => e.id === "sig-SOA-2000")).toBe(true);
     expect(g.edges.some((e) => e.id === "sig-CDS-1000")).toBe(true);
-    // CDS names the KSK (key tag 1000): a grey reference edge points to it.
+    // CDS names the KSK (key tag 1000): a grey reference edge points to it,
+    // drawn as a bowed path so it clears the signature edge.
     const ref = g.edges.find((e) => e.kind === "ref" && e.id === "ref-CDS-1000");
     expect(ref).toBeTruthy();
     expect(ref.targetTag).toBe(1000);
+    expect(typeof ref.d).toBe("string");
   });
 
   it("draws a ghost DS node for an island (keys, no DS)", () => {

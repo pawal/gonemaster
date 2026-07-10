@@ -107,7 +107,7 @@ describe("DnssecChain", () => {
     openChain(container);
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
-    expect(container.querySelectorAll("line.edge-ref").length).toBe(2);
+    expect(container.querySelectorAll("path.edge-ref").length).toBe(2);
   });
 
   it("shows the unavailable note on a 404 and never an SVG", async () => {

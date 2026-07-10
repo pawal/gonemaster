@@ -15,6 +15,7 @@ const PAD_X = 24;
 const PAD_TOP = 44;
 const PAD_BOTTOM = 16;
 const LOOP_PAD = 36; // right margin so a key self-loop is not clipped
+const REF_BOW = 46; // sideways bow of a CDS/CDNSKEY reference edge
 
 const ALGO = {
   1: "RSAMD5", 3: "DSA", 5: "RSASHA1", 6: "DSA-NSEC3-SHA1", 7: "RSASHA1-NSEC3-SHA1",
@@ -212,6 +213,8 @@ export function layoutChain(chain) {
       });
     }
     // CDS/CDNSKEY name a DNSKEY by tag: draw a grey reference edge to that key.
+    // It is bowed to the side so it does not sit on top of the signature edge
+    // between the same two nodes.
     for (const tag of entry.refs ?? []) {
       const key = byId.get(`key-${tag}`);
       if (!key) continue;
@@ -220,16 +223,25 @@ export function layoutChain(chain) {
         kind: "ref",
         rrset: entry.type,
         targetTag: tag,
-        from: edgePoint(to, "top"),
-        to: edgePoint(key, "bottom"),
+        d: refPath(edgePoint(to, "top"), edgePoint(key, "bottom")),
       });
     }
   }
 
   const hasLoop = edges.some((e) => e.kind === "selfsig");
-  const width = totalW + 2 * PAD_X + (hasLoop ? LOOP_PAD : 0);
+  const hasRef = edges.some((e) => e.kind === "ref");
+  const rightPad = Math.max(hasLoop ? LOOP_PAD : 0, hasRef ? REF_BOW + 12 : 0);
+  const width = totalW + 2 * PAD_X + rightPad;
   const height = PAD_TOP + (rows.length - 1) * V_GAP + NODE_H + PAD_BOTTOM;
   return { width, height, clusters, nodes, edges };
+}
+
+// refPath draws a reference edge as a quadratic curve bowed to the right so it
+// stays clear of the straight signature edge between the same two nodes.
+function refPath(a, b) {
+  const mx = (a.x + b.x) / 2 + REF_BOW;
+  const my = (a.y + b.y) / 2;
+  return `M ${round(a.x)} ${round(a.y)} Q ${round(mx)} ${round(my)} ${round(b.x)} ${round(b.y)}`;
 }
 
 function edgePoint(node, side) {

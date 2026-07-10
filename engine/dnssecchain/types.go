@@ -1,0 +1,126 @@
+// Package dnssecchain extracts a per-run DNSSEC authentication-chain summary
+// from responses already cached during a run. Extraction is strictly
+// cache-only: it clones the run profile with NoNetwork=true and reads only
+// entries the run's testcases already populated, so it never issues a query.
+// Validity is evaluated at the run start time (packet timestamps are honored
+// against warm cache entries), matching what the testcases observed.
+package dnssecchain
+
+// Version is the schema version of the emitted Summary. Changes are additive.
+const Version = 1
+
+// Roll-up status values.
+const (
+	StatusSecure        = "secure"
+	StatusBroken        = "broken"
+	StatusIsland        = "island"
+	StatusUnsigned      = "unsigned"
+	StatusIndeterminate = "indeterminate"
+)
+
+// Delegation kinds.
+const (
+	DelegationNormal      = "normal"
+	DelegationUndelegated = "undelegated"
+)
+
+// DS source kinds.
+const (
+	DSSourceParent = "parent"
+	DSSourceInput  = "input"
+	DSSourceNone   = "none"
+)
+
+// RRSIG signature states.
+const (
+	SigValid       = "valid"
+	SigExpired     = "expired"
+	SigNotYetValid = "not_yet_valid"
+	SigBogus       = "bogus"
+	SigUnsupported = "unsupported_algorithm"
+	SigNoKey       = "no_key"
+	SigUnverified  = "unverified"
+)
+
+// DS-to-DNSKEY link statuses.
+const (
+	LinkMatch             = "match"
+	LinkDigestMismatch    = "digest_mismatch"
+	LinkNoDNSKEY          = "no_dnskey"
+	LinkUnsupportedDigest = "unsupported_digest"
+)
+
+// Summary is the versioned chain document persisted per public run.
+type Summary struct {
+	Version    int    `json:"version"`
+	Zone       string `json:"zone"`
+	ParentZone string `json:"parent_zone"`
+	Delegation string `json:"delegation"`
+	Status     string `json:"status"`
+	Truncated  bool   `json:"truncated"`
+
+	Parent Parent `json:"parent"`
+	Child  Child  `json:"child"`
+	Links  []Link `json:"links"`
+}
+
+// Parent holds the DS evidence gathered from the parent zone's servers.
+type Parent struct {
+	DSSource           string   `json:"ds_source"`
+	DS                 []DS     `json:"ds"`
+	DSRRSIG            []RRSIG  `json:"ds_rrsig"`
+	ServersQueried     []string `json:"servers_queried"`
+	ServersWithoutDS   []string `json:"servers_without_ds"`
+	ServersDisagreeing []string `json:"servers_disagreeing"`
+}
+
+// Child holds the DNSKEY and signature evidence from the tested zone's servers.
+type Child struct {
+	DNSKEYs              []DNSKEY `json:"dnskeys"`
+	DNSKEYRRSIG          []RRSIG  `json:"dnskey_rrsig"`
+	SOARRSIG             []RRSIG  `json:"soa_rrsig"`
+	ServersQueried       []string `json:"servers_queried"`
+	ServersWithoutDNSKEY []string `json:"servers_without_dnskey"`
+	ServersDisagreeing   []string `json:"servers_disagreeing"`
+}
+
+// DS is one delegation-signer record in the union across parent servers.
+type DS struct {
+	KeyTag     uint16   `json:"key_tag"`
+	Algorithm  uint8    `json:"algorithm"`
+	DigestType uint8    `json:"digest_type"`
+	Digest     string   `json:"digest"`
+	Servers    []string `json:"servers"`
+}
+
+// DNSKEY is one public key in the union across child servers. Key material is
+// deliberately excluded; only derived properties are recorded.
+type DNSKEY struct {
+	KeyTag    uint16   `json:"key_tag"`
+	Algorithm uint8    `json:"algorithm"`
+	Flags     uint16   `json:"flags"`
+	SEP       bool     `json:"sep"`
+	ZoneKey   bool     `json:"zone_key"`
+	Revoked   bool     `json:"revoked"`
+	KeySize   int      `json:"key_size"`
+	Servers   []string `json:"servers"`
+}
+
+// RRSIG is one signature covering a DS, DNSKEY, or SOA RRset.
+type RRSIG struct {
+	KeyTag     uint16   `json:"key_tag"`
+	Algorithm  uint8    `json:"algorithm"`
+	Inception  int64    `json:"inception"`
+	Expiration int64    `json:"expiration"`
+	Signer     string   `json:"signer"`
+	State      string   `json:"state"`
+	Servers    []string `json:"servers"`
+}
+
+// Link is one DS-to-DNSKEY edge. DNSKEYKeyTag is omitted when no key matches.
+type Link struct {
+	DSKeyTag     uint16   `json:"ds_key_tag"`
+	DNSKEYKeyTag uint16   `json:"dnskey_key_tag,omitempty"`
+	Status       string   `json:"status"`
+	Servers      []string `json:"servers"`
+}

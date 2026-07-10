@@ -106,6 +106,7 @@
   // Fail-safe default: hide scoring until server confirms it is enabled.
   let scoringEnabled = $state(false);
   let nameserverTimingsEnabled = $state(false);
+  let dnssecChainEnabled = $state(false);
 
   async function fetchLocales() {
     try {
@@ -204,6 +205,9 @@
         if (typeof data?.show_nameserver_timings_public === "boolean") {
           nameserverTimingsEnabled = data.show_nameserver_timings_public;
         }
+        if (typeof data?.show_dnssec_chain_public === "boolean") {
+          dnssecChainEnabled = data.show_dnssec_chain_public;
+        }
       }
     } catch (_) { /* keep false - fail-safe */ }
   }
@@ -284,6 +288,7 @@
         finishedAt={jobFinishedAt}
         {scoringEnabled}
         {nameserverTimingsEnabled}
+        {dnssecChainEnabled}
         ontestparent={onTestParent}
       />
     {:else}

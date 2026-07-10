@@ -493,4 +493,38 @@ describe("Results", () => {
     await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
     expect(screen.queryByTestId("no-zone-callout")).toBeNull();
   });
+
+  // markerResp adds the has_dnssec_chain field to a plain result payload.
+  const markerResp = (hasChain) => ({
+    ok: true,
+    status: 200,
+    json: async () => ({
+      job_id: "test-id",
+      status: "succeeded",
+      raw: { locale: "en", entries: [] },
+      nameserver_timings: [],
+      testcase_descriptions: {},
+      has_dnssec_chain: hasChain,
+    }),
+  });
+
+  it("renders the DNSSEC chain section when enabled and the marker is set", async () => {
+    global.fetch.mockResolvedValue(markerResp(true));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com", dnssecChainEnabled: true } });
+    await waitFor(() => expect(screen.getByTestId("dnssec-chain")).toBeTruthy());
+  });
+
+  it("hides the DNSSEC chain section when the marker is absent", async () => {
+    global.fetch.mockResolvedValue(markerResp(false));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com", dnssecChainEnabled: true } });
+    await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
+    expect(screen.queryByTestId("dnssec-chain")).toBeNull();
+  });
+
+  it("hides the DNSSEC chain section when the feature flag is off", async () => {
+    global.fetch.mockResolvedValue(markerResp(true));
+    render(Results, { props: { publicID: "abc12345", domain: "example.com", dnssecChainEnabled: false } });
+    await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
+    expect(screen.queryByTestId("dnssec-chain")).toBeNull();
+  });
 });

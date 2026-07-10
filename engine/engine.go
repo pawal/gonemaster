@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
+	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	ns "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
@@ -99,6 +100,10 @@ type RunRequest struct {
 	Context context.Context
 	// Runner, when set, supplies the per-run container to Run.
 	Runner *Runner
+	// DNSSECChainSink, when set, receives the per-run DNSSEC chain summary
+	// extracted from cached responses at the end of a full successful run.
+	// Extraction is cache-only and skipped when this is nil.
+	DNSSECChainSink func(*dnssecchain.Summary)
 }
 
 // LogEntry is one event from a test run, suitable for JSON output.
@@ -798,7 +803,35 @@ func runWithContext(ctx context.Context, req RunRequest, module string, testcase
 		return nil, err
 	}
 
+	emitDNSSECChain(ctx, req, &z)
 	return entries, nil
+}
+
+// emitDNSSECChain extracts the per-run DNSSEC chain summary from cached
+// responses and hands it to the sink. It is a no-op when no sink is set, and
+// extraction itself never issues a query. Inputs come from the memoized zone
+// state, which is unrecoverable once the run returns.
+func emitDNSSECChain(ctx context.Context, req RunRequest, z *zone.Zone) {
+	if req.DNSSECChainSink == nil || z == nil {
+		return
+	}
+	at := time.Now().UTC()
+	if runner := RunnerFromContext(ctx); runner != nil && !runner.StartedAt.IsZero() {
+		at = runner.StartedAt.UTC()
+	}
+	in := dnssecchain.Input{Zone: z.Name, At: at}
+	if childNS, ok := z.CachedNS(); ok {
+		in.ChildNS = childNS
+	}
+	if parent, ok := z.CachedParent(); ok && parent != nil {
+		in.ParentZone = parent.Name
+		if parentNS, ok := parent.CachedNS(); ok {
+			in.ParentNS = parentNS
+		}
+	}
+	if summary := dnssecchain.Extract(ctx, in); summary != nil {
+		req.DNSSECChainSink(summary)
+	}
 }
 
 func convertEntries(entries []*logger.Entry, minLevel string) ([]LogEntry, error) {

@@ -28,6 +28,53 @@ function algoLabel(algo) {
   return m ? `${m} (alg ${algo})` : `alg ${algo}`;
 }
 
+const DIGEST = { 1: "SHA-1", 2: "SHA-256", 3: "GOST R 34.11-94", 4: "SHA-384" };
+
+function digestLabel(dt) {
+  const m = DIGEST[dt];
+  return m ? `${m} (${dt})` : `digest type ${dt}`;
+}
+
+function flagWords(k) {
+  const w = [];
+  if (k.zone_key) w.push("ZONE");
+  if (k.sep) w.push("SEP");
+  if (k.revoked) w.push("REVOKE");
+  return w.join(", ");
+}
+
+function shortHex(h) {
+  const s = String(h ?? "");
+  return s.length > 24 ? `${s.slice(0, 24)}…` : s;
+}
+
+function serversLine(servers) {
+  if (!Array.isArray(servers) || servers.length === 0) return null;
+  const shown = servers.slice(0, 4).join(", ");
+  return servers.length > 4 ? `Servers: ${shown}, +${servers.length - 4}` : `Servers: ${shown}`;
+}
+
+// fmtDate renders a unix-second timestamp as an ISO date.
+export function fmtDate(sec) {
+  if (!sec) return "";
+  return new Date(sec * 1000).toISOString().slice(0, 10);
+}
+
+function joinLines(lines) {
+  return lines.filter(Boolean).join("\n");
+}
+
+// sigTitle builds the multi-line hover text for one RRSIG.
+function sigTitle(headline, sig) {
+  const lines = [headline, `Signing key: ${sig.key_tag}`, `Algorithm: ${algoLabel(sig.algorithm)}`];
+  if (sig.inception && sig.expiration) {
+    lines.push(`Valid: ${fmtDate(sig.inception)} to ${fmtDate(sig.expiration)}`);
+  }
+  lines.push(`Status: ${sig.state}`);
+  lines.push(serversLine(sig.servers));
+  return joinLines(lines);
+}
+
 // truncateName shortens a long name with a middle ellipsis. The full name is
 // meant to go into a title/tooltip via titleText.
 export function truncateName(name, max = 28) {
@@ -72,11 +119,18 @@ export function layoutChain(chain) {
   const dsNodes = [];
   if (dsList.length > 0) {
     for (const ds of dsList) {
+      const input = dsSource === "input";
       dsNodes.push({
         id: `ds-${ds.key_tag}`,
-        kind: dsSource === "input" ? "ds-input" : "ds",
+        kind: input ? "ds-input" : "ds",
         keyTag: ds.key_tag,
-        titleText: `DS ${ds.key_tag}, ${algoLabel(ds.algorithm)}, digest type ${ds.digest_type}`,
+        titleText: joinLines([
+          `DS · key tag ${ds.key_tag}${input ? " (test input)" : ""}`,
+          `Algorithm: ${algoLabel(ds.algorithm)}`,
+          `Digest type: ${digestLabel(ds.digest_type)}`,
+          ds.digest ? `Digest: ${shortHex(ds.digest)}` : null,
+          serversLine(ds.servers),
+        ]),
       });
     }
   } else {
@@ -87,11 +141,17 @@ export function layoutChain(chain) {
   const kskNodes = [];
   const zskNodes = [];
   for (const k of [...keys].sort((a, b) => a.key_tag - b.key_tag)) {
-    const bits = k.key_size ? `, ${k.key_size} bits` : "";
+    const words = flagWords(k);
     const node = {
       id: `key-${k.key_tag}`,
       keyTag: k.key_tag,
-      titleText: `${k.sep ? "KSK" : "ZSK"} ${k.key_tag}, ${algoLabel(k.algorithm)}${bits}`,
+      titleText: joinLines([
+        `${k.sep ? "KSK" : "ZSK"} · key tag ${k.key_tag}`,
+        `Algorithm: ${algoLabel(k.algorithm)}`,
+        `Flags: ${k.flags}${words ? ` (${words})` : ""}`,
+        k.key_size ? `Key size: ${k.key_size} bits` : null,
+        serversLine(k.servers),
+      ]),
     };
     if (k.sep) {
       node.kind = "ksk";
@@ -102,12 +162,19 @@ export function layoutChain(chain) {
     }
   }
 
-  const signedNodes = signed.map((s) => ({
-    id: `rrset-${s.type}`,
-    kind: "rrset",
-    label: s.type,
-    titleText: `${s.type} RRset`,
-  }));
+  const signedNodes = signed.map((s) => {
+    const sigParts = (s.rrsig ?? []).map((r) => `key ${r.key_tag} (${r.state})`);
+    return {
+      id: `rrset-${s.type}`,
+      kind: "rrset",
+      label: s.type,
+      titleText: joinLines([
+        `${s.type} RRset`,
+        sigParts.length ? `Signed by: ${sigParts.join(", ")}` : null,
+        s.refs?.length ? `Names key: ${s.refs.join(", ")}` : null,
+      ]),
+    };
+  });
 
   // Assemble the visible rows top to bottom, tagging which carries a label.
   const rows = [{ label: "parent", nodes: dsNodes }];
@@ -158,6 +225,11 @@ export function layoutChain(chain) {
       status: link.status,
       dsKeyTag: link.ds_key_tag,
       dnskeyKeyTag: link.dnskey_key_tag,
+      title: joinLines([
+        `DS ${link.ds_key_tag} -> DNSKEY ${link.dnskey_key_tag ?? "?"}`,
+        `Status: ${link.status}`,
+        serversLine(link.servers),
+      ]),
       from: edgePoint(from, "bottom"),
       to: edgePoint(to, "top"),
     });
@@ -174,6 +246,7 @@ export function layoutChain(chain) {
       keyTag: sig.key_tag,
       inception: sig.inception,
       expiration: sig.expiration,
+      title: sigTitle("RRSIG over DNSKEY RRset", sig),
       d: selfLoopPath(signer),
     });
     for (const target of nodes) {
@@ -187,6 +260,7 @@ export function layoutChain(chain) {
         targetTag: target.keyTag,
         inception: sig.inception,
         expiration: sig.expiration,
+        title: sigTitle(`RRSIG over DNSKEY RRset (covers key ${target.keyTag})`, sig),
         from: edgePoint(signer, "bottom"),
         to: edgePoint(target, "top"),
       });
@@ -208,6 +282,7 @@ export function layoutChain(chain) {
         rrset: entry.type,
         inception: sig.inception,
         expiration: sig.expiration,
+        title: sigTitle(`RRSIG over ${entry.type} RRset`, sig),
         from: edgePoint(from, "bottom"),
         to: edgePoint(to, "top"),
       });
@@ -223,6 +298,7 @@ export function layoutChain(chain) {
         kind: "ref",
         rrset: entry.type,
         targetTag: tag,
+        title: `${entry.type} names DNSKEY ${tag}`,
         d: refPath(edgePoint(to, "top"), edgePoint(key, "bottom")),
       });
     }

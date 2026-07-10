@@ -75,6 +75,32 @@ describe("layoutChain", () => {
     expect(g.nodes.some((n) => n.id === "rrset-dnskey")).toBe(false);
   });
 
+  it("builds rich multi-line hover text for nodes and signature edges", () => {
+    const chain = secureChain();
+    chain.parent.ds[0].digest = "ab34cd";
+    chain.child.dnskeys[0].key_size = 2048;
+    chain.child.dnskeys[0].zone_key = true;
+    chain.child.dnskey_rrsig[0].algorithm = 13;
+    chain.child.dnskey_rrsig[0].inception = 1751500800;
+    chain.child.dnskey_rrsig[0].expiration = 1752710400;
+    const g = layoutChain(chain);
+
+    const ds = g.nodes.find((n) => n.kind === "ds");
+    expect(ds.titleText).toContain("Algorithm: ECDSAP256SHA256 (alg 13)");
+    expect(ds.titleText).toContain("Digest type: SHA-256 (2)");
+    expect(ds.titleText).toContain("Digest: ab34cd");
+
+    const ksk = g.nodes.find((n) => n.kind === "ksk");
+    expect(ksk.titleText).toContain("Flags: 257");
+    expect(ksk.titleText).toContain("SEP");
+    expect(ksk.titleText).toContain("Key size: 2048 bits");
+
+    const self = g.edges.find((e) => e.kind === "selfsig");
+    expect(self.title).toContain("Signing key: 1000");
+    expect(self.title).toContain("Valid: 2025-07-03 to 2025-07-17");
+    expect(self.title).toContain("Status: valid");
+  });
+
   it("labels the parent and key clusters with their zone names", () => {
     const g = layoutChain(secureChain());
     const parent = g.clusters.find((c) => c.id === "parent");

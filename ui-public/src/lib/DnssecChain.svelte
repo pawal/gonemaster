@@ -1,7 +1,7 @@
 <script>
   import { t } from "../i18n.js";
   import { getDnssecChain } from "../api.js";
-  import { layoutChain } from "./dnssecChainLayout.js";
+  import { layoutChain, fmtDate } from "./dnssecChainLayout.js";
 
   let { publicID, domain = "" } = $props();
 
@@ -66,11 +66,6 @@
     (chain?.parent?.ds?.length ?? 0) > 0 && (chain?.child?.dnskeys?.length ?? 0) === 0
   );
 
-  function fmtDate(sec) {
-    if (!sec) return "";
-    return new Date(sec * 1000).toISOString().slice(0, 10);
-  }
-
   let sigWindows = $derived([
     ...(chain?.child?.dnskey_rrsig ?? [])
       .filter((s) => s.state === "valid" && s.inception && s.expiration)
@@ -102,23 +97,6 @@
       default:
         return "edge-neutral";
     }
-  }
-
-  function edgeTitle(edge) {
-    if (edge.kind === "ref") {
-      return `${edge.rrset} -> DNSKEY ${edge.targetTag}`;
-    }
-    if (edge.kind === "ds") {
-      return `DS ${edge.dsKeyTag} -> DNSKEY ${edge.dnskeyKeyTag ?? "?"}: ${edge.status}`;
-    }
-    const detail =
-      edge.status === "valid" && edge.inception && edge.expiration
-        ? $t("pub.dnssec_chain_sig_window", { from: fmtDate(edge.inception), to: fmtDate(edge.expiration) })
-        : edge.status;
-    if (edge.kind === "selfsig") return `DNSKEY ${edge.keyTag} -> DNSKEY RRset: ${detail}`;
-    if (edge.kind === "keysig") return `DNSKEY ${edge.keyTag} -> DNSKEY ${edge.targetTag}: ${detail}`;
-    if (edge.kind === "sig") return `DNSKEY ${edge.keyTag} -> ${edge.rrset} RRset: ${detail}`;
-    return "";
   }
 
   function nodeLines(node) {
@@ -199,7 +177,7 @@
             {#each mainEdges as edge (edge.id)}
               {#if edge.kind === "selfsig"}
                 <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)">
-                  <title>{edgeTitle(edge)}</title>
+                  <title>{edge.title}</title>
                 </path>
               {:else}
                 <line
@@ -210,7 +188,7 @@
                   y2={edge.to.y}
                   marker-end="url(#chain-arrow)"
                 >
-                  <title>{edgeTitle(edge)}</title>
+                  <title>{edge.title}</title>
                 </line>
               {/if}
             {/each}
@@ -229,7 +207,7 @@
 
             {#each refEdges as edge (edge.id)}
               <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)">
-                <title>{edgeTitle(edge)}</title>
+                <title>{edge.title}</title>
               </path>
             {/each}
           </svg>

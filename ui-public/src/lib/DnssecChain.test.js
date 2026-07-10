@@ -93,7 +93,11 @@ describe("DnssecChain", () => {
     // The KSK self-signs the DNSKEY RRset: a loop path is drawn.
     expect(container.querySelector("path.chain-edge")).toBeTruthy();
     expect(screen.getByTestId("chain-legend")).toBeTruthy();
-    expect(screen.getByTestId("chain-facts")).toBeTruthy();
+    // Facts use IANA mnemonics, not raw algorithm/digest numbers.
+    const facts = screen.getByTestId("chain-facts").textContent;
+    expect(facts).toContain("ECDSAP256SHA256");
+    expect(facts).toContain("SHA-256");
+    expect(facts).not.toContain("(13/2)");
   });
 
   it("draws grey reference edges from CDS/CDNSKEY to the named key", async () => {

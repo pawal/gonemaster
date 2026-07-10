@@ -1,7 +1,7 @@
 <script>
   import { t } from "../i18n.js";
   import { getDnssecChain } from "../api.js";
-  import { layoutChain } from "./dnssecChainLayout.js";
+  import { layoutChain, algoMnemonic, digestMnemonic } from "./dnssecChainLayout.js";
 
   let { publicID, domain = "" } = $props();
 
@@ -46,12 +46,12 @@
 
   let dsSummary = $derived(
     (chain?.parent?.ds ?? [])
-      .map((d) => `DS ${d.key_tag} (${d.algorithm}/${d.digest_type})`)
+      .map((d) => `${d.key_tag} (${algoMnemonic(d.algorithm)}/${digestMnemonic(d.digest_type)})`)
       .join(", ") || "-"
   );
   let keySummary = $derived(
     (chain?.child?.dnskeys ?? [])
-      .map((k) => `${k.sep ? "KSK" : "ZSK"} ${k.key_tag} (${k.algorithm})`)
+      .map((k) => `${k.sep ? "KSK" : "ZSK"} ${k.key_tag} (${algoMnemonic(k.algorithm)})`)
       .join(", ") || "-"
   );
 

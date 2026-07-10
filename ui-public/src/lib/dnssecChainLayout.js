@@ -35,6 +35,16 @@ function digestLabel(dt) {
   return m ? `${m} (${dt})` : `digest type ${dt}`;
 }
 
+// algoMnemonic / digestMnemonic return the IANA identifier, falling back to the
+// raw number when unknown.
+export function algoMnemonic(algo) {
+  return ALGO[algo] ?? String(algo);
+}
+
+export function digestMnemonic(dt) {
+  return DIGEST[dt] ?? String(dt);
+}
+
 function flagWords(k) {
   const w = [];
   if (k.zone_key) w.push("ZONE");

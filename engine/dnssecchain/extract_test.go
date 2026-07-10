@@ -241,6 +241,82 @@ func TestExtractSecure(t *testing.T) {
 	}
 }
 
+func TestExtractSignedRRsets(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	childKSK := genKey(t, testZone, true)
+	childZSK := genKey(t, testZone, false)
+	dnskeyRRset := []dns.RR{childKSK.key, childZSK.key}
+	win := func(rr []dns.RR, signer keypair) *dns.RRSIG {
+		return signRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	}
+	dnskeySig := win(dnskeyRRset, childKSK)
+
+	// SOA signed by the ZSK, CDS (from the KSK) signed by the KSK.
+	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(testZone), Class: dns.ClassINET, TTL: 3600}}
+	soa.Ns = dnsutil.Fqdn("ns1." + testZone)
+	soa.Mbox = dnsutil.Fqdn("hostmaster." + testZone)
+	soa.Serial = 1
+	soa.Refresh = 3600
+	soa.Retry = 600
+	soa.Expire = 604800
+	soa.Minttl = 3600
+	soaSig := win([]dns.RR{soa}, childZSK)
+
+	ds := childKSK.key.ToDS(dns.SHA256)
+	cds := &dns.CDS{DS: *ds}
+	cdsSig := win([]dns.RR{cds}, childKSK)
+
+	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.key, childZSK.key, dnskeySig)
+		case "SOA":
+			return dnssecAnswer(testZone, dns.TypeSOA, soa, soaSig)
+		case "CDS":
+			return dnssecAnswer(testZone, dns.TypeCDS, cds, cdsSig)
+		}
+		return packet.Packet{}
+	}
+	parentHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dnssecAnswer(testZone, dns.TypeDS, ds, win([]dns.RR{ds}, childKSK))
+		}
+		return packet.Packet{}
+	}
+	childNS := hookedNS(t, ctx, "ns1."+testZone, "203.0.113.1", childHook)
+	parentNS := hookedNS(t, ctx, "ns1."+testParent, "192.0.2.1", parentHook)
+
+	warm(t, ctx, childNS, testZone, "DNSKEY")
+	warm(t, ctx, childNS, testZone, "SOA")
+	warm(t, ctx, childNS, testZone, "CDS")
+	warm(t, ctx, parentNS, testZone, "DS")
+
+	in := Input{
+		Zone:       dnsname.New(testZone),
+		ParentZone: dnsname.New(testParent),
+		ChildNS:    []nameserver.Nameserver{childNS},
+		ParentNS:   []nameserver.Nameserver{parentNS},
+		At:         fixedAt,
+	}
+	got := Extract(ctx, in)
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	if len(got.Child.Signed) != 2 {
+		t.Fatalf("expected 2 signed RRsets, got %d: %+v", len(got.Child.Signed), got.Child.Signed)
+	}
+	// SOA comes before CDS, matching the fixed display order.
+	if got.Child.Signed[0].Type != "SOA" || got.Child.Signed[1].Type != "CDS" {
+		t.Fatalf("unexpected signed order: %s, %s", got.Child.Signed[0].Type, got.Child.Signed[1].Type)
+	}
+	for _, s := range got.Child.Signed {
+		if len(s.RRSIG) != 1 || s.RRSIG[0].State != SigValid {
+			t.Errorf("%s: expected 1 valid RRSIG, got %+v", s.Type, s.RRSIG)
+		}
+	}
+}
+
 func TestExtractDigestMismatch(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	in := buildInput(t, ctx, fixtureOpts{badDigest: true})

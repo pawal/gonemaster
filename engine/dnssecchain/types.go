@@ -76,12 +76,19 @@ type Parent struct {
 
 // Child holds the DNSKEY and signature evidence from the tested zone's servers.
 type Child struct {
-	DNSKEYs              []DNSKEY `json:"dnskeys"`
-	DNSKEYRRSIG          []RRSIG  `json:"dnskey_rrsig"`
-	SOARRSIG             []RRSIG  `json:"soa_rrsig"`
-	ServersQueried       []string `json:"servers_queried"`
-	ServersWithoutDNSKEY []string `json:"servers_without_dnskey"`
-	ServersDisagreeing   []string `json:"servers_disagreeing"`
+	DNSKEYs              []DNSKEY      `json:"dnskeys"`
+	DNSKEYRRSIG          []RRSIG       `json:"dnskey_rrsig"`
+	Signed               []SignedRRset `json:"signed"`
+	ServersQueried       []string      `json:"servers_queried"`
+	ServersWithoutDNSKEY []string      `json:"servers_without_dnskey"`
+	ServersDisagreeing   []string      `json:"servers_disagreeing"`
+}
+
+// SignedRRset is one apex RRset the zone publishes together with the signatures
+// covering it (for example SOA, NSEC3PARAM, CDS, CDNSKEY).
+type SignedRRset struct {
+	Type  string  `json:"type"`
+	RRSIG []RRSIG `json:"rrsig"`
 }
 
 // DS is one delegation-signer record in the union across parent servers.

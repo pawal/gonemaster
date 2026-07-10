@@ -69,6 +69,7 @@ func Extract(ctx context.Context, in Input) *Summary {
 		dsIndex:   map[string]int{},
 		keyIndex:  map[string]int{},
 		childKeys: map[uint16]*dns.DNSKEY{},
+		signed:    map[string][]RRSIG{},
 	}
 
 	e.extractParent(cctx, in)
@@ -92,6 +93,7 @@ type extractor struct {
 	dsIndex   map[string]int         // DS identity -> index into summary.Parent.DS
 	keyIndex  map[string]int         // DNSKEY identity -> index into summary.Child.DNSKEYs
 	childKeys map[uint16]*dns.DNSKEY // keytag -> key object, for digest comparison
+	signed    map[string][]RRSIG     // RRset type -> covering signatures
 }
 
 // cacheOnlyContext clones the profile with NoNetwork set and swaps in a fresh
@@ -200,17 +202,47 @@ func (e *extractor) extractChild(ctx context.Context, in Input) {
 			e.addRRSIG(&e.summary.Child.DNSKEYRRSIG, sig, state, ip)
 		}
 
-		// SOA signatures are best-effort: only present when a testcase cached a
-		// SOA query with the DO bit for this server.
-		if soaResp, ok := query(ctx, ns, zoneName, "SOA"); ok && validDNSSECAnswer(soaResp) {
-			soaRRset := recordsOfType(soaResp, e.zone, dns.TypeSOA)
-			for _, sig := range coveringRRSIG(soaResp, dns.TypeSOA, zoneName) {
-				state := sigState(sig, soaRRset, keyRRs, e.at)
-				e.addRRSIG(&e.summary.Child.SOARRSIG, sig, state, ip)
+		// Apex zone-data signatures cached with the DO bit by a testcase.
+		for _, zt := range zoneDataTypes {
+			zresp, ok := query(ctx, ns, zoneName, zt.name)
+			if !ok || !validDNSSECAnswer(zresp) {
+				continue
+			}
+			rrset := recordsOfType(zresp, e.zone, zt.rrtype)
+			for _, sig := range coveringRRSIG(zresp, zt.rrtype, zoneName) {
+				state := sigState(sig, rrset, keyRRs, e.at)
+				e.addSignedRRSIG(zt.name, sig, state, ip)
 			}
 		}
 	}
 	e.summary.Child.ServersDisagreeing = disagreeing(sigByIP)
+	e.buildSigned()
+}
+
+// zoneDataTypes are apex RRsets, in display order, whose signatures the run
+// already cached with the DO bit.
+var zoneDataTypes = []struct {
+	name   string
+	rrtype uint16
+}{
+	{"SOA", dns.TypeSOA},
+	{"NSEC3PARAM", dns.TypeNSEC3PARAM},
+	{"CDS", dns.TypeCDS},
+	{"CDNSKEY", dns.TypeCDNSKEY},
+}
+
+func (e *extractor) addSignedRRSIG(rrtype string, sig *dns.RRSIG, state, server string) {
+	dst := e.signed[rrtype]
+	mergeRRSIG(&dst, sig, state, server)
+	e.signed[rrtype] = dst
+}
+
+func (e *extractor) buildSigned() {
+	for _, zt := range zoneDataTypes {
+		if sigs := e.signed[zt.name]; len(sigs) > 0 {
+			e.summary.Child.Signed = append(e.summary.Child.Signed, SignedRRset{Type: zt.name, RRSIG: sigs})
+		}
+	}
 }
 
 func (e *extractor) hasEvidence() bool {
@@ -354,6 +386,12 @@ func (e *extractor) addDNSKEY(key *dns.DNSKEY, server string) {
 }
 
 func (e *extractor) addRRSIG(dst *[]RRSIG, sig *dns.RRSIG, state string, server string) {
+	mergeRRSIG(dst, sig, state, server)
+}
+
+// mergeRRSIG appends sig to dst, merging servers when the same signature was
+// already seen and preferring the valid state.
+func mergeRRSIG(dst *[]RRSIG, sig *dns.RRSIG, state string, server string) {
 	if sig == nil {
 		return
 	}
@@ -415,7 +453,9 @@ func (e *extractor) finalize() {
 	})
 	sortRRSIG(p.DSRRSIG)
 	sortRRSIG(c.DNSKEYRRSIG)
-	sortRRSIG(c.SOARRSIG)
+	for i := range c.Signed {
+		sortRRSIG(c.Signed[i].RRSIG)
+	}
 	sort.Slice(e.summary.Links, func(i, j int) bool {
 		if e.summary.Links[i].DSKeyTag != e.summary.Links[j].DSKeyTag {
 			return e.summary.Links[i].DSKeyTag < e.summary.Links[j].DSKeyTag
@@ -434,7 +474,9 @@ func (e *extractor) finalize() {
 	}
 	finalizeRRSIGServers(p.DSRRSIG)
 	finalizeRRSIGServers(c.DNSKEYRRSIG)
-	finalizeRRSIGServers(c.SOARRSIG)
+	for i := range c.Signed {
+		finalizeRRSIGServers(c.Signed[i].RRSIG)
+	}
 
 	e.applyCaps()
 	e.ensureNonNil()
@@ -460,8 +502,8 @@ func (e *extractor) ensureNonNil() {
 	if c.DNSKEYRRSIG == nil {
 		c.DNSKEYRRSIG = []RRSIG{}
 	}
-	if c.SOARRSIG == nil {
-		c.SOARRSIG = []RRSIG{}
+	if c.Signed == nil {
+		c.Signed = []SignedRRset{}
 	}
 	c.ServersQueried = orEmpty(c.ServersQueried)
 	c.ServersWithoutDNSKEY = orEmpty(c.ServersWithoutDNSKEY)
@@ -486,7 +528,9 @@ func (e *extractor) applyCaps() {
 	c.DNSKEYs, trunc = capSlice(c.DNSKEYs, maxDNSKEY, trunc)
 	p.DSRRSIG, trunc = capSlice(p.DSRRSIG, maxRRSIG, trunc)
 	c.DNSKEYRRSIG, trunc = capSlice(c.DNSKEYRRSIG, maxRRSIG, trunc)
-	c.SOARRSIG, trunc = capSlice(c.SOARRSIG, maxRRSIG, trunc)
+	for i := range c.Signed {
+		c.Signed[i].RRSIG, trunc = capSlice(c.Signed[i].RRSIG, maxRRSIG, trunc)
+	}
 	e.summary.Links, trunc = capSlice(e.summary.Links, maxLinks, trunc)
 
 	p.ServersQueried, trunc = capSlice(p.ServersQueried, maxServers, trunc)

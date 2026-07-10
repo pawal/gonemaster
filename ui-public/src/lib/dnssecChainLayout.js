@@ -1,11 +1,5 @@
-// Pure layout for the DNSSEC chain-of-trust graph. Given a chain summary it
-// returns geometry ({width, height, clusters, nodes, edges}) with no DOM
-// dependency, so it is fully unit-testable. The component renders the geometry
-// as SVG; all coordinates are plain numbers used as SVG attributes.
-//
-// The model follows the DNSViz convention: a key that signs the DNSKEY RRset
-// self-signs (a loop) and vouches for the other keys in the set, so KSKs sit in
-// a row above the ZSKs with downward "signs" edges; ZSKs then sign zone data.
+// Pure layout for the DNSSEC chain graph: chain summary in, SVG geometry out.
+// A key signing the DNSKEY RRset self-loops and vouches for the keys below it.
 
 const NODE_W = 132;
 const NODE_H = 52;
@@ -20,7 +14,7 @@ const REF_BOW = 46; // sideways bow of a CDS/CDNSKEY reference edge
 const ALGO = {
   1: "RSAMD5", 3: "DSA", 5: "RSASHA1", 6: "DSA-NSEC3-SHA1", 7: "RSASHA1-NSEC3-SHA1",
   8: "RSASHA256", 10: "RSASHA512", 12: "ECC-GOST", 13: "ECDSAP256SHA256",
-  14: "ECDSAP384SHA384", 15: "ED25519", 16: "ED448",
+  14: "ECDSAP384SHA384", 15: "ED25519", 16: "ED448", 17: "SM2SM3", 23: "ECC-GOST12",
 };
 
 function algoLabel(algo) {
@@ -28,7 +22,7 @@ function algoLabel(algo) {
   return m ? `${m} (alg ${algo})` : `alg ${algo}`;
 }
 
-const DIGEST = { 1: "SHA-1", 2: "SHA-256", 3: "GOST R 34.11-94", 4: "SHA-384" };
+const DIGEST = { 1: "SHA-1", 2: "SHA-256", 3: "GOST R 34.11-94", 4: "SHA-384", 5: "GOST R 34.11-2012", 6: "SM3" };
 
 function digestLabel(dt) {
   const m = DIGEST[dt];
@@ -142,16 +136,17 @@ export function layoutChain(chain) {
     for (const ds of dsList) {
       const input = dsSource === "input";
       dsNodes.push({
-        id: `ds-${ds.key_tag}`,
+        id: `ds-${ds.key_tag}-${ds.digest_type ?? 0}`,
         kind: input ? "ds-input" : "ds",
         keyTag: ds.key_tag,
+        digestType: ds.digest_type ?? 0,
         titleText: joinLines([
           `DS · key tag ${ds.key_tag}${input ? " (test input)" : ""}`,
           `Algorithm: ${algoLabel(ds.algorithm)}`,
           `Digest type: ${digestLabel(ds.digest_type)}`,
           ds.digest ? `Digest: ${shortHex(ds.digest)}` : null,
           ...dsSigLines,
-          serversLine(ds.servers),
+          input ? null : serversLine(ds.servers),
         ]),
       });
     }
@@ -238,18 +233,28 @@ export function layoutChain(chain) {
 
   const edges = [];
 
-  // DS -> DNSKEY edges from the computed links.
+  // DS -> DNSKEY edges from the computed links. Older blobs lack
+  // ds_digest_type; fall back to the first DS node with the key tag.
   for (const link of links) {
-    const from = byId.get(`ds-${link.ds_key_tag}`);
+    const from =
+      byId.get(`ds-${link.ds_key_tag}-${link.ds_digest_type ?? 0}`) ??
+      dsNodes.find((n) => n.keyTag === link.ds_key_tag);
     if (!from) continue;
     const toId = link.status === "no_dnskey" && byId.has("key-ghost") ? "key-ghost" : `key-${link.dnskey_key_tag}`;
     const to = byId.get(toId);
-    if (!to) continue;
+    if (!to) {
+      // A stale DS names a retired key while other keys exist: no target node
+      // to draw to, so mark the DS node itself as broken.
+      if (link.status === "no_dnskey") {
+        from.unmatched = true;
+        from.titleText += `\nNo DNSKEY with tag ${link.ds_key_tag}`;
+      }
+      continue;
+    }
     edges.push({
-      id: `link-${link.ds_key_tag}-${link.dnskey_key_tag ?? "none"}`,
+      id: `link-${link.ds_key_tag}-${link.ds_digest_type ?? 0}-${link.dnskey_key_tag ?? "none"}`,
       kind: "ds",
       status: link.status,
-      dsKeyTag: link.ds_key_tag,
       dnskeyKeyTag: link.dnskey_key_tag,
       title: joinLines([
         `DS ${link.ds_key_tag} -> DNSKEY ${link.dnskey_key_tag ?? "?"}`,
@@ -262,16 +267,15 @@ export function layoutChain(chain) {
   }
 
   // Keys that sign the DNSKEY RRset self-loop and vouch for lower-row keys.
+  // Edge ids carry the inception: one key can serve overlapping signatures.
   for (const sig of dnskeySigs) {
     const signer = byId.get(`key-${sig.key_tag}`);
     if (!signer) continue;
     edges.push({
-      id: `self-${sig.key_tag}`,
+      id: `self-${sig.key_tag}-${sig.inception ?? 0}`,
       kind: "selfsig",
       status: sig.state,
       keyTag: sig.key_tag,
-      inception: sig.inception,
-      expiration: sig.expiration,
       title: sigTitle("RRSIG over DNSKEY RRset", sig),
       d: selfLoopPath(signer),
     });
@@ -279,13 +283,11 @@ export function layoutChain(chain) {
       if ((target.kind !== "ksk" && target.kind !== "zsk") || target.id === signer.id) continue;
       if (target.rowIndex <= signer.rowIndex) continue;
       edges.push({
-        id: `keysig-${sig.key_tag}-${target.keyTag}`,
+        id: `keysig-${sig.key_tag}-${sig.inception ?? 0}-${target.keyTag}`,
         kind: "keysig",
         status: sig.state,
         keyTag: sig.key_tag,
         targetTag: target.keyTag,
-        inception: sig.inception,
-        expiration: sig.expiration,
         title: sigTitle(`RRSIG over DNSKEY RRset (covers key ${target.keyTag})`, sig),
         from: edgePoint(signer, "bottom"),
         to: edgePoint(target, "top"),
@@ -301,13 +303,10 @@ export function layoutChain(chain) {
       const from = byId.get(`key-${sig.key_tag}`);
       if (!from) continue;
       edges.push({
-        id: `sig-${entry.type}-${sig.key_tag}`,
+        id: `sig-${entry.type}-${sig.key_tag}-${sig.inception ?? 0}`,
         kind: "sig",
         status: sig.state,
         keyTag: sig.key_tag,
-        rrset: entry.type,
-        inception: sig.inception,
-        expiration: sig.expiration,
         title: sigTitle(`RRSIG over ${entry.type} RRset`, sig),
         from: edgePoint(from, "bottom"),
         to: edgePoint(to, "top"),

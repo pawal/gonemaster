@@ -165,9 +165,10 @@ describe("layoutChain", () => {
     const g = layoutChain(chain);
     expect(g.nodes.some((n) => n.id === "rrset-SOA" && n.label === "SOA")).toBe(true);
     expect(g.nodes.some((n) => n.id === "rrset-CDS" && n.label === "CDS")).toBe(true);
-    // ZSK signs SOA, KSK signs CDS.
-    expect(g.edges.some((e) => e.id === "sig-SOA-2000")).toBe(true);
-    expect(g.edges.some((e) => e.id === "sig-CDS-1000")).toBe(true);
+    // ZSK signs SOA, KSK signs CDS. Edge ids end with the inception (0 when
+    // the fixture sets none) so overlapping signatures stay distinct.
+    expect(g.edges.some((e) => e.id === "sig-SOA-2000-0")).toBe(true);
+    expect(g.edges.some((e) => e.id === "sig-CDS-1000-0")).toBe(true);
     // CDS names the KSK (key tag 1000): a grey reference edge points to it,
     // drawn as a bowed path so it clears the signature edge.
     const ref = g.edges.find((e) => e.kind === "ref" && e.id === "ref-CDS-1000");
@@ -208,6 +209,72 @@ describe("layoutChain", () => {
       },
     });
     const g = layoutChain(chain);
-    expect(g.nodes.some((n) => n.kind === "ds-input")).toBe(true);
+    const input = g.nodes.find((n) => n.kind === "ds-input");
+    expect(input).toBeTruthy();
+    // The "-" placeholder for input DS must not render as a servers line.
+    expect(input.titleText.includes("Servers:")).toBe(false);
+  });
+
+  it("keeps dual-digest DS records for one key tag as distinct nodes and edges", () => {
+    // A parent commonly publishes SHA-256 and SHA-384 DS records for the same
+    // KSK. Both must get unique node and edge ids or Svelte's keyed each
+    // blocks throw on duplicates and the graph fails to render.
+    const chain = secureChain();
+    chain.parent.ds = [
+      { key_tag: 1000, algorithm: 13, digest_type: 2, digest: "ab", servers: ["192.0.2.1"] },
+      { key_tag: 1000, algorithm: 13, digest_type: 4, digest: "cd", servers: ["192.0.2.1"] },
+    ];
+    chain.links = [
+      { ds_key_tag: 1000, ds_digest_type: 2, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] },
+      { ds_key_tag: 1000, ds_digest_type: 4, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] },
+    ];
+    const g = layoutChain(chain);
+    const dsNodes = g.nodes.filter((n) => n.kind === "ds");
+    expect(dsNodes).toHaveLength(2);
+    const dsEdges = g.edges.filter((e) => e.kind === "ds");
+    expect(dsEdges).toHaveLength(2);
+    const nodeIds = new Set(g.nodes.map((n) => n.id));
+    const edgeIds = new Set(g.edges.map((e) => e.id));
+    expect(nodeIds.size).toBe(g.nodes.length);
+    expect(edgeIds.size).toBe(g.edges.length);
+    // Each edge starts at its own DS node, not both at the first one.
+    expect(dsEdges[0].from.x).not.toBe(dsEdges[1].from.x);
+  });
+
+  it("keeps overlapping signatures by the same key as distinct edges", () => {
+    // During re-signing a zone serves two RRSIGs by the same key with
+    // different validity windows; their edges need unique ids.
+    const chain = secureChain();
+    chain.child.dnskey_rrsig = [
+      { key_tag: 1000, algorithm: 13, state: "valid", inception: 100, expiration: 200, servers: ["203.0.113.1"] },
+      { key_tag: 1000, algorithm: 13, state: "expired", inception: 1, expiration: 99, servers: ["203.0.113.1"] },
+    ];
+    const g = layoutChain(chain);
+    const selfLoops = g.edges.filter((e) => e.kind === "selfsig");
+    expect(selfLoops).toHaveLength(2);
+    const edgeIds = new Set(g.edges.map((e) => e.id));
+    expect(edgeIds.size).toBe(g.edges.length);
+  });
+
+  it("marks a DS naming a retired key when other keys exist", () => {
+    // Stale DS after a rollover: no target node exists for the broken link,
+    // so the DS node itself must show the failure instead of dropping it.
+    const chain = secureChain();
+    chain.links = [{ ds_key_tag: 1000, ds_digest_type: 2, status: "no_dnskey", servers: ["192.0.2.1"] }];
+    chain.child.dnskeys = [{ key_tag: 2000, algorithm: 13, flags: 256, sep: false, servers: ["203.0.113.1"] }];
+    const g = layoutChain(chain);
+    const ds = g.nodes.find((n) => n.kind === "ds");
+    expect(ds.unmatched).toBe(true);
+    expect(ds.titleText).toContain("No DNSKEY with tag 1000");
+    expect(g.edges.some((e) => e.kind === "ds")).toBe(false);
+  });
+
+  it("resolves links without ds_digest_type to the DS node by key tag", () => {
+    // Blobs stored before links carried ds_digest_type still draw their edge.
+    const chain = secureChain();
+    const g = layoutChain(chain);
+    const dsEdge = g.edges.find((e) => e.kind === "ds");
+    expect(dsEdge).toBeTruthy();
+    expect(dsEdge.status).toBe("match");
   });
 });

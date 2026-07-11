@@ -420,6 +420,38 @@ describe("layoutChain", () => {
     expect(g.nodes.some((n) => n.kind === "key-phantom")).toBe(false);
   });
 
+  it("orders the key row by key tag so DS edges do not cross the phantom", () => {
+    // A DS for the absent key 11155 (phantom) and a DS for the present KSK
+    // 34586. The key row must be [11155, 34586] to match the DS row order, so
+    // the two DS edges stay parallel.
+    const chain = secureChain();
+    chain.parent.ds = [
+      { key_tag: 11155, algorithm: 8, digest_type: 2, digest: "ab", servers: ["192.0.2.1"] },
+      { key_tag: 34586, algorithm: 8, digest_type: 2, digest: "cd", servers: ["192.0.2.1"] },
+    ];
+    chain.child.dnskeys = [
+      { key_tag: 34586, algorithm: 8, flags: 257, sep: true, anchored: true, servers: ["203.0.113.1"] },
+      { key_tag: 10194, algorithm: 8, flags: 256, sep: false, servers: ["203.0.113.1"] },
+    ];
+    chain.links = [
+      { ds_key_tag: 11155, ds_digest_type: 2, status: "no_dnskey", servers: ["192.0.2.1"] },
+      { ds_key_tag: 34586, ds_digest_type: 2, dnskey_key_tag: 34586, status: "match", servers: ["203.0.113.1"] },
+    ];
+    const g = layoutChain(chain);
+    const phantom = g.nodes.find((n) => n.id === "key-11155");
+    const realKsk = g.nodes.find((n) => n.id === "key-34586");
+    // Lower key tag sits to the left, matching the DS row order.
+    expect(phantom.x).toBeLessThan(realKsk.x);
+    const dsLow = g.nodes.find((n) => n.id === "ds-11155-2");
+    const dsHigh = g.nodes.find((n) => n.id === "ds-34586-2");
+    expect(dsLow.x).toBeLessThan(dsHigh.x);
+    // Both DS edges run left-to-left and right-to-right (no crossing).
+    const edges = g.edges.filter((e) => e.kind === "ds");
+    const eLow = edges.find((e) => Math.round(e.from.x) === Math.round(dsLow.x + dsLow.w / 2));
+    const eHigh = edges.find((e) => Math.round(e.from.x) === Math.round(dsHigh.x + dsHigh.w / 2));
+    expect(eLow.to.x).toBeLessThan(eHigh.to.x);
+  });
+
   it("resolves links without ds_digest_type to the DS node by key tag", () => {
     // Blobs stored before links carried ds_digest_type still draw their edge.
     const chain = secureChain();

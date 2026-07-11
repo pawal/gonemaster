@@ -243,9 +243,12 @@ export function layoutChain(chain) {
     }
   }
   if (keys.length > 0) {
-    for (const tag of [...phantomTags].sort((a, b) => a - b)) {
+    for (const tag of phantomTags) {
       kskNodes.push({ id: `key-${tag}`, kind: "key-phantom", keyTag: tag, tip: [{ k: "pub.dnssec_chain_tip_phantom_key", p: { tag } }] });
     }
+    // Order the KSK row by key tag so it matches the key-tag-ordered DS row and
+    // the DS -> key edges stay parallel instead of crossing.
+    kskNodes.sort((a, b) => a.keyTag - b.keyTag);
   }
 
   // Assemble the visible rows top to bottom, tagging which carries a label.

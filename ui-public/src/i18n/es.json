@@ -82,6 +82,7 @@
   "pub.dnssec_chain_keys_label": "Claves de la zona",
   "pub.dnssec_chain_signed_label": "Registros firmados",
   "pub.dnssec_chain_provided_ds": "DS proporcionado como entrada de prueba (prueba no delegada)",
+  "pub.dnssec_chain_truncated": "Se omitieron algunos registros para mantener esta vista compacta.",
   "pub.dnssec_chain_legend_ksk": "KSK - clave de firma de claves",
   "pub.dnssec_chain_legend_zsk": "ZSK - clave de firma de zona",
   "pub.dnssec_chain_legend_ds": "DS - registro Delegation Signer en la zona padre",

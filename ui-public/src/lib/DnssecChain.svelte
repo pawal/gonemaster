@@ -77,6 +77,7 @@
 
   // status is the roll-up shown as a heading badge and the first facts line.
   let status = $derived(phase === "loaded" && chain?.status ? chain.status : "");
+  let truncated = $derived(!!chain?.truncated);
 
   // Custom hover tooltip: the native SVG <title> has a browser-controlled
   // delay; this one appears immediately and is positioned via the JS DOM API.
@@ -200,6 +201,9 @@
         {/if}
         {#if providedDS}
           <p class="dnssec-chain-callout callout-info" data-testid="chain-provided-ds">{$t("pub.dnssec_chain_provided_ds")}</p>
+        {/if}
+        {#if truncated}
+          <p class="dnssec-chain-callout callout-info" data-testid="chain-truncated">{$t("pub.dnssec_chain_truncated")}</p>
         {/if}
 
         <div class="chain-scroll">

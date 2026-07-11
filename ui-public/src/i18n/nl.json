@@ -82,6 +82,7 @@
   "pub.dnssec_chain_keys_label": "Zonesleutels",
   "pub.dnssec_chain_signed_label": "Ondertekende records",
   "pub.dnssec_chain_provided_ds": "DS opgegeven als testinvoer (niet-gedelegeerde test)",
+  "pub.dnssec_chain_truncated": "Sommige records zijn weggelaten om deze weergave compact te houden.",
   "pub.dnssec_chain_legend_ksk": "KSK - sleutelondertekeningssleutel",
   "pub.dnssec_chain_legend_zsk": "ZSK - zoneondertekeningssleutel",
   "pub.dnssec_chain_legend_ds": "DS - Delegation Signer-record bij de bovenliggende zone",

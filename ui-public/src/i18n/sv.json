@@ -82,6 +82,7 @@
   "pub.dnssec_chain_keys_label": "Zonnycklar",
   "pub.dnssec_chain_signed_label": "Signerade poster",
   "pub.dnssec_chain_provided_ds": "DS angiven som testindata (odelegerat test)",
+  "pub.dnssec_chain_truncated": "Vissa poster utelämnades för att hålla vyn kompakt.",
   "pub.dnssec_chain_legend_ksk": "KSK - nyckelsigneringsnyckel",
   "pub.dnssec_chain_legend_zsk": "ZSK - zonsigneringsnyckel",
   "pub.dnssec_chain_legend_ds": "DS - delegeringssignerarpost hos föräldern",

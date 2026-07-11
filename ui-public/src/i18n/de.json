@@ -82,6 +82,7 @@
   "pub.dnssec_chain_keys_label": "Zonenschlüssel",
   "pub.dnssec_chain_signed_label": "Signierte Records",
   "pub.dnssec_chain_provided_ds": "DS als Testeingabe angegeben (undelegierter Test)",
+  "pub.dnssec_chain_truncated": "Einige Records wurden weggelassen, um diese Ansicht kompakt zu halten.",
   "pub.dnssec_chain_legend_ksk": "KSK - Schlüssel-Signierschlüssel",
   "pub.dnssec_chain_legend_zsk": "ZSK - Zonen-Signierschlüssel",
   "pub.dnssec_chain_legend_ds": "DS - Delegation-Signer-Record bei der übergeordneten Zone",

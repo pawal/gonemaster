@@ -264,6 +264,25 @@ describe("DnssecChain", () => {
     expect(badge.classList.contains("badge-neutral")).toBe(true);
   });
 
+  it("shows a truncation callout when the summary was capped", async () => {
+    const chain = secureChain();
+    chain.truncated = true;
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-truncated")).toBeTruthy());
+  });
+
+  it("omits the truncation callout when nothing was capped", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.queryByTestId("chain-truncated")).toBeNull();
+  });
+
   it("marks a revoked key on the node, legend, and facts", async () => {
     const chain = secureChain();
     chain.child.dnskeys[0].revoked = true;

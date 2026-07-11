@@ -82,6 +82,7 @@
   "pub.dnssec_chain_keys_label": "Klíče zóny",
   "pub.dnssec_chain_signed_label": "Podepsané záznamy",
   "pub.dnssec_chain_provided_ds": "DS zadán jako testovací vstup (nedelegovaný test)",
+  "pub.dnssec_chain_truncated": "Některé záznamy byly vynechány, aby zůstal tento pohled kompaktní.",
   "pub.dnssec_chain_legend_ksk": "KSK - klíč pro podepisování klíčů",
   "pub.dnssec_chain_legend_zsk": "ZSK - klíč pro podepisování zóny",
   "pub.dnssec_chain_legend_ds": "DS - záznam Delegation Signer u nadřazené zóny",

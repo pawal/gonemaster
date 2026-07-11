@@ -82,6 +82,7 @@
   "pub.dnssec_chain_keys_label": "Sonenøkler",
   "pub.dnssec_chain_signed_label": "Signerte poster",
   "pub.dnssec_chain_provided_ds": "DS angitt som testinndata (udelegert test)",
+  "pub.dnssec_chain_truncated": "Noen records ble utelatt for å holde denne visningen kompakt.",
   "pub.dnssec_chain_legend_ksk": "KSK - nøkkelsigneringsnøkkel",
   "pub.dnssec_chain_legend_zsk": "ZSK - sonesigneringsnøkkel",
   "pub.dnssec_chain_legend_ds": "DS - Delegation Signer-post hos forelderen",

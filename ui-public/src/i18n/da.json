@@ -82,6 +82,7 @@
   "pub.dnssec_chain_keys_label": "Zonenøgler",
   "pub.dnssec_chain_signed_label": "Signerede poster",
   "pub.dnssec_chain_provided_ds": "DS angivet som testinput (udelegeret test)",
+  "pub.dnssec_chain_truncated": "Nogle records blev udeladt for at holde denne visning kompakt.",
   "pub.dnssec_chain_legend_ksk": "KSK - nøglesigneringsnøgle",
   "pub.dnssec_chain_legend_zsk": "ZSK - zonesigneringsnøgle",
   "pub.dnssec_chain_legend_ds": "DS - delegeringssigneringspost hos forælderen",

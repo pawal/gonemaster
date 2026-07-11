@@ -82,6 +82,7 @@
   "pub.dnssec_chain_keys_label": "Zone keys",
   "pub.dnssec_chain_signed_label": "Signed records",
   "pub.dnssec_chain_provided_ds": "DS provided as test input (undelegated test)",
+  "pub.dnssec_chain_truncated": "Some records were omitted to keep this view compact.",
   "pub.dnssec_chain_legend_ksk": "KSK - key-signing key",
   "pub.dnssec_chain_legend_zsk": "ZSK - zone-signing key",
   "pub.dnssec_chain_legend_ds": "DS - delegation signer record at the parent",

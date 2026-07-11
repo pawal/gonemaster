@@ -82,6 +82,7 @@
   "pub.dnssec_chain_keys_label": "Ključi cone",
   "pub.dnssec_chain_signed_label": "Podpisani zapisi",
   "pub.dnssec_chain_provided_ds": "DS podan kot testni vhod (nedelegiran test)",
+  "pub.dnssec_chain_truncated": "Nekateri zapisi so bili izpuščeni, da ostane ta pogled kompakten.",
   "pub.dnssec_chain_legend_ksk": "KSK - ključ za podpisovanje ključev",
   "pub.dnssec_chain_legend_zsk": "ZSK - ključ za podpisovanje cone",
   "pub.dnssec_chain_legend_ds": "DS - zapis Delegation Signer pri nadrejeni coni",

@@ -79,6 +79,7 @@ func Extract(ctx context.Context, in Input) *Summary {
 	}
 
 	e.buildLinks()
+	e.markAnchoredKeys()
 	e.finalize()
 	e.summary.Status = e.rollup()
 	return e.summary
@@ -370,6 +371,21 @@ func (e *extractor) rollup() string {
 			return StatusSecure
 		}
 		return StatusBroken
+	}
+}
+
+// markAnchoredKeys flags each DNSKEY a matching DS names.
+func (e *extractor) markAnchoredKeys() {
+	matched := map[uint16]bool{}
+	for _, l := range e.summary.Links {
+		if l.Status == LinkMatch {
+			matched[l.DNSKEYKeyTag] = true
+		}
+	}
+	for i := range e.summary.Child.DNSKEYs {
+		if matched[e.summary.Child.DNSKEYs[i].KeyTag] {
+			e.summary.Child.DNSKEYs[i].Anchored = true
+		}
 	}
 }
 

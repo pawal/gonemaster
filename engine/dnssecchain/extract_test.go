@@ -236,6 +236,9 @@ func TestExtractSecure(t *testing.T) {
 	if !ok || sig.State != SigValid {
 		t.Errorf("expected valid DNSKEY RRSIG for KSK, got %+v", sig)
 	}
+	if !ksk.Anchored {
+		t.Error("expected the DS-matched KSK to be anchored")
+	}
 	if len(got.Parent.DSRRSIG) != 1 || got.Parent.DSRRSIG[0].State != SigValid {
 		t.Errorf("expected 1 valid DS RRSIG, got %+v", got.Parent.DSRRSIG)
 	}
@@ -399,6 +402,64 @@ func TestExtractCDSRolloverSignaled(t *testing.T) {
 		if len(s.NewKeys) != 1 || s.NewKeys[0] != newKSK.key.KeyTag() {
 			t.Errorf("%s new_keys = %v, want [%d]", s.Type, s.NewKeys, newKSK.key.KeyTag())
 		}
+	}
+}
+
+func TestExtractAnchoredMarksOnlyDSMatchedKSK(t *testing.T) {
+	// A double-signature KSK rollover: two KSKs both sign the DNSKEY RRset, but
+	// the parent DS anchors only one. Only that KSK must be flagged anchored;
+	// the incoming KSK is left unanchored.
+	ctx, _, _ := testhelpers.Context(t)
+
+	anchoredKSK := genKey(t, testZone, true)
+	incomingKSK := genKey(t, testZone, true)
+	zsk := genKey(t, testZone, false)
+	dnskeyRRset := []dns.RR{anchoredKSK.key, incomingKSK.key, zsk.key}
+	win := func(rr []dns.RR, signer keypair) *dns.RRSIG {
+		return signRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	}
+	// Both KSKs sign the DNSKEY RRset (double-signature phase).
+	sigAnchored := win(dnskeyRRset, anchoredKSK)
+	sigIncoming := win(dnskeyRRset, incomingKSK)
+
+	ds := anchoredKSK.key.ToDS(dns.SHA256)
+	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DNSKEY" {
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, anchoredKSK.key, incomingKSK.key, zsk.key, sigAnchored, sigIncoming)
+		}
+		return packet.Packet{}
+	}
+	parentHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dnssecAnswer(testZone, dns.TypeDS, ds, win([]dns.RR{ds}, anchoredKSK))
+		}
+		return packet.Packet{}
+	}
+	childNS := hookedNS(t, ctx, "ns1."+testZone, "203.0.113.1", childHook)
+	parentNS := hookedNS(t, ctx, "ns1."+testParent, "192.0.2.1", parentHook)
+
+	warm(t, ctx, childNS, testZone, "DNSKEY")
+	warm(t, ctx, parentNS, testZone, "DS")
+
+	got := Extract(ctx, Input{
+		Zone:       dnsname.New(testZone),
+		ParentZone: dnsname.New(testParent),
+		ChildNS:    []nameserver.Nameserver{childNS},
+		ParentNS:   []nameserver.Nameserver{parentNS},
+		At:         fixedAt,
+	})
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	for _, k := range got.Child.DNSKEYs {
+		want := k.KeyTag == anchoredKSK.key.KeyTag()
+		if k.Anchored != want {
+			t.Errorf("key %d anchored = %v, want %v", k.KeyTag, k.Anchored, want)
+		}
+	}
+	// Both KSK signatures over the DNSKEY RRset are recorded and valid.
+	if len(got.Child.DNSKEYRRSIG) != 2 {
+		t.Fatalf("expected 2 DNSKEY RRSIGs, got %d", len(got.Child.DNSKEYRRSIG))
 	}
 }
 

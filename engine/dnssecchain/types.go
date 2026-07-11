@@ -109,7 +109,8 @@ type DS struct {
 }
 
 // DNSKEY is one public key in the union across child servers. Key material is
-// deliberately excluded; only derived properties are recorded.
+// deliberately excluded; only derived properties are recorded. Anchored is set
+// when a matching DS at the parent names this key.
 type DNSKEY struct {
 	KeyTag    uint16   `json:"key_tag"`
 	Algorithm uint8    `json:"algorithm"`
@@ -118,6 +119,7 @@ type DNSKEY struct {
 	ZoneKey   bool     `json:"zone_key"`
 	Revoked   bool     `json:"revoked"`
 	KeySize   int      `json:"key_size"`
+	Anchored  bool     `json:"anchored,omitempty"`
 	Servers   []string `json:"servers"`
 }
 

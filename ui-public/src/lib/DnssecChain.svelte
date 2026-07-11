@@ -93,9 +93,15 @@
   // status is the roll-up shown as a heading badge and the first facts line.
   let status = $derived(phase === "loaded" && chain?.status ? chain.status : "");
   let truncated = $derived(!!chain?.truncated);
-  // rolloverKeys: keys signaled by CDS/CDNSKEY that have no DS at the parent yet.
+  // rolloverKeys: keys not yet anchored by a DS - unanchored KSKs plus any
+  // CDS/CDNSKEY signals a new key. A rollover is only meaningful when some key
+  // is already anchored.
+  let anyAnchored = $derived((chain?.child?.dnskeys ?? []).some((k) => k.anchored));
   let rolloverKeys = $derived([
-    ...new Set((chain?.child?.signed ?? []).flatMap((s) => (s.ds_match === "rollover" ? s.new_keys ?? [] : []))),
+    ...new Set([
+      ...(anyAnchored ? (chain?.child?.dnskeys ?? []).filter((k) => k.sep && !k.anchored).map((k) => k.key_tag) : []),
+      ...(chain?.child?.signed ?? []).flatMap((s) => (s.ds_match === "rollover" ? s.new_keys ?? [] : [])),
+    ]),
   ]);
 
   // Custom hover tooltip: the native SVG <title> has a browser-controlled
@@ -164,6 +170,9 @@
   function edgeClass(edge) {
     if (edge.kind === "ref") {
       return edge.rollover ? "edge-ref-pending" : "edge-ref";
+    }
+    if (edge.incoming) {
+      return "edge-incoming";
     }
     if (edge.kind === "ds") {
       return edge.status === "match" ? "edge-ok" : "edge-bad";
@@ -290,7 +299,7 @@
 
             {#each graph.nodes as node (node.id)}
               {@const lines = nodeLines(node)}
-              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} class:node-rollover={node.rollover} data-tip={buildTip(node.tip)}>
+              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} class:node-rollover={node.rollover} class:node-incoming={node.incoming} data-tip={buildTip(node.tip)}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
                 <text class="chain-node-label chain-node-title" x={node.x + node.w / 2} y={node.y + 21} text-anchor="middle">{lines[0]}</text>
                 {#if lines[1]}
@@ -489,6 +498,10 @@
     stroke: var(--grade-c);
     stroke-width: 2;
   }
+  .node-incoming .chain-node-box {
+    stroke: var(--grade-c);
+    stroke-dasharray: 5 3;
+  }
   .chain-edge {
     stroke-width: 2;
     fill: none;
@@ -516,6 +529,13 @@
     stroke: var(--grade-c);
     stroke-width: 2;
     stroke-dasharray: 4 3;
+    fill: none;
+  }
+  .edge-incoming {
+    stroke: var(--ink-2);
+    stroke-width: 1.5;
+    stroke-dasharray: 3 3;
+    opacity: 0.45;
     fill: none;
   }
   .chain-legend {

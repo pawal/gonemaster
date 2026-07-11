@@ -281,6 +281,44 @@ describe("layoutChain", () => {
     expect(ds.dsSigTone).toBe("");
   });
 
+  it("marks an unanchored KSK incoming and de-emphasizes its edges", () => {
+    // Double-signature KSK rollover: KSK 1000 is anchored by a DS; KSK 3000
+    // signs the DNSKEY RRset but has no DS yet, so it is an incoming key.
+    const chain = secureChain();
+    chain.child.dnskeys = [
+      { key_tag: 1000, algorithm: 13, flags: 257, sep: true, anchored: true, servers: ["203.0.113.1"] },
+      { key_tag: 3000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] },
+      { key_tag: 2000, algorithm: 13, flags: 256, sep: false, servers: ["203.0.113.1"] },
+    ];
+    chain.child.dnskey_rrsig = [
+      { key_tag: 1000, algorithm: 13, state: "valid" },
+      { key_tag: 3000, algorithm: 13, state: "valid" },
+    ];
+    const g = layoutChain(chain);
+    const anchored = g.nodes.find((n) => n.id === "key-1000");
+    const incoming = g.nodes.find((n) => n.id === "key-3000");
+    expect(anchored.incoming).toBe(false);
+    expect(incoming.incoming).toBe(true);
+    // The incoming KSK's self-loop and vouching edges are flagged incoming.
+    const incomingEdges = g.edges.filter((e) => (e.kind === "selfsig" || e.kind === "keysig") && e.keyTag === 3000);
+    expect(incomingEdges.length).toBeGreaterThan(0);
+    expect(incomingEdges.every((e) => e.incoming === true)).toBe(true);
+    // The anchored KSK's edges are not.
+    const anchoredEdges = g.edges.filter((e) => (e.kind === "selfsig" || e.kind === "keysig") && e.keyTag === 1000);
+    expect(anchoredEdges.every((e) => e.incoming === false)).toBe(true);
+  });
+
+  it("does not mark a KSK incoming when no key is anchored", () => {
+    // With no anchored key at all the zone is broken/island, not rolling.
+    const chain = secureChain();
+    chain.child.dnskeys = [
+      { key_tag: 1000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] },
+      { key_tag: 2000, algorithm: 13, flags: 256, sep: false, servers: ["203.0.113.1"] },
+    ];
+    const g = layoutChain(chain);
+    expect(g.nodes.every((n) => !n.incoming)).toBe(true);
+  });
+
   it("flags revoked keys on their node", () => {
     const chain = secureChain();
     chain.child.dnskeys[0].revoked = true;

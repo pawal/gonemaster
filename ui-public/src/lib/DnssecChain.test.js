@@ -335,6 +335,43 @@ describe("DnssecChain", () => {
     expect(facts).toContain("expired");
   });
 
+  it("flags an unanchored KSK as a rollover, even without CDS/CDNSKEY", async () => {
+    // A double-signature KSK rollover managed with manual DS updates: KSK 1000
+    // is anchored, KSK 3000 signs but has no DS, and there are no CDS records.
+    const chain = secureChain();
+    chain.child.dnskeys = [
+      { key_tag: 1000, algorithm: 8, flags: 257, sep: true, anchored: true, key_size: 2048, servers: ["203.0.113.1"] },
+      { key_tag: 3000, algorithm: 8, flags: 257, sep: true, key_size: 2048, servers: ["203.0.113.1"] },
+      { key_tag: 2000, algorithm: 8, flags: 256, sep: false, servers: ["203.0.113.1"] },
+    ];
+    chain.child.dnskey_rrsig = [
+      { key_tag: 1000, algorithm: 8, state: "valid" },
+      { key_tag: 3000, algorithm: 8, state: "valid" },
+    ];
+    chain.child.signed = [];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-rollover")).toBeTruthy());
+    expect(screen.getByTestId("chain-rollover").textContent).toContain("3000");
+    // The incoming KSK node is marked and its edges de-emphasized.
+    expect(container.querySelector("g.node-incoming")).toBeTruthy();
+    expect(container.querySelector("path.edge-incoming")).toBeTruthy();
+  });
+
+  it("does not flag a rollover for a plain single-KSK secure zone", async () => {
+    const chain = secureChain();
+    chain.child.dnskeys[0].anchored = true;
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.queryByTestId("chain-rollover")).toBeNull();
+    expect(container.querySelector("g.node-incoming")).toBeNull();
+  });
+
   it("shows a rollover callout and marks the CDS node when CDS/CDNSKEY signal a key change", async () => {
     const chain = secureChain();
     chain.child.dnskeys.push({ key_tag: 3000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] });

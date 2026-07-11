@@ -175,11 +175,15 @@ export function layoutChain(chain) {
   }
 
   // Split DNSKEYs into KSK (SEP) and ZSK rows so signing edges read downward.
+  // An unanchored KSK is a rollover signal only when another KSK is anchored;
+  // with no anchored key at all the zone is broken or an island, not rolling.
+  const anyAnchored = keys.some((k) => k.anchored);
   const kskNodes = [];
   const zskNodes = [];
   for (const k of [...keys].sort((a, b) => a.key_tag - b.key_tag)) {
     const words = flagWords(k);
     const flagsText = words ? `${k.flags} (${words})` : `${k.flags}`;
+    const incoming = !!k.sep && !k.anchored && anyAnchored;
     const signsSet = dnskeySigs
       .filter((s) => s.key_tag === k.key_tag)
       .map((s) => sigLine("pub.dnssec_chain_tip_signs_set", s));
@@ -187,11 +191,13 @@ export function layoutChain(chain) {
       id: `key-${k.key_tag}`,
       keyTag: k.key_tag,
       revoked: !!k.revoked,
+      incoming,
       tip: [
         { k: "pub.dnssec_chain_tip_key", p: { role: k.sep ? "KSK" : "ZSK", tag: k.key_tag } },
         { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(k.algorithm) } },
         { k: "pub.dnssec_chain_tip_flags", p: { flags: flagsText } },
         k.key_size ? { k: "pub.dnssec_chain_tip_key_size", p: { bits: k.key_size } } : null,
+        incoming ? { k: "pub.dnssec_chain_tip_unanchored" } : null,
         ...signsSet,
         serversTip(k.servers),
       ].filter(Boolean),
@@ -297,11 +303,14 @@ export function layoutChain(chain) {
   for (const sig of dnskeySigs) {
     const signer = byId.get(`key-${sig.key_tag}`);
     if (!signer) continue;
+    // An unanchored KSK's signatures are valid but off the chain of trust.
+    const incoming = !!signer.incoming;
     edges.push({
       id: `self-${sig.key_tag}-${sig.inception ?? 0}`,
       kind: "selfsig",
       status: sig.state,
       keyTag: sig.key_tag,
+      incoming,
       tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey" }, sig),
       d: selfLoopPath(signer),
     });
@@ -314,6 +323,7 @@ export function layoutChain(chain) {
         status: sig.state,
         keyTag: sig.key_tag,
         targetTag: target.keyTag,
+        incoming,
         tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey_covers", p: { tag: target.keyTag } }, sig),
         from: edgePoint(signer, "bottom"),
         to: edgePoint(target, "top"),

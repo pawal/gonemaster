@@ -229,6 +229,25 @@ export function layoutChain(chain) {
     };
   });
 
+  // Phantom keys: a DS or CDS/CDNSKEY names a key tag that is absent from the
+  // DNSKEY RRset (an outgoing key already removed, or an incoming one not yet
+  // published). Draw a grey ghost so those edges have a target.
+  const keyTags = new Set(keys.map((k) => k.key_tag));
+  const phantomTags = new Set();
+  for (const l of links) {
+    if (l.status === "no_dnskey" && !keyTags.has(l.ds_key_tag)) phantomTags.add(l.ds_key_tag);
+  }
+  for (const s of signed) {
+    for (const t of s.refs ?? []) {
+      if (!keyTags.has(t)) phantomTags.add(t);
+    }
+  }
+  if (keys.length > 0) {
+    for (const tag of [...phantomTags].sort((a, b) => a - b)) {
+      kskNodes.push({ id: `key-${tag}`, kind: "key-phantom", keyTag: tag, tip: [{ k: "pub.dnssec_chain_tip_phantom_key", p: { tag } }] });
+    }
+  }
+
   // Assemble the visible rows top to bottom, tagging which carries a label.
   const rows = [{ label: "parent", nodes: dsNodes }];
   if (keys.length === 0) {
@@ -272,15 +291,18 @@ export function layoutChain(chain) {
       byId.get(`ds-${link.ds_key_tag}-${link.ds_digest_type ?? 0}`) ??
       dsNodes.find((n) => n.keyTag === link.ds_key_tag);
     if (!from) continue;
-    const toId = link.status === "no_dnskey" && byId.has("key-ghost") ? "key-ghost" : `key-${link.dnskey_key_tag}`;
+    let toId;
+    if (link.status === "no_dnskey") {
+      // Route to the phantom key the DS names, or the generic ghost when the
+      // zone serves no DNSKEY at all.
+      toId = byId.has(`key-${link.ds_key_tag}`) ? `key-${link.ds_key_tag}` : "key-ghost";
+    } else {
+      toId = `key-${link.dnskey_key_tag}`;
+    }
     const to = byId.get(toId);
     if (!to) {
-      // A stale DS names a retired key while other keys exist: no target node
-      // to draw to, so mark the DS node itself as broken.
-      if (link.status === "no_dnskey") {
-        from.unmatched = true;
-        from.tip.push({ k: "pub.dnssec_chain_tip_no_key_tag", p: { tag: link.ds_key_tag } });
-      }
+      from.unmatched = true;
+      from.tip.push({ k: "pub.dnssec_chain_tip_no_key_tag", p: { tag: link.ds_key_tag } });
       continue;
     }
     edges.push({

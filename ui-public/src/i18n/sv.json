@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "Signalerar nyckelbyte: {keys} saknas i förälderns DS",
   "pub.dnssec_chain_tip_ref_pending": "{type} namnger DNSKEY {tag} (ännu inte i förälderns DS)",
   "pub.dnssec_chain_tip_unanchored": "Ännu inte förankrad av en DS hos föräldern",
+  "pub.dnssec_chain_tip_phantom_key": "Refereras av DS eller CDS/CDNSKEY men finns inte i zonens DNSKEY-RRset",
   "pub.dnssec_chain_tip_no_key_tag": "Ingen DNSKEY med key tag {tag}",
   "pub.dnssec_chain_tip_no_ds": "Ingen DS hos föräldern",
   "pub.dnssec_chain_tip_no_dnskey": "Ingen DNSKEY i zonen",

@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "Signaleert sleutelwissel: {keys} niet in bovenliggende DS",
   "pub.dnssec_chain_tip_ref_pending": "{type} benoemt DNSKEY {tag} (nog niet in bovenliggende DS)",
   "pub.dnssec_chain_tip_unanchored": "Nog niet verankerd door een DS bij de bovenliggende zone",
+  "pub.dnssec_chain_tip_phantom_key": "Aangewezen door DS of CDS/CDNSKEY maar niet in de DNSKEY-RRset van de zone",
   "pub.dnssec_chain_tip_no_key_tag": "Geen DNSKEY met key tag {tag}",
   "pub.dnssec_chain_tip_no_ds": "Geen DS bij de bovenliggende zone",
   "pub.dnssec_chain_tip_no_dnskey": "Geen DNSKEY in de zone",

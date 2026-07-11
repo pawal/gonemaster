@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "Ilmoittaa avaimen vaihdosta: {keys} puuttuu vanhemman DS:stä",
   "pub.dnssec_chain_tip_ref_pending": "{type} nimeää DNSKEY {tag} (ei vielä vanhemman DS:ssä)",
   "pub.dnssec_chain_tip_unanchored": "Ei vielä ankkuroitu vanhemman DS-tietueeseen",
+  "pub.dnssec_chain_tip_phantom_key": "Viitattu DS- tai CDS/CDNSKEY-tietueesta mutta puuttuu vyöhykkeen DNSKEY-RRsetistä",
   "pub.dnssec_chain_tip_no_key_tag": "Ei DNSKEY:tä key tag {tag}",
   "pub.dnssec_chain_tip_no_ds": "Ei DS:ää vanhemmassa",
   "pub.dnssec_chain_tip_no_dnskey": "Ei DNSKEY:tä vyöhykkeessä",

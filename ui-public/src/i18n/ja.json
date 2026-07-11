@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "鍵の切り替えを通知: {keys} は親の DS にありません",
   "pub.dnssec_chain_tip_ref_pending": "{type} は DNSKEY {tag} を指定 (親の DS にまだない)",
   "pub.dnssec_chain_tip_unanchored": "親の DS によってまだ固定されていません",
+  "pub.dnssec_chain_tip_phantom_key": "DS または CDS/CDNSKEY から参照されているが、ゾーンの DNSKEY RRset にありません",
   "pub.dnssec_chain_tip_no_key_tag": "key tag {tag} の DNSKEY がありません",
   "pub.dnssec_chain_tip_no_ds": "親に DS がありません",
   "pub.dnssec_chain_tip_no_dnskey": "ゾーンに DNSKEY がありません",

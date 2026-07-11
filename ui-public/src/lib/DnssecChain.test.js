@@ -335,6 +335,28 @@ describe("DnssecChain", () => {
     expect(facts).toContain("expired");
   });
 
+  it("renders a phantom key node for a DS naming an absent key", async () => {
+    // A DS points to keytag 5000, which is not in the DNSKEY RRset. The graph
+    // draws a grey phantom key node so the broken DS edge has a target.
+    const chain = secureChain();
+    chain.parent.ds = [
+      { key_tag: 1000, algorithm: 13, digest_type: 2, digest: "ab", servers: ["192.0.2.1"] },
+      { key_tag: 5000, algorithm: 13, digest_type: 2, digest: "cd", servers: ["192.0.2.1"] },
+    ];
+    chain.links = [
+      { ds_key_tag: 1000, ds_digest_type: 2, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] },
+      { ds_key_tag: 5000, ds_digest_type: 2, status: "no_dnskey", servers: ["192.0.2.1"] },
+    ];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const phantom = container.querySelector("g.node-key-phantom");
+    expect(phantom).toBeTruthy();
+    expect(phantom.textContent).toContain("5000");
+  });
+
   it("flags an unanchored KSK as a rollover, even without CDS/CDNSKEY", async () => {
     // A double-signature KSK rollover managed with manual DS updates: KSK 1000
     // is anchored, KSK 3000 signs but has no DS, and there are no CDS records.

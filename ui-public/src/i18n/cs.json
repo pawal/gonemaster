@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "Signalizuje výměnu klíče: {keys} chybí v nadřazeném DS",
   "pub.dnssec_chain_tip_ref_pending": "{type} pojmenovává DNSKEY {tag} (dosud není v nadřazeném DS)",
   "pub.dnssec_chain_tip_unanchored": "Dosud neukotveno záznamem DS u nadřazené zóny",
+  "pub.dnssec_chain_tip_phantom_key": "Odkazováno záznamem DS nebo CDS/CDNSKEY, ale není v DNSKEY RRsetu zóny",
   "pub.dnssec_chain_tip_no_key_tag": "Žádný DNSKEY s key tag {tag}",
   "pub.dnssec_chain_tip_no_ds": "Žádné DS u nadřazené zóny",
   "pub.dnssec_chain_tip_no_dnskey": "Žádný DNSKEY v zóně",

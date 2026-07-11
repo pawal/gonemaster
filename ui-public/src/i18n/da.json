@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "Signalerer nøgleskift: {keys} mangler i forældrezonens DS",
   "pub.dnssec_chain_tip_ref_pending": "{type} navngiver DNSKEY {tag} (endnu ikke i forældrezonens DS)",
   "pub.dnssec_chain_tip_unanchored": "Endnu ikke forankret af en DS hos forældrezonen",
+  "pub.dnssec_chain_tip_phantom_key": "Refereret af DS eller CDS/CDNSKEY, men ikke i zonens DNSKEY-RRset",
   "pub.dnssec_chain_tip_no_key_tag": "Ingen DNSKEY med key tag {tag}",
   "pub.dnssec_chain_tip_no_ds": "Ingen DS hos forældrezonen",
   "pub.dnssec_chain_tip_no_dnskey": "Ingen DNSKEY i zonen",

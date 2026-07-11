@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "Señala cambio de clave: {keys} no está en el DS del padre",
   "pub.dnssec_chain_tip_ref_pending": "{type} nombra DNSKEY {tag} (aún no en el DS del padre)",
   "pub.dnssec_chain_tip_unanchored": "Aún no anclada por un DS en el padre",
+  "pub.dnssec_chain_tip_phantom_key": "Referenciada por DS o CDS/CDNSKEY pero ausente del RRset DNSKEY de la zona",
   "pub.dnssec_chain_tip_no_key_tag": "Ninguna DNSKEY con key tag {tag}",
   "pub.dnssec_chain_tip_no_ds": "Sin DS en el padre",
   "pub.dnssec_chain_tip_no_dnskey": "Sin DNSKEY en la zona",

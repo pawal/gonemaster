@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "Signaliserer nøkkelbytte: {keys} mangler i foreldresonens DS",
   "pub.dnssec_chain_tip_ref_pending": "{type} navngir DNSKEY {tag} (ennå ikke i foreldresonens DS)",
   "pub.dnssec_chain_tip_unanchored": "Ennå ikke forankret av en DS hos foreldresonen",
+  "pub.dnssec_chain_tip_phantom_key": "Referert av DS eller CDS/CDNSKEY, men ikke i sonens DNSKEY-RRset",
   "pub.dnssec_chain_tip_no_key_tag": "Ingen DNSKEY med key tag {tag}",
   "pub.dnssec_chain_tip_no_ds": "Ingen DS hos foreldresonen",
   "pub.dnssec_chain_tip_no_dnskey": "Ingen DNSKEY i sonen",

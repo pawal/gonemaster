@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "Signalisiert Schlüsselwechsel: {keys} nicht im übergeordneten DS",
   "pub.dnssec_chain_tip_ref_pending": "{type} benennt DNSKEY {tag} (noch nicht im übergeordneten DS)",
   "pub.dnssec_chain_tip_unanchored": "Noch nicht durch ein DS bei der übergeordneten Zone verankert",
+  "pub.dnssec_chain_tip_phantom_key": "Von DS oder CDS/CDNSKEY benannt, aber nicht im DNSKEY-RRset der Zone",
   "pub.dnssec_chain_tip_no_key_tag": "Kein DNSKEY mit key tag {tag}",
   "pub.dnssec_chain_tip_no_ds": "Kein DS bei der übergeordneten Zone",
   "pub.dnssec_chain_tip_no_dnskey": "Kein DNSKEY in der Zone",

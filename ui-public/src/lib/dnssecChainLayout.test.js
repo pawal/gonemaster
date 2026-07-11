@@ -386,17 +386,38 @@ describe("layoutChain", () => {
     expect(edgeIds.size).toBe(g.edges.length);
   });
 
-  it("marks a DS naming a retired key when other keys exist", () => {
-    // Stale DS after a rollover: no target node exists for the broken link,
-    // so the DS node itself must show the failure instead of dropping it.
+  it("draws a phantom key node for a DS naming an absent key, with an edge to it", () => {
+    // Stale DS after a rollover: keytag 1000 has a DS but is gone from the
+    // DNSKEY RRset. A grey phantom key node stands in for it and the broken
+    // DS edge points at it, rather than the DS floating with no target.
     const chain = secureChain();
     chain.links = [{ ds_key_tag: 1000, ds_digest_type: 2, status: "no_dnskey", servers: ["192.0.2.1"] }];
     chain.child.dnskeys = [{ key_tag: 2000, algorithm: 13, flags: 256, sep: false, servers: ["203.0.113.1"] }];
     const g = layoutChain(chain);
-    const ds = g.nodes.find((n) => n.kind === "ds");
-    expect(ds.unmatched).toBe(true);
-    expect(tipParams(ds, "pub.dnssec_chain_tip_no_key_tag").tag).toBe(1000);
-    expect(g.edges.some((e) => e.kind === "ds")).toBe(false);
+    const phantom = g.nodes.find((n) => n.id === "key-1000");
+    expect(phantom.kind).toBe("key-phantom");
+    expect(phantom.keyTag).toBe(1000);
+    const edge = g.edges.find((e) => e.kind === "ds");
+    expect(edge.status).toBe("no_dnskey");
+  });
+
+  it("draws a phantom key node for a CDS/CDNSKEY naming a not-yet-published key", () => {
+    // CDS/CDNSKEY signal an incoming key 30169 that is not in the DNSKEY RRset;
+    // it becomes a phantom node so the reference edge has a target.
+    const chain = secureChain();
+    chain.child.signed = [
+      { type: "CDNSKEY", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [30169], ds_match: "rollover", new_keys: [30169] },
+    ];
+    const g = layoutChain(chain);
+    const phantom = g.nodes.find((n) => n.id === "key-30169");
+    expect(phantom.kind).toBe("key-phantom");
+    const ref = g.edges.find((e) => e.kind === "ref" && e.targetTag === 30169);
+    expect(ref.rollover).toBe(true);
+  });
+
+  it("does not create phantom nodes for keys that are present", () => {
+    const g = layoutChain(secureChain());
+    expect(g.nodes.some((n) => n.kind === "key-phantom")).toBe(false);
   });
 
   it("resolves links without ds_digest_type to the DS node by key tag", () => {

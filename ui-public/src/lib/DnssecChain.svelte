@@ -205,6 +205,8 @@
         return ["ZSK", `tag ${node.keyTag}`];
       case "key-ghost":
         return ["DNSKEY", ""];
+      case "key-phantom":
+        return ["DNSKEY", `tag ${node.keyTag}`];
       case "rrset":
         return [node.label, ""];
       default:
@@ -485,10 +487,14 @@
     stroke: var(--grade-c);
   }
   .node-ds-ghost .chain-node-box,
-  .node-key-ghost .chain-node-box {
+  .node-key-ghost .chain-node-box,
+  .node-key-phantom .chain-node-box {
     fill: transparent;
     stroke: var(--border);
     stroke-dasharray: 5 4;
+  }
+  .node-key-phantom .chain-node-label {
+    fill: var(--ink-2);
   }
   .node-rrset .chain-node-box {
     fill: var(--surface-2);

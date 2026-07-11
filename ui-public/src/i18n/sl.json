@@ -104,6 +104,7 @@
   "pub.dnssec_chain_tip_rollover": "Signalizira menjavo ključa: {keys} ni v DS nadrejene cone",
   "pub.dnssec_chain_tip_ref_pending": "{type} poimenuje DNSKEY {tag} (še ni v DS nadrejene cone)",
   "pub.dnssec_chain_tip_unanchored": "Še ni zasidrano z zapisom DS pri nadrejeni coni",
+  "pub.dnssec_chain_tip_phantom_key": "Naslovljeno z DS ali CDS/CDNSKEY, a ni v DNSKEY RRset cone",
   "pub.dnssec_chain_tip_no_key_tag": "Ni DNSKEY s key tag {tag}",
   "pub.dnssec_chain_tip_no_ds": "Ni DS pri nadrejeni coni",
   "pub.dnssec_chain_tip_no_dnskey": "Ni DNSKEY v coni",

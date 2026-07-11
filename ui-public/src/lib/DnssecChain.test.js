@@ -171,6 +171,32 @@ describe("DnssecChain", () => {
     await waitFor(() => expect(screen.getByTestId("chain-disagree")).toBeTruthy());
   });
 
+  it("lists disagreeing and record-less server addresses in the facts", async () => {
+    const chain = secureChain();
+    chain.parent.servers_disagreeing = ["192.0.2.2"];
+    chain.parent.servers_without_ds = ["192.0.2.3"];
+    chain.child.servers_without_dnskey = ["203.0.113.9"];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-disagree-servers")).toBeTruthy());
+    expect(screen.getByTestId("chain-disagree-servers").textContent).toContain("192.0.2.2");
+    expect(screen.getByTestId("chain-servers-without-ds").textContent).toContain("192.0.2.3");
+    expect(screen.getByTestId("chain-servers-without-dnskey").textContent).toContain("203.0.113.9");
+  });
+
+  it("omits the per-server facts lines when every server agrees", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-facts")).toBeTruthy());
+    expect(screen.queryByTestId("chain-disagree-servers")).toBeNull();
+    expect(screen.queryByTestId("chain-servers-without-ds")).toBeNull();
+    expect(screen.queryByTestId("chain-servers-without-dnskey")).toBeNull();
+  });
+
   it("shows the provided-DS note for undelegated input", async () => {
     const chain = secureChain();
     chain.delegation = "undelegated";

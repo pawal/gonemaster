@@ -52,10 +52,13 @@
   );
   let hasRevoked = $derived((chain?.child?.dnskeys ?? []).some((k) => k.revoked));
 
-  let disagree = $derived(
-    (chain?.parent?.servers_disagreeing?.length ?? 0) > 0 ||
-      (chain?.child?.servers_disagreeing?.length ?? 0) > 0
-  );
+  let disagreeingServers = $derived([
+    ...(chain?.parent?.servers_disagreeing ?? []),
+    ...(chain?.child?.servers_disagreeing ?? []),
+  ]);
+  let serversWithoutDS = $derived(chain?.parent?.servers_without_ds ?? []);
+  let serversWithoutDNSKEY = $derived(chain?.child?.servers_without_dnskey ?? []);
+  let disagree = $derived(disagreeingServers.length > 0);
   let providedDS = $derived(chain?.parent?.ds_source === "input");
   let unsigned = $derived(chain?.status === "unsigned");
   let indeterminate = $derived(chain?.status === "indeterminate");
@@ -288,6 +291,15 @@
         <li>{$t("pub.dnssec_chain_parent_label")}: {chain?.parent_zone || "-"}</li>
         <li>DS: {dsSummary}</li>
         <li>{$t("pub.dnssec_chain_keys_label")}: {keySummary}</li>
+        {#if disagreeingServers.length}
+          <li data-testid="chain-disagree-servers">{$t("pub.dnssec_chain_disagree_servers", { servers: disagreeingServers.join(", ") })}</li>
+        {/if}
+        {#if serversWithoutDS.length}
+          <li data-testid="chain-servers-without-ds">{$t("pub.dnssec_chain_servers_without_ds", { servers: serversWithoutDS.join(", ") })}</li>
+        {/if}
+        {#if serversWithoutDNSKEY.length}
+          <li data-testid="chain-servers-without-dnskey">{$t("pub.dnssec_chain_servers_without_dnskey", { servers: serversWithoutDNSKEY.join(", ") })}</li>
+        {/if}
         {#each dsSigWindows as sw (sw.keyTag + "-" + sw.from)}
           <li data-testid="chain-ds-sig-fact">
             RRSIG DS ({sw.keyTag}): {$t("pub.dnssec_chain_sig_window", { from: sw.from, to: sw.to })}{sw.state !== "valid" ? ` - ${sw.state}` : ""}

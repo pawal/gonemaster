@@ -47,9 +47,10 @@
   );
   let keySummary = $derived(
     (chain?.child?.dnskeys ?? [])
-      .map((k) => `${k.sep ? "KSK" : "ZSK"} ${k.key_tag} (${algoMnemonic(k.algorithm)})`)
+      .map((k) => `${k.sep ? "KSK" : "ZSK"} ${k.key_tag} (${algoMnemonic(k.algorithm)})${k.revoked ? ` [${$t("pub.dnssec_chain_revoked")}]` : ""}`)
       .join(", ") || "-"
   );
+  let hasRevoked = $derived((chain?.child?.dnskeys ?? []).some((k) => k.revoked));
 
   let disagree = $derived(
     (chain?.parent?.servers_disagreeing?.length ?? 0) > 0 ||
@@ -241,7 +242,7 @@
 
             {#each graph.nodes as node (node.id)}
               {@const lines = nodeLines(node)}
-              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} data-tip={node.titleText}>
+              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} data-tip={node.titleText}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
                 <text class="chain-node-label chain-node-title" x={node.x + node.w / 2} y={node.y + 21} text-anchor="middle">{lines[0]}</text>
                 {#if lines[1]}
@@ -262,6 +263,9 @@
           <span class="chain-legend-item"><span class="chain-swatch swatch-zsk"></span>{$t("pub.dnssec_chain_legend_zsk")}</span>
           <span class="chain-legend-item"><span class="chain-swatch swatch-ds"></span>{$t("pub.dnssec_chain_legend_ds")}</span>
           <span class="chain-legend-item"><span class="chain-swatch swatch-sig"></span>{$t("pub.dnssec_chain_legend_sig")}</span>
+          {#if hasRevoked}
+            <span class="chain-legend-item" data-testid="chain-legend-revoked"><span class="chain-swatch swatch-revoked"></span>{$t("pub.dnssec_chain_legend_revoked")}</span>
+          {/if}
         </div>
       {/if}
 
@@ -399,6 +403,10 @@
   .node-unmatched .chain-node-box {
     stroke: var(--grade-f);
   }
+  .node-revoked .chain-node-box {
+    stroke: var(--grade-f);
+    stroke-dasharray: 5 3;
+  }
   .node-ds-ghost .chain-node-box,
   .node-key-ghost .chain-node-box {
     fill: transparent;
@@ -463,6 +471,10 @@
   .swatch-sig {
     border: none;
     background: linear-gradient(90deg, var(--grade-a), var(--grade-c), var(--grade-f));
+  }
+  .swatch-revoked {
+    border-color: var(--grade-f);
+    border-style: dashed;
   }
   .chain-facts {
     margin: 0;

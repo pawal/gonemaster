@@ -86,6 +86,8 @@
   "pub.dnssec_chain_legend_zsk": "ZSK - zoneondertekeningssleutel",
   "pub.dnssec_chain_legend_ds": "DS - Delegation Signer-record bij de bovenliggende zone",
   "pub.dnssec_chain_legend_sig": "RRSIG - handtekening, gekleurd op geldigheid",
+  "pub.dnssec_chain_revoked": "ingetrokken",
+  "pub.dnssec_chain_legend_revoked": "REVOKE - ingetrokken sleutel",
   "pub.dnssec_chain_sig_window": "Handtekening geldig van {from} tot {to}",
   "pub.score_label": "DNS-kwaliteitsscore",
   "pub.score_partial": "Gedeeltelijke score - testen van {stacks} was uitgeschakeld",

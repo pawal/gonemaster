@@ -86,6 +86,8 @@
   "pub.dnssec_chain_legend_zsk": "ZSK - zonsigneringsnyckel",
   "pub.dnssec_chain_legend_ds": "DS - delegeringssignerarpost hos föräldern",
   "pub.dnssec_chain_legend_sig": "RRSIG - signatur, färgad efter giltighet",
+  "pub.dnssec_chain_revoked": "återkallad",
+  "pub.dnssec_chain_legend_revoked": "REVOKE - återkallad nyckel",
   "pub.dnssec_chain_sig_window": "Signatur giltig {from} till {to}",
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Partiellt resultat - testning av {stacks} inaktiverades",

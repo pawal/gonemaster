@@ -86,6 +86,8 @@
   "pub.dnssec_chain_legend_zsk": "ZSK - klíč pro podepisování zóny",
   "pub.dnssec_chain_legend_ds": "DS - záznam Delegation Signer u nadřazené zóny",
   "pub.dnssec_chain_legend_sig": "RRSIG - podpis, obarvený podle platnosti",
+  "pub.dnssec_chain_revoked": "odvolán",
+  "pub.dnssec_chain_legend_revoked": "REVOKE - odvolaný klíč",
   "pub.dnssec_chain_sig_window": "Podpis platný od {from} do {to}",
   "pub.score_label": "Skóre kvality DNS",
   "pub.score_partial": "Částečné skóre - testování {stacks} bylo vypnuto",

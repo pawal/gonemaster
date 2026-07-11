@@ -86,6 +86,8 @@
   "pub.dnssec_chain_legend_zsk": "ZSK - vyöhykkeen allekirjoitusavain",
   "pub.dnssec_chain_legend_ds": "DS - Delegation Signer -tietue ylävyöhykkeellä",
   "pub.dnssec_chain_legend_sig": "RRSIG - allekirjoitus, väritetty voimassaolon mukaan",
+  "pub.dnssec_chain_revoked": "kumottu",
+  "pub.dnssec_chain_legend_revoked": "REVOKE - kumottu avain",
   "pub.dnssec_chain_sig_window": "Allekirjoitus voimassa {from} - {to}",
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Osittaiset pisteet - {stacks}-testaus oli poistettu käytöstä",

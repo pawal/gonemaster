@@ -86,6 +86,8 @@
   "pub.dnssec_chain_legend_zsk": "ZSK - clé de signature de zone",
   "pub.dnssec_chain_legend_ds": "DS - enregistrement Delegation Signer chez le parent",
   "pub.dnssec_chain_legend_sig": "RRSIG - signature, colorée selon la validité",
+  "pub.dnssec_chain_revoked": "révoquée",
+  "pub.dnssec_chain_legend_revoked": "REVOKE - clé révoquée",
   "pub.dnssec_chain_sig_window": "Signature valide du {from} au {to}",
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Score partiel - le test {stacks} était désactivé",

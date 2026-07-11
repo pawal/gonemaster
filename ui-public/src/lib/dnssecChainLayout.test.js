@@ -200,6 +200,16 @@ describe("layoutChain", () => {
     expect(edge.status).toBe("no_dnskey");
   });
 
+  it("flags revoked keys on their node", () => {
+    const chain = secureChain();
+    chain.child.dnskeys[0].revoked = true;
+    const g = layoutChain(chain);
+    const ksk = g.nodes.find((n) => n.kind === "ksk");
+    const zsk = g.nodes.find((n) => n.kind === "zsk");
+    expect(ksk.revoked).toBe(true);
+    expect(zsk.revoked).toBe(false);
+  });
+
   it("marks input-provided DS nodes distinctly", () => {
     const chain = secureChain({
       delegation: "undelegated",

@@ -165,6 +165,7 @@ export function layoutChain(chain) {
     const node = {
       id: `key-${k.key_tag}`,
       keyTag: k.key_tag,
+      revoked: !!k.revoked,
       titleText: joinLines([
         `${k.sep ? "KSK" : "ZSK"} · key tag ${k.key_tag}`,
         `Algorithm: ${algoLabel(k.algorithm)}`,

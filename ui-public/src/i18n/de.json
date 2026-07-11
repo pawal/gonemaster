@@ -86,6 +86,8 @@
   "pub.dnssec_chain_legend_zsk": "ZSK - Zonen-Signierschlüssel",
   "pub.dnssec_chain_legend_ds": "DS - Delegation-Signer-Record bei der übergeordneten Zone",
   "pub.dnssec_chain_legend_sig": "RRSIG - Signatur, nach Gültigkeit eingefärbt",
+  "pub.dnssec_chain_revoked": "widerrufen",
+  "pub.dnssec_chain_legend_revoked": "REVOKE - widerrufener Schlüssel",
   "pub.dnssec_chain_sig_window": "Signatur gültig {from} bis {to}",
   "pub.score_label": "DNS-Qualitätsbewertung",
   "pub.score_partial": "Teilbewertung - {stacks}-Tests waren deaktiviert",

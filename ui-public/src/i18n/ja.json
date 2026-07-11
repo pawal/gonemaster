@@ -86,6 +86,8 @@
   "pub.dnssec_chain_legend_zsk": "ZSK - ゾーン署名鍵",
   "pub.dnssec_chain_legend_ds": "DS - 親にある委任署名レコード",
   "pub.dnssec_chain_legend_sig": "RRSIG - 署名、有効性で色分け",
+  "pub.dnssec_chain_revoked": "失効",
+  "pub.dnssec_chain_legend_revoked": "REVOKE - 失効した鍵",
   "pub.dnssec_chain_sig_window": "署名は {from} から {to} まで有効",
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "部分スコア - {stacks}のテストが無効でした",

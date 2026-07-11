@@ -86,6 +86,8 @@
   "pub.dnssec_chain_legend_zsk": "ZSK - ključ za podpisovanje cone",
   "pub.dnssec_chain_legend_ds": "DS - zapis Delegation Signer pri nadrejeni coni",
   "pub.dnssec_chain_legend_sig": "RRSIG - podpis, obarvan glede na veljavnost",
+  "pub.dnssec_chain_revoked": "preklican",
+  "pub.dnssec_chain_legend_revoked": "REVOKE - preklican ključ",
   "pub.dnssec_chain_sig_window": "Podpis veljaven od {from} do {to}",
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Delna ocena - testiranje {stacks} je bilo onemogočeno",

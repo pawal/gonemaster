@@ -86,6 +86,8 @@
   "pub.dnssec_chain_legend_zsk": "ZSK - zonesigneringsnøgle",
   "pub.dnssec_chain_legend_ds": "DS - delegeringssigneringspost hos forælderen",
   "pub.dnssec_chain_legend_sig": "RRSIG - signatur, farvet efter gyldighed",
+  "pub.dnssec_chain_revoked": "tilbagekaldt",
+  "pub.dnssec_chain_legend_revoked": "REVOKE - tilbagekaldt nøgle",
   "pub.dnssec_chain_sig_window": "Signatur gyldig {from} til {to}",
   "pub.score_label": "DNS Quality Score",
   "pub.score_partial": "Delvis score - test af {stacks} var deaktiveret",

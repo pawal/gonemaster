@@ -263,4 +263,27 @@ describe("DnssecChain", () => {
     expect(badge.textContent).toBe("Unsigned");
     expect(badge.classList.contains("badge-neutral")).toBe(true);
   });
+
+  it("marks a revoked key on the node, legend, and facts", async () => {
+    const chain = secureChain();
+    chain.child.dnskeys[0].revoked = true;
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(container.querySelector("g.node-revoked")).toBeTruthy();
+    expect(screen.getByTestId("chain-legend-revoked")).toBeTruthy();
+    expect(screen.getByTestId("chain-facts").textContent).toContain("revoked");
+  });
+
+  it("omits the revoked legend item when no key is revoked", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(container.querySelector("g.node-revoked")).toBeNull();
+    expect(screen.queryByTestId("chain-legend-revoked")).toBeNull();
+  });
 });

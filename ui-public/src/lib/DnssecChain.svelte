@@ -47,7 +47,11 @@
   );
   let keySummary = $derived(
     (chain?.child?.dnskeys ?? [])
-      .map((k) => `${k.sep ? "KSK" : "ZSK"} ${k.key_tag} (${algoMnemonic(k.algorithm)})${k.revoked ? ` [${$t("pub.dnssec_chain_revoked")}]` : ""}`)
+      .map((k) => {
+        const size = k.key_size ? `, ${k.key_size} bit` : "";
+        const revoked = k.revoked ? ` [${$t("pub.dnssec_chain_revoked")}]` : "";
+        return `${k.sep ? "KSK" : "ZSK"} ${k.key_tag} (${algoMnemonic(k.algorithm)}${size})${revoked}`;
+      })
       .join(", ") || "-"
   );
   let hasRevoked = $derived((chain?.child?.dnskeys ?? []).some((k) => k.revoked));

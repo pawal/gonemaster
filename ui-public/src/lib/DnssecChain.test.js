@@ -256,6 +256,17 @@ describe("DnssecChain", () => {
     expect(screen.queryByTestId("chain-indeterminate")).toBeNull();
   });
 
+  it("includes key sizes in the key facts summary when known", async () => {
+    const chain = secureChain();
+    chain.child.dnskeys[0].key_size = 2048;
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-facts")).toBeTruthy());
+    expect(screen.getByTestId("chain-facts").textContent).toContain("2048 bit");
+  });
+
   it("lists the DNSKEY signature validity window in the facts", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
     const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });

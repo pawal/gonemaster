@@ -256,8 +256,39 @@ func (e *extractor) buildSigned() {
 		if len(sigs) == 0 && len(refs) == 0 {
 			continue
 		}
-		e.summary.Child.Signed = append(e.summary.Child.Signed, SignedRRset{Type: zt.name, RRSIG: sigs, Refs: refs})
+		rr := SignedRRset{Type: zt.name, RRSIG: sigs, Refs: refs}
+		if zt.name == "CDS" || zt.name == "CDNSKEY" {
+			rr.DSMatch, rr.NewKeys = e.compareRefsToDS(refs)
+		}
+		e.summary.Child.Signed = append(e.summary.Child.Signed, rr)
 	}
+}
+
+// compareRefsToDS returns "" when the parent has no DS to compare against.
+func (e *extractor) compareRefsToDS(refs []uint16) (string, []uint16) {
+	if len(e.summary.Parent.DS) == 0 || len(refs) == 0 {
+		return "", nil
+	}
+	dsTags := map[uint16]bool{}
+	for _, ds := range e.summary.Parent.DS {
+		dsTags[ds.KeyTag] = true
+	}
+	refTags := map[uint16]bool{}
+	var newKeys []uint16
+	for _, kt := range refs {
+		if refTags[kt] {
+			continue
+		}
+		refTags[kt] = true
+		if !dsTags[kt] {
+			newKeys = append(newKeys, kt)
+		}
+	}
+	if len(newKeys) == 0 && len(refTags) == len(dsTags) {
+		return CDSMatchExact, nil
+	}
+	sort.Slice(newKeys, func(i, j int) bool { return newKeys[i] < newKeys[j] })
+	return CDSMatchRollover, newKeys
 }
 
 func (e *extractor) hasEvidence() bool {

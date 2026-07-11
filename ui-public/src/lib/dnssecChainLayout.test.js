@@ -210,6 +210,35 @@ describe("layoutChain", () => {
     expect(typeof ref.d).toBe("string");
   });
 
+  it("flags a CDS rollover node and tints the ref edge to the unanchored key", () => {
+    const chain = secureChain();
+    // CDS names the anchored KSK 1000 plus an incoming key 3000 with no DS.
+    chain.child.dnskeys.push({ key_tag: 3000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] });
+    chain.child.signed = [
+      { type: "CDS", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000, 3000], ds_match: "rollover", new_keys: [3000] },
+    ];
+    const g = layoutChain(chain);
+    const cds = g.nodes.find((n) => n.id === "rrset-CDS");
+    expect(cds.rollover).toBe(true);
+    // Ref edge to the unanchored key 3000 is marked pending; the one to 1000 is not.
+    const pending = g.edges.find((e) => e.kind === "ref" && e.targetTag === 3000);
+    const anchored = g.edges.find((e) => e.kind === "ref" && e.targetTag === 1000);
+    expect(pending.rollover).toBe(true);
+    expect(anchored.rollover).toBe(false);
+  });
+
+  it("does not flag CDS as rollover when it matches the DS", () => {
+    const chain = secureChain();
+    chain.child.signed = [
+      { type: "CDS", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000], ds_match: "match" },
+    ];
+    const g = layoutChain(chain);
+    const cds = g.nodes.find((n) => n.id === "rrset-CDS");
+    expect(cds.rollover).toBe(false);
+    const ref = g.edges.find((e) => e.kind === "ref");
+    expect(ref.rollover).toBe(false);
+  });
+
   it("draws a ghost DS node for an island (keys, no DS)", () => {
     const chain = secureChain({
       status: "island",

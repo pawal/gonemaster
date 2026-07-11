@@ -83,11 +83,21 @@ type Child struct {
 // SignedRRset is one apex RRset the zone publishes together with the signatures
 // covering it (for example SOA, NSEC3PARAM, CDS, CDNSKEY). Refs lists the
 // DNSKEY key tags the RRset points at (CDS/CDNSKEY name a key by tag).
+// For CDS/CDNSKEY, DSMatch reports whether those key tags match the parent DS
+// and NewKeys lists the signaled key tags with no DS at the parent yet.
 type SignedRRset struct {
-	Type  string   `json:"type"`
-	RRSIG []RRSIG  `json:"rrsig"`
-	Refs  []uint16 `json:"refs,omitempty"`
+	Type    string   `json:"type"`
+	RRSIG   []RRSIG  `json:"rrsig"`
+	Refs    []uint16 `json:"refs,omitempty"`
+	DSMatch string   `json:"ds_match,omitempty"`
+	NewKeys []uint16 `json:"new_keys,omitempty"`
 }
+
+// CDS/CDNSKEY-to-parent-DS verdicts.
+const (
+	CDSMatchExact    = "match"
+	CDSMatchRollover = "rollover"
+)
 
 // DS is one delegation-signer record in the union across parent servers.
 type DS struct {

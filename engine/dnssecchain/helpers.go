@@ -44,22 +44,24 @@ func dedupeByAddress(nss []nameserver.Nameserver) []nameserver.Nameserver {
 	return out
 }
 
-// cdsRefs returns the DNSKEY key tags named by the CDS records in resp.
+// cdsRefs returns the DNSKEY key tags named by the CDS records in resp,
+// skipping the RFC 8078 DELETE sentinel (algorithm 0).
 func cdsRefs(resp packet.Packet, zone dnsname.Name) []uint16 {
 	var out []uint16
 	for _, rr := range resp.GetRecordsForName("CDS", zone, "answer") {
-		if cds, ok := rr.(*dns.CDS); ok {
+		if cds, ok := rr.(*dns.CDS); ok && cds.Algorithm != 0 {
 			out = append(out, cds.KeyTag)
 		}
 	}
 	return out
 }
 
-// cdnskeyRefs returns the DNSKEY key tags named by the CDNSKEY records in resp.
+// cdnskeyRefs returns the DNSKEY key tags named by the CDNSKEY records in resp,
+// skipping the RFC 8078 DELETE sentinel (algorithm 0).
 func cdnskeyRefs(resp packet.Packet, zone dnsname.Name) []uint16 {
 	var out []uint16
 	for _, rr := range resp.GetRecordsForName("CDNSKEY", zone, "answer") {
-		if ck, ok := rr.(*dns.CDNSKEY); ok {
+		if ck, ok := rr.(*dns.CDNSKEY); ok && ck.Algorithm != 0 {
 			out = append(out, ck.KeyTag())
 		}
 	}

@@ -320,8 +320,137 @@ func TestExtractSignedRRsets(t *testing.T) {
 	if len(cdsEntry.Refs) != 1 || cdsEntry.Refs[0] != childKSK.key.KeyTag() {
 		t.Errorf("CDS refs = %v, want [%d]", cdsEntry.Refs, childKSK.key.KeyTag())
 	}
+	// CDS names the same key the parent DS anchors: a steady-state match.
+	if cdsEntry.DSMatch != CDSMatchExact || len(cdsEntry.NewKeys) != 0 {
+		t.Errorf("CDS ds_match = %q new_keys = %v, want match/none", cdsEntry.DSMatch, cdsEntry.NewKeys)
+	}
 	if len(got.Child.Signed[0].Refs) != 0 {
 		t.Errorf("SOA should carry no refs, got %v", got.Child.Signed[0].Refs)
+	}
+}
+
+func TestExtractCDSRolloverSignaled(t *testing.T) {
+	// A KSK rollover in progress: the parent DS anchors only the old KSK, but
+	// CDS/CDNSKEY name the old and a new incoming KSK. The extractor must flag
+	// the new key tag as signaled-but-unanchored, mirroring DNSSEC18.
+	ctx, _, _ := testhelpers.Context(t)
+
+	oldKSK := genKey(t, testZone, true)
+	newKSK := genKey(t, testZone, true)
+	zsk := genKey(t, testZone, false)
+	dnskeyRRset := []dns.RR{oldKSK.key, newKSK.key, zsk.key}
+	win := func(rr []dns.RR, signer keypair) *dns.RRSIG {
+		return signRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	}
+	dnskeySig := win(dnskeyRRset, oldKSK)
+
+	// Parent publishes DS only for the old KSK.
+	ds := oldKSK.key.ToDS(dns.SHA256)
+
+	cdsOld := &dns.CDS{DS: *oldKSK.key.ToDS(dns.SHA256)}
+	cdsNew := &dns.CDS{DS: *newKSK.key.ToDS(dns.SHA256)}
+	cdsSig := win([]dns.RR{cdsOld, cdsNew}, oldKSK)
+	cdnskeyOld := &dns.CDNSKEY{DNSKEY: *oldKSK.key}
+	cdnskeyNew := &dns.CDNSKEY{DNSKEY: *newKSK.key}
+	cdnskeySig := win([]dns.RR{cdnskeyOld, cdnskeyNew}, oldKSK)
+
+	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, oldKSK.key, newKSK.key, zsk.key, dnskeySig)
+		case "CDS":
+			return dnssecAnswer(testZone, dns.TypeCDS, cdsOld, cdsNew, cdsSig)
+		case "CDNSKEY":
+			return dnssecAnswer(testZone, dns.TypeCDNSKEY, cdnskeyOld, cdnskeyNew, cdnskeySig)
+		}
+		return packet.Packet{}
+	}
+	parentHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dnssecAnswer(testZone, dns.TypeDS, ds, win([]dns.RR{ds}, oldKSK))
+		}
+		return packet.Packet{}
+	}
+	childNS := hookedNS(t, ctx, "ns1."+testZone, "203.0.113.1", childHook)
+	parentNS := hookedNS(t, ctx, "ns1."+testParent, "192.0.2.1", parentHook)
+
+	warm(t, ctx, childNS, testZone, "DNSKEY")
+	warm(t, ctx, childNS, testZone, "CDS")
+	warm(t, ctx, childNS, testZone, "CDNSKEY")
+	warm(t, ctx, parentNS, testZone, "DS")
+
+	got := Extract(ctx, Input{
+		Zone:       dnsname.New(testZone),
+		ParentZone: dnsname.New(testParent),
+		ChildNS:    []nameserver.Nameserver{childNS},
+		ParentNS:   []nameserver.Nameserver{parentNS},
+		At:         fixedAt,
+	})
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	for _, s := range got.Child.Signed {
+		if s.Type != "CDS" && s.Type != "CDNSKEY" {
+			continue
+		}
+		if s.DSMatch != CDSMatchRollover {
+			t.Errorf("%s ds_match = %q, want rollover", s.Type, s.DSMatch)
+		}
+		if len(s.NewKeys) != 1 || s.NewKeys[0] != newKSK.key.KeyTag() {
+			t.Errorf("%s new_keys = %v, want [%d]", s.Type, s.NewKeys, newKSK.key.KeyTag())
+		}
+	}
+}
+
+func TestExtractCDSNoParentDSLeavesMatchEmpty(t *testing.T) {
+	// An island (keys and CDS but no DS at the parent) has nothing to compare
+	// against, so ds_match stays empty rather than claiming a rollover.
+	ctx, _, _ := testhelpers.Context(t)
+
+	ksk := genKey(t, testZone, true)
+	win := func(rr []dns.RR, signer keypair) *dns.RRSIG {
+		return signRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	}
+	dnskeySig := win([]dns.RR{ksk.key}, ksk)
+	cds := &dns.CDS{DS: *ksk.key.ToDS(dns.SHA256)}
+	cdsSig := win([]dns.RR{cds}, ksk)
+
+	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, ksk.key, dnskeySig)
+		case "CDS":
+			return dnssecAnswer(testZone, dns.TypeCDS, cds, cdsSig)
+		}
+		return packet.Packet{}
+	}
+	parentHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dnssecAnswer(testZone, dns.TypeDS) // NOERROR, no DS
+		}
+		return packet.Packet{}
+	}
+	childNS := hookedNS(t, ctx, "ns1."+testZone, "203.0.113.1", childHook)
+	parentNS := hookedNS(t, ctx, "ns1."+testParent, "192.0.2.1", parentHook)
+
+	warm(t, ctx, childNS, testZone, "DNSKEY")
+	warm(t, ctx, childNS, testZone, "CDS")
+	warm(t, ctx, parentNS, testZone, "DS")
+
+	got := Extract(ctx, Input{
+		Zone:       dnsname.New(testZone),
+		ParentZone: dnsname.New(testParent),
+		ChildNS:    []nameserver.Nameserver{childNS},
+		ParentNS:   []nameserver.Nameserver{parentNS},
+		At:         fixedAt,
+	})
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	for _, s := range got.Child.Signed {
+		if s.Type == "CDS" && s.DSMatch != "" {
+			t.Errorf("CDS ds_match = %q, want empty (no parent DS)", s.DSMatch)
+		}
 	}
 }
 

@@ -335,6 +335,39 @@ describe("DnssecChain", () => {
     expect(facts).toContain("expired");
   });
 
+  it("shows a rollover callout and marks the CDS node when CDS/CDNSKEY signal a key change", async () => {
+    const chain = secureChain();
+    chain.child.dnskeys.push({ key_tag: 3000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] });
+    chain.child.signed = [
+      { type: "CDS", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000, 3000], ds_match: "rollover", new_keys: [3000] },
+      { type: "CDNSKEY", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000, 3000], ds_match: "rollover", new_keys: [3000] },
+    ];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-rollover")).toBeTruthy());
+    // The incoming key tag is named in the callout.
+    expect(screen.getByTestId("chain-rollover").textContent).toContain("3000");
+    // The CDS node is toned as a rollover, and a pending ref edge is drawn.
+    expect(container.querySelector("g.node-rollover")).toBeTruthy();
+    expect(container.querySelector("path.edge-ref-pending")).toBeTruthy();
+  });
+
+  it("shows no rollover callout when CDS matches the parent DS", async () => {
+    const chain = secureChain();
+    chain.child.signed = [
+      { type: "CDS", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000], ds_match: "match" },
+    ];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.queryByTestId("chain-rollover")).toBeNull();
+    expect(container.querySelector("g.node-rollover")).toBeNull();
+  });
+
   it("shows a truncation callout when the summary was capped", async () => {
     const chain = secureChain();
     chain.truncated = true;

@@ -207,14 +207,18 @@ export function layoutChain(chain) {
 
   const signedNodes = signed.map((s) => {
     const sigLines = (s.rrsig ?? []).map((r) => sigLine("pub.dnssec_chain_tip_rrset_sig", r, { tag: r.key_tag }));
+    const rollover = s.ds_match === "rollover";
+    const newKeys = Array.isArray(s.new_keys) ? s.new_keys : [];
     return {
       id: `rrset-${s.type}`,
       kind: "rrset",
       label: s.type,
+      rollover,
       tip: [
         { k: "pub.dnssec_chain_tip_rrset", p: { type: s.type } },
         ...sigLines,
         s.refs?.length ? { k: "pub.dnssec_chain_tip_names_key", p: { tags: s.refs.join(", ") } } : null,
+        rollover && newKeys.length ? { k: "pub.dnssec_chain_tip_rollover", p: { keys: newKeys.join(", ") } } : null,
       ].filter(Boolean),
     };
   });
@@ -337,15 +341,20 @@ export function layoutChain(chain) {
     // CDS/CDNSKEY name a DNSKEY by tag: draw a grey reference edge to that key.
     // It is bowed to the side so it does not sit on top of the signature edge
     // between the same two nodes.
+    const newKeys = Array.isArray(entry.new_keys) ? entry.new_keys : [];
     for (const tag of entry.refs ?? []) {
       const key = byId.get(`key-${tag}`);
       if (!key) continue;
+      const pending = newKeys.includes(tag);
       edges.push({
         id: `ref-${entry.type}-${tag}`,
         kind: "ref",
         rrset: entry.type,
         targetTag: tag,
-        tip: [{ k: "pub.dnssec_chain_tip_ref", p: { type: entry.type, tag } }],
+        rollover: pending,
+        tip: pending
+          ? [{ k: "pub.dnssec_chain_tip_ref_pending", p: { type: entry.type, tag } }]
+          : [{ k: "pub.dnssec_chain_tip_ref", p: { type: entry.type, tag } }],
         d: refPath(edgePoint(to, "top"), edgePoint(key, "bottom")),
       });
     }

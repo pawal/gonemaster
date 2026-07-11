@@ -52,20 +52,19 @@ function shortHex(h) {
   return s.length > 24 ? `${s.slice(0, 24)}…` : s;
 }
 
-function serversLine(servers) {
+// serversTip returns a tip line listing up to four server addresses, or null.
+// Addresses are protocol tokens, so only the label is localized.
+function serversTip(servers) {
   if (!Array.isArray(servers) || servers.length === 0) return null;
   const shown = servers.slice(0, 4).join(", ");
-  return servers.length > 4 ? `Servers: ${shown}, +${servers.length - 4}` : `Servers: ${shown}`;
+  const list = servers.length > 4 ? `${shown}, +${servers.length - 4}` : shown;
+  return { k: "pub.dnssec_chain_tip_servers", p: { servers: list } };
 }
 
 // fmtDate renders a unix-second timestamp as an ISO date.
 export function fmtDate(sec) {
   if (!sec) return "";
   return new Date(sec * 1000).toISOString().slice(0, 10);
-}
-
-function joinLines(lines) {
-  return lines.filter(Boolean).join("\n");
 }
 
 // worstSigTone reduces a set of signatures to the most severe tone: bad for
@@ -79,24 +78,30 @@ export function worstSigTone(sigs) {
   return tone;
 }
 
-// sigInline renders a signature's state and validity window on one line.
-function sigInline(sig) {
-  let s = sig.state;
-  if (sig.inception && sig.expiration) {
-    s += `, ${fmtDate(sig.inception)} to ${fmtDate(sig.expiration)}`;
-  }
-  return s;
+// sigDetail carries a signature's state and window for the component to
+// localize; the component turns it into "state, from to to".
+function sigDetail(sig) {
+  return { state: sig.state, from: fmtDate(sig.inception), to: fmtDate(sig.expiration) };
 }
 
-// sigTitle builds the multi-line hover text for one RRSIG.
+// sigLine is a tip line whose label takes a localized signature detail.
+function sigLine(k, sig, extra = {}) {
+  return { k, p: extra, sig: sigDetail(sig) };
+}
+
+// sigTitle builds the tip lines for one RRSIG edge.
 function sigTitle(headline, sig) {
-  const lines = [headline, `Signing key: ${sig.key_tag}`, `Algorithm: ${algoLabel(sig.algorithm)}`];
+  const lines = [
+    headline,
+    { k: "pub.dnssec_chain_tip_signing_key", p: { tag: sig.key_tag } },
+    { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(sig.algorithm) } },
+  ];
   if (sig.inception && sig.expiration) {
-    lines.push(`Valid: ${fmtDate(sig.inception)} to ${fmtDate(sig.expiration)}`);
+    lines.push({ k: "pub.dnssec_chain_tip_valid", p: { from: fmtDate(sig.inception), to: fmtDate(sig.expiration) } });
   }
-  lines.push(`Status: ${sig.state}`);
-  lines.push(serversLine(sig.servers));
-  return joinLines(lines);
+  lines.push({ k: "pub.dnssec_chain_tip_status", statusState: sig.state });
+  lines.push(serversTip(sig.servers));
+  return lines.filter(Boolean);
 }
 
 // truncateName shortens a long name with a middle ellipsis. The full name is
@@ -143,7 +148,7 @@ export function layoutChain(chain) {
   const dsNodes = [];
   if (dsList.length > 0) {
     const dsRRSIG = Array.isArray(chain.parent?.ds_rrsig) ? chain.parent.ds_rrsig : [];
-    const dsSigLines = dsRRSIG.map((r) => `DS RRset signature (key ${r.key_tag}): ${sigInline(r)}`);
+    const dsSigLines = dsRRSIG.map((r) => sigLine("pub.dnssec_chain_tip_ds_sig", r, { tag: r.key_tag }));
     // The DS RRSIG covers the whole DS RRset, so its worst state tints every
     // DS node's border, making an expired DS signature visible at a glance.
     const dsSigTone = worstSigTone(dsRRSIG);
@@ -155,18 +160,18 @@ export function layoutChain(chain) {
         keyTag: ds.key_tag,
         digestType: ds.digest_type ?? 0,
         dsSigTone,
-        titleText: joinLines([
-          `DS · key tag ${ds.key_tag}${input ? " (test input)" : ""}`,
-          `Algorithm: ${algoLabel(ds.algorithm)}`,
-          `Digest type: ${digestLabel(ds.digest_type)}`,
-          ds.digest ? `Digest: ${shortHex(ds.digest)}` : null,
+        tip: [
+          { k: input ? "pub.dnssec_chain_tip_ds_input" : "pub.dnssec_chain_tip_ds", p: { tag: ds.key_tag } },
+          { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(ds.algorithm) } },
+          { k: "pub.dnssec_chain_tip_digest_type", p: { dt: digestLabel(ds.digest_type) } },
+          ds.digest ? { k: "pub.dnssec_chain_tip_digest", p: { digest: shortHex(ds.digest) } } : null,
           ...dsSigLines,
-          input ? null : serversLine(ds.servers),
-        ]),
+          input ? null : serversTip(ds.servers),
+        ].filter(Boolean),
       });
     }
   } else {
-    dsNodes.push({ id: "ds-ghost", kind: "ds-ghost", titleText: "No DS at the parent" });
+    dsNodes.push({ id: "ds-ghost", kind: "ds-ghost", tip: [{ k: "pub.dnssec_chain_tip_no_ds" }] });
   }
 
   // Split DNSKEYs into KSK (SEP) and ZSK rows so signing edges read downward.
@@ -174,21 +179,22 @@ export function layoutChain(chain) {
   const zskNodes = [];
   for (const k of [...keys].sort((a, b) => a.key_tag - b.key_tag)) {
     const words = flagWords(k);
+    const flagsText = words ? `${k.flags} (${words})` : `${k.flags}`;
     const signsSet = dnskeySigs
       .filter((s) => s.key_tag === k.key_tag)
-      .map((s) => `Signs DNSKEY RRset: ${sigInline(s)}`);
+      .map((s) => sigLine("pub.dnssec_chain_tip_signs_set", s));
     const node = {
       id: `key-${k.key_tag}`,
       keyTag: k.key_tag,
       revoked: !!k.revoked,
-      titleText: joinLines([
-        `${k.sep ? "KSK" : "ZSK"} · key tag ${k.key_tag}`,
-        `Algorithm: ${algoLabel(k.algorithm)}`,
-        `Flags: ${k.flags}${words ? ` (${words})` : ""}`,
-        k.key_size ? `Key size: ${k.key_size} bits` : null,
+      tip: [
+        { k: "pub.dnssec_chain_tip_key", p: { role: k.sep ? "KSK" : "ZSK", tag: k.key_tag } },
+        { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(k.algorithm) } },
+        { k: "pub.dnssec_chain_tip_flags", p: { flags: flagsText } },
+        k.key_size ? { k: "pub.dnssec_chain_tip_key_size", p: { bits: k.key_size } } : null,
         ...signsSet,
-        serversLine(k.servers),
-      ]),
+        serversTip(k.servers),
+      ].filter(Boolean),
     };
     if (k.sep) {
       node.kind = "ksk";
@@ -200,23 +206,23 @@ export function layoutChain(chain) {
   }
 
   const signedNodes = signed.map((s) => {
-    const sigLines = (s.rrsig ?? []).map((r) => `Signature by key ${r.key_tag}: ${sigInline(r)}`);
+    const sigLines = (s.rrsig ?? []).map((r) => sigLine("pub.dnssec_chain_tip_rrset_sig", r, { tag: r.key_tag }));
     return {
       id: `rrset-${s.type}`,
       kind: "rrset",
       label: s.type,
-      titleText: joinLines([
-        `${s.type} RRset`,
+      tip: [
+        { k: "pub.dnssec_chain_tip_rrset", p: { type: s.type } },
         ...sigLines,
-        s.refs?.length ? `Names key: ${s.refs.join(", ")}` : null,
-      ]),
+        s.refs?.length ? { k: "pub.dnssec_chain_tip_names_key", p: { tags: s.refs.join(", ") } } : null,
+      ].filter(Boolean),
     };
   });
 
   // Assemble the visible rows top to bottom, tagging which carries a label.
   const rows = [{ label: "parent", nodes: dsNodes }];
   if (keys.length === 0) {
-    rows.push({ label: "keys", nodes: [{ id: "key-ghost", kind: "key-ghost", titleText: "No DNSKEY at the zone" }] });
+    rows.push({ label: "keys", nodes: [{ id: "key-ghost", kind: "key-ghost", tip: [{ k: "pub.dnssec_chain_tip_no_dnskey" }] }] });
   } else {
     let keyLabelUsed = false;
     if (kskNodes.length > 0) {
@@ -263,7 +269,7 @@ export function layoutChain(chain) {
       // to draw to, so mark the DS node itself as broken.
       if (link.status === "no_dnskey") {
         from.unmatched = true;
-        from.titleText += `\nNo DNSKEY with tag ${link.ds_key_tag}`;
+        from.tip.push({ k: "pub.dnssec_chain_tip_no_key_tag", p: { tag: link.ds_key_tag } });
       }
       continue;
     }
@@ -272,11 +278,11 @@ export function layoutChain(chain) {
       kind: "ds",
       status: link.status,
       dnskeyKeyTag: link.dnskey_key_tag,
-      title: joinLines([
-        `DS ${link.ds_key_tag} -> DNSKEY ${link.dnskey_key_tag ?? "?"}`,
-        `Status: ${link.status}`,
-        serversLine(link.servers),
-      ]),
+      tip: [
+        { k: "pub.dnssec_chain_tip_link", p: { ds: link.ds_key_tag, key: link.dnskey_key_tag ?? "?" } },
+        { k: "pub.dnssec_chain_tip_status", linkState: link.status },
+        serversTip(link.servers),
+      ].filter(Boolean),
       from: edgePoint(from, "bottom"),
       to: edgePoint(to, "top"),
     });
@@ -292,7 +298,7 @@ export function layoutChain(chain) {
       kind: "selfsig",
       status: sig.state,
       keyTag: sig.key_tag,
-      title: sigTitle("RRSIG over DNSKEY RRset", sig),
+      tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey" }, sig),
       d: selfLoopPath(signer),
     });
     for (const target of nodes) {
@@ -304,7 +310,7 @@ export function layoutChain(chain) {
         status: sig.state,
         keyTag: sig.key_tag,
         targetTag: target.keyTag,
-        title: sigTitle(`RRSIG over DNSKEY RRset (covers key ${target.keyTag})`, sig),
+        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey_covers", p: { tag: target.keyTag } }, sig),
         from: edgePoint(signer, "bottom"),
         to: edgePoint(target, "top"),
       });
@@ -323,7 +329,7 @@ export function layoutChain(chain) {
         kind: "sig",
         status: sig.state,
         keyTag: sig.key_tag,
-        title: sigTitle(`RRSIG over ${entry.type} RRset`, sig),
+        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_over", p: { type: entry.type } }, sig),
         from: edgePoint(from, "bottom"),
         to: edgePoint(to, "top"),
       });
@@ -339,7 +345,7 @@ export function layoutChain(chain) {
         kind: "ref",
         rrset: entry.type,
         targetTag: tag,
-        title: `${entry.type} names DNSKEY ${tag}`,
+        tip: [{ k: "pub.dnssec_chain_tip_ref", p: { type: entry.type, tag } }],
         d: refPath(edgePoint(to, "top"), edgePoint(key, "bottom")),
       });
     }

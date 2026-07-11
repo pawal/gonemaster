@@ -131,6 +131,28 @@
     return "neutral";
   }
 
+  // sigDetail localizes a signature's state and appends its window.
+  function sigDetail(sig) {
+    const st = $t(`pub.dnssec_chain_state_${sig.state}`);
+    return sig.from && sig.to
+      ? $t("pub.dnssec_chain_tip_window", { state: st, from: sig.from, to: sig.to })
+      : st;
+  }
+
+  // tipLine renders one structured tip line through i18n; sig/statusState/
+  // linkState carry values that must themselves be localized before substitution.
+  function tipLine(l) {
+    if (l.sig) return $t(l.k, { ...l.p, detail: sigDetail(l.sig) });
+    if (l.statusState) return $t(l.k, { status: $t(`pub.dnssec_chain_state_${l.statusState}`) });
+    if (l.linkState) return $t(l.k, { status: $t(`pub.dnssec_chain_linkstatus_${l.linkState}`) });
+    return $t(l.k, l.p);
+  }
+
+  // buildTip joins a node or edge's tip lines into the hover string.
+  function buildTip(lines) {
+    return (lines ?? []).map(tipLine).filter(Boolean).join("\n");
+  }
+
   function edgeClass(edge) {
     if (edge.kind === "ref") {
       return "edge-ref";
@@ -241,7 +263,7 @@
 
             {#each mainEdges as edge (edge.id)}
               {#if edge.kind === "selfsig"}
-                <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={edge.title}></path>
+                <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={buildTip(edge.tip)}></path>
               {:else}
                 <line
                   class="chain-edge {edgeClass(edge)}"
@@ -250,14 +272,14 @@
                   x2={edge.to.x}
                   y2={edge.to.y}
                   marker-end="url(#chain-arrow)"
-                  data-tip={edge.title}
+                  data-tip={buildTip(edge.tip)}
                 ></line>
               {/if}
             {/each}
 
             {#each graph.nodes as node (node.id)}
               {@const lines = nodeLines(node)}
-              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} data-tip={node.titleText}>
+              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} data-tip={buildTip(node.tip)}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
                 <text class="chain-node-label chain-node-title" x={node.x + node.w / 2} y={node.y + 21} text-anchor="middle">{lines[0]}</text>
                 {#if lines[1]}
@@ -267,7 +289,7 @@
             {/each}
 
             {#each refEdges as edge (edge.id)}
-              <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={edge.title}></path>
+              <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={buildTip(edge.tip)}></path>
             {/each}
           </svg>
         </div>

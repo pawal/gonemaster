@@ -1,6 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { layoutChain, truncateName, worstSigTone } from "./dnssecChainLayout.js";
 
+// tipParams returns the params of the tip line with the given i18n key.
+function tipParams(el, k) {
+  const line = (el.tip ?? []).find((l) => l.k === k);
+  return line ? line.p : undefined;
+}
+
+// hasTip reports whether an element carries a tip line with the given key.
+function hasTip(el, k) {
+  return (el.tip ?? []).some((l) => l.k === k);
+}
+
 // secureChain builds a minimal but complete "secure" summary: one DS matching a
 // KSK, plus a ZSK, with a valid DNSKEY signature.
 function secureChain(overrides = {}) {
@@ -94,7 +105,7 @@ describe("layoutChain", () => {
     expect(g.nodes.some((n) => n.id === "rrset-dnskey")).toBe(false);
   });
 
-  it("builds rich multi-line hover text for nodes and signature edges", () => {
+  it("emits structured, localizable tip lines for nodes and signature edges", () => {
     const chain = secureChain();
     chain.parent.ds[0].digest = "ab34cd";
     chain.child.dnskeys[0].key_size = 2048;
@@ -104,20 +115,23 @@ describe("layoutChain", () => {
     chain.child.dnskey_rrsig[0].expiration = 1752710400;
     const g = layoutChain(chain);
 
+    // Tip lines carry i18n keys plus verbatim protocol tokens as params, so
+    // the component can localize labels while key tags and dates stay literal.
     const ds = g.nodes.find((n) => n.kind === "ds");
-    expect(ds.titleText).toContain("Algorithm: ECDSAP256SHA256 (alg 13)");
-    expect(ds.titleText).toContain("Digest type: SHA-256 (2)");
-    expect(ds.titleText).toContain("Digest: ab34cd");
+    expect(tipParams(ds, "pub.dnssec_chain_tip_algorithm").algo).toBe("ECDSAP256SHA256 (alg 13)");
+    expect(tipParams(ds, "pub.dnssec_chain_tip_digest_type").dt).toBe("SHA-256 (2)");
+    expect(tipParams(ds, "pub.dnssec_chain_tip_digest").digest).toBe("ab34cd");
 
     const ksk = g.nodes.find((n) => n.kind === "ksk");
-    expect(ksk.titleText).toContain("Flags: 257");
-    expect(ksk.titleText).toContain("SEP");
-    expect(ksk.titleText).toContain("Key size: 2048 bits");
+    expect(tipParams(ksk, "pub.dnssec_chain_tip_flags").flags).toBe("257 (ZONE, SEP)");
+    expect(tipParams(ksk, "pub.dnssec_chain_tip_key_size").bits).toBe(2048);
 
     const self = g.edges.find((e) => e.kind === "selfsig");
-    expect(self.title).toContain("Signing key: 1000");
-    expect(self.title).toContain("Valid: 2025-07-03 to 2025-07-17");
-    expect(self.title).toContain("Status: valid");
+    expect(tipParams(self, "pub.dnssec_chain_tip_signing_key").tag).toBe(1000);
+    const valid = self.tip.find((l) => l.k === "pub.dnssec_chain_tip_valid");
+    expect(valid.p).toEqual({ from: "2025-07-03", to: "2025-07-17" });
+    const st = self.tip.find((l) => l.k === "pub.dnssec_chain_tip_status");
+    expect(st.statusState).toBe("valid");
   });
 
   it("labels the parent and key clusters with their zone names", () => {
@@ -260,7 +274,8 @@ describe("layoutChain", () => {
     const input = g.nodes.find((n) => n.kind === "ds-input");
     expect(input).toBeTruthy();
     // The "-" placeholder for input DS must not render as a servers line.
-    expect(input.titleText.includes("Servers:")).toBe(false);
+    expect(hasTip(input, "pub.dnssec_chain_tip_servers")).toBe(false);
+    expect(hasTip(input, "pub.dnssec_chain_tip_ds_input")).toBe(true);
   });
 
   it("keeps dual-digest DS records for one key tag as distinct nodes and edges", () => {
@@ -313,7 +328,7 @@ describe("layoutChain", () => {
     const g = layoutChain(chain);
     const ds = g.nodes.find((n) => n.kind === "ds");
     expect(ds.unmatched).toBe(true);
-    expect(ds.titleText).toContain("No DNSKEY with tag 1000");
+    expect(tipParams(ds, "pub.dnssec_chain_tip_no_key_tag").tag).toBe(1000);
     expect(g.edges.some((e) => e.kind === "ds")).toBe(false);
   });
 

@@ -114,7 +114,7 @@ describe("DnssecChain", () => {
     expect(container.querySelectorAll("path.edge-ref").length).toBe(2);
   });
 
-  it("shows a custom tooltip immediately on hover", async () => {
+  it("shows a custom tooltip immediately on hover, localized from tip data", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
     const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
     openChain(container);
@@ -125,8 +125,26 @@ describe("DnssecChain", () => {
 
     const tip = container.querySelector(".chain-tip");
     expect(tip.classList.contains("chain-tip-shown")).toBe(true);
+    // "Algorithm:" and the mnemonic exist only via i18n + params now.
     expect(tip.textContent).toContain("KSK");
-    expect(tip.textContent).toContain("Algorithm:");
+    expect(tip.textContent).toContain("Algorithm: ECDSAP256SHA256");
+  });
+
+  it("localizes signature state and window in edge tooltips", async () => {
+    const chain = secureChain();
+    chain.child.dnskey_rrsig = [
+      { key_tag: 1000, algorithm: 13, state: "expired", inception: 1700000000, expiration: 1750000000, servers: ["203.0.113.1"] },
+    ];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const self = container.querySelector("path.chain-edge");
+    // The data-tip attribute holds the rendered, localized multi-line string.
+    const tip = self.getAttribute("data-tip");
+    expect(tip).toContain("Status: expired");
+    expect(tip).toContain("2023-11-14 to 2025-06-15");
   });
 
   it("shows the unavailable note on a 404 and never an SVG", async () => {

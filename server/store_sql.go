@@ -585,15 +585,18 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 }
 
 // GetRunDNSSECChain returns the stored chain summary JSON for a run.
-func (s *SQLJobStore) GetRunDNSSECChain(runID string) (string, bool) {
+func (s *SQLJobStore) GetRunDNSSECChain(runID string) (string, bool, error) {
 	var chain string
 	err := s.db.QueryRow(
 		fmt.Sprintf("SELECT chain_json FROM run_dnssec_chain WHERE run_id = %s", s.ph(1)), runID,
 	).Scan(&chain)
-	if err != nil {
-		return "", false
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
 	}
-	return chain, true
+	if err != nil {
+		return "", false, err
+	}
+	return chain, true, nil
 }
 
 // upsertDomainTx gets or creates a domain row inside tx, returning its ID.

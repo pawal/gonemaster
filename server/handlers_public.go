@@ -239,7 +239,11 @@ func (s *Server) handlePublicGetDNSSECChain(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
 		return
 	}
-	chain, ok := s.store.GetRunDNSSECChain(job.ID)
+	chain, ok, err := s.store.GetRunDNSSECChain(job.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "lookup_failed", "could not load DNSSEC chain data", nil)
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusNotFound, "no_chain_data", "no DNSSEC chain data for this run", nil)
 		return

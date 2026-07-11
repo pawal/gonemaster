@@ -60,7 +60,7 @@ func (s *spyJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
 }
 
-func (s *spyJobStore) GetRunDNSSECChain(runID string) (string, bool) {
+func (s *spyJobStore) GetRunDNSSECChain(runID string) (string, bool, error) {
 	return s.inner.GetRunDNSSECChain(runID)
 }
 

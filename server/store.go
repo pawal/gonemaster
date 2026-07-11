@@ -127,8 +127,9 @@ type JobStore interface {
 	// GetResult reconstructs a JobResult from the runs+entries tables.
 	GetResult(jobID string) (JobResult, bool)
 
-	// GetRunDNSSECChain returns the stored chain summary JSON for a run.
-	GetRunDNSSECChain(runID string) (string, bool)
+	// GetRunDNSSECChain returns the chain JSON; false means no row, error means
+	// a lookup failure (kept distinct from absence).
+	GetRunDNSSECChain(runID string) (string, bool, error)
 
 	// Domain management.
 	GetOrCreateDomain(name string) (Domain, error)
@@ -611,11 +612,11 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 }
 
 // GetRunDNSSECChain returns the stored chain summary JSON for a run.
-func (s *InMemoryJobStore) GetRunDNSSECChain(runID string) (string, bool) {
+func (s *InMemoryJobStore) GetRunDNSSECChain(runID string) (string, bool, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	chain, ok := s.dnssecChains[runID]
-	return chain, ok
+	return chain, ok, nil
 }
 
 // GetResult reconstructs a JobResult from the run and its entries.

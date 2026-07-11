@@ -19,7 +19,10 @@ func TestSQLStoreDNSSECChainRoundTrip(t *testing.T) {
 			job.DNSSECChainJSON = chain
 			graduateSQLJob(t, s, job, nil)
 
-			got, ok := s.GetRunDNSSECChain(job.ID)
+			got, ok, err := s.GetRunDNSSECChain(job.ID)
+			if err != nil {
+				t.Fatalf("GetRunDNSSECChain: %v", err)
+			}
 			if !ok {
 				t.Fatal("GetRunDNSSECChain: not found")
 			}
@@ -41,7 +44,7 @@ func TestSQLStoreDNSSECChainRoundTrip(t *testing.T) {
 				t.Fatalf("Create plain: %v", err)
 			}
 			graduateSQLJob(t, s, plain, nil)
-			if _, ok := s.GetRunDNSSECChain(plain.ID); ok {
+			if _, ok, _ := s.GetRunDNSSECChain(plain.ID); ok {
 				t.Error("expected no chain row for plain job")
 			}
 			plainResult, _ := s.GetResult(plain.ID)
@@ -67,7 +70,7 @@ func TestSQLStorePurgeRemovesDNSSECChain(t *testing.T) {
 			job.DNSSECChainJSON = chain
 			graduateSQLJob(t, s, job, nil)
 
-			if _, ok := s.GetRunDNSSECChain(job.ID); !ok {
+			if _, ok, _ := s.GetRunDNSSECChain(job.ID); !ok {
 				t.Fatal("expected chain before purge")
 			}
 			n, err := s.PurgeOlderThan(time.Now().UTC().Add(-24 * time.Hour))
@@ -77,7 +80,7 @@ func TestSQLStorePurgeRemovesDNSSECChain(t *testing.T) {
 			if n < 1 {
 				t.Fatalf("purged %d runs, want >= 1", n)
 			}
-			if _, ok := s.GetRunDNSSECChain(job.ID); ok {
+			if _, ok, _ := s.GetRunDNSSECChain(job.ID); ok {
 				t.Error("expected chain removed after purge")
 			}
 		})

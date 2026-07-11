@@ -18,7 +18,10 @@ func TestInMemoryStoreDNSSECChainRoundTrip(t *testing.T) {
 	created.DNSSECChainJSON = testChainJSON
 	graduateTestJob(t, store, created, nil)
 
-	chain, ok := store.GetRunDNSSECChain(created.ID)
+	chain, ok, err := store.GetRunDNSSECChain(created.ID)
+	if err != nil {
+		t.Fatalf("GetRunDNSSECChain: %v", err)
+	}
 	if !ok {
 		t.Fatal("expected stored chain")
 	}
@@ -46,7 +49,7 @@ func TestInMemoryStoreDNSSECChainAbsent(t *testing.T) {
 	// No DNSSECChainJSON set.
 	graduateTestJob(t, store, created, nil)
 
-	if _, ok := store.GetRunDNSSECChain(created.ID); ok {
+	if _, ok, _ := store.GetRunDNSSECChain(created.ID); ok {
 		t.Error("expected no stored chain")
 	}
 	result, ok := store.GetResult(created.ID)
@@ -71,7 +74,7 @@ func TestInMemoryStorePurgeRemovesDNSSECChain(t *testing.T) {
 	created.DNSSECChainJSON = testChainJSON
 	graduateTestJob(t, store, created, nil)
 
-	if _, ok := store.GetRunDNSSECChain(created.ID); !ok {
+	if _, ok, _ := store.GetRunDNSSECChain(created.ID); !ok {
 		t.Fatal("expected chain before purge")
 	}
 	n, err := store.PurgeOlderThan(time.Now().UTC().Add(-24 * time.Hour))
@@ -81,7 +84,7 @@ func TestInMemoryStorePurgeRemovesDNSSECChain(t *testing.T) {
 	if n != 1 {
 		t.Fatalf("purged %d runs, want 1", n)
 	}
-	if _, ok := store.GetRunDNSSECChain(created.ID); ok {
+	if _, ok, _ := store.GetRunDNSSECChain(created.ID); ok {
 		t.Error("expected chain removed after purge")
 	}
 }

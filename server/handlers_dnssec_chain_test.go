@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -157,6 +158,57 @@ func TestAdminDNSSECChainTwin(t *testing.T) {
 	if body := resp.Body.String(); body != handlerChainJSON {
 		t.Errorf("body = %q, want %q", body, handlerChainJSON)
 	}
+}
+
+// errChainStore wraps a real store but fails every chain lookup, standing in
+// for a transient database error. Everything else delegates to the embedded
+// store, so the handler still resolves the job before the failing lookup.
+type errChainStore struct {
+	JobStore
+	err error
+}
+
+func (e errChainStore) GetRunDNSSECChain(string) (string, bool, error) {
+	return "", false, e.err
+}
+
+func TestPublicDNSSECChainLookupErrorReturns500(t *testing.T) {
+	srv := New(DefaultConfig())
+	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
+	srv.store = errChainStore{JobStore: srv.store, err: errors.New("db down")}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	// A lookup failure must not masquerade as absent data (404), or the UI
+	// would latch a permanent "no chain data" note for data that exists.
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body.String())
+	}
+	assertErrorCode(t, resp, "lookup_failed")
+	if cc := resp.Header().Get("Cache-Control"); cc != "" {
+		t.Errorf("no cache header expected on 500, got %q", cc)
+	}
+}
+
+func TestAdminDNSSECChainLookupErrorReturns500(t *testing.T) {
+	srv := New(DefaultConfig())
+	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
+	job, ok := srv.store.GetByPublicID(publicID)
+	if !ok {
+		t.Fatal("expected job")
+	}
+	srv.store = errChainStore{JobStore: srv.store, err: errors.New("db down")}
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/"+job.ID+"/dnssec-chain", nil)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusInternalServerError {
+		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body.String())
+	}
+	assertErrorCode(t, resp, "lookup_failed")
 }
 
 // assertErrorCode decodes a writeError body and checks its error code.

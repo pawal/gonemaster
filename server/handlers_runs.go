@@ -116,7 +116,11 @@ func (s *Server) handleGetRunResult(w http.ResponseWriter, r *http.Request) {
 // Admins see stored data directly; only public runs ever have a blob.
 func (s *Server) handleGetRunDNSSECChain(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	chain, ok := s.store.GetRunDNSSECChain(id)
+	chain, ok, err := s.store.GetRunDNSSECChain(id)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "lookup_failed", "could not load DNSSEC chain data", nil)
+		return
+	}
 	if !ok {
 		writeError(w, http.StatusNotFound, "not_found", "no DNSSEC chain data for this run", nil)
 		return

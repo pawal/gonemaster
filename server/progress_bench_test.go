@@ -49,7 +49,7 @@ func (s *countingJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
 }
 
-func (s *countingJobStore) GetRunDNSSECChain(runID string) (string, bool) {
+func (s *countingJobStore) GetRunDNSSECChain(runID string) (string, bool, error) {
 	return s.inner.GetRunDNSSECChain(runID)
 }
 

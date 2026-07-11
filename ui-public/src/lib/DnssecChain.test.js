@@ -224,4 +224,43 @@ describe("DnssecChain", () => {
     expect(facts).toContain("2027-01-15");
     expect(facts).toContain("RRSIG DNSKEY (1000)");
   });
+
+  it("shows a status badge toned by the roll-up and repeats it in the facts", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    // No badge before the data loads.
+    expect(screen.queryByTestId("chain-status-badge")).toBeNull();
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+    const badge = screen.getByTestId("chain-status-badge");
+    expect(badge.textContent).toBe("Secure");
+    expect(badge.classList.contains("badge-ok")).toBe(true);
+    // The status is repeated as the first facts line.
+    expect(screen.getByTestId("chain-status-fact").textContent).toContain("Secure");
+  });
+
+  it("tones the badge red for a broken chain", async () => {
+    const broken = secureChain();
+    broken.status = "broken";
+    fetch.mockResolvedValue(jsonResponse(broken));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+    const badge = screen.getByTestId("chain-status-badge");
+    expect(badge.textContent).toBe("Broken");
+    expect(badge.classList.contains("badge-bad")).toBe(true);
+  });
+
+  it("tones the badge neutral for an unsigned zone", async () => {
+    fetch.mockResolvedValue(jsonResponse({ version: 1, zone: "example.com", status: "unsigned", parent: {}, child: {}, links: [] }));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+    const badge = screen.getByTestId("chain-status-badge");
+    expect(badge.textContent).toBe("Unsigned");
+    expect(badge.classList.contains("badge-neutral")).toBe(true);
+  });
 });

@@ -74,6 +74,9 @@
     }))
   );
 
+  // status is the roll-up shown as a heading badge and the first facts line.
+  let status = $derived(phase === "loaded" && chain?.status ? chain.status : "");
+
   // Custom hover tooltip: the native SVG <title> has a browser-controlled
   // delay; this one appears immediately and is positioned via the JS DOM API.
   let tipEl = $state(null);
@@ -105,6 +108,14 @@
     const text = el?.dataset?.tip;
     if (text) showTip(e, text);
     else hideTip();
+  }
+
+  // statusTone maps a roll-up status to a badge color: secure ok, broken bad,
+  // everything else neutral.
+  function statusTone(s) {
+    if (s === "secure") return "ok";
+    if (s === "broken") return "bad";
+    return "neutral";
   }
 
   function edgeClass(edge) {
@@ -154,6 +165,9 @@
   <summary class="score-bonus-summary">
     <span class="score-bonus-chevron"></span>
     <span class="score-bonus-title">{$t("pub.dnssec_chain_heading")}</span>
+    {#if status}
+      <span class="dnssec-chain-badge badge-{statusTone(status)}" data-testid="chain-status-badge">{$t(`pub.dnssec_chain_status_${status}`)}</span>
+    {/if}
     <span class="dnssec-chain-subtitle">{$t("pub.dnssec_chain_subtitle")}</span>
   </summary>
 
@@ -252,6 +266,9 @@
       {/if}
 
       <ul class="chain-facts" data-testid="chain-facts">
+        {#if status}
+          <li data-testid="chain-status-fact">{$t("pub.dnssec_chain_status_label")}: {$t(`pub.dnssec_chain_status_${status}`)}</li>
+        {/if}
         <li>{$t("pub.dnssec_chain_parent_label")}: {chain?.parent_zone || "-"}</li>
         <li>DS: {dsSummary}</li>
         <li>{$t("pub.dnssec_chain_keys_label")}: {keySummary}</li>
@@ -270,6 +287,28 @@
     color: var(--ink-2);
     font-size: 0.85rem;
     margin-left: 0.5rem;
+  }
+  .dnssec-chain-badge {
+    margin-left: 0.5rem;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  .badge-ok {
+    border-color: var(--grade-a);
+    color: var(--grade-a);
+  }
+  .badge-bad {
+    border-color: var(--grade-f);
+    color: var(--grade-f);
+  }
+  .badge-neutral {
+    border-color: var(--border);
+    color: var(--ink-2);
   }
   .dnssec-chain-content {
     display: flex;

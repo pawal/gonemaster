@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { layoutChain, truncateName } from "./dnssecChainLayout.js";
+import { layoutChain, truncateName, worstSigTone } from "./dnssecChainLayout.js";
 
 // secureChain builds a minimal but complete "secure" summary: one DS matching a
 // KSK, plus a ZSK, with a valid DNSKEY signature.
@@ -43,6 +43,25 @@ describe("truncateName", () => {
   it("handles null and undefined", () => {
     expect(truncateName(null)).toBe("");
     expect(truncateName(undefined)).toBe("");
+  });
+});
+
+describe("worstSigTone", () => {
+  it("returns bad for expired, bogus, or missing-key states", () => {
+    expect(worstSigTone([{ state: "valid" }, { state: "expired" }])).toBe("bad");
+    expect(worstSigTone([{ state: "bogus" }])).toBe("bad");
+    expect(worstSigTone([{ state: "no_key" }])).toBe("bad");
+  });
+
+  it("returns warn for not-yet-valid or unsupported without anything worse", () => {
+    expect(worstSigTone([{ state: "valid" }, { state: "not_yet_valid" }])).toBe("warn");
+    expect(worstSigTone([{ state: "unsupported_algorithm" }])).toBe("warn");
+  });
+
+  it("returns empty for all-valid or no signatures", () => {
+    expect(worstSigTone([{ state: "valid" }])).toBe("");
+    expect(worstSigTone([])).toBe("");
+    expect(worstSigTone(undefined)).toBe("");
   });
 });
 
@@ -198,6 +217,25 @@ describe("layoutChain", () => {
     expect(g.nodes.some((n) => n.kind === "key-ghost")).toBe(true);
     const edge = g.edges.find((e) => e.kind === "ds");
     expect(edge.status).toBe("no_dnskey");
+  });
+
+  it("tints DS nodes by the worst covering-signature state", () => {
+    const chain = secureChain();
+    chain.parent.ds_rrsig = [
+      { key_tag: 5000, state: "valid" },
+      { key_tag: 5000, state: "expired" },
+    ];
+    const g = layoutChain(chain);
+    const ds = g.nodes.find((n) => n.kind === "ds");
+    expect(ds.dsSigTone).toBe("bad");
+  });
+
+  it("leaves DS nodes untinted when the covering signature is valid", () => {
+    const chain = secureChain();
+    chain.parent.ds_rrsig = [{ key_tag: 5000, state: "valid" }];
+    const g = layoutChain(chain);
+    const ds = g.nodes.find((n) => n.kind === "ds");
+    expect(ds.dsSigTone).toBe("");
   });
 
   it("flags revoked keys on their node", () => {

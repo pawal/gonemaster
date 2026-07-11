@@ -68,6 +68,17 @@ function joinLines(lines) {
   return lines.filter(Boolean).join("\n");
 }
 
+// worstSigTone reduces a set of signatures to the most severe tone: bad for
+// expired/bogus/no-key, warn for not-yet-valid/unsupported, else empty.
+export function worstSigTone(sigs) {
+  let tone = "";
+  for (const s of Array.isArray(sigs) ? sigs : []) {
+    if (s.state === "expired" || s.state === "bogus" || s.state === "no_key") return "bad";
+    if (s.state === "not_yet_valid" || s.state === "unsupported_algorithm") tone = "warn";
+  }
+  return tone;
+}
+
 // sigInline renders a signature's state and validity window on one line.
 function sigInline(sig) {
   let s = sig.state;
@@ -133,6 +144,9 @@ export function layoutChain(chain) {
   if (dsList.length > 0) {
     const dsRRSIG = Array.isArray(chain.parent?.ds_rrsig) ? chain.parent.ds_rrsig : [];
     const dsSigLines = dsRRSIG.map((r) => `DS RRset signature (key ${r.key_tag}): ${sigInline(r)}`);
+    // The DS RRSIG covers the whole DS RRset, so its worst state tints every
+    // DS node's border, making an expired DS signature visible at a glance.
+    const dsSigTone = worstSigTone(dsRRSIG);
     for (const ds of dsList) {
       const input = dsSource === "input";
       dsNodes.push({
@@ -140,6 +154,7 @@ export function layoutChain(chain) {
         kind: input ? "ds-input" : "ds",
         keyTag: ds.key_tag,
         digestType: ds.digest_type ?? 0,
+        dsSigTone,
         titleText: joinLines([
           `DS · key tag ${ds.key_tag}${input ? " (test input)" : ""}`,
           `Algorithm: ${algoLabel(ds.algorithm)}`,

@@ -74,6 +74,14 @@
       state: s.state,
     }))
   );
+  let dsSigWindows = $derived(
+    (chain?.parent?.ds_rrsig ?? []).map((s) => ({
+      keyTag: s.key_tag,
+      from: fmtDate(s.inception),
+      to: fmtDate(s.expiration),
+      state: s.state,
+    }))
+  );
 
   // status is the roll-up shown as a heading badge and the first facts line.
   let status = $derived(phase === "loaded" && chain?.status ? chain.status : "");
@@ -246,7 +254,7 @@
 
             {#each graph.nodes as node (node.id)}
               {@const lines = nodeLines(node)}
-              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} data-tip={node.titleText}>
+              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} data-tip={node.titleText}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
                 <text class="chain-node-label chain-node-title" x={node.x + node.w / 2} y={node.y + 21} text-anchor="middle">{lines[0]}</text>
                 {#if lines[1]}
@@ -280,6 +288,11 @@
         <li>{$t("pub.dnssec_chain_parent_label")}: {chain?.parent_zone || "-"}</li>
         <li>DS: {dsSummary}</li>
         <li>{$t("pub.dnssec_chain_keys_label")}: {keySummary}</li>
+        {#each dsSigWindows as sw (sw.keyTag + "-" + sw.from)}
+          <li data-testid="chain-ds-sig-fact">
+            RRSIG DS ({sw.keyTag}): {$t("pub.dnssec_chain_sig_window", { from: sw.from, to: sw.to })}{sw.state !== "valid" ? ` - ${sw.state}` : ""}
+          </li>
+        {/each}
         {#each sigWindows as sw (sw.keyTag + "-" + sw.from)}
           <li>
             RRSIG DNSKEY ({sw.keyTag}): {$t("pub.dnssec_chain_sig_window", { from: sw.from, to: sw.to })}{sw.state !== "valid" ? ` - ${sw.state}` : ""}
@@ -410,6 +423,12 @@
   .node-revoked .chain-node-box {
     stroke: var(--grade-f);
     stroke-dasharray: 5 3;
+  }
+  .node-sig-bad .chain-node-box {
+    stroke: var(--grade-f);
+  }
+  .node-sig-warn .chain-node-box {
+    stroke: var(--grade-c);
   }
   .node-ds-ghost .chain-node-box,
   .node-key-ghost .chain-node-box {

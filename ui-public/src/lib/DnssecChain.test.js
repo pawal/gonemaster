@@ -264,6 +264,22 @@ describe("DnssecChain", () => {
     expect(badge.classList.contains("badge-neutral")).toBe(true);
   });
 
+  it("tints the DS node and lists DS signatures when the DS RRSIG is expired", async () => {
+    const chain = secureChain();
+    chain.parent.ds_rrsig = [
+      { key_tag: 5000, state: "expired", inception: 1700000000, expiration: 1750000000 },
+    ];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(container.querySelector("g.node-ds.node-sig-bad")).toBeTruthy();
+    const facts = screen.getByTestId("chain-facts").textContent;
+    expect(facts).toContain("RRSIG DS (5000)");
+    expect(facts).toContain("expired");
+  });
+
   it("shows a truncation callout when the summary was capped", async () => {
     const chain = secureChain();
     chain.truncated = true;

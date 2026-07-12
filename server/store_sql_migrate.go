@@ -523,6 +523,17 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN tag_view_min_level VARCHAR(16) NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		// Per-run DNSSEC chain summary blob, kept out of the shared runCols
+		// select and served only through the lazy chain endpoint.
+		version: 4,
+		stmts: []string{
+			`CREATE TABLE IF NOT EXISTS run_dnssec_chain (
+				run_id     VARCHAR(255) NOT NULL PRIMARY KEY,
+				chain_json TEXT         NOT NULL
+			)`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies

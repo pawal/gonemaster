@@ -31,6 +31,7 @@ Public endpoint groups:
 | `POST /pub/api/v1/jobs` | Submit a public single-domain job. |
 | `GET /pub/api/v1/jobs/{public_id}` | Poll public job status. |
 | `GET /pub/api/v1/jobs/{public_id}/result` | Fetch a public job result. |
+| `GET /pub/api/v1/jobs/{public_id}/dnssec-chain` | Fetch the DNSSEC chain summary for a public run. |
 | `GET /pub/api/v1/profiles` | List stored profiles marked public. |
 | `GET /pub/api/v1/locales` | List available locales. |
 | `GET /pub/api/v1/lookup/{domain}` | Public lookup helper. |
@@ -156,11 +157,21 @@ Result reads are idempotent and the public ID is unguessable, so a CDN or
 reverse-proxy cache absorbs repeat reads better than rate limiting does.
 
 The application sets `Cache-Control: public, max-age=300` on
-`GET /pub/api/v1/jobs/{public_id}/result` (200 responses only). Public
+`GET /pub/api/v1/jobs/{public_id}/result` and, on hits, on
+`GET /pub/api/v1/jobs/{public_id}/dnssec-chain` (200 responses only). Public
 analysis snapshot endpoints already advertise `public, max-age=86400, immutable`
 when the snapshot slug is explicit in the path. Configure your reverse proxy
 or CDN to honour these headers - e.g. enable `proxy_cache` in nginx or
 caching at Caddy / Cloudflare / Fastly.
+
+## DNSSEC Chain Summary
+
+`GET /pub/api/v1/jobs/{public_id}/dnssec-chain` serves a structural summary of
+the chain of trust, extracted at run end from cached responses (no extra
+queries) and stored only for public-UI runs. The `show_dnssec_chain_public`
+flag (default `true`) gates it: when off or the id is unknown it returns `404`
+`not_found`; a run without chain data returns `404` `no_chain_data` (uncached).
+The result payload's `has_dnssec_chain` marker tells the UI when to fetch it.
 
 ## Reverse Proxy
 

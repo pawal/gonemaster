@@ -1,0 +1,529 @@
+// Pure layout for the DNSSEC chain graph: chain summary in, SVG geometry out.
+// A key signing the DNSKEY RRset self-loops and vouches for the keys below it.
+
+const NODE_W = 132;
+const NODE_H = 52;
+const H_GAP = 20;
+const V_GAP = 104;
+const PAD_X = 24;
+const PAD_TOP = 44;
+const PAD_BOTTOM = 16;
+const LOOP_PAD = 36; // right margin so a key self-loop is not clipped
+const REF_BOW = 46; // sideways bow of a CDS/CDNSKEY reference edge
+
+const ALGO = {
+  1: "RSAMD5", 3: "DSA", 5: "RSASHA1", 6: "DSA-NSEC3-SHA1", 7: "RSASHA1-NSEC3-SHA1",
+  8: "RSASHA256", 10: "RSASHA512", 12: "ECC-GOST", 13: "ECDSAP256SHA256",
+  14: "ECDSAP384SHA384", 15: "ED25519", 16: "ED448", 17: "SM2SM3", 23: "ECC-GOST12",
+};
+
+function algoLabel(algo) {
+  const m = ALGO[algo];
+  return m ? `${m} (alg ${algo})` : `alg ${algo}`;
+}
+
+const DIGEST = { 1: "SHA-1", 2: "SHA-256", 3: "GOST R 34.11-94", 4: "SHA-384", 5: "GOST R 34.11-2012", 6: "SM3" };
+
+function digestLabel(dt) {
+  const m = DIGEST[dt];
+  return m ? `${m} (${dt})` : `digest type ${dt}`;
+}
+
+// algoMnemonic / digestMnemonic return the IANA identifier, falling back to the
+// raw number when unknown.
+export function algoMnemonic(algo) {
+  return ALGO[algo] ?? String(algo);
+}
+
+export function digestMnemonic(dt) {
+  return DIGEST[dt] ?? String(dt);
+}
+
+function flagWords(k) {
+  const w = [];
+  if (k.zone_key) w.push("ZONE");
+  if (k.sep) w.push("SEP");
+  if (k.revoked) w.push("REVOKE");
+  return w.join(", ");
+}
+
+function shortHex(h) {
+  const s = String(h ?? "");
+  return s.length > 24 ? `${s.slice(0, 24)}…` : s;
+}
+
+// ttlLine returns a TTL tip line, or null when absent. A TTL of 0 is valid
+// (NSEC3PARAM commonly uses it), so only a missing field is dropped.
+function ttlLine(ttl) {
+  return ttl == null ? null : { k: "pub.dnssec_chain_tip_ttl", p: { ttl } };
+}
+
+// serversTip returns a tip line listing up to four server addresses, or null.
+// Addresses are protocol tokens, so only the label is localized.
+function serversTip(servers) {
+  if (!Array.isArray(servers) || servers.length === 0) return null;
+  const shown = servers.slice(0, 4).join(", ");
+  const list = servers.length > 4 ? `${shown}, +${servers.length - 4}` : shown;
+  return { k: "pub.dnssec_chain_tip_servers", p: { servers: list } };
+}
+
+// fmtDate renders a unix-second timestamp as an ISO date.
+export function fmtDate(sec) {
+  if (!sec) return "";
+  return new Date(sec * 1000).toISOString().slice(0, 10);
+}
+
+// worstSigTone reduces a set of signatures to the most severe tone: bad for
+// expired/bogus/no-key, warn for not-yet-valid/unsupported, else empty.
+export function worstSigTone(sigs) {
+  let tone = "";
+  for (const s of Array.isArray(sigs) ? sigs : []) {
+    if (s.state === "expired" || s.state === "bogus" || s.state === "no_key") return "bad";
+    if (s.state === "not_yet_valid" || s.state === "unsupported_algorithm") tone = "warn";
+  }
+  return tone;
+}
+
+// sigDetail carries a signature's state and window for the component to
+// localize; the component turns it into "state, from to to".
+function sigDetail(sig) {
+  return { state: sig.state, from: fmtDate(sig.inception), to: fmtDate(sig.expiration) };
+}
+
+// sigLine is a tip line whose label takes a localized signature detail.
+function sigLine(k, sig, extra = {}) {
+  return { k, p: extra, sig: sigDetail(sig) };
+}
+
+// sigTitle builds the tip lines for one RRSIG edge.
+function sigTitle(headline, sig) {
+  const lines = [
+    headline,
+    { k: "pub.dnssec_chain_tip_signing_key", p: { tag: sig.key_tag } },
+    { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(sig.algorithm) } },
+  ];
+  if (sig.inception && sig.expiration) {
+    lines.push({ k: "pub.dnssec_chain_tip_valid", p: { from: fmtDate(sig.inception), to: fmtDate(sig.expiration) } });
+  }
+  lines.push({ k: "pub.dnssec_chain_tip_status", statusState: sig.state });
+  lines.push(serversTip(sig.servers));
+  return lines.filter(Boolean);
+}
+
+// truncateName shortens a long name with a middle ellipsis. The full name is
+// meant to go into a title/tooltip via titleText.
+export function truncateName(name, max = 28) {
+  const s = String(name ?? "");
+  if (s.length <= max) return s;
+  const keep = max - 1;
+  const head = Math.ceil(keep / 2);
+  const tail = Math.floor(keep / 2);
+  return s.slice(0, head) + "…" + s.slice(s.length - tail);
+}
+
+function rowWidth(count) {
+  if (count <= 0) return NODE_W;
+  return count * NODE_W + (count - 1) * H_GAP;
+}
+
+function place(nodes, y, totalW, rowIndex) {
+  const w = rowWidth(nodes.length);
+  const startX = PAD_X + (totalW - w) / 2;
+  nodes.forEach((n, i) => {
+    n.x = startX + i * (NODE_W + H_GAP);
+    n.y = y;
+    n.w = NODE_W;
+    n.h = NODE_H;
+    n.rowIndex = rowIndex;
+  });
+}
+
+// layoutChain builds the graph. Returns null for an unsigned zone (rendered as
+// a callout, not a graph) or when there is nothing to draw.
+export function layoutChain(chain) {
+  if (!chain || chain.status === "unsigned") return null;
+
+  const dsList = Array.isArray(chain.parent?.ds) ? chain.parent.ds : [];
+  const dsSource = chain.parent?.ds_source ?? "none";
+  const dsRRSIG = Array.isArray(chain.parent?.ds_rrsig) ? chain.parent.ds_rrsig : [];
+  const parentKeys = Array.isArray(chain.parent?.dnskeys) ? chain.parent.dnskeys : [];
+  const keys = Array.isArray(chain.child?.dnskeys) ? chain.child.dnskeys : [];
+  const dnskeySigs = Array.isArray(chain.child?.dnskey_rrsig) ? chain.child.dnskey_rrsig : [];
+  const signed = Array.isArray(chain.child?.signed) ? chain.child.signed : [];
+  const links = Array.isArray(chain.links) ? chain.links : [];
+
+  // Parent DS nodes, or a dashed ghost when the zone is an island (keys, no DS).
+  // DS records are grouped by key tag: a key commonly publishes the same tag
+  // under several digest types (SHA-1 and SHA-256), drawn as one node with each
+  // digest listed in its tooltip. Tags sort ascending to match the key row.
+  const dsNodes = [];
+  if (dsList.length > 0) {
+    const dsSigLines = dsRRSIG.map((r) => sigLine("pub.dnssec_chain_tip_ds_sig", r, { tag: r.key_tag }));
+    // The DS RRSIG covers the whole DS RRset, so its worst state tints every
+    // DS node's border, making an expired DS signature visible at a glance.
+    const dsSigTone = worstSigTone(dsRRSIG);
+    const input = dsSource === "input";
+    const byTag = new Map();
+    for (const ds of dsList) {
+      const group = byTag.get(ds.key_tag);
+      if (group) group.push(ds);
+      else byTag.set(ds.key_tag, [ds]);
+    }
+    for (const tag of [...byTag.keys()].sort((a, b) => a - b)) {
+      const group = byTag.get(tag).slice().sort((a, b) => (a.digest_type ?? 0) - (b.digest_type ?? 0));
+      const first = group[0];
+      const digestLines = group.flatMap((ds) => [
+        { k: "pub.dnssec_chain_tip_digest_type", p: { dt: digestLabel(ds.digest_type) } },
+        ds.digest ? { k: "pub.dnssec_chain_tip_digest", p: { digest: shortHex(ds.digest) } } : null,
+      ]);
+      const servers = [...new Set(group.flatMap((ds) => ds.servers ?? []))];
+      dsNodes.push({
+        id: `ds-${tag}`,
+        kind: input ? "ds-input" : "ds",
+        keyTag: tag,
+        dsSigTone,
+        tip: [
+          { k: input ? "pub.dnssec_chain_tip_ds_input" : "pub.dnssec_chain_tip_ds", p: { tag } },
+          { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(first.algorithm) } },
+          ...digestLines,
+          ttlLine(first.ttl),
+          ...dsSigLines,
+          input ? null : serversTip(servers),
+        ].filter(Boolean),
+      });
+    }
+  } else {
+    dsNodes.push({ id: "ds-ghost", kind: "ds-ghost", tip: [{ k: "pub.dnssec_chain_tip_no_ds" }] });
+  }
+
+  // Parent-zone key(s) that sign the DS RRset, drawn above the DS row.
+  const parentKeyNodes = parentKeys.map((pk) => ({
+    id: `pkey-${pk.key_tag}`,
+    kind: "parent-key",
+    keyTag: pk.key_tag,
+    tip: [
+      { k: "pub.dnssec_chain_tip_parent_key", p: { tag: pk.key_tag } },
+      { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(pk.algorithm) } },
+      pk.key_size ? { k: "pub.dnssec_chain_tip_key_size", p: { bits: pk.key_size } } : null,
+      ttlLine(pk.ttl),
+      serversTip(pk.servers),
+    ].filter(Boolean),
+  }));
+
+  // Split DNSKEYs into KSK (SEP) and ZSK rows so signing edges read downward.
+  // An unanchored KSK is a rollover signal only when another KSK is anchored;
+  // with no anchored key at all the zone is broken or an island, not rolling.
+  const anyAnchored = keys.some((k) => k.anchored);
+  const kskNodes = [];
+  const zskNodes = [];
+  // The DNSKEY RRset signature(s) cover every key in the set, so show them on
+  // each key node with validity, like the DS and signed-RRset nodes do.
+  const dnskeySigLines = dnskeySigs.map((s) => sigLine("pub.dnssec_chain_tip_dnskey_sig", s, { tag: s.key_tag }));
+  for (const k of [...keys].sort((a, b) => a.key_tag - b.key_tag)) {
+    const words = flagWords(k);
+    const flagsText = words ? `${k.flags} (${words})` : `${k.flags}`;
+    const incoming = !!k.sep && !k.anchored && anyAnchored;
+    const node = {
+      id: `key-${k.key_tag}`,
+      keyTag: k.key_tag,
+      revoked: !!k.revoked,
+      incoming,
+      tip: [
+        { k: "pub.dnssec_chain_tip_key", p: { role: k.sep ? "KSK" : "ZSK", tag: k.key_tag } },
+        { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(k.algorithm) } },
+        { k: "pub.dnssec_chain_tip_flags", p: { flags: flagsText } },
+        k.key_size ? { k: "pub.dnssec_chain_tip_key_size", p: { bits: k.key_size } } : null,
+        incoming ? { k: "pub.dnssec_chain_tip_unanchored" } : null,
+        ttlLine(k.ttl),
+        ...dnskeySigLines,
+        serversTip(k.servers),
+      ].filter(Boolean),
+    };
+    if (k.sep) {
+      node.kind = "ksk";
+      kskNodes.push(node);
+    } else {
+      node.kind = "zsk";
+      zskNodes.push(node);
+    }
+  }
+
+  const signedNodes = signed.map((s) => {
+    const sigLines = (s.rrsig ?? []).map((r) => sigLine("pub.dnssec_chain_tip_rrset_sig", r, { tag: r.key_tag }));
+    const rollover = s.ds_match === "rollover";
+    const newKeys = Array.isArray(s.new_keys) ? s.new_keys : [];
+    return {
+      id: `rrset-${s.type}`,
+      kind: "rrset",
+      label: s.type,
+      rollover,
+      tip: [
+        { k: "pub.dnssec_chain_tip_rrset", p: { type: s.type } },
+        ttlLine(s.ttl),
+        ...sigLines,
+        s.refs?.length ? { k: "pub.dnssec_chain_tip_names_key", p: { tags: s.refs.join(", ") } } : null,
+        rollover && newKeys.length ? { k: "pub.dnssec_chain_tip_rollover", p: { keys: newKeys.join(", ") } } : null,
+      ].filter(Boolean),
+    };
+  });
+
+  // Phantom keys: a DS or CDS/CDNSKEY names a key tag that is absent from the
+  // DNSKEY RRset (an outgoing key already removed, or an incoming one not yet
+  // published). Draw a grey ghost so those edges have a target.
+  const keyTags = new Set(keys.map((k) => k.key_tag));
+  const phantomTags = new Set();
+  for (const l of links) {
+    if (l.status === "no_dnskey" && !keyTags.has(l.ds_key_tag)) phantomTags.add(l.ds_key_tag);
+  }
+  for (const s of signed) {
+    for (const t of s.refs ?? []) {
+      if (!keyTags.has(t)) phantomTags.add(t);
+    }
+  }
+  if (keys.length > 0) {
+    for (const tag of phantomTags) {
+      kskNodes.push({ id: `key-${tag}`, kind: "key-phantom", keyTag: tag, tip: [{ k: "pub.dnssec_chain_tip_phantom_key", p: { tag } }] });
+    }
+    // Order the KSK row by key tag so it matches the key-tag-ordered DS row and
+    // the DS -> key edges stay parallel instead of crossing.
+    kskNodes.sort((a, b) => a.keyTag - b.keyTag);
+  }
+
+  // Assemble the visible rows top to bottom, tagging which carries a label.
+  // When the parent keys are known, they sit above the DS in the parent zone.
+  const rows = [];
+  if (parentKeyNodes.length > 0) {
+    rows.push({ label: "parent", nodes: parentKeyNodes });
+    rows.push({ label: null, nodes: dsNodes });
+  } else {
+    rows.push({ label: "parent", nodes: dsNodes });
+  }
+  if (keys.length === 0) {
+    rows.push({ label: "keys", nodes: [{ id: "key-ghost", kind: "key-ghost", tip: [{ k: "pub.dnssec_chain_tip_no_dnskey" }] }] });
+  } else {
+    let keyLabelUsed = false;
+    if (kskNodes.length > 0) {
+      rows.push({ label: "keys", nodes: kskNodes });
+      keyLabelUsed = true;
+    }
+    if (zskNodes.length > 0) {
+      rows.push({ label: keyLabelUsed ? null : "keys", nodes: zskNodes });
+    }
+  }
+  if (signedNodes.length > 0) {
+    rows.push({ label: "signed", nodes: signedNodes });
+  }
+
+  const totalW = Math.max(...rows.map((r) => rowWidth(r.nodes.length)));
+  rows.forEach((r, i) => place(r.nodes, PAD_TOP + i * V_GAP, totalW, i));
+
+  const nodes = rows.flatMap((r) => r.nodes);
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+
+  const nameFor = (label) => {
+    if (label === "parent") return truncateName(chain.parent_zone ?? "");
+    if (label === "keys") return truncateName(chain.zone ?? "");
+    return "";
+  };
+  const labelKeyFor = (label) => `pub.dnssec_chain_${label === "parent" ? "parent_label" : label === "keys" ? "keys_label" : "signed_label"}`;
+  const clusters = rows
+    .filter((r) => r.label)
+    .map((r) => ({ id: r.label, labelKey: labelKeyFor(r.label), name: nameFor(r.label), x: PAD_X, y: r.nodes[0].y - 22 }));
+
+  const edges = [];
+
+  // Parent key(s) sign the DS RRset: an edge from the parent key to each DS.
+  for (const sig of dsRRSIG) {
+    const signer = byId.get(`pkey-${sig.key_tag}`);
+    if (!signer) continue;
+    for (const ds of dsNodes) {
+      if (ds.kind !== "ds" && ds.kind !== "ds-input") continue;
+      edges.push({
+        id: `dssig-${sig.key_tag}-${sig.inception ?? 0}-${ds.id}`,
+        kind: "keysig",
+        status: sig.state,
+        keyTag: sig.key_tag,
+        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_ds" }, sig),
+        from: edgePoint(signer, "bottom"),
+        to: edgePoint(ds, "top"),
+      });
+    }
+  }
+
+  // DS -> DNSKEY edges from the computed links, one per DS key tag. The digest
+  // types for a tag share one DS node, so their links collapse to a single
+  // edge: the tag is anchored when any digest matches.
+  const linksByTag = new Map();
+  for (const link of links) {
+    const group = linksByTag.get(link.ds_key_tag);
+    if (group) group.push(link);
+    else linksByTag.set(link.ds_key_tag, [link]);
+  }
+  for (const [dsTag, group] of linksByTag) {
+    const link = group.find((l) => l.status === "match") ?? group[0];
+    // Fall back to the DS node by key tag for older blobs without matching ids.
+    const from = byId.get(`ds-${dsTag}`) ?? dsNodes.find((n) => n.keyTag === dsTag);
+    if (!from) continue;
+    let toId;
+    if (link.status === "no_dnskey") {
+      // Route to the phantom key the DS names, or the generic ghost when the
+      // zone serves no DNSKEY at all.
+      toId = byId.has(`key-${dsTag}`) ? `key-${dsTag}` : "key-ghost";
+    } else {
+      toId = `key-${link.dnskey_key_tag}`;
+    }
+    const to = byId.get(toId);
+    if (!to) {
+      from.unmatched = true;
+      from.tip.push({ k: "pub.dnssec_chain_tip_no_key_tag", p: { tag: dsTag } });
+      continue;
+    }
+    const servers = [...new Set(group.flatMap((l) => l.servers ?? []))];
+    edges.push({
+      id: `link-${dsTag}-${link.dnskey_key_tag ?? "none"}`,
+      kind: "ds",
+      status: link.status,
+      dnskeyKeyTag: link.dnskey_key_tag,
+      tip: [
+        { k: "pub.dnssec_chain_tip_link", p: { ds: dsTag, key: link.dnskey_key_tag ?? "?" } },
+        { k: "pub.dnssec_chain_tip_status", linkState: link.status },
+        serversTip(servers),
+      ].filter(Boolean),
+      from: edgePoint(from, "bottom"),
+      to: edgePoint(to, "top"),
+    });
+  }
+
+  // Keys that sign the DNSKEY RRset self-loop, vouch for lower-row keys, and
+  // vouch for same-row KSKs that do not sign themselves (one signature covers
+  // the whole RRset). Edge ids carry the inception: one key can serve
+  // overlapping signatures.
+  const signingTags = new Set(dnskeySigs.map((s) => s.key_tag));
+  for (const sig of dnskeySigs) {
+    const signer = byId.get(`key-${sig.key_tag}`);
+    if (!signer) continue;
+    // An unanchored KSK's signatures are valid but off the chain of trust.
+    const incoming = !!signer.incoming;
+    edges.push({
+      id: `self-${sig.key_tag}-${sig.inception ?? 0}`,
+      kind: "selfsig",
+      status: sig.state,
+      keyTag: sig.key_tag,
+      incoming,
+      tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey" }, sig),
+      d: selfLoopPath(signer),
+    });
+    for (const target of nodes) {
+      if (target.kind !== "ksk" && target.kind !== "zsk") continue;
+      if (target.id === signer.id) continue;
+      const downward = target.rowIndex > signer.rowIndex;
+      const sibling = target.rowIndex === signer.rowIndex && target.kind === "ksk" && !signingTags.has(target.keyTag);
+      if (!downward && !sibling) continue;
+      const edge = {
+        id: `keysig-${sig.key_tag}-${sig.inception ?? 0}-${target.keyTag}`,
+        kind: "keysig",
+        status: sig.state,
+        keyTag: sig.key_tag,
+        targetTag: target.keyTag,
+        incoming,
+        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey_covers", p: { tag: target.keyTag } }, sig),
+      };
+      if (downward) {
+        edge.from = edgePoint(signer, "bottom");
+        edge.to = edgePoint(target, "top");
+      } else {
+        edge.d = siblingSigPath(signer, target);
+      }
+      edges.push(edge);
+    }
+  }
+
+  // Keys that sign zone data point at each signed RRset.
+  for (const entry of signed) {
+    const to = byId.get(`rrset-${entry.type}`);
+    if (!to) continue;
+    for (const sig of entry.rrsig ?? []) {
+      const from = byId.get(`key-${sig.key_tag}`);
+      if (!from) continue;
+      edges.push({
+        id: `sig-${entry.type}-${sig.key_tag}-${sig.inception ?? 0}`,
+        kind: "sig",
+        status: sig.state,
+        keyTag: sig.key_tag,
+        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_over", p: { type: entry.type } }, sig),
+        from: edgePoint(from, "bottom"),
+        to: edgePoint(to, "top"),
+      });
+    }
+    // CDS/CDNSKEY name a DNSKEY by tag: draw a grey reference edge to that key.
+    // It is bowed to the side so it does not sit on top of the signature edge
+    // between the same two nodes.
+    const newKeys = Array.isArray(entry.new_keys) ? entry.new_keys : [];
+    for (const tag of entry.refs ?? []) {
+      const key = byId.get(`key-${tag}`);
+      if (!key) continue;
+      const pending = newKeys.includes(tag);
+      edges.push({
+        id: `ref-${entry.type}-${tag}`,
+        kind: "ref",
+        rrset: entry.type,
+        targetTag: tag,
+        rollover: pending,
+        tip: pending
+          ? [{ k: "pub.dnssec_chain_tip_ref_pending", p: { type: entry.type, tag } }]
+          : [{ k: "pub.dnssec_chain_tip_ref", p: { type: entry.type, tag } }],
+        d: refPath(edgePoint(to, "top"), edgePoint(key, "bottom")),
+      });
+    }
+  }
+
+  const hasLoop = edges.some((e) => e.kind === "selfsig");
+  const hasRef = edges.some((e) => e.kind === "ref");
+  const rightPad = Math.max(hasLoop ? LOOP_PAD : 0, hasRef ? REF_BOW + 12 : 0);
+  const width = totalW + 2 * PAD_X + rightPad;
+  const height = PAD_TOP + (rows.length - 1) * V_GAP + NODE_H + PAD_BOTTOM;
+  return { width, height, clusters, nodes, edges };
+}
+
+// refPath draws a reference edge as a quadratic curve bowed to the right so it
+// stays clear of the straight signature edge between the same two nodes.
+function refPath(a, b) {
+  const mx = (a.x + b.x) / 2 + REF_BOW;
+  const my = (a.y + b.y) / 2;
+  return `M ${round(a.x)} ${round(a.y)} Q ${round(mx)} ${round(my)} ${round(b.x)} ${round(b.y)}`;
+}
+
+function edgePoint(node, side) {
+  const cx = node.x + node.w / 2;
+  return { x: round(cx), y: side === "top" ? node.y : node.y + node.h };
+}
+
+// siblingSigPath draws a gently bowed edge between two same-row KSK boxes. It
+// runs low on the boxes to clear the signer's self-loop and approaches the
+// target horizontally so the arrowhead points clearly into it.
+function siblingSigPath(from, to) {
+  const y = round(from.y + from.h * 0.72);
+  const leftToRight = from.x < to.x;
+  const ax = round(leftToRight ? from.x + from.w : from.x);
+  const bx = round(leftToRight ? to.x : to.x + to.w);
+  const span = Math.abs(bx - ax);
+  const bow = Math.max(10, Math.min(22, span * 0.4));
+  const dir = leftToRight ? 1 : -1;
+  const c1x = round(ax + dir * span * 0.35);
+  const c2x = round(bx - dir * span * 0.5);
+  return `M ${ax} ${y} C ${c1x} ${round(y + bow)}, ${c2x} ${y}, ${bx} ${y}`;
+}
+
+// selfLoopPath draws a small loop off the node's top-right corner, ending on the
+// right edge with the arrowhead pointing back into the node.
+function selfLoopPath(node) {
+  const sx = node.x + node.w * 0.66;
+  const sy = node.y;
+  const ex = node.x + node.w;
+  const ey = node.y + node.h * 0.3;
+  return `M ${round(sx)} ${round(sy)} C ${round(sx + 22)} ${round(sy - 28)}, ${round(ex + 30)} ${round(ey - 24)}, ${round(ex)} ${round(ey)}`;
+}
+
+function round(n) {
+  return Math.round(n * 10) / 10;
+}

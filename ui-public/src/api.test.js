@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { API_BASE, createJob, getJob, getResult, getLocales } from "./api.js";
+import { API_BASE, createJob, getJob, getResult, getLocales, getDnssecChain } from "./api.js";
 
 describe("API_BASE", () => {
   it("points to /pub/api/v1", () => {
@@ -83,5 +83,21 @@ describe("getLocales", () => {
   it("GETs /pub/api/v1/locales", async () => {
     await getLocales();
     expect(fetch).toHaveBeenCalledWith("/pub/api/v1/locales");
+  });
+});
+
+describe("getDnssecChain", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn().mockResolvedValue({ ok: true });
+  });
+
+  it("GETs /pub/api/v1/jobs/:publicID/dnssec-chain", async () => {
+    await getDnssecChain("abc12345");
+    expect(fetch).toHaveBeenCalledWith("/pub/api/v1/jobs/abc12345/dnssec-chain");
+  });
+
+  it("URL-encodes the publicID", async () => {
+    await getDnssecChain("a b/c");
+    expect(fetch).toHaveBeenCalledWith("/pub/api/v1/jobs/a%20b%2Fc/dnssec-chain");
   });
 });

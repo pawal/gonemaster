@@ -57,6 +57,7 @@ func publicProfileView(profile StoredProfile) PublicProfileView {
 type publicInfoResponse struct {
 	ShowScorePublic             bool `json:"show_score_public"`
 	ShowNameserverTimingsPublic bool `json:"show_nameserver_timings_public"`
+	ShowDNSSECChainPublic       bool `json:"show_dnssec_chain_public"`
 }
 
 // handlePublicInfo handles GET /pub/api/v1/info.
@@ -67,6 +68,7 @@ func (s *Server) handlePublicInfo(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, publicInfoResponse{
 		ShowScorePublic:             s.cfg.ShowScorePublic,
 		ShowNameserverTimingsPublic: s.cfg.ShowNameserverTimingsPublic,
+		ShowDNSSECChainPublic:       s.cfg.ShowDNSSECChainPublic,
 	})
 }
 
@@ -160,6 +162,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		ProfileName:   resolvedProfile.Name,
 		IPv4Disabled:  req.IPv4Disabled,
 		IPv6Disabled:  req.IPv6Disabled,
+		Origin:        JobOriginPublic,
 	}
 	created, err := s.store.Create(job)
 	if err != nil {
@@ -214,7 +217,38 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 	if !s.cfg.ShowNameserverTimingsPublic {
 		result.NameserverTimings = nil
 	}
+	if !s.cfg.ShowDNSSECChainPublic {
+		result.HasDNSSECChain = false
+	}
 	// Let a CDN absorb repeat reads; short window so show_* flips propagate.
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	writeJSON(w, http.StatusOK, result)
+}
+
+// handlePublicGetDNSSECChain handles GET /pub/api/v1/jobs/{publicID}/dnssec-chain.
+// Flag-off and unknown id answer 404 not_found; a run without a blob answers
+// 404 no_chain_data with no cache header so a re-run is not masked.
+func (s *Server) handlePublicGetDNSSECChain(w http.ResponseWriter, r *http.Request) {
+	if !s.cfg.ShowDNSSECChainPublic {
+		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
+		return
+	}
+	publicID := r.PathValue("publicID")
+	job, ok := s.store.GetByPublicID(publicID)
+	if !ok {
+		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
+		return
+	}
+	chain, ok, err := s.store.GetRunDNSSECChain(job.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "lookup_failed", "could not load DNSSEC chain data", nil)
+		return
+	}
+	if !ok {
+		writeError(w, http.StatusNotFound, "no_chain_data", "no DNSSEC chain data for this run", nil)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	_, _ = w.Write([]byte(chain))
 }

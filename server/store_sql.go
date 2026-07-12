@@ -154,6 +154,7 @@ type jobConfigJSON struct {
 	MinLevel      string                         `json:"min_level,omitempty"`
 	IPv4Disabled  bool                           `json:"ipv4_disabled,omitempty"`
 	IPv6Disabled  bool                           `json:"ipv6_disabled,omitempty"`
+	Origin        string                         `json:"origin,omitempty"`
 }
 
 func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
@@ -207,6 +208,7 @@ func (s *SQLJobStore) scanJob(row rowScanner) (Job, error) {
 		MinLevel:      cfg.MinLevel,
 		IPv4Disabled:  cfg.IPv4Disabled,
 		IPv6Disabled:  cfg.IPv6Disabled,
+		Origin:        cfg.Origin,
 	}, nil
 }
 
@@ -224,6 +226,7 @@ func (s *SQLJobStore) Create(job Job) (Job, error) {
 		MinLevel:      job.MinLevel,
 		IPv4Disabled:  job.IPv4Disabled,
 		IPv6Disabled:  job.IPv6Disabled,
+		Origin:        job.Origin,
 	}
 	configJSON, err := toNullJSON(cfg)
 	if err != nil {
@@ -299,6 +302,7 @@ func (s *SQLJobStore) Update(job Job) error {
 		MinLevel:      job.MinLevel,
 		IPv4Disabled:  job.IPv4Disabled,
 		IPv6Disabled:  job.IPv6Disabled,
+		Origin:        job.Origin,
 	}
 	configJSON, err := toNullJSON(cfg)
 	if err != nil {
@@ -567,7 +571,32 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 		return fmt.Errorf("delete job: %w", err)
 	}
 
+	if job.DNSSECChainJSON != "" {
+		if _, err := tx.Exec(
+			fmt.Sprintf("INSERT INTO run_dnssec_chain (run_id, chain_json) VALUES (%s, %s)", s.ph(1), s.ph(2)),
+			job.ID, job.DNSSECChainJSON,
+		); err != nil {
+			_ = tx.Rollback()
+			return fmt.Errorf("insert dnssec chain: %w", err)
+		}
+	}
+
 	return tx.Commit()
+}
+
+// GetRunDNSSECChain returns the stored chain summary JSON for a run.
+func (s *SQLJobStore) GetRunDNSSECChain(runID string) (string, bool, error) {
+	var chain string
+	err := s.db.QueryRow(
+		fmt.Sprintf("SELECT chain_json FROM run_dnssec_chain WHERE run_id = %s", s.ph(1)), runID,
+	).Scan(&chain)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return chain, true, nil
 }
 
 // upsertDomainTx gets or creates a domain row inside tx, returning its ID.
@@ -657,7 +686,14 @@ func (s *SQLJobStore) GetResult(jobID string) (JobResult, bool) {
 		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
 	}
 	sr := scoring.Compute(run.Domain, scoringEntries, s.scoringCfg)
-	return buildJobResult(run, entries, &sr), true
+	result := buildJobResult(run, entries, &sr)
+	var probe int
+	if err := s.db.QueryRow(
+		fmt.Sprintf("SELECT 1 FROM run_dnssec_chain WHERE run_id = %s", s.ph(1)), jobID,
+	).Scan(&probe); err == nil {
+		result.HasDNSSECChain = true
+	}
+	return result, true
 }
 
 // loadEntries loads all entries for a run, ordered by timestamp.
@@ -2000,6 +2036,7 @@ func (s *SQLJobStore) DeleteBatch(batchID string) ([]int64, error) {
 		{"analysis_run_domain_facts", fmt.Sprintf(`DELETE FROM analysis_run_domain_facts WHERE run_id IN (%s)`, runSetSubquery)},
 		{"analysis_run_domain_summary", fmt.Sprintf(`DELETE FROM analysis_run_domain_summary WHERE run_id IN (%s)`, runSetSubquery)},
 		{"entries", fmt.Sprintf(`DELETE FROM entries WHERE run_id IN (%s)`, runSetSubquery)},
+		{"run_dnssec_chain", fmt.Sprintf(`DELETE FROM run_dnssec_chain WHERE run_id IN (%s)`, runSetSubquery)},
 		{"runs", fmt.Sprintf(`DELETE FROM runs WHERE batch_id = %s`, ph)},
 		{"jobs", fmt.Sprintf(`DELETE FROM jobs WHERE batch_id = %s`, ph)},
 		{"batches", fmt.Sprintf(`DELETE FROM batches WHERE id = %s`, ph)},
@@ -2446,6 +2483,10 @@ func (s *SQLJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
 			_ = tx.Rollback()
 			return total, fmt.Errorf("purge entries: %w", err)
 		}
+		if _, err := tx.Exec(`DELETE FROM run_dnssec_chain WHERE run_id IN (`+inPH+`)`, args...); err != nil {
+			_ = tx.Rollback()
+			return total, fmt.Errorf("purge dnssec chains: %w", err)
+		}
 		res, err := tx.Exec(`DELETE FROM runs WHERE id IN (`+inPH+`)`, args...)
 		if err != nil {
 			_ = tx.Rollback()
@@ -2508,6 +2549,10 @@ func (s *SQLJobStore) PurgeByTag(tag string) (int64, error) {
 		if _, err := tx.Exec(`DELETE FROM entries WHERE run_id IN (`+inPH+`)`, args...); err != nil {
 			_ = tx.Rollback()
 			return total, fmt.Errorf("purge by tag entries: %w", err)
+		}
+		if _, err := tx.Exec(`DELETE FROM run_dnssec_chain WHERE run_id IN (`+inPH+`)`, args...); err != nil {
+			_ = tx.Rollback()
+			return total, fmt.Errorf("purge by tag dnssec chains: %w", err)
 		}
 		res, err := tx.Exec(`DELETE FROM runs WHERE id IN (`+inPH+`)`, args...)
 		if err != nil {

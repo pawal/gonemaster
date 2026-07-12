@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
-	"fmt"
 	"maps"
-	"math/big"
 	"slices"
 	"sort"
 	"strconv"
@@ -18,6 +16,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/dnssecutil"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -7103,34 +7102,7 @@ func rrsetForName(rrs []dns.RR, owner string) []dns.RR {
 	return out
 }
 
-func dnskeyKeySize(key *dns.DNSKEY) int {
-	if key == nil || key.PublicKey == "" {
-		return 0
-	}
-	keybuf, err := base64.StdEncoding.DecodeString(key.PublicKey)
-	if err != nil || len(keybuf) == 0 {
-		return 0
-	}
-
-	explen := int(keybuf[0])
-	keyoff := 1
-	if explen == 0 {
-		if len(keybuf) < 3 {
-			return 0
-		}
-		explen = int(keybuf[1])<<8 | int(keybuf[2])
-		keyoff = 3
-	}
-	if explen <= 0 || keyoff+explen >= len(keybuf) {
-		return 0
-	}
-
-	modulus := keybuf[keyoff+explen:]
-	if len(modulus) == 0 {
-		return 0
-	}
-	return new(big.Int).SetBytes(modulus).BitLen()
-}
+var dnskeyKeySize = dnssecutil.KeySize
 
 func rrsigHasKeytag(rrs []*dns.RRSIG, keytag uint16) bool {
 	for _, sig := range rrs {
@@ -7672,14 +7644,7 @@ func containsDS(records []*dns.DS, candidate *dns.DS) bool {
 	return false
 }
 
-func dsDigestSupported(digest uint8) bool {
-	switch digest {
-	case 1, 2, 3, 4:
-		return true
-	default:
-		return false
-	}
-}
+var dsDigestSupported = dnssecutil.DigestSupported
 
 // cdsDigestMUST: digest types designated MUST in the IANA "Implement for
 // DNSSEC Delegation" column. RFC 9975 restricts CDS consistency checks to
@@ -7791,29 +7756,11 @@ func rrsigTypeString(typeCovered uint16) string {
 	return strconv.Itoa(int(typeCovered))
 }
 
-func dnssecAlgorithmSupported(algo uint8) bool {
-	switch algo {
-	case dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519:
-		return true
-	default:
-		return false
-	}
-}
-
-func verifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) (err error) {
-	if sig == nil || key == nil {
-		return errors.New("missing rrsig or key")
-	}
-	if !sig.ValidPeriod(at) {
-		return errors.New("rrsig not valid at time")
-	}
-	defer func() {
-		if r := recover(); r != nil {
-			err = fmt.Errorf("dns library panic during RRSIG verification: %v", r)
-		}
-	}()
-	return sig.Verify(key, rrset, &dns.SignOption{})
-}
+// Aliases to the shared dnssecutil primitives; behavior is identical.
+var (
+	dnssecAlgorithmSupported = dnssecutil.AlgorithmSupported
+	verifyRRSIG              = dnssecutil.VerifyRRSIG
+)
 
 // DNSSEC20 runs the DNSSEC20 test case.
 // It verifies that the NSEC/NSEC3 type bitmap at the zone apex accurately

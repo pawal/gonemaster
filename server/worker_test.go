@@ -60,6 +60,10 @@ func (s *spyJobStore) GetResult(jobID string) (JobResult, bool) {
 	return s.inner.GetResult(jobID)
 }
 
+func (s *spyJobStore) GetRunDNSSECChain(runID string) (string, bool, error) {
+	return s.inner.GetRunDNSSECChain(runID)
+}
+
 func (s *spyJobStore) GetOrCreateDomain(name string) (Domain, error) {
 	return s.inner.GetOrCreateDomain(name)
 }
@@ -369,11 +373,11 @@ func TestRunEngineForJobParallel(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -411,11 +415,11 @@ func TestRunEngineForJobLimiter(t *testing.T) {
 
 	errs := make(chan error, 2)
 	go func() {
-		_, _, _, _, err := srv.runEngineForJob(job1, context.Background())
+		_, err := srv.runEngineForJob(job1, context.Background())
 		errs <- err
 	}()
 	go func() {
-		_, _, _, _, err := srv.runEngineForJob(job2, context.Background())
+		_, err := srv.runEngineForJob(job2, context.Background())
 		errs <- err
 	}()
 
@@ -462,7 +466,7 @@ func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
 		},
 	}
 
-	_, _, _, _, err := srv.runEngineForJob(job, context.Background())
+	_, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -504,7 +508,7 @@ func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	_, _, _, _, err := srv.runEngineForJob(job, context.Background())
+	_, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -533,7 +537,7 @@ func TestRunEngineForJobPassesIPDisableFlags(t *testing.T) {
 		IPv6Disabled: true,
 	}
 
-	_, _, _, _, err := srv.runEngineForJob(job, context.Background())
+	_, err := srv.runEngineForJob(job, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -555,7 +559,7 @@ func TestRunEngineForJobPassesIPDisableFlags(t *testing.T) {
 		CreatedAt:    time.Now().UTC(),
 		IPv4Disabled: true,
 	}
-	_, _, _, _, err = srv.runEngineForJob(job2, context.Background())
+	_, err = srv.runEngineForJob(job2, context.Background())
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -603,7 +607,8 @@ func TestRunEngineForJobPassesCacheStore(t *testing.T) {
 		CreatedAt: time.Now().UTC(),
 	}
 
-	_, stats, _, _, err := srv.runEngineForJob(job, context.Background())
+	art, err := srv.runEngineForJob(job, context.Background())
+	stats := art.stats
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -649,7 +654,8 @@ func TestRunEngineForJobHotCacheReportsWarmQueryMetrics(t *testing.T) {
 	}
 
 	jobA := Job{ID: "job-hot-a", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()}
-	_, statsA, _, _, err := srv.runEngineForJob(jobA, context.Background())
+	artA, err := srv.runEngineForJob(jobA, context.Background())
+	statsA := artA.stats
 	if err != nil {
 		t.Fatalf("first runEngineForJob: %v", err)
 	}
@@ -658,7 +664,8 @@ func TestRunEngineForJobHotCacheReportsWarmQueryMetrics(t *testing.T) {
 	}
 
 	jobB := Job{ID: "job-hot-b", Domain: "example.net", Status: JobQueued, CreatedAt: time.Now().UTC()}
-	_, statsB, _, _, err := srv.runEngineForJob(jobB, context.Background())
+	artB, err := srv.runEngineForJob(jobB, context.Background())
+	statsB := artB.stats
 	if err != nil {
 		t.Fatalf("second runEngineForJob: %v", err)
 	}
@@ -806,7 +813,8 @@ func TestRunEngineForJobClampsNonGlobalGuard(t *testing.T) {
 	srv := New(DefaultConfig())
 	var captured engine.RunRequest
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) { captured = req; return nil, nil }
-	_, _, _, effective, err := srv.runEngineForJob(makeJob(), context.Background())
+	artDefault, err := srv.runEngineForJob(makeJob(), context.Background())
+	effective := artDefault.effectiveProfile
 	if err != nil {
 		t.Fatalf("runEngineForJob: %v", err)
 	}
@@ -827,7 +835,8 @@ func TestRunEngineForJobClampsNonGlobalGuard(t *testing.T) {
 	srvAllow := New(cfgAllow)
 	var capturedAllow engine.RunRequest
 	srvAllow.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) { capturedAllow = req; return nil, nil }
-	_, _, _, effectiveAllow, err := srvAllow.runEngineForJob(makeJob(), context.Background())
+	artAllow, err := srvAllow.runEngineForJob(makeJob(), context.Background())
+	effectiveAllow := artAllow.effectiveProfile
 	if err != nil {
 		t.Fatalf("runEngineForJob (allow): %v", err)
 	}

@@ -28,6 +28,13 @@ Path: `/public/`
 The public test UI lets an end user submit one domain test and retrieve the
 result through the restricted public API.
 
+When a signed zone is tested, the result page shows a collapsed "DNSSEC chain of
+trust" section. Expanding it lazily fetches the stored chain summary and draws a
+hand-rolled SVG graph of the parent DS records, the zone's DNSKEYs, and the
+signatures linking them, with a parallel text summary for assistive tech. The
+section only appears when `show_dnssec_chain_public` is enabled and the run has
+chain data (public-UI runs only).
+
 ## Public Analysis UI
 
 Path: `/analysis/`

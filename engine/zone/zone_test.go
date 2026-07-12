@@ -537,3 +537,56 @@ func TestZoneApexNSNamesNilZone(t *testing.T) {
 		t.Fatalf("expected error for nil zone")
 	}
 }
+
+func TestCachedParentReturnsMemoizedState(t *testing.T) {
+	// A nil zone and an unresolved zone both report "not resolved".
+	var nilZone *Zone
+	if p, ok := nilZone.CachedParent(); ok || p != nil {
+		t.Fatalf("nil zone: got (%v, %v), want (nil, false)", p, ok)
+	}
+	unresolved := &Zone{Name: dnsname.New("example")}
+	if p, ok := unresolved.CachedParent(); ok || p != nil {
+		t.Fatalf("unresolved: got (%v, %v), want (nil, false)", p, ok)
+	}
+
+	// Once parent resolution has run the memoized value is returned as-is,
+	// including the nil-parent-but-resolved case (parentSet true, parent nil).
+	parent := &Zone{Name: dnsname.New("se")}
+	resolved := &Zone{Name: dnsname.New("example.se"), parent: parent, parentSet: true}
+	if p, ok := resolved.CachedParent(); !ok || p != parent {
+		t.Fatalf("resolved: got (%v, %v), want (parent, true)", p, ok)
+	}
+	resolvedNil := &Zone{Name: dnsname.New("com"), parentSet: true}
+	if p, ok := resolvedNil.CachedParent(); !ok || p != nil {
+		t.Fatalf("resolved-nil: got (%v, %v), want (nil, true)", p, ok)
+	}
+}
+
+func TestCachedNSReturnsMemoizedCopy(t *testing.T) {
+	var nilZone *Zone
+	if ns, ok := nilZone.CachedNS(); ok || ns != nil {
+		t.Fatalf("nil zone: got (%v, %v), want (nil, false)", ns, ok)
+	}
+	unresolved := &Zone{Name: dnsname.New("example")}
+	if ns, ok := unresolved.CachedNS(); ok || ns != nil {
+		t.Fatalf("unresolved: got (%v, %v), want (nil, false)", ns, ok)
+	}
+
+	ctx, _, _ := testhelpers.Context(t)
+	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	z := &Zone{Name: dnsname.New("example"), ns: []nameserver.Nameserver{ns1}, nsSet: true}
+	got, ok := z.CachedNS()
+	if !ok || len(got) != 1 {
+		t.Fatalf("resolved: got (%v, %v), want 1 nameserver, true", got, ok)
+	}
+
+	// The returned slice must be a copy: mutating it must not affect the zone.
+	got[0] = nameserver.Nameserver{}
+	again, _ := z.CachedNS()
+	if again[0].AddressString() != "192.0.2.1" {
+		t.Fatalf("CachedNS returned an aliased slice; zone state was mutated")
+	}
+}

@@ -151,6 +151,38 @@ describe("App", () => {
     expect(screen.queryByTestId("nameserver-timings")).toBeNull();
   });
 
+  it("shows the DNSSEC chain section when public info enables it and the marker is set", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/info", { ok: true, json: async () => ({ show_dnssec_chain_public: true }) }],
+      ["jobs/abc12345/result", {
+        ok: true,
+        status: 200,
+        json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [] }, has_dnssec_chain: true }),
+      }],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("dnssec-chain"));
+  });
+
+  it("hides the DNSSEC chain section by default (fail-safe, no info)", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["jobs/abc12345/result", {
+        ok: true,
+        status: 200,
+        json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [] }, has_dnssec_chain: true }),
+      }],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("results-view"));
+    expect(screen.queryByTestId("dnssec-chain")).toBeNull();
+  });
+
   it("shows ExpiredResult when job is expired", async () => {
     window.location.hash = "#/result/abc12345";
     fetchRouter([

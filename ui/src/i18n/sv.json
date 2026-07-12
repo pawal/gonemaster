@@ -271,7 +271,7 @@
   "tc.dnssec15": "Existens av CDS och CDNSKEY",
   "tc.dnssec16": "Validera CDS",
   "tc.dnssec17": "Validera CDNSKEY",
-  "tc.dnssec18": "Validera förtroendekedja från DS till CDS och CDNSKEY",
+  "tc.dnssec18": "Validera tillitskedja från DS till CDS och CDNSKEY",
   "tc.dnssec19": "Kontrollera DNSKEY-poster för kända kryptografiska svagheter",
   "tc.dnssec20": "NSEC/NSEC3-typbitkarta vid zonens apex matchar faktiska RR-typer",
   "tc.dnssec21": "Föräldrazonens DS RRset är signerat av en giltig DNSKEY",

@@ -4,6 +4,7 @@
   import { getResult } from "../api.js";
   import { LEVELS, levelClass, bannerClass, worstLevel } from "../severity.js";
   import ShareButton from "./ShareButton.svelte";
+  import DnssecChain from "./DnssecChain.svelte";
 
   // Force all <details> open before printing, restore after.
   let closedBeforePrint = [];
@@ -33,7 +34,7 @@
     return LEVELS.filter((l) => counts[l]).map((l) => ({ level: l, count: counts[l] }));
   }
 
-  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false, nameserverTimingsEnabled = true, ontestparent } = $props();
+  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false, nameserverTimingsEnabled = true, dnssecChainEnabled = false, ontestparent } = $props();
 
   let finishedStr = $derived((() => {
     if (!finishedAt) return "";
@@ -44,6 +45,7 @@
   let entries = $state([]);
   let nameserverTimings = $state([]);
   let score = $state(null);
+  let hasDnssecChain = $state(false);
   let loading = $state(true);
   let errorKey = $state("");
   const NOTICE_IDX = LEVELS.indexOf("NOTICE");
@@ -58,6 +60,7 @@
     loading = true;
     errorKey = "";
     score = null;
+    hasDnssecChain = false;
     try {
       const res = await getResult(pid, loc);
       if (!res.ok) {
@@ -70,6 +73,7 @@
       entries = data.raw?.entries ?? [];
       nameserverTimings = data.nameserver_timings ?? [];
       score = data.score ?? null;
+      hasDnssecChain = data.has_dnssec_chain === true;
       loading = false;
     } catch (_) {
       errorKey = "pub.error_network";
@@ -433,6 +437,9 @@
         </div>
       </details>
     {/each}
+    {#if dnssecChainEnabled && hasDnssecChain}
+      <DnssecChain {publicID} {domain} />
+    {/if}
     {#if nameserverTimingsEnabled && nameserverTimings.length > 0}
       <details class="score-bonus ns-timings-card" data-testid="nameserver-timings">
         <summary class="score-bonus-summary ns-timings-summary">

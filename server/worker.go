@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -207,9 +208,9 @@ func (s *Server) runJob(jobID string) error {
 	s.initProgressWriteState(job.ID, 0, now)
 	defer s.clearProgressWriteState(job.ID)
 
-	entries, qStats, nsTimings, effectiveProfile, runErr := s.runEngineForJob(job, jobCtx)
-	s.metrics.ObserveDNSQueries(qStats.ipv4, qStats.ipv6)
-	s.metrics.ObserveCacheMetrics(qStats.cacheHits, qStats.cacheMisses, qStats.cacheEvictions)
+	art, runErr := s.runEngineForJob(job, jobCtx)
+	s.metrics.ObserveDNSQueries(art.stats.ipv4, art.stats.ipv6)
+	s.metrics.ObserveCacheMetrics(art.stats.cacheHits, art.stats.cacheMisses, art.stats.cacheEvictions)
 	finishedAt := time.Now().UTC()
 
 	if jobCtx.Err() != nil {
@@ -224,13 +225,14 @@ func (s *Server) runJob(jobID string) error {
 
 	job.Progress = 100
 	job.FinishedAt = finishedAt
-	job.EffectiveProfile = effectiveProfile
-	job.NameserverTimings = nsTimings
+	job.EffectiveProfile = art.effectiveProfile
+	job.NameserverTimings = art.nsTimings
+	job.DNSSECChainJSON = art.dnssecChainJSON
 
 	// Get previous status for metrics before graduation removes the job.
 	previous, prevOK := s.store.Get(job.ID)
 
-	if err := s.store.GraduateJob(job, entries); err != nil {
+	if err := s.store.GraduateJob(job, art.entries); err != nil {
 		log.Printf("CRITICAL: job %s: failed to graduate: %v", job.ID, err)
 		return err
 	}
@@ -246,7 +248,7 @@ func (s *Server) runJob(jobID string) error {
 		if !job.StartedAt.IsZero() {
 			duration = finishedAt.Sub(job.StartedAt)
 		}
-		s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, severityTotalsFromEntries(entries))
+		s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, severityTotalsFromEntries(art.entries))
 	}
 
 	if s.analysis != nil {
@@ -266,10 +268,23 @@ type jobQueryStats struct {
 	cacheEvictions int64
 }
 
-func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntry, jobQueryStats, []NameserverTiming, string, error) {
+// jobArtifacts bundles everything a run produces for graduation.
+type jobArtifacts struct {
+	entries          []engine.LogEntry
+	stats            jobQueryStats
+	nsTimings        []NameserverTiming
+	effectiveProfile string
+	dnssecChainJSON  string
+}
+
+// maxDNSSECChainBytes bounds the stored chain blob well under the MariaDB
+// TEXT limit; oversized summaries are dropped rather than truncated.
+const maxDNSSECChainBytes = 60 * 1024
+
+func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, error) {
 	if s.engineLimiter != nil {
 		if err := s.engineLimiter.Acquire(ctx); err != nil {
-			return nil, jobQueryStats{}, nil, "", err
+			return jobArtifacts{}, err
 		}
 		defer s.engineLimiter.Release()
 	}
@@ -332,15 +347,15 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		queryCounter.Callback,
 	}
 	if err := applyProfileOverrides(&req, s.store, job.ProfileID, job.Overrides, s.cfg.ProfilePath); err != nil {
-		return nil, jobQueryStats{}, nil, "", err
+		return jobArtifacts{}, err
 	}
 	effectiveProfile, err := engine.EffectiveProfile(req)
 	if err != nil {
-		return nil, jobQueryStats{}, nil, "", err
+		return jobArtifacts{}, err
 	}
 	effectiveProfileJSON, err := effectiveProfile.ToJSON()
 	if err != nil {
-		return nil, jobQueryStats{}, nil, "", err
+		return jobArtifacts{}, err
 	}
 
 	if len(job.Tests) == 0 {
@@ -349,6 +364,16 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		}
 	}
 	req.LogCallback = chainLogCallbacks(callbacks...)
+
+	// Public jobs only; multi-testcase jobs keep the summary with most evidence.
+	var chainSummary *dnssecchain.Summary
+	if job.Origin == JobOriginPublic && s.cfg.ShowDNSSECChainPublic {
+		req.DNSSECChainSink = func(sm *dnssecchain.Summary) {
+			if chainEvidenceScore(sm) >= chainEvidenceScore(chainSummary) {
+				chainSummary = sm
+			}
+		}
+	}
 
 	collectStats := func() jobQueryStats {
 		ipv4, ipv6 := queryCounter.Totals()
@@ -362,33 +387,68 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) ([]engine.LogEntr
 		}
 	}
 
-	if len(job.Tests) == 1 {
-		req.Testcases = []string{job.Tests[0]}
-		entries, err := s.runEngine(req)
-		return entries, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), entries), effectiveProfileJSON, err
-	}
-	if len(job.Tests) == 0 {
-		entries, err := s.runEngine(req)
-		return entries, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), entries), effectiveProfileJSON, err
+	var entries []engine.LogEntry
+	var runErr error
+	if total := len(job.Tests); total <= 1 {
+		req.Testcases = job.Tests
+		entries, runErr = s.runEngine(req)
+	} else {
+		for i, testcase := range job.Tests {
+			runReq := req
+			runReq.Testcases = []string{testcase}
+			part, err := s.runEngine(runReq)
+			progress := int(math.Round((float64(i+1) / float64(total)) * 100))
+			s.updateJobProgress(job.ID, progress)
+			if err != nil {
+				runErr = err
+				break
+			}
+			entries = append(entries, part...)
+		}
 	}
 
-	var all []engine.LogEntry
-	total := len(job.Tests)
-	for i, testcase := range job.Tests {
-		runReq := req
-		runReq.Testcases = []string{testcase}
-		entries, err := s.runEngine(runReq)
-		if total > 0 {
-			done := i + 1
-			progress := int(math.Round((float64(done) / float64(total)) * 100))
-			s.updateJobProgress(job.ID, progress)
-		}
-		if err != nil {
-			return all, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), all), effectiveProfileJSON, err
-		}
-		all = append(all, entries...)
+	art := jobArtifacts{
+		entries:          entries,
+		stats:            collectStats(),
+		nsTimings:        s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), entries),
+		effectiveProfile: effectiveProfileJSON,
+		dnssecChainJSON:  s.marshalDNSSECChain(chainSummary),
 	}
-	return all, collectStats(), s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), all), effectiveProfileJSON, nil
+	return art, runErr
+}
+
+// chainEvidenceScore ranks summaries: parent evidence outweighs child evidence.
+func chainEvidenceScore(sm *dnssecchain.Summary) int {
+	if sm == nil {
+		return -1
+	}
+	score := 0
+	if len(sm.Parent.ServersQueried) > 0 || sm.Parent.DSSource == dnssecchain.DSSourceInput {
+		score += 2
+	}
+	if len(sm.Child.ServersQueried) > 0 {
+		score++
+	}
+	return score
+}
+
+// marshalDNSSECChain serializes the chain summary, dropping it when nil or
+// larger than the storage cap.
+func (s *Server) marshalDNSSECChain(sm *dnssecchain.Summary) string {
+	if sm == nil {
+		return ""
+	}
+	blob, err := json.Marshal(sm)
+	if err != nil {
+		return ""
+	}
+	if len(blob) > maxDNSSECChainBytes {
+		if s.cfg.Debug {
+			log.Printf("dnssec chain: %d bytes exceeds %d cap, skipping", len(blob), maxDNSSECChainBytes)
+		}
+		return ""
+	}
+	return string(blob)
 }
 
 func (s *Server) runEngine(req engine.RunRequest) ([]engine.LogEntry, error) {

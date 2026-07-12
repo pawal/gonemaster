@@ -273,6 +273,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /entries", s.handleListEntries)
 
 	apiMux.HandleFunc("GET /runs/{id}/result", s.handleGetRunResult)
+	apiMux.HandleFunc("GET /runs/{id}/dnssec-chain", s.handleGetRunDNSSECChain)
 	apiMux.HandleFunc("GET /runs/{id}", s.handleGetRun)
 	apiMux.HandleFunc("GET /runs", s.handleListRuns)
 
@@ -323,6 +324,7 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
 	pubMux.HandleFunc("GET /profiles", s.handlePublicProfiles)
 	pubMux.HandleFunc("GET /jobs/{publicID}/result", s.handlePublicGetResult)
+	pubMux.HandleFunc("GET /jobs/{publicID}/dnssec-chain", s.handlePublicGetDNSSECChain)
 	pubMux.HandleFunc("GET /jobs/{publicID}", s.handlePublicGetJob)
 	pubMux.HandleFunc("GET /locales", s.handleLocales)
 	pubMux.HandleFunc("GET /lookup/{domain}", s.handlePublicLookupDomain)

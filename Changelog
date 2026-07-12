@@ -2,9 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.6.0] - 2026-07-12
 
-Reports a stale DS at the parent of an unsigned zone as an error. Adds a DNSSEC chain-of-trust graph to the public result page. Adds SEO metadata to the analysis dashboards. Flag timed-out name servers as unreachable.
+Reports a stale DS at the parent of an unsigned zone as an error. Adds a DNSSEC chain-of-trust graph to the public result page. Adds SEO metadata to the analysis dashboards. Flags timed-out name servers as unreachable.
 
 ### Added
 

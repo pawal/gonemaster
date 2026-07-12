@@ -281,6 +281,41 @@ describe("layoutChain", () => {
     expect(ds.dsSigTone).toBe("");
   });
 
+  it("draws a sibling signing edge from a signing KSK to a non-signing KSK", () => {
+    // Two anchored KSKs, but only 10075 signs the DNSKEY RRset; its signature
+    // covers the whole RRset, so it vouches for the non-signing KSK 37745.
+    const chain = secureChain();
+    chain.child.dnskeys = [
+      { key_tag: 10075, algorithm: 8, flags: 257, sep: true, anchored: true, servers: ["203.0.113.1"] },
+      { key_tag: 37745, algorithm: 8, flags: 257, sep: true, anchored: true, servers: ["203.0.113.1"] },
+      { key_tag: 23415, algorithm: 8, flags: 256, sep: false, servers: ["203.0.113.1"] },
+    ];
+    chain.child.dnskey_rrsig = [{ key_tag: 10075, algorithm: 8, state: "valid" }];
+    const g = layoutChain(chain);
+    const sibling = g.edges.find((e) => e.kind === "keysig" && e.keyTag === 10075 && e.targetTag === 37745);
+    expect(sibling).toBeTruthy();
+    // Same-row sibling edges render as a path, not a straight line.
+    expect(typeof sibling.d).toBe("string");
+    // 10075 still vouches downward for the ZSK too.
+    expect(g.edges.some((e) => e.kind === "keysig" && e.keyTag === 10075 && e.targetTag === 23415)).toBe(true);
+  });
+
+  it("does not draw sibling edges when both KSKs sign the DNSKEY RRset", () => {
+    const chain = secureChain();
+    chain.child.dnskeys = [
+      { key_tag: 872, algorithm: 8, flags: 257, sep: true, anchored: true, servers: ["203.0.113.1"] },
+      { key_tag: 62294, algorithm: 8, flags: 257, sep: true, anchored: true, servers: ["203.0.113.1"] },
+    ];
+    chain.child.dnskey_rrsig = [
+      { key_tag: 872, algorithm: 8, state: "valid" },
+      { key_tag: 62294, algorithm: 8, state: "valid" },
+    ];
+    const g = layoutChain(chain);
+    // Both self-sign, so no KSK -> KSK vouching edge is needed.
+    const ksks = new Set([872, 62294]);
+    expect(g.edges.some((e) => e.kind === "keysig" && ksks.has(e.targetTag))).toBe(false);
+  });
+
   it("marks an unanchored KSK incoming and de-emphasizes its edges", () => {
     // Double-signature KSK rollover: KSK 1000 is anchored by a DS; KSK 3000
     // signs the DNSKEY RRset but has no DS yet, so it is an incoming key.

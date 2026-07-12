@@ -284,7 +284,7 @@
             {/each}
 
             {#each mainEdges as edge (edge.id)}
-              {#if edge.kind === "selfsig"}
+              {#if edge.d}
                 <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={buildTip(edge.tip)}></path>
               {:else}
                 <line

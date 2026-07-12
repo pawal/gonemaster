@@ -323,8 +323,11 @@ export function layoutChain(chain) {
     });
   }
 
-  // Keys that sign the DNSKEY RRset self-loop and vouch for lower-row keys.
-  // Edge ids carry the inception: one key can serve overlapping signatures.
+  // Keys that sign the DNSKEY RRset self-loop, vouch for lower-row keys, and
+  // vouch for same-row KSKs that do not sign themselves (one signature covers
+  // the whole RRset). Edge ids carry the inception: one key can serve
+  // overlapping signatures.
+  const signingTags = new Set(dnskeySigs.map((s) => s.key_tag));
   for (const sig of dnskeySigs) {
     const signer = byId.get(`key-${sig.key_tag}`);
     if (!signer) continue;
@@ -340,9 +343,12 @@ export function layoutChain(chain) {
       d: selfLoopPath(signer),
     });
     for (const target of nodes) {
-      if ((target.kind !== "ksk" && target.kind !== "zsk") || target.id === signer.id) continue;
-      if (target.rowIndex <= signer.rowIndex) continue;
-      edges.push({
+      if (target.kind !== "ksk" && target.kind !== "zsk") continue;
+      if (target.id === signer.id) continue;
+      const downward = target.rowIndex > signer.rowIndex;
+      const sibling = target.rowIndex === signer.rowIndex && target.kind === "ksk" && !signingTags.has(target.keyTag);
+      if (!downward && !sibling) continue;
+      const edge = {
         id: `keysig-${sig.key_tag}-${sig.inception ?? 0}-${target.keyTag}`,
         kind: "keysig",
         status: sig.state,
@@ -350,9 +356,14 @@ export function layoutChain(chain) {
         targetTag: target.keyTag,
         incoming,
         tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey_covers", p: { tag: target.keyTag } }, sig),
-        from: edgePoint(signer, "bottom"),
-        to: edgePoint(target, "top"),
-      });
+      };
+      if (downward) {
+        edge.from = edgePoint(signer, "bottom");
+        edge.to = edgePoint(target, "top");
+      } else {
+        edge.d = siblingSigPath(signer, target);
+      }
+      edges.push(edge);
     }
   }
 
@@ -414,6 +425,18 @@ function refPath(a, b) {
 function edgePoint(node, side) {
   const cx = node.x + node.w / 2;
   return { x: round(cx), y: side === "top" ? node.y : node.y + node.h };
+}
+
+// siblingSigPath draws a bowed edge between two same-row KSK boxes, entering
+// the target on its facing side with the arrowhead.
+function siblingSigPath(from, to) {
+  const y = round(from.y + from.h / 2);
+  const leftToRight = from.x < to.x;
+  const ax = round(leftToRight ? from.x + from.w : from.x);
+  const bx = round(leftToRight ? to.x : to.x + to.w);
+  const bow = Math.max(14, Math.min(30, Math.abs(bx - ax) * 0.4));
+  const mx = round((ax + bx) / 2);
+  return `M ${ax} ${y} Q ${mx} ${round(y - bow)} ${bx} ${y}`;
 }
 
 // selfLoopPath draws a small loop off the node's top-right corner, ending on the

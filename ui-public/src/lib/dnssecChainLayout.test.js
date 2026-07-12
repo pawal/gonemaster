@@ -434,10 +434,10 @@ describe("layoutChain", () => {
     expect(hasTip(input, "pub.dnssec_chain_tip_ds_input")).toBe(true);
   });
 
-  it("keeps dual-digest DS records for one key tag as distinct nodes and edges", () => {
+  it("groups dual-digest DS records for one key tag into a single node and edge", () => {
     // A parent commonly publishes SHA-256 and SHA-384 DS records for the same
-    // KSK. Both must get unique node and edge ids or Svelte's keyed each
-    // blocks throw on duplicates and the graph fails to render.
+    // KSK. They collapse to one DS node (both digests listed in its tooltip)
+    // and one DS -> DNSKEY edge, rather than two boxes with the same tag.
     const chain = secureChain();
     chain.parent.ds = [
       { key_tag: 1000, algorithm: 13, digest_type: 2, digest: "ab", servers: ["192.0.2.1"] },
@@ -449,15 +449,36 @@ describe("layoutChain", () => {
     ];
     const g = layoutChain(chain);
     const dsNodes = g.nodes.filter((n) => n.kind === "ds");
-    expect(dsNodes).toHaveLength(2);
+    expect(dsNodes).toHaveLength(1);
+    expect(dsNodes[0].id).toBe("ds-1000");
+    // Both digest types appear in the one node's tooltip.
+    const digestTypes = dsNodes[0].tip.filter((l) => l.k === "pub.dnssec_chain_tip_digest_type").map((l) => l.p.dt);
+    expect(digestTypes).toEqual(["SHA-256 (2)", "SHA-384 (4)"]);
     const dsEdges = g.edges.filter((e) => e.kind === "ds");
-    expect(dsEdges).toHaveLength(2);
+    expect(dsEdges).toHaveLength(1);
+    expect(dsEdges[0].status).toBe("match");
     const nodeIds = new Set(g.nodes.map((n) => n.id));
     const edgeIds = new Set(g.edges.map((e) => e.id));
     expect(nodeIds.size).toBe(g.nodes.length);
     expect(edgeIds.size).toBe(g.edges.length);
-    // Each edge starts at its own DS node, not both at the first one.
-    expect(dsEdges[0].from.x).not.toBe(dsEdges[1].from.x);
+  });
+
+  it("marks a grouped DS as matched when only one digest matches the key", () => {
+    // If SHA-256 matches but SHA-1 does not, the tag is still anchored: a
+    // validator accepts the delegation, so the single edge reads as a match.
+    const chain = secureChain();
+    chain.parent.ds = [
+      { key_tag: 1000, algorithm: 13, digest_type: 1, digest: "ab", servers: ["192.0.2.1"] },
+      { key_tag: 1000, algorithm: 13, digest_type: 2, digest: "cd", servers: ["192.0.2.1"] },
+    ];
+    chain.links = [
+      { ds_key_tag: 1000, ds_digest_type: 1, dnskey_key_tag: 1000, status: "digest_mismatch", servers: ["203.0.113.1"] },
+      { ds_key_tag: 1000, ds_digest_type: 2, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] },
+    ];
+    const g = layoutChain(chain);
+    const dsEdges = g.edges.filter((e) => e.kind === "ds");
+    expect(dsEdges).toHaveLength(1);
+    expect(dsEdges[0].status).toBe("match");
   });
 
   it("keeps overlapping signatures by the same key as distinct edges", () => {
@@ -531,8 +552,8 @@ describe("layoutChain", () => {
     const realKsk = g.nodes.find((n) => n.id === "key-34586");
     // Lower key tag sits to the left, matching the DS row order.
     expect(phantom.x).toBeLessThan(realKsk.x);
-    const dsLow = g.nodes.find((n) => n.id === "ds-11155-2");
-    const dsHigh = g.nodes.find((n) => n.id === "ds-34586-2");
+    const dsLow = g.nodes.find((n) => n.id === "ds-11155");
+    const dsHigh = g.nodes.find((n) => n.id === "ds-34586");
     expect(dsLow.x).toBeLessThan(dsHigh.x);
     // Both DS edges run left-to-left and right-to-right (no crossing).
     const edges = g.edges.filter((e) => e.kind === "ds");

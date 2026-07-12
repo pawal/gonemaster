@@ -153,28 +153,42 @@ export function layoutChain(chain) {
   const links = Array.isArray(chain.links) ? chain.links : [];
 
   // Parent DS nodes, or a dashed ghost when the zone is an island (keys, no DS).
+  // DS records are grouped by key tag: a key commonly publishes the same tag
+  // under several digest types (SHA-1 and SHA-256), drawn as one node with each
+  // digest listed in its tooltip. Tags sort ascending to match the key row.
   const dsNodes = [];
   if (dsList.length > 0) {
     const dsSigLines = dsRRSIG.map((r) => sigLine("pub.dnssec_chain_tip_ds_sig", r, { tag: r.key_tag }));
     // The DS RRSIG covers the whole DS RRset, so its worst state tints every
     // DS node's border, making an expired DS signature visible at a glance.
     const dsSigTone = worstSigTone(dsRRSIG);
+    const input = dsSource === "input";
+    const byTag = new Map();
     for (const ds of dsList) {
-      const input = dsSource === "input";
+      const group = byTag.get(ds.key_tag);
+      if (group) group.push(ds);
+      else byTag.set(ds.key_tag, [ds]);
+    }
+    for (const tag of [...byTag.keys()].sort((a, b) => a - b)) {
+      const group = byTag.get(tag).slice().sort((a, b) => (a.digest_type ?? 0) - (b.digest_type ?? 0));
+      const first = group[0];
+      const digestLines = group.flatMap((ds) => [
+        { k: "pub.dnssec_chain_tip_digest_type", p: { dt: digestLabel(ds.digest_type) } },
+        ds.digest ? { k: "pub.dnssec_chain_tip_digest", p: { digest: shortHex(ds.digest) } } : null,
+      ]);
+      const servers = [...new Set(group.flatMap((ds) => ds.servers ?? []))];
       dsNodes.push({
-        id: `ds-${ds.key_tag}-${ds.digest_type ?? 0}`,
+        id: `ds-${tag}`,
         kind: input ? "ds-input" : "ds",
-        keyTag: ds.key_tag,
-        digestType: ds.digest_type ?? 0,
+        keyTag: tag,
         dsSigTone,
         tip: [
-          { k: input ? "pub.dnssec_chain_tip_ds_input" : "pub.dnssec_chain_tip_ds", p: { tag: ds.key_tag } },
-          { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(ds.algorithm) } },
-          { k: "pub.dnssec_chain_tip_digest_type", p: { dt: digestLabel(ds.digest_type) } },
-          ds.digest ? { k: "pub.dnssec_chain_tip_digest", p: { digest: shortHex(ds.digest) } } : null,
-          ttlLine(ds.ttl),
+          { k: input ? "pub.dnssec_chain_tip_ds_input" : "pub.dnssec_chain_tip_ds", p: { tag } },
+          { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(first.algorithm) } },
+          ...digestLines,
+          ttlLine(first.ttl),
           ...dsSigLines,
-          input ? null : serversTip(ds.servers),
+          input ? null : serversTip(servers),
         ].filter(Boolean),
       });
     }
@@ -336,36 +350,44 @@ export function layoutChain(chain) {
     }
   }
 
-  // DS -> DNSKEY edges from the computed links. Older blobs lack
-  // ds_digest_type; fall back to the first DS node with the key tag.
+  // DS -> DNSKEY edges from the computed links, one per DS key tag. The digest
+  // types for a tag share one DS node, so their links collapse to a single
+  // edge: the tag is anchored when any digest matches.
+  const linksByTag = new Map();
   for (const link of links) {
-    const from =
-      byId.get(`ds-${link.ds_key_tag}-${link.ds_digest_type ?? 0}`) ??
-      dsNodes.find((n) => n.keyTag === link.ds_key_tag);
+    const group = linksByTag.get(link.ds_key_tag);
+    if (group) group.push(link);
+    else linksByTag.set(link.ds_key_tag, [link]);
+  }
+  for (const [dsTag, group] of linksByTag) {
+    const link = group.find((l) => l.status === "match") ?? group[0];
+    // Fall back to the DS node by key tag for older blobs without matching ids.
+    const from = byId.get(`ds-${dsTag}`) ?? dsNodes.find((n) => n.keyTag === dsTag);
     if (!from) continue;
     let toId;
     if (link.status === "no_dnskey") {
       // Route to the phantom key the DS names, or the generic ghost when the
       // zone serves no DNSKEY at all.
-      toId = byId.has(`key-${link.ds_key_tag}`) ? `key-${link.ds_key_tag}` : "key-ghost";
+      toId = byId.has(`key-${dsTag}`) ? `key-${dsTag}` : "key-ghost";
     } else {
       toId = `key-${link.dnskey_key_tag}`;
     }
     const to = byId.get(toId);
     if (!to) {
       from.unmatched = true;
-      from.tip.push({ k: "pub.dnssec_chain_tip_no_key_tag", p: { tag: link.ds_key_tag } });
+      from.tip.push({ k: "pub.dnssec_chain_tip_no_key_tag", p: { tag: dsTag } });
       continue;
     }
+    const servers = [...new Set(group.flatMap((l) => l.servers ?? []))];
     edges.push({
-      id: `link-${link.ds_key_tag}-${link.ds_digest_type ?? 0}-${link.dnskey_key_tag ?? "none"}`,
+      id: `link-${dsTag}-${link.dnskey_key_tag ?? "none"}`,
       kind: "ds",
       status: link.status,
       dnskeyKeyTag: link.dnskey_key_tag,
       tip: [
-        { k: "pub.dnssec_chain_tip_link", p: { ds: link.ds_key_tag, key: link.dnskey_key_tag ?? "?" } },
+        { k: "pub.dnssec_chain_tip_link", p: { ds: dsTag, key: link.dnskey_key_tag ?? "?" } },
         { k: "pub.dnssec_chain_tip_status", linkState: link.status },
-        serversTip(link.servers),
+        serversTip(servers),
       ].filter(Boolean),
       from: edgePoint(from, "bottom"),
       to: edgePoint(to, "top"),

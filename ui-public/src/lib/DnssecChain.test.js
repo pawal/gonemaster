@@ -130,6 +130,24 @@ describe("DnssecChain", () => {
     expect(tip.textContent).toContain("Algorithm: ECDSAP256SHA256");
   });
 
+  it("shows the DNSKEY RRset signature with validity on every key node", async () => {
+    const chain = secureChain();
+    chain.child.dnskey_rrsig = [
+      { key_tag: 1000, algorithm: 13, state: "valid", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] },
+    ];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    // The ZSK does not sign the DNSKEY RRset, but its box tip still shows the
+    // covering signature and window (like the DS and SOA boxes do).
+    const zsk = container.querySelector("g.node-zsk");
+    const tip = zsk.getAttribute("data-tip");
+    expect(tip).toContain("DNSKEY RRset signature (key 1000)");
+    expect(tip).toContain("2023-11-14 to 2027-01-15");
+  });
+
   it("localizes signature state and window in edge tooltips", async () => {
     const chain = secureChain();
     chain.child.dnskey_rrsig = [

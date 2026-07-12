@@ -91,7 +91,7 @@
   "pub.dnssec_chain_tip_key_size": "Sleutelgrootte: {bits} bits",
   "pub.dnssec_chain_tip_servers": "Naamservers: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS-RRset-handtekening (sleutel {tag}): {detail}",
-  "pub.dnssec_chain_tip_signs_set": "Ondertekent DNSKEY-RRset: {detail}",
+  "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY-RRset-handtekening (sleutel {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Handtekening door sleutel {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Benoemt sleutel: {tags}",
   "pub.dnssec_chain_tip_signing_key": "Ondertekeningssleutel: {tag}",

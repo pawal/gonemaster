@@ -91,7 +91,7 @@
   "pub.dnssec_chain_tip_key_size": "Nøglestørrelse: {bits} bit",
   "pub.dnssec_chain_tip_servers": "Navneservere: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS-RRset-signatur (nøgle {tag}): {detail}",
-  "pub.dnssec_chain_tip_signs_set": "Signerer DNSKEY-RRset: {detail}",
+  "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY-RRset-signatur (nøgle {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Signatur af nøgle {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Navngiver nøgle: {tags}",
   "pub.dnssec_chain_tip_signing_key": "Signeringsnøgle: {tag}",

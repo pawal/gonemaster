@@ -91,7 +91,7 @@
   "pub.dnssec_chain_tip_key_size": "Key size: {bits} bits",
   "pub.dnssec_chain_tip_servers": "Servers: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS RRset signature (key {tag}): {detail}",
-  "pub.dnssec_chain_tip_signs_set": "Signs DNSKEY RRset: {detail}",
+  "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY RRset signature (key {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Signature by key {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Names key: {tags}",
   "pub.dnssec_chain_tip_signing_key": "Signing key: {tag}",

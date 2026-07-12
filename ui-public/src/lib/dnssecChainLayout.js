@@ -180,13 +180,13 @@ export function layoutChain(chain) {
   const anyAnchored = keys.some((k) => k.anchored);
   const kskNodes = [];
   const zskNodes = [];
+  // The DNSKEY RRset signature(s) cover every key in the set, so show them on
+  // each key node with validity, like the DS and signed-RRset nodes do.
+  const dnskeySigLines = dnskeySigs.map((s) => sigLine("pub.dnssec_chain_tip_dnskey_sig", s, { tag: s.key_tag }));
   for (const k of [...keys].sort((a, b) => a.key_tag - b.key_tag)) {
     const words = flagWords(k);
     const flagsText = words ? `${k.flags} (${words})` : `${k.flags}`;
     const incoming = !!k.sep && !k.anchored && anyAnchored;
-    const signsSet = dnskeySigs
-      .filter((s) => s.key_tag === k.key_tag)
-      .map((s) => sigLine("pub.dnssec_chain_tip_signs_set", s));
     const node = {
       id: `key-${k.key_tag}`,
       keyTag: k.key_tag,
@@ -198,7 +198,7 @@ export function layoutChain(chain) {
         { k: "pub.dnssec_chain_tip_flags", p: { flags: flagsText } },
         k.key_size ? { k: "pub.dnssec_chain_tip_key_size", p: { bits: k.key_size } } : null,
         incoming ? { k: "pub.dnssec_chain_tip_unanchored" } : null,
-        ...signsSet,
+        ...dnskeySigLines,
         serversTip(k.servers),
       ].filter(Boolean),
     };

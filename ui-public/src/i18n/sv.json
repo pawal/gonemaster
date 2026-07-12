@@ -91,7 +91,7 @@
   "pub.dnssec_chain_tip_key_size": "Nyckelstorlek: {bits} bitar",
   "pub.dnssec_chain_tip_servers": "Namnservrar: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS-RRset-signatur (nyckel {tag}): {detail}",
-  "pub.dnssec_chain_tip_signs_set": "Signerar DNSKEY-RRset: {detail}",
+  "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY-RRset-signatur (nyckel {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Signatur av nyckel {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Namnger nyckel: {tags}",
   "pub.dnssec_chain_tip_signing_key": "Signeringsnyckel: {tag}",

@@ -91,7 +91,7 @@
   "pub.dnssec_chain_tip_key_size": "Velikost ključa: {bits} bitov",
   "pub.dnssec_chain_tip_servers": "Imenski strežniki: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "Podpis RRset DS (ključ {tag}): {detail}",
-  "pub.dnssec_chain_tip_signs_set": "Podpisuje RRset DNSKEY: {detail}",
+  "pub.dnssec_chain_tip_dnskey_sig": "Podpis RRset DNSKEY (ključ {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Podpis s ključem {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Poimenuje ključ: {tags}",
   "pub.dnssec_chain_tip_signing_key": "Podpisni ključ: {tag}",

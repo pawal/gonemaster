@@ -427,16 +427,20 @@ function edgePoint(node, side) {
   return { x: round(cx), y: side === "top" ? node.y : node.y + node.h };
 }
 
-// siblingSigPath draws a bowed edge between two same-row KSK boxes, entering
-// the target on its facing side with the arrowhead.
+// siblingSigPath draws a gently bowed edge between two same-row KSK boxes. It
+// runs low on the boxes to clear the signer's self-loop and approaches the
+// target horizontally so the arrowhead points clearly into it.
 function siblingSigPath(from, to) {
-  const y = round(from.y + from.h / 2);
+  const y = round(from.y + from.h * 0.72);
   const leftToRight = from.x < to.x;
   const ax = round(leftToRight ? from.x + from.w : from.x);
   const bx = round(leftToRight ? to.x : to.x + to.w);
-  const bow = Math.max(14, Math.min(30, Math.abs(bx - ax) * 0.4));
-  const mx = round((ax + bx) / 2);
-  return `M ${ax} ${y} Q ${mx} ${round(y - bow)} ${bx} ${y}`;
+  const span = Math.abs(bx - ax);
+  const bow = Math.max(10, Math.min(22, span * 0.4));
+  const dir = leftToRight ? 1 : -1;
+  const c1x = round(ax + dir * span * 0.35);
+  const c2x = round(bx - dir * span * 0.5);
+  return `M ${ax} ${y} C ${c1x} ${round(y + bow)}, ${c2x} ${y}, ${bx} ${y}`;
 }
 
 // selfLoopPath draws a small loop off the node's top-right corner, ending on the

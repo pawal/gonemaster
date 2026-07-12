@@ -89,6 +89,7 @@
   "pub.dnssec_chain_tip_digest": "Condensé : {digest}",
   "pub.dnssec_chain_tip_flags": "Indicateurs : {flags}",
   "pub.dnssec_chain_tip_key_size": "Taille de clé : {bits} bits",
+  "pub.dnssec_chain_tip_ttl": "TTL : {ttl}",
   "pub.dnssec_chain_tip_servers": "Serveurs de noms : {servers}",
   "pub.dnssec_chain_tip_ds_sig": "Signature du RRset DS (clé {tag}) : {detail}",
   "pub.dnssec_chain_tip_dnskey_sig": "Signature du RRset DNSKEY (clé {tag}) : {detail}",

@@ -130,6 +130,19 @@ describe("DnssecChain", () => {
     expect(tip.textContent).toContain("Algorithm: ECDSAP256SHA256");
   });
 
+  it("shows the record TTL in the DS and key box tooltips", async () => {
+    const chain = secureChain();
+    chain.parent.ds[0].ttl = 86400;
+    chain.child.dnskeys[0].ttl = 3600;
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(container.querySelector("g.node-ds").getAttribute("data-tip")).toContain("TTL: 86400");
+    expect(container.querySelector("g.node-ksk").getAttribute("data-tip")).toContain("TTL: 3600");
+  });
+
   it("shows the DNSKEY RRset signature with validity on every key node", async () => {
     const chain = secureChain();
     chain.child.dnskey_rrsig = [

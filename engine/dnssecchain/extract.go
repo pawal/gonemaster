@@ -69,6 +69,7 @@ func Extract(ctx context.Context, in Input) *Summary {
 		childKeys:  map[uint16][]*dns.DNSKEY{},
 		signed:     map[string][]RRSIG{},
 		signedRefs: map[string]map[uint16]bool{},
+		signedTTL:  map[string]uint32{},
 	}
 
 	e.extractParent(cctx, in)
@@ -95,6 +96,7 @@ type extractor struct {
 	childKeys  map[uint16][]*dns.DNSKEY   // keytag -> key objects, for digest comparison
 	signed     map[string][]RRSIG         // RRset type -> covering signatures
 	signedRefs map[string]map[uint16]bool // RRset type -> referenced DNSKEY key tags
+	signedTTL  map[string]uint32          // RRset type -> RRset TTL
 }
 
 // cacheOnlyContext clones the profile with NoNetwork set and swaps in a fresh
@@ -209,6 +211,11 @@ func (e *extractor) extractChild(ctx context.Context, in Input) {
 				continue
 			}
 			rrset := recordsOfType(zresp, e.zone, zt.rrtype)
+			if len(rrset) > 0 {
+				if _, seen := e.signedTTL[zt.name]; !seen {
+					e.signedTTL[zt.name] = rrset[0].Header().TTL
+				}
+			}
 			for _, sig := range coveringRRSIG(zresp, zt.rrtype, zoneName) {
 				state := sigState(sig, rrset, keyRRs, e.at)
 				e.addSignedRRSIG(zt.name, sig, state, ip)
@@ -257,7 +264,7 @@ func (e *extractor) buildSigned() {
 		if len(sigs) == 0 && len(refs) == 0 {
 			continue
 		}
-		rr := SignedRRset{Type: zt.name, RRSIG: sigs, Refs: refs}
+		rr := SignedRRset{Type: zt.name, RRSIG: sigs, Refs: refs, TTL: e.signedTTL[zt.name]}
 		if zt.name == "CDS" || zt.name == "CDNSKEY" {
 			rr.DSMatch, rr.NewKeys = e.compareRefsToDS(refs)
 		}
@@ -432,6 +439,7 @@ func (e *extractor) addDS(ds *dns.DS, server string) {
 		Algorithm:  ds.Algorithm,
 		DigestType: ds.DigestType,
 		Digest:     strings.ToLower(ds.Digest),
+		TTL:        ds.Hdr.TTL,
 		Servers:    []string{server},
 	})
 }
@@ -456,6 +464,7 @@ func (e *extractor) addDNSKEY(key *dns.DNSKEY, server string) {
 		ZoneKey:   key.Flags&dns.FlagZONE != 0,
 		Revoked:   key.Flags&revokeFlag != 0,
 		KeySize:   keySizeBits(key),
+		TTL:       key.Hdr.TTL,
 		Servers:   []string{server},
 	})
 }

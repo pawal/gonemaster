@@ -89,6 +89,7 @@
   "pub.dnssec_chain_tip_digest": "ダイジェスト: {digest}",
   "pub.dnssec_chain_tip_flags": "フラグ: {flags}",
   "pub.dnssec_chain_tip_key_size": "鍵サイズ: {bits} ビット",
+  "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "ネームサーバー: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS RRset の署名 (鍵 {tag}): {detail}",
   "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY RRset の署名 (鍵 {tag}): {detail}",

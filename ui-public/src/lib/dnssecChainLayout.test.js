@@ -262,6 +262,22 @@ describe("layoutChain", () => {
     expect(edge.status).toBe("no_dnskey");
   });
 
+  it("adds a TTL tip line to DS, DNSKEY, and signed-RRset nodes when present", () => {
+    const chain = secureChain();
+    chain.parent.ds[0].ttl = 86400;
+    chain.child.dnskeys[0].ttl = 3600;
+    chain.child.signed = [{ type: "SOA", ttl: 900, rrsig: [{ key_tag: 2000, state: "valid" }] }];
+    const g = layoutChain(chain);
+    expect(tipParams(g.nodes.find((n) => n.kind === "ds"), "pub.dnssec_chain_tip_ttl").ttl).toBe(86400);
+    expect(tipParams(g.nodes.find((n) => n.id === "key-1000"), "pub.dnssec_chain_tip_ttl").ttl).toBe(3600);
+    expect(tipParams(g.nodes.find((n) => n.id === "rrset-SOA"), "pub.dnssec_chain_tip_ttl").ttl).toBe(900);
+  });
+
+  it("omits the TTL tip line when the blob has no ttl (older data)", () => {
+    const g = layoutChain(secureChain());
+    expect(hasTip(g.nodes.find((n) => n.kind === "ds"), "pub.dnssec_chain_tip_ttl")).toBe(false);
+  });
+
   it("tints DS nodes by the worst covering-signature state", () => {
     const chain = secureChain();
     chain.parent.ds_rrsig = [

@@ -89,6 +89,7 @@
   "pub.dnssec_chain_tip_digest": "Tiiviste: {digest}",
   "pub.dnssec_chain_tip_flags": "Liput: {flags}",
   "pub.dnssec_chain_tip_key_size": "Avaimen koko: {bits} bittiä",
+  "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "Nimipalvelimet: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS-RRset-allekirjoitus (avain {tag}): {detail}",
   "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY-RRset-allekirjoitus (avain {tag}): {detail}",

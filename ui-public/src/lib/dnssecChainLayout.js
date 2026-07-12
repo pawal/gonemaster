@@ -52,6 +52,11 @@ function shortHex(h) {
   return s.length > 24 ? `${s.slice(0, 24)}…` : s;
 }
 
+// ttlLine returns a TTL tip line, or null when absent (older blobs omit it).
+function ttlLine(ttl) {
+  return ttl ? { k: "pub.dnssec_chain_tip_ttl", p: { ttl } } : null;
+}
+
 // serversTip returns a tip line listing up to four server addresses, or null.
 // Addresses are protocol tokens, so only the label is localized.
 function serversTip(servers) {
@@ -165,6 +170,7 @@ export function layoutChain(chain) {
           { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(ds.algorithm) } },
           { k: "pub.dnssec_chain_tip_digest_type", p: { dt: digestLabel(ds.digest_type) } },
           ds.digest ? { k: "pub.dnssec_chain_tip_digest", p: { digest: shortHex(ds.digest) } } : null,
+          ttlLine(ds.ttl),
           ...dsSigLines,
           input ? null : serversTip(ds.servers),
         ].filter(Boolean),
@@ -198,6 +204,7 @@ export function layoutChain(chain) {
         { k: "pub.dnssec_chain_tip_flags", p: { flags: flagsText } },
         k.key_size ? { k: "pub.dnssec_chain_tip_key_size", p: { bits: k.key_size } } : null,
         incoming ? { k: "pub.dnssec_chain_tip_unanchored" } : null,
+        ttlLine(k.ttl),
         ...dnskeySigLines,
         serversTip(k.servers),
       ].filter(Boolean),
@@ -222,6 +229,7 @@ export function layoutChain(chain) {
       rollover,
       tip: [
         { k: "pub.dnssec_chain_tip_rrset", p: { type: s.type } },
+        ttlLine(s.ttl),
         ...sigLines,
         s.refs?.length ? { k: "pub.dnssec_chain_tip_names_key", p: { tags: s.refs.join(", ") } } : null,
         rollover && newKeys.length ? { k: "pub.dnssec_chain_tip_rollover", p: { keys: newKeys.join(", ") } } : null,

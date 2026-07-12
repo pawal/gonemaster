@@ -221,8 +221,15 @@ func TestExtractSecure(t *testing.T) {
 	if len(got.Parent.DS) != 1 {
 		t.Fatalf("want 1 DS, got %d", len(got.Parent.DS))
 	}
+	// The fixture records use TTL 3600; DS and DNSKEY carry the RRset TTL.
+	if got.Parent.DS[0].TTL != 3600 {
+		t.Errorf("DS TTL = %d, want 3600", got.Parent.DS[0].TTL)
+	}
 	if len(got.Child.DNSKEYs) != 2 {
 		t.Fatalf("want 2 DNSKEYs, got %d", len(got.Child.DNSKEYs))
+	}
+	if got.Child.DNSKEYs[0].TTL != 3600 {
+		t.Errorf("DNSKEY TTL = %d, want 3600", got.Child.DNSKEYs[0].TTL)
 	}
 	if !got.Child.DNSKEYs[0].SEP {
 		t.Errorf("expected SEP (KSK) key ordered first")
@@ -312,6 +319,9 @@ func TestExtractSignedRRsets(t *testing.T) {
 	// SOA comes before CDS, matching the fixed display order.
 	if got.Child.Signed[0].Type != "SOA" || got.Child.Signed[1].Type != "CDS" {
 		t.Fatalf("unexpected signed order: %s, %s", got.Child.Signed[0].Type, got.Child.Signed[1].Type)
+	}
+	if got.Child.Signed[0].TTL != 3600 {
+		t.Errorf("SOA RRset TTL = %d, want 3600", got.Child.Signed[0].TTL)
 	}
 	for _, s := range got.Child.Signed {
 		if len(s.RRSIG) != 1 || s.RRSIG[0].State != SigValid {

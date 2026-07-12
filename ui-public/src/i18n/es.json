@@ -89,6 +89,7 @@
   "pub.dnssec_chain_tip_digest": "Digest: {digest}",
   "pub.dnssec_chain_tip_flags": "Indicadores: {flags}",
   "pub.dnssec_chain_tip_key_size": "Tamaño de clave: {bits} bits",
+  "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "Servidores de nombres: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "Firma del RRset DS (clave {tag}): {detail}",
   "pub.dnssec_chain_tip_dnskey_sig": "Firma del RRset DNSKEY (clave {tag}): {detail}",

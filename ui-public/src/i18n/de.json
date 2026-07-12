@@ -92,6 +92,8 @@
   "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "Nameserver: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS-RRset-Signatur (Schlüssel {tag}): {detail}",
+  "pub.dnssec_chain_tip_parent_key": "DNSKEY der übergeordneten Zone, key tag {tag}",
+  "pub.dnssec_chain_tip_rrsig_ds": "RRSIG über DS-RRset",
   "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY-RRset-Signatur (Schlüssel {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Signatur von Schlüssel {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Benennt Schlüssel: {tags}",

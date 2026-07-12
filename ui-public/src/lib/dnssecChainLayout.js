@@ -145,6 +145,8 @@ export function layoutChain(chain) {
 
   const dsList = Array.isArray(chain.parent?.ds) ? chain.parent.ds : [];
   const dsSource = chain.parent?.ds_source ?? "none";
+  const dsRRSIG = Array.isArray(chain.parent?.ds_rrsig) ? chain.parent.ds_rrsig : [];
+  const parentKeys = Array.isArray(chain.parent?.dnskeys) ? chain.parent.dnskeys : [];
   const keys = Array.isArray(chain.child?.dnskeys) ? chain.child.dnskeys : [];
   const dnskeySigs = Array.isArray(chain.child?.dnskey_rrsig) ? chain.child.dnskey_rrsig : [];
   const signed = Array.isArray(chain.child?.signed) ? chain.child.signed : [];
@@ -153,7 +155,6 @@ export function layoutChain(chain) {
   // Parent DS nodes, or a dashed ghost when the zone is an island (keys, no DS).
   const dsNodes = [];
   if (dsList.length > 0) {
-    const dsRRSIG = Array.isArray(chain.parent?.ds_rrsig) ? chain.parent.ds_rrsig : [];
     const dsSigLines = dsRRSIG.map((r) => sigLine("pub.dnssec_chain_tip_ds_sig", r, { tag: r.key_tag }));
     // The DS RRSIG covers the whole DS RRset, so its worst state tints every
     // DS node's border, making an expired DS signature visible at a glance.
@@ -180,6 +181,20 @@ export function layoutChain(chain) {
   } else {
     dsNodes.push({ id: "ds-ghost", kind: "ds-ghost", tip: [{ k: "pub.dnssec_chain_tip_no_ds" }] });
   }
+
+  // Parent-zone key(s) that sign the DS RRset, drawn above the DS row.
+  const parentKeyNodes = parentKeys.map((pk) => ({
+    id: `pkey-${pk.key_tag}`,
+    kind: "parent-key",
+    keyTag: pk.key_tag,
+    tip: [
+      { k: "pub.dnssec_chain_tip_parent_key", p: { tag: pk.key_tag } },
+      { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(pk.algorithm) } },
+      pk.key_size ? { k: "pub.dnssec_chain_tip_key_size", p: { bits: pk.key_size } } : null,
+      ttlLine(pk.ttl),
+      serversTip(pk.servers),
+    ].filter(Boolean),
+  }));
 
   // Split DNSKEYs into KSK (SEP) and ZSK rows so signing edges read downward.
   // An unanchored KSK is a rollover signal only when another KSK is anchored;
@@ -261,7 +276,14 @@ export function layoutChain(chain) {
   }
 
   // Assemble the visible rows top to bottom, tagging which carries a label.
-  const rows = [{ label: "parent", nodes: dsNodes }];
+  // When the parent keys are known, they sit above the DS in the parent zone.
+  const rows = [];
+  if (parentKeyNodes.length > 0) {
+    rows.push({ label: "parent", nodes: parentKeyNodes });
+    rows.push({ label: null, nodes: dsNodes });
+  } else {
+    rows.push({ label: "parent", nodes: dsNodes });
+  }
   if (keys.length === 0) {
     rows.push({ label: "keys", nodes: [{ id: "key-ghost", kind: "key-ghost", tip: [{ k: "pub.dnssec_chain_tip_no_dnskey" }] }] });
   } else {
@@ -295,6 +317,24 @@ export function layoutChain(chain) {
     .map((r) => ({ id: r.label, labelKey: labelKeyFor(r.label), name: nameFor(r.label), x: PAD_X, y: r.nodes[0].y - 22 }));
 
   const edges = [];
+
+  // Parent key(s) sign the DS RRset: an edge from the parent key to each DS.
+  for (const sig of dsRRSIG) {
+    const signer = byId.get(`pkey-${sig.key_tag}`);
+    if (!signer) continue;
+    for (const ds of dsNodes) {
+      if (ds.kind !== "ds" && ds.kind !== "ds-input") continue;
+      edges.push({
+        id: `dssig-${sig.key_tag}-${sig.inception ?? 0}-${ds.id}`,
+        kind: "keysig",
+        status: sig.state,
+        keyTag: sig.key_tag,
+        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_ds" }, sig),
+        from: edgePoint(signer, "bottom"),
+        to: edgePoint(ds, "top"),
+      });
+    }
+  }
 
   // DS -> DNSKEY edges from the computed links. Older blobs lack
   // ds_digest_type; fall back to the first DS node with the key tag.

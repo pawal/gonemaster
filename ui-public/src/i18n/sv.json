@@ -92,6 +92,8 @@
   "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "Namnservrar: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS-RRset-signatur (nyckel {tag}): {detail}",
+  "pub.dnssec_chain_tip_parent_key": "DNSKEY i föräldrazonen, key tag {tag}",
+  "pub.dnssec_chain_tip_rrsig_ds": "RRSIG över DS-RRset",
   "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY-RRset-signatur (nyckel {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Signatur av nyckel {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Namnger nyckel: {tags}",

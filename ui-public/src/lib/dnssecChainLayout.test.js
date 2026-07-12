@@ -134,6 +134,36 @@ describe("layoutChain", () => {
     expect(st.statusState).toBe("valid");
   });
 
+  it("draws the parent key above the DS with a signing edge, when present", () => {
+    const chain = secureChain();
+    chain.parent.dnskeys = [{ key_tag: 5000, algorithm: 13, flags: 256, key_size: 1024, ttl: 3600, servers: ["192.0.2.1"] }];
+    chain.parent.ds_rrsig = [{ key_tag: 5000, algorithm: 13, state: "valid", inception: 100, expiration: 200, servers: ["192.0.2.1"] }];
+    const g = layoutChain(chain);
+    const pk = g.nodes.find((n) => n.id === "pkey-5000");
+    expect(pk.kind).toBe("parent-key");
+    const ds = g.nodes.find((n) => n.kind === "ds");
+    // Parent key sits above the DS.
+    expect(pk.y).toBeLessThan(ds.y);
+    // A signing edge runs from the parent key down to the DS.
+    const edge = g.edges.find((e) => e.kind === "keysig" && e.keyTag === 5000);
+    expect(edge).toBeTruthy();
+    expect(edge.status).toBe("valid");
+    expect(edge.from.y).toBeLessThan(edge.to.y);
+    // The parent cluster label is on the parent-key row.
+    const parent = g.clusters.find((c) => c.id === "parent");
+    expect(parent.y).toBeLessThan(ds.y);
+  });
+
+  it("keeps the DS as the parent row when the parent key is unknown", () => {
+    const g = layoutChain(secureChain());
+    expect(g.nodes.some((n) => n.kind === "parent-key")).toBe(false);
+    const parent = g.clusters.find((c) => c.id === "parent");
+    const ds = g.nodes.find((n) => n.kind === "ds");
+    // The parent label sits on the DS row (no separate parent-key row).
+    expect(parent.y).toBeLessThan(ds.y);
+    expect(parent.y).toBeGreaterThan(ds.y - 40);
+  });
+
   it("labels the parent and key clusters with their zone names", () => {
     const g = layoutChain(secureChain());
     const parent = g.clusters.find((c) => c.id === "parent");

@@ -130,6 +130,20 @@ describe("DnssecChain", () => {
     expect(tip.textContent).toContain("Algorithm: ECDSAP256SHA256");
   });
 
+  it("renders the parent-zone signing key above the DS", async () => {
+    const chain = secureChain();
+    chain.parent.dnskeys = [{ key_tag: 5000, algorithm: 13, flags: 256, key_size: 2048, servers: ["192.0.2.1"] }];
+    chain.parent.ds_rrsig = [{ key_tag: 5000, algorithm: 13, state: "valid", inception: 100, expiration: 200, servers: ["192.0.2.1"] }];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const pk = container.querySelector("g.node-parent-key");
+    expect(pk).toBeTruthy();
+    expect(pk.getAttribute("data-tip")).toContain("Parent zone DNSKEY");
+  });
+
   it("shows the record TTL in the DS and key box tooltips", async () => {
     const chain = secureChain();
     chain.parent.ds[0].ttl = 86400;

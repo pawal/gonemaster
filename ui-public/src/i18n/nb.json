@@ -92,6 +92,8 @@
   "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "Navnetjenere: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS-RRset-signatur (nøkkel {tag}): {detail}",
+  "pub.dnssec_chain_tip_parent_key": "DNSKEY i foreldresonen, key tag {tag}",
+  "pub.dnssec_chain_tip_rrsig_ds": "RRSIG over DS-RRset",
   "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY-RRset-signatur (nøkkel {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Signatur av nøkkel {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Navngir nøkkel: {tags}",

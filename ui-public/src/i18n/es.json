@@ -92,6 +92,8 @@
   "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "Servidores de nombres: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "Firma del RRset DS (clave {tag}): {detail}",
+  "pub.dnssec_chain_tip_parent_key": "DNSKEY de la zona padre, key tag {tag}",
+  "pub.dnssec_chain_tip_rrsig_ds": "RRSIG sobre el RRset DS",
   "pub.dnssec_chain_tip_dnskey_sig": "Firma del RRset DNSKEY (clave {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Firma de la clave {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Nombra la clave: {tags}",

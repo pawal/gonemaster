@@ -92,6 +92,8 @@
   "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "Nimipalvelimet: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS-RRset-allekirjoitus (avain {tag}): {detail}",
+  "pub.dnssec_chain_tip_parent_key": "Vanhemman vyöhykkeen DNSKEY, key tag {tag}",
+  "pub.dnssec_chain_tip_rrsig_ds": "RRSIG DS-RRsetin ylle",
   "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY-RRset-allekirjoitus (avain {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Avaimen {tag} allekirjoitus: {detail}",
   "pub.dnssec_chain_tip_names_key": "Nimeää avaimen: {tags}",

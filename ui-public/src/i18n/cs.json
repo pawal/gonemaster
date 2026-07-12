@@ -92,6 +92,8 @@
   "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "Jmenné servery: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "Podpis RRsetu DS (klíč {tag}): {detail}",
+  "pub.dnssec_chain_tip_parent_key": "DNSKEY nadřazené zóny, key tag {tag}",
+  "pub.dnssec_chain_tip_rrsig_ds": "RRSIG nad RRsetem DS",
   "pub.dnssec_chain_tip_dnskey_sig": "Podpis RRsetu DNSKEY (klíč {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "Podpis klíčem {tag}: {detail}",
   "pub.dnssec_chain_tip_names_key": "Pojmenovává klíč: {tags}",

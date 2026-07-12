@@ -250,6 +250,13 @@ func TestExtractSecure(t *testing.T) {
 	if len(got.Parent.DSRRSIG) != 1 || got.Parent.DSRRSIG[0].State != SigValid {
 		t.Errorf("expected 1 valid DS RRSIG, got %+v", got.Parent.DSRRSIG)
 	}
+	// The parent key that signs the DS RRset is captured, matching the DS RRSIG.
+	if len(got.Parent.DNSKEYs) != 1 {
+		t.Fatalf("want 1 parent DNSKEY (the DS signer), got %d", len(got.Parent.DNSKEYs))
+	}
+	if got.Parent.DNSKEYs[0].KeyTag != got.Parent.DSRRSIG[0].KeyTag {
+		t.Errorf("parent DNSKEY keytag %d != DS RRSIG signer %d", got.Parent.DNSKEYs[0].KeyTag, got.Parent.DSRRSIG[0].KeyTag)
+	}
 }
 
 func TestExtractSignedRRsets(t *testing.T) {

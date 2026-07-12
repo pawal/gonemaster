@@ -92,6 +92,8 @@
   "pub.dnssec_chain_tip_ttl": "TTL: {ttl}",
   "pub.dnssec_chain_tip_servers": "ネームサーバー: {servers}",
   "pub.dnssec_chain_tip_ds_sig": "DS RRset の署名 (鍵 {tag}): {detail}",
+  "pub.dnssec_chain_tip_parent_key": "親ゾーンの DNSKEY、key tag {tag}",
+  "pub.dnssec_chain_tip_rrsig_ds": "DS RRset に対する RRSIG",
   "pub.dnssec_chain_tip_dnskey_sig": "DNSKEY RRset の署名 (鍵 {tag}): {detail}",
   "pub.dnssec_chain_tip_rrset_sig": "鍵 {tag} による署名: {detail}",
   "pub.dnssec_chain_tip_names_key": "鍵を指定: {tags}",

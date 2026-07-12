@@ -62,14 +62,15 @@ func Extract(ctx context.Context, in Input) *Summary {
 			ParentZone: in.ParentZone.String(),
 			Delegation: DelegationNormal,
 		},
-		zone:       in.Zone,
-		at:         at,
-		dsIndex:    map[string]int{},
-		keyIndex:   map[string]int{},
-		childKeys:  map[uint16][]*dns.DNSKEY{},
-		signed:     map[string][]RRSIG{},
-		signedRefs: map[string]map[uint16]bool{},
-		signedTTL:  map[string]uint32{},
+		zone:           in.Zone,
+		at:             at,
+		dsIndex:        map[string]int{},
+		keyIndex:       map[string]int{},
+		parentKeyIndex: map[string]int{},
+		childKeys:      map[uint16][]*dns.DNSKEY{},
+		signed:         map[string][]RRSIG{},
+		signedRefs:     map[string]map[uint16]bool{},
+		signedTTL:      map[string]uint32{},
 	}
 
 	e.extractParent(cctx, in)
@@ -91,12 +92,13 @@ type extractor struct {
 	zone    dnsname.Name
 	at      time.Time
 
-	dsIndex    map[string]int             // DS identity -> index into summary.Parent.DS
-	keyIndex   map[string]int             // DNSKEY identity -> index into summary.Child.DNSKEYs
-	childKeys  map[uint16][]*dns.DNSKEY   // keytag -> key objects, for digest comparison
-	signed     map[string][]RRSIG         // RRset type -> covering signatures
-	signedRefs map[string]map[uint16]bool // RRset type -> referenced DNSKEY key tags
-	signedTTL  map[string]uint32          // RRset type -> RRset TTL
+	dsIndex        map[string]int             // DS identity -> index into summary.Parent.DS
+	keyIndex       map[string]int             // DNSKEY identity -> index into summary.Child.DNSKEYs
+	parentKeyIndex map[string]int             // DNSKEY identity -> index into summary.Parent.DNSKEYs
+	childKeys      map[uint16][]*dns.DNSKEY   // keytag -> key objects, for digest comparison
+	signed         map[string][]RRSIG         // RRset type -> covering signatures
+	signedRefs     map[string]map[uint16]bool // RRset type -> referenced DNSKEY key tags
+	signedTTL      map[string]uint32          // RRset type -> RRset TTL
 }
 
 // cacheOnlyContext clones the profile with NoNetwork set and swaps in a fresh
@@ -165,6 +167,11 @@ func (e *extractor) extractParent(ctx context.Context, in Input) {
 		for _, sig := range coveringRRSIG(resp, dns.TypeDS, parentApex) {
 			state := sigState(sig, dsRRset, parentKeys, e.at)
 			e.addRRSIG(&e.summary.Parent.DSRRSIG, sig, state, ip)
+			for _, pk := range parentKeys {
+				if pk.KeyTag() == sig.KeyTag {
+					e.addParentDNSKEY(pk, ip)
+				}
+			}
 		}
 	}
 
@@ -469,6 +476,31 @@ func (e *extractor) addDNSKEY(key *dns.DNSKEY, server string) {
 	})
 }
 
+// addParentDNSKEY records a parent-apex key that signs the DS RRset.
+func (e *extractor) addParentDNSKEY(key *dns.DNSKEY, server string) {
+	if key == nil {
+		return
+	}
+	keytag := key.KeyTag()
+	id := fmt.Sprintf("%d|%d|%d", keytag, key.Algorithm, key.Flags)
+	if idx, ok := e.parentKeyIndex[id]; ok {
+		e.summary.Parent.DNSKEYs[idx].Servers = append(e.summary.Parent.DNSKEYs[idx].Servers, server)
+		return
+	}
+	e.parentKeyIndex[id] = len(e.summary.Parent.DNSKEYs)
+	e.summary.Parent.DNSKEYs = append(e.summary.Parent.DNSKEYs, DNSKEY{
+		KeyTag:    keytag,
+		Algorithm: key.Algorithm,
+		Flags:     key.Flags,
+		SEP:       key.Flags&dns.FlagSEP != 0,
+		ZoneKey:   key.Flags&dns.FlagZONE != 0,
+		Revoked:   key.Flags&revokeFlag != 0,
+		KeySize:   keySizeBits(key),
+		TTL:       key.Hdr.TTL,
+		Servers:   []string{server},
+	})
+}
+
 func (e *extractor) addRRSIG(dst *[]RRSIG, sig *dns.RRSIG, state string, server string) {
 	mergeRRSIG(dst, sig, state, server)
 }
@@ -535,6 +567,7 @@ func (e *extractor) finalize() {
 		}
 		return c.DNSKEYs[i].KeyTag < c.DNSKEYs[j].KeyTag
 	})
+	sort.Slice(p.DNSKEYs, func(i, j int) bool { return p.DNSKEYs[i].KeyTag < p.DNSKEYs[j].KeyTag })
 	sortRRSIG(p.DSRRSIG)
 	sortRRSIG(c.DNSKEYRRSIG)
 	for i := range c.Signed {
@@ -552,6 +585,9 @@ func (e *extractor) finalize() {
 	}
 	for i := range c.DNSKEYs {
 		c.DNSKEYs[i].Servers = sortUnique(c.DNSKEYs[i].Servers)
+	}
+	for i := range p.DNSKEYs {
+		p.DNSKEYs[i].Servers = sortUnique(p.DNSKEYs[i].Servers)
 	}
 	for i := range e.summary.Links {
 		e.summary.Links[i].Servers = sortUnique(e.summary.Links[i].Servers)
@@ -610,6 +646,7 @@ func (e *extractor) applyCaps() {
 	trunc := false
 	p.DS, trunc = capSlice(p.DS, maxDS, trunc)
 	c.DNSKEYs, trunc = capSlice(c.DNSKEYs, maxDNSKEY, trunc)
+	p.DNSKEYs, trunc = capSlice(p.DNSKEYs, maxDNSKEY, trunc)
 	p.DSRRSIG, trunc = capSlice(p.DSRRSIG, maxRRSIG, trunc)
 	c.DNSKEYRRSIG, trunc = capSlice(c.DNSKEYRRSIG, maxRRSIG, trunc)
 	for i := range c.Signed {
@@ -628,6 +665,9 @@ func (e *extractor) applyCaps() {
 	}
 	for i := range c.DNSKEYs {
 		c.DNSKEYs[i].Servers, trunc = capSlice(c.DNSKEYs[i].Servers, maxServers, trunc)
+	}
+	for i := range p.DNSKEYs {
+		p.DNSKEYs[i].Servers, trunc = capSlice(p.DNSKEYs[i].Servers, maxServers, trunc)
 	}
 	e.summary.Truncated = trunc
 }

@@ -65,6 +65,7 @@ type Parent struct {
 	DSSource           string   `json:"ds_source"`
 	DS                 []DS     `json:"ds"`
 	DSRRSIG            []RRSIG  `json:"ds_rrsig"`
+	DNSKEYs            []DNSKEY `json:"dnskeys,omitempty"` // parent keys that sign the DS RRset
 	ServersQueried     []string `json:"servers_queried"`
 	ServersWithoutDS   []string `json:"servers_without_ds"`
 	ServersDisagreeing []string `json:"servers_disagreeing"`

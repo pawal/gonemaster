@@ -207,6 +207,8 @@
         return ["DNSKEY", ""];
       case "key-phantom":
         return ["DNSKEY", `tag ${node.keyTag}`];
+      case "parent-key":
+        return ["DNSKEY", `tag ${node.keyTag}`];
       case "rrset":
         return [node.label, ""];
       default:
@@ -466,7 +468,8 @@
   .node-zsk .chain-node-box {
     stroke: var(--accent-2);
   }
-  .node-ds .chain-node-box {
+  .node-ds .chain-node-box,
+  .node-parent-key .chain-node-box {
     stroke: var(--accent);
   }
   .node-ds-input .chain-node-box {

@@ -52,9 +52,10 @@ function shortHex(h) {
   return s.length > 24 ? `${s.slice(0, 24)}…` : s;
 }
 
-// ttlLine returns a TTL tip line, or null when absent (older blobs omit it).
+// ttlLine returns a TTL tip line, or null when absent. A TTL of 0 is valid
+// (NSEC3PARAM commonly uses it), so only a missing field is dropped.
 function ttlLine(ttl) {
-  return ttl ? { k: "pub.dnssec_chain_tip_ttl", p: { ttl } } : null;
+  return ttl == null ? null : { k: "pub.dnssec_chain_tip_ttl", p: { ttl } };
 }
 
 // serversTip returns a tip line listing up to four server addresses, or null.

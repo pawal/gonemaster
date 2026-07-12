@@ -3,6 +3,7 @@ package dnssecchain
 import (
 	"context"
 	"crypto"
+	"encoding/json"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -997,5 +998,24 @@ func TestExtractIndeterminateWithoutChildEvidence(t *testing.T) {
 	}
 	if len(got.Child.ServersQueried) != 0 {
 		t.Errorf("expected no child servers queried, got %v", got.Child.ServersQueried)
+	}
+}
+
+func TestZeroTTLIsSerialized(t *testing.T) {
+	// NSEC3PARAM commonly uses TTL 0 (RFC 5155); a zero TTL must still appear
+	// in the JSON so the UI can show "TTL: 0" rather than dropping it.
+	cases := []any{
+		SignedRRset{Type: "NSEC3PARAM", TTL: 0, RRSIG: []RRSIG{}},
+		DS{KeyTag: 1, TTL: 0},
+		DNSKEY{KeyTag: 1, TTL: 0},
+	}
+	for _, c := range cases {
+		b, err := json.Marshal(c)
+		if err != nil {
+			t.Fatalf("marshal %T: %v", c, err)
+		}
+		if !strings.Contains(string(b), `"ttl":0`) {
+			t.Errorf("%T: expected ttl:0 in JSON, got %s", c, b)
+		}
 	}
 }

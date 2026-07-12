@@ -278,6 +278,14 @@ describe("layoutChain", () => {
     expect(hasTip(g.nodes.find((n) => n.kind === "ds"), "pub.dnssec_chain_tip_ttl")).toBe(false);
   });
 
+  it("shows a TTL of 0 (NSEC3PARAM commonly uses it)", () => {
+    const chain = secureChain();
+    chain.child.signed = [{ type: "NSEC3PARAM", ttl: 0, rrsig: [{ key_tag: 2000, state: "valid" }] }];
+    const g = layoutChain(chain);
+    const node = g.nodes.find((n) => n.id === "rrset-NSEC3PARAM");
+    expect(tipParams(node, "pub.dnssec_chain_tip_ttl").ttl).toBe(0);
+  });
+
   it("tints DS nodes by the worst covering-signature state", () => {
     const chain = secureChain();
     chain.parent.ds_rrsig = [

@@ -91,7 +91,7 @@ type SignedRRset struct {
 	Refs    []uint16 `json:"refs,omitempty"`
 	DSMatch string   `json:"ds_match,omitempty"`
 	NewKeys []uint16 `json:"new_keys,omitempty"`
-	TTL     uint32   `json:"ttl,omitempty"`
+	TTL     uint32   `json:"ttl"`
 }
 
 // CDS/CDNSKEY-to-parent-DS verdicts.
@@ -106,7 +106,7 @@ type DS struct {
 	Algorithm  uint8    `json:"algorithm"`
 	DigestType uint8    `json:"digest_type"`
 	Digest     string   `json:"digest"`
-	TTL        uint32   `json:"ttl,omitempty"`
+	TTL        uint32   `json:"ttl"`
 	Servers    []string `json:"servers"`
 }
 
@@ -122,7 +122,7 @@ type DNSKEY struct {
 	Revoked   bool     `json:"revoked"`
 	KeySize   int      `json:"key_size"`
 	Anchored  bool     `json:"anchored,omitempty"`
-	TTL       uint32   `json:"ttl,omitempty"`
+	TTL       uint32   `json:"ttl"`
 	Servers   []string `json:"servers"`
 }
 

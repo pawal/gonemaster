@@ -8,6 +8,9 @@ import (
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -306,6 +309,29 @@ func TestBuildHreflang(t *testing.T) {
 	}
 	if !strings.Contains(result, `href="https://example.com/"`) {
 		t.Fatal("buildHreflang missing expected href")
+	}
+}
+
+// The hreflang language list drifted once (cs, de, nl were shipped as UI
+// locales without being added here), so this test pins hreflangLangs to the
+// locale catalogs actually shipped in ui-public/src/i18n.
+func TestHreflangLangsMatchShippedLocales(t *testing.T) {
+	entries, err := os.ReadDir(filepath.Join("..", "..", "ui-public", "src", "i18n"))
+	if err != nil {
+		t.Fatalf("read ui-public locale dir: %v", err)
+	}
+	locales := []string{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		locales = append(locales, strings.TrimSuffix(entry.Name(), ".json"))
+	}
+	slices.Sort(locales)
+	langs := slices.Clone(hreflangLangs)
+	slices.Sort(langs)
+	if !slices.Equal(langs, locales) {
+		t.Fatalf("hreflangLangs = %v, shipped locales = %v; keep them in sync", langs, locales)
 	}
 }
 

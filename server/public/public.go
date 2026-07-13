@@ -23,7 +23,9 @@ var (
 	distErr  error
 )
 
-var hreflangLangs = []string{"da", "en", "es", "fi", "fr", "ja", "nb", "sl", "sv"}
+// Must match the locale catalogs shipped in ui-public/src/i18n (see
+// TestHreflangLangsMatchShippedLocales).
+var hreflangLangs = []string{"cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"}
 
 func resolvePublicURL(configured string, r *http.Request) string {
 	if configured != "" {

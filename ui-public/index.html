@@ -20,6 +20,46 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <!-- HREFLANG_TAGS -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": "WebSite",
+          "@id": "__PUBLIC_URL__#website",
+          "name": "Gonemaster",
+          "url": "__PUBLIC_URL__",
+          "inLanguage": ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"]
+        },
+        {
+          "@type": ["WebApplication", "SoftwareApplication"],
+          "@id": "__PUBLIC_URL__#app",
+          "name": "Gonemaster",
+          "description": "Free online DNS health checker. Runs 80+ automated testcases across nine areas - basics, address records, connectivity, cross-nameserver consistency, delegation, DNSSEC, nameserver behavior, name syntax, and zone data - against every authoritative nameserver for a domain, resolved from the DNS root. Supports undelegated tests with custom NS records and DS trust anchors. Findings are graded by severity, with a 0-100 score, an A+ to F letter grade, and a DNSSEC chain-of-trust view. No account required.",
+          "url": "__PUBLIC_URL__",
+          "image": "/android-chrome-512x512.png",
+          "isAccessibleForFree": true,
+          "applicationCategory": "NetworkUtility",
+          "operatingSystem": "Any",
+          "browserRequirements": "Requires JavaScript",
+          "isPartOf": { "@id": "__PUBLIC_URL__#website" },
+          "sameAs": ["https://codeberg.org/pawal/gonemaster"],
+          "featureList": [
+            "80+ automated testcases across nine areas: basics, address records, connectivity, consistency, delegation, DNSSEC, nameserver behavior, name syntax, and zone data",
+            "Tests every authoritative nameserver for the domain, resolved from the DNS root",
+            "Full DNSSEC chain-of-trust validation with an interactive chain graph",
+            "Cross-nameserver consistency checks for SOA, NS sets, and addresses",
+            "Nameserver reachability over UDP and TCP, with network (ASN) diversity checks",
+            "Undelegated (pre-delegation) testing with custom NS records and DS trust anchors",
+            "IPv4-only and IPv6-only test modes",
+            "Severity-graded findings translated into twelve languages",
+            "0-100 score with an A+ to F letter grade",
+            "Shareable result links"
+          ]
+        }
+      ]
+    }
+    </script>
     <title>Gonemaster</title>
   </head>
   <body>

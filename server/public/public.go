@@ -27,8 +27,13 @@ var (
 // TestHreflangLangsMatchShippedLocales).
 var hreflangLangs = []string{"cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"}
 
+// The returned URL always ends with "/" so index.html can join asset
+// paths onto it (e.g. __PUBLIC_URL__android-chrome-512x512.png).
 func resolvePublicURL(configured string, r *http.Request) string {
 	if configured != "" {
+		if !strings.HasSuffix(configured, "/") {
+			configured += "/"
+		}
 		return configured
 	}
 	scheme := "http"

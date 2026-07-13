@@ -338,6 +338,7 @@ func TestHreflangLangsMatchShippedLocales(t *testing.T) {
 func TestServeIndexInjectsPlaceholders(t *testing.T) {
 	const indexHTML = `<head>` +
 		`<meta property="og:url" content="__PUBLIC_URL__" />` +
+		`<meta property="og:image" content="__PUBLIC_URL__android-chrome-512x512.png" />` +
 		`<!-- HREFLANG_TAGS -->` +
 		`</head>`
 	fsys := fstest.MapFS{
@@ -359,6 +360,12 @@ func TestServeIndexInjectsPlaceholders(t *testing.T) {
 		{
 			name:       "configured subpath",
 			configured: "https://example.com/public/",
+			reqHost:    "ignored.example.com",
+			wantURL:    "https://example.com/public/",
+		},
+		{
+			name:       "configured without trailing slash gets one",
+			configured: "https://example.com/public",
 			reqHost:    "ignored.example.com",
 			wantURL:    "https://example.com/public/",
 		},
@@ -386,6 +393,9 @@ func TestServeIndexInjectsPlaceholders(t *testing.T) {
 			}
 			if !strings.Contains(body, `content="`+tt.wantURL+`"`) {
 				t.Fatalf("og:url not set to %q in body: %s", tt.wantURL, body)
+			}
+			if !strings.Contains(body, `content="`+tt.wantURL+`android-chrome-512x512.png"`) {
+				t.Fatalf("og:image not joined onto %q in body: %s", tt.wantURL, body)
 			}
 			if !strings.Contains(body, `hreflang="en"`) {
 				t.Fatal("hreflang tags not injected")

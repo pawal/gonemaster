@@ -75,6 +75,14 @@ describe("index.html JSON-LD", () => {
     expect(app.isPartOf["@id"]).toBe(websiteNode()["@id"]);
   });
 
+  it("joins the image URL onto the substituted public URL", () => {
+    // resolvePublicURL guarantees a trailing slash, so plain
+    // concatenation must yield a valid absolute URL.
+    expect(appNode().image).toBe(
+      "https://example.com/android-chrome-512x512.png"
+    );
+  });
+
   it("declares the app free without offers or aggregateRating", () => {
     const app = appNode();
     expect(app.isAccessibleForFree).toBe(true);
@@ -95,5 +103,21 @@ describe("index.html JSON-LD", () => {
       .sort();
     const inLanguage = [...websiteNode().inLanguage].sort();
     expect(inLanguage).toEqual(locales);
+  });
+});
+
+describe("index.html social meta images", () => {
+  // og:image and twitter:image must be absolute URLs for link scrapers,
+  // so they build on __PUBLIC_URL__ rather than a root-relative path.
+  it("build og:image and twitter:image on the __PUBLIC_URL__ placeholder", () => {
+    const images = [
+      ...indexHtml.matchAll(
+        /(?:property="og:image"|name="twitter:image") content="([^"]*)"/g
+      ),
+    ].map((match) => match[1]);
+    expect(images.length).toBe(2);
+    for (const image of images) {
+      expect(image).toBe("__PUBLIC_URL__android-chrome-512x512.png");
+    }
   });
 });

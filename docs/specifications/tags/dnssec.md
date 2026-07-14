@@ -36,6 +36,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS02_NO_MATCH_DS_DNSKEY` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
+| `DS02_RSA_EXPONENT_UNSUPPORTED` | `NOTICE` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS03_ERROR_RESPONSE_NSEC_QUERY` | `ERROR` | [dnssec03](../tests/dnssec/dnssec03.md) | yes |
 | `DS03_ERR_MULT_NSEC3` | `ERROR` | [dnssec03](../tests/dnssec/dnssec03.md) | yes |
 | `DS03_ILLEGAL_HASH_ALGO` | `ERROR` | [dnssec03](../tests/dnssec/dnssec03.md) | yes |
@@ -87,10 +88,12 @@ _Do not edit by hand - regenerate with the command above._
 | `DS08_MISSING_RRSIG_IN_RESPONSE` | `ERROR` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
 | `DS08_NO_MATCHING_DNSKEY` | `ERROR` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
+| `DS08_RSA_EXPONENT_UNSUPPORTED` | `NOTICE` | [dnssec08](../tests/dnssec/dnssec08.md) | yes |
 | `DS09_ALGO_NOT_SUPPORTED_BY_ZM` | `NOTICE` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
 | `DS09_MISSING_RRSIG_IN_RESPONSE` | `ERROR` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
 | `DS09_NO_MATCHING_DNSKEY` | `ERROR` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
+| `DS09_RSA_EXPONENT_UNSUPPORTED` | `NOTICE` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
 | `DS09_SOA_RRSIG_EXPIRED` | `ERROR` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
 | `DS09_SOA_RRSIG_NOT_YET_VALID` | `ERROR` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |
 | `DS09_SOA_RRSIG_VALID` | `INFO` | [dnssec09](../tests/dnssec/dnssec09.md) | yes |

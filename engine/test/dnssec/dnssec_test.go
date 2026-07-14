@@ -3081,6 +3081,277 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 	}
 }
 
+// lvKSK42018Pub is the real .lv KSK public key (RSASHA256, 2048-bit, public
+// exponent 2^32+1). Both miekg/dns and crypto/rsa reject an exponent this
+// large, so verifyRRSIG can never succeed for it. The key is otherwise
+// well-formed: it matches a DS built from it, which is what makes it a DS-linked
+// key in DNSSEC02.
+const lvKSK42018Pub = "BQEAAAAByLU9dUcHHcl1eLgjLidTJKlwxsU9a580xierZ+WyfRBI47L3LLXAZZ0ub6Sea3qKP2mhP5ZBG/reXvyh3OSlHa39WoMiUUZFcuouCajBg7XeLGVPL4U1Ja1UW9wq/Oc8WU1dq4e+2Q8Dt8tipFvbL0AD0BhJAsfQuT3wperedwQAUKId0/JQOFNTWhEJaYN2P5IIhyRKWQp8OhtKmdNYQ5jfqqpXVO4zyqV+4ZxWurXJS8c7bKrE3OAewWEGAtTjeElfQ2CFAKWVjMOLeZ86+mgw7p3UHhGB+KuRaKg6fAtTcQYBF78Xe40wuj9EgGL19mp9v6tDwFe+Epow4SFSPQ=="
+
+func lvLargeExponentKSK(owner string) *dns.DNSKEY {
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE | dns.FlagSEP
+	key.Protocol = 3
+	key.Algorithm = 8 // RSASHA256
+	key.PublicKey = lvKSK42018Pub
+	return key
+}
+
+// A DS-linked DNSKEY whose only problem is an RSA exponent gonemaster cannot
+// verify locally must be reclassified from the ERROR DS02_RRSIG_NOT_VALID_BY_DNSKEY
+// to the NOTICE DS02_RSA_EXPONENT_UNSUPPORTED, and the DNSKEY-signed-by-DS
+// aggregate must treat it as indeterminate rather than a hard failure. This is
+// the .lv scenario, which validates on public resolvers but not here.
+func TestDNSSEC02RSAExponentUnsupported(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origGetParent := parentNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		parentNameservers = origGetParent
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	now := time.Unix(1700000000, 0).UTC()
+	key := lvLargeExponentKSK("example")
+	ds := key.ToDS(2)
+	if ds == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+	sig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+
+	parentNS := newNameserver(t, ctx, "ns-parent.example", "192.0.2.90", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DS" {
+			return packet.Packet{}
+		}
+		return dsPacketFromDS(qname, ds)
+	})
+	childNS := newNameserver(t, ctx, "ns-child.example", "192.0.2.91", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		pkt := answerPacket(qname, dns.TypeDNSKEY, key, sig)
+		pkt.Timestamp = now
+		return pkt
+	})
+
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	}
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{childNS}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC02(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec02: %v", err)
+	}
+	if !hasEntryTag(entries, "DS02_RSA_EXPONENT_UNSUPPORTED") {
+		t.Fatalf("expected DS02_RSA_EXPONENT_UNSUPPORTED")
+	}
+	// None of the false-failure tags may fire for the indeterminate key.
+	for _, tag := range []string{
+		"DS02_RRSIG_NOT_VALID_BY_DNSKEY",
+		"DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS",
+		"DS02_NO_MATCHING_DNSKEY_RRSIG",
+		"DS02_NO_VALID_DNSKEY_FOR_ANY_DS",
+	} {
+		if hasEntryTag(entries, tag) {
+			t.Errorf("did not expect %s for a large-exponent DS-linked key", tag)
+		}
+	}
+}
+
+// A DS-matching DNSKEY whose exponent is normal (65537) must still fail as
+// before: the RSA-exponent reclassification must not swallow a genuine bad
+// signature. This is the negative control for DNSSEC02.
+func TestDNSSEC02RRSIGNotValidByDNSKEYNormalExponent(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origGetParent := parentNameservers
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		parentNameservers = origGetParent
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	now := time.Unix(1700000000, 0).UTC()
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	key.Flags = dns.FlagZONE | dns.FlagSEP
+	key.Protocol = 3
+	key.Algorithm = 8
+	if _, err := key.Generate(1024); err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	ds := key.ToDS(2)
+	if ds == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+	// A fabricated RRSIG that will not verify against the generated key.
+	sig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+
+	parentNS := newNameserver(t, ctx, "ns-parent.example", "192.0.2.92", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DS" {
+			return packet.Packet{}
+		}
+		return dsPacketFromDS(qname, ds)
+	})
+	childNS := newNameserver(t, ctx, "ns-child.example", "192.0.2.93", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		pkt := answerPacket(qname, dns.TypeDNSKEY, key, sig)
+		pkt.Timestamp = now
+		return pkt
+	})
+
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	}
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{childNS}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC02(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec02: %v", err)
+	}
+	if hasEntryTag(entries, "DS02_RSA_EXPONENT_UNSUPPORTED") {
+		t.Fatalf("did not expect DS02_RSA_EXPONENT_UNSUPPORTED for a normal 65537 exponent")
+	}
+	if !hasEntryTag(entries, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS") {
+		t.Fatalf("expected DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS for a genuinely bad signature")
+	}
+}
+
+// DNSSEC08 must reclassify the same way: a DNSKEY RRSIG that cannot be checked
+// only because of a large RSA exponent becomes the NOTICE, not the ERROR, and
+// the nameserver is not counted as a DS08_DNSKEY_RRSIG_VALID pass.
+func TestDNSSEC08RSAExponentUnsupported(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	now := time.Unix(1700000000, 0).UTC()
+	key := lvLargeExponentKSK("example")
+	sig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.94", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		pkt := answerPacket(qname, dns.TypeDNSKEY, key, sig)
+		pkt.Timestamp = now
+		return pkt
+	})
+
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC08(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec08: %v", err)
+	}
+	if !hasEntryTag(entries, "DS08_RSA_EXPONENT_UNSUPPORTED") {
+		t.Fatalf("expected DS08_RSA_EXPONENT_UNSUPPORTED")
+	}
+	for _, tag := range []string{"DS08_RRSIG_NOT_VALID_BY_DNSKEY", "DS08_DNSKEY_RRSIG_VALID"} {
+		if hasEntryTag(entries, tag) {
+			t.Errorf("did not expect %s for a large-exponent key", tag)
+		}
+	}
+}
+
+// DNSSEC09 covers the SOA RRSIG path with the same reclassification.
+func TestDNSSEC09RSAExponentUnsupported(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM4 := glueNameservers
+	origM5 := apexNameservers
+	t.Cleanup(func() {
+		glueNameservers = origM4
+		apexNameservers = origM5
+	})
+
+	now := time.Unix(1700000000, 0).UTC()
+	key := lvLargeExponentKSK("example")
+	sig := rrsigRecord("example", dns.TypeSOA, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.95", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		switch qtype {
+		case "DNSKEY":
+			pkt := dnskeyPacket(qname, key)
+			pkt.Timestamp = now
+			return pkt
+		case "SOA":
+			pkt := answerPacket(qname, dns.TypeSOA, soaRecord(qname), sig)
+			pkt.Timestamp = now
+			return pkt
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC09(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec09: %v", err)
+	}
+	if !hasEntryTag(entries, "DS09_RSA_EXPONENT_UNSUPPORTED") {
+		t.Fatalf("expected DS09_RSA_EXPONENT_UNSUPPORTED")
+	}
+	for _, tag := range []string{"DS09_RRSIG_NOT_VALID_BY_DNSKEY", "DS09_SOA_RRSIG_VALID"} {
+		if hasEntryTag(entries, tag) {
+			t.Errorf("did not expect %s for a large-exponent key", tag)
+		}
+	}
+}
+
 func TestDNSSEC09ParallelQueries(t *testing.T) {
 	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)

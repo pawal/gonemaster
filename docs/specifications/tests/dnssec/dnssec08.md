@@ -100,6 +100,7 @@ emit TEST_CASE_END
 | `DS08_MISSING_RRSIG_IN_RESPONSE` | DNSKEY answer exists but contains no RRSIG records. |
 | `DS08_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY in DNSKEY RRset. |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none validate the RRSIG. |
+| `DS08_RSA_EXPONENT_UNSUPPORTED` | RRSIG could not be checked only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -122,6 +123,8 @@ emit TEST_CASE_END
 | `DS08_NO_MATCHING_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `keytag` | `int` | RRSIG keytag that failed DNSKEY verification. |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS08_RSA_EXPONENT_UNSUPPORTED` | `keytag` | `int` | RRSIG keytag whose matching DNSKEY RSA public exponent the local verifier cannot use. |
+| `DS08_RSA_EXPONENT_UNSUPPORTED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DNSKEY`). |
@@ -141,6 +144,7 @@ emit TEST_CASE_END
 | `DS08_MISSING_RRSIG_IN_RESPONSE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS08_NO_MATCHING_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS08_RSA_EXPONENT_UNSUPPORTED` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`); carries zero score penalty (`scoring` `TagPenalties`). |
 | `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -157,3 +161,4 @@ emit TEST_CASE_END
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one query outcome.
 - Responses failing shape checks (`Msg`, `NOERROR`, `AA`, apex DNSKEY presence) are silently skipped for DS08 findings.
 - Unsupported algorithm can be detected either before verification (`dnssecAlgorithmSupported`) or during verification (`dns.ErrAlg`).
+- Large RSA public exponent exception: when an RRSIG fails verification only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier (miekg/dns plus `crypto/rsa`) can use, the finding is reclassified from the `ERROR` `DS08_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS08_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS08_DNSKEY_RRSIG_VALID` pass.

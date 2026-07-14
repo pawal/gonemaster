@@ -2358,3 +2358,21 @@ msgstr "Jmenný server {ns}/{address} odpovídá na dotaz EDNS zkrácenou odpov�
 msgctxt "SYNTAX:NO_RESPONSE"
 msgid "No response from {ns} asking for {domain}."
 msgstr "Žádná odpověď od {ns} na dotaz pro {domain}."
+
+msgctxt "DNSSEC:DS02_RSA_EXPONENT_UNSUPPORTED"
+msgid ""
+"The RRSIG with keytag {keytag} could not be verified because the DNSKEY uses an RSA public exponent that this installation does not support. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr ""
+"RRSIG s tagem {keytag} nelze ověřit, protože DNSKEY používá veřejný exponent RSA, který tato instalace nepodporuje. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
+
+msgctxt "DNSSEC:DS08_RSA_EXPONENT_UNSUPPORTED"
+msgid ""
+"The RRSIG with keytag {keytag} could not be verified because the DNSKEY uses an RSA public exponent that this installation does not support. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr ""
+"RRSIG s tagem {keytag} nelze ověřit, protože DNSKEY používá veřejný exponent RSA, který tato instalace nepodporuje. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
+
+msgctxt "DNSSEC:DS09_RSA_EXPONENT_UNSUPPORTED"
+msgid ""
+"The RRSIG with keytag {keytag} could not be verified because the DNSKEY uses an RSA public exponent that this installation does not support. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr ""
+"RRSIG s tagem {keytag} nelze ověřit, protože DNSKEY používá veřejný exponent RSA, který tato instalace nepodporuje. Získáno z jmenných serverů s IP adresami \"{addresses}\"."

@@ -148,6 +148,7 @@ emit TEST_CASE_END
 | `DS02_NO_MATCH_DS_DNSKEY` | DNSKEY keytag match exists but DS digest/algorithm does not match DNSKEY data. |
 | `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | Responding child nameserver has no valid DS-matching DNSKEY for any DS. |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | Candidate DNSKEY RRSIG was present but failed verification with matching DNSKEY. |
+| `DS02_RSA_EXPONENT_UNSUPPORTED` | Candidate DNSKEY RRSIG could not be checked only because the matching DS-linked DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DS` or `DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DS` or `DNSKEY`). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -175,6 +176,8 @@ emit TEST_CASE_END
 | `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `keytag` | `int` | Keytag from DNSKEY RRSIG verification failure. |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS02_RSA_EXPONENT_UNSUPPORTED` | `keytag` | `int` | DS-linked DNSKEY keytag whose RSA public exponent the local verifier cannot use. |
+| `DS02_RSA_EXPONENT_UNSUPPORTED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`DS` or `DNSKEY`). |
@@ -197,6 +200,7 @@ emit TEST_CASE_END
 | `DS02_NO_MATCH_DS_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS02_RSA_EXPONENT_UNSUPPORTED` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`); carries zero score penalty (`scoring` `TagPenalties`). |
 | `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `IPV6_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -213,3 +217,4 @@ emit TEST_CASE_END
 - If parent DS discovery yields no DS records, testcase stops after boundary tags and emits no DS02 findings.
 - Child nameservers are deduplicated by IP before DNSKEY checks, so repeated names on one IP collapse into one probe context.
 - `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` and `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` are mutually exclusive by implementation (`else if` branch).
+- Large RSA public exponent exception: when a DS-linked DNSKEY RRSIG fails verification only because the key is an RSA key whose public exponent exceeds what the local verifier (miekg/dns plus `crypto/rsa`) can use (more than 4 bytes, or greater than 2^31-1), the finding is reclassified from the `ERROR` `DS02_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS02_RSA_EXPONENT_UNSUPPORTED`. Such a key is treated as indeterminate rather than failed: it does not raise `DS02_NO_MATCHING_DNSKEY_RRSIG`, and when it is the sole reason a nameserver has no validating DS-linked key, `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` is suppressed. The zone may validate perfectly on public resolvers; gonemaster simply cannot check the signature locally.

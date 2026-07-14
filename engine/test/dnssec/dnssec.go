@@ -330,6 +330,7 @@ func Metadata() map[string][]string {
 			"DS02_NO_MATCH_DS_DNSKEY",
 			"DS02_NO_VALID_DNSKEY_FOR_ANY_DS",
 			"DS02_RRSIG_NOT_VALID_BY_DNSKEY",
+			"DS02_RSA_EXPONENT_UNSUPPORTED",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -421,6 +422,7 @@ func Metadata() map[string][]string {
 			"DS08_MISSING_RRSIG_IN_RESPONSE",
 			"DS08_NO_MATCHING_DNSKEY",
 			"DS08_RRSIG_NOT_VALID_BY_DNSKEY",
+			"DS08_RSA_EXPONENT_UNSUPPORTED",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -431,6 +433,7 @@ func Metadata() map[string][]string {
 			"DS09_MISSING_RRSIG_IN_RESPONSE",
 			"DS09_NO_MATCHING_DNSKEY",
 			"DS09_RRSIG_NOT_VALID_BY_DNSKEY",
+			"DS09_RSA_EXPONENT_UNSUPPORTED",
 			"DS09_SOA_RRSIG_EXPIRED",
 			"DS09_SOA_RRSIG_NOT_YET_VALID",
 			"DS09_SOA_RRSIG_VALID",
@@ -931,9 +934,12 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	noMatchingDNSKEYRRSIG := map[uint16][]string{}
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
 	rrsigNotValidByDNSKEY := map[uint16][]string{}
+	rsaExponentUnsupported := map[uint16][]string{}
 	respondingChildNS := map[string]bool{}
 	hasDNSKEYMatchDS := map[string]bool{}
 	hasRRSIGMatchDS := map[string]bool{}
+	hasRRSIGUnsupportedDS := map[string]bool{}
+	hasRRSIGHardFailDS := map[string]bool{}
 	var nsDNSKEY []string
 	var nsRRSIG []string
 
@@ -1036,6 +1042,8 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			noMatchingDNSKEYRRSIG   map[uint16]bool
 			algoNotSupportedByZM    map[uint16]map[uint8]bool
 			rrsigNotValidByDNSKEY   map[uint16]bool
+			rsaExponentUnsupported  map[uint16]bool
+			hasRRSIGUnsupportedDS   bool
 		}
 
 		var ordered []nameserver.Nameserver
@@ -1064,6 +1072,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					noMatchingDNSKEYRRSIG:   map[uint16]bool{},
 					algoNotSupportedByZM:    map[uint16]map[uint8]bool{},
 					rrsigNotValidByDNSKEY:   map[uint16]bool{},
+					rsaExponentUnsupported:  map[uint16]bool{},
 				}
 
 				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DNSKEY"); err != nil {
@@ -1179,6 +1188,9 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 										outcome.algoNotSupportedByZM[keytag] = map[uint8]bool{}
 									}
 									outcome.algoNotSupportedByZM[keytag][sig.Algorithm] = true
+								} else if dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+									// RSA exponent we cannot verify locally: indeterminate, not a failure.
+									outcome.rsaExponentUnsupported[keytag] = true
 								} else {
 									outcome.rrsigNotValidByDNSKEY[keytag] = true
 								}
@@ -1187,10 +1199,15 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							}
 						}
 
-						if len(matchingRRSIG) == 0 || !foundMatch {
-							outcome.noMatchingDNSKEYRRSIG[keytag] = true
-						} else {
+						switch {
+						case foundMatch:
 							outcome.hasRRSIGMatchDS = true
+						case outcome.rsaExponentUnsupported[keytag] && !outcome.rrsigNotValidByDNSKEY[keytag] && outcome.algoNotSupportedByZM[keytag] == nil:
+							// Sole reason this DS-linked key did not verify is the unsupported
+							// exponent; leave it indeterminate rather than raising a failure.
+							outcome.hasRRSIGUnsupportedDS = true
+						default:
+							outcome.noMatchingDNSKEYRRSIG[keytag] = true
 						}
 					}
 				}
@@ -1219,6 +1236,12 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if outcome.hasRRSIGMatchDS {
 				hasRRSIGMatchDS[outcome.nsIP] = true
 			}
+			if outcome.hasRRSIGUnsupportedDS {
+				hasRRSIGUnsupportedDS[outcome.nsIP] = true
+			}
+			if len(outcome.rrsigNotValidByDNSKEY) > 0 || len(outcome.noMatchingDNSKEYRRSIG) > 0 {
+				hasRRSIGHardFailDS[outcome.nsIP] = true
+			}
 
 			for keytag := range outcome.noDNSKEYForDS {
 				noDNSKEYForDS[keytag] = append(noDNSKEYForDS[keytag], outcome.nsIP)
@@ -1245,6 +1268,9 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 			for keytag := range outcome.rrsigNotValidByDNSKEY {
 				rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.rsaExponentUnsupported {
+				rsaExponentUnsupported[keytag] = append(rsaExponentUnsupported[keytag], outcome.nsIP)
 			}
 		}
 	}
@@ -1317,12 +1343,23 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
+	for keytag, nsList := range rsaExponentUnsupported {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS02_RSA_EXPONENT_UNSUPPORTED", args); err != nil {
+			return results, err
+		}
+	}
 
 	for nsIP := range respondingChildNS {
 		if !hasDNSKEYMatchDS[nsIP] {
 			nsDNSKEY = append(nsDNSKEY, nsIP)
 		}
-		if !hasRRSIGMatchDS[nsIP] {
+		// A DS-linked key that only failed the unsupported-exponent check is
+		// indeterminate: do not claim the DNSKEY RRset is unsigned by any DS.
+		if !hasRRSIGMatchDS[nsIP] && !(hasRRSIGUnsupportedDS[nsIP] && !hasRRSIGHardFailDS[nsIP]) {
 			nsRRSIG = append(nsRRSIG, nsIP)
 		}
 	}
@@ -2508,6 +2545,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	dnskeyRRSIGExpired := map[uint16][]string{}
 	noMatchingDNSKEY := map[uint16][]string{}
 	rrsigNotValidByDNSKEY := map[uint16][]string{}
+	rsaExponentUnsupported := map[uint16][]string{}
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
 	var ds08PassedIPs []string
 
@@ -2548,6 +2586,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			dnskeyRRSIGExpired     map[uint16]bool
 			noMatchingDNSKEY       map[uint16]bool
 			rrsigNotValidByDNSKEY  map[uint16]bool
+			rsaExponentUnsupported map[uint16]bool
 			algoNotSupportedByZM   map[uint16]map[uint8]bool
 		}
 
@@ -2562,6 +2601,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					dnskeyRRSIGExpired:     map[uint16]bool{},
 					noMatchingDNSKEY:       map[uint16]bool{},
 					rrsigNotValidByDNSKEY:  map[uint16]bool{},
+					rsaExponentUnsupported: map[uint16]bool{},
 					algoNotSupportedByZM:   map[uint16]map[uint8]bool{},
 				}
 
@@ -2644,10 +2684,13 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					rrset := dnskeyRRset(dnskeyRecords)
 					valid := false
 					algoUnsupported := false
+					rsaUnsupported := false
 					for _, dnskey := range matchingDNSKEYs {
 						if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
 							if errors.Is(err, dns.ErrAlg) {
 								algoUnsupported = true
+							} else if dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+								rsaUnsupported = true
 							}
 							continue
 						}
@@ -2664,7 +2707,12 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 
 					if !valid {
-						outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+						if rsaUnsupported {
+							// RSA exponent we cannot verify locally: indeterminate, not a failure.
+							outcome.rsaExponentUnsupported[sig.KeyTag] = true
+						} else {
+							outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+						}
 					}
 				}
 
@@ -2696,6 +2744,9 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for keytag := range outcome.rrsigNotValidByDNSKEY {
 				rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], outcome.nsIP)
 			}
+			for keytag := range outcome.rsaExponentUnsupported {
+				rsaExponentUnsupported[keytag] = append(rsaExponentUnsupported[keytag], outcome.nsIP)
+			}
 			for keytag, algoMap := range outcome.algoNotSupportedByZM {
 				if algoNotSupportedByZM[keytag] == nil {
 					algoNotSupportedByZM[keytag] = map[uint8][]string{}
@@ -2710,6 +2761,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				len(outcome.dnskeyRRSIGExpired) == 0 &&
 				len(outcome.noMatchingDNSKEY) == 0 &&
 				len(outcome.rrsigNotValidByDNSKEY) == 0 &&
+				len(outcome.rsaExponentUnsupported) == 0 &&
 				len(outcome.algoNotSupportedByZM) == 0 {
 				ds08PassedIPs = append(ds08PassedIPs, outcome.nsIP)
 			}
@@ -2759,6 +2811,15 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			return results, err
 		}
 	}
+	for keytag, nsList := range rsaExponentUnsupported {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS08_RSA_EXPONENT_UNSUPPORTED", args); err != nil {
+			return results, err
+		}
+	}
 	for keytag, algoMap := range algoNotSupportedByZM {
 		for algo, nsList := range algoMap {
 			prop := algoPropertyFor(algo)
@@ -2804,6 +2865,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	soaRRSIGExpired := map[uint16][]string{}
 	noMatchingDNSKEY := map[uint16][]string{}
 	rrsigNotValidByDNSKEY := map[uint16][]string{}
+	rsaExponentUnsupported := map[uint16][]string{}
 	algoNotSupportedByZM := map[uint16]map[uint8][]string{}
 
 	nssDel, err := glueNameservers(ctx, z)
@@ -2836,14 +2898,15 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	if len(ordered) > 0 {
 		type nsOutcome struct {
-			nsIP                  string
-			hadRRSIGs             bool
-			soaWithoutRRSIG       bool
-			soaRRSIGNotYetValid   map[uint16]bool
-			soaRRSIGExpired       map[uint16]bool
-			noMatchingDNSKEY      map[uint16]bool
-			rrsigNotValidByDNSKEY map[uint16]bool
-			algoNotSupportedByZM  map[uint16]map[uint8]bool
+			nsIP                   string
+			hadRRSIGs              bool
+			soaWithoutRRSIG        bool
+			soaRRSIGNotYetValid    map[uint16]bool
+			soaRRSIGExpired        map[uint16]bool
+			noMatchingDNSKEY       map[uint16]bool
+			rrsigNotValidByDNSKEY  map[uint16]bool
+			rsaExponentUnsupported map[uint16]bool
+			algoNotSupportedByZM   map[uint16]map[uint8]bool
 		}
 
 		outcomes := make([]nsOutcome, len(ordered))
@@ -2852,12 +2915,13 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := nsOutcome{
-					nsIP:                  ns.Address.String(),
-					soaRRSIGNotYetValid:   map[uint16]bool{},
-					soaRRSIGExpired:       map[uint16]bool{},
-					noMatchingDNSKEY:      map[uint16]bool{},
-					rrsigNotValidByDNSKEY: map[uint16]bool{},
-					algoNotSupportedByZM:  map[uint16]map[uint8]bool{},
+					nsIP:                   ns.Address.String(),
+					soaRRSIGNotYetValid:    map[uint16]bool{},
+					soaRRSIGExpired:        map[uint16]bool{},
+					noMatchingDNSKEY:       map[uint16]bool{},
+					rrsigNotValidByDNSKEY:  map[uint16]bool{},
+					rsaExponentUnsupported: map[uint16]bool{},
+					algoNotSupportedByZM:   map[uint16]map[uint8]bool{},
 				}
 
 				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DNSKEY"); err != nil {
@@ -2952,10 +3016,13 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					rrset := append([]dns.RR{}, soaRRs...)
 					valid := false
 					algoUnsupported := false
+					rsaUnsupported := false
 					for _, dnskey := range matchingDNSKEYs {
 						if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
 							if errors.Is(err, dns.ErrAlg) {
 								algoUnsupported = true
+							} else if dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+								rsaUnsupported = true
 							}
 							continue
 						}
@@ -2972,7 +3039,12 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 
 					if !valid {
-						outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+						if rsaUnsupported {
+							// RSA exponent we cannot verify locally: indeterminate, not a failure.
+							outcome.rsaExponentUnsupported[sig.KeyTag] = true
+						} else {
+							outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
+						}
 					}
 				}
 
@@ -3004,6 +3076,9 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for keytag := range outcome.rrsigNotValidByDNSKEY {
 				rrsigNotValidByDNSKEY[keytag] = append(rrsigNotValidByDNSKEY[keytag], outcome.nsIP)
 			}
+			for keytag := range outcome.rsaExponentUnsupported {
+				rsaExponentUnsupported[keytag] = append(rsaExponentUnsupported[keytag], outcome.nsIP)
+			}
 			for keytag, algoMap := range outcome.algoNotSupportedByZM {
 				if algoNotSupportedByZM[keytag] == nil {
 					algoNotSupportedByZM[keytag] = map[uint8][]string{}
@@ -3018,6 +3093,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				len(outcome.soaRRSIGExpired) == 0 &&
 				len(outcome.noMatchingDNSKEY) == 0 &&
 				len(outcome.rrsigNotValidByDNSKEY) == 0 &&
+				len(outcome.rsaExponentUnsupported) == 0 &&
 				len(outcome.algoNotSupportedByZM) == 0 {
 				ds09PassedIPs = append(ds09PassedIPs, outcome.nsIP)
 			}
@@ -3064,6 +3140,15 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 		setTypedAddressesFromValues(args, nsList)
 		if err := appendLog(ctx, &results, testcase, "DS09_RRSIG_NOT_VALID_BY_DNSKEY", args); err != nil {
+			return results, err
+		}
+	}
+	for keytag, nsList := range rsaExponentUnsupported {
+		args := map[string]any{
+			"keytag": keytag,
+		}
+		setTypedAddressesFromValues(args, nsList)
+		if err := appendLog(ctx, &results, testcase, "DS09_RSA_EXPONENT_UNSUPPORTED", args); err != nil {
 			return results, err
 		}
 	}
@@ -3348,7 +3433,8 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 											}
 											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
-										} else {
+										} else if !dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+											// Skip an unsupported RSA exponent: indeterminate, not a verify error.
 											outcome.nsec3RRSIGVerifyError[keytag] = true
 										}
 									}
@@ -3426,7 +3512,8 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 											}
 											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
-										} else {
+										} else if !dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+											// Skip an unsupported RSA exponent: indeterminate, not a verify error.
 											outcome.nsecRRSIGVerifyError[keytag] = true
 										}
 									}
@@ -3521,7 +3608,8 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 											}
 											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
-										} else {
+										} else if !dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+											// Skip an unsupported RSA exponent: indeterminate, not a verify error.
 											outcome.nsecRRSIGVerifyError[keytag] = true
 										}
 									}
@@ -8040,18 +8128,19 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	type ds21Outcome struct {
-		ip                    string
-		ignored               bool
-		noDS                  bool
-		noDSRRSIG             bool
-		parentDNSKEYMissing   bool
-		hadRRSIG              bool
-		verifiedKeytags       []uint16
-		rrsigNotValidByDNSKEY map[uint16]bool
-		rrsigExpired          map[uint16]bool
-		rrsigNotYetValid      map[uint16]bool
-		noDNSKEYForRRSIG      map[uint16]bool
-		algoNotSupported      map[uint16]map[uint8]bool
+		ip                     string
+		ignored                bool
+		noDS                   bool
+		noDSRRSIG              bool
+		parentDNSKEYMissing    bool
+		hadRRSIG               bool
+		verifiedKeytags        []uint16
+		rrsigNotValidByDNSKEY  map[uint16]bool
+		rrsigExpired           map[uint16]bool
+		rrsigNotYetValid       map[uint16]bool
+		noDNSKEYForRRSIG       map[uint16]bool
+		algoNotSupported       map[uint16]map[uint8]bool
+		rsaExponentUnsupported bool
 	}
 
 	parentApex := parent.Name.String()
@@ -8181,10 +8270,13 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				verified := false
 				algoUnsupported := false
+				rsaUnsupported := false
 				for _, k := range matchingKeys {
 					if verr := verifyRRSIG(sig, dsRRset, k, testTime); verr != nil {
 						if errors.Is(verr, dns.ErrAlg) {
 							algoUnsupported = true
+						} else if dnssecutil.RSAExponentBeyondLocalVerifier(k) {
+							rsaUnsupported = true
 						}
 						continue
 					}
@@ -8200,6 +8292,11 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						outcome.algoNotSupported[sig.KeyTag] = map[uint8]bool{}
 					}
 					outcome.algoNotSupported[sig.KeyTag][sig.Algorithm] = true
+					continue
+				}
+				if rsaUnsupported {
+					// RSA exponent we cannot verify locally: indeterminate, not a failure.
+					outcome.rsaExponentUnsupported = true
 					continue
 				}
 				outcome.rrsigNotValidByDNSKEY[sig.KeyTag] = true
@@ -8245,7 +8342,17 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if len(oc.verifiedKeytags) > 0 {
 			verifiedIPs = append(verifiedIPs, oc.ip)
 		} else if oc.hadRRSIG {
-			notVerifiableIPs = append(notVerifiableIPs, oc.ip)
+			// An outcome whose only unverifiable signature used an unsupported RSA
+			// exponent is indeterminate, not a hard "not verifiable" result.
+			onlyRSAUnsupported := oc.rsaExponentUnsupported &&
+				len(oc.rrsigNotValidByDNSKEY) == 0 &&
+				len(oc.rrsigExpired) == 0 &&
+				len(oc.rrsigNotYetValid) == 0 &&
+				len(oc.noDNSKEYForRRSIG) == 0 &&
+				len(oc.algoNotSupported) == 0
+			if !onlyRSAUnsupported {
+				notVerifiableIPs = append(notVerifiableIPs, oc.ip)
+			}
 		}
 		for kt := range oc.rrsigNotValidByDNSKEY {
 			perKeytagInvalid[kt] = append(perKeytagInvalid[kt], oc.ip)

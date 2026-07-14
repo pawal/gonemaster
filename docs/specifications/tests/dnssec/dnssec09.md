@@ -88,6 +88,7 @@ emit TEST_CASE_END
 | `DS09_MISSING_RRSIG_IN_RESPONSE` | SOA response has no answer-section RRSIG records. |
 | `DS09_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY keytag. |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none verify the SOA signature. |
+| `DS09_RSA_EXPONENT_UNSUPPORTED` | SOA RRSIG could not be checked only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports. |
 | `DS09_SOA_RRSIG_EXPIRED` | SOA-related RRSIG expiration is before test time. |
 | `DS09_SOA_RRSIG_NOT_YET_VALID` | SOA-related RRSIG inception is after test time. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
@@ -107,6 +108,8 @@ emit TEST_CASE_END
 | `DS09_NO_MATCHING_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `keytag` | `int` | RRSIG keytag that failed DNSKEY verification. |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS09_RSA_EXPONENT_UNSUPPORTED` | `keytag` | `int` | RRSIG keytag whose matching DNSKEY RSA public exponent the local verifier cannot use. |
+| `DS09_RSA_EXPONENT_UNSUPPORTED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS09_SOA_RRSIG_EXPIRED` | `keytag` | `int` | RRSIG keytag with expired validity window. |
 | `DS09_SOA_RRSIG_EXPIRED` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS09_SOA_RRSIG_NOT_YET_VALID` | `keytag` | `int` | RRSIG keytag with not-yet-valid validity window. |
@@ -128,6 +131,7 @@ emit TEST_CASE_END
 | `DS09_MISSING_RRSIG_IN_RESPONSE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS09_NO_MATCHING_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS09_RSA_EXPONENT_UNSUPPORTED` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`); carries zero score penalty (`scoring` `TagPenalties`). |
 | `DS09_SOA_RRSIG_EXPIRED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS09_SOA_RRSIG_NOT_YET_VALID` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS09_SOA_RRSIG_VALID` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -148,3 +152,4 @@ emit TEST_CASE_END
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one DS09 outcome.
 - Nameservers failing response-shape checks (`Msg`, `NOERROR`, `AA`, apex owner match) are skipped for DS09 findings.
 - If no usable DNSKEY records are found for a nameserver, SOA signing checks are skipped for that nameserver.
+- Large RSA public exponent exception: when the SOA RRSIG fails verification only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier (miekg/dns plus `crypto/rsa`) can use, the finding is reclassified from the `ERROR` `DS09_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS09_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS09_SOA_RRSIG_VALID` pass.

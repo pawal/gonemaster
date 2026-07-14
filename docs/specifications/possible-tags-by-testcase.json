@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 82,
-    "unique_tag_count": 541
+    "unique_tag_count": 544
   },
   "modules": {
     "address": {
@@ -354,6 +354,7 @@
         "DS02_NO_MATCH_DS_DNSKEY",
         "DS02_NO_VALID_DNSKEY_FOR_ANY_DS",
         "DS02_RRSIG_NOT_VALID_BY_DNSKEY",
+        "DS02_RSA_EXPONENT_UNSUPPORTED",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",
@@ -445,6 +446,7 @@
         "DS08_MISSING_RRSIG_IN_RESPONSE",
         "DS08_NO_MATCHING_DNSKEY",
         "DS08_RRSIG_NOT_VALID_BY_DNSKEY",
+        "DS08_RSA_EXPONENT_UNSUPPORTED",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",
@@ -455,6 +457,7 @@
         "DS09_MISSING_RRSIG_IN_RESPONSE",
         "DS09_NO_MATCHING_DNSKEY",
         "DS09_RRSIG_NOT_VALID_BY_DNSKEY",
+        "DS09_RSA_EXPONENT_UNSUPPORTED",
         "DS09_SOA_RRSIG_EXPIRED",
         "DS09_SOA_RRSIG_NOT_YET_VALID",
         "DS09_SOA_RRSIG_VALID",

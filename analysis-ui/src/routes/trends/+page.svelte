@@ -4,9 +4,10 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import TrendLine from "$lib/charts/TrendLine.svelte";
-  import { domainsGradeHref, domainsSeverityHref } from "$lib/entityLinks";
-  import { formatCount, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
-  import { pinnedSeries } from "$lib/trends";
+  import { domainsGradeHref, domainsSeverityHref, tagHref } from "$lib/entityLinks";
+  import { downloadCSV, type ExportColumn } from "$lib/exporters";
+  import { formatCount, levelTone, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
+  import { computeTagMovers, pinnedSeries } from "$lib/trends";
   import type { LayoutData } from "../+layout";
   import { TREND_CATEGORIES, type TrendsPageData } from "./+page";
 
@@ -216,6 +217,29 @@
   );
   // Prefer the short source date for the x-axis; series is aligned to pinned.
   const pinnedLabels = $derived(series.map((s) => s.sourceDate || s.label));
+
+  // Biggest tag movers between the first and last snapshot, from the separate
+  // top_tags series.
+  const movers = $derived(computeTagMovers(data.topTagPoints ?? [], 10));
+  const query = $derived(page.url.search);
+
+  // Export the visible category series: one row per snapshot, one column per
+  // bucket, plus the total.
+  function exportSeries() {
+    if (series.length === 0) return;
+    const columns: ExportColumn<Series>[] = [
+      { key: "snapshot", label: "Snapshot", value: (s) => s.label },
+      { key: "date", label: "Source date", value: (s) => s.sourceDate },
+      ...bucketKeys.map((key) => ({
+        key,
+        label: labelForKey(key),
+        value: (s: Series) => countFor(s, key)
+      })),
+      { key: "total", label: "Total", value: (s) => totalFor(s) }
+    ];
+    const tag = data.datasetTag ?? "cohort";
+    downloadCSV(`${tag}-trends-${data.category}.csv`, series, columns);
+  }
 </script>
 
 <svelte:window onkeydown={onKeydown} />
@@ -266,7 +290,14 @@
   </section>
 {:else}
   <section class="card">
-    <h3>{TREND_CATEGORIES.find((c) => c.key === data.category)?.label}</h3>
+    <div class="list-head">
+      <h3>{TREND_CATEGORIES.find((c) => c.key === data.category)?.label}</h3>
+      <div class="export-group">
+        <button type="button" class="ghost" onclick={exportSeries} disabled={series.length === 0}>
+          Export CSV
+        </button>
+      </div>
+    </div>
     {#if focusActive}
       <div class="focus-head">
         <div>
@@ -352,6 +383,32 @@
       {/each}
     </ul>
   </section>
+
+  {#if movers.length > 0}
+    <section class="card">
+      <h3>Top movers</h3>
+      <p class="hint">
+        Finding tags whose domain count changed most between the first and
+        last snapshot shown. Rising counts are regressions.
+      </p>
+      <ol class="mover-list">
+        {#each movers as m (m.tag)}
+          <li class="mover-row">
+            <a class="mover-tag" href={tagHref(base, m.tag, query)}>{m.tag}</a>
+            {#if m.level}
+              <span class="level level-{levelTone(m.level)}">{m.level}</span>
+            {:else}
+              <span class="level level-neutral">-</span>
+            {/if}
+            <span class="mover-counts">{formatCount(m.first)} → {formatCount(m.last)}</span>
+            <span class="mover-delta" class:up={m.delta > 0} class:down={m.delta < 0}>
+              {m.delta > 0 ? "+" : ""}{formatCount(m.delta)}
+            </span>
+          </li>
+        {/each}
+      </ol>
+    </section>
+  {/if}
 {/if}
 
 <style>
@@ -541,5 +598,51 @@
     background: var(--surface-2);
     color: var(--ink);
     font-weight: 600;
+  }
+
+  .mover-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(10rem, 1fr) minmax(4rem, auto) minmax(6rem, auto) minmax(4rem, auto);
+    column-gap: var(--space-3);
+    row-gap: 6px;
+    align-items: center;
+  }
+  .mover-row {
+    display: contents;
+  }
+  .mover-tag {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    color: var(--ink);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mover-tag:hover {
+    color: var(--accent-2);
+    text-decoration: underline;
+  }
+  .mover-counts {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+    text-align: right;
+  }
+  .mover-delta {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: right;
+    color: var(--ink-2);
+  }
+  .mover-delta.up {
+    color: var(--bar-error);
+  }
+  .mover-delta.down {
+    color: var(--bar-ok);
   }
 </style>

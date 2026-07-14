@@ -1,4 +1,4 @@
-import { getTrends, type TrendKeyMeta, type TrendPoint } from "$lib/api";
+import { getTrends, type TrendKeyMeta, type TrendPoint, type TrendResponse } from "$lib/api";
 
 // Trend categories; keys match the fact-store category constants on the
 // server (server/analysis_fact_categories.go).
@@ -16,6 +16,9 @@ export type TrendsPageData = {
   category: TrendCategoryKey;
   points: TrendPoint[];
   keyMeta: Record<string, TrendKeyMeta>;
+  // Top-tags time series that drives the "Top movers" panel. Independent of
+  // the selected category and non-fatal: empty when unavailable.
+  topTagPoints: TrendPoint[];
   error: string | null;
 };
 
@@ -26,15 +29,23 @@ export async function load({ parent, fetch, url }): Promise<TrendsPageData> {
   const category: TrendCategoryKey =
     TREND_CATEGORIES.find((c) => c.key === rawCategory)?.key ?? "severity";
   if (!datasetTag) {
-    return { datasetTag: null, category, points: [], keyMeta: {}, error: null };
+    return { datasetTag: null, category, points: [], keyMeta: {}, topTagPoints: [], error: null };
   }
   try {
-    const trend = await getTrends(datasetTag, { category }, fetch);
+    // The movers series is a separate category the server already serves; keep
+    // it non-fatal so a movers failure never blanks the main chart.
+    const [trend, movers] = await Promise.all([
+      getTrends(datasetTag, { category }, fetch),
+      getTrends(datasetTag, { category: "top_tags" }, fetch).catch(
+        (): TrendResponse => ({ dataset_tag: datasetTag, category: "top_tags", points: [] })
+      )
+    ]);
     return {
       datasetTag,
       category,
       points: trend.points ?? [],
       keyMeta: trend.key_meta ?? {},
+      topTagPoints: movers.points ?? [],
       error: null
     };
   } catch (error) {
@@ -43,6 +54,7 @@ export async function load({ parent, fetch, url }): Promise<TrendsPageData> {
       category,
       points: [],
       keyMeta: {},
+      topTagPoints: [],
       error: error instanceof Error ? error.message : String(error)
     };
   }

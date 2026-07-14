@@ -116,6 +116,36 @@ describe("+trends.load", () => {
     expect(data.points).toEqual([]);
     expect(data.error).toMatch(/HTTP 500/);
   });
+
+  it("also fetches the top_tags series for the movers panel", async () => {
+    const calls: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const u = typeof input === "string" ? input : (input as URL).toString();
+      calls.push(u);
+      if (u.includes("category=top_tags")) {
+        return stubResponse({ dataset_tag: "tld", category: "top_tags", points: [{ slug: "s1", captured_at: "s1", payload: [] }] });
+      }
+      return stubResponse({ dataset_tag: "tld", category: "severity", points: [] });
+    }) as unknown as typeof fetch;
+
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl }));
+    expect(calls.some((c) => c.includes("category=top_tags"))).toBe(true);
+    expect(data.topTagPoints).toHaveLength(1);
+  });
+
+  it("keeps the main chart when the movers fetch fails", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const u = typeof input === "string" ? input : (input as URL).toString();
+      if (u.includes("category=top_tags")) return stubResponse({ error: "boom" }, false);
+      return stubResponse({ dataset_tag: "tld", category: "severity", points: [{ slug: "s1", captured_at: "s1", payload: {} }] });
+    }) as unknown as typeof fetch;
+
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl }));
+    // Movers failure is non-fatal: main series and no error survive.
+    expect(data.error).toBeNull();
+    expect(data.points).toHaveLength(1);
+    expect(data.topTagPoints).toEqual([]);
+  });
 });
 
 function trendsData(overrides: Partial<TrendsPageData> = {}): TrendsPageData {
@@ -129,6 +159,7 @@ function trendsData(overrides: Partial<TrendsPageData> = {}): TrendsPageData {
       ok: { label: "OK", tone: "ok", order: 0 },
       critical: { label: "Critical", tone: "critical", order: 5 }
     },
+    topTagPoints: [],
     error: null,
     ...overrides
   };
@@ -194,5 +225,26 @@ describe("trends page rendering", () => {
     h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=bogus");
     const { container } = render(TrendsPage, { data: trendsData() });
     expect(container.querySelector(".trend-list")).not.toBeNull();
+  });
+
+  it("lists the biggest tag movers from the top_tags series", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity");
+    render(TrendsPage, {
+      data: trendsData({
+        topTagPoints: [
+          { slug: "s1", captured_at: "s1", payload: [{ tag: "DS02", level: "ERROR", domain_count: 100 }] },
+          { slug: "s2", captured_at: "s2", payload: [{ tag: "DS02", level: "ERROR", domain_count: 60 }] }
+        ]
+      })
+    });
+    const link = screen.getByRole("link", { name: "DS02" });
+    expect(link.getAttribute("href")).toContain("/analysis/tags/DS02");
+    // The 100 -> 60 drop shows as a signed delta.
+    expect(screen.getByText("-40")).toBeInTheDocument();
+  });
+
+  it("omits the movers panel when there is no movement", () => {
+    render(TrendsPage, { data: trendsData({ topTagPoints: [] }) });
+    expect(screen.queryByText(/top movers/i)).toBeNull();
   });
 });

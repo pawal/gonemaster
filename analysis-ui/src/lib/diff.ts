@@ -14,6 +14,15 @@ export const LEVEL_ORDER = ["NOTICE", "WARNING", "ERROR", "CRITICAL"];
 
 export type Direction = "regressed" | "improved" | "neutral";
 
+// The snapshot preceding `toSlug` in a newest-first list, or "" when `to` is
+// unknown or already the oldest. Lets the diff loader default the other side.
+export function previousSlug(snapshots: { slug: string }[], toSlug: string): string {
+  if (!toSlug) return "";
+  const idx = snapshots.findIndex((s) => s.slug === toSlug);
+  if (idx < 0) return "";
+  return snapshots[idx + 1]?.slug ?? "";
+}
+
 function rankIn(order: string[], value: string | null | undefined): number | null {
   const idx = order.indexOf(String(value ?? "").trim().toUpperCase());
   return idx < 0 ? null : idx;

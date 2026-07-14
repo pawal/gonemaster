@@ -112,15 +112,17 @@
     return `${base}/diff?${params.toString()}`;
   });
 
-  const summaryCards = $derived.by(() => {
+  const summaryCards = $derived.by<{ label: string; value: number; href: string | null }[]>(() => {
     const t = data.totals;
     if (!t) return [];
     // Domains lead the hero tiles, so the entity row covers the rest.
+    // Prefixes have no list view (folded into the Addresses tab), so the
+    // count shows without a link rather than pointing at a dead route.
     return [
       { label: "Nameservers", value: t.nameserver_count, href: "/nameservers" },
       { label: "Endpoints", value: t.endpoint_count, href: "/endpoints" },
       { label: "ASNs", value: t.asn_count, href: "/asns" },
-      { label: "Prefixes", value: t.prefix_count, href: "/prefixes" }
+      { label: "Prefixes", value: t.prefix_count, href: null }
     ];
   });
 
@@ -331,10 +333,15 @@
 
     <section class="summary-grid" aria-label="Cohort entity counts">
       {#each summaryCards as card (card.label)}
-        <a class="summary-card" href={`${base}${card.href}${query}`}>
+        <svelte:element
+          this={card.href ? "a" : "div"}
+          class="summary-card"
+          class:static={!card.href}
+          href={card.href ? `${base}${card.href}${query}` : undefined}
+        >
           <span class="summary-count">{formatCount(card.value)}</span>
           <span class="summary-label">{card.label}</span>
-        </a>
+        </svelte:element>
       {/each}
     </section>
 
@@ -824,9 +831,13 @@
     color: var(--ink);
     transition: border-color 0.15s ease, transform 0.15s ease;
   }
-  .summary-card:hover {
+  .summary-card:hover:not(.static) {
     border-color: var(--accent-2);
     transform: translateY(-1px);
+  }
+  /* Non-linking count (e.g. Prefixes, which has no list view). */
+  .summary-card.static {
+    cursor: default;
   }
   .summary-count {
     font-size: var(--text-2xl);

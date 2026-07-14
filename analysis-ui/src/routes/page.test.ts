@@ -363,4 +363,15 @@ describe("overview page rendering", () => {
     render(OverviewPage, { data: overviewData({ diff: null }) });
     expect(screen.queryByText(/since the previous snapshot/i)).toBeNull();
   });
+
+  it("shows the prefix count without linking to the removed prefixes list", () => {
+    render(OverviewPage, { data: overviewData() });
+    // Prefixes has no list route, so its tile is a plain element, not a link.
+    const prefixCard = screen.getByText("Prefixes").closest(".summary-card");
+    expect(prefixCard?.tagName).toBe("DIV");
+    expect(prefixCard?.getAttribute("href")).toBeNull();
+    // Sibling entity cards that do have list routes stay real links.
+    const nsCard = screen.getByText("Nameservers").closest(".summary-card");
+    expect(nsCard?.tagName).toBe("A");
+  });
 });

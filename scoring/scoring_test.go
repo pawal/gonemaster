@@ -588,6 +588,25 @@ func TestCompute_N16HasNSIDNopenalty(t *testing.T) {
 	}
 }
 
+func TestCompute_RSAExponentUnsupportedNopenalty(t *testing.T) {
+	// DS0x_RSA_EXPONENT_UNSUPPORTED is a NOTICE flagging that the RRSIG could not
+	// be verified locally because of a large RSA public exponent. The zone can be
+	// perfectly valid, so this local limitation must carry zero penalty - unlike a
+	// bare NOTICE, which would otherwise deduct one point each.
+	entries := []Entry{
+		e("DNSSEC", "DS02_RSA_EXPONENT_UNSUPPORTED", "NOTICE"),
+		e("DNSSEC", "DS08_RSA_EXPONENT_UNSUPPORTED", "NOTICE"),
+		e("DNSSEC", "DS09_RSA_EXPONENT_UNSUPPORTED", "NOTICE"),
+	}
+	r := Compute("example.se", entries, cfg)
+	if r.Score != 100 {
+		t.Errorf("expected score 100 with RSA_EXPONENT_UNSUPPORTED entries, got %d", r.Score)
+	}
+	if cat := r.Categories["dnssec"]; cat.Penalties != 0 {
+		t.Errorf("expected dnssec penalties 0 for RSA_EXPONENT_UNSUPPORTED, got %d", cat.Penalties)
+	}
+}
+
 func TestCompute_Z13SpfMacroTargetNopenalty(t *testing.T) {
 	// Z13_SPF_MACRO_TARGET is NOTICE but should carry no penalty - the SPF
 	// construct is valid, only the sub-lookup count is unauditable.

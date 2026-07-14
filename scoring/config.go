@@ -109,6 +109,13 @@ func DefaultConfig() Config {
 			// DS07_NO_DS_FOR_SIGNED_ZONE: zone is signed but has no DS record at
 			// the parent - breaks the chain of trust. Same severity as above.
 			"DS07_NO_DS_FOR_SIGNED_ZONE": 20,
+			// DS0x_RSA_EXPONENT_UNSUPPORTED: the RRSIG could not be checked only
+			// because the RSA public exponent exceeds what the local verifier
+			// handles. The zone may be perfectly valid (it validates on public
+			// resolvers), so this local limitation must not cost the operator points.
+			"DS02_RSA_EXPONENT_UNSUPPORTED": 0,
+			"DS08_RSA_EXPONENT_UNSUPPORTED": 0,
+			"DS09_RSA_EXPONENT_UNSUPPORTED": 0,
 			// NO_IPV6_NS_CHILD / NO_IPV6_NS_DEL: zero nameservers have IPv6
 			// addresses - the zone is entirely unreachable over IPv6. Both are
 			// NOTICE (1 pt) by default but warrant the same weight as an ERROR.

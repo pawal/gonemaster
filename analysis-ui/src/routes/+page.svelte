@@ -3,8 +3,11 @@
   import { page } from "$app/state";
   import FactDistributionBar from "$lib/FactDistributionBar.svelte";
   import FilterBar from "$lib/FilterBar.svelte";
+  import GradeChip from "$lib/GradeChip.svelte";
+  import Sparkline from "$lib/charts/Sparkline.svelte";
   import {
     asnHref,
+    domainHref,
     domainsGradeHref,
     domainsSeverityHref,
     nameserverHref,
@@ -17,6 +20,13 @@
     snapshotDisplayLabel,
     snapshotSourceDate
   } from "$lib/format";
+  import { netDirection, sortByMovement, summarizeDiff } from "$lib/diff";
+  import {
+    seriesShareByKeys,
+    seriesShareByTone,
+    seriesTotals,
+    summarizeMetric
+  } from "$lib/overview";
   import { idnTooltip } from "$lib/idn";
   import type { LayoutData } from "./+layout";
   import type { OverviewPageData } from "./+page";
@@ -25,11 +35,68 @@
 
   const layoutData = $derived(page.data as LayoutData);
 
+  // ── Hero metrics: latest value + movement + sparkline per tile. ──────────
+  const domainsMetric = $derived(summarizeMetric(seriesTotals(data.severityTrend.points)));
+  const healthyMetric = $derived(
+    summarizeMetric(seriesShareByTone(data.severityTrend.points, data.severityTrend.keyMeta, ["ok"]))
+  );
+  const topGradeMetric = $derived(
+    summarizeMetric(seriesShareByKeys(data.gradeTrend.points, ["A+", "A"]))
+  );
+
+  // Domain count prefers the live trend, falling back to the overview total
+  // when a cohort has no trend series yet.
+  const domainCount = $derived(domainsMetric.latest ?? data.totals?.domain_count ?? 0);
+
+  type DeltaTone = "ok" | "error" | "neutral";
+  function deltaTone(delta: number | null, higherIsBetter: boolean | null): DeltaTone {
+    if (delta === null || delta === 0 || higherIsBetter === null) return "neutral";
+    return delta > 0 === higherIsBetter ? "ok" : "error";
+  }
+  function deltaText(delta: number | null, suffix: string): string {
+    if (delta === null || delta === 0) return "";
+    return `${delta > 0 ? "▲ +" : "▼ "}${formatCount(delta)}${suffix}`;
+  }
+
+  // ── "Since last snapshot" movers, derived from the diff-vs-previous. ──────
+  const diffSummary = $derived(summarizeDiff(data.diff));
+  const gradeChanges = $derived(sortByMovement(data.diff?.grade_changed ?? [], "grade"));
+  const regressions = $derived(
+    gradeChanges.filter((e) => netDirection(e) === "regressed").slice(0, 5)
+  );
+  const improvements = $derived(
+    gradeChanges.filter((e) => netDirection(e) === "improved").reverse().slice(0, 5)
+  );
+  const hasMovement = $derived(
+    !!data.diff &&
+      (diffSummary.regressed > 0 ||
+        diffSummary.improved > 0 ||
+        diffSummary.added > 0 ||
+        diffSummary.removed > 0)
+  );
+
+  function moverDomainLink(domain: string): string {
+    const params = new URLSearchParams();
+    if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
+    if (data.diffTo) params.set("snapshot", data.diffTo);
+    const q = params.toString();
+    return domainHref(base, domain, q ? `?${q}` : "");
+  }
+
+  const fullDiffHref = $derived.by(() => {
+    const params = new URLSearchParams();
+    if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
+    if (data.diffFrom) params.set("from", data.diffFrom);
+    if (data.diffTo) params.set("to", data.diffTo);
+    params.set("tab", "grade_changed");
+    return `${base}/diff?${params.toString()}`;
+  });
+
   const summaryCards = $derived.by(() => {
     const t = data.totals;
     if (!t) return [];
+    // Domains lead the hero tiles, so the entity row covers the rest.
     return [
-      { label: "Domains", value: t.domain_count, href: "/domains" },
       { label: "Nameservers", value: t.nameserver_count, href: "/nameservers" },
       { label: "Endpoints", value: t.endpoint_count, href: "/endpoints" },
       { label: "ASNs", value: t.asn_count, href: "/asns" },
@@ -185,6 +252,115 @@
       </p>
     </section>
   {:else}
+    <section class="hero" aria-label="Cohort headline metrics">
+      <a class="hero-tile" href={`${base}/domains${query}`}>
+        <span class="hero-label">Domains</span>
+        <span class="hero-value">{formatCount(domainCount)}</span>
+        <span class="hero-foot">
+          {#if domainsMetric.delta !== null && domainsMetric.delta !== 0}
+            <span class="hero-delta tone-{deltaTone(domainsMetric.delta, null)}">{deltaText(domainsMetric.delta, "")}</span>
+          {/if}
+          {#if domainsMetric.values.length > 1}
+            <Sparkline values={domainsMetric.values} tone="neutral" ariaLabel="Domain count trend" />
+          {/if}
+        </span>
+      </a>
+      {#if healthyMetric.latest !== null}
+        <a class="hero-tile" href={`${base}/trends?category=severity${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`}>
+          <span class="hero-label">Healthy</span>
+          <span class="hero-value">{healthyMetric.latest}%</span>
+          <span class="hero-foot">
+            {#if healthyMetric.delta !== null && healthyMetric.delta !== 0}
+              <span class="hero-delta tone-{deltaTone(healthyMetric.delta, true)}">{deltaText(healthyMetric.delta, "%")}</span>
+            {/if}
+            {#if healthyMetric.values.length > 1}
+              <Sparkline values={healthyMetric.values} tone="ok" yDomain={[0, 100]} ariaLabel="Healthy share trend" />
+            {/if}
+          </span>
+        </a>
+      {/if}
+      {#if topGradeMetric.latest !== null}
+        <a class="hero-tile" href={`${base}/trends?category=grade${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`}>
+          <span class="hero-label">Grade A / A+</span>
+          <span class="hero-value">{topGradeMetric.latest}%</span>
+          <span class="hero-foot">
+            {#if topGradeMetric.delta !== null && topGradeMetric.delta !== 0}
+              <span class="hero-delta tone-{deltaTone(topGradeMetric.delta, true)}">{deltaText(topGradeMetric.delta, "%")}</span>
+            {/if}
+            {#if topGradeMetric.values.length > 1}
+              <Sparkline values={topGradeMetric.values} tone="ok" yDomain={[0, 100]} ariaLabel="Top-grade share trend" />
+            {/if}
+          </span>
+        </a>
+      {/if}
+    </section>
+
+    <section class="summary-grid" aria-label="Cohort entity counts">
+      {#each summaryCards as card (card.label)}
+        <a class="summary-card" href={`${base}${card.href}${query}`}>
+          <span class="summary-count">{formatCount(card.value)}</span>
+          <span class="summary-label">{card.label}</span>
+        </a>
+      {/each}
+    </section>
+
+    {#if hasMovement}
+      <section class="card movers-card">
+        <div class="list-head">
+          <h3>Since the previous snapshot</h3>
+          <a class="movers-difflink" href={fullDiffHref}>View full diff</a>
+        </div>
+        <ul class="mover-summary">
+          <li class="tone-error"><strong>{diffSummary.regressed}</strong> regressed</li>
+          <li class="tone-ok"><strong>{diffSummary.improved}</strong> improved</li>
+          <li class="tone-notice"><strong>{diffSummary.added}</strong> added</li>
+          <li class="tone-neutral"><strong>{diffSummary.removed}</strong> removed</li>
+        </ul>
+        <div class="mover-cols">
+          <div class="mover-col">
+            <h4>Top regressions</h4>
+            {#if regressions.length > 0}
+              <ul class="mover-domains">
+                {#each regressions as e (e.domain)}
+                  <li>
+                    <a class="mover-domain" href={moverDomainLink(e.domain)}>{e.domain}</a>
+                    <span class="pair">
+                      <GradeChip grade={e.from_grade} />
+                      <span class="arrow" aria-hidden="true">→</span>
+                      <span class="sr-only">to</span>
+                      <GradeChip grade={e.to_grade} />
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <p class="hint">No grade regressions.</p>
+            {/if}
+          </div>
+          <div class="mover-col">
+            <h4>Top improvements</h4>
+            {#if improvements.length > 0}
+              <ul class="mover-domains">
+                {#each improvements as e (e.domain)}
+                  <li>
+                    <a class="mover-domain" href={moverDomainLink(e.domain)}>{e.domain}</a>
+                    <span class="pair">
+                      <GradeChip grade={e.from_grade} />
+                      <span class="arrow" aria-hidden="true">→</span>
+                      <span class="sr-only">to</span>
+                      <GradeChip grade={e.to_grade} />
+                    </span>
+                  </li>
+                {/each}
+              </ul>
+            {:else}
+              <p class="hint">No grade improvements.</p>
+            {/if}
+          </div>
+        </div>
+      </section>
+    {/if}
+
     {#each factDistributions as dist (dist.category)}
       <FactDistributionBar
         title={dist.label}
@@ -279,14 +455,6 @@
         {/if}
       </div>
     {/if}
-    <section class="summary-grid" aria-label="Cohort summary counts">
-      {#each summaryCards as card (card.label)}
-        <a class="summary-card" href={`${base}${card.href}${query}`}>
-          <span class="summary-count">{formatCount(card.value)}</span>
-          <span class="summary-label">{card.label}</span>
-        </a>
-      {/each}
-    </section>
   {/if}
 {/if}
 
@@ -464,6 +632,134 @@
     font-family: var(--mono);
     font-size: var(--text-sm);
     text-align: right;
+  }
+
+  .hero {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: var(--space-3);
+  }
+  .hero-tile {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    padding: var(--space-4) var(--space-5);
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .hero-tile:hover {
+    border-color: var(--accent-2);
+    transform: translateY(-1px);
+  }
+  .hero-label {
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .hero-value {
+    font-size: var(--text-2xl);
+    font-weight: 700;
+    font-family: var(--mono);
+    line-height: 1.1;
+  }
+  .hero-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    min-height: 24px;
+  }
+  .hero-delta {
+    font-family: var(--mono);
+    font-size: var(--text-xs);
+    font-weight: 600;
+  }
+  .hero-delta.tone-ok { color: var(--bar-ok); }
+  .hero-delta.tone-error { color: var(--bar-error); }
+  .hero-delta.tone-neutral { color: var(--ink-2); }
+
+  .movers-card {
+    gap: var(--space-3);
+  }
+  .movers-difflink {
+    color: var(--accent-2);
+    text-decoration: none;
+    font-size: var(--text-sm);
+  }
+  .movers-difflink:hover {
+    text-decoration: underline;
+  }
+  .mover-summary {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+  }
+  .mover-summary strong {
+    font-family: var(--mono);
+    font-size: var(--text-lg);
+  }
+  .mover-summary .tone-error strong { color: var(--bar-error); }
+  .mover-summary .tone-ok strong { color: var(--bar-ok); }
+  .mover-summary .tone-notice strong { color: var(--bar-notice); }
+  .mover-summary .tone-neutral strong { color: var(--ink); }
+  .mover-cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
+    gap: var(--space-4);
+  }
+  .mover-col h4 {
+    margin: 0 0 var(--space-2);
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .mover-domains {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .mover-domains li {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+  }
+  .mover-domain {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    color: var(--ink);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mover-domain:hover {
+    color: var(--accent-2);
+    text-decoration: underline;
+  }
+  .pair {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+  .pair .arrow {
+    color: var(--ink-2);
+    font-family: var(--mono);
   }
 
   .summary-grid {

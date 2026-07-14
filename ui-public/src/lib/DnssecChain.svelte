@@ -358,12 +358,12 @@
         {#if serversWithoutDNSKEY.length}
           <li data-testid="chain-servers-without-dnskey">{$t("pub.dnssec_chain_servers_without_dnskey", { servers: serversWithoutDNSKEY.join(", ") })}</li>
         {/if}
-        {#each dsSigWindows as sw (sw.keyTag + "-" + sw.from)}
+        {#each dsSigWindows as sw, i (i)}
           <li data-testid="chain-ds-sig-fact">
             RRSIG DS ({sw.keyTag}): {$t("pub.dnssec_chain_sig_window", { from: sw.from, to: sw.to })}{sw.state !== "valid" ? ` - ${sw.state}` : ""}
           </li>
         {/each}
-        {#each sigWindows as sw (sw.keyTag + "-" + sw.from)}
+        {#each sigWindows as sw, i (i)}
           <li>
             RRSIG DNSKEY ({sw.keyTag}): {$t("pub.dnssec_chain_sig_window", { from: sw.from, to: sw.to })}{sw.state !== "valid" ? ` - ${sw.state}` : ""}
           </li>

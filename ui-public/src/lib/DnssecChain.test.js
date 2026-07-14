@@ -224,6 +224,26 @@ describe("DnssecChain", () => {
     expect(self.getAttribute("data-tip")).toContain("Status: unsupported key exponent");
   });
 
+  it("renders when the parent serves multiple DS RRSIGs with the same key tag and day", async () => {
+    // The real .lv shape: root servers re-sign the DS RRset on staggered
+    // schedules, so the same signer (key 57780) appears twice, differing only
+    // sub-day. The facts list must not derive a duplicate {#each} key from
+    // (key_tag, day) or Svelte throws each_key_duplicate and the section hangs.
+    const chain = secureChain();
+    chain.status = "partial";
+    chain.parent.ds_rrsig = [
+      { key_tag: 57780, algorithm: 8, state: "valid", inception: 1784044800, expiration: 1785171600, servers: ["192.203.230.10"] },
+      { key_tag: 57780, algorithm: 8, state: "valid", inception: 1784052000, expiration: 1785178800, servers: ["198.41.0.4"] },
+    ];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    // Both DS RRSIG facts lines render rather than collapsing or crashing.
+    expect(screen.getAllByTestId("chain-ds-sig-fact").length).toBe(2);
+  });
+
   it("shows the unavailable note on a 404 and never an SVG", async () => {
     fetch.mockResolvedValue(jsonResponse({}, 404));
     const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });

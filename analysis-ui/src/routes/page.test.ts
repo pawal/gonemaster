@@ -318,7 +318,7 @@ function overviewData(overrides: Partial<OverviewPageData> = {}): OverviewPageDa
     },
     diffFrom: "s1",
     diffTo: "s2",
-    snapshot: { slug: "s2", run_count: 1, domain_count: 120 },
+    snapshot: { slug: "s2", captured_at: "2026-04-20T00:00:00Z", run_count: 1, domain_count: 120 },
     noSnapshot: false,
     loadError: null,
     ...overrides
@@ -362,6 +362,21 @@ describe("overview page rendering", () => {
   it("omits the movers card when there is no diff", () => {
     render(OverviewPage, { data: overviewData({ diff: null }) });
     expect(screen.queryByText(/since the previous snapshot/i)).toBeNull();
+  });
+
+  it("offers a diff-vs-previous link on the snapshot pill", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, { data: overviewData() });
+    const pill = within(screen.getByLabelText("Active snapshot"));
+    const link = pill.getByRole("link", { name: /diff vs previous/i });
+    expect(link.getAttribute("href")).toContain("from=s1");
+    expect(link.getAttribute("href")).toContain("to=s2");
+  });
+
+  it("hides the pill diff link when there is no previous snapshot", () => {
+    render(OverviewPage, { data: overviewData({ diffFrom: "" }) });
+    const pill = within(screen.getByLabelText("Active snapshot"));
+    expect(pill.queryByRole("link", { name: /diff vs previous/i })).toBeNull();
   });
 
   it("shows the prefix count without linking to the removed prefixes list", () => {

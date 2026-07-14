@@ -247,4 +247,22 @@ describe("trends page rendering", () => {
     render(TrendsPage, { data: trendsData({ topTagPoints: [] }) });
     expect(screen.queryByText(/top movers/i)).toBeNull();
   });
+
+  it("links each snapshot row (except the oldest) to the diff against its predecessor", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity");
+    render(TrendsPage, {
+      data: trendsData({
+        points: [
+          { slug: "2026-02-01", captured_at: "2026-02-01T00:00:00Z", payload: { ok: 8, critical: 2 } },
+          { slug: "2026-03-01", captured_at: "2026-03-01T00:00:00Z", payload: { ok: 6, critical: 4 } }
+        ]
+      })
+    });
+    const links = screen.getAllByRole("link", { name: /diff vs previous/i });
+    // Two snapshots -> exactly one row (the newer) gets a diff link.
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toContain("from=2026-02-01");
+    expect(links[0].getAttribute("href")).toContain("to=2026-03-01");
+    expect(links[0].getAttribute("href")).toContain("tab=grade_changed");
+  });
 });

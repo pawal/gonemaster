@@ -213,6 +213,9 @@
     {#if formatTimestamp(data.snapshot.captured_at)}
       <span class="snapshot-captured">Built {formatTimestamp(data.snapshot.captured_at)}</span>
     {/if}
+    {#if data.diffFrom}
+      <a class="snapshot-diff-link" href={fullDiffHref}>Diff vs previous</a>
+    {/if}
   </p>
 {/if}
 
@@ -899,5 +902,15 @@
     font-size: var(--text-xs);
     border-left: 1px solid var(--border);
     padding-left: 8px;
+  }
+  .snapshot-diff-link {
+    color: var(--accent-2);
+    font-size: var(--text-xs);
+    text-decoration: none;
+    border-left: 1px solid var(--border);
+    padding-left: 8px;
+  }
+  .snapshot-diff-link:hover {
+    text-decoration: underline;
   }
 </style>

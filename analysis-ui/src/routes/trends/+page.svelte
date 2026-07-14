@@ -39,6 +39,22 @@
     return null;
   }
 
+  // Link a snapshot row to the diff against its predecessor. Series is
+  // oldest-first, so the previous snapshot is the row above; the first row
+  // has none.
+  function diffRowHref(index: number): string | null {
+    if (index <= 0) return null;
+    const from = series[index - 1]?.slug;
+    const to = series[index]?.slug;
+    if (!from || !to) return null;
+    const params = new URLSearchParams();
+    if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
+    params.set("from", from);
+    params.set("to", to);
+    params.set("tab", "grade_changed");
+    return `${base}/diff?${params.toString()}`;
+  }
+
   function onCategoryChange(value: string) {
     const params = new URLSearchParams(page.url.searchParams);
     params.set("category", value);
@@ -323,12 +339,16 @@
       />
     {:else}
     <ol class="trend-list" aria-label="Stacked distribution per snapshot">
-      {#each series as s (s.slug)}
+      {#each series as s, i (s.slug)}
+        {@const diffHref = diffRowHref(i)}
         <li class="trend-row">
           <div class="trend-meta">
             <span class="trend-slug" title={`Snapshot ${s.slug}`}>{s.label}</span>
             {#if s.sourceDate && s.sourceDate !== s.label}
               <span class="trend-captured">{s.sourceDate}</span>
+            {/if}
+            {#if diffHref}
+              <a class="trend-diff-link" href={diffHref}>Diff vs previous</a>
             {/if}
           </div>
           <div class="trend-bar" role="group" aria-label="{s.label} distribution">
@@ -464,6 +484,15 @@
   .trend-captured {
     color: var(--ink-2);
     font-size: var(--text-xs);
+  }
+  .trend-diff-link {
+    font-size: var(--text-xs);
+    color: var(--accent-2);
+    text-decoration: none;
+    width: fit-content;
+  }
+  .trend-diff-link:hover {
+    text-decoration: underline;
   }
   .trend-bar {
     display: flex;

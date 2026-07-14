@@ -33,6 +33,7 @@ export type OverviewPageData = {
   // when a cohort has a single snapshot or the fetch failed - both non-fatal.
   severityTrend: TrendBundle;
   gradeTrend: TrendBundle;
+  dnssecTrend: TrendBundle;
   // Diff into the viewed snapshot for the "since last snapshot" card.
   diff: DiffResponse | null;
   diffFrom: string;
@@ -78,13 +79,14 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
   // Hero deltas/sparklines and the movers card are enrichments: fetch them in
   // parallel and never let a failure blank the overview.
   const prevSlug = previousSlug(layout.snapshots ?? [], snapshotSlug);
-  const [severityTrend, gradeTrend, diff] = await Promise.all([
-    getTrends(datasetTag, { category: "severity" }, fetch)
+  const trend = (category: string) =>
+    getTrends(datasetTag, { category }, fetch)
       .then((t): TrendBundle => ({ points: t.points ?? [], keyMeta: t.key_meta ?? {} }))
-      .catch(() => EMPTY_TREND),
-    getTrends(datasetTag, { category: "grade" }, fetch)
-      .then((t): TrendBundle => ({ points: t.points ?? [], keyMeta: t.key_meta ?? {} }))
-      .catch(() => EMPTY_TREND),
+      .catch(() => EMPTY_TREND);
+  const [severityTrend, gradeTrend, dnssecTrend, diff] = await Promise.all([
+    trend("severity"),
+    trend("grade"),
+    trend("dnssec_posture"),
     prevSlug && snapshotSlug
       ? getDiff(datasetTag, prevSlug, snapshotSlug, fetch).catch(() => null)
       : Promise.resolve(null)
@@ -103,6 +105,7 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
     topASNs: payload?.top_asns ?? [],
     severityTrend,
     gradeTrend,
+    dnssecTrend,
     diff,
     diffFrom: prevSlug,
     diffTo: snapshotSlug,
@@ -125,6 +128,7 @@ function emptyPageData(datasetTag: string | null): OverviewPageData {
     topASNs: [],
     severityTrend: EMPTY_TREND,
     gradeTrend: EMPTY_TREND,
+    dnssecTrend: EMPTY_TREND,
     diff: null,
     diffFrom: "",
     diffTo: "",

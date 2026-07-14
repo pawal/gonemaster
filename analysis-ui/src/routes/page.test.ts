@@ -186,14 +186,20 @@ describe("+page.load (overview)", () => {
       {
         match: (url) => url.includes("category=grade"),
         body: { dataset_tag: "tld", category: "grade", points: [{ slug: "s1", captured_at: "s1", payload: { A: 6 } }] }
+      },
+      {
+        match: (url) => url.includes("category=dnssec_posture"),
+        body: { dataset_tag: "tld", category: "dnssec_posture", points: [{ slug: "s1", captured_at: "s1", payload: { signed: 5 } }] }
       }
     ]);
     const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl, effectiveSnapshotSlug: "s2" }));
     // Trend series are fetched at cohort scope (no snapshot slug in the path).
     expect(calls.some((c) => c.includes("category=severity"))).toBe(true);
     expect(calls.some((c) => c.includes("category=grade"))).toBe(true);
+    expect(calls.some((c) => c.includes("category=dnssec_posture"))).toBe(true);
     expect(data.severityTrend.points).toHaveLength(1);
     expect(data.gradeTrend.points).toHaveLength(1);
+    expect(data.dnssecTrend.points).toHaveLength(1);
   });
 
   it("keeps the overview when the trend enrichment fails", async () => {
@@ -281,8 +287,8 @@ function overviewData(overrides: Partial<OverviewPageData> = {}): OverviewPageDa
     totals: { domain_count: 120, nameserver_count: 5, endpoint_count: 8, asn_count: 3, prefix_count: 2 },
     factDistributions: null,
     topTags: [],
-    topNameservers: [],
-    topASNs: [],
+    topNameservers: [{ nameserver: "ns1.example", domain_count: 60 }],
+    topASNs: [{ asn: 64500, label: "Example AS", domain_count: 48 }],
     severityTrend: {
       points: [
         { slug: "s1", captured_at: "s1", payload: { ok: 70, critical: 30 } },
@@ -292,6 +298,13 @@ function overviewData(overrides: Partial<OverviewPageData> = {}): OverviewPageDa
     },
     gradeTrend: {
       points: [{ slug: "s2", captured_at: "s2", payload: { "A+": 10, A: 20, B: 90 } }],
+      keyMeta: {}
+    },
+    dnssecTrend: {
+      points: [
+        { slug: "s1", captured_at: "s1", payload: { signed: 30, unsigned: 70 } },
+        { slug: "s2", captured_at: "s2", payload: { signed: 50, unsigned: 70 } }
+      ],
       keyMeta: {}
     },
     diff: {
@@ -313,14 +326,25 @@ function overviewData(overrides: Partial<OverviewPageData> = {}): OverviewPageDa
 }
 
 describe("overview page rendering", () => {
-  it("leads with hero tiles for domains and health", () => {
+  it("leads with hero tiles for domains, health, and signed share", () => {
     h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
     render(OverviewPage, { data: overviewData() });
     const hero = within(screen.getByLabelText("Cohort headline metrics"));
     // Domains tile uses the latest trend total (120).
     expect(hero.getByText("120")).toBeInTheDocument();
-    // Healthy tile is present.
     expect(hero.getByText("Healthy")).toBeInTheDocument();
+    // Signed tile from the dnssec_posture trend: signed / (signed+unsigned)
+    // at s2 = 50/120 = 41.7%.
+    expect(hero.getByText("Signed")).toBeInTheDocument();
+    expect(hero.getByText("41.7%")).toBeInTheDocument();
+  });
+
+  it("shows single-provider concentration in the infra cards", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, { data: overviewData() });
+    // Leader nameserver 60/120 = 50%, leader ASN 48/120 = 40%.
+    expect(screen.getByText(/Leader hosts 50% of domains/)).toBeInTheDocument();
+    expect(screen.getByText(/Leader hosts 40% of domains/)).toBeInTheDocument();
   });
 
   it("shows a 'since the previous snapshot' movers card with regressed domains", () => {

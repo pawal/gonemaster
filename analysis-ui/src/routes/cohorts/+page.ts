@@ -1,15 +1,16 @@
-import { listCohorts, type Cohort } from "$lib/api";
+import type { Cohort } from "$lib/api";
 
 export type CohortsPageData = {
   cohorts: Cohort[];
   error: string | null;
 };
 
-export async function load({ fetch }): Promise<CohortsPageData> {
-  try {
-    const cohorts = await listCohorts(fetch);
-    return { cohorts: cohorts ?? [], error: null };
-  } catch (error) {
-    return { cohorts: [], error: error instanceof Error ? error.message : String(error) };
+// The layout already loaded the catalog (cohorts with per-cohort snapshot
+// metadata), so reuse it instead of refetching the cohort list here.
+export async function load({ parent }): Promise<CohortsPageData> {
+  const layout = await parent();
+  if (layout.catalogError) {
+    return { cohorts: [], error: layout.catalogError };
   }
+  return { cohorts: layout.catalog?.cohorts ?? [], error: null };
 }

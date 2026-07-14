@@ -22,8 +22,10 @@
   } from "$lib/format";
   import { netDirection, sortByMovement, summarizeDiff } from "$lib/diff";
   import {
+    percentOf,
     seriesShareByKeys,
     seriesShareByTone,
+    seriesShareExcludingKeys,
     seriesTotals,
     summarizeMetric
   } from "$lib/overview";
@@ -42,6 +44,24 @@
   );
   const topGradeMetric = $derived(
     summarizeMetric(seriesShareByKeys(data.gradeTrend.points, ["A+", "A"]))
+  );
+  // Signed = every DNSSEC posture except the unsigned bucket.
+  const signedMetric = $derived(
+    summarizeMetric(seriesShareExcludingKeys(data.dnssecTrend.points, ["unsigned"]))
+  );
+
+  // Single-provider concentration: the leading nameserver / ASN's share of
+  // domains. Exact (one entity's domain count over the total), unlike a
+  // top-N sum which would double-count multi-homed domains.
+  const nsLeaderShare = $derived(
+    data.topNameservers.length && data.totals
+      ? percentOf(data.topNameservers[0].domain_count, data.totals.domain_count)
+      : 0
+  );
+  const asnLeaderShare = $derived(
+    data.topASNs.length && data.totals
+      ? percentOf(data.topASNs[0].domain_count, data.totals.domain_count)
+      : 0
   );
 
   // Domain count prefers the live trend, falling back to the overview total
@@ -293,6 +313,20 @@
           </span>
         </a>
       {/if}
+      {#if signedMetric.latest !== null}
+        <a class="hero-tile" href={`${base}/trends?category=dnssec_posture${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`}>
+          <span class="hero-label">Signed</span>
+          <span class="hero-value">{signedMetric.latest}%</span>
+          <span class="hero-foot">
+            {#if signedMetric.delta !== null && signedMetric.delta !== 0}
+              <span class="hero-delta tone-{deltaTone(signedMetric.delta, true)}">{deltaText(signedMetric.delta, "%")}</span>
+            {/if}
+            {#if signedMetric.values.length > 1}
+              <Sparkline values={signedMetric.values} tone="notice" yDomain={[0, 100]} ariaLabel="Signed share trend" />
+            {/if}
+          </span>
+        </a>
+      {/if}
     </section>
 
     <section class="summary-grid" aria-label="Cohort entity counts">
@@ -410,6 +444,9 @@
             <p class="hint">
               Nameservers hosting the most domains in this cohort.
               Showing top {topNameserverRows.length}.
+              {#if nsLeaderShare > 0}
+                <span class="concentration">Leader hosts {nsLeaderShare}% of domains.</span>
+              {/if}
             </p>
             <ol class="infra-list">
               {#each topNameserverRows as row (row.name)}
@@ -432,6 +469,9 @@
             <p class="hint">
               ASNs hosting the most domains in this cohort. Showing top
               {topASNRows.length}.
+              {#if asnLeaderShare > 0}
+                <span class="concentration">Leader hosts {asnLeaderShare}% of domains.</span>
+              {/if}
             </p>
             <ol class="infra-list">
               {#each topASNRows as row (row.asn)}
@@ -562,6 +602,10 @@
   }
   .infra-card h3 {
     margin: 0;
+  }
+  .concentration {
+    color: var(--ink);
+    font-weight: 600;
   }
   .infra-list {
     list-style: none;

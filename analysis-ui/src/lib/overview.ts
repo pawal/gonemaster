@@ -55,6 +55,28 @@ export function seriesShareByKeys(points: TrendPoint[], keys: string[]): number[
   });
 }
 
+// Percentage of each snapshot's domains NOT in the given bucket keys. Used
+// for "signed" = everything except the unsigned bucket.
+export function seriesShareExcludingKeys(points: TrendPoint[], keys: string[]): number[] {
+  const skip = new Set(keys);
+  return (points ?? []).map((p) => {
+    const counts = asCounts(p.payload);
+    const t = total(counts);
+    if (t === 0) return 0;
+    let hit = 0;
+    for (const [key, count] of Object.entries(counts)) {
+      if (!skip.has(key)) hit += Number(count) || 0;
+    }
+    return Math.round((hit / t) * 1000) / 10;
+  });
+}
+
+// A part as a rounded percentage of a total, guarding division by zero.
+export function percentOf(part: number, whole: number): number {
+  if (!whole || whole <= 0) return 0;
+  return Math.round((part / whole) * 1000) / 10;
+}
+
 export type MetricSummary = {
   values: number[];
   latest: number | null;

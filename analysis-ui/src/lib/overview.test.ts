@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
+  percentOf,
   seriesShareByKeys,
   seriesShareByTone,
+  seriesShareExcludingKeys,
   seriesTotals,
   summarizeMetric
 } from "./overview";
@@ -47,6 +49,30 @@ describe("seriesShareByKeys", () => {
     const points = [point("s1", { "A+": 20, A: 30, B: 50 })];
     // Top grades = A+ and A = 50/100 = 50%.
     expect(seriesShareByKeys(points, ["A+", "A"])).toEqual([50]);
+  });
+});
+
+describe("seriesShareExcludingKeys", () => {
+  it("computes the share of everything except the excluded keys", () => {
+    const points = [point("s1", { signed: 30, nsec3: 40, unsigned: 30 })];
+    // Signed = all but unsigned = 70/100 = 70%.
+    expect(seriesShareExcludingKeys(points, ["unsigned"])).toEqual([70]);
+  });
+
+  it("returns zero for an empty snapshot rather than 100", () => {
+    expect(seriesShareExcludingKeys([point("s1", {})], ["unsigned"])).toEqual([0]);
+  });
+});
+
+describe("percentOf", () => {
+  it("rounds a part over a whole to one decimal", () => {
+    expect(percentOf(42, 120)).toBe(35);
+    expect(percentOf(1, 3)).toBe(33.3);
+  });
+
+  it("returns zero when the whole is zero or negative", () => {
+    expect(percentOf(5, 0)).toBe(0);
+    expect(percentOf(5, -1)).toBe(0);
   });
 });
 

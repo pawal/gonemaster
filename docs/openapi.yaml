@@ -2727,7 +2727,7 @@ components:
           enum: [normal, undelegated]
         status:
           type: string
-          enum: [secure, broken, island, unsigned, indeterminate]
+          enum: [secure, broken, partial, island, unsigned, indeterminate]
         truncated:
           type: boolean
         parent:

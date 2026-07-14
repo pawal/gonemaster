@@ -1,9 +1,10 @@
 <script lang="ts">
   import "../app.css";
   import { onMount } from "svelte";
-  import { page } from "$app/state";
+  import { page, navigating } from "$app/state";
   import { base } from "$app/paths";
   import { getVersion } from "$lib/api";
+  import NavProgress from "$lib/NavProgress.svelte";
   import { navItems, isActive, visibleNavItems } from "$lib/nav";
   import type { LayoutData } from "./+layout";
   import { applyTheme, initialTheme, persistTheme, type Theme } from "$lib/theme";
@@ -81,6 +82,8 @@
     return `${path}${navQuery}`;
   }
 </script>
+
+<NavProgress active={!!navigating.to} />
 
 <div class="app-shell">
   <header class="app-header">

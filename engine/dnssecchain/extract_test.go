@@ -1026,3 +1026,126 @@ func TestZeroTTLIsSerialized(t *testing.T) {
 		}
 	}
 }
+
+// Real DNSKEY public keys captured 2026-07-14 (same fixtures as the dnssecutil
+// package test).
+const (
+	// .lv KSK, keytag 42018: RSASHA256, 2048-bit, public exponent 2^32+1
+	// (5 bytes). miekg/dns and crypto/rsa both reject exponents this large, so
+	// gonemaster cannot verify its signatures locally even though .lv validates
+	// on public resolvers. This is the key that drives the partial status.
+	lvKSK42018Pub = "BQEAAAAByLU9dUcHHcl1eLgjLidTJKlwxsU9a580xierZ+WyfRBI47L3LLXAZZ0ub6Sea3qKP2mhP5ZBG/reXvyh3OSlHa39WoMiUUZFcuouCajBg7XeLGVPL4U1Ja1UW9wq/Oc8WU1dq4e+2Q8Dt8tipFvbL0AD0BhJAsfQuT3wperedwQAUKId0/JQOFNTWhEJaYN2P5IIhyRKWQp8OhtKmdNYQ5jfqqpXVO4zyqV+4ZxWurXJS8c7bKrE3OAewWEGAtTjeElfQ2CFAKWVjMOLeZ86+mgw7p3UHhGB+KuRaKg6fAtTcQYBF78Xe40wuj9EgGL19mp9v6tDwFe+Epow4SFSPQ=="
+
+	// .lb KSK, keytag 3842: RSASHA256, 2048-bit, exponent 65537 (normal).
+	// Negative control: a normal RSA key whose signature merely fails to verify
+	// must stay bogus, never get reclassified as unverifiable.
+	lbKSK3842Pub = "AwEAAcOaB0E27SPJIT/u/dQzN6NYXhVrBVGWPuh7gMJPHY1DULKuzAbZr4EwA/RcNnkBVygzDrZVxkJuBrT9uqjiuqK67VAupJDnTW3zKYzxmOpBQJW01B9LHyYMe3JYopl4BagGvzK3W5EGQBHuTk35/3y1a+d/M7Iky+9XRNBGwFbGlcXCBTg6uvdnGbyQkF2/ESmYOhXVw114YKREcFI3KBD5d6N+3nb6dy2nV3Oq+N7JRiepcxEzrXrjNo7yRoSToLJH4SfzVl/rdcJmqi59OgBfAFBQDTdwIddWkFSfOcEWYGxKCWvqmHbLCAKlmKaWcHvLIvABO0VTMnJz18JnVoE="
+)
+
+func rsaDNSKEY(owner string, flags uint16, pub string) *dns.DNSKEY {
+	k := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}
+	k.Flags = flags
+	k.Protocol = 3
+	k.Algorithm = dns.RSASHA256
+	k.PublicKey = pub
+	return k
+}
+
+// dummyRRSIG builds a well-formed DNSKEY RRSIG for keytag. The signature bytes
+// are deliberately not real: verification of a large-exponent key fails on the
+// key before the math runs, so any parseable RRSIG exercises the path, and for
+// a normal-exponent key it fails as bogus, which is exactly what the control
+// asserts.
+func dummyRRSIG(keytag uint16) *dns.RRSIG {
+	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(testZone), Class: dns.ClassINET, TTL: 3600}}
+	sig.TypeCovered = dns.TypeDNSKEY
+	sig.Algorithm = dns.RSASHA256
+	sig.Labels = 2
+	sig.OrigTTL = 3600
+	sig.Inception = uint32(fixedAt.Add(-24 * time.Hour).Unix())
+	sig.Expiration = uint32(fixedAt.Add(24 * time.Hour).Unix())
+	sig.KeyTag = keytag
+	sig.SignerName = dnsutil.Fqdn(testZone)
+	sig.Signature = "ZHVtbXlzaWc="
+	return sig
+}
+
+func TestSigStateRSAExponentUnsupported(t *testing.T) {
+	lv := rsaDNSKEY(testZone, 257, lvKSK42018Pub)
+	lb := rsaDNSKEY(testZone, 257, lbKSK3842Pub)
+
+	// The .lv KSK exponent is beyond the local verifier, so its signature is
+	// unproven (unsupported_key), not invalid.
+	if got := sigState(dummyRRSIG(lv.KeyTag()), []dns.RR{lv}, []*dns.DNSKEY{lv}, fixedAt); got != SigUnsupportedKey {
+		t.Errorf("lv KSK sigState = %q, want %q", got, SigUnsupportedKey)
+	}
+	// The .lb KSK has a normal exponent; a signature that does not verify is
+	// genuinely bogus and must not be softened to unsupported_key.
+	if got := sigState(dummyRRSIG(lb.KeyTag()), []dns.RR{lb}, []*dns.DNSKEY{lb}, fixedAt); got != SigBogus {
+		t.Errorf("lb KSK sigState = %q, want %q", got, SigBogus)
+	}
+}
+
+func TestExtractRSAExponentPartial(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	// The child KSK is the real .lv KSK: a valid 2048-bit RSASHA256 key whose
+	// 2^32+1 exponent the local verifier cannot use. The DS still digest-matches
+	// the key (digests do not touch the exponent), so the chain is anchored, but
+	// the DNSKEY signature cannot be checked -> partial, not broken.
+	ksk := rsaDNSKEY(testZone, 257, lvKSK42018Pub)
+	keytag := ksk.KeyTag()
+	dnskeySig := dummyRRSIG(keytag)
+
+	ds := ksk.ToDS(dns.SHA256)
+	if ds == nil {
+		t.Fatal("KSK ToDS returned nil")
+	}
+	parentKSK := genKey(t, testParent, true)
+	dsSig := signRRset(t, parentKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+
+	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DNSKEY" {
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, ksk, dnskeySig)
+		}
+		return packet.Packet{}
+	}
+	parentHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype == "DS" {
+			return dnssecAnswer(testZone, dns.TypeDS, ds, dsSig)
+		}
+		return packet.Packet{}
+	}
+
+	childNS := hookedNS(t, ctx, "ns1."+testZone, "203.0.113.1", childHook)
+	parentNS := hookedNS(t, ctx, "ns1."+testParent, "192.0.2.1", parentHook)
+	warm(t, ctx, childNS, testZone, "DNSKEY")
+	warm(t, ctx, parentNS, testZone, "DS")
+
+	in := Input{
+		Zone:       dnsname.New(testZone),
+		ParentZone: dnsname.New(testParent),
+		ChildNS:    []nameserver.Nameserver{childNS},
+		ParentNS:   []nameserver.Nameserver{parentNS},
+		At:         fixedAt,
+	}
+
+	got := Extract(ctx, in)
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	if got.Status != StatusPartial {
+		t.Errorf("status = %q, want %q", got.Status, StatusPartial)
+	}
+	sig, ok := findDNSKEYSig(got, keytag)
+	if !ok {
+		t.Fatalf("no DNSKEY RRSIG for keytag %d", keytag)
+	}
+	if sig.State != SigUnsupportedKey {
+		t.Errorf("DNSKEY RRSIG state = %q, want %q", sig.State, SigUnsupportedKey)
+	}
+	link, ok := findLink(got, keytag)
+	if !ok || link.Status != LinkMatch {
+		t.Errorf("expected matching DS link for keytag %d, got %+v", keytag, link)
+	}
+}

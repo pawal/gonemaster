@@ -180,15 +180,21 @@ func sigState(sig *dns.RRSIG, rrset []dns.RR, keys []*dns.DNSKEY, at time.Time) 
 		return SigNoKey
 	}
 	algoUnsupported := false
+	unsupportedKey := false
 	for _, k := range matching {
 		if err := dnssecutil.VerifyRRSIG(sig, rrset, k, at); err == nil {
 			return SigValid
 		} else if errors.Is(err, dns.ErrAlg) {
 			algoUnsupported = true
+		} else if dnssecutil.RSAExponentBeyondLocalVerifier(k) {
+			unsupportedKey = true // RSA exponent beyond the local verifier
 		}
 	}
 	if algoUnsupported {
 		return SigUnsupported
+	}
+	if unsupportedKey {
+		return SigUnsupportedKey
 	}
 	return SigBogus
 }

@@ -384,6 +384,10 @@ func (e *extractor) rollup() string {
 		if e.hasValidDNSKEYSignature() {
 			return StatusSecure
 		}
+		// A DS-anchored key we cannot verify locally is unproven, not broken.
+		if e.hasUnverifiableDNSKEYSignature() {
+			return StatusPartial
+		}
 		return StatusBroken
 	}
 }
@@ -423,6 +427,23 @@ func (e *extractor) hasValidDNSKEYSignature() bool {
 	}
 	for _, sig := range e.summary.Child.DNSKEYRRSIG {
 		if sig.State == SigValid && matched[sig.KeyTag] {
+			return true
+		}
+	}
+	return false
+}
+
+// hasUnverifiableDNSKEYSignature reports whether a DS-matched key signs the
+// DNSKEY RRset with a locally unverifiable signature (unsupported RSA exponent).
+func (e *extractor) hasUnverifiableDNSKEYSignature() bool {
+	matched := map[uint16]bool{}
+	for _, l := range e.summary.Links {
+		if l.Status == LinkMatch {
+			matched[l.DNSKEYKeyTag] = true
+		}
+	}
+	for _, sig := range e.summary.Child.DNSKEYRRSIG {
+		if sig.State == SigUnsupportedKey && matched[sig.KeyTag] {
 			return true
 		}
 	}

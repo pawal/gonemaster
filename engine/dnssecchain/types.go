@@ -9,6 +9,7 @@ const Version = 1
 const (
 	StatusSecure        = "secure"
 	StatusBroken        = "broken"
+	StatusPartial       = "partial"
 	StatusIsland        = "island"
 	StatusUnsigned      = "unsigned"
 	StatusIndeterminate = "indeterminate"
@@ -29,13 +30,14 @@ const (
 
 // RRSIG signature states.
 const (
-	SigValid       = "valid"
-	SigExpired     = "expired"
-	SigNotYetValid = "not_yet_valid"
-	SigBogus       = "bogus"
-	SigUnsupported = "unsupported_algorithm"
-	SigNoKey       = "no_key"
-	SigUnverified  = "unverified"
+	SigValid          = "valid"
+	SigExpired        = "expired"
+	SigNotYetValid    = "not_yet_valid"
+	SigBogus          = "bogus"
+	SigUnsupported    = "unsupported_algorithm"
+	SigUnsupportedKey = "unsupported_key"
+	SigNoKey          = "no_key"
+	SigUnverified     = "unverified"
 )
 
 // DS-to-DNSKEY link statuses.

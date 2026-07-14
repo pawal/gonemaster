@@ -68,10 +68,48 @@
   --tone-error-fg:    #7c2d12;
   --tone-critical-bg: #fecaca;
   --tone-critical-fg: #7f1d1d;
+
+  /* Solid grade colours for the GradeChip letter tile. Match the admin UI
+     palette so grades read the same across both dashboards. */
+  --grade-aplus: #059669;
+  --grade-a:     #16a34a;
+  --grade-b:     #65a30d;
+  --grade-c:     #ca8a04;
+  --grade-d:     #ea580c;
+  --grade-f:     #dc2626;
+
+  /* Pastel grade badge pairs (bg + fg) for the .grade pill in tables. */
+  --grade-aplus-bg: #d1fae5; --grade-aplus-fg: #065f46;
+  --grade-a-bg:     #dcfce7; --grade-a-fg:     #166534;
+  --grade-b-bg:     #fef9c3; --grade-b-fg:     #854d0e;
+  --grade-c-bg:     #fef3c7; --grade-c-fg:     #92400e;
+  --grade-d-bg:     #ffedd5; --grade-d-fg:     #9a3412;
+  --grade-f-bg:     #fee2e2; --grade-f-fg:     #991b1b;
+
+  /* Severity badge pairs (bg + fg) for .level pills and status banners. */
+  --sev-notice-bg:   #e0f2fe; --sev-notice-fg:   #075985;
+  --sev-warning-bg:  #fef3c7; --sev-warning-fg:  #92400e;
+  --sev-error-bg:    #ffedd5; --sev-error-fg:    #9a3412;
+  --sev-critical-bg: #fee2e2; --sev-critical-fg: #991b1b;
 }
 
 /* ── Reset ───────────────────────────────────────────────────────────────── */
 * { box-sizing: border-box; }
+
+/* Visually hidden but exposed to assistive tech. Used for accessible data
+   tables behind hand-rolled SVG charts. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* SvelteKit's #svelte-announcer hides itself via inline styles, which our
    CSP (style-src 'self') blocks; replicate the hide same-origin. */
@@ -371,9 +409,9 @@ button:hover:not(:disabled) {
   background: var(--surface);
 }
 
-.status-banner.error    { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
-.status-banner.warn     { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
-.status-banner.ok       { background: #e7f8ee; border-color: #a7f3d0; color: #065f46; }
+.status-banner.error    { background: var(--sev-error-bg);   border-color: var(--sev-error-fg);   color: var(--sev-error-fg); }
+.status-banner.warn     { background: var(--sev-warning-bg); border-color: var(--sev-warning-fg); color: var(--sev-warning-fg); }
+.status-banner.ok       { background: var(--tone-ok-bg);     border-color: var(--tone-ok-fg);     color: var(--tone-ok-fg); }
 
 .pill {
   display: inline-flex;
@@ -468,6 +506,27 @@ button:hover:not(:disabled) {
     --tone-error-fg:    #ffedd5;
     --tone-critical-bg: #b91c1c;
     --tone-critical-fg: #fee2e2;
+
+    --grade-aplus: #34d399;
+    --grade-a:     #4ade80;
+    --grade-b:     #a3e635;
+    --grade-c:     #facc15;
+    --grade-d:     #fb923c;
+    --grade-f:     #f87171;
+
+    /* Dark badge pairs: deep-tinted bg with a bright fg, matching the
+       admin UI's dark severity treatment. */
+    --grade-aplus-bg: #0a2a1a; --grade-aplus-fg: #34d399;
+    --grade-a-bg:     #0f2a18; --grade-a-fg:     #4ade80;
+    --grade-b-bg:     #1f2a0a; --grade-b-fg:     #a3e635;
+    --grade-c-bg:     #2a230a; --grade-c-fg:     #facc15;
+    --grade-d-bg:     #2a150a; --grade-d-fg:     #fb923c;
+    --grade-f-bg:     #2a0a0a; --grade-f-fg:     #f87171;
+
+    --sev-notice-bg:   #0f2a38; --sev-notice-fg:   #7dd3fc;
+    --sev-warning-bg:  #2a1f0a; --sev-warning-fg:  #fbbf24;
+    --sev-error-bg:    #2a150a; --sev-error-fg:    #fb923c;
+    --sev-critical-bg: #2a0a0a; --sev-critical-fg: #f87171;
   }
 }
 
@@ -505,6 +564,25 @@ button:hover:not(:disabled) {
   --tone-error-fg:    #ffedd5;
   --tone-critical-bg: #b91c1c;
   --tone-critical-fg: #fee2e2;
+
+  --grade-aplus: #34d399;
+  --grade-a:     #4ade80;
+  --grade-b:     #a3e635;
+  --grade-c:     #facc15;
+  --grade-d:     #fb923c;
+  --grade-f:     #f87171;
+
+  --grade-aplus-bg: #0a2a1a; --grade-aplus-fg: #34d399;
+  --grade-a-bg:     #0f2a18; --grade-a-fg:     #4ade80;
+  --grade-b-bg:     #1f2a0a; --grade-b-fg:     #a3e635;
+  --grade-c-bg:     #2a230a; --grade-c-fg:     #facc15;
+  --grade-d-bg:     #2a150a; --grade-d-fg:     #fb923c;
+  --grade-f-bg:     #2a0a0a; --grade-f-fg:     #f87171;
+
+  --sev-notice-bg:   #0f2a38; --sev-notice-fg:   #7dd3fc;
+  --sev-warning-bg:  #2a1f0a; --sev-warning-fg:  #fbbf24;
+  --sev-error-bg:    #2a150a; --sev-error-fg:    #fb923c;
+  --sev-critical-bg: #2a0a0a; --sev-critical-fg: #f87171;
 }
 
 /* ── List-page layout ────────────────────────────────────────────────────── */
@@ -608,18 +686,18 @@ button:hover:not(:disabled) {
   text-transform: uppercase;
   letter-spacing: 0.04em;
 }
-.grade-aplus { background: #d1fae5; color: #065f46; }
-.grade-a     { background: #dcfce7; color: #166534; }
-.grade-b     { background: #fef9c3; color: #854d0e; }
-.grade-c     { background: #fef3c7; color: #92400e; }
-.grade-d     { background: #ffedd5; color: #9a3412; }
-.grade-f     { background: #fee2e2; color: #991b1b; }
+.grade-aplus { background: var(--grade-aplus-bg); color: var(--grade-aplus-fg); }
+.grade-a     { background: var(--grade-a-bg);     color: var(--grade-a-fg); }
+.grade-b     { background: var(--grade-b-bg);     color: var(--grade-b-fg); }
+.grade-c     { background: var(--grade-c-bg);     color: var(--grade-c-fg); }
+.grade-d     { background: var(--grade-d-bg);     color: var(--grade-d-fg); }
+.grade-f     { background: var(--grade-f-bg);     color: var(--grade-f-fg); }
 .grade-neutral { background: var(--surface-2); color: var(--on-surface-2); }
 
-.level-critical { background: #fee2e2; color: #991b1b; }
-.level-error    { background: #ffedd5; color: #9a3412; }
-.level-warning  { background: #fef3c7; color: #92400e; }
-.level-notice   { background: #e0f2fe; color: #075985; }
+.level-critical { background: var(--sev-critical-bg); color: var(--sev-critical-fg); }
+.level-error    { background: var(--sev-error-bg);    color: var(--sev-error-fg); }
+.level-warning  { background: var(--sev-warning-bg);  color: var(--sev-warning-fg); }
+.level-notice   { background: var(--sev-notice-bg);   color: var(--sev-notice-fg); }
 .level-neutral  { background: var(--surface-2); color: var(--on-surface-2); }
 
 /* ── Responsive ──────────────────────────────────────────────────────────── */

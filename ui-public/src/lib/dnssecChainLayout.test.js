@@ -67,6 +67,9 @@ describe("worstSigTone", () => {
   it("returns warn for not-yet-valid or unsupported without anything worse", () => {
     expect(worstSigTone([{ state: "valid" }, { state: "not_yet_valid" }])).toBe("warn");
     expect(worstSigTone([{ state: "unsupported_algorithm" }])).toBe("warn");
+    // An unsupported RSA exponent is unproven, not invalid: a caution, not bad.
+    expect(worstSigTone([{ state: "unsupported_key" }])).toBe("warn");
+    expect(worstSigTone([{ state: "valid" }, { state: "unsupported_key" }])).toBe("warn");
   });
 
   it("returns empty for all-valid or no signatures", () => {

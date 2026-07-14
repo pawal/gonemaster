@@ -66,6 +66,13 @@
   let providedDS = $derived(chain?.parent?.ds_source === "input");
   let unsigned = $derived(chain?.status === "unsigned");
   let indeterminate = $derived(chain?.status === "indeterminate");
+  // DNSKEY key tags whose signature the local verifier cannot check (unsupported
+  // RSA exponent): unproven, not invalid. Drives the amber "unverifiable" callout.
+  let unverifiableKeys = $derived([
+    ...new Set(
+      (chain?.child?.dnskey_rrsig ?? []).filter((s) => s.state === "unsupported_key").map((s) => s.key_tag)
+    ),
+  ]);
   let noDS = $derived(chain?.parent?.ds_source === "none" && (chain?.child?.dnskeys?.length ?? 0) > 0);
   // Claiming "serves no DNSKEY" needs a server that answered without keys.
   let noDNSKEY = $derived(
@@ -138,10 +145,11 @@
   }
 
   // statusTone maps a roll-up status to a badge color: secure ok, broken bad,
-  // everything else neutral.
+  // partial warn, everything else neutral.
   function statusTone(s) {
     if (s === "secure") return "ok";
     if (s === "broken") return "bad";
+    if (s === "partial") return "warn";
     return "neutral";
   }
 
@@ -186,6 +194,7 @@
         return "edge-bad";
       case "not_yet_valid":
       case "unsupported_algorithm":
+      case "unsupported_key":
         return "edge-warn";
       default:
         return "edge-neutral";
@@ -246,6 +255,9 @@
         {/if}
         {#if noDNSKEY}
           <p class="dnssec-chain-callout callout-bad" data-testid="chain-no-dnskey">{$t("pub.dnssec_chain_no_dnskey")}</p>
+        {/if}
+        {#if unverifiableKeys.length}
+          <p class="dnssec-chain-callout callout-warn" data-testid="chain-unsupported-key">{$t("pub.dnssec_chain_unsupported_key", { keys: unverifiableKeys.join(", ") })}</p>
         {/if}
         {#if indeterminate}
           <p class="dnssec-chain-callout callout-info" data-testid="chain-indeterminate">{$t("pub.dnssec_chain_indeterminate")}</p>
@@ -384,6 +396,10 @@
   .badge-bad {
     border-color: var(--grade-f);
     color: var(--grade-f);
+  }
+  .badge-warn {
+    border-color: var(--grade-c);
+    color: var(--grade-c);
   }
   .badge-neutral {
     border-color: var(--border);

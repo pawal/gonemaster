@@ -192,6 +192,38 @@ describe("DnssecChain", () => {
     expect(tip).toContain("2023-11-14 to 2025-06-15");
   });
 
+  it("renders an unverifiable large-RSA-exponent chain as a warn (partial), not a failure", async () => {
+    // The .lv shape: DS matches the KSK, but the local verifier cannot check
+    // the KSK's RSA exponent, so the DNSKEY signature is unsupported_key. The
+    // chain rolls up to partial and the signature edge is amber, not red.
+    const chain = secureChain();
+    chain.status = "partial";
+    chain.child.dnskey_rrsig = [
+      { key_tag: 1000, algorithm: 8, state: "unsupported_key", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] },
+    ];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+    openChain(container);
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    // The heading badge is the amber "partial" tone, not the red "broken" one.
+    const badge = screen.getByTestId("chain-status-badge");
+    expect(badge.classList.contains("badge-warn")).toBe(true);
+    expect(badge.textContent).toBe("Partial");
+
+    // The unverifiable-key callout names the affected key tag.
+    const callout = screen.getByTestId("chain-unsupported-key");
+    expect(callout.textContent).toContain("1000");
+
+    // The self-signature edge is amber (edge-warn), never edge-bad.
+    const self = container.querySelector("path.chain-edge");
+    const cls = self.getAttribute("class");
+    expect(cls).toContain("edge-warn");
+    expect(cls).not.toContain("edge-bad");
+    expect(self.getAttribute("data-tip")).toContain("Status: unsupported key exponent");
+  });
+
   it("shows the unavailable note on a 404 and never an SVG", async () => {
     fetch.mockResolvedValue(jsonResponse({}, 404));
     const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });

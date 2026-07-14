@@ -74,12 +74,14 @@ export function fmtDate(sec) {
 }
 
 // worstSigTone reduces a set of signatures to the most severe tone: bad for
-// expired/bogus/no-key, warn for not-yet-valid/unsupported, else empty.
+// expired/bogus/no-key, warn for not-yet-valid/unsupported (algorithm or key),
+// else empty. An unsupported_key signature is unproven, not invalid, so it is a
+// caution (warn), never a failure (bad).
 export function worstSigTone(sigs) {
   let tone = "";
   for (const s of Array.isArray(sigs) ? sigs : []) {
     if (s.state === "expired" || s.state === "bogus" || s.state === "no_key") return "bad";
-    if (s.state === "not_yet_valid" || s.state === "unsupported_algorithm") tone = "warn";
+    if (s.state === "not_yet_valid" || s.state === "unsupported_algorithm" || s.state === "unsupported_key") tone = "warn";
   }
   return tone;
 }

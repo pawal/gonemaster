@@ -167,4 +167,32 @@ describe("trends page rendering", () => {
     const critical = screen.getByRole("link", { name: /Critical: 2 domains, 20%/ });
     expect(critical).toBeInTheDocument();
   });
+
+  it("switches to the focus line chart when a bucket is pinned via ?key=", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=critical");
+    const { container } = render(TrendsPage, {
+      data: trendsData({
+        points: [
+          { slug: "2026-02-01", captured_at: "2026-02-01T00:00:00Z", payload: { ok: 9, critical: 1 } },
+          { slug: "2026-03-01", captured_at: "2026-03-01T00:00:00Z", payload: { ok: 6, critical: 4 } }
+        ]
+      })
+    });
+    // The stacked list is replaced by the focus chart.
+    expect(container.querySelector(".trend-list")).toBeNull();
+    expect(screen.getByRole("img", { name: /Critical across snapshots/ })).toBeInTheDocument();
+  });
+
+  it("marks the pinned bucket's legend button as pressed", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=critical");
+    render(TrendsPage, { data: trendsData() });
+    const active = screen.getByRole("button", { name: /Critical/, pressed: true });
+    expect(active).toBeInTheDocument();
+  });
+
+  it("stays on the stacked view when ?key= names an unknown bucket", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=bogus");
+    const { container } = render(TrendsPage, { data: trendsData() });
+    expect(container.querySelector(".trend-list")).not.toBeNull();
+  });
 });

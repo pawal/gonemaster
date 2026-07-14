@@ -3,14 +3,23 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
+  import TrendLine from "$lib/charts/TrendLine.svelte";
   import { domainsGradeHref, domainsSeverityHref } from "$lib/entityLinks";
   import { formatCount, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
+  import { pinnedSeries } from "$lib/trends";
   import type { LayoutData } from "../+layout";
   import { TREND_CATEGORIES, type TrendsPageData } from "./+page";
 
   let { data }: { data: TrendsPageData } = $props();
 
   const layoutData = $derived(page.data as LayoutData);
+
+  // Tone keys the TrendLine understands; anything else falls back to neutral.
+  type ChartTone = "ok" | "notice" | "warning" | "error" | "critical" | "neutral";
+  const CHART_TONES = new Set<ChartTone>(["ok", "notice", "warning", "error", "critical", "neutral"]);
+  function chartTone(tone: string | null): ChartTone {
+    return tone && CHART_TONES.has(tone as ChartTone) ? (tone as ChartTone) : "neutral";
+  }
 
   // Segments narrower than this render as a bare colour sliver: labels would
   // overflow. The value still reaches readers via the tooltip and the
@@ -32,10 +41,36 @@
   function onCategoryChange(value: string) {
     const params = new URLSearchParams(page.url.searchParams);
     params.set("category", value);
+    // Buckets differ per category, so a pinned key from the old category is
+    // meaningless under the new one.
+    params.delete("key");
     goto(`${page.url.pathname}?${params.toString()}`, {
       replaceState: true,
       noScroll: true
     });
+  }
+
+  // Focus mode: ?key= pins one bucket to a line chart; ?scale= toggles the
+  // y-axis between absolute counts (default) and percentage share.
+  const pinnedKey = $derived(page.url.searchParams.get("key") ?? "");
+  const scale = $derived(page.url.searchParams.get("scale") === "share" ? "share" : "count");
+
+  function setKey(key: string) {
+    const params = new URLSearchParams(page.url.searchParams);
+    if (key) params.set("key", key);
+    else params.delete("key");
+    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+  }
+
+  function setScale(value: "count" | "share") {
+    const params = new URLSearchParams(page.url.searchParams);
+    if (value === "share") params.set("scale", "share");
+    else params.delete("scale");
+    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+  }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape" && pinnedKey) setKey("");
   }
 
   // Label, tone, and order for every observed key come from data.keyMeta,
@@ -171,7 +206,19 @@
   function countFor(s: Series, key: string): number {
     return s.buckets.find((b) => b.key === key)?.count ?? 0;
   }
+
+  // Focus mode is active only when the pinned key is a real bucket in the
+  // current series.
+  const focusActive = $derived(!!pinnedKey && bucketKeys.includes(pinnedKey));
+  const pinned = $derived.by(() => (focusActive ? pinnedSeries(series, pinnedKey) : []));
+  const pinnedValues = $derived(
+    scale === "share" ? pinned.map((p) => p.share) : pinned.map((p) => p.count)
+  );
+  // Prefer the short source date for the x-axis; series is aligned to pinned.
+  const pinnedLabels = $derived(series.map((s) => s.sourceDate || s.label));
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 <FilterBar
   cohorts={layoutData.catalog?.cohorts ?? []}
@@ -220,6 +267,30 @@
 {:else}
   <section class="card">
     <h3>{TREND_CATEGORIES.find((c) => c.key === data.category)?.label}</h3>
+    {#if focusActive}
+      <div class="focus-head">
+        <div>
+          <h4 class="focus-title">Focus: {labelForKey(pinnedKey)}</h4>
+          <p class="hint">This bucket's {scale === "share" ? "share" : "domain count"} across snapshots.</p>
+        </div>
+        <div class="focus-controls">
+          <div class="scale-toggle" role="group" aria-label="Value scale">
+            <button type="button" class="scale-btn" class:active={scale === "count"} onclick={() => setScale("count")}>Count</button>
+            <button type="button" class="scale-btn" class:active={scale === "share"} onclick={() => setScale("share")}>Share</button>
+          </div>
+          <button type="button" class="ghost" onclick={() => setKey("")}>Show all buckets</button>
+        </div>
+      </div>
+      <TrendLine
+        values={pinnedValues}
+        labels={pinnedLabels}
+        tone={chartTone(toneForKey(pinnedKey))}
+        seriesLabel={scale === "share" ? "Share" : "Domains"}
+        valueSuffix={scale === "share" ? "%" : ""}
+        yDomain={scale === "share" ? [0, 100] : undefined}
+        caption={`${labelForKey(pinnedKey)} across snapshots`}
+      />
+    {:else}
     <ol class="trend-list" aria-label="Stacked distribution per snapshot">
       {#each series as s (s.slug)}
         <li class="trend-row">
@@ -263,11 +334,20 @@
         </li>
       {/each}
     </ol>
-    <ul class="trend-legend" aria-label="Buckets">
+    {/if}
+    <ul class="trend-legend" aria-label="Buckets - select one to focus its trend">
       {#each bucketKeys as key, i (key)}
         <li class="trend-legend-item">
-          <span class="legend-swatch" style:background={colorForBucket(key, i)}></span>
-          <span class="legend-label">{labelForKey(key)}</span>
+          <button
+            type="button"
+            class="legend-btn"
+            class:active={pinnedKey === key}
+            aria-pressed={pinnedKey === key}
+            onclick={() => setKey(pinnedKey === key ? "" : key)}
+          >
+            <span class="legend-swatch" style:background={colorForBucket(key, i)}></span>
+            <span class="legend-label">{labelForKey(key)}</span>
+          </button>
         </li>
       {/each}
     </ul>
@@ -391,6 +471,28 @@
     align-items: center;
     gap: 6px;
   }
+  .legend-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+  .legend-btn:hover {
+    border-color: var(--border);
+    color: var(--ink);
+  }
+  .legend-btn.active {
+    border-color: var(--accent-2);
+    background: var(--surface-2);
+    color: var(--ink);
+  }
   .legend-swatch {
     display: inline-block;
     width: 12px;
@@ -399,5 +501,45 @@
   }
   .legend-label {
     font-family: var(--mono);
+  }
+
+  .focus-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .focus-title {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: 600;
+  }
+  .focus-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .scale-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .scale-btn {
+    padding: 5px var(--space-3);
+    background: var(--surface);
+    color: var(--ink-2);
+    border: none;
+    border-radius: 0;
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .scale-btn.active {
+    background: var(--surface-2);
+    color: var(--ink);
+    font-weight: 600;
   }
 </style>

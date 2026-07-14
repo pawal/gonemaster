@@ -33,6 +33,25 @@ func DigestSupported(digest uint8) bool {
 	}
 }
 
+// parseRSAExponentLen decodes the RFC 3110 exponent-length prefix of an RSA
+// DNSKEY public key, returning the exponent length in bytes and the offset at
+// which the exponent begins.
+func parseRSAExponentLen(keybuf []byte) (explen, off int, ok bool) {
+	if len(keybuf) < 1 {
+		return 0, 0, false
+	}
+	explen = int(keybuf[0])
+	off = 1
+	if explen == 0 {
+		if len(keybuf) < 3 {
+			return 0, 0, false
+		}
+		explen = int(keybuf[1])<<8 | int(keybuf[2])
+		off = 3
+	}
+	return explen, off, true
+}
+
 // KeySize returns the RSA modulus size in bits, or 0 when not derivable.
 func KeySize(key *dns.DNSKEY) int {
 	if key == nil || key.PublicKey == "" {
@@ -43,16 +62,8 @@ func KeySize(key *dns.DNSKEY) int {
 		return 0
 	}
 
-	explen := int(keybuf[0])
-	keyoff := 1
-	if explen == 0 {
-		if len(keybuf) < 3 {
-			return 0
-		}
-		explen = int(keybuf[1])<<8 | int(keybuf[2])
-		keyoff = 3
-	}
-	if explen <= 0 || keyoff+explen >= len(keybuf) {
+	explen, keyoff, ok := parseRSAExponentLen(keybuf)
+	if !ok || explen <= 0 || keyoff+explen >= len(keybuf) {
 		return 0
 	}
 
@@ -61,6 +72,42 @@ func KeySize(key *dns.DNSKEY) int {
 		return 0
 	}
 	return new(big.Int).SetBytes(modulus).BitLen()
+}
+
+// RSAExponentBeyondLocalVerifier reports whether key is an RSA DNSKEY whose
+// public exponent exceeds what the local RRSIG verifier (miekg/dns + crypto/rsa)
+// can use. Both reject exponents encoded in more than 4 bytes or with a value
+// greater than 2^31-1. Such a key cannot be checked here even though its
+// signatures may be perfectly valid (e.g. the .lv TLD KSK, whose exponent is
+// 2^32+1). Returns false for non-RSA algorithms and for unparseable keys.
+func RSAExponentBeyondLocalVerifier(key *dns.DNSKEY) bool {
+	if key == nil {
+		return false
+	}
+	switch key.Algorithm {
+	case dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512:
+	default:
+		return false
+	}
+	keybuf, err := base64.StdEncoding.DecodeString(key.PublicKey)
+	if err != nil || len(keybuf) < 3 {
+		return false
+	}
+	explen, off, ok := parseRSAExponentLen(keybuf)
+	if !ok {
+		return false
+	}
+	if explen > 4 {
+		return true // a >4-byte exponent is necessarily > 2^31-1
+	}
+	if off+explen > len(keybuf) {
+		return false // malformed; leave to existing handling
+	}
+	var expo uint64
+	for _, b := range keybuf[off : off+explen] {
+		expo = expo<<8 | uint64(b)
+	}
+	return expo > (1<<31 - 1)
 }
 
 // VerifyRRSIG checks the signature against the RRset and key at the given time.

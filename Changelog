@@ -2,6 +2,23 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [v1.6.1] - 2026-07-14
+
+Stops reporting a false DNSSEC failure on zones signed with an RSA key whose public exponent is too large for the local verifier (for example the `.lv` TLD). Adds structured data and social image metadata to the public result page.
+
+### Added
+
+- engine, docs: NOTICE tags `DS02_RSA_EXPONENT_UNSUPPORTED`, `DS08_RSA_EXPONENT_UNSUPPORTED`, and `DS09_RSA_EXPONENT_UNSUPPORTED`, translated into every shipped locale
+- ui-public: JSON-LD structured data on the result page, with Open Graph, Twitter, and JSON-LD image URLs built on the public origin
+
+### Changed
+
+- server: sync the public UI hreflang languages with the shipped locales
+
+### Fixed
+
+- engine: reclassify DNSSEC02/08/09 RRSIG failures caused only by an RSA public exponent the local verifier cannot use as unverifiable, not invalid; no `*_RRSIG_NOT_VALID_BY_DNSKEY` error and no grade impact
+
 ## [v1.6.0] - 2026-07-12
 
 Reports a stale DS at the parent of an unsigned zone as an error. Adds a DNSSEC chain-of-trust graph to the public result page. Adds SEO metadata to the analysis dashboards. Flags timed-out name servers as unreachable.

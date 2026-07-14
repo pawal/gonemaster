@@ -1,5 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
-import { load } from "./+page";
+import { render, screen } from "@testing-library/svelte";
+import { load, type TrendsPageData } from "./+page";
+
+const h = vi.hoisted(() => ({
+  page: { url: new URL("http://localhost/analysis/trends"), data: { snapshots: [] } as unknown }
+}));
+vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
+vi.mock("$app/paths", () => ({ base: "/analysis" }));
+vi.mock("$app/state", () => ({
+  page: {
+    get url() {
+      return h.page.url;
+    },
+    get data() {
+      return h.page.data;
+    }
+  }
+}));
+
+import TrendsPage from "./+page.svelte";
 
 function stubResponse(body: unknown, ok = true): Response {
   return {
@@ -96,5 +115,56 @@ describe("+trends.load", () => {
     const data = await load(evt({ resolvedCohort: "tld", fetchImpl }));
     expect(data.points).toEqual([]);
     expect(data.error).toMatch(/HTTP 500/);
+  });
+});
+
+function trendsData(overrides: Partial<TrendsPageData> = {}): TrendsPageData {
+  return {
+    datasetTag: "tld",
+    category: "severity",
+    points: [
+      { slug: "2026-03-01", captured_at: "2026-03-01T00:00:00Z", payload: { ok: 8, critical: 2 } }
+    ],
+    keyMeta: {
+      ok: { label: "OK", tone: "ok", order: 0 },
+      critical: { label: "Critical", tone: "critical", order: 5 }
+    },
+    error: null,
+    ...overrides
+  };
+}
+
+describe("trends page rendering", () => {
+  it("links severity segments to the domains behind them in that snapshot", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity");
+    render(TrendsPage, { data: trendsData() });
+    const links = screen.getAllByRole("link");
+    const critical = links.find((a) => a.getAttribute("href")?.includes("worst_level=critical"));
+    expect(critical).toBeTruthy();
+    expect(critical?.getAttribute("href")).toContain("snapshot=2026-03-01");
+  });
+
+  it("keeps a sub-percent bucket visible instead of dropping it", () => {
+    const { container } = render(TrendsPage, {
+      data: trendsData({
+        points: [
+          { slug: "2026-03-01", captured_at: "2026-03-01T00:00:00Z", payload: { ok: 9999, critical: 1 } }
+        ]
+      })
+    });
+    // 1 in 10000 rounds to 0.0% but must still render as a tiny sliver, and
+    // still carry its count for assistive tech.
+    const tiny = container.querySelector(".trend-segment.tiny");
+    expect(tiny).not.toBeNull();
+    expect(tiny?.getAttribute("aria-label")).toContain("1 domains");
+  });
+
+  it("labels every segment with its count and share for assistive tech", () => {
+    render(TrendsPage, { data: trendsData() });
+    // Non-linked-category segments render as role=img; linked ones as links.
+    // The severity fixture is linked, so assert the accessible name carries
+    // the count and share.
+    const critical = screen.getByRole("link", { name: /Critical: 2 domains, 20%/ });
+    expect(critical).toBeInTheDocument();
   });
 });

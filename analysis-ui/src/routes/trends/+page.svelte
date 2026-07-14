@@ -1,7 +1,9 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
+  import { domainsGradeHref, domainsSeverityHref } from "$lib/entityLinks";
   import { formatCount, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
   import type { LayoutData } from "../+layout";
   import { TREND_CATEGORIES, type TrendsPageData } from "./+page";
@@ -9,6 +11,23 @@
   let { data }: { data: TrendsPageData } = $props();
 
   const layoutData = $derived(page.data as LayoutData);
+
+  // Segments narrower than this render as a bare colour sliver: labels would
+  // overflow. The value still reaches readers via the tooltip and the
+  // accessible table below the chart.
+  const TINY_PCT = 5;
+
+  // Deep-link a severity/grade segment to the domains behind it, in that
+  // snapshot. Other categories have no matching domains filter.
+  function segmentHref(key: string, slug: string): string | null {
+    const params = new URLSearchParams();
+    if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
+    params.set("snapshot", slug);
+    const q = `?${params.toString()}`;
+    if (data.category === "severity") return domainsSeverityHref(base, key, q);
+    if (data.category === "grade") return domainsGradeHref(base, key, q);
+    return null;
+  }
 
   function onCategoryChange(value: string) {
     const params = new URLSearchParams(page.url.searchParams);
@@ -140,6 +159,15 @@
     return Math.round((bucket.count / total) * 1000) / 10;
   }
 
+  // Unrounded share for the bar width, so a bucket with count > 0 keeps a
+  // nonzero width instead of collapsing to 0% and vanishing.
+  function rawPctFor(s: Series, key: string): number {
+    const total = totalFor(s);
+    if (total === 0) return 0;
+    const bucket = s.buckets.find((b) => b.key === key);
+    return bucket ? (bucket.count / total) * 100 : 0;
+  }
+
   function countFor(s: Series, key: string): number {
     return s.buckets.find((b) => b.key === key)?.count ?? 0;
   }
@@ -201,25 +229,37 @@
               <span class="trend-captured">{s.sourceDate}</span>
             {/if}
           </div>
-          <div class="trend-bar" aria-hidden="true">
+          <div class="trend-bar" role="group" aria-label="{s.label} distribution">
             {#each bucketKeys as key, i (key)}
               {@const pct = pctFor(s, key)}
+              {@const rawPct = rawPctFor(s, key)}
               {@const count = countFor(s, key)}
-              {#if pct > 0}
-                <span
+              {#if count > 0}
+                {@const href = segmentHref(key, s.slug)}
+                {@const tiny = rawPct < TINY_PCT}
+                {@const label = `${labelForKey(key)}: ${formatCount(count)} domains, ${pct}%${href ? " - view domains" : ""}`}
+                <svelte:element
+                  this={href ? "a" : "span"}
+                  {href}
+                  role={href ? undefined : "img"}
                   class="trend-segment"
-                  style:width="{pct}%"
+                  class:tiny
+                  class:linked={!!href}
+                  style:width="{rawPct}%"
                   style:background={colorForBucket(key, i)}
                   style:color={colorFgForBucket(key, i)}
+                  aria-label={label}
                   title="{labelForKey(key)}: {formatCount(count)} ({pct}%)"
                 >
-                  <span class="trend-segment-label">{labelForKey(key)}</span>
-                  <span class="trend-segment-count">{formatCount(count)}</span>
-                </span>
+                  {#if !tiny}
+                    <span class="trend-segment-label" aria-hidden="true">{labelForKey(key)}</span>
+                    <span class="trend-segment-count" aria-hidden="true">{formatCount(count)}</span>
+                  {/if}
+                </svelte:element>
               {/if}
             {/each}
           </div>
-          <span class="trend-total">{totalFor(s)}</span>
+          <span class="trend-total">{formatCount(totalFor(s))}</span>
         </li>
       {/each}
     </ol>
@@ -304,6 +344,20 @@
     height: 100%;
     overflow: hidden;
     padding: 0 var(--space-2);
+    text-decoration: none;
+  }
+  /* Tiny segments drop their padding and take a small floor width so a
+     nonzero count is always visible without over-representing it. */
+  .trend-segment.tiny {
+    padding: 0;
+    min-width: 3px;
+  }
+  .trend-segment.linked {
+    cursor: pointer;
+  }
+  .trend-segment.linked:hover {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
   }
   .trend-segment-label {
     font-size: var(--text-xs);

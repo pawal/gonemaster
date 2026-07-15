@@ -194,3 +194,35 @@ func TestPublicNameserverListSurfacesLatency(t *testing.T) {
 		t.Errorf("ns1 latency_samples = %d, want 1", ns1.LatencySamples)
 	}
 }
+
+// TestPublicNameserverDetailSurfacesLatency proves the per-nameserver detail
+// endpoint carries the aggregated latency too.
+func TestPublicNameserverDetailSurfacesLatency(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	now := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	f.seedEndpoint("run-lat", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+	dom, _ := f.store.GetOrCreateDomain("a.example")
+	ns, _ := f.store.UpsertAnalysisNameserver("ns1.example", now)
+	addr, _ := f.store.UpsertAnalysisAddress("192.0.2.1", "ipv4", now)
+	if err := f.store.ReplaceAnalysisRunNSEndpoints(f.cohort.ID, "run-lat", []AnalysisRunNameserverEndpoint{
+		{CohortID: f.cohort.ID, RunID: "run-lat", DomainID: dom.ID, NameserverID: ns.ID, AddressID: addr.ID, Role: "authoritative", Family: "ipv4", QueryCount: 1, AvgMS: 22},
+	}); err != nil {
+		t.Fatalf("reseed endpoint with latency: %v", err)
+	}
+	f.refreshSnapshotViews(f.batchID)
+
+	resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
+	}
+	var got PublicAnalysisNameserverDetail
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if got.LatencyP50MS == nil || *got.LatencyP50MS != 22 {
+		t.Errorf("detail latency_p50_ms = %v, want 22", got.LatencyP50MS)
+	}
+	if got.LatencySamples != 1 {
+		t.Errorf("detail latency_samples = %d, want 1", got.LatencySamples)
+	}
+}

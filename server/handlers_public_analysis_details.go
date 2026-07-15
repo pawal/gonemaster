@@ -112,26 +112,32 @@ type PublicAnalysisDomainEntry struct {
 
 // PublicAnalysisNameserverDetail is the per-nameserver detail view.
 type PublicAnalysisNameserverDetail struct {
-	Nameserver    string   `json:"nameserver"`
-	DomainCount   int      `json:"domain_count"`
-	EndpointCount int      `json:"endpoint_count"`
-	IPv4Count     int      `json:"ipv4_count"`
-	IPv6Count     int      `json:"ipv6_count"`
-	Addresses     []string `json:"addresses"`
-	Domains       []string `json:"domains"`
-	ASNs          []int64  `json:"asns"`
+	Nameserver     string   `json:"nameserver"`
+	DomainCount    int      `json:"domain_count"`
+	EndpointCount  int      `json:"endpoint_count"`
+	IPv4Count      int      `json:"ipv4_count"`
+	IPv6Count      int      `json:"ipv6_count"`
+	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples int      `json:"latency_samples,omitempty"`
+	Addresses      []string `json:"addresses"`
+	Domains        []string `json:"domains"`
+	ASNs           []int64  `json:"asns"`
 }
 
 // PublicAnalysisEndpointDetail is the per-(nameserver,address) detail view.
 type PublicAnalysisEndpointDetail struct {
-	Nameserver  string   `json:"nameserver"`
-	Address     string   `json:"address"`
-	Family      string   `json:"family"`
-	ASN         *int64   `json:"asn,omitempty"`
-	ASNLabel    string   `json:"asn_label,omitempty"`
-	Prefix      string   `json:"prefix,omitempty"`
-	DomainCount int      `json:"domain_count"`
-	Domains     []string `json:"domains"`
+	Nameserver     string   `json:"nameserver"`
+	Address        string   `json:"address"`
+	Family         string   `json:"family"`
+	ASN            *int64   `json:"asn,omitempty"`
+	ASNLabel       string   `json:"asn_label,omitempty"`
+	Prefix         string   `json:"prefix,omitempty"`
+	DomainCount    int      `json:"domain_count"`
+	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples int      `json:"latency_samples,omitempty"`
+	Domains        []string `json:"domains"`
 }
 
 // PublicAnalysisASNDetail is the per-ASN detail view.
@@ -142,6 +148,9 @@ type PublicAnalysisASNDetail struct {
 	AddressCount    int      `json:"address_count"`
 	NameserverCount int      `json:"nameserver_count"`
 	PrefixCount     int      `json:"prefix_count"`
+	LatencyP50MS    *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS    *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples  int      `json:"latency_samples,omitempty"`
 	Domains         []string `json:"domains"`
 	Nameservers     []string `json:"nameservers"`
 	Prefixes        []string `json:"prefixes"`
@@ -387,14 +396,17 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 
 	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisNameserverDetail{
-		Nameserver:    view.NameserverName,
-		DomainCount:   view.DomainCount,
-		EndpointCount: view.EndpointCount,
-		IPv4Count:     view.IPv4Count,
-		IPv6Count:     view.IPv6Count,
-		Addresses:     view.Addresses,
-		Domains:       view.Domains,
-		ASNs:          view.ASNs,
+		Nameserver:     view.NameserverName,
+		DomainCount:    view.DomainCount,
+		EndpointCount:  view.EndpointCount,
+		IPv4Count:      view.IPv4Count,
+		IPv6Count:      view.IPv6Count,
+		LatencyP50MS:   copyFloatPtr(view.LatencyP50MS),
+		LatencyP95MS:   copyFloatPtr(view.LatencyP95MS),
+		LatencySamples: view.LatencySamples,
+		Addresses:      view.Addresses,
+		Domains:        view.Domains,
+		ASNs:           view.ASNs,
 	})
 }
 
@@ -432,14 +444,17 @@ func (s *Server) handlePublicAnalysisEndpointDetail(w http.ResponseWriter, r *ht
 
 	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisEndpointDetail{
-		Nameserver:  view.NameserverName,
-		Address:     view.Address,
-		Family:      view.Family,
-		ASN:         view.ASN,
-		ASNLabel:    view.ASNLabel,
-		Prefix:      view.Prefix,
-		DomainCount: view.DomainCount,
-		Domains:     view.Domains,
+		Nameserver:     view.NameserverName,
+		Address:        view.Address,
+		Family:         view.Family,
+		ASN:            view.ASN,
+		ASNLabel:       view.ASNLabel,
+		Prefix:         view.Prefix,
+		DomainCount:    view.DomainCount,
+		LatencyP50MS:   copyFloatPtr(view.LatencyP50MS),
+		LatencyP95MS:   copyFloatPtr(view.LatencyP95MS),
+		LatencySamples: view.LatencySamples,
+		Domains:        view.Domains,
 	})
 }
 
@@ -476,6 +491,9 @@ func (s *Server) handlePublicAnalysisASNDetail(w http.ResponseWriter, r *http.Re
 		AddressCount:    view.AddressCount,
 		NameserverCount: view.NameserverCount,
 		PrefixCount:     view.PrefixCount,
+		LatencyP50MS:    copyFloatPtr(view.LatencyP50MS),
+		LatencyP95MS:    copyFloatPtr(view.LatencyP95MS),
+		LatencySamples:  view.LatencySamples,
 		Domains:         view.Domains,
 		Nameservers:     view.Nameservers,
 		Prefixes:        view.Prefixes,

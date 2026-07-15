@@ -5,6 +5,7 @@
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
+  import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
   import { tagHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import { idnToUnicode } from "$lib/idn";
@@ -161,6 +162,7 @@
       <div><dt>ASNs</dt><dd>{formatCount(d.asn_count)}</dd></div>
       <div><dt>Prefixes</dt><dd>{formatCount(d.prefix_count)}</dd></div>
     </dl>
+    <EntityHistorySparkline points={data.history} metric="score" label="Score over snapshots" />
   </section>
 
   <section class="card">

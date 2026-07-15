@@ -28,8 +28,11 @@ const base: NameserverDetail = {
   asns: [64500]
 };
 
-function pageData(detail: NameserverDetail): NameserverDetailPageData {
-  return { nameserver: "ns1.example", datasetTag: "tld", detail, error: null };
+function pageData(
+  detail: NameserverDetail,
+  history: NameserverDetailPageData["history"] = []
+): NameserverDetailPageData {
+  return { nameserver: "ns1.example", datasetTag: "tld", detail, history, error: null };
 }
 
 describe("nameserver detail latency stat", () => {
@@ -46,5 +49,32 @@ describe("nameserver detail latency stat", () => {
   it("omits latency tiles on a snapshot with no latency", () => {
     render(NameserverDetailPage, { data: pageData(base) });
     expect(screen.queryByText("Median latency")).toBeNull();
+  });
+
+  it("renders a history sparkline when at least two present points exist", () => {
+    render(
+      NameserverDetailPage,
+      {
+        data: pageData(base, [
+          { slug: "s1", captured_at: "2026-04-17T00:00:00Z", present: true, domain_count: 1 },
+          { slug: "s2", captured_at: "2026-04-20T00:00:00Z", present: true, domain_count: 2 }
+        ])
+      }
+    );
+    expect(screen.getByText("Domains over snapshots")).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: /Domains over snapshots across 2 snapshots/ })).toBeInTheDocument();
+  });
+
+  it("omits the sparkline with fewer than two present points", () => {
+    render(
+      NameserverDetailPage,
+      {
+        data: pageData(base, [
+          { slug: "s1", captured_at: "2026-04-17T00:00:00Z", present: true, domain_count: 1 },
+          { slug: "s2", captured_at: "2026-04-20T00:00:00Z", present: false, domain_count: 0 }
+        ])
+      }
+    );
+    expect(screen.queryByText("Domains over snapshots")).toBeNull();
   });
 });

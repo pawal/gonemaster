@@ -4,6 +4,7 @@
   import ASNChip from "$lib/chips/ASNChip.svelte";
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
+  import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
   import { formatCount, formatMs } from "$lib/format";
   import { idnToUnicode } from "$lib/idn";
   import type { NameserverDetailPageData } from "./+page";
@@ -56,6 +57,7 @@
         {/if}
       {/if}
     </dl>
+    <EntityHistorySparkline points={data.history} metric="domain_count" label="Domains over snapshots" />
   </section>
 
   <section class="card">

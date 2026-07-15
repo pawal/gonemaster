@@ -413,6 +413,25 @@ export type TagDiffResponse = {
   level_changed: TagDiffEntry[];
 };
 
+export type HistoryPoint = {
+  slug: string;
+  captured_at: string;
+  present: boolean;
+  domain_count: number;
+  latency_p50_ms?: number;
+  score?: number;
+  grade?: string;
+};
+
+export type EntityHistoryResponse = {
+  dataset_tag: string;
+  entity: string;
+  key: string;
+  points: HistoryPoint[];
+};
+
+export type HistoryEntity = "nameserver" | "asn" | "tag" | "domain";
+
 export type FetchLike = typeof fetch;
 
 // buildQuery drops empty/null fields and returns a string starting with "?"
@@ -601,6 +620,18 @@ export const getTagDiff = (
       to: string;
       granularity: string;
     },
+    fetchFn
+  );
+
+export const getEntityHistory = (
+  datasetTag: string,
+  entity: HistoryEntity,
+  key: string,
+  fetchFn: FetchLike = fetch
+) =>
+  getJSON<EntityHistoryResponse>(
+    `/cohorts/${encodeURIComponent(datasetTag)}/history`,
+    { entity, key } as AnalysisFilter & { entity: string; key: string },
     fetchFn
   );
 

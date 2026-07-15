@@ -1,9 +1,16 @@
-import { getASNDetail, type AnalysisFilter, type ASNDetail } from "$lib/api";
+import {
+  getASNDetail,
+  getEntityHistory,
+  type AnalysisFilter,
+  type ASNDetail,
+  type HistoryPoint
+} from "$lib/api";
 
 export type ASNDetailPageData = {
   asn: string;
   datasetTag: string | null;
   detail: ASNDetail | null;
+  history: HistoryPoint[];
   error: string | null;
 };
 
@@ -13,7 +20,7 @@ export async function load({ parent, fetch, params }): Promise<ASNDetailPageData
   const asn = params.asn ?? "";
 
   if (!datasetTag || !asn) {
-    return { asn, datasetTag, detail: null, error: null };
+    return { asn, datasetTag, detail: null, history: [], error: null };
   }
 
   const snapshot = layout.effectiveSnapshotSlug ?? "";
@@ -21,13 +28,17 @@ export async function load({ parent, fetch, params }): Promise<ASNDetailPageData
   try {
     const filter: AnalysisFilter = { dataset_tag: datasetTag };
     if (snapshot) filter.snapshot = snapshot;
-    const detail = await getASNDetail(asn, filter, fetch);
-    return { asn, datasetTag, detail, error: null };
+    const [detail, history] = await Promise.all([
+      getASNDetail(asn, filter, fetch),
+      getEntityHistory(datasetTag, "asn", asn, fetch).then((h) => h.points).catch(() => [])
+    ]);
+    return { asn, datasetTag, detail, history, error: null };
   } catch (error) {
     return {
       asn,
       datasetTag,
       detail: null,
+      history: [],
       error: error instanceof Error ? error.message : String(error)
     };
   }

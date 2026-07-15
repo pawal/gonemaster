@@ -64,6 +64,15 @@ snapshot has latency data; snapshots captured before latency aggregation show
 no column until they are re-materialized (admin "Rebuild aggregates" or a
 cohort rebuild).
 
+## Entity History
+
+The nameserver, ASN, tag, and domain detail pages show a small sparkline of
+how the entity moved across the cohort's captured snapshots (domain count for
+nameserver/ASN/tag, score for a domain). It is fed by
+`GET /pub/api/v1/analysis/cohorts/{dataset_tag}/history?entity=&key=` and only
+appears when at least two snapshots carry the entity, so single-snapshot
+cohorts and brand-new entities show nothing rather than a flat line.
+
 ## Empty States
 
 If the UI is empty after a batch finishes, check:

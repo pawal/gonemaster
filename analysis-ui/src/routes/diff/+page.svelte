@@ -4,8 +4,9 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import GradeChip from "$lib/GradeChip.svelte";
+  import TagChip from "$lib/chips/TagChip.svelte";
   import { domainHref } from "$lib/entityLinks";
-  import { snapshotOptionLabel, levelTone } from "$lib/format";
+  import { snapshotOptionLabel, levelTone, formatCount } from "$lib/format";
   import { downloadCSV, type ExportColumn } from "$lib/exporters";
   import {
     buildGradeMatrix,
@@ -14,7 +15,7 @@
     sortByMovement,
     summarizeDiff
   } from "$lib/diff";
-  import type { DiffEntry } from "$lib/api";
+  import type { DiffEntry, TagDiffEntry } from "$lib/api";
   import type { LayoutData } from "../+layout";
   import type { DiffPageData } from "./+page";
 
@@ -66,6 +67,19 @@
 
   const summary = $derived(summarizeDiff(data.diff));
   const matrix = $derived(buildGradeMatrix(data.diff?.grade_changed ?? []));
+
+  // Total tag movements, for the "no changes" empty state.
+  const tagChangeTotal = $derived(
+    data.tagDiff
+      ? data.tagDiff.appeared.length + data.tagDiff.cleared.length + data.tagDiff.level_changed.length
+      : 0
+  );
+
+  function signedCount(n: number): string {
+    if (n > 0) return `+${formatCount(n)}`;
+    if (n < 0) return `-${formatCount(-n)}`;
+    return "0";
+  }
 
   const entries = $derived.by<DiffEntry[]>(() => {
     if (!data.diff) return [];
@@ -354,6 +368,74 @@
       </div>
     {/if}
   </section>
+
+  {#snippet movedTags(title: string, entries: TagDiffEntry[], showFrom: boolean)}
+    <h4>{title}</h4>
+    <div class="table-wrap">
+      <table class="data-table">
+        <thead>
+          <tr><th>Tag</th><th>Level</th><th class="col-num">Domains</th></tr>
+        </thead>
+        <tbody>
+          {#each entries as e (e.tag)}
+            {@const lvl = showFrom ? e.from_level : e.to_level}
+            <tr>
+              <td class="row-ident"><TagChip tag={e.tag} /></td>
+              <td>{#if lvl}<span class="level level-{levelTone(lvl)}">{lvl}</span>{/if}</td>
+              <td class="col-num">{signedCount(e.domain_delta)}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/snippet}
+
+  <section class="card tag-diff" aria-label="Tag changes">
+    <h3>Tag changes</h3>
+    {#if !data.tagDiff}
+      <p class="hint">Tag-level changes are not available for these snapshots yet.</p>
+    {:else if tagChangeTotal === 0}
+      <p class="hint">No finding tags appeared, cleared, or changed severity between these snapshots.</p>
+    {:else}
+      <p class="hint">
+        Which finding tags moved cohort-wide - this explains the domain
+        movement above: a tag that appeared on many domains is a likely
+        regression driver.
+      </p>
+      {#if data.tagDiff.appeared.length > 0}
+        {@render movedTags("Appeared", data.tagDiff.appeared, false)}
+      {/if}
+      {#if data.tagDiff.level_changed.length > 0}
+        <h4>Severity changed</h4>
+        <div class="table-wrap">
+          <table class="data-table">
+            <thead>
+              <tr><th>Tag</th><th>Severity change</th><th class="col-num">Domains</th></tr>
+            </thead>
+            <tbody>
+              {#each data.tagDiff.level_changed as e (e.tag)}
+                <tr>
+                  <td class="row-ident"><TagChip tag={e.tag} /></td>
+                  <td>
+                    <span class="pair">
+                      <span class="level level-{levelTone(e.from_level)}">{e.from_level ?? "-"}</span>
+                      <span class="arrow" aria-hidden="true">→</span>
+                      <span class="sr-only">to</span>
+                      <span class="level level-{levelTone(e.to_level)}">{e.to_level ?? "-"}</span>
+                    </span>
+                  </td>
+                  <td class="col-num">{signedCount(e.domain_delta)}</td>
+                </tr>
+              {/each}
+            </tbody>
+          </table>
+        </div>
+      {/if}
+      {#if data.tagDiff.cleared.length > 0}
+        {@render movedTags("Cleared", data.tagDiff.cleared, true)}
+      {/if}
+    {/if}
+  </section>
 {/if}
 
 <style>
@@ -505,4 +587,9 @@
   }
   .pair.dir-regressed .arrow { color: var(--bar-error); }
   .pair.dir-improved .arrow { color: var(--bar-ok); }
+
+  .tag-diff h4 {
+    margin: var(--space-3) 0 var(--space-2);
+    font-size: var(--text-sm);
+  }
 </style>

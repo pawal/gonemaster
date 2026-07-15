@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
 import { load, type DiffPageData } from "./+page";
 import { previousSlug } from "$lib/diff";
-import type { DiffResponse } from "$lib/api";
+import type { DiffResponse, TagDiffResponse } from "$lib/api";
 
 // A mutable URL holder so each render can set the active ?tab= before mounting.
 const h = vi.hoisted(() => ({
@@ -59,6 +59,22 @@ const sampleDiff: DiffResponse = {
   level_changed: [{ domain: "lvl.se", from_level: "NOTICE", to_level: "ERROR", to_grade: "C" }]
 };
 
+const sampleTagDiff: TagDiffResponse = {
+  dataset_tag: "tld",
+  from_slug: "s1",
+  to_slug: "s2",
+  granularity: "tags",
+  appeared: [
+    { tag: "NS_FEW", module: "DELEGATION", to_level: "WARNING", from_domain_count: 0, to_domain_count: 8, domain_delta: 8 }
+  ],
+  cleared: [
+    { tag: "DS08_MISSING", module: "DNSSEC", from_level: "WARNING", from_domain_count: 3, to_domain_count: 0, domain_delta: -3 }
+  ],
+  level_changed: [
+    { tag: "SOA_SERIAL", module: "CONSISTENCY", from_level: "NOTICE", to_level: "ERROR", from_domain_count: 4, to_domain_count: 6, domain_delta: 2 }
+  ]
+};
+
 function pageData(overrides: Partial<DiffPageData> = {}): DiffPageData {
   return {
     datasetTag: "tld",
@@ -66,6 +82,7 @@ function pageData(overrides: Partial<DiffPageData> = {}): DiffPageData {
     toSlug: "s2",
     fromDefaulted: false,
     diff: sampleDiff,
+    tagDiff: null,
     error: null,
     ...overrides
   };
@@ -96,8 +113,9 @@ describe("+diff.load", () => {
     );
     expect(data.fromSlug).toBe("s1");
     expect(data.fromDefaulted).toBe(true);
-    // The diff must actually be fetched once a From was derived.
-    expect(fetchImpl).toHaveBeenCalledOnce();
+    // Once a From is derived, both the domain diff and the tag-level diff
+    // are fetched (in parallel), so exactly two requests fire.
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   it("does not mark From as defaulted when the URL supplies it", async () => {
@@ -163,5 +181,38 @@ describe("diff page rendering", () => {
     h.url = new URL("http://localhost/analysis/diff?to=s2&tab=added");
     render(DiffPage, { data: pageData({ fromDefaulted: true }) });
     expect(screen.getByText(/previous snapshot/i)).toBeInTheDocument();
+  });
+
+  it("lists appeared, cleared, and severity-changed tags with signed counts", () => {
+    h.url = new URL("http://localhost/analysis/diff?from=s1&to=s2&tab=added");
+    render(DiffPage, { data: pageData({ tagDiff: sampleTagDiff }) });
+    const section = within(screen.getByLabelText("Tag changes"));
+    expect(section.getByText("Appeared")).toBeInTheDocument();
+    expect(section.getByText("Cleared")).toBeInTheDocument();
+    expect(section.getByText("Severity changed")).toBeInTheDocument();
+    // Each tag is a real link, and the domain delta is shown signed.
+    expect(section.getByRole("link", { name: "NS_FEW" })).toBeInTheDocument();
+    expect(section.getByText("+8")).toBeInTheDocument();
+    expect(section.getByRole("link", { name: "DS08_MISSING" })).toBeInTheDocument();
+    expect(section.getByText("-3")).toBeInTheDocument();
+    expect(section.getByRole("link", { name: "SOA_SERIAL" })).toBeInTheDocument();
+  });
+
+  it("shows a friendly message when there are no tag changes", () => {
+    h.url = new URL("http://localhost/analysis/diff?from=s1&to=s2&tab=added");
+    render(DiffPage, {
+      data: pageData({
+        tagDiff: { ...sampleTagDiff, appeared: [], cleared: [], level_changed: [] }
+      })
+    });
+    const section = within(screen.getByLabelText("Tag changes"));
+    expect(section.getByText(/No finding tags appeared/i)).toBeInTheDocument();
+  });
+
+  it("notes when tag-level changes are unavailable", () => {
+    h.url = new URL("http://localhost/analysis/diff?from=s1&to=s2&tab=added");
+    render(DiffPage, { data: pageData({ tagDiff: null }) });
+    const section = within(screen.getByLabelText("Tag changes"));
+    expect(section.getByText(/not available/i)).toBeInTheDocument();
   });
 });

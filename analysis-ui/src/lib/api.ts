@@ -385,6 +385,27 @@ export type DiffResponse = {
   level_changed: DiffEntry[];
 };
 
+export type TagDiffEntry = {
+  tag: string;
+  module?: string;
+  testcase?: string;
+  from_level?: string;
+  to_level?: string;
+  from_domain_count: number;
+  to_domain_count: number;
+  domain_delta: number;
+};
+
+export type TagDiffResponse = {
+  dataset_tag: string;
+  from_slug: string;
+  to_slug: string;
+  granularity: "tags";
+  appeared: TagDiffEntry[];
+  cleared: TagDiffEntry[];
+  level_changed: TagDiffEntry[];
+};
+
 export type FetchLike = typeof fetch;
 
 // buildQuery drops empty/null fields and returns a string starting with "?"
@@ -557,6 +578,22 @@ export const getDiff = (
   getJSON<DiffResponse>(
     `/cohorts/${encodeURIComponent(datasetTag)}/diff`,
     { from, to } as AnalysisFilter & { from: string; to: string },
+    fetchFn
+  );
+
+export const getTagDiff = (
+  datasetTag: string,
+  from: string,
+  to: string,
+  fetchFn: FetchLike = fetch
+) =>
+  getJSON<TagDiffResponse>(
+    `/cohorts/${encodeURIComponent(datasetTag)}/diff`,
+    { from, to, granularity: "tags" } as AnalysisFilter & {
+      from: string;
+      to: string;
+      granularity: string;
+    },
     fetchFn
   );
 

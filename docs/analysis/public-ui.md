@@ -45,6 +45,16 @@ testcase opens a filtered detail view.
 The UI preserves the active snapshot as visitors click through detail pages.
 Shared links should include `snapshot` when the numbers must remain stable.
 
+## Snapshot Diffs
+
+The diff view compares two snapshots of a cohort. Alongside the per-domain
+changes (added, removed, grade or worst-level changes) it shows a tag-level
+summary: which finding tags appeared, cleared, or changed severity
+cohort-wide, with domain counts. This makes a regression explainable, for
+example "14 domains regressed; DS02_NO_MATCHING_DS appeared on 12 of them".
+The tag section degrades gracefully: if a snapshot has no materialized tag
+view it shows a short notice rather than an error.
+
 ## Empty States
 
 If the UI is empty after a batch finishes, check:

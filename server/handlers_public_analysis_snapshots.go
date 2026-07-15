@@ -85,6 +85,31 @@ type PublicAnalysisDiffEntry struct {
 	WorstLevel string  `json:"worst_level,omitempty"`
 }
 
+// PublicAnalysisTagDiffEntry is one finding-tag row in a granularity=tags
+// diff. from_* fields are zero for appeared tags; to_* for cleared tags.
+type PublicAnalysisTagDiffEntry struct {
+	Tag             string `json:"tag"`
+	Module          string `json:"module,omitempty"`
+	Testcase        string `json:"testcase,omitempty"`
+	FromLevel       string `json:"from_level,omitempty"`
+	ToLevel         string `json:"to_level,omitempty"`
+	FromDomainCount int    `json:"from_domain_count"`
+	ToDomainCount   int    `json:"to_domain_count"`
+	DomainDelta     int    `json:"domain_delta"`
+}
+
+// PublicAnalysisTagDiffResponse is the granularity=tags diff shape: which
+// finding tags appeared, cleared, or changed worst severity cohort-wide.
+type PublicAnalysisTagDiffResponse struct {
+	DatasetTag   string                       `json:"dataset_tag"`
+	FromSlug     string                       `json:"from_slug"`
+	ToSlug       string                       `json:"to_slug"`
+	Granularity  string                       `json:"granularity"`
+	Appeared     []PublicAnalysisTagDiffEntry `json:"appeared"`
+	Cleared      []PublicAnalysisTagDiffEntry `json:"cleared"`
+	LevelChanged []PublicAnalysisTagDiffEntry `json:"level_changed"`
+}
+
 // PublicAnalysisDiffResponse is the /diff response shape, grouped by the
 // kind of change between the two snapshots.
 type PublicAnalysisDiffResponse struct {
@@ -368,6 +393,19 @@ func (s *Server) handlePublicAnalysisDiff(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Optional tag-level granularity: which finding tags moved cohort-wide.
+	switch strings.ToLower(strings.TrimSpace(r.URL.Query().Get("granularity"))) {
+	case "", "domains":
+		// Domain-level diff below.
+	case "tags":
+		s.writeTagDiff(w, cohort, fromSnap, toSnap, readStore)
+		return
+	default:
+		writeError(w, http.StatusBadRequest, "invalid_granularity",
+			"granularity must be omitted, 'domains', or 'tags'", nil)
+		return
+	}
+
 	fromByName := indexDomainViewsByName(readStore.ListSnapshotDomainViews(fromSnap.ID))
 	toByName := indexDomainViewsByName(readStore.ListSnapshotDomainViews(toSnap.ID))
 
@@ -458,4 +496,108 @@ func optionalString(v string) *string {
 
 func sortDiffEntries(items []PublicAnalysisDiffEntry) {
 	sort.Slice(items, func(i, j int) bool { return items[i].Domain < items[j].Domain })
+}
+
+// writeTagDiff computes and writes the granularity=tags diff between two
+// snapshots from their materialized tag views.
+func (s *Server) writeTagDiff(w http.ResponseWriter, cohort AnalysisCohort, fromSnap, toSnap AnalysisCohortSnapshot, readStore AnalysisReadStore) {
+	appeared, cleared, levelChanged := diffTagViews(
+		readStore.ListSnapshotTagViews(fromSnap.ID),
+		readStore.ListSnapshotTagViews(toSnap.ID),
+	)
+	writeJSON(w, http.StatusOK, PublicAnalysisTagDiffResponse{
+		DatasetTag:   cohort.SourceTag,
+		FromSlug:     fromSnap.Slug,
+		ToSlug:       toSnap.Slug,
+		Granularity:  "tags",
+		Appeared:     appeared,
+		Cleared:      cleared,
+		LevelChanged: levelChanged,
+	})
+}
+
+// diffTagViews classifies finding tags between two snapshots' tag views:
+// appeared (only in to), cleared (only in from), and level-changed (present
+// in both with a different worst severity). Each slice is sorted
+// most-impactful-first for stable, useful output.
+func diffTagViews(fromViews, toViews []AnalysisSnapshotTagView) (appeared, cleared, levelChanged []PublicAnalysisTagDiffEntry) {
+	fromByTag := indexTagViewsByTag(fromViews)
+	toByTag := indexTagViewsByTag(toViews)
+
+	appeared = []PublicAnalysisTagDiffEntry{}
+	cleared = []PublicAnalysisTagDiffEntry{}
+	levelChanged = []PublicAnalysisTagDiffEntry{}
+
+	for tag, to := range toByTag {
+		if _, ok := fromByTag[tag]; ok {
+			continue
+		}
+		appeared = append(appeared, PublicAnalysisTagDiffEntry{
+			Tag: tag, Module: to.Module, Testcase: to.Testcase,
+			ToLevel: to.Level, ToDomainCount: to.DomainCount,
+			DomainDelta: to.DomainCount,
+		})
+	}
+	for tag, from := range fromByTag {
+		if _, ok := toByTag[tag]; ok {
+			continue
+		}
+		cleared = append(cleared, PublicAnalysisTagDiffEntry{
+			Tag: tag, Module: from.Module, Testcase: from.Testcase,
+			FromLevel: from.Level, FromDomainCount: from.DomainCount,
+			DomainDelta: -from.DomainCount,
+		})
+	}
+	for tag, to := range toByTag {
+		from, ok := fromByTag[tag]
+		if !ok || strings.EqualFold(from.Level, to.Level) {
+			continue
+		}
+		levelChanged = append(levelChanged, PublicAnalysisTagDiffEntry{
+			Tag:             tag,
+			Module:          firstNonEmptyStr(to.Module, from.Module),
+			Testcase:        firstNonEmptyStr(to.Testcase, from.Testcase),
+			FromLevel:       from.Level,
+			ToLevel:         to.Level,
+			FromDomainCount: from.DomainCount,
+			ToDomainCount:   to.DomainCount,
+			DomainDelta:     to.DomainCount - from.DomainCount,
+		})
+	}
+
+	sortTagDiffEntries(appeared)
+	sortTagDiffEntries(cleared)
+	sortTagDiffEntries(levelChanged)
+	return appeared, cleared, levelChanged
+}
+
+func indexTagViewsByTag(rows []AnalysisSnapshotTagView) map[string]AnalysisSnapshotTagView {
+	out := make(map[string]AnalysisSnapshotTagView, len(rows))
+	for _, row := range rows {
+		if row.Tag == "" {
+			continue
+		}
+		out[row.Tag] = row
+	}
+	return out
+}
+
+// sortTagDiffEntries orders by the larger of the two domain counts (impact)
+// descending, then tag ascending, so output is deterministic.
+func sortTagDiffEntries(items []PublicAnalysisTagDiffEntry) {
+	sort.Slice(items, func(i, j int) bool {
+		li := max(items[i].FromDomainCount, items[i].ToDomainCount)
+		lj := max(items[j].FromDomainCount, items[j].ToDomainCount)
+		if li != lj {
+			return li > lj
+		}
+		return items[i].Tag < items[j].Tag
+	})
+}
+
+func firstNonEmptyStr(a, b string) string {
+	if a != "" {
+		return a
+	}
+	return b
 }

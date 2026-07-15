@@ -43,10 +43,6 @@ type AsnlookupEnricher struct {
 	Resolver resolverAdapter
 	TTL      time.Duration
 
-	// Caches the recursor requires (nameserver) and reuses (asn) per lookup.
-	nsCache  *nameserver.CacheStore
-	asnCache *asnlookup.Cache
-
 	mu    sync.Mutex
 	addrs map[string]addrEntry
 	asns  map[int64]asnEntry
@@ -68,26 +64,14 @@ func NewAsnlookupEnricher(resolver resolverAdapter, ttl time.Duration) *Asnlooku
 	if ttl <= 0 {
 		ttl = 24 * time.Hour
 	}
-	return &AsnlookupEnricher{
-		Resolver: resolver,
-		TTL:      ttl,
-		nsCache:  nameserver.NewCacheStore(),
-		asnCache: asnlookup.NewCache(),
-	}
+	return &AsnlookupEnricher{Resolver: resolver, TTL: ttl}
 }
 
-// withCaches attaches the caches the recursor needs to ctx. Without a
-// nameserver cache the recursor fails closed, silently starving enrichment.
-func (e *AsnlookupEnricher) withCaches(ctx context.Context) context.Context {
-	nsCache := e.nsCache
-	if nsCache == nil {
-		nsCache = nameserver.NewCacheStore()
-	}
-	ctx = nameserver.WithCache(ctx, nsCache)
-	if e.asnCache != nil {
-		ctx = asnlookup.WithCache(ctx, e.asnCache)
-	}
-	return ctx
+// recursionContext returns ctx carrying the fresh nameserver cache the recursor
+// requires. Per-lookup scope matches the engine's per-run cache; results are
+// cached separately so this stays short-lived scratch, not a stale global.
+func (e *AsnlookupEnricher) recursionContext(ctx context.Context) context.Context {
+	return nameserver.WithCache(ctx, nameserver.NewCacheStore())
 }
 
 // EnrichAddress looks up the prefix and ASN for an IP via cymru/ripe. Any
@@ -109,7 +93,7 @@ func (e *AsnlookupEnricher) EnrichAddress(ctx context.Context, ip string) (Addre
 	}
 	e.mu.Unlock()
 
-	result, err := asnlookup.GetWithPrefix(e.withCaches(ctx), e.Resolver, addr)
+	result, err := asnlookup.GetWithPrefix(e.recursionContext(ctx), e.Resolver, addr)
 	out := AddressEnrichment{}
 	if err == nil {
 		if result.Prefix != nil {
@@ -163,7 +147,7 @@ func (e *AsnlookupEnricher) EnrichASNLabel(ctx context.Context, asn int64) (stri
 	}
 	e.mu.Unlock()
 
-	info, err := asnlookup.LookupASNInfo(e.withCaches(ctx), e.Resolver, int(asn))
+	info, err := asnlookup.LookupASNInfo(e.recursionContext(ctx), e.Resolver, int(asn))
 	label := ""
 	if err == nil && info.Code == asnlookup.CodeFound {
 		label = info.Label

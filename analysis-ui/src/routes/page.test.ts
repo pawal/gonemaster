@@ -291,10 +291,14 @@ function overviewData(overrides: Partial<OverviewPageData> = {}): OverviewPageDa
     topASNs: [{ asn: 64500, label: "Example AS", domain_count: 48 }],
     severityTrend: {
       points: [
-        { slug: "s1", captured_at: "s1", payload: { ok: 70, critical: 30 } },
-        { slug: "s2", captured_at: "s2", payload: { ok: 100, critical: 20 } }
+        { slug: "s1", captured_at: "s1", payload: { ok: 40, notice: 30, critical: 30 } },
+        { slug: "s2", captured_at: "s2", payload: { ok: 60, notice: 30, critical: 30 } }
       ],
-      keyMeta: { ok: { label: "OK", tone: "ok", order: 0 }, critical: { label: "Crit", tone: "critical", order: 5 } }
+      keyMeta: {
+        ok: { label: "OK", tone: "ok", order: 0 },
+        notice: { label: "Notice", tone: "notice", order: 1 },
+        critical: { label: "Crit", tone: "critical", order: 5 }
+      }
     },
     gradeTrend: {
       points: [{ slug: "s2", captured_at: "s2", payload: { "A+": 10, A: 20, B: 90 } }],
@@ -337,6 +341,26 @@ describe("overview page rendering", () => {
     // at s2 = 50/120 = 41.7%.
     expect(hero.getByText("Signed")).toBeInTheDocument();
     expect(hero.getByText("41.7%")).toBeInTheDocument();
+  });
+
+  it("counts OK and NOTICE domains as healthy, not just the OK bucket", () => {
+    render(OverviewPage, { data: overviewData() });
+    const hero = within(screen.getByLabelText("Cohort headline metrics"));
+    // s2 = ok 60 + notice 30 + critical 30. Healthy = (60+30)/120 = 75%,
+    // not 60/120 = 50% that OK-only would give.
+    expect(hero.getByText("75%")).toBeInTheDocument();
+  });
+
+  it("explains each hero tile on hover and for screen readers", () => {
+    render(OverviewPage, { data: overviewData() });
+    const healthyTile = screen.getByText("Healthy").closest(".hero-tile");
+    // Native title drives the hover tooltip.
+    expect(healthyTile?.getAttribute("title")).toMatch(/WARNING level or worse/);
+    // A visually-hidden copy carries the same help to assistive tech.
+    expect(healthyTile?.querySelector(".sr-only")?.textContent).toMatch(/WARNING level or worse/);
+    // Every rendered tile carries a help title.
+    const tiles = within(screen.getByLabelText("Cohort headline metrics")).getAllByRole("link");
+    expect(tiles.every((t) => (t.getAttribute("title") ?? "").length > 0)).toBe(true);
   });
 
   it("shows single-provider concentration in the infra cards", () => {

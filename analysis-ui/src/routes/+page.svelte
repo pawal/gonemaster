@@ -39,8 +39,11 @@
 
   // ── Hero metrics: latest value + movement + sparkline per tile. ──────────
   const domainsMetric = $derived(summarizeMetric(seriesTotals(data.severityTrend.points)));
+  // Healthy = worst level below WARNING (OK or NOTICE); OK alone reads ~0%.
   const healthyMetric = $derived(
-    summarizeMetric(seriesShareByTone(data.severityTrend.points, data.severityTrend.keyMeta, ["ok"]))
+    summarizeMetric(
+      seriesShareByTone(data.severityTrend.points, data.severityTrend.keyMeta, ["ok", "notice"])
+    )
   );
   const topGradeMetric = $derived(
     summarizeMetric(seriesShareByKeys(data.gradeTrend.points, ["A+", "A"]))
@@ -49,6 +52,14 @@
   const signedMetric = $derived(
     summarizeMetric(seriesShareExcludingKeys(data.dnssecTrend.points, ["unsigned"]))
   );
+
+  // Hover + screen-reader help per hero tile.
+  const HERO_HELP = {
+    domains: "Total domains in this cohort's latest snapshot.",
+    healthy: "Share of domains with no findings at WARNING level or worse.",
+    grade: "Share of domains graded A or A+ by the scoring engine.",
+    signed: "Share of domains with DNSSEC enabled (any posture except unsigned)."
+  };
 
   // Single-provider concentration: the leading nameserver / ASN's share of
   // domains. Exact (one entity's domain count over the total), unlike a
@@ -278,7 +289,7 @@
     </section>
   {:else}
     <section class="hero" aria-label="Cohort headline metrics">
-      <a class="hero-tile" href={`${base}/domains${query}`}>
+      <a class="hero-tile" href={`${base}/domains${query}`} title={HERO_HELP.domains}>
         <span class="hero-label">Domains</span>
         <span class="hero-value">{formatCount(domainCount)}</span>
         <span class="hero-foot">
@@ -289,9 +300,10 @@
             <Sparkline values={domainsMetric.values} tone="neutral" ariaLabel="Domain count trend" />
           {/if}
         </span>
+        <span class="sr-only">{HERO_HELP.domains}</span>
       </a>
       {#if healthyMetric.latest !== null}
-        <a class="hero-tile" href={`${base}/trends?category=severity${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`}>
+        <a class="hero-tile" href={`${base}/trends?category=severity${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`} title={HERO_HELP.healthy}>
           <span class="hero-label">Healthy</span>
           <span class="hero-value">{healthyMetric.latest}%</span>
           <span class="hero-foot">
@@ -302,10 +314,11 @@
               <Sparkline values={healthyMetric.values} tone="ok" yDomain={[0, 100]} ariaLabel="Healthy share trend" />
             {/if}
           </span>
+          <span class="sr-only">{HERO_HELP.healthy}</span>
         </a>
       {/if}
       {#if topGradeMetric.latest !== null}
-        <a class="hero-tile" href={`${base}/trends?category=grade${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`}>
+        <a class="hero-tile" href={`${base}/trends?category=grade${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`} title={HERO_HELP.grade}>
           <span class="hero-label">Grade A / A+</span>
           <span class="hero-value">{topGradeMetric.latest}%</span>
           <span class="hero-foot">
@@ -316,10 +329,11 @@
               <Sparkline values={topGradeMetric.values} tone="ok" yDomain={[0, 100]} ariaLabel="Top-grade share trend" />
             {/if}
           </span>
+          <span class="sr-only">{HERO_HELP.grade}</span>
         </a>
       {/if}
       {#if signedMetric.latest !== null}
-        <a class="hero-tile" href={`${base}/trends?category=dnssec_posture${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`}>
+        <a class="hero-tile" href={`${base}/trends?category=dnssec_posture${data.datasetTag ? `&dataset_tag=${data.datasetTag}` : ""}`} title={HERO_HELP.signed}>
           <span class="hero-label">Signed</span>
           <span class="hero-value">{signedMetric.latest}%</span>
           <span class="hero-foot">
@@ -330,6 +344,7 @@
               <Sparkline values={signedMetric.values} tone="notice" yDomain={[0, 100]} ariaLabel="Signed share trend" />
             {/if}
           </span>
+          <span class="sr-only">{HERO_HELP.signed}</span>
         </a>
       {/if}
     </section>

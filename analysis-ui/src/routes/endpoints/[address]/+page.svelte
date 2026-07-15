@@ -5,7 +5,7 @@
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
-  import { formatCount } from "$lib/format";
+  import { formatCount, formatMs } from "$lib/format";
   import type { EndpointDetailPageData } from "./+page";
 
   let { data }: { data: EndpointDetailPageData } = $props();
@@ -54,6 +54,12 @@
 
     <dl class="detail-counts">
       <div><dt>Domains</dt><dd>{formatCount(d.domain_count)}</dd></div>
+      {#if d.latency_p50_ms != null}
+        <div><dt>Median latency</dt><dd title={`${d.latency_samples ?? 0} observations`}>{formatMs(d.latency_p50_ms)}</dd></div>
+        {#if d.latency_p95_ms != null}
+          <div><dt>p95 latency</dt><dd>{formatMs(d.latency_p95_ms)}</dd></div>
+        {/if}
+      {/if}
     </dl>
   </section>
 

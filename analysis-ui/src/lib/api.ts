@@ -257,7 +257,7 @@ export type EndpointDetail = {
   prefix?: string;
   domain_count: number;
   domains: string[];
-};
+} & LatencyFields;
 
 export type PrefixDetail = {
   prefix: string;
@@ -278,7 +278,7 @@ export type NameserverDetail = {
   addresses: string[];
   domains: string[];
   asns: number[];
-};
+} & LatencyFields;
 
 export type ASNDetail = {
   asn: number;
@@ -290,7 +290,7 @@ export type ASNDetail = {
   domains: string[];
   nameservers: string[];
   prefixes: string[];
-};
+} & LatencyFields;
 
 export type TagDetail = {
   tag: string;

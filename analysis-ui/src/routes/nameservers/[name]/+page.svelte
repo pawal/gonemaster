@@ -4,7 +4,7 @@
   import ASNChip from "$lib/chips/ASNChip.svelte";
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
-  import { formatCount } from "$lib/format";
+  import { formatCount, formatMs } from "$lib/format";
   import { idnToUnicode } from "$lib/idn";
   import type { NameserverDetailPageData } from "./+page";
 
@@ -49,6 +49,12 @@
       <div><dt>Endpoints</dt><dd>{formatCount(d.endpoint_count)}</dd></div>
       <div><dt>IPv4</dt><dd>{formatCount(d.ipv4_count)}</dd></div>
       <div><dt>IPv6</dt><dd>{formatCount(d.ipv6_count)}</dd></div>
+      {#if d.latency_p50_ms != null}
+        <div><dt>Median latency</dt><dd title={`${d.latency_samples ?? 0} observations`}>{formatMs(d.latency_p50_ms)}</dd></div>
+        {#if d.latency_p95_ms != null}
+          <div><dt>p95 latency</dt><dd>{formatMs(d.latency_p95_ms)}</dd></div>
+        {/if}
+      {/if}
     </dl>
   </section>
 

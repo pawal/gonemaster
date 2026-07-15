@@ -82,14 +82,27 @@ func testBackends(t *testing.T) []testBackend {
 	return backends
 }
 
-// resetSchema drops all application tables so tests start from a clean state
-// on persistent backends (PostgreSQL, MariaDB).
+// resetSchema drops every application table so tests start from a clean state
+// on persistent backends (PostgreSQL, MariaDB). It must list every table the
+// migrations create - a table left behind here keeps its old schema, so a
+// later ALTER migration re-run fails with "column already exists". Keep this
+// in sync with the CREATE TABLE statements in store_sql_migrate.go.
 func resetSchema(db *sql.DB) error {
 	for _, tbl := range []string{
-		"analysis_cohort_snapshot_aggregates",
+		"analysis_cohort_snapshot_aggregates", // legacy, pre-view-table name
+		"analysis_snapshot_overview_view",
+		"analysis_snapshot_nameserver_view",
+		"analysis_snapshot_endpoint_view",
+		"analysis_snapshot_asn_view",
+		"analysis_snapshot_domain_view",
+		"analysis_snapshot_prefix_view",
+		"analysis_snapshot_tag_view",
 		"analysis_cohort_snapshots",
 		"analysis_projection_state",
 		"analysis_run_domain_summary",
+		"analysis_run_domain_facts",
+		"analysis_run_tag_summary",
+		"analysis_run_domain_asns",
 		"analysis_run_address_asns",
 		"analysis_run_ns_endpoints",
 		"analysis_asns",
@@ -97,6 +110,7 @@ func resetSchema(db *sql.DB) error {
 		"analysis_addresses",
 		"analysis_nameservers",
 		"analysis_cohort_catalog",
+		"run_dnssec_chain",
 		"entries", "runs", "domain_tags", "domains", "tags", "jobs", "batches", "profiles", "settings", "schema_migrations",
 	} {
 		if _, err := db.Exec("DROP TABLE IF EXISTS " + tbl); err != nil {
@@ -266,6 +280,33 @@ func TestRunMigrationsUsesDialectPlaceholder(t *testing.T) {
 	}
 	if spy.placeholderCalls == 0 {
 		t.Fatal("runMigrations did not call dialect.Placeholder")
+	}
+}
+
+// TestResetSchemaAllowsMigrationRerun reproduces the persistent-backend reset
+// cycle (drop everything, re-run migrations) on a single shared in-memory
+// SQLite DB. If resetSchema leaves a table behind, that table keeps its old
+// schema and a later ALTER migration re-run fails with a duplicate-column
+// error - the exact failure the v5 latency columns hit on PostgreSQL/MariaDB
+// because the snapshot view tables were missing from resetSchema.
+func TestResetSchemaAllowsMigrationRerun(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	// A single connection keeps the :memory: database alive across the reset
+	// so leftover tables would persist, just like a real shared backend.
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("first runMigrations: %v", err)
+	}
+	if err := resetSchema(db); err != nil {
+		t.Fatalf("resetSchema: %v", err)
+	}
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations after reset must succeed on a fully dropped schema: %v", err)
 	}
 }
 

@@ -76,6 +76,27 @@ func TestEnrichASNLabelAttachesNameserverCache(t *testing.T) {
 	}
 }
 
+// A repeated lookup for the same address within the TTL must be served from the
+// enricher's own cache rather than re-querying the resolver. This is what makes
+// the month-long TTL configured in the server meaningful: a stable ASN/prefix
+// mapping is resolved once, not on every cohort rebuild.
+func TestEnrichAddressCachesWithinTTL(t *testing.T) {
+	withCymruProfile(t)
+	rr := &recordingResolver{}
+	e := NewAsnlookupEnricher(rr, time.Hour)
+
+	e.EnrichAddress(context.Background(), "8.8.8.8")
+	afterFirst := len(rr.contexts())
+	if afterFirst == 0 {
+		t.Fatal("first lookup never reached the resolver")
+	}
+
+	e.EnrichAddress(context.Background(), "8.8.8.8")
+	if afterSecond := len(rr.contexts()); afterSecond != afterFirst {
+		t.Fatalf("second lookup re-queried the resolver (%d calls vs %d); result was not cached", afterSecond, afterFirst)
+	}
+}
+
 // withCymruProfile installs a default (Cymru) effective profile so the ASN
 // lookup gets past its style/sources guards and actually reaches the resolver,
 // then restores the prior effective profile when the test ends.

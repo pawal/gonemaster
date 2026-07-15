@@ -402,7 +402,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		// the recursor (e.g. network misconfiguration at startup) just
 		// leaves projection un-enriched instead of refusing to run.
 		if rec, err := recursor.New(); err == nil {
-			ctrl.SetEnricher(analysis.NewAsnlookupEnricher(rec, 0))
+			// ASN/prefix mappings change rarely, so cache results a month.
+			ctrl.SetEnricher(analysis.NewAsnlookupEnricher(rec, 30*24*time.Hour))
 		} else {
 			fmt.Fprintf(errOut, "analysis: enrichment disabled: %v\n", err)
 		}

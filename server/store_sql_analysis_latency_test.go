@@ -1,6 +1,8 @@
 package server
 
 import (
+	"encoding/json"
+	"net/http"
 	"testing"
 	"time"
 )
@@ -147,5 +149,48 @@ func TestComputeSnapshotEntityViewsAggregatesLatency(t *testing.T) {
 				t.Errorf("asn 64496 p50 = %v, want 20", asn.LatencyP50MS)
 			}
 		})
+	}
+}
+
+// TestPublicNameserverListSurfacesLatency proves the aggregated latency is
+// carried all the way out to the public nameserver list JSON.
+func TestPublicNameserverListSurfacesLatency(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	now := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	f.seedEndpoint("run-lat", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+
+	// Re-emit the run's endpoint with a real response time, then rebuild views.
+	dom, _ := f.store.GetOrCreateDomain("a.example")
+	ns, _ := f.store.UpsertAnalysisNameserver("ns1.example", now)
+	addr, _ := f.store.UpsertAnalysisAddress("192.0.2.1", "ipv4", now)
+	if err := f.store.ReplaceAnalysisRunNSEndpoints(f.cohort.ID, "run-lat", []AnalysisRunNameserverEndpoint{
+		{CohortID: f.cohort.ID, RunID: "run-lat", DomainID: dom.ID, NameserverID: ns.ID, AddressID: addr.ID, Role: "authoritative", Family: "ipv4", QueryCount: 1, AvgMS: 15},
+	}); err != nil {
+		t.Fatalf("reseed endpoint with latency: %v", err)
+	}
+	f.refreshSnapshotViews(f.batchID)
+
+	resp := getPublic(t, f.srv, f.publicURL("nameservers"))
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
+	}
+	var got PublicAnalysisListResponse[PublicAnalysisNameserverView]
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	var ns1 *PublicAnalysisNameserverView
+	for i := range got.Items {
+		if got.Items[i].Nameserver == "ns1.example" {
+			ns1 = &got.Items[i]
+		}
+	}
+	if ns1 == nil {
+		t.Fatalf("ns1.example missing from list: %+v", got.Items)
+	}
+	if ns1.LatencyP50MS == nil || *ns1.LatencyP50MS != 15 {
+		t.Errorf("ns1 latency_p50_ms = %v, want 15", ns1.LatencyP50MS)
+	}
+	if ns1.LatencySamples != 1 {
+		t.Errorf("ns1 latency_samples = %d, want 1", ns1.LatencySamples)
 	}
 }

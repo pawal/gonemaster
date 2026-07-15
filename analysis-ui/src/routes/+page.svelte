@@ -127,13 +127,11 @@
     const t = data.totals;
     if (!t) return [];
     // Domains lead the hero tiles, so the entity row covers the rest.
-    // Prefixes have no list view (folded into the Addresses tab), so the
-    // count shows without a link rather than pointing at a dead route.
     return [
       { label: "Nameservers", value: t.nameserver_count, href: "/nameservers" },
       { label: "Endpoints", value: t.endpoint_count, href: "/endpoints" },
       { label: "ASNs", value: t.asn_count, href: "/asns" },
-      { label: "Prefixes", value: t.prefix_count, href: null }
+      { label: "Prefixes", value: t.prefix_count, href: "/prefixes" }
     ];
   });
 

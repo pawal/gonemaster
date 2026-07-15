@@ -403,13 +403,13 @@ describe("overview page rendering", () => {
     expect(pill.queryByRole("link", { name: /diff vs previous/i })).toBeNull();
   });
 
-  it("shows the prefix count without linking to the removed prefixes list", () => {
+  it("links the prefix count to the prefixes list", () => {
     render(OverviewPage, { data: overviewData() });
-    // Prefixes has no list route, so its tile is a plain element, not a link.
+    // Prefixes has a browsable list route again, so its tile is a real link.
     const prefixCard = screen.getByText("Prefixes").closest(".summary-card");
-    expect(prefixCard?.tagName).toBe("DIV");
-    expect(prefixCard?.getAttribute("href")).toBeNull();
-    // Sibling entity cards that do have list routes stay real links.
+    expect(prefixCard?.tagName).toBe("A");
+    expect(prefixCard?.getAttribute("href")).toContain("/prefixes");
+    // Sibling entity cards that also have list routes stay real links.
     const nsCard = screen.getByText("Nameservers").closest(".summary-card");
     expect(nsCard?.tagName).toBe("A");
   });

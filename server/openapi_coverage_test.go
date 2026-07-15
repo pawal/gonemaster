@@ -289,6 +289,7 @@ func TestOpenAPICoversRecentServerRoutes(t *testing.T) {
 		"/pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots:",
 		"/pub/api/v1/analysis/cohorts/{dataset_tag}/trends:",
 		"/pub/api/v1/analysis/cohorts/{dataset_tag}/diff:",
+		"/pub/api/v1/analysis/cohorts/{dataset_tag}/history:",
 		"snapshot_intent:",
 		"AnalysisCohort:",
 		"AnalysisCohortSnapshot:",

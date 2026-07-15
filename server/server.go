@@ -374,6 +374,7 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}", s.handlePublicAnalysisSnapshotDetail)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/trends", s.handlePublicAnalysisTrends)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/diff", s.handlePublicAnalysisDiff)
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/history", s.handlePublicAnalysisEntityHistory)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}", s.handlePublicAnalysisCohortDetail)
 	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", pubMux)
 	if d := s.cfg.PublicAPI.AnalysisRequestTimeout.Duration; d > 0 {

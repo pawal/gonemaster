@@ -38,6 +38,7 @@ type AnalysisReadStore interface {
 	GetSnapshotASNView(snapshotID, asn int64) (AnalysisSnapshotASNView, bool)
 	ListSnapshotPrefixViews(snapshotID int64) []AnalysisSnapshotPrefixView
 	GetSnapshotPrefixView(snapshotID int64, prefix string) (AnalysisSnapshotPrefixView, bool)
+	AnalysisEntityHistory(cohortID int64, entity, key string) ([]AnalysisEntityHistoryPoint, error)
 }
 
 // analysisListFilter captures the shared query parameters used by public list

@@ -577,6 +577,18 @@ type AnalysisSnapshotASNView struct {
 	Prefixes       []string `json:"prefixes,omitempty"`
 }
 
+// AnalysisEntityHistoryPoint is one entity's value in one snapshot.
+// Present is false for snapshots where the entity was absent.
+type AnalysisEntityHistoryPoint struct {
+	Slug         string    `json:"slug"`
+	CapturedAt   time.Time `json:"captured_at"`
+	Present      bool      `json:"present"`
+	DomainCount  int       `json:"domain_count"`
+	LatencyP50MS *float64  `json:"latency_p50_ms,omitempty"`
+	Score        *int      `json:"score,omitempty"`
+	Grade        string    `json:"grade,omitempty"`
+}
+
 // AnalysisSnapshotPrefixView is one pre-computed prefix row for a
 // captured snapshot, serving the prefix detail and listing pages.
 type AnalysisSnapshotPrefixView struct {

@@ -36,8 +36,10 @@ func TestSnapshotPathOverviewServesContent(t *testing.T) {
 	if got.DatasetTag != "tld" {
 		t.Errorf("DatasetTag = %q", got.DatasetTag)
 	}
-	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "immutable") {
-		t.Errorf("Cache-Control = %q, want immutable on path-segmented URL", cc)
+	// Snapshots can be rebuilt under the same slug, so the response must not be
+	// immutable; it revalidates via the ETag, which changes on rebuild.
+	if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {
+		t.Errorf("Cache-Control = %q, must not be immutable on path-segmented URL", cc)
 	}
 	if etag := resp.Header().Get("ETag"); etag == "" {
 		t.Error("expected ETag on captured snapshot URL")
@@ -65,8 +67,12 @@ func TestSnapshotPathDomainDetailServesContent(t *testing.T) {
 	if got.Domain != "alpha.example" {
 		t.Errorf("Domain = %q", got.Domain)
 	}
-	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "immutable") {
-		t.Errorf("Cache-Control = %q, want immutable", cc)
+	// Rebuildable snapshot: must revalidate via ETag, not be immutable.
+	if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {
+		t.Errorf("Cache-Control = %q, must not be immutable", cc)
+	}
+	if resp.Header().Get("ETag") == "" {
+		t.Error("expected ETag on captured snapshot URL")
 	}
 }
 

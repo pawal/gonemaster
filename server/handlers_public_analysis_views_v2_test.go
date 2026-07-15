@@ -82,8 +82,13 @@ func TestASNDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
-	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "immutable") {
-		t.Errorf("explicit-snapshot Cache-Control = %q, want immutable", cc)
+	// Snapshots can be rebuilt under the same slug, so the response must not be
+	// immutable; it revalidates via the ETag, which changes on rebuild.
+	if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {
+		t.Errorf("explicit-snapshot Cache-Control = %q, must not be immutable", cc)
+	}
+	if resp.Header().Get("ETag") == "" {
+		t.Error("explicit-snapshot response missing ETag for revalidation")
 	}
 }
 

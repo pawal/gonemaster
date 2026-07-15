@@ -80,9 +80,11 @@ func TestPublicAnalysisCacheHeadersExplicitSnapshot(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
 	}
+	// Snapshots can be rebuilt under the same slug, so the response must not be
+	// immutable; it revalidates via the ETag, which changes on rebuild.
 	cc := resp.Header().Get("Cache-Control")
-	if !strings.Contains(cc, "immutable") {
-		t.Errorf("explicit snapshot Cache-Control = %q, want immutable", cc)
+	if strings.Contains(cc, "immutable") {
+		t.Errorf("explicit snapshot Cache-Control = %q, must not be immutable", cc)
 	}
 	if etag := resp.Header().Get("ETag"); etag == "" {
 		t.Error("explicit snapshot must set ETag")

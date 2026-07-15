@@ -8,7 +8,7 @@
   import ASNChip from "$lib/chips/ASNChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import { nameserverHref } from "$lib/entityLinks";
-  import { formatCount } from "$lib/format";
+  import { formatCount, formatMs } from "$lib/format";
   import { updateURLParam } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
   import type { NameserverView } from "$lib/api";
@@ -36,6 +36,8 @@
 
   const rows = $derived((data.list?.items ?? []) as NameserverView[]);
   const search = $derived(page.url.search);
+  // Only show the latency column when the snapshot actually has data for it.
+  const hasLatency = $derived(rows.some((r) => r.latency_p50_ms != null));
 
   function rowClick(event: MouseEvent, href: string) {
     const target = event.target as HTMLElement | null;
@@ -51,7 +53,9 @@
     { key: "endpoint_count", label: "Endpoints", value: (r) => r.endpoint_count },
     { key: "ipv4_count", label: "IPv4", value: (r) => r.ipv4_count },
     { key: "ipv6_count", label: "IPv6", value: (r) => r.ipv6_count },
-    { key: "asn_count", label: "ASNs", value: (r) => r.asn_count }
+    { key: "asn_count", label: "ASNs", value: (r) => r.asn_count },
+    { key: "latency_p50_ms", label: "Latency p50 (ms)", value: (r) => r.latency_p50_ms ?? "" },
+    { key: "latency_p95_ms", label: "Latency p95 (ms)", value: (r) => r.latency_p95_ms ?? "" }
   ];
 
   function filenamePrefix(): string {
@@ -117,6 +121,9 @@
             </th>
             <th scope="col" class="col-num">IPv4</th>
             <th scope="col" class="col-num">IPv6</th>
+            {#if hasLatency}
+              <th scope="col" class="col-num">Latency</th>
+            {/if}
           </tr>
         </thead>
         <tbody>
@@ -136,6 +143,18 @@
               <td class="col-num">{formatCount(row.endpoint_count)}</td>
               <td class="col-num">{formatCount(row.ipv4_count)}</td>
               <td class="col-num">{formatCount(row.ipv6_count)}</td>
+              {#if hasLatency}
+                <td class="col-num">
+                  {#if row.latency_p50_ms != null}
+                    {formatMs(row.latency_p50_ms)}
+                    {#if row.latency_p95_ms != null}
+                      <span class="latency-sub">p95 {formatMs(row.latency_p95_ms)}</span>
+                    {/if}
+                  {:else}
+                    <span class="latency-sub">-</span>
+                  {/if}
+                </td>
+              {/if}
             </tr>
           {/each}
         </tbody>
@@ -154,4 +173,5 @@
     overflow-wrap: anywhere;
   }
   .operator-multi { color: var(--ink-2); font-family: var(--sans); font-style: italic; }
+  .latency-sub { display: block; color: var(--ink-2); font-size: var(--text-xs); font-family: var(--sans); }
 </style>

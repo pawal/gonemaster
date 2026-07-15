@@ -10,7 +10,7 @@
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import { endpointHref } from "$lib/entityLinks";
-  import { formatCount } from "$lib/format";
+  import { formatCount, formatMs } from "$lib/format";
   import { updateURLParam } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
   import type { EndpointView } from "$lib/api";
@@ -31,6 +31,8 @@
 
   const rows = $derived((data.list?.items ?? []) as EndpointView[]);
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
+  // Only show the latency column when the snapshot actually has data for it.
+  const hasLatency = $derived(rows.some((r) => r.latency_p50_ms != null));
 
   const sortSpecs = {
     nameserver: { desc: "nameserver_desc" },
@@ -46,7 +48,9 @@
     { key: "family", label: "Family", value: (r) => r.family },
     { key: "domain_count", label: "Domains", value: (r) => r.domain_count },
     { key: "asn", label: "ASN", value: (r) => r.asn ?? "" },
-    { key: "prefix", label: "Prefix", value: (r) => r.prefix ?? "" }
+    { key: "prefix", label: "Prefix", value: (r) => r.prefix ?? "" },
+    { key: "latency_p50_ms", label: "Latency p50 (ms)", value: (r) => r.latency_p50_ms ?? "" },
+    { key: "latency_p95_ms", label: "Latency p95 (ms)", value: (r) => r.latency_p95_ms ?? "" }
   ];
 
   function filenamePrefix(): string {
@@ -123,6 +127,9 @@
             <th scope="col">
               <SortHeader label="Prefix" spec={sortSpecs.prefix} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
+            {#if hasLatency}
+              <th scope="col" class="col-num">Latency</th>
+            {/if}
           </tr>
         </thead>
         <tbody>
@@ -145,6 +152,18 @@
                   <PrefixChip prefix={row.prefix} />
                 {:else}-{/if}
               </td>
+              {#if hasLatency}
+                <td class="col-num">
+                  {#if row.latency_p50_ms != null}
+                    {formatMs(row.latency_p50_ms)}
+                    {#if row.latency_p95_ms != null}
+                      <span class="latency-sub">p95 {formatMs(row.latency_p95_ms)}</span>
+                    {/if}
+                  {:else}
+                    <span class="latency-sub">-</span>
+                  {/if}
+                </td>
+              {/if}
             </tr>
           {/each}
         </tbody>
@@ -162,4 +181,5 @@
     white-space: normal;
     overflow-wrap: anywhere;
   }
+  .latency-sub { display: block; color: var(--ink-2); font-size: var(--text-xs); font-family: var(--sans); }
 </style>

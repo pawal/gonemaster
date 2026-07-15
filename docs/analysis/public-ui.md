@@ -55,6 +55,15 @@ example "14 domains regressed; DS02_NO_MATCHING_DS appeared on 12 of them".
 The tag section degrades gracefully: if a snapshot has no materialized tag
 view it shows a short notice rather than an error.
 
+## Latency
+
+The nameserver, address, and ASN lists show a Latency column with the median
+(p50) and 95th-percentile response time aggregated from the queries the
+snapshot already recorded (no extra probing). The column only appears when the
+snapshot has latency data; snapshots captured before latency aggregation show
+no column until they are re-materialized (admin "Rebuild aggregates" or a
+cohort rebuild).
+
 ## Empty States
 
 If the UI is empty after a batch finishes, check:

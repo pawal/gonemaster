@@ -135,6 +135,13 @@ export type DomainView = {
   finished_at?: string;
 };
 
+// Latency fields are absent on snapshots captured before latency aggregation.
+export type LatencyFields = {
+  latency_p50_ms?: number;
+  latency_p95_ms?: number;
+  latency_samples?: number;
+};
+
 export type NameserverView = {
   nameserver: string;
   domain_count: number;
@@ -145,7 +152,7 @@ export type NameserverView = {
   operator?: string;
   operator_asn?: number;
   query_count?: number;
-};
+} & LatencyFields;
 
 export type EndpointView = {
   nameserver: string;
@@ -155,7 +162,7 @@ export type EndpointView = {
   asn?: number;
   asn_label?: string;
   prefix?: string;
-};
+} & LatencyFields;
 
 export type ASNView = {
   asn: number;
@@ -166,7 +173,7 @@ export type ASNView = {
   prefix_count: number;
   ipv4_count: number;
   ipv6_count: number;
-};
+} & LatencyFields;
 
 export type PrefixView = {
   prefix: string;

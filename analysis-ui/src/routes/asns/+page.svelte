@@ -7,7 +7,7 @@
   import SortHeader from "$lib/SortHeader.svelte";
   import ASNChip from "$lib/chips/ASNChip.svelte";
   import { asnHref } from "$lib/entityLinks";
-  import { formatCount } from "$lib/format";
+  import { formatCount, formatMs } from "$lib/format";
   import { updateURLParam } from "$lib/filters";
   import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
   import type { ASNView } from "$lib/api";
@@ -36,6 +36,8 @@
 
   const rows = $derived((data.list?.items ?? []) as ASNView[]);
   const search = $derived(page.url.search);
+  // Only show the latency column when the snapshot actually has data for it.
+  const hasLatency = $derived(rows.some((r) => r.latency_p50_ms != null));
 
   function rowClick(event: MouseEvent, href: string) {
     const target = event.target as HTMLElement | null;
@@ -51,7 +53,9 @@
     { key: "nameserver_count", label: "Nameservers", value: (r) => r.nameserver_count },
     { key: "prefix_count", label: "Prefixes", value: (r) => r.prefix_count },
     { key: "ipv4_count", label: "IPv4", value: (r) => r.ipv4_count },
-    { key: "ipv6_count", label: "IPv6", value: (r) => r.ipv6_count }
+    { key: "ipv6_count", label: "IPv6", value: (r) => r.ipv6_count },
+    { key: "latency_p50_ms", label: "Latency p50 (ms)", value: (r) => r.latency_p50_ms ?? "" },
+    { key: "latency_p95_ms", label: "Latency p95 (ms)", value: (r) => r.latency_p95_ms ?? "" }
   ];
 
   function filenamePrefix(): string {
@@ -118,6 +122,9 @@
             <th scope="col" class="col-num">
               <SortHeader label="Prefixes" spec={sortSpecs.prefixCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
+            {#if hasLatency}
+              <th scope="col" class="col-num">Latency</th>
+            {/if}
           </tr>
         </thead>
         <tbody>
@@ -135,6 +142,18 @@
               </td>
               <td class="col-num">{formatCount(row.nameserver_count)}</td>
               <td class="col-num">{formatCount(row.prefix_count)}</td>
+              {#if hasLatency}
+                <td class="col-num">
+                  {#if row.latency_p50_ms != null}
+                    {formatMs(row.latency_p50_ms)}
+                    {#if row.latency_p95_ms != null}
+                      <span class="family-mix">p95 {formatMs(row.latency_p95_ms)}</span>
+                    {/if}
+                  {:else}
+                    <span class="family-mix">-</span>
+                  {/if}
+                </td>
+              {/if}
             </tr>
           {/each}
         </tbody>

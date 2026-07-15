@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatCount,
   formatDate,
+  formatMs,
   formatTimestamp,
   gradeTone,
   levelTone,
@@ -63,6 +64,18 @@ describe("format helpers", () => {
     expect(formatCount(0)).toBe("0");
     const big = formatCount(1234567);
     expect(big.replace(/[,.\u202f\s]/g, "")).toBe("1234567");
+  });
+
+  it("formatMs rounds by magnitude and blanks missing values", () => {
+    // Missing/invalid latency renders as a dash so the UI degrades gracefully.
+    expect(formatMs(null)).toBe("-");
+    expect(formatMs(undefined)).toBe("-");
+    expect(formatMs(NaN)).toBe("-");
+    // Sub-10ms keeps one decimal; larger values round to whole ms.
+    expect(formatMs(0.4)).toBe("0.4 ms");
+    expect(formatMs(9.87)).toBe("9.9 ms");
+    expect(formatMs(15.4)).toBe("15 ms");
+    expect(formatMs(123.6)).toBe("124 ms");
   });
 
   it("levelTone returns stable class suffixes", () => {

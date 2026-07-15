@@ -141,6 +141,21 @@ func nullInt64Value(v *int64) sql.NullInt64 {
 	return sql.NullInt64{Int64: *v, Valid: true}
 }
 
+func nullFloat64Ptr(nf sql.NullFloat64) *float64 {
+	if !nf.Valid {
+		return nil
+	}
+	v := nf.Float64
+	return &v
+}
+
+func nullFloat64Value(v *float64) sql.NullFloat64 {
+	if v == nil {
+		return sql.NullFloat64{}
+	}
+	return sql.NullFloat64{Float64: *v, Valid: true}
+}
+
 // ── job column helpers ────────────────────────────────────────────────────────
 
 const jobCols = `id, domain_id, domain, batch_id, status, created_at, started_at,

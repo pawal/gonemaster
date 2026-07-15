@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"math"
 	"slices"
 	"sort"
 	"strings"
@@ -580,6 +581,8 @@ type batchEndpointRow struct {
 	Address        string
 	Family         string
 	QueryCount     int
+	AvgMS          float64
+	HasAvg         bool // AvgMS is a real, positive measurement.
 }
 
 func (s *SQLJobStore) queryBatchEndpoints(cohortID int64, batchID string) ([]batchEndpointRow, error) {
@@ -588,7 +591,7 @@ func (s *SQLJobStore) queryBatchEndpoints(cohortID int64, batchID string) ([]bat
 				COALESCE(n.name, ''),
 				COALESCE(a.address, ''),
 				COALESCE(a.family, e.family),
-				e.query_count
+				e.query_count, e.avg_ms
 			FROM analysis_run_ns_endpoints e
 			JOIN runs r ON r.id = e.run_id
 			LEFT JOIN analysis_nameservers n ON n.id = e.nameserver_id
@@ -604,16 +607,59 @@ func (s *SQLJobStore) queryBatchEndpoints(cohortID int64, batchID string) ([]bat
 
 	var out []batchEndpointRow
 	for rows.Next() {
-		var row batchEndpointRow
+		var (
+			row   batchEndpointRow
+			avgMS sql.NullFloat64
+		)
 		if err := rows.Scan(
 			&row.NameserverID, &row.AddressID, &row.DomainID,
-			&row.NameserverName, &row.Address, &row.Family, &row.QueryCount,
+			&row.NameserverName, &row.Address, &row.Family, &row.QueryCount, &avgMS,
 		); err != nil {
 			return nil, fmt.Errorf("scan batch endpoint: %w", err)
 		}
+		row.AvgMS = avgMS.Float64
+		row.HasAvg = avgMS.Valid && avgMS.Float64 > 0
 		out = append(out, row)
 	}
 	return out, rows.Err()
+}
+
+// percentileMS returns the linear-interpolated pth (0..100) percentile of
+// samples, or (0, false) when empty.
+func percentileMS(samples []float64, p float64) (float64, bool) {
+	if len(samples) == 0 {
+		return 0, false
+	}
+	s := append([]float64(nil), samples...)
+	sort.Float64s(s)
+	if len(s) == 1 {
+		return s[0], true
+	}
+	rank := (p / 100) * float64(len(s)-1)
+	lo := int(math.Floor(rank))
+	hi := int(math.Ceil(rank))
+	if lo == hi {
+		return s[lo], true
+	}
+	return s[lo] + (s[hi]-s[lo])*(rank-float64(lo)), true
+}
+
+// latencyStats is the aggregated latency for one entity's samples.
+type latencyStats struct {
+	P50     *float64
+	P95     *float64
+	Samples int
+}
+
+func aggregateLatency(samples []float64) latencyStats {
+	out := latencyStats{Samples: len(samples)}
+	if p50, ok := percentileMS(samples, 50); ok {
+		out.P50 = &p50
+	}
+	if p95, ok := percentileMS(samples, 95); ok {
+		out.P95 = &p95
+	}
+	return out
 }
 
 func (s *SQLJobStore) queryBatchAddressASNs(cohortID int64, batchID string) ([]AnalysisRunAddressASN, error) {
@@ -730,6 +776,7 @@ func buildNameserverViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunA
 		asns           map[int64]struct{}
 		addressLiteral map[int64]string
 		queryCount     int
+		latency        []float64
 	}
 	buckets := map[int64]*bucket{}
 	for _, ep := range endpoints {
@@ -747,6 +794,9 @@ func buildNameserverViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunA
 			buckets[ep.NameserverID] = b
 		}
 		b.domains[ep.DomainID] = struct{}{}
+		if ep.HasAvg {
+			b.latency = append(b.latency, ep.AvgMS)
+		}
 		if ep.AddressID == 0 {
 			continue
 		}
@@ -777,6 +827,10 @@ func buildNameserverViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunA
 			ASNCount:       len(b.asns),
 			QueryCount:     b.queryCount,
 		}
+		lat := aggregateLatency(b.latency)
+		view.LatencyP50MS = lat.P50
+		view.LatencyP95MS = lat.P95
+		view.LatencySamples = lat.Samples
 		switch len(b.asns) {
 		case 0:
 		case 1:
@@ -831,6 +885,7 @@ func buildEndpointViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAdd
 		address string
 		family  string
 		domains map[int64]struct{}
+		latency []float64
 	}
 	buckets := map[key]*bucket{}
 	for _, ep := range endpoints {
@@ -849,6 +904,9 @@ func buildEndpointViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAdd
 			buckets[k] = b
 		}
 		b.domains[ep.DomainID] = struct{}{}
+		if ep.HasAvg {
+			b.latency = append(b.latency, ep.AvgMS)
+		}
 	}
 	out := make([]AnalysisSnapshotEndpointView, 0, len(buckets))
 	for k, b := range buckets {
@@ -860,6 +918,10 @@ func buildEndpointViews(endpoints []batchEndpointRow, addrFacts []AnalysisRunAdd
 			Family:         b.family,
 			DomainCount:    len(b.domains),
 		}
+		lat := aggregateLatency(b.latency)
+		v.LatencyP50MS = lat.P50
+		v.LatencyP95MS = lat.P95
+		v.LatencySamples = lat.Samples
 		asnSet := map[int64]struct{}{}
 		prefixSet := map[string]struct{}{}
 		for _, f := range factsByAddr[k.addrID] {
@@ -909,9 +971,13 @@ func buildASNViews(
 	asnByID, prefixByID, domainNames, nameserverNames map[int64]string,
 ) []AnalysisSnapshotASNView {
 	addrFamily := map[int64]string{}
+	addrLatency := map[int64][]float64{}
 	for _, ep := range endpoints {
 		if ep.AddressID != 0 && ep.Family != "" {
 			addrFamily[ep.AddressID] = ep.Family
+		}
+		if ep.AddressID != 0 && ep.HasAvg {
+			addrLatency[ep.AddressID] = append(addrLatency[ep.AddressID], ep.AvgMS)
 		}
 	}
 	addrToNS := map[int64]map[int64]struct{}{}
@@ -993,6 +1059,15 @@ func buildASNViews(
 			IPv4Count:       len(b.ipv4),
 			IPv6Count:       len(b.ipv6),
 		}
+		var samples []float64
+		for addrID := range b.addresses {
+			samples = append(samples, addrLatency[addrID]...)
+		}
+		lat := aggregateLatency(samples)
+		v.LatencyP50MS = lat.P50
+		v.LatencyP95MS = lat.P95
+		v.LatencySamples = lat.Samples
+
 		domains := make([]string, 0, len(b.domains))
 		for id := range b.domains {
 			if name, ok := domainNames[id]; ok && name != "" {
@@ -1166,10 +1241,12 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 			fmt.Sprintf(`INSERT INTO analysis_snapshot_nameserver_view
 				(snapshot_id, nameserver_id, nameserver_name, domain_count, endpoint_count,
 				 ipv4_count, ipv6_count, asn_count, operator, operator_asn, query_count,
+				 latency_p50_ms, latency_p95_ms, latency_samples,
 				 addresses_json, asns_json, domains_json)
-				VALUES (%s)`, s.phRange(1, 14)),
+				VALUES (%s)`, s.phRange(1, 17)),
 			snapshotID, v.NameserverID, v.NameserverName, v.DomainCount, v.EndpointCount,
 			v.IPv4Count, v.IPv6Count, v.ASNCount, v.Operator, nullInt64Value(v.OperatorASN), v.QueryCount,
+			nullFloat64Value(v.LatencyP50MS), nullFloat64Value(v.LatencyP95MS), v.LatencySamples,
 			addressesJSON, asnsJSON, domainsJSON,
 		); err != nil {
 			_ = tx.Rollback()
@@ -1185,10 +1262,12 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 		if _, err := tx.Exec(
 			fmt.Sprintf(`INSERT INTO analysis_snapshot_endpoint_view
 				(snapshot_id, nameserver_id, address_id, nameserver_name, address, family,
-				 domain_count, asn, asn_label, prefix, domains_json)
-				VALUES (%s)`, s.phRange(1, 11)),
+				 domain_count, asn, asn_label, prefix,
+				 latency_p50_ms, latency_p95_ms, latency_samples, domains_json)
+				VALUES (%s)`, s.phRange(1, 14)),
 			snapshotID, v.NameserverID, v.AddressID, v.NameserverName, v.Address, v.Family,
-			v.DomainCount, nullInt64Value(v.ASN), v.ASNLabel, v.Prefix, domainsJSON,
+			v.DomainCount, nullInt64Value(v.ASN), v.ASNLabel, v.Prefix,
+			nullFloat64Value(v.LatencyP50MS), nullFloat64Value(v.LatencyP95MS), v.LatencySamples, domainsJSON,
 		); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("insert endpoint view ns=%d addr=%d: %w", v.NameserverID, v.AddressID, err)
@@ -1214,10 +1293,12 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 			fmt.Sprintf(`INSERT INTO analysis_snapshot_asn_view
 				(snapshot_id, asn, label, domain_count, address_count, nameserver_count,
 				 prefix_count, ipv4_count, ipv6_count,
+				 latency_p50_ms, latency_p95_ms, latency_samples,
 				 domains_json, nameservers_json, prefixes_json)
-				VALUES (%s)`, s.phRange(1, 12)),
+				VALUES (%s)`, s.phRange(1, 15)),
 			snapshotID, v.ASN, v.Label, v.DomainCount, v.AddressCount, v.NameserverCount,
 			v.PrefixCount, v.IPv4Count, v.IPv6Count,
+			nullFloat64Value(v.LatencyP50MS), nullFloat64Value(v.LatencyP95MS), v.LatencySamples,
 			domainsJSON, nsJSON, prefixesJSON,
 		); err != nil {
 			_ = tx.Rollback()
@@ -1382,25 +1463,34 @@ func unmarshalDomainTags(raw string) []DomainViewTag {
 
 const analysisSnapshotNameserverViewCols = `snapshot_id, nameserver_id, nameserver_name,
 	domain_count, endpoint_count, ipv4_count, ipv6_count, asn_count,
-	operator, operator_asn, query_count, addresses_json, asns_json, domains_json`
+	operator, operator_asn, query_count,
+	latency_p50_ms, latency_p95_ms, latency_samples,
+	addresses_json, asns_json, domains_json`
 
 func scanSnapshotNameserverView(row rowScanner) (AnalysisSnapshotNameserverView, error) {
 	var (
-		v             AnalysisSnapshotNameserverView
-		operatorASN   sql.NullInt64
-		addressesJSON string
-		asnsJSON      string
-		domainsJSON   string
+		v              AnalysisSnapshotNameserverView
+		operatorASN    sql.NullInt64
+		latencyP50     sql.NullFloat64
+		latencyP95     sql.NullFloat64
+		latencySamples sql.NullInt64
+		addressesJSON  string
+		asnsJSON       string
+		domainsJSON    string
 	)
 	if err := row.Scan(
 		&v.SnapshotID, &v.NameserverID, &v.NameserverName,
 		&v.DomainCount, &v.EndpointCount, &v.IPv4Count, &v.IPv6Count, &v.ASNCount,
 		&v.Operator, &operatorASN, &v.QueryCount,
+		&latencyP50, &latencyP95, &latencySamples,
 		&addressesJSON, &asnsJSON, &domainsJSON,
 	); err != nil {
 		return AnalysisSnapshotNameserverView{}, err
 	}
 	v.OperatorASN = nullInt64Ptr(operatorASN)
+	v.LatencyP50MS = nullFloat64Ptr(latencyP50)
+	v.LatencyP95MS = nullFloat64Ptr(latencyP95)
+	v.LatencySamples = int(latencySamples.Int64)
 	v.Addresses = unmarshalStringList(addressesJSON)
 	v.ASNs = unmarshalInt64List(asnsJSON)
 	v.Domains = unmarshalStringList(domainsJSON)
@@ -1453,21 +1543,29 @@ func (s *SQLJobStore) GetSnapshotNameserverViewByName(snapshotID int64, name str
 }
 
 const analysisSnapshotEndpointViewCols = `snapshot_id, nameserver_id, address_id, nameserver_name,
-	address, family, domain_count, asn, asn_label, prefix, domains_json`
+	address, family, domain_count, asn, asn_label, prefix,
+	latency_p50_ms, latency_p95_ms, latency_samples, domains_json`
 
 func scanSnapshotEndpointView(row rowScanner) (AnalysisSnapshotEndpointView, error) {
 	var (
-		v           AnalysisSnapshotEndpointView
-		asn         sql.NullInt64
-		domainsJSON string
+		v              AnalysisSnapshotEndpointView
+		asn            sql.NullInt64
+		latencyP50     sql.NullFloat64
+		latencyP95     sql.NullFloat64
+		latencySamples sql.NullInt64
+		domainsJSON    string
 	)
 	if err := row.Scan(
 		&v.SnapshotID, &v.NameserverID, &v.AddressID, &v.NameserverName,
-		&v.Address, &v.Family, &v.DomainCount, &asn, &v.ASNLabel, &v.Prefix, &domainsJSON,
+		&v.Address, &v.Family, &v.DomainCount, &asn, &v.ASNLabel, &v.Prefix,
+		&latencyP50, &latencyP95, &latencySamples, &domainsJSON,
 	); err != nil {
 		return AnalysisSnapshotEndpointView{}, err
 	}
 	v.ASN = nullInt64Ptr(asn)
+	v.LatencyP50MS = nullFloat64Ptr(latencyP50)
+	v.LatencyP95MS = nullFloat64Ptr(latencyP95)
+	v.LatencySamples = int(latencySamples.Int64)
 	v.Domains = unmarshalStringList(domainsJSON)
 	return v, nil
 }
@@ -1531,22 +1629,30 @@ func (s *SQLJobStore) ListSnapshotEndpointViewsByAddress(snapshotID int64, addre
 
 const analysisSnapshotASNViewCols = `snapshot_id, asn, label, domain_count, address_count,
 	nameserver_count, prefix_count, ipv4_count, ipv6_count,
+	latency_p50_ms, latency_p95_ms, latency_samples,
 	domains_json, nameservers_json, prefixes_json`
 
 func scanSnapshotASNView(row rowScanner) (AnalysisSnapshotASNView, error) {
 	var (
-		v           AnalysisSnapshotASNView
-		domainsJSON string
-		nsJSON      string
-		prefixJSON  string
+		v              AnalysisSnapshotASNView
+		latencyP50     sql.NullFloat64
+		latencyP95     sql.NullFloat64
+		latencySamples sql.NullInt64
+		domainsJSON    string
+		nsJSON         string
+		prefixJSON     string
 	)
 	if err := row.Scan(
 		&v.SnapshotID, &v.ASN, &v.Label, &v.DomainCount, &v.AddressCount,
 		&v.NameserverCount, &v.PrefixCount, &v.IPv4Count, &v.IPv6Count,
+		&latencyP50, &latencyP95, &latencySamples,
 		&domainsJSON, &nsJSON, &prefixJSON,
 	); err != nil {
 		return AnalysisSnapshotASNView{}, err
 	}
+	v.LatencyP50MS = nullFloat64Ptr(latencyP50)
+	v.LatencyP95MS = nullFloat64Ptr(latencyP95)
+	v.LatencySamples = int(latencySamples.Int64)
 	v.Domains = unmarshalStringList(domainsJSON)
 	v.Nameservers = unmarshalStringList(nsJSON)
 	v.Prefixes = unmarshalStringList(prefixJSON)

@@ -2,9 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.6.2] - 2026-07-16
 
-Reworks the public analysis dashboards: a stat-tile overview, a focus mode and top movers in trends, a richer snapshot diff, latency and history on entity pages, keyboard shortcuts, and honest exports.
+Reworks the public analysis dashboards: a stat-tile overview, a focus mode and top movers in trends, a richer snapshot diff, latency and history on entity pages, keyboard shortcuts, and honest exports. Adds a one-click way to run a cohort snapshot and make it the default, and updates the bundled DNS library.
 
 ### Added
 
@@ -16,12 +16,14 @@ Reworks the public analysis dashboards: a stat-tile overview, a focus mode and t
 - analysis-ui, server: per-entity history sparklines on the nameserver, ASN, tag, and domain detail pages
 - analysis-ui: keyboard shortcuts - g then a letter to jump between sections, / to focus search, ? for a help overlay
 - analysis-ui: a top navigation progress bar during blocking loads, and a restored prefixes list page
+- admin-ui, server: a "Run + set as default" option next to "Run new snapshot" on the cohorts page - it runs a snapshot and pins it as the cohort's default as soon as it finishes capturing
 
 ### Changed
 
 - analysis-ui: exports cover the whole filtered set (up to the 500-row server limit) and state the row count, instead of only the rows on screen
 - analysis-ui: shared empty-state styling, accessible distribution bars (screen-reader counts, ellipsis on squeezed segments), and grade/severity colours moved to themeable tokens with dark-mode fixes
 - server: revalidate analysis snapshot responses with ETags instead of marking them immutable
+- server, engine: update the bundled DNS library (miekg/dns) to v0.6.84
 
 ### Fixed
 

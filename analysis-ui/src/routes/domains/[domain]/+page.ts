@@ -1,9 +1,16 @@
-import { getDomainDetail, type AnalysisFilter, type DomainDetail } from "$lib/api";
+import {
+  getDomainDetail,
+  getEntityHistory,
+  type AnalysisFilter,
+  type DomainDetail,
+  type HistoryPoint
+} from "$lib/api";
 
 export type DomainDetailPageData = {
   domain: string;
   datasetTag: string | null;
   detail: DomainDetail | null;
+  history: HistoryPoint[];
   error: string | null;
 };
 
@@ -13,7 +20,7 @@ export async function load({ parent, fetch, params }): Promise<DomainDetailPageD
   const domain = params.domain ?? "";
 
   if (!datasetTag || !domain) {
-    return { domain, datasetTag, detail: null, error: null };
+    return { domain, datasetTag, detail: null, history: [], error: null };
   }
 
   const snapshot = layout.effectiveSnapshotSlug ?? "";
@@ -21,13 +28,17 @@ export async function load({ parent, fetch, params }): Promise<DomainDetailPageD
   try {
     const filter: AnalysisFilter = { dataset_tag: datasetTag };
     if (snapshot) filter.snapshot = snapshot;
-    const detail = await getDomainDetail(domain, filter, fetch);
-    return { domain, datasetTag, detail, error: null };
+    const [detail, history] = await Promise.all([
+      getDomainDetail(domain, filter, fetch),
+      getEntityHistory(datasetTag, "domain", domain, fetch).then((h) => h.points).catch(() => [])
+    ]);
+    return { domain, datasetTag, detail, history, error: null };
   } catch (error) {
     return {
       domain,
       datasetTag,
       detail: null,
+      history: [],
       error: error instanceof Error ? error.message : String(error)
     };
   }

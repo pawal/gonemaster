@@ -1,5 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
-import { load } from "./+page";
+import { render, screen } from "@testing-library/svelte";
+import { load, type TrendsPageData } from "./+page";
+
+const h = vi.hoisted(() => ({
+  page: { url: new URL("http://localhost/analysis/trends"), data: { snapshots: [] } as unknown }
+}));
+vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
+vi.mock("$app/paths", () => ({ base: "/analysis" }));
+vi.mock("$app/state", () => ({
+  page: {
+    get url() {
+      return h.page.url;
+    },
+    get data() {
+      return h.page.data;
+    }
+  }
+}));
+
+import TrendsPage from "./+page.svelte";
 
 function stubResponse(body: unknown, ok = true): Response {
   return {
@@ -96,5 +115,154 @@ describe("+trends.load", () => {
     const data = await load(evt({ resolvedCohort: "tld", fetchImpl }));
     expect(data.points).toEqual([]);
     expect(data.error).toMatch(/HTTP 500/);
+  });
+
+  it("also fetches the top_tags series for the movers panel", async () => {
+    const calls: string[] = [];
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const u = typeof input === "string" ? input : (input as URL).toString();
+      calls.push(u);
+      if (u.includes("category=top_tags")) {
+        return stubResponse({ dataset_tag: "tld", category: "top_tags", points: [{ slug: "s1", captured_at: "s1", payload: [] }] });
+      }
+      return stubResponse({ dataset_tag: "tld", category: "severity", points: [] });
+    }) as unknown as typeof fetch;
+
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl }));
+    expect(calls.some((c) => c.includes("category=top_tags"))).toBe(true);
+    expect(data.topTagPoints).toHaveLength(1);
+  });
+
+  it("keeps the main chart when the movers fetch fails", async () => {
+    const fetchImpl = vi.fn(async (input: RequestInfo | URL) => {
+      const u = typeof input === "string" ? input : (input as URL).toString();
+      if (u.includes("category=top_tags")) return stubResponse({ error: "boom" }, false);
+      return stubResponse({ dataset_tag: "tld", category: "severity", points: [{ slug: "s1", captured_at: "s1", payload: {} }] });
+    }) as unknown as typeof fetch;
+
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl }));
+    // Movers failure is non-fatal: main series and no error survive.
+    expect(data.error).toBeNull();
+    expect(data.points).toHaveLength(1);
+    expect(data.topTagPoints).toEqual([]);
+  });
+});
+
+function trendsData(overrides: Partial<TrendsPageData> = {}): TrendsPageData {
+  return {
+    datasetTag: "tld",
+    category: "severity",
+    points: [
+      { slug: "2026-03-01", captured_at: "2026-03-01T00:00:00Z", payload: { ok: 8, critical: 2 } }
+    ],
+    keyMeta: {
+      ok: { label: "OK", tone: "ok", order: 0 },
+      critical: { label: "Critical", tone: "critical", order: 5 }
+    },
+    topTagPoints: [],
+    error: null,
+    ...overrides
+  };
+}
+
+describe("trends page rendering", () => {
+  it("links severity segments to the domains behind them in that snapshot", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity");
+    render(TrendsPage, { data: trendsData() });
+    const links = screen.getAllByRole("link");
+    const critical = links.find((a) => a.getAttribute("href")?.includes("worst_level=critical"));
+    expect(critical).toBeTruthy();
+    expect(critical?.getAttribute("href")).toContain("snapshot=2026-03-01");
+  });
+
+  it("keeps a sub-percent bucket visible instead of dropping it", () => {
+    const { container } = render(TrendsPage, {
+      data: trendsData({
+        points: [
+          { slug: "2026-03-01", captured_at: "2026-03-01T00:00:00Z", payload: { ok: 9999, critical: 1 } }
+        ]
+      })
+    });
+    // 1 in 10000 rounds to 0.0% but must still render as a tiny sliver, and
+    // still carry its count for assistive tech.
+    const tiny = container.querySelector(".trend-segment.tiny");
+    expect(tiny).not.toBeNull();
+    expect(tiny?.getAttribute("aria-label")).toContain("1 domains");
+  });
+
+  it("labels every segment with its count and share for assistive tech", () => {
+    render(TrendsPage, { data: trendsData() });
+    // Non-linked-category segments render as role=img; linked ones as links.
+    // The severity fixture is linked, so assert the accessible name carries
+    // the count and share.
+    const critical = screen.getByRole("link", { name: /Critical: 2 domains, 20%/ });
+    expect(critical).toBeInTheDocument();
+  });
+
+  it("switches to the focus line chart when a bucket is pinned via ?key=", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=critical");
+    const { container } = render(TrendsPage, {
+      data: trendsData({
+        points: [
+          { slug: "2026-02-01", captured_at: "2026-02-01T00:00:00Z", payload: { ok: 9, critical: 1 } },
+          { slug: "2026-03-01", captured_at: "2026-03-01T00:00:00Z", payload: { ok: 6, critical: 4 } }
+        ]
+      })
+    });
+    // The stacked list is replaced by the focus chart.
+    expect(container.querySelector(".trend-list")).toBeNull();
+    expect(screen.getByRole("img", { name: /Critical across snapshots/ })).toBeInTheDocument();
+  });
+
+  it("marks the pinned bucket's legend button as pressed", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=critical");
+    render(TrendsPage, { data: trendsData() });
+    const active = screen.getByRole("button", { name: /Critical/, pressed: true });
+    expect(active).toBeInTheDocument();
+  });
+
+  it("stays on the stacked view when ?key= names an unknown bucket", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity&key=bogus");
+    const { container } = render(TrendsPage, { data: trendsData() });
+    expect(container.querySelector(".trend-list")).not.toBeNull();
+  });
+
+  it("lists the biggest tag movers from the top_tags series", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity");
+    render(TrendsPage, {
+      data: trendsData({
+        topTagPoints: [
+          { slug: "s1", captured_at: "s1", payload: [{ tag: "DS02", level: "ERROR", domain_count: 100 }] },
+          { slug: "s2", captured_at: "s2", payload: [{ tag: "DS02", level: "ERROR", domain_count: 60 }] }
+        ]
+      })
+    });
+    const link = screen.getByRole("link", { name: "DS02" });
+    expect(link.getAttribute("href")).toContain("/analysis/tags/DS02");
+    // The 100 -> 60 drop shows as a signed delta.
+    expect(screen.getByText("-40")).toBeInTheDocument();
+  });
+
+  it("omits the movers panel when there is no movement", () => {
+    render(TrendsPage, { data: trendsData({ topTagPoints: [] }) });
+    expect(screen.queryByText(/top movers/i)).toBeNull();
+  });
+
+  it("links each snapshot row (except the oldest) to the diff against its predecessor", () => {
+    h.page.url = new URL("http://localhost/analysis/trends?category=severity");
+    render(TrendsPage, {
+      data: trendsData({
+        points: [
+          { slug: "2026-02-01", captured_at: "2026-02-01T00:00:00Z", payload: { ok: 8, critical: 2 } },
+          { slug: "2026-03-01", captured_at: "2026-03-01T00:00:00Z", payload: { ok: 6, critical: 4 } }
+        ]
+      })
+    });
+    const links = screen.getAllByRole("link", { name: /diff vs previous/i });
+    // Two snapshots -> exactly one row (the newer) gets a diff link.
+    expect(links).toHaveLength(1);
+    expect(links[0].getAttribute("href")).toContain("from=2026-02-01");
+    expect(links[0].getAttribute("href")).toContain("to=2026-03-01");
+    expect(links[0].getAttribute("href")).toContain("tab=grade_changed");
   });
 });

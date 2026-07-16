@@ -97,6 +97,7 @@
         <span>Search</span>
         <input
           type="search"
+          data-shortcut-filter
           value={search}
           placeholder="substring match"
           onchange={(e) => onChange("search", e.currentTarget.value.trim())}

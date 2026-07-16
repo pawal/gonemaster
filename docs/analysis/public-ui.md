@@ -45,6 +45,79 @@ testcase opens a filtered detail view.
 The UI preserves the active snapshot as visitors click through detail pages.
 Shared links should include `snapshot` when the numbers must remain stable.
 
+Some views add their own parameters: the diff `tab`, and the trends focused
+bucket `key` and scale `scale`. Back, forward, and shared links reproduce the
+same view.
+
+## Overview
+
+The overview page opens with stat tiles for the cohort: total domains, the
+share with no warnings, the share graded A or A+, and the share that is
+signed. Each tile shows the change since the previous snapshot and a small
+sparkline across snapshots. Below the tiles it lists the top issues and the
+main nameservers, ASNs, and prefixes, including the leading provider's share
+of domains. A movers card lists the domains that improved or regressed most
+since the previous snapshot.
+
+## Trends
+
+The trends page shows how the grade, severity, DNSSEC, and DNSKEY algorithm
+mix changes over time, one stacked bar per snapshot.
+
+Click a bucket in the legend to focus it: the bars are replaced by a single
+line chart of that bucket across snapshots. `key` holds the focused bucket and
+`scale` switches between share and absolute count. Click the bucket again or
+press Escape to go back. A top-movers panel lists the finding tags that
+changed most between the first and last snapshot shown.
+
+## Snapshot Diffs
+
+The diff view compares two snapshots of a cohort. A summary strip counts how
+many domains regressed, improved, were added, or removed. The change lists
+link each domain, and a grade-transition matrix shows how grades moved. Use
+the swap button to reverse the two snapshots; `tab` selects the active list so
+a shared link opens on the right one. When only a "to" snapshot is chosen, the
+snapshot before it is used as "from".
+
+Alongside the per-domain changes it shows a tag-level summary: which finding
+tags appeared, cleared, or changed severity cohort-wide, with domain counts.
+This makes a regression explainable, for example "14 domains regressed;
+DS02_NO_MATCHING_DS appeared on 12 of them". The tag section degrades
+gracefully: if a snapshot has no materialized tag view it shows a short notice
+rather than an error.
+
+## Latency
+
+The nameserver, address, and ASN lists show a Latency column with the median
+(p50) and 95th-percentile response time aggregated from the queries the
+snapshot already recorded (no extra probing). The column only appears when the
+snapshot has latency data; snapshots captured before latency aggregation show
+no column until they are re-materialized (admin "Rebuild aggregates" or a
+cohort rebuild).
+
+## Entity History
+
+The nameserver, ASN, tag, and domain detail pages show a small sparkline of
+how the entity moved across the cohort's captured snapshots (domain count for
+nameserver/ASN/tag, score for a domain). It is fed by
+`GET /pub/api/v1/analysis/cohorts/{dataset_tag}/history?entity=&key=` and only
+appears when at least two snapshots carry the entity, so single-snapshot
+cohorts and brand-new entities show nothing rather than a flat line.
+
+## Keyboard Shortcuts
+
+Press `?` for the list of shortcuts. `g` followed by a letter jumps between
+sections (for example `g d` for domains, `g t` for tags), `/` focuses the
+search box, and Escape closes the help. Shortcuts keep the current cohort and
+snapshot.
+
+## Exports
+
+The list pages export CSV and JSON. An export covers the whole filtered set,
+up to the server's 500-row limit, not just the rows on screen. A note next to
+the buttons says how many rows it will include, and the file name marks an
+export that hit the limit.
+
 ## Empty States
 
 If the UI is empty after a batch finishes, check:

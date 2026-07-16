@@ -4,7 +4,8 @@
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
-  import { formatCount } from "$lib/format";
+  import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
+  import { formatCount, formatMs } from "$lib/format";
   import type { ASNDetailPageData } from "./+page";
 
   let { data }: { data: ASNDetailPageData } = $props();
@@ -46,7 +47,14 @@
       <div><dt>Addresses</dt><dd>{formatCount(d.address_count)}</dd></div>
       <div><dt>Nameservers</dt><dd>{formatCount(d.nameserver_count)}</dd></div>
       <div><dt>Prefixes</dt><dd>{formatCount(d.prefix_count)}</dd></div>
+      {#if d.latency_p50_ms != null}
+        <div><dt>Median latency</dt><dd title={`${d.latency_samples ?? 0} observations`}>{formatMs(d.latency_p50_ms)}</dd></div>
+        {#if d.latency_p95_ms != null}
+          <div><dt>p95 latency</dt><dd>{formatMs(d.latency_p95_ms)}</dd></div>
+        {/if}
+      {/if}
     </dl>
+    <EntityHistorySparkline points={data.history} metric="domain_count" label="Domains over snapshots" />
   </section>
 
   <section class="card">

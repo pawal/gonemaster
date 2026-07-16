@@ -457,17 +457,21 @@ type AnalysisCohortSnapshot struct {
 // captured snapshot, ready to serve the Nameservers tab and the per-
 // nameserver detail page without scanning facts.
 type AnalysisSnapshotNameserverView struct {
-	SnapshotID     int64    `json:"snapshot_id"`
-	NameserverID   int64    `json:"nameserver_id"`
-	NameserverName string   `json:"nameserver_name"`
-	DomainCount    int      `json:"domain_count"`
-	EndpointCount  int      `json:"endpoint_count"`
-	IPv4Count      int      `json:"ipv4_count"`
-	IPv6Count      int      `json:"ipv6_count"`
-	ASNCount       int      `json:"asn_count"`
-	Operator       string   `json:"operator,omitempty"`
-	OperatorASN    *int64   `json:"operator_asn,omitempty"`
-	QueryCount     int      `json:"query_count,omitempty"`
+	SnapshotID     int64  `json:"snapshot_id"`
+	NameserverID   int64  `json:"nameserver_id"`
+	NameserverName string `json:"nameserver_name"`
+	DomainCount    int    `json:"domain_count"`
+	EndpointCount  int    `json:"endpoint_count"`
+	IPv4Count      int    `json:"ipv4_count"`
+	IPv6Count      int    `json:"ipv6_count"`
+	ASNCount       int    `json:"asn_count"`
+	Operator       string `json:"operator,omitempty"`
+	OperatorASN    *int64 `json:"operator_asn,omitempty"`
+	QueryCount     int    `json:"query_count,omitempty"`
+	// Aggregated response time; nil when the snapshot predates latency.
+	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples int      `json:"latency_samples,omitempty"`
 	Addresses      []string `json:"addresses,omitempty"`
 	ASNs           []int64  `json:"asns,omitempty"`
 	Domains        []string `json:"domains,omitempty"`
@@ -476,16 +480,20 @@ type AnalysisSnapshotNameserverView struct {
 // AnalysisSnapshotEndpointView is one pre-computed (nameserver, address) row
 // for a captured snapshot.
 type AnalysisSnapshotEndpointView struct {
-	SnapshotID     int64    `json:"snapshot_id"`
-	NameserverID   int64    `json:"nameserver_id"`
-	AddressID      int64    `json:"address_id"`
-	NameserverName string   `json:"nameserver_name"`
-	Address        string   `json:"address"`
-	Family         string   `json:"family"`
-	DomainCount    int      `json:"domain_count"`
-	ASN            *int64   `json:"asn,omitempty"`
-	ASNLabel       string   `json:"asn_label,omitempty"`
-	Prefix         string   `json:"prefix,omitempty"`
+	SnapshotID     int64  `json:"snapshot_id"`
+	NameserverID   int64  `json:"nameserver_id"`
+	AddressID      int64  `json:"address_id"`
+	NameserverName string `json:"nameserver_name"`
+	Address        string `json:"address"`
+	Family         string `json:"family"`
+	DomainCount    int    `json:"domain_count"`
+	ASN            *int64 `json:"asn,omitempty"`
+	ASNLabel       string `json:"asn_label,omitempty"`
+	Prefix         string `json:"prefix,omitempty"`
+	// Aggregated response time; nil when the snapshot predates latency.
+	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples int      `json:"latency_samples,omitempty"`
 	Domains        []string `json:"domains,omitempty"`
 }
 
@@ -551,18 +559,34 @@ type DomainViewTag struct {
 
 // AnalysisSnapshotASNView is one pre-computed ASN row for a captured snapshot.
 type AnalysisSnapshotASNView struct {
-	SnapshotID      int64    `json:"snapshot_id"`
-	ASN             int64    `json:"asn"`
-	Label           string   `json:"label,omitempty"`
-	DomainCount     int      `json:"domain_count"`
-	AddressCount    int      `json:"address_count"`
-	NameserverCount int      `json:"nameserver_count"`
-	PrefixCount     int      `json:"prefix_count"`
-	IPv4Count       int      `json:"ipv4_count"`
-	IPv6Count       int      `json:"ipv6_count"`
-	Domains         []string `json:"domains,omitempty"`
-	Nameservers     []string `json:"nameservers,omitempty"`
-	Prefixes        []string `json:"prefixes,omitempty"`
+	SnapshotID      int64  `json:"snapshot_id"`
+	ASN             int64  `json:"asn"`
+	Label           string `json:"label,omitempty"`
+	DomainCount     int    `json:"domain_count"`
+	AddressCount    int    `json:"address_count"`
+	NameserverCount int    `json:"nameserver_count"`
+	PrefixCount     int    `json:"prefix_count"`
+	IPv4Count       int    `json:"ipv4_count"`
+	IPv6Count       int    `json:"ipv6_count"`
+	// Aggregated response time; nil when the snapshot predates latency.
+	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples int      `json:"latency_samples,omitempty"`
+	Domains        []string `json:"domains,omitempty"`
+	Nameservers    []string `json:"nameservers,omitempty"`
+	Prefixes       []string `json:"prefixes,omitempty"`
+}
+
+// AnalysisEntityHistoryPoint is one entity's value in one snapshot.
+// Present is false for snapshots where the entity was absent.
+type AnalysisEntityHistoryPoint struct {
+	Slug         string    `json:"slug"`
+	CapturedAt   time.Time `json:"captured_at"`
+	Present      bool      `json:"present"`
+	DomainCount  int       `json:"domain_count"`
+	LatencyP50MS *float64  `json:"latency_p50_ms,omitempty"`
+	Score        *int      `json:"score,omitempty"`
+	Grade        string    `json:"grade,omitempty"`
 }
 
 // AnalysisSnapshotPrefixView is one pre-computed prefix row for a

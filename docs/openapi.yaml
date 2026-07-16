@@ -2250,14 +2250,57 @@ paths:
           required: true
           schema:
             type: string
+        - name: granularity
+          in: query
+          required: false
+          description: >-
+            Diff granularity. Omitted or "domains" returns the per-domain
+            diff; "tags" returns which finding tags appeared, cleared, or
+            changed worst severity cohort-wide.
+          schema:
+            type: string
+            enum: [domains, tags]
       responses:
         '200':
-          description: Diff response
+          description: Diff response (shape depends on granularity)
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PublicAnalysisDiffResponse'
+                oneOf:
+                  - $ref: '#/components/schemas/PublicAnalysisDiffResponse'
+                  - $ref: '#/components/schemas/PublicAnalysisTagDiffResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
         '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/history:
+    get:
+      tags: [Public]
+      summary: Per-entity history across a cohort's captured snapshots
+      operationId: publicAnalysisEntityHistory
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - name: entity
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [nameserver, asn, tag, domain]
+        - name: key
+          in: query
+          required: true
+          description: Entity identifier (nameserver name, ASN number, tag, or domain).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: History response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisEntityHistoryResponse'
+        '400':
           $ref: '#/components/responses/ErrorResponse'
 
 components:
@@ -3432,6 +3475,89 @@ components:
         to_level:
           type: string
         worst_level:
+          type: string
+
+    PublicAnalysisTagDiffResponse:
+      type: object
+      required: [dataset_tag, from_slug, to_slug, granularity, appeared, cleared, level_changed]
+      properties:
+        dataset_tag:
+          type: string
+        from_slug:
+          type: string
+        to_slug:
+          type: string
+        granularity:
+          type: string
+          enum: [tags]
+        appeared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisTagDiffEntry'
+        cleared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisTagDiffEntry'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisTagDiffEntry'
+
+    PublicAnalysisTagDiffEntry:
+      type: object
+      required: [tag, from_domain_count, to_domain_count, domain_delta]
+      properties:
+        tag:
+          type: string
+        module:
+          type: string
+        testcase:
+          type: string
+        from_level:
+          type: string
+        to_level:
+          type: string
+        from_domain_count:
+          type: integer
+        to_domain_count:
+          type: integer
+        domain_delta:
+          type: integer
+
+    PublicAnalysisEntityHistoryResponse:
+      type: object
+      required: [dataset_tag, entity, key, points]
+      properties:
+        dataset_tag:
+          type: string
+        entity:
+          type: string
+          enum: [nameserver, asn, tag, domain]
+        key:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisEntityHistoryPoint'
+
+    PublicAnalysisEntityHistoryPoint:
+      type: object
+      required: [slug, captured_at, present, domain_count]
+      properties:
+        slug:
+          type: string
+        captured_at:
+          type: string
+          format: date-time
+        present:
+          type: boolean
+        domain_count:
+          type: integer
+        latency_p50_ms:
+          type: number
+        score:
+          type: integer
+        grade:
           type: string
 
     ProfileDefaults:

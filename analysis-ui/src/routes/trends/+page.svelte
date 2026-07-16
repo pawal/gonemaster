@@ -1,8 +1,13 @@
 <script lang="ts">
   import { goto } from "$app/navigation";
+  import { base } from "$app/paths";
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
-  import { formatCount, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
+  import TrendLine from "$lib/charts/TrendLine.svelte";
+  import { domainsGradeHref, domainsSeverityHref, tagHref } from "$lib/entityLinks";
+  import { downloadCSV, type ExportColumn } from "$lib/exporters";
+  import { formatCount, levelTone, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
+  import { computeTagMovers, pinnedSeries } from "$lib/trends";
   import type { LayoutData } from "../+layout";
   import { TREND_CATEGORIES, type TrendsPageData } from "./+page";
 
@@ -10,13 +15,79 @@
 
   const layoutData = $derived(page.data as LayoutData);
 
+  // Tone keys the TrendLine understands; anything else falls back to neutral.
+  type ChartTone = "ok" | "notice" | "warning" | "error" | "critical" | "neutral";
+  const CHART_TONES = new Set<ChartTone>(["ok", "notice", "warning", "error", "critical", "neutral"]);
+  function chartTone(tone: string | null): ChartTone {
+    return tone && CHART_TONES.has(tone as ChartTone) ? (tone as ChartTone) : "neutral";
+  }
+
+  // Segments narrower than this render as a bare colour sliver: labels would
+  // overflow. The value still reaches readers via the tooltip and the
+  // accessible table below the chart.
+  const TINY_PCT = 5;
+
+  // Deep-link a severity/grade segment to the domains behind it, in that
+  // snapshot. Other categories have no matching domains filter.
+  function segmentHref(key: string, slug: string): string | null {
+    const params = new URLSearchParams();
+    if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
+    params.set("snapshot", slug);
+    const q = `?${params.toString()}`;
+    if (data.category === "severity") return domainsSeverityHref(base, key, q);
+    if (data.category === "grade") return domainsGradeHref(base, key, q);
+    return null;
+  }
+
+  // Link a snapshot row to the diff against its predecessor. Series is
+  // oldest-first, so the previous snapshot is the row above; the first row
+  // has none.
+  function diffRowHref(index: number): string | null {
+    if (index <= 0) return null;
+    const from = series[index - 1]?.slug;
+    const to = series[index]?.slug;
+    if (!from || !to) return null;
+    const params = new URLSearchParams();
+    if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
+    params.set("from", from);
+    params.set("to", to);
+    params.set("tab", "grade_changed");
+    return `${base}/diff?${params.toString()}`;
+  }
+
   function onCategoryChange(value: string) {
     const params = new URLSearchParams(page.url.searchParams);
     params.set("category", value);
+    // Buckets differ per category, so a pinned key from the old category is
+    // meaningless under the new one.
+    params.delete("key");
     goto(`${page.url.pathname}?${params.toString()}`, {
       replaceState: true,
       noScroll: true
     });
+  }
+
+  // Focus mode: ?key= pins one bucket to a line chart; ?scale= toggles the
+  // y-axis between absolute counts (default) and percentage share.
+  const pinnedKey = $derived(page.url.searchParams.get("key") ?? "");
+  const scale = $derived(page.url.searchParams.get("scale") === "share" ? "share" : "count");
+
+  function setKey(key: string) {
+    const params = new URLSearchParams(page.url.searchParams);
+    if (key) params.set("key", key);
+    else params.delete("key");
+    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+  }
+
+  function setScale(value: "count" | "share") {
+    const params = new URLSearchParams(page.url.searchParams);
+    if (value === "share") params.set("scale", "share");
+    else params.delete("scale");
+    goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
+  }
+
+  function onKeydown(event: KeyboardEvent) {
+    if (event.key === "Escape" && pinnedKey) setKey("");
   }
 
   // Label, tone, and order for every observed key come from data.keyMeta,
@@ -140,10 +211,54 @@
     return Math.round((bucket.count / total) * 1000) / 10;
   }
 
+  // Unrounded share for the bar width, so a bucket with count > 0 keeps a
+  // nonzero width instead of collapsing to 0% and vanishing.
+  function rawPctFor(s: Series, key: string): number {
+    const total = totalFor(s);
+    if (total === 0) return 0;
+    const bucket = s.buckets.find((b) => b.key === key);
+    return bucket ? (bucket.count / total) * 100 : 0;
+  }
+
   function countFor(s: Series, key: string): number {
     return s.buckets.find((b) => b.key === key)?.count ?? 0;
   }
+
+  // Focus mode is active only when the pinned key is a real bucket in the
+  // current series.
+  const focusActive = $derived(!!pinnedKey && bucketKeys.includes(pinnedKey));
+  const pinned = $derived.by(() => (focusActive ? pinnedSeries(series, pinnedKey) : []));
+  const pinnedValues = $derived(
+    scale === "share" ? pinned.map((p) => p.share) : pinned.map((p) => p.count)
+  );
+  // Prefer the short source date for the x-axis; series is aligned to pinned.
+  const pinnedLabels = $derived(series.map((s) => s.sourceDate || s.label));
+
+  // Biggest tag movers between the first and last snapshot, from the separate
+  // top_tags series.
+  const movers = $derived(computeTagMovers(data.topTagPoints ?? [], 10));
+  const query = $derived(page.url.search);
+
+  // Export the visible category series: one row per snapshot, one column per
+  // bucket, plus the total.
+  function exportSeries() {
+    if (series.length === 0) return;
+    const columns: ExportColumn<Series>[] = [
+      { key: "snapshot", label: "Snapshot", value: (s) => s.label },
+      { key: "date", label: "Source date", value: (s) => s.sourceDate },
+      ...bucketKeys.map((key) => ({
+        key,
+        label: labelForKey(key),
+        value: (s: Series) => countFor(s, key)
+      })),
+      { key: "total", label: "Total", value: (s) => totalFor(s) }
+    ];
+    const tag = data.datasetTag ?? "cohort";
+    downloadCSV(`${tag}-trends-${data.category}.csv`, series, columns);
+  }
 </script>
+
+<svelte:window onkeydown={onKeydown} />
 
 <FilterBar
   cohorts={layoutData.catalog?.cohorts ?? []}
@@ -191,47 +306,129 @@
   </section>
 {:else}
   <section class="card">
-    <h3>{TREND_CATEGORIES.find((c) => c.key === data.category)?.label}</h3>
+    <div class="list-head">
+      <h3>{TREND_CATEGORIES.find((c) => c.key === data.category)?.label}</h3>
+      <div class="export-group">
+        <button type="button" class="ghost" onclick={exportSeries} disabled={series.length === 0}>
+          Export CSV
+        </button>
+      </div>
+    </div>
+    {#if focusActive}
+      <div class="focus-head">
+        <div>
+          <h4 class="focus-title">Focus: {labelForKey(pinnedKey)}</h4>
+          <p class="hint">This bucket's {scale === "share" ? "share" : "domain count"} across snapshots.</p>
+        </div>
+        <div class="focus-controls">
+          <div class="scale-toggle" role="group" aria-label="Value scale">
+            <button type="button" class="scale-btn" class:active={scale === "count"} onclick={() => setScale("count")}>Count</button>
+            <button type="button" class="scale-btn" class:active={scale === "share"} onclick={() => setScale("share")}>Share</button>
+          </div>
+          <button type="button" class="ghost" onclick={() => setKey("")}>Show all buckets</button>
+        </div>
+      </div>
+      <TrendLine
+        values={pinnedValues}
+        labels={pinnedLabels}
+        tone={chartTone(toneForKey(pinnedKey))}
+        seriesLabel={scale === "share" ? "Share" : "Domains"}
+        valueSuffix={scale === "share" ? "%" : ""}
+        yDomain={scale === "share" ? [0, 100] : undefined}
+        caption={`${labelForKey(pinnedKey)} across snapshots`}
+      />
+    {:else}
     <ol class="trend-list" aria-label="Stacked distribution per snapshot">
-      {#each series as s (s.slug)}
+      {#each series as s, i (s.slug)}
+        {@const diffHref = diffRowHref(i)}
         <li class="trend-row">
           <div class="trend-meta">
             <span class="trend-slug" title={`Snapshot ${s.slug}`}>{s.label}</span>
             {#if s.sourceDate && s.sourceDate !== s.label}
               <span class="trend-captured">{s.sourceDate}</span>
             {/if}
+            {#if diffHref}
+              <a class="trend-diff-link" href={diffHref}>Diff vs previous</a>
+            {/if}
           </div>
-          <div class="trend-bar" aria-hidden="true">
+          <div class="trend-bar" role="group" aria-label="{s.label} distribution">
             {#each bucketKeys as key, i (key)}
               {@const pct = pctFor(s, key)}
+              {@const rawPct = rawPctFor(s, key)}
               {@const count = countFor(s, key)}
-              {#if pct > 0}
-                <span
+              {#if count > 0}
+                {@const href = segmentHref(key, s.slug)}
+                {@const tiny = rawPct < TINY_PCT}
+                {@const label = `${labelForKey(key)}: ${formatCount(count)} domains, ${pct}%${href ? " - view domains" : ""}`}
+                <svelte:element
+                  this={href ? "a" : "span"}
+                  {href}
+                  role={href ? undefined : "img"}
                   class="trend-segment"
-                  style:width="{pct}%"
+                  class:tiny
+                  class:linked={!!href}
+                  style:width="{rawPct}%"
                   style:background={colorForBucket(key, i)}
                   style:color={colorFgForBucket(key, i)}
+                  aria-label={label}
                   title="{labelForKey(key)}: {formatCount(count)} ({pct}%)"
                 >
-                  <span class="trend-segment-label">{labelForKey(key)}</span>
-                  <span class="trend-segment-count">{formatCount(count)}</span>
-                </span>
+                  {#if !tiny}
+                    <span class="trend-segment-label" aria-hidden="true">{labelForKey(key)}</span>
+                    <span class="trend-segment-count" aria-hidden="true">{formatCount(count)}</span>
+                  {/if}
+                </svelte:element>
               {/if}
             {/each}
           </div>
-          <span class="trend-total">{totalFor(s)}</span>
+          <span class="trend-total">{formatCount(totalFor(s))}</span>
         </li>
       {/each}
     </ol>
-    <ul class="trend-legend" aria-label="Buckets">
+    {/if}
+    <ul class="trend-legend" aria-label="Buckets - select one to focus its trend">
       {#each bucketKeys as key, i (key)}
         <li class="trend-legend-item">
-          <span class="legend-swatch" style:background={colorForBucket(key, i)}></span>
-          <span class="legend-label">{labelForKey(key)}</span>
+          <button
+            type="button"
+            class="legend-btn"
+            class:active={pinnedKey === key}
+            aria-pressed={pinnedKey === key}
+            onclick={() => setKey(pinnedKey === key ? "" : key)}
+          >
+            <span class="legend-swatch" style:background={colorForBucket(key, i)}></span>
+            <span class="legend-label">{labelForKey(key)}</span>
+          </button>
         </li>
       {/each}
     </ul>
   </section>
+
+  {#if movers.length > 0}
+    <section class="card">
+      <h3>Top movers</h3>
+      <p class="hint">
+        Finding tags whose domain count changed most between the first and
+        last snapshot shown. Rising counts are regressions.
+      </p>
+      <ol class="mover-list">
+        {#each movers as m (m.tag)}
+          <li class="mover-row">
+            <a class="mover-tag" href={tagHref(base, m.tag, query)}>{m.tag}</a>
+            {#if m.level}
+              <span class="level level-{levelTone(m.level)}">{m.level}</span>
+            {:else}
+              <span class="level level-neutral">-</span>
+            {/if}
+            <span class="mover-counts">{formatCount(m.first)} → {formatCount(m.last)}</span>
+            <span class="mover-delta" class:up={m.delta > 0} class:down={m.delta < 0}>
+              {m.delta > 0 ? "+" : ""}{formatCount(m.delta)}
+            </span>
+          </li>
+        {/each}
+      </ol>
+    </section>
+  {/if}
 {/if}
 
 <style>
@@ -288,6 +485,15 @@
     color: var(--ink-2);
     font-size: var(--text-xs);
   }
+  .trend-diff-link {
+    font-size: var(--text-xs);
+    color: var(--accent-2);
+    text-decoration: none;
+    width: fit-content;
+  }
+  .trend-diff-link:hover {
+    text-decoration: underline;
+  }
   .trend-bar {
     display: flex;
     height: 36px;
@@ -304,6 +510,20 @@
     height: 100%;
     overflow: hidden;
     padding: 0 var(--space-2);
+    text-decoration: none;
+  }
+  /* Tiny segments drop their padding and take a small floor width so a
+     nonzero count is always visible without over-representing it. */
+  .trend-segment.tiny {
+    padding: 0;
+    min-width: 3px;
+  }
+  .trend-segment.linked {
+    cursor: pointer;
+  }
+  .trend-segment.linked:hover {
+    outline: 2px solid var(--ink);
+    outline-offset: -2px;
   }
   .trend-segment-label {
     font-size: var(--text-xs);
@@ -337,6 +557,28 @@
     align-items: center;
     gap: 6px;
   }
+  .legend-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 8px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: var(--text-xs);
+    cursor: pointer;
+  }
+  .legend-btn:hover {
+    border-color: var(--border);
+    color: var(--ink);
+  }
+  .legend-btn.active {
+    border-color: var(--accent-2);
+    background: var(--surface-2);
+    color: var(--ink);
+  }
   .legend-swatch {
     display: inline-block;
     width: 12px;
@@ -345,5 +587,91 @@
   }
   .legend-label {
     font-family: var(--mono);
+  }
+
+  .focus-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+  }
+  .focus-title {
+    margin: 0;
+    font-size: var(--text-base);
+    font-weight: 600;
+  }
+  .focus-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+  }
+  .scale-toggle {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    overflow: hidden;
+  }
+  .scale-btn {
+    padding: 5px var(--space-3);
+    background: var(--surface);
+    color: var(--ink-2);
+    border: none;
+    border-radius: 0;
+    font: inherit;
+    font-size: var(--text-sm);
+    cursor: pointer;
+  }
+  .scale-btn.active {
+    background: var(--surface-2);
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .mover-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: minmax(10rem, 1fr) minmax(4rem, auto) minmax(6rem, auto) minmax(4rem, auto);
+    column-gap: var(--space-3);
+    row-gap: 6px;
+    align-items: center;
+  }
+  .mover-row {
+    display: contents;
+  }
+  .mover-tag {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    color: var(--ink);
+    text-decoration: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .mover-tag:hover {
+    color: var(--accent-2);
+    text-decoration: underline;
+  }
+  .mover-counts {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+    text-align: right;
+  }
+  .mover-delta {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    font-weight: 600;
+    text-align: right;
+    color: var(--ink-2);
+  }
+  .mover-delta.up {
+    color: var(--bar-error);
+  }
+  .mover-delta.down {
+    color: var(--bar-ok);
   }
 </style>

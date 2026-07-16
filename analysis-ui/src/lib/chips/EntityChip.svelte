@@ -58,8 +58,8 @@
 
   .entity-chip-cohort,
   .entity-chip-tag {
-    background: rgba(3, 105, 161, 0.12);
-    border-color: rgba(3, 105, 161, 0.25);
+    background: color-mix(in srgb, var(--accent-2) 12%, transparent);
+    border-color: color-mix(in srgb, var(--accent-2) 25%, transparent);
     color: var(--accent-2);
   }
 
@@ -68,9 +68,9 @@
   }
 
   .entity-chip-asn {
-    background: #eef2f7;
-    color: #334155;
-    border-color: #c8d3e0;
+    background: color-mix(in srgb, var(--accent-2) 8%, var(--surface-2));
+    color: var(--ink);
+    border-color: color-mix(in srgb, var(--accent-2) 25%, var(--border));
   }
 
   /* Mark chips that open in a new tab. Kept as ::after so it stays out of

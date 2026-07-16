@@ -77,6 +77,13 @@ export function formatCount(n: number | null | undefined): string {
   return new Intl.NumberFormat().format(n);
 }
 
+// Response time in ms; sub-10ms keeps one decimal, larger values round.
+export function formatMs(n: number | null | undefined): string {
+  if (n === null || n === undefined || !Number.isFinite(n)) return "-";
+  const rounded = n < 10 ? Math.round(n * 10) / 10 : Math.round(n);
+  return `${rounded} ms`;
+}
+
 export function levelTone(level: string | null | undefined): string {
   switch (String(level ?? "").toUpperCase()) {
     case "CRITICAL":

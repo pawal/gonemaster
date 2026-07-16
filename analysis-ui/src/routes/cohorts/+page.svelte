@@ -2,6 +2,7 @@
   import { base } from "$app/paths";
   import { page } from "$app/state";
   import CohortChip from "$lib/chips/CohortChip.svelte";
+  import { formatCount, snapshotSourceDate } from "$lib/format";
   import type { CohortsPageData } from "./+page";
 
   let { data }: { data: CohortsPageData } = $props();
@@ -35,6 +36,19 @@
             </div>
             {#if cohort.description}
               <p class="hint">{cohort.description}</p>
+            {/if}
+            {#if cohort.default_snapshot}
+              <dl class="cohort-stats">
+                <div><dt>Domains</dt><dd>{formatCount(cohort.default_snapshot.domain_count)}</dd></div>
+                {#if cohort.snapshot_count}
+                  <div><dt>Snapshots</dt><dd>{formatCount(cohort.snapshot_count)}</dd></div>
+                {/if}
+                {#if snapshotSourceDate(cohort.default_snapshot)}
+                  <div><dt>Latest</dt><dd>{snapshotSourceDate(cohort.default_snapshot)}</dd></div>
+                {/if}
+              </dl>
+            {:else}
+              <p class="cohort-nostat">No captured snapshot yet.</p>
             {/if}
           </a>
         </li>
@@ -76,8 +90,38 @@
     flex-wrap: wrap;
   }
 
+  .cohort-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-4);
+    margin: 4px 0 0;
+  }
+  .cohort-stats div {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+  }
+  .cohort-stats dt {
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .cohort-stats dd {
+    margin: 0;
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    color: var(--ink);
+  }
+  .cohort-nostat {
+    margin: 4px 0 0;
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+    font-style: italic;
+  }
+
   .active .cohort-select {
     border-color: var(--accent-2);
-    background: rgba(3, 105, 161, 0.04);
+    background: color-mix(in srgb, var(--accent-2) 5%, transparent);
   }
 </style>

@@ -135,6 +135,13 @@ export type DomainView = {
   finished_at?: string;
 };
 
+// Latency fields are absent on snapshots captured before latency aggregation.
+export type LatencyFields = {
+  latency_p50_ms?: number;
+  latency_p95_ms?: number;
+  latency_samples?: number;
+};
+
 export type NameserverView = {
   nameserver: string;
   domain_count: number;
@@ -145,7 +152,7 @@ export type NameserverView = {
   operator?: string;
   operator_asn?: number;
   query_count?: number;
-};
+} & LatencyFields;
 
 export type EndpointView = {
   nameserver: string;
@@ -155,7 +162,7 @@ export type EndpointView = {
   asn?: number;
   asn_label?: string;
   prefix?: string;
-};
+} & LatencyFields;
 
 export type ASNView = {
   asn: number;
@@ -166,7 +173,7 @@ export type ASNView = {
   prefix_count: number;
   ipv4_count: number;
   ipv6_count: number;
-};
+} & LatencyFields;
 
 export type PrefixView = {
   prefix: string;
@@ -250,7 +257,7 @@ export type EndpointDetail = {
   prefix?: string;
   domain_count: number;
   domains: string[];
-};
+} & LatencyFields;
 
 export type PrefixDetail = {
   prefix: string;
@@ -271,7 +278,7 @@ export type NameserverDetail = {
   addresses: string[];
   domains: string[];
   asns: number[];
-};
+} & LatencyFields;
 
 export type ASNDetail = {
   asn: number;
@@ -283,7 +290,7 @@ export type ASNDetail = {
   domains: string[];
   nameservers: string[];
   prefixes: string[];
-};
+} & LatencyFields;
 
 export type TagDetail = {
   tag: string;
@@ -384,6 +391,46 @@ export type DiffResponse = {
   grade_changed: DiffEntry[];
   level_changed: DiffEntry[];
 };
+
+export type TagDiffEntry = {
+  tag: string;
+  module?: string;
+  testcase?: string;
+  from_level?: string;
+  to_level?: string;
+  from_domain_count: number;
+  to_domain_count: number;
+  domain_delta: number;
+};
+
+export type TagDiffResponse = {
+  dataset_tag: string;
+  from_slug: string;
+  to_slug: string;
+  granularity: "tags";
+  appeared: TagDiffEntry[];
+  cleared: TagDiffEntry[];
+  level_changed: TagDiffEntry[];
+};
+
+export type HistoryPoint = {
+  slug: string;
+  captured_at: string;
+  present: boolean;
+  domain_count: number;
+  latency_p50_ms?: number;
+  score?: number;
+  grade?: string;
+};
+
+export type EntityHistoryResponse = {
+  dataset_tag: string;
+  entity: string;
+  key: string;
+  points: HistoryPoint[];
+};
+
+export type HistoryEntity = "nameserver" | "asn" | "tag" | "domain";
 
 export type FetchLike = typeof fetch;
 
@@ -557,6 +604,34 @@ export const getDiff = (
   getJSON<DiffResponse>(
     `/cohorts/${encodeURIComponent(datasetTag)}/diff`,
     { from, to } as AnalysisFilter & { from: string; to: string },
+    fetchFn
+  );
+
+export const getTagDiff = (
+  datasetTag: string,
+  from: string,
+  to: string,
+  fetchFn: FetchLike = fetch
+) =>
+  getJSON<TagDiffResponse>(
+    `/cohorts/${encodeURIComponent(datasetTag)}/diff`,
+    { from, to, granularity: "tags" } as AnalysisFilter & {
+      from: string;
+      to: string;
+      granularity: string;
+    },
+    fetchFn
+  );
+
+export const getEntityHistory = (
+  datasetTag: string,
+  entity: HistoryEntity,
+  key: string,
+  fetchFn: FetchLike = fetch
+) =>
+  getJSON<EntityHistoryResponse>(
+    `/cohorts/${encodeURIComponent(datasetTag)}/history`,
+    { entity, key } as AnalysisFilter & { entity: string; key: string },
     fetchFn
   );
 

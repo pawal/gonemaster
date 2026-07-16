@@ -1,10 +1,14 @@
 <script lang="ts">
   import "../app.css";
   import { onMount } from "svelte";
-  import { page } from "$app/state";
+  import { page, navigating } from "$app/state";
+  import { goto } from "$app/navigation";
   import { base } from "$app/paths";
   import { getVersion } from "$lib/api";
+  import NavProgress from "$lib/NavProgress.svelte";
+  import ShortcutsHelp from "$lib/ShortcutsHelp.svelte";
   import { navItems, isActive, visibleNavItems } from "$lib/nav";
+  import { resolveShortcut } from "$lib/shortcuts";
   import type { LayoutData } from "./+layout";
   import { applyTheme, initialTheme, persistTheme, type Theme } from "$lib/theme";
   import { applyHead } from "$lib/head";
@@ -80,7 +84,67 @@
     const path = `${base}${href === "/" ? "" : href}`;
     return `${path}${navQuery}`;
   }
+
+  // Keyboard shortcuts. helpOpen is reactive; pendingG/gTimer are not, since
+  // the g-prefix is transient chord state the UI never renders.
+  let helpOpen = $state(false);
+  let pendingG = false;
+  let gTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function clearG() {
+    pendingG = false;
+    if (gTimer) {
+      clearTimeout(gTimer);
+      gTimer = null;
+    }
+  }
+
+  function armG() {
+    pendingG = true;
+    if (gTimer) clearTimeout(gTimer);
+    gTimer = setTimeout(() => {
+      pendingG = false;
+      gTimer = null;
+    }, 1200);
+  }
+
+  function handleShortcut(event: KeyboardEvent) {
+    // A non-help modal owns the keyboard; it closes itself on Esc.
+    if (!helpOpen && document.querySelector('[aria-modal="true"]')) return;
+    const action = resolveShortcut(event, { pendingG, overlayOpen: helpOpen });
+    switch (action.type) {
+      case "help-toggle":
+        event.preventDefault();
+        helpOpen = !helpOpen;
+        break;
+      case "close":
+        event.preventDefault();
+        helpOpen = false;
+        break;
+      case "set-g":
+        event.preventDefault();
+        armG();
+        break;
+      case "clear-g":
+        clearG();
+        break;
+      case "navigate":
+        event.preventDefault();
+        clearG();
+        // Route through navHref so shortcuts preserve cohort/snapshot scope.
+        goto(navHref(action.href));
+        break;
+      case "focus-filter":
+        event.preventDefault();
+        (document.querySelector("[data-shortcut-filter]") as HTMLElement | null)?.focus();
+        break;
+    }
+  }
 </script>
+
+<svelte:window onkeydown={handleShortcut} />
+
+<NavProgress active={!!navigating.to} />
 
 <div class="app-shell">
   <header class="app-header">
@@ -142,10 +206,12 @@
   </footer>
 </div>
 
+<ShortcutsHelp open={helpOpen} onClose={() => (helpOpen = false)} />
+
 <style>
   .backend-warning {
-    border-color: var(--severity-warning, #b45309);
-    background: color-mix(in srgb, var(--severity-warning, #b45309) 8%, var(--card));
+    border-color: var(--sev-warning-fg);
+    background: color-mix(in srgb, var(--sev-warning-fg) 8%, var(--card));
   }
   .backend-warning code {
     font-family: var(--mono);

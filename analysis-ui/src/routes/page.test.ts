@@ -1,5 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
-import { load } from "./+page";
+import { render, screen, within } from "@testing-library/svelte";
+import { load, type OverviewPageData } from "./+page";
+
+const h = vi.hoisted(() => ({
+  page: { url: new URL("http://localhost/analysis"), data: { snapshots: [] } as unknown }
+}));
+vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
+vi.mock("$app/paths", () => ({ base: "/analysis" }));
+vi.mock("$app/state", () => ({
+  page: {
+    get url() {
+      return h.page.url;
+    },
+    get data() {
+      return h.page.data;
+    }
+  }
+}));
+
+import OverviewPage from "./+page.svelte";
 
 function stubResponse(body: unknown, ok = true): Response {
   return {
@@ -35,13 +54,15 @@ function evt(overrides: {
   resolvedCohort: string | null;
   fetchImpl: typeof fetch;
   effectiveSnapshotSlug?: string | null;
+  snapshots?: { slug: string }[];
 }) {
   return {
     parent: async () => ({
       catalog: null,
       catalogError: null,
       resolvedCohort: overrides.resolvedCohort,
-      effectiveSnapshotSlug: overrides.effectiveSnapshotSlug ?? null
+      effectiveSnapshotSlug: overrides.effectiveSnapshotSlug ?? null,
+      snapshots: overrides.snapshots ?? []
     }),
     fetch: overrides.fetchImpl,
     url: new URL("http://localhost/analysis")
@@ -106,7 +127,7 @@ describe("+page.load (overview)", () => {
     expect(calls).toHaveLength(0);
   });
 
-  it("collapses to a single /overview call and reads totals + top-N from the payload", async () => {
+  it("reads totals + top-N from the bundled /overview payload", async () => {
     const snapshot = {
       slug: "2026-04-26-fixture",
       label: "Fixture",
@@ -131,8 +152,10 @@ describe("+page.load (overview)", () => {
       evt({ resolvedCohort: "tld", fetchImpl: impl, effectiveSnapshotSlug: "2026-04-26-fixture" })
     );
 
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain("/cohorts/tld/snapshots/2026-04-26-fixture/overview");
+    // Overview data still comes from the single bundled call...
+    expect(calls.find((c) => c.includes("/overview"))).toContain(
+      "/cohorts/tld/snapshots/2026-04-26-fixture/overview"
+    );
     expect(data.snapshot?.slug).toBe("2026-04-26-fixture");
     expect(data.totals?.domain_count).toBe(12);
     expect(data.totals?.nameserver_count).toBe(5);
@@ -145,27 +168,80 @@ describe("+page.load (overview)", () => {
     expect(data.loadError).toBeNull();
   });
 
-  it("forwards ?snapshot= to the overview call only", async () => {
-    const snapshot = { slug: "2026-04-17-old", run_count: 1, domain_count: 1 };
+  it("enriches the hero with the severity and grade trend series", async () => {
     const { impl, calls } = fetchRouter([
       {
         match: (url) => url.includes("/overview"),
         body: {
           dataset_tag: "tld",
           label: "TLD",
-          materialization_status: "ready",
-          is_default: false,
-          snapshot,
+          snapshot: { slug: "s2", run_count: 1, domain_count: 10 },
           overview: sampleOverview
         }
+      },
+      {
+        match: (url) => url.includes("category=severity"),
+        body: { dataset_tag: "tld", category: "severity", points: [{ slug: "s1", captured_at: "s1", payload: { ok: 8 } }], key_meta: {} }
+      },
+      {
+        match: (url) => url.includes("category=grade"),
+        body: { dataset_tag: "tld", category: "grade", points: [{ slug: "s1", captured_at: "s1", payload: { A: 6 } }] }
+      },
+      {
+        match: (url) => url.includes("category=dnssec_posture"),
+        body: { dataset_tag: "tld", category: "dnssec_posture", points: [{ slug: "s1", captured_at: "s1", payload: { signed: 5 } }] }
+      }
+    ]);
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl, effectiveSnapshotSlug: "s2" }));
+    // Trend series are fetched at cohort scope (no snapshot slug in the path).
+    expect(calls.some((c) => c.includes("category=severity"))).toBe(true);
+    expect(calls.some((c) => c.includes("category=grade"))).toBe(true);
+    expect(calls.some((c) => c.includes("category=dnssec_posture"))).toBe(true);
+    expect(data.severityTrend.points).toHaveLength(1);
+    expect(data.gradeTrend.points).toHaveLength(1);
+    expect(data.dnssecTrend.points).toHaveLength(1);
+  });
+
+  it("keeps the overview when the trend enrichment fails", async () => {
+    // Only /overview is routed; trend/diff calls hit the 500 default and must
+    // be swallowed rather than blanking the page.
+    const { impl } = fetchRouter([
+      {
+        match: (url) => url.includes("/overview"),
+        body: { dataset_tag: "tld", label: "TLD", snapshot: { slug: "s2", run_count: 1, domain_count: 10 }, overview: sampleOverview }
+      }
+    ]);
+    const data = await load(evt({ resolvedCohort: "tld", fetchImpl: impl, effectiveSnapshotSlug: "s2" }));
+    expect(data.loadError).toBeNull();
+    expect(data.totals?.domain_count).toBe(12);
+    expect(data.severityTrend.points).toEqual([]);
+    expect(data.diff).toBeNull();
+  });
+
+  it("fetches the diff-vs-previous when an earlier snapshot exists", async () => {
+    const { impl, calls } = fetchRouter([
+      {
+        match: (url) => url.includes("/overview"),
+        body: { dataset_tag: "tld", label: "TLD", snapshot: { slug: "s2", run_count: 1, domain_count: 10 }, overview: sampleOverview }
+      },
+      {
+        match: (url) => url.includes("/diff"),
+        body: { dataset_tag: "tld", from_slug: "s1", to_slug: "s2", added: [], removed: [], grade_changed: [], level_changed: [] }
       }
     ]);
     const data = await load(
-      evt({ resolvedCohort: "tld", fetchImpl: impl, effectiveSnapshotSlug: "2026-04-17-old" })
+      evt({
+        resolvedCohort: "tld",
+        fetchImpl: impl,
+        effectiveSnapshotSlug: "s2",
+        snapshots: [{ slug: "s2" }, { slug: "s1" }]
+      })
     );
-    expect(data.snapshot?.slug).toBe("2026-04-17-old");
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain("/cohorts/tld/snapshots/2026-04-17-old/overview");
+    // Newest-first list: previous of s2 is s1.
+    expect(calls.some((c) => c.includes("/diff") && c.includes("from=s1") && c.includes("to=s2"))).toBe(true);
+    expect(data.diffFrom).toBe("s1");
+    expect(data.diffTo).toBe("s2");
+    expect(data.diff).not.toBeNull();
   });
 
   it("surfaces a load error when /overview fails", async () => {
@@ -199,5 +275,142 @@ describe("+page.load (overview)", () => {
     expect(data.topTags).toEqual([]);
     expect(data.factDistributions).toBeNull();
     expect(data.loadError).toBeNull();
+  });
+});
+
+function overviewData(overrides: Partial<OverviewPageData> = {}): OverviewPageData {
+  return {
+    datasetTag: "tld",
+    label: "TLD",
+    description: "",
+    lastMaterializedAt: null,
+    totals: { domain_count: 120, nameserver_count: 5, endpoint_count: 8, asn_count: 3, prefix_count: 2 },
+    factDistributions: null,
+    topTags: [],
+    topNameservers: [{ nameserver: "ns1.example", domain_count: 60 }],
+    topASNs: [{ asn: 64500, label: "Example AS", domain_count: 48 }],
+    severityTrend: {
+      points: [
+        { slug: "s1", captured_at: "s1", payload: { ok: 40, notice: 30, critical: 30 } },
+        { slug: "s2", captured_at: "s2", payload: { ok: 60, notice: 30, critical: 30 } }
+      ],
+      keyMeta: {
+        ok: { label: "OK", tone: "ok", order: 0 },
+        notice: { label: "Notice", tone: "notice", order: 1 },
+        critical: { label: "Crit", tone: "critical", order: 5 }
+      }
+    },
+    gradeTrend: {
+      points: [{ slug: "s2", captured_at: "s2", payload: { "A+": 10, A: 20, B: 90 } }],
+      keyMeta: {}
+    },
+    dnssecTrend: {
+      points: [
+        { slug: "s1", captured_at: "s1", payload: { signed: 30, unsigned: 70 } },
+        { slug: "s2", captured_at: "s2", payload: { signed: 50, unsigned: 70 } }
+      ],
+      keyMeta: {}
+    },
+    diff: {
+      dataset_tag: "tld",
+      from_slug: "s1",
+      to_slug: "s2",
+      added: [{ domain: "new.se" }],
+      removed: [],
+      grade_changed: [{ domain: "reg.se", from_grade: "A", to_grade: "D" }],
+      level_changed: []
+    },
+    diffFrom: "s1",
+    diffTo: "s2",
+    snapshot: { slug: "s2", captured_at: "2026-04-20T00:00:00Z", run_count: 1, domain_count: 120 },
+    noSnapshot: false,
+    loadError: null,
+    ...overrides
+  };
+}
+
+describe("overview page rendering", () => {
+  it("leads with hero tiles for domains, health, and signed share", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, { data: overviewData() });
+    const hero = within(screen.getByLabelText("Cohort headline metrics"));
+    // Domains tile uses the latest trend total (120).
+    expect(hero.getByText("120")).toBeInTheDocument();
+    expect(hero.getByText("Healthy")).toBeInTheDocument();
+    // Signed tile from the dnssec_posture trend: signed / (signed+unsigned)
+    // at s2 = 50/120 = 41.7%.
+    expect(hero.getByText("Signed")).toBeInTheDocument();
+    expect(hero.getByText("41.7%")).toBeInTheDocument();
+  });
+
+  it("counts OK and NOTICE domains as healthy, not just the OK bucket", () => {
+    render(OverviewPage, { data: overviewData() });
+    const hero = within(screen.getByLabelText("Cohort headline metrics"));
+    // s2 = ok 60 + notice 30 + critical 30. Healthy = (60+30)/120 = 75%,
+    // not 60/120 = 50% that OK-only would give.
+    expect(hero.getByText("75%")).toBeInTheDocument();
+  });
+
+  it("explains each hero tile on hover and for screen readers", () => {
+    render(OverviewPage, { data: overviewData() });
+    const healthyTile = screen.getByText("Healthy").closest(".hero-tile");
+    // Native title drives the hover tooltip.
+    expect(healthyTile?.getAttribute("title")).toMatch(/WARNING level or worse/);
+    // A visually-hidden copy carries the same help to assistive tech.
+    expect(healthyTile?.querySelector(".sr-only")?.textContent).toMatch(/WARNING level or worse/);
+    // Every rendered tile carries a help title.
+    const tiles = within(screen.getByLabelText("Cohort headline metrics")).getAllByRole("link");
+    expect(tiles.every((t) => (t.getAttribute("title") ?? "").length > 0)).toBe(true);
+  });
+
+  it("shows single-provider concentration in the infra cards", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, { data: overviewData() });
+    // Leader nameserver 60/120 = 50%, leader ASN 48/120 = 40%.
+    expect(screen.getByText(/Leader hosts 50% of domains/)).toBeInTheDocument();
+    expect(screen.getByText(/Leader hosts 40% of domains/)).toBeInTheDocument();
+  });
+
+  it("shows a 'since the previous snapshot' movers card with regressed domains", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, { data: overviewData() });
+    expect(screen.getByText(/since the previous snapshot/i)).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: "reg.se" });
+    expect(link.getAttribute("href")).toContain("/analysis/domains/reg.se");
+    // Full-diff link carries the two slugs.
+    const full = screen.getByRole("link", { name: /view full diff/i });
+    expect(full.getAttribute("href")).toContain("from=s1");
+    expect(full.getAttribute("href")).toContain("to=s2");
+  });
+
+  it("omits the movers card when there is no diff", () => {
+    render(OverviewPage, { data: overviewData({ diff: null }) });
+    expect(screen.queryByText(/since the previous snapshot/i)).toBeNull();
+  });
+
+  it("offers a diff-vs-previous link on the snapshot pill", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, { data: overviewData() });
+    const pill = within(screen.getByLabelText("Active snapshot"));
+    const link = pill.getByRole("link", { name: /diff vs previous/i });
+    expect(link.getAttribute("href")).toContain("from=s1");
+    expect(link.getAttribute("href")).toContain("to=s2");
+  });
+
+  it("hides the pill diff link when there is no previous snapshot", () => {
+    render(OverviewPage, { data: overviewData({ diffFrom: "" }) });
+    const pill = within(screen.getByLabelText("Active snapshot"));
+    expect(pill.queryByRole("link", { name: /diff vs previous/i })).toBeNull();
+  });
+
+  it("links the prefix count to the prefixes list", () => {
+    render(OverviewPage, { data: overviewData() });
+    // Prefixes has a browsable list route again, so its tile is a real link.
+    const prefixCard = screen.getByText("Prefixes").closest(".summary-card");
+    expect(prefixCard?.tagName).toBe("A");
+    expect(prefixCard?.getAttribute("href")).toContain("/prefixes");
+    // Sibling entity cards that also have list routes stay real links.
+    const nsCard = screen.getByText("Nameservers").closest(".summary-card");
+    expect(nsCard?.tagName).toBe("A");
   });
 });

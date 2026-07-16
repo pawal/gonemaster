@@ -198,8 +198,10 @@ func TestDomainDetailTagFloorHonorsWarningOverride(t *testing.T) {
 	}
 }
 
-// TestDomainDetailCacheHeadersExplicitSnapshot pins the immutable
+// TestDomainDetailCacheHeadersExplicitSnapshot pins the revalidating
 // Cache-Control + ETag emitted when the URL pins a captured snapshot.
+// Snapshots can be rebuilt under the same slug, so the response must not
+// be immutable.
 func TestDomainDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
@@ -209,8 +211,8 @@ func TestDomainDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 	if resp.Code != http.StatusOK {
 		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
 	}
-	if cc := resp.Header().Get("Cache-Control"); !strings.Contains(cc, "immutable") {
-		t.Errorf("explicit-snapshot Cache-Control = %q, want immutable", cc)
+	if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {
+		t.Errorf("explicit-snapshot Cache-Control = %q, must not be immutable", cc)
 	}
 	if etag := resp.Header().Get("ETag"); etag == "" {
 		t.Error("explicit-snapshot must set ETag")

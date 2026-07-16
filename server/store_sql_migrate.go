@@ -534,6 +534,22 @@ var sqlMigrations = []sqlMigration{
 			)`,
 		},
 	},
+	{
+		// Aggregated latency (median + p95 ms, sample count) per snapshot
+		// entity. Nullable: pre-migration snapshots read as no data.
+		version: 5,
+		stmts: []string{
+			`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN latency_p50_ms REAL`,
+			`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN latency_p95_ms REAL`,
+			`ALTER TABLE analysis_snapshot_nameserver_view ADD COLUMN latency_samples INTEGER`,
+			`ALTER TABLE analysis_snapshot_endpoint_view ADD COLUMN latency_p50_ms REAL`,
+			`ALTER TABLE analysis_snapshot_endpoint_view ADD COLUMN latency_p95_ms REAL`,
+			`ALTER TABLE analysis_snapshot_endpoint_view ADD COLUMN latency_samples INTEGER`,
+			`ALTER TABLE analysis_snapshot_asn_view ADD COLUMN latency_p50_ms REAL`,
+			`ALTER TABLE analysis_snapshot_asn_view ADD COLUMN latency_p95_ms REAL`,
+			`ALTER TABLE analysis_snapshot_asn_view ADD COLUMN latency_samples INTEGER`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies

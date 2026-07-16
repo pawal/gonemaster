@@ -21,6 +21,10 @@ type PublicAnalysisNameserverView struct {
 	Operator    string `json:"operator,omitempty"`
 	OperatorASN *int64 `json:"operator_asn,omitempty"`
 	QueryCount  int    `json:"query_count,omitempty"`
+	// Aggregated response time; nil when the snapshot predates latency.
+	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples int      `json:"latency_samples,omitempty"`
 }
 
 // PublicAnalysisEndpointView is one (nameserver, address) pair in the cohort.
@@ -32,6 +36,10 @@ type PublicAnalysisEndpointView struct {
 	ASN         *int64 `json:"asn,omitempty"`
 	ASNLabel    string `json:"asn_label,omitempty"`
 	Prefix      string `json:"prefix,omitempty"`
+	// Aggregated response time; nil when the snapshot predates latency.
+	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples int      `json:"latency_samples,omitempty"`
 }
 
 // PublicAnalysisASNView aggregates one ASN's footprint in the cohort.
@@ -44,6 +52,10 @@ type PublicAnalysisASNView struct {
 	PrefixCount     int    `json:"prefix_count"`
 	IPv4Count       int    `json:"ipv4_count"`
 	IPv6Count       int    `json:"ipv6_count"`
+	// Aggregated response time; nil when the snapshot predates latency.
+	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples int      `json:"latency_samples,omitempty"`
 }
 
 // PublicAnalysisPrefixView aggregates one announced prefix in the cohort.
@@ -54,6 +66,14 @@ type PublicAnalysisPrefixView struct {
 	AddressCount int    `json:"address_count"`
 	ASN          *int64 `json:"asn,omitempty"`
 	ASNLabel     string `json:"asn_label,omitempty"`
+}
+
+func copyFloatPtr(v *float64) *float64 {
+	if v == nil {
+		return nil
+	}
+	c := *v
+	return &c
 }
 
 // handlePublicAnalysisNameservers handles GET /pub/api/v1/analysis/nameservers.
@@ -84,6 +104,9 @@ func (s *Server) handlePublicAnalysisNameservers(w http.ResponseWriter, r *http.
 			Operator:      row.Operator,
 			QueryCount:    row.QueryCount,
 		}
+		view.LatencyP50MS = copyFloatPtr(row.LatencyP50MS)
+		view.LatencyP95MS = copyFloatPtr(row.LatencyP95MS)
+		view.LatencySamples = row.LatencySamples
 		if row.OperatorASN != nil {
 			asnCopy := *row.OperatorASN
 			view.OperatorASN = &asnCopy
@@ -256,6 +279,9 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 			ASNLabel:    row.ASNLabel,
 			Prefix:      row.Prefix,
 		}
+		v.LatencyP50MS = copyFloatPtr(row.LatencyP50MS)
+		v.LatencyP95MS = copyFloatPtr(row.LatencyP95MS)
+		v.LatencySamples = row.LatencySamples
 		if row.ASN != nil {
 			asnCopy := *row.ASN
 			v.ASN = &asnCopy
@@ -313,6 +339,9 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 			PrefixCount:     row.PrefixCount,
 			IPv4Count:       row.IPv4Count,
 			IPv6Count:       row.IPv6Count,
+			LatencyP50MS:    copyFloatPtr(row.LatencyP50MS),
+			LatencyP95MS:    copyFloatPtr(row.LatencyP95MS),
+			LatencySamples:  row.LatencySamples,
 		})
 	}
 

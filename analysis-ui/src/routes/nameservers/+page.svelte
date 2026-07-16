@@ -8,10 +8,18 @@
   import ASNChip from "$lib/chips/ASNChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import { nameserverHref } from "$lib/entityLinks";
-  import { formatCount } from "$lib/format";
-  import { updateURLParam } from "$lib/filters";
-  import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
-  import type { NameserverView } from "$lib/api";
+  import { formatCount, formatMs } from "$lib/format";
+  import { updateURLParam, filterFromURL } from "$lib/filters";
+  import {
+    downloadCSV,
+    downloadJSON,
+    collectExportRows,
+    exportScope,
+    exportCaption,
+    exportScopeSuffix,
+    type ExportColumn
+  } from "$lib/exporters";
+  import { listNameservers, type NameserverView, type AnalysisFilter } from "$lib/api";
   import type { LayoutData } from "../+layout";
   import type { NameserversPageData } from "./+page";
 
@@ -36,6 +44,8 @@
 
   const rows = $derived((data.list?.items ?? []) as NameserverView[]);
   const search = $derived(page.url.search);
+  // Only show the latency column when the snapshot actually has data for it.
+  const hasLatency = $derived(rows.some((r) => r.latency_p50_ms != null));
 
   function rowClick(event: MouseEvent, href: string) {
     const target = event.target as HTMLElement | null;
@@ -51,7 +61,9 @@
     { key: "endpoint_count", label: "Endpoints", value: (r) => r.endpoint_count },
     { key: "ipv4_count", label: "IPv4", value: (r) => r.ipv4_count },
     { key: "ipv6_count", label: "IPv6", value: (r) => r.ipv6_count },
-    { key: "asn_count", label: "ASNs", value: (r) => r.asn_count }
+    { key: "asn_count", label: "ASNs", value: (r) => r.asn_count },
+    { key: "latency_p50_ms", label: "Latency p50 (ms)", value: (r) => r.latency_p50_ms ?? "" },
+    { key: "latency_p95_ms", label: "Latency p95 (ms)", value: (r) => r.latency_p95_ms ?? "" }
   ];
 
   function filenamePrefix(): string {
@@ -59,14 +71,36 @@
     return `${tag}-nameservers`;
   }
 
-  function exportCSV() {
-    if (!data.list) return;
-    downloadCSV(`${filenamePrefix()}.csv`, data.list.items, exportColumns);
+  const exportScopeInfo = $derived(exportScope(total));
+  const exportNote = $derived(exportCaption(exportScopeInfo));
+
+  // Reproduce the loader's list params so the export honours the active
+  // filter, snapshot and sort, then widen pagination to the row cap.
+  function exportFilter(): AnalysisFilter {
+    return {
+      ...filterFromURL(page.url),
+      dataset_tag: data.datasetTag ?? undefined,
+      snapshot: layoutData.effectiveSnapshotSlug ?? undefined,
+      sort: currentSort || undefined
+    };
   }
 
-  function exportJSONFile() {
-    if (!data.list) return;
-    downloadJSON(`${filenamePrefix()}.json`, data.list.items, exportColumns);
+  function fetchExportRows(): Promise<NameserverView[]> {
+    return collectExportRows(data.list?.items ?? [], currentOffset, total, (limit) =>
+      listNameservers({ ...exportFilter(), limit, offset: 0 }).then((r) => r.items)
+    );
+  }
+
+  async function exportCSV() {
+    const rows = await fetchExportRows();
+    if (!rows.length) return;
+    downloadCSV(`${filenamePrefix()}${exportScopeSuffix(exportScopeInfo)}.csv`, rows, exportColumns);
+  }
+
+  async function exportJSONFile() {
+    const rows = await fetchExportRows();
+    if (!rows.length) return;
+    downloadJSON(`${filenamePrefix()}${exportScopeSuffix(exportScopeInfo)}.json`, rows, exportColumns);
   }
 </script>
 
@@ -88,8 +122,11 @@
         </select>
       </label>
       <div class="export-group">
-        <button type="button" class="ghost" onclick={exportCSV} disabled={!data.list?.items.length}>CSV</button>
-        <button type="button" class="ghost" onclick={exportJSONFile} disabled={!data.list?.items.length}>JSON</button>
+        <div class="export-buttons">
+          <button type="button" class="ghost" onclick={exportCSV} disabled={!data.list?.items.length}>CSV</button>
+          <button type="button" class="ghost" onclick={exportJSONFile} disabled={!data.list?.items.length}>JSON</button>
+        </div>
+        <p class="export-note">{exportNote}</p>
       </div>
     </div>
   </div>
@@ -99,7 +136,9 @@
   {:else if data.error}
     <p class="status-banner error">Failed to load nameservers: {data.error}</p>
   {:else if !data.list || data.list.items.length === 0}
-    <p class="status-banner">No nameservers materialized for this cohort yet.</p>
+    <div class="empty-state">
+      <p class="hint">No nameservers materialized for this cohort yet.</p>
+    </div>
   {:else}
     <div class="table-wrap">
       <table class="data-table">
@@ -117,6 +156,9 @@
             </th>
             <th scope="col" class="col-num">IPv4</th>
             <th scope="col" class="col-num">IPv6</th>
+            {#if hasLatency}
+              <th scope="col" class="col-num">Latency</th>
+            {/if}
           </tr>
         </thead>
         <tbody>
@@ -136,6 +178,18 @@
               <td class="col-num">{formatCount(row.endpoint_count)}</td>
               <td class="col-num">{formatCount(row.ipv4_count)}</td>
               <td class="col-num">{formatCount(row.ipv6_count)}</td>
+              {#if hasLatency}
+                <td class="col-num">
+                  {#if row.latency_p50_ms != null}
+                    {formatMs(row.latency_p50_ms)}
+                    {#if row.latency_p95_ms != null}
+                      <span class="latency-sub">p95 {formatMs(row.latency_p95_ms)}</span>
+                    {/if}
+                  {:else}
+                    <span class="latency-sub">-</span>
+                  {/if}
+                </td>
+              {/if}
             </tr>
           {/each}
         </tbody>
@@ -154,4 +208,5 @@
     overflow-wrap: anywhere;
   }
   .operator-multi { color: var(--ink-2); font-family: var(--sans); font-style: italic; }
+  .latency-sub { display: block; color: var(--ink-2); font-size: var(--text-xs); font-family: var(--sans); }
 </style>

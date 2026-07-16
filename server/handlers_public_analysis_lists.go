@@ -38,6 +38,7 @@ type AnalysisReadStore interface {
 	GetSnapshotASNView(snapshotID, asn int64) (AnalysisSnapshotASNView, bool)
 	ListSnapshotPrefixViews(snapshotID int64) []AnalysisSnapshotPrefixView
 	GetSnapshotPrefixView(snapshotID int64, prefix string) (AnalysisSnapshotPrefixView, bool)
+	AnalysisEntityHistory(cohortID int64, entity, key string) ([]AnalysisEntityHistoryPoint, error)
 }
 
 // analysisListFilter captures the shared query parameters used by public list
@@ -141,23 +142,15 @@ func (s *Server) resolvePublicAnalysisCohortAndSnapshot(w http.ResponseWriter, r
 	return cohort, snap, true
 }
 
-// writeSnapshotCacheHeaders sets Cache-Control and ETag based on the
-// resolution mode. Explicit ?snapshot= pins a captured snapshot whose
-// slug embeds its captured_at id, so the response is truly immutable -
-// max-age=1y. Auto-latest or no-snapshot revalidates so a new default
-// takes effect promptly.
+// writeSnapshotCacheHeaders sets Cache-Control and ETag. Snapshots can be
+// rebuilt in place (same slug, new content), so responses are never marked
+// immutable; clients revalidate via the ETag, which changes on rebuild -
+// a cheap 304 when unchanged, fresh 200 after a rebuild.
 func writeSnapshotCacheHeaders(w http.ResponseWriter, r *http.Request, snap AnalysisCohortSnapshot) {
-	if snap.ID == 0 {
-		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
-		return
+	w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+	if snap.ID != 0 {
+		w.Header().Set("ETag", snapshotETag(snap))
 	}
-	explicit := strings.TrimSpace(r.URL.Query().Get("snapshot")) != ""
-	if explicit && snap.Status == AnalysisSnapshotStatusCaptured {
-		w.Header().Set("Cache-Control", "public, max-age=31536000, immutable")
-	} else {
-		w.Header().Set("Cache-Control", "no-cache, must-revalidate")
-	}
-	w.Header().Set("ETag", snapshotETag(snap))
 }
 
 func snapshotETag(snap AnalysisCohortSnapshot) string {

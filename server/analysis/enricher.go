@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
+	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
@@ -66,6 +67,13 @@ func NewAsnlookupEnricher(resolver resolverAdapter, ttl time.Duration) *Asnlooku
 	return &AsnlookupEnricher{Resolver: resolver, TTL: ttl}
 }
 
+// recursionContext returns ctx carrying the fresh nameserver cache the recursor
+// requires. Per-lookup scope matches the engine's per-run cache; results are
+// cached separately so this stays short-lived scratch, not a stale global.
+func (e *AsnlookupEnricher) recursionContext(ctx context.Context) context.Context {
+	return nameserver.WithCache(ctx, nameserver.NewCacheStore())
+}
+
 // EnrichAddress looks up the prefix and ASN for an IP via cymru/ripe. Any
 // lookup error is swallowed and returned as ok=false so the projector keeps
 // going. The address string is expected in its engine-normalized form.
@@ -85,7 +93,7 @@ func (e *AsnlookupEnricher) EnrichAddress(ctx context.Context, ip string) (Addre
 	}
 	e.mu.Unlock()
 
-	result, err := asnlookup.GetWithPrefix(ctx, e.Resolver, addr)
+	result, err := asnlookup.GetWithPrefix(e.recursionContext(ctx), e.Resolver, addr)
 	out := AddressEnrichment{}
 	if err == nil {
 		if result.Prefix != nil {
@@ -139,7 +147,7 @@ func (e *AsnlookupEnricher) EnrichASNLabel(ctx context.Context, asn int64) (stri
 	}
 	e.mu.Unlock()
 
-	info, err := asnlookup.LookupASNInfo(ctx, e.Resolver, int(asn))
+	info, err := asnlookup.LookupASNInfo(e.recursionContext(ctx), e.Resolver, int(asn))
 	label := ""
 	if err == nil && info.Code == asnlookup.CodeFound {
 		label = info.Label

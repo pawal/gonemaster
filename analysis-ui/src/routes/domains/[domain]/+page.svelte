@@ -5,6 +5,7 @@
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
+  import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
   import { tagHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import { idnToUnicode } from "$lib/idn";
@@ -161,6 +162,7 @@
       <div><dt>ASNs</dt><dd>{formatCount(d.asn_count)}</dd></div>
       <div><dt>Prefixes</dt><dd>{formatCount(d.prefix_count)}</dd></div>
     </dl>
+    <EntityHistorySparkline points={data.history} metric="score" label="Score over snapshots" />
   </section>
 
   <section class="card">
@@ -529,13 +531,13 @@
 
   .ns-row-unreachable,
   .ns-row-unresolved {
-    background: #fef2f2;
+    background: var(--sev-critical-bg);
   }
   .ns-row-unreachable td,
   .ns-row-unreachable th,
   .ns-row-unresolved td,
   .ns-row-unresolved th {
-    color: #7f1d1d;
+    color: var(--sev-critical-fg);
   }
   .ns-status-badge {
     display: inline-block;
@@ -547,7 +549,7 @@
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--sev-critical-bg);
+    color: var(--sev-critical-fg);
   }
 </style>

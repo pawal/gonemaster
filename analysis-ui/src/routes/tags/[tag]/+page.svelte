@@ -3,6 +3,7 @@
   import { page } from "$app/state";
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import TestcaseChip from "$lib/chips/TestcaseChip.svelte";
+  import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
   import { formatCount, levelTone } from "$lib/format";
   import { testcaseTitle } from "$lib/testcaseTitles";
   import type { TagDetailPageData } from "./+page";
@@ -58,6 +59,7 @@
       <div><dt>Domains</dt><dd>{formatCount(d.domain_count)}</dd></div>
       <div><dt>Occurrences</dt><dd>{formatCount(d.occurrence_count)}</dd></div>
     </dl>
+    <EntityHistorySparkline points={data.history} metric="domain_count" label="Domains over snapshots" />
   </section>
 
   <section class="card">

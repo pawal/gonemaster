@@ -389,6 +389,52 @@ describe("AnalysisCohorts", () => {
     });
   });
 
+  it("opens the run-options menu via the caret and submits promote_snapshot_default", async () => {
+    const handles = installSnapshotFetch();
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    // The menu item only exists once the caret opens the menu.
+    expect(within(tldRow).queryByRole("menuitem")).toBeNull();
+
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /More run options/i }));
+    const menuItem = await within(tldRow).findByRole("menuitem", { name: /Run \+ set as default/i });
+    await fireEvent.click(menuItem);
+
+    await waitFor(() => expect(handles.submittedBatches).toHaveLength(1));
+    expect(handles.submittedBatches[0]).toEqual({
+      from_tag: "tld",
+      snapshot_intent: true,
+      promote_snapshot_default: true,
+    });
+  });
+
+  it("closes the run-options menu on Escape", async () => {
+    installSnapshotFetch();
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /More run options/i }));
+    await within(tldRow).findByRole("menuitem", { name: /Run \+ set as default/i });
+
+    await fireEvent.keyDown(document.body, { key: "Escape" });
+
+    await waitFor(() => expect(within(tldRow).queryByRole("menuitem")).toBeNull());
+  });
+
+  it("closes the run-options menu on an outside click", async () => {
+    installSnapshotFetch();
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /More run options/i }));
+    await within(tldRow).findByRole("menuitem", { name: /Run \+ set as default/i });
+
+    await fireEvent.click(document.body);
+
+    await waitFor(() => expect(within(tldRow).queryByRole("menuitem")).toBeNull());
+  });
+
   it("lists snapshots with a mixed-profile banner when one is flagged", async () => {
     const snapshotsByCohort = {
       1: [

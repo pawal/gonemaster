@@ -70,6 +70,8 @@
   let editingLabelKey = $state("");
   let editingLabelValue = $state("");
   let submittingSnapshotCohortId = $state(null);
+  // Which cohort's "Run new snapshot" split-button menu is open (id or null).
+  let openRunMenuCohortId = $state(null);
   // Poll handle kept outside state so we can clear it without reactively
   // re-triggering. Rebuilds run server-side in a goroutine and report
   // materialization_done / materialization_total on the cohort row; while
@@ -520,16 +522,22 @@
   }
 
   // "Run new snapshot" → POST /jobs/batch with from_tag + snapshot_intent.
-  async function runSnapshot(cohort) {
+  // With promoteDefault, the captured snapshot is pinned as cohort default.
+  async function runSnapshot(cohort, { promoteDefault = false } = {}) {
+    openRunMenuCohortId = null;
     submittingSnapshotCohortId = cohort.id;
     try {
       const payload = { from_tag: cohort.source_tag, snapshot_intent: true };
+      if (promoteDefault) payload.promote_snapshot_default = true;
       const response = await apiFetch("/jobs/batch", {
         method: "POST",
         body: JSON.stringify(payload),
       });
+      const noticeKey = promoteDefault
+        ? "analysis_cohorts_snapshot_submitted_default"
+        : "analysis_cohorts_snapshot_submitted";
       setNotice(
-        $t("analysis_cohorts_snapshot_submitted", { id: response.batch_id, tag: cohort.source_tag }),
+        $t(noticeKey, { id: response.batch_id, tag: cohort.source_tag }),
         "ok"
       );
       expandedSnapshotCohortId = cohort.id;
@@ -542,6 +550,29 @@
     } finally {
       submittingSnapshotCohortId = null;
     }
+  }
+
+  function toggleRunMenu(cohort) {
+    openRunMenuCohortId = openRunMenuCohortId === cohort.id ? null : cohort.id;
+  }
+
+  // Close the run-options menu on Escape or any click/focus outside its
+  // split button. Listeners are scoped to the mounted menu and removed on
+  // destroy; the menu only renders while open.
+  function runMenuDismiss(node) {
+    const scope = node.closest(".run-split") || node;
+    const onKey = (e) => { if (e.key === "Escape") openRunMenuCohortId = null; };
+    const onOutside = (e) => { if (!scope.contains(e.target)) openRunMenuCohortId = null; };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("click", onOutside, true);
+    window.addEventListener("focusin", onOutside, true);
+    return {
+      destroy() {
+        window.removeEventListener("keydown", onKey);
+        window.removeEventListener("click", onOutside, true);
+        window.removeEventListener("focusin", onOutside, true);
+      },
+    };
   }
 
   function snapshotStatusTone(status) {
@@ -712,6 +743,7 @@
             {#each cohorts as cohort (cohort.id)}
               {@const busy = busyCohortId === cohort.id}
               {@const tone = materializationBadgeTone(cohort)}
+              {@const runDisabled = busy || !cohort.analysis_enabled || submittingSnapshotCohortId === cohort.id}
               <tr class:row-editing={editingCohortId === cohort.id}>
                 <th scope="row" class="cohort-cell">
                   <span class="cohort-tag">{cohort.source_tag}</span>
@@ -791,12 +823,30 @@
                 </td>
                 <td class="col-right">
                   <div class="row-actions">
-                    <button type="button" class="row-action row-action-primary"
-                            disabled={busy || !cohort.analysis_enabled || submittingSnapshotCohortId === cohort.id}
-                            title={$t("analysis_cohorts_run_snapshot_title")}
-                            onclick={() => runSnapshot(cohort)}>
-                      {$t("analysis_cohorts_run_snapshot")}
-                    </button>
+                    <div class="run-split">
+                      <button type="button" class="row-action row-action-primary run-split-main"
+                              disabled={runDisabled}
+                              title={$t("analysis_cohorts_run_snapshot_title")}
+                              onclick={() => runSnapshot(cohort)}>
+                        {$t("analysis_cohorts_run_snapshot")}
+                      </button>
+                      <button type="button" class="row-action row-action-primary run-split-caret"
+                              disabled={runDisabled}
+                              aria-haspopup="menu"
+                              aria-expanded={openRunMenuCohortId === cohort.id}
+                              aria-label={$t("analysis_cohorts_run_snapshot_menu_toggle")}
+                              onclick={() => toggleRunMenu(cohort)}>
+                        <span aria-hidden="true">&#9662;</span>
+                      </button>
+                      {#if openRunMenuCohortId === cohort.id}
+                        <div class="run-menu" role="menu" use:runMenuDismiss>
+                          <button type="button" class="run-menu-item" role="menuitem"
+                                  onclick={() => runSnapshot(cohort, { promoteDefault: true })}>
+                            {$t("analysis_cohorts_run_snapshot_default")}
+                          </button>
+                        </div>
+                      {/if}
+                    </div>
                     <button type="button" class="row-action" disabled={busy} onclick={() => toggleSnapshots(cohort)}>
                       {$t("analysis_snapshots_heading")}
                     </button>
@@ -1298,6 +1348,61 @@
 
   .row-action-primary:not(:disabled):hover {
     background: color-mix(in srgb, var(--accent-2) 8%, var(--surface-2));
+  }
+
+  .run-split {
+    position: relative;
+    display: inline-flex;
+  }
+
+  .run-split-main {
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .run-split-caret {
+    margin-left: -1px;
+    padding-left: 7px;
+    padding-right: 7px;
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
+    font-size: 0.7em;
+    line-height: 1;
+  }
+
+  .run-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    z-index: 20;
+    min-width: max-content;
+    padding: 4px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  }
+
+  .run-menu-item {
+    display: block;
+    width: 100%;
+    padding: 6px 10px;
+    text-align: left;
+    white-space: nowrap;
+    font-size: var(--text-xs);
+    font-weight: 500;
+    color: var(--ink);
+    background: transparent;
+    border: none;
+    border-radius: 4px;
+    box-shadow: none;
+    cursor: pointer;
+  }
+
+  .run-menu-item:hover:not(:disabled) {
+    background: var(--surface-2);
+    transform: none;
+    box-shadow: none;
   }
 
   .snapshot-subrow > td {

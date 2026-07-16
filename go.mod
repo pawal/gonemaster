@@ -3,7 +3,7 @@ module codeberg.org/pawal/gonemaster
 go 1.26.0
 
 require (
-	codeberg.org/miekg/dns v0.6.81
+	codeberg.org/miekg/dns v0.6.84
 	github.com/go-sql-driver/mysql v1.9.3
 	github.com/lib/pq v1.11.2
 	github.com/modelcontextprotocol/go-sdk v1.6.1

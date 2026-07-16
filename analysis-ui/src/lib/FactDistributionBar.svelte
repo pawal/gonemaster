@@ -29,12 +29,12 @@
   const visible = $derived(buckets.filter((b) => b.count > 0));
 </script>
 
-{#if visible.length > 0}
-  <section class="card fact-dist-section">
-    <h3>{title}</h3>
-    {#if description}
-      <p class="hint">{description}</p>
-    {/if}
+<section class="card fact-dist-section">
+  <h3>{title}</h3>
+  {#if description}
+    <p class="hint">{description}</p>
+  {/if}
+  {#if visible.length > 0}
     {#if hrefForKey}
       <ul class="fact-dist-bar" aria-label={title}>
         {#each visible as b (b.key)}
@@ -71,8 +71,12 @@
         cohort's domain count.
       </p>
     {/if}
-  </section>
-{/if}
+  {:else}
+    <div class="empty-state">
+      <p class="hint">No data for this metric in the current snapshot.</p>
+    </div>
+  {/if}
+</section>
 
 <style>
   .fact-dist-section {

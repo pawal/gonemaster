@@ -869,21 +869,6 @@
     letter-spacing: 0.06em;
   }
 
-  .empty-state h2,
-  .empty-state h3 {
-    margin: 0;
-    color: var(--ink);
-  }
-
-  .empty-state code {
-    font-family: var(--mono);
-    font-size: var(--text-sm);
-    background: var(--surface-2);
-    color: var(--on-surface-2);
-    padding: 1px 6px;
-    border-radius: 4px;
-  }
-
   .next-steps {
     padding-left: var(--space-5);
     margin: var(--space-2) 0 0;

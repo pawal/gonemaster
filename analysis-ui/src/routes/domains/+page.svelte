@@ -139,7 +139,9 @@
   {:else if data.error}
     <p class="status-banner error">Failed to load domains: {data.error}</p>
   {:else if !data.list || data.list.items.length === 0}
-    <p class="status-banner">No domains materialized for this cohort yet.</p>
+    <div class="empty-state">
+      <p class="hint">No domains materialized for this cohort yet.</p>
+    </div>
   {:else}
     <div class="table-wrap">
       <table class="data-table">

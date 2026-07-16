@@ -4,6 +4,15 @@
   import { apiCall } from "../lib/api.js";
   import { formatTimestampLocal } from "../lib/format.js";
   import { href, navigate } from "../lib/router.svelte.js";
+  import {
+    compareText,
+    compareNumber,
+    compareTimestamp,
+    nextTableSort,
+    tableSortAria,
+    tableSortIndicator,
+    sortItems,
+  } from "../lib/sort.js";
   import InlineNotice from "../components/InlineNotice.svelte";
   import ConfirmDialog from "../components/ConfirmDialog.svelte";
 
@@ -67,8 +76,8 @@
   let snapshotsLoadingIds = $state(new Set());
   let expandedSnapshotCohortId = $state(null);
   let busySnapshotKey = $state("");
-  // Set only while a rematerialize POST is in flight.
-  let rebuildingSnapshotKey = $state("");
+  // Snapshot table sort; defaults to newest-captured-first (API order).
+  let snapshotSort = $state({ key: "captured", direction: "desc" });
   let editingLabelKey = $state("");
   let editingLabelValue = $state("");
   let submittingSnapshotCohortId = $state(null);
@@ -475,19 +484,20 @@
   async function rebuildSnapshotAggregates(cohort, snap) {
     const key = snapshotKey(cohort.id, snap.slug);
     busySnapshotKey = key;
-    rebuildingSnapshotKey = key;
     try {
+      // The rebuild runs server-side in the background; the POST returns 202
+      // with the snapshot pending. Reload once so the progress bar appears,
+      // then the poll loop tracks it to completion.
       await apiFetch(
         `/analysis/cohorts/${cohort.id}/snapshots/${encodeURIComponent(snap.slug)}/rematerialize`,
         { method: "POST" }
       );
       await loadSnapshots(cohort, { refresh: true });
-      setNotice($t("analysis_snapshots_rebuilt", { slug: snap.slug }), "ok");
+      setNotice($t("analysis_snapshots_rebuild_started", { slug: snap.slug }), "ok");
     } catch (error) {
       setNotice($t("analysis_snapshots_action_error", { error: error.message || "" }), "warn");
     } finally {
       busySnapshotKey = "";
-      rebuildingSnapshotKey = "";
     }
   }
 
@@ -655,6 +665,29 @@
     return Math.floor((done / total) * 100);
   }
 
+  // Same math for a snapshot's rematerialize progress.
+  const snapshotProgressPercent = (snap) => progressPercent(snap);
+
+  // Any loaded snapshot mid-rebuild -> keep polling that cohort's list.
+  const anySnapshotMaterializing = $derived(
+    Object.values(snapshotsByCohortId).some((list) =>
+      Array.isArray(list) && list.some((s) => s.materialization_status === "pending"),
+    ),
+  );
+
+  const SNAPSHOT_COMPARATORS = {
+    snapshot: (a, b) => compareText(snapshotDisplayName(a), snapshotDisplayName(b)),
+    captured: (a, b) => compareTimestamp(a.captured_at, b.captured_at),
+    profile: (a, b) => compareText(a.profile_name, b.profile_name),
+    counts: (a, b) => compareNumber(a.domain_count, b.domain_count),
+    status: (a, b) => compareText(a.status, b.status),
+  };
+  const snapshotTieBreaker = (a, b) => compareNumber(a.id, b.id);
+  const sortSnapshots = (list) => sortItems(list, snapshotSort, SNAPSHOT_COMPARATORS, snapshotTieBreaker);
+  const setSnapshotSort = (key, defaultDir = "asc") => {
+    snapshotSort = nextTableSort(snapshotSort, key, defaultDir);
+  };
+
   async function pollCohortsQuietly() {
     try {
       const result = await apiFetch("/analysis/cohorts");
@@ -663,24 +696,26 @@
       // Silent: a transient fetch error shouldn't overwrite the visible
       // notice area while a rebuild is running.
     }
-    // While a cohort with its snapshots panel expanded is mid-rebuild,
-    // refresh that cohort's snapshot list too - otherwise the per-snapshot
-    // run/domain counts go stale until the user collapses and re-expands.
+    // Refresh the expanded cohort's snapshot list while either the cohort is
+    // rebuilding or one of its snapshots is being rematerialized, so the
+    // per-snapshot progress bar and counts advance without a manual reload.
     if (expandedSnapshotCohortId != null) {
       const cohort = cohorts.find((c) => c.id === expandedSnapshotCohortId);
-      if (cohort?.materialization_status === "pending") {
+      const snaps = snapshotsByCohortId[expandedSnapshotCohortId] ?? [];
+      const snapPending = snaps.some((s) => s.materialization_status === "pending");
+      if (cohort?.materialization_status === "pending" || snapPending) {
         loadSnapshots(cohort, { refresh: true });
       }
     }
   }
 
   $effect(() => {
-    // Start the poll only while something is pending; stop as soon as
-    // every cohort is ready or failed so the UI isn't hitting the API
-    // in steady state.
-    if (anyPending && pollTimer == null) {
+    // Poll while a cohort rebuild or a snapshot rematerialize is in flight;
+    // stop once everything is ready/failed so the UI is idle in steady state.
+    const active = anyPending || anySnapshotMaterializing;
+    if (active && pollTimer == null) {
       pollTimer = setInterval(pollCohortsQuietly, POLL_INTERVAL_MS);
-    } else if (!anyPending && pollTimer != null) {
+    } else if (!active && pollTimer != null) {
       clearInterval(pollTimer);
       pollTimer = null;
     }
@@ -871,6 +906,7 @@
               </tr>
               {#if expandedSnapshotCohortId === cohort.id}
                 {@const snaps = snapshotsByCohortId[cohort.id] ?? []}
+                {@const sortedSnaps = sortSnapshots(snaps)}
                 {@const mixed = snaps.some((s) => s.status === "failed_mixed_profiles")}
                 <tr class="snapshot-subrow">
                   <td colspan="6">
@@ -887,20 +923,20 @@
                       <table class="data-table snapshot-table">
                         <thead>
                           <tr>
-                            <th>{$t("analysis_snapshots_col_snapshot")}</th>
-                            <th>{$t("analysis_snapshots_col_captured_at")}</th>
-                            <th>{$t("analysis_snapshots_col_profile")}</th>
-                            <th>{$t("analysis_snapshots_col_counts")}</th>
+                            <th class="sortable-column" aria-sort={tableSortAria(snapshotSort, "snapshot")}><button class="table-sort-button" type="button" onclick={() => setSnapshotSort("snapshot")}><span>{$t("analysis_snapshots_col_snapshot")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(snapshotSort, "snapshot")}</span></button></th>
+                            <th class="sortable-column" aria-sort={tableSortAria(snapshotSort, "captured")}><button class="table-sort-button" type="button" onclick={() => setSnapshotSort("captured", "desc")}><span>{$t("analysis_snapshots_col_captured_at")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(snapshotSort, "captured")}</span></button></th>
+                            <th class="sortable-column" aria-sort={tableSortAria(snapshotSort, "profile")}><button class="table-sort-button" type="button" onclick={() => setSnapshotSort("profile")}><span>{$t("analysis_snapshots_col_profile")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(snapshotSort, "profile")}</span></button></th>
+                            <th class="sortable-column" aria-sort={tableSortAria(snapshotSort, "counts")}><button class="table-sort-button" type="button" onclick={() => setSnapshotSort("counts", "desc")}><span>{$t("analysis_snapshots_col_counts")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(snapshotSort, "counts")}</span></button></th>
                             <th>{$t("analysis_snapshots_col_source_batch")}</th>
-                            <th>{$t("analysis_snapshots_col_status")}</th>
+                            <th class="sortable-column" aria-sort={tableSortAria(snapshotSort, "status")}><button class="table-sort-button" type="button" onclick={() => setSnapshotSort("status")}><span>{$t("analysis_snapshots_col_status")}</span><span class="sort-indicator" aria-hidden="true">{tableSortIndicator(snapshotSort, "status")}</span></button></th>
                             <th class="col-right">{$t("analysis_snapshots_col_actions")}</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {#each snaps as snap (snap.id)}
+                          {#each sortedSnaps as snap (snap.id)}
                             {@const snapKey = snapshotKey(cohort.id, snap.slug)}
                             {@const snapBusy = busySnapshotKey === snapKey}
-                            {@const snapRebuilding = rebuildingSnapshotKey === snapKey}
+                            {@const snapRebuilding = snap.materialization_status === "pending"}
                             {@const editing = editingLabelKey === snapKey}
                             <tr>
                               <td>
@@ -934,11 +970,19 @@
                                   <span class="badge badge-default" title={$t("analysis_cohorts_default_snapshot_tooltip")}>{$t("analysis_cohorts_default_active")}</span>
                                 {/if}
                                 {#if snapRebuilding}
-                                  <div class="snapshot-progress" role="progressbar"
-                                       aria-label={$t("analysis_snapshots_rebuilding")} aria-busy="true">
-                                    <div class="snapshot-progress-fill"></div>
+                                  <div class="materialization-progress" role="progressbar"
+                                       aria-valuenow={snapshotProgressPercent(snap)}
+                                       aria-valuemin="0" aria-valuemax="100"
+                                       aria-label={$t("analysis_snapshots_rebuilding")}>
+                                    <div class="materialization-progress-fill" use:applyWidth={`${snapshotProgressPercent(snap)}%`}></div>
                                   </div>
-                                  <span class="snapshot-rebuilding-label">{$t("analysis_snapshots_rebuilding")}</span>
+                                  <span class="snapshot-rebuilding-label">
+                                    {$t("analysis_snapshots_rebuilding")} {snap.materialization_done ?? 0}/{snap.materialization_total ?? 0}
+                                  </span>
+                                {:else if snap.materialization_status === "failed"}
+                                  <span class="materialization-error" title={snap.last_materialization_error}>
+                                    {$t("analysis_snapshots_rebuild_failed")}
+                                  </span>
                                 {/if}
                               </td>
                               <td class="col-right">
@@ -966,7 +1010,7 @@
                                         title={snap.source_runs_available === false
                                           ? $t("analysis_snapshots_rebuild_unavailable_title")
                                           : $t("analysis_snapshots_rebuild_title")}
-                                        disabled={snapBusy || snap.source_runs_available === false}
+                                        disabled={snapBusy || snapRebuilding || snap.source_runs_available === false}
                                         onclick={() => rebuildSnapshotAggregates(cohort, snap)}
                                       >
                                         {$t("analysis_snapshots_rebuild")}
@@ -1288,42 +1332,11 @@
     transition: width 0.2s ease;
   }
 
-  /* Indeterminate bar for the synchronous snapshot rematerialize. */
-  .snapshot-progress {
-    margin-top: 4px;
-    width: 140px;
-    height: 4px;
-    background: var(--surface-2);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .snapshot-progress-fill {
-    height: 100%;
-    width: 40%;
-    background: var(--accent-1, #4c9bff);
-    border-radius: 2px;
-    animation: snapshot-progress-slide 1.1s ease-in-out infinite;
-  }
-
-  @keyframes snapshot-progress-slide {
-    0% { transform: translateX(-100%); }
-    100% { transform: translateX(350%); }
-  }
-
   .snapshot-rebuilding-label {
     display: block;
     margin-top: 2px;
     font-size: var(--text-xs);
     color: var(--ink-2);
-  }
-
-  @media (prefers-reduced-motion: reduce) {
-    .snapshot-progress-fill {
-      width: 100%;
-      animation: none;
-      opacity: 0.6;
-    }
   }
 
   .link-action {

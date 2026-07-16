@@ -548,22 +548,21 @@ describe("AnalysisCohorts", () => {
     expect(handles.snapshotDeletes[0]).toEqual({ id: 1, slug: "2026-04-20", purge: true });
   });
 
-  it("shows an indeterminate progress indicator while a snapshot rematerialize is in flight", async () => {
-    // The rematerialize POST is synchronous server-side and can take a while,
-    // so the row shows an indeterminate "Rebuilding aggregates..." bar for the
-    // duration. We drive the fetch with a hand-released deferred promise so the
-    // in-flight UI can be observed before the POST settles, then assert the
-    // indicator clears once the follow-up snapshot refresh completes.
-    const snapshotsByCohort = {
-      1: [{
-        id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
-        profile_name: "strict", run_count: 3, domain_count: 3,
-        status: "captured", is_public: true, is_default: false,
-        source_runs_available: true,
-      }],
+  it("shows a determinate progress bar driven by materialization status and clears it when ready", async () => {
+    // Tier-2 flow: the rematerialize POST returns 202 and flips the snapshot to
+    // materialization_status "pending"; the admin UI then polls the snapshots
+    // list and renders a determinate bar from materialization_done/total. We
+    // model the async server with a single mutable snapshot object so the poll
+    // loop can observe pending (0/4 -> 2/4) and finally ready, at which point
+    // the bar must disappear. The label span is queried directly so the numeric
+    // "done/total" text can be asserted independent of node splitting.
+    const snap = {
+      id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
+      profile_name: "strict", run_count: 3, domain_count: 3,
+      status: "captured", is_public: true, is_default: false,
+      source_runs_available: true,
+      materialization_status: "", materialization_done: 0, materialization_total: 0,
     };
-    let releaseRematerialize;
-    const rematerializeDone = new Promise((resolve) => { releaseRematerialize = resolve; });
     let rematerializeCalls = 0;
 
     global.fetch.mockImplementation((url, requestOptions = {}) => {
@@ -573,34 +572,80 @@ describe("AnalysisCohorts", () => {
       if (value === "/api/v1/analysis/cohorts" && method === "GET") return jsonResponse(sampleCohorts());
       if (value === "/api/v1/analysis/status" && method === "GET") return jsonResponse({ backend_supported: true });
       const listSnaps = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots$/);
-      if (listSnaps && method === "GET") return jsonResponse(snapshotsByCohort[Number(listSnaps[1])] || []);
+      if (listSnaps && method === "GET") return jsonResponse([{ ...snap }]);
       const remat = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots\/([^/?]+)\/rematerialize$/);
       if (remat && method === "POST") {
         rematerializeCalls += 1;
-        return rematerializeDone.then(() => jsonResponse(snapshotsByCohort[1][0]));
+        // Server accepts (202) and marks the snapshot pending.
+        snap.materialization_status = "pending";
+        snap.materialization_done = 0;
+        snap.materialization_total = 4;
+        return jsonResponse({ ...snap });
       }
       return jsonResponse({});
     });
 
     render(AnalysisCohorts);
-
     const tldRow = (await screen.findByText("tld")).closest("tr");
     await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
 
     const snapRow = (await screen.findByText("2026-04-20")).closest("tr");
     await fireEvent.click(within(snapRow).getByRole("button", { name: /Rebuild aggregates/i }));
 
-    // In flight: the indeterminate bar and its label are shown on the row.
     expect(rematerializeCalls).toBe(1);
-    expect(await within(snapRow).findByText(/Rebuilding aggregates/i)).toBeInTheDocument();
-    expect(within(snapRow).getByRole("progressbar")).toBeInTheDocument();
+    // The determinate bar and the numeric "0/4" label appear from the pending
+    // status returned by the 202 and the follow-up snapshots reload.
+    await screen.findByRole("progressbar");
+    const label = () => document.querySelector(".snapshot-rebuilding-label");
+    expect(label()).toBeTruthy();
+    expect(label().textContent).toMatch(/0\/4/);
 
-    // Settle the POST; the indicator clears once the row refreshes.
-    releaseRematerialize();
-    await waitFor(() => {
-      const row = screen.getByText("2026-04-20").closest("tr");
-      expect(within(row).queryByText(/Rebuilding aggregates/i)).toBeNull();
-    });
+    // The poll re-fetches the list; advancing done is reflected in the label.
+    snap.materialization_done = 2;
+    await waitFor(() => expect(label()?.textContent).toMatch(/2\/4/));
+
+    // Completion: the poll observes ready and the bar/label disappears.
+    snap.materialization_status = "ready";
+    snap.materialization_done = 4;
+    await waitFor(() => expect(document.querySelector(".snapshot-rebuilding-label")).toBeNull());
+    expect(screen.queryByRole("progressbar")).toBeNull();
+  });
+
+  it("sorts the snapshot table when a column header is clicked", async () => {
+    // Two captured snapshots; default order is newest-captured-first. Clicking
+    // the Snapshot header sorts by display name (slug) ascending, and the
+    // ascending order here is the reverse of the default captured-desc order,
+    // so asserting the first data row's slug proves the click re-sorted.
+    const snapshotsByCohort = {
+      1: [
+        {
+          id: 100, slug: "2026-04-20-later", label: "", captured_at: "2026-04-20T12:00:00Z",
+          profile_name: "strict", run_count: 3, domain_count: 3,
+          status: "captured", is_public: true, is_default: false, source_runs_available: true,
+        },
+        {
+          id: 101, slug: "2026-04-10-earlier", label: "", captured_at: "2026-04-10T12:00:00Z",
+          profile_name: "strict", run_count: 1, domain_count: 1,
+          status: "captured", is_public: true, is_default: false, source_runs_available: true,
+        },
+      ],
+    };
+    installSnapshotFetch({ snapshotsByCohort });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+    await screen.findByText("2026-04-20-later");
+
+    const firstSlug = () =>
+      document.querySelector(".snapshot-table tbody tr .snapshot-id")?.textContent?.trim();
+    // Default: captured desc -> the April 20 snapshot leads.
+    expect(firstSlug()).toBe("2026-04-20-later");
+
+    // Sort by Snapshot name ascending -> the April 10 slug sorts first.
+    // Anchored name avoids matching the "Snapshots" expand button.
+    await fireEvent.click(screen.getByRole("button", { name: /^Snapshot$/ }));
+    await waitFor(() => expect(firstSlug()).toBe("2026-04-10-earlier"));
   });
 
   // ── Delete-batch action ──────────────────────────────────────────────────

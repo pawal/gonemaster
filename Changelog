@@ -2,6 +2,17 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- admin-ui, server: a progress bar while a snapshot is rebuilt; the rebuild runs in the background instead of freezing the button
+- admin-ui: sortable columns on the snapshot table
+
+### Fixed
+
+- admin-ui, server: rebuilding a snapshot no longer changes its captured date, so the snapshot list stays newest-first
+
 ## [v1.6.2] - 2026-07-16
 
 Reworks the public analysis dashboards: a stat-tile overview, a focus mode and top movers in trends, a richer snapshot diff, latency and history on entity pages, keyboard shortcuts, and honest exports. Adds a one-click way to run a cohort snapshot and make it the default, and updates the bundled DNS library.

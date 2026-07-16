@@ -50,6 +50,13 @@
   .grade-chip-letter[data-grade="C"]  { background: var(--grade-c); color: #1a1a1a; }
   .grade-chip-letter[data-grade="D"]  { background: var(--grade-d); }
   .grade-chip-letter[data-grade="F"]  { background: var(--grade-f); }
+
+  /* Dark theme flips the grade solids to light pastels, so every letter needs
+     dark ink; the light-theme white text above would wash out on them. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]):not([data-theme="dark"]) .grade-chip-letter { color: #1a1a1a; }
+  }
+  :root[data-theme="dark"] .grade-chip-letter { color: #1a1a1a; }
   .grade-chip-score {
     color: var(--ink);
     font-family: var(--mono);

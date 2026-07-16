@@ -531,13 +531,13 @@
 
   .ns-row-unreachable,
   .ns-row-unresolved {
-    background: #fef2f2;
+    background: var(--sev-critical-bg);
   }
   .ns-row-unreachable td,
   .ns-row-unreachable th,
   .ns-row-unresolved td,
   .ns-row-unresolved th {
-    color: #7f1d1d;
+    color: var(--sev-critical-fg);
   }
   .ns-status-badge {
     display: inline-block;
@@ -549,7 +549,7 @@
     font-weight: 600;
     letter-spacing: 0.04em;
     text-transform: uppercase;
-    background: #fee2e2;
-    color: #991b1b;
+    background: var(--sev-critical-bg);
+    color: var(--sev-critical-fg);
   }
 </style>

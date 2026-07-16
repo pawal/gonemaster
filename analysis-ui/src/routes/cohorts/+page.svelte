@@ -122,6 +122,6 @@
 
   .active .cohort-select {
     border-color: var(--accent-2);
-    background: rgba(3, 105, 161, 0.04);
+    background: color-mix(in srgb, var(--accent-2) 5%, transparent);
   }
 </style>

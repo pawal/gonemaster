@@ -210,8 +210,8 @@
 
 <style>
   .backend-warning {
-    border-color: var(--severity-warning, #b45309);
-    background: color-mix(in srgb, var(--severity-warning, #b45309) 8%, var(--card));
+    border-color: var(--sev-warning-fg);
+    background: color-mix(in srgb, var(--sev-warning-fg) 8%, var(--card));
   }
   .backend-warning code {
     font-family: var(--mono);

@@ -2636,7 +2636,7 @@ func edeTagForCode(code uint16) string {
 		dns.ExtendedErrorSignatureExpiredBeforeValid, // 25
 		dns.ExtendedErrorUnsupportedNSEC3IterValue,   // 27
 		dns.ExtendedErrorSynthesized,                 // 29
-		33:                                           // Negative Trust Anchor (RFC 7646); no named constant in v0.6.81
+		dns.ExtendedErrorNegativeTrustAnchor:         // 33 (RFC 7646)
 		return "N18_RESOLVER_BEHAVIOR_REPORTED"
 	default:
 		// 0, 14, 24, 26, 28, 30, 31, 32, unassigned (>=34), private-use: benign annotation.

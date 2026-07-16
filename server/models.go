@@ -460,8 +460,14 @@ type AnalysisCohortSnapshot struct {
 	IsDefault       bool      `json:"is_default"`
 	IsPublic        bool      `json:"is_public"`
 	TagViewMinLevel string    `json:"tag_view_min_level,omitempty"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	// Rematerialize progress; distinct from the capture-lifecycle Status.
+	MaterializationStatus    string    `json:"materialization_status,omitempty"`
+	MaterializationDone      int       `json:"materialization_done,omitempty"`
+	MaterializationTotal     int       `json:"materialization_total,omitempty"`
+	LastMaterializationError string    `json:"last_materialization_error,omitempty"`
+	LastMaterializedAt       time.Time `json:"last_materialized_at,omitempty"`
+	CreatedAt                time.Time `json:"created_at"`
+	UpdatedAt                time.Time `json:"updated_at"`
 }
 
 // AnalysisSnapshotNameserverView is one pre-computed nameserver row for a

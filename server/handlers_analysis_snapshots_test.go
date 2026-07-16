@@ -282,22 +282,59 @@ func TestAdminSnapshotRetireUnpinsCohort(t *testing.T) {
 	}
 }
 
-// TestAdminSnapshotRematerialize verifies the rematerialize action
-// rewrites the overview view and bumps CapturedAt.
+// waitForMaterialization polls the snapshot row until its materialization
+// status reaches want, returning the final row. The rematerialize endpoint
+// dispatches the rebuild in a goroutine, so tests must wait for completion
+// rather than reading the row immediately after the 202.
+func (f *adminSnapshotFixture) waitForMaterialization(id int64, want string) (AnalysisCohortSnapshot, bool) {
+	f.t.Helper()
+	deadline := time.Now().Add(5 * time.Second)
+	for {
+		snap, found := f.snapshotByID(id)
+		if found && snap.MaterializationStatus == want {
+			return snap, true
+		}
+		if time.Now().After(deadline) {
+			return snap, false
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}
+
+// TestAdminSnapshotRematerialize verifies the rematerialize action rebuilds the
+// overview view asynchronously, reports progress to completion, marks the
+// snapshot ready, and - the ordering-fix contract - leaves captured_at intact.
+// A rebuild recomputes derived views; it does not re-capture, so it must not
+// bump captured_at and thereby reorder the newest-captured-first snapshot list.
 func TestAdminSnapshotRematerialize(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
-	originalCaptured := f.snapshot.CapturedAt
+	before, ok := f.snapshotByID(f.snapshot.ID)
+	if !ok {
+		t.Fatal("fixture snapshot not readable")
+	}
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s/rematerialize", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodPost, path, "")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("rematerialize: got %d, want 200: %s", resp.Code, resp.Body)
+	if resp.Code != http.StatusAccepted {
+		t.Fatalf("rematerialize: got %d, want 202: %s", resp.Code, resp.Body)
 	}
-	snap, found := f.snapshotByID(f.snapshot.ID)
-	if !found {
-		t.Fatal("snapshot missing after rematerialize")
+	snap, ok := f.waitForMaterialization(f.snapshot.ID, AnalysisMaterializationReady)
+	if !ok {
+		t.Fatalf("snapshot did not reach ready: status=%q done=%d/%d",
+			snap.MaterializationStatus, snap.MaterializationDone, snap.MaterializationTotal)
 	}
-	if !snap.CapturedAt.After(originalCaptured) {
-		t.Fatalf("CapturedAt = %s, want advanced from %s", snap.CapturedAt, originalCaptured)
+	if snap.MaterializationTotal != rematerializePhases || snap.MaterializationDone != rematerializePhases {
+		t.Fatalf("progress = %d/%d, want %d/%d", snap.MaterializationDone, snap.MaterializationTotal,
+			rematerializePhases, rematerializePhases)
+	}
+	if snap.LastMaterializationError != "" {
+		t.Fatalf("unexpected error on success: %q", snap.LastMaterializationError)
+	}
+	if snap.LastMaterializedAt.IsZero() {
+		t.Fatal("last_materialized_at not stamped on ready")
+	}
+	// The ordering-fix contract: captured_at must be byte-for-byte unchanged.
+	if !snap.CapturedAt.Equal(before.CapturedAt) {
+		t.Fatalf("CapturedAt changed to %s, want unchanged %s", snap.CapturedAt, before.CapturedAt)
 	}
 	if _, ok := f.store.GetSnapshotOverview(snap.ID); !ok {
 		t.Fatal("expected overview view row to be written by rematerialize")

@@ -30,6 +30,8 @@ type adminSnapshotAggregator interface {
 	ComputeSnapshotEntityViews(cohortID int64, batchID string, minLevel string) (SnapshotEntityViews, error)
 	ReplaceSnapshotEntityViews(snapshotID int64, views SnapshotEntityViews) error
 	TagViewMinLevel() string
+	SetAnalysisSnapshotMaterialization(id int64, status string, done, total int, errMsg string, materializedAt *time.Time) error
+	SetAnalysisSnapshotMaterializationProgress(id int64, done int) error
 }
 
 // AdminAnalysisSnapshotView is the admin shape for one snapshot row. It
@@ -55,30 +57,45 @@ type AdminAnalysisSnapshotView struct {
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
 	SourceRunsAvailable bool      `json:"source_runs_available"`
+	// Rematerialize progress, polled by the admin UI while pending.
+	MaterializationStatus    string     `json:"materialization_status,omitempty"`
+	MaterializationDone      int        `json:"materialization_done,omitempty"`
+	MaterializationTotal     int        `json:"materialization_total,omitempty"`
+	LastMaterializationError string     `json:"last_materialization_error,omitempty"`
+	LastMaterializedAt       *time.Time `json:"last_materialized_at,omitempty"`
 }
 
 func adminAnalysisSnapshotView(snap AnalysisCohortSnapshot, sourceRunsAvailable bool) AdminAnalysisSnapshotView {
-	return AdminAnalysisSnapshotView{
-		ID:                  snap.ID,
-		CohortID:            snap.CohortID,
-		BatchID:             snap.BatchID,
-		Slug:                snap.Slug,
-		Label:               snap.Label,
-		Description:         snap.Description,
-		ProfileID:           snap.ProfileID,
-		ProfileName:         snap.ProfileName,
-		CapturedAt:          snap.CapturedAt,
-		FirstRunAt:          snap.FirstRunAt,
-		LastRunAt:           snap.LastRunAt,
-		RunCount:            snap.RunCount,
-		DomainCount:         snap.DomainCount,
-		Status:              snap.Status,
-		IsDefault:           snap.IsDefault,
-		IsPublic:            snap.IsPublic,
-		CreatedAt:           snap.CreatedAt,
-		UpdatedAt:           snap.UpdatedAt,
-		SourceRunsAvailable: sourceRunsAvailable,
+	view := AdminAnalysisSnapshotView{
+		ID:                       snap.ID,
+		CohortID:                 snap.CohortID,
+		BatchID:                  snap.BatchID,
+		Slug:                     snap.Slug,
+		Label:                    snap.Label,
+		Description:              snap.Description,
+		ProfileID:                snap.ProfileID,
+		ProfileName:              snap.ProfileName,
+		CapturedAt:               snap.CapturedAt,
+		FirstRunAt:               snap.FirstRunAt,
+		LastRunAt:                snap.LastRunAt,
+		RunCount:                 snap.RunCount,
+		DomainCount:              snap.DomainCount,
+		Status:                   snap.Status,
+		IsDefault:                snap.IsDefault,
+		IsPublic:                 snap.IsPublic,
+		CreatedAt:                snap.CreatedAt,
+		UpdatedAt:                snap.UpdatedAt,
+		SourceRunsAvailable:      sourceRunsAvailable,
+		MaterializationStatus:    snap.MaterializationStatus,
+		MaterializationDone:      snap.MaterializationDone,
+		MaterializationTotal:     snap.MaterializationTotal,
+		LastMaterializationError: snap.LastMaterializationError,
 	}
+	if !snap.LastMaterializedAt.IsZero() {
+		t := snap.LastMaterializedAt
+		view.LastMaterializedAt = &t
+	}
+	return view
 }
 
 // handleAnalysisCohortSnapshots handles GET on
@@ -141,10 +158,13 @@ func (s *Server) handleAnalysisCohortSnapshotByID(w http.ResponseWriter, r *http
 	}
 }
 
-// handleAnalysisCohortSnapshotRematerialize handles POST on
-// /api/v1/analysis/cohorts/{id}/snapshots/{slug}/rematerialize. Rebuilds
-// the overview row and entity views from current facts, bumps
-// CapturedAt, and returns the refreshed snapshot row.
+// Progress steps reported during a rebuild: overview compute + write, then
+// entity-view compute + write.
+const rematerializePhases = 4
+
+// handleAnalysisCohortSnapshotRematerialize rebuilds a snapshot's views in the
+// background and returns 202 with the snapshot pending so the UI can poll.
+// captured_at is left intact: a rebuild recomputes views, it does not recapture.
 func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -171,37 +191,69 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 		writeError(w, http.StatusServiceUnavailable, "analysis_unavailable", "analysis store does not support rematerialize", nil)
 		return
 	}
-	overview, err := aggWriter.ComputeSnapshotOverview(cohort.ID, snap.BatchID)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "compute_failed", err.Error(), nil)
-		return
-	}
-	if err := aggWriter.ReplaceSnapshotOverview(snap.ID, overview); err != nil {
-		writeError(w, http.StatusInternalServerError, "write_failed", err.Error(), nil)
-		return
-	}
 	floor := cohort.TagViewMinLevel
 	if !IsValidTagViewMinLevel(floor) {
 		floor = aggWriter.TagViewMinLevel()
 	}
-	views, err := aggWriter.ComputeSnapshotEntityViews(cohort.ID, snap.BatchID, floor)
-	if err != nil {
-		writeError(w, http.StatusInternalServerError, "compute_failed", err.Error(), nil)
-		return
-	}
-	if err := aggWriter.ReplaceSnapshotEntityViews(snap.ID, views); err != nil {
-		writeError(w, http.StatusInternalServerError, "write_failed", err.Error(), nil)
-		return
-	}
-	snap.TagViewMinLevel = floor
-	snap.CapturedAt = time.Now().UTC()
-	snap.UpdatedAt = snap.CapturedAt
-	if _, err := store.UpsertAnalysisCohortSnapshot(snap); err != nil {
-		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
-		return
-	}
+	s.dispatchSnapshotRematerialize(store, aggWriter, cohort.ID, snap, floor)
 	refreshed, _ := store.GetAnalysisCohortSnapshotBySlug(cohort.ID, snap.Slug)
-	writeJSON(w, http.StatusOK, adminAnalysisSnapshotView(refreshed, s.store.BatchHasRuns(refreshed.BatchID)))
+	writeJSON(w, http.StatusAccepted, adminAnalysisSnapshotView(refreshed, s.store.BatchHasRuns(refreshed.BatchID)))
+}
+
+// dispatchSnapshotRematerialize marks the snapshot pending and rebuilds it in a
+// goroutine. A per-snapshot in-flight guard drops duplicate requests.
+func (s *Server) dispatchSnapshotRematerialize(store adminSnapshotStore, aggWriter adminSnapshotAggregator, cohortID int64, snap AnalysisCohortSnapshot, floor string) {
+	s.snapshotRematerializeMu.Lock()
+	if _, running := s.snapshotRematerializeInFlight[snap.ID]; running {
+		s.snapshotRematerializeMu.Unlock()
+		return
+	}
+	s.snapshotRematerializeInFlight[snap.ID] = struct{}{}
+	s.snapshotRematerializeMu.Unlock()
+
+	_ = aggWriter.SetAnalysisSnapshotMaterialization(snap.ID, AnalysisMaterializationPending, 0, rematerializePhases, "", nil)
+
+	go func() {
+		defer func() {
+			s.snapshotRematerializeMu.Lock()
+			delete(s.snapshotRematerializeInFlight, snap.ID)
+			s.snapshotRematerializeMu.Unlock()
+		}()
+		if err := s.runSnapshotRematerialize(store, aggWriter, cohortID, snap, floor); err != nil {
+			_ = aggWriter.SetAnalysisSnapshotMaterialization(snap.ID, AnalysisMaterializationFailed, 0, rematerializePhases, err.Error(), nil)
+		}
+	}()
+}
+
+// runSnapshotRematerialize recomputes the overview and entity views, bumping
+// progress per phase and marking the snapshot ready on success.
+func (s *Server) runSnapshotRematerialize(store adminSnapshotStore, aggWriter adminSnapshotAggregator, cohortID int64, snap AnalysisCohortSnapshot, floor string) error {
+	overview, err := aggWriter.ComputeSnapshotOverview(cohortID, snap.BatchID)
+	if err != nil {
+		return err
+	}
+	_ = aggWriter.SetAnalysisSnapshotMaterializationProgress(snap.ID, 1)
+	if err := aggWriter.ReplaceSnapshotOverview(snap.ID, overview); err != nil {
+		return err
+	}
+	_ = aggWriter.SetAnalysisSnapshotMaterializationProgress(snap.ID, 2)
+	views, err := aggWriter.ComputeSnapshotEntityViews(cohortID, snap.BatchID, floor)
+	if err != nil {
+		return err
+	}
+	_ = aggWriter.SetAnalysisSnapshotMaterializationProgress(snap.ID, 3)
+	if err := aggWriter.ReplaceSnapshotEntityViews(snap.ID, views); err != nil {
+		return err
+	}
+	_ = aggWriter.SetAnalysisSnapshotMaterializationProgress(snap.ID, rematerializePhases)
+
+	snap.TagViewMinLevel = floor
+	snap.UpdatedAt = time.Now().UTC()
+	if _, err := store.UpsertAnalysisCohortSnapshot(snap); err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	return aggWriter.SetAnalysisSnapshotMaterialization(snap.ID, AnalysisMaterializationReady, rematerializePhases, rematerializePhases, "", &now)
 }
 
 // handlePatchAnalysisCohortSnapshot applies a partial update to one

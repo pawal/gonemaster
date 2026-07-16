@@ -11,22 +11,25 @@ const analysisCohortSnapshotCols = `id, cohort_id, batch_id, slug, label, descri
 	profile_id, profile_name, captured_at, first_run_at, last_run_at,
 	run_count, domain_count, status, is_default, is_public,
 	tag_view_min_level,
+	materialization_status, materialization_done, materialization_total,
+	last_materialization_error, last_materialized_at,
 	created_at, updated_at`
 
 func (s *SQLJobStore) scanAnalysisCohortSnapshot(row rowScanner) (AnalysisCohortSnapshot, error) {
 	var (
-		snap        AnalysisCohortSnapshot
-		profileID   sql.NullInt64
-		capturedAt  string
-		firstRunAt  string
-		lastRunAt   string
-		isDefault   int
-		isPublic    int
-		createdAt   string
-		updatedAt   string
-		description string
-		label       string
-		profileName string
+		snap           AnalysisCohortSnapshot
+		profileID      sql.NullInt64
+		capturedAt     string
+		firstRunAt     string
+		lastRunAt      string
+		isDefault      int
+		isPublic       int
+		materializedAt string
+		createdAt      string
+		updatedAt      string
+		description    string
+		label          string
+		profileName    string
 	)
 	if err := row.Scan(
 		&snap.ID,
@@ -46,6 +49,11 @@ func (s *SQLJobStore) scanAnalysisCohortSnapshot(row rowScanner) (AnalysisCohort
 		&isDefault,
 		&isPublic,
 		&snap.TagViewMinLevel,
+		&snap.MaterializationStatus,
+		&snap.MaterializationDone,
+		&snap.MaterializationTotal,
+		&snap.LastMaterializationError,
+		&materializedAt,
 		&createdAt,
 		&updatedAt,
 	); err != nil {
@@ -60,6 +68,7 @@ func (s *SQLJobStore) scanAnalysisCohortSnapshot(row rowScanner) (AnalysisCohort
 	snap.LastRunAt = parseTimestampStr(lastRunAt)
 	snap.IsDefault = intToBool(isDefault)
 	snap.IsPublic = intToBool(isPublic)
+	snap.LastMaterializedAt = parseTimestampStr(materializedAt)
 	snap.CreatedAt = parseTimestampStr(createdAt)
 	snap.UpdatedAt = parseTimestampStr(updatedAt)
 	return snap, nil
@@ -302,6 +311,54 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 		return AnalysisCohortSnapshot{}, errors.New("cohort snapshot inserted but not readable")
 	}
 	return created, nil
+}
+
+// SetAnalysisSnapshotMaterialization writes the rematerialize progress columns.
+// A non-nil materializedAt also stamps last_materialized_at (success path); nil
+// leaves the prior timestamp intact. Never touched by UpsertAnalysisCohortSnapshot.
+func (s *SQLJobStore) SetAnalysisSnapshotMaterialization(id int64, status string, done, total int, errMsg string, materializedAt *time.Time) error {
+	if materializedAt != nil {
+		_, err := s.db.Exec(
+			fmt.Sprintf(`UPDATE analysis_cohort_snapshots SET
+				materialization_status = %s,
+				materialization_done = %s,
+				materialization_total = %s,
+				last_materialization_error = %s,
+				last_materialized_at = %s
+			WHERE id = %s`, s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6)),
+			status, done, total, errMsg, snapshotStoredTimestamp(*materializedAt), id,
+		)
+		if err != nil {
+			return fmt.Errorf("update snapshot materialization: %w", err)
+		}
+		return nil
+	}
+	_, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE analysis_cohort_snapshots SET
+			materialization_status = %s,
+			materialization_done = %s,
+			materialization_total = %s,
+			last_materialization_error = %s
+		WHERE id = %s`, s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5)),
+		status, done, total, errMsg, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update snapshot materialization: %w", err)
+	}
+	return nil
+}
+
+// SetAnalysisSnapshotMaterializationProgress bumps only the done counter.
+func (s *SQLJobStore) SetAnalysisSnapshotMaterializationProgress(id int64, done int) error {
+	_, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE analysis_cohort_snapshots SET materialization_done = %s WHERE id = %s`,
+			s.ph(1), s.ph(2)),
+		done, id,
+	)
+	if err != nil {
+		return fmt.Errorf("update snapshot materialization progress: %w", err)
+	}
+	return nil
 }
 
 // SetCohortDefaultSnapshot pins snapshotID as the cohort's default: it clears

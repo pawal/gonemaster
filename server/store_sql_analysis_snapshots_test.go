@@ -126,6 +126,83 @@ func TestSQLJobStoreUpsertAnalysisCohortSnapshotValidates(t *testing.T) {
 	}
 }
 
+// TestSQLJobStoreSetAnalysisSnapshotMaterialization exercises the rematerialize
+// progress setters that back the admin-UI progress bar. It walks the full
+// lifecycle: pending (no timestamp) -> progress bump -> ready (timestamp
+// stamped). It then asserts the subtle contract that calling the setter with a
+// nil materializedAt (the pending/failed paths) leaves the previously stamped
+// last_materialized_at intact, so a failed re-run still shows when the snapshot
+// was last successfully rebuilt.
+func TestSQLJobStoreSetAnalysisSnapshotMaterialization(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cohortID := seedCohortForSnapshotTest(t, s, "tld")
+			created, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+				CohortID: cohortID,
+				BatchID:  "batch-1",
+				Slug:     "2026-04-20",
+				Status:   AnalysisSnapshotStatusCaptured,
+				IsPublic: true,
+			})
+			if err != nil {
+				t.Fatalf("seed snapshot: %v", err)
+			}
+
+			// Start: pending, no completion timestamp yet.
+			if err := s.SetAnalysisSnapshotMaterialization(created.ID, AnalysisMaterializationPending, 0, 4, "", nil); err != nil {
+				t.Fatalf("set pending: %v", err)
+			}
+			got, _ := s.GetAnalysisCohortSnapshot(created.ID)
+			if got.MaterializationStatus != AnalysisMaterializationPending || got.MaterializationDone != 0 || got.MaterializationTotal != 4 {
+				t.Fatalf("pending state = %q %d/%d, want pending 0/4",
+					got.MaterializationStatus, got.MaterializationDone, got.MaterializationTotal)
+			}
+			if !got.LastMaterializedAt.IsZero() {
+				t.Fatalf("last_materialized_at = %s, want zero while pending", got.LastMaterializedAt)
+			}
+
+			// Progress bump touches only the done counter.
+			if err := s.SetAnalysisSnapshotMaterializationProgress(created.ID, 2); err != nil {
+				t.Fatalf("bump progress: %v", err)
+			}
+			got, _ = s.GetAnalysisCohortSnapshot(created.ID)
+			if got.MaterializationDone != 2 || got.MaterializationStatus != AnalysisMaterializationPending || got.MaterializationTotal != 4 {
+				t.Fatalf("after bump = %q %d/%d, want pending 2/4",
+					got.MaterializationStatus, got.MaterializationDone, got.MaterializationTotal)
+			}
+
+			// Ready stamps last_materialized_at.
+			readyAt := time.Date(2026, 4, 21, 9, 30, 0, 0, time.UTC)
+			if err := s.SetAnalysisSnapshotMaterialization(created.ID, AnalysisMaterializationReady, 4, 4, "", &readyAt); err != nil {
+				t.Fatalf("set ready: %v", err)
+			}
+			got, _ = s.GetAnalysisCohortSnapshot(created.ID)
+			if got.MaterializationStatus != AnalysisMaterializationReady || got.MaterializationDone != 4 {
+				t.Fatalf("ready state = %q %d/%d, want ready 4/4",
+					got.MaterializationStatus, got.MaterializationDone, got.MaterializationTotal)
+			}
+			if !got.LastMaterializedAt.Equal(readyAt) {
+				t.Fatalf("last_materialized_at = %s, want %s", got.LastMaterializedAt, readyAt)
+			}
+
+			// A later failure (nil materializedAt) records the error but must
+			// preserve the last successful materialization timestamp.
+			if err := s.SetAnalysisSnapshotMaterialization(created.ID, AnalysisMaterializationFailed, 1, 4, "boom", nil); err != nil {
+				t.Fatalf("set failed: %v", err)
+			}
+			got, _ = s.GetAnalysisCohortSnapshot(created.ID)
+			if got.MaterializationStatus != AnalysisMaterializationFailed || got.LastMaterializationError != "boom" {
+				t.Fatalf("failed state = %q err=%q, want failed err=boom",
+					got.MaterializationStatus, got.LastMaterializationError)
+			}
+			if !got.LastMaterializedAt.Equal(readyAt) {
+				t.Fatalf("last_materialized_at = %s after failure, want preserved %s", got.LastMaterializedAt, readyAt)
+			}
+		})
+	}
+}
+
 func TestSQLJobStoreAnalysisCohortSnapshotSlugUnique(t *testing.T) {
 	s := testStoreForBackend(t, testBackends(t)[0])
 	cohortID := seedCohortForSnapshotTest(t, s, "tld")

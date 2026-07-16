@@ -550,6 +550,18 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_snapshot_asn_view ADD COLUMN latency_samples INTEGER`,
 		},
 	},
+	{
+		// Per-snapshot rematerialize progress so the admin UI can poll and
+		// render a bar. Separate from the capture-lifecycle `status` column.
+		version: 6,
+		stmts: []string{
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN materialization_status VARCHAR(32) NOT NULL DEFAULT ''`,
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN materialization_done INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN materialization_total INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN last_materialization_error TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN last_materialized_at VARCHAR(64) NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies

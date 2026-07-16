@@ -1675,18 +1675,26 @@ paths:
     post:
       tags: [Analysis]
       summary: Recompute snapshot aggregates
+      description: >-
+        Rebuilds the snapshot's overview and entity views in the background and
+        returns 202 with the snapshot in the pending materialization state. Poll
+        the snapshot list for materialization_status/done/total to track
+        progress. captured_at is left unchanged: a rebuild recomputes derived
+        views, it does not re-capture the snapshot.
       operationId: rematerializeAnalysisCohortSnapshot
       parameters:
         - $ref: '#/components/parameters/IDPath'
         - $ref: '#/components/parameters/SlugPath'
       responses:
-        '200':
-          description: Refreshed snapshot
+        '202':
+          description: Rebuild accepted; snapshot returned in pending materialization state
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/AnalysisCohortSnapshot'
         '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
           $ref: '#/components/responses/ErrorResponse'
 
   /pub/api/v1/jobs:
@@ -3325,6 +3333,23 @@ components:
           type: boolean
         is_public:
           type: boolean
+        materialization_status:
+          type: string
+          description: Rematerialize progress state; distinct from the capture-lifecycle status. Empty until first rebuilt.
+          enum: ['', pending, ready, failed]
+        materialization_done:
+          type: integer
+          description: Completed rebuild phases (0..materialization_total).
+        materialization_total:
+          type: integer
+          description: Total rebuild phases for the in-flight or last rematerialize.
+        last_materialization_error:
+          type: string
+          description: Error from the last failed rematerialize, if any.
+        last_materialized_at:
+          type: string
+          format: date-time
+          description: When the snapshot was last successfully rebuilt.
         created_at:
           type: string
           format: date-time

@@ -50,7 +50,11 @@ type Server struct {
 	// clears the set.
 	cohortRebuildsMu       sync.Mutex
 	cohortRebuildsInFlight map[int64]struct{}
-	adminTokens            atomic.Pointer[tokenSet]
+	// snapshotRematerializeInFlight guards against overlapping rematerializes
+	// of the same snapshot, keyed by snapshot ID.
+	snapshotRematerializeMu       sync.Mutex
+	snapshotRematerializeInFlight map[int64]struct{}
+	adminTokens                   atomic.Pointer[tokenSet]
 }
 
 // setScoringConfig loads an optional scoring config file and sets it on the
@@ -143,20 +147,21 @@ func NewWithOptions(cfg Config) (*Server, error) {
 // newServer constructs a Server with the given store and queue.
 func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	s := &Server{
-		cfg:                      cfg,
-		mux:                      http.NewServeMux(),
-		store:                    store,
-		queue:                    queue,
-		metrics:                  NewMetricsCollector(cfg),
-		metricsCache:             map[string]metricsCacheEntry{},
-		progressWrites:           map[string]progressWriteState{},
-		progressWriteMinStep:     defaultProgressWriteMinStep,
-		progressWriteMinInterval: defaultProgressWriteMinInterval,
-		cohortRebuildsInFlight:   map[int64]struct{}{},
-		engineRunner:             engine.Run,
-		engineLimiter:            newEngineLimiter(cfg.MaxConcurrentJobs),
-		cancels:                  map[string]context.CancelFunc{},
-		delegationLookup:         lookupDelegation,
+		cfg:                           cfg,
+		mux:                           http.NewServeMux(),
+		store:                         store,
+		queue:                         queue,
+		metrics:                       NewMetricsCollector(cfg),
+		metricsCache:                  map[string]metricsCacheEntry{},
+		progressWrites:                map[string]progressWriteState{},
+		progressWriteMinStep:          defaultProgressWriteMinStep,
+		progressWriteMinInterval:      defaultProgressWriteMinInterval,
+		cohortRebuildsInFlight:        map[int64]struct{}{},
+		snapshotRematerializeInFlight: map[int64]struct{}{},
+		engineRunner:                  engine.Run,
+		engineLimiter:                 newEngineLimiter(cfg.MaxConcurrentJobs),
+		cancels:                       map[string]context.CancelFunc{},
+		delegationLookup:              lookupDelegation,
 	}
 	if cfg.PublicAPI.RateLimitEnabled {
 		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)

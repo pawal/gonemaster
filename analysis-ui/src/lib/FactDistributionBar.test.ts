@@ -51,6 +51,27 @@ describe("FactDistributionBar", () => {
     expect(screen.getByText(/No data for this metric/i)).toBeInTheDocument();
   });
 
+  it("exposes an sr-only count per segment and hides the visual text from AT", () => {
+    const { container } = render(FactDistributionBar, {
+      title: "Severity",
+      buckets: [bucket({ key: "ok", label: "OK", count: 12 })]
+    });
+    // The visual spans clip when squeezed, so they must not be the AT source.
+    expect(container.querySelector(".fact-dist-label")?.getAttribute("aria-hidden")).toBe("true");
+    expect(container.querySelector(".fact-dist-count")?.getAttribute("aria-hidden")).toBe("true");
+    // The sr-only span carries the full label and count regardless of width.
+    expect(container.querySelector(".sr-only")?.textContent).toBe("OK: 12");
+  });
+
+  it("adds the domains noun to the sr-only count when multi-per-domain", () => {
+    const { container } = render(FactDistributionBar, {
+      title: "DNSKEY algorithm",
+      multiPerDomain: true,
+      buckets: [bucket({ key: "13", label: "ECDSAP256SHA256", tone: "notice", count: 8 })]
+    });
+    expect(container.querySelector(".sr-only")?.textContent).toBe("ECDSAP256SHA256: 8 domains");
+  });
+
   it("makes segments links when hrefForKey is provided", () => {
     render(FactDistributionBar, {
       title: "Grade",

@@ -44,8 +44,9 @@
               href={hrefForKey(b.key)}
               title="{b.label}: {formatCount(b.count)}{multiPerDomain ? ' domains' : ''}. Click to filter the domains list."
             >
-              <span class="fact-dist-label">{b.label}</span>
-              <span class="fact-dist-count">{formatCount(b.count)}</span>
+              <span class="fact-dist-label" aria-hidden="true">{b.label}</span>
+              <span class="fact-dist-count" aria-hidden="true">{formatCount(b.count)}</span>
+              <span class="sr-only">{b.label}: {formatCount(b.count)}{multiPerDomain ? " domains" : ""}</span>
             </a>
           </li>
         {/each}
@@ -59,8 +60,9 @@
             style:flex-grow={b.count}
             title="{b.label}: {formatCount(b.count)}{multiPerDomain ? ' domains' : ''}"
           >
-            <span class="fact-dist-label">{b.label}</span>
-            <span class="fact-dist-count">{formatCount(b.count)}</span>
+            <span class="fact-dist-label" aria-hidden="true">{b.label}</span>
+            <span class="fact-dist-count" aria-hidden="true">{formatCount(b.count)}</span>
+            <span class="sr-only">{b.label}: {formatCount(b.count)}{multiPerDomain ? " domains" : ""}</span>
           </div>
         {/each}
       </div>
@@ -123,9 +125,17 @@
   }
   .fact-dist-label {
     font-weight: 600;
+    /* A squeezed segment ellipsizes its label ("…") so a clipped bucket is
+       obvious rather than silently truncated; the full text stays in the
+       sr-only span. min-width:0 lets the flex item shrink below its content. */
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .fact-dist-count {
     font-family: var(--mono);
+    /* Keep the count intact when the label ellipsizes. */
+    flex-shrink: 0;
   }
   .tone-ok       { background: var(--tone-ok-bg);       color: var(--tone-ok-fg); }
   .tone-notice   { background: var(--tone-notice-bg);   color: var(--tone-notice-fg); }
@@ -155,6 +165,11 @@
       padding: 6px var(--space-3);
       white-space: normal;
       justify-content: space-between;
+    }
+    /* Full-width rows have room for the whole label; drop the ellipsis. */
+    .fact-dist-label {
+      overflow: visible;
+      text-overflow: clip;
     }
   }
 </style>

@@ -2,6 +2,31 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+Reworks the public analysis dashboards: a stat-tile overview, a focus mode and top movers in trends, a richer snapshot diff, latency and history on entity pages, keyboard shortcuts, and honest exports.
+
+### Added
+
+- analysis-ui: the overview leads with stat tiles (domains, share without warnings, grade A/A+, signed) that show the change since the previous snapshot and a sparkline, plus a since-last-snapshot movers card and the leading provider's share on the infrastructure cards
+- analysis-ui: trends focus mode - click a legend bucket to pin its share or count as a line across snapshots - plus a top-movers panel and CSV export of the visible series
+- analysis-ui: snapshot diff summary strip, grade-transition matrix, directional grade rows, linked domains, a swap-sides button, and CSV export
+- analysis-ui, server: tag-level snapshot diff showing which finding tags appeared, cleared, or changed severity cohort-wide
+- analysis-ui, server: p50/p95 latency on the nameserver, address, and ASN lists and detail pages, from queries the snapshot already recorded
+- analysis-ui, server: per-entity history sparklines on the nameserver, ASN, tag, and domain detail pages
+- analysis-ui: keyboard shortcuts - g then a letter to jump between sections, / to focus search, ? for a help overlay
+- analysis-ui: a top navigation progress bar during blocking loads, and a restored prefixes list page
+
+### Changed
+
+- analysis-ui: exports cover the whole filtered set (up to the 500-row server limit) and state the row count, instead of only the rows on screen
+- analysis-ui: shared empty-state styling, accessible distribution bars (screen-reader counts, ellipsis on squeezed segments), and grade/severity colours moved to themeable tokens with dark-mode fixes
+- server: revalidate analysis snapshot responses with ETags instead of marking them immutable
+
+### Fixed
+
+- analysis, server: per-address ASN and prefix enrichment failed without its nameserver cache, leaving ASN rosters and the prefix count empty; the cache is now attached and the results cached
+
 ## [v1.6.1] - 2026-07-14
 
 Stops reporting a false DNSSEC failure on zones signed with an RSA key whose public exponent is too large for the local verifier (for example the `.lv` TLD). Adds structured data and social image metadata to the public result page.

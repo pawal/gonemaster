@@ -14,6 +14,7 @@ type adminSnapshotStore interface {
 	GetAnalysisCohortSnapshotBySlug(cohortID int64, slug string) (AnalysisCohortSnapshot, bool)
 	ListAnalysisCohortSnapshots(cohortID int64) []AnalysisCohortSnapshot
 	UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) (AnalysisCohortSnapshot, error)
+	SetCohortDefaultSnapshot(cohortID, snapshotID int64) error
 }
 
 // adminSnapshotPurger is the optional surface the purge action needs.
@@ -361,24 +362,10 @@ func (s *Server) resolveAdminCohortSnapshot(w http.ResponseWriter, r *http.Reque
 // pinCohortDefaultSnapshot flips the cohort to pinned policy pointing at
 // snapshotID, clears is_default on every other snapshot in the same
 // cohort, and keeps snapshotID's is_default=true. Idempotent when
-// called for the already-pinned snapshot.
+// called for the already-pinned snapshot. Delegates to the shared store
+// method so the manual and capture-loop paths stay in lockstep.
 func (s *Server) pinCohortDefaultSnapshot(store adminSnapshotStore, cohort AnalysisCohort, snapshotID int64) error {
-	for _, existing := range store.ListAnalysisCohortSnapshots(cohort.ID) {
-		if existing.ID == snapshotID || !existing.IsDefault {
-			continue
-		}
-		existing.IsDefault = false
-		if _, err := store.UpsertAnalysisCohortSnapshot(existing); err != nil {
-			return err
-		}
-	}
-	cohort.DefaultSnapshotPolicy = DefaultSnapshotPolicyPinned
-	id := snapshotID
-	cohort.DefaultSnapshotID = &id
-	if _, err := s.store.UpsertAnalysisCohort(cohort); err != nil {
-		return err
-	}
-	return nil
+	return store.SetCohortDefaultSnapshot(cohort.ID, snapshotID)
 }
 
 // unpinCohortDefaultSnapshot reverts the cohort to auto_latest and

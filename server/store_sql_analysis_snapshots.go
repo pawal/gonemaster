@@ -304,6 +304,41 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 	return created, nil
 }
 
+// SetCohortDefaultSnapshot pins snapshotID as the cohort's default: it clears
+// is_default on every sibling, sets it on the target, and flips the catalog to
+// the pinned policy pointing at the target. Idempotent when the target is
+// already the pinned default. Shared by the manual "Set default" handler and
+// the capture-loop promote-on-capture path so both stay in lockstep.
+func (s *SQLJobStore) SetCohortDefaultSnapshot(cohortID, snapshotID int64) error {
+	now := s.ts(time.Now().UTC())
+	if _, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE analysis_cohort_snapshots
+			SET is_default = 0, updated_at = %s
+			WHERE cohort_id = %s AND id <> %s AND is_default = 1`,
+			s.ph(1), s.ph(2), s.ph(3)),
+		now, cohortID, snapshotID,
+	); err != nil {
+		return fmt.Errorf("clear sibling defaults for cohort %d: %w", cohortID, err)
+	}
+	if _, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE analysis_cohort_snapshots
+			SET is_default = 1, updated_at = %s
+			WHERE id = %s`, s.ph(1), s.ph(2)),
+		now, snapshotID,
+	); err != nil {
+		return fmt.Errorf("set default snapshot %d: %w", snapshotID, err)
+	}
+	if _, err := s.db.Exec(
+		fmt.Sprintf(`UPDATE analysis_cohort_catalog
+			SET default_snapshot_policy = %s, default_snapshot_id = %s, updated_at = %s
+			WHERE id = %s`, s.ph(1), s.ph(2), s.ph(3), s.ph(4)),
+		DefaultSnapshotPolicyPinned, snapshotID, now, cohortID,
+	); err != nil {
+		return fmt.Errorf("pin cohort %d default snapshot: %w", cohortID, err)
+	}
+	return nil
+}
+
 // ListPendingAnalysisCohortSnapshots returns every snapshot still in pending
 // state across all cohorts. Used by the capture poller to check whether each
 // such snapshot's batch has finished so the snapshot can be promoted to

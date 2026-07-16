@@ -349,6 +349,72 @@ func TestClearAnalysisCohortSnapshotsResetsPin(t *testing.T) {
 	}
 }
 
+// TestSQLJobStoreSetCohortDefaultSnapshot covers the shared pin helper used by
+// both the manual "Set default" handler and the promote-on-capture path: it
+// sets is_default on the target, clears every sibling, and flips the catalog to
+// the pinned policy. Re-pinning a different snapshot moves the badge; re-pinning
+// the same snapshot is a no-op.
+func TestSQLJobStoreSetCohortDefaultSnapshot(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cohortID := seedCohortForSnapshotTest(t, s, "tld")
+			now := time.Now().UTC().Truncate(time.Microsecond)
+
+			snapA, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+				CohortID: cohortID, BatchID: "batch-a", Slug: "2026-04-20-a",
+				Status: AnalysisSnapshotStatusCaptured, IsPublic: true, CapturedAt: now,
+			})
+			if err != nil {
+				t.Fatalf("seed snapshot A: %v", err)
+			}
+			snapB, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+				CohortID: cohortID, BatchID: "batch-b", Slug: "2026-04-21-b",
+				Status: AnalysisSnapshotStatusCaptured, IsPublic: true, CapturedAt: now,
+			})
+			if err != nil {
+				t.Fatalf("seed snapshot B: %v", err)
+			}
+
+			assertPin := func(want int64, wantDefault, wantOther int64) {
+				t.Helper()
+				cohort, _ := s.GetAnalysisCohort(cohortID)
+				if cohort.DefaultSnapshotPolicy != DefaultSnapshotPolicyPinned {
+					t.Fatalf("policy = %q, want pinned", cohort.DefaultSnapshotPolicy)
+				}
+				if cohort.DefaultSnapshotID == nil || *cohort.DefaultSnapshotID != want {
+					t.Fatalf("default_snapshot_id = %+v, want %d", cohort.DefaultSnapshotID, want)
+				}
+				def, _ := s.GetAnalysisCohortSnapshot(wantDefault)
+				if !def.IsDefault {
+					t.Fatalf("snapshot %d should be is_default", wantDefault)
+				}
+				other, _ := s.GetAnalysisCohortSnapshot(wantOther)
+				if other.IsDefault {
+					t.Fatalf("snapshot %d should not be is_default", wantOther)
+				}
+			}
+
+			if err := s.SetCohortDefaultSnapshot(cohortID, snapA.ID); err != nil {
+				t.Fatalf("pin A: %v", err)
+			}
+			assertPin(snapA.ID, snapA.ID, snapB.ID)
+
+			// Moving the pin flips is_default off A and onto B.
+			if err := s.SetCohortDefaultSnapshot(cohortID, snapB.ID); err != nil {
+				t.Fatalf("pin B: %v", err)
+			}
+			assertPin(snapB.ID, snapB.ID, snapA.ID)
+
+			// Re-pinning the already-default snapshot is idempotent.
+			if err := s.SetCohortDefaultSnapshot(cohortID, snapB.ID); err != nil {
+				t.Fatalf("re-pin B: %v", err)
+			}
+			assertPin(snapB.ID, snapB.ID, snapA.ID)
+		})
+	}
+}
+
 func TestSQLJobStoreReplaceSnapshotOverview(t *testing.T) {
 	for _, b := range testBackends(t) {
 		t.Run(b.name, func(t *testing.T) {

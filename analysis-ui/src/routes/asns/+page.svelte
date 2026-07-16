@@ -8,9 +8,17 @@
   import ASNChip from "$lib/chips/ASNChip.svelte";
   import { asnHref } from "$lib/entityLinks";
   import { formatCount, formatMs } from "$lib/format";
-  import { updateURLParam } from "$lib/filters";
-  import { downloadCSV, downloadJSON, type ExportColumn } from "$lib/exporters";
-  import type { ASNView } from "$lib/api";
+  import { updateURLParam, filterFromURL } from "$lib/filters";
+  import {
+    downloadCSV,
+    downloadJSON,
+    collectExportRows,
+    exportScope,
+    exportCaption,
+    exportScopeSuffix,
+    type ExportColumn
+  } from "$lib/exporters";
+  import { listASNs, type ASNView, type AnalysisFilter } from "$lib/api";
   import type { LayoutData } from "../+layout";
   import type { ASNsPageData } from "./+page";
 
@@ -63,14 +71,36 @@
     return `${tag}-asns`;
   }
 
-  function exportCSV() {
-    if (!data.list) return;
-    downloadCSV(`${filenamePrefix()}.csv`, data.list.items, exportColumns);
+  const exportScopeInfo = $derived(exportScope(total));
+  const exportNote = $derived(exportCaption(exportScopeInfo));
+
+  // Reproduce the loader's list params so the export honours the active
+  // filter, snapshot and sort, then widen pagination to the row cap.
+  function exportFilter(): AnalysisFilter {
+    return {
+      ...filterFromURL(page.url),
+      dataset_tag: data.datasetTag ?? undefined,
+      snapshot: layoutData.effectiveSnapshotSlug ?? undefined,
+      sort: currentSort || undefined
+    };
   }
 
-  function exportJSONFile() {
-    if (!data.list) return;
-    downloadJSON(`${filenamePrefix()}.json`, data.list.items, exportColumns);
+  function fetchExportRows(): Promise<ASNView[]> {
+    return collectExportRows(data.list?.items ?? [], currentOffset, total, (limit) =>
+      listASNs({ ...exportFilter(), limit, offset: 0 }).then((r) => r.items)
+    );
+  }
+
+  async function exportCSV() {
+    const rows = await fetchExportRows();
+    if (!rows.length) return;
+    downloadCSV(`${filenamePrefix()}${exportScopeSuffix(exportScopeInfo)}.csv`, rows, exportColumns);
+  }
+
+  async function exportJSONFile() {
+    const rows = await fetchExportRows();
+    if (!rows.length) return;
+    downloadJSON(`${filenamePrefix()}${exportScopeSuffix(exportScopeInfo)}.json`, rows, exportColumns);
   }
 </script>
 
@@ -92,8 +122,11 @@
         </select>
       </label>
       <div class="export-group">
-        <button type="button" class="ghost" onclick={exportCSV} disabled={!data.list?.items.length}>CSV</button>
-        <button type="button" class="ghost" onclick={exportJSONFile} disabled={!data.list?.items.length}>JSON</button>
+        <div class="export-buttons">
+          <button type="button" class="ghost" onclick={exportCSV} disabled={!data.list?.items.length}>CSV</button>
+          <button type="button" class="ghost" onclick={exportJSONFile} disabled={!data.list?.items.length}>JSON</button>
+        </div>
+        <p class="export-note">{exportNote}</p>
       </div>
     </div>
   </div>

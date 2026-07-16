@@ -1,11 +1,14 @@
 import { describe, expect, it, vi, beforeAll, beforeEach } from "vitest";
-import { render, screen, within, fireEvent } from "@testing-library/svelte";
+import { render, screen, within, fireEvent, waitFor } from "@testing-library/svelte";
 import { load, type PrefixesPageData } from "./+page";
 import { goto } from "$app/navigation";
 import type { PrefixView } from "$lib/api";
 
 // A mutable URL holder so each render can set the active query before mounting.
-const h = vi.hoisted(() => ({ url: new URL("http://localhost/prefixes") }));
+const h = vi.hoisted(() => ({
+  url: new URL("http://localhost/prefixes"),
+  data: {} as Record<string, unknown>
+}));
 vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
 vi.mock("$app/paths", () => ({ base: "/analysis" }));
 vi.mock("$app/state", () => ({
@@ -13,7 +16,9 @@ vi.mock("$app/state", () => ({
     get url() {
       return h.url;
     },
-    data: {}
+    get data() {
+      return h.data;
+    }
   }
 }));
 
@@ -150,6 +155,8 @@ describe("prefixes page rendering", () => {
 
   beforeEach(() => {
     h.url = new URL("http://localhost/prefixes");
+    // A resolved snapshot so export refetches lift to a snapshot-scoped path.
+    h.data = { effectiveSnapshotSlug: "2026-04-26" };
     capturedDownload = "";
     vi.mocked(goto).mockClear();
   });
@@ -197,9 +204,47 @@ describe("prefixes page rendering", () => {
     expect(screen.getByText(/Failed to load prefixes: boom/i)).toBeInTheDocument();
   });
 
-  it("exports a CSV whose filename carries the cohort tag", async () => {
+  it("captions the export honestly for a full in-cap set", () => {
+    render(PrefixesPage, { data: pageData() });
+    expect(screen.getByText(`Exports all ${rows.length} matching rows`)).toBeInTheDocument();
+  });
+
+  it("exports a CSV whose filename carries the cohort tag when the page holds the whole set", async () => {
+    // total == loaded rows, offset 0: no refetch, clean filename.
     render(PrefixesPage, { data: pageData() });
     await fireEvent.click(screen.getByRole("button", { name: "CSV" }));
-    expect(capturedDownload).toBe("tld-prefixes.csv");
+    await waitFor(() => expect(capturedDownload).toBe("tld-prefixes.csv"));
+  });
+
+  it("labels a capped export and fetches the full filtered set from the top", async () => {
+    // 50-row page out of 1234 matches: export must fetch, cap at 500, and say so.
+    const bigRows: PrefixView[] = Array.from({ length: 500 }, (_, i) => ({
+      prefix: `10.${i}.0.0/24`,
+      family: "ipv4",
+      domain_count: i,
+      address_count: i
+    }));
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValue(stubResponse({ items: bigRows, total: 1234, limit: 500, offset: 0 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(PrefixesPage, {
+      data: pageData({ list: { items: rows, total: 1234, limit: 50, offset: 0 } })
+    });
+
+    expect(
+      screen.getByText("Exports the first 500 of 1234 matching rows (server limit)")
+    ).toBeInTheDocument();
+
+    await fireEvent.click(screen.getByRole("button", { name: "CSV" }));
+    await waitFor(() => expect(capturedDownload).toBe("tld-prefixes-first-500.csv"));
+
+    // The export widens pagination to the cap and starts at offset 0.
+    const requestedUrl = String(fetchMock.mock.calls[0][0]);
+    expect(requestedUrl).toContain("limit=500");
+    expect(requestedUrl).toContain("offset=0");
+
+    vi.unstubAllGlobals();
   });
 });

@@ -624,7 +624,9 @@ button:hover:not(:disabled) {
   letter-spacing: normal;
 }
 
-.export-group { display: flex; gap: var(--space-2); }
+.export-group { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.export-buttons { display: flex; gap: var(--space-2); }
+.export-note { margin: 0; font-size: var(--text-xs); color: var(--muted); }
 
 /* ── Data table ──────────────────────────────────────────────────────────── */
 .table-wrap {

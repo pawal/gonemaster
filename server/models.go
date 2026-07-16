@@ -200,6 +200,17 @@ const (
 	DefaultSnapshotPolicyPinned     = "pinned"
 )
 
+// promoteDefaultSettingPrefix namespaces the per-batch pin-on-capture intent
+// in the settings key/value table.
+const promoteDefaultSettingPrefix = "analysis:promote_default:"
+
+// PromoteDefaultSettingKey returns the settings key holding the pin-on-capture
+// intent for one batch. Shared by the batch handler (write) and the capture
+// loop (read/delete) so the format has a single source of truth.
+func PromoteDefaultSettingKey(batchID string) string {
+	return promoteDefaultSettingPrefix + batchID
+}
+
 // AnalysisCohort describes one admin-managed analysis cohort entry.
 // V1 cohorts are tag-backed, analysis-enabled/public-enabled independently,
 // and one public cohort may be marked as the default.
@@ -851,6 +862,9 @@ type JobBatchRequest struct {
 	// repairs never enter the cohort series by accident; the admin UI's
 	// "Capture as cohort snapshot" checkbox is what sets it to true.
 	SnapshotIntent bool `json:"snapshot_intent,omitempty"`
+	// PromoteSnapshotDefault pins the captured snapshot as cohort default.
+	// Only meaningful with SnapshotIntent; consumed once at capture time.
+	PromoteSnapshotDefault bool `json:"promote_snapshot_default,omitempty"`
 }
 
 // UndelegatedNameserverInput represents one undelegated nameserver row.

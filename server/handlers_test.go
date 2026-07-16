@@ -656,6 +656,51 @@ func TestBatchSubmit(t *testing.T) {
 	}
 }
 
+// TestBatchSubmitRecordsPromoteDefaultIntent verifies the batch handler
+// records the per-batch pin-on-capture intent only when both snapshot_intent
+// and promote_snapshot_default are set. The intent is stored in the settings
+// table under a batch-scoped key; the capture loop consumes it later.
+func TestBatchSubmitRecordsPromoteDefaultIntent(t *testing.T) {
+	submit := func(t *testing.T, payload string) (*Server, string) {
+		t.Helper()
+		srv := New(DefaultConfig())
+		resp := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch", bytes.NewBufferString(payload))
+		req.Header.Set("Content-Type", "application/json")
+		srv.Handler().ServeHTTP(resp, req)
+		if resp.Code != http.StatusAccepted {
+			t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
+		}
+		var out JobBatchResponse
+		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return srv, out.BatchID
+	}
+
+	t.Run("records intent with snapshot_intent and promote", func(t *testing.T) {
+		srv, batchID := submit(t, `{"domains":["example.com"],"snapshot_intent":true,"promote_snapshot_default":true}`)
+		v, ok := srv.store.GetSetting(PromoteDefaultSettingKey(batchID))
+		if !ok || v != "1" {
+			t.Fatalf("expected promote-default setting = 1, got %q ok=%v", v, ok)
+		}
+	})
+
+	t.Run("omits intent for plain snapshot batch", func(t *testing.T) {
+		srv, batchID := submit(t, `{"domains":["example.com"],"snapshot_intent":true}`)
+		if _, ok := srv.store.GetSetting(PromoteDefaultSettingKey(batchID)); ok {
+			t.Fatal("plain snapshot batch must not record the promote-default intent")
+		}
+	})
+
+	t.Run("omits intent when promote set without snapshot_intent", func(t *testing.T) {
+		srv, batchID := submit(t, `{"domains":["example.com"],"promote_snapshot_default":true}`)
+		if _, ok := srv.store.GetSetting(PromoteDefaultSettingKey(batchID)); ok {
+			t.Fatal("promote without snapshot_intent must not record the intent")
+		}
+	})
+}
+
 func TestBatchSubmitRejectsUndelegatedFields(t *testing.T) {
 	srv := New(DefaultConfig())
 

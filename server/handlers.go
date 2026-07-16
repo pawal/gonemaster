@@ -151,6 +151,11 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		SnapshotIntent: req.SnapshotIntent,
 	})
 
+	// Pin-on-capture intent, consumed once by the capture loop.
+	if req.SnapshotIntent && req.PromoteSnapshotDefault {
+		_ = s.store.SetSetting(PromoteDefaultSettingKey(batchID), "1")
+	}
+
 	writeJSON(w, http.StatusAccepted, JobBatchResponse{BatchID: batchID, JobIDs: jobIDs})
 }
 

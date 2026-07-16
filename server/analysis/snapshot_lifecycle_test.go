@@ -533,6 +533,120 @@ func TestControllerRebuildCohortSkipsNonIntentBatches(t *testing.T) {
 	}
 }
 
+// TestControllerCapturePromotesDefaultOnIntent covers the promote-on-capture
+// path: when the interactive run flow recorded the per-batch pin intent, the
+// snapshot that captures is pinned as the cohort default. The pin moves
+// forward off any previously pinned snapshot, and the one-shot intent setting
+// is cleared once consumed.
+func TestControllerCapturePromotesDefaultOnIntent(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+
+	// An older captured snapshot currently holds the pin. The new capture
+	// must move the DEFAULT badge off this one.
+	old, err := store.UpsertAnalysisCohortSnapshot(serverpkg.AnalysisCohortSnapshot{
+		CohortID: 10,
+		BatchID:  "batch-old",
+		Slug:     "2026-04-19-old",
+		Status:   serverpkg.AnalysisSnapshotStatusCaptured,
+		IsPublic: true,
+	})
+	if err != nil {
+		t.Fatalf("seed old snapshot: %v", err)
+	}
+	if err := store.SetCohortDefaultSnapshot(10, old.ID); err != nil {
+		t.Fatalf("pin old default: %v", err)
+	}
+
+	seedSnapshotBatch(store, "batch-promote", true)
+	run := testAnalysisRun("run-promote", 100, "alpha.example", time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC), "192.0.2.10", "2001:db8::10")
+	run.BatchID = "batch-promote"
+	store.runs[run.ID] = run
+	store.entries[run.ID] = testAnalysisEntries(run)
+	store.tags[run.DomainID] = []string{"tld"}
+
+	// The batch handler records this at run submit time.
+	key := serverpkg.PromoteDefaultSettingKey("batch-promote")
+	if err := store.SetSetting(key, "1"); err != nil {
+		t.Fatalf("seed promote intent: %v", err)
+	}
+
+	controller := NewController(store)
+	if err := controller.ProjectRun(run.ID); err != nil {
+		t.Fatalf("ProjectRun: %v", err)
+	}
+	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+		t.Fatalf("CaptureCompletedSnapshots: %v", err)
+	}
+
+	newSnap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-promote")
+	if !ok {
+		t.Fatal("expected snapshot for batch-promote")
+	}
+	if newSnap.Status != serverpkg.AnalysisSnapshotStatusCaptured {
+		t.Fatalf("status = %q, want captured", newSnap.Status)
+	}
+	if !newSnap.IsDefault {
+		t.Fatal("captured snapshot should have been pinned as default")
+	}
+
+	oldSnap, _ := store.GetAnalysisCohortSnapshotByBatch(10, "batch-old")
+	if oldSnap.IsDefault {
+		t.Fatal("pin should have moved off the previously default snapshot")
+	}
+
+	cohort, _ := store.GetAnalysisCohort(10)
+	if cohort.DefaultSnapshotPolicy != serverpkg.DefaultSnapshotPolicyPinned {
+		t.Fatalf("policy = %q, want pinned", cohort.DefaultSnapshotPolicy)
+	}
+	if cohort.DefaultSnapshotID == nil || *cohort.DefaultSnapshotID != newSnap.ID {
+		t.Fatalf("default_snapshot_id = %+v, want %d", cohort.DefaultSnapshotID, newSnap.ID)
+	}
+	if _, ok := store.GetSetting(key); ok {
+		t.Fatal("promote intent setting should be cleared after consumption")
+	}
+}
+
+// TestControllerCaptureWithoutIntentLeavesDefaultUntouched confirms the
+// plain "Run new snapshot" flow does not pin: a capture with no recorded
+// intent leaves the cohort's default policy at its resting state and never
+// sets is_default on the new snapshot.
+func TestControllerCaptureWithoutIntentLeavesDefaultUntouched(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-plain", true)
+	run := testAnalysisRun("run-plain", 100, "alpha.example", time.Date(2026, 4, 20, 10, 0, 0, 0, time.UTC), "192.0.2.10", "2001:db8::10")
+	run.BatchID = "batch-plain"
+	store.runs[run.ID] = run
+	store.entries[run.ID] = testAnalysisEntries(run)
+	store.tags[run.DomainID] = []string{"tld"}
+
+	controller := NewController(store)
+	if err := controller.ProjectRun(run.ID); err != nil {
+		t.Fatalf("ProjectRun: %v", err)
+	}
+	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+		t.Fatalf("CaptureCompletedSnapshots: %v", err)
+	}
+
+	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-plain")
+	if !ok {
+		t.Fatal("expected snapshot for batch-plain")
+	}
+	if snap.Status != serverpkg.AnalysisSnapshotStatusCaptured {
+		t.Fatalf("status = %q, want captured", snap.Status)
+	}
+	if snap.IsDefault {
+		t.Fatal("plain run must not pin the snapshot as default")
+	}
+
+	cohort, _ := store.GetAnalysisCohort(10)
+	if cohort.DefaultSnapshotPolicy == serverpkg.DefaultSnapshotPolicyPinned {
+		t.Fatalf("policy = %q, want unpinned", cohort.DefaultSnapshotPolicy)
+	}
+	if cohort.DefaultSnapshotID != nil {
+		t.Fatalf("expected no default_snapshot_id, got %+v", cohort.DefaultSnapshotID)
+	}
+}
+
 // TestControllerRebuildCohortFlagsMixedProfilesAcrossRuns confirms that
 // the deferred-snapshot reconciliation pass still detects mixed
 // profiles even though it sees only a sample run per (cohort, batch)

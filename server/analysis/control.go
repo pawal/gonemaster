@@ -53,10 +53,13 @@ type ControlStore interface {
 	ComputeSnapshotEntityViews(cohortID int64, batchID string, minLevel string) (serverpkg.SnapshotEntityViews, error)
 	ReplaceSnapshotEntityViews(snapshotID int64, views serverpkg.SnapshotEntityViews) error
 	TagViewMinLevel() string
+	// SetCohortDefaultSnapshot pins one snapshot as the cohort default.
+	SetCohortDefaultSnapshot(cohortID, snapshotID int64) error
 
-	// First-boot backfill surface.
+	// Settings surface: first-boot backfill and pin-on-capture intent.
 	GetSetting(key string) (string, bool)
 	SetSetting(key, value string) error
+	DeleteSetting(key string) error
 }
 
 // Controller coordinates per-run projection with cohort-wide rebuild and clear
@@ -801,6 +804,20 @@ func (c *Controller) captureSnapshot(snap serverpkg.AnalysisCohortSnapshot) erro
 	if _, err := c.store.UpsertAnalysisCohortSnapshot(snap); err != nil {
 		return fmt.Errorf("promote snapshot %d to captured: %w", snap.ID, err)
 	}
+	return c.consumePromoteDefaultIntent(snap)
+}
+
+// consumePromoteDefaultIntent pins the just-captured snapshot as the cohort
+// default when the run flow recorded that intent. Single-use: pin then clear.
+func (c *Controller) consumePromoteDefaultIntent(snap serverpkg.AnalysisCohortSnapshot) error {
+	key := serverpkg.PromoteDefaultSettingKey(snap.BatchID)
+	if _, ok := c.store.GetSetting(key); !ok {
+		return nil
+	}
+	if err := c.store.SetCohortDefaultSnapshot(snap.CohortID, snap.ID); err != nil {
+		return fmt.Errorf("promote snapshot %d to cohort default: %w", snap.ID, err)
+	}
+	_ = c.store.DeleteSetting(key)
 	return nil
 }
 

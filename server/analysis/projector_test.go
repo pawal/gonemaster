@@ -418,6 +418,40 @@ func (s *fakeStore) SetSetting(key, value string) error {
 	return nil
 }
 
+func (s *fakeStore) DeleteSetting(key string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.settings, key)
+	return nil
+}
+
+// SetCohortDefaultSnapshot mirrors the SQL store: clear is_default on every
+// sibling, set it on the target, and pin the cohort catalog to it.
+func (s *fakeStore) SetCohortDefaultSnapshot(cohortID, snapshotID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureSnapshotMaps()
+	for key, snap := range s.snapshots {
+		if key.cohortID != cohortID {
+			continue
+		}
+		want := snap.ID == snapshotID
+		if snap.IsDefault != want {
+			snap.IsDefault = want
+			s.snapshots[key] = snap
+		}
+	}
+	for i := range s.cohorts {
+		if s.cohorts[i].ID == cohortID {
+			id := snapshotID
+			s.cohorts[i].DefaultSnapshotPolicy = serverpkg.DefaultSnapshotPolicyPinned
+			s.cohorts[i].DefaultSnapshotID = &id
+			break
+		}
+	}
+	return nil
+}
+
 func (s *fakeStore) UpsertAnalysisCohortSnapshot(snap serverpkg.AnalysisCohortSnapshot) (serverpkg.AnalysisCohortSnapshot, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()

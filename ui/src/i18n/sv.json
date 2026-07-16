@@ -741,6 +741,7 @@
   "analysis_snapshots_rebuild": "Bygg om aggregat",
   "analysis_snapshots_rebuild_title": "Beräkna om trend- och diffaggregat från befintliga analysrader",
   "analysis_snapshots_rebuild_unavailable_title": "Källjobbdata har rensats. Ombyggnad kräver de ursprungliga körningarna och är inte längre möjlig för denna ögonblicksbild.",
+  "analysis_snapshots_rebuilding": "Bygger om aggregat...",
   "analysis_snapshots_purge": "Radera ögonblicksbild",
   "analysis_snapshots_purge_title": "Ta bara bort denna ögonblicksbild och dess aggregat",
   "analysis_snapshots_delete_source_batch": "Ta bort källbatch",

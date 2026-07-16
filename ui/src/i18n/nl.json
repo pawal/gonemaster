@@ -186,6 +186,7 @@
   "analysis_snapshots_rebuild": "Aggregaten opnieuw opbouwen",
   "analysis_snapshots_rebuild_title": "Trend- en diff-aggregaten opnieuw berekenen uit bestaande analyserijen",
   "analysis_snapshots_rebuild_unavailable_title": "Brongegevens van de taak zijn opgeschoond. Opnieuw opbouwen vereist de oorspronkelijke uitvoeringen en is voor deze snapshot niet langer mogelijk.",
+  "analysis_snapshots_rebuilding": "Aggregaten opnieuw opbouwen...",
   "analysis_snapshots_purge": "Snapshot opschonen",
   "analysis_snapshots_purge_title": "Verwijder alleen deze snapshot en de bijbehorende snapshotaggregaten",
   "analysis_snapshots_delete_source_batch": "Bronbatch verwijderen",

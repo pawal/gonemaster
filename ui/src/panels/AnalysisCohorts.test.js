@@ -548,6 +548,61 @@ describe("AnalysisCohorts", () => {
     expect(handles.snapshotDeletes[0]).toEqual({ id: 1, slug: "2026-04-20", purge: true });
   });
 
+  it("shows an indeterminate progress indicator while a snapshot rematerialize is in flight", async () => {
+    // The rematerialize POST is synchronous server-side and can take a while,
+    // so the row shows an indeterminate "Rebuilding aggregates..." bar for the
+    // duration. We drive the fetch with a hand-released deferred promise so the
+    // in-flight UI can be observed before the POST settles, then assert the
+    // indicator clears once the follow-up snapshot refresh completes.
+    const snapshotsByCohort = {
+      1: [{
+        id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
+        profile_name: "strict", run_count: 3, domain_count: 3,
+        status: "captured", is_public: true, is_default: false,
+        source_runs_available: true,
+      }],
+    };
+    let releaseRematerialize;
+    const rematerializeDone = new Promise((resolve) => { releaseRematerialize = resolve; });
+    let rematerializeCalls = 0;
+
+    global.fetch.mockImplementation((url, requestOptions = {}) => {
+      const value = typeof url === "string" ? url : String(url?.url || url);
+      const method = requestOptions.method || "GET";
+      if (value === "/api/v1/tags?limit=500" && method === "GET") return jsonResponse([]);
+      if (value === "/api/v1/analysis/cohorts" && method === "GET") return jsonResponse(sampleCohorts());
+      if (value === "/api/v1/analysis/status" && method === "GET") return jsonResponse({ backend_supported: true });
+      const listSnaps = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots$/);
+      if (listSnaps && method === "GET") return jsonResponse(snapshotsByCohort[Number(listSnaps[1])] || []);
+      const remat = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots\/([^/?]+)\/rematerialize$/);
+      if (remat && method === "POST") {
+        rematerializeCalls += 1;
+        return rematerializeDone.then(() => jsonResponse(snapshotsByCohort[1][0]));
+      }
+      return jsonResponse({});
+    });
+
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+
+    const snapRow = (await screen.findByText("2026-04-20")).closest("tr");
+    await fireEvent.click(within(snapRow).getByRole("button", { name: /Rebuild aggregates/i }));
+
+    // In flight: the indeterminate bar and its label are shown on the row.
+    expect(rematerializeCalls).toBe(1);
+    expect(await within(snapRow).findByText(/Rebuilding aggregates/i)).toBeInTheDocument();
+    expect(within(snapRow).getByRole("progressbar")).toBeInTheDocument();
+
+    // Settle the POST; the indicator clears once the row refreshes.
+    releaseRematerialize();
+    await waitFor(() => {
+      const row = screen.getByText("2026-04-20").closest("tr");
+      expect(within(row).queryByText(/Rebuilding aggregates/i)).toBeNull();
+    });
+  });
+
   // ── Delete-batch action ──────────────────────────────────────────────────
 
   it("renders a Delete source batch button per snapshot row when onDeleteBatch is provided", async () => {

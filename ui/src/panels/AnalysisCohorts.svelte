@@ -67,6 +67,8 @@
   let snapshotsLoadingIds = $state(new Set());
   let expandedSnapshotCohortId = $state(null);
   let busySnapshotKey = $state("");
+  // Set only while a rematerialize POST is in flight.
+  let rebuildingSnapshotKey = $state("");
   let editingLabelKey = $state("");
   let editingLabelValue = $state("");
   let submittingSnapshotCohortId = $state(null);
@@ -473,6 +475,7 @@
   async function rebuildSnapshotAggregates(cohort, snap) {
     const key = snapshotKey(cohort.id, snap.slug);
     busySnapshotKey = key;
+    rebuildingSnapshotKey = key;
     try {
       await apiFetch(
         `/analysis/cohorts/${cohort.id}/snapshots/${encodeURIComponent(snap.slug)}/rematerialize`,
@@ -484,6 +487,7 @@
       setNotice($t("analysis_snapshots_action_error", { error: error.message || "" }), "warn");
     } finally {
       busySnapshotKey = "";
+      rebuildingSnapshotKey = "";
     }
   }
 
@@ -896,6 +900,7 @@
                           {#each snaps as snap (snap.id)}
                             {@const snapKey = snapshotKey(cohort.id, snap.slug)}
                             {@const snapBusy = busySnapshotKey === snapKey}
+                            {@const snapRebuilding = rebuildingSnapshotKey === snapKey}
                             {@const editing = editingLabelKey === snapKey}
                             <tr>
                               <td>
@@ -927,6 +932,13 @@
                                 </span>
                                 {#if snap.is_default}
                                   <span class="badge badge-default" title={$t("analysis_cohorts_default_snapshot_tooltip")}>{$t("analysis_cohorts_default_active")}</span>
+                                {/if}
+                                {#if snapRebuilding}
+                                  <div class="snapshot-progress" role="progressbar"
+                                       aria-label={$t("analysis_snapshots_rebuilding")} aria-busy="true">
+                                    <div class="snapshot-progress-fill"></div>
+                                  </div>
+                                  <span class="snapshot-rebuilding-label">{$t("analysis_snapshots_rebuilding")}</span>
                                 {/if}
                               </td>
                               <td class="col-right">
@@ -1274,6 +1286,44 @@
     height: 100%;
     background: var(--accent-1, #4c9bff);
     transition: width 0.2s ease;
+  }
+
+  /* Indeterminate bar for the synchronous snapshot rematerialize. */
+  .snapshot-progress {
+    margin-top: 4px;
+    width: 140px;
+    height: 4px;
+    background: var(--surface-2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .snapshot-progress-fill {
+    height: 100%;
+    width: 40%;
+    background: var(--accent-1, #4c9bff);
+    border-radius: 2px;
+    animation: snapshot-progress-slide 1.1s ease-in-out infinite;
+  }
+
+  @keyframes snapshot-progress-slide {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(350%); }
+  }
+
+  .snapshot-rebuilding-label {
+    display: block;
+    margin-top: 2px;
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .snapshot-progress-fill {
+      width: 100%;
+      animation: none;
+      opacity: 0.6;
+    }
   }
 
   .link-action {

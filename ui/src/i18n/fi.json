@@ -741,6 +741,7 @@
   "analysis_snapshots_rebuild": "Rakenna koosteet uudelleen",
   "analysis_snapshots_rebuild_title": "Laske trendi- ja vertailukoosteet uudelleen olemassa olevista analyysiriveistä",
   "analysis_snapshots_rebuild_unavailable_title": "Lähdetehtävän tiedot on poistettu. Uudelleenrakennus tarvitsee alkuperäiset ajot, eikä se ole enää mahdollista tälle tilannekuvalle.",
+  "analysis_snapshots_rebuilding": "Rakennetaan koosteita uudelleen...",
   "analysis_snapshots_purge": "Poista tilannekuva",
   "analysis_snapshots_purge_title": "Poista vain tämä tilannekuva ja sen koosteet",
   "analysis_snapshots_delete_source_batch": "Poista lähde-erä",

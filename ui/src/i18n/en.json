@@ -186,6 +186,7 @@
   "analysis_snapshots_rebuild": "Rebuild aggregates",
   "analysis_snapshots_rebuild_title": "Recompute trend and diff aggregates from existing analysis rows",
   "analysis_snapshots_rebuild_unavailable_title": "Source job data has been purged. Rebuild needs the original runs and is no longer possible for this snapshot.",
+  "analysis_snapshots_rebuilding": "Rebuilding aggregates...",
   "analysis_snapshots_purge": "Purge snapshot",
   "analysis_snapshots_purge_title": "Remove only this snapshot and its snapshot aggregates",
   "analysis_snapshots_delete_source_batch": "Delete source batch",

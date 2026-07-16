@@ -186,6 +186,7 @@
   "analysis_snapshots_rebuild": "Přestavět agregace",
   "analysis_snapshots_rebuild_title": "Přepočítat agregace trendů a rozdílů z existujících analytických řádků",
   "analysis_snapshots_rebuild_unavailable_title": "Zdrojová data úloh byla vymazána. Přestavba vyžaduje původní běhy a pro tento snímek již není možná.",
+  "analysis_snapshots_rebuilding": "Přestavování agregací...",
   "analysis_snapshots_purge": "Vymazat snímek",
   "analysis_snapshots_purge_title": "Odstranit pouze tento snímek a jeho agregace snímku",
   "analysis_snapshots_delete_source_batch": "Smazat zdrojovou dávku",

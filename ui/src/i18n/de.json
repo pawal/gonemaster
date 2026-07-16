@@ -186,6 +186,7 @@
   "analysis_snapshots_rebuild": "Aggregate neu aufbauen",
   "analysis_snapshots_rebuild_title": "Trend- und Diff-Aggregate aus vorhandenen Analysezeilen neu berechnen",
   "analysis_snapshots_rebuild_unavailable_title": "Die Job-Quelldaten wurden gelöscht. Für den Neuaufbau werden die ursprünglichen Läufe benötigt, was für diesen Snapshot nicht mehr möglich ist.",
+  "analysis_snapshots_rebuilding": "Aggregate werden neu aufgebaut...",
   "analysis_snapshots_purge": "Snapshot bereinigen",
   "analysis_snapshots_purge_title": "Nur diesen Snapshot und seine Snapshot-Aggregate entfernen",
   "analysis_snapshots_delete_source_batch": "Quell-Batch löschen",

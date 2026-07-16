@@ -741,6 +741,7 @@
   "analysis_snapshots_rebuild": "Reconstruir agregados",
   "analysis_snapshots_rebuild_title": "Recalcula los agregados de tendencias y diferencias a partir de las filas de análisis existentes",
   "analysis_snapshots_rebuild_unavailable_title": "Los datos del trabajo de origen se han purgado. La reconstrucción requiere las ejecuciones originales y ya no es posible para esta instantánea.",
+  "analysis_snapshots_rebuilding": "Reconstruyendo agregados...",
   "analysis_snapshots_purge": "Purgar instantánea",
   "analysis_snapshots_purge_title": "Eliminar solo esta instantánea y sus agregados",
   "analysis_snapshots_delete_source_batch": "Eliminar lote origen",

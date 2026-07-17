@@ -51,10 +51,15 @@ export function linkify(text, entries) {
   }
   items.sort((a, b) => b.phrase.length - a.phrase.length);
   const pattern = items.map((i) => escapeRe(i.phrase)).join("|");
-  // Unicode-aware boundaries so accented terms (e.g. French "condense"
-  // with an accent, Czech "podpis") match even when a term ends in a
-  // non-ASCII letter, where ASCII \b would place no boundary.
-  const re = new RegExp(`(?<![\\p{L}\\p{N}])(?:${pattern})(?![\\p{L}\\p{N}])`, "giu");
+  // Boundaries guard only against continuation within Latin script, so
+  // accented terms (French "condense" with an accent, Czech "podpis")
+  // still match while terms flanked by non-Latin scripts also match -
+  // e.g. a Latin acronym or a Japanese term inside CJK text, which has no
+  // spaces between words.
+  const re = new RegExp(
+    `(?<![\\p{Script=Latin}\\p{N}])(?:${pattern})(?![\\p{Script=Latin}\\p{N}])`,
+    "giu",
+  );
 
   const used = new Set();
   const segments = [];

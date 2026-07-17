@@ -157,6 +157,19 @@ describe("linkify", () => {
     expect(segs.filter((s) => s.type === "term").length).toBe(0);
   });
 
+  it("matches Latin acronyms and terms flanked by CJK characters", () => {
+    // Japanese-style prose has no spaces; a term sits directly against
+    // Japanese letters on both sides and must still match.
+    const jp = [
+      { slug: "dnssec", phrases: ["DNSSEC"] },
+      { slug: "glue", phrases: ["グルー"] },
+    ];
+    const segs = linkify("これはDNSSECとグルーの説明です。", jp);
+    const slugs = segs.filter((s) => s.type === "term").map((s) => s.slug);
+    expect(slugs).toEqual(["dnssec", "glue"]);
+    expect(flatten(segs)).toBe("これはDNSSECとグルーの説明です。");
+  });
+
   it("links several distinct terms in one string", () => {
     const segs = linkify("DNSSEC uses a DS and NSEC3.", ENTRIES);
     const slugs = segs.filter((s) => s.type === "term").map((s) => s.slug);

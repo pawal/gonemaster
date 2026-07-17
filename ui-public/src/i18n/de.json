@@ -978,5 +978,7 @@
   "pub.glossary.ipv4": "IPv4 ist das ältere Schema der Internetadressierung (zum Beispiel 192.0.2.1). Viele Clients sind weiterhin darauf angewiesen, daher sollten Nameserver darüber erreichbar bleiben.",
   "pub.glossary.ipv4.match": "IPv4",
   "pub.glossary.ipv6": "IPv6 ist das neuere Schema der Internetadressierung (zum Beispiel 2001:db8::1), das IPv4 ablösen soll, wenn der Adressraum knapp wird.",
-  "pub.glossary.ipv6.match": "IPv6"
+  "pub.glossary.ipv6.match": "IPv6",
+  "pub.tag.dnssec.DS10_NONSTANDARD_NSEC_RESPONSE.header": "Nicht standardkonforme NSEC-Antwortform",
+  "pub.tag.dnssec.DS10_NONSTANDARD_NSEC_RESPONSE.desc": "Ein Nameserver hat eine NSEC-Abfrage beantwortet, indem er den NSEC-Record in den Autoritätsabschnitt statt in den Antwortabschnitt gelegt hat. Diese Antwortform wird von Implementierungen der RFC-4470-White-Lies und der kompakten Nichtexistenz-Beweise nach RFC 9824 verwendet (z. B. AWS Route 53, Cloudflare). Validierende Resolver akzeptieren beide Formen; der Hinweis ist rein informativ, damit der Betreiber weiß, dass sein Nameserver die nicht standardkonforme Form verwendet."
 }

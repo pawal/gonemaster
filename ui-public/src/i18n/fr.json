@@ -978,5 +978,7 @@
   "pub.glossary.ipv4": "IPv4 est l'ancien schéma d'adressage d'Internet (par exemple 192.0.2.1). De nombreux clients en dépendent encore, les serveurs de noms devraient donc y rester joignables.",
   "pub.glossary.ipv4.match": "IPv4",
   "pub.glossary.ipv6": "IPv6 est le nouveau schéma d'adressage d'Internet (par exemple 2001:db8::1), conçu pour succéder à IPv4 à mesure que l'espace d'adressage s'épuise.",
-  "pub.glossary.ipv6.match": "IPv6"
+  "pub.glossary.ipv6.match": "IPv6",
+  "pub.tag.dnssec.DS10_NONSTANDARD_NSEC_RESPONSE.header": "Forme de réponse NSEC non standard",
+  "pub.tag.dnssec.DS10_NONSTANDARD_NSEC_RESPONSE.desc": "Un serveur de noms a répondu à une requête NSEC en plaçant l'enregistrement NSEC dans la section d'autorité au lieu de la section de réponse. C'est la forme de réponse utilisée par les implémentations des white-lies de la RFC 4470 et de la preuve d'inexistence compacte de la RFC 9824 (par exemple AWS Route 53, Cloudflare). Les résolveurs validants acceptent les deux formes ; l'avis est purement informatif, afin que l'opérateur sache que son serveur de noms utilise la forme non standard."
 }

@@ -978,5 +978,7 @@
   "pub.glossary.ipv4": "IPv4 är det äldre systemet för internetadressering (till exempel 192.0.2.1). Många klienter förlitar sig fortfarande på det, så namnservrar bör vara nåbara över det.",
   "pub.glossary.ipv4.match": "IPv4",
   "pub.glossary.ipv6": "IPv6 är det nyare systemet för internetadressering (till exempel 2001:db8::1), utformat för att efterträda IPv4 när adressutrymmet tar slut.",
-  "pub.glossary.ipv6.match": "IPv6"
+  "pub.glossary.ipv6.match": "IPv6",
+  "pub.tag.dnssec.DS10_NONSTANDARD_NSEC_RESPONSE.header": "Icke-standardiserad NSEC-svarsform",
+  "pub.tag.dnssec.DS10_NONSTANDARD_NSEC_RESPONSE.desc": "En namnserver besvarade en NSEC-fråga genom att placera NSEC-posten i auktoritetssektionen i stället för svarssektionen. Det är den svarsform som används av implementationer av RFC 4470-white-lies och RFC 9824-kompakt icke-existensbevis (till exempel AWS Route 53, Cloudflare). Validerande resolvrar accepterar båda formerna; notisen är enbart informativ så att operatören vet att namnservern använder den icke-standardiserade formen."
 }

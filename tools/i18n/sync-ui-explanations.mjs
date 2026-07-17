@@ -18,20 +18,22 @@ const enJsonPath = resolve(repoRoot, "ui-public/src/i18n/en.json");
 
 const KEY_PREFIX_TC_DESC = "pub.tc_desc.";
 const KEY_PREFIX_TAG = "pub.tag.";
+const KEY_PREFIX_GLOSSARY = "pub.glossary.";
 
 function parseModuleFile(text, moduleName) {
   // The parser is a small state machine. It walks the file line by
-  // line and recognises three section headers:
+  // line and recognises these section headers:
   //   "## Testcase <id>"
   //   "## Tag <TAG>"
+  //   "## Glossary <slug>"
   //   "## ..."   (anything else ends the current section)
-  // Inside a section it looks for "Header:" and "Description:" labels.
-  // Body text between the "Description:" label and the next section
-  // header (or EOF) is collected as the description.
+  // Inside a section it looks for "Header:" / "Match:" and "Description:"
+  // labels. Body text between the "Description:" label and the next
+  // section header (or EOF) is collected as the description.
   const out = {};
   const lines = text.split(/\r?\n/);
-  let mode = null;        // "testcase" | "tag" | null
-  let id = null;          // current testcase id or tag name
+  let mode = null;        // "testcase" | "tag" | "glossary" | null
+  let id = null;          // current testcase id, tag name, or glossary slug
   let buffer = [];        // lines collected for the current Description:
   let capturing = false;  // true once a "Description:" label has been seen
 
@@ -43,6 +45,8 @@ function parseModuleFile(text, moduleName) {
       out[`${KEY_PREFIX_TC_DESC}${id.toLowerCase()}`] = text;
     } else if (mode === "tag") {
       out[`${KEY_PREFIX_TAG}${moduleName.toLowerCase()}.${id}.desc`] = text;
+    } else if (mode === "glossary") {
+      out[`${KEY_PREFIX_GLOSSARY}${id}`] = text;
     }
   };
 
@@ -71,6 +75,13 @@ function parseModuleFile(text, moduleName) {
       id = tagMatch[1];
       continue;
     }
+    const glossaryMatch = line.match(/^##\s+Glossary\s+(\S+)\s*$/);
+    if (glossaryMatch) {
+      resetSection();
+      mode = "glossary";
+      id = glossaryMatch[1];
+      continue;
+    }
     if (line.startsWith("## ")) {
       // Some other section header (e.g. document title continuation).
       resetSection();
@@ -85,7 +96,15 @@ function parseModuleFile(text, moduleName) {
       }
     }
 
-    if ((mode === "testcase" || mode === "tag") && /^Description:\s*$/.test(line)) {
+    if (mode === "glossary") {
+      const match = line.match(/^Match:\s*(.+?)\s*$/);
+      if (match) {
+        out[`${KEY_PREFIX_GLOSSARY}${id}.match`] = match[1];
+        continue;
+      }
+    }
+
+    if ((mode === "testcase" || mode === "tag" || mode === "glossary") && /^Description:\s*$/.test(line)) {
       capturing = true;
       buffer = [];
       continue;
@@ -140,7 +159,11 @@ function mergeIntoCatalog(catalog, managed) {
 }
 
 function isManagedKey(k) {
-  return k.startsWith(KEY_PREFIX_TC_DESC) || k.startsWith(KEY_PREFIX_TAG);
+  return (
+    k.startsWith(KEY_PREFIX_TC_DESC) ||
+    k.startsWith(KEY_PREFIX_TAG) ||
+    k.startsWith(KEY_PREFIX_GLOSSARY)
+  );
 }
 
 function removedKeys(catalog, managed) {

@@ -94,6 +94,51 @@ describe("sync-ui-explanations", () => {
     }
   });
 
+  it("extracts glossary definition and match keys", () => {
+    const { dir, sourceDir, enJsonPath } = setupFixture();
+    try {
+      writeFileSync(
+        resolve(sourceDir, "glossary.md"),
+        [
+          "# Public UI glossary",
+          "",
+          "## Glossary zone-apex",
+          "",
+          "Match: zone apex, apex",
+          "",
+          "Description:",
+          "",
+          "The zone apex is the top of your domain.",
+          "",
+          "## Glossary dnssec",
+          "",
+          "Match: DNSSEC",
+          "",
+          "Description:",
+          "",
+          "DNSSEC adds signatures to DNS answers.",
+          "",
+        ].join("\n"),
+      );
+      writeFileSync(enJsonPath, "{}\n");
+
+      runSync(sourceDir, enJsonPath);
+
+      const out = JSON.parse(readFileSync(enJsonPath, "utf8"));
+      // Slugs keep hyphens; the .match line is captured verbatim.
+      expect(out["pub.glossary.zone-apex"]).toBe(
+        "The zone apex is the top of your domain.",
+      );
+      expect(out["pub.glossary.zone-apex.match"]).toBe("zone apex, apex");
+      expect(out["pub.glossary.dnssec"]).toBe(
+        "DNSSEC adds signatures to DNS answers.",
+      );
+      expect(out["pub.glossary.dnssec.match"]).toBe("DNSSEC");
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
   it("lowercases the module name in tag keys", () => {
     const { dir, sourceDir, enJsonPath } = setupFixture();
     try {

@@ -51,7 +51,10 @@ export function linkify(text, entries) {
   }
   items.sort((a, b) => b.phrase.length - a.phrase.length);
   const pattern = items.map((i) => escapeRe(i.phrase)).join("|");
-  const re = new RegExp(`\\b(?:${pattern})\\b`, "gi");
+  // Unicode-aware boundaries so accented terms (e.g. French "condense"
+  // with an accent, Czech "podpis") match even when a term ends in a
+  // non-ASCII letter, where ASCII \b would place no boundary.
+  const re = new RegExp(`(?<![\\p{L}\\p{N}])(?:${pattern})(?![\\p{L}\\p{N}])`, "giu");
 
   const used = new Set();
   const segments = [];

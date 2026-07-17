@@ -136,6 +136,27 @@ describe("linkify", () => {
     expect(linkify(undefined, ENTRIES)).toEqual([{ type: "text", value: "" }]);
   });
 
+  it("matches accented terms that end in a non-ASCII letter", () => {
+    // Simulates a French-style phrase list (glue -> "colle", digest ->
+    // "condense" with an accent) matched against accented prose.
+    const accented = [
+      { slug: "glue", phrases: ["colle"] },
+      { slug: "digest", phrases: ["condensé"] },
+      { slug: "authoritative", phrases: ["faisant autorité"] },
+    ];
+    const segs = linkify("La colle et le condensé faisant autorité ici.", accented);
+    const slugs = segs.filter((s) => s.type === "term").map((s) => s.slug);
+    expect(slugs).toEqual(["glue", "digest", "authoritative"]);
+    expect(flatten(segs)).toBe("La colle et le condensé faisant autorité ici.");
+  });
+
+  it("does not match an accented term embedded in a longer word", () => {
+    const entries = [{ slug: "digest", phrases: ["condensé"] }];
+    // "condensée" (feminine) should not match the masculine "condensé".
+    const segs = linkify("une valeur condensée ici", entries);
+    expect(segs.filter((s) => s.type === "term").length).toBe(0);
+  });
+
   it("links several distinct terms in one string", () => {
     const segs = linkify("DNSSEC uses a DS and NSEC3.", ENTRIES);
     const slugs = segs.filter((s) => s.type === "term").map((s) => s.slug);

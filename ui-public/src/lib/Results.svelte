@@ -5,6 +5,7 @@
   import { LEVELS, levelClass, bannerClass, worstLevel } from "../severity.js";
   import ShareButton from "./ShareButton.svelte";
   import DnssecChain from "./DnssecChain.svelte";
+  import GlossaryText from "./GlossaryText.svelte";
 
   // Force all <details> open before printing, restore after.
   let closedBeforePrint = [];
@@ -385,10 +386,10 @@
                           </summary>
                           <div class="result-explanation-body">
                             {#if tcLongText}
-                              <p class="result-explanation-para result-explanation-para-test" data-testid="result-explanation-test">{tcLongText}</p>
+                              <p class="result-explanation-para result-explanation-para-test" data-testid="result-explanation-test"><GlossaryText text={tcLongText} /></p>
                             {/if}
                             {#if tagDesc}
-                              <p class="result-explanation-para result-explanation-para-tag" data-testid="result-explanation-tag">{tagDesc}</p>
+                              <p class="result-explanation-para result-explanation-para-tag" data-testid="result-explanation-tag"><GlossaryText text={tagDesc} /></p>
                             {/if}
                           </div>
                         </details>
@@ -422,10 +423,10 @@
                       </summary>
                       <div class="result-explanation-body">
                         {#if tcLongText}
-                          <p class="result-explanation-para result-explanation-para-test" data-testid="result-explanation-test">{tcLongText}</p>
+                          <p class="result-explanation-para result-explanation-para-test" data-testid="result-explanation-test"><GlossaryText text={tcLongText} /></p>
                         {/if}
                         {#if tagDesc}
-                          <p class="result-explanation-para result-explanation-para-tag" data-testid="result-explanation-tag">{tagDesc}</p>
+                          <p class="result-explanation-para result-explanation-para-tag" data-testid="result-explanation-tag"><GlossaryText text={tagDesc} /></p>
                         {/if}
                       </div>
                     </details>

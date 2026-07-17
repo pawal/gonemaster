@@ -417,6 +417,41 @@ describe("Results", () => {
       .toBe("Minimum number of name servers");
   });
 
+  it("links a glossary term inside the finding explanation", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-explanation-tag")).toBeTruthy());
+    // The tag description mentions "delegation", a glossary term.
+    const term = screen.getAllByTestId("glossary-term").find((el) => el.textContent === "delegation");
+    expect(term).toBeTruthy();
+  });
+
+  it("shows a glossary definition tooltip on hover", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-explanation-tag")).toBeTruthy());
+    const term = screen.getAllByTestId("glossary-term").find((el) => el.textContent === "delegation");
+    // Tooltip is absent until the term is hovered.
+    expect(screen.queryByTestId("glossary-tip")).toBeNull();
+    await fireEvent.mouseEnter(term);
+    expect(screen.getByTestId("glossary-tip").textContent).toMatch(/pointer in the parent zone/i);
+  });
+
+  it("keeps the full explanation text intact when terms are linked", async () => {
+    global.fetch.mockResolvedValue(resultResp([
+      { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
+    ]));
+    render(Results, { props: { publicID: "abc12345" } });
+    await waitFor(() => expect(screen.getByTestId("result-explanation-tag")).toBeTruthy());
+    // The linkified paragraph reads exactly as authored (no injected tooltip text).
+    expect(screen.getByTestId("result-explanation-tag").textContent)
+      .toMatch(/parent zone's delegation lists fewer nameservers/i);
+  });
+
   it("re-fetches with new locale when locale prop changes", async () => {
     const enResp = {
       ok: true, status: 200,

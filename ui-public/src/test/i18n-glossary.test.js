@@ -18,6 +18,12 @@ const i18nDir = resolve(here, "..", "i18n");
 const en = JSON.parse(readFileSync(resolve(i18nDir, "en.json"), "utf8"));
 const glossaryKeys = Object.keys(en).filter((k) => k.startsWith("pub.glossary."));
 
+// The full explanation layer: testcase descriptions, tag headers/descriptions,
+// and glossary entries. Every locale must carry the complete set.
+const explanationKeys = Object.keys(en).filter((k) =>
+  /^pub\.(tc_desc|tag|glossary)\./.test(k),
+);
+
 const locales = readdirSync(i18nDir)
   .filter((f) => f.endsWith(".json") && f !== "en.json")
   .map((f) => f.replace(/\.json$/, ""));
@@ -45,6 +51,22 @@ describe("ui-public glossary translations", () => {
         expect(typeof cat[k]).toBe("string");
         expect(cat[k].trim().length).toBeGreaterThan(0);
       }
+    });
+  }
+});
+
+describe("ui-public explanation-layer parity", () => {
+  for (const loc of locales) {
+    const cat = JSON.parse(readFileSync(resolve(i18nDir, `${loc}.json`), "utf8"));
+    it(`${loc}: has every pub.tc_desc/pub.tag/pub.glossary key en has`, () => {
+      const missing = explanationKeys.filter((k) => !(k in cat));
+      expect(missing).toEqual([]);
+    });
+    it(`${loc}: all explanation-layer values are non-empty`, () => {
+      const empty = explanationKeys.filter(
+        (k) => k in cat && !String(cat[k]).trim(),
+      );
+      expect(empty).toEqual([]);
     });
   }
 });

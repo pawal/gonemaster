@@ -137,12 +137,59 @@ func applyNameserverFilter(items []PublicAnalysisNameserverView, filter analysis
 		}
 		items = kept
 	}
+	items = filterMinLatencySamples(items, filter.MinLatencySamples, func(v PublicAnalysisNameserverView) int { return v.LatencySamples })
 	sortNameserverViews(items, filter.Sort)
 	return items
 }
 
+// compareLatencyP50 orders nullable p50 values with nil last; decided is
+// false for equal or both-nil pairs so the caller's tiebreak applies.
+func compareLatencyP50(a, b *float64, desc bool) (less bool, decided bool) {
+	switch {
+	case a == nil && b == nil:
+		return false, false
+	case a == nil:
+		return false, true
+	case b == nil:
+		return true, true
+	case *a == *b:
+		return false, false
+	case desc:
+		return *a > *b, true
+	default:
+		return *a < *b, true
+	}
+}
+
+func filterMinLatencySamples[T any](items []T, min int, samples func(T) int) []T {
+	if min <= 0 {
+		return items
+	}
+	kept := items[:0]
+	for _, it := range items {
+		if samples(it) >= min {
+			kept = append(kept, it)
+		}
+	}
+	return kept
+}
+
 func sortNameserverViews(items []PublicAnalysisNameserverView, mode string) {
 	switch mode {
+	case "latency_p50_asc":
+		sort.Slice(items, func(i, j int) bool {
+			if less, ok := compareLatencyP50(items[i].LatencyP50MS, items[j].LatencyP50MS, false); ok {
+				return less
+			}
+			return items[i].Nameserver < items[j].Nameserver
+		})
+	case "latency_p50_desc":
+		sort.Slice(items, func(i, j int) bool {
+			if less, ok := compareLatencyP50(items[i].LatencyP50MS, items[j].LatencyP50MS, true); ok {
+				return less
+			}
+			return items[i].Nameserver < items[j].Nameserver
+		})
 	case "domain_count_desc":
 		sort.Slice(items, func(i, j int) bool {
 			if items[i].DomainCount != items[j].DomainCount {
@@ -222,6 +269,10 @@ func sortEndpointViews(items []PublicAnalysisEndpointView, mode string) {
 						}
 						return items[i].ASNLabel < items[j].ASNLabel
 					}
+				case "latency_p50":
+					if less, ok := compareLatencyP50(items[i].LatencyP50MS, items[j].LatencyP50MS, k[1] == "desc"); ok {
+						return less
+					}
 				}
 			}
 			return false
@@ -229,6 +280,10 @@ func sortEndpointViews(items []PublicAnalysisEndpointView, mode string) {
 	}
 	var keys [][2]string
 	switch mode {
+	case "latency_p50_asc":
+		keys = [][2]string{{"latency_p50", "asc"}, {"nameserver", "asc"}, {"address", "asc"}}
+	case "latency_p50_desc":
+		keys = [][2]string{{"latency_p50", "desc"}, {"nameserver", "asc"}, {"address", "asc"}}
 	case "nameserver_desc":
 		keys = [][2]string{{"nameserver", "desc"}, {"address", "asc"}}
 	case "address_asc":
@@ -300,6 +355,7 @@ func (s *Server) handlePublicAnalysisEndpoints(w http.ResponseWriter, r *http.Re
 		}
 		items = kept
 	}
+	items = filterMinLatencySamples(items, filter.MinLatencySamples, func(v PublicAnalysisEndpointView) int { return v.LatencySamples })
 	sortEndpointViews(items, filter.Sort)
 	total := len(items)
 	start, end := clampPage(filter.Limit, filter.Offset, total)
@@ -361,8 +417,17 @@ func (s *Server) handlePublicAnalysisASNs(w http.ResponseWriter, r *http.Request
 		}
 		items = kept
 	}
+	items = filterMinLatencySamples(items, filter.MinLatencySamples, func(v PublicAnalysisASNView) int { return v.LatencySamples })
 	sort.Slice(items, func(i, j int) bool {
 		switch filter.Sort {
+		case "latency_p50_asc":
+			if less, ok := compareLatencyP50(items[i].LatencyP50MS, items[j].LatencyP50MS, false); ok {
+				return less
+			}
+		case "latency_p50_desc":
+			if less, ok := compareLatencyP50(items[i].LatencyP50MS, items[j].LatencyP50MS, true); ok {
+				return less
+			}
 		case "domain_count_desc":
 			if items[i].DomainCount != items[j].DomainCount {
 				return items[i].DomainCount > items[j].DomainCount

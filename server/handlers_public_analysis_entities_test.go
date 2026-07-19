@@ -11,13 +11,15 @@ import (
 
 // seedEndpoint inserts one (run, domain, nameserver, address) endpoint row
 // plus the normalized entity rows. Runs and domains are upserted as needed.
-func (f *analysisAPITestFixture) seedEndpoint(runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string) {
-	f.seedEndpointInBatch(f.batchID, runID, domainName, nameserverName, address, family, finishedAt, asn, prefix)
+func (f *analysisAPITestFixture) seedEndpoint(runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string, avgMS ...float64) {
+	f.seedEndpointInBatch(f.batchID, runID, domainName, nameserverName, address, family, finishedAt, asn, prefix, avgMS...)
 }
 
 // seedEndpointInBatch is seedEndpoint with an explicit batch id. Used by
-// tests that need to scope runs into different snapshots.
-func (f *analysisAPITestFixture) seedEndpointInBatch(batchID, runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string) {
+// tests that need to scope runs into different snapshots. An optional avgMS
+// sets the endpoint's average response time so the capture-time aggregation
+// produces latency; omitting it leaves the endpoint latency-free.
+func (f *analysisAPITestFixture) seedEndpointInBatch(batchID, runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string, avgMS ...float64) {
 	f.t.Helper()
 	domain, err := f.store.GetOrCreateDomain(domainName)
 	if err != nil {
@@ -55,6 +57,9 @@ func (f *analysisAPITestFixture) seedEndpointInBatch(batchID, runID, domainName,
 		CohortID: f.cohort.ID, RunID: runID, DomainID: domain.ID,
 		NameserverID: ns.ID, AddressID: addr.ID,
 		Role: "authoritative", Source: "timings", Family: family, QueryCount: 1,
+	}
+	if len(avgMS) > 0 {
+		newEndpoint.AvgMS = avgMS[0]
 	}
 	existingEndpoints = append(existingEndpoints, newEndpoint)
 	if err := f.store.ReplaceAnalysisRunNSEndpoints(f.cohort.ID, runID, existingEndpoints); err != nil {

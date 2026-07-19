@@ -44,10 +44,11 @@ type AnalysisReadStore interface {
 // analysisListFilter captures the shared query parameters used by public list
 // endpoints.
 type analysisListFilter struct {
-	Search string
-	Limit  int
-	Offset int
-	Sort   string
+	Search            string
+	Limit             int
+	Offset            int
+	Sort              string
+	MinLatencySamples int
 }
 
 // defaultAnalysisListLimit and maxAnalysisListLimit bound the page size.
@@ -80,6 +81,14 @@ func parseAnalysisListFilter(w http.ResponseWriter, r *http.Request) (analysisLi
 			return filter, false
 		}
 		filter.Offset = v
+	}
+	if raw := strings.TrimSpace(q.Get("min_latency_samples")); raw != "" {
+		v, err := strconv.Atoi(raw)
+		if err != nil || v < 0 {
+			writeError(w, http.StatusBadRequest, "invalid_min_latency_samples", "min_latency_samples must be a non-negative integer", nil)
+			return filter, false
+		}
+		filter.MinLatencySamples = v
 	}
 	return filter, true
 }

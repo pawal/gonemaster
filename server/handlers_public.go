@@ -172,6 +172,10 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = s.queue.Enqueue(created.ID, PriorityNormal)
 	s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
+	s.reqLog(r, slog.LevelInfo, "job created",
+		"domain", created.Domain,
+		"public_id", created.PublicID,
+		"origin", created.Origin)
 
 	writeJSON(w, http.StatusCreated, publicJobView(created))
 }

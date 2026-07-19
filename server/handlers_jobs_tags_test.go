@@ -35,6 +35,29 @@ func TestCreateJobWithTags(t *testing.T) {
 	}
 }
 
+func TestCreateJobLogsDomain(t *testing.T) {
+	var buf bytes.Buffer
+	srv := New(DefaultConfig())
+	srv.logger = newLogger("json", "info", &buf)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"example.com"}`))
+	req.Header.Set("Content-Type", "application/json")
+	srv.Handler().ServeHTTP(resp, req)
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body)
+	}
+
+	line := findLogLine(t, &buf, "job created")
+	if line["domain"] != "example.com" {
+		t.Fatalf("domain = %v, want example.com", line["domain"])
+	}
+	if line["origin"] != JobOriginAdmin {
+		t.Fatalf("origin = %v, want %q", line["origin"], JobOriginAdmin)
+	}
+}
+
 func TestCreateJobWithUnknownTag(t *testing.T) {
 	srv := New(DefaultConfig())
 

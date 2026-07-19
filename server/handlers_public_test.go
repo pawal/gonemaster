@@ -184,6 +184,38 @@ func TestPublicCreateJobCSRFAcceptsSameOrigin(t *testing.T) {
 	}
 }
 
+func TestPublicCreateJobLogsDomain(t *testing.T) {
+	var buf bytes.Buffer
+	srv := New(DefaultConfig())
+	srv.logger = newLogger("json", "info", &buf)
+
+	resp := httptest.NewRecorder()
+	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
+		bytes.NewBufferString(`{"domain":"Example.COM"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", "http://"+req.Host)
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
+	}
+	line := findLogLine(t, &buf, "job created")
+	// The logged domain is the normalized form, not the raw request input.
+	if line["domain"] != "example.com" {
+		t.Fatalf("domain = %v, want example.com", line["domain"])
+	}
+	if pid, ok := line["public_id"].(string); !ok || pid == "" {
+		t.Fatalf("missing public_id, got %v", line["public_id"])
+	}
+	if line["origin"] != JobOriginPublic {
+		t.Fatalf("origin = %v, want %q", line["origin"], JobOriginPublic)
+	}
+	// The event shares the request's correlation ID with the access-log line.
+	if id, ok := line["request_id"].(string); !ok || id == "" {
+		t.Fatalf("missing request_id, got %v", line["request_id"])
+	}
+}
+
 func TestPublicCreateJobCSRFAcceptsHTTPSOriginViaTrustedProxy(t *testing.T) {
 	// Caddy/nginx terminate TLS upstream; gonemaster sees plain HTTP.
 	// Without honoring X-Forwarded-Proto, port 443 (Origin) won't match

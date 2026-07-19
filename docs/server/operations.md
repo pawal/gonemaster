@@ -88,3 +88,56 @@ The JSON metrics endpoint accepts:
 - `limit_batches=1..100`
 
 Prometheus output ignores JSON-only query parameters.
+
+## Logging
+
+The server writes operational logs (lifecycle, access log, warnings, errors) to
+stderr using `log/slog`. Two encodings are available, selected with `log_format`
+(see [configuration.md](configuration.md)):
+
+- `text` (default): human-readable `key=value` lines for local use and journald.
+- `json`: one JSON object per line, for aggregation (Loki, ELK, cloud logging).
+
+Ship logs by letting systemd/journald or the container runtime capture stderr;
+there is no in-process file rotation.
+
+`log_level` sets the minimum level (`debug`, `info`, `warn`, `error`). Levels are
+chosen so operators can alert on `error` lines without parsing status codes.
+
+### Access log
+
+Each `/api/v1` and `/pub/api/v1` request emits one `http_request` line. Its level
+follows the response status: 2xx/3xx -> `info`, 4xx -> `warn`, 5xx -> `error`.
+Fields:
+
+| Field | Meaning |
+|---|---|
+| `method` | HTTP method. |
+| `path` | Request path. |
+| `route` | Templated route (IDs collapsed), for aggregation. |
+| `status` | HTTP status code. |
+| `duration_ms` | Handler wall time in milliseconds. |
+| `bytes` | Response body bytes written. |
+| `remote` | Client IP (honors `trusted_proxy_cidrs`). |
+| `request_id` | Correlation ID, also returned in the `X-Request-Id` header. |
+| `body` | Response body preview, only when `--debug`/`log_level=debug` is set. |
+
+A sample JSON access line:
+
+```json
+{"time":"2026-07-19T10:00:00Z","level":"INFO","msg":"http_request","method":"GET","path":"/api/v1/jobs/j1","route":"/api/v1/jobs/{job_id}","status":200,"duration_ms":12,"bytes":842,"remote":"203.0.113.7","request_id":"9f1c2a3b4d5e6f70"}
+```
+
+### Request IDs
+
+Every API request is tagged with a correlation ID that ties the access-log line,
+any handler audit/error lines, and a panic line to the same request. The ID is
+returned in the `X-Request-Id` response header. An inbound `X-Request-Id` is
+trusted only from a `trusted_proxy_cidrs` peer; otherwise a fresh ID is
+generated.
+
+### Body capture
+
+`--debug` (or `debug: true`) implies `log_level=debug` and adds a `body` field
+with a truncated response-body preview to each access line. Leave it off in
+production to avoid logging response bodies.

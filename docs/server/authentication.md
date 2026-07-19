@@ -58,7 +58,8 @@ systemctl reload gonemaster-server     # config-file edits, no downtime
 systemctl restart gonemaster-server    # env or flag edits
 ```
 
-The server logs `auth: token mode, 1 token` once tokens are active.
+The server logs a structured `auth token mode` line with a `tokens` count once
+tokens are active.
 
 ## Log into the admin UI
 
@@ -120,7 +121,8 @@ curl -s -o /dev/null -w '%{http_code}\n' -b cookies.txt \
 ## Turn auth off
 
 Empty `auth.admin_tokens` (or unset the environment variable) and reload or
-restart. The server logs `auth: open mode` and the UI stops asking for a token.
+restart. The server logs an `auth open mode` line and the UI stops asking for a
+token.
 
 ## Troubleshooting
 

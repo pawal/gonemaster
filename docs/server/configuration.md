@@ -33,7 +33,9 @@ gonemaster-server --dump-config
 | `profile_path` | Default engine profile file. |
 | `public_url` | Canonical public base URL for public pages, robots, and sitemap. |
 | `scoring_config_path` | Optional JSON scoring configuration file. |
-| `debug` | Enables more verbose server logging. |
+| `debug` | Captures request/response bodies in the access log and implies `log_level=debug`. |
+| `log_format` | Operational log encoding: `text` (default, human-readable) or `json` (one object per line, for aggregation). |
+| `log_level` | Minimum operational log level: `debug`, `info` (default), `warn`, or `error`. |
 | `trusted_proxy_cidrs` | CIDRs (or bare IPs) of reverse proxies allowed to set `X-Forwarded-For`. Empty (default) trusts nothing and uses `RemoteAddr`. See [public-api-and-proxy.md](public-api-and-proxy.md). |
 | `read_timeout` | Per-connection read timeout (default 30s). |
 | `write_timeout` | Per-connection write timeout (default 60s). Must exceed `public_api.analysis_request_timeout`. |
@@ -51,6 +53,8 @@ gonemaster-server --dump-config
 | `GONEMASTER_MIN_LEVEL` | `min_level` |
 | `GONEMASTER_PROFILE` | `profile_path` |
 | `GONEMASTER_DEBUG` | `debug` |
+| `GONEMASTER_LOG_FORMAT` | `log_format` |
+| `GONEMASTER_LOG_LEVEL` | `log_level` |
 | `GONEMASTER_DB_DRIVER` | `database.driver` |
 | `GONEMASTER_DB_DSN` | `database.dsn` |
 | `GONEMASTER_DB_RETENTION_DAYS` | `database.retention_days` |
@@ -87,6 +91,8 @@ Common flags:
 --cross-job-hot-cache-ttl N
 --profile PATH
 --min-level LEVEL
+--log-format text|json
+--log-level debug|info|warn|error
 --trusted-proxy-cidrs LIST
 --read-timeout DURATION
 --write-timeout DURATION
@@ -127,6 +133,8 @@ Database and public API flags are covered in [database.md](database.md) and
   "retrans": 3,
   "fallback": true,
   "min_level": "INFO",
+  "log_format": "text",
+  "log_level": "info",
   "profile_path": "/etc/gonemaster/profile.json",
   "database": {
     "driver": "sqlite",
@@ -256,6 +264,26 @@ The config file can hide score and nameserver timing UI elements:
 ```
 
 These settings affect UI display. They do not remove stored data.
+
+## Operational Logging
+
+`log_format` and `log_level` control the server's operational logs (lifecycle,
+access log, warnings, errors). They are independent of `min_level`, which governs
+the DNS test result data. Set `log_format=json` for log aggregation and pick a
+`log_level` floor of `debug`, `info`, `warn`, or `error`.
+
+`--debug` (or `debug: true`) captures request/response bodies in the access log
+and implies `log_level=debug`; leave it off in production so bodies are not
+logged.
+
+Every `/api/v1` and `/pub/api/v1` request gets an `X-Request-Id`. The server
+generates one by default and echoes it in the response header. An inbound
+`X-Request-Id` is honored only when the request comes from a `trusted_proxy_cidrs`
+peer; from any other client it is ignored and a fresh ID is generated, so the ID
+cannot be spoofed on a directly exposed server.
+
+See [operations.md](operations.md) for the log formats, the access-log fields,
+and shipping logs to journald or Loki.
 
 ## Related Pages
 

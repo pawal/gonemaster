@@ -8,6 +8,13 @@ All notable changes to all gonemaster components will be documented in this file
 
 - admin-ui, server: a progress bar while a snapshot is rebuilt; the rebuild runs in the background instead of freezing the button
 - admin-ui: sortable columns on the snapshot table
+- server: text or json logs, set with `--log-format` and `--log-level`
+- server: a request ID on each API request, returned as `X-Request-Id` and shown in the logs
+- server: one access-log line per API request
+
+### Changed
+
+- server: server logs now use a structured logger; `--debug` logs request and response bodies
 
 ### Fixed
 

@@ -137,6 +137,11 @@ type Config struct {
 	SourceAddr6 *string `json:"source_addr6,omitempty"`
 	MinLevel    string  `json:"min_level"`
 	ProfilePath string  `json:"profile_path,omitempty"`
+	// LogFormat selects the operational log encoding: "text" (default) or "json".
+	LogFormat string `json:"log_format,omitempty"`
+	// LogLevel sets the minimum operational log level: debug|info|warn|error.
+	// Empty means "info".
+	LogLevel string `json:"log_level,omitempty"`
 	// TrustedProxyCIDRs lists CIDR blocks (or bare IPs) whose requests are
 	// allowed to set X-Forwarded-For. Empty means trust nothing and use
 	// RemoteAddr. Without this, XFF is spoofable and rate limits can be
@@ -223,6 +228,8 @@ type FileConfig struct {
 	SourceAddr6                 *string              `json:"source_addr6"`
 	MinLevel                    *string              `json:"min_level"`
 	ProfilePath                 *string              `json:"profile_path"`
+	LogFormat                   *string              `json:"log_format,omitempty"`
+	LogLevel                    *string              `json:"log_level,omitempty"`
 	TrustedProxyCIDRs           *[]string            `json:"trusted_proxy_cidrs,omitempty"`
 	ReadTimeout                 *string              `json:"read_timeout,omitempty"`
 	WriteTimeout                *string              `json:"write_timeout,omitempty"`
@@ -251,6 +258,8 @@ func DefaultConfig() Config {
 		WorkerCount:                 16,
 		MaxConcurrentJobs:           0,
 		MinLevel:                    "INFO",
+		LogFormat:                   "text",
+		LogLevel:                    "info",
 		ShowScoreAdmin:              true,
 		ShowScorePublic:             true,
 		ShowNameserverTimingsAdmin:  true,
@@ -350,6 +359,12 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ProfilePath != nil {
 		c.ProfilePath = *file.ProfilePath
+	}
+	if file.LogFormat != nil {
+		c.LogFormat = *file.LogFormat
+	}
+	if file.LogLevel != nil {
+		c.LogLevel = *file.LogLevel
 	}
 	if file.TrustedProxyCIDRs != nil {
 		c.TrustedProxyCIDRs = append(c.TrustedProxyCIDRs[:0], *file.TrustedProxyCIDRs...)

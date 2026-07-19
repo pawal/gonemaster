@@ -50,6 +50,35 @@ func TestApplyFileConfigHTTPTimeouts(t *testing.T) {
 	}
 }
 
+func TestDefaultConfigLogging(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.LogFormat != "text" {
+		t.Fatalf("expected default log_format text, got %q", cfg.LogFormat)
+	}
+	if cfg.LogLevel != "info" {
+		t.Fatalf("expected default log_level info, got %q", cfg.LogLevel)
+	}
+}
+
+func TestApplyFileConfigLogging(t *testing.T) {
+	cfg := DefaultConfig()
+	format, level := "json", "debug"
+	cfg.ApplyFileConfig(FileConfig{LogFormat: &format, LogLevel: &level})
+	if cfg.LogFormat != "json" {
+		t.Fatalf("expected log_format json after apply, got %q", cfg.LogFormat)
+	}
+	if cfg.LogLevel != "debug" {
+		t.Fatalf("expected log_level debug after apply, got %q", cfg.LogLevel)
+	}
+
+	// Nil means "not set" - defaults stay in place.
+	cfg2 := DefaultConfig()
+	cfg2.ApplyFileConfig(FileConfig{LogFormat: nil, LogLevel: nil})
+	if cfg2.LogFormat != "text" || cfg2.LogLevel != "info" {
+		t.Fatalf("expected defaults preserved with nil, got %q/%q", cfg2.LogFormat, cfg2.LogLevel)
+	}
+}
+
 func TestDefaultConfigDatabaseIsMemory(t *testing.T) {
 	cfg := DefaultConfig()
 	if cfg.Database.Driver != "" {

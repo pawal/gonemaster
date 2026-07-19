@@ -4,8 +4,16 @@ import {
   getDiff,
   getOverview,
   getTrends,
+  listASNs,
+  listEndpoints,
+  listNameservers,
+  type ASNView,
+  type AnalysisFilter,
   type DiffResponse,
+  type EndpointView,
   type FactDistribution,
+  type ListResponse,
+  type NameserverView,
   type OverviewResponse,
   type OverviewTotals,
   type SnapshotView,
@@ -16,6 +24,16 @@ import {
   type TrendPoint
 } from "$lib/api";
 import { previousSlug } from "$lib/diff";
+
+// Front-page latency rankings: fastest/slowest N per entity, min-sample gated.
+const RANK_LIMIT = 10;
+const RANK_MIN_SAMPLES = 5;
+
+export type LatencyRankings = {
+  nameservers: { fastest: NameserverView[]; slowest: NameserverView[] };
+  endpoints: { fastest: EndpointView[]; slowest: EndpointView[] };
+  asns: { fastest: ASNView[]; slowest: ASNView[] };
+};
 
 export type TrendBundle = { points: TrendPoint[]; keyMeta: Record<string, TrendKeyMeta> };
 
@@ -29,6 +47,8 @@ export type OverviewPageData = {
   topTags: TopTagEntry[];
   topNameservers: TopNameserverEntry[];
   topASNs: TopASNEntry[];
+  // Fastest/slowest entities by median latency; empty when the snapshot has none.
+  latency: LatencyRankings;
   // Trend series that back the hero stat tiles (deltas + sparklines). Empty
   // when a cohort has a single snapshot or the fetch failed - both non-fatal.
   severityTrend: TrendBundle;
@@ -83,13 +103,37 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
     getTrends(datasetTag, { category }, fetch)
       .then((t): TrendBundle => ({ points: t.points ?? [], keyMeta: t.key_meta ?? {} }))
       .catch(() => EMPTY_TREND);
-  const [severityTrend, gradeTrend, dnssecTrend, diff] = await Promise.all([
+  const rank = <T>(
+    list: (filter: AnalysisFilter, fetchFn: typeof fetch) => Promise<ListResponse<T>>,
+    sort: string
+  ): Promise<T[]> =>
+    list({ ...filter, sort, limit: RANK_LIMIT, min_latency_samples: RANK_MIN_SAMPLES }, fetch)
+      .then((r) => r.items ?? [])
+      .catch(() => []);
+  const [
+    severityTrend,
+    gradeTrend,
+    dnssecTrend,
+    diff,
+    nsFast,
+    nsSlow,
+    epFast,
+    epSlow,
+    asnFast,
+    asnSlow
+  ] = await Promise.all([
     trend("severity"),
     trend("grade"),
     trend("dnssec_posture"),
     prevSlug && snapshotSlug
       ? getDiff(datasetTag, prevSlug, snapshotSlug, fetch).catch(() => null)
-      : Promise.resolve(null)
+      : Promise.resolve(null),
+    rank<NameserverView>(listNameservers, "latency_p50_asc"),
+    rank<NameserverView>(listNameservers, "latency_p50_desc"),
+    rank<EndpointView>(listEndpoints, "latency_p50_asc"),
+    rank<EndpointView>(listEndpoints, "latency_p50_desc"),
+    rank<ASNView>(listASNs, "latency_p50_asc"),
+    rank<ASNView>(listASNs, "latency_p50_desc")
   ]);
 
   const payload = overview.overview ?? null;
@@ -103,6 +147,11 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
     topTags: payload?.top_tags ?? [],
     topNameservers: payload?.top_nameservers ?? [],
     topASNs: payload?.top_asns ?? [],
+    latency: {
+      nameservers: { fastest: nsFast, slowest: nsSlow },
+      endpoints: { fastest: epFast, slowest: epSlow },
+      asns: { fastest: asnFast, slowest: asnSlow }
+    },
     severityTrend,
     gradeTrend,
     dnssecTrend,
@@ -126,6 +175,11 @@ function emptyPageData(datasetTag: string | null): OverviewPageData {
     topTags: [],
     topNameservers: [],
     topASNs: [],
+    latency: {
+      nameservers: { fastest: [], slowest: [] },
+      endpoints: { fastest: [], slowest: [] },
+      asns: { fastest: [], slowest: [] }
+    },
     severityTrend: EMPTY_TREND,
     gradeTrend: EMPTY_TREND,
     dnssecTrend: EMPTY_TREND,

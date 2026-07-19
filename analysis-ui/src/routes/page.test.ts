@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
+import type { NameserverView } from "$lib/api";
 import { load, type OverviewPageData } from "./+page";
 
 const h = vi.hoisted(() => ({
@@ -289,6 +290,11 @@ function overviewData(overrides: Partial<OverviewPageData> = {}): OverviewPageDa
     topTags: [],
     topNameservers: [{ nameserver: "ns1.example", domain_count: 60 }],
     topASNs: [{ asn: 64500, label: "Example AS", domain_count: 48 }],
+    latency: {
+      nameservers: { fastest: [], slowest: [] },
+      endpoints: { fastest: [], slowest: [] },
+      asns: { fastest: [], slowest: [] }
+    },
     severityTrend: {
       points: [
         { slug: "s1", captured_at: "s1", payload: { ok: 40, notice: 30, critical: 30 } },
@@ -413,4 +419,56 @@ describe("overview page rendering", () => {
     const nsCard = screen.getByText("Nameservers").closest(".summary-card");
     expect(nsCard?.tagName).toBe("A");
   });
+
+  it("renders the latency rankings with fastest/slowest entities and links", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, {
+      data: overviewData({
+        latency: {
+          nameservers: {
+            fastest: [nsView("fast.ns", 8)],
+            slowest: [nsView("slow.ns", 400)]
+          },
+          endpoints: {
+            fastest: [{ nameserver: "ns.x", address: "192.0.2.9", family: "ipv4", domain_count: 1, latency_p50_ms: 5, latency_samples: 6 }],
+            slowest: []
+          },
+          asns: { fastest: [], slowest: [] }
+        }
+      })
+    });
+    const section = within(screen.getByText("Response times").closest("section") as HTMLElement);
+    // Both directions render, each with its heading.
+    expect(section.getAllByText("Fastest").length).toBeGreaterThan(0);
+    expect(section.getAllByText("Slowest").length).toBeGreaterThan(0);
+    // Entity rows link to their detail pages.
+    expect(screen.getByText("fast.ns").closest("a")?.getAttribute("href")).toContain(
+      "/analysis/nameservers/fast.ns"
+    );
+    expect(screen.getByText("slow.ns")).toBeInTheDocument();
+    const addrLink = screen.getByText("192.0.2.9").closest("a");
+    expect(addrLink?.getAttribute("href")).toContain("/analysis/endpoints/192.0.2.9");
+    expect(addrLink?.getAttribute("href")).toContain("nameserver=ns.x");
+    // The ASNs column is omitted when it has no eligible entities.
+    expect(section.queryByText("ASNs")).toBeNull();
+  });
+
+  it("hides the latency rankings when no entity has latency", () => {
+    render(OverviewPage, { data: overviewData() });
+    expect(screen.queryByText("Response times")).toBeNull();
+  });
 });
+
+function nsView(nameserver: string, p50: number): NameserverView {
+  return {
+    nameserver,
+    domain_count: 1,
+    endpoint_count: 1,
+    ipv4_count: 1,
+    ipv6_count: 0,
+    asn_count: 1,
+    latency_p50_ms: p50,
+    latency_p95_ms: p50 + 10,
+    latency_samples: 6
+  };
+}

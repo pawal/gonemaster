@@ -10,16 +10,25 @@
     domainHref,
     domainsGradeHref,
     domainsSeverityHref,
+    endpointHref,
     nameserverHref,
     tagHref
   } from "$lib/entityLinks";
   import {
     formatCount,
+    formatMs,
     formatTimestamp,
     levelTone,
     snapshotDisplayLabel,
     snapshotSourceDate
   } from "$lib/format";
+  import {
+    asnLatencyRows,
+    endpointLatencyRows,
+    hasAnyLatencyRanking,
+    nameserverLatencyRows,
+    type LatencyRankRow
+  } from "$lib/latencyRanking";
   import { netDirection, sortByMovement, summarizeDiff } from "$lib/diff";
   import {
     percentOf,
@@ -200,6 +209,32 @@
 
   const query = $derived(page.url.search);
   const isEmpty = $derived((data.totals?.domain_count ?? 0) === 0);
+
+  // Fastest/slowest by median latency, three entity columns. The server sorts
+  // and applies the >=5-sample floor; here we just normalize and build links.
+  const latencyColumns = $derived([
+    {
+      title: "Nameservers",
+      fastest: nameserverLatencyRows(data.latency.nameservers.fastest),
+      slowest: nameserverLatencyRows(data.latency.nameservers.slowest),
+      href: (r: LatencyRankRow) => nameserverHref(base, r.label, query)
+    },
+    {
+      title: "Addresses",
+      fastest: endpointLatencyRows(data.latency.endpoints.fastest),
+      slowest: endpointLatencyRows(data.latency.endpoints.slowest),
+      href: (r: LatencyRankRow) => endpointHref(base, r.label, r.sublabel || null, query)
+    },
+    {
+      title: "ASNs",
+      fastest: asnLatencyRows(data.latency.asns.fastest),
+      slowest: asnLatencyRows(data.latency.asns.slowest),
+      href: (r: LatencyRankRow) => asnHref(base, r.key, query)
+    }
+  ]);
+  const showLatencyRankings = $derived(
+    hasAnyLatencyRanking(latencyColumns.flatMap((c) => [c.fastest, c.slowest]))
+  );
 </script>
 
 <FilterBar
@@ -518,6 +553,53 @@
         {/if}
       </div>
     {/if}
+
+    {#snippet rankList(heading: string, rows: LatencyRankRow[], href: (r: LatencyRankRow) => string)}
+      <div class="latency-sub">
+        <h5>{heading}</h5>
+        <ol class="latency-list">
+          {#each rows as row (row.key)}
+            <li>
+              <a class="latency-row" href={href(row)}>
+                <span class="latency-ent">
+                  <span class="latency-ent-label" title={idnTooltip(row.label)}>{row.label}</span>
+                  {#if row.sublabel}
+                    <span class="latency-ent-sub" title={idnTooltip(row.sublabel)}>{row.sublabel}</span>
+                  {/if}
+                </span>
+                <span class="latency-val">
+                  {formatMs(row.latencyP50)}
+                  {#if row.latencyP95 !== null}
+                    <span class="latency-p95">p95 {formatMs(row.latencyP95)}</span>
+                  {/if}
+                </span>
+              </a>
+            </li>
+          {/each}
+        </ol>
+      </div>
+    {/snippet}
+
+    {#if showLatencyRankings}
+      <section class="card latency-rankings">
+        <h3>Response times</h3>
+        <p class="hint">
+          Fastest and slowest by median (p50) response time, among entities with
+          at least 5 timing samples in this snapshot.
+        </p>
+        <div class="latency-grid">
+          {#each latencyColumns as col (col.title)}
+            {#if col.fastest.length > 0}
+              <div class="latency-col">
+                <h4>{col.title}</h4>
+                {@render rankList("Fastest", col.fastest, col.href)}
+                {@render rankList("Slowest", col.slowest, col.href)}
+              </div>
+            {/if}
+          {/each}
+        </div>
+      </section>
+    {/if}
   {/if}
 {/if}
 
@@ -699,6 +781,87 @@
     font-family: var(--mono);
     font-size: var(--text-sm);
     text-align: right;
+  }
+
+  .latency-rankings {
+    gap: var(--space-2);
+  }
+  .latency-rankings h3 {
+    margin: 0;
+  }
+  .latency-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+    gap: var(--space-4);
+  }
+  .latency-col {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+  .latency-col h4 {
+    margin: 0;
+    font-size: var(--text-sm);
+  }
+  .latency-sub h5 {
+    margin: 0 0 4px;
+    font-size: var(--text-xs);
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .latency-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .latency-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-3);
+    padding: 4px var(--space-2);
+    border-radius: var(--radius);
+    text-decoration: none;
+    color: var(--ink);
+    border: 1px solid transparent;
+  }
+  .latency-row:hover {
+    border-color: var(--accent-2);
+    background: var(--surface-2);
+  }
+  .latency-ent {
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+  }
+  .latency-ent-label {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .latency-ent-sub {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .latency-val {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .latency-p95 {
+    display: block;
+    color: var(--ink-2);
+    font-size: var(--text-xs);
   }
 
   .hero {

@@ -312,6 +312,7 @@ export type AnalysisFilter = {
   min_level?: string;
   worst_level?: string;
   grade?: string;
+  min_latency_samples?: number;
 };
 
 // Snapshot-specific response shapes consumed by the snapshot selector,

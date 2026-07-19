@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
@@ -100,7 +100,8 @@ func parseTrustedProxies(cidrs []string) []netip.Prefix {
 			out = append(out, netip.PrefixFrom(a, a.BitLen()))
 			continue
 		}
-		log.Printf("server: ignoring invalid trusted_proxy_cidrs entry %q", s)
+		// Uses the default logger set in newServer; no Server handle here.
+		slog.Default().Warn("ignoring invalid trusted_proxy_cidrs entry", "entry", s)
 	}
 	return out
 }

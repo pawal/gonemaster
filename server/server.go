@@ -3,9 +3,10 @@ package server
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"net/netip"
+	"os"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -55,6 +56,7 @@ type Server struct {
 	snapshotRematerializeMu       sync.Mutex
 	snapshotRematerializeInFlight map[int64]struct{}
 	adminTokens                   atomic.Pointer[tokenSet]
+	logger                        *slog.Logger
 }
 
 // setScoringConfig loads an optional scoring config file and sets it on the
@@ -146,11 +148,19 @@ func NewWithOptions(cfg Config) (*Server, error) {
 
 // newServer constructs a Server with the given store and queue.
 func newServer(cfg Config, store JobStore, queue Queue) *Server {
+	// --debug implies at least debug level so body capture and verbose lines show.
+	level := cfg.LogLevel
+	if cfg.Debug {
+		level = "debug"
+	}
+	logger := newLogger(cfg.LogFormat, level, os.Stderr)
+	slog.SetDefault(logger)
 	s := &Server{
 		cfg:                           cfg,
 		mux:                           http.NewServeMux(),
 		store:                         store,
 		queue:                         queue,
+		logger:                        logger,
 		metrics:                       NewMetricsCollector(cfg),
 		metricsCache:                  map[string]metricsCacheEntry{},
 		progressWrites:                map[string]progressWriteState{},
@@ -174,7 +184,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	s.purgeIntervalSec.Store(int64(cfg.EffectivePurgeInterval() / time.Second))
 	ts, err := newTokenSet(cfg.Auth)
 	if err != nil {
-		log.Printf("auth: invalid admin_tokens, running in open mode: %v", err)
+		s.logger.Warn("invalid admin_tokens, running in open mode", "err", err)
 		ts = &tokenSet{}
 	}
 	s.adminTokens.Store(ts)

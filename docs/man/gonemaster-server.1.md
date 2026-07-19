@@ -31,7 +31,7 @@ variables, CLI flags. Later sources override earlier ones.
 : Maximum request body size (default: 1048576).
 
 **--debug**
-: Enable request/response logging.
+: Capture request/response bodies in the access log and imply **--log-level** *debug*.
 
 **--shutdown-timeout** *DURATION*
 : Graceful shutdown timeout (default: 10s).
@@ -131,6 +131,14 @@ variables, CLI flags. Later sources override earlier ones.
 **--min-level** *LEVEL*
 : Minimum result log level (default: INFO).
 
+### Logging
+
+**--log-format** *FORMAT*
+: Operational log encoding: **text** (default, human-readable) or **json** (one object per line, for aggregation).
+
+**--log-level** *LEVEL*
+: Minimum operational log level: **debug**, **info** (default), **warn**, or **error**. Independent of **--min-level**, which governs the DNS test result data.
+
 ## ENVIRONMENT
 
 **GONEMASTER_LISTEN**
@@ -150,6 +158,12 @@ variables, CLI flags. Later sources override earlier ones.
 
 **GONEMASTER_DEBUG**
 : Equivalent to **--debug**.
+
+**GONEMASTER_LOG_FORMAT**
+: Equivalent to **--log-format**.
+
+**GONEMASTER_LOG_LEVEL**
+: Equivalent to **--log-level**.
 
 **GONEMASTER_DB_DRIVER**
 : Equivalent to **--db-driver**.
@@ -197,6 +211,8 @@ The **--config** file is JSON with optional fields:
       "max_concurrent_jobs": 0,
       "debug": false,
       "min_level": "INFO",
+      "log_format": "text",
+      "log_level": "info",
       "profile_path": "",
       "database": {
         "driver": "sqlite",

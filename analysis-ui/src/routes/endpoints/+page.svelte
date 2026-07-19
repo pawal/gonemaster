@@ -47,7 +47,8 @@
     address: { asc: "address_asc", desc: "address_desc" },
     domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
     operator: { asc: "operator_asc", desc: "operator_desc" },
-    prefix: { asc: "prefix_asc", desc: "prefix_desc" }
+    prefix: { asc: "prefix_asc", desc: "prefix_desc" },
+    latency: { asc: "latency_p50_asc", desc: "latency_p50_desc" }
   } as const;
 
   const exportColumns: ExportColumn<EndpointView>[] = [
@@ -163,7 +164,9 @@
               <SortHeader label="Prefix" spec={sortSpecs.prefix} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
             {#if hasLatency}
-              <th scope="col" class="col-num">Latency</th>
+              <th scope="col" class="col-num">
+                <SortHeader label="Latency" spec={sortSpecs.latency} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+              </th>
             {/if}
           </tr>
         </thead>

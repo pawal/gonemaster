@@ -30,7 +30,8 @@
     domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
     addressCount: { asc: "address_count_asc", desc: "address_count_desc" },
     nameserverCount: { asc: "nameserver_count_asc", desc: "nameserver_count_desc" },
-    prefixCount: { asc: "prefix_count_asc", desc: "prefix_count_desc" }
+    prefixCount: { asc: "prefix_count_asc", desc: "prefix_count_desc" },
+    latency: { asc: "latency_p50_asc", desc: "latency_p50_desc" }
   } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
@@ -158,7 +159,9 @@
               <SortHeader label="Prefixes" spec={sortSpecs.prefixCount} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
             {#if hasLatency}
-              <th scope="col" class="col-num">Latency</th>
+              <th scope="col" class="col-num">
+                <SortHeader label="Latency" spec={sortSpecs.latency} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+              </th>
             {/if}
           </tr>
         </thead>

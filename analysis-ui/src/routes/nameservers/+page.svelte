@@ -30,7 +30,8 @@
   const sortSpecs = {
     name: { desc: "name_desc" },
     domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
-    endpointCount: { asc: "endpoint_count_asc", desc: "endpoint_count_desc" }
+    endpointCount: { asc: "endpoint_count_asc", desc: "endpoint_count_desc" },
+    latency: { asc: "latency_p50_asc", desc: "latency_p50_desc" }
   } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
@@ -157,7 +158,9 @@
             <th scope="col" class="col-num">IPv4</th>
             <th scope="col" class="col-num">IPv6</th>
             {#if hasLatency}
-              <th scope="col" class="col-num">Latency</th>
+              <th scope="col" class="col-num">
+                <SortHeader label="Latency" spec={sortSpecs.latency} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+              </th>
             {/if}
           </tr>
         </thead>

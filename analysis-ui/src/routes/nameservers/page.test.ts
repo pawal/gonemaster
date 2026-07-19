@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/svelte";
+import { fireEvent, render, screen } from "@testing-library/svelte";
+import { goto } from "$app/navigation";
 import type { NameserverView } from "$lib/api";
 import type { NameserversPageData } from "./+page";
 
@@ -52,5 +53,18 @@ describe("nameservers latency column", () => {
     expect(screen.queryByRole("columnheader", { name: "Latency" })).toBeNull();
     // The row still renders its other columns.
     expect(screen.getByRole("link", { name: "ns1.example" })).toBeInTheDocument();
+  });
+
+  it("makes the latency header sortable, emitting the p50 sort token", async () => {
+    vi.mocked(goto).mockClear();
+    render(NameserversPage, {
+      data: pageData([{ ...base, latency_p50_ms: 15, latency_p95_ms: 40, latency_samples: 3 }])
+    });
+    // The first click from the neutral state selects descending (slowest first).
+    await fireEvent.click(screen.getByRole("button", { name: /Sort by Latency/ }));
+    expect(goto).toHaveBeenCalledWith(
+      expect.stringContaining("sort=latency_p50_desc"),
+      expect.anything()
+    );
   });
 });

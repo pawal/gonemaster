@@ -220,11 +220,9 @@ func (s *Server) ReloadAuth(cfg AuthConfig) error {
 	return nil
 }
 
-// Handler returns the root HTTP handler.
+// Handler returns the root HTTP handler. Request-ID and access-log middleware
+// are applied per API surface in routes(), not here.
 func (s *Server) Handler() http.Handler {
-	if s.cfg.Debug {
-		return securityHeadersMiddleware(gzipMiddleware(debugMiddleware(s.mux)))
-	}
 	return securityHeadersMiddleware(gzipMiddleware(s.mux))
 }
 
@@ -330,10 +328,10 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /whoami", s.handleWhoami)
 	apiMux.HandleFunc("/session", s.handleSession)
 
-	s.mux.Handle("/api/v1/", s.recoverMiddleware(s.apiMetricsMiddleware(s.authMiddleware(http.StripPrefix("/api/v1", apiMux)))))
-	s.mux.Handle("/api/v1", s.recoverMiddleware(s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.mux.Handle("/api/v1/", s.requestIDMiddleware(s.accessLogMiddleware(s.recoverMiddleware(s.apiMetricsMiddleware(s.authMiddleware(http.StripPrefix("/api/v1", apiMux)))))))
+	s.mux.Handle("/api/v1", s.requestIDMiddleware(s.accessLogMiddleware(s.recoverMiddleware(s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
-	}))))
+	}))))))
 
 	pubMux := http.NewServeMux()
 	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
@@ -399,6 +397,7 @@ func (s *Server) routes() {
 		pubHandler = rateLimitMiddleware(s.rateLimiter, s.trustedProxies, pubHandler)
 	}
 	pubHandler = s.recoverMiddleware(pubHandler)
+	pubHandler = s.requestIDMiddleware(s.accessLogMiddleware(pubHandler))
 	s.mux.Handle("/pub/api/v1/", pubHandler)
 
 	s.mux.HandleFunc("GET /robots.txt", s.handleRobotsTxt)

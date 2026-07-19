@@ -3,11 +3,13 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"fmt"
 	"io"
-	"log"
+	"log/slog"
 	"net"
 	"net/http"
+	"net/netip"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -69,25 +71,85 @@ func (r *responseRecorder) Flush() {
 	flusher.Flush()
 }
 
-func debugMiddleware(next http.Handler) http.Handler {
+// remoteIsTrustedProxy reports whether the request's RemoteAddr falls inside a
+// configured trusted-proxy CIDR. Only trusted peers may supply X-Request-Id.
+func (s *Server) remoteIsTrustedProxy(r *http.Request) bool {
+	host, _, err := net.SplitHostPort(r.RemoteAddr)
+	if err != nil {
+		host = r.RemoteAddr
+	}
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return false
+	}
+	return ipInPrefixes(addr, s.trustedProxies)
+}
+
+// requestIDMiddleware puts a correlation ID on the request context and echoes it
+// in the X-Request-Id response header. An inbound header is honored only from a
+// trusted proxy; otherwise a fresh ID is generated so clients cannot spoof it.
+func (s *Server) requestIDMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		id := ""
+		if inbound := r.Header.Get("X-Request-Id"); inbound != "" && s.remoteIsTrustedProxy(r) {
+			id = sanitizeRequestID(inbound)
+		}
+		if id == "" {
+			id = newRequestID()
+		}
+		w.Header().Set("X-Request-Id", id)
+		ctx := context.WithValue(r.Context(), requestIDContextKey, id)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// statusLevel maps an HTTP status to a log level so operators can alert on
+// error lines without parsing status codes: 5xx->error, 4xx->warn, else info.
+func statusLevel(status int) slog.Level {
+	switch {
+	case status >= 500:
+		return slog.LevelError
+	case status >= 400:
+		return slog.LevelWarn
+	default:
+		return slog.LevelInfo
+	}
+}
+
+// accessLogMiddleware emits one structured line per request. The response body
+// is captured only when debug logging is on, to avoid logging bodies by default.
+func (s *Server) accessLogMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
-		rec := newResponseRecorder(w, debugBodyLimit)
+		captureBody := s.logger.Enabled(r.Context(), slog.LevelDebug)
+		maxBody := 0
+		if captureBody {
+			maxBody = debugBodyLimit
+		}
+		rec := newResponseRecorder(w, maxBody)
 		next.ServeHTTP(rec, r)
 		status := rec.status
 		if status == 0 {
 			status = http.StatusOK
 		}
-		duration := time.Since(start)
-		msg := fmt.Sprintf("%s %s %d %s bytes=%d", r.Method, r.URL.Path, status, duration, rec.bytes)
-		if rec.body != nil && rec.body.Len() > 0 {
+		attrs := []slog.Attr{
+			slog.String("method", r.Method),
+			slog.String("path", r.URL.Path),
+			slog.String("route", apiRouteTemplate(r.URL.Path)),
+			slog.Int("status", status),
+			slog.Int64("duration_ms", time.Since(start).Milliseconds()),
+			slog.Int("bytes", rec.bytes),
+			slog.String("remote", clientIP(r, s.trustedProxies)),
+			slog.String("request_id", requestIDFromContext(r.Context())),
+		}
+		if captureBody && rec.body != nil && rec.body.Len() > 0 {
 			body := strings.TrimSpace(rec.body.String())
 			if rec.truncated {
-				body = body + "..."
+				body += "..."
 			}
-			msg = fmt.Sprintf("%s body=%q", msg, body)
+			attrs = append(attrs, slog.String("body", body))
 		}
-		log.Printf("api: %s", msg)
+		s.logger.LogAttrs(r.Context(), statusLevel(status), "http_request", attrs...)
 	})
 }
 
@@ -177,7 +239,13 @@ func (s *Server) recoverMiddleware(next http.Handler) http.Handler {
 				panic(rec)
 			}
 			s.metrics.ObservePanic()
-			log.Printf("panic: method=%s path=%s value=%v\n%s", r.Method, r.URL.Path, rec, debug.Stack())
+			s.logger.LogAttrs(r.Context(), slog.LevelError, "panic",
+				slog.String("method", r.Method),
+				slog.String("path", r.URL.Path),
+				slog.String("request_id", requestIDFromContext(r.Context())),
+				slog.Any("value", rec),
+				slog.String("stack", string(debug.Stack())),
+			)
 			writeError(w, http.StatusInternalServerError, "internal_error", "request processing failed", nil)
 		}()
 		next.ServeHTTP(w, r)

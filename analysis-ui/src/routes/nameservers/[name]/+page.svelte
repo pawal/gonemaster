@@ -57,7 +57,10 @@
         {/if}
       {/if}
     </dl>
-    <EntityHistorySparkline points={data.history} metric="domain_count" label="Domains over snapshots" />
+    <div class="history-sparks">
+      <EntityHistorySparkline points={data.history} metric="domain_count" label="Domains over snapshots" />
+      <EntityHistorySparkline points={data.history} metric="latency_p50_ms" label="Median latency over snapshots" />
+    </div>
   </section>
 
   <section class="card">
@@ -133,6 +136,12 @@
     font-family: var(--mono);
     font-size: var(--text-lg);
     font-weight: 600;
+  }
+
+  .history-sparks {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .chip-list {

@@ -77,4 +77,35 @@ describe("nameserver detail latency stat", () => {
     );
     expect(screen.queryByText("Domains over snapshots")).toBeNull();
   });
+
+  it("renders a latency trend line when two snapshots carry latency", () => {
+    render(
+      NameserverDetailPage,
+      {
+        data: pageData(base, [
+          { slug: "s1", captured_at: "2026-04-17T00:00:00Z", present: true, domain_count: 1, latency_p50_ms: 12 },
+          { slug: "s2", captured_at: "2026-04-20T00:00:00Z", present: true, domain_count: 2, latency_p50_ms: 18 }
+        ])
+      }
+    );
+    expect(screen.getByText("Median latency over snapshots")).toBeInTheDocument();
+    expect(
+      screen.getByRole("img", { name: /Median latency over snapshots across 2 snapshots/ })
+    ).toBeInTheDocument();
+  });
+
+  it("omits the latency trend line when snapshots have no latency", () => {
+    render(
+      NameserverDetailPage,
+      {
+        data: pageData(base, [
+          { slug: "s1", captured_at: "2026-04-17T00:00:00Z", present: true, domain_count: 1 },
+          { slug: "s2", captured_at: "2026-04-20T00:00:00Z", present: true, domain_count: 2 }
+        ])
+      }
+    );
+    // Domain-count line still draws; the latency line drops out honestly.
+    expect(screen.getByText("Domains over snapshots")).toBeInTheDocument();
+    expect(screen.queryByText("Median latency over snapshots")).toBeNull();
+  });
 });

@@ -168,6 +168,43 @@ func TestApplyEnvVarsMinLevel(t *testing.T) {
 	}
 }
 
+func TestApplyEnvVarsLogFormat(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_LOG_FORMAT": "json",
+	}), &warn)
+	if cfg.LogFormat != "json" {
+		t.Fatalf("expected LogFormat=json, got %q", cfg.LogFormat)
+	}
+	if warn.String() != "" {
+		t.Fatalf("unexpected warning: %q", warn.String())
+	}
+}
+
+func TestApplyEnvVarsLogLevel(t *testing.T) {
+	cfg := server.DefaultConfig()
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
+		"GONEMASTER_LOG_LEVEL": "debug",
+	}), &warn)
+	if cfg.LogLevel != "debug" {
+		t.Fatalf("expected LogLevel=debug, got %q", cfg.LogLevel)
+	}
+}
+
+func TestApplyEnvVarsLogFormatCLIWins(t *testing.T) {
+	cfg := server.DefaultConfig()
+	cfg.LogFormat = "text" // set by CLI
+	var warn strings.Builder
+	applyEnvVars(&cfg, map[string]bool{"log-format": true}, fakeEnv(map[string]string{
+		"GONEMASTER_LOG_FORMAT": "json",
+	}), &warn)
+	if cfg.LogFormat != "text" {
+		t.Fatalf("expected CLI value text to win, got %q", cfg.LogFormat)
+	}
+}
+
 func TestApplyEnvVarsProfile(t *testing.T) {
 	cfg := server.DefaultConfig()
 	var warn strings.Builder

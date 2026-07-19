@@ -52,6 +52,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	var sourceAddr6 string
 	var minLevel string
 	var profilePath string
+	var logFormat string
+	var logLevel string
 	var dbDriver string
 	var dbDSN string
 	var dbRetentionDays int
@@ -134,6 +136,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
 		})
+		printUsageGroup(errOut, "Logging", []usageLine{
+			{flag: "--log-format FORMAT", detail: "Operational log encoding: text (default) or json (env: GONEMASTER_LOG_FORMAT)"},
+			{flag: "--log-level LEVEL", detail: "Operational log level: debug|info|warn|error (default info) (env: GONEMASTER_LOG_LEVEL)"},
+		})
 	}
 	fs.StringVar(&configPath, "config", "", "JSON config file path (optional)")
 	fs.StringVar(&listen, "listen", "127.0.0.1:8080", "Address to listen on (default 127.0.0.1:8080)")
@@ -152,6 +158,8 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
+	fs.StringVar(&logFormat, "log-format", "", "Operational log encoding: text (default) or json")
+	fs.StringVar(&logLevel, "log-level", "", "Operational log level: debug|info|warn|error (default info)")
 	fs.StringVar(&dbDriver, "db-driver", "", "Storage backend: memory (default), sqlite, postgres, or mariadb")
 	fs.StringVar(&dbDSN, "db-dsn", "", "Database file path or connection string (optional)")
 	fs.IntVar(&dbRetentionDays, "db-retention-days", 0, "Delete completed jobs older than N days (0 = keep forever)")
@@ -329,6 +337,12 @@ func run(args []string, out *os.File, errOut *os.File) int {
 	if flagsSet["profile"] {
 		cfg.ProfilePath = profilePath
 	}
+	if flagsSet["log-format"] {
+		cfg.LogFormat = logFormat
+	}
+	if flagsSet["log-level"] {
+		cfg.LogLevel = logLevel
+	}
 	if flagsSet["db-driver"] {
 		cfg.Database.Driver = dbDriver
 	}
@@ -380,6 +394,10 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintf(errOut, "invalid admin tokens: %v\n", err)
 		return 2
 	}
+	if err := server.ValidateLogConfig(cfg); err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
 
 	if dumpConfig {
 		enc := json.NewEncoder(out)
@@ -396,6 +414,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
+	logger := srv.Logger()
 	if ctrl, ok := analysis.NewControllerFromJobStore(srv.Store()); ok {
 		// Best-effort enrichment of per-address ASN/prefix and per-ASN
 		// label via the engine's cymru/ripe backends. A failure to build
@@ -405,7 +424,7 @@ func run(args []string, out *os.File, errOut *os.File) int {
 			// ASN/prefix mappings change rarely, so cache results a month.
 			ctrl.SetEnricher(analysis.NewAsnlookupEnricher(rec, 30*24*time.Hour))
 		} else {
-			fmt.Fprintf(errOut, "analysis: enrichment disabled: %v\n", err)
+			logger.Warn("analysis enrichment disabled", "err", err)
 		}
 		srv.SetAnalysisController(ctrl)
 	}
@@ -426,13 +445,15 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		IdleTimeout:       cfg.IdleTimeout.Duration,
 	}
 
-	fmt.Fprintf(errOut, "Gonemaster version %s\n", engine.VersionFull())
-	fmt.Fprintf(errOut, "Miekg DNS version %s\n", moduleVersion("codeberg.org/miekg/dns"))
-	fmt.Fprintf(errOut, "Started server at %s\n", formatListenURL(cfg.ListenAddr))
+	logger.Info("server starting",
+		"version", engine.VersionFull(),
+		"miekg_dns_version", moduleVersion("codeberg.org/miekg/dns"),
+		"listen", formatListenURL(cfg.ListenAddr),
+		"log_format", cfg.LogFormat)
 	if n := len(cfg.Auth.AdminTokens); n == 0 {
-		fmt.Fprintln(errOut, "auth: open mode (no admin tokens configured)")
+		logger.Info("auth open mode", "tokens", 0)
 	} else {
-		fmt.Fprintf(errOut, "auth: token mode, %d token(s) configured\n", n)
+		logger.Info("auth token mode", "tokens", n)
 	}
 
 	shutdownCh := make(chan os.Signal, 1)
@@ -456,23 +477,23 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		for range hupCh {
 			auth, err := resolveAuthConfig(configPath, os.Getenv("GONEMASTER_ADMIN_TOKEN_HASHES"), flagHashes)
 			if err != nil {
-				fmt.Fprintf(errOut, "auth: reload failed: %v\n", err)
+				logger.Error("auth reload failed", "err", err)
 				continue
 			}
 			if err := srv.ReloadAuth(auth); err != nil {
-				fmt.Fprintf(errOut, "auth: reload rejected: %v\n", err)
+				logger.Error("auth reload rejected", "err", err)
 				continue
 			}
 			if n := len(auth.AdminTokens); n == 0 {
-				fmt.Fprintln(errOut, "auth: reloaded, open mode")
+				logger.Info("auth reloaded", "mode", "open", "tokens", 0)
 			} else {
-				fmt.Fprintf(errOut, "auth: reloaded, %d token(s) configured\n", n)
+				logger.Info("auth reloaded", "mode", "token", "tokens", n)
 			}
 		}
 	}()
 
 	if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-		fmt.Fprintln(errOut, err.Error())
+		logger.Error("listen failed", "err", err)
 		return 2
 	}
 

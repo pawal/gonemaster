@@ -77,6 +77,8 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyInt("max-concurrent-jobs", "GONEMASTER_MAX_CONCURRENT_JOBS", &cfg.MaxConcurrentJobs)
 	applyString("min-level", "GONEMASTER_MIN_LEVEL", &cfg.MinLevel)
 	applyString("profile", "GONEMASTER_PROFILE", &cfg.ProfilePath)
+	applyString("log-format", "GONEMASTER_LOG_FORMAT", &cfg.LogFormat)
+	applyString("log-level", "GONEMASTER_LOG_LEVEL", &cfg.LogLevel)
 	applyBool("debug", "GONEMASTER_DEBUG", &cfg.Debug)
 	applyString("db-driver", "GONEMASTER_DB_DRIVER", &cfg.Database.Driver)
 	applyString("db-dsn", "GONEMASTER_DB_DSN", &cfg.Database.DSN)

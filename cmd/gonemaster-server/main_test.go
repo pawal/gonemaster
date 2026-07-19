@@ -58,9 +58,12 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"Resolver/Profile:",
 		"Database:",
 		"Output:",
+		"Logging:",
 		"--workers N",
 		"--version",
 		"--min-level LEVEL",
+		"--log-format FORMAT",
+		"--log-level LEVEL",
 		"--sourceaddr4 IPADDR",
 		"--sourceaddr6 IPADDR",
 		"--db-driver DRIVER",
@@ -88,6 +91,38 @@ func TestRunSourceAddr4Validation(t *testing.T) {
 	errText := readTempFile(t, errOut)
 	if !strings.Contains(errText, "--sourceaddr4 must be a valid IPv4 address") {
 		t.Fatalf("expected sourceaddr4 validation error, got %q", errText)
+	}
+}
+
+func TestRunLogFormatValidation(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--log-format", "xml"}, out, errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "invalid log_format") {
+		t.Fatalf("expected log_format validation error, got %q", errText)
+	}
+}
+
+func TestRunLogLevelValidation(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--log-level", "verbose"}, out, errOut)
+	if code != 2 {
+		t.Fatalf("expected exit code 2, got %d", code)
+	}
+	errText := readTempFile(t, errOut)
+	if !strings.Contains(errText, "invalid log_level") {
+		t.Fatalf("expected log_level validation error, got %q", errText)
 	}
 }
 

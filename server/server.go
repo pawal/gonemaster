@@ -231,6 +231,12 @@ func (s *Server) Store() JobStore {
 	return s.store
 }
 
+// Logger returns the server's structured logger so the binary can route its
+// lifecycle messages through the same format and level.
+func (s *Server) Logger() *slog.Logger {
+	return s.logger
+}
+
 // SHA-256 of SvelteKit's #svelte-announcer inline style; verified against
 // the embedded bundle by TestAnalysisAnnouncerHashMatchesDist.
 const announcerStyleHash = "'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo='"

@@ -103,6 +103,13 @@ func (s *Server) requestIDMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// reqLog emits a structured line tagged with the request's correlation ID so
+// handler-level events can be joined to the matching access-log line.
+func (s *Server) reqLog(r *http.Request, level slog.Level, msg string, args ...any) {
+	args = append(args, "request_id", requestIDFromContext(r.Context()))
+	s.logger.Log(r.Context(), level, msg, args...)
+}
+
 // statusLevel maps an HTTP status to a log level so operators can alert on
 // error lines without parsing status codes: 5xx->error, 4xx->warn, else info.
 func statusLevel(status int) slog.Level {

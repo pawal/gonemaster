@@ -23,7 +23,7 @@ func (s *Server) handlePublicAnalysisEntityHistory(w http.ResponseWriter, r *htt
 	}
 	cohort, err := ResolveAnalysisCohort(s.store.ListAnalysisCohorts(), datasetTag, "")
 	if err != nil {
-		writePublicAnalysisResolutionError(w, err)
+		s.writePublicAnalysisResolutionError(w, r, err)
 		return
 	}
 	readStore, ok := s.analysisReadStore(w)

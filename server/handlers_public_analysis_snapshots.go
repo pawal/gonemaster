@@ -131,7 +131,7 @@ func (s *Server) handlePublicAnalysisSnapshots(w http.ResponseWriter, r *http.Re
 	}
 	cohort, err := ResolveAnalysisCohort(s.store.ListAnalysisCohorts(), datasetTag, "")
 	if err != nil {
-		writePublicAnalysisResolutionError(w, err)
+		s.writePublicAnalysisResolutionError(w, r, err)
 		return
 	}
 	readStore, ok := s.analysisReadStore(w)
@@ -182,7 +182,7 @@ func (s *Server) handlePublicAnalysisSnapshotDetail(w http.ResponseWriter, r *ht
 	}
 	cohort, err := ResolveAnalysisCohort(s.store.ListAnalysisCohorts(), datasetTag, "")
 	if err != nil {
-		writePublicAnalysisResolutionError(w, err)
+		s.writePublicAnalysisResolutionError(w, r, err)
 		return
 	}
 	readStore, ok := s.analysisReadStore(w)
@@ -230,7 +230,7 @@ func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Reque
 	}
 	cohort, err := ResolveAnalysisCohort(s.store.ListAnalysisCohorts(), datasetTag, "")
 	if err != nil {
-		writePublicAnalysisResolutionError(w, err)
+		s.writePublicAnalysisResolutionError(w, r, err)
 		return
 	}
 	readStore, ok := s.analysisReadStore(w)
@@ -366,7 +366,7 @@ func (s *Server) handlePublicAnalysisDiff(w http.ResponseWriter, r *http.Request
 	}
 	cohort, err := ResolveAnalysisCohort(s.store.ListAnalysisCohorts(), datasetTag, "")
 	if err != nil {
-		writePublicAnalysisResolutionError(w, err)
+		s.writePublicAnalysisResolutionError(w, r, err)
 		return
 	}
 	readStore, ok := s.analysisReadStore(w)

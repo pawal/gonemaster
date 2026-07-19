@@ -199,7 +199,7 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 	}
 	cohort, err := ResolveAnalysisCohort(s.store.ListAnalysisCohorts(), datasetTag, "")
 	if err != nil {
-		writePublicAnalysisResolutionError(w, err)
+		s.writePublicAnalysisResolutionError(w, r, err)
 		return
 	}
 	detail := PublicAnalysisCohortDetail{

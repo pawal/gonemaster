@@ -2,7 +2,7 @@ package server
 
 import (
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -166,7 +166,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 	}
 	created, err := s.store.Create(job)
 	if err != nil {
-		log.Printf("public create job: store error: %v", err)
+		s.reqLog(r, slog.LevelError, "public job create failed", "err", err)
 		writeError(w, http.StatusInternalServerError, "store_error", "job submission failed", nil)
 		return
 	}

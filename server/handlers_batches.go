@@ -2,7 +2,7 @@ package server
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -288,8 +288,9 @@ func (s *Server) handleDeleteBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return
 	}
-	log.Printf("batch_delete: id=%s tag=%s runs=%d entries=%d snapshots=%d",
-		batchID, preview.Tag, preview.CompletedRuns, preview.Entries, len(snapshotIDs))
+	s.reqLog(r, slog.LevelInfo, "batch deleted",
+		"batch_id", batchID, "tag", preview.Tag, "runs", preview.CompletedRuns,
+		"entries", preview.Entries, "snapshots", len(snapshotIDs))
 	w.WriteHeader(http.StatusNoContent)
 }
 

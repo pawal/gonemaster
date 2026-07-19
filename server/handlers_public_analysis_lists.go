@@ -90,7 +90,7 @@ func (s *Server) resolvePublicAnalysisCohort(w http.ResponseWriter, r *http.Requ
 	datasetTag := strings.TrimSpace(r.URL.Query().Get("dataset_tag"))
 	cohort, err := ResolveAnalysisCohort(s.store.ListAnalysisCohorts(), datasetTag, "")
 	if err != nil {
-		writePublicAnalysisResolutionError(w, err)
+		s.writePublicAnalysisResolutionError(w, r, err)
 		return AnalysisCohort{}, false
 	}
 	return cohort, true

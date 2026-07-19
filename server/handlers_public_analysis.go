@@ -2,7 +2,7 @@ package server
 
 import (
 	"errors"
-	"log"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -79,7 +79,7 @@ func (s *Server) publicAnalysisCohortView(cohort AnalysisCohort) PublicAnalysisC
 func (s *Server) handlePublicAnalysisCatalog(w http.ResponseWriter, r *http.Request) {
 	selectable, err := SelectableAnalysisCohorts(s.store.ListAnalysisCohorts())
 	if err != nil && !errors.Is(err, ErrNoSelectableAnalysisCohorts) {
-		log.Printf("public analysis catalog: %v", err)
+		s.reqLog(r, slog.LevelError, "public analysis catalog failed", "err", err)
 		writeError(w, http.StatusInternalServerError, "invalid_catalog", "analysis catalog unavailable", nil)
 		return
 	}
@@ -105,7 +105,7 @@ func (s *Server) handlePublicAnalysisCatalog(w http.ResponseWriter, r *http.Requ
 func (s *Server) handlePublicAnalysisCohorts(w http.ResponseWriter, r *http.Request) {
 	selectable, err := SelectableAnalysisCohorts(s.store.ListAnalysisCohorts())
 	if err != nil && !errors.Is(err, ErrNoSelectableAnalysisCohorts) {
-		log.Printf("public analysis cohorts: %v", err)
+		s.reqLog(r, slog.LevelError, "public analysis cohorts failed", "err", err)
 		writeError(w, http.StatusInternalServerError, "invalid_catalog", "analysis catalog unavailable", nil)
 		return
 	}
@@ -160,7 +160,7 @@ func loadSnapshotOverviewV2(store AnalysisReadStore, snapshotID int64) (Snapshot
 
 // writePublicAnalysisResolutionError maps cohort-resolution sentinels to
 // status codes suitable for the public API surface.
-func writePublicAnalysisResolutionError(w http.ResponseWriter, err error) {
+func (s *Server) writePublicAnalysisResolutionError(w http.ResponseWriter, r *http.Request, err error) {
 	switch {
 	case errors.Is(err, ErrNoSelectableAnalysisCohorts):
 		writeError(w, http.StatusServiceUnavailable, "no_selectable_cohorts", "no public analysis cohorts are configured", nil)
@@ -171,10 +171,10 @@ func writePublicAnalysisResolutionError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrAnalysisCohortNotFound):
 		writeError(w, http.StatusNotFound, "cohort_not_found", "requested dataset_tag is not a public analysis cohort", nil)
 	case errors.Is(err, ErrInvalidAnalysisCohortCatalog):
-		log.Printf("public analysis: invalid catalog: %v", err)
+		s.reqLog(r, slog.LevelError, "public analysis invalid catalog", "err", err)
 		writeError(w, http.StatusInternalServerError, "invalid_catalog", "analysis catalog unavailable", nil)
 	default:
-		log.Printf("public analysis: catalog error: %v", err)
+		s.reqLog(r, slog.LevelError, "public analysis catalog error", "err", err)
 		writeError(w, http.StatusInternalServerError, "catalog_error", "analysis request failed", nil)
 	}
 }

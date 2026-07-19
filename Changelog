@@ -4,8 +4,13 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+Gives the server structured text or json logging with per-request IDs and one access-log line per request. Rebuilds snapshots in the background with a progress bar. Adds glossary tooltips to public finding explanations and completes the result explanations across every shipped locale.
+
 ### Added
 
+- ui-public: a DNS glossary linking jargon in finding explanations to plain-language tooltips, in every shipped locale
+- ui-public: finding and testcase explanations translated into Danish, Norwegian Bokmal, Spanish, Finnish, and Slovenian
+- ui-public: DS10 non-standard-NSEC tag explanation and the ZONEMD apex testcase name in the remaining locales
 - admin-ui, server: a progress bar while a snapshot is rebuilt; the rebuild runs in the background instead of freezing the button
 - admin-ui: sortable columns on the snapshot table
 - server: text or json logs, set with `--log-format` and `--log-level`

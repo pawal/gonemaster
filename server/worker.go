@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
+	"log/slog"
 	"math"
 	"net/netip"
 	"os"
@@ -46,9 +46,7 @@ func (s *Server) Start() {
 	// Always start the purge goroutine; it reads RetentionDays and the purge
 	// interval dynamically so changes via the settings API take effect without
 	// a restart.
-	startPurgeLoop(ctx, s.store, &s.retentionDays, &s.purgeIntervalSec, s.metrics, func(format string, args ...any) {
-		log.Printf(format, args...)
-	})
+	startPurgeLoop(ctx, s.store, &s.retentionDays, &s.purgeIntervalSec, s.metrics, s.logger)
 
 	if s.rateLimiter != nil {
 		go func() {
@@ -68,10 +66,10 @@ func (s *Server) Start() {
 	if s.analysis != nil {
 		go func() {
 			if err := s.analysis.RepairAllCohorts(ctx); err != nil && ctx.Err() == nil {
-				log.Printf("analysis: startup repair failed: %v", err)
+				s.logger.Warn("analysis startup repair failed", "err", err)
 			}
 		}()
-		startSnapshotCaptureLoop(ctx, s.analysis)
+		startSnapshotCaptureLoop(ctx, s.analysis, s.logger)
 	}
 }
 
@@ -79,10 +77,13 @@ func (s *Server) Start() {
 // that re-scans pending snapshots every 30 seconds. Pulled out of Start()
 // so analysis_runtime_test.go can exercise the loop without standing up a
 // full server.
-func startSnapshotCaptureLoop(ctx context.Context, ctrl AnalysisController) {
+func startSnapshotCaptureLoop(ctx context.Context, ctrl AnalysisController, logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	go func() {
 		if err := ctrl.CaptureCompletedSnapshots(ctx); err != nil && ctx.Err() == nil {
-			log.Printf("analysis: snapshot capture (initial): %v", err)
+			logger.Warn("analysis snapshot capture failed", "phase", "initial", "err", err)
 		}
 		ticker := time.NewTicker(30 * time.Second)
 		defer ticker.Stop()
@@ -92,7 +93,7 @@ func startSnapshotCaptureLoop(ctx context.Context, ctrl AnalysisController) {
 				return
 			case <-ticker.C:
 				if err := ctrl.CaptureCompletedSnapshots(ctx); err != nil && ctx.Err() == nil {
-					log.Printf("analysis: snapshot capture: %v", err)
+					logger.Warn("analysis snapshot capture failed", "phase", "periodic", "err", err)
 				}
 			}
 		}
@@ -176,8 +177,8 @@ func (s *Server) workerLoop(ctx context.Context) {
 		if err != nil {
 			return
 		}
-		if err := s.runJob(jobID); err != nil && s.cfg.Debug {
-			log.Printf("worker: job %s error: %v", jobID, err)
+		if err := s.runJob(jobID); err != nil {
+			s.logger.Error("job failed", "job_id", jobID, "err", err)
 		}
 	}
 }
@@ -233,7 +234,7 @@ func (s *Server) runJob(jobID string) error {
 	previous, prevOK := s.store.Get(job.ID)
 
 	if err := s.store.GraduateJob(job, art.entries); err != nil {
-		log.Printf("CRITICAL: job %s: failed to graduate: %v", job.ID, err)
+		s.logger.Error("job graduation failed", "job_id", job.ID, "err", err)
 		return err
 	}
 
@@ -253,7 +254,7 @@ func (s *Server) runJob(jobID string) error {
 
 	if s.analysis != nil {
 		if err := s.analysis.ProjectRun(job.ID); err != nil {
-			log.Printf("analysis: project run %s: %v", job.ID, err)
+			s.logger.Warn("analysis project run failed", "job_id", job.ID, "err", err)
 		}
 	}
 
@@ -443,9 +444,7 @@ func (s *Server) marshalDNSSECChain(sm *dnssecchain.Summary) string {
 		return ""
 	}
 	if len(blob) > maxDNSSECChainBytes {
-		if s.cfg.Debug {
-			log.Printf("dnssec chain: %d bytes exceeds %d cap, skipping", len(blob), maxDNSSECChainBytes)
-		}
+		s.logger.Debug("dnssec chain dropped", "bytes", len(blob), "cap", maxDNSSECChainBytes)
 		return ""
 	}
 	return string(blob)

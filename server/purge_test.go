@@ -3,11 +3,21 @@ package server
 import (
 	"context"
 	"fmt"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
 )
+
+// purgeErrStore wraps a JobStore but forces PurgeOlderThan to fail, exercising
+// the loop's error-logging path.
+type purgeErrStore struct {
+	JobStore
+	err error
+}
+
+func (s purgeErrStore) PurgeOlderThan(time.Time) (int64, error) {
+	return 0, s.err
+}
 
 // TestServerStartWiresPurgeLoop verifies that calling Start() with
 // RetentionDays > 0 causes old completed jobs to be deleted.
@@ -45,7 +55,7 @@ func TestNewWithOptionsRetentionDaysZeroNoPurge(t *testing.T) {
 }
 
 // TestStartPurgeLoopPurgesOldJobs verifies that the loop calls PurgeOlderThan
-// and logs the count when runs are deleted.
+// and logs a structured "jobs purged" line with a count when runs are deleted.
 func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 	store := NewInMemoryJobStore()
 	cutoffAge := 90
@@ -59,10 +69,7 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 		t.Fatalf("graduate: %v", err)
 	}
 
-	logCh := make(chan string, 10)
-	logger := func(format string, args ...any) {
-		logCh <- fmt.Sprintf(format, args...)
-	}
+	logger, recCh := newChanLogger(10)
 
 	ctx := t.Context()
 
@@ -70,18 +77,49 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 	retDays.Store(int64(cutoffAge))
 	startPurgeLoopWithInterval(ctx, store, &retDays, logger, 10*time.Millisecond)
 
-	var msg string
+	var rec capturedRecord
 	select {
-	case msg = <-logCh:
+	case rec = <-recCh:
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for purge log message")
+		t.Fatal("timeout waiting for purge log line")
 	}
 
 	if store.ListRuns(RunFilter{Limit: 1}).Total != 0 {
 		t.Fatal("expected run to be purged by loop")
 	}
-	if !strings.Contains(msg, "purged 1 jobs") {
-		t.Fatalf("expected purge log message, got %q", msg)
+	// Assert on the structured attributes, not a formatted string.
+	if rec.Message != "jobs purged" {
+		t.Fatalf("message = %q, want %q", rec.Message, "jobs purged")
+	}
+	if rec.Attrs["count"] != int64(1) {
+		t.Fatalf("count attr = %v, want 1", rec.Attrs["count"])
+	}
+	if _, ok := rec.Attrs["cutoff"].(string); !ok {
+		t.Fatalf("expected cutoff string attr, got %v", rec.Attrs["cutoff"])
+	}
+}
+
+// TestStartPurgeLoopLogsErrorOnPurgeFailure verifies the loop emits a
+// structured "purge failed" line with the error when the store errors.
+func TestStartPurgeLoopLogsErrorOnPurgeFailure(t *testing.T) {
+	store := purgeErrStore{JobStore: NewInMemoryJobStore(), err: fmt.Errorf("boom")}
+	logger, recCh := newChanLogger(10)
+
+	var retDays atomic.Int64
+	retDays.Store(90)
+	startPurgeLoopWithInterval(t.Context(), store, &retDays, logger, 10*time.Millisecond)
+
+	var rec capturedRecord
+	select {
+	case rec = <-recCh:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timeout waiting for purge error log line")
+	}
+	if rec.Message != "purge failed" {
+		t.Fatalf("message = %q, want %q", rec.Message, "purge failed")
+	}
+	if errStr, _ := rec.Attrs["err"].(error); errStr == nil || errStr.Error() != "boom" {
+		t.Fatalf("err attr = %v, want boom", rec.Attrs["err"])
 	}
 }
 
@@ -90,8 +128,7 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 func TestStartPurgeLoopNoLogWhenNothingPurged(t *testing.T) {
 	store := NewInMemoryJobStore()
 
-	var logCount atomic.Int64
-	logger := func(string, ...any) { logCount.Add(1) }
+	logger, recCh := newChanLogger(10)
 
 	ctx := t.Context()
 
@@ -102,7 +139,7 @@ func TestStartPurgeLoopNoLogWhenNothingPurged(t *testing.T) {
 	// Let the loop tick a few times.
 	time.Sleep(50 * time.Millisecond)
 
-	if n := logCount.Load(); n != 0 {
+	if n := len(recCh); n != 0 {
 		t.Fatalf("expected no log messages for empty store, got %d", n)
 	}
 }
@@ -111,7 +148,7 @@ func TestStartPurgeLoopNoLogWhenNothingPurged(t *testing.T) {
 // stops the goroutine cleanly (no panic, no hang).
 func TestStartPurgeLoopStopsOnContextCancel(t *testing.T) {
 	store := NewInMemoryJobStore()
-	logger := func(string, ...any) {}
+	logger, _ := newChanLogger(10)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	var retDays atomic.Int64
@@ -139,7 +176,7 @@ func TestStartPurgeLoopPreservesNewJobs(t *testing.T) {
 		t.Fatalf("graduate: %v", err)
 	}
 
-	logger := func(string, ...any) {}
+	logger, _ := newChanLogger(10)
 	ctx := t.Context()
 
 	var retDays atomic.Int64
@@ -158,7 +195,7 @@ func TestStartPurgeLoopPreservesNewJobs(t *testing.T) {
 func TestPurgeLoopRetentionDaysDynamic(t *testing.T) {
 	store := NewInMemoryJobStore()
 	var retDays atomic.Int64 // start disabled (0)
-	logger := func(string, ...any) {}
+	logger, _ := newChanLogger(10)
 
 	ctx := t.Context()
 
@@ -212,17 +249,16 @@ func TestRunPurgeLoopRecordsPurgeMetric(t *testing.T) {
 	}
 
 	metrics := NewMetricsCollector(DefaultConfig())
-	logCh := make(chan string, 4)
-	logger := func(format string, args ...any) { logCh <- fmt.Sprintf(format, args...) }
+	logger, recCh := newChanLogger(4)
 
 	var retDays atomic.Int64
 	retDays.Store(90)
 	runPurgeLoop(t.Context(), store, &retDays, metrics, logger, func() time.Duration { return 10 * time.Millisecond })
 
 	select {
-	case <-logCh:
+	case <-recCh:
 	case <-time.After(2 * time.Second):
-		t.Fatal("timeout waiting for purge log message")
+		t.Fatal("timeout waiting for purge log line")
 	}
 
 	if got := metrics.Snapshot().Jobs.PurgedTotal; got != 1 {
@@ -235,8 +271,7 @@ func TestRunPurgeLoopRecordsPurgeMetric(t *testing.T) {
 // exercises the ticker.Reset branch.
 func TestRunPurgeLoopAppliesIntervalChange(t *testing.T) {
 	store := NewInMemoryJobStore()
-	logCh := make(chan string, 8)
-	logger := func(format string, args ...any) { logCh <- fmt.Sprintf(format, args...) }
+	logger, recCh := newChanLogger(8)
 
 	var intervalNanos atomic.Int64
 	intervalNanos.Store(int64(10 * time.Millisecond))
@@ -258,7 +293,7 @@ func TestRunPurgeLoopAppliesIntervalChange(t *testing.T) {
 	}
 	waitForPurge := func(label string) {
 		select {
-		case <-logCh:
+		case <-recCh:
 		case <-time.After(2 * time.Second):
 			t.Fatalf("timeout waiting for purge (%s)", label)
 		}

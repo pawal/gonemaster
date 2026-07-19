@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"log/slog"
 	"sync/atomic"
 	"time"
 )
@@ -10,7 +11,7 @@ import (
 // retention window and sweep interval from atomics so both take effect at the
 // next tick when changed via the settings API. metrics may be nil. The loop
 // exits when ctx is cancelled and is a no-op while retentionDays.Load() <= 0.
-func startPurgeLoop(ctx context.Context, store JobStore, retentionDays, purgeIntervalSec *atomic.Int64, metrics *MetricsCollector, logger func(string, ...any)) {
+func startPurgeLoop(ctx context.Context, store JobStore, retentionDays, purgeIntervalSec *atomic.Int64, metrics *MetricsCollector, logger *slog.Logger) {
 	intervalFn := func() time.Duration {
 		secs := purgeIntervalSec.Load()
 		if secs <= 0 {
@@ -23,13 +24,16 @@ func startPurgeLoop(ctx context.Context, store JobStore, retentionDays, purgeInt
 
 // startPurgeLoopWithInterval runs the loop with a fixed interval and no metrics.
 // Exposed so tests can use a short tick without sleeping for an hour.
-func startPurgeLoopWithInterval(ctx context.Context, store JobStore, retentionDays *atomic.Int64, logger func(string, ...any), interval time.Duration) {
+func startPurgeLoopWithInterval(ctx context.Context, store JobStore, retentionDays *atomic.Int64, logger *slog.Logger, interval time.Duration) {
 	runPurgeLoop(ctx, store, retentionDays, nil, logger, func() time.Duration { return interval })
 }
 
 // runPurgeLoop is the core loop. intervalFn is read each tick; when its result
 // changes the ticker is reset so a new interval applies without a restart.
-func runPurgeLoop(ctx context.Context, store JobStore, retentionDays *atomic.Int64, metrics *MetricsCollector, logger func(string, ...any), intervalFn func() time.Duration) {
+func runPurgeLoop(ctx context.Context, store JobStore, retentionDays *atomic.Int64, metrics *MetricsCollector, logger *slog.Logger, intervalFn func() time.Duration) {
+	if logger == nil {
+		logger = slog.Default()
+	}
 	go func() {
 		interval := intervalFn()
 		ticker := time.NewTicker(interval)
@@ -50,14 +54,14 @@ func runPurgeLoop(ctx context.Context, store JobStore, retentionDays *atomic.Int
 				cutoff := time.Now().UTC().Add(-time.Duration(days) * 24 * time.Hour)
 				n, err := store.PurgeOlderThan(cutoff)
 				if err != nil {
-					logger("purge error: %v", err)
+					logger.Error("purge failed", "err", err)
 					continue
 				}
 				if n > 0 {
 					if metrics != nil {
 						metrics.ObserveJobsPurged(n)
 					}
-					logger("purged %d jobs older than %s", n, cutoff.Format(time.RFC3339))
+					logger.Info("jobs purged", "count", n, "cutoff", cutoff.Format(time.RFC3339))
 				}
 			}
 		}

@@ -41,6 +41,80 @@ func TestAPIRouteTemplate(t *testing.T) {
 	}
 }
 
+func TestRouteLabel(t *testing.T) {
+	tests := []struct {
+		prefix  string
+		pattern string
+		want    string
+	}{
+		// Method-qualified patterns: the method is dropped because the access
+		// log records it in its own field.
+		{"/pub/api/v1", "GET /locales", "/pub/api/v1/locales"},
+		{"/pub/api/v1", "GET /jobs/{publicID}", "/pub/api/v1/jobs/{publicID}"},
+		{"/pub/api/v1", "GET /jobs/{publicID}/result", "/pub/api/v1/jobs/{publicID}/result"},
+		{"/pub/api/v1", "POST /jobs", "/pub/api/v1/jobs"},
+		// Method-less patterns pass through unchanged apart from the prefix.
+		{"/api/v1", "/healthz", "/api/v1/healthz"},
+		// Subtree patterns keep the trailing slash out of the label.
+		{"/api/v1", "/jobs/", "/api/v1/jobs"},
+		// An unmatched request has no pattern and lands in the mount's bucket.
+		{"/pub/api/v1", "", "/pub/api/v1/unknown"},
+	}
+	for _, tc := range tests {
+		if got := routeLabel(tc.prefix, tc.pattern); got != tc.want {
+			t.Errorf("routeLabel(%q, %q) = %q, want %q", tc.prefix, tc.pattern, got, tc.want)
+		}
+	}
+}
+
+// TestAccessLogRouteFromMatchedPattern drives the fully wired handler so the
+// route field is derived from the router's matched pattern. Before the fix the
+// public surface, mounted under /pub/api/v1, always logged /api/v1/unknown
+// because apiRouteTemplate only understood the admin /api/v1 prefix.
+func TestAccessLogRouteFromMatchedPattern(t *testing.T) {
+	tests := []struct {
+		name      string
+		path      string
+		wantRoute string
+	}{
+		{"public static route", "/pub/api/v1/locales", "/pub/api/v1/locales"},
+		{"public info route", "/pub/api/v1/info", "/pub/api/v1/info"},
+		{"public templated route", "/pub/api/v1/jobs/does-not-exist", "/pub/api/v1/jobs/{publicID}"},
+		{"public unmatched route", "/pub/api/v1/no-such-endpoint", "/pub/api/v1/unknown"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			srv := New(DefaultConfig())
+			srv.logger = newLogger("json", "info", &buf)
+
+			resp := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			srv.Handler().ServeHTTP(resp, req)
+
+			line := findLogLine(t, &buf, "http_request")
+			if got := line["route"]; got != tc.wantRoute {
+				t.Fatalf("route = %v, want %q (path %q)", got, tc.wantRoute, tc.path)
+			}
+			if got := line["path"]; got != tc.path {
+				t.Fatalf("path = %v, want %q", got, tc.path)
+			}
+		})
+	}
+}
+
+// findLogLine returns the first decoded log line whose msg matches want.
+func findLogLine(t *testing.T, buf *bytes.Buffer, want string) map[string]any {
+	t.Helper()
+	for _, line := range decodeLogLines(t, buf) {
+		if line["msg"] == want {
+			return line
+		}
+	}
+	t.Fatalf("no log line with msg=%q in output: %s", want, buf.String())
+	return nil
+}
+
 func TestRecoverMiddlewareReturnsCleanError(t *testing.T) {
 	srv := New(DefaultConfig())
 	canary := "secret-stack-frame-marker-XYZ123"

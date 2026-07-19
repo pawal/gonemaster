@@ -75,6 +75,8 @@ type contextKey string
 
 const requestIDContextKey contextKey = "request_id"
 
+const routeHolderContextKey contextKey = "route_holder"
+
 // requestIDFromContext returns the correlation ID stored on ctx, or "".
 func requestIDFromContext(ctx context.Context) string {
 	if v, ok := ctx.Value(requestIDContextKey).(string); ok {

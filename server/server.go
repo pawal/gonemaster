@@ -334,7 +334,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /whoami", s.handleWhoami)
 	apiMux.HandleFunc("/session", s.handleSession)
 
-	s.mux.Handle("/api/v1/", s.requestIDMiddleware(s.accessLogMiddleware(s.recoverMiddleware(s.apiMetricsMiddleware(s.authMiddleware(http.StripPrefix("/api/v1", apiMux)))))))
+	s.mux.Handle("/api/v1/", s.requestIDMiddleware(s.accessLogMiddleware(s.recoverMiddleware(s.apiMetricsMiddleware(s.authMiddleware(http.StripPrefix("/api/v1", captureRoute("/api/v1", apiMux))))))))
 	s.mux.Handle("/api/v1", s.requestIDMiddleware(s.accessLogMiddleware(s.recoverMiddleware(s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
 	}))))))
@@ -395,7 +395,7 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/diff", s.handlePublicAnalysisDiff)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/history", s.handlePublicAnalysisEntityHistory)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}", s.handlePublicAnalysisCohortDetail)
-	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", pubMux)
+	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", captureRoute("/pub/api/v1", pubMux))
 	if d := s.cfg.PublicAPI.AnalysisRequestTimeout.Duration; d > 0 {
 		pubHandler = analysisTimeoutMiddleware(d, pubHandler)
 	}

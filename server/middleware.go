@@ -12,6 +12,7 @@ import (
 	"net/netip"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"time"
 )
 
@@ -133,16 +134,24 @@ func (s *Server) accessLogMiddleware(next http.Handler) http.Handler {
 		if captureBody {
 			maxBody = debugBodyLimit
 		}
+		holder := &routeHolder{}
+		r = r.WithContext(context.WithValue(r.Context(), routeHolderContextKey, holder))
 		rec := newResponseRecorder(w, maxBody)
 		next.ServeHTTP(rec, r)
 		status := rec.status
 		if status == 0 {
 			status = http.StatusOK
 		}
+		// Prefer the router's matched pattern; fall back to path parsing for
+		// non-mux handlers that never populate the holder.
+		route := apiRouteTemplate(r.URL.Path)
+		if p := holder.route.Load(); p != nil {
+			route = *p
+		}
 		attrs := []slog.Attr{
 			slog.String("method", r.Method),
 			slog.String("path", r.URL.Path),
-			slog.String("route", apiRouteTemplate(r.URL.Path)),
+			slog.String("route", route),
 			slog.Int("status", status),
 			slog.Int64("duration_ms", time.Since(start).Milliseconds()),
 			slog.Int("bytes", rec.bytes),
@@ -290,6 +299,35 @@ func analysisTimeoutMiddleware(d time.Duration, next http.Handler) http.Handler 
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// routeHolder carries the router's matched pattern to the access log.
+type routeHolder struct {
+	route atomic.Pointer[string]
+}
+
+// captureRoute records the mux's matched pattern as a mount-qualified route.
+func captureRoute(prefix string, mux *http.ServeMux) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mux.ServeHTTP(w, r)
+		holder, ok := r.Context().Value(routeHolderContextKey).(*routeHolder)
+		if !ok {
+			return
+		}
+		label := routeLabel(prefix, r.Pattern)
+		holder.route.Store(&label)
+	})
+}
+
+// routeLabel maps "GET /jobs/{id}" to a method-free "/api/v1/jobs/{id}".
+func routeLabel(prefix, pattern string) string {
+	if pattern == "" {
+		return prefix + "/unknown"
+	}
+	if i := strings.IndexByte(pattern, ' '); i >= 0 {
+		pattern = pattern[i+1:]
+	}
+	return prefix + strings.TrimSuffix(pattern, "/")
 }
 
 func apiRouteTemplate(path string) string {

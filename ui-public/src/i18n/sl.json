@@ -252,6 +252,7 @@
   "pub.tc.zone11": "Politika SPF na vrhu cone",
   "pub.tc.zone12": "Zapis CSYNC RR na vrhu cone",
   "pub.tc.zone13": "Skladnost z omejitvijo DNS-poizvedb SPF",
+  "pub.tc.zone14": "Zapis ZONEMD na vrhu cone",
   "pub.glossary.dnssec.match": "DNSSEC",
   "pub.glossary.ds.match": "DS",
   "pub.glossary.dnskey.match": "DNSKEY",

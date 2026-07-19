@@ -252,6 +252,7 @@
   "pub.tc.zone11": "Política SPF en el ápice de la zona",
   "pub.tc.zone12": "Registro CSYNC RR en el ápice de la zona",
   "pub.tc.zone13": "Cumplimiento del límite de consultas DNS SPF",
+  "pub.tc.zone14": "Registro ZONEMD en el ápice de la zona",
   "pub.glossary.dnssec.match": "DNSSEC",
   "pub.glossary.ds.match": "DS",
   "pub.glossary.dnskey.match": "DNSKEY",

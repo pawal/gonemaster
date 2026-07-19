@@ -252,6 +252,7 @@
   "pub.tc.zone11": "SPF-käytäntö vyöhykkeen kärjessä",
   "pub.tc.zone12": "CSYNC RR vyöhykkeen kärjessä",
   "pub.tc.zone13": "SPF DNS -hakurajan noudattaminen",
+  "pub.tc.zone14": "ZONEMD-tietue vyöhykkeen kärjessä",
   "pub.glossary.dnssec.match": "DNSSEC",
   "pub.glossary.ds.match": "DS",
   "pub.glossary.dnskey.match": "DNSKEY",

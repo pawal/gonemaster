@@ -252,6 +252,7 @@
   "pub.tc.zone11": "SPF-politik ved zonens apex",
   "pub.tc.zone12": "CSYNC RR ved zonens apex",
   "pub.tc.zone13": "SPF DNS-opslagsgrænse overholdes",
+  "pub.tc.zone14": "ZONEMD-post ved zonens apex",
   "pub.glossary.dnssec.match": "DNSSEC",
   "pub.glossary.ds.match": "DS",
   "pub.glossary.dnskey.match": "DNSKEY",

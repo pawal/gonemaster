@@ -2,7 +2,7 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.6.3] - 2026-07-19
 
 Gives the server structured text or json logging with per-request IDs and one access-log line per request. Rebuilds snapshots in the background with a progress bar. Adds glossary tooltips to public finding explanations and completes the result explanations across every shipped locale.
 
@@ -16,6 +16,7 @@ Gives the server structured text or json logging with per-request IDs and one ac
 - server: text or json logs, set with `--log-format` and `--log-level`
 - server: a request ID on each API request, returned as `X-Request-Id` and shown in the logs
 - server: one access-log line per API request
+- server: a log line recording the tested domain and its public id when a job is created
 
 ### Changed
 

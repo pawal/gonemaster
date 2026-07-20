@@ -264,9 +264,13 @@
             {#each d.nameserver_timings ?? [] as t (`${t.nameserver}|${t.address}`)}
               {@const st = timingStatus(t)}
               <tr class:ns-row-unreachable={st === "unreachable"} class:ns-row-unresolved={st === "unresolved"}>
-                <th scope="row" class="row-ident">{t.nameserver}</th>
+                <th scope="row" class="row-ident">
+                  <NameserverChip nameserver={t.nameserver} />
+                </th>
                 <td class="row-ident">
-                  {t.address || "-"}
+                  {#if t.address}
+                    <EndpointChip address={t.address} nameserver={t.nameserver} />
+                  {:else}-{/if}
                   {#if st === "unreachable"}
                     <span class="ns-status-badge">No response</span>
                   {:else if st === "unresolved"}

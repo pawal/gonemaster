@@ -145,8 +145,14 @@ describe("/domains/[domain] response-times table", () => {
     const section = within(
       screen.getByText("Nameserver response times").closest("section") as HTMLElement
     );
-    expect(section.getByText("192.0.2.1")).toBeInTheDocument();
+    // Address and nameserver cross-link to their entity detail pages.
+    expect(section.getByText("192.0.2.1").closest("a")?.getAttribute("href")).toContain(
+      "/analysis/endpoints/192.0.2.1"
+    );
     expect(section.getByText("2001:db8::1")).toBeInTheDocument();
+    expect(section.getAllByText("ns1.example")[0].closest("a")?.getAttribute("href")).toContain(
+      "/analysis/nameservers/ns1.example"
+    );
     expect(section.getByText("20")).toBeInTheDocument();
     expect(section.getByText("40")).toBeInTheDocument();
   });

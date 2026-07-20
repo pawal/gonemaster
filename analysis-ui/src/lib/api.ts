@@ -230,6 +230,19 @@ export type DomainDetailEntry = {
   raw?: string;
 };
 
+// NameserverTiming is one (nameserver, address) response-time row from the run.
+export type NameserverTiming = {
+  nameserver: string;
+  address: string;
+  avg_ms: number;
+  min_ms: number;
+  max_ms: number;
+  median_ms: number;
+  stddev_ms: number;
+  count: number;
+  status?: string;
+};
+
 export type DomainDetail = {
   domain: string;
   score?: number;
@@ -246,6 +259,8 @@ export type DomainDetail = {
   // Localized log entries from the originating run; absent when the
   // run has been purged and the UI falls back to tags.
   entries?: DomainDetailEntry[];
+  // Per-nameserver response times from the run; absent when it was purged.
+  nameserver_timings?: NameserverTiming[];
 };
 
 export type EndpointDetail = {

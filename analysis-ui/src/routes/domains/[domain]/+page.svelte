@@ -9,7 +9,7 @@
   import { tagHref } from "$lib/entityLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import { idnToUnicode } from "$lib/idn";
-  import type { DomainDetailEntry, DomainDetailTag } from "$lib/api";
+  import type { DomainDetailEntry, DomainDetailTag, NameserverTiming } from "$lib/api";
   import type { DomainDetailPageData } from "./+page";
 
   let { data }: { data: DomainDetailPageData } = $props();
@@ -23,6 +23,24 @@
   function unicodeName(name: string): string | null {
     const decoded = idnToUnicode(name);
     return decoded !== name ? decoded : null;
+  }
+
+  // Response-time cells mirror the public result view: infinity for a
+  // reachable-but-silent endpoint, dash for a name that never resolved.
+  function timingStatus(t: NameserverTiming): "ok" | "unreachable" | "unresolved" {
+    return t.status === "unreachable" || t.status === "unresolved" ? t.status : "ok";
+  }
+  function timingMs(t: NameserverTiming, value: number): string {
+    const s = timingStatus(t);
+    if (s === "unreachable") return "∞";
+    if (s === "unresolved") return "-";
+    return `${Math.round(value)}`;
+  }
+  function timingSamples(t: NameserverTiming): string {
+    const s = timingStatus(t);
+    if (s === "unreachable") return "0";
+    if (s === "unresolved") return "-";
+    return `${t.count}`;
   }
 
   // Unified row covering both detail sources: per-entry rows (run still
@@ -225,6 +243,47 @@
       </div>
     {/if}
   </section>
+
+  {#if (d.nameserver_timings?.length ?? 0) > 0}
+    <section class="card">
+      <h3>Nameserver response times</h3>
+      <p class="hint">Per-address query response time from the run that produced this snapshot.</p>
+      <div class="table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th scope="col">Nameserver</th>
+              <th scope="col">Address</th>
+              <th scope="col" class="ts-num">Avg (ms)</th>
+              <th scope="col" class="ts-num">Min (ms)</th>
+              <th scope="col" class="ts-num">Max (ms)</th>
+              <th scope="col" class="ts-num">Samples</th>
+            </tr>
+          </thead>
+          <tbody>
+            {#each d.nameserver_timings ?? [] as t (`${t.nameserver}|${t.address}`)}
+              {@const st = timingStatus(t)}
+              <tr class:ns-row-unreachable={st === "unreachable"} class:ns-row-unresolved={st === "unresolved"}>
+                <th scope="row" class="row-ident">{t.nameserver}</th>
+                <td class="row-ident">
+                  {t.address || "-"}
+                  {#if st === "unreachable"}
+                    <span class="ns-status-badge">No response</span>
+                  {:else if st === "unresolved"}
+                    <span class="ns-status-badge">Does not resolve</span>
+                  {/if}
+                </td>
+                <td class="ts-num">{timingMs(t, t.avg_ms)}</td>
+                <td class="ts-num">{timingMs(t, t.min_ms)}</td>
+                <td class="ts-num">{timingMs(t, t.max_ms)}</td>
+                <td class="ts-num">{timingSamples(t)}</td>
+              </tr>
+            {/each}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  {/if}
 
   <section class="card results-card">
     <h3>Findings</h3>
@@ -551,5 +610,11 @@
     text-transform: uppercase;
     background: var(--sev-critical-bg);
     color: var(--sev-critical-fg);
+  }
+
+  .ts-num {
+    text-align: right;
+    font-family: var(--mono);
+    white-space: nowrap;
   }
 </style>

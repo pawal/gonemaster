@@ -1,5 +1,21 @@
 import { describe, expect, it, vi } from "vitest";
-import { load } from "./+page";
+import { render, screen, within } from "@testing-library/svelte";
+import type { DomainDetail } from "$lib/api";
+import { load, type DomainDetailPageData } from "./+page";
+
+const h = vi.hoisted(() => ({ url: new URL("http://localhost/domains/alpha.example") }));
+vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
+vi.mock("$app/paths", () => ({ base: "/analysis" }));
+vi.mock("$app/state", () => ({
+  page: {
+    get url() {
+      return h.url;
+    },
+    data: {}
+  }
+}));
+
+import DomainDetailPage from "./+page.svelte";
 
 function stubResponse(body: unknown, ok = true): Response {
   return {
@@ -91,5 +107,72 @@ describe("/domains/[domain] +page.load", () => {
     );
     expect(data.detail).toBeNull();
     expect(data.error).toMatch(/HTTP 500/);
+  });
+});
+
+function nsDetail(over: Partial<DomainDetail> = {}): DomainDetail {
+  return {
+    domain: "alpha.example",
+    score: 85,
+    grade: "B",
+    worst_level: "WARNING",
+    nameserver_count: 1,
+    endpoint_count: 2,
+    asn_count: 1,
+    prefix_count: 1,
+    nameservers: [],
+    addresses: [],
+    ...over
+  };
+}
+
+function nsPageData(detail: DomainDetail | null): DomainDetailPageData {
+  return { domain: "alpha.example", datasetTag: "tld", detail, history: [], error: null };
+}
+
+describe("/domains/[domain] response-times table", () => {
+  it("shows per-address rows with avg/min/max/samples", () => {
+    render(DomainDetailPage, {
+      data: nsPageData(
+        nsDetail({
+          nameserver_timings: [
+            { nameserver: "ns1.example", address: "192.0.2.1", avg_ms: 20, min_ms: 18, max_ms: 25, median_ms: 20, stddev_ms: 2, count: 5, status: "ok" },
+            { nameserver: "ns1.example", address: "2001:db8::1", avg_ms: 40, min_ms: 38, max_ms: 45, median_ms: 40, stddev_ms: 2, count: 6, status: "ok" }
+          ]
+        })
+      )
+    });
+    const section = within(
+      screen.getByText("Nameserver response times").closest("section") as HTMLElement
+    );
+    expect(section.getByText("192.0.2.1")).toBeInTheDocument();
+    expect(section.getByText("2001:db8::1")).toBeInTheDocument();
+    expect(section.getByText("20")).toBeInTheDocument();
+    expect(section.getByText("40")).toBeInTheDocument();
+  });
+
+  it("marks unreachable with infinity and unresolved with a dash", () => {
+    render(DomainDetailPage, {
+      data: nsPageData(
+        nsDetail({
+          nameserver_timings: [
+            { nameserver: "down.example", address: "192.0.2.9", avg_ms: 0, min_ms: 0, max_ms: 0, median_ms: 0, stddev_ms: 0, count: 0, status: "unreachable" },
+            { nameserver: "gone.example", address: "", avg_ms: 0, min_ms: 0, max_ms: 0, median_ms: 0, stddev_ms: 0, count: 0, status: "unresolved" }
+          ]
+        })
+      )
+    });
+    const section = within(
+      screen.getByText("Nameserver response times").closest("section") as HTMLElement
+    );
+    // Avg/min/max all read infinity for a reachable-but-silent endpoint.
+    expect(section.getAllByText("∞").length).toBeGreaterThan(0);
+    expect(section.getByText("No response")).toBeInTheDocument();
+    expect(section.getByText("Does not resolve")).toBeInTheDocument();
+  });
+
+  it("omits the table when the run carried no timings", () => {
+    render(DomainDetailPage, { data: nsPageData(nsDetail()) });
+    expect(screen.queryByText("Nameserver response times")).toBeNull();
   });
 });

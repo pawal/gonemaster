@@ -12,25 +12,26 @@ import (
 
 // seedGraduatedRun runs a job through GraduateJob so that entries and domain
 // latest_* fields get populated, then upserts an analysis summary for the run.
-func (f *analysisAPITestFixture) seedGraduatedRun(domainName string, finishedAt time.Time, entries []engine.LogEntry) Run {
-	return f.seedGraduatedRunInBatch(f.batchID, domainName, finishedAt, entries)
+func (f *analysisAPITestFixture) seedGraduatedRun(domainName string, finishedAt time.Time, entries []engine.LogEntry, timings ...NameserverTiming) Run {
+	return f.seedGraduatedRunInBatch(f.batchID, domainName, finishedAt, entries, timings...)
 }
 
 // seedGraduatedRunInBatch is seedGraduatedRun with an explicit batch id,
 // used by snapshot-scoping tests that need runs under a non-default
 // batch so their facts live in a different snapshot.
-func (f *analysisAPITestFixture) seedGraduatedRunInBatch(batchID, domainName string, finishedAt time.Time, entries []engine.LogEntry) Run {
+func (f *analysisAPITestFixture) seedGraduatedRunInBatch(batchID, domainName string, finishedAt time.Time, entries []engine.LogEntry, timings ...NameserverTiming) Run {
 	f.t.Helper()
 	runID := "run-" + domainName + "-" + finishedAt.Format("20060102150405")
 	now := finishedAt
 	job := Job{
-		ID:         runID,
-		Domain:     domainName,
-		BatchID:    batchID,
-		Status:     JobSucceeded,
-		CreatedAt:  now.Add(-time.Minute),
-		StartedAt:  now.Add(-time.Minute),
-		FinishedAt: now,
+		ID:                runID,
+		Domain:            domainName,
+		BatchID:           batchID,
+		Status:            JobSucceeded,
+		CreatedAt:         now.Add(-time.Minute),
+		StartedAt:         now.Add(-time.Minute),
+		FinishedAt:        now,
+		NameserverTimings: timings,
 	}
 	if _, err := f.store.Create(job); err != nil {
 		f.t.Fatalf("create job: %v", err)

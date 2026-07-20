@@ -316,3 +316,33 @@ func TestDomainViewListRoundTripPreservesPayload(t *testing.T) {
 		t.Errorf("Addresses round-trip lost: %+v", row.Addresses)
 	}
 }
+
+// TestDomainDetailIncludesNameserverTimings proves the domain detail carries the
+// run's per-nameserver response times so the analysis UI can show the same
+// per-address (IPv4/IPv6) timing table the public result view has.
+func TestDomainDetailIncludesNameserverTimings(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+	f.seedGraduatedRun("alpha.example", now, nil,
+		NameserverTiming{Nameserver: "ns1.example", Address: "192.0.2.1", AvgMS: 20, MinMS: 18, MaxMS: 25, MedianMS: 20, Count: 5, Status: "ok"},
+		NameserverTiming{Nameserver: "ns1.example", Address: "2001:db8::1", AvgMS: 40, MinMS: 38, MaxMS: 45, MedianMS: 40, Count: 5, Status: "ok"},
+	)
+	runID := "run-alpha.example-" + now.Format("20060102150405")
+	f.seedEndpoint(runID, "alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+	f.seedEndpoint(runID, "alpha.example", "ns1.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32")
+
+	got := decodeJSON[PublicAnalysisDomainDetail](t, getPublic(t, f.srv, f.publicURL("domains/alpha.example")))
+	if len(got.NameserverTimings) != 2 {
+		t.Fatalf("nameserver_timings len = %d, want 2 (%+v)", len(got.NameserverTimings), got.NameserverTimings)
+	}
+	byAddr := map[string]NameserverTiming{}
+	for _, tm := range got.NameserverTimings {
+		byAddr[tm.Address] = tm
+	}
+	if v4, ok := byAddr["192.0.2.1"]; !ok || v4.AvgMS != 20 || v4.Count != 5 {
+		t.Fatalf("v4 timing = %+v, want avg 20 count 5", v4)
+	}
+	if v6, ok := byAddr["2001:db8::1"]; !ok || v6.AvgMS != 40 {
+		t.Fatalf("v6 timing = %+v, want avg 40", v6)
+	}
+}

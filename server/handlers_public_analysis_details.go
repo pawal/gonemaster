@@ -68,6 +68,8 @@ type PublicAnalysisDomainDetail struct {
 	Tags            []PublicAnalysisDomainTag        `json:"tags,omitempty"`
 	// Localized log entries from the run; empty when the run was purged.
 	Entries []PublicAnalysisDomainEntry `json:"entries,omitempty"`
+	// Per-nameserver response times from the run; empty when it was purged.
+	NameserverTimings []NameserverTiming `json:"nameserver_timings,omitempty"`
 }
 
 // PublicAnalysisDomainTag is one tag observed at the capture-time floor.
@@ -290,43 +292,47 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	}
 
 	detail := domainViewToDetail(view)
-	if entries, ok := s.lookupSnapshotDomainEntries(snapshot.BatchID, view.DomainID); ok {
+	if entries, timings, ok := s.lookupSnapshotDomainRun(snapshot.BatchID, view.DomainID); ok {
 		detail.Entries = entries
+		detail.NameserverTimings = timings
 	}
 
 	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, detail)
 }
 
-// lookupSnapshotDomainEntries returns English log entries for the run that
-// materialized this snapshot's (batch, domain), or ok=false when the run has
-// been purged.
-func (s *Server) lookupSnapshotDomainEntries(batchID string, domainID int64) ([]PublicAnalysisDomainEntry, bool) {
+// lookupSnapshotDomainRun returns the English log entries and per-nameserver
+// timings from the run that materialized this snapshot's (batch, domain).
+// ok is false when the run has been purged or carries neither.
+func (s *Server) lookupSnapshotDomainRun(batchID string, domainID int64) (entries []PublicAnalysisDomainEntry, timings []NameserverTiming, ok bool) {
 	if batchID == "" || domainID == 0 {
-		return nil, false
+		return nil, nil, false
 	}
 	list := s.store.ListRuns(RunFilter{BatchID: batchID, DomainID: domainID, Limit: 1})
 	if len(list.Items) == 0 {
-		return nil, false
+		return nil, nil, false
 	}
-	result, ok := s.store.GetResult(list.Items[0].ID)
-	if !ok || result.Raw == nil || len(result.Raw.Entries) == 0 {
-		return nil, false
+	result, found := s.store.GetResult(list.Items[0].ID)
+	if !found {
+		return nil, nil, false
 	}
-	localized := localizeResultEntries(result.Raw.Entries, "en")
-	out := make([]PublicAnalysisDomainEntry, 0, len(localized))
-	for _, e := range localized {
-		out = append(out, PublicAnalysisDomainEntry{
-			Timestamp: e.Timestamp,
-			Module:    e.Module,
-			Testcase:  e.Testcase,
-			Tag:       e.Tag,
-			Level:     e.Level,
-			Message:   e.Message,
-			Raw:       e.Raw,
-		})
+	if result.Raw != nil && len(result.Raw.Entries) > 0 {
+		localized := localizeResultEntries(result.Raw.Entries, "en")
+		entries = make([]PublicAnalysisDomainEntry, 0, len(localized))
+		for _, e := range localized {
+			entries = append(entries, PublicAnalysisDomainEntry{
+				Timestamp: e.Timestamp,
+				Module:    e.Module,
+				Testcase:  e.Testcase,
+				Tag:       e.Tag,
+				Level:     e.Level,
+				Message:   e.Message,
+				Raw:       e.Raw,
+			})
+		}
 	}
-	return out, true
+	timings = result.NameserverTimings
+	return entries, timings, len(entries) > 0 || len(timings) > 0
 }
 
 // domainViewToDetail rehydrates the per-snapshot domain view into the

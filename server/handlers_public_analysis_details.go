@@ -110,6 +110,13 @@ type PublicAnalysisDomainEntry struct {
 	Raw       string  `json:"raw,omitempty"`
 }
 
+// PublicAnalysisFamilyLatency is one address family's latency for a nameserver.
+type PublicAnalysisFamilyLatency struct {
+	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
+	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
+	LatencySamples int      `json:"latency_samples,omitempty"`
+}
+
 // PublicAnalysisNameserverDetail is the per-nameserver detail view.
 type PublicAnalysisNameserverDetail struct {
 	Nameserver     string   `json:"nameserver"`
@@ -120,9 +127,12 @@ type PublicAnalysisNameserverDetail struct {
 	LatencyP50MS   *float64 `json:"latency_p50_ms,omitempty"`
 	LatencyP95MS   *float64 `json:"latency_p95_ms,omitempty"`
 	LatencySamples int      `json:"latency_samples,omitempty"`
-	Addresses      []string `json:"addresses"`
-	Domains        []string `json:"domains"`
-	ASNs           []int64  `json:"asns"`
+	// Per-family latency, set only when the nameserver has that family with data.
+	LatencyIPv4 *PublicAnalysisFamilyLatency `json:"latency_ipv4,omitempty"`
+	LatencyIPv6 *PublicAnalysisFamilyLatency `json:"latency_ipv6,omitempty"`
+	Addresses   []string                     `json:"addresses"`
+	Domains     []string                     `json:"domains"`
+	ASNs        []int64                      `json:"asns"`
 }
 
 // PublicAnalysisEndpointDetail is the per-(nameserver,address) detail view.
@@ -394,6 +404,8 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 		return
 	}
 
+	v4, v6 := nameserverFamilyLatency(readStore, snapshot.ID, view)
+
 	writeSnapshotCacheHeaders(w, r, snapshot)
 	writeJSON(w, http.StatusOK, PublicAnalysisNameserverDetail{
 		Nameserver:     view.NameserverName,
@@ -404,10 +416,55 @@ func (s *Server) handlePublicAnalysisNameserverDetail(w http.ResponseWriter, r *
 		LatencyP50MS:   copyFloatPtr(view.LatencyP50MS),
 		LatencyP95MS:   copyFloatPtr(view.LatencyP95MS),
 		LatencySamples: view.LatencySamples,
+		LatencyIPv4:    v4,
+		LatencyIPv6:    v6,
 		Addresses:      view.Addresses,
 		Domains:        view.Domains,
 		ASNs:           view.ASNs,
 	})
+}
+
+// nameserverFamilyLatency splits a nameserver's latency into IPv4 and IPv6 by
+// pooling its per-address endpoint medians, sample-weighted. Returns nil for a
+// family the nameserver does not have with data.
+func nameserverFamilyLatency(readStore AnalysisReadStore, snapshotID int64, view AnalysisSnapshotNameserverView) (v4, v6 *PublicAnalysisFamilyLatency) {
+	type acc struct {
+		p50Weighted float64
+		p95Weighted float64
+		samples     int
+	}
+	byFamily := map[string]*acc{}
+	for _, addr := range view.Addresses {
+		for _, ep := range readStore.ListSnapshotEndpointViewsByAddress(snapshotID, addr, view.NameserverName) {
+			if ep.LatencyP50MS == nil || ep.LatencySamples == 0 {
+				continue
+			}
+			a := byFamily[ep.Family]
+			if a == nil {
+				a = &acc{}
+				byFamily[ep.Family] = a
+			}
+			a.p50Weighted += *ep.LatencyP50MS * float64(ep.LatencySamples)
+			if ep.LatencyP95MS != nil {
+				a.p95Weighted += *ep.LatencyP95MS * float64(ep.LatencySamples)
+			}
+			a.samples += ep.LatencySamples
+		}
+	}
+	build := func(family string) *PublicAnalysisFamilyLatency {
+		a := byFamily[family]
+		if a == nil || a.samples == 0 {
+			return nil
+		}
+		p50 := a.p50Weighted / float64(a.samples)
+		out := &PublicAnalysisFamilyLatency{LatencyP50MS: &p50, LatencySamples: a.samples}
+		if a.p95Weighted > 0 {
+			p95 := a.p95Weighted / float64(a.samples)
+			out.LatencyP95MS = &p95
+		}
+		return out
+	}
+	return build("ipv4"), build("ipv6")
 }
 
 // ── endpoint detail ────────────────────────────────────────────────────────────

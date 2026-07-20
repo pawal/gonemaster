@@ -160,3 +160,37 @@ func TestNameserverViewRoundTripPreservesRosters(t *testing.T) {
 		}
 	}
 }
+
+// TestNameserverDetailPerFamilyLatency proves the detail handler splits a
+// dual-stack nameserver's latency into IPv4 and IPv6 from its per-address
+// endpoints (v4 endpoint at 10ms, v6 at 50ms).
+func TestNameserverDetailPerFamilyLatency(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+	f.seedEndpoint("run-a", "a.example", "ns.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24", 10)
+	f.seedEndpoint("run-b", "b.example", "ns.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32", 50)
+
+	got := decodeJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns.example")))
+	if got.LatencyIPv4 == nil || got.LatencyIPv4.LatencyP50MS == nil || *got.LatencyIPv4.LatencyP50MS != 10 {
+		t.Fatalf("IPv4 latency = %+v, want p50 10", got.LatencyIPv4)
+	}
+	if got.LatencyIPv6 == nil || got.LatencyIPv6.LatencyP50MS == nil || *got.LatencyIPv6.LatencyP50MS != 50 {
+		t.Fatalf("IPv6 latency = %+v, want p50 50", got.LatencyIPv6)
+	}
+}
+
+// TestNameserverDetailPerFamilyLatencySingleStack leaves the missing family nil
+// so the UI renders no comparison for a v4-only nameserver.
+func TestNameserverDetailPerFamilyLatencySingleStack(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+	f.seedEndpoint("run-a", "a.example", "ns4.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24", 10)
+
+	got := decodeJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns4.example")))
+	if got.LatencyIPv4 == nil || got.LatencyIPv4.LatencyP50MS == nil || *got.LatencyIPv4.LatencyP50MS != 10 {
+		t.Fatalf("IPv4 latency = %+v, want p50 10", got.LatencyIPv4)
+	}
+	if got.LatencyIPv6 != nil {
+		t.Fatalf("IPv6 latency should be nil for a v4-only nameserver, got %+v", got.LatencyIPv6)
+	}
+}

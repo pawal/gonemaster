@@ -23,6 +23,18 @@
     <h2>{data.tag}</h2>
     <p class="status-banner warn">No cohort resolved. Configure a public cohort to view tag details.</p>
   </section>
+{:else if data.notInSnapshot}
+  <section class="card">
+    <h2>{data.tag}</h2>
+    <p class="status-banner">
+      No findings with this tag in the selected snapshot{#if data.snapshot}
+        (<code>{data.snapshot}</code>){/if}. It may have cleared, or only appear
+      in other snapshots - pick another from the filter bar.
+    </p>
+    {#if data.history.length > 0}
+      <EntityHistorySparkline points={data.history} metric="domain_count" label="Domains over snapshots" />
+    {/if}
+  </section>
 {:else if data.error}
   <section class="card">
     <h2>{data.tag}</h2>

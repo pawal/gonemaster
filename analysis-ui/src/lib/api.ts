@@ -520,12 +520,38 @@ function buildURL(path: string, filter: AnalysisFilter = {}): string {
   return full;
 }
 
+// Thrown for a non-OK HTTP response. Carries the status and parsed error code
+// so callers can branch (e.g. treat a detail 404 as "absent in this snapshot").
+export class ApiError extends Error {
+  status: number;
+  code: string;
+  constructor(message: string, status: number, code: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+}
+
+function parseErrorCode(body: string): string {
+  try {
+    const parsed = JSON.parse(body);
+    return typeof parsed?.error?.code === "string" ? parsed.error.code : "";
+  } catch {
+    return "";
+  }
+}
+
 async function getJSON<T>(path: string, filter: AnalysisFilter, fetchFn: FetchLike): Promise<T> {
   const url = buildURL(path, filter);
   const response = await fetchFn(url);
   if (!response.ok) {
     const message = await response.text().catch(() => "");
-    throw new Error(`${path} → HTTP ${response.status}${message ? `: ${message.slice(0, 120)}` : ""}`);
+    throw new ApiError(
+      `${path} → HTTP ${response.status}${message ? `: ${message.slice(0, 120)}` : ""}`,
+      response.status,
+      parseErrorCode(message)
+    );
   }
   return (await response.json()) as T;
 }

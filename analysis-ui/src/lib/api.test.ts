@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
+  ApiError,
   NoSnapshotError,
   PUBLIC_BASE,
   buildQuery,
@@ -146,5 +147,51 @@ describe("analysis API client", () => {
   it("non-2xx responses surface a descriptive error", async () => {
     const { stub } = recorder({ error: { message: "boom" } }, false);
     await expect(getCatalog(stub)).rejects.toThrow(/HTTP 500/);
+  });
+
+  it("throws an ApiError carrying the status and parsed error code", async () => {
+    // The tag detail page relies on status === 404 to render a friendly
+    // "absent in this snapshot" note instead of a raw error banner, and on
+    // the code to distinguish that benign case from other failures. Keep the
+    // human-readable HTTP suffix in the message for the generic error path.
+    const body = JSON.stringify({ error: { code: "not_found", message: "tag not found in cohort" } });
+    const stub = vi.fn(async () => ({
+      ok: false,
+      status: 404,
+      statusText: "Not Found",
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => JSON.parse(body),
+      text: async () => body
+    })) as unknown as typeof fetch;
+
+    const err = await getCatalog(stub).then(
+      () => null,
+      (e) => e
+    );
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.status).toBe(404);
+    expect(err.code).toBe("not_found");
+    expect(err.message).toContain("HTTP 404");
+  });
+
+  it("leaves the error code empty when the body is not the expected JSON shape", async () => {
+    const stub = vi.fn(async () => ({
+      ok: false,
+      status: 502,
+      statusText: "Bad Gateway",
+      headers: new Headers({ "content-type": "text/plain" }),
+      json: async () => {
+        throw new Error("not json");
+      },
+      text: async () => "upstream exploded"
+    })) as unknown as typeof fetch;
+
+    const err = await getCatalog(stub).then(
+      () => null,
+      (e) => e
+    );
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.status).toBe(502);
+    expect(err.code).toBe("");
   });
 });

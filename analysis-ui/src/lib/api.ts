@@ -278,6 +278,8 @@ export type NameserverDetail = {
   addresses: string[];
   domains: string[];
   asns: number[];
+  latency_ipv4?: LatencyFields;
+  latency_ipv6?: LatencyFields;
 } & LatencyFields;
 
 export type ASNDetail = {

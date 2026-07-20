@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/svelte";
+import { render, screen, within } from "@testing-library/svelte";
 import type { NameserverDetail } from "$lib/api";
 import type { NameserverDetailPageData } from "./+page";
 
@@ -107,5 +107,33 @@ describe("nameserver detail latency stat", () => {
     // Domain-count line still draws; the latency line drops out honestly.
     expect(screen.getByText("Domains over snapshots")).toBeInTheDocument();
     expect(screen.queryByText("Median latency over snapshots")).toBeNull();
+  });
+
+  it("shows the IPv4/IPv6 comparison for a dual-stack nameserver", () => {
+    render(NameserverDetailPage, {
+      data: pageData({
+        ...base,
+        latency_ipv4: { latency_p50_ms: 12, latency_p95_ms: 20, latency_samples: 8 },
+        latency_ipv6: { latency_p50_ms: 40, latency_p95_ms: 55, latency_samples: 6 }
+      })
+    });
+    // Scope to the family block; "IPv4"/"IPv6" also label the address-count tiles.
+    const fam = within(
+      screen.getByText("Response time by family").closest(".family-latency") as HTMLElement
+    );
+    expect(fam.getByText("IPv4")).toBeInTheDocument();
+    expect(fam.getByText("IPv6")).toBeInTheDocument();
+    expect(fam.getByText("12 ms")).toBeInTheDocument();
+    expect(fam.getByText("40 ms")).toBeInTheDocument();
+  });
+
+  it("omits the family comparison when the nameserver is single-stack", () => {
+    render(NameserverDetailPage, {
+      data: pageData({
+        ...base,
+        latency_ipv4: { latency_p50_ms: 12, latency_samples: 8 }
+      })
+    });
+    expect(screen.queryByText("Response time by family")).toBeNull();
   });
 });

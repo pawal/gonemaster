@@ -17,6 +17,24 @@
     const decoded = idnToUnicode(name);
     return decoded !== name ? decoded : null;
   }
+
+  // Two bars scaled to the slower family; only for dual-stack nameservers.
+  const familyBars = $derived.by(() => {
+    const v4 = data.detail?.latency_ipv4;
+    const v6 = data.detail?.latency_ipv6;
+    if (v4?.latency_p50_ms == null || v6?.latency_p50_ms == null) return null;
+    const max = Math.max(v4.latency_p50_ms, v6.latency_p50_ms) || 1;
+    const row = (family: string, p50: number, p95?: number) => ({
+      family,
+      p50,
+      p95: p95 ?? null,
+      pct: Math.max(4, Math.round((p50 / max) * 100))
+    });
+    return [
+      row("IPv4", v4.latency_p50_ms, v4.latency_p95_ms),
+      row("IPv6", v6.latency_p50_ms, v6.latency_p95_ms)
+    ];
+  });
 </script>
 
 <nav class="breadcrumbs" aria-label="Breadcrumb">
@@ -61,6 +79,26 @@
       <EntityHistorySparkline points={data.history} metric="domain_count" label="Domains over snapshots" />
       <EntityHistorySparkline points={data.history} metric="latency_p50_ms" label="Median latency over snapshots" />
     </div>
+
+    {#if familyBars}
+      <div class="family-latency">
+        <h3 class="family-latency-title">Response time by family</h3>
+        <ol class="family-bars">
+          {#each familyBars as row (row.family)}
+            <li class="family-bar-row">
+              <span class="family-label">{row.family}</span>
+              <span class="family-bar-track" aria-hidden="true">
+                <span class="family-bar" style:width="{row.pct}%"></span>
+              </span>
+              <span class="family-val">
+                {formatMs(row.p50)}
+                {#if row.p95 !== null}<span class="family-p95">p95 {formatMs(row.p95)}</span>{/if}
+              </span>
+            </li>
+          {/each}
+        </ol>
+      </div>
+    {/if}
   </section>
 
   <section class="card">
@@ -142,6 +180,63 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
+  }
+
+  .family-latency {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    margin-top: var(--space-4);
+  }
+  .family-latency-title {
+    margin: 0;
+    font-size: var(--text-sm);
+    color: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .family-bars {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    grid-template-columns: 3.5rem 1fr auto;
+    column-gap: var(--space-3);
+    row-gap: 6px;
+    align-items: center;
+    max-width: 32rem;
+  }
+  .family-bar-row {
+    display: contents;
+  }
+  .family-label {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+  }
+  .family-bar-track {
+    display: block;
+    width: 100%;
+    height: 10px;
+    background: var(--surface-2);
+    border-radius: 5px;
+    overflow: hidden;
+  }
+  .family-bar {
+    display: block;
+    height: 100%;
+    border-radius: 5px;
+    background: var(--accent-2);
+  }
+  .family-val {
+    font-family: var(--mono);
+    font-size: var(--text-sm);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .family-p95 {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    margin-left: 6px;
   }
 
   .chip-list {

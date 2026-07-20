@@ -65,6 +65,15 @@ export function tagHref(base: string, tag: string, query = ""): string {
   return `${base}/tags/${encodeURIComponent(tag)}${query}`;
 }
 
+// Query that pins a snapshot-scoped detail page to one cohort snapshot.
+export function scopedQuery(datasetTag: string | null, snapshot: string): string {
+  const params = new URLSearchParams();
+  if (datasetTag) params.set("dataset_tag", datasetTag);
+  if (snapshot) params.set("snapshot", snapshot);
+  const q = params.toString();
+  return q ? `?${q}` : "";
+}
+
 // domainsSeverityHref links to the domains list filtered by an exact
 // worst_level bucket. Used by the overview's health bar so every segment
 // deep-links into the matching subset without losing the cohort scope.

@@ -5,7 +5,7 @@
   import FilterBar from "$lib/FilterBar.svelte";
   import GradeChip from "$lib/GradeChip.svelte";
   import TagChip from "$lib/chips/TagChip.svelte";
-  import { domainHref } from "$lib/entityLinks";
+  import { domainHref, scopedQuery } from "$lib/entityLinks";
   import { snapshotOptionLabel, levelTone, formatCount } from "$lib/format";
   import { downloadCSV, type ExportColumn } from "$lib/exporters";
   import {
@@ -103,11 +103,13 @@
   // Open the domain detail in the "to" snapshot's context, keeping the cohort
   // scope so the page resolves the right materialized rows.
   function domainLink(domain: string): string {
-    const params = new URLSearchParams();
-    if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
-    if (data.toSlug) params.set("snapshot", data.toSlug);
-    const q = params.toString();
-    return domainHref(base, domain, q ? `?${q}` : "");
+    return domainHref(base, domain, scopedQuery(data.datasetTag, data.toSlug));
+  }
+
+  // Tag detail is snapshot-scoped: a cleared tag exists only in "from",
+  // appeared/changed tags in "to". Pin the side where its view row exists.
+  function tagLinkQuery(side: "from" | "to"): string {
+    return scopedQuery(data.datasetTag, side === "from" ? data.fromSlug : data.toSlug);
   }
 
   // Discrete intensity + direction class for a transition cell, avoiding a
@@ -380,7 +382,7 @@
           {#each entries as e (e.tag)}
             {@const lvl = showFrom ? e.from_level : e.to_level}
             <tr>
-              <td class="row-ident"><TagChip tag={e.tag} /></td>
+              <td class="row-ident"><TagChip tag={e.tag} query={tagLinkQuery(showFrom ? "from" : "to")} /></td>
               <td>{#if lvl}<span class="level level-{levelTone(lvl)}">{lvl}</span>{/if}</td>
               <td class="col-num">{signedCount(e.domain_delta)}</td>
             </tr>
@@ -415,7 +417,7 @@
             <tbody>
               {#each data.tagDiff.level_changed as e (e.tag)}
                 <tr>
-                  <td class="row-ident"><TagChip tag={e.tag} /></td>
+                  <td class="row-ident"><TagChip tag={e.tag} query={tagLinkQuery("to")} /></td>
                   <td>
                     <span class="pair">
                       <span class="level level-{levelTone(e.from_level)}">{e.from_level ?? "-"}</span>

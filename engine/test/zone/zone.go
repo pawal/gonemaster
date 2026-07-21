@@ -1057,7 +1057,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := mxOutcome{ip: ns.Address.String()}
 
-				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "SOA", "MX"); err != nil {
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "MX"); err != nil {
 					return err
 				} else if disabled {
 					outcome.disabled = true
@@ -1065,12 +1065,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
-				p1, _ := ns.QueryWithOptions(ctx, z.Name.String(), "SOA", nil)
-				if p1.Msg == nil || p1.Rcode() != "NOERROR" || !p1.AA() || !p1.HasRRsOfTypeForName("SOA", z.Name) {
-					outcomes[i] = outcome
-					return nil
-				}
-
+				// Query MX directly; there is no SOA precondition.
 				outcome.checked = true
 				usevc := false
 				fallback := false

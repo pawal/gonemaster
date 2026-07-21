@@ -1744,7 +1744,7 @@
         {
           "tag": "Z13_SPF_LOOKUP_COUNT_EXCEEDED",
           "file": "engine/test/zone/zone.go",
-          "line": 1839,
+          "line": 1834,
           "shape": "unknown"
         }
       ]
@@ -1790,7 +1790,7 @@
         {
           "tag": "Z13_SPF_LOOKUP_LOOP",
           "file": "engine/test/zone/zone.go",
-          "line": 1811,
+          "line": 1806,
           "shape": "unknown"
         }
       ]
@@ -1841,31 +1841,31 @@
         {
           "tag": "Z09_INCONSISTENT_MX_DATA",
           "file": "engine/test/zone/zone.go",
-          "line": 1204,
+          "line": 1199,
           "shape": "unknown"
         },
         {
           "tag": "Z09_MX_DATA",
           "file": "engine/test/zone/zone.go",
-          "line": 1249,
+          "line": 1244,
           "shape": "unknown"
         },
         {
           "tag": "Z09_NON_AUTH_MX_RESPONSE",
           "file": "engine/test/zone/zone.go",
-          "line": 1160,
+          "line": 1155,
           "shape": "unknown"
         },
         {
           "tag": "Z09_NO_RESPONSE_MX_QUERY",
           "file": "engine/test/zone/zone.go",
-          "line": 1140,
+          "line": 1135,
           "shape": "unknown"
         },
         {
           "tag": "Z09_UNEXPECTED_RCODE_MX",
           "file": "engine/test/zone/zone.go",
-          "line": 1151,
+          "line": 1146,
           "shape": "unknown"
         }
       ]
@@ -3008,13 +3008,13 @@
         {
           "tag": "Z13_SPF_MACRO_TARGET",
           "file": "engine/test/zone/zone.go",
-          "line": 1820,
+          "line": 1815,
           "shape": "unknown"
         },
         {
           "tag": "Z13_SPF_RECURSIVE_ERROR",
           "file": "engine/test/zone/zone.go",
-          "line": 1829,
+          "line": 1824,
           "shape": "unknown"
         }
       ]
@@ -3316,7 +3316,7 @@
     {
       "tag": "APEX_DNAME",
       "file": "engine/test/zone/zone.go",
-      "line": 1340,
+      "line": 1335,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3520,13 +3520,13 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 2026,
+      "line": 2021,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 2050,
+      "line": 2045,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3610,13 +3610,13 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 2016,
+      "line": 2011,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/zone/zone.go",
-      "line": 2040,
+      "line": 2035,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3658,7 +3658,7 @@
     {
       "tag": "MULTIPLE_SOA",
       "file": "engine/test/zone/zone.go",
-      "line": 1314,
+      "line": 1309,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"count\": len(records),\n})"
     },
     {
@@ -3784,7 +3784,7 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/zone/zone.go",
-      "line": 1305,
+      "line": 1300,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3856,7 +3856,7 @@
     {
       "tag": "NO_SOA_IN_RESPONSE",
       "file": "engine/test/zone/zone.go",
-      "line": 1346,
+      "line": 1341,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3898,7 +3898,7 @@
     {
       "tag": "SOA_AND_CNAME",
       "file": "engine/test/zone/zone.go",
-      "line": 1333,
+      "line": 1328,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3922,7 +3922,7 @@
     {
       "tag": "WRONG_SOA",
       "file": "engine/test/zone/zone.go",
-      "line": 1323,
+      "line": 1318,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"owner\":\towner,\n\t\"query_name\":\texpected,\n})"
     },
     {
@@ -3952,31 +3952,31 @@
     {
       "tag": "Z12_MULTIPLE_CSYNC",
       "file": "engine/test/zone/zone.go",
-      "line": 1660,
+      "line": 1655,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"count\": len(outcome.csyncRRs),\n})"
     },
     {
       "tag": "Z12_SERIAL_MISMATCH",
       "file": "engine/test/zone/zone.go",
-      "line": 1673,
+      "line": 1668,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"csync_serial\":\tcsync.CSYNC.Serial,\n\t\"soa_serial\":\toutcome.soaSerial,\n})"
     },
     {
       "tag": "Z14_DUPLICATE_SCHEME_HASH",
       "file": "engine/test/zone/zone.go",
-      "line": 2683,
+      "line": 2678,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"scheme\":\tk.scheme,\n\t\"hash\":\t\tk.hash,\n})"
     },
     {
       "tag": "Z14_SERIAL_MISMATCH",
       "file": "engine/test/zone/zone.go",
-      "line": 2714,
+      "line": 2709,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"zonemd_serial\":\tr.serial,\n\t\"soa_serial\":\t\toutcome.soaSerial,\n})"
     },
     {
       "tag": "Z14_UNSUPPORTED_HASH",
       "file": "engine/test/zone/zone.go",
-      "line": 2698,
+      "line": 2693,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"hash\": r.hash,\n})"
     },
     {

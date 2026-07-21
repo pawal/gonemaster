@@ -2146,16 +2146,45 @@ func TestZone09NoServersMXResponse(t *testing.T) {
 	}
 }
 
-// TestZone09NoServersMXResponseSkippedWhenSOAFails verifies the aggregate tag
-// is not emitted when no server passed SOA gating (no MX query was made).
-func TestZone09NoServersMXResponseSkippedWhenSOAFails(t *testing.T) {
+// TestZone09NoServersMXResponseSkippedWithoutServers verifies the aggregate tag
+// is not emitted when there is no nameserver to query at all.
+func TestZone09NoServersMXResponseSkippedWithoutServers(t *testing.T) {
 	ctx := setupTest(t)
 
 	orig := authoritativeNS
 	t.Cleanup(func() { authoritativeNS = orig })
 
-	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ *ens.QueryOptions) packet.Packet {
-		return packet.Packet{}
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return nil, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone09(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+	if hasEntryTag(entries, "Z09_NO_SERVERS_MX_RESPONSE") {
+		t.Fatalf("no servers to query; Z09_NO_SERVERS_MX_RESPONSE must not fire, got %v", entryTags(entries))
+	}
+}
+
+// TestZone09EvaluatesMXWithoutSOA verifies the MX query has no SOA precondition:
+// a server that does not answer SOA at all but returns MX data still produces
+// MX findings. A reintroduced SOA gate would skip this server and drop the tag.
+func TestZone09EvaluatesMXWithoutSOA(t *testing.T) {
+	ctx := setupTest(t)
+
+	orig := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = orig })
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "MX":
+			return mxPacket("example.com", 300, mxRR{10, "mail.example."})
+		default:
+			// No SOA (or anything else) is answered.
+			return packet.Packet{}
+		}
 	})
 	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns}, nil
@@ -2166,7 +2195,7 @@ func TestZone09NoServersMXResponseSkippedWhenSOAFails(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone09: %v", err)
 	}
-	if hasEntryTag(entries, "Z09_NO_SERVERS_MX_RESPONSE") {
-		t.Fatalf("no server passed SOA gating; Z09_NO_SERVERS_MX_RESPONSE must not fire, got %v", entryTags(entries))
+	if !hasEntryTag(entries, "Z09_MX_DATA") {
+		t.Fatalf("expected Z09_MX_DATA without a SOA precondition, got %v", entryTags(entries))
 	}
 }

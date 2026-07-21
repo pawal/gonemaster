@@ -10,7 +10,7 @@ Status: Final
   - A `zone.Zone` object is available.
 - Required inputs:
   - Nameserver addresses from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
-  - SOA and MX responses per nameserver.
+  - MX responses per nameserver.
 - Profile/config knobs that affect behavior:
   - `resolver.defaults.parallel`: parallel nameserver query fanout.
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped.
@@ -20,8 +20,7 @@ Status: Final
 2. Collect nameservers from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate probing list by IP address, and keep a name-to-IP grouping view for later reporting.
 3. For each unique nameserver IP (parallelized):
    - Skip disabled transports.
-   - Query apex `SOA`; continue only when response exists, `RCODE=NOERROR`, `AA=true`, and SOA answer exists.
-   - Query apex `MX` over UDP with `fallback=false`; if truncated, retry with TCP (`usevc=true`, `fallback=false`).
+   - Query apex `MX` directly over UDP with `fallback=false`; if truncated, retry with TCP (`usevc=true`, `fallback=false`). There is no SOA precondition.
    - Classify outcome into one bucket:
      - no response;
      - unexpected RCODE;
@@ -61,8 +60,8 @@ Status: Final
    - If zone is root, TLD, or under `.arpa`: emit `Z09_NO_MX_FOUND_OR_EXPECTED`.
    - Otherwise: emit `Z09_MISSING_MAIL_TARGET`.
 8. If both the MX RRset and “no MX” buckets are empty but at least one
-   nameserver passed SOA gating, emit `Z09_NO_SERVERS_MX_RESPONSE` (no server
-   returned a usable MX response).
+   non-disabled nameserver was queried, emit `Z09_NO_SERVERS_MX_RESPONSE` (no
+   server returned a usable MX response).
 9. Emit `TEST_CASE_END`.
 
 ### Per-NS MX Probe and Aggregation (steps 2-8)
@@ -73,12 +72,9 @@ ns list = ZoneNameservers; dedupe by IP (uniqueServersByIP)
 
 For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):
 
-   transport disabled for SOA/MX -> IPV4_DISABLED / IPV6_DISABLED, skip
-   query SOA at z.Name
-    +- no resp / RCODE != NOERROR / !AA / no SOA for z.Name -> skip silently
-    +- otherwise                                            -> proceed (checked=true)
+   transport disabled for MX -> IPV4_DISABLED / IPV6_DISABLED, skip
 
-   query MX at z.Name (UseVC=false, Fallback=false)
+   query MX at z.Name (UseVC=false, Fallback=false); no SOA precondition
       resp.TC() -> retry with UseVC=true
     +- resp.Msg == nil                              -> noResponseMX[ip]
     +- RCODE != NOERROR                             -> unexpectedRcodeMX[rcode][ip]
@@ -122,7 +118,7 @@ mxSet empty AND noMXSet non-empty:
    otherwise
       -> Z09_MISSING_MAIL_TARGET (no args)
 
-mxSet empty AND noMXSet empty AND at least one server passed SOA gating:
+mxSet empty AND noMXSet empty AND at least one non-disabled server queried:
    -> Z09_NO_SERVERS_MX_RESPONSE (no args)
 
 emit TEST_CASE_END

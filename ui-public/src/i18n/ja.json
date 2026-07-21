@@ -601,6 +601,8 @@
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.desc": "あるネームサーバーが、「authoritative answer」フラグを設定せずにお客様のゾーンのMXデータを返しました。AAフラグを検証するリゾルバーはその応答を信頼せず、送信側メールサーバーは別の場所に再試行するか、配信を完全に拒否する場合があります。",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.header": "MXクエリに応答がない",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.desc": "あるネームサーバーが、お客様のゾーンのMXレコードを求めるクエリに応答しませんでした。たまたまこのネームサーバーに最初に問い合わせる送信側メールサーバーはタイムアウトに遭遇し、お客様のドメイン宛てのメール配信を遅延させたり失敗させたりする場合があります。",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.header": "どのネームサーバーからも有効なMX応答がない",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.desc": "お客様のゾーンのすべてのネームサーバーはSOAクエリには応答しましたが、いずれもMXクエリに有効な応答を返さなかったため、お客様のドメインのメール配送先をまったく判断できませんでした。送信側メールサーバーはメッセージの配信先を見つけられず、メールは遅延したり不達になったりする可能性があります。",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.header": "ヌルMXが通常のMXと併せて公開されている",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.desc": "お客様のゾーンは、ヌルMXレコード（preference 0の`\".\"`で、「このドメインはメールを受け付けない」という意味）を他の通常のMXレコードと併せて公開しています。この2つは互いに矛盾しており、メールサーバーは配信すべきかバウンスすべきか判断できず、ほとんどのサーバーはこれを設定エラーとして扱い配信を拒否します。",
   "pub.tag.zone.Z09_TLD_EMAIL_DOMAIN.header": "TLD頂点にMXレコードがある",

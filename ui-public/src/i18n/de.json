@@ -601,6 +601,8 @@
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.desc": "Ein Nameserver hat MX-Daten für die Zone ohne gesetztes \"Authoritative Answer\"-Flag zurückgegeben. Resolver, die das AA-Flag prüfen, werden der Antwort nicht vertrauen, und sendende Mailserver können anderswo erneut anfragen oder die Zustellung ganz ablehnen.",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.header": "Keine Antwort auf MX-Abfrage",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.desc": "Ein Nameserver hat auf eine Abfrage nach den MX-Records der Zone nicht geantwortet. Sendende Mailserver, die diesen Nameserver zuerst anfragen, werden Timeouts sehen und können Mail an die Domain verzögert oder gar nicht zustellen.",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.header": "Keine brauchbare MX-Antwort von einem Nameserver",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.desc": "Alle Nameserver Ihrer Zone haben die SOA-Abfrage beantwortet, aber keiner lieferte eine brauchbare Antwort auf die MX-Abfrage, sodass sich das Mailrouting für Ihre Domain überhaupt nicht bestimmen ließ. Sendende Mailserver können nicht feststellen, wohin Nachrichten zugestellt werden sollen, und Mail wird wahrscheinlich verzögert oder abgewiesen.",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.header": "Null-MX neben normalem MX veröffentlicht",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.desc": "Die Zone veröffentlicht einen Null-MX-Record (\".\", Präferenz 0, Bedeutung: \"Diese Domain akzeptiert keine Mail\") zusammen mit anderen regulären MX-Records. Die beiden widersprechen sich - Mailserver können nicht erkennen, ob Zustellung oder Ablehnung gewünscht ist - und die meisten behandeln dies als Konfigurationsfehler und verweigern die Zustellung.",
   "pub.tag.zone.Z09_TLD_EMAIL_DOMAIN.header": "MX-Record am TLD-Apex",

@@ -172,6 +172,14 @@ Description:
 
 A nameserver did not answer a query for your zone's MX records. Sending mail servers that happen to ask this nameserver first will see timeouts and may delay or fail to deliver mail aimed at your domain.
 
+## Tag Z09_NO_SERVERS_MX_RESPONSE
+
+Header: No usable MX response from any nameserver
+
+Description:
+
+Every nameserver for your zone answered the SOA query but none returned a usable answer to the MX query, so no mail routing for your domain could be determined at all. Sending mail servers cannot find where to deliver messages, and mail is likely to be delayed or bounced.
+
 ## Tag Z09_NULL_MX_WITH_OTHER_MX
 
 Header: Null MX published alongside normal MX

@@ -565,6 +565,8 @@
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.desc": "Jmenný server vrátil pro vaši zónu data MX bez nastaveného příznaku \"autoritativní odpovědi\". Resolvery, které ověřují příznak AA, odpovědi nedůvěřují a odesílající poštovní servery mohou zkusit jiný server nebo doručení rovnou odmítnout.",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.header": "Žádná odpověď na dotaz MX",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.desc": "Jmenný server neodpověděl na dotaz na záznamy MX vaší zóny. Odesílající poštovní servery, které se zrovna zeptají tohoto jmenného serveru jako prvního, narazí na vypršení časového limitu a mohou doručení pošty směřující na vaši doménu zpozdit nebo nedokončit.",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.header": "Žádná použitelná odpověď MX od žádného jmenného serveru",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.desc": "Všechny jmenné servery vaší zóny odpověděly na dotaz SOA, ale žádný nevrátil použitelnou odpověď na dotaz MX, takže vůbec nebylo možné určit směrování pošty pro vaši doménu. Odesílající poštovní servery nemohou najít, kam doručit zprávy, a pošta bude pravděpodobně zpožděna nebo odmítnuta.",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.header": "Null MX zveřejněn společně s běžným MX",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.desc": "Vaše zóna zveřejňuje záznam null MX (`\".\"` s preferencí 0, což znamená \"tato doména nepřijímá poštu\") společně s dalšími běžnými záznamy MX. Tyto dva si protiřečí - poštovní servery nedokáží určit, zda doručit nebo vrátit zprávu - a většina je bude považovat za konfigurační chybu a doručení odmítne.",
   "pub.tag.zone.Z09_TLD_EMAIL_DOMAIN.header": "Záznam MX v apexu TLD",

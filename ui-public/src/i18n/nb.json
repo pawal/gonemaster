@@ -371,6 +371,8 @@
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.desc": "En navnetjener returnerte MX-data for sonen din uten at flagget for autoritativt svar var satt. Resolvere som validerer AA-flagget, vil ikke stole på svaret, og avsendende e-postservere kan prøve på nytt et annet sted eller avvise leveringen direkte.",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.header": "Ingen svar på MX-spørring",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.desc": "En navnetjener svarte ikke på en spørring etter MX-postene til sonen din. Avsendende e-postservere som tilfeldigvis spør denne navnetjeneren først, vil oppleve tidsavbrudd og kan forsinke eller mislykkes i å levere e-post ment for domenet ditt.",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.header": "Ingen brukbar MX-respons fra noen navnetjener",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.desc": "Alle navnetjenerne for sonen din svarte på SOA-spørringen, men ingen ga et brukbart svar på MX-spørringen, så det var umulig å avgjøre hvordan e-post til domenet ditt skal rutes. Avsendende e-postservere finner ikke hvor meldinger skal leveres, og e-post vil sannsynligvis bli forsinket eller returnert.",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.header": "Null MX publisert ved siden av vanlig MX",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.desc": "Sonen din publiserer en null MX-post (\".\" med preferanse 0, som betyr \"dette domenet tar ikke imot e-post\") sammen med andre vanlige MX-poster. De to motsier hverandre - e-postservere kan ikke avgjøre om de skal levere eller returnere meldingen - og de fleste vil behandle det som en konfigurasjonsfeil og nekte levering.",
   "pub.tag.zone.Z09_TLD_EMAIL_DOMAIN.header": "MX-post ved TLD-apex",

@@ -371,6 +371,8 @@
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.desc": "En navneserver returnerede MX-data for din zone uden at flaget for autoritativt svar var sat. Resolvere, der validerer AA-flaget, vil ikke stole på svaret, og afsendende mailservere kan forsøge andre steder eller afvise afleveringen helt.",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.header": "Intet svar på MX-forespørgsel",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.desc": "En navneserver svarede ikke på en forespørgsel om din zones MX-records. Afsendende mailservere, der tilfældigvis spørger denne navneserver først, vil opleve timeouts og kan forsinke eller mislykkes med at aflevere mail til dit domæne.",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.header": "Intet brugbart MX-svar fra nogen navneserver",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.desc": "Alle navneservere for din zone svarede på SOA-forespørgslen, men ingen returnerede et brugbart svar på MX-forespørgslen, så det kunne slet ikke afgøres, hvordan mail til dit domæne skal dirigeres. Afsendende mailservere kan ikke finde ud af, hvor beskeder skal afleveres, og mail vil sandsynligvis blive forsinket eller afvist.",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.header": "Null-MX udgivet sammen med almindelig MX",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.desc": "Din zone udgiver en null-MX-record (\".\" med preference 0, hvilket betyder \"dette domæne accepterer ikke mail\") sammen med andre almindelige MX-records. De to modsiger hinanden - mailservere kan ikke afgøre, om de skal aflevere eller afvise - og de fleste vil betragte det som en konfigurationsfejl og nægte aflevering.",
   "pub.tag.zone.Z09_TLD_EMAIL_DOMAIN.header": "MX-record ved TLD-apex",

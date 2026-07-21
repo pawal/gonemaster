@@ -371,6 +371,8 @@
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.desc": "Imenski strežnik je vrnil podatke MX za vašo cono brez nastavljene zastavice \"avtoritativni odgovor\". Razreševalniki, ki preverjajo zastavico AA, odgovoru ne bodo zaupali, pošiljajoči poštni strežniki pa lahko poskus ponovijo drugje ali dostavo naravnost zavrnejo.",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.header": "Ni odgovora na poizvedbo MX",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.desc": "Imenski strežnik ni odgovoril na poizvedbo za zapise MX vaše cone. Pošiljajoči poštni strežniki, ki po naključju najprej vprašajo ta imenski strežnik, bodo naleteli na iztek časa in lahko zakasnijo ali ne uspejo dostaviti pošte, namenjene vaši domeni.",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.header": "Noben imenski strežnik ni vrnil uporabnega odgovora MX",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.desc": "Vsi imenski strežniki vaše cone so odgovorili na poizvedbo SOA, vendar nobeden ni vrnil uporabnega odgovora na poizvedbo MX, zato usmerjanja pošte za vašo domeno sploh ni bilo mogoče določiti. Pošiljajoči poštni strežniki ne morejo najti, kam dostaviti sporočila, pošta pa bo verjetno zakasnjena ali zavrnjena.",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.header": "Null MX objavljen poleg običajnega MX",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.desc": "Vaša cona objavlja zapis null MX (\".\" s prednostjo 0, kar pomeni \"ta domena ne sprejema pošte\") skupaj z drugimi običajnimi zapisi MX. Oba si nasprotujeta - poštni strežniki ne morejo ugotoviti, ali naj dostavijo ali zavrnejo - zato bo večina to obravnavala kot napako v nastavitvah in dostavo zavrnila.",
   "pub.tag.zone.Z09_TLD_EMAIL_DOMAIN.header": "Zapis MX na vrhu TLD",

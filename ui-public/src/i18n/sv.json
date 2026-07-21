@@ -601,6 +601,8 @@
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.desc": "En namnserver returnerade MX-data för din zon utan att flaggan för \"auktoritativt svar\" var satt. Resolvers som validerar AA-flaggan kommer inte att lita på svaret, och sändande e-postservrar kan göra nya försök på annat håll eller avvisa leveransen direkt.",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.header": "Inget svar på MX-fråga",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.desc": "En namnserver svarade inte på en fråga efter din zons MX-poster. Sändande e-postservrar som råkar fråga denna namnserver först kommer att se timeouter och kan fördröja eller misslyckas med att leverera e-post riktad till din domän.",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.header": "Inget användbart MX-svar från någon namnserver",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.desc": "Alla namnservrar för din zon svarade på SOA-frågan men ingen gav ett användbart svar på MX-frågan, så det gick inte alls att avgöra hur e-post till din domän ska dirigeras. Sändande e-postservrar kan inte hitta vart meddelanden ska levereras, och e-post kommer sannolikt att fördröjas eller studsa.",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.header": "Null-MX publicerad tillsammans med normalt MX",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.desc": "Din zon publicerar en null-MX-post (`\".\"` med preferens 0, vilket betyder \"denna domän tar inte emot e-post\") tillsammans med andra vanliga MX-poster. De två motsäger varandra - e-postservrar kan inte avgöra om de ska leverera eller studsa - och de flesta behandlar det som ett konfigurationsfel och vägrar leverans.",
   "pub.tag.zone.Z09_TLD_EMAIL_DOMAIN.header": "MX-post i TLD-apex",

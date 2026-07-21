@@ -559,6 +559,8 @@
   "pub.tag.zone.Z09_NON_AUTH_MX_RESPONSE.desc": "A nameserver returned MX data for your zone without the \"authoritative answer\" flag set. Resolvers that validate the AA flag will not trust the answer, and sending mail servers may retry elsewhere or reject the delivery outright.",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.header": "No response to MX query",
   "pub.tag.zone.Z09_NO_RESPONSE_MX_QUERY.desc": "A nameserver did not answer a query for your zone's MX records. Sending mail servers that happen to ask this nameserver first will see timeouts and may delay or fail to deliver mail aimed at your domain.",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.header": "No usable MX response from any nameserver",
+  "pub.tag.zone.Z09_NO_SERVERS_MX_RESPONSE.desc": "Every nameserver for your zone answered the SOA query but none returned a usable answer to the MX query, so no mail routing for your domain could be determined at all. Sending mail servers cannot find where to deliver messages, and mail is likely to be delayed or bounced.",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.header": "Null MX published alongside normal MX",
   "pub.tag.zone.Z09_NULL_MX_WITH_OTHER_MX.desc": "Your zone publishes a null MX record (`\".\"` with preference 0, meaning \"this domain does not accept mail\") along with other regular MX records. The two contradict each other - mail servers cannot tell whether to deliver or bounce - and most will treat it as a configuration error and refuse delivery.",
   "pub.tag.zone.Z09_TLD_EMAIL_DOMAIN.header": "MX record at TLD apex",

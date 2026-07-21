@@ -291,6 +291,7 @@ func Metadata() map[string][]string {
 			"TEST_CASE_START",
 		},
 		"zone09": {
+			"Z09_ARPA_EMAIL_DOMAIN",
 			"Z09_INCONSISTENT_MX",
 			"Z09_INCONSISTENT_MX_DATA",
 			"Z09_MISSING_MAIL_TARGET",
@@ -298,12 +299,15 @@ func Metadata() map[string][]string {
 			"Z09_MX_FOUND",
 			"Z09_NON_AUTH_MX_RESPONSE",
 			"Z09_NO_MX_FOUND",
+			"Z09_NO_MX_FOUND_OR_EXPECTED",
 			"Z09_NO_RESPONSE_MX_QUERY",
+			"Z09_NO_SERVERS_MX_RESPONSE",
 			"Z09_NULL_MX_NON_ZERO_PREF",
 			"Z09_NULL_MX_WITH_OTHER_MX",
 			"Z09_ROOT_EMAIL_DOMAIN",
 			"Z09_TLD_EMAIL_DOMAIN",
 			"Z09_UNEXPECTED_RCODE_MX",
+			"Z09_VALID_NULL_MX",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -1107,10 +1111,12 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		results = append(results, entries...)
 	}
 
+	checkedCount := 0
 	for _, outcome := range outcomes {
 		if outcome.disabled || !outcome.checked {
 			continue
 		}
+		checkedCount++
 		switch {
 		case outcome.noResponse:
 			noResponseMX = append(noResponseMX, outcome.ip)
@@ -1231,6 +1237,10 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 					if err := appendLog(ctx, &results, testcase, "Z09_TLD_EMAIL_DOMAIN", map[string]any{}); err != nil {
 						return results, err
 					}
+				} else if isArpaTree(z.Name) {
+					if err := appendLog(ctx, &results, testcase, "Z09_ARPA_EMAIL_DOMAIN", map[string]any{}); err != nil {
+						return results, err
+					}
 				} else {
 					args := map[string]any{
 						"mail_targets": mxExchangeList(mxSet[firstIP]),
@@ -1240,14 +1250,25 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 						return results, err
 					}
 				}
+			} else if !hasEntryTag(results, "Z09_NULL_MX_WITH_OTHER_MX") && !hasEntryTag(results, "Z09_NULL_MX_NON_ZERO_PREF") {
+				// A single Null MX with preference 0 is a valid "no mail" statement.
+				if err := appendLog(ctx, &results, testcase, "Z09_VALID_NULL_MX", map[string]any{}); err != nil {
+					return results, err
+				}
 			}
 		}
 	} else if len(noMXSet) > 0 {
-		name := strings.ToLower(z.Name.String())
-		if z.Name.String() != "." && !nextHigherIsRoot(z.Name) && !strings.HasSuffix(name, ".arpa") {
-			if err := appendLog(ctx, &results, testcase, "Z09_MISSING_MAIL_TARGET", map[string]any{}); err != nil {
+		if isNonMailDomain(z.Name) {
+			if err := appendLog(ctx, &results, testcase, "Z09_NO_MX_FOUND_OR_EXPECTED", map[string]any{}); err != nil {
 				return results, err
 			}
+		} else if err := appendLog(ctx, &results, testcase, "Z09_MISSING_MAIL_TARGET", map[string]any{}); err != nil {
+			return results, err
+		}
+	} else if checkedCount > 0 {
+		// Servers answered SOA but none returned a usable MX response.
+		if err := appendLog(ctx, &results, testcase, "Z09_NO_SERVERS_MX_RESPONSE", map[string]any{}); err != nil {
+			return results, err
 		}
 	}
 
@@ -2512,6 +2533,17 @@ func badSpfIPs(nsSpf map[string][]string) []string {
 func nextHigherIsRoot(name dnsname.Name) bool {
 	parent, ok := name.NextHigher()
 	return ok && parent.String() == "."
+}
+
+// isArpaTree reports whether name is inside the .arpa tree (excluding the arpa TLD itself).
+func isArpaTree(name dnsname.Name) bool {
+	return strings.HasSuffix(strings.ToLower(name.String()), ".arpa")
+}
+
+// isNonMailDomain reports whether a zone is not expected to host mail: the root,
+// a TLD, or a domain in the .arpa tree.
+func isNonMailDomain(name dnsname.Name) bool {
+	return name.String() == "." || nextHigherIsRoot(name) || isArpaTree(name)
 }
 
 // Zone14 runs the Zone14 test case (ZONEMD presence and RFC 8976 compliance).

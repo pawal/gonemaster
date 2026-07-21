@@ -555,6 +555,15 @@ func mxPacket(owner string, ttl uint32, rrs ...mxRR) packet.Packet {
 	return packet.Packet{Msg: msg}
 }
 
+// noMXPacket builds an authoritative NOERROR response with no MX records.
+func noMXPacket(owner string) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeMX)
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	return packet.Packet{Msg: msg}
+}
+
 // TestEncodeMXRRSetRDATA verifies the MX consistency key: it is built from
 // RDATA (preference + mail target) only, is independent of TTL and record
 // order, is case-insensitive on the target, and distinguishes genuine RDATA
@@ -2015,4 +2024,149 @@ func entryTags(entries []*logger.Entry) []string {
 		}
 	}
 	return tags
+}
+
+// runZone09 wires a single-nameserver zone09 run for a given zone name and MX
+// handler, and returns the emitted entries.
+func runZone09(t *testing.T, name string, mx func() packet.Packet) []*logger.Entry {
+	t.Helper()
+	ctx := setupTest(t)
+
+	orig := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = orig })
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		switch qtype {
+		case "SOA":
+			return soaPacket(name, 1, 1, 1, 1, 1)
+		case "MX":
+			return mx()
+		default:
+			return packet.Packet{}
+		}
+	})
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New(name)}
+	entries, err := Zone09(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+	return entries
+}
+
+// TestZone09ArpaEmailDomain verifies that a zone in the .arpa tree carrying a
+// non-null MX is flagged as an unexpected mail domain, not reported as ordinary
+// MX data.
+func TestZone09ArpaEmailDomain(t *testing.T) {
+	entries := runZone09(t, "in-addr.arpa", func() packet.Packet {
+		return mxPacket("in-addr.arpa", 300, mxRR{10, "mail.example."})
+	})
+	if !hasEntryTag(entries, "Z09_ARPA_EMAIL_DOMAIN") {
+		t.Fatalf("expected Z09_ARPA_EMAIL_DOMAIN, got %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "Z09_MX_DATA") {
+		t.Fatalf("arpa zone with MX must not emit Z09_MX_DATA, got %v", entryTags(entries))
+	}
+}
+
+// TestZone09NoMXFoundOrExpectedForNonMailDomain verifies that a non-mail domain
+// (here a TLD) with no MX gets the affirmative Z09_NO_MX_FOUND_OR_EXPECTED and
+// not the missing-target warning.
+func TestZone09NoMXFoundOrExpectedForNonMailDomain(t *testing.T) {
+	entries := runZone09(t, "example", func() packet.Packet {
+		return noMXPacket("example")
+	})
+	if !hasEntryTag(entries, "Z09_NO_MX_FOUND_OR_EXPECTED") {
+		t.Fatalf("expected Z09_NO_MX_FOUND_OR_EXPECTED, got %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "Z09_MISSING_MAIL_TARGET") {
+		t.Fatalf("non-mail domain must not emit Z09_MISSING_MAIL_TARGET, got %v", entryTags(entries))
+	}
+}
+
+// TestZone09MissingMailTargetForNormalDomain verifies an ordinary domain with
+// no MX still gets Z09_MISSING_MAIL_TARGET, not the non-mail-domain tag.
+func TestZone09MissingMailTargetForNormalDomain(t *testing.T) {
+	entries := runZone09(t, "example.com", func() packet.Packet {
+		return noMXPacket("example.com")
+	})
+	if !hasEntryTag(entries, "Z09_MISSING_MAIL_TARGET") {
+		t.Fatalf("expected Z09_MISSING_MAIL_TARGET, got %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "Z09_NO_MX_FOUND_OR_EXPECTED") {
+		t.Fatalf("normal domain must not emit Z09_NO_MX_FOUND_OR_EXPECTED, got %v", entryTags(entries))
+	}
+}
+
+// TestZone09ValidNullMX verifies that a single zero-preference null MX is
+// reported as a valid "no mail" statement and not as a problem or as MX data.
+func TestZone09ValidNullMX(t *testing.T) {
+	entries := runZone09(t, "example.com", func() packet.Packet {
+		return mxPacket("example.com", 300, mxRR{0, "."})
+	})
+	if !hasEntryTag(entries, "Z09_VALID_NULL_MX") {
+		t.Fatalf("expected Z09_VALID_NULL_MX, got %v", entryTags(entries))
+	}
+	for _, tag := range []string{"Z09_NULL_MX_WITH_OTHER_MX", "Z09_NULL_MX_NON_ZERO_PREF", "Z09_MX_DATA"} {
+		if hasEntryTag(entries, tag) {
+			t.Fatalf("valid null MX must not emit %s, got %v", tag, entryTags(entries))
+		}
+	}
+}
+
+// TestZone09ValidNullMXSuppressedWithNonZeroPref verifies that a null MX with a
+// non-zero preference is a problem, not a valid null MX.
+func TestZone09ValidNullMXSuppressedWithNonZeroPref(t *testing.T) {
+	entries := runZone09(t, "example.com", func() packet.Packet {
+		return mxPacket("example.com", 300, mxRR{10, "."})
+	})
+	if !hasEntryTag(entries, "Z09_NULL_MX_NON_ZERO_PREF") {
+		t.Fatalf("expected Z09_NULL_MX_NON_ZERO_PREF, got %v", entryTags(entries))
+	}
+	if hasEntryTag(entries, "Z09_VALID_NULL_MX") {
+		t.Fatalf("non-zero-preference null MX must not emit Z09_VALID_NULL_MX, got %v", entryTags(entries))
+	}
+}
+
+// TestZone09NoServersMXResponse verifies that when servers pass SOA gating but
+// return no usable MX response, the aggregate Z09_NO_SERVERS_MX_RESPONSE is
+// emitted alongside the per-server no-response tag.
+func TestZone09NoServersMXResponse(t *testing.T) {
+	entries := runZone09(t, "example.com", func() packet.Packet {
+		return packet.Packet{}
+	})
+	if !hasEntryTag(entries, "Z09_NO_SERVERS_MX_RESPONSE") {
+		t.Fatalf("expected Z09_NO_SERVERS_MX_RESPONSE, got %v", entryTags(entries))
+	}
+	if !hasEntryTag(entries, "Z09_NO_RESPONSE_MX_QUERY") {
+		t.Fatalf("expected Z09_NO_RESPONSE_MX_QUERY, got %v", entryTags(entries))
+	}
+}
+
+// TestZone09NoServersMXResponseSkippedWhenSOAFails verifies the aggregate tag
+// is not emitted when no server passed SOA gating (no MX query was made).
+func TestZone09NoServersMXResponseSkippedWhenSOAFails(t *testing.T) {
+	ctx := setupTest(t)
+
+	orig := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = orig })
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ *ens.QueryOptions) packet.Packet {
+		return packet.Packet{}
+	})
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	}
+
+	z := zonepkg.Zone{Name: dnsname.New("example.com")}
+	entries, err := Zone09(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+	if hasEntryTag(entries, "Z09_NO_SERVERS_MX_RESPONSE") {
+		t.Fatalf("no server passed SOA gating; Z09_NO_SERVERS_MX_RESPONSE must not fire, got %v", entryTags(entries))
+	}
 }

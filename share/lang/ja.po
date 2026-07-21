@@ -2038,6 +2038,22 @@ msgctxt "ZONE:Z09_TLD_EMAIL_DOMAIN"
 msgid "The zone is a TLD and has an unexpected MX RRset (non-Null MX)."
 msgstr "このゾーンは TLD であり、想定外の MX RRset (非 Null MX) があります。"
 
+msgctxt "ZONE:Z09_ARPA_EMAIL_DOMAIN"
+msgid "The zone is in the ARPA tree and has an unexpected MX RRset (non-Null MX)."
+msgstr "このゾーンは ARPA ツリーに属しており、想定外の MX RRset (非 Null MX) があります。"
+
+msgctxt "ZONE:Z09_NO_MX_FOUND_OR_EXPECTED"
+msgid "MX RRset was neither found nor expected for the zone."
+msgstr "このゾーンには MX RRset は見つからず、想定もされていません。"
+
+msgctxt "ZONE:Z09_NO_SERVERS_MX_RESPONSE"
+msgid "No server responds to MX query."
+msgstr "MX クエリに応答するサーバーがありません。"
+
+msgctxt "ZONE:Z09_VALID_NULL_MX"
+msgid "The zone has a valid Null MX record as the only MX record."
+msgstr "このゾーンには唯一の MX レコードとして有効な Null MX があります。"
+
 msgctxt "ZONE:Z09_UNEXPECTED_RCODE_MX"
 msgid ""
 "Unexpected RCODE value ({rcode}) on the MX query from name servers "

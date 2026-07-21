@@ -3894,6 +3894,27 @@ msgstr ""
 "La zone est un domaine de premier niveau et contient un ensemble "
 "d’enregistrements MX inattendu, différent de « null MX »."
 
+msgctxt "ZONE:Z09_ARPA_EMAIL_DOMAIN"
+msgid "The zone is in the ARPA tree and has an unexpected MX RRset (non-Null MX)."
+msgstr ""
+"Zone située dans l’arbre ARPA contenant un ensemble d’enregistrements MX "
+"inattendu, différent de « null MX »."
+
+msgctxt "ZONE:Z09_NO_MX_FOUND_OR_EXPECTED"
+msgid "MX RRset was neither found nor expected for the zone."
+msgstr ""
+"Aucun ensemble d’enregistrements MX n’a été trouvé ni attendu pour la zone."
+
+msgctxt "ZONE:Z09_NO_SERVERS_MX_RESPONSE"
+msgid "No server responds to MX query."
+msgstr "Aucun serveur ne répond à la requête MX."
+
+msgctxt "ZONE:Z09_VALID_NULL_MX"
+msgid "The zone has a valid Null MX record as the only MX record."
+msgstr ""
+"La zone possède un enregistrement « null MX » valide comme unique "
+"enregistrement MX."
+
 msgctxt "ZONE:Z09_UNEXPECTED_RCODE_MX"
 msgid ""
 "Unexpected RCODE value ({rcode}) on the MX query from name servers "

@@ -52,6 +52,7 @@ _Do not edit by hand - regenerate with the command above._
 | `Z01_MNAME_NOT_RESOLVE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_NO_RESPONSE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_UNEXPECTED_RCODE` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
+| `Z09_ARPA_EMAIL_DOMAIN` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_INCONSISTENT_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_INCONSISTENT_MX_DATA` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_MISSING_MAIL_TARGET` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
@@ -59,12 +60,15 @@ _Do not edit by hand - regenerate with the command above._
 | `Z09_MX_FOUND` | `INFO` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_NON_AUTH_MX_RESPONSE` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_NO_MX_FOUND` | `INFO` | [zone09](../tests/zone/zone09.md) | yes |
+| `Z09_NO_MX_FOUND_OR_EXPECTED` | `INFO` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_NO_RESPONSE_MX_QUERY` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
+| `Z09_NO_SERVERS_MX_RESPONSE` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_NULL_MX_NON_ZERO_PREF` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_NULL_MX_WITH_OTHER_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_ROOT_EMAIL_DOMAIN` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_TLD_EMAIL_DOMAIN` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_UNEXPECTED_RCODE_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
+| `Z09_VALID_NULL_MX` | `INFO` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z11_DIFFERENT_SPF_POLICIES_FOUND` | `NOTICE` | [zone11](../tests/zone/zone11.md) | yes |
 | `Z11_INCONSISTENT_SPF_POLICIES` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
 | `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN` | `NOTICE` | [zone11](../tests/zone/zone11.md) | yes |

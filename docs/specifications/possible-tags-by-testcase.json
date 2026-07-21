@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 82,
-    "unique_tag_count": 544
+    "unique_tag_count": 548
   },
   "modules": {
     "address": {
@@ -975,6 +975,7 @@
       "zone09": [
         "TEST_CASE_END",
         "TEST_CASE_START",
+        "Z09_ARPA_EMAIL_DOMAIN",
         "Z09_INCONSISTENT_MX",
         "Z09_INCONSISTENT_MX_DATA",
         "Z09_MISSING_MAIL_TARGET",
@@ -982,12 +983,15 @@
         "Z09_MX_FOUND",
         "Z09_NON_AUTH_MX_RESPONSE",
         "Z09_NO_MX_FOUND",
+        "Z09_NO_MX_FOUND_OR_EXPECTED",
         "Z09_NO_RESPONSE_MX_QUERY",
+        "Z09_NO_SERVERS_MX_RESPONSE",
         "Z09_NULL_MX_NON_ZERO_PREF",
         "Z09_NULL_MX_WITH_OTHER_MX",
         "Z09_ROOT_EMAIL_DOMAIN",
         "Z09_TLD_EMAIL_DOMAIN",
-        "Z09_UNEXPECTED_RCODE_MX"
+        "Z09_UNEXPECTED_RCODE_MX",
+        "Z09_VALID_NULL_MX"
       ],
       "zone10": [
         "APEX_DNAME",

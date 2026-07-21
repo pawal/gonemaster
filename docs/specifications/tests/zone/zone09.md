@@ -48,9 +48,9 @@ Status: Final
        - `Z09_NULL_MX_WITH_OTHER_MX` when `.` mailtarget is mixed with other MX RRs;
        - `Z09_NULL_MX_NON_ZERO_PREF` when null-MX preference is not zero;
      - if no null-MX:
-       - emit `Z09_ROOT_EMAIL_DOMAIN` for root zone;
-       - emit `Z09_TLD_EMAIL_DOMAIN` for TLD zone;
-       - emit `Z09_ARPA_EMAIL_DOMAIN` for a zone under `.arpa`;
+       - emit `Z09_ROOT_EMAIL_DOMAIN` for root zone (`mail_targets`);
+       - emit `Z09_TLD_EMAIL_DOMAIN` for TLD zone (`mail_targets`);
+       - emit `Z09_ARPA_EMAIL_DOMAIN` for a zone under `.arpa` (`mail_targets`);
        - otherwise emit `Z09_MX_DATA` with `servers` (name servers by host name
          and IP) and `mail_targets`.
      - if null-MX and neither `Z09_NULL_MX_WITH_OTHER_MX` nor
@@ -105,9 +105,9 @@ mxSet non-empty (servers grouped by MX RDATA key: pref + lower(target), sorted):
             len(records) > 1       -> Z09_NULL_MX_WITH_OTHER_MX (no args)
             MX.Preference > 0      -> Z09_NULL_MX_NON_ZERO_PREF (no args)
       !hasNullMX:
-         z.Name == "."             -> Z09_ROOT_EMAIL_DOMAIN (no args)
-         nextHigherIsRoot(z.Name)  -> Z09_TLD_EMAIL_DOMAIN  (no args)
-         isArpaTree(z.Name)        -> Z09_ARPA_EMAIL_DOMAIN (no args)
+         z.Name == "."             -> Z09_ROOT_EMAIL_DOMAIN (mail_targets)
+         nextHigherIsRoot(z.Name)  -> Z09_TLD_EMAIL_DOMAIN  (mail_targets)
+         isArpaTree(z.Name)        -> Z09_ARPA_EMAIL_DOMAIN (mail_targets)
          otherwise                 -> Z09_MX_DATA (servers = mxSet endpoints, mail_targets)
       hasNullMX AND no null-MX problem tag fired
                                    -> Z09_VALID_NULL_MX (no args)
@@ -153,7 +153,7 @@ emit TEST_CASE_END
 | --- | --- | --- | --- |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Zone09`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Zone09`). |
-| `Z09_ARPA_EMAIL_DOMAIN` | `-` | `-` | No arguments. |
+| `Z09_ARPA_EMAIL_DOMAIN` | `mail_targets` | `array<string>` | Structured MX exchange hostname list. |
 | `Z09_INCONSISTENT_MX` | `-` | `-` | No arguments. |
 | `Z09_INCONSISTENT_MX_DATA` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) returning this RDATA variant. |
 | `Z09_INCONSISTENT_MX_DATA` | `mail_targets` | `array<string>` | Structured MX exchange hostname list for this RDATA variant. |
@@ -168,8 +168,8 @@ emit TEST_CASE_END
 | `Z09_NO_SERVERS_MX_RESPONSE` | `-` | `-` | No arguments. |
 | `Z09_NULL_MX_NON_ZERO_PREF` | `-` | `-` | No arguments. |
 | `Z09_NULL_MX_WITH_OTHER_MX` | `-` | `-` | No arguments. |
-| `Z09_ROOT_EMAIL_DOMAIN` | `-` | `-` | No arguments. |
-| `Z09_TLD_EMAIL_DOMAIN` | `-` | `-` | No arguments. |
+| `Z09_ROOT_EMAIL_DOMAIN` | `mail_targets` | `array<string>` | Structured MX exchange hostname list. |
+| `Z09_TLD_EMAIL_DOMAIN` | `mail_targets` | `array<string>` | Structured MX exchange hostname list. |
 | `Z09_UNEXPECTED_RCODE_MX` | `rcode` | `string` | Unexpected RCODE text. |
 | `Z09_UNEXPECTED_RCODE_MX` | `addresses` | `array<string>` | Structured nameserver IPs for that RCODE. |
 

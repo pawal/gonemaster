@@ -1224,22 +1224,21 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 
 			if !hasNullMX {
+				mailTargets := mxExchangeList(mxSet[firstIP])
 				if z.Name.String() == "." {
-					if err := appendLog(ctx, &results, testcase, "Z09_ROOT_EMAIL_DOMAIN", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z09_ROOT_EMAIL_DOMAIN", map[string]any{"mail_targets": mailTargets}); err != nil {
 						return results, err
 					}
 				} else if nextHigherIsRoot(z.Name) {
-					if err := appendLog(ctx, &results, testcase, "Z09_TLD_EMAIL_DOMAIN", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z09_TLD_EMAIL_DOMAIN", map[string]any{"mail_targets": mailTargets}); err != nil {
 						return results, err
 					}
 				} else if isArpaTree(z.Name) {
-					if err := appendLog(ctx, &results, testcase, "Z09_ARPA_EMAIL_DOMAIN", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "Z09_ARPA_EMAIL_DOMAIN", map[string]any{"mail_targets": mailTargets}); err != nil {
 						return results, err
 					}
 				} else {
-					args := map[string]any{
-						"mail_targets": mxExchangeList(mxSet[firstIP]),
-					}
+					args := map[string]any{"mail_targets": mailTargets}
 					setTypedServersFromEndpoints(args, endpointsFor(mxSetOrder))
 					if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", args); err != nil {
 						return results, err

@@ -2031,16 +2031,16 @@ msgid "The zone has a Null MX mixed with other MX records."
 msgstr "このゾーンは Null MX と他の MX レコードが混在しています。"
 
 msgctxt "ZONE:Z09_ROOT_EMAIL_DOMAIN"
-msgid "Root zone with an unexpected MX RRset (non-Null MX)."
-msgstr "ルートゾーンに想定外の MX RRset (非 Null MX) があります。"
+msgid "Root zone with an unexpected MX RRset (non-Null MX): \"{mail_targets}\"."
+msgstr "ルートゾーンに想定外の MX RRset (非 Null MX) があります。メール配送先は \"{mail_targets}\" です。"
 
 msgctxt "ZONE:Z09_TLD_EMAIL_DOMAIN"
-msgid "The zone is a TLD and has an unexpected MX RRset (non-Null MX)."
-msgstr "このゾーンは TLD であり、想定外の MX RRset (非 Null MX) があります。"
+msgid "The zone is a TLD and has an unexpected MX RRset (non-Null MX): \"{mail_targets}\"."
+msgstr "このゾーンは TLD であり、想定外の MX RRset (非 Null MX) があります。メール配送先は \"{mail_targets}\" です。"
 
 msgctxt "ZONE:Z09_ARPA_EMAIL_DOMAIN"
-msgid "The zone is in the ARPA tree and has an unexpected MX RRset (non-Null MX)."
-msgstr "このゾーンは ARPA ツリーに属しており、想定外の MX RRset (非 Null MX) があります。"
+msgid "The zone is in the ARPA tree and has an unexpected MX RRset (non-Null MX): \"{mail_targets}\"."
+msgstr "このゾーンは ARPA ツリーに属しており、想定外の MX RRset (非 Null MX) があります。メール配送先は \"{mail_targets}\" です。"
 
 msgctxt "ZONE:Z09_NO_MX_FOUND_OR_EXPECTED"
 msgid "MX RRset was neither found nor expected for the zone."

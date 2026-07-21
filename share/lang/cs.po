@@ -1732,16 +1732,16 @@ msgid "The zone has a Null MX mixed with other MX records."
 msgstr "Zóna má Null MX smíchané s dalšími MX záznamy."
 
 msgctxt "ZONE:Z09_ROOT_EMAIL_DOMAIN"
-msgid "Root zone with an unexpected MX RRset (non-Null MX)."
-msgstr "Kořenová zóna s neočekávaným MX RRset (non-Null MX)."
+msgid "Root zone with an unexpected MX RRset (non-Null MX): \"{mail_targets}\"."
+msgstr "Kořenová zóna s neočekávaným MX RRset (non-Null MX): \"{mail_targets}\"."
 
 msgctxt "ZONE:Z09_TLD_EMAIL_DOMAIN"
-msgid "The zone is a TLD and has an unexpected MX RRset (non-Null MX)."
-msgstr "Zóna je TLD a má neočekávaný MX RRset (non-Null MX)."
+msgid "The zone is a TLD and has an unexpected MX RRset (non-Null MX): \"{mail_targets}\"."
+msgstr "Zóna je TLD a má neočekávaný MX RRset (non-Null MX): \"{mail_targets}\"."
 
 msgctxt "ZONE:Z09_ARPA_EMAIL_DOMAIN"
-msgid "The zone is in the ARPA tree and has an unexpected MX RRset (non-Null MX)."
-msgstr "Zóna je ve stromu ARPA a má neočekávaný MX RRset (non-Null MX)."
+msgid "The zone is in the ARPA tree and has an unexpected MX RRset (non-Null MX): \"{mail_targets}\"."
+msgstr "Zóna je ve stromu ARPA a má neočekávaný MX RRset (non-Null MX): \"{mail_targets}\"."
 
 msgctxt "ZONE:Z09_NO_MX_FOUND_OR_EXPECTED"
 msgid "MX RRset was neither found nor expected for the zone."

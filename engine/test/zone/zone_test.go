@@ -2026,6 +2026,16 @@ func entryTags(entries []*logger.Entry) []string {
 	return tags
 }
 
+// findEntryByTag returns the first entry with the given tag, or nil.
+func findEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
+	for _, e := range entries {
+		if e != nil && e.Tag == tag {
+			return e
+		}
+	}
+	return nil
+}
+
 // runZone09 wires a single-nameserver zone09 run for a given zone name and MX
 // handler, and returns the emitted entries.
 func runZone09(t *testing.T, name string, mx func() packet.Packet) []*logger.Entry {
@@ -2064,11 +2074,30 @@ func TestZone09ArpaEmailDomain(t *testing.T) {
 	entries := runZone09(t, "in-addr.arpa", func() packet.Packet {
 		return mxPacket("in-addr.arpa", 300, mxRR{10, "mail.example."})
 	})
-	if !hasEntryTag(entries, "Z09_ARPA_EMAIL_DOMAIN") {
+	arpa := findEntryByTag(entries, "Z09_ARPA_EMAIL_DOMAIN")
+	if arpa == nil {
 		t.Fatalf("expected Z09_ARPA_EMAIL_DOMAIN, got %v", entryTags(entries))
+	}
+	if targets, ok := arpa.Args["mail_targets"].([]string); !ok || len(targets) != 1 || targets[0] != "mail.example" {
+		t.Fatalf("expected mail_targets [mail.example], got %#v", arpa.Args["mail_targets"])
 	}
 	if hasEntryTag(entries, "Z09_MX_DATA") {
 		t.Fatalf("arpa zone with MX must not emit Z09_MX_DATA, got %v", entryTags(entries))
+	}
+}
+
+// TestZone09TLDEmailDomainReportsMailTargets verifies the TLD email-domain
+// finding carries the mail target(s), mirroring a real ccTLD apex MX.
+func TestZone09TLDEmailDomainReportsMailTargets(t *testing.T) {
+	entries := runZone09(t, "example", func() packet.Packet {
+		return mxPacket("example", 300, mxRR{0, "no.mx.example."})
+	})
+	tld := findEntryByTag(entries, "Z09_TLD_EMAIL_DOMAIN")
+	if tld == nil {
+		t.Fatalf("expected Z09_TLD_EMAIL_DOMAIN, got %v", entryTags(entries))
+	}
+	if targets, ok := tld.Args["mail_targets"].([]string); !ok || len(targets) != 1 || targets[0] != "no.mx.example" {
+		t.Fatalf("expected mail_targets [no.mx.example], got %#v", tld.Args["mail_targets"])
 	}
 }
 

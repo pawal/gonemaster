@@ -841,17 +841,15 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	childKeys := slices.Sorted(maps.Keys(childNSNames))
 
-	for _, key := range childKeys {
-		nsName := childNSNames[key]
-		aResponses, err := queryParentAll(ctx, z, nsName.String(), "A")
-		if err != nil {
-			return results, err
+	// Glue comes only from the referral additional section. A parent that
+	// answers out-of-domain names directly must not poison the glue set.
+	for _, resp := range nsResponses {
+		if resp.Msg == nil {
+			continue
 		}
-		for _, resp := range aResponses {
-			if resp.Msg == nil {
-				continue
-			}
-			for _, rr := range resp.GetRecordsForName("A", nsName) {
+		for _, key := range childKeys {
+			nsName := childNSNames[key]
+			for _, rr := range resp.GetRecordsForName("A", nsName, "additional") {
 				aRR, ok := rr.(*dns.A)
 				if !ok {
 					continue
@@ -859,17 +857,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				glueKey := strings.ToLower(rr.Header().Name) + "/" + aRR.Addr.String()
 				parentGlues[glueKey] = nsName
 			}
-		}
-
-		aaaaResponses, err := queryParentAll(ctx, z, nsName.String(), "AAAA")
-		if err != nil {
-			return results, err
-		}
-		for _, resp := range aaaaResponses {
-			if resp.Msg == nil {
-				continue
-			}
-			for _, rr := range resp.GetRecordsForName("AAAA", nsName) {
+			for _, rr := range resp.GetRecordsForName("AAAA", nsName, "additional") {
 				AAAArr, ok := rr.(*dns.AAAA)
 				if !ok {
 					continue

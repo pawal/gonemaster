@@ -648,23 +648,11 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 	}
 
 	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
-		switch strings.ToUpper(qtype) {
-		case "NS":
-			return []packet.Packet{nsPacket(name, []string{"ns1.example", "ns2.example"})}, nil
-		case "A":
-			switch strings.ToLower(name) {
-			case "ns1.example":
-				return []packet.Packet{addrPacket(name, "A", "192.0.2.1")}, nil
-			case "ns2.example":
-				return []packet.Packet{addrPacket(name, "A", "192.0.2.2")}, nil
-			}
-		case "AAAA":
-			switch strings.ToLower(name) {
-			case "ns1.example":
-				return []packet.Packet{addrPacket(name, "AAAA", "2001:db8::1")}, nil
-			case "ns2.example":
-				return []packet.Packet{addrPacket(name, "AAAA", "2001:db8::2")}, nil
-			}
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
+				"ns1.example": {"192.0.2.1", "2001:db8::1"},
+				"ns2.example": {"192.0.2.2", "2001:db8::2"},
+			})}, nil
 		}
 		return []packet.Packet{}, nil
 	}
@@ -775,13 +763,10 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	}
 
 	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
-		switch strings.ToUpper(qtype) {
-		case "NS":
-			return []packet.Packet{nsPacket(name, []string{"ns1.example"})}, nil
-		case "A":
-			if strings.EqualFold(name, "ns1.example") {
-				return []packet.Packet{addrPacket(name, "A", "192.0.2.1")}, nil
-			}
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
+				"ns1.example": {"192.0.2.1"},
+			})}, nil
 		}
 		return []packet.Packet{}, nil
 	}
@@ -871,13 +856,10 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 	}
 
 	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
-		switch strings.ToUpper(qtype) {
-		case "NS":
-			return []packet.Packet{nsPacket(name, []string{"ns1.example"})}, nil
-		case "A":
-			if strings.EqualFold(name, "ns1.example") {
-				return []packet.Packet{addrPacket(name, "A", "192.0.2.1")}, nil
-			}
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
+				"ns1.example": {"192.0.2.1"},
+			})}, nil
 		}
 		return []packet.Packet{}, nil
 	}
@@ -924,13 +906,10 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	}
 
 	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
-		switch strings.ToUpper(qtype) {
-		case "NS":
-			return []packet.Packet{nsPacket(name, []string{"ns1.other"})}, nil
-		case "A":
-			if strings.EqualFold(name, "ns1.other") {
-				return []packet.Packet{addrPacket(name, "A", "192.0.2.1")}, nil
-			}
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
+				"ns1.other": {"192.0.2.1"},
+			})}, nil
 		}
 		return []packet.Packet{}, nil
 	}
@@ -1051,6 +1030,78 @@ func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
 				t.Fatalf("unexpected OUT_OF_BAILIWICK_ADDR_MISMATCH for glueless OOB delegation")
 			}
 		})
+	}
+}
+
+// A parent that answers direct out-of-domain address queries with loopback (a
+// catch-all or wildcard zone) must not poison the glue set. Glue is read only
+// from the referral additional section, so a glueless referral yields no
+// out-of-domain glue and no spurious mismatch, even though the parent would
+// answer ns1.other/A with 127.0.0.1 (zonemaster-engine#1537).
+func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origM23 := allNSNames
+	origM45 := allNameservers
+	origParent := queryParentAll
+	origRecurse := recurse
+	t.Cleanup(func() {
+		allNSNames = origM23
+		allNameservers = origM45
+		queryParentAll = origParent
+		recurse = origRecurse
+	})
+
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{}, nil
+	}
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{}, nil
+	}
+
+	// Glueless referral, but the parent answers direct out-of-domain address
+	// queries with loopback. The referral additional section carries no glue.
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		switch strings.ToUpper(qtype) {
+		case "NS":
+			return []packet.Packet{nsPacket(name, []string{"ns1.other"})}, nil
+		case "A":
+			if strings.EqualFold(name, "ns1.other") {
+				return []packet.Packet{addrPacket(name, "A", "127.0.0.1")}, nil
+			}
+		case "AAAA":
+			if strings.EqualFold(name, "ns1.other") {
+				return []packet.Packet{addrPacket(name, "AAAA", "::1")}, nil
+			}
+		}
+		return []packet.Packet{}, nil
+	}
+
+	// Public resolution returns the real addresses, not loopback.
+	recurse = func(_ context.Context, _ *zone.Zone, _ string, qtype string) (packet.Packet, error) {
+		switch strings.ToUpper(qtype) {
+		case "A":
+			return addrPacket("ns1.other", "A", "192.0.2.9"), nil
+		case "AAAA":
+			return addrPacket("ns1.other", "AAAA", "2001:db8::9"), nil
+		}
+		return packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "OUT_OF_BAILIWICK_ADDR_MISMATCH") {
+		t.Fatalf("loopback answered by parent for an out-of-domain name must not produce OUT_OF_BAILIWICK_ADDR_MISMATCH")
+	}
+	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
+		t.Fatalf("expected ADDRESSES_MATCH when the referral carries no glue")
 	}
 }
 
@@ -1256,6 +1307,37 @@ func nsPacketTTL(owner string, nsNames []string, ttl uint32) packet.Packet {
 		msg.Answer = append(msg.Answer, nsRR)
 	}
 	return packet.Packet{Msg: msg}
+}
+
+// nsPacketWithGlue builds a referral carrying NS records plus glue (A/AAAA)
+// in the additional section, keyed by owner name.
+func nsPacketWithGlue(owner string, glue map[string][]string) packet.Packet {
+	names := make([]string, 0, len(glue))
+	for name := range glue {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+
+	p := nsPacket(owner, names)
+	for _, name := range names {
+		for _, address := range glue[name] {
+			ip, err := netip.ParseAddr(address)
+			if err != nil {
+				continue
+			}
+			hdr := dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
+			if ip.Is4() {
+				aRR := &dns.A{Hdr: hdr}
+				aRR.Addr = ip.Unmap()
+				p.Msg.Extra = append(p.Msg.Extra, aRR)
+			} else {
+				aaaaRR := &dns.AAAA{Hdr: hdr}
+				aaaaRR.Addr = ip
+				p.Msg.Extra = append(p.Msg.Extra, aaaaRR)
+			}
+		}
+	}
+	return p
 }
 
 func addrPacket(name string, qtype string, address string) packet.Packet {

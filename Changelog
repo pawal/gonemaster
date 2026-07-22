@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- engine: fix Consistency05 reporting bogus glue mismatches for out-of-domain name servers
+
 ## [v1.6.3] - 2026-07-19
 
 Gives the server structured text or json logging with per-request IDs and one access-log line per request. Rebuilds snapshots in the background with a progress bar. Adds glossary tooltips to public finding explanations and completes the result explanations across every shipped locale.

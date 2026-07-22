@@ -10,7 +10,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Parent-side NS, A, and AAAA responses via `queryParentAll`.
+  - Parent-side NS referral responses via `queryParentAll`; glue A and AAAA records are read from the additional section of those responses.
   - Child-side nameserver names via [`AllNSNames`](../../nameserver-resolution.md#allnsnames).
   - Child-side nameserver servers via [`AllNameservers`](../../nameserver-resolution.md#allnameservers).
   - Recursive lookup results via `recurse` for not-in-domain checks and referral fallbacks.
@@ -20,7 +20,7 @@ Status: Final
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
 2. Query parent for child-zone NS records; collect unique child NS names.
-3. For each child NS name, query parent for A and AAAA and collect glue items `owner/ip`.
+3. Read glue items `owner/ip` from the additional section of the parent NS referral responses, keeping only owners that match a child NS name. Glue is never taken from separate address queries to the parent, so a parent that answers out-of-domain names directly cannot contribute bogus glue.
 4. Split parent glue into:
    - in-domain strict glue (`strictGlue`),
    - not-in-domain extended glue (`extendedGlue` grouped by NS name).
@@ -48,11 +48,10 @@ Status: Final
 {{% expand "Show diagram" %}}
 ```
 queryParentAll(z, "NS")
- +- collect distinct child NS names from NS answer records
-
-For each child NS name (sorted):
-   queryParentAll(name, "A");    collect (owner lower / addr) glue items
-   queryParentAll(name, "AAAA"); collect (owner lower / addr) glue items
+ +- collect distinct child NS names from NS records
+ +- read glue (A / AAAA) from the referral additional section,
+      keeping only owners that match a child NS name
+      -> (owner lower / addr) glue items
 
 split parent glue by domain relation:
    z.Name.IsInBailiwick(nsName) -> strictGlue[owner/ip]
@@ -163,6 +162,7 @@ emit TEST_CASE_END
   - `no`
 
 ## Edge Cases And Limitations
+- Glue is taken only from the referral additional section, so a parent name server that answers out-of-domain names (for example via a catch-all or wildcard zone) does not inject spurious glue and cannot trigger a false `OUT_OF_BAILIWICK_ADDR_MISMATCH`.
 - `CHILD_ZONE_LAME` short-circuits testcase execution and suppresses later mismatch checks when no usable in-domain address lookup path was found.
 - Not-in-domain mismatch reporting is per NS name group; each emission includes full parent list for that group.
 - Disabled IP versions affect child authoritative probes indirectly by filtering queried child servers.

@@ -448,6 +448,13 @@
   .chain-svg {
     display: block;
   }
+  /* On small screens scale the diagram to fit; viewBox keeps it proportional. */
+  @media (max-width: 600px) {
+    .chain-svg {
+      max-width: 100%;
+      height: auto;
+    }
+  }
   .chain-cluster-label {
     fill: var(--ink-2);
     font-size: 12px;

@@ -200,6 +200,51 @@ describe("layoutChain", () => {
     expect(keySig).toBeTruthy();
   });
 
+  it("carries an algorithm_mismatch DS link through to the edge and tip", () => {
+    // A DS whose algorithm field disagrees with the DNSKEY it points at is
+    // unusable for validators (RFC 4034 section 5.2). The layout must pass
+    // the status through untouched: DnssecChain.svelte colors any non-match
+    // DS edge as bad, and the tip localizes the status via
+    // pub.dnssec_chain_linkstatus_algorithm_mismatch.
+    const g = layoutChain(secureChain({
+      status: "broken",
+      parent: {
+        ds_source: "parent",
+        ds: [{ key_tag: 1000, algorithm: 253, digest_type: 2, digest: "ab", servers: ["192.0.2.1"] }],
+      },
+      links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "algorithm_mismatch", servers: ["203.0.113.1"] }],
+    }));
+    const dsEdge = g.edges.find((e) => e.kind === "ds");
+    expect(dsEdge.status).toBe("algorithm_mismatch");
+    const statusLine = dsEdge.tip.find((l) => l.k === "pub.dnssec_chain_tip_status");
+    expect(statusLine.linkState).toBe("algorithm_mismatch");
+  });
+
+  it("prefers the matching link when a mismatched sibling DS shares the key tag", () => {
+    // Two DS records for the same key tag, one usable and one with a wrong
+    // algorithm field: the single collapsed edge must stay a match, since a
+    // validator needs only one usable DS.
+    const g = layoutChain(secureChain({
+      links: [
+        { ds_key_tag: 1000, dnskey_key_tag: 1000, status: "algorithm_mismatch", servers: ["203.0.113.1"] },
+        { ds_key_tag: 1000, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] },
+      ],
+    }));
+    const dsEdges = g.edges.filter((e) => e.kind === "ds");
+    expect(dsEdges.length).toBe(1);
+    expect(dsEdges[0].status).toBe("match");
+  });
+
+  it("ships a localized label for the algorithm_mismatch link status in every locale", async () => {
+    const locales = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
+    for (const loc of locales) {
+      const catalog = (await import(`../i18n/${loc}.json`)).default;
+      const val = catalog["pub.dnssec_chain_linkstatus_algorithm_mismatch"];
+      expect(typeof val, loc).toBe("string");
+      expect(val.length > 0, loc).toBe(true);
+    }
+  });
+
   it("keeps all node coordinates within the viewBox", () => {
     const g = layoutChain(secureChain());
     for (const n of g.nodes) {

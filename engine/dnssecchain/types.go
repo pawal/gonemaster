@@ -44,6 +44,7 @@ const (
 const (
 	LinkMatch             = "match"
 	LinkDigestMismatch    = "digest_mismatch"
+	LinkAlgorithmMismatch = "algorithm_mismatch"
 	LinkNoDNSKEY          = "no_dnskey"
 	LinkUnsupportedDigest = "unsupported_digest"
 )

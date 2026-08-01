@@ -123,10 +123,12 @@ func findDNSKEYSig(s *Summary, keytag uint16) (RRSIG, bool) {
 // secureFixture wires a fully signed delegation. When mutate is non-nil it can
 // alter records or the DS before packets are built.
 type fixtureOpts struct {
-	badDigest     bool // corrupt the DS digest -> digest_mismatch
-	expiredKeySig bool // child DNSKEY RRSIG expired
-	noDS          bool // parent serves no DS (island)
-	noDNSKEY      bool // child serves no DNSKEY
+	badDigest        bool // corrupt the DS digest -> digest_mismatch
+	wrongDSAlgo      bool // DS algorithm field disagrees with the key -> algorithm_mismatch
+	extraWrongAlgoDS bool // add a second DS with a wrong algorithm field next to the good one
+	expiredKeySig    bool // child DNSKEY RRSIG expired
+	noDS             bool // parent serves no DS (island)
+	noDNSKEY         bool // child serves no DNSKEY
 }
 
 func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
@@ -152,7 +154,15 @@ func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
 	if opts.badDigest {
 		ds.Digest = strings.Repeat("00", len(ds.Digest)/2)
 	}
+	if opts.wrongDSAlgo {
+		ds.Algorithm = 253
+	}
 	dsRRset := []dns.RR{ds}
+	if opts.extraWrongAlgoDS {
+		wrong := *ds
+		wrong.Algorithm = 253
+		dsRRset = append(dsRRset, &wrong)
+	}
 	dsSig := signRRset(t, parentKSK, dsRRset, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 
 	parentKeyRRset := []dns.RR{parentKSK.key}
@@ -174,7 +184,8 @@ func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
 			if opts.noDS {
 				return dnssecAnswer(testZone, dns.TypeDS)
 			}
-			return dnssecAnswer(testZone, dns.TypeDS, ds, dsSig)
+			answers := append(append([]dns.RR{}, dsRRset...), dsSig)
+			return dnssecAnswer(testZone, dns.TypeDS, answers...)
 		case "DNSKEY":
 			if qname == dnsutil.Fqdn(testParent) || qname == testParent {
 				return dnssecAnswer(testParent, dns.TypeDNSKEY, parentKSK.key, parentKeySig)
@@ -553,6 +564,72 @@ func TestExtractDigestMismatch(t *testing.T) {
 	}
 }
 
+func TestExtractDSAlgorithmMismatch(t *testing.T) {
+	// The parent's DS carries an algorithm field that disagrees with the
+	// DNSKEY it was generated from, while key tag and digest both line up.
+	// RFC 4034 section 5.2 makes the algorithm field part of the reference,
+	// so validators ignore such a DS: the link must not count as a match,
+	// no key may be anchored, and the chain must roll up broken.
+	ctx, _, _ := testhelpers.Context(t)
+	in := buildInput(t, ctx, fixtureOpts{wrongDSAlgo: true})
+
+	got := Extract(ctx, in)
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	if got.Status != StatusBroken {
+		t.Errorf("status = %q, want broken", got.Status)
+	}
+	if len(got.Parent.DS) != 1 {
+		t.Fatalf("want 1 DS, got %d", len(got.Parent.DS))
+	}
+	link, ok := findLink(got, got.Parent.DS[0].KeyTag)
+	if !ok || link.Status != LinkAlgorithmMismatch {
+		t.Errorf("expected algorithm_mismatch link, got %+v", link)
+	}
+	for _, k := range got.Child.DNSKEYs {
+		if k.Anchored {
+			t.Errorf("key %d must not be anchored by a mismatched DS", k.KeyTag)
+		}
+	}
+}
+
+func TestExtractDSAlgorithmMismatchWithValidSibling(t *testing.T) {
+	// Two DS records reference the same KSK: one correct and one whose
+	// algorithm field is wrong. A validator needs only one usable DS, so
+	// the chain stays secure and the key anchored, while the unusable DS
+	// still surfaces as an algorithm_mismatch link.
+	ctx, _, _ := testhelpers.Context(t)
+	in := buildInput(t, ctx, fixtureOpts{extraWrongAlgoDS: true})
+
+	got := Extract(ctx, in)
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	if got.Status != StatusSecure {
+		t.Errorf("status = %q, want secure", got.Status)
+	}
+	if len(got.Parent.DS) != 2 {
+		t.Fatalf("want 2 DS, got %d", len(got.Parent.DS))
+	}
+	statuses := map[string]int{}
+	for _, l := range got.Links {
+		statuses[l.Status]++
+	}
+	if statuses[LinkMatch] != 1 || statuses[LinkAlgorithmMismatch] != 1 {
+		t.Errorf("links = %v, want one match and one algorithm_mismatch", statuses)
+	}
+	anchored := false
+	for _, k := range got.Child.DNSKEYs {
+		if k.SEP && k.Anchored {
+			anchored = true
+		}
+	}
+	if !anchored {
+		t.Error("KSK must stay anchored via the correct DS")
+	}
+}
+
 func TestExtractExpiredKeySignature(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	in := buildInput(t, ctx, fixtureOpts{expiredKeySig: true})
@@ -925,6 +1002,29 @@ func TestDSLinkStatusMatchesAnyKeyWithTag(t *testing.T) {
 	}
 	if got := dsLinkStatus(ds, []*dns.DNSKEY{k1.key}); got != LinkDigestMismatch {
 		t.Errorf("status = %q, want %q", got, LinkDigestMismatch)
+	}
+}
+
+func TestDSLinkStatusAlgorithmMismatchPrecedence(t *testing.T) {
+	// Mixed candidate set under one key tag: one key matches the DS
+	// algorithm but not its digest, the other matches the digest but not
+	// the algorithm. The digest match proves which key the DS was
+	// generated from, so the actionable verdict is algorithm_mismatch,
+	// not digest_mismatch.
+	right := genKey(t, testZone, true)
+	wrong := genKey(t, testZone, true)
+	wrong.key.Algorithm = dns.RSASHA256 // rewrite before deriving the DS
+	real := wrong.key.ToDS(dns.SHA256)
+	if real == nil {
+		t.Fatal("ToDS returned nil")
+	}
+	ds := DS{KeyTag: real.KeyTag, Algorithm: dns.ECDSAP256SHA256, DigestType: real.DigestType, Digest: strings.ToLower(real.Digest)}
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{right.key, wrong.key}); got != LinkAlgorithmMismatch {
+		t.Errorf("status = %q, want %q", got, LinkAlgorithmMismatch)
+	}
+	// A lone wrong-algorithm key with a matching digest classifies the same.
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{wrong.key}); got != LinkAlgorithmMismatch {
+		t.Errorf("status = %q, want %q", got, LinkAlgorithmMismatch)
 	}
 }
 

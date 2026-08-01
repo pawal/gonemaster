@@ -336,13 +336,15 @@ func (e *extractor) buildLinks() {
 	}
 }
 
-// dsLinkStatus compares the DS digest against every key with its tag; a nil
-// ToDS counts as unsupported digest, never as a mismatch.
+// dsLinkStatus compares the DS against every key with its tag; a nil
+// ToDS counts as unsupported digest, never as a mismatch. Per RFC 4034
+// section 5.2 the DS algorithm field must also equal the key algorithm.
 func dsLinkStatus(ds DS, keys []*dns.DNSKEY) string {
 	if !dnssecutil.DigestSupported(ds.DigestType) {
 		return LinkUnsupportedDigest
 	}
 	sawDigest := false
+	algoMismatch := false
 	for _, key := range keys {
 		tmp := key.ToDS(ds.DigestType)
 		if tmp == nil {
@@ -350,11 +352,18 @@ func dsLinkStatus(ds DS, keys []*dns.DNSKEY) string {
 		}
 		sawDigest = true
 		if strings.EqualFold(tmp.Digest, ds.Digest) {
-			return LinkMatch
+			if key.Algorithm == ds.Algorithm {
+				return LinkMatch
+			}
+			// The digest proves which key the DS came from.
+			algoMismatch = true
 		}
 	}
 	if !sawDigest {
 		return LinkUnsupportedDigest
+	}
+	if algoMismatch {
+		return LinkAlgorithmMismatch
 	}
 	return LinkDigestMismatch
 }

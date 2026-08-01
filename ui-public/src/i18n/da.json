@@ -501,6 +501,8 @@
   "pub.tag.dnssec.DS02_DNSKEY_NOT_FOR_ZONE_SIGNING.desc": "En DNSKEY, som en DS peger på, mangler \"zone\"-flaget, hvilket betyder, at den ikke er markeret som brugt til at signere zonedata. Resolvere, der håndhæver flaget, vil ikke stole på signaturer lavet med denne nøgle, så den kan ikke fuldføre DNSSEC-kæden, selvom DS'en matcher den.",
   "pub.tag.dnssec.DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS.header": "DNSKEY er ikke signeret af nogen DS-matchet nøgle",
   "pub.tag.dnssec.DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS.desc": "DNSKEY-RRsettet er ikke signeret af en DNSKEY, som nogen DS-record hos forælderen matcher. Validerende resolvere kan ikke opbygge tillid: de har DS'en, og de har DNSKEY-sættet, men ingen nøgle godkendt af DS'en signerer sættet.",
+  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.header": "DS-algoritmen matcher ikke DNSKEY",
+  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.desc": "En DS-record hos forælderen angiver en anden algoritme end den DNSKEY, den peger på, selvom nøgle-tag og digest stemmer. Validerende resolvere ignorerer en DS, hvis algoritmefelt ikke stemmer med nøglen, så denne DS kan ikke etablere tillid; nogle resolvere afviser hele zonen. Erstat DS-recorden med en, der er genereret ud fra den faktiske nøgle.",
   "pub.tag.dnssec.DS02_NO_DNSKEY_FOR_DS.header": "Ingen DNSKEY matcher denne DS",
   "pub.tag.dnssec.DS02_NO_DNSKEY_FOR_DS.desc": "En DS-record hos forælderen matcher ingen DNSKEY i barnezonen. Den nøgle, som forælderen indestod for, er væk (eller har aldrig eksisteret), så denne DS kan aldrig fuldføre valideringen. Den bør fjernes fra registeret eller afbalanceres ved at udgive den nøgle, der refereres til.",
   "pub.tag.dnssec.DS02_NO_MATCHING_DNSKEY_RRSIG.header": "Ingen DNSKEY har en matchende RRSIG",

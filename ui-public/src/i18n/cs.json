@@ -651,6 +651,8 @@
   "pub.tag.dnssec.DS02_DNSKEY_NOT_FOR_ZONE_SIGNING.desc": "U klíče DNSKEY, na který ukazuje DS, chybí příznak \"zone\", což znamená, že není označen jako klíč používaný k podepisování dat zóny. Resolvery, které tento příznak vynucují, nebudou důvěřovat podpisům vytvořeným tímto klíčem, takže nemůže dokončit řetěz DNSSEC, i když mu DS odpovídá.",
   "pub.tag.dnssec.DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS.header": "DNSKEY nepodepsán žádným klíčem odpovídajícím DS",
   "pub.tag.dnssec.DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS.desc": "RRset DNSKEY není podepsán žádným klíčem DNSKEY, kterému by odpovídal nějaký záznam DS v nadřazené zóně. Validující resolvery nemohou navázat důvěru: mají DS a mají sadu DNSKEY, ale tuto sadu nepodepisuje žádný klíč autorizovaný DS.",
+  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.header": "Algoritmus DS neodpovídá DNSKEY",
+  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.desc": "DS záznam u rodiče uvádí jiný algoritmus než DNSKEY, na který odkazuje, přestože keytag a digest souhlasí. Validující resolvery ignorují DS, jehož pole algoritmu neodpovídá klíči, takže tento DS nemůže vytvořit důvěru; některé resolvery odmítnou celou zónu. Nahraďte DS záznamem vygenerovaným ze skutečného klíče.",
   "pub.tag.dnssec.DS02_NO_DNSKEY_FOR_DS.header": "Tomuto DS neodpovídá žádný DNSKEY",
   "pub.tag.dnssec.DS02_NO_DNSKEY_FOR_DS.desc": "Záznam DS v nadřazené zóně neodpovídá žádnému klíči DNSKEY v podřízené zóně. Klíč, za který se nadřazená zóna zaručila, je pryč (nebo nikdy neexistoval), takže tento DS nemůže nikdy dokončit validaci. Měl by být odstraněn z registru nebo vyrovnán zveřejněním odkazovaného klíče.",
   "pub.tag.dnssec.DS02_NO_MATCHING_DNSKEY_RRSIG.header": "Žádný DNSKEY nemá odpovídající RRSIG",

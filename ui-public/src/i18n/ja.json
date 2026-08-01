@@ -687,6 +687,8 @@
   "pub.tag.dnssec.DS02_DNSKEY_NOT_FOR_ZONE_SIGNING.desc": "あるDSが指し示すDNSKEYに「zone」フラグが欠けており、これはゾーンデータの署名に使用されるものとしてマークされていないことを意味します。このフラグを強制するリゾルバーは、この鍵で作成された署名を信頼しないため、DSが一致していても、この鍵ではDNSSECチェーンを完成させることができません。",
   "pub.tag.dnssec.DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS.header": "DNSKEYがDSに一致するいずれの鍵でも署名されていません",
   "pub.tag.dnssec.DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS.desc": "DNSKEYのRRsetが、親のいずれのDSレコードにも一致するDNSKEYで署名されていません。検証リゾルバーは信頼を確立できません。DSもDNSKEYセットも保持していますが、DSが認可したいずれの鍵もそのセットを署名していないためです。",
+  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.header": "DS のアルゴリズムが DNSKEY と一致しない",
+  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.desc": "親ゾーンの DS レコードが、指している DNSKEY と異なるアルゴリズムを指定しています。キータグとダイジェストは一致していても、アルゴリズムフィールドが鍵と一致しない DS を検証リゾルバーは無視するため、この DS では信頼を確立できません。一部のリゾルバーはゾーン全体の検証に失敗します。実際の鍵から生成した DS に置き換えてください。",
   "pub.tag.dnssec.DS02_NO_DNSKEY_FOR_DS.header": "このDSに一致するDNSKEYがありません",
   "pub.tag.dnssec.DS02_NO_DNSKEY_FOR_DS.desc": "親のあるDSレコードが、子ゾーンのいずれのDNSKEYにも一致しません。親が保証した鍵は失われている(あるいは最初から存在しなかった)ため、このDSが検証を完成させることは決してできません。レジストリから削除するか、参照されている鍵を公開して整合させる必要があります。",
   "pub.tag.dnssec.DS02_NO_MATCHING_DNSKEY_RRSIG.header": "一致するRRSIGを持つDNSKEYがありません",

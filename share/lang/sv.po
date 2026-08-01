@@ -712,6 +712,10 @@ msgctxt "CONSISTENCY:CHILD_ZONE_LAME"
 msgid "Lame delegation."
 msgstr "Det går inte att följa delegeringen av domännamnet."
 
+msgctxt "CONSISTENCY:DELEGATION_NS_SET"
+msgid "Saw delegation NS set ({ns_set_servers}) from parent name server(s) ({servers})."
+msgstr "NS-uppsättningen ({ns_set_servers}) i delegeringen returnerades från namnservrarna ({servers})."
+
 msgctxt "CONSISTENCY:EXTRA_ADDRESS_CHILD"
 msgid ""
 "Child has extra nameserver IP address(es) not listed at parent "
@@ -734,6 +738,10 @@ msgstr ""
 msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
 msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
 msgstr "Namnservrar levererar zonens NS-poster med {count} olika TTL-värden."
+
+msgctxt "CONSISTENCY:MULTIPLE_DELEGATION_NS_SET"
+msgid "Found {count} different delegation NS sets at the parent name servers."
+msgstr "{count} olika NS-uppsättningar hittades i delegeringen från föräldrazonens namnservrar."
 
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."

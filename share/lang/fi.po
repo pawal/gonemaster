@@ -749,6 +749,10 @@ msgctxt "CONSISTENCY:CHILD_ZONE_LAME"
 msgid "Lame delegation."
 msgstr "Delegointivirhe."
 
+msgctxt "CONSISTENCY:DELEGATION_NS_SET"
+msgid "Saw delegation NS set ({ns_set_servers}) from parent name server(s) ({servers})."
+msgstr "Delegoinnin NS-joukko ({ns_set_servers}) saatiin nimipalvelimilta ({servers})."
+
 msgctxt "CONSISTENCY:EXTRA_ADDRESS_CHILD"
 msgid ""
 "Child has extra nameserver IP address(es) not listed at parent "
@@ -771,6 +775,10 @@ msgstr ""
 msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
 msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
 msgstr "Nimipalvelimet palvelevat vyöhykkeen NS-tietueita {count} eri TTL-arvolla."
+
+msgctxt "CONSISTENCY:MULTIPLE_DELEGATION_NS_SET"
+msgid "Found {count} different delegation NS sets at the parent name servers."
+msgstr "Ylemmän vyöhykkeen nimipalvelimilta löydettiin {count} erilaista delegoinnin NS-joukkoa."
 
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."

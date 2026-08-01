@@ -475,6 +475,10 @@ msgctxt "CONSISTENCY:CHILD_ZONE_LAME"
 msgid "Lame delegation."
 msgstr "Lame delegace."
 
+msgctxt "CONSISTENCY:DELEGATION_NS_SET"
+msgid "Saw delegation NS set ({ns_set_servers}) from parent name server(s) ({servers})."
+msgstr "Sada NS v delegaci ({ns_set_servers}) vrácena jmennými servery nadřazené zóny ({servers})."
+
 msgctxt "CONSISTENCY:EXTRA_ADDRESS_CHILD"
 msgid "Child has extra nameserver IP address(es) not listed at parent ({addresses})."
 msgstr "Podřízená strana má další IP adresy jmenných serverů, které nejsou uvedeny u nadřazené strany ({addresses})."
@@ -486,6 +490,10 @@ msgstr "Jmenný server v doméně uvedený u nadřazené strany má nesoulad mez
 msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
 msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
 msgstr "Jmenné servery poskytují NS záznamy zóny s {count} různými hodnotami TTL."
+
+msgctxt "CONSISTENCY:MULTIPLE_DELEGATION_NS_SET"
+msgid "Found {count} different delegation NS sets at the parent name servers."
+msgstr "Nalezeno {count} různých sad NS v delegaci na jmenných serverech nadřazené zóny."
 
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."

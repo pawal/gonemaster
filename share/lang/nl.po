@@ -475,6 +475,10 @@ msgctxt "CONSISTENCY:CHILD_ZONE_LAME"
 msgid "Lame delegation."
 msgstr "Lame delegation."
 
+msgctxt "CONSISTENCY:DELEGATION_NS_SET"
+msgid "Saw delegation NS set ({ns_set_servers}) from parent name server(s) ({servers})."
+msgstr "Set naamservers ({ns_set_servers}) in de delegatie ontvangen van de naamservers ({servers})."
+
 msgctxt "CONSISTENCY:EXTRA_ADDRESS_CHILD"
 msgid "Child has extra nameserver IP address(es) not listed at parent ({addresses})."
 msgstr "De onderliggende zone heeft extra naamserver-IP-adres(sen) die niet bij de bovenliggende zone staan vermeld ({addresses})."
@@ -486,6 +490,10 @@ msgstr "Een in-domain-naamserver die bij de bovenliggende zone staat vermeld, he
 msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
 msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
 msgstr "Naamservers leveren de NS-records van de zone met {count} verschillende TTL-waarden."
+
+msgctxt "CONSISTENCY:MULTIPLE_DELEGATION_NS_SET"
+msgid "Found {count} different delegation NS sets at the parent name servers."
+msgstr "{count} verschillende sets naamservers gevonden in de delegatie van de naamservers van de bovenliggende zone."
 
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."

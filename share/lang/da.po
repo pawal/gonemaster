@@ -3667,3 +3667,35 @@ msgid ""
 "The RRSIG with keytag {keytag} could not be verified because the DNSKEY uses an RSA public exponent that this installation does not support. Fetched from the nameservers with IP addresses \"{addresses}\"."
 msgstr ""
 "RRSIG med tag {keytag} kunne ikke verificeres, fordi DNSKEY bruger en offentlig RSA-eksponent, som denne installation ikke understøtter. Fundet på navneserverne med IP-adresserne \"{addresses}\"."
+
+msgctxt "DNSSEC:DS01_KEY_ALGO_OK"
+msgid "The DS record with keytag {keytag} references DNSKEY algorithm {ds_key_algo_num} ({ds_key_algo_descr}). Fetched from name servers \"{servers}\"."
+msgstr "DS-recorden med tag {keytag} refererer til DNSKEY-algoritme {ds_key_algo_num} ({ds_key_algo_descr}). Hentet fra navneserverne \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_KEY_ALGO_NOT_RECOMMENDED"
+msgid "The DS record with keytag {keytag} references unrecommended DNSKEY algorithm {ds_key_algo_num} ({ds_key_algo_descr}). Fetched from name servers \"{servers}\"."
+msgstr "DS-recorden med tag {keytag} refererer til DNSKEY-algoritme {ds_key_algo_num} ({ds_key_algo_descr}), som ikke anbefales. Hentet fra navneserverne \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_KEY_ALGO_DEPRECATED"
+msgid "The DS record with keytag {keytag} references deprecated DNSKEY algorithm {ds_key_algo_num} ({ds_key_algo_descr}). Fetched from name servers \"{servers}\"."
+msgstr "DS-recorden med tag {keytag} refererer til DNSKEY-algoritme {ds_key_algo_num} ({ds_key_algo_descr}), som er forældet. Hentet fra navneserverne \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_KEY_ALGO_NOT_ZONE_SIGN"
+msgid "The DS record with keytag {keytag} references DNSKEY algorithm {ds_key_algo_num} ({ds_key_algo_descr}) which is not meant for zone signing. Fetched from name servers \"{servers}\"."
+msgstr "DS-recorden med tag {keytag} refererer til DNSKEY-algoritme {ds_key_algo_num} ({ds_key_algo_descr}), som ikke er beregnet til zonesignering. Hentet fra navneserverne \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_KEY_ALGO_PRIVATE"
+msgid "The DS record with keytag {keytag} references DNSKEY algorithm {ds_key_algo_num} ({ds_key_algo_descr}) which is reserved for private use. Fetched from name servers \"{servers}\"."
+msgstr "DS-recorden med tag {keytag} refererer til DNSKEY-algoritme {ds_key_algo_num} ({ds_key_algo_descr}), som er reserveret til privat brug. Hentet fra navneserverne \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_KEY_ALGO_RESERVED"
+msgid "The DS record with keytag {keytag} references reserved DNSKEY algorithm {ds_key_algo_num} ({ds_key_algo_descr}). Fetched from name servers \"{servers}\"."
+msgstr "DS-recorden med tag {keytag} refererer til DNSKEY-algoritme {ds_key_algo_num} ({ds_key_algo_descr}), som er reserveret. Hentet fra navneserverne \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_KEY_ALGO_UNASSIGNED"
+msgid "The DS record with keytag {keytag} references unassigned DNSKEY algorithm {ds_key_algo_num} ({ds_key_algo_descr}). Fetched from name servers \"{servers}\"."
+msgstr "DS-recorden med tag {keytag} refererer til DNSKEY-algoritme {ds_key_algo_num} ({ds_key_algo_descr}), som ikke er tildelt. Hentet fra navneserverne \"{servers}\"."
+
+msgctxt "DNSSEC:DS02_DS_ALGO_DNSKEY_MISMATCH"
+msgid "The DS record with keytag {keytag} specifies algorithm {ds_key_algo_num} ({ds_key_algo_mnemo}), but the DNSKEY record it matches uses algorithm {algo_num} ({algo_mnemo}). Validating resolvers ignore this DS record. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "DS-recorden med tag {keytag} angiver algoritme {ds_key_algo_num} ({ds_key_algo_mnemo}), men den DNSKEY-record den matcher, bruger algoritme {algo_num} ({algo_mnemo}). Validerende resolvere ignorerer denne DS-record. Fundet på navneserverne med IP-adresserne \"{addresses}\"."

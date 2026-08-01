@@ -4,6 +4,7 @@ Status: Final
 
 ## Purpose
 - Validate DS digest algorithm usage for the child delegation and classify each observed DS digest type.
+- Classify the algorithm field of each observed DS record (the DNSKEY algorithm the DS references), so every value including private-use algorithms is visible and severity-rated.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -18,7 +19,7 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Initialize classification sets for DS digest classes, plus tracking sets for:
+2. Initialize classification sets for DS digest classes and DS algorithm field classes, plus tracking sets for:
    - parent nameservers ignored due to invalid response shape,
    - parent nameservers responding without valid DS owner,
    - parent nameservers responding with DS,
@@ -32,8 +33,8 @@ Status: Final
    - Send DS query with DNSSEC enabled.
    - If response is absent or fails required shape checks (`NOERROR`, `OPT`, `DO`, `AA`), mark nameserver as ignored.
    - If response has no DS record with owner matching child zone name, mark nameserver in `Responds Without Valid DS`.
-   - Else mark nameserver in `Responds With DS` and classify each DS digest algorithm into the corresponding DS01 tag set.
-6. Emit DS classification tags (`DS01_DS_ALGO_*`) grouped by `(digest, keytag)` with merged `servers`.
+   - Else mark nameserver in `Responds With DS` and classify each DS digest algorithm and each DS algorithm field value into the corresponding DS01 tag sets.
+6. Emit DS classification tags (`DS01_DS_ALGO_*`) grouped by `(digest, keytag)` with merged `servers`, and DS algorithm field classification tags (`DS01_KEY_ALGO_*`) grouped by `(algorithm, keytag)` with merged `servers`. The algorithm-to-class mapping mirrors the DNSKEY algorithm classification of DNSSEC05 (`dnssec01TagForKeyAlgorithm` reuses the ranges of `dnssec05TagForAlgorithm`; 253 and 254 map to `_PRIVATE`).
 7. Emit `DS01_DS_ALGO_2_MISSING` for keytags that have non-2 DS but no digest-2 DS on the same source nameservers.
 8. If no valid/non-valid DS responders exist and ignored responders exist, emit `DS01_NO_RESPONSE`.
 9. Emit informational tags based on zone type and undelegated DS status:
@@ -52,7 +53,8 @@ parentNS = ParentNameservers
 
 undelegated DS path (any parent NS has FakeDSRecords for z):
    for each DS record in fake set:
-     classify by digest -> sets[<tag>][digest][keytag] += "-"
+     classify by digest    -> sets[<tag>][digest][keytag] += "-"
+     classify by algorithm -> keyAlgoSets[<tag>][algorithm][keytag] += "-"
      digest == 2 -> algo2DS[keytag] += "-"
      else        -> nonAlgo2DS[keytag] += "-"
    respondsWithDS += "-"
@@ -71,6 +73,10 @@ Otherwise, per unique parent NS IP (parallel; fan-out = resolver.defaults.parall
           tag = dnssec01TagForDigest(digest)
             ({DEPRECATED, RESERVED, UNASSIGNED, PRIVATE, NOT_DS, OK})
           sets[tag][digest][keytag] += ns/ip
+          keyTag = dnssec01TagForKeyAlgorithm(algorithm)
+            ({OK, NOT_RECOMMENDED, DEPRECATED, NOT_ZONE_SIGN,
+              PRIVATE, RESERVED, UNASSIGNED})
+          keyAlgoSets[keyTag][algorithm][keytag] += ns/ip
           digest == 2 -> algo2DS[keytag]    += ns/ip
           else        -> nonAlgo2DS[keytag] += ns/ip
 ```
@@ -85,6 +91,12 @@ emit per-digest classification tags:
      for each digest in sorted digest keys:
        for each keytag in sorted keytag keys:
          -> <tag> (keytag, ds_algo_num, ds_algo_descr, servers)
+
+emit per-algorithm-field classification tags:
+   for each tag in sorted DS01_KEY_ALGO_* keys:
+     for each algorithm in sorted algorithm keys:
+       for each keytag in sorted keytag keys:
+         -> <tag> (keytag, ds_key_algo_num, ds_key_algo_descr, servers)
 
 algo-2 coverage:
    for each keytag in nonAlgo2DS:
@@ -118,6 +130,13 @@ emit TEST_CASE_END
 | `DS01_DS_ALGO_PRIVATE` | A DS digest algorithm value maps to private-use class. |
 | `DS01_DS_ALGO_RESERVED` | A DS digest algorithm value maps to reserved class. |
 | `DS01_DS_ALGO_UNASSIGNED` | A DS digest algorithm value maps to unassigned class. |
+| `DS01_KEY_ALGO_OK` | A DS algorithm field value maps to acceptable class. |
+| `DS01_KEY_ALGO_NOT_RECOMMENDED` | A DS algorithm field value maps to not-recommended class. |
+| `DS01_KEY_ALGO_DEPRECATED` | A DS algorithm field value maps to deprecated class. |
+| `DS01_KEY_ALGO_NOT_ZONE_SIGN` | A DS algorithm field value is not meant for zone signing. |
+| `DS01_KEY_ALGO_PRIVATE` | A DS algorithm field value maps to private-use class (253, 254). |
+| `DS01_KEY_ALGO_RESERVED` | A DS algorithm field value maps to reserved class. |
+| `DS01_KEY_ALGO_UNASSIGNED` | A DS algorithm field value maps to unassigned class. |
 | `DS01_NO_RESPONSE` | All queried parent nameservers were ignored for invalid/no response shape and no DS/non-DS responder set was produced. |
 | `DS01_PARENT_SERVER_NO_DS` | At least one parent nameserver returned a valid DS and at least one returned no valid DS. |
 | `DS01_PARENT_ZONE_NO_DS` | Parent nameservers returned no valid DS and none returned DS. |
@@ -157,6 +176,34 @@ emit TEST_CASE_END
 | `DS01_DS_ALGO_UNASSIGNED` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
 | `DS01_DS_ALGO_UNASSIGNED` | `ds_algo_num` | `int` | DS digest algorithm number from DS RDATA. |
 | `DS01_DS_ALGO_UNASSIGNED` | `ds_algo_descr` | `string` | Text description of DS digest algorithm number. |
+| `DS01_KEY_ALGO_OK` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
+| `DS01_KEY_ALGO_OK` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
+| `DS01_KEY_ALGO_OK` | `ds_key_algo_num` | `int` | DS algorithm field value from DS RDATA. |
+| `DS01_KEY_ALGO_OK` | `ds_key_algo_descr` | `string` | Text description of DS algorithm field value. |
+| `DS01_KEY_ALGO_NOT_RECOMMENDED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
+| `DS01_KEY_ALGO_NOT_RECOMMENDED` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
+| `DS01_KEY_ALGO_NOT_RECOMMENDED` | `ds_key_algo_num` | `int` | DS algorithm field value from DS RDATA. |
+| `DS01_KEY_ALGO_NOT_RECOMMENDED` | `ds_key_algo_descr` | `string` | Text description of DS algorithm field value. |
+| `DS01_KEY_ALGO_DEPRECATED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
+| `DS01_KEY_ALGO_DEPRECATED` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
+| `DS01_KEY_ALGO_DEPRECATED` | `ds_key_algo_num` | `int` | DS algorithm field value from DS RDATA. |
+| `DS01_KEY_ALGO_DEPRECATED` | `ds_key_algo_descr` | `string` | Text description of DS algorithm field value. |
+| `DS01_KEY_ALGO_NOT_ZONE_SIGN` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
+| `DS01_KEY_ALGO_NOT_ZONE_SIGN` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
+| `DS01_KEY_ALGO_NOT_ZONE_SIGN` | `ds_key_algo_num` | `int` | DS algorithm field value from DS RDATA. |
+| `DS01_KEY_ALGO_NOT_ZONE_SIGN` | `ds_key_algo_descr` | `string` | Text description of DS algorithm field value. |
+| `DS01_KEY_ALGO_PRIVATE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
+| `DS01_KEY_ALGO_PRIVATE` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
+| `DS01_KEY_ALGO_PRIVATE` | `ds_key_algo_num` | `int` | DS algorithm field value from DS RDATA. |
+| `DS01_KEY_ALGO_PRIVATE` | `ds_key_algo_descr` | `string` | Text description of DS algorithm field value. |
+| `DS01_KEY_ALGO_RESERVED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
+| `DS01_KEY_ALGO_RESERVED` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
+| `DS01_KEY_ALGO_RESERVED` | `ds_key_algo_num` | `int` | DS algorithm field value from DS RDATA. |
+| `DS01_KEY_ALGO_RESERVED` | `ds_key_algo_descr` | `string` | Text description of DS algorithm field value. |
+| `DS01_KEY_ALGO_UNASSIGNED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object), or `-` for undelegated DS source. |
+| `DS01_KEY_ALGO_UNASSIGNED` | `keytag` | `int` | DNSKEY key tag referenced by DS record. |
+| `DS01_KEY_ALGO_UNASSIGNED` | `ds_key_algo_num` | `int` | DS algorithm field value from DS RDATA. |
+| `DS01_KEY_ALGO_UNASSIGNED` | `ds_key_algo_descr` | `string` | Text description of DS algorithm field value. |
 | `DS01_NO_RESPONSE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) ignored due to invalid/no DS response shape. |
 | `DS01_PARENT_SERVER_NO_DS` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that returned no valid DS owner. |
 | `DS01_PARENT_ZONE_NO_DS` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that returned no valid DS owner. |
@@ -181,6 +228,13 @@ emit TEST_CASE_END
 | `DS01_DS_ALGO_PRIVATE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS01_DS_ALGO_RESERVED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS01_DS_ALGO_UNASSIGNED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS01_KEY_ALGO_OK` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS01_KEY_ALGO_NOT_RECOMMENDED` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS01_KEY_ALGO_DEPRECATED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS01_KEY_ALGO_NOT_ZONE_SIGN` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS01_KEY_ALGO_PRIVATE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS01_KEY_ALGO_RESERVED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS01_KEY_ALGO_UNASSIGNED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS01_NO_RESPONSE` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS01_PARENT_SERVER_NO_DS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS01_PARENT_ZONE_NO_DS` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -195,6 +249,7 @@ emit TEST_CASE_END
 - Differences (Upstream vs Gonemaster):
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
   - Upstream: Summary argument list omits `ds_algo_descr` for some DS01 tags. Gonemaster: includes `ds_algo_descr` for all emitted `DS01_DS_ALGO_*` classification tags.
+  - Upstream: does not classify the DS algorithm field. Gonemaster: emits `DS01_KEY_ALGO_*` classification tags for every observed DS algorithm field value.
 - Potential upstream report:
   - `no`
 

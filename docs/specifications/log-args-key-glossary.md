@@ -40,6 +40,14 @@ Scope:
 | `ptr_names` | `array<string>` | PTR hostname list from reverse-DNS checks. | Used for PTR mismatch detail payloads. |
 | `mail_targets` | `array<string>` | MX target hostname list. | Replaces `mailtarget_list`. |
 
+## DNSSEC Algorithm Keys
+
+| Key | Type | Meaning | Notes |
+| --- | --- | --- | --- |
+| `ds_key_algo_num` | `int` | Algorithm field value from DS RDATA (the DNSKEY algorithm the DS references). | Distinct from `ds_algo_num` (DS digest type) and `algo_num` (DNSKEY record algorithm). |
+| `ds_key_algo_descr` | `string` | Text description of the DS algorithm field value. | |
+| `ds_key_algo_mnemo` | `string` | DNSSEC algorithm mnemonic for the DS algorithm field value (for example `PRIVATEDNS`). | |
+
 ## Temporal Keys
 
 | Key | Type | Meaning | Notes |

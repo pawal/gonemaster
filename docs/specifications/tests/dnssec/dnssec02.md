@@ -32,6 +32,7 @@ Status: Final
    - Mark nameserver as responding.
    - For each DS record:
      - Find DNSKEY candidates by keytag and select a matching candidate (digest-checked when digest type is supported).
+     - A keytag candidate whose DNSKEY algorithm differs from the DS algorithm field is never a match: add keytag/ns with both algorithm values to `DS02_DS_ALGO_DNSKEY_MISMATCH` and skip the candidate. This applies on both the supported-digest and unsupported-digest branches (RFC 4034 section 5.2 requires the DS algorithm field to equal the DNSKEY algorithm).
      - If no DNSKEY by keytag exists, add keytag/ns to `DS02_NO_DNSKEY_FOR_DS`.
      - If DNSKEY exists but DS digest check fails, add keytag/ns to `DS02_NO_MATCH_DS_DNSKEY`.
      - If DNSKEY has no ZONE flag, add keytag/ns to `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` and stop processing that DS.
@@ -90,6 +91,8 @@ For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
    For each DS in dsRecords:
      matchingKeytagDNSKEYs = DNSKEYs with key.KeyTag() == ds.KeyTag
      scan matchingKeytagDNSKEYs:
+        ds.Algorithm != key.Algorithm
+           -> dsAlgoMismatch[ds.KeyTag][ds.Algorithm/key.Algorithm], skip candidate
         digest supported AND key.ToDS(ds.DigestType).Digest == ds.Digest
            -> matchingDNSKEY, matchDSDNSKEY = true
         digest unsupported
@@ -123,6 +126,9 @@ Aggregation:
     DS02_NO_MATCHING_DNSKEY_RRSIG, DS02_RRSIG_NOT_VALID_BY_DNSKEY
   per (keytag, algo):
     DS02_ALGO_NOT_SUPPORTED_BY_ZM (algo_num, algo_mnemo)
+  per (keytag, ds algo, dnskey algo):
+    DS02_DS_ALGO_DNSKEY_MISMATCH (keytag, ds_key_algo_num, ds_key_algo_mnemo,
+                                  algo_num, algo_mnemo, addresses)
 
   nsDNSKEY  = responding child NS without DS-matching DNSKEY
   nsRRSIG   = responding child NS without RRSIG match for any DS-matching DNSKEY
@@ -139,6 +145,7 @@ emit TEST_CASE_END
 | Tag | Emitted when |
 | --- | --- |
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | DNSKEY RRSIG verification requires an unsupported algorithm for this build/runtime. |
+| `DS02_DS_ALGO_DNSKEY_MISMATCH` | A DNSKEY matches the DS keytag but the DS algorithm field differs from the DNSKEY algorithm; validating resolvers ignore such a DS record. |
 | `DS02_MATCH_DS_DNSKEY` | At least one child nameserver has a DS-matching DNSKEY with a valid DNSKEY RRSIG. |
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | DS-matching DNSKEY is found but lacks ZONE flag. |
 | `DS02_DNSKEY_NOT_SEP` | DS-matching DNSKEY is found but lacks SEP flag. |
@@ -161,6 +168,12 @@ emit TEST_CASE_END
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | `algo_num` | `int` | DNSSEC algorithm number that verification cannot process. |
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | `algo_mnemo` | `string` | DNSSEC algorithm mnemonic string. |
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS02_DS_ALGO_DNSKEY_MISMATCH` | `keytag` | `int` | DS keytag whose DS algorithm field disagrees with the DNSKEY algorithm. |
+| `DS02_DS_ALGO_DNSKEY_MISMATCH` | `ds_key_algo_num` | `int` | Algorithm field value from the DS RDATA. |
+| `DS02_DS_ALGO_DNSKEY_MISMATCH` | `ds_key_algo_mnemo` | `string` | DNSSEC algorithm mnemonic for the DS algorithm field value. |
+| `DS02_DS_ALGO_DNSKEY_MISMATCH` | `algo_num` | `int` | Algorithm of the keytag-matching DNSKEY record. |
+| `DS02_DS_ALGO_DNSKEY_MISMATCH` | `algo_mnemo` | `string` | DNSSEC algorithm mnemonic for the DNSKEY algorithm. |
+| `DS02_DS_ALGO_DNSKEY_MISMATCH` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | `keytag` | `int` | DS/DNSKEY keytag lacking ZONE bit. |
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_DNSKEY_NOT_SEP` | `keytag` | `int` | DS/DNSKEY keytag lacking SEP bit. |
@@ -191,6 +204,7 @@ emit TEST_CASE_END
 | Tag | Level | Notes |
 | --- | --- | --- |
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS02_DS_ALGO_DNSKEY_MISMATCH` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_DNSKEY_NOT_SEP` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -217,4 +231,5 @@ emit TEST_CASE_END
 - If parent DS discovery yields no DS records, testcase stops after boundary tags and emits no DS02 findings.
 - Child nameservers are deduplicated by IP before DNSKEY checks, so repeated names on one IP collapse into one probe context.
 - `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` and `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` are mutually exclusive by implementation (`else if` branch).
+- DS algorithm field mismatch: a DS whose algorithm field differs from the keytag-matching DNSKEY algorithm never counts as a match. A zone whose only DS has a mismatched algorithm therefore gets both `DS02_DS_ALGO_DNSKEY_MISMATCH` and the summary `DS02_NO_VALID_DNSKEY_FOR_ANY_DS`; a zone with an additional correct DS keeps `DS02_MATCH_DS_DNSKEY` alongside the mismatch tag. The keytag-fallback selection of the candidate for the ZONE/SEP flag checks is unaffected.
 - Large RSA public exponent exception: when a DS-linked DNSKEY RRSIG fails verification only because the key is an RSA key whose public exponent exceeds what the local verifier (miekg/dns plus `crypto/rsa`) can use (more than 4 bytes, or greater than 2^31-1), the finding is reclassified from the `ERROR` `DS02_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS02_RSA_EXPONENT_UNSUPPORTED`. Such a key is treated as indeterminate rather than failed: it does not raise `DS02_NO_MATCHING_DNSKEY_RRSIG`, and when it is the sole reason a nameserver has no validating DS-linked key, `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` is suppressed. The zone may validate perfectly on public resolvers; gonemaster simply cannot check the signature locally.

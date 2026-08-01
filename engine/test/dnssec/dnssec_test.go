@@ -298,6 +298,236 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 	}
 }
 
+func TestDNSSEC01TagForKeyAlgorithmTable(t *testing.T) {
+	// Covers every range boundary of the classification. The mapping must use
+	// the exact same value ranges as dnssec05TagForAlgorithm, with only the
+	// tag prefix swapped, so each case also cross-checks against it.
+	cases := []struct {
+		algo uint8
+		want string
+	}{
+		{0, "DS01_KEY_ALGO_NOT_ZONE_SIGN"},
+		{1, "DS01_KEY_ALGO_DEPRECATED"},
+		{2, "DS01_KEY_ALGO_NOT_ZONE_SIGN"},
+		{3, "DS01_KEY_ALGO_DEPRECATED"},
+		{4, "DS01_KEY_ALGO_RESERVED"},
+		{5, "DS01_KEY_ALGO_DEPRECATED"},
+		{8, "DS01_KEY_ALGO_OK"},
+		{10, "DS01_KEY_ALGO_NOT_RECOMMENDED"},
+		{13, "DS01_KEY_ALGO_OK"},
+		{16, "DS01_KEY_ALGO_OK"},
+		{17, "DS01_KEY_ALGO_OK"},
+		{18, "DS01_KEY_ALGO_UNASSIGNED"},
+		{22, "DS01_KEY_ALGO_UNASSIGNED"},
+		{23, "DS01_KEY_ALGO_OK"},
+		{24, "DS01_KEY_ALGO_UNASSIGNED"},
+		{122, "DS01_KEY_ALGO_UNASSIGNED"},
+		{123, "DS01_KEY_ALGO_RESERVED"},
+		{251, "DS01_KEY_ALGO_RESERVED"},
+		{252, "DS01_KEY_ALGO_NOT_ZONE_SIGN"},
+		{253, "DS01_KEY_ALGO_PRIVATE"},
+		{254, "DS01_KEY_ALGO_PRIVATE"},
+		{255, "DS01_KEY_ALGO_RESERVED"},
+	}
+	for _, tc := range cases {
+		got := dnssec01TagForKeyAlgorithm(tc.algo)
+		if got != tc.want {
+			t.Errorf("algo %d: got %s, want %s", tc.algo, got, tc.want)
+		}
+		fromDS05 := "DS01_KEY_ALGO_" + strings.TrimPrefix(dnssec05TagForAlgorithm(tc.algo), "DS05_ALGO_")
+		if got != fromDS05 {
+			t.Errorf("algo %d: DS01 class %s diverges from DS05 class %s", tc.algo, got, fromDS05)
+		}
+	}
+}
+
+func TestDNSSEC01KeyAlgoPrivate(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origGetParent := parentNameservers
+	origZoneParent := zoneParent
+	origHasFake := hasFakeAddresses
+	t.Cleanup(func() {
+		parentNameservers = origGetParent
+		zoneParent = origZoneParent
+		hasFakeAddresses = origHasFake
+	})
+
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+	hasFakeAddresses = func(_ *zone.Zone) bool {
+		return false
+	}
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.33", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DS" {
+			return packet.Packet{}
+		}
+		// DS algorithm field 253 (private use), digest algorithm 2 (acceptable).
+		return dsPacket(qname, 12345, 253, 2)
+	})
+
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC01(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec01: %v", err)
+	}
+	entry := firstEntryByTag(entries, "DS01_KEY_ALGO_PRIVATE")
+	if entry == nil {
+		t.Fatalf("expected DS01_KEY_ALGO_PRIVATE for DS algorithm field 253")
+	}
+	if entry.Args["ds_key_algo_num"] != uint8(253) {
+		t.Fatalf("expected ds_key_algo_num 253, got %#v", entry.Args["ds_key_algo_num"])
+	}
+	if entry.Args["keytag"] != uint16(12345) {
+		t.Fatalf("expected keytag 12345, got %#v", entry.Args["keytag"])
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) == 0 {
+		t.Fatalf("expected emitting servers list, got %#v", entry.Args["servers"])
+	}
+}
+
+func TestDNSSEC01KeyAlgoOK(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origGetParent := parentNameservers
+	origZoneParent := zoneParent
+	origHasFake := hasFakeAddresses
+	t.Cleanup(func() {
+		parentNameservers = origGetParent
+		zoneParent = origZoneParent
+		hasFakeAddresses = origHasFake
+	})
+
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return nil, nil
+	}
+	hasFakeAddresses = func(_ *zone.Zone) bool {
+		return false
+	}
+
+	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.34", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DS" {
+			return packet.Packet{}
+		}
+		return dsPacket(qname, 12345, 13, 2)
+	})
+
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC01(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec01: %v", err)
+	}
+	entry := firstEntryByTag(entries, "DS01_KEY_ALGO_OK")
+	if entry == nil {
+		t.Fatalf("expected DS01_KEY_ALGO_OK for DS algorithm field 13")
+	}
+	if entry.Args["ds_key_algo_num"] != uint8(13) {
+		t.Fatalf("expected ds_key_algo_num 13, got %#v", entry.Args["ds_key_algo_num"])
+	}
+	// The digest classification must be unaffected by the new tags.
+	if !hasEntryTag(entries, "DS01_DS_ALGO_OK") {
+		t.Fatalf("expected DS01_DS_ALGO_OK for digest algorithm 2")
+	}
+}
+
+func TestDNSSEC01KeyAlgoUndelegated(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origGetParent := parentNameservers
+	origZoneParent := zoneParent
+	origHasFake := hasFakeAddresses
+	t.Cleanup(func() {
+		parentNameservers = origGetParent
+		zoneParent = origZoneParent
+		hasFakeAddresses = origHasFake
+	})
+
+	r := &recursor.Recursor{}
+	if err := r.AddFakeAddresses(".", map[string][]string{
+		"ns1.root": {"192.0.2.1"},
+	}); err != nil {
+		t.Fatalf("add fake root addresses: %v", err)
+	}
+	if err := r.AddFakeAddresses("example", map[string][]string{
+		"ns-child.example": {"192.0.2.53"},
+	}); err != nil {
+		t.Fatalf("add fake child addresses: %v", err)
+	}
+
+	parent, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new parent zone: %v", err)
+	}
+	child, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new child zone: %v", err)
+	}
+
+	parentNS, err := nameserver.NewWithContext(ctx, "ns1.root", "192.0.2.1", r.Client())
+	if err != nil {
+		t.Fatalf("new parent nameserver: %v", err)
+	}
+	if err := parentNS.AddFakeDS("example", []nameserver.DSData{
+		{
+			KeyTag:     12345,
+			Algorithm:  253,
+			DigestType: 2,
+			Digest:     "ABCD",
+		},
+	}); err != nil {
+		t.Fatalf("add fake DS: %v", err)
+	}
+
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+	zoneParent = func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+		return &parent, nil
+	}
+	hasFakeAddresses = func(_ *zone.Zone) bool {
+		return true
+	}
+
+	entries, err := DNSSEC01(ctx, &child)
+	if err != nil {
+		t.Fatalf("dnssec01: %v", err)
+	}
+	entry := firstEntryByTag(entries, "DS01_KEY_ALGO_PRIVATE")
+	if entry == nil {
+		t.Fatalf("expected DS01_KEY_ALGO_PRIVATE from undelegated fake DS")
+	}
+	servers, ok := entry.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one server for undelegated fake DS, got %#v", entry.Args["servers"])
+	}
+	if servers[0]["ns"] != "-" {
+		t.Fatalf("expected undelegated fake DS source (servers[0].ns='-'), got %#v", servers[0])
+	}
+}
+
 func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)
@@ -537,6 +767,291 @@ func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "DS02_DNSKEY_NOT_FOR_ZONE_SIGNING") {
 		t.Fatalf("expected DS02_DNSKEY_NOT_FOR_ZONE_SIGNING")
+	}
+}
+
+// signedDNSKEYPair generates a real ECDSAP256SHA256 zone key and a valid
+// RRSIG over its single-record DNSKEY RRset, so DNSSEC02's signature
+// verification genuinely succeeds unless the DS is rejected earlier.
+func signedDNSKEYPair(t *testing.T, owner string) (*dns.DNSKEY, *dns.RRSIG) {
+	t.Helper()
+
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}
+	key.Flags = dns.FlagZONE | dns.FlagSEP
+	key.Protocol = 3
+	key.Algorithm = dns.ECDSAP256SHA256
+	priv, err := key.Generate(256)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	now := time.Now().UTC()
+	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}
+	sig.Algorithm = key.Algorithm
+	sig.Inception = uint32(now.Add(-time.Hour).Unix())
+	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
+	sig.KeyTag = key.KeyTag()
+	sig.SignerName = dnsutil.Fqdn(owner)
+	signer, ok := priv.(crypto.Signer)
+	if !ok {
+		t.Fatalf("private key does not implement crypto.Signer")
+	}
+	if err := sig.Sign(signer, []dns.RR{key}, &dns.SignOption{}); err != nil {
+		t.Fatalf("sign DNSKEY rrset: %v", err)
+	}
+	return key, sig
+}
+
+func dnssec02Wire(t *testing.T, parentNS nameserver.Nameserver, childNS nameserver.Nameserver) func() {
+	t.Helper()
+
+	origGetParent := parentNameservers
+	origGlue := glueNameservers
+	origApex := apexNameservers
+
+	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	}
+	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{childNS}, nil
+	}
+	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	}
+
+	return func() {
+		parentNameservers = origGetParent
+		glueNameservers = origGlue
+		apexNameservers = origApex
+	}
+}
+
+func TestDNSSEC02DSAlgorithmMismatch(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	key, sig := signedDNSKEYPair(t, "example")
+
+	// The published DS carries algorithm 253 although the DNSKEY uses 13;
+	// keytag and digest still match (the dragangaming.com/alvinsong.top shape).
+	ds := key.ToDS(2)
+	if ds == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+	mismatchDS := *ds
+	mismatchDS.Algorithm = 253
+
+	parentNS := newNameserver(t, ctx, "ns-parent.example", "192.0.2.40", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DS" {
+			return packet.Packet{}
+		}
+		dsCopy := mismatchDS
+		return dsPacketFromDS(qname, &dsCopy)
+	})
+	childNS := newNameserver(t, ctx, "ns-child.example", "192.0.2.41", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		keyCopy := *key
+		sigCopy := *sig
+		return answerPacket(qname, dns.TypeDNSKEY, &keyCopy, &sigCopy)
+	})
+	t.Cleanup(dnssec02Wire(t, parentNS, childNS))
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC02(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec02: %v", err)
+	}
+
+	entry := firstEntryByTag(entries, "DS02_DS_ALGO_DNSKEY_MISMATCH")
+	if entry == nil {
+		t.Fatalf("expected DS02_DS_ALGO_DNSKEY_MISMATCH")
+	}
+	if entry.Args["ds_key_algo_num"] != uint8(253) {
+		t.Fatalf("expected ds_key_algo_num 253, got %#v", entry.Args["ds_key_algo_num"])
+	}
+	if entry.Args["ds_key_algo_mnemo"] != "PRIVATEDNS" {
+		t.Fatalf("expected ds_key_algo_mnemo PRIVATEDNS, got %#v", entry.Args["ds_key_algo_mnemo"])
+	}
+	if entry.Args["algo_num"] != uint8(13) {
+		t.Fatalf("expected algo_num 13, got %#v", entry.Args["algo_num"])
+	}
+	if entry.Args["algo_mnemo"] != "ECDSAP256SHA256" {
+		t.Fatalf("expected algo_mnemo ECDSAP256SHA256, got %#v", entry.Args["algo_mnemo"])
+	}
+	if entry.Args["keytag"] != key.KeyTag() {
+		t.Fatalf("expected keytag %d, got %#v", key.KeyTag(), entry.Args["keytag"])
+	}
+
+	// The mismatched DS must not count as a match even though keytag and
+	// digest agree and the DNSKEY RRSIG is valid.
+	if hasEntryTag(entries, "DS02_MATCH_DS_DNSKEY") {
+		t.Fatalf("did not expect DS02_MATCH_DS_DNSKEY for algorithm-mismatched DS")
+	}
+	// The specific mismatch tag replaces the generic digest-mismatch tag.
+	if hasEntryTag(entries, "DS02_NO_MATCH_DS_DNSKEY") {
+		t.Fatalf("did not expect DS02_NO_MATCH_DS_DNSKEY for algorithm-mismatched DS")
+	}
+	if !hasEntryTag(entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS") {
+		t.Fatalf("expected DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
+	}
+}
+
+func TestDNSSEC02DSAlgorithmMismatchAlongsideValidDS(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	key, sig := signedDNSKEYPair(t, "example")
+
+	goodDS := key.ToDS(2)
+	if goodDS == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+	mismatchDS := *goodDS
+	mismatchDS.Algorithm = 253
+
+	parentNS := newNameserver(t, ctx, "ns-parent.example", "192.0.2.42", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DS" {
+			return packet.Packet{}
+		}
+		goodCopy := *goodDS
+		badCopy := mismatchDS
+		return answerPacket(qname, dns.TypeDS, &goodCopy, &badCopy)
+	})
+	childNS := newNameserver(t, ctx, "ns-child.example", "192.0.2.43", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		keyCopy := *key
+		sigCopy := *sig
+		return answerPacket(qname, dns.TypeDNSKEY, &keyCopy, &sigCopy)
+	})
+	t.Cleanup(dnssec02Wire(t, parentNS, childNS))
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC02(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec02: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS02_MATCH_DS_DNSKEY") {
+		t.Fatalf("expected DS02_MATCH_DS_DNSKEY from the correct DS")
+	}
+	if !hasEntryTag(entries, "DS02_DS_ALGO_DNSKEY_MISMATCH") {
+		t.Fatalf("expected DS02_DS_ALGO_DNSKEY_MISMATCH from the mismatched DS")
+	}
+	if hasEntryTag(entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS") {
+		t.Fatalf("did not expect DS02_NO_VALID_DNSKEY_FOR_ANY_DS when a correct DS matches")
+	}
+}
+
+func TestDNSSEC02DSAlgorithmMismatchUnsupportedDigest(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	key, sig := signedDNSKEYPair(t, "example")
+
+	// Unsupported digest type: this branch used to accept any keytag
+	// candidate without an algorithm check.
+	ds := key.ToDS(2)
+	if ds == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+	mismatchDS := *ds
+	mismatchDS.Algorithm = 253
+	mismatchDS.DigestType = 6
+
+	parentNS := newNameserver(t, ctx, "ns-parent.example", "192.0.2.44", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DS" {
+			return packet.Packet{}
+		}
+		dsCopy := mismatchDS
+		return dsPacketFromDS(qname, &dsCopy)
+	})
+	childNS := newNameserver(t, ctx, "ns-child.example", "192.0.2.45", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		keyCopy := *key
+		sigCopy := *sig
+		return answerPacket(qname, dns.TypeDNSKEY, &keyCopy, &sigCopy)
+	})
+	t.Cleanup(dnssec02Wire(t, parentNS, childNS))
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC02(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec02: %v", err)
+	}
+
+	if !hasEntryTag(entries, "DS02_DS_ALGO_DNSKEY_MISMATCH") {
+		t.Fatalf("expected DS02_DS_ALGO_DNSKEY_MISMATCH on the unsupported-digest branch")
+	}
+	if hasEntryTag(entries, "DS02_MATCH_DS_DNSKEY") {
+		t.Fatalf("did not expect DS02_MATCH_DS_DNSKEY for algorithm-mismatched DS with unsupported digest")
+	}
+	if !hasEntryTag(entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS") {
+		t.Fatalf("expected DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
+	}
+}
+
+func TestDNSSEC02MatchWithoutAlgorithmMismatch(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	key, sig := signedDNSKEYPair(t, "example")
+
+	ds := key.ToDS(2)
+	if ds == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+
+	parentNS := newNameserver(t, ctx, "ns-parent.example", "192.0.2.46", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DS" {
+			return packet.Packet{}
+		}
+		dsCopy := *ds
+		return dsPacketFromDS(qname, &dsCopy)
+	})
+	childNS := newNameserver(t, ctx, "ns-child.example", "192.0.2.47", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		keyCopy := *key
+		sigCopy := *sig
+		return answerPacket(qname, dns.TypeDNSKEY, &keyCopy, &sigCopy)
+	})
+	t.Cleanup(dnssec02Wire(t, parentNS, childNS))
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC02(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec02: %v", err)
+	}
+
+	// Happy path: a DS whose algorithm field equals the DNSKEY algorithm
+	// still matches, and the mismatch tag never appears.
+	if !hasEntryTag(entries, "DS02_MATCH_DS_DNSKEY") {
+		t.Fatalf("expected DS02_MATCH_DS_DNSKEY for the correct DS")
+	}
+	if hasEntryTag(entries, "DS02_DS_ALGO_DNSKEY_MISMATCH") {
+		t.Fatalf("did not expect DS02_DS_ALGO_DNSKEY_MISMATCH for the correct DS")
+	}
+	if hasEntryTag(entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS") {
+		t.Fatalf("did not expect DS02_NO_VALID_DNSKEY_FOR_ANY_DS for the correct DS")
 	}
 }
 

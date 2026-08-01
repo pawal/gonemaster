@@ -8,6 +8,8 @@ Adds response-time analysis to the dashboards. Extends the Zone09 mail checks, a
 
 ### Added
 
+- engine: DNSSEC01 classifies the DS record algorithm field, so every value including private algorithms is visible and countable, in every shipped locale
+- engine: DNSSEC02 reports a DS whose algorithm field disagrees with the matching DNSKEY as an error, with a public result-page explanation
 - analysis-ui, server: latency rankings and trends - sortable entity lists, fastest and slowest on the front page, trend lines on detail pages
 - analysis-ui, server: IPv4 vs IPv6 response times per nameserver, and a response-times table on the domain detail page
 - engine: new Zone09 findings for arpa MX, null MX use, no-MX answers, and no usable MX response, in every shipped locale
@@ -21,6 +23,7 @@ Adds response-time analysis to the dashboards. Extends the Zone09 mail checks, a
 
 ### Fixed
 
+- engine: DNSSEC02 no longer accepts a DS as matching a DNSKEY when the DS algorithm field differs from the key algorithm; validating resolvers ignore such a DS
 - engine: fix Consistency05 bogus glue mismatches for out-of-domain name servers
 - analysis-ui: cleared-tag diff links point at the from snapshot
 - ui-public: the DNSSEC chain diagram scales to fit small screens

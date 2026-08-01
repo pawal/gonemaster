@@ -984,5 +984,7 @@
   "pub.glossary.bailiwick": "A name is in-bailiwick when it sits inside the zone being delegated. Such nameservers need glue, because their addresses can only be found within that same zone.",
   "pub.glossary.chain-of-trust": "The chain of trust is the DNSSEC link from the root zone down to yours: each level signs a record vouching for the key of the level below, so a resolver can trust your data from the top down.",
   "pub.glossary.ipv4": "IPv4 is the older internet addressing scheme (for example 192.0.2.1). Many clients still rely on it, so nameservers should stay reachable over it.",
-  "pub.glossary.ipv6": "IPv6 is the newer internet addressing scheme (for example 2001:db8::1), designed to succeed IPv4 as address space runs out."
+  "pub.glossary.ipv6": "IPv6 is the newer internet addressing scheme (for example 2001:db8::1), designed to succeed IPv4 as address space runs out.",
+  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.header": "DS algorithm does not match DNSKEY",
+  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.desc": "A DS record at the parent names a different algorithm than the DNSKEY it points to, even though the key tag and digest line up. Validating resolvers ignore a DS whose algorithm field disagrees with the key, so this DS cannot establish trust; some resolvers fail the whole zone. Replace the DS with one generated from the actual key."
 }

@@ -186,6 +186,14 @@ Description:
 
 The DNSKEY RRset is not signed by a DNSKEY that any DS record at the parent matches. Validating resolvers cannot bootstrap trust: they have the DS, and they have the DNSKEY set, but no key authorised by the DS signs the set.
 
+## Tag DS02_DS_ALGO_DNSKEY_MISMATCH
+
+Header: DS algorithm does not match DNSKEY
+
+Description:
+
+A DS record at the parent names a different algorithm than the DNSKEY it points to, even though the key tag and digest line up. Validating resolvers ignore a DS whose algorithm field disagrees with the key, so this DS cannot establish trust; some resolvers fail the whole zone. Replace the DS with one generated from the actual key.
+
 ## Tag DS02_NO_DNSKEY_FOR_DS
 
 Header: No DNSKEY matches this DS

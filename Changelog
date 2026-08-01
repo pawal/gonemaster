@@ -4,13 +4,26 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+Adds response-time analysis to the dashboards. Extends the Zone09 mail checks, and makes Consistency05 verify that the parent name servers agree on the delegation.
+
 ### Added
 
-- engine: Consistency05 now compares the delegation NS set served by each responding parent name server and reports disagreement with the new MULTIPLE_DELEGATION_NS_SET and DELEGATION_NS_SET findings, using no additional DNS queries
+- analysis-ui, server: latency rankings and trends - sortable entity lists, fastest and slowest on the front page, trend lines on detail pages
+- analysis-ui, server: IPv4 vs IPv6 response times per nameserver, and a response-times table on the domain detail page
+- engine: new Zone09 findings for arpa MX, null MX use, no-MX answers, and no usable MX response, in every shipped locale
+- engine: Consistency05 reports when parent name servers serve different delegation NS sets, with no extra DNS queries
+- analysis-ui: a friendly note when a tag is absent from the selected snapshot
+
+### Changed
+
+- engine: Zone09 queries MX without requiring a SOA answer first, and email-domain findings name the mail target
+- admin-ui, ui-public, analysis-ui: update postcss and @sveltejs/kit for npm audit findings
 
 ### Fixed
 
-- engine: fix Consistency05 reporting bogus glue mismatches for out-of-domain name servers
+- engine: fix Consistency05 bogus glue mismatches for out-of-domain name servers
+- analysis-ui: cleared-tag diff links point at the from snapshot
+- ui-public: the DNSSEC chain diagram scales to fit small screens
 
 ## [v1.6.3] - 2026-07-19
 

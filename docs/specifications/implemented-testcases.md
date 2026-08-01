@@ -43,7 +43,7 @@ make spec-export-implemented
 - consistency02 - Check SOA RNAME consistency across nameservers for the tested zone.
 - consistency03 - Check consistency of SOA timer fields (`refresh`, `retry`, `expire`, `minimum`) across nameservers.
 - consistency04 - Check NS RRset consistency across nameservers for the tested zone.
-- consistency05 - Compare delegation glue addresses against child authoritative address data for in-domain nameservers.
+- consistency05 - Compare the delegation NS set (NS names plus attached glue) served by each responding parent nameserver.
 - consistency06 - Check SOA MNAME consistency across nameservers for the tested zone.
 
 ### delegation (7)

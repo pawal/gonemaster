@@ -21,6 +21,13 @@ _Do not edit by hand - regenerate with the command above._
 | `DS01_DS_ALGO_PRIVATE` | `ERROR` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
 | `DS01_DS_ALGO_RESERVED` | `ERROR` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
 | `DS01_DS_ALGO_UNASSIGNED` | `ERROR` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
+| `DS01_KEY_ALGO_DEPRECATED` | `ERROR` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
+| `DS01_KEY_ALGO_NOT_RECOMMENDED` | `WARNING` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
+| `DS01_KEY_ALGO_NOT_ZONE_SIGN` | `ERROR` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
+| `DS01_KEY_ALGO_OK` | `INFO` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
+| `DS01_KEY_ALGO_PRIVATE` | `ERROR` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
+| `DS01_KEY_ALGO_RESERVED` | `ERROR` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
+| `DS01_KEY_ALGO_UNASSIGNED` | `ERROR` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
 | `DS01_NO_RESPONSE` | `WARNING` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
 | `DS01_PARENT_SERVER_NO_DS` | `ERROR` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
 | `DS01_PARENT_ZONE_NO_DS` | `NOTICE` | [dnssec01](../tests/dnssec/dnssec01.md) | yes |
@@ -30,6 +37,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_DNSKEY_NOT_SEP` | `NOTICE` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
+| `DS02_DS_ALGO_DNSKEY_MISMATCH` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_MATCH_DS_DNSKEY` | `INFO` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_NO_DNSKEY_FOR_DS` | `WARNING` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_NO_MATCHING_DNSKEY_RRSIG` | `WARNING` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |

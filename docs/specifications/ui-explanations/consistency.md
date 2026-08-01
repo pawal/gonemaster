@@ -67,3 +67,11 @@ Header: Glue address disagrees with public DNS
 Description:
 
 The parent zone's delegation for your domain includes glue address records for a nameserver whose name is outside the zone, and those addresses do not match what is visible in the public DNS for that name. Out-of-zone glue should not be used at all - and when it disagrees with reality it is guaranteed to cause inconsistent lookups depending on which resolver a client happens to use.
+
+## Tag MULTIPLE_DELEGATION_NS_SET
+
+Header: Parent nameservers serve different delegations
+
+Description:
+
+The parent zone's nameservers do not all hand out the same delegation for your zone - the NS names or glue addresses differ depending on which parent server is asked. This is normal for a short time after a delegation change; if it persists, resolvers keep being steered to different nameserver sets and some may reach servers that no longer host your zone.

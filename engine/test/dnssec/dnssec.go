@@ -309,6 +309,13 @@ func Metadata() map[string][]string {
 			"DS01_DS_ALGO_PRIVATE",
 			"DS01_DS_ALGO_RESERVED",
 			"DS01_DS_ALGO_UNASSIGNED",
+			"DS01_KEY_ALGO_DEPRECATED",
+			"DS01_KEY_ALGO_NOT_RECOMMENDED",
+			"DS01_KEY_ALGO_NOT_ZONE_SIGN",
+			"DS01_KEY_ALGO_OK",
+			"DS01_KEY_ALGO_PRIVATE",
+			"DS01_KEY_ALGO_RESERVED",
+			"DS01_KEY_ALGO_UNASSIGNED",
 			"DS01_NO_RESPONSE",
 			"DS01_PARENT_SERVER_NO_DS",
 			"DS01_PARENT_ZONE_NO_DS",
@@ -324,6 +331,7 @@ func Metadata() map[string][]string {
 			"DS02_DNSKEY_NOT_FOR_ZONE_SIGNING",
 			"DS02_DNSKEY_NOT_SEP",
 			"DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS",
+			"DS02_DS_ALGO_DNSKEY_MISMATCH",
 			"DS02_MATCH_DS_DNSKEY",
 			"DS02_NO_DNSKEY_FOR_DS",
 			"DS02_NO_MATCHING_DNSKEY_RRSIG",
@@ -664,6 +672,17 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		"DS01_DS_ALGO_OK":         {},
 	}
 
+	// Classification of the DS algorithm field (the referenced DNSKEY algorithm).
+	keyAlgoSets := map[string]map[uint8]map[uint16][]string{
+		"DS01_KEY_ALGO_OK":              {},
+		"DS01_KEY_ALGO_NOT_RECOMMENDED": {},
+		"DS01_KEY_ALGO_DEPRECATED":      {},
+		"DS01_KEY_ALGO_NOT_ZONE_SIGN":   {},
+		"DS01_KEY_ALGO_PRIVATE":         {},
+		"DS01_KEY_ALGO_RESERVED":        {},
+		"DS01_KEY_ALGO_UNASSIGNED":      {},
+	}
+
 	parentNS, err := parentNameservers(ctx, z)
 	if err != nil {
 		return results, err
@@ -694,6 +713,12 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							sets[tag][digest] = map[uint16][]string{}
 						}
 						sets[tag][digest][keytag] = append(sets[tag][digest][keytag], nsLabel)
+						algo := ds.Algorithm
+						algoTag := dnssec01TagForKeyAlgorithm(algo)
+						if keyAlgoSets[algoTag][algo] == nil {
+							keyAlgoSets[algoTag][algo] = map[uint16][]string{}
+						}
+						keyAlgoSets[algoTag][algo][keytag] = append(keyAlgoSets[algoTag][algo][keytag], nsLabel)
 						if digest == 2 {
 							algo2DS[keytag] = append(algo2DS[keytag], nsLabel)
 						} else {
@@ -714,6 +739,7 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			respondsWithoutValid []string
 			respondsWith         []string
 			sets                 map[string]map[uint8]map[uint16][]string
+			keyAlgoSets          map[string]map[uint8]map[uint16][]string
 			algo2DS              map[uint16][]string
 			nonAlgo2DS           map[uint16][]string
 		}
@@ -729,9 +755,10 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				ns := matchingNS[0]
 				outcome := parentOutcome{
-					sets:       map[string]map[uint8]map[uint16][]string{},
-					algo2DS:    map[uint16][]string{},
-					nonAlgo2DS: map[uint16][]string{},
+					sets:        map[string]map[uint8]map[uint16][]string{},
+					keyAlgoSets: map[string]map[uint8]map[uint16][]string{},
+					algo2DS:     map[uint16][]string{},
+					nonAlgo2DS:  map[uint16][]string{},
 				}
 
 				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "DS"); err != nil {
@@ -788,6 +815,15 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						outcome.sets[tag][digest] = map[uint16][]string{}
 					}
 					outcome.sets[tag][digest][keytag] = append(outcome.sets[tag][digest][keytag], matchingStrings...)
+					algo := ds.Algorithm
+					algoTag := dnssec01TagForKeyAlgorithm(algo)
+					if outcome.keyAlgoSets[algoTag] == nil {
+						outcome.keyAlgoSets[algoTag] = map[uint8]map[uint16][]string{}
+					}
+					if outcome.keyAlgoSets[algoTag][algo] == nil {
+						outcome.keyAlgoSets[algoTag][algo] = map[uint16][]string{}
+					}
+					outcome.keyAlgoSets[algoTag][algo][keytag] = append(outcome.keyAlgoSets[algoTag][algo][keytag], matchingStrings...)
 					if digest == 2 {
 						outcome.algo2DS[keytag] = append(outcome.algo2DS[keytag], matchingStrings...)
 					} else {
@@ -825,6 +861,19 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 				}
 			}
+			for tag, algoMap := range outcome.keyAlgoSets {
+				if keyAlgoSets[tag] == nil {
+					keyAlgoSets[tag] = map[uint8]map[uint16][]string{}
+				}
+				for algo, keytagMap := range algoMap {
+					if keyAlgoSets[tag][algo] == nil {
+						keyAlgoSets[tag][algo] = map[uint16][]string{}
+					}
+					for keytag, nsList := range keytagMap {
+						keyAlgoSets[tag][algo][keytag] = append(keyAlgoSets[tag][algo][keytag], nsList...)
+					}
+				}
+			}
 			for keytag, nsList := range outcome.algo2DS {
 				algo2DS[keytag] = append(algo2DS[keytag], nsList...)
 			}
@@ -856,6 +905,37 @@ func DNSSEC01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					"keytag":        keytag,
 					"ds_algo_num":   digest,
 					"ds_algo_descr": digestDescription(digest),
+				}
+				setTypedServersFromNames(args, keytags[keytag])
+				if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
+					return results, err
+				}
+			}
+		}
+	}
+
+	keyAlgoTagKeys := slices.Sorted(maps.Keys(keyAlgoSets))
+	for _, tag := range keyAlgoTagKeys {
+		values := keyAlgoSets[tag]
+		algoKeys := make([]int, 0, len(values))
+		for algo := range values {
+			algoKeys = append(algoKeys, int(algo))
+		}
+		sort.Ints(algoKeys)
+		for _, algoKey := range algoKeys {
+			algo := uint8(algoKey)
+			keytags := values[algo]
+			keytagKeys := make([]int, 0, len(keytags))
+			for keytag := range keytags {
+				keytagKeys = append(keytagKeys, int(keytag))
+			}
+			sort.Ints(keytagKeys)
+			for _, keytagKey := range keytagKeys {
+				keytag := uint16(keytagKey)
+				args := map[string]any{
+					"keytag":            keytag,
+					"ds_key_algo_num":   algo,
+					"ds_key_algo_descr": algoPropertyFor(algo).description,
 				}
 				setTypedServersFromNames(args, keytags[keytag])
 				if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
@@ -929,6 +1009,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var dsRecords []*dns.DS
 	noDNSKEYForDS := map[uint16][]string{}
 	noMatchDSDNSKEY := map[uint16][]string{}
+	dsAlgoMismatch := map[uint16]map[[2]uint8][]string{}
 	dnskeyNotForZoneSigning := map[uint16][]string{}
 	dnskeyNotSEP := map[uint16][]string{}
 	noMatchingDNSKEYRRSIG := map[uint16][]string{}
@@ -1037,6 +1118,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			hasRRSIGMatchDS         bool
 			noDNSKEYForDS           map[uint16]bool
 			noMatchDSDNSKEY         map[uint16]bool
+			dsAlgoMismatch          map[uint16]map[[2]uint8]bool
 			dnskeyNotForZoneSigning map[uint16]bool
 			dnskeyNotSEP            map[uint16]bool
 			noMatchingDNSKEYRRSIG   map[uint16]bool
@@ -1067,6 +1149,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					nsIP:                    ns.Address.String(),
 					noDNSKEYForDS:           map[uint16]bool{},
 					noMatchDSDNSKEY:         map[uint16]bool{},
+					dsAlgoMismatch:          map[uint16]map[[2]uint8]bool{},
 					dnskeyNotForZoneSigning: map[uint16]bool{},
 					dnskeyNotSEP:            map[uint16]bool{},
 					noMatchingDNSKEYRRSIG:   map[uint16]bool{},
@@ -1123,6 +1206,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					var matchingDNSKEY *dns.DNSKEY
 					var matchingKeytagDNSKEYs []*dns.DNSKEY
 					matchDSDNSKEY := false
+					hasAlgoMatchCandidate := false
 
 					for _, key := range dnskeyRecords {
 						if ds.KeyTag == key.KeyTag() {
@@ -1131,6 +1215,16 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 
 					for _, key := range matchingKeytagDNSKEYs {
+						// RFC 4034 section 5.2: the DS algorithm field must equal
+						// the DNSKEY algorithm, otherwise validators ignore the DS.
+						if ds.Algorithm != key.Algorithm {
+							if outcome.dsAlgoMismatch[ds.KeyTag] == nil {
+								outcome.dsAlgoMismatch[ds.KeyTag] = map[[2]uint8]bool{}
+							}
+							outcome.dsAlgoMismatch[ds.KeyTag][[2]uint8{ds.Algorithm, key.Algorithm}] = true
+							continue
+						}
+						hasAlgoMatchCandidate = true
 						if dsDigestSupported(ds.DigestType) {
 							tmpDS := key.ToDS(ds.DigestType)
 							if tmpDS == nil || strings.EqualFold(tmpDS.Digest, ds.Digest) {
@@ -1154,7 +1248,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 
-					if !matchDSDNSKEY {
+					if !matchDSDNSKEY && hasAlgoMatchCandidate {
 						outcome.noMatchDSDNSKEY[ds.KeyTag] = true
 					}
 
@@ -1164,6 +1258,12 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 					if matchingDNSKEY.Flags&dns.FlagSEP == 0 {
 						outcome.dnskeyNotSEP[ds.KeyTag] = true
+					}
+
+					// A DS whose only keytag candidates mismatch on algorithm is
+					// ignored by validators; do not count it as a match.
+					if !matchDSDNSKEY && !hasAlgoMatchCandidate {
+						continue
 					}
 
 					dnskeyMatchingDS[matchingDNSKEY] = matchingDNSKEY.KeyTag()
@@ -1249,6 +1349,14 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for keytag := range outcome.noMatchDSDNSKEY {
 				noMatchDSDNSKEY[keytag] = append(noMatchDSDNSKEY[keytag], outcome.nsIP)
 			}
+			for keytag, algoPairs := range outcome.dsAlgoMismatch {
+				if dsAlgoMismatch[keytag] == nil {
+					dsAlgoMismatch[keytag] = map[[2]uint8][]string{}
+				}
+				for pair := range algoPairs {
+					dsAlgoMismatch[keytag][pair] = append(dsAlgoMismatch[keytag][pair], outcome.nsIP)
+				}
+			}
 			for keytag := range outcome.dnskeyNotForZoneSigning {
 				dnskeyNotForZoneSigning[keytag] = append(dnskeyNotForZoneSigning[keytag], outcome.nsIP)
 			}
@@ -1291,6 +1399,21 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		setTypedAddressesFromValues(args, nsList)
 		if err := appendLog(ctx, &results, testcase, "DS02_NO_MATCH_DS_DNSKEY", args); err != nil {
 			return results, err
+		}
+	}
+	for keytag, algoPairs := range dsAlgoMismatch {
+		for pair, nsList := range algoPairs {
+			args := map[string]any{
+				"keytag":            keytag,
+				"ds_key_algo_num":   pair[0],
+				"ds_key_algo_mnemo": algoPropertyFor(pair[0]).mnemonic,
+				"algo_num":          pair[1],
+				"algo_mnemo":        algoPropertyFor(pair[1]).mnemonic,
+			}
+			setTypedAddressesFromValues(args, nsList)
+			if err := appendLog(ctx, &results, testcase, "DS02_DS_ALGO_DNSKEY_MISMATCH", args); err != nil {
+				return results, err
+			}
 		}
 	}
 	for keytag, nsList := range dnskeyNotForZoneSigning {
@@ -7453,6 +7576,11 @@ func dnssec01TagForDigest(digest uint8) string {
 	default:
 		return "DS01_DS_ALGO_UNASSIGNED"
 	}
+}
+
+// dnssec01TagForKeyAlgorithm classifies the DS algorithm field with the same ranges as dnssec05TagForAlgorithm.
+func dnssec01TagForKeyAlgorithm(algo uint8) string {
+	return "DS01_KEY_ALGO_" + strings.TrimPrefix(dnssec05TagForAlgorithm(algo), "DS05_ALGO_")
 }
 
 func dnssec05TagForAlgorithm(algo uint8) string {

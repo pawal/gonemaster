@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 82,
-    "unique_tag_count": 548
+    "unique_tag_count": 550
   },
   "modules": {
     "address": {
@@ -231,8 +231,10 @@
         "ADDRESSES_MATCH",
         "CHILD_NS_FAILED",
         "CHILD_ZONE_LAME",
+        "DELEGATION_NS_SET",
         "EXTRA_ADDRESS_CHILD",
         "IN_BAILIWICK_ADDR_MISMATCH",
+        "MULTIPLE_DELEGATION_NS_SET",
         "NO_RESPONSE",
         "OUT_OF_BAILIWICK_ADDR_MISMATCH",
         "TEST_CASE_END",

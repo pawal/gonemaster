@@ -4,7 +4,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
-Adds response-time analysis to the dashboards. Extends the Zone09 mail checks, and makes Consistency05 verify that the parent name servers agree on the delegation.
+Adds response-time analysis to the dashboards. Extends the Zone09 mail checks, makes Consistency05 verify that the parent name servers agree on the delegation, and checks the DS record algorithm field including DS/DNSKEY algorithm mismatches.
 
 ### Added
 

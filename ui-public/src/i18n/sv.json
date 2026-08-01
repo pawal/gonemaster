@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "overifierad",
   "pub.dnssec_chain_linkstatus_match": "matchar",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "digest stämmer inte",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "algoritm stämmer inte",
   "pub.dnssec_chain_linkstatus_no_dnskey": "ingen DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "digest som inte stöds",
   "pub.dnssec_chain_aria": "Diagram över DNSSEC-tillitskedjan för {domain}",

@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "unverified",
   "pub.dnssec_chain_linkstatus_match": "matches",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "digest mismatch",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "algorithm mismatch",
   "pub.dnssec_chain_linkstatus_no_dnskey": "no DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "unsupported digest",
   "pub.dnssec_chain_aria": "Diagram of the DNSSEC chain of trust for {domain}",

@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "ikke verificeret",
   "pub.dnssec_chain_linkstatus_match": "matcher",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "digest stemmer ikke",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "algoritme stemmer ikke",
   "pub.dnssec_chain_linkstatus_no_dnskey": "ingen DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "ikke-understøttet digest",
   "pub.dnssec_chain_aria": "Diagram over DNSSEC-tillidskæden for {domain}",

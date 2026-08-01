@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "neověřeno",
   "pub.dnssec_chain_linkstatus_match": "odpovídá",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "digest nesouhlasí",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "algoritmus nesouhlasí",
   "pub.dnssec_chain_linkstatus_no_dnskey": "žádný DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "nepodporovaný digest",
   "pub.dnssec_chain_aria": "Diagram řetězu důvěry DNSSEC pro {domain}",

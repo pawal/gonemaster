@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "nepreverjeno",
   "pub.dnssec_chain_linkstatus_match": "se ujema",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "digest se ne ujema",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "algoritem se ne ujema",
   "pub.dnssec_chain_linkstatus_no_dnskey": "ni DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "nepodprt digest",
   "pub.dnssec_chain_aria": "Diagram verige zaupanja DNSSEC za {domain}",

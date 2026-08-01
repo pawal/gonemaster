@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "no verificada",
   "pub.dnssec_chain_linkstatus_match": "coincide",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "digest no coincide",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "algoritmo no coincide",
   "pub.dnssec_chain_linkstatus_no_dnskey": "sin DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "digest no admitido",
   "pub.dnssec_chain_aria": "Diagrama de la cadena de confianza DNSSEC para {domain}",

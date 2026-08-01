@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "未検証",
   "pub.dnssec_chain_linkstatus_match": "一致",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "ダイジェスト不一致",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "アルゴリズム不一致",
   "pub.dnssec_chain_linkstatus_no_dnskey": "DNSKEY なし",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "未対応のダイジェスト",
   "pub.dnssec_chain_aria": "{domain} の DNSSEC 信頼チェーンの図",

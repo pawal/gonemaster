@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "non vérifié",
   "pub.dnssec_chain_linkstatus_match": "correspond",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "condensé différent",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "algorithme différent",
   "pub.dnssec_chain_linkstatus_no_dnskey": "aucune DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "condensé non pris en charge",
   "pub.dnssec_chain_aria": "Schéma de la chaîne de confiance DNSSEC pour {domain}",

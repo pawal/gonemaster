@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "nicht verifiziert",
   "pub.dnssec_chain_linkstatus_match": "passt",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "Digest stimmt nicht überein",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "Algorithmus stimmt nicht überein",
   "pub.dnssec_chain_linkstatus_no_dnskey": "kein DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "nicht unterstützter Digest",
   "pub.dnssec_chain_aria": "Diagramm der DNSSEC-Vertrauenskette für {domain}",

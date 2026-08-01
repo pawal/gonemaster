@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "niet geverifieerd",
   "pub.dnssec_chain_linkstatus_match": "komt overeen",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "digest komt niet overeen",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "algoritme komt niet overeen",
   "pub.dnssec_chain_linkstatus_no_dnskey": "geen DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "niet-ondersteunde digest",
   "pub.dnssec_chain_aria": "Diagram van de DNSSEC-vertrouwensketen voor {domain}",

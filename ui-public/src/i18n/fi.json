@@ -126,6 +126,7 @@
   "pub.dnssec_chain_state_unverified": "varmentamaton",
   "pub.dnssec_chain_linkstatus_match": "vastaa",
   "pub.dnssec_chain_linkstatus_digest_mismatch": "tiiviste ei täsmää",
+  "pub.dnssec_chain_linkstatus_algorithm_mismatch": "algoritmi ei täsmää",
   "pub.dnssec_chain_linkstatus_no_dnskey": "ei DNSKEY",
   "pub.dnssec_chain_linkstatus_unsupported_digest": "ei tuettu tiiviste",
   "pub.dnssec_chain_aria": "Kaavio verkkotunnuksen {domain} DNSSEC-luottamusketjusta",

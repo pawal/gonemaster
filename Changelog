@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- engine, ui-public: the DNSSEC chain of trust shows a DS/DNSKEY algorithm mismatch as a broken link, in every shipped locale
+
 ## [v1.6.4] - 2026-08-01
 
 Adds response-time analysis to the dashboards. Extends the Zone09 mail checks, makes Consistency05 verify that the parent name servers agree on the delegation, and checks the DS record algorithm field including DS/DNSKEY algorithm mismatches.

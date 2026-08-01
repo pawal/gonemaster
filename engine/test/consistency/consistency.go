@@ -154,8 +154,10 @@ func Metadata() map[string][]string {
 			"ADDRESSES_MATCH",
 			"CHILD_NS_FAILED",
 			"CHILD_ZONE_LAME",
+			"DELEGATION_NS_SET",
 			"EXTRA_ADDRESS_CHILD",
 			"IN_BAILIWICK_ADDR_MISMATCH",
+			"MULTIPLE_DELEGATION_NS_SET",
 			"NO_RESPONSE",
 			"OUT_OF_BAILIWICK_ADDR_MISMATCH",
 			"TEST_CASE_END",
@@ -868,6 +870,24 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	// Report when responding parents serve different delegation NS sets.
+	setOrder, setServers := delegationNSSets(z, nsResponses)
+	if len(setOrder) > 1 {
+		if err := appendLog(ctx, &results, testcase, "MULTIPLE_DELEGATION_NS_SET", map[string]any{
+			"count": len(setOrder),
+		}); err != nil {
+			return results, err
+		}
+		for _, setKey := range setOrder {
+			args := map[string]any{}
+			setTypedServerListAtKey(args, "ns_set_servers", setKey)
+			setTypedServersFromNames(args, strings.Join(uniqueSortedValues(setServers[setKey]), ";"))
+			if err := appendLog(ctx, &results, testcase, "DELEGATION_NS_SET", args); err != nil {
+				return results, err
+			}
+		}
+	}
+
 	for nsString, nsName := range parentGlues {
 		if z.Name.IsInBailiwick(nsName) {
 			strictGlue[nsString] = true
@@ -1261,6 +1281,56 @@ func appendChildNSNamesFromServers(ctx context.Context, z *zone.Zone, names []dn
 		out = append(out, seen[key])
 	}
 	return out
+}
+
+// delegationNSSets groups responding parent servers by the delegation NS set
+// they serve; non-responding parents are not part of any set.
+func delegationNSSets(z *zone.Zone, responses []packet.Packet) ([]string, map[string][]string) {
+	order := []string{}
+	setServers := map[string][]string{}
+	for _, resp := range responses {
+		if resp.Msg == nil {
+			continue
+		}
+		nameSet := map[string]dnsname.Name{}
+		for _, rr := range resp.GetRecordsForName("NS", z.Name) {
+			nsRR, ok := rr.(*dns.NS)
+			if !ok {
+				continue
+			}
+			name := dnsname.New(strings.ToLower(nsRR.Ns))
+			nameSet[name.String()] = name
+		}
+		if len(nameSet) == 0 {
+			continue
+		}
+		var elements []string
+		for _, key := range slices.Sorted(maps.Keys(nameSet)) {
+			nsName := nameSet[key]
+			glues := map[string]bool{}
+			for _, rr := range resp.GetRecordsForName("A", nsName, "additional") {
+				if aRR, ok := rr.(*dns.A); ok {
+					glues[key+"/"+aRR.Addr.String()] = true
+				}
+			}
+			for _, rr := range resp.GetRecordsForName("AAAA", nsName, "additional") {
+				if aaaaRR, ok := rr.(*dns.AAAA); ok {
+					glues[key+"/"+aaaaRR.Addr.String()] = true
+				}
+			}
+			if len(glues) == 0 {
+				elements = append(elements, key)
+				continue
+			}
+			elements = append(elements, sortedKeys(glues)...)
+		}
+		setKey := strings.Join(elements, ";")
+		if _, ok := setServers[setKey]; !ok {
+			order = append(order, setKey)
+		}
+		setServers[setKey] = append(setServers[setKey], resp.AnswerFrom)
+	}
+	return order, setServers
 }
 
 func getAddrRRs(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name, qtype string, z *zone.Zone, testcase string) (*logger.Entry, []dns.RR, error) {

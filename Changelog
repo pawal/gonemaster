@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- engine: Consistency05 now compares the delegation NS set served by each responding parent name server and reports disagreement with the new MULTIPLE_DELEGATION_NS_SET and DELEGATION_NS_SET findings, using no additional DNS queries
+
 ### Fixed
 
 - engine: fix Consistency05 reporting bogus glue mismatches for out-of-domain name servers

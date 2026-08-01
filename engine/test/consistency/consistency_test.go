@@ -1105,6 +1105,303 @@ func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
 	}
 }
 
+// stubConsistency05Child installs the child-side stubs shared by the
+// delegation NS-set tests: the child zone knows ns1.example and ns2.example,
+// and one authoritative child server answers their A/AAAA lookups with the
+// standard test addresses. queryParentAll is restored on cleanup as well;
+// each test installs its own parent responses.
+func stubConsistency05Child(t *testing.T, ctx context.Context) {
+	t.Helper()
+
+	origM23 := allNSNames
+	origM45 := allNameservers
+	origParent := queryParentAll
+	t.Cleanup(func() {
+		allNSNames = origM23
+		allNameservers = origM45
+		queryParentAll = origParent
+	})
+
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
+	}
+
+	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
+		switch strings.ToUpper(qtype) {
+		case "A":
+			switch strings.ToLower(qname) {
+			case "ns1.example":
+				return addrPacket(qname, "A", "192.0.2.1")
+			case "ns2.example":
+				return addrPacket(qname, "A", "192.0.2.2")
+			}
+		case "AAAA":
+			switch strings.ToLower(qname) {
+			case "ns1.example":
+				return addrPacket(qname, "AAAA", "2001:db8::1")
+			case "ns2.example":
+				return addrPacket(qname, "AAAA", "2001:db8::2")
+			}
+		}
+		return packet.Packet{}
+	})
+
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{authNS}, nil
+	}
+}
+
+// fullTestGlue is the glue set matching what stubConsistency05Child's
+// authoritative child server answers.
+func fullTestGlue() map[string][]string {
+	return map[string][]string{
+		"ns1.example": {"192.0.2.1", "2001:db8::1"},
+		"ns2.example": {"192.0.2.2", "2001:db8::2"},
+	}
+}
+
+// glueParentPacket builds one parent referral response with glue and a
+// parent server identity.
+func glueParentPacket(owner string, glue map[string][]string, answerFrom string) packet.Packet {
+	p := nsPacketWithGlue(owner, glue)
+	p.AnswerFrom = answerFrom
+	return p
+}
+
+func TestConsistency05DelegationNSSetConsistentParents(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, fullTestGlue(), "192.0.2.101"),
+				glueParentPacket(name, fullTestGlue(), "192.0.2.102"),
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	// Two parents serving the identical delegation must stay silent.
+	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
+		t.Fatalf("did not expect MULTIPLE_DELEGATION_NS_SET for identical parent delegations")
+	}
+	if hasEntryTag(entries, "DELEGATION_NS_SET") {
+		t.Fatalf("did not expect DELEGATION_NS_SET for identical parent delegations")
+	}
+	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
+		t.Fatalf("expected ADDRESSES_MATCH")
+	}
+}
+
+func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	// Parent one serves the full delegation plus a glueless out-of-domain
+	// name; parent two only knows ns1. Both respond, so both are part of
+	// the comparison and two distinct sets must be reported.
+	glueOne := fullTestGlue()
+	glueOne["ns3.other.test"] = nil
+	glueTwo := map[string][]string{
+		"ns1.example": {"192.0.2.1", "2001:db8::1"},
+	}
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, glueOne, "192.0.2.101"),
+				glueParentPacket(name, glueTwo, "192.0.2.102"),
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+
+	multiple := firstEntryByTag(entries, "MULTIPLE_DELEGATION_NS_SET")
+	if multiple == nil {
+		t.Fatalf("expected MULTIPLE_DELEGATION_NS_SET")
+	}
+	if count, ok := multiple.Args["count"].(int); !ok || count != 2 {
+		t.Fatalf("expected count=2, got %#v", multiple.Args["count"])
+	}
+
+	var sets []*logger.Entry
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "DELEGATION_NS_SET" {
+			sets = append(sets, entry)
+		}
+	}
+	if len(sets) != 2 {
+		t.Fatalf("expected 2 DELEGATION_NS_SET entries, got %d", len(sets))
+	}
+
+	// First set (first-seen order): 4 glue-backed elements plus the bare
+	// glueless name, served by parent one.
+	first, ok := sets[0].Args["ns_set_servers"].([]map[string]any)
+	if !ok || len(first) != 5 {
+		t.Fatalf("expected 5 typed ns_set_servers elements, got %#v", sets[0].Args["ns_set_servers"])
+	}
+	if first[0]["ns"] != "ns1.example" || first[0]["address"] != "192.0.2.1" {
+		t.Fatalf("unexpected first element: %#v", first[0])
+	}
+	if first[4]["ns"] != "ns3.other.test" {
+		t.Fatalf("expected bare glueless element last, got %#v", first[4])
+	}
+	if addr, ok := first[4]["address"].(string); ok && addr != "" {
+		t.Fatalf("glueless element must carry no address, got %#v", first[4])
+	}
+	servers, ok := sets[0].Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.101" {
+		t.Fatalf("expected first set served by 192.0.2.101, got %#v", sets[0].Args["servers"])
+	}
+
+	// Second set: only ns1 with its two glue addresses, served by parent two.
+	second, ok := sets[1].Args["ns_set_servers"].([]map[string]any)
+	if !ok || len(second) != 2 {
+		t.Fatalf("expected 2 typed ns_set_servers elements, got %#v", sets[1].Args["ns_set_servers"])
+	}
+	servers, ok = sets[1].Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.102" {
+		t.Fatalf("expected second set served by 192.0.2.102, got %#v", sets[1].Args["servers"])
+	}
+}
+
+func TestConsistency05DelegationNSSetGlueDifference(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	// Same NS names on both parents, but one glue address differs; that is
+	// still two distinct delegation NS sets.
+	glueTwo := map[string][]string{
+		"ns1.example": {"192.0.2.1", "2001:db8::1"},
+		"ns2.example": {"192.0.2.99", "2001:db8::2"},
+	}
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, fullTestGlue(), "192.0.2.101"),
+				glueParentPacket(name, glueTwo, "192.0.2.102"),
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	multiple := firstEntryByTag(entries, "MULTIPLE_DELEGATION_NS_SET")
+	if multiple == nil {
+		t.Fatalf("expected MULTIPLE_DELEGATION_NS_SET for a glue-only difference")
+	}
+	if count, ok := multiple.Args["count"].(int); !ok || count != 2 {
+		t.Fatalf("expected count=2, got %#v", multiple.Args["count"])
+	}
+}
+
+func TestConsistency05DelegationNSSetIgnoresNonRespondingParent(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	// The middle parent never responds (zero packet). A server that does
+	// not respond is not part of any set, so the two agreeing parents make
+	// the delegation consistent and nothing may be emitted.
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, fullTestGlue(), "192.0.2.101"),
+				{},
+				glueParentPacket(name, fullTestGlue(), "192.0.2.103"),
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
+		t.Fatalf("a non-responding parent must not produce MULTIPLE_DELEGATION_NS_SET")
+	}
+	if hasEntryTag(entries, "DELEGATION_NS_SET") {
+		t.Fatalf("a non-responding parent must not produce DELEGATION_NS_SET")
+	}
+}
+
+func TestConsistency05DelegationNSSetIgnoresParentWithoutNSRecords(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	// One parent responds but without NS records for the child zone. Such
+	// a response contributes no set either, so the comparison sees one
+	// distinct set and stays silent.
+	emptyResponse := func() packet.Packet {
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeSuccess
+		return packet.Packet{Msg: msg, AnswerFrom: "192.0.2.102"}
+	}
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, fullTestGlue(), "192.0.2.101"),
+				emptyResponse(),
+				glueParentPacket(name, fullTestGlue(), "192.0.2.103"),
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
+		t.Fatalf("a parent without NS records must not produce MULTIPLE_DELEGATION_NS_SET")
+	}
+	if hasEntryTag(entries, "DELEGATION_NS_SET") {
+		t.Fatalf("a parent without NS records must not produce DELEGATION_NS_SET")
+	}
+}
+
 func TestConsistency06MultipleMnames(t *testing.T) {
 	ctx := testCtx()
 	t.Cleanup(profile.ResetEffective)

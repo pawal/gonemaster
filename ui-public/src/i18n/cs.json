@@ -45,6 +45,8 @@
   "pub.progress_testing": "Testování {domain}…",
   "pub.progress_testing_label": "Testování",
   "pub.progress_queued": "Čekání ve frontě…",
+  "pub.history_title": "Poslední testy",
+  "pub.history_clear": "Vymazat",
   "pub.result_heading": "Výsledky pro {domain}",
   "pub.result_share": "Sdílet výsledek",
   "pub.result_share_copied": "Zkopírováno!",

@@ -45,6 +45,8 @@
   "pub.progress_testing": "Tester {domain}…",
   "pub.progress_testing_label": "Tester",
   "pub.progress_queued": "Venter i kø…",
+  "pub.history_title": "Siste tester",
+  "pub.history_clear": "Tøm",
   "pub.result_heading": "Resultater for {domain}",
   "pub.result_share": "Del resultat",
   "pub.result_share_copied": "Kopiert!",

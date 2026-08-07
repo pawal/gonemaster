@@ -45,6 +45,8 @@
   "pub.progress_testing": "Probando {domain}…",
   "pub.progress_testing_label": "Probando",
   "pub.progress_queued": "Esperando en cola…",
+  "pub.history_title": "Pruebas recientes",
+  "pub.history_clear": "Borrar",
   "pub.result_heading": "Resultados para {domain}",
   "pub.result_share": "Compartir resultado",
   "pub.result_share_copied": "¡Copiado!",

@@ -45,6 +45,8 @@
   "pub.progress_testing": "Test de {domain}…",
   "pub.progress_testing_label": "Test en cours",
   "pub.progress_queued": "En attente dans la file…",
+  "pub.history_title": "Tests récents",
+  "pub.history_clear": "Effacer",
   "pub.result_heading": "Résultats pour {domain}",
   "pub.result_share": "Partager le résultat",
   "pub.result_share_copied": "Copié !",

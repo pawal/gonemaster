@@ -45,6 +45,8 @@
   "pub.progress_testing": "Testataan {domain}…",
   "pub.progress_testing_label": "Testataan",
   "pub.progress_queued": "Odotetaan jonossa…",
+  "pub.history_title": "Viimeisimmät testit",
+  "pub.history_clear": "Tyhjennä",
   "pub.result_heading": "Tulokset verkkotunnukselle {domain}",
   "pub.result_share": "Jaa tulos",
   "pub.result_share_copied": "Kopioitu!",

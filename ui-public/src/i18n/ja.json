@@ -45,6 +45,8 @@
   "pub.progress_testing": "{domain} をテスト中…",
   "pub.progress_testing_label": "テスト中",
   "pub.progress_queued": "キューで待機中…",
+  "pub.history_title": "最近のテスト",
+  "pub.history_clear": "クリア",
   "pub.result_heading": "{domain} の結果",
   "pub.result_share": "結果を共有",
   "pub.result_share_copied": "コピーしました！",

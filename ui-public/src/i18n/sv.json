@@ -45,6 +45,8 @@
   "pub.progress_testing": "Testar {domain}…",
   "pub.progress_testing_label": "Testar",
   "pub.progress_queued": "Väntar i kön…",
+  "pub.history_title": "Senaste tester",
+  "pub.history_clear": "Rensa",
   "pub.result_heading": "Resultat för {domain}",
   "pub.result_share": "Dela resultat",
   "pub.result_share_copied": "Kopierad!",

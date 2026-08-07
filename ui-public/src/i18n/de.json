@@ -45,6 +45,8 @@
   "pub.progress_testing": "{domain} wird getestet…",
   "pub.progress_testing_label": "Wird getestet",
   "pub.progress_queued": "Wartet in der Warteschlange…",
+  "pub.history_title": "Letzte Tests",
+  "pub.history_clear": "Löschen",
   "pub.result_heading": "Ergebnisse für {domain}",
   "pub.result_share": "Ergebnis teilen",
   "pub.result_share_copied": "Kopiert!",

@@ -45,6 +45,8 @@
   "pub.progress_testing": "Bezig met testen van {domain}…",
   "pub.progress_testing_label": "Bezig met testen",
   "pub.progress_queued": "Wachten in wachtrij…",
+  "pub.history_title": "Recente tests",
+  "pub.history_clear": "Wissen",
   "pub.result_heading": "Resultaten voor {domain}",
   "pub.result_share": "Resultaat delen",
   "pub.result_share_copied": "Gekopieerd!",

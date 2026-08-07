@@ -7,6 +7,8 @@
   import Progress from "./lib/Progress.svelte";
   import Results from "./lib/Results.svelte";
   import ExpiredResult from "./lib/ExpiredResult.svelte";
+  import RecentTests from "./lib/RecentTests.svelte";
+  import { loadEntries, addEntry, setGrade, removeEntry, clearEntries } from "./lib/history.js";
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
@@ -35,6 +37,19 @@
   let jobDomain = $state("");
   let jobFinishedAt = $state(null);
   let jobProgress = $state(0);
+
+  // ── Recent tests history ────────────────────────────────────────────────────
+  let historyEntries = $state(loadEntries());
+  // True only for runs created in this tab; share-link visits stay unrecorded.
+  let startedHere = false;
+
+  function onScore(detail) {
+    historyEntries = setGrade(detail.publicID, detail.grade);
+  }
+
+  function onClearHistory() {
+    historyEntries = clearEntries();
+  }
 
   $effect(() => {
     document.title = phase === "running" ? `${jobProgress}% Gonemaster` : "Gonemaster";
@@ -137,9 +152,11 @@
     const { view, publicID: id } = parseHash(window.location.hash);
     if (view !== "result" || !id) return;
     publicID = id;
+    startedHere = false;
     try {
       const res = await getJob(id);
       if (!res.ok) {
+        if (res.status === 404) historyEntries = removeEntry(id);
         jobStatus = "expired";
         phase = "done";
         return;
@@ -168,6 +185,7 @@
   // ── Job handlers ────────────────────────────────────────────────────────────
   function onJobCreated(detail) {
     publicID = detail.publicID;
+    startedHere = true;
     jobStatus = "";
     jobDomain = "";
     jobFinishedAt = null;
@@ -181,6 +199,9 @@
     jobDomain = detail.domain ?? "";
     jobFinishedAt = detail.finishedAt ?? null;
     phase = "done";
+    if (detail.status === "succeeded" && startedHere) {
+      historyEntries = addEntry({ id: detail.publicID, domain: jobDomain, finishedAt: jobFinishedAt });
+    }
   }
 
   function resetToIdle() {
@@ -273,6 +294,10 @@
 
   <TestForm disabled={phase === "running"} {focusSignal} {prefillDomain} {prefillSignal} onjobcreated={onJobCreated} />
 
+  {#if phase === "idle" && historyEntries.length > 0}
+    <RecentTests entries={historyEntries} locale={resultLocale} onclear={onClearHistory} />
+  {/if}
+
   {#if phase === "running"}
     <Progress
       publicID={publicID}
@@ -290,6 +315,7 @@
         {nameserverTimingsEnabled}
         {dnssecChainEnabled}
         ontestparent={onTestParent}
+        onscore={onScore}
       />
     {:else}
       <ExpiredResult onnewtest={resetToIdle} />

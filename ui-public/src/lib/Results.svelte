@@ -35,7 +35,7 @@
     return LEVELS.filter((l) => counts[l]).map((l) => ({ level: l, count: counts[l] }));
   }
 
-  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false, nameserverTimingsEnabled = true, dnssecChainEnabled = false, ontestparent } = $props();
+  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false, nameserverTimingsEnabled = true, dnssecChainEnabled = false, ontestparent, onscore } = $props();
 
   let finishedStr = $derived((() => {
     if (!finishedAt) return "";
@@ -76,6 +76,7 @@
       score = data.score ?? null;
       hasDnssecChain = data.has_dnssec_chain === true;
       loading = false;
+      if (score?.grade) onscore?.({ publicID: pid, grade: score.grade });
     } catch (_) {
       errorKey = "pub.error_network";
       nameserverTimings = [];

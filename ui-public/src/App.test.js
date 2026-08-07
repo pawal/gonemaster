@@ -378,4 +378,141 @@ describe("App", () => {
     await fireEvent.click(btn);
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
   });
+
+  // ── Recent tests history ────────────────────────────────────────────────────
+
+  describe("recent tests history", () => {
+    const HISTORY_KEY = "gonemaster.public.history.v1";
+    const readHistory = () => JSON.parse(window.localStorage.getItem(HISTORY_KEY) ?? "[]");
+    const seedHistory = (entries) =>
+      window.localStorage.setItem(HISTORY_KEY, JSON.stringify(entries));
+
+    // Drives the real form: type a domain and click Test, so the run goes
+    // through onJobCreated and counts as started in this tab.
+    const startTest = async (domain) => {
+      await fireEvent.input(screen.getByLabelText("Domain"), { target: { value: domain } });
+      await fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    };
+
+    it("records a run started in this tab when it succeeds", async () => {
+      fetchRouter([
+        ["/locales", localesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/abc12345", jobResp("succeeded", "example.com", 100, "2026-08-07T09:30:00Z")],
+        ["/jobs", { ok: true, status: 200, json: async () => ({ public_id: "abc12345" }) }],
+      ]);
+      render(App);
+      await startTest("example.com");
+      await waitFor(() => screen.getByTestId("results-view"));
+      expect(readHistory()).toEqual([
+        { id: "abc12345", domain: "example.com", finishedAt: "2026-08-07T09:30:00Z" },
+      ]);
+    });
+
+    it("does not record a failed run", async () => {
+      fetchRouter([
+        ["/locales", localesResp],
+        ["/jobs/abc12345", jobResp("failed", "example.com", 100)],
+        ["/jobs", { ok: true, status: 200, json: async () => ({ public_id: "abc12345" }) }],
+      ]);
+      render(App);
+      await startTest("example.com");
+      await waitFor(() => screen.getByTestId("expired-view"));
+      expect(readHistory()).toEqual([]);
+    });
+
+    it("does not record a share-link visit, even one watched to completion", async () => {
+      // The shared job is still running on arrival (applyHash sees "running"),
+      // then Progress's first poll sees it finish. Despite the succeeded
+      // onJobDone, nothing may be recorded: the run was not started here.
+      window.location.hash = "#/result/abc12345";
+      let jobCalls = 0;
+      global.fetch = vi.fn().mockImplementation(async (url) => {
+        if (url.includes("/locales")) return localesResp;
+        if (url.includes("jobs/abc12345/result")) return resultResp();
+        if (url.includes("/jobs/abc12345")) {
+          jobCalls += 1;
+          return jobResp(jobCalls === 1 ? "running" : "succeeded", "example.com", 100, "2026-08-07T09:30:00Z");
+        }
+        return { ok: true, json: async () => [] };
+      });
+      render(App);
+      await waitFor(() => screen.getByTestId("results-view"));
+      expect(readHistory()).toEqual([]);
+    });
+
+    it("prunes a stored entry when its result has expired (404)", async () => {
+      seedHistory([
+        { id: "abc12345", domain: "example.com", finishedAt: null },
+        { id: "keep1", domain: "example.org", finishedAt: null },
+      ]);
+      window.location.hash = "#/result/abc12345";
+      fetchRouter([
+        ["/locales", localesResp],
+        ["/jobs/", { ok: false, status: 404, json: async () => ({}) }],
+      ]);
+      render(App);
+      await waitFor(() => screen.getByTestId("expired-view"));
+      expect(readHistory().map((e) => e.id)).toEqual(["keep1"]);
+    });
+
+    it("shows the list on the idle view when entries exist", () => {
+      seedHistory([{ id: "id1", domain: "example.com", finishedAt: null }]);
+      render(App);
+      expect(screen.getByTestId("recent-tests")).toBeTruthy();
+      expect(screen.getByText("example.com")).toBeTruthy();
+    });
+
+    it("hides the list when there is no history", () => {
+      render(App);
+      expect(screen.queryByTestId("recent-tests")).toBeNull();
+    });
+
+    it("hides the list while a test is running", async () => {
+      seedHistory([{ id: "id1", domain: "example.com", finishedAt: null }]);
+      window.location.hash = "#/result/abc12345";
+      fetchRouter([
+        ["/locales", localesResp],
+        ["/jobs/abc12345", jobResp("running", "example.com", 30)],
+      ]);
+      render(App);
+      await waitFor(() => screen.getByTestId("progress-view"));
+      expect(screen.queryByTestId("recent-tests")).toBeNull();
+    });
+
+    it("hides the list on the result view", async () => {
+      seedHistory([{ id: "id1", domain: "example.com", finishedAt: null }]);
+      window.location.hash = "#/result/abc12345";
+      fetchRouter([
+        ["/locales", localesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/", jobResp("succeeded", "example.com", 100)],
+      ]);
+      render(App);
+      await waitFor(() => screen.getByTestId("results-view"));
+      expect(screen.queryByTestId("recent-tests")).toBeNull();
+    });
+
+    it("updates the stored grade from a viewed result", async () => {
+      seedHistory([{ id: "abc12345", domain: "example.com", finishedAt: null }]);
+      window.location.hash = "#/result/abc12345";
+      fetchRouter([
+        ["/locales", localesResp],
+        ["jobs/abc12345/result", {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            job_id: "x",
+            status: "succeeded",
+            raw: { locale: "en", entries: [] },
+            score: { grade: "B" },
+          }),
+        }],
+        ["/jobs/", jobResp("succeeded", "example.com", 100)],
+      ]);
+      render(App);
+      await waitFor(() => screen.getByTestId("results-view"));
+      await waitFor(() => expect(readHistory()[0].grade).toBe("B"));
+    });
+  });
 });

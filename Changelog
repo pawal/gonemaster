@@ -9,6 +9,10 @@ All notable changes to all gonemaster components will be documented in this file
 - ui-public: a recent tests list on the start page, kept only in the browser, with a clear button
 - ui-public: the logo links back to the start page
 
+### Changed
+
+- admin-ui: update undici for an npm audit finding
+
 ### Fixed
 
 - engine, ui-public: the DNSSEC chain of trust shows a DS/DNSKEY algorithm mismatch as a broken link, in every shipped locale

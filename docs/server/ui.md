@@ -35,6 +35,14 @@ signatures linking them, with a parallel text summary for assistive tech. The
 section only appears when `show_dnssec_chain_public` is enabled and the run has
 chain data (public-UI runs only).
 
+The start page also shows a "Recent tests" list: tests started in the same
+browser, with the domain, the finish time, and the grade when public scoring
+is enabled. Each row links back to the stored result. The list is kept only
+in the browser (localStorage); nothing is stored on the server, and other
+devices or browsers do not see it. It holds at most 20 entries. When a result
+has expired on the server, opening it shows the normal expired page and the
+entry is removed from the list. The "Clear" button empties the list.
+
 ## Public Analysis UI
 
 Path: `/analysis/`

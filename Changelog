@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- ui-public: a recent tests list on the start page, kept only in the browser, with a clear button
+
 ### Fixed
 
 - engine, ui-public: the DNSSEC chain of trust shows a DS/DNSKEY algorithm mismatch as a broken link, in every shipped locale

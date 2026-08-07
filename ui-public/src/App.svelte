@@ -266,7 +266,9 @@
   <header>
     <div class="header-text">
       <h1 class="brand-mark">
-        <img class="brand-logo" src={logoSrc} alt="gonemaster" />
+        <a class="brand-link" href="#/">
+          <img class="brand-logo" src={logoSrc} alt="gonemaster" />
+        </a>
       </h1>
     </div>
     <div class="header-controls">

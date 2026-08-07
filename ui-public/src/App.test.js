@@ -200,6 +200,13 @@ describe("App", () => {
     expect(screen.getByAltText("gonemaster")).toBeTruthy();
   });
 
+  it("wraps the logo in a link back to the home view", () => {
+    render(App);
+    const link = screen.getByAltText("gonemaster").closest("a");
+    expect(link).not.toBeNull();
+    expect(link.getAttribute("href")).toBe("#/");
+  });
+
   it("renders the locale selector when multiple locales are available", async () => {
     fetchRouter([
       ["/locales", multiLocalesResp],
@@ -491,6 +498,25 @@ describe("App", () => {
       render(App);
       await waitFor(() => screen.getByTestId("results-view"));
       expect(screen.queryByTestId("recent-tests")).toBeNull();
+    });
+
+    it("shows the list after navigating back to the home view", async () => {
+      // The full loop the feature exists for: run a test, land on the result
+      // view (list hidden there), go home the way the logo link does (hash
+      // navigation), and find the finished run in the recent tests list.
+      fetchRouter([
+        ["/locales", localesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/abc12345", jobResp("succeeded", "example.com", 100, "2026-08-07T09:30:00Z")],
+        ["/jobs", { ok: true, status: 200, json: async () => ({ public_id: "abc12345" }) }],
+      ]);
+      render(App);
+      await startTest("example.com");
+      await waitFor(() => screen.getByTestId("results-view"));
+      expect(screen.queryByTestId("recent-tests")).toBeNull();
+      window.location.hash = "#/";
+      await waitFor(() => screen.getByTestId("recent-tests"));
+      expect(screen.getByText("example.com")).toBeTruthy();
     });
 
     it("updates the stored grade from a viewed result", async () => {

@@ -121,6 +121,11 @@ header {
   line-height: 0;
 }
 
+.brand-link {
+  display: inline-block;
+  line-height: 0;
+}
+
 .brand-logo {
   display: block;
   width: min(100%, 320px);

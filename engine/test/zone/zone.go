@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"net/netip"
+	"net/url"
 	"regexp"
 	"slices"
 	"sort"
@@ -217,6 +218,16 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if util.ShouldRunTest(ctx, "zone15") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Zone15(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
 	return results, nil
 }
 
@@ -368,6 +379,27 @@ func Metadata() map[string][]string {
 			"Z14_SERIAL_MISMATCH",
 			"Z14_UNSUPPORTED_HASH",
 			"Z14_ZONEMD_FOUND",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"zone15": {
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"Z15_CAA_FOUND",
+			"Z15_INCONSISTENT_CAA",
+			"Z15_INVALID_IODEF_VALUE",
+			"Z15_INVALID_ISSUE_VALUE",
+			"Z15_INVALID_PROPERTY_TAG",
+			"Z15_ISSUANCE_FORBIDDEN",
+			"Z15_ISSUE_CONTRADICTION",
+			"Z15_MIXED_PRESENCE",
+			"Z15_NO_CAA",
+			"Z15_NO_CAA_TLD",
+			"Z15_NO_RESPONSE_CAA_QUERY",
+			"Z15_RESERVED_FLAGS",
+			"Z15_UNEXPECTED_RCODE_CAA",
+			"Z15_UNKNOWN_PROPERTY",
+			"Z15_UNKNOWN_PROPERTY_CRITICAL",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -2759,6 +2791,460 @@ func Zone14(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	if hasZONEMD > 1 && len(nsKeys) > 1 {
 		if err := appendLog(ctx, &results, testcase, "Z14_INCONSISTENT_ZONEMD", map[string]any{}); err != nil {
 			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+const (
+	caaFlagIssuerCritical uint8 = 0x80
+	caaFlagReservedMask   uint8 = 0x7F
+)
+
+// caaKnownProperties holds the assignable entries in the IANA "Certification
+// Authority Restriction Properties" registry. The Reserved entries auth, path
+// and policy are left out on purpose: they can never be assigned a meaning, so
+// no certificate authority will ever act on them.
+var caaKnownProperties = map[string]struct{}{
+	"issue":        {},
+	"issuewild":    {},
+	"iodef":        {},
+	"issuemail":    {},
+	"contactemail": {},
+	"contactphone": {},
+	"issuevmc":     {},
+}
+
+// caaIssueValue is the outcome of parsing an issue-value.
+type caaIssueValue struct {
+	valid   bool
+	forbids bool
+}
+
+// parseCAAIssueValue parses an issue-value per RFC 8659 section 4.2. A value
+// that does not match the grammar forbids issuance just like one with an empty
+// issuer-domain-name.
+func parseCAAIssueValue(value string) caaIssueValue {
+	rest := strings.TrimLeft(value, " \t")
+
+	var domain string
+	semicolon := strings.IndexByte(rest, ';')
+	if semicolon < 0 {
+		domain = strings.TrimRight(rest, " \t")
+	} else {
+		domain = strings.TrimRight(rest[:semicolon], " \t")
+	}
+
+	if domain != "" && !caaIssuerDomainValid(domain) {
+		return caaIssueValue{forbids: true}
+	}
+	if semicolon >= 0 && !caaParametersValid(rest[semicolon+1:]) {
+		return caaIssueValue{forbids: true}
+	}
+	return caaIssueValue{valid: true, forbids: domain == ""}
+}
+
+// caaIssuerDomainValid checks issuer-domain-name = label *("." label).
+func caaIssuerDomainValid(domain string) bool {
+	for _, label := range strings.Split(domain, ".") {
+		if !caaLabelValid(label) {
+			return false
+		}
+	}
+	return true
+}
+
+// caaLabelValid checks label = (ALPHA / DIGIT) *( *("-") (ALPHA / DIGIT)),
+// which allows hyphens only between alphanumerics.
+func caaLabelValid(label string) bool {
+	if label == "" {
+		return false
+	}
+	if !caaAlphaNum(label[0]) || !caaAlphaNum(label[len(label)-1]) {
+		return false
+	}
+	for i := 0; i < len(label); i++ {
+		if !caaAlphaNum(label[i]) && label[i] != '-' {
+			return false
+		}
+	}
+	return true
+}
+
+// caaParametersValid checks *WSP [parameters *WSP] following the first ";".
+func caaParametersValid(rest string) bool {
+	rest = strings.Trim(rest, " \t")
+	if rest == "" {
+		return true
+	}
+	for _, parameter := range strings.Split(rest, ";") {
+		parameter = strings.Trim(parameter, " \t")
+		equals := strings.IndexByte(parameter, '=')
+		if equals < 0 {
+			return false
+		}
+		tag := strings.TrimRight(parameter[:equals], " \t")
+		value := strings.TrimLeft(parameter[equals+1:], " \t")
+		if !caaLabelValid(tag) || !caaParameterValueValid(value) {
+			return false
+		}
+	}
+	return true
+}
+
+// caaParameterValueValid checks value = *(%x21-3A / %x3C-7E).
+func caaParameterValueValid(value string) bool {
+	for i := 0; i < len(value); i++ {
+		c := value[i]
+		if (c < 0x21 || c > 0x3A) && (c < 0x3C || c > 0x7E) {
+			return false
+		}
+	}
+	return true
+}
+
+// caaPropertyTagValid checks RFC 8659 section 4.1: at least one character,
+// ASCII letters and digits only.
+func caaPropertyTagValid(tag string) bool {
+	if tag == "" {
+		return false
+	}
+	for i := 0; i < len(tag); i++ {
+		if !caaAlphaNum(tag[i]) {
+			return false
+		}
+	}
+	return true
+}
+
+func caaAlphaNum(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9')
+}
+
+// caaIodefValueValid reports whether value is one of the URL schemes RFC 8659
+// section 4.4 supports for iodef.
+func caaIodefValueValid(value string) bool {
+	parsed, err := url.Parse(value)
+	if err != nil {
+		return false
+	}
+	switch strings.ToLower(parsed.Scheme) {
+	case "mailto":
+		return parsed.Opaque != ""
+	case "http", "https":
+		return parsed.Host != ""
+	}
+	return false
+}
+
+// isRootOrTLD reports whether name is the root zone or a top-level domain.
+// Neither can hold a publicly trusted certificate for its own name.
+func isRootOrTLD(name dnsname.Name) bool {
+	return name.String() == "." || nextHigherIsRoot(name)
+}
+
+// Zone15 runs the Zone15 test case (CAA presence and syntax at the zone apex).
+func Zone15(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
+	const testcase = "Zone15"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	nss, err := authoritativeNS(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	type caaOutcome struct {
+		ns              nameserver.Nameserver
+		checked         bool
+		noResponse      bool
+		unexpectedRcode string
+		caaRRs          []dns.RR
+	}
+
+	var outcomes []caaOutcome
+	if len(nss) > 0 {
+		outcomes = make([]caaOutcome, len(nss))
+		tasks := make([]runner.Task, len(nss))
+		for i, ns := range nss {
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				outcome := caaOutcome{ns: ns}
+
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, "CAA"); err != nil {
+					return err
+				} else if disabled {
+					outcomes[i] = outcome
+					return nil
+				}
+
+				resp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "CAA", nil)
+				switch {
+				case resp.Msg == nil:
+					outcome.noResponse = true
+				case resp.Rcode() != "NOERROR":
+					outcome.unexpectedRcode = resp.Rcode()
+				case !resp.AA():
+					// Lameness is reported by the Nameserver module.
+				default:
+					outcome.checked = true
+					outcome.caaRRs = resp.GetRecordsForName("CAA", z.Name)
+				}
+
+				outcomes[i] = outcome
+				return nil
+			}
+		}
+
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if err != nil {
+			return results, err
+		}
+		results = append(results, entries...)
+	}
+
+	var noResponseCAA []string
+	unexpectedRcodeCAA := map[string][]string{}
+	for _, outcome := range outcomes {
+		switch {
+		case outcome.noResponse:
+			noResponseCAA = append(noResponseCAA, outcome.ns.AddressString())
+		case outcome.unexpectedRcode != "":
+			rcode := outcome.unexpectedRcode
+			unexpectedRcodeCAA[rcode] = append(unexpectedRcodeCAA[rcode], outcome.ns.AddressString())
+		}
+	}
+
+	if len(noResponseCAA) > 0 {
+		args := map[string]any{}
+		setTypedAddresses(args, noResponseCAA)
+		if err := appendLog(ctx, &results, testcase, "Z15_NO_RESPONSE_CAA_QUERY", args); err != nil {
+			return results, err
+		}
+	}
+	for _, rcode := range sortedKeys(unexpectedRcodeCAA) {
+		args := map[string]any{"rcode": rcode}
+		setTypedAddresses(args, unexpectedRcodeCAA[rcode])
+		if err := appendLog(ctx, &results, testcase, "Z15_UNEXPECTED_RCODE_CAA", args); err != nil {
+			return results, err
+		}
+	}
+
+	type caaRec struct {
+		flags uint8
+		tag   string
+		value string
+	}
+	type caaGroup struct {
+		rec       caaRec
+		endpoints []string
+	}
+
+	var hasCAA, noCAA int
+	nsKeys := map[string]struct{}{}
+	caaGroups := map[string]*caaGroup{}
+	var caaGroupOrder []string
+	var noCAANames []string
+	var distinct []caaRec
+	seen := map[string]struct{}{}
+
+	for _, outcome := range outcomes {
+		if !outcome.checked {
+			continue
+		}
+		ns := outcome.ns
+
+		// Extract typed records in response order for deterministic processing.
+		var recs []caaRec
+		for _, rr := range outcome.caaRRs {
+			caa, ok := rr.(*dns.CAA)
+			if !ok {
+				continue
+			}
+			recs = append(recs, caaRec{flags: caa.CAA.Flag, tag: caa.CAA.Tag, value: caa.CAA.Value})
+		}
+
+		if len(recs) == 0 {
+			noCAA++
+			noCAANames = append(noCAANames, ns.NameString()+"/"+ns.AddressString())
+			continue
+		}
+
+		hasCAA++
+		endpoint := ns.NameString() + "/" + ns.AddressString()
+
+		// Group records by byte-exact content for consolidated Z15_CAA_FOUND;
+		// build the per-NS consistency key and the deduplicated union.
+		var nsKeyParts []string
+		for _, r := range recs {
+			recordKey := fmt.Sprintf("%d/%s/%s", r.flags, r.tag, r.value)
+			nsKeyParts = append(nsKeyParts, recordKey)
+			if g, ok := caaGroups[recordKey]; ok {
+				g.endpoints = append(g.endpoints, endpoint)
+			} else {
+				caaGroups[recordKey] = &caaGroup{rec: r, endpoints: []string{endpoint}}
+				caaGroupOrder = append(caaGroupOrder, recordKey)
+			}
+			if _, ok := seen[recordKey]; !ok {
+				seen[recordKey] = struct{}{}
+				distinct = append(distinct, r)
+			}
+		}
+		sort.Strings(nsKeyParts)
+		nsKeys[strings.Join(nsKeyParts, "|")] = struct{}{}
+	}
+
+	for _, key := range caaGroupOrder {
+		g := caaGroups[key]
+		args := map[string]any{
+			"caa_flags":    g.rec.flags,
+			"caa_property": g.rec.tag,
+			"caa_value":    g.rec.value,
+		}
+		setTypedServersFromEndpoints(args, g.endpoints)
+		if err := appendLog(ctx, &results, testcase, "Z15_CAA_FOUND", args); err != nil {
+			return results, err
+		}
+	}
+
+	if noCAA > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, noCAANames)
+		tag := "Z15_NO_CAA"
+		if isRootOrTLD(z.Name) {
+			tag = "Z15_NO_CAA_TLD"
+		}
+		if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
+			return results, err
+		}
+	}
+
+	if hasCAA > 0 && noCAA > 0 {
+		if err := appendLog(ctx, &results, testcase, "Z15_MIXED_PRESENCE", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+	inconsistent := hasCAA > 1 && len(nsKeys) > 1
+	if inconsistent {
+		if err := appendLog(ctx, &results, testcase, "Z15_INCONSISTENT_CAA", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+
+	// Content validation runs once over the deduplicated union: a CAA defect is
+	// a property of the zone content, not of an individual nameserver.
+	type caaPolicy struct{ forbid, permit int }
+	policies := map[string]*caaPolicy{}
+	var policyOrder []string
+
+	for _, r := range distinct {
+		if r.flags&caaFlagReservedMask != 0 {
+			if err := appendLog(ctx, &results, testcase, "Z15_RESERVED_FLAGS", map[string]any{
+				"caa_flags":    r.flags,
+				"caa_property": r.tag,
+				"caa_value":    r.value,
+			}); err != nil {
+				return results, err
+			}
+		}
+
+		if !caaPropertyTagValid(r.tag) {
+			if err := appendLog(ctx, &results, testcase, "Z15_INVALID_PROPERTY_TAG", map[string]any{
+				"caa_property": r.tag,
+				"caa_value":    r.value,
+			}); err != nil {
+				return results, err
+			}
+			// An unusable tag blocks issuance when critical: RFC 8659 section
+			// 4.1 covers properties that are unknown or unsupported.
+			if r.flags&caaFlagIssuerCritical != 0 {
+				if err := appendLog(ctx, &results, testcase, "Z15_UNKNOWN_PROPERTY_CRITICAL", map[string]any{
+					"caa_property": r.tag,
+					"caa_flags":    r.flags,
+				}); err != nil {
+					return results, err
+				}
+			}
+			continue
+		}
+
+		property := strings.ToLower(r.tag)
+		if _, known := caaKnownProperties[property]; !known {
+			tag := "Z15_UNKNOWN_PROPERTY"
+			args := map[string]any{"caa_property": r.tag}
+			if r.flags&caaFlagIssuerCritical != 0 {
+				tag = "Z15_UNKNOWN_PROPERTY_CRITICAL"
+				args["caa_flags"] = r.flags
+			}
+			if err := appendLog(ctx, &results, testcase, tag, args); err != nil {
+				return results, err
+			}
+			continue
+		}
+
+		switch property {
+		case "issue", "issuewild", "issuemail":
+			parsed := parseCAAIssueValue(r.value)
+			if !parsed.valid {
+				if err := appendLog(ctx, &results, testcase, "Z15_INVALID_ISSUE_VALUE", map[string]any{
+					"caa_property": r.tag,
+					"caa_value":    r.value,
+				}); err != nil {
+					return results, err
+				}
+			}
+			policy, ok := policies[property]
+			if !ok {
+				policy = &caaPolicy{}
+				policies[property] = policy
+				policyOrder = append(policyOrder, property)
+			}
+			if parsed.forbids {
+				policy.forbid++
+			} else {
+				policy.permit++
+			}
+		case "iodef":
+			if !caaIodefValueValid(r.value) {
+				if err := appendLog(ctx, &results, testcase, "Z15_INVALID_IODEF_VALUE", map[string]any{
+					"caa_value": r.value,
+				}); err != nil {
+					return results, err
+				}
+			}
+		}
+	}
+
+	// Policy verdicts need one agreed policy that a certificate authority would
+	// actually consult, so they are skipped when the servers disagree and at the
+	// root, which RFC 8659 tree-climbing never reaches.
+	if inconsistent || z.Name.String() == "." {
+		return appendTestCaseEnd(ctx, results, testcase)
+	}
+
+	// issuewild takes precedence over issue for wildcard names, so a permitting
+	// issuewild keeps issuance open even when every issue value forbids.
+	issue := policies["issue"]
+	issuewild := policies["issuewild"]
+	if issue != nil && issue.permit == 0 && (issuewild == nil || issuewild.permit == 0) {
+		if err := appendLog(ctx, &results, testcase, "Z15_ISSUANCE_FORBIDDEN", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+
+	for _, property := range policyOrder {
+		policy := policies[property]
+		if policy.forbid > 0 && policy.permit > 0 {
+			if err := appendLog(ctx, &results, testcase, "Z15_ISSUE_CONTRADICTION", map[string]any{
+				"caa_property": property,
+			}); err != nil {
+				return results, err
+			}
 		}
 	}
 

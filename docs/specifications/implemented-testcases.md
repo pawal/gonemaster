@@ -12,7 +12,7 @@ Notes:
 
 ## Summary
 - Modules: 9
-- Implemented testcases: 82
+- Implemented testcases: 83
 
 ## Regeneration
 
@@ -106,7 +106,7 @@ make spec-export-implemented
 - syntax07 - Validate SOA `MNAME` hostname syntax using the same hostname validator as `syntax04`.
 - syntax08 - Validate syntax of MX exchange hostnames for the tested zone.
 
-### zone (14)
+### zone (15)
 - zone01 - Validate SOA MNAME handling for the child zone: name sanity, resolvability, authority behavior, and serial-based master inference.
 - zone02 - Validate that SOA `refresh` is at or above the configured minimum threshold.
 - zone03 - Validate ordering relationship between SOA timers: `refresh` should be greater than `retry`.
@@ -121,4 +121,5 @@ make spec-export-implemented
 - zone12 - Check existence and RFC 7477 compliance of the CSYNC RR at the zone apex.
 - zone13 - Validate that the SPF policy at the zone apex does not exceed the DNS lookup limit defined in RFC 7208 Section 4.6.4.
 - zone14 - Check existence and RFC 8976 compliance of the ZONEMD RR at the zone apex.
+- zone15 - Check presence and syntax of CAA records (RFC 8659) at the zone apex.
 

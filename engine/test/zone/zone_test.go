@@ -2228,3 +2228,809 @@ func TestZone09EvaluatesMXWithoutSOA(t *testing.T) {
 		t.Fatalf("expected Z09_MX_DATA without a SOA precondition, got %v", entryTags(entries))
 	}
 }
+
+// --- Zone15 (CAA at the zone apex) ---------------------------------------
+
+// caaRecord is the test-side description of one CAA RR. The fields mirror
+// rdata.CAA so that a test reads like the zone file line it stands for.
+type caaRecord struct {
+	flags uint8
+	tag   string
+	value string
+}
+
+// caaPacket builds an authoritative NOERROR answer carrying the given CAA
+// records at the owner name. Passing no records yields the "authoritative, but
+// the CAA RRset is empty" case, which is how a zone without CAA answers.
+func caaPacket(name string, records []caaRecord) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeCAA)
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	for _, r := range records {
+		caa := &dns.CAA{}
+		caa.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}
+		caa.CAA.Flag = r.flags
+		caa.CAA.Tag = r.tag
+		caa.CAA.Value = r.value
+		msg.Answer = append(msg.Answer, caa)
+	}
+	return packet.Packet{Msg: msg}
+}
+
+// caaRcodePacket builds an authoritative response carrying only an RCODE, for
+// the servers that answer the CAA query with a failure.
+func caaRcodePacket(name string, rcode uint16) packet.Packet {
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeCAA)
+	msg.Authoritative = true
+	msg.Rcode = rcode
+	return packet.Packet{Msg: msg}
+}
+
+// caaHandler answers CAA queries with the given packet and stays silent for
+// every other query type, which also asserts that Zone15 asks for nothing else.
+func caaHandler(resp packet.Packet) func(string, string, *ens.QueryOptions) packet.Packet {
+	return func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+		if qtype == "CAA" {
+			return resp
+		}
+		return packet.Packet{}
+	}
+}
+
+// useNameservers points the module's authoritativeNS hook at a fixed list for
+// the duration of one test.
+func useNameservers(t *testing.T, nss ...ens.Nameserver) {
+	t.Helper()
+	orig := authoritativeNS
+	t.Cleanup(func() { authoritativeNS = orig })
+	authoritativeNS = func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return nss, nil
+	}
+}
+
+// runZone15 runs the testcase against a zone name and fails on error.
+func runZone15(t *testing.T, ctx context.Context, zoneName string) []*logger.Entry {
+	t.Helper()
+	z := zonepkg.Zone{Name: dnsname.New(zoneName)}
+	entries, err := Zone15(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone15: %v", err)
+	}
+	return entries
+}
+
+func entriesWithTag(entries []*logger.Entry, tag string) []*logger.Entry {
+	var out []*logger.Entry
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == tag {
+			out = append(out, entry)
+		}
+	}
+	return out
+}
+
+func firstEntryWithTag(t *testing.T, entries []*logger.Entry, tag string) *logger.Entry {
+	t.Helper()
+	found := entriesWithTag(entries, tag)
+	if len(found) == 0 {
+		t.Fatalf("expected %s, got %v", tag, entryTags(entries))
+	}
+	return found[0]
+}
+
+func requireNoTag(t *testing.T, entries []*logger.Entry, tags ...string) {
+	t.Helper()
+	for _, tag := range tags {
+		if hasEntryTag(entries, tag) {
+			t.Fatalf("did not expect %s, got %v", tag, entryTags(entries))
+		}
+	}
+}
+
+func TestZone15CAAFound(t *testing.T) {
+	ctx := setupTest(t)
+
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "ca.example"}}),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	found := firstEntryWithTag(t, entries, "Z15_CAA_FOUND")
+	if got, ok := found.Args["caa_flags"].(uint8); !ok || got != 0 {
+		t.Fatalf("expected caa_flags=0, got %#v", found.Args["caa_flags"])
+	}
+	if got, ok := found.Args["caa_property"].(string); !ok || got != "issue" {
+		t.Fatalf("expected caa_property=issue, got %#v", found.Args["caa_property"])
+	}
+	if got, ok := found.Args["caa_value"].(string); !ok || got != "ca.example" {
+		t.Fatalf("expected caa_value=ca.example, got %#v", found.Args["caa_value"])
+	}
+	// A single well-formed permitting record is a clean result: no defect tag,
+	// and no policy verdict since issuance is not forbidden.
+	requireNoTag(t, entries,
+		"Z15_NO_CAA", "Z15_NO_CAA_TLD", "Z15_RESERVED_FLAGS", "Z15_INVALID_PROPERTY_TAG",
+		"Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL", "Z15_INVALID_ISSUE_VALUE",
+		"Z15_ISSUANCE_FORBIDDEN", "Z15_ISSUE_CONTRADICTION")
+}
+
+func TestZone15ConsolidatedFound(t *testing.T) {
+	ctx := setupTest(t)
+
+	// Two nameservers serving byte-identical content must collapse into one
+	// finding listing both endpoints, rather than one finding per server.
+	resp := caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "ca.example"}})
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(resp))
+	ns2 := newNameserver(t, ctx, "ns2.example.com", "192.0.2.2", caaHandler(resp))
+	useNameservers(t, ns1, ns2)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	found := entriesWithTag(entries, "Z15_CAA_FOUND")
+	if len(found) != 1 {
+		t.Fatalf("expected one consolidated Z15_CAA_FOUND, got %d", len(found))
+	}
+	servers, ok := found[0].Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 2 {
+		t.Fatalf("expected both name servers in servers, got %#v", found[0].Args["servers"])
+	}
+	requireNoTag(t, entries, "Z15_INCONSISTENT_CAA", "Z15_MIXED_PRESENCE")
+}
+
+func TestZone15NoCAA(t *testing.T) {
+	ctx := setupTest(t)
+
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", nil),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	noCAA := firstEntryWithTag(t, entries, "Z15_NO_CAA")
+	servers, ok := noCAA.Args["servers"].([]map[string]any)
+	if !ok || len(servers) != 1 {
+		t.Fatalf("expected one server in Z15_NO_CAA, got %#v", noCAA.Args["servers"])
+	}
+	// A normal delegated domain must not get the TLD wording.
+	requireNoTag(t, entries, "Z15_NO_CAA_TLD", "Z15_MIXED_PRESENCE")
+}
+
+func TestZone15NoCAATLD(t *testing.T) {
+	// A TLD (and the root) cannot hold a publicly trusted certificate for its
+	// own name, so the "any CA may issue for this domain" wording of
+	// Z15_NO_CAA would be false there.
+	for _, zoneName := range []string{"se", "."} {
+		t.Run(zoneName, func(t *testing.T) {
+			ctx := setupTest(t)
+			ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+				caaPacket(zoneName, nil),
+			))
+			useNameservers(t, ns1)
+
+			entries := runZone15(t, ctx, zoneName)
+
+			if !hasEntryTag(entries, "Z15_NO_CAA_TLD") {
+				t.Fatalf("expected Z15_NO_CAA_TLD for %q, got %v", zoneName, entryTags(entries))
+			}
+			requireNoTag(t, entries, "Z15_NO_CAA")
+		})
+	}
+}
+
+func TestZone15NoResponse(t *testing.T) {
+	ctx := setupTest(t)
+
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(packet.Packet{}))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	noResp := firstEntryWithTag(t, entries, "Z15_NO_RESPONSE_CAA_QUERY")
+	addrs, ok := noResp.Args["addresses"].([]string)
+	if !ok || len(addrs) != 1 || addrs[0] != "192.0.2.1" {
+		t.Fatalf("expected silent endpoint [192.0.2.1], got %#v", noResp.Args["addresses"])
+	}
+	// A server that never answered is not a server that "has no CAA".
+	requireNoTag(t, entries, "Z15_NO_CAA", "Z15_NO_CAA_TLD", "Z15_MIXED_PRESENCE")
+}
+
+func TestZone15UnexpectedRcode(t *testing.T) {
+	ctx := setupTest(t)
+
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaRcodePacket("example.com", dns.RcodeServerFailure),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	bad := firstEntryWithTag(t, entries, "Z15_UNEXPECTED_RCODE_CAA")
+	if got, ok := bad.Args["rcode"].(string); !ok || got != "SERVFAIL" {
+		t.Fatalf("expected rcode=SERVFAIL, got %#v", bad.Args["rcode"])
+	}
+	addrs, ok := bad.Args["addresses"].([]string)
+	if !ok || len(addrs) != 1 || addrs[0] != "192.0.2.1" {
+		t.Fatalf("expected failing endpoint [192.0.2.1], got %#v", bad.Args["addresses"])
+	}
+	requireNoTag(t, entries, "Z15_NO_CAA", "Z15_MIXED_PRESENCE")
+}
+
+func TestZone15NonAuthoritativeSkipped(t *testing.T) {
+	ctx := setupTest(t)
+
+	// NOERROR without AA is another module's finding (lameness); Zone15 keeps
+	// quiet rather than restating it, matching Zone14.
+	resp := caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "ca.example"}})
+	resp.Msg.Authoritative = false
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(resp))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	requireNoTag(t, entries,
+		"Z15_CAA_FOUND", "Z15_NO_CAA", "Z15_NO_CAA_TLD", "Z15_MIXED_PRESENCE",
+		"Z15_INCONSISTENT_CAA", "Z15_NO_RESPONSE_CAA_QUERY", "Z15_UNEXPECTED_RCODE_CAA")
+	if !hasEntryTag(entries, "TEST_CASE_END") {
+		t.Fatalf("expected TEST_CASE_END even when every server is skipped")
+	}
+}
+
+func TestZone15MixedPresence(t *testing.T) {
+	ctx := setupTest(t)
+
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "ca.example"}}),
+	))
+	ns2 := newNameserver(t, ctx, "ns2.example.com", "192.0.2.2", caaHandler(
+		caaPacket("example.com", nil),
+	))
+	useNameservers(t, ns1, ns2)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if !hasEntryTag(entries, "Z15_MIXED_PRESENCE") {
+		t.Fatalf("expected Z15_MIXED_PRESENCE, got %v", entryTags(entries))
+	}
+	if !hasEntryTag(entries, "Z15_CAA_FOUND") || !hasEntryTag(entries, "Z15_NO_CAA") {
+		t.Fatalf("expected both presence groups reported, got %v", entryTags(entries))
+	}
+}
+
+func TestZone15Inconsistent(t *testing.T) {
+	ctx := setupTest(t)
+
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "ca1.example"}}),
+	))
+	ns2 := newNameserver(t, ctx, "ns2.example.com", "192.0.2.2", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "ca2.example"}}),
+	))
+	useNameservers(t, ns1, ns2)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if !hasEntryTag(entries, "Z15_INCONSISTENT_CAA") {
+		t.Fatalf("expected Z15_INCONSISTENT_CAA, got %v", entryTags(entries))
+	}
+	if got := len(entriesWithTag(entries, "Z15_CAA_FOUND")); got != 2 {
+		t.Fatalf("expected one Z15_CAA_FOUND per distinct content, got %d", got)
+	}
+	requireNoTag(t, entries, "Z15_MIXED_PRESENCE")
+}
+
+func TestZone15ReservedFlags(t *testing.T) {
+	ctx := setupTest(t)
+
+	// RFC 8659 section 4.1 defines only bit 0 (value 128, issuer critical).
+	// Flags 1 sets a reserved bit; flags 129 sets a reserved bit alongside the
+	// critical bit. Neither record has an unknown property.
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{
+			{flags: 1, tag: "issue", value: "ca.example"},
+			{flags: 129, tag: "issuewild", value: "ca.example"},
+		}),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if got := len(entriesWithTag(entries, "Z15_RESERVED_FLAGS")); got != 2 {
+		t.Fatalf("expected Z15_RESERVED_FLAGS per offending record, got %d", got)
+	}
+	requireNoTag(t, entries, "Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL")
+}
+
+func TestZone15InvalidPropertyTag(t *testing.T) {
+	ctx := setupTest(t)
+
+	// RFC 8659 section 4.1: tags MUST NOT contain characters outside ASCII
+	// letters and digits, and the wire-format tag length must be at least 1.
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{
+			{flags: 0, tag: "", value: "ca.example"},
+			{flags: 0, tag: "iss ue", value: "ca.example"},
+			{flags: 0, tag: "iss_ue", value: "ca.example"},
+		}),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if got := len(entriesWithTag(entries, "Z15_INVALID_PROPERTY_TAG")); got != 3 {
+		t.Fatalf("expected Z15_INVALID_PROPERTY_TAG per offending record, got %d", got)
+	}
+	// An unusable tag is not classified further: there is no property to
+	// validate the value against, and the critical flag is not set.
+	requireNoTag(t, entries,
+		"Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL", "Z15_INVALID_ISSUE_VALUE")
+}
+
+func TestZone15InvalidPropertyTagCritical(t *testing.T) {
+	ctx := setupTest(t)
+
+	// A critical-flagged garbage tag blocks issuance exactly as a well-formed
+	// unknown tag does: RFC 8659 section 4.1 forbids issuance for a critical
+	// property that is "unknown or unsupported", and an invalid tag can never
+	// be supported.
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 128, tag: "iss_ue", value: "ca.example"}}),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if !hasEntryTag(entries, "Z15_INVALID_PROPERTY_TAG") {
+		t.Fatalf("expected Z15_INVALID_PROPERTY_TAG, got %v", entryTags(entries))
+	}
+	critical := firstEntryWithTag(t, entries, "Z15_UNKNOWN_PROPERTY_CRITICAL")
+	if got, ok := critical.Args["caa_flags"].(uint8); !ok || got != 128 {
+		t.Fatalf("expected caa_flags=128, got %#v", critical.Args["caa_flags"])
+	}
+}
+
+func TestZone15UnknownProperty(t *testing.T) {
+	tests := []struct {
+		name     string
+		flags    uint8
+		wantTag  string
+		otherTag string
+	}{
+		// Consumers ignore unrecognized non-critical properties (RFC 8659
+		// section 3), so this is a hygiene notice only.
+		{name: "non-critical", flags: 0, wantTag: "Z15_UNKNOWN_PROPERTY", otherTag: "Z15_UNKNOWN_PROPERTY_CRITICAL"},
+		// With the critical bit set, every conforming CA refuses all issuance.
+		{name: "critical", flags: 128, wantTag: "Z15_UNKNOWN_PROPERTY_CRITICAL", otherTag: "Z15_UNKNOWN_PROPERTY"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+				caaPacket("example.com", []caaRecord{{flags: tc.flags, tag: "futureprop", value: "x"}}),
+			))
+			useNameservers(t, ns1)
+
+			entries := runZone15(t, ctx, "example.com")
+
+			if !hasEntryTag(entries, tc.wantTag) {
+				t.Fatalf("expected %s, got %v", tc.wantTag, entryTags(entries))
+			}
+			requireNoTag(t, entries, tc.otherTag)
+			prop := firstEntryWithTag(t, entries, tc.wantTag)
+			if got, ok := prop.Args["caa_property"].(string); !ok || got != "futureprop" {
+				t.Fatalf("expected caa_property=futureprop, got %#v", prop.Args["caa_property"])
+			}
+		})
+	}
+}
+
+func TestZone15KnownPropertyCaseInsensitive(t *testing.T) {
+	ctx := setupTest(t)
+
+	// RFC 8659 section 4.1 makes tag matching case insensitive, so "Issue"
+	// classifies as issue. Mixed case is not itself a finding.
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "Issue", value: "ca.example"}}),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	requireNoTag(t, entries,
+		"Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL", "Z15_INVALID_PROPERTY_TAG")
+	// The value is still validated against the issue-value grammar.
+	requireNoTag(t, entries, "Z15_INVALID_ISSUE_VALUE")
+}
+
+func TestZone15RegisteredPropertiesKnown(t *testing.T) {
+	ctx := setupTest(t)
+
+	// Every assignable entry in the IANA registry is recognized, so domains
+	// using the contact properties or issuevmc get no false unknown finding.
+	known := []caaRecord{
+		{flags: 0, tag: "issuemail", value: "ca.example"},
+		{flags: 0, tag: "contactemail", value: "admin@example.com"},
+		{flags: 0, tag: "contactphone", value: "+46 8 000 000"},
+		{flags: 0, tag: "issuevmc", value: "ca.example"},
+	}
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", known),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+	requireNoTag(t, entries, "Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL")
+
+	// The Reserved entries are deliberately treated as unknown: RFC 8659
+	// reserved them so they can never be assigned a meaning, so no CA will
+	// ever act on them.
+	for _, tag := range []string{"auth", "path", "policy"} {
+		t.Run(tag, func(t *testing.T) {
+			ctx := setupTest(t)
+			ns := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+				caaPacket("example.com", []caaRecord{{flags: 0, tag: tag, value: "x"}}),
+			))
+			useNameservers(t, ns)
+
+			entries := runZone15(t, ctx, "example.com")
+			if !hasEntryTag(entries, "Z15_UNKNOWN_PROPERTY") {
+				t.Fatalf("expected reserved tag %q to be reported unknown, got %v", tag, entryTags(entries))
+			}
+		})
+	}
+}
+
+func TestZone15InvalidIssueValue(t *testing.T) {
+	for _, property := range []string{"issue", "issuewild", "issuemail"} {
+		t.Run(property, func(t *testing.T) {
+			ctx := setupTest(t)
+			ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+				caaPacket("example.com", []caaRecord{
+					{flags: 0, tag: property, value: "bad_domain!"},
+				}),
+			))
+			useNameservers(t, ns1)
+
+			entries := runZone15(t, ctx, "example.com")
+
+			bad := firstEntryWithTag(t, entries, "Z15_INVALID_ISSUE_VALUE")
+			if got, ok := bad.Args["caa_property"].(string); !ok || got != property {
+				t.Fatalf("expected caa_property=%s, got %#v", property, bad.Args["caa_property"])
+			}
+			if got, ok := bad.Args["caa_value"].(string); !ok || got != "bad_domain!" {
+				t.Fatalf("expected caa_value=bad_domain!, got %#v", bad.Args["caa_value"])
+			}
+		})
+	}
+}
+
+func TestZone15IssueParametersValid(t *testing.T) {
+	ctx := setupTest(t)
+
+	// RFC 8657 parameters are CA-defined; only the grammar is checked, so a
+	// well-formed parameter list must not be reported.
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{
+			{flags: 0, tag: "issue", value: "ca.example; validationmethods=dns-01"},
+		}),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+	requireNoTag(t, entries, "Z15_INVALID_ISSUE_VALUE", "Z15_ISSUANCE_FORBIDDEN")
+}
+
+func TestZone15InvalidIodef(t *testing.T) {
+	tests := []struct {
+		name    string
+		value   string
+		wantBad bool
+	}{
+		{name: "not a url", value: "not a url", wantBad: true},
+		// RFC 8659 section 4.4: mailto, http and https are the only supported
+		// schemes.
+		{name: "ftp scheme", value: "ftp://x.example/report", wantBad: true},
+		{name: "empty mailto", value: "mailto:", wantBad: true},
+		{name: "mailto", value: "mailto:security@example.com", wantBad: false},
+		{name: "https", value: "https://example.com/iodef", wantBad: false},
+		{name: "http", value: "http://example.com/iodef", wantBad: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := setupTest(t)
+			ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+				caaPacket("example.com", []caaRecord{{flags: 0, tag: "iodef", value: tc.value}}),
+			))
+			useNameservers(t, ns1)
+
+			entries := runZone15(t, ctx, "example.com")
+
+			got := hasEntryTag(entries, "Z15_INVALID_IODEF_VALUE")
+			if got != tc.wantBad {
+				t.Fatalf("iodef %q: got Z15_INVALID_IODEF_VALUE=%v, want %v", tc.value, got, tc.wantBad)
+			}
+		})
+	}
+}
+
+func TestZone15IssuanceForbidden(t *testing.T) {
+	ctx := setupTest(t)
+
+	// The deliberate lockdown: RFC 8659 section 4.2 spells it issue ";".
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: ";"}}),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if !hasEntryTag(entries, "Z15_ISSUANCE_FORBIDDEN") {
+		t.Fatalf("expected Z15_ISSUANCE_FORBIDDEN, got %v", entryTags(entries))
+	}
+	// Nothing contradicts it, and ";" is valid syntax rather than an error.
+	requireNoTag(t, entries, "Z15_ISSUE_CONTRADICTION", "Z15_INVALID_ISSUE_VALUE")
+}
+
+func TestZone15MalformedIssueForbids(t *testing.T) {
+	ctx := setupTest(t)
+
+	// RFC 8659 section 4.2: an issue-value that does not match the grammar
+	// "MUST be treated the same as one specifying an empty issuer-domain-name".
+	// So a lone malformed record is not merely untidy, it blocks issuance.
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "bad_domain!"}}),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if !hasEntryTag(entries, "Z15_INVALID_ISSUE_VALUE") {
+		t.Fatalf("expected Z15_INVALID_ISSUE_VALUE, got %v", entryTags(entries))
+	}
+	if !hasEntryTag(entries, "Z15_ISSUANCE_FORBIDDEN") {
+		t.Fatalf("expected a malformed issue value to forbid issuance, got %v", entryTags(entries))
+	}
+}
+
+func TestZone15IssueWildOverridesForbidden(t *testing.T) {
+	// RFC 8659 section 4.3: issuewild takes precedence over issue for wildcard
+	// names. With issue ";" plus a permitting issuewild, wildcard issuance is
+	// still open, so claiming all issuance is forbidden would be wrong.
+	t.Run("issuewild permits", func(t *testing.T) {
+		ctx := setupTest(t)
+		ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+			caaPacket("example.com", []caaRecord{
+				{flags: 0, tag: "issue", value: ";"},
+				{flags: 0, tag: "issuewild", value: "ca.example"},
+			}),
+		))
+		useNameservers(t, ns1)
+
+		entries := runZone15(t, ctx, "example.com")
+		requireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN")
+	})
+
+	t.Run("issuewild also forbids", func(t *testing.T) {
+		ctx := setupTest(t)
+		ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+			caaPacket("example.com", []caaRecord{
+				{flags: 0, tag: "issue", value: ";"},
+				{flags: 0, tag: "issuewild", value: ";"},
+			}),
+		))
+		useNameservers(t, ns1)
+
+		entries := runZone15(t, ctx, "example.com")
+		if !hasEntryTag(entries, "Z15_ISSUANCE_FORBIDDEN") {
+			t.Fatalf("expected Z15_ISSUANCE_FORBIDDEN when both properties forbid, got %v", entryTags(entries))
+		}
+	})
+}
+
+func TestZone15IssueContradiction(t *testing.T) {
+	// Under RFC 8659 union semantics the forbidding record is inert when a
+	// sibling permits a CA, so it is almost always a leftover.
+	for _, property := range []string{"issue", "issuewild"} {
+		t.Run(property, func(t *testing.T) {
+			ctx := setupTest(t)
+			ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+				caaPacket("example.com", []caaRecord{
+					{flags: 0, tag: property, value: ";"},
+					{flags: 0, tag: property, value: "ca.example"},
+				}),
+			))
+			useNameservers(t, ns1)
+
+			entries := runZone15(t, ctx, "example.com")
+
+			contradiction := firstEntryWithTag(t, entries, "Z15_ISSUE_CONTRADICTION")
+			if got, ok := contradiction.Args["caa_property"].(string); !ok || got != property {
+				t.Fatalf("expected caa_property=%s, got %#v", property, contradiction.Args["caa_property"])
+			}
+			requireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN")
+		})
+	}
+}
+
+func TestZone15PolicySuppressedWhenInconsistent(t *testing.T) {
+	ctx := setupTest(t)
+
+	// The union of a forbidding NS1 and a permitting NS2 looks like a
+	// contradiction, but neither server actually publishes that RRset: on NS1
+	// issuance really is forbidden. The inconsistency is the finding.
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: ";"}}),
+	))
+	ns2 := newNameserver(t, ctx, "ns2.example.com", "192.0.2.2", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "ca.example"}}),
+	))
+	useNameservers(t, ns1, ns2)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if !hasEntryTag(entries, "Z15_INCONSISTENT_CAA") {
+		t.Fatalf("expected Z15_INCONSISTENT_CAA, got %v", entryTags(entries))
+	}
+	requireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN", "Z15_ISSUE_CONTRADICTION")
+}
+
+func TestZone15RootNoPolicyVerdict(t *testing.T) {
+	ctx := setupTest(t)
+
+	// RFC 8659 section 3 climbs "up to, but not including, the DNS root", so a
+	// CAA RRset at the root apex is never consulted by any CA. It is still
+	// reported, but no policy verdict can follow from it.
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaPacket(".", []caaRecord{{flags: 0, tag: "issue", value: ";"}}),
+	))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, ".")
+
+	if !hasEntryTag(entries, "Z15_CAA_FOUND") {
+		t.Fatalf("expected Z15_CAA_FOUND at the root, got %v", entryTags(entries))
+	}
+	requireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN", "Z15_ISSUE_CONTRADICTION")
+}
+
+func TestZone15PartialFailure(t *testing.T) {
+	ctx := setupTest(t)
+
+	// One server fails the query, the other serves records. The failure is
+	// reported, but a failed server must not be counted as "has no CAA", so
+	// there is no mixed presence.
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+		caaRcodePacket("example.com", dns.RcodeServerFailure),
+	))
+	ns2 := newNameserver(t, ctx, "ns2.example.com", "192.0.2.2", caaHandler(
+		caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "ca.example"}}),
+	))
+	useNameservers(t, ns1, ns2)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if !hasEntryTag(entries, "Z15_UNEXPECTED_RCODE_CAA") {
+		t.Fatalf("expected Z15_UNEXPECTED_RCODE_CAA, got %v", entryTags(entries))
+	}
+	if !hasEntryTag(entries, "Z15_CAA_FOUND") {
+		t.Fatalf("expected Z15_CAA_FOUND from the healthy server, got %v", entryTags(entries))
+	}
+	requireNoTag(t, entries, "Z15_MIXED_PRESENCE", "Z15_INCONSISTENT_CAA")
+}
+
+func TestZone15ApexCNAME(t *testing.T) {
+	ctx := setupTest(t)
+
+	// A CNAME answer yields no CAA records for the owner name. Apex CNAME
+	// problems belong to other testcases, so this counts as absence here.
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, dnsutil.Fqdn("example.com"), dns.TypeCAA)
+	msg.Authoritative = true
+	msg.Rcode = dns.RcodeSuccess
+	cname := &dns.CNAME{Hdr: dns.Header{Name: dnsutil.Fqdn("example.com"), Class: dns.ClassINET, TTL: 300}}
+	cname.CNAME.Target = dnsutil.Fqdn("target.example")
+	msg.Answer = []dns.RR{cname}
+
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(packet.Packet{Msg: msg}))
+	useNameservers(t, ns1)
+
+	entries := runZone15(t, ctx, "example.com")
+
+	if !hasEntryTag(entries, "Z15_NO_CAA") {
+		t.Fatalf("expected a CNAME answer to count as absence, got %v", entryTags(entries))
+	}
+	requireNoTag(t, entries, "Z15_CAA_FOUND", "Z15_ISSUANCE_FORBIDDEN")
+}
+
+func TestParseCAAIssueValue(t *testing.T) {
+	tests := []struct {
+		name        string
+		value       string
+		wantValid   bool
+		wantForbids bool
+	}{
+		// Every element of the ABNF is optional, so both spellings of "no
+		// issuer is authorized" parse cleanly.
+		{name: "empty", value: "", wantValid: true, wantForbids: true},
+		{name: "semicolon only", value: ";", wantValid: true, wantForbids: true},
+		{name: "whitespace only", value: "  ", wantValid: true, wantForbids: true},
+		{name: "semicolon with spaces", value: " ; ", wantValid: true, wantForbids: true},
+
+		{name: "plain issuer", value: "ca.example", wantValid: true, wantForbids: false},
+		{name: "single label issuer", value: "ca", wantValid: true, wantForbids: false},
+		{name: "leading whitespace", value: "  ca.example", wantValid: true, wantForbids: false},
+		{name: "trailing whitespace", value: "ca.example  ", wantValid: true, wantForbids: false},
+		{name: "tab whitespace", value: "\tca.example\t", wantValid: true, wantForbids: false},
+		{name: "digits in label", value: "ca1.example2", wantValid: true, wantForbids: false},
+		// A label may carry hyphens in the interior, including consecutive
+		// ones: label = (ALPHA / DIGIT) *( *("-") (ALPHA / DIGIT)).
+		{name: "interior hyphen", value: "my-ca.example", wantValid: true, wantForbids: false},
+		{name: "consecutive hyphens", value: "my--ca.example", wantValid: true, wantForbids: false},
+
+		{name: "one parameter", value: "ca.example; account=123", wantValid: true, wantForbids: false},
+		{name: "two parameters", value: "ca.example; a=1; b=2", wantValid: true, wantForbids: false},
+		{name: "whitespace around equals", value: "ca.example; a = 1", wantValid: true, wantForbids: false},
+		{name: "no space after semicolon", value: "ca.example;a=1", wantValid: true, wantForbids: false},
+		{name: "hyphen in parameter tag", value: "ca.example; my-tag=1", wantValid: true, wantForbids: false},
+		{name: "parameters without issuer", value: "; a=1", wantValid: true, wantForbids: true},
+
+		// Invalid values forbid issuance too (RFC 8659 section 4.2).
+		{name: "underscore in label", value: "bad_domain", wantValid: false, wantForbids: true},
+		{name: "bang in label", value: "bad!", wantValid: false, wantForbids: true},
+		{name: "wildcard label", value: "*.example", wantValid: false, wantForbids: true},
+		{name: "leading hyphen", value: "-bad.example", wantValid: false, wantForbids: true},
+		{name: "trailing hyphen", value: "bad-.example", wantValid: false, wantForbids: true},
+		{name: "trailing dot", value: "ca.example.", wantValid: false, wantForbids: true},
+		{name: "leading dot", value: ".ca.example", wantValid: false, wantForbids: true},
+		{name: "empty label", value: "ca..example", wantValid: false, wantForbids: true},
+		{name: "space inside issuer", value: "ca example", wantValid: false, wantForbids: true},
+		{name: "parameter without name", value: "ca.example; =broken", wantValid: false, wantForbids: true},
+		{name: "parameter without equals", value: "ca.example; broken", wantValid: false, wantForbids: true},
+		// A parameter value is %x21-3A / %x3C-7E, which excludes the space.
+		{name: "space in parameter value", value: "ca.example; a=1 2", wantValid: false, wantForbids: true},
+		{name: "empty parameter", value: "ca.example; ;", wantValid: false, wantForbids: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := parseCAAIssueValue(tc.value)
+			if got.valid != tc.wantValid {
+				t.Fatalf("parseCAAIssueValue(%q).valid = %v, want %v", tc.value, got.valid, tc.wantValid)
+			}
+			if got.forbids != tc.wantForbids {
+				t.Fatalf("parseCAAIssueValue(%q).forbids = %v, want %v", tc.value, got.forbids, tc.wantForbids)
+			}
+		})
+	}
+}
+
+func TestCaaIodefValueValid(t *testing.T) {
+	tests := []struct {
+		name  string
+		value string
+		want  bool
+	}{
+		{name: "mailto", value: "mailto:security@example.com", want: true},
+		{name: "https", value: "https://example.com/iodef", want: true},
+		{name: "http", value: "http://example.com/iodef", want: true},
+		// Scheme matching is case insensitive per RFC 3986.
+		{name: "uppercase scheme", value: "MAILTO:security@example.com", want: true},
+
+		{name: "empty", value: "", want: false},
+		{name: "plain text", value: "not a url", want: false},
+		{name: "ftp", value: "ftp://example.com/iodef", want: false},
+		{name: "mailto without address", value: "mailto:", want: false},
+		{name: "https without host", value: "https:///iodef", want: false},
+		{name: "bare hostname", value: "example.com", want: false},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := caaIodefValueValid(tc.value)
+			if got != tc.want {
+				t.Fatalf("caaIodefValueValid(%q) = %v, want %v", tc.value, got, tc.want)
+			}
+		})
+	}
+}

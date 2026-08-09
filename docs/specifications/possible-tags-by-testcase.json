@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 82,
-    "unique_tag_count": 558
+    "testcase_count": 83,
+    "unique_tag_count": 573
   },
   "modules": {
     "address": {
@@ -1062,6 +1062,27 @@
         "Z14_SERIAL_MISMATCH",
         "Z14_UNSUPPORTED_HASH",
         "Z14_ZONEMD_FOUND"
+      ],
+      "zone15": [
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START",
+        "Z15_CAA_FOUND",
+        "Z15_INCONSISTENT_CAA",
+        "Z15_INVALID_IODEF_VALUE",
+        "Z15_INVALID_ISSUE_VALUE",
+        "Z15_INVALID_PROPERTY_TAG",
+        "Z15_ISSUANCE_FORBIDDEN",
+        "Z15_ISSUE_CONTRADICTION",
+        "Z15_MIXED_PRESENCE",
+        "Z15_NO_CAA",
+        "Z15_NO_CAA_TLD",
+        "Z15_NO_RESPONSE_CAA_QUERY",
+        "Z15_RESERVED_FLAGS",
+        "Z15_UNEXPECTED_RCODE_CAA",
+        "Z15_UNKNOWN_PROPERTY",
+        "Z15_UNKNOWN_PROPERTY_CRITICAL"
       ]
     }
   }

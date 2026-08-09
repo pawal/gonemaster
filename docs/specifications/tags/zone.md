@@ -15,8 +15,8 @@ _Do not edit by hand - regenerate with the command above._
 | `EXPIRE_LOWER_THAN_REFRESH` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
 | `EXPIRE_MINIMUM_VALUE_LOWER` | `WARNING` | [zone05](../tests/zone/zone05.md) | yes |
 | `EXPIRE_MINIMUM_VALUE_OK` | `INFO` | [zone05](../tests/zone/zone05.md) | yes |
-| `IPV4_DISABLED` | `-` | [zone12](../tests/zone/zone12.md), [zone14](../tests/zone/zone14.md) | yes |
-| `IPV6_DISABLED` | `-` | [zone12](../tests/zone/zone12.md), [zone14](../tests/zone/zone14.md) | yes |
+| `IPV4_DISABLED` | `-` | [zone12](../tests/zone/zone12.md), [zone14](../tests/zone/zone14.md), [zone15](../tests/zone/zone15.md) | yes |
+| `IPV6_DISABLED` | `-` | [zone12](../tests/zone/zone12.md), [zone14](../tests/zone/zone14.md), [zone15](../tests/zone/zone15.md) | yes |
 | `MNAME_HAS_NO_ADDRESS` | `WARNING` | [zone07](../tests/zone/zone07.md) | yes |
 | `MNAME_IS_CNAME` | `NOTICE` | [zone07](../tests/zone/zone07.md) | yes |
 | `MNAME_IS_NOT_CNAME` | `INFO` | [zone07](../tests/zone/zone07.md) | yes |
@@ -38,8 +38,8 @@ _Do not edit by hand - regenerate with the command above._
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_HIGHER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_LOWER` | `NOTICE` | [zone06](../tests/zone/zone06.md) | yes |
 | `SOA_DEFAULT_TTL_MAXIMUM_VALUE_OK` | `INFO` | [zone06](../tests/zone/zone06.md) | yes |
-| `TEST_CASE_END` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md), [zone13](../tests/zone/zone13.md), [zone14](../tests/zone/zone14.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md), [zone13](../tests/zone/zone13.md), [zone14](../tests/zone/zone14.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md), [zone13](../tests/zone/zone13.md), [zone14](../tests/zone/zone14.md), [zone15](../tests/zone/zone15.md) | yes |
+| `TEST_CASE_START` | `DEBUG` | [zone01](../tests/zone/zone01.md), [zone02](../tests/zone/zone02.md), [zone03](../tests/zone/zone03.md), [zone04](../tests/zone/zone04.md), [zone05](../tests/zone/zone05.md), [zone06](../tests/zone/zone06.md), [zone07](../tests/zone/zone07.md), [zone08](../tests/zone/zone08.md), [zone09](../tests/zone/zone09.md), [zone10](../tests/zone/zone10.md), [zone12](../tests/zone/zone12.md), [zone13](../tests/zone/zone13.md), [zone14](../tests/zone/zone14.md), [zone15](../tests/zone/zone15.md) | yes |
 | `WRONG_SOA` | `DEBUG` | [zone10](../tests/zone/zone10.md) | yes |
 | `Z01_MNAME_HAS_LOCALHOST_ADDR` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
 | `Z01_MNAME_IS_DOT` | `NOTICE` | [zone01](../tests/zone/zone01.md) | yes |
@@ -100,6 +100,21 @@ _Do not edit by hand - regenerate with the command above._
 | `Z14_SERIAL_MISMATCH` | `WARNING` | [zone14](../tests/zone/zone14.md) | yes |
 | `Z14_UNSUPPORTED_HASH` | `NOTICE` | [zone14](../tests/zone/zone14.md) | yes |
 | `Z14_ZONEMD_FOUND` | `INFO` | [zone14](../tests/zone/zone14.md) | yes |
+| `Z15_CAA_FOUND` | `INFO` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_INCONSISTENT_CAA` | `WARNING` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_INVALID_IODEF_VALUE` | `WARNING` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_INVALID_ISSUE_VALUE` | `WARNING` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_INVALID_PROPERTY_TAG` | `WARNING` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_ISSUANCE_FORBIDDEN` | `INFO` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_ISSUE_CONTRADICTION` | `NOTICE` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_MIXED_PRESENCE` | `WARNING` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_NO_CAA` | `INFO` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_NO_CAA_TLD` | `INFO` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_NO_RESPONSE_CAA_QUERY` | `WARNING` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_RESERVED_FLAGS` | `NOTICE` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_UNEXPECTED_RCODE_CAA` | `WARNING` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_UNKNOWN_PROPERTY` | `NOTICE` | [zone15](../tests/zone/zone15.md) | yes |
+| `Z15_UNKNOWN_PROPERTY_CRITICAL` | `ERROR` | [zone15](../tests/zone/zone15.md) | yes |
 
 ## i18n Notes
 

@@ -264,6 +264,7 @@ var zoneTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry, e
 	"zone12": zonetest.Zone12,
 	"zone13": zonetest.Zone13,
 	"zone14": zonetest.Zone14,
+	"zone15": zonetest.Zone15,
 }
 
 var nameserverTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry, error){

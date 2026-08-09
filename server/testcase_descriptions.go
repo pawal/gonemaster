@@ -105,6 +105,7 @@ var testcaseDescriptions = map[string]string{
 	"ZONE12": "CSYNC RR at zone apex",
 	"ZONE13": "SPF DNS lookup limit compliance",
 	"ZONE14": "ZONEMD RR at zone apex (RFC 8976 compliance)",
+	"ZONE15": "CAA records at zone apex (RFC 8659 compliance)",
 }
 
 // TestcaseDescriptions returns the short testcase descriptions keyed by

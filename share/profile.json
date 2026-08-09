@@ -704,7 +704,22 @@
             "Z14_NO_ZONEMD": "INFO",
             "Z14_SERIAL_MISMATCH": "WARNING",
             "Z14_UNSUPPORTED_HASH": "NOTICE",
-            "Z14_ZONEMD_FOUND": "INFO"
+            "Z14_ZONEMD_FOUND": "INFO",
+            "Z15_CAA_FOUND": "INFO",
+            "Z15_INCONSISTENT_CAA": "WARNING",
+            "Z15_INVALID_IODEF_VALUE": "WARNING",
+            "Z15_INVALID_ISSUE_VALUE": "WARNING",
+            "Z15_INVALID_PROPERTY_TAG": "WARNING",
+            "Z15_ISSUANCE_FORBIDDEN": "INFO",
+            "Z15_ISSUE_CONTRADICTION": "NOTICE",
+            "Z15_MIXED_PRESENCE": "WARNING",
+            "Z15_NO_CAA": "INFO",
+            "Z15_NO_CAA_TLD": "INFO",
+            "Z15_NO_RESPONSE_CAA_QUERY": "WARNING",
+            "Z15_RESERVED_FLAGS": "NOTICE",
+            "Z15_UNEXPECTED_RCODE_CAA": "WARNING",
+            "Z15_UNKNOWN_PROPERTY": "NOTICE",
+            "Z15_UNKNOWN_PROPERTY_CRITICAL": "ERROR"
         }
     },
     "test_cases": [
@@ -789,6 +804,7 @@
         "zone11",
         "zone12",
         "zone13",
-        "zone14"
+        "zone14",
+        "zone15"
     ]
 }

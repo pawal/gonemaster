@@ -87,3 +87,4 @@
 "zone12" = "CSYNC RR at zone apex"
 "zone13" = "SPF DNS lookup limit compliance"
 "zone14" = "ZONEMD RR at zone apex (RFC 8976 compliance)"
+"zone15" = "CAA records at zone apex (RFC 8659 compliance)"

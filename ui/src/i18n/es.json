@@ -314,6 +314,7 @@
   "tc.zone12": "Registro CSYNC RR en el ápice de la zona",
   "tc.zone13": "Cumplimiento del límite de consultas DNS SPF",
   "tc.zone14": "Registro ZONEMD en el ápice de la zona",
+  "tc.zone15": "Registros CAA en el ápice de la zona",
   "result_status_ok": "No se encontraron problemas",
   "result_status_notice": "Observaciones",
   "result_status_warning": "Advertencias encontradas",

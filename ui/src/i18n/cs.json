@@ -744,6 +744,7 @@
   "tc.zone12": "CSYNC RR v apexu zóny",
   "tc.zone13": "Soulad s limitem DNS dotazů pro SPF",
   "tc.zone14": "Záznam ZONEMD na apexu zóny",
+  "tc.zone15": "Záznamy CAA na apexu zóny",
   "result_status_ok": "Nebyly nalezeny žádné problémy",
   "result_status_notice": "Upozornění",
   "result_status_warning": "Nalezena varování",

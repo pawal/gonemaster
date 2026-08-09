@@ -744,6 +744,7 @@
   "tc.zone12": "CSYNC-RR op zone-apex",
   "tc.zone13": "Naleving van limiet voor SPF DNS-lookups",
   "tc.zone14": "ZONEMD-record op zone-apex",
+  "tc.zone15": "CAA-records op zone-apex",
   "result_status_ok": "Geen problemen gevonden",
   "result_status_notice": "Meldingen",
   "result_status_warning": "Waarschuwingen gevonden",

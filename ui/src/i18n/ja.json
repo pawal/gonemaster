@@ -314,6 +314,7 @@
   "tc.zone12": "ゾーン頂点のCSYNC RRレコード",
   "tc.zone13": "SPF DNS検索制限への準拠",
   "tc.zone14": "ゾーン頂点のZONEMDレコード",
+  "tc.zone15": "ゾーン頂点のCAAレコード",
   "result_status_ok": "問題は見つかりませんでした",
   "result_status_notice": "通知",
   "result_status_warning": "警告が見つかりました",

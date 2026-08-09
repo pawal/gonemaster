@@ -744,6 +744,7 @@
   "tc.zone12": "CSYNC-RR an der Zone-Apex",
   "tc.zone13": "SPF-DNS-Lookup-Limit-Konformität",
   "tc.zone14": "ZONEMD-Record an der Zone-Apex",
+  "tc.zone15": "CAA-Records an der Zone-Apex",
   "result_status_ok": "Keine Probleme gefunden",
   "result_status_notice": "Hinweise",
   "result_status_warning": "Warnungen gefunden",

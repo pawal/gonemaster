@@ -314,6 +314,7 @@
   "tc.zone12": "CSYNC RR vyöhykkeen kärjessä",
   "tc.zone13": "SPF DNS -hakurajan noudattaminen",
   "tc.zone14": "ZONEMD-tietue vyöhykkeen kärjessä",
+  "tc.zone15": "CAA-tietueet vyöhykkeen kärjessä",
   "result_status_ok": "Ongelmia ei löytynyt",
   "result_status_notice": "Huomautuksia",
   "result_status_warning": "Varoituksia löytyi",

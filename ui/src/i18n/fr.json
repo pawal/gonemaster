@@ -314,6 +314,7 @@
   "tc.zone12": "Enregistrement CSYNC RR à l'apex de la zone",
   "tc.zone13": "Conformité à la limite de résolutions DNS SPF",
   "tc.zone14": "Enregistrement ZONEMD à l'apex de la zone",
+  "tc.zone15": "Enregistrements CAA à l'apex de la zone",
   "result_status_ok": "Aucun problème trouvé",
   "result_status_notice": "Remarques",
   "result_status_warning": "Avertissements trouvés",

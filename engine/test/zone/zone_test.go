@@ -3034,3 +3034,38 @@ func TestCaaIodefValueValid(t *testing.T) {
 		})
 	}
 }
+
+func TestZone15QueryBudget(t *testing.T) {
+	ctx := setupTest(t)
+
+	// The query budget is a hard constraint: exactly one CAA query per
+	// authoritative endpoint and nothing else. Unlike Zone14 there is no
+	// companion SOA query, so a regression here would be easy to miss.
+	var mu sync.Mutex
+	queries := map[string][]string{}
+	record := func(endpoint string) func(string, string, *ens.QueryOptions) packet.Packet {
+		return func(_ string, qtype string, _ *ens.QueryOptions) packet.Packet {
+			mu.Lock()
+			queries[endpoint] = append(queries[endpoint], qtype)
+			mu.Unlock()
+			if qtype == "CAA" {
+				return caaPacket("example.com", []caaRecord{{flags: 0, tag: "issue", value: "ca.example"}})
+			}
+			return packet.Packet{}
+		}
+	}
+	ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", record("192.0.2.1"))
+	ns2 := newNameserver(t, ctx, "ns2.example.com", "192.0.2.2", record("192.0.2.2"))
+	useNameservers(t, ns1, ns2)
+
+	runZone15(t, ctx, "example.com")
+
+	if len(queries) != 2 {
+		t.Fatalf("expected both endpoints queried, got %#v", queries)
+	}
+	for endpoint, types := range queries {
+		if len(types) != 1 || types[0] != "CAA" {
+			t.Fatalf("endpoint %s: expected exactly one CAA query, got %v", endpoint, types)
+		}
+	}
+}

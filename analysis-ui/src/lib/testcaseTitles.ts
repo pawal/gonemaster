@@ -86,6 +86,7 @@ const TESTCASE_TITLES: Record<string, string> = {
   zone12: "CSYNC RR at zone apex",
   zone13: "SPF DNS lookup limit compliance",
   zone14: "ZONEMD record at zone apex",
+  zone15: "CAA records at zone apex",
 };
 
 export function testcaseTitle(testcase: string | undefined | null): string | null {

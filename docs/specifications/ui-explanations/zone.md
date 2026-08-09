@@ -84,6 +84,12 @@ Description:
 
 ZONEMD (RFC 8976) is an optional record at the zone apex that publishes a cryptographic hash of the zone's contents, so a recipient can verify that data received from secondary servers, mirrors, or files on disk has not been altered or truncated. This check looks for ZONEMD records on each authoritative nameserver and verifies that the records agree across servers, that the serial matches the SOA, that there are no duplicate (Scheme, Hash) pairs, and that the hash algorithm is one of the IANA-assigned values that standard tooling can verify.
 
+## Testcase zone15
+
+Description:
+
+CAA records (RFC 8659) let a domain state which certificate authorities may issue certificates for it. Certificate authorities must check CAA before issuing and must refuse to issue when a record they have to honour is malformed or is marked critical but not understood, so a broken CAA setup silently blocks certificate issuance and renewal until someone notices an expired certificate. This check queries every authoritative nameserver for CAA records at the zone apex, validates the flags, property tags, and issue and iodef values, verifies that the records agree across servers, and reports whether the published policy forbids issuance. Publishing no CAA records is a valid choice and is only reported as information.
+
 ## Tag APEX_DNAME
 
 Header: DNAME at zone apex

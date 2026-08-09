@@ -256,6 +256,7 @@
   "pub.tc.zone12": "CSYNC RR at zone apex",
   "pub.tc.zone13": "SPF DNS lookup limit compliance",
   "pub.tc.zone14": "ZONEMD record at zone apex",
+  "pub.tc.zone15": "CAA records at zone apex",
   "pub.tc_desc.delegation01": "A domain should be served by at least two authoritative name servers so it stays reachable if one of them has a problem. Fewer than two is a resilience risk: when the single server has any outage the domain effectively disappears from the internet.",
   "pub.tag.delegation.NOT_ENOUGH_NS_DEL.header": "Not enough nameservers",
   "pub.tag.delegation.NOT_ENOUGH_NS_DEL.desc": "The parent zone's delegation lists fewer nameservers than the recommended minimum. With too few servers, a single outage can make your domain unreachable - visitors, mail, and other services that depend on DNS stop working until the server comes back.",
@@ -989,5 +990,6 @@
   "pub.glossary.ipv4": "IPv4 is the older internet addressing scheme (for example 192.0.2.1). Many clients still rely on it, so nameservers should stay reachable over it.",
   "pub.glossary.ipv6": "IPv6 is the newer internet addressing scheme (for example 2001:db8::1), designed to succeed IPv4 as address space runs out.",
   "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.header": "DS algorithm does not match DNSKEY",
-  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.desc": "A DS record at the parent names a different algorithm than the DNSKEY it points to, even though the key tag and digest line up. Validating resolvers ignore a DS whose algorithm field disagrees with the key, so this DS cannot establish trust; some resolvers fail the whole zone. Replace the DS with one generated from the actual key."
+  "pub.tag.dnssec.DS02_DS_ALGO_DNSKEY_MISMATCH.desc": "A DS record at the parent names a different algorithm than the DNSKEY it points to, even though the key tag and digest line up. Validating resolvers ignore a DS whose algorithm field disagrees with the key, so this DS cannot establish trust; some resolvers fail the whole zone. Replace the DS with one generated from the actual key.",
+  "pub.tc_desc.zone15": "CAA records (RFC 8659) let a domain state which certificate authorities may issue certificates for it. Certificate authorities must check CAA before issuing and must refuse to issue when a record they have to honour is malformed or is marked critical but not understood, so a broken CAA setup silently blocks certificate issuance and renewal until someone notices an expired certificate. This check queries every authoritative nameserver for CAA records at the zone apex, validates the flags, property tags, and issue and iodef values, verifies that the records agree across servers, and reports whether the published policy forbids issuance. Publishing no CAA records is a valid choice and is only reported as information."
 }

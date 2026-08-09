@@ -23,7 +23,7 @@ Status: Draft
 1. Emit `TEST_CASE_START`.
 2. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
 3. For each nameserver (parallelized, input-order merged logs):
-   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `ZONEMD`, then skip.
+   - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for query type `ZONEMD`, then skip.
    - Send ZONEMD query to the zone apex with default query options.
    - If no response, or response is not authoritative NOERROR, skip this nameserver silently.
    - Else collect the ZONEMD RRs from the answer section (zero or more records).
@@ -116,10 +116,10 @@ emit TEST_CASE_END
 | --- | --- | --- | --- |
 | `IPV4_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv4. |
 | `IPV4_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV4_DISABLED` | `rrtype` | `string` | rrtype skipped (`ZONEMD`). |
+| `IPV4_DISABLED` | `query_type` | `string` | Query type skipped (`ZONEMD`). |
 | `IPV6_DISABLED` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP) skipped on IPv6. |
 | `IPV6_DISABLED` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `IPV6_DISABLED` | `rrtype` | `string` | rrtype skipped (`ZONEMD`). |
+| `IPV6_DISABLED` | `query_type` | `string` | Query type skipped (`ZONEMD`). |
 | `Z14_DUPLICATE_SCHEME_HASH` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `Z14_DUPLICATE_SCHEME_HASH` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `Z14_DUPLICATE_SCHEME_HASH` | `scheme` | `uint8` | The duplicated ZONEMD `Scheme` value (`1` = SIMPLE, `240-254` = private use). |

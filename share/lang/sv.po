@@ -3437,7 +3437,7 @@ msgid ""
 "but that target could not be resolved."
 msgstr ""
 "SPF-policyn för {domain} refererar till {target} via include eller redirect, "
-"men målet kunde inte lösas upp."
+"men målet kunde inte slås upp."
 
 msgctxt "ZONE:Z13_UNABLE_TO_CHECK"
 msgid ""

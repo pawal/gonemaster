@@ -191,7 +191,7 @@ function main() {
   if (check) {
     if (next !== current) {
       console.error(
-        `ui-public/src/i18n/en.json is out of sync with ${sourceDir}. ` +
+        `${enJsonPath} is out of sync with ${sourceDir}. ` +
           `Run: node tools/i18n/sync-ui-explanations.mjs`,
       );
       process.exit(1);

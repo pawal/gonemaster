@@ -35,7 +35,13 @@ function runSync(sourceDir, enJsonPath, args = []) {
     );
   const patchedPath = resolve(dirname(enJsonPath), "sync-patched.mjs");
   writeFileSync(patchedPath, patched);
-  return execFileSync("node", [patchedPath, ...args], { encoding: "utf8" });
+  // Pipe stderr rather than inheriting it: the staleness test below expects
+  // the script to fail, and an inherited stderr makes that expected failure
+  // look like a real build warning in the test output.
+  return execFileSync("node", [patchedPath, ...args], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
 }
 
 function setupFixture() {
@@ -206,7 +212,19 @@ describe("sync-ui-explanations", () => {
         ].join("\n"),
       );
       writeFileSync(enJsonPath, "{}\n");
-      expect(() => runSync(sourceDir, enJsonPath, ["--check"])).toThrow();
+
+      let error;
+      try {
+        runSync(sourceDir, enJsonPath, ["--check"]);
+      } catch (e) {
+        error = e;
+      }
+      expect(error).toBeDefined();
+      expect(error.status).toBe(1);
+      // The diagnostic must name the catalog that was actually checked, so a
+      // caller pointing the script at some other file is not told to go and
+      // fix the default one.
+      expect(error.stderr).toContain(enJsonPath);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

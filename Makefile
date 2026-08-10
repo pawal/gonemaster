@@ -24,6 +24,7 @@ CMD ?= all
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-export-testcase-descriptions spec-check-testcase-descriptions \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
+	spec-check-ui-explanations \
 	architecture-check badkeys-update badkeys-update-embed man man-gz clean-man \
 	package-binaries package-deb package-rpm packages clean-packages
 
@@ -66,7 +67,8 @@ help:
 	@echo "  spec-check-tags    Check tag catalog files are up to date (drift detection)"
 	@echo "  spec-check-coherency Run log-args coherency guardrail checks"
 	@echo "  spec-check-i18n-placeholders  Verify placeholder parity and reject non-allowlisted legacy placeholders"
-	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder + testcase-description checks"
+	@echo "  spec-check-ui-explanations  Check ui-public en.json is in sync with the ui-explanations markdown"
+	@echo "  spec-check         Run spec-validate + spec-check-tags + coherency + i18n placeholder + testcase-description + ui-explanations checks"
 	@echo "  architecture-check Verify docs/architecture.md against cmd/, build tags, drivers, and the Last reviewed date"
 	@echo "  docs             Build the documentation site (writes site/public/)"
 	@echo "  docs-serve       Serve the documentation site locally"
@@ -303,7 +305,10 @@ spec-check-coherency:
 spec-check-i18n-placeholders:
 	GOOS= GOARCH= $(GO) run ./tools/i18n/check-placeholders
 
-spec-check: spec-validate spec-check-tags spec-check-coherency spec-check-i18n-placeholders spec-check-testcase-descriptions
+spec-check-ui-explanations:
+	node tools/i18n/sync-ui-explanations.mjs --check
+
+spec-check: spec-validate spec-check-tags spec-check-coherency spec-check-i18n-placeholders spec-check-testcase-descriptions spec-check-ui-explanations
 
 architecture-check:
 	GOOS= GOARCH= $(GO) run ./tools/architecture-check

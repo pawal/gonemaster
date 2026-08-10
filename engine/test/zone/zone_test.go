@@ -2421,6 +2421,30 @@ func TestZone15NoCAATLD(t *testing.T) {
 	}
 }
 
+func TestZone15PublicSuffixIsNotATLD(t *testing.T) {
+	// The absence tag keys off label count, not the Public Suffix List, and
+	// that is deliberate. Z15_NO_CAA_TLD claims the apex cannot hold a
+	// publicly trusted certificate, which is true for dotless names only.
+	// A multi-label public suffix is an ordinary FQDN that may hold one
+	// (github.io demonstrably does), so it must get the plain Z15_NO_CAA.
+	for _, zoneName := range []string{"co.uk", "github.io"} {
+		t.Run(zoneName, func(t *testing.T) {
+			ctx := setupTest(t)
+			ns1 := newNameserver(t, ctx, "ns1.example.com", "192.0.2.1", caaHandler(
+				caaPacket(zoneName, nil),
+			))
+			useNameservers(t, ns1)
+
+			entries := runZone15(t, ctx, zoneName)
+
+			if !hasEntryTag(entries, "Z15_NO_CAA") {
+				t.Fatalf("expected Z15_NO_CAA for public suffix %q, got %v", zoneName, entryTags(entries))
+			}
+			requireNoTag(t, entries, "Z15_NO_CAA_TLD")
+		})
+	}
+}
+
 func TestZone15NoResponse(t *testing.T) {
 	ctx := setupTest(t)
 

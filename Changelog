@@ -2,21 +2,26 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.6.5] - 2026-08-10
+
+Adds Zone15, which validates CAA records at the zone apex. The public UI keeps a list of recent tests in the browser, and the DNSSEC chain of trust now shows a DS/DNSKEY algorithm mismatch as a broken link.
 
 ### Added
 
-- engine: zone15 validates CAA records at the zone apex
+- engine: Zone15 validates CAA records at the zone apex
 - ui-public: a recent tests list on the start page, kept only in the browser, with a clear button
 - ui-public: the logo links back to the start page
 
 ### Changed
 
 - admin-ui: update undici for an npm audit finding
+- admin-ui, ui-public, analysis-ui: update nanoid for an npm audit finding
+- make: spec-check verifies the public UI explanation catalog is in sync with its source
 
 ### Fixed
 
 - engine, ui-public: the DNSSEC chain of trust shows a DS/DNSKEY algorithm mismatch as a broken link, in every shipped locale
+- share: Swedish wording for an SPF target that could not be looked up
 
 ## [v1.6.4] - 2026-08-01
 

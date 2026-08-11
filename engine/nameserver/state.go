@@ -406,6 +406,7 @@ type CacheStore struct {
 	addrLastAccess    map[string]time.Time // when each address was last used
 	warmAddrTTL       time.Duration        // evict addresses idle longer than this
 	sharedParent      *CacheStore
+	reachability      *reachabilityCache
 	queryMetrics      cacheMetrics
 	errorMetrics      cacheMetrics
 	queryTimes        map[string][]time.Duration
@@ -424,6 +425,7 @@ func NewCacheStore() *CacheStore {
 		observedQueries:   map[string]*queryCache{},
 		observedErrors:    map[string]*errorCache{},
 		addrLastAccess:    map[string]time.Time{},
+		reachability:      newReachabilityCache(),
 		queryTimes:        map[string][]time.Duration{},
 		queryTimeouts:     map[string]int{},
 	}
@@ -637,8 +639,12 @@ func (c *CacheStore) SnapshotForRun() *CacheStore {
 		observedErrors:    map[string]*errorCache{},
 		addrLastAccess:    map[string]time.Time{},
 		sharedParent:      c,
-		queryTimes:        map[string][]time.Duration{},
-		queryTimeouts:     map[string]int{},
+		// Deliberately a fresh cache, not the parent's: a hard network error
+		// in one run must not blackout the address for concurrent or future
+		// runs. Warmed query data is shared, derived failure state is not.
+		reachability:  newReachabilityCache(),
+		queryTimes:    map[string][]time.Duration{},
+		queryTimeouts: map[string]int{},
 	}
 	return snapshot
 }
@@ -673,7 +679,8 @@ func (c *CacheStore) DetachSharedMetricObservers() {
 
 // MergeWarmDataFrom merges warmed query caches and concurrency caps from
 // other into c. Error caches are intentionally NOT merged: they reflect
-// transient run-local failures and must not poison subsequent runs.
+// transient run-local failures and must not poison subsequent runs. The
+// reachability cache is not merged either, and for the same reason.
 //
 // Nameserver object instances are also not merged to avoid sharing
 // mutable adaptation state across runs. Before merging, addresses in c
@@ -751,7 +758,8 @@ func (c *CacheStore) evictStaleAddrsLocked() {
 	}
 }
 
-// Empty clears nameserver object caches and query caches.
+// Empty clears nameserver object caches and query caches. The reachability
+// cache is left alone: it is owner-scoped policy, not cached response data.
 func (c *CacheStore) Empty() {
 	if c == nil {
 		return
@@ -784,6 +792,23 @@ func (c *CacheStore) ErrorMetrics() CacheMetrics {
 		return CacheMetrics{}
 	}
 	return c.errorMetrics.snapshot()
+}
+
+// ReachabilityMetrics returns metrics for the reachability backoff cache.
+func (c *CacheStore) ReachabilityMetrics() CacheMetrics {
+	if c == nil {
+		return CacheMetrics{}
+	}
+	return c.reachability.metrics()
+}
+
+// reachabilityBackoff returns the store's backoff cache. The field is set at
+// construction and never reassigned, so no lock is needed.
+func (c *CacheStore) reachabilityBackoff() *reachabilityCache {
+	if c == nil {
+		return nil
+	}
+	return c.reachability
 }
 
 // AddressCacheCount returns the number of per-address query caches accessible

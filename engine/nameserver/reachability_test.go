@@ -147,6 +147,74 @@ func TestReachabilityCacheClearResetsMetrics(t *testing.T) {
 	}
 }
 
+// Ownership: the cache belongs to the CacheStore that created it. A snapshot
+// taken for a run must get its own instance, because the server only ever
+// runs on SnapshotForRun-derived stores. Every method on the cache is
+// nil-receiver-safe, so a missed initialisation here would not panic - it
+// would silently disable backoff on the server path.
+func TestSnapshotForRunHasWorkingReachabilityCache(t *testing.T) {
+	base := NewCacheStore()
+	snap := base.SnapshotForRun()
+
+	backoff := snap.reachabilityBackoff()
+	if backoff == nil {
+		t.Fatalf("SnapshotForRun must give the run its own reachability cache")
+	}
+
+	addr := "192.0.2.230"
+	backoff.mark(addr, time.Minute)
+	backoff.mark(addr, time.Minute)
+	if skip, _ := backoff.shouldSkip(addr); !skip {
+		t.Fatalf("the snapshot's cache must engage after two hard errors")
+	}
+	if got := snap.ReachabilityMetrics(); got.Hits != 1 {
+		t.Fatalf("store metrics must report the suppressed query; got %+v", got)
+	}
+}
+
+// A blackout learned by one store must be invisible to every other store,
+// including the base a snapshot was taken from. This is the isolation the
+// package global made impossible to express.
+func TestCacheStoresGetDistinctReachabilityCaches(t *testing.T) {
+	base := NewCacheStore()
+	other := NewCacheStore()
+	snap := base.SnapshotForRun()
+
+	addr := "192.0.2.231"
+	snap.reachabilityBackoff().mark(addr, time.Minute)
+	snap.reachabilityBackoff().mark(addr, time.Minute)
+	if skip, _ := snap.reachabilityBackoff().shouldSkip(addr); !skip {
+		t.Fatalf("the snapshot must have engaged its own blackout")
+	}
+
+	for name, store := range map[string]*CacheStore{"base": base, "unrelated": other} {
+		if skip, _ := store.reachabilityBackoff().shouldSkip(addr); skip {
+			t.Fatalf("%s store must not see a blackout learned by another store", name)
+		}
+	}
+
+	// A second snapshot of the same base starts clean too.
+	if skip, _ := base.SnapshotForRun().reachabilityBackoff().shouldSkip(addr); skip {
+		t.Fatalf("a later run must not inherit the previous run's blackout")
+	}
+}
+
+// Empty flushes cached responses. A blackout is not response data, so it
+// survives - and clearing it here would deadlock, since Empty holds the
+// store lock for its whole body.
+func TestEmptyKeepsReachabilityBlackout(t *testing.T) {
+	store := NewCacheStore()
+	addr := "192.0.2.232"
+	store.reachabilityBackoff().mark(addr, time.Minute)
+	store.reachabilityBackoff().mark(addr, time.Minute)
+
+	store.Empty()
+
+	if skip, _ := store.reachabilityBackoff().shouldSkip(addr); !skip {
+		t.Fatalf("Empty must not clear the reachability blackout")
+	}
+}
+
 // A pending strike for an address that is never marked again would otherwise
 // sit in the map for the lifetime of the cache. mark sweeps stale entries.
 func TestReachabilityCacheMarkSweepsStalePending(t *testing.T) {

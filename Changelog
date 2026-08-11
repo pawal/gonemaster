@@ -2,6 +2,13 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- engine: reachability backoff for unreachable name server addresses belongs to the run instead of the process, so one run can no longer change another run's findings; the cache is now bounded
+- ci: the race detector runs on every push over the engine and the server tests that share a cache store
+
 ## [v1.6.5] - 2026-08-10
 
 Adds Zone15, which validates CAA records at the zone apex. The public UI keeps a list of recent tests in the browser, and the DNSSEC chain of trust now shows a DS/DNSKEY algorithm mismatch as a broken link.

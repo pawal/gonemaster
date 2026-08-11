@@ -1,6 +1,6 @@
 # gonemaster architecture
 
-Last reviewed: 2026-05-17.
+Last reviewed: 2026-08-11.
 
 ## 1. System overview
 
@@ -265,6 +265,14 @@ the same code used by `gonemaster` and `gonemaster-nagios`.
 state from its arguments; nothing is shared between concurrent runs
 through global variables. A binary may call `engine.Run` from many
 goroutines without external synchronization.
+
+Per-run backoff state - the query cache, the error cache and the
+reachability cache that suppresses queries to unreachable addresses -
+belongs to the `nameserver.CacheStore` the run was given. Any sharing
+across runs is therefore something the caller opts into by reusing a
+store, not something the engine does behind its back. The server does
+reuse warmed query data across jobs through the nameserver hot cache;
+derived failure state is never shared that way.
 
 ### Worker pool
 
@@ -595,7 +603,7 @@ commit.
 |---|---|---|
 | Go unit / integration | `make test-go` | All Go packages, `go test ./...`. In-memory store by default. |
 | Cross-driver integration | `make test-integration` | `server/...` tests against SQLite, PostgreSQL 17, and MariaDB 11 (Docker Compose). |
-| Race detector | `make race` | `go test -race ./...`. Run periodically; not in default CI. |
+| Race detector | `make race-ci` | Runs in CI over `./engine/...`, `./scoring/...` and the shared-store server tests. `make race` covers the full tree and is run periodically. |
 | Vet | `make vet` | `go vet ./...`. |
 | Admin and public UIs | `make ui-test`, `make ui-public-test` | `npm test` in each frontend. |
 | Analysis UI | `make ui-analysis-test` | Run separately; not bundled into `make test`. |

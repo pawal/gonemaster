@@ -64,6 +64,26 @@ Set the threshold in the engine profile:
 
 Set it to `0` to disable fast-fail.
 
+## Reachability Backoff
+
+Fast-fail handles servers that time out. Reachability backoff handles addresses
+the local host cannot reach at all - no route to host, network or host
+unreachable - which fail immediately rather than after a timeout. The common
+cause is a host with an IPv6 address but no working IPv6 transit.
+
+Two such errors on one address inside the TTL window suppress further queries
+to it. A single error does not: one stray ICMP unreachable must not blackhole a
+healthy nameserver and cascade into spurious no-working-nameserver verdicts.
+
+The TTL is derived, not configured: it is the smaller of
+`resolver.defaults.negative_cache_ttl` (falling back to `error_cache_ttl`) and
+the per-query timeout and retry budget. With the shipped profile that is 15
+seconds. Setting both TTLs to `0` disables the mechanism.
+
+The state belongs to the run. A suppressed query is invisible at default log
+levels; raise the engine to DEBUG2 to see `REACHABILITY_CACHE_SKIP`, or use
+`gonemaster --debug-queries`, which reports a `skipped_reachability` tally.
+
 ## Resolver Settings
 
 Timeout, retry, retransmit, fallback, parallelism, and ordering settings live

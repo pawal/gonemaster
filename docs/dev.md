@@ -198,8 +198,11 @@ func main() {
 
 ## Caching and tuning knobs
 - Per-run nameserver caches (query cache + error cache) isolate concurrent runs.
-- Hard network errors (host/network unreachable) are cached globally across runs
-  to avoid repeated failing dials.
+- Hard network errors (host/network unreachable) are remembered per run, on the
+  cache store, to avoid repeated failing dials within that run. Two errors on
+  one address inside the TTL window suppress further queries to it; a single
+  transient error does not. The state is not shared between runs, so one run's
+  unreachable address cannot change another run's findings.
 - Error cache TTL is controlled by `resolver.defaults.error_cache_ttl` (or the
   `--error-cache-ttl` CLI flag). The effective TTL is capped by the per-query
   timeout/retry budget.

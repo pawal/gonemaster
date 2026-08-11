@@ -20,7 +20,7 @@ CMD ?= all
 	build-gonemaster build-gonemaster-badkeys-embed build-gonemaster-server build-gonemaster-server-noui \
 	build-gonemaster-server-badkeys-embed build-gonemaster-server-noui-badkeys-embed build-gonemaster-client \
 	build-gonemaster-nagios build-gonemaster-mcp install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
-	install-gonemaster-nagios install-gonemaster-mcp ui-check test-go test-integration vet race \
+	install-gonemaster-nagios install-gonemaster-mcp ui-check test-go test-integration vet race race-ci \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-export-testcase-descriptions spec-check-testcase-descriptions \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
@@ -269,6 +269,14 @@ vet:
 
 race:
 	$(GO) test -race ./...
+
+# Race gate for CI: the engine tree, plus the server tests that share a run
+# store across goroutines. The full server package is excluded because it is
+# three times slower under race instrumentation and covers none of the
+# per-run isolation invariant.
+race-ci:
+	$(GO) test -race -count=1 -timeout 900s ./engine/... ./scoring/...
+	$(GO) test -race -count=1 -timeout 900s -short -run 'HotCache|Queue|Concurren' ./server/
 
 spec-export-implemented:
 	GOOS= GOARCH= $(GO) run ./tools/specifications/export-implemented > docs/specifications/implemented-testcases.json

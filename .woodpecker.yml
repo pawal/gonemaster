@@ -54,6 +54,13 @@ steps:
     commands:
       - go test ./...
 
+  # -race requires cgo, so this step must stay on the Debian-based golang
+  # image and must never inherit CGO_ENABLED=0.
+  race_test:
+    image: golang:1.26
+    commands:
+      - make race-ci
+
   integration_test:
     image: golang:1.26
     depends_on:
@@ -79,6 +86,7 @@ steps:
       - integration_test
       - build_server_with_ui
       - spec_check
+      - race_test
     environment:
       CODEBERG_PAGES_TOKEN:
         from_secret: CODEBERG_PAGES_TOKEN

@@ -384,6 +384,7 @@ type DSData struct {
 type nsState struct {
 	cache           *queryCache
 	errorCache      *errorCache
+	reachability    *reachabilityCache
 	concurrencyCap  *nameserverConcurrencyCap
 	fakeDelegations map[string]delegation
 	fakeDS          map[string][]dns.RR
@@ -889,6 +890,7 @@ func (ns *Nameserver) ensureState() {
 	ns.state = &nsState{
 		cache:           cache.cacheForAddress(addrKey),
 		errorCache:      cache.errorCacheForAddress(addrKey),
+		reachability:    cache.reachabilityBackoff(),
 		concurrencyCap:  cache.concurrencyCapForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},

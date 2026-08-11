@@ -106,6 +106,7 @@ func newWithCache(ctx context.Context, cache *CacheStore, name string, address s
 	state := &nsState{
 		cache:           queryCache,
 		errorCache:      cache.errorCacheForAddress(addrKey),
+		reachability:    cache.reachabilityBackoff(),
 		concurrencyCap:  cache.concurrencyCapForAddress(addrKey),
 		fakeDelegations: map[string]delegation{},
 		fakeDS:          map[string][]dns.RR{},
@@ -314,12 +315,14 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			}
 		}
 	}
-	if err != nil && (ctx == nil || ctx.Err() == nil) && isHardNetworkError(err) {
-		if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
-			globalReachability.mark(ns.Address.String(), ttl)
+	if ns.state != nil {
+		if err != nil && (ctx == nil || ctx.Err() == nil) && isHardNetworkError(err) {
+			if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
+				ns.state.reachability.mark(ns.Address.String(), ttl)
+			}
+		} else if err == nil && resp.Msg != nil {
+			ns.state.reachability.observeSuccess(ns.Address.String())
 		}
-	} else if err == nil && resp.Msg != nil {
-		globalReachability.observeSuccess(ns.Address.String())
 	}
 
 	// Log oversized packets before releasing inflight waiters - both paths share
@@ -746,8 +749,8 @@ func (ns Nameserver) shouldSkipQuery(prof *profile.Profile, opts *QueryOptions, 
 		return args
 	}
 
-	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
-		if skip, remaining := globalReachability.shouldSkip(ns.Address.String()); skip {
+	if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 && ns.state != nil {
+		if skip, remaining := ns.state.reachability.shouldSkip(ns.Address.String()); skip {
 			return &skipDecision{
 				tag: "REACHABILITY_CACHE_SKIP",
 				args: skipArgs(map[string]any{

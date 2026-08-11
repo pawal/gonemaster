@@ -2,6 +2,7 @@ package nameserver
 
 import (
 	"fmt"
+	"net/netip"
 	"testing"
 	"time"
 )
@@ -145,6 +146,25 @@ func TestReachabilityCacheClearResetsMetrics(t *testing.T) {
 	if got := c.metrics(); got != (CacheMetrics{}) {
 		t.Fatalf("clear must zero the counters; got %+v", got)
 	}
+}
+
+// The reachability rung is the first in the skip ladder and was the only one
+// without a nil-state guard. A zero-value Nameserver must skip the mechanism
+// rather than panic.
+func TestZeroValueNameserverSkipsReachability(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Net.AllowNonGlobalTargets = true
+
+	var ns Nameserver
+	ns.Address = netip.MustParseAddr("192.0.2.233")
+
+	// No store, so no state: the call must not panic before it fails.
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("zero-value nameserver must not panic on the reachability rung: %v", r)
+		}
+	}()
+	_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
 }
 
 // Ownership: the cache belongs to the CacheStore that created it. A snapshot

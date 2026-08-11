@@ -163,16 +163,6 @@ func (c *reachabilityCache) len() (blocked int, pending int) {
 	return len(c.data), len(c.pending)
 }
 
-var globalReachability = newReachabilityCache()
-
-func clearReachabilityCache() {
-	globalReachability.clear()
-}
-
-func reachabilityMetricsSnapshot() CacheMetrics {
-	return globalReachability.metrics()
-}
-
 // isHardNetworkError reports whether err is a "host not reachable from here"
 // failure (no-route, host/net unreachable/down). Timeouts return false here.
 // Caller gates on outer ctx.Err() for job-cancellation attribution.

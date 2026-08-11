@@ -57,7 +57,11 @@ func TestLatencyTrackerDisabledWhenBudgetZero(t *testing.T) {
 // budget catches a server that never produces a usable answer.
 func TestQuerySkipsAddressOverLatencyBudget(t *testing.T) {
 	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.NameserverMaxTotalMS = 30
+	// 100ms budget against 60ms sleeps leaves 40ms of headroom on the first
+	// query. The earlier 30ms/20ms pairing left only 10ms, which is not enough
+	// under the race detector on a loaded CI runner: one slow first query would
+	// cross the budget on its own and suppress the second.
+	prof.Resolver.Defaults.NameserverMaxTotalMS = 100
 	prof.Resolver.Defaults.FastFailTimeoutCount = 0
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 	opts := &QueryOptions{BlacklistingDisabled: true}
@@ -73,12 +77,12 @@ func TestQuerySkipsAddressOverLatencyBudget(t *testing.T) {
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		calls++
-		time.Sleep(20 * time.Millisecond) // ~20ms each; two queries (~40ms) cross the 30ms budget
+		time.Sleep(60 * time.Millisecond) // ~60ms each; two queries (~120ms) cross the 100ms budget
 		return packet.Packet{}, fmt.Errorf("read timeout")
 	})
 
 	// Distinct qnames so the per-query cache does not short-circuit. The first
-	// two queries run; their ~40ms total crosses 30ms, so the third is skipped.
+	// two queries run; their ~120ms total crosses 100ms, so the third is skipped.
 	for _, qname := range []string{"a.example", "b.example", "c.example"} {
 		_, _ = ns.QueryWithOptions(ctx, qname, "A", opts)
 	}

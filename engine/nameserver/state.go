@@ -82,6 +82,17 @@ func (m *cacheMetrics) snapshot() CacheMetrics {
 	}
 }
 
+// reset zeroes the counters field by field. A whole-struct assignment would
+// race with the atomic loads in snapshot.
+func (m *cacheMetrics) reset() {
+	if m == nil {
+		return
+	}
+	atomic.StoreUint64(&m.hits, 0)
+	atomic.StoreUint64(&m.misses, 0)
+	atomic.StoreUint64(&m.evictions, 0)
+}
+
 func (c *errorCache) shouldSkip(key string) (bool, time.Duration) {
 	if c == nil {
 		return false, 0

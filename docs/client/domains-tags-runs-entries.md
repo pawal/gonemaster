@@ -57,9 +57,22 @@ Examples:
 gonemaster-client runs list --tag tld --level WARNING --limit 100
 gonemaster-client runs get run_123
 gonemaster-client runs results run_123 --view raw --format json
+gonemaster-client runs diff run_123 run_456
 ```
 
 Filters include `--tag`, `--domain`, `--batch`, `--level`, and `--limit`.
+
+`runs diff` compares two runs at the tag level: which findings appeared,
+which cleared, and which changed severity. Each tag is collapsed to its
+worst level within a run first, so a tag emitted once per nameserver is
+compared by its severest occurrence rather than by count. The exit status is
+`0` when the runs are identical and `1` when they differ, which makes it
+usable as a gate:
+
+```sh
+# Before and after a fix, or the same domain under two profiles.
+gonemaster-client runs diff --quiet run_before run_after || echo "findings changed"
+```
 
 ## Entries
 

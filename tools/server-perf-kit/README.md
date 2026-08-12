@@ -61,6 +61,19 @@ Notes:
 - Canary/outlier domains are forced in from:
   - `tools/server-perf-kit/canary-domains.txt`
 
+For nameserver-concentrated corpora - every domain delegating to the same
+farm, which is what makes an operator's rate limiter observable - use
+`make_domains_by_nameserver.sh` instead. Provenance, guardrails and the
+lists-are-not-committed policy are in `corpus/README.md`.
+
+```bash
+./tools/server-perf-kit/make_domains_by_nameserver.sh \
+  --zone se.zone \
+  --ns-pattern '^ns0[12]\.one\.com$' \
+  --count 500 \
+  --out /tmp/onecom-se-500.txt
+```
+
 ## 3) Run Matrix
 
 This builds all variant binaries in parallel, then runs all benchmark runs sequentially in interleaved order.
@@ -81,6 +94,35 @@ Output includes:
 - `SUMMARY.md`
 - `runs.csv`
 - per-run logs and JSON under `runs/`
+
+Two options matter when the corpus is concentrated on one operator:
+
+- `--inter-run-sleep N` idles N seconds between runs. A farm limiter has
+  memory, so without a cool-down each variant is punished for the traffic of
+  the one before it.
+- The variants file takes an optional third column, a per-variant profile
+  path, for knob-only sweeps. Variants sharing a ref share one worktree and
+  one binary, so both arms are provably the same code and only the profile
+  differs.
+
+## 3b) Per-Nameserver Aggregation
+
+`nsagg` collapses the stored `nameserver_timings` rows of a batch into one
+line per address, which is the level the rate-limit question lives at: a
+single run says nothing, while the sum over a 500-domain farm batch shows
+which addresses dropped or refused what share of our queries.
+
+```bash
+go run ./tools/server-perf-kit/cmd/nsagg \
+  --base-url http://127.0.0.1:18080 \
+  serial=batch_1 workers4=batch_2 workers16=batch_3 > ns.csv
+```
+
+Columns: variant, nameserver, address, runs, queries, timeouts, refused,
+timeout_rate, refused_rate, avg_median_ms, max_ms, unreachable_runs,
+runs_with_failures. Rates use answers plus timeouts as the denominator,
+since a timeout produces no answer and would otherwise not be counted in
+what we asked the address for.
 
 ## 4) Evaluate Gates
 

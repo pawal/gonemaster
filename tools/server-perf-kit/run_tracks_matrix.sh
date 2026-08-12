@@ -9,8 +9,13 @@ Usage:
   run_tracks_matrix.sh --variants FILE --domains FILE [options]
 
 Required:
-  --variants FILE              Variant file: "name ref" per line
+  --variants FILE              Variant file: "name ref [profile]" per line
   --domains FILE               Domain list (one domain per line)
+
+The optional third column is a per-variant profile path, for knob-only
+sweeps where every variant builds from the same ref. Use "-" to leave a
+variant on the global --profile. Variants sharing a ref share one worktree
+and one binary, so a knob sweep builds once.
 
 Options:
   --out-dir DIR                Output directory (default: perf-runs/server/tracks-<utc>)
@@ -20,6 +25,10 @@ Options:
   --max-concurrent-jobs N      Engine limiter (default: 8)
   --port N                     Listen port (default: 18080)
   --profile FILE               Profile path passed to server (optional)
+  --inter-run-sleep N          Seconds to idle between runs (default: 0). Use
+                               against rate-limited farms: their limiters have
+                               memory, and without a cool-down each variant is
+                               punished for its predecessor's traffic.
   --min-level LEVEL            Server min-level (default: INFO)
   --batch-poll-seconds N       Batch polling interval (default: 2)
   --sample-seconds N           Sampling interval (default: 1)
@@ -112,13 +121,14 @@ compute_markdown_summary() {
     echo "- Domains file: \`$(jq -r '.domains_file' "$report_json")\` (\`$(jq -r '.domains_count' "$report_json")\` domains, sha256 \`$(jq -r '.domains_sha256' "$report_json")\`)"
     echo "- Warmups per variant: \`$(jq -r '.warmup_runs_per_variant' "$report_json")\`"
     echo "- Measured runs per variant: \`$(jq -r '.measured_runs_per_variant' "$report_json")\`"
+    echo "- Cool-down between runs: \`$(jq -r '.inter_run_sleep_seconds' "$report_json")s\`"
     echo "- Server settings: \`workers=$(jq -r '.workers' "$report_json")\`, \`max-concurrent-jobs=$(jq -r '.max_concurrent_jobs' "$report_json")\`"
     echo
     echo "## Variant Provenance"
     echo
-    echo "| Variant | Ref | Commit | Binary SHA256 |"
-    echo "| --- | --- | --- | --- |"
-    jq -r '.variants[] | "| \(.name) | `\(.ref)` | `\(.commit_sha)` | `\(.binary_sha256)` |"' "$report_json"
+    echo "| Variant | Ref | Commit | Binary SHA256 | Profile | Profile SHA256 |"
+    echo "| --- | --- | --- | --- | --- | --- |"
+    jq -r '.variants[] | "| \(.name) | `\(.ref)` | `\(.commit_sha)` | `\(.binary_sha256)` | `\(.profile // "-")` | `\(.profile_sha256 // "-")` |"' "$report_json"
     echo
     echo "## Aggregate Metrics (measured runs only)"
     echo
@@ -147,6 +157,7 @@ min_level="INFO"
 batch_poll_seconds=2
 sample_seconds=1
 batch_timeout_seconds=5400
+inter_run_sleep=0
 worktree_root=""
 go_cache="/tmp/gocache"
 keep_worktrees=0
@@ -166,6 +177,7 @@ while [ $# -gt 0 ]; do
     --batch-poll-seconds) batch_poll_seconds="$2"; shift 2 ;;
     --sample-seconds) sample_seconds="$2"; shift 2 ;;
     --batch-timeout-seconds) batch_timeout_seconds="$2"; shift 2 ;;
+    --inter-run-sleep) inter_run_sleep="$2"; shift 2 ;;
     --worktree-root) worktree_root="$2"; shift 2 ;;
     --go-cache) go_cache="$2"; shift 2 ;;
     --keep-worktrees) keep_worktrees=1; shift ;;
@@ -229,23 +241,33 @@ jq -n --rawfile lines "$domains_clean" '{domains: ($lines | split("\n") | map(se
 
 variant_names=()
 variant_refs=()
+variant_profiles=()
 while IFS= read -r raw; do
   line="${raw%%#*}"
   line="$(echo "$line" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
   [ -n "$line" ] || continue
   set -- $line
   if [ $# -lt 2 ]; then
-    echo "invalid variants line (need: name ref): $raw" >&2
+    echo "invalid variants line (need: name ref [profile]): $raw" >&2
     exit 1
   fi
   name="$1"
   ref="$2"
+  variant_profile="${3:-}"
+  if [ "$variant_profile" = "-" ]; then
+    variant_profile=""
+  fi
   if ! [[ "$name" =~ ^[A-Za-z0-9._-]+$ ]]; then
     echo "invalid variant name: $name" >&2
     exit 1
   fi
+  if [ -n "$variant_profile" ] && [ ! -f "$variant_profile" ]; then
+    echo "variant profile not found for $name: $variant_profile" >&2
+    exit 1
+  fi
   variant_names+=("$name")
   variant_refs+=("$ref")
+  variant_profiles+=("$variant_profile")
 done <"$variants_file"
 
 variant_count="${#variant_names[@]}"
@@ -267,42 +289,83 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# Variants sharing a ref share one worktree and one binary. A knob-only
+# sweep therefore builds once, and every variant in it is provably the same
+# binary rather than two builds asserted to be equal.
 variant_worktrees=()
+variant_owners=()
+build_names=()
+build_refs=()
 for i in "${!variant_names[@]}"; do
   name="${variant_names[$i]}"
   ref="${variant_refs[$i]}"
-  wt="$worktree_root/$name"
-  git -C "$repo_root" worktree add --detach "$wt" "$ref" >/dev/null
+  owner=""
+  for j in "${!build_names[@]}"; do
+    if [ "${build_refs[$j]}" = "$ref" ]; then
+      owner="${build_names[$j]}"
+      break
+    fi
+  done
+  if [ -z "$owner" ]; then
+    owner="$name"
+    wt="$worktree_root/$name"
+    git -C "$repo_root" worktree add --detach "$wt" "$ref" >/dev/null
+    worktrees_created+=("$wt")
+    build_names+=("$name")
+    build_refs+=("$ref")
+  else
+    wt="$worktree_root/$owner"
+  fi
   variant_worktrees+=("$wt")
-  worktrees_created+=("$wt")
+  variant_owners+=("$owner")
 done
 
-echo "Building ${variant_count} variant binaries in parallel..."
+echo "Building ${#build_names[@]} binaries for ${variant_count} variants in parallel..."
 build_pids=()
 for i in "${!variant_names[@]}"; do
+  [ "${variant_owners[$i]}" = "${variant_names[$i]}" ] || continue
   (
     set -euo pipefail
     name="${variant_names[$i]}"
-    ref="${variant_refs[$i]}"
     wt="${variant_worktrees[$i]}"
     commit_sha="$(git -C "$wt" rev-parse HEAD)"
     bin_path="$out_dir/bin/gonemaster-server-$name"
     GOCACHE="$go_cache" go -C "$wt" build -o "$bin_path" ./cmd/gonemaster-server
-    bin_sha="$(sha256sum "$bin_path" | awk '{print $1}')"
-    jq -n \
-      --arg name "$name" \
-      --arg ref "$ref" \
-      --arg worktree "$wt" \
-      --arg commit_sha "$commit_sha" \
-      --arg binary "$bin_path" \
-      --arg binary_sha256 "$bin_sha" \
-      '{name:$name,ref:$ref,worktree:$worktree,commit_sha:$commit_sha,binary:$binary,binary_sha256:$binary_sha256}' \
-      >"$out_dir/variants/$name.json"
+    echo "$commit_sha" >"$out_dir/bin/$name.commit"
   ) &
   build_pids+=("$!")
 done
 for p in "${build_pids[@]}"; do
   wait "$p"
+done
+
+for i in "${!variant_names[@]}"; do
+  name="${variant_names[$i]}"
+  ref="${variant_refs[$i]}"
+  wt="${variant_worktrees[$i]}"
+  owner="${variant_owners[$i]}"
+  bin_path="$out_dir/bin/gonemaster-server-$owner"
+  commit_sha="$(cat "$out_dir/bin/$owner.commit")"
+  bin_sha="$(sha256sum "$bin_path" | awk '{print $1}')"
+  variant_profile="${variant_profiles[$i]}"
+  if [ -z "$variant_profile" ]; then
+    variant_profile="$profile_file"
+  fi
+  profile_sha=""
+  if [ -n "$variant_profile" ]; then
+    profile_sha="$(sha256sum "$variant_profile" | awk '{print $1}')"
+  fi
+  jq -n \
+    --arg name "$name" \
+    --arg ref "$ref" \
+    --arg worktree "$wt" \
+    --arg commit_sha "$commit_sha" \
+    --arg binary "$bin_path" \
+    --arg binary_sha256 "$bin_sha" \
+    --arg profile "$variant_profile" \
+    --arg profile_sha256 "$profile_sha" \
+    '{name:$name,ref:$ref,worktree:$worktree,commit_sha:$commit_sha,binary:$binary,binary_sha256:$binary_sha256,profile:$profile,profile_sha256:$profile_sha256}' \
+    >"$out_dir/variants/$name.json"
 done
 
 jq -s '.' "$out_dir"/variants/*.json >"$out_dir/variants.json"
@@ -355,10 +418,11 @@ while IFS=$'\t' read -r variant run_index warmup; do
     exit 1
   fi
 
+  run_profile="$(jq -r '.profile // ""' "$variant_meta")"
   base_url="http://127.0.0.1:$port"
   server_cmd=("$binary_path" "--listen" "127.0.0.1:$port" "--workers" "$workers" "--max-concurrent-jobs" "$max_concurrent_jobs" "--min-level" "$min_level")
-  if [ -n "$profile_file" ]; then
-    server_cmd+=("--profile" "$profile_file")
+  if [ -n "$run_profile" ]; then
+    server_cmd+=("--profile" "$run_profile")
   fi
   "${server_cmd[@]}" >"$run_dir/server.stdout.log" 2>"$run_dir/server.stderr.log" &
   server_pid="$!"
@@ -556,6 +620,11 @@ while IFS=$'\t' read -r variant run_index warmup; do
   done
   kill -KILL "$server_pid" >/dev/null 2>&1 || true
   wait "$server_pid" >/dev/null 2>&1 || true
+
+  if [ "$inter_run_sleep" -gt 0 ] && [ "$run_num" -lt "$run_total" ]; then
+    echo "  cool-down ${inter_run_sleep}s"
+    sleep "$inter_run_sleep"
+  fi
 done <"$run_order"
 
 report_json="$out_dir/report.json"
@@ -566,6 +635,7 @@ jq -s \
   --argjson domains_count "$domains_count" \
   --argjson warmups "$warmups" \
   --argjson repeats "$repeats" \
+  --argjson inter_run_sleep_seconds "$inter_run_sleep" \
   --argjson workers "$workers" \
   --argjson max_concurrent_jobs "$max_concurrent_jobs" \
   --argjson variants "$(cat "$out_dir/variants.json")" \
@@ -593,6 +663,7 @@ jq -s \
     domains_count: $domains_count,
     warmup_runs_per_variant: $warmups,
     measured_runs_per_variant: $repeats,
+    inter_run_sleep_seconds: $inter_run_sleep_seconds,
     workers: $workers,
     max_concurrent_jobs: $max_concurrent_jobs,
     variants: $variants,

@@ -1,4 +1,14 @@
-# name ref
+# name ref [profile]
+#
+# The third column is optional: a per-variant profile path for knob-only
+# sweeps, where every variant builds from the same ref and differs only in
+# resolver settings. Use "-" to fall back to the global --profile. Variants
+# sharing a ref share one worktree and one binary, so the sweep below builds
+# once and the two arms are provably the same code.
 main main
 # track-a refs/heads/perf-track-a
 # track-b refs/heads/perf-track-b
+#
+# Knob sweep example (same binary, two profiles):
+# off  main  profiles/backoff-off.json
+# on   main  profiles/backoff-on.json

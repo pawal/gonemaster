@@ -345,7 +345,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  queue pause|resume|reorder|remove")
 	fmt.Fprintln(out, "  domains list|get|runs|tag|untag")
 	fmt.Fprintln(out, "  tags list|create|delete|domains|summary|add-domains")
-	fmt.Fprintln(out, "  runs list|get|results")
+	fmt.Fprintln(out, "  runs list|get|results|diff")
 	fmt.Fprintln(out, "  entries query")
 }
 

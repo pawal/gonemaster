@@ -216,6 +216,17 @@ Fetch and display results for a run.
 **--view** *VIEW*
 : Result view: **summary**, **modules**, **raw**, **json**.
 
+### runs diff *RUN-A* *RUN-B*
+
+Compare two runs at the tag level and report which findings appeared,
+cleared, or changed severity. Each tag is collapsed to its worst level
+within a run, so a tag emitted once per nameserver is compared by its
+severest occurrence. Exits **0** when the two runs are identical, **1** when
+they differ, and **2** on error, so it can be used as a gate in a script.
+
+**--quiet**
+: Print nothing; report the verdict through the exit status only.
+
 ### entries query
 
 Query individual engine log entries across runs.

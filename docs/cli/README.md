@@ -60,7 +60,7 @@ stderr when stdout is a terminal.
 Additional output controls:
 
 - `--count` appends human-readable level and tag counts.
-- `--nstimes` appends per-nameserver timing statistics (max, min, avg, stddev, median, total, count), sorted by nameserver name, address, then median.
+- `--nstimes` appends per-nameserver timing statistics (max, min, avg, stddev, median, total, count, timeout, refused), sorted by nameserver name, address, then median. `timeout` counts exchanges that spent every attempt without an answer; `refused` counts responses carrying rcode REFUSED.
 - `--output PATH` writes selected output to a file.
 - `--save PATH` writes the DNS packet cache after the run.
 - `--restore PATH` primes the DNS packet cache before the run.

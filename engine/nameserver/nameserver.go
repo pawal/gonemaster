@@ -441,8 +441,8 @@ func resolveTTLWithBudget(baseSeconds int, prof *profile.Profile, opts *QueryOpt
 	return baseTTL
 }
 
-// queryNetwork times the query, counting timed-out queries per NS and feeding
-// the per-address latency budget.
+// queryNetwork times the query, counting timed-out and REFUSED queries per NS
+// and feeding the per-address latency budget.
 func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error) {
 	start := time.Now()
 	resp, err := ns.queryNetworkRaw(ctx, qname, qtype, qclass, opts)
@@ -450,6 +450,11 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	attributable := ctx == nil || ctx.Err() == nil
 	if ns.cache != nil && err != nil && attributable && isTimeoutPatternError(err) {
 		ns.cache.RecordQueryTimeout(ns.NameString() + "/" + ns.AddressString())
+	}
+	// REFUSED arrives as a parsed answer, not an error, so it is invisible
+	// in the timeout count while being the other half of the load signal.
+	if ns.cache != nil && attributable && resp.Msg != nil && resp.Msg.Rcode == dns.RcodeRefused {
+		ns.cache.RecordQueryRefused(ns.NameString() + "/" + ns.AddressString())
 	}
 	if ns.state != nil && attributable {
 		if ns.state.latency.observe(elapsed, resolveLatencyBudget(profile.FromContext(ctx))) {

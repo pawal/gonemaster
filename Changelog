@@ -4,6 +4,11 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- engine, server: per-nameserver timeout and REFUSED counts are recorded per address and stored with the nameserver timings
+- cli: `--nstimes` reports the per-nameserver timeout and refused counts in two new columns
+
 ### Changed
 
 - engine: reachability backoff for unreachable name server addresses belongs to the run instead of the process, so one run can no longer change another run's findings; the cache is now bounded

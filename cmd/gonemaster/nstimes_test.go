@@ -13,7 +13,7 @@ import (
 
 func TestWriteNSTimesEmpty(t *testing.T) {
 	var buf bytes.Buffer
-	if err := writeNSTimes(&buf, nil, nil); err != nil {
+	if err := writeNSTimes(&buf, nil, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 	if buf.Len() != 0 {
@@ -34,7 +34,7 @@ func TestWriteNSTimesFormat(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := writeNSTimes(&buf, timings, nil); err != nil {
+	if err := writeNSTimes(&buf, timings, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -92,7 +92,7 @@ func TestWriteNSTimesUnreachable(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := writeNSTimes(&buf, timings, timeouts); err != nil {
+	if err := writeNSTimes(&buf, timings, timeouts, nil); err != nil {
 		t.Fatal(err)
 	}
 	output := buf.String()
@@ -127,7 +127,7 @@ func TestWriteNSTimesLongNames(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := writeNSTimes(&buf, timings, nil); err != nil {
+	if err := writeNSTimes(&buf, timings, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -143,7 +143,7 @@ func TestWriteNSTimesSortedByName(t *testing.T) {
 	}
 
 	var buf bytes.Buffer
-	if err := writeNSTimes(&buf, timings, nil); err != nil {
+	if err := writeNSTimes(&buf, timings, nil, nil); err != nil {
 		t.Fatal(err)
 	}
 

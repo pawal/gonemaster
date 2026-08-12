@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	dns "codeberg.org/miekg/dns"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
@@ -135,6 +136,104 @@ func TestQueryNetworkRecordsTimeoutSeparately(t *testing.T) {
 	}
 }
 
+// TestQueryNetworkRecordsRefused verifies the other half of the load signal.
+// REFUSED arrives as a parsed answer with a normal response time, not as an
+// error, so it is invisible in both the timeout count and the timing stats -
+// a farm that starts refusing under load looks, to every existing counter,
+// exactly like a farm answering promptly. The response itself must reach the
+// caller untouched so UNEXPECTED_RCODE-class findings still fire.
+func TestQueryNetworkRecordsRefused(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
+
+	store := NewCacheStore()
+	ns, err := NewWithCache(store, "ns.example", "192.0.2.251", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(func(_ context.Context, qname string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		msg := new(dns.Msg)
+		// A NOERROR answer for the second name proves the counter keys on
+		// the rcode, not merely on "a response arrived".
+		if qname == "clean" {
+			msg.Rcode = dns.RcodeSuccess
+		} else {
+			msg.Rcode = dns.RcodeRefused
+		}
+		return packet.Packet{Msg: msg, QueryTime: 2 * time.Millisecond}, nil
+	})
+
+	resp, err := ns.QueryWithOptions(ctx, "refused", "A", &QueryOptions{BlacklistingDisabled: true})
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if resp.Msg == nil || resp.Msg.Rcode != dns.RcodeRefused {
+		t.Fatalf("REFUSED response must reach the caller unchanged, got %+v", resp.Msg)
+	}
+	if _, err := ns.QueryWithOptions(ctx, "clean", "A", &QueryOptions{BlacklistingDisabled: true}); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+
+	const key = "ns.example/192.0.2.251"
+	if got := store.QueryRefused()[key]; got != 1 {
+		t.Fatalf("QueryRefused[%q] = %d, want 1 (%+v)", key, got, store.QueryRefused())
+	}
+	// A REFUSED answer is a response, not a failure to answer: it must not
+	// be double-counted as a timeout.
+	if got := store.QueryTimeouts()[key]; got != 0 {
+		t.Fatalf("QueryTimeouts[%q] = %d, want 0", key, got)
+	}
+}
+
+// TestQueryNetworkRefusedNotCountedOnCancelledContext mirrors the timeout
+// rule: a cancelled job must not be charged to the nameserver, or a batch
+// that shuts down mid-run would inflate every farm's refused count.
+func TestQueryNetworkRefusedNotCountedOnCancelledContext(t *testing.T) {
+	ctx, prof := testContext(t)
+	prof.Resolver.Defaults.ErrorCacheTTL = 0
+	ctx, cancel := context.WithCancel(ctx)
+
+	store := NewCacheStore()
+	ns, err := NewWithCache(store, "ns.example", "192.0.2.250", nil)
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+		cancel()
+		msg := new(dns.Msg)
+		msg.Rcode = dns.RcodeRefused
+		return packet.Packet{Msg: msg, QueryTime: 2 * time.Millisecond}, nil
+	})
+
+	if _, err := ns.QueryWithOptions(ctx, "refused", "A", &QueryOptions{BlacklistingDisabled: true}); err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if got := store.QueryRefused()["ns.example/192.0.2.250"]; got != 0 {
+		t.Fatalf("cancelled query charged to the nameserver: refused count %d, want 0", got)
+	}
+}
+
+// TestRecordQueryRefusedOnSnapshotStore is the sibling of the timeout guard
+// below: SnapshotForRun builds its store from a literal, not NewCacheStore,
+// so a map added to only one of the two constructors panics on the server
+// path while every CLI test stays green.
+func TestRecordQueryRefusedOnSnapshotStore(t *testing.T) {
+	base := NewCacheStore()
+	run := base.SnapshotForRun()
+
+	run.RecordQueryRefused("ns.example/192.0.2.1")
+	run.RecordQueryRefused("ns.example/192.0.2.1")
+
+	if got := run.QueryRefused()["ns.example/192.0.2.1"]; got != 2 {
+		t.Fatalf("expected refused count 2 on snapshot store, got %d", got)
+	}
+	// Refused counts are run-local: a snapshot must not write through to
+	// the shared parent, where a later run would inherit them.
+	if got := base.QueryRefused()["ns.example/192.0.2.1"]; got != 0 {
+		t.Fatalf("snapshot refused count leaked into the parent store: %d", got)
+	}
+}
+
 // TestRecordQueryTimeoutOnSnapshotStore guards against the nil-map panic that
 // hit the server: SnapshotForRun builds a run-local store, and every timed-out
 // query in that run calls RecordQueryTimeout on it. The count must be recorded
@@ -171,11 +270,11 @@ func TestQueryTimingsNilCacheStore(t *testing.T) {
 }
 
 func TestTimingsFromQueryMapEmpty(t *testing.T) {
-	out := TimingsFromQueryMap(nil, nil)
+	out := TimingsFromQueryMap(nil, nil, nil)
 	if len(out) != 0 {
 		t.Fatalf("expected empty slice, got %d entries", len(out))
 	}
-	out = TimingsFromQueryMap(map[string][]time.Duration{}, map[string]int{})
+	out = TimingsFromQueryMap(map[string][]time.Duration{}, map[string]int{}, map[string]int{})
 	if len(out) != 0 {
 		t.Fatalf("expected empty slice for empty map, got %d entries", len(out))
 	}
@@ -194,7 +293,7 @@ func TestTimingsFromQueryMapTimeoutOnlyKey(t *testing.T) {
 		// stay "ok", not be demoted to unreachable.
 		"ns1.example.com/192.0.2.1": 1,
 	}
-	out := TimingsFromQueryMap(timings, timeouts)
+	out := TimingsFromQueryMap(timings, timeouts, nil)
 	if len(out) != 2 {
 		t.Fatalf("expected 2 entries, got %d: %+v", len(out), out)
 	}
@@ -234,7 +333,7 @@ func TestTimingsFromQueryMapCarriesTimeoutCount(t *testing.T) {
 		"ns1.example.com/192.0.2.1": 4,
 		"ns2.example.com/192.0.2.2": 3,
 	}
-	out := TimingsFromQueryMap(timings, timeouts)
+	out := TimingsFromQueryMap(timings, timeouts, nil)
 
 	byKey := map[string]NameserverTiming{}
 	for _, item := range out {
@@ -282,7 +381,7 @@ func TestTimingsFromQueryMapSingle(t *testing.T) {
 	timings := map[string][]time.Duration{
 		"ns1.example.com/192.0.2.1": {10 * time.Millisecond, 20 * time.Millisecond},
 	}
-	out := TimingsFromQueryMap(timings, nil)
+	out := TimingsFromQueryMap(timings, nil, nil)
 	if len(out) != 1 {
 		t.Fatalf("expected 1 entry, got %d", len(out))
 	}
@@ -310,7 +409,7 @@ func TestTimingsFromQueryMapSortedByNameThenAddress(t *testing.T) {
 		"ns1.example.com/192.0.2.2": {20 * time.Millisecond},
 		"ns1.example.com/192.0.2.1": {10 * time.Millisecond},
 	}
-	out := TimingsFromQueryMap(timings, nil)
+	out := TimingsFromQueryMap(timings, nil, nil)
 	if len(out) != 3 {
 		t.Fatalf("expected 3 entries, got %d", len(out))
 	}
@@ -330,7 +429,7 @@ func TestTimingsFromQueryMapMalformedKeySkipped(t *testing.T) {
 		"no-slash":                  {10 * time.Millisecond},
 		"ns1.example.com/192.0.2.1": {20 * time.Millisecond},
 	}
-	out := TimingsFromQueryMap(timings, nil)
+	out := TimingsFromQueryMap(timings, nil, nil)
 	if len(out) != 1 {
 		t.Fatalf("expected 1 entry (malformed key skipped), got %d", len(out))
 	}

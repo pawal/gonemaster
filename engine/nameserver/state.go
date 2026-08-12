@@ -412,6 +412,7 @@ type CacheStore struct {
 	errorMetrics      cacheMetrics
 	queryTimes        map[string][]time.Duration
 	queryTimeouts     map[string]int
+	queryRefused      map[string]int
 	axfrMu            sync.Mutex
 	axfrCache         map[string]*axfrRecord
 }
@@ -429,6 +430,7 @@ func NewCacheStore() *CacheStore {
 		reachability:      newReachabilityCache(),
 		queryTimes:        map[string][]time.Duration{},
 		queryTimeouts:     map[string]int{},
+		queryRefused:      map[string]int{},
 	}
 }
 
@@ -492,6 +494,34 @@ func (c *CacheStore) QueryTimeouts() map[string]int {
 	defer c.mu.Unlock()
 	out := make(map[string]int, len(c.queryTimeouts))
 	for k, v := range c.queryTimeouts {
+		out[k] = v
+	}
+	return out
+}
+
+// RecordQueryRefused counts a REFUSED response. Run-local like the timeout
+// counts: it measures what this run's own traffic provoked.
+func (c *CacheStore) RecordQueryRefused(key string) {
+	if c == nil {
+		return
+	}
+	c.mu.Lock()
+	if c.queryRefused == nil {
+		c.queryRefused = map[string]int{}
+	}
+	c.queryRefused[key]++
+	c.mu.Unlock()
+}
+
+// QueryRefused returns a copy of the per-nameserver REFUSED response counts.
+func (c *CacheStore) QueryRefused() map[string]int {
+	if c == nil {
+		return nil
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	out := make(map[string]int, len(c.queryRefused))
+	for k, v := range c.queryRefused {
 		out[k] = v
 	}
 	return out
@@ -646,6 +676,7 @@ func (c *CacheStore) SnapshotForRun() *CacheStore {
 		reachability:  newReachabilityCache(),
 		queryTimes:    map[string][]time.Duration{},
 		queryTimeouts: map[string]int{},
+		queryRefused:  map[string]int{},
 	}
 	return snapshot
 }

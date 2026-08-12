@@ -108,7 +108,7 @@ func TestSummarizeNameserverTimingsFiltersAndSorts(t *testing.T) {
 		{name: "ns2.example.test"},
 	}
 
-	got := summarizeNameserverTimings(queryTimings, targets)
+	got := summarizeNameserverTimings(queryTimings, nil, targets)
 	if len(got) != 3 {
 		t.Fatalf("timings len = %d, want 3 (%+v)", len(got), got)
 	}
@@ -149,7 +149,7 @@ func TestSummarizeNameserverTimingsEmitsUnreachableForTargetWithoutSamples(t *te
 		{name: "ok.example.test", address: "192.0.2.1"},
 		{name: "dead.example.test", address: "192.0.2.99"},
 	}
-	got := summarizeNameserverTimings(queryTimings, targets)
+	got := summarizeNameserverTimings(queryTimings, nil, targets)
 	if len(got) != 2 {
 		t.Fatalf("timings len = %d (%+v), want 2", len(got), got)
 	}
@@ -188,7 +188,7 @@ func TestSummarizeNameserverTimingsEmitsUnresolvedForNameOnlyTargetWithoutSample
 	targets := []nameserverTimingTarget{
 		{name: "ghost.example"}, // no address, no samples anywhere
 	}
-	got := summarizeNameserverTimings(queryTimings, targets)
+	got := summarizeNameserverTimings(queryTimings, nil, targets)
 	if len(got) != 1 {
 		t.Fatalf("timings len = %d, want 1 (%+v)", len(got), got)
 	}
@@ -197,6 +197,81 @@ func TestSummarizeNameserverTimingsEmitsUnresolvedForNameOnlyTargetWithoutSample
 	}
 	if got[0].Address != "" {
 		t.Fatalf("unresolved row should have no address, got %q", got[0].Address)
+	}
+}
+
+// TestSummarizeNameserverTimingsCarriesTimeoutCount pins the fix for the
+// server path dropping queryTimeouts on the floor. The engine has always
+// counted per-address timeouts; collectNameserverTimings received the map
+// and the summarizer ignored it, so no stored run has ever carried the
+// number. Three shapes are covered: an address that answered and also
+// timed out (the rate-limit signature), an address in the delegation that
+// only ever timed out, and a clean address that must stay at zero.
+func TestSummarizeNameserverTimingsCarriesTimeoutCount(t *testing.T) {
+	queryTimings := map[string][]time.Duration{
+		"ns1.example.test/192.0.2.1": {20 * time.Millisecond, 40 * time.Millisecond},
+		"ns3.example.test/192.0.2.3": {10 * time.Millisecond},
+	}
+	// Keys arrive from the engine unnormalized (trailing dot, mixed case);
+	// the summarizer normalizes names on both sides or the counts miss.
+	queryTimeouts := map[string]int{
+		"NS1.example.test./192.0.2.1": 6,
+		"ns2.example.test/192.0.2.2":  9,
+	}
+	targets := []nameserverTimingTarget{
+		{name: "ns1.example.test", address: "192.0.2.1"},
+		{name: "ns2.example.test", address: "192.0.2.2"},
+		{name: "ns3.example.test", address: "192.0.2.3"},
+	}
+
+	got := summarizeNameserverTimings(queryTimings, queryTimeouts, targets)
+	byKey := map[string]NameserverTiming{}
+	for _, item := range got {
+		byKey[item.Nameserver+"/"+item.Address] = item
+	}
+
+	answered := byKey["ns1.example.test/192.0.2.1"]
+	if answered.Status != NameserverTimingStatusOK || answered.TimeoutCount != 6 {
+		t.Fatalf("answered-and-timed-out row = %+v, want ok with TimeoutCount 6", answered)
+	}
+	dead := byKey["ns2.example.test/192.0.2.2"]
+	if dead.Status != NameserverTimingStatusUnreachable || dead.TimeoutCount != 9 {
+		t.Fatalf("timeout-only row = %+v, want unreachable with TimeoutCount 9", dead)
+	}
+	if clean := byKey["ns3.example.test/192.0.2.3"]; clean.TimeoutCount != 0 {
+		t.Fatalf("clean row = %+v, want TimeoutCount 0", clean)
+	}
+}
+
+// TestSummarizeNameserverTimingsNameOnlyTargetDiscoversTimeoutOnlyAddress
+// covers the name-only target path: a delegation that lists only the NS
+// name, where one of its addresses answered and another never did. Before
+// the timeout map was threaded through, the silent address produced no row
+// at all, so the very addresses a rate limiter drops were the ones missing
+// from the measurement.
+func TestSummarizeNameserverTimingsNameOnlyTargetDiscoversTimeoutOnlyAddress(t *testing.T) {
+	queryTimings := map[string][]time.Duration{
+		"multi.example/192.0.2.1": {10 * time.Millisecond},
+	}
+	queryTimeouts := map[string]int{
+		"multi.example/2001:db8::1": 4,
+	}
+	targets := []nameserverTimingTarget{{name: "multi.example"}}
+
+	got := summarizeNameserverTimings(queryTimings, queryTimeouts, targets)
+	if len(got) != 2 {
+		t.Fatalf("timings len = %d, want 2 (%+v)", len(got), got)
+	}
+	byAddr := map[string]NameserverTiming{}
+	for _, item := range got {
+		byAddr[item.Address] = item
+	}
+	if v4 := byAddr["192.0.2.1"]; v4.Status != NameserverTimingStatusOK || v4.TimeoutCount != 0 {
+		t.Fatalf("v4 row = %+v, want ok with no timeouts", v4)
+	}
+	v6 := byAddr["2001:db8::1"]
+	if v6.Status != NameserverTimingStatusUnreachable || v6.TimeoutCount != 4 {
+		t.Fatalf("v6 row = %+v, want unreachable with TimeoutCount 4", v6)
 	}
 }
 
@@ -209,7 +284,7 @@ func TestSummarizeNameserverTimingsNameOnlyTargetWithSamples(t *testing.T) {
 		"multi.example/2001:db8::1": {12 * time.Millisecond},
 	}
 	targets := []nameserverTimingTarget{{name: "multi.example"}}
-	got := summarizeNameserverTimings(queryTimings, targets)
+	got := summarizeNameserverTimings(queryTimings, nil, targets)
 	if len(got) != 2 {
 		t.Fatalf("timings len = %d, want 2 (%+v)", len(got), got)
 	}

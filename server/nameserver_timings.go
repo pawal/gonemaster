@@ -63,7 +63,7 @@ func uniqueNameserverTimingTargets(items []nameserverTimingTarget) []nameserverT
 	return out
 }
 
-func summarizeNameserverTimings(queryTimings map[string][]time.Duration, targets []nameserverTimingTarget) []NameserverTiming {
+func summarizeNameserverTimings(queryTimings map[string][]time.Duration, queryTimeouts map[string]int, targets []nameserverTimingTarget) []NameserverTiming {
 	if len(targets) == 0 {
 		return nil
 	}
@@ -89,6 +89,21 @@ func summarizeNameserverTimings(queryTimings map[string][]time.Duration, targets
 		samplesByName[name] = append(samplesByName[name], entry)
 	}
 
+	// Indexed separately: an address that only ever timed out has no
+	// samples entry, and its count must still reach a row.
+	timeoutsByKey := map[string]int{}
+	timeoutAddrsByName := map[string][]string{}
+	for key, count := range queryTimeouts {
+		name, address, ok := strings.Cut(key, "/")
+		if !ok {
+			continue
+		}
+		name = normalizeNameserverName(name)
+		address = strings.TrimSpace(address)
+		timeoutsByKey[name+"/"+address] += count
+		timeoutAddrsByName[name] = append(timeoutAddrsByName[name], address)
+	}
+
 	out := make([]NameserverTiming, 0, len(targets))
 	seen := map[string]bool{}
 	emit := func(t NameserverTiming) {
@@ -106,10 +121,12 @@ func summarizeNameserverTimings(queryTimings map[string][]time.Duration, targets
 		}
 		if target.address == "" {
 			// Name-only target: use whatever addresses the engine probed
-			// for the name. Zero matches → the NS hostname never
-			// resolved, emit a single "unresolved" marker row.
+			// for the name, including ones that only ever timed out. Zero
+			// matches → the NS hostname never resolved, emit a single
+			// "unresolved" marker row.
 			matches := samplesByName[target.name]
-			if len(matches) == 0 {
+			timedOut := timeoutAddrsByName[target.name]
+			if len(matches) == 0 && len(timedOut) == 0 {
 				emit(NameserverTiming{
 					Nameserver: target.name,
 					Status:     NameserverTimingStatusUnresolved,
@@ -117,21 +134,31 @@ func summarizeNameserverTimings(queryTimings map[string][]time.Duration, targets
 				continue
 			}
 			for _, m := range matches {
-				emit(timingFromSamples(m.name, m.address, m.samples))
+				emit(timingFromSamples(m.name, m.address, m.samples, timeoutsByKey[m.name+"/"+m.address]))
+			}
+			for _, address := range timedOut {
+				emit(NameserverTiming{
+					Nameserver:   target.name,
+					Address:      address,
+					Status:       NameserverTimingStatusUnreachable,
+					TimeoutCount: timeoutsByKey[target.name+"/"+address],
+				})
 			}
 			continue
 		}
 
-		m, ok := samplesByKey[target.name+"/"+target.address]
+		key := target.name + "/" + target.address
+		m, ok := samplesByKey[key]
 		if !ok {
 			emit(NameserverTiming{
-				Nameserver: target.name,
-				Address:    target.address,
-				Status:     NameserverTimingStatusUnreachable,
+				Nameserver:   target.name,
+				Address:      target.address,
+				Status:       NameserverTimingStatusUnreachable,
+				TimeoutCount: timeoutsByKey[key],
 			})
 			continue
 		}
-		emit(timingFromSamples(m.name, m.address, m.samples))
+		emit(timingFromSamples(m.name, m.address, m.samples, timeoutsByKey[key]))
 	}
 
 	sort.Slice(out, func(i, j int) bool {
@@ -153,25 +180,27 @@ func summarizeNameserverTimings(queryTimings map[string][]time.Duration, targets
 // timingFromSamples builds an "ok" row from samples, or downgrades to
 // "unreachable" when stats computation yields zero count (defensive: the
 // caller should already have filtered empty samples).
-func timingFromSamples(name, address string, samples []time.Duration) NameserverTiming {
+func timingFromSamples(name, address string, samples []time.Duration, timeouts int) NameserverTiming {
 	stats := enginenameserver.ComputeTimingStats(samples)
 	if stats.Count == 0 {
 		return NameserverTiming{
-			Nameserver: name,
-			Address:    address,
-			Status:     NameserverTimingStatusUnreachable,
+			Nameserver:   name,
+			Address:      address,
+			Status:       NameserverTimingStatusUnreachable,
+			TimeoutCount: timeouts,
 		}
 	}
 	return NameserverTiming{
-		Nameserver: name,
-		Address:    address,
-		AvgMS:      stats.Avg,
-		MinMS:      stats.Min,
-		MaxMS:      stats.Max,
-		MedianMS:   stats.Median,
-		StddevMS:   stats.Stddev,
-		Count:      stats.Count,
-		Status:     NameserverTimingStatusOK,
+		Nameserver:   name,
+		Address:      address,
+		AvgMS:        stats.Avg,
+		MinMS:        stats.Min,
+		MaxMS:        stats.Max,
+		MedianMS:     stats.Median,
+		StddevMS:     stats.Stddev,
+		Count:        stats.Count,
+		Status:       NameserverTimingStatusOK,
+		TimeoutCount: timeouts,
 	}
 }
 
@@ -217,7 +246,7 @@ func (s *Server) collectNameserverTimings(job Job, queryTimings map[string][]tim
 		// lookupDelegation happened to hit a DNS hiccup at test time.
 		targets = childNameserversFromEntries(entries)
 	}
-	return summarizeNameserverTimings(queryTimings, targets)
+	return summarizeNameserverTimings(queryTimings, queryTimeouts, targets)
 }
 
 // childNameserversFromEntries collects (ns, address) pairs from engine

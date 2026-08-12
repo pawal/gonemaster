@@ -2,8 +2,10 @@ package nameserver
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math"
+	"strings"
 	"testing"
 	"time"
 
@@ -213,6 +215,66 @@ func TestTimingsFromQueryMapTimeoutOnlyKey(t *testing.T) {
 	alive := byKey["ns1.example.com/192.0.2.1"]
 	if alive.Status != NameserverTimingStatusOK || alive.Count != 2 {
 		t.Fatalf("expected ns1 ok with 2 samples, got %+v", alive)
+	}
+}
+
+// TestTimingsFromQueryMapCarriesTimeoutCount pins the per-address timeout
+// count onto the emitted rows. This is the measurement B1 exists for: an
+// address that answers most queries but times out on some is exactly the
+// signature a rate limiter produces, and before this field the count was
+// visible only in a local --debug-queries run, never in a stored result.
+// Both row shapes must carry it: the "ok" row for an address that answered
+// at least once, and the "unreachable" row for one that never did.
+func TestTimingsFromQueryMapCarriesTimeoutCount(t *testing.T) {
+	timings := map[string][]time.Duration{
+		"ns1.example.com/192.0.2.1": {10 * time.Millisecond, 20 * time.Millisecond},
+		"ns3.example.com/192.0.2.3": {5 * time.Millisecond},
+	}
+	timeouts := map[string]int{
+		"ns1.example.com/192.0.2.1": 4,
+		"ns2.example.com/192.0.2.2": 3,
+	}
+	out := TimingsFromQueryMap(timings, timeouts)
+
+	byKey := map[string]NameserverTiming{}
+	for _, item := range out {
+		byKey[item.Nameserver+"/"+item.Address] = item
+	}
+
+	if got := byKey["ns1.example.com/192.0.2.1"]; got.TimeoutCount != 4 {
+		t.Fatalf("mixed answer/timeout row: TimeoutCount = %d, want 4 (%+v)", got.TimeoutCount, got)
+	}
+	if got := byKey["ns2.example.com/192.0.2.2"]; got.TimeoutCount != 3 {
+		t.Fatalf("timeout-only row: TimeoutCount = %d, want 3 (%+v)", got.TimeoutCount, got)
+	}
+	// An address with no timeouts at all must leave the field zero so the
+	// omitempty JSON tag keeps it out of stored blobs entirely.
+	if got := byKey["ns3.example.com/192.0.2.3"]; got.TimeoutCount != 0 {
+		t.Fatalf("clean row: TimeoutCount = %d, want 0 (%+v)", got.TimeoutCount, got)
+	}
+}
+
+// TestNameserverTimingCountsOmittedWhenZero pins the JSON additivity claim:
+// rows without the new counters must serialize exactly as before, so old
+// stored blobs and new ones stay comparable.
+func TestNameserverTimingCountsOmittedWhenZero(t *testing.T) {
+	clean, err := json.Marshal(NameserverTiming{Nameserver: "ns1.example.com", Address: "192.0.2.1", Status: NameserverTimingStatusOK})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(clean), "timeout_count") || strings.Contains(string(clean), "refused_count") {
+		t.Fatalf("zero counters must be omitted, got %s", clean)
+	}
+
+	counted, err := json.Marshal(NameserverTiming{Nameserver: "ns1.example.com", Address: "192.0.2.1", TimeoutCount: 2, RefusedCount: 5})
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(counted), `"timeout_count":2`) {
+		t.Fatalf("expected timeout_count in %s", counted)
+	}
+	if !strings.Contains(string(counted), `"refused_count":5`) {
+		t.Fatalf("expected refused_count in %s", counted)
 	}
 }
 

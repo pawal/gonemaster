@@ -16,9 +16,9 @@ import (
 // any single run's row and obvious in the sum over 500 of them.
 func TestAddrStatsAccumulatesAcrossRuns(t *testing.T) {
 	s := &addrStats{nameserver: "ns01.example", address: "192.0.2.1"}
-	s.add(nameserverTiming{Count: 40, MedianMS: 10, MaxMS: 30, Status: "ok"})
-	s.add(nameserverTiming{Count: 38, MedianMS: 20, MaxMS: 90, Status: "ok", TimeoutCount: 2, RefusedCount: 1})
-	s.add(nameserverTiming{Count: 0, Status: "unreachable", TimeoutCount: 5})
+	s.add(nameserverTiming{Count: 40, MedianMS: 10, MaxMS: 30, Status: "ok"}, 0)
+	s.add(nameserverTiming{Count: 38, MedianMS: 20, MaxMS: 90, Status: "ok", TimeoutCount: 2, RefusedCount: 1}, 0)
+	s.add(nameserverTiming{Count: 0, Status: "unreachable", TimeoutCount: 5}, 0)
 
 	if s.runs != 3 {
 		t.Fatalf("runs = %d, want 3", s.runs)
@@ -46,6 +46,45 @@ func TestAddrStatsAccumulatesAcrossRuns(t *testing.T) {
 	// which is the opposite of the truth.
 	if got := avg(s.medianSum, s.medianRuns); got != "15.00" {
 		t.Fatalf("avg median = %q, want 15.00", got)
+	}
+}
+
+// TestEngagementReplayIsPerRunAndRequiresAPriorAnswer pins the replay that
+// B5 question 3 is answered with. Two conditions have to hold together, and
+// each has a distinct failure mode if dropped:
+//
+//   - Per run, never summed. An address seen in fifty runs with one timeout
+//     each sums to fifty and engages in none of them; summing first would
+//     report a spurious-engagement rate near 100% on any large corpus.
+//   - The address must have answered. That is E1's "timeout after the
+//     address has answered" prefix, the whole thing separating a rate
+//     limiter (drops excess, answers the rest) from a dead server, which
+//     fast-fail and blacklisting already handle.
+func TestEngagementReplayIsPerRunAndRequiresAPriorAnswer(t *testing.T) {
+	s := &addrStats{}
+	// Below threshold in each run, and three runs' worth in total: a sum
+	// would engage here, a per-run replay must not.
+	s.add(nameserverTiming{Count: 40, TimeoutCount: 1, Status: "ok"}, 3)
+	s.add(nameserverTiming{Count: 40, TimeoutCount: 1, Status: "ok"}, 3)
+	s.add(nameserverTiming{Count: 40, TimeoutCount: 1, Status: "ok"}, 3)
+	if s.runsEngaged != 0 {
+		t.Fatalf("runs_engaged = %d, want 0: engagement must not accumulate across runs", s.runsEngaged)
+	}
+	// Past threshold within one run, on an address that answered: engaged.
+	s.add(nameserverTiming{Count: 30, TimeoutCount: 4, Status: "ok"}, 3)
+	if s.runsEngaged != 1 {
+		t.Fatalf("runs_engaged = %d, want 1", s.runsEngaged)
+	}
+	// Past threshold but never answered: a dead address, not a limited one.
+	s.add(nameserverTiming{Count: 0, TimeoutCount: 9, Status: "unreachable"}, 3)
+	if s.runsEngaged != 1 {
+		t.Fatalf("runs_engaged = %d, want 1: an address that never answered is not E1 evidence", s.runsEngaged)
+	}
+	// Threshold 0 disables the replay entirely.
+	off := &addrStats{}
+	off.add(nameserverTiming{Count: 30, TimeoutCount: 99, Status: "ok"}, 0)
+	if off.runsEngaged != 0 {
+		t.Fatalf("runs_engaged = %d with the replay off, want 0", off.runsEngaged)
 	}
 }
 
@@ -102,7 +141,7 @@ func TestAggregateBatchMergesAddressAcrossDomains(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	stats, err := aggregateBatch(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "batch-x", 1000)
+	stats, err := aggregateBatch(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "batch-x", 1000, 0)
 	if err != nil {
 		t.Fatalf("aggregate: %v", err)
 	}
@@ -148,7 +187,7 @@ func TestAggregateBatchSurvivesAMissingRunResult(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	stats, err := aggregateBatch(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "batch-y", 1000)
+	stats, err := aggregateBatch(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "batch-y", 1000, 0)
 	if err != nil {
 		t.Fatalf("aggregate: %v", err)
 	}
@@ -207,7 +246,7 @@ func TestAggregateBatchRejectsEmptyBatch(t *testing.T) {
 	}))
 	defer srv.Close()
 
-	if _, err := aggregateBatch(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "typo", 1000); err == nil {
+	if _, err := aggregateBatch(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "typo", 1000, 0); err == nil {
 		t.Fatal("expected an error for a batch with no runs")
 	}
 }

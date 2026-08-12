@@ -68,9 +68,17 @@ type addrStats struct {
 	maxMS        float64
 	unreachable  int
 	runsWithFail int
+	runsEngaged  int
 }
 
-func (s *addrStats) add(t nameserverTiming) {
+// add folds one run's row for this address into the batch totals. engage is
+// the evidence threshold to replay: a run counts as engaged when the address
+// answered at least once and still burned that many timeout budgets, which
+// is the E1 "timeout after the address has answered" condition. Engagement
+// is per run by construction, so it cannot be derived from batch sums - an
+// address with one timeout in each of fifty runs sums to fifty and engages
+// in none of them.
+func (s *addrStats) add(t nameserverTiming, engage int) {
 	s.runs++
 	s.queries += t.Count
 	s.timeouts += t.TimeoutCount
@@ -88,6 +96,9 @@ func (s *addrStats) add(t nameserverTiming) {
 	if t.TimeoutCount > 0 || t.RefusedCount > 0 {
 		s.runsWithFail++
 	}
+	if engage > 0 && t.Count > 0 && t.TimeoutCount >= engage {
+		s.runsEngaged++
+	}
 }
 
 func main() {
@@ -95,6 +106,7 @@ func main() {
 	limit := flag.Int("limit", 500, "Runs fetched per page (server caps this at 500)")
 	timeout := flag.Duration("timeout", 60*time.Second, "HTTP timeout per request")
 	minQueries := flag.Int("min-queries", 0, "Only print addresses with at least this many queries")
+	engage := flag.Int("engage-threshold", 0, "Replay the detector: count runs where an address answered and still burned this many timeout budgets (0 = off)")
 	flag.Parse()
 
 	pairs := flag.Args()
@@ -111,6 +123,7 @@ func main() {
 	header := []string{
 		"variant", "nameserver", "address", "runs", "queries", "timeouts", "refused",
 		"timeout_rate", "refused_rate", "avg_median_ms", "max_ms", "unreachable_runs", "runs_with_failures",
+		"runs_engaged",
 	}
 	if err := w.Write(header); err != nil {
 		fail(err)
@@ -121,7 +134,7 @@ func main() {
 		if !ok {
 			fail(fmt.Errorf("argument %q is not variant=batch-id", pair))
 		}
-		stats, err := aggregateBatch(client, api, batchID, *limit)
+		stats, err := aggregateBatch(client, api, batchID, *limit, *engage)
 		if err != nil {
 			fail(fmt.Errorf("variant %s: %w", variant, err))
 		}
@@ -159,6 +172,7 @@ func main() {
 				fmt.Sprintf("%.2f", s.maxMS),
 				strconv.Itoa(s.unreachable),
 				strconv.Itoa(s.runsWithFail),
+				strconv.Itoa(s.runsEngaged),
 			}
 			if err := w.Write(row); err != nil {
 				fail(err)
@@ -168,7 +182,7 @@ func main() {
 	}
 }
 
-func aggregateBatch(client *http.Client, api, batchID string, limit int) (map[string]*addrStats, error) {
+func aggregateBatch(client *http.Client, api, batchID string, limit, engage int) (map[string]*addrStats, error) {
 	items, err := listBatchRuns(client, api, batchID, limit)
 	if err != nil {
 		return nil, err
@@ -191,7 +205,7 @@ func aggregateBatch(client *http.Client, api, batchID string, limit int) (map[st
 				s = &addrStats{nameserver: t.Nameserver, address: t.Address}
 				stats[key] = s
 			}
-			s.add(t)
+			s.add(t, engage)
 		}
 	}
 	return stats, nil

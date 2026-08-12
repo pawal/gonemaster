@@ -120,9 +120,16 @@ go run ./tools/server-perf-kit/cmd/nsagg \
 
 Columns: variant, nameserver, address, runs, queries, timeouts, refused,
 timeout_rate, refused_rate, avg_median_ms, max_ms, unreachable_runs,
-runs_with_failures. Rates use answers plus timeouts as the denominator,
-since a timeout produces no answer and would otherwise not be counted in
-what we asked the address for.
+runs_with_failures, runs_engaged. Rates use answers plus timeouts as the
+denominator, since a timeout produces no answer and would otherwise not be
+counted in what we asked the address for.
+
+`--engage-threshold N` replays a detector over stored data: it counts the
+runs in which an address answered at least once and still burned N timeout
+budgets. Use it to estimate how often a proposed backoff trigger would fire
+on a corpus that is not being rate limited, which is the spurious-engagement
+question. The count is per run, never summed - an address with one timeout
+in each of fifty runs engages in none of them.
 
 ## 4) Evaluate Gates
 

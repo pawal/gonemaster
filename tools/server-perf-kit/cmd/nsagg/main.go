@@ -1,16 +1,6 @@
-// Command nsagg aggregates per-nameserver timing rows across the runs of one
-// or more batches and prints one CSV row per (variant, nameserver, address).
-//
-// It exists because the rate-limit question is per address, not per domain:
-// a farm that drops or refuses a share of our queries shows up as a rising
-// timeout or refused rate on a handful of addresses shared by hundreds of
-// domains, and that is invisible in any per-domain summary.
-//
-// Usage:
-//
-//	nsagg --base-url http://127.0.0.1:18080 serial=batch_1 workers16=batch_2
-//
-// Each argument is variant=batch-id. Output is CSV on stdout.
+// Command nsagg aggregates stored nameserver timings per address across the
+// runs of one or more batches. Arguments are variant=batch-id; output is CSV.
+// See the kit README for the columns and what they mean.
 package main
 
 import (
@@ -53,9 +43,8 @@ type runResult struct {
 	NameserverTimings []nameserverTiming `json:"nameserver_timings"`
 }
 
-// addrStats accumulates one address across every run in a variant. Medians
-// are averaged rather than pooled: the per-run median is what the stored row
-// carries, and re-deriving a true pooled median would need the raw samples.
+// addrStats accumulates one address across a variant. Medians are averaged,
+// not pooled: the stored row carries only the per-run median.
 type addrStats struct {
 	nameserver   string
 	address      string
@@ -71,13 +60,9 @@ type addrStats struct {
 	runsEngaged  int
 }
 
-// add folds one run's row for this address into the batch totals. engage is
-// the evidence threshold to replay: a run counts as engaged when the address
-// answered at least once and still burned that many timeout budgets, which
-// is the E1 "timeout after the address has answered" condition. Engagement
-// is per run by construction, so it cannot be derived from batch sums - an
-// address with one timeout in each of fifty runs sums to fifty and engages
-// in none of them.
+// add folds one run's row into the totals. engage replays a backoff trigger:
+// a run counts as engaged when the address answered and still burned that
+// many timeout budgets. Per run, never summed.
 func (s *addrStats) add(t nameserverTiming, engage int) {
 	s.runs++
 	s.queries += t.Count
@@ -105,7 +90,7 @@ func main() {
 	baseURL := flag.String("base-url", "http://127.0.0.1:18080", "Server base URL")
 	limit := flag.Int("limit", 500, "Runs fetched per page (server caps this at 500)")
 	timeout := flag.Duration("timeout", 60*time.Second, "HTTP timeout per request")
-	minQueries := flag.Int("min-queries", 0, "Only print addresses with at least this many queries")
+	minQueries := flag.Int("min-queries", 0, "Only print addresses we sent at least this many queries to (answers plus timeouts)")
 	engage := flag.Int("engage-threshold", 0, "Replay the detector: count runs where an address answered and still burned this many timeout budgets (0 = off)")
 	flag.Parse()
 
@@ -119,7 +104,6 @@ func main() {
 	api := strings.TrimSuffix(*baseURL, "/") + "/api/v1"
 
 	w := csv.NewWriter(os.Stdout)
-	defer w.Flush()
 	header := []string{
 		"variant", "nameserver", "address", "runs", "queries", "timeouts", "refused",
 		"timeout_rate", "refused_rate", "avg_median_ms", "max_ms", "unreachable_runs", "runs_with_failures",
@@ -154,10 +138,12 @@ func main() {
 		})
 		for _, k := range keys {
 			s := stats[k]
-			if s.queries < *minQueries {
+			// Filter on attempts, not answers: an address that timed out in
+			// every run has zero answers and is exactly the row to keep.
+			attempts := s.queries + s.timeouts
+			if attempts < *minQueries {
 				continue
 			}
-			attempts := s.queries + s.timeouts
 			row := []string{
 				variant,
 				s.nameserver,
@@ -179,6 +165,9 @@ func main() {
 			}
 		}
 		w.Flush()
+		if err := w.Error(); err != nil {
+			fail(err)
+		}
 	}
 }
 
@@ -212,8 +201,7 @@ func aggregateBatch(client *http.Client, api, batchID string, limit, engage int)
 }
 
 // listBatchRuns pages through a batch. The server caps limit at 500, so a
-// farm corpus larger than that must be walked with offset or the tail of the
-// batch silently disappears from the aggregate.
+// larger batch must be walked with offset or its tail is silently dropped.
 func listBatchRuns(client *http.Client, api, batchID string, pageSize int) ([]runListItem, error) {
 	if pageSize <= 0 || pageSize > 500 {
 		pageSize = 500

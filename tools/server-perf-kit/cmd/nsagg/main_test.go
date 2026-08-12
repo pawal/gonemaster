@@ -49,17 +49,18 @@ func TestAddrStatsAccumulatesAcrossRuns(t *testing.T) {
 	}
 }
 
-// TestEngagementReplayIsPerRunAndRequiresAPriorAnswer pins the replay that
-// B5 question 3 is answered with. Two conditions have to hold together, and
-// each has a distinct failure mode if dropped:
+// TestEngagementReplayIsPerRunAndRequiresAPriorAnswer pins the replay used
+// to estimate how often a backoff trigger would fire on a corpus that is
+// not being rate limited. Two conditions have to hold together, and each
+// has a distinct failure mode if dropped:
 //
 //   - Per run, never summed. An address seen in fifty runs with one timeout
 //     each sums to fifty and engages in none of them; summing first would
 //     report a spurious-engagement rate near 100% on any large corpus.
-//   - The address must have answered. That is E1's "timeout after the
-//     address has answered" prefix, the whole thing separating a rate
-//     limiter (drops excess, answers the rest) from a dead server, which
-//     fast-fail and blacklisting already handle.
+//   - The address must have answered. "Timed out after answering" is the
+//     whole thing separating a rate limiter (drops excess, answers the
+//     rest) from a dead server, which fast-fail and blacklisting already
+//     handle.
 func TestEngagementReplayIsPerRunAndRequiresAPriorAnswer(t *testing.T) {
 	s := &addrStats{}
 	// Below threshold in each run, and three runs' worth in total: a sum
@@ -78,7 +79,7 @@ func TestEngagementReplayIsPerRunAndRequiresAPriorAnswer(t *testing.T) {
 	// Past threshold but never answered: a dead address, not a limited one.
 	s.add(nameserverTiming{Count: 0, TimeoutCount: 9, Status: "unreachable"}, 3)
 	if s.runsEngaged != 1 {
-		t.Fatalf("runs_engaged = %d, want 1: an address that never answered is not E1 evidence", s.runsEngaged)
+		t.Fatalf("runs_engaged = %d, want 1: an address that never answered is not evidence of limiting", s.runsEngaged)
 	}
 	// Threshold 0 disables the replay entirely.
 	off := &addrStats{}

@@ -318,10 +318,10 @@ func TestTimingsFromQueryMapTimeoutOnlyKey(t *testing.T) {
 }
 
 // TestTimingsFromQueryMapCarriesTimeoutCount pins the per-address timeout
-// count onto the emitted rows. This is the measurement B1 exists for: an
-// address that answers most queries but times out on some is exactly the
-// signature a rate limiter produces, and before this field the count was
-// visible only in a local --debug-queries run, never in a stored result.
+// count onto the emitted rows. An address that answers most queries but
+// times out on some is exactly the signature a rate limiter produces, and
+// before this field the count was visible only in a local --debug-queries
+// run, never in a stored result.
 // Both row shapes must carry it: the "ok" row for an address that answered
 // at least once, and the "unreachable" row for one that never did.
 func TestTimingsFromQueryMapCarriesTimeoutCount(t *testing.T) {

@@ -3,9 +3,11 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -243,7 +245,10 @@ func TestBatchesDiffRollsUpTagsAcrossDomains(t *testing.T) {
 // TestBatchesDiffReportsUncomparableDomains keeps a batch that lost domains
 // from quietly shrinking the denominator: a domain tested in only one arm
 // cannot contribute a delta, and silently dropping it would make a run that
-// failed to complete look cleaner than one that did.
+// failed to complete look cleaner than one that did. An unmatched domain is
+// therefore not agreement, and the exit status has to say so - a gate that
+// returned 0 here would read a batch that tested one domain of five hundred
+// as "no findings changed".
 func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
 	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
 	defer batchDiffFixture(t, map[string]map[string][]jobResultEntry{
@@ -253,21 +258,104 @@ func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
 
 	var out, errOut bytes.Buffer
 	code := run([]string{"--format", "json", "batches", "diff", "serial", "w16"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("no domain differs, expected exit 0, got %d: %s", code, errOut.String())
+	if code != 1 {
+		t.Fatalf("unmatched domains must fail the gate, got exit %d: %s", code, errOut.String())
 	}
 	var diff batchDiffOutput
 	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
 		t.Fatalf("expected JSON output: %v", err)
 	}
-	if diff.Compared != 1 {
-		t.Fatalf("compared = %d, want 1", diff.Compared)
+	if diff.Compared != 1 || diff.Differing != 0 {
+		t.Fatalf("compared/differing = %d/%d, want 1/0", diff.Compared, diff.Differing)
 	}
 	if len(diff.OnlyInA) != 1 || diff.OnlyInA[0] != "gone.example" {
 		t.Fatalf("only_in_a = %+v, want [gone.example]", diff.OnlyInA)
 	}
 	if len(diff.OnlyInB) != 1 || diff.OnlyInB[0] != "new.example" {
 		t.Fatalf("only_in_b = %+v, want [new.example]", diff.OnlyInB)
+	}
+}
+
+// TestBatchesDiffTreatsEmptyRunsAsUnusable covers the case where both arms
+// broke the same way. Two runs with no entries produce two empty tag maps,
+// which compare as identical; counting that as agreement would let a gate
+// pass a comparison in which nothing actually ran.
+func TestBatchesDiffTreatsEmptyRunsAsUnusable(t *testing.T) {
+	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
+	defer batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+		"serial": {"a.example": clean, "broken.example": {}},
+		"w16":    {"a.example": clean, "broken.example": {}},
+	})()
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"--format", "json", "batches", "diff", "serial", "w16"}, &out, &errOut)
+	if code != 1 {
+		t.Fatalf("an entry-less run must fail the gate, got exit %d", code)
+	}
+	var diff batchDiffOutput
+	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
+		t.Fatalf("expected JSON output: %v", err)
+	}
+	if diff.Compared != 1 || diff.Identical != 1 {
+		t.Fatalf("compared/identical = %d/%d, want 1/1", diff.Compared, diff.Identical)
+	}
+	if len(diff.Unusable) != 1 || diff.Unusable[0] != "broken.example" {
+		t.Fatalf("unusable = %+v, want [broken.example]", diff.Unusable)
+	}
+}
+
+// TestBatchesDiffRefusesToTruncate pins the paging guard. Silently comparing
+// the first --limit runs of a larger batch would report agreement over a
+// subset while looking like a complete answer.
+func TestBatchesDiffRefusesToTruncate(t *testing.T) {
+	old := newHTTPClient
+	defer func() { newHTTPClient = old }()
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+			items := make([]runRecord, 0, limit)
+			for i := 0; i < limit; i++ {
+				items = append(items, runRecord{ID: fmt.Sprintf("r%d", i), Domain: fmt.Sprintf("d%d.example", i)})
+			}
+			body, _ := json.Marshal(runList{Items: items, Total: 900})
+			return jsonResponse(200, string(body)), nil
+		})}
+	}
+	var out, errOut bytes.Buffer
+	if code := run([]string{"batches", "diff", "--limit", "500", "a", "b"}, &out, &errOut); code != 2 {
+		t.Fatalf("expected an error exit 2, got %d", code)
+	}
+	if !strings.Contains(errOut.String(), "above the --limit") {
+		t.Fatalf("expected a truncation error, got: %s", errOut.String())
+	}
+}
+
+// TestWorstLevelByTagRanksDebugLevels pins the severity ordering against the
+// engine's own. An unranked level ties with every other unranked one, so the
+// collapse keeps whichever entry happened to arrive first and two identical
+// runs can report a severity change.
+func TestWorstLevelByTagRanksDebugLevels(t *testing.T) {
+	forward := worstLevelByTag(jobResult{Raw: &jobResultRaw{Entries: []jobResultEntry{
+		{Module: "SYSTEM", Tag: "X", Level: "DEBUG2"},
+		{Module: "SYSTEM", Tag: "X", Level: "DEBUG3"},
+	}}})
+	reverse := worstLevelByTag(jobResult{Raw: &jobResultRaw{Entries: []jobResultEntry{
+		{Module: "SYSTEM", Tag: "X", Level: "DEBUG3"},
+		{Module: "SYSTEM", Tag: "X", Level: "DEBUG2"},
+	}}})
+	// DEBUG3 is the least severe level the engine defines, so DEBUG2 wins
+	// regardless of the order the entries arrive in.
+	if forward["X"].Level != "DEBUG2" || reverse["X"].Level != "DEBUG2" {
+		t.Fatalf("emission order changed the collapse: forward=%q reverse=%q, want DEBUG2 both",
+			forward["X"].Level, reverse["X"].Level)
+	}
+	// And every debug level must rank below the ordinary ones.
+	ranked := worstLevelByTag(jobResult{Raw: &jobResultRaw{Entries: []jobResultEntry{
+		{Module: "SYSTEM", Tag: "Y", Level: "INFO"},
+		{Module: "SYSTEM", Tag: "Y", Level: "DEBUG2"},
+	}}})
+	if ranked["Y"].Level != "INFO" {
+		t.Fatalf("worst level = %q, want INFO to outrank DEBUG2", ranked["Y"].Level)
 	}
 }
 

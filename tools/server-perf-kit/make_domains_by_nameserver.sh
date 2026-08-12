@@ -126,9 +126,13 @@ tmp_root="$(mktemp -d)"
 trap 'rm -rf "$tmp_root"' EXIT
 
 # Derive the apex from the zone's own SOA so "one label below the apex" can
-# be enforced without the caller having to state the zone name.
+# be enforced without the caller having to state the zone name. The type
+# field is located by name rather than by position, since presentation
+# format lets the TTL or the class be omitted.
 apex="$(awk '
-  $4 == "SOA" && $1 != "" { print tolower($1); exit }
+  {
+    for (i = 2; i <= NF; i++) if ($i == "SOA") { print tolower($1); exit }
+  }
 ' "$zone_file")"
 if [ -z "$apex" ]; then
   echo "no SOA record found in $zone_file; is it a zone file?" >&2
@@ -137,12 +141,25 @@ fi
 apex="${apex%.}"
 
 matches="$tmp_root/matches.txt"
+# The NS field is located by name, not by position: presentation format
+# allows the TTL or class to be omitted, and an omitted owner repeats the
+# previous record's. A strictly positional parser drops those records
+# silently, which shrinks the corpus without any warning.
 awk -v pattern="$ns_pattern" -v apex="$apex" '
-  $4 != "NS" { next }
   {
-    owner = tolower($1)
+    ns_at = 0
+    for (i = 1; i < NF; i++) if ($i == "NS") { ns_at = i; break }
+    if (ns_at == 0) next
+    # A line starting with whitespace repeats the previous owner. awk has
+    # already stripped that whitespace from $1, so test the raw line.
+    if ($0 ~ /^[ \t]/) {
+      owner = last_owner
+    } else {
+      owner = tolower($1)
+      last_owner = owner
+    }
     sub(/\.$/, "", owner)
-    target = tolower($5)
+    target = tolower($(ns_at + 1))
     sub(/\.$/, "", target)
     if (owner == "" || owner == apex) next
     # Only direct children of the apex: a deeper delegation belongs to a
@@ -167,7 +184,7 @@ sample_deterministic "$matches" "$count" "$seed" "$out"
 out_count="$(wc -l <"$out" | awk '{print $1}')"
 out_sha="$(sha256sum "$out" | awk '{print $1}')"
 zone_sha="$(sha256sum "$zone_file" | awk '{print $1}')"
-zone_serial="$(awk '$4 == "SOA" { print $7; exit }' "$zone_file")"
+zone_serial="$(awk '{ for (i = 2; i <= NF; i++) if ($i == "SOA") { print $(i + 3); exit } }' "$zone_file")"
 
 jq -n \
   --arg generated_at_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \

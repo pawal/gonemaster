@@ -69,10 +69,12 @@ gonemaster-client batches diff batch_before batch_after
 gonemaster-client batches diff --per-domain batch_before batch_after
 ```
 
-Domains present in only one of the two batches are reported separately
-rather than dropped, so a batch that did not complete cannot look cleaner
-than one that did. The exit status is `0` when no domain differs and `1`
-otherwise, which makes the command usable as a gate.
+Domains present in only one of the two batches, and domains whose run
+carries no entries, are reported separately rather than dropped: they are
+domains the comparison cannot make a statement about, not evidence of
+agreement. The exit status is `0` only when every domain was comparable and
+identical, and `1` otherwise, so a batch that did not complete cannot pass
+the gate by testing fewer domains.
 
 ## Results
 

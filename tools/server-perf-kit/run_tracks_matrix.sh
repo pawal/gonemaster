@@ -128,7 +128,8 @@ compute_markdown_summary() {
     echo
     echo "| Variant | Ref | Commit | Binary SHA256 | Profile | Profile SHA256 |"
     echo "| --- | --- | --- | --- | --- | --- |"
-    jq -r '.variants[] | "| \(.name) | `\(.ref)` | `\(.commit_sha)` | `\(.binary_sha256)` | `\(.profile // "-")` | `\(.profile_sha256 // "-")` |"' "$report_json"
+    jq -r 'def dash: if (. // "") == "" then "-" else . end;
+      .variants[] | "| \(.name) | `\(.ref)` | `\(.commit_sha)` | `\(.binary_sha256)` | `\(.profile|dash)` | `\(.profile_sha256|dash)` |"' "$report_json"
     echo
     echo "## Aggregate Metrics (measured runs only)"
     echo

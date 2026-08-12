@@ -12,15 +12,18 @@ import (
 	"strings"
 )
 
-// levelRank orders severities so a tag seen at several levels within one run
-// collapses to its worst.
+// levelRank mirrors the engine's severity ordering, including the debug
+// levels: an unranked level would tie with every other unranked one and
+// report a severity change between identical runs.
 var levelRank = map[string]int{
-	"DEBUG":    1,
-	"INFO":     2,
-	"NOTICE":   3,
-	"WARNING":  4,
-	"ERROR":    5,
-	"CRITICAL": 6,
+	"DEBUG3":   1,
+	"DEBUG2":   2,
+	"DEBUG":    3,
+	"INFO":     4,
+	"NOTICE":   5,
+	"WARNING":  6,
+	"ERROR":    7,
+	"CRITICAL": 8,
 }
 
 type tagInfo struct {
@@ -49,14 +52,13 @@ type runDiffOutput struct {
 }
 
 // Identical reports whether the two runs produced the same worst level for
-// every tag. This is the zero-delta gate the measurement plans require.
+// every tag.
 func (d runDiffOutput) Identical() bool {
 	return len(d.Added) == 0 && len(d.Removed) == 0 && len(d.Changed) == 0
 }
 
-// worstLevelByTag collapses a run's entries to one entry per tag, keeping the
-// highest-severity level seen for that tag. Same logic as the MCP run_diff
-// tool, so the two agree on what "changed" means.
+// worstLevelByTag keeps the highest-severity level seen per tag, matching
+// the MCP run_diff tool so the two agree on what "changed" means.
 func worstLevelByTag(result jobResult) map[string]tagInfo {
 	m := map[string]tagInfo{}
 	if result.Raw == nil {
@@ -163,10 +165,18 @@ type batchDiffOutput struct {
 	Differing    int               `json:"differing"`
 	OnlyInA      []string          `json:"only_in_a,omitempty"`
 	OnlyInB      []string          `json:"only_in_b,omitempty"`
+	Unusable     []string          `json:"unusable,omitempty"`
 	TagAdded     map[string]int    `json:"tag_added,omitempty"`
 	TagRemoved   map[string]int    `json:"tag_removed,omitempty"`
 	TagChanged   map[string]int    `json:"tag_changed,omitempty"`
 	DomainDeltas []batchDiffDomain `json:"domain_deltas,omitempty"`
+}
+
+// Clean reports whether the two batches are comparable and agree. An
+// unmatched or unusable domain is not agreement: it is a domain the
+// comparison could not make a statement about.
+func (d batchDiffOutput) Clean() bool {
+	return d.Differing == 0 && len(d.OnlyInA) == 0 && len(d.OnlyInB) == 0 && len(d.Unusable) == 0
 }
 
 func runBatchesDiff(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
@@ -187,17 +197,14 @@ func runBatchesDiff(ctx context.Context, client *apiClient, opts globalOptions, 
 		return 2
 	}
 
-	diff, err := fetchBatchDiff(ctx, client, opts, strings.TrimSpace(rest[0]), strings.TrimSpace(rest[1]), limit)
+	diff, err := fetchBatchDiff(ctx, client, opts, strings.TrimSpace(rest[0]), strings.TrimSpace(rest[1]), limit, perDomain)
 	if err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
-	if !perDomain {
-		diff.DomainDeltas = nil
-	}
 
 	if quiet {
-		if diff.Differing == 0 {
+		if diff.Clean() {
 			return 0
 		}
 		return 1
@@ -210,13 +217,13 @@ func runBatchesDiff(ctx context.Context, client *apiClient, opts globalOptions, 
 	} else {
 		writeBatchDiffPretty(out, diff)
 	}
-	if diff.Differing == 0 {
+	if diff.Clean() {
 		return 0
 	}
 	return 1
 }
 
-func fetchBatchDiff(ctx context.Context, client *apiClient, opts globalOptions, batchA, batchB string, limit int) (batchDiffOutput, error) {
+func fetchBatchDiff(ctx context.Context, client *apiClient, opts globalOptions, batchA, batchB string, limit int, perDomain bool) (batchDiffOutput, error) {
 	runsA, err := listBatchRuns(ctx, client, batchA, limit)
 	if err != nil {
 		return batchDiffOutput{}, fmt.Errorf("batch %s: %w", batchA, err)
@@ -256,13 +263,14 @@ func fetchBatchDiff(ctx context.Context, client *apiClient, opts globalOptions, 
 
 	for _, domain := range domains {
 		idA, idB := runsA[domain], runsB[domain]
-		resultA, _, err := fetchRunForDiff(ctx, client, opts, idA)
-		if err != nil {
-			return batchDiffOutput{}, fmt.Errorf("run %s (%s): %w", idA, domain, err)
-		}
-		resultB, _, err := fetchRunForDiff(ctx, client, opts, idB)
-		if err != nil {
-			return batchDiffOutput{}, fmt.Errorf("run %s (%s): %w", idB, domain, err)
+		// A run that could not be fetched, or that carries no entries,
+		// supports no comparison. Counting it as identical would let a
+		// broken arm pass a zero-delta gate, so it is reported apart.
+		resultA, errA := fetchRunResult(ctx, client, opts, idA)
+		resultB, errB := fetchRunResult(ctx, client, opts, idB)
+		if errA != nil || errB != nil || !comparableResult(resultA) || !comparableResult(resultB) {
+			diff.Unusable = append(diff.Unusable, domain)
+			continue
 		}
 		added, removed, changed := diffTagMaps(worstLevelByTag(resultA), worstLevelByTag(resultB))
 		diff.Compared++
@@ -280,6 +288,9 @@ func fetchBatchDiff(ctx context.Context, client *apiClient, opts globalOptions, 
 		for _, d := range changed {
 			diff.TagChanged[d.Tag]++
 		}
+		if !perDomain {
+			continue
+		}
 		entry := batchDiffDomain{Domain: domain, RunA: idA, RunB: idB, Added: added, Removed: removed, Changed: changed}
 		if resultA.Score != nil {
 			entry.GradeA = resultA.Score.Grade
@@ -292,12 +303,23 @@ func fetchBatchDiff(ctx context.Context, client *apiClient, opts globalOptions, 
 	return diff, nil
 }
 
+// comparableResult reports whether a fetched run can carry a tag set. An
+// empty entry list means the run failed or was purged, not that it found
+// nothing.
+func comparableResult(result jobResult) bool {
+	return result.Raw != nil && len(result.Raw.Entries) > 0
+}
+
 // listBatchRuns maps domain to run ID for one batch. The runs endpoint caps
 // limit at 500, so larger batches must be paged or their tail silently
 // disappears from the comparison.
 func listBatchRuns(ctx context.Context, client *apiClient, batchID string, limit int) (map[string]string, error) {
 	const pageSize = 500
+	if limit <= 0 {
+		return nil, fmt.Errorf("limit must be positive, got %d", limit)
+	}
 	out := map[string]string{}
+	total := 0
 	for offset := 0; offset < limit; offset += pageSize {
 		size := min(pageSize, limit-offset)
 		q := url.Values{}
@@ -308,6 +330,7 @@ func listBatchRuns(ctx context.Context, client *apiClient, batchID string, limit
 		if err := client.doJSON(ctx, http.MethodGet, "/runs?"+q.Encode(), nil, &page); err != nil {
 			return nil, err
 		}
+		total = page.Total
 		for _, item := range page.Items {
 			// Newest first, so the first run seen for a domain wins if the
 			// batch somehow contains a domain twice.
@@ -322,6 +345,11 @@ func listBatchRuns(ctx context.Context, client *apiClient, batchID string, limit
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no runs found")
 	}
+	// Truncating would silently shrink the comparison, which reads as
+	// agreement rather than as missing data.
+	if total > limit {
+		return nil, fmt.Errorf("batch holds %d runs, above the --limit of %d; raise --limit", total, limit)
+	}
 	return out, nil
 }
 
@@ -333,6 +361,9 @@ func writeBatchDiffPretty(out io.Writer, diff batchDiffOutput) {
 	}
 	if len(diff.OnlyInB) > 0 {
 		fmt.Fprintf(out, "  Only in B: %d\n", len(diff.OnlyInB))
+	}
+	if len(diff.Unusable) > 0 {
+		fmt.Fprintf(out, "  Not comparable: %d\n", len(diff.Unusable))
 	}
 	writeTagCounts(out, "  + appeared in B", diff.TagAdded)
 	writeTagCounts(out, "  - cleared in B", diff.TagRemoved)
@@ -392,15 +423,26 @@ func fetchRunForDiff(ctx context.Context, client *apiClient, opts globalOptions,
 	if err := client.doJSON(ctx, http.MethodGet, "/runs/"+url.PathEscape(runID), nil, &record); err != nil {
 		return jobResult{}, "", err
 	}
+	result, err := fetchRunResult(ctx, client, opts, runID)
+	if err != nil {
+		return jobResult{}, "", err
+	}
+	return result, record.Domain, nil
+}
+
+// fetchRunResult skips the metadata request. The batch path already knows
+// each run's domain from the listing, so fetching it again doubles the
+// request count over a large corpus.
+func fetchRunResult(ctx context.Context, client *apiClient, opts globalOptions, runID string) (jobResult, error) {
 	path := "/runs/" + url.PathEscape(runID) + "/result"
 	if v := strings.TrimSpace(opts.locale); v != "" {
 		path += "?locale=" + url.QueryEscape(v)
 	}
 	var result jobResult
 	if err := client.doJSON(ctx, http.MethodGet, path, nil, &result); err != nil {
-		return jobResult{}, "", err
+		return jobResult{}, err
 	}
-	return result, record.Domain, nil
+	return result, nil
 }
 
 func writeRunDiffPretty(out io.Writer, diff runDiffOutput) {

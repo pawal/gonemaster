@@ -50,9 +50,29 @@ Useful commands:
 - `batches results`: fetch all results in a batch.
 - `batches cancel`: cancel queued or running jobs in a batch.
 - `batches remove`: remove queued jobs from a batch.
+- `batches diff`: compare two batches of the same corpus domain by domain.
 
 Batch jobs run at batch priority so they do not block interactive single-job
 submissions.
+
+## Comparing two batches
+
+`batches diff` pairs runs by domain name and diffs each pair at the tag
+level, then rolls the result up: how many domains are identical, how many
+differ, and which tags appeared, cleared, or changed severity on how many
+domains. Use it when the same corpus was tested twice and you need to know
+what moved - before and after a fix, or the same corpus under two different
+server settings.
+
+```sh
+gonemaster-client batches diff batch_before batch_after
+gonemaster-client batches diff --per-domain batch_before batch_after
+```
+
+Domains present in only one of the two batches are reported separately
+rather than dropped, so a batch that did not complete cannot look cleaner
+than one that did. The exit status is `0` when no domain differs and `1`
+otherwise, which makes the command usable as a gate.
 
 ## Results
 

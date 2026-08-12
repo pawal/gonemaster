@@ -341,7 +341,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Commands:")
 	fmt.Fprintln(out, "  jobs create|batch|list|get|watch|cancel|results|purge")
-	fmt.Fprintln(out, "  batches get|watch|results|cancel|remove")
+	fmt.Fprintln(out, "  batches get|watch|results|cancel|remove|diff")
 	fmt.Fprintln(out, "  queue pause|resume|reorder|remove")
 	fmt.Fprintln(out, "  domains list|get|runs|tag|untag")
 	fmt.Fprintln(out, "  tags list|create|delete|domains|summary|add-domains")
@@ -616,6 +616,8 @@ func runBatches(ctx context.Context, client *apiClient, opts globalOptions, args
 		return runBatchesCancel(ctx, client, opts, args, out, errOut)
 	case "remove":
 		return runBatchesRemove(ctx, client, opts, args, out, errOut)
+	case "diff":
+		return runBatchesDiff(ctx, client, opts, args, out, errOut)
 	default:
 		fmt.Fprintf(errOut, "Unknown batches command %q\n", cmd)
 		return 2

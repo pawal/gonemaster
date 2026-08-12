@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/url"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -145,6 +147,162 @@ func TestWorstLevelByTagKeepsHighestSeverity(t *testing.T) {
 func TestWorstLevelByTagEmptyResult(t *testing.T) {
 	if got := worstLevelByTag(jobResult{}); len(got) != 0 {
 		t.Fatalf("expected empty map for a result with no raw entries, got %+v", got)
+	}
+}
+
+// batchDiffFixture serves two batches whose runs are keyed by domain. It
+// answers the runs listing per batch and each run's result, which is the
+// pair of calls the cohort diff makes per domain.
+func batchDiffFixture(t *testing.T, batches map[string]map[string][]jobResultEntry) func() {
+	t.Helper()
+	runs := map[string][]jobResultEntry{}
+	for batch, byDomain := range batches {
+		for domain, entries := range byDomain {
+			runs[batch+":"+domain] = entries
+		}
+	}
+	old := newHTTPClient
+	newHTTPClient = func(_ time.Duration) *http.Client {
+		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			path := strings.TrimPrefix(r.URL.Path, "/api/v1")
+			if path == "/runs" {
+				batch := r.URL.Query().Get("batch")
+				byDomain, ok := batches[batch]
+				if !ok {
+					return jsonResponse(200, `{"items":[],"total":0}`), nil
+				}
+				items := []runRecord{}
+				domains := make([]string, 0, len(byDomain))
+				for domain := range byDomain {
+					domains = append(domains, domain)
+				}
+				sort.Strings(domains)
+				for _, domain := range domains {
+					items = append(items, runRecord{ID: batch + ":" + domain, Domain: domain, Status: "completed"})
+				}
+				body, _ := json.Marshal(runList{Items: items, Total: len(items)})
+				return jsonResponse(200, string(body)), nil
+			}
+			id := strings.TrimPrefix(path, "/runs/")
+			id = strings.TrimSuffix(id, "/result")
+			id, _ = url.PathUnescape(id)
+			entries, ok := runs[id]
+			if !ok {
+				return jsonResponse(404, `{"error":"not found"}`), nil
+			}
+			if strings.HasSuffix(path, "/result") {
+				body, _ := json.Marshal(jobResult{JobID: id, Status: "completed", Raw: &jobResultRaw{Entries: entries}})
+				return jsonResponse(200, string(body)), nil
+			}
+			domain := id[strings.Index(id, ":")+1:]
+			body, _ := json.Marshal(runRecord{ID: id, Domain: domain, Status: "completed"})
+			return jsonResponse(200, string(body)), nil
+		})}
+	}
+	return func() { newHTTPClient = old }
+}
+
+// TestBatchesDiffRollsUpTagsAcrossDomains is the instrument the farm
+// characterization reads: two runs of the same corpus under different load,
+// answering "how many domains gained a finding, and which finding". A
+// per-domain view alone cannot answer that, and a batch-level grade
+// histogram cannot say which tag moved.
+func TestBatchesDiffRollsUpTagsAcrossDomains(t *testing.T) {
+	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
+	broke := []jobResultEntry{
+		{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"},
+		{Module: "NAMESERVER", Tag: "N11_NO_RESPONSE", Level: "WARNING"},
+	}
+	defer batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+		"serial": {"a.example": clean, "b.example": clean, "c.example": clean},
+		"w16":    {"a.example": broke, "b.example": broke, "c.example": clean},
+	})()
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"--format", "json", "batches", "diff", "serial", "w16"}, &out, &errOut)
+	if code != 1 {
+		t.Fatalf("differing batches must exit 1, got %d: %s", code, errOut.String())
+	}
+	var diff batchDiffOutput
+	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
+		t.Fatalf("expected JSON output: %v (%s)", err, out.String())
+	}
+	if diff.Compared != 3 || diff.Identical != 1 || diff.Differing != 2 {
+		t.Fatalf("compared/identical/differing = %d/%d/%d, want 3/1/2", diff.Compared, diff.Identical, diff.Differing)
+	}
+	// Two of three domains gained N11_NO_RESPONSE under load. That count is
+	// the spurious-finding rate the gate is written against.
+	if diff.TagAdded["N11_NO_RESPONSE"] != 2 {
+		t.Fatalf("tag_added = %+v, want N11_NO_RESPONSE on 2 domains", diff.TagAdded)
+	}
+	if len(diff.TagRemoved) != 0 || len(diff.TagChanged) != 0 {
+		t.Fatalf("unexpected removed/changed rollups: %+v %+v", diff.TagRemoved, diff.TagChanged)
+	}
+}
+
+// TestBatchesDiffReportsUncomparableDomains keeps a batch that lost domains
+// from quietly shrinking the denominator: a domain tested in only one arm
+// cannot contribute a delta, and silently dropping it would make a run that
+// failed to complete look cleaner than one that did.
+func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
+	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
+	defer batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+		"serial": {"a.example": clean, "gone.example": clean},
+		"w16":    {"a.example": clean, "new.example": clean},
+	})()
+
+	var out, errOut bytes.Buffer
+	code := run([]string{"--format", "json", "batches", "diff", "serial", "w16"}, &out, &errOut)
+	if code != 0 {
+		t.Fatalf("no domain differs, expected exit 0, got %d: %s", code, errOut.String())
+	}
+	var diff batchDiffOutput
+	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
+		t.Fatalf("expected JSON output: %v", err)
+	}
+	if diff.Compared != 1 {
+		t.Fatalf("compared = %d, want 1", diff.Compared)
+	}
+	if len(diff.OnlyInA) != 1 || diff.OnlyInA[0] != "gone.example" {
+		t.Fatalf("only_in_a = %+v, want [gone.example]", diff.OnlyInA)
+	}
+	if len(diff.OnlyInB) != 1 || diff.OnlyInB[0] != "new.example" {
+		t.Fatalf("only_in_b = %+v, want [new.example]", diff.OnlyInB)
+	}
+}
+
+// TestBatchesDiffOmitsPerDomainListByDefault keeps a 500-domain comparison
+// readable: the rollup is the answer, the per-domain list is the follow-up.
+func TestBatchesDiffOmitsPerDomainListByDefault(t *testing.T) {
+	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
+	broke := []jobResultEntry{{Module: "NAMESERVER", Tag: "N11_NO_RESPONSE", Level: "WARNING"}}
+	defer batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+		"serial": {"a.example": clean},
+		"w16":    {"a.example": broke},
+	})()
+
+	var out, errOut bytes.Buffer
+	if code := run([]string{"--format", "json", "batches", "diff", "serial", "w16"}, &out, &errOut); code != 1 {
+		t.Fatalf("expected exit 1, got %d", code)
+	}
+	var diff batchDiffOutput
+	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
+		t.Fatalf("expected JSON output: %v", err)
+	}
+	if len(diff.DomainDeltas) != 0 {
+		t.Fatalf("per-domain list must be opt-in, got %+v", diff.DomainDeltas)
+	}
+
+	out.Reset()
+	errOut.Reset()
+	if code := run([]string{"--format", "json", "batches", "diff", "--per-domain", "serial", "w16"}, &out, &errOut); code != 1 {
+		t.Fatalf("expected exit 1, got %d", code)
+	}
+	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
+		t.Fatalf("expected JSON output: %v", err)
+	}
+	if len(diff.DomainDeltas) != 1 || diff.DomainDeltas[0].Domain != "a.example" {
+		t.Fatalf("--per-domain must include the delta list, got %+v", diff.DomainDeltas)
 	}
 }
 

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -139,6 +140,230 @@ func runRunsDiff(ctx context.Context, client *apiClient, opts globalOptions, arg
 		return 0
 	}
 	return 1
+}
+
+type batchDiffDomain struct {
+	Domain  string     `json:"domain"`
+	RunA    string     `json:"run_a"`
+	RunB    string     `json:"run_b"`
+	GradeA  string     `json:"grade_a,omitempty"`
+	GradeB  string     `json:"grade_b,omitempty"`
+	Added   []tagDelta `json:"added"`
+	Removed []tagDelta `json:"removed"`
+	Changed []tagDelta `json:"changed"`
+}
+
+type batchDiffOutput struct {
+	BatchA string `json:"batch_a"`
+	BatchB string `json:"batch_b"`
+	// Domains present in both batches. Domains tested in only one batch are
+	// not comparable and are reported separately rather than dropped.
+	Compared     int               `json:"compared"`
+	Identical    int               `json:"identical"`
+	Differing    int               `json:"differing"`
+	OnlyInA      []string          `json:"only_in_a,omitempty"`
+	OnlyInB      []string          `json:"only_in_b,omitempty"`
+	TagAdded     map[string]int    `json:"tag_added,omitempty"`
+	TagRemoved   map[string]int    `json:"tag_removed,omitempty"`
+	TagChanged   map[string]int    `json:"tag_changed,omitempty"`
+	DomainDeltas []batchDiffDomain `json:"domain_deltas,omitempty"`
+}
+
+func runBatchesDiff(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	fs := flag.NewFlagSet("batches diff", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	setSubcommandUsage(fs)
+	var quiet, perDomain bool
+	var limit int
+	fs.BoolVar(&quiet, "quiet", false, "Print nothing; exit 1 when any domain differs")
+	fs.BoolVar(&perDomain, "per-domain", false, "Include the per-domain delta list")
+	fs.IntVar(&limit, "limit", 5000, "Max runs to fetch per batch")
+	if err := parseWithReorderedFlags(fs, args); err != nil {
+		return 2
+	}
+	rest := fs.Args()
+	if len(rest) < 2 {
+		fmt.Fprintln(errOut, "two batch IDs are required: batches diff <batch-a> <batch-b>")
+		return 2
+	}
+
+	diff, err := fetchBatchDiff(ctx, client, opts, strings.TrimSpace(rest[0]), strings.TrimSpace(rest[1]), limit)
+	if err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+	if !perDomain {
+		diff.DomainDeltas = nil
+	}
+
+	if quiet {
+		if diff.Differing == 0 {
+			return 0
+		}
+		return 1
+	}
+	if opts.format != "pretty" {
+		if err := writeOutput(out, opts.format, diff); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+	} else {
+		writeBatchDiffPretty(out, diff)
+	}
+	if diff.Differing == 0 {
+		return 0
+	}
+	return 1
+}
+
+func fetchBatchDiff(ctx context.Context, client *apiClient, opts globalOptions, batchA, batchB string, limit int) (batchDiffOutput, error) {
+	runsA, err := listBatchRuns(ctx, client, batchA, limit)
+	if err != nil {
+		return batchDiffOutput{}, fmt.Errorf("batch %s: %w", batchA, err)
+	}
+	runsB, err := listBatchRuns(ctx, client, batchB, limit)
+	if err != nil {
+		return batchDiffOutput{}, fmt.Errorf("batch %s: %w", batchB, err)
+	}
+
+	diff := batchDiffOutput{
+		BatchA:     batchA,
+		BatchB:     batchB,
+		TagAdded:   map[string]int{},
+		TagRemoved: map[string]int{},
+		TagChanged: map[string]int{},
+	}
+	for domain := range runsA {
+		if _, ok := runsB[domain]; !ok {
+			diff.OnlyInA = append(diff.OnlyInA, domain)
+		}
+	}
+	for domain := range runsB {
+		if _, ok := runsA[domain]; !ok {
+			diff.OnlyInB = append(diff.OnlyInB, domain)
+		}
+	}
+	sort.Strings(diff.OnlyInA)
+	sort.Strings(diff.OnlyInB)
+
+	domains := make([]string, 0, len(runsA))
+	for domain := range runsA {
+		if _, ok := runsB[domain]; ok {
+			domains = append(domains, domain)
+		}
+	}
+	sort.Strings(domains)
+
+	for _, domain := range domains {
+		idA, idB := runsA[domain], runsB[domain]
+		resultA, _, err := fetchRunForDiff(ctx, client, opts, idA)
+		if err != nil {
+			return batchDiffOutput{}, fmt.Errorf("run %s (%s): %w", idA, domain, err)
+		}
+		resultB, _, err := fetchRunForDiff(ctx, client, opts, idB)
+		if err != nil {
+			return batchDiffOutput{}, fmt.Errorf("run %s (%s): %w", idB, domain, err)
+		}
+		added, removed, changed := diffTagMaps(worstLevelByTag(resultA), worstLevelByTag(resultB))
+		diff.Compared++
+		if len(added) == 0 && len(removed) == 0 && len(changed) == 0 {
+			diff.Identical++
+			continue
+		}
+		diff.Differing++
+		for _, d := range added {
+			diff.TagAdded[d.Tag]++
+		}
+		for _, d := range removed {
+			diff.TagRemoved[d.Tag]++
+		}
+		for _, d := range changed {
+			diff.TagChanged[d.Tag]++
+		}
+		entry := batchDiffDomain{Domain: domain, RunA: idA, RunB: idB, Added: added, Removed: removed, Changed: changed}
+		if resultA.Score != nil {
+			entry.GradeA = resultA.Score.Grade
+		}
+		if resultB.Score != nil {
+			entry.GradeB = resultB.Score.Grade
+		}
+		diff.DomainDeltas = append(diff.DomainDeltas, entry)
+	}
+	return diff, nil
+}
+
+// listBatchRuns maps domain to run ID for one batch. The runs endpoint caps
+// limit at 500, so larger batches must be paged or their tail silently
+// disappears from the comparison.
+func listBatchRuns(ctx context.Context, client *apiClient, batchID string, limit int) (map[string]string, error) {
+	const pageSize = 500
+	out := map[string]string{}
+	for offset := 0; offset < limit; offset += pageSize {
+		size := min(pageSize, limit-offset)
+		q := url.Values{}
+		q.Set("batch", batchID)
+		q.Set("limit", strconv.Itoa(size))
+		q.Set("offset", strconv.Itoa(offset))
+		var page runList
+		if err := client.doJSON(ctx, http.MethodGet, "/runs?"+q.Encode(), nil, &page); err != nil {
+			return nil, err
+		}
+		for _, item := range page.Items {
+			// Newest first, so the first run seen for a domain wins if the
+			// batch somehow contains a domain twice.
+			if _, ok := out[item.Domain]; !ok {
+				out[item.Domain] = item.ID
+			}
+		}
+		if len(page.Items) < size {
+			break
+		}
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no runs found")
+	}
+	return out, nil
+}
+
+func writeBatchDiffPretty(out io.Writer, diff batchDiffOutput) {
+	fmt.Fprintf(out, "Batch diff: %s -> %s\n", diff.BatchA, diff.BatchB)
+	fmt.Fprintf(out, "  Domains compared: %d (identical %d, differing %d)\n", diff.Compared, diff.Identical, diff.Differing)
+	if len(diff.OnlyInA) > 0 {
+		fmt.Fprintf(out, "  Only in A: %d\n", len(diff.OnlyInA))
+	}
+	if len(diff.OnlyInB) > 0 {
+		fmt.Fprintf(out, "  Only in B: %d\n", len(diff.OnlyInB))
+	}
+	writeTagCounts(out, "  + appeared in B", diff.TagAdded)
+	writeTagCounts(out, "  - cleared in B", diff.TagRemoved)
+	writeTagCounts(out, "  ~ changed severity", diff.TagChanged)
+	for _, d := range diff.DomainDeltas {
+		fmt.Fprintf(out, "  %s: added=%d removed=%d changed=%d\n", d.Domain, len(d.Added), len(d.Removed), len(d.Changed))
+	}
+}
+
+func writeTagCounts(out io.Writer, label string, counts map[string]int) {
+	if len(counts) == 0 {
+		return
+	}
+	type row struct {
+		tag string
+		n   int
+	}
+	rows := make([]row, 0, len(counts))
+	for tag, n := range counts {
+		rows = append(rows, row{tag, n})
+	}
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].n != rows[j].n {
+			return rows[i].n > rows[j].n
+		}
+		return rows[i].tag < rows[j].tag
+	})
+	fmt.Fprintln(out, label+":")
+	for _, r := range rows {
+		fmt.Fprintf(out, "      %-44s %d domains\n", r.tag, r.n)
+	}
 }
 
 func fetchRunDiff(ctx context.Context, client *apiClient, opts globalOptions, runA, runB string) (runDiffOutput, error) {

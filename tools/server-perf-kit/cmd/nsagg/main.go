@@ -92,7 +92,7 @@ func (s *addrStats) add(t nameserverTiming) {
 
 func main() {
 	baseURL := flag.String("base-url", "http://127.0.0.1:18080", "Server base URL")
-	limit := flag.Int("limit", 100000, "Max runs to list per batch")
+	limit := flag.Int("limit", 500, "Runs fetched per page (server caps this at 500)")
 	timeout := flag.Duration("timeout", 60*time.Second, "HTTP timeout per request")
 	minQueries := flag.Int("min-queries", 0, "Only print addresses with at least this many queries")
 	flag.Parse()
@@ -169,19 +169,16 @@ func main() {
 }
 
 func aggregateBatch(client *http.Client, api, batchID string, limit int) (map[string]*addrStats, error) {
-	var list runList
-	q := url.Values{}
-	q.Set("batch", batchID)
-	q.Set("limit", strconv.Itoa(limit))
-	if err := getJSON(client, api+"/runs?"+q.Encode(), &list); err != nil {
-		return nil, fmt.Errorf("list runs: %w", err)
+	items, err := listBatchRuns(client, api, batchID, limit)
+	if err != nil {
+		return nil, err
 	}
-	if len(list.Items) == 0 {
+	if len(items) == 0 {
 		return nil, fmt.Errorf("batch %s has no runs", batchID)
 	}
 
 	stats := map[string]*addrStats{}
-	for _, item := range list.Items {
+	for _, item := range items {
 		var result runResult
 		if err := getJSON(client, api+"/runs/"+url.PathEscape(item.ID)+"/result", &result); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: run %s (%s): %v\n", item.ID, item.Domain, err)
@@ -198,6 +195,30 @@ func aggregateBatch(client *http.Client, api, batchID string, limit int) (map[st
 		}
 	}
 	return stats, nil
+}
+
+// listBatchRuns pages through a batch. The server caps limit at 500, so a
+// farm corpus larger than that must be walked with offset or the tail of the
+// batch silently disappears from the aggregate.
+func listBatchRuns(client *http.Client, api, batchID string, pageSize int) ([]runListItem, error) {
+	if pageSize <= 0 || pageSize > 500 {
+		pageSize = 500
+	}
+	var items []runListItem
+	for offset := 0; ; offset += pageSize {
+		q := url.Values{}
+		q.Set("batch", batchID)
+		q.Set("limit", strconv.Itoa(pageSize))
+		q.Set("offset", strconv.Itoa(offset))
+		var page runList
+		if err := getJSON(client, api+"/runs?"+q.Encode(), &page); err != nil {
+			return nil, fmt.Errorf("list runs: %w", err)
+		}
+		items = append(items, page.Items...)
+		if len(page.Items) < pageSize || len(items) >= page.Total {
+			return items, nil
+		}
+	}
 }
 
 func getJSON(client *http.Client, endpoint string, out any) error {

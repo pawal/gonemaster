@@ -2,8 +2,10 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"testing"
 	"time"
 )
@@ -152,6 +154,46 @@ func TestAggregateBatchSurvivesAMissingRunResult(t *testing.T) {
 	}
 	if len(stats) != 1 || stats["ns.example/192.0.2.9"].queries != 10 {
 		t.Fatalf("expected the surviving run to be aggregated, got %+v", stats)
+	}
+}
+
+// TestListBatchRunsPagesPastTheServerCap covers the trap that a 500-domain
+// farm corpus walks straight into: the runs endpoint refuses any limit above
+// 500, and a single unpaged request would have silently dropped every run
+// past the cap - producing a smaller, cleaner-looking aggregate rather than
+// an error.
+func TestListBatchRunsPagesPastTheServerCap(t *testing.T) {
+	const total = 1200
+	var requests []string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+		if limit > 500 {
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		requests = append(requests, r.URL.RawQuery)
+		items := []runListItem{}
+		for i := offset; i < offset+limit && i < total; i++ {
+			items = append(items, runListItem{ID: fmt.Sprintf("run-%d", i)})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(runList{Items: items, Total: total})
+	}))
+	defer srv.Close()
+
+	items, err := listBatchRuns(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "batch-big", 100000)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(items) != total {
+		t.Fatalf("got %d runs, want %d", len(items), total)
+	}
+	if len(requests) != 3 {
+		t.Fatalf("expected 3 pages of 500, got %d requests: %v", len(requests), requests)
+	}
+	if items[0].ID != "run-0" || items[total-1].ID != fmt.Sprintf("run-%d", total-1) {
+		t.Fatalf("pages stitched wrong: first=%s last=%s", items[0].ID, items[total-1].ID)
 	}
 }
 

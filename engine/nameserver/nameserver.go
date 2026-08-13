@@ -451,8 +451,8 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	if ns.cache != nil && err != nil && attributable && isTimeoutPatternError(err) {
 		ns.cache.RecordQueryTimeout(ns.NameString() + "/" + ns.AddressString())
 	}
-	// REFUSED arrives as a parsed answer, not an error, so it is invisible
-	// in the timeout count while being the other half of the load signal.
+	// REFUSED arrives as a parsed answer, not an error, so the timeout
+	// count never sees it.
 	if ns.cache != nil && attributable && resp.Msg != nil && resp.Msg.Rcode == dns.RcodeRefused {
 		ns.cache.RecordQueryRefused(ns.NameString() + "/" + ns.AddressString())
 	}

@@ -12,9 +12,8 @@ import (
 	"strings"
 )
 
-// levelRank mirrors the engine's severity ordering, including the debug
-// levels: an unranked level would tie with every other unranked one and
-// report a severity change between identical runs.
+// levelRank mirrors the engine's severity ordering. An unranked level would
+// tie with every other unranked one and look like a severity change.
 var levelRank = map[string]int{
 	"DEBUG3":   1,
 	"DEBUG2":   2,
@@ -51,14 +50,13 @@ type runDiffOutput struct {
 	Changed []tagDelta `json:"changed"`
 }
 
-// Identical reports whether the two runs produced the same worst level for
-// every tag.
+// Identical reports whether every tag kept its worst level.
 func (d runDiffOutput) Identical() bool {
 	return len(d.Added) == 0 && len(d.Removed) == 0 && len(d.Changed) == 0
 }
 
 // worstLevelByTag keeps the highest-severity level seen per tag, matching
-// the MCP run_diff tool so the two agree on what "changed" means.
+// the MCP run_diff tool.
 func worstLevelByTag(result jobResult) map[string]tagInfo {
 	m := map[string]tagInfo{}
 	if result.Raw == nil {
@@ -103,7 +101,7 @@ func runRunsDiff(ctx context.Context, client *apiClient, opts globalOptions, arg
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	var quiet bool
-	fs.BoolVar(&quiet, "quiet", false, "Print nothing; exit 1 when the runs differ")
+	fs.BoolVar(&quiet, "quiet", false, "Report through the exit status only")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
@@ -158,8 +156,7 @@ type batchDiffDomain struct {
 type batchDiffOutput struct {
 	BatchA string `json:"batch_a"`
 	BatchB string `json:"batch_b"`
-	// Domains present in both batches. Domains tested in only one batch are
-	// not comparable and are reported separately rather than dropped.
+	// Domains in both batches; the rest are reported apart, not dropped.
 	Compared     int               `json:"compared"`
 	Identical    int               `json:"identical"`
 	Differing    int               `json:"differing"`
@@ -172,9 +169,8 @@ type batchDiffOutput struct {
 	DomainDeltas []batchDiffDomain `json:"domain_deltas,omitempty"`
 }
 
-// Clean reports whether the two batches are comparable and agree. An
-// unmatched or unusable domain is not agreement: it is a domain the
-// comparison could not make a statement about.
+// Clean reports agreement over a complete comparison. An unmatched or
+// unusable domain is missing data, not agreement.
 func (d batchDiffOutput) Clean() bool {
 	return d.Differing == 0 && len(d.OnlyInA) == 0 && len(d.OnlyInB) == 0 && len(d.Unusable) == 0
 }
@@ -185,9 +181,9 @@ func runBatchesDiff(ctx context.Context, client *apiClient, opts globalOptions, 
 	setSubcommandUsage(fs)
 	var quiet, perDomain bool
 	var limit int
-	fs.BoolVar(&quiet, "quiet", false, "Print nothing; exit 1 when any domain differs")
-	fs.BoolVar(&perDomain, "per-domain", false, "Include the per-domain delta list")
-	fs.IntVar(&limit, "limit", 5000, "Max runs to fetch per batch")
+	fs.BoolVar(&quiet, "quiet", false, "Report through the exit status only")
+	fs.BoolVar(&perDomain, "per-domain", false, "Include per-domain deltas")
+	fs.IntVar(&limit, "limit", 5000, "Max runs per batch")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
@@ -263,9 +259,8 @@ func fetchBatchDiff(ctx context.Context, client *apiClient, opts globalOptions, 
 
 	for _, domain := range domains {
 		idA, idB := runsA[domain], runsB[domain]
-		// A run that could not be fetched, or that carries no entries,
-		// supports no comparison. Counting it as identical would let a
-		// broken arm pass a zero-delta gate, so it is reported apart.
+		// An unfetchable or entry-less run supports no comparison, and
+		// counting it identical would let a broken arm pass the gate.
 		resultA, errA := fetchRunResult(ctx, client, opts, idA)
 		resultB, errB := fetchRunResult(ctx, client, opts, idB)
 		if errA != nil || errB != nil || !comparableResult(resultA) || !comparableResult(resultB) {
@@ -303,16 +298,14 @@ func fetchBatchDiff(ctx context.Context, client *apiClient, opts globalOptions, 
 	return diff, nil
 }
 
-// comparableResult reports whether a fetched run can carry a tag set. An
-// empty entry list means the run failed or was purged, not that it found
-// nothing.
+// comparableResult reports whether a run can carry a tag set; no entries
+// means it failed or was purged, not that it found nothing.
 func comparableResult(result jobResult) bool {
 	return result.Raw != nil && len(result.Raw.Entries) > 0
 }
 
 // listBatchRuns maps domain to run ID for one batch. The runs endpoint caps
-// limit at 500, so larger batches must be paged or their tail silently
-// disappears from the comparison.
+// limit at 500, so larger batches must be paged.
 func listBatchRuns(ctx context.Context, client *apiClient, batchID string, limit int) (map[string]string, error) {
 	const pageSize = 500
 	if limit <= 0 {
@@ -332,8 +325,7 @@ func listBatchRuns(ctx context.Context, client *apiClient, batchID string, limit
 		}
 		total = page.Total
 		for _, item := range page.Items {
-			// Newest first, so the first run seen for a domain wins if the
-			// batch somehow contains a domain twice.
+			// Newest first, so the first run for a domain wins.
 			if _, ok := out[item.Domain]; !ok {
 				out[item.Domain] = item.ID
 			}
@@ -345,8 +337,7 @@ func listBatchRuns(ctx context.Context, client *apiClient, batchID string, limit
 	if len(out) == 0 {
 		return nil, fmt.Errorf("no runs found")
 	}
-	// Truncating would silently shrink the comparison, which reads as
-	// agreement rather than as missing data.
+	// Truncating would shrink the comparison and read as agreement.
 	if total > limit {
 		return nil, fmt.Errorf("batch holds %d runs, above the --limit of %d; raise --limit", total, limit)
 	}
@@ -430,9 +421,8 @@ func fetchRunForDiff(ctx context.Context, client *apiClient, opts globalOptions,
 	return result, record.Domain, nil
 }
 
-// fetchRunResult skips the metadata request. The batch path already knows
-// each run's domain from the listing, so fetching it again doubles the
-// request count over a large corpus.
+// fetchRunResult skips the metadata request; the batch path already has the
+// domain from the listing.
 func fetchRunResult(ctx context.Context, client *apiClient, opts globalOptions, runID string) (jobResult, error) {
 	path := "/runs/" + url.PathEscape(runID) + "/result"
 	if v := strings.TrimSpace(opts.locale); v != "" {

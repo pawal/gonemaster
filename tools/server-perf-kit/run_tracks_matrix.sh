@@ -12,10 +12,8 @@ Required:
   --variants FILE              Variant file: "name ref [profile]" per line
   --domains FILE               Domain list (one domain per line)
 
-The optional third column is a per-variant profile path, for knob-only
-sweeps where every variant builds from the same ref. Use "-" to leave a
-variant on the global --profile. Variants sharing a ref share one worktree
-and one binary, so a knob sweep builds once.
+The optional profile column overrides --profile for that variant; use "-" to
+keep the global one. Variants sharing a ref share one worktree and binary.
 
 Options:
   --out-dir DIR                Output directory (default: perf-runs/server/tracks-<utc>)
@@ -25,10 +23,7 @@ Options:
   --max-concurrent-jobs N      Engine limiter (default: 8)
   --port N                     Listen port (default: 18080)
   --profile FILE               Profile path passed to server (optional)
-  --inter-run-sleep N          Seconds to idle between runs (default: 0). Use
-                               against rate-limited farms: their limiters have
-                               memory, and without a cool-down each variant is
-                               punished for its predecessor's traffic.
+  --inter-run-sleep N          Cool-down between runs in seconds (default: 0)
   --min-level LEVEL            Server min-level (default: INFO)
   --batch-poll-seconds N       Batch polling interval (default: 2)
   --sample-seconds N           Sampling interval (default: 1)

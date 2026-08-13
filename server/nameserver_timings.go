@@ -63,8 +63,7 @@ func uniqueNameserverTimingTargets(items []nameserverTimingTarget) []nameserverT
 	return out
 }
 
-// nsFailureCounts are the per-address failure counters that ride along with
-// the timing rows.
+// nsFailureCounts are the per-address failure counters on a timing row.
 type nsFailureCounts struct {
 	timeouts int
 	refused  int
@@ -96,8 +95,7 @@ func summarizeNameserverTimings(queryTimings map[string][]time.Duration, queryTi
 		samplesByName[name] = append(samplesByName[name], entry)
 	}
 
-	// Indexed separately: an address that only ever timed out has no
-	// samples entry, and its count must still reach a row.
+	// Indexed apart: a timeout-only address has no samples entry.
 	countsByKey := map[string]nsFailureCounts{}
 	timeoutAddrsByName := map[string][]string{}
 	for key, count := range queryTimeouts {
@@ -112,8 +110,7 @@ func summarizeNameserverTimings(queryTimings map[string][]time.Duration, queryTi
 		countsByKey[name+"/"+address] = entry
 		timeoutAddrsByName[name] = append(timeoutAddrsByName[name], address)
 	}
-	// REFUSED never creates a row of its own: it is a response, so the
-	// address always has samples and a target row already.
+	// REFUSED needs no row of its own; a refusing address has samples.
 	for key, count := range queryRefused {
 		name, address, ok := strings.Cut(key, "/")
 		if !ok {
@@ -143,9 +140,8 @@ func summarizeNameserverTimings(queryTimings map[string][]time.Duration, queryTi
 		}
 		if target.address == "" {
 			// Name-only target: use whatever addresses the engine probed
-			// for the name, including ones that only ever timed out. Zero
-			// matches → the NS hostname never resolved, emit a single
-			// "unresolved" marker row.
+			// for the name, including timeout-only ones. Zero matches →
+			// the NS hostname never resolved, emit an "unresolved" row.
 			matches := samplesByName[target.name]
 			timedOut := timeoutAddrsByName[target.name]
 			if len(matches) == 0 && len(timedOut) == 0 {

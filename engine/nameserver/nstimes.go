@@ -37,8 +37,7 @@ const (
 // median query time ascending. Keys present only in timeouts (queries that
 // timed out with no response) surface as unreachable rows so a dead server
 // stays visible without its waited budget masquerading as a response time.
-// REFUSED counts ride along; they never create a row of their own since a
-// REFUSED answer is a response and already carries a timing sample.
+// REFUSED counts ride along and never create a row of their own.
 func TimingsFromQueryMap(queryTimings map[string][]time.Duration, timeouts map[string]int, refused map[string]int) []NameserverTiming {
 	type entry struct {
 		nameserver string

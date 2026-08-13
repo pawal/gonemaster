@@ -3,40 +3,32 @@ set -euo pipefail
 
 usage() {
   cat <<'EOF'
-Build a nameserver-concentrated domain corpus from a zone file.
-
-Where make_domains_from_majestic.sh produces an NS-diverse corpus, this one
-produces the opposite: every domain in the output delegates to the same small
-nameserver set. That concentration is what makes a farm's rate limiter
-observable, since a diverse corpus spreads our query volume too thin to trip
-anything.
+Create a nameserver-concentrated domain corpus from a zone file.
 
 Usage:
   make_domains_by_nameserver.sh --zone FILE --ns-pattern REGEX --out FILE [options]
 
-Required:
-  --zone FILE          Zone file in presentation format (dig AXFR output works)
-  --ns-pattern REGEX   POSIX ERE matched against each NS target, without the
-                       trailing dot, e.g. '^ns0[12]\.one\.com$'
-  --out FILE           Output domain list
-
 Options:
+  --zone FILE          Zone file in presentation format (required)
+  --ns-pattern REGEX   POSIX ERE matched against each NS target (required)
+  --out FILE           Output domain list (required)
   --count N            Output size (default: 500; 0 keeps every match)
   --seed S             Deterministic seed string (default: 20260812)
-  --min-ns N           Require at least N matching NS records per domain
-                       (default: 1)
-  --manifest FILE      Write a JSON manifest beside the list (default:
-                       <out>.manifest.json)
+  --min-ns N           Minimum matching NS records per domain (default: 1)
+  --manifest FILE      Manifest path (default: <out>.manifest.json)
   --help               Show this help
 
-Guardrails, all deliberate:
-  - Only names directly under the zone apex are eligible, so a delegation
-    below a delegation cannot inflate the corpus.
-  - The domain lists themselves are not committed: they are regenerable from
-    zone data, and a published list of one operator's customers is a target
-    list nobody needs. Commit this script and the manifest instead.
-  - Zone data from zonedata.iis.se is CC BY 4.0; keep the attribution in the
-    manifest with the results.
+Behavior:
+  - Selects every domain delegating to a matching nameserver set, so the
+    corpus concentrates load the way an NS-diverse one cannot.
+  - Only direct children of the zone apex are eligible; the apex comes from
+    the zone's own SOA.
+  - The NS pattern matches the target without its trailing dot, for example
+    '^ns0[12]\.one\.com$'.
+  - Writes a JSON manifest recording zone serial, sha256, pattern, seed and
+    output sha256, so a corpus can be rebuilt exactly.
+  - Domain lists are not committed; see corpus/README.md for the policy and
+    the CC BY 4.0 attribution for zonedata.iis.se.
 EOF
 }
 
@@ -47,8 +39,7 @@ need_cmd() {
   fi
 }
 
-# Deterministic sample, seeded so a corpus can be rebuilt exactly. Same
-# approach as make_domains_from_majestic.sh, minus the rank tiers.
+# Deterministic sample, same approach as make_domains_from_majestic.sh.
 sample_deterministic() {
   local infile="$1"
   local n="$2"
@@ -125,10 +116,8 @@ fi
 tmp_root="$(mktemp -d)"
 trap 'rm -rf "$tmp_root"' EXIT
 
-# Derive the apex from the zone's own SOA so "one label below the apex" can
-# be enforced without the caller having to state the zone name. The type
-# field is located by name rather than by position, since presentation
-# format lets the TTL or the class be omitted.
+# Apex from the zone's own SOA. Type located by name, not position, since
+# presentation format lets the TTL or class be omitted.
 apex="$(awk '
   {
     for (i = 2; i <= NF; i++) if ($i == "SOA") { print tolower($1); exit }
@@ -141,17 +130,14 @@ fi
 apex="${apex%.}"
 
 matches="$tmp_root/matches.txt"
-# The NS field is located by name, not by position: presentation format
-# allows the TTL or class to be omitted, and an omitted owner repeats the
-# previous record's. A strictly positional parser drops those records
-# silently, which shrinks the corpus without any warning.
+# NS located by name, not position: a positional parser drops abbreviated
+# records silently and shrinks the corpus without warning.
 awk -v pattern="$ns_pattern" -v apex="$apex" '
   {
     ns_at = 0
     for (i = 1; i < NF; i++) if ($i == "NS") { ns_at = i; break }
     if (ns_at == 0) next
-    # A line starting with whitespace repeats the previous owner. awk has
-    # already stripped that whitespace from $1, so test the raw line.
+    # Leading whitespace repeats the previous owner; awk strips it from $1.
     if ($0 ~ /^[ \t]/) {
       owner = last_owner
     } else {
@@ -162,8 +148,7 @@ awk -v pattern="$ns_pattern" -v apex="$apex" '
     target = tolower($(ns_at + 1))
     sub(/\.$/, "", target)
     if (owner == "" || owner == apex) next
-    # Only direct children of the apex: a deeper delegation belongs to a
-    # subzone, not to a registrable domain in this zone.
+    # Direct children only; deeper names belong to a subzone.
     rest = owner
     suffix = "." apex
     if (index(rest, suffix) != length(rest) - length(suffix) + 1) next

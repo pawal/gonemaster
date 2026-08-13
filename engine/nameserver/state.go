@@ -499,8 +499,7 @@ func (c *CacheStore) QueryTimeouts() map[string]int {
 	return out
 }
 
-// RecordQueryRefused counts a REFUSED response. Run-local like the timeout
-// counts: it measures what this run's own traffic provoked.
+// RecordQueryRefused counts a REFUSED response, run-local like the timeouts.
 func (c *CacheStore) RecordQueryRefused(key string) {
 	if c == nil {
 		return

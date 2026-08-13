@@ -61,8 +61,7 @@ type addrStats struct {
 }
 
 // add folds one run's row into the totals. engage replays a backoff trigger:
-// a run counts as engaged when the address answered and still burned that
-// many timeout budgets. Per run, never summed.
+// engaged means the address answered and still burned that many budgets.
 func (s *addrStats) add(t nameserverTiming, engage int) {
 	s.runs++
 	s.queries += t.Count
@@ -88,10 +87,10 @@ func (s *addrStats) add(t nameserverTiming, engage int) {
 
 func main() {
 	baseURL := flag.String("base-url", "http://127.0.0.1:18080", "Server base URL")
-	limit := flag.Int("limit", 500, "Runs fetched per page (server caps this at 500)")
+	limit := flag.Int("limit", 500, "Runs fetched per page (server caps at 500)")
 	timeout := flag.Duration("timeout", 60*time.Second, "HTTP timeout per request")
-	minQueries := flag.Int("min-queries", 0, "Only print addresses we sent at least this many queries to (answers plus timeouts)")
-	engage := flag.Int("engage-threshold", 0, "Replay the detector: count runs where an address answered and still burned this many timeout budgets (0 = off)")
+	minQueries := flag.Int("min-queries", 0, "Minimum attempts (answers plus timeouts) to print a row")
+	engage := flag.Int("engage-threshold", 0, "Timeout budgets per run that count as engaged (0 = off)")
 	flag.Parse()
 
 	pairs := flag.Args()
@@ -126,8 +125,7 @@ func main() {
 		for k := range stats {
 			keys = append(keys, k)
 		}
-		// Worst first: the addresses carrying the most failed queries are
-		// the only ones the characterization cares about.
+		// Worst first: most failed queries at the top.
 		sort.Slice(keys, func(i, j int) bool {
 			a, b := stats[keys[i]], stats[keys[j]]
 			fa, fb := a.timeouts+a.refused, b.timeouts+b.refused
@@ -138,8 +136,8 @@ func main() {
 		})
 		for _, k := range keys {
 			s := stats[k]
-			// Filter on attempts, not answers: an address that timed out in
-			// every run has zero answers and is exactly the row to keep.
+			// Filter on attempts, not answers: a fully timed-out address
+			// has no answers and is exactly the row to keep.
 			attempts := s.queries + s.timeouts
 			if attempts < *minQueries {
 				continue
@@ -200,8 +198,7 @@ func aggregateBatch(client *http.Client, api, batchID string, limit, engage int)
 	return stats, nil
 }
 
-// listBatchRuns pages through a batch. The server caps limit at 500, so a
-// larger batch must be walked with offset or its tail is silently dropped.
+// listBatchRuns pages through a batch; the server caps limit at 500.
 func listBatchRuns(client *http.Client, api, batchID string, pageSize int) ([]runListItem, error) {
 	if pageSize <= 0 || pageSize > 500 {
 		pageSize = 500

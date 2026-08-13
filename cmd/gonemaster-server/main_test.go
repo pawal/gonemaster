@@ -179,6 +179,57 @@ func TestRunDBRetentionDaysValidation(t *testing.T) {
 	}
 }
 
+// TestRunProfileOverrideValidation covers the flags the engine re-validates
+// per run. Before this check the server accepted --retry 0 at startup, came up
+// healthy, and then failed every job when the profile rejected the value, so
+// the misconfiguration surfaced as broken results rather than as a refusal to
+// start. Zero is the interesting case: it is not negative, so the old
+// non-negative check let it through.
+func TestRunProfileOverrideValidation(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"retry zero", []string{"--retry", "0"}, "--retry"},
+		{"retry above max", []string{"--retry", "256"}, "--retry"},
+		{"retry negative", []string{"--retry", "-1"}, "--retry"},
+		{"retrans zero", []string{"--retrans", "0"}, "--retrans"},
+		{"retrans above max", []string{"--retrans", "256"}, "--retrans"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := newTempFile(t)
+			errOut := newTempFile(t)
+			defer cleanupTempFile(t, out)
+			defer cleanupTempFile(t, errOut)
+
+			if code := run(tc.args, out, errOut); code != 2 {
+				t.Fatalf("expected exit code 2 for %v, got %d", tc.args, code)
+			}
+			errText := readTempFile(t, errOut)
+			if !strings.Contains(errText, tc.want) {
+				t.Fatalf("expected %q named in the error, got %q", tc.want, errText)
+			}
+		})
+	}
+}
+
+// TestRunProfileOverrideAcceptsInRangeValues pins the other side: values the
+// profile accepts must still start the server, so the new check cannot become
+// a refusal to run with a valid retry count.
+func TestRunProfileOverrideAcceptsInRangeValues(t *testing.T) {
+	out := newTempFile(t)
+	errOut := newTempFile(t)
+	defer cleanupTempFile(t, out)
+	defer cleanupTempFile(t, errOut)
+
+	code := run([]string{"--retry", "3", "--retrans", "2", "--dump-config"}, out, errOut)
+	if code != 0 {
+		t.Fatalf("expected exit code 0 for in-range values, got %d (stderr %q)", code, readTempFile(t, errOut))
+	}
+}
+
 func TestRunDBRetentionDaysDumpConfig(t *testing.T) {
 	out := newTempFile(t)
 	errOut := newTempFile(t)

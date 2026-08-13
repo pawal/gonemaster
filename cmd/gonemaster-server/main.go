@@ -17,10 +17,23 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/server"
 	"codeberg.org/pawal/gonemaster/server/analysis"
 )
+
+// checkProfileOverride validates a flag against the profile property it overrides.
+func checkProfileOverride(property, flag string, value int) error {
+	p, err := profile.Default()
+	if err != nil {
+		return fmt.Errorf("%s: %v", flag, err)
+	}
+	if err := p.Set(property, value); err != nil {
+		return fmt.Errorf("%s: %v", flag, err)
+	}
+	return nil
+}
 
 type usageLine struct {
 	flag   string
@@ -213,13 +226,17 @@ func run(args []string, out *os.File, errOut *os.File) int {
 		fmt.Fprintln(errOut, "--timeout must be >= 0")
 		return 2
 	}
-	if flagsSet["retry"] && retryCount < 0 {
-		fmt.Fprintln(errOut, "--retry must be >= 0")
-		return 2
+	if flagsSet["retry"] {
+		if err := checkProfileOverride("resolver.defaults.retry", "--retry", retryCount); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
 	}
-	if flagsSet["retrans"] && retransSeconds < 0 {
-		fmt.Fprintln(errOut, "--retrans must be >= 0")
-		return 2
+	if flagsSet["retrans"] {
+		if err := checkProfileOverride("resolver.defaults.retrans", "--retrans", retransSeconds); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
 	}
 	if flagsSet["db-retention-days"] && dbRetentionDays < 0 {
 		fmt.Fprintln(errOut, "--db-retention-days must be >= 0")

@@ -1,0 +1,206 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  cat <<'EOF'
+Create a nameserver-concentrated domain corpus from a zone file.
+
+Usage:
+  make_domains_by_nameserver.sh --zone FILE --ns-pattern REGEX --out FILE [options]
+
+Options:
+  --zone FILE          Zone file in presentation format (required)
+  --ns-pattern REGEX   POSIX ERE matched against each NS target (required)
+  --out FILE           Output domain list (required)
+  --count N            Output size (default: 500; 0 keeps every match)
+  --seed S             Deterministic seed string (default: 20260812)
+  --min-ns N           Minimum matching NS records per domain (default: 1)
+  --manifest FILE      Manifest path (default: <out>.manifest.json)
+  --help               Show this help
+
+Behavior:
+  - Selects every domain delegating to a matching nameserver set, so the
+    corpus concentrates load the way an NS-diverse one cannot.
+  - Only direct children of the zone apex are eligible; the apex comes from
+    the zone's own SOA.
+  - The NS pattern matches the target without its trailing dot, for example
+    '^ns0[12]\.one\.com$'.
+  - Writes a JSON manifest recording zone serial, sha256, pattern, seed and
+    output sha256, so a corpus can be rebuilt exactly.
+  - Domain lists are not committed; see corpus/README.md for the policy and
+    the CC BY 4.0 attribution for zonedata.iis.se.
+EOF
+}
+
+need_cmd() {
+  if ! command -v "$1" >/dev/null 2>&1; then
+    echo "missing required command: $1" >&2
+    exit 1
+  fi
+}
+
+# Deterministic sample, same approach as make_domains_from_majestic.sh.
+sample_deterministic() {
+  local infile="$1"
+  local n="$2"
+  local seed="$3"
+  local outfile="$4"
+  local total seed_num
+
+  total="$(wc -l <"$infile" | awk '{print $1}')"
+  if [ "$n" -le 0 ] || [ "$total" -le "$n" ]; then
+    cp "$infile" "$outfile"
+    return
+  fi
+
+  if command -v shuf >/dev/null 2>&1; then
+    local rs
+    rs="$(mktemp)"
+    yes "$seed" | tr -d '\n' | head -c 1048576 >"$rs" || true
+    shuf --random-source="$rs" -n "$n" "$infile" | sort >"$outfile"
+    rm -f "$rs"
+    return
+  fi
+
+  seed_num="$(printf '%s' "$seed" | cksum | awk '{print $1}')"
+  awk -v seed="$seed_num" '
+    BEGIN { srand(seed) }
+    { printf "%.12f\t%s\n", rand(), $0 }
+  ' "$infile" | sort -k1,1n | cut -f2- | awk -v n="$n" 'NR<=n { print }' | sort >"$outfile"
+}
+
+zone_file=""
+ns_pattern=""
+out=""
+count=500
+seed="20260812"
+min_ns=1
+manifest=""
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --zone) zone_file="$2"; shift 2 ;;
+    --ns-pattern) ns_pattern="$2"; shift 2 ;;
+    --out) out="$2"; shift 2 ;;
+    --count) count="$2"; shift 2 ;;
+    --seed) seed="$2"; shift 2 ;;
+    --min-ns) min_ns="$2"; shift 2 ;;
+    --manifest) manifest="$2"; shift 2 ;;
+    --help) usage; exit 0 ;;
+    *)
+      echo "unknown option: $1" >&2
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+if [ -z "$zone_file" ] || [ -z "$ns_pattern" ] || [ -z "$out" ]; then
+  usage
+  exit 1
+fi
+if [ ! -f "$zone_file" ]; then
+  echo "zone file not found: $zone_file" >&2
+  exit 1
+fi
+
+need_cmd awk
+need_cmd sha256sum
+need_cmd sort
+need_cmd jq
+
+if [ -z "$manifest" ]; then
+  manifest="$out.manifest.json"
+fi
+
+tmp_root="$(mktemp -d)"
+trap 'rm -rf "$tmp_root"' EXIT
+
+# Apex from the zone's own SOA. Type located by name, not position, since
+# presentation format lets the TTL or class be omitted.
+apex="$(awk '
+  {
+    for (i = 2; i <= NF; i++) if ($i == "SOA") { print tolower($1); exit }
+  }
+' "$zone_file")"
+if [ -z "$apex" ]; then
+  echo "no SOA record found in $zone_file; is it a zone file?" >&2
+  exit 1
+fi
+apex="${apex%.}"
+
+matches="$tmp_root/matches.txt"
+# NS located by name, not position: a positional parser drops abbreviated
+# records silently and shrinks the corpus without warning.
+awk -v pattern="$ns_pattern" -v apex="$apex" '
+  {
+    ns_at = 0
+    for (i = 1; i < NF; i++) if ($i == "NS") { ns_at = i; break }
+    if (ns_at == 0) next
+    # Leading whitespace repeats the previous owner; awk strips it from $1.
+    if ($0 ~ /^[ \t]/) {
+      owner = last_owner
+    } else {
+      owner = tolower($1)
+      last_owner = owner
+    }
+    sub(/\.$/, "", owner)
+    target = tolower($(ns_at + 1))
+    sub(/\.$/, "", target)
+    if (owner == "" || owner == apex) next
+    # Direct children only; deeper names belong to a subzone.
+    rest = owner
+    suffix = "." apex
+    if (index(rest, suffix) != length(rest) - length(suffix) + 1) next
+    label = substr(rest, 1, length(rest) - length(suffix))
+    if (index(label, ".") > 0) next
+    if (target ~ pattern) print owner
+  }
+' "$zone_file" | sort | uniq -c | awk -v m="$min_ns" '$1 >= m { print $2 }' >"$matches"
+
+match_count="$(wc -l <"$matches" | awk '{print $1}')"
+if [ "$match_count" -le 0 ]; then
+  echo "no domains in $zone_file delegate to a nameserver matching $ns_pattern" >&2
+  exit 1
+fi
+
+sample_deterministic "$matches" "$count" "$seed" "$out"
+
+out_count="$(wc -l <"$out" | awk '{print $1}')"
+out_sha="$(sha256sum "$out" | awk '{print $1}')"
+zone_sha="$(sha256sum "$zone_file" | awk '{print $1}')"
+zone_serial="$(awk '{ for (i = 2; i <= NF; i++) if ($i == "SOA") { print $(i + 3); exit } }' "$zone_file")"
+
+jq -n \
+  --arg generated_at_utc "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+  --arg apex "$apex" \
+  --arg ns_pattern "$ns_pattern" \
+  --arg zone_file "$zone_file" \
+  --arg zone_sha256 "$zone_sha" \
+  --arg zone_serial "${zone_serial:-unknown}" \
+  --arg seed "$seed" \
+  --arg out "$out" \
+  --arg out_sha256 "$out_sha" \
+  --argjson out_count "$out_count" \
+  --argjson candidates "$match_count" \
+  --argjson min_ns "$min_ns" \
+  '{
+    generated_at_utc: $generated_at_utc,
+    zone_apex: $apex,
+    ns_pattern: $ns_pattern,
+    min_ns_matches: $min_ns,
+    zone_file: $zone_file,
+    zone_sha256: $zone_sha256,
+    zone_serial: $zone_serial,
+    seed: $seed,
+    candidates_matched: $candidates,
+    output_file: $out,
+    output_count: $out_count,
+    output_sha256: $out_sha256,
+    attribution: "Zone data from zonedata.iis.se, licensed CC BY 4.0.",
+    policy: "Domain lists are not committed; regenerate from zone data using this manifest."
+  }' >"$manifest"
+
+echo "matched $match_count domains, wrote $out_count to $out"
+echo "sha256=$out_sha"
+echo "manifest=$manifest"

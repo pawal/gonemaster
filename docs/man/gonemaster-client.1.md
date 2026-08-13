@@ -216,6 +216,37 @@ Fetch and display results for a run.
 **--view** *VIEW*
 : Result view: **summary**, **modules**, **raw**, **json**.
 
+### batches diff *BATCH-A* *BATCH-B*
+
+Compare two batches of the same corpus domain by domain, pairing runs by
+domain name and diffing each pair at the tag level. Reports how many domains
+are identical and how many differ, a rollup of which tags appeared, cleared,
+or changed severity and on how many domains, the domains present in only one
+of the two batches, and the domains whose run carried no entries. Exits
+**0** only when every domain was comparable and identical, **1** otherwise.
+A batch holding more runs than **--limit** is an error rather than a
+truncated comparison.
+
+**--per-domain**
+: Include the per-domain delta list, not only the rollup.
+
+**--quiet**
+: Print nothing; report the verdict through the exit status only.
+
+**--limit** *N*
+: Maximum runs fetched per batch (default: 5000).
+
+### runs diff *RUN-A* *RUN-B*
+
+Compare two runs at the tag level and report which findings appeared,
+cleared, or changed severity. Each tag is collapsed to its worst level
+within a run, so a tag emitted once per nameserver is compared by its
+severest occurrence. Exits **0** when the two runs are identical, **1** when
+they differ, and **2** on error, so it can be used as a gate in a script.
+
+**--quiet**
+: Print nothing; report the verdict through the exit status only.
+
 ### entries query
 
 Query individual engine log entries across runs.

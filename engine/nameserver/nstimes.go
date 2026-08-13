@@ -19,6 +19,10 @@ type NameserverTiming struct {
 	Count      int     `json:"count"`
 	// Empty on rows written before this field existed; treat as "ok".
 	Status string `json:"status,omitempty"`
+	// Exchanges that spent every attempt without an answer.
+	TimeoutCount int `json:"timeout_count,omitempty"`
+	// Responses carrying rcode REFUSED.
+	RefusedCount int `json:"refused_count,omitempty"`
 }
 
 // Status values for NameserverTiming.
@@ -33,7 +37,8 @@ const (
 // median query time ascending. Keys present only in timeouts (queries that
 // timed out with no response) surface as unreachable rows so a dead server
 // stays visible without its waited budget masquerading as a response time.
-func TimingsFromQueryMap(queryTimings map[string][]time.Duration, timeouts map[string]int) []NameserverTiming {
+// REFUSED counts ride along and never create a row of their own.
+func TimingsFromQueryMap(queryTimings map[string][]time.Duration, timeouts map[string]int, refused map[string]int) []NameserverTiming {
 	type entry struct {
 		nameserver string
 		address    string
@@ -51,29 +56,34 @@ func TimingsFromQueryMap(queryTimings map[string][]time.Duration, timeouts map[s
 
 	out := make([]NameserverTiming, 0, len(entries))
 	for _, e := range entries {
+		key := e.nameserver + "/" + e.address
 		stats := ComputeTimingStats(e.samples)
 		if stats.Count == 0 {
 			out = append(out, NameserverTiming{
-				Nameserver: e.nameserver,
-				Address:    e.address,
-				Status:     NameserverTimingStatusUnreachable,
+				Nameserver:   e.nameserver,
+				Address:      e.address,
+				Status:       NameserverTimingStatusUnreachable,
+				TimeoutCount: timeouts[key],
+				RefusedCount: refused[key],
 			})
 			continue
 		}
 		out = append(out, NameserverTiming{
-			Nameserver: e.nameserver,
-			Address:    e.address,
-			AvgMS:      stats.Avg,
-			MinMS:      stats.Min,
-			MaxMS:      stats.Max,
-			MedianMS:   stats.Median,
-			StddevMS:   stats.Stddev,
-			Count:      stats.Count,
-			Status:     NameserverTimingStatusOK,
+			Nameserver:   e.nameserver,
+			Address:      e.address,
+			AvgMS:        stats.Avg,
+			MinMS:        stats.Min,
+			MaxMS:        stats.Max,
+			MedianMS:     stats.Median,
+			StddevMS:     stats.Stddev,
+			Count:        stats.Count,
+			Status:       NameserverTimingStatusOK,
+			TimeoutCount: timeouts[key],
+			RefusedCount: refused[key],
 		})
 	}
 
-	for key := range timeouts {
+	for key, count := range timeouts {
 		if _, ok := queryTimings[key]; ok {
 			continue
 		}
@@ -82,9 +92,11 @@ func TimingsFromQueryMap(queryTimings map[string][]time.Duration, timeouts map[s
 			continue
 		}
 		out = append(out, NameserverTiming{
-			Nameserver: name,
-			Address:    address,
-			Status:     NameserverTimingStatusUnreachable,
+			Nameserver:   name,
+			Address:      address,
+			Status:       NameserverTimingStatusUnreachable,
+			TimeoutCount: count,
+			RefusedCount: refused[key],
 		})
 	}
 

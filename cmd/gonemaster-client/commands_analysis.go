@@ -593,7 +593,7 @@ func runTagsAddDomains(ctx context.Context, client *apiClient, opts globalOption
 
 func runRuns(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "runs subcommand is required: list|get|results")
+		fmt.Fprintln(errOut, "runs subcommand is required: list|get|results|diff")
 		return 2
 	}
 	cmd := args[0]
@@ -605,6 +605,8 @@ func runRuns(ctx context.Context, client *apiClient, opts globalOptions, args []
 		return runRunsGet(ctx, client, opts, args, out, errOut)
 	case "results":
 		return runRunsResults(ctx, client, opts, args, out, errOut)
+	case "diff":
+		return runRunsDiff(ctx, client, opts, args, out, errOut)
 	default:
 		fmt.Fprintf(errOut, "Unknown runs command %q\n", cmd)
 		return 2

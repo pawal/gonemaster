@@ -59,10 +59,12 @@ Results are printed with severity levels and can be output in several formats.
 : Print a summary count by level and message tag.
 
 **--nstimes**
-: Print per-nameserver query timing statistics (max, min, avg, stddev, median, total, count),
-  sorted by nameserver name, address, then median query time. When combined with **--json**,
-  the output is wrapped as a JSON object with keys **entries** and **nameserver_timings**
-  instead of a bare array.
+: Print per-nameserver query timing statistics (max, min, avg, stddev, median, total, count,
+  timeout, refused), sorted by nameserver name, address, then median query time. The timeout
+  column counts exchanges that spent every attempt without an answer; the refused column
+  counts responses carrying rcode REFUSED. When combined with **--json**, the output is
+  wrapped as a JSON object with keys **entries** and **nameserver_timings** instead of a
+  bare array.
 
 **--no-progress**
 : Disable the progress indicator.

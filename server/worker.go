@@ -411,7 +411,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, er
 	art := jobArtifacts{
 		entries:          entries,
 		stats:            collectStats(),
-		nsTimings:        s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), entries),
+		nsTimings:        s.collectNameserverTimings(job, cacheStore.QueryTimings(), cacheStore.QueryTimeouts(), cacheStore.QueryRefused(), entries),
 		effectiveProfile: effectiveProfileJSON,
 		dnssecChainJSON:  s.marshalDNSSECChain(chainSummary),
 	}

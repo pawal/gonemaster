@@ -966,6 +966,57 @@ func TestExchangeEmitsAttemptEventPerTimeout(t *testing.T) {
 	}
 }
 
+// TestExchangeWithRetriesDisabledMakesOneAttempt pins two transport promises
+// that hold for every caller: a client with retries explicitly set to zero
+// makes exactly one attempt, and ApplyProfileDefaults does not restore the
+// profile's retry count over that explicit zero. The per-attempt window is
+// asserted separately, because withdrawing retransmits must not also shorten
+// how long a server has to answer.
+func TestExchangeWithRetriesDisabledMakesOneAttempt(t *testing.T) {
+	// Black-hole server: reads the query, never writes a reply.
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {})
+	defer shutdown()
+
+	prof, err := profile.Default()
+	if err != nil {
+		t.Fatalf("profile default: %v", err)
+	}
+	if prof.Resolver.Defaults.Retry == 0 {
+		t.Fatal("shipped profile must carry a non-zero retry for this test to mean anything")
+	}
+
+	rec := &recordingTrace{}
+	ctx := querytrace.WithContext(context.Background(), rec)
+
+	client := &Client{}
+	client.SetUseTCP(false)
+	client.SetFallback(false)
+	client.SetTimeout(100 * time.Millisecond)
+	client.SetRetrans(50 * time.Millisecond)
+	client.SetRetries(0)
+	client.ApplyProfileDefaults(prof)
+
+	if client.Retries != 0 {
+		t.Fatalf("ApplyProfileDefaults restored Retries to %d, so an explicit zero is a no-op", client.Retries)
+	}
+
+	_, err = client.Exchange(ctx, addr, BuildQuery("degraded.example.", dns.TypeSOA))
+	if err == nil {
+		t.Fatal("expected a timeout error from a non-responding server, got nil")
+	}
+
+	events := rec.attempts()
+	if len(events) != 1 {
+		t.Fatalf("expected exactly 1 attempt event with retries disabled, got %d: %+v", len(events), events)
+	}
+	if events[0].Outcome != querytrace.OutcomeTimeout {
+		t.Errorf("expected OutcomeTimeout, got %q (err %q)", events[0].Outcome, events[0].Err)
+	}
+	if events[0].Elapsed < 40*time.Millisecond {
+		t.Errorf("expected the attempt to wait out its ~50ms window, got %v", events[0].Elapsed)
+	}
+}
+
 // TestExchangeEmitsAttemptEventOnSuccess confirms a single successful query
 // emits exactly one OutcomeOK event (no spurious retries are traced) and that
 // the query name/type are reported correctly.

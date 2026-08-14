@@ -1006,10 +1006,10 @@ func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
 				return []nameserver.Nameserver{ns41, ns42}, nil
 			}
 
-			// Glueless delegation: the parent returns NS records but no glue.
+			// Glueless delegation: the parent refers but carries no glue.
 			queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 				if strings.EqualFold(qtype, "NS") {
-					return []packet.Packet{nsPacket(name, []string{sc.ns41, sc.ns42})}, nil
+					return []packet.Packet{referralPacket(name, []string{sc.ns41, sc.ns42})}, nil
 				}
 				return []packet.Packet{}, nil
 			}
@@ -1068,7 +1068,7 @@ func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
 	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 		switch strings.ToUpper(qtype) {
 		case "NS":
-			return []packet.Packet{nsPacket(name, []string{"ns1.other"})}, nil
+			return []packet.Packet{referralPacket(name, []string{"ns1.other"})}, nil
 		case "A":
 			if strings.EqualFold(name, "ns1.other") {
 				return []packet.Packet{addrPacket(name, "A", "127.0.0.1")}, nil
@@ -1255,30 +1255,33 @@ func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
 		t.Fatalf("expected 2 DELEGATION_NS_SET entries, got %d", len(sets))
 	}
 
-	// First set (first-seen order): 4 glue-backed elements plus the bare
-	// glueless name, served by parent one.
+	// First set (first-seen order): the three delegated names, served by
+	// parent one. Elements are names only, so the glue-backed and the
+	// glueless name are rendered alike.
 	first, ok := sets[0].Args["ns_set_servers"].([]map[string]any)
-	if !ok || len(first) != 5 {
-		t.Fatalf("expected 5 typed ns_set_servers elements, got %#v", sets[0].Args["ns_set_servers"])
+	if !ok || len(first) != 3 {
+		t.Fatalf("expected 3 typed ns_set_servers elements, got %#v", sets[0].Args["ns_set_servers"])
 	}
-	if first[0]["ns"] != "ns1.example" || first[0]["address"] != "192.0.2.1" {
+	if first[0]["ns"] != "ns1.example" {
 		t.Fatalf("unexpected first element: %#v", first[0])
 	}
-	if first[4]["ns"] != "ns3.other.test" {
-		t.Fatalf("expected bare glueless element last, got %#v", first[4])
+	if first[2]["ns"] != "ns3.other.test" {
+		t.Fatalf("expected ns3.other.test last, got %#v", first[2])
 	}
-	if addr, ok := first[4]["address"].(string); ok && addr != "" {
-		t.Fatalf("glueless element must carry no address, got %#v", first[4])
+	for _, element := range first {
+		if addr, ok := element["address"].(string); ok && addr != "" {
+			t.Fatalf("delegation set element must carry no address, got %#v", element)
+		}
 	}
 	servers, ok := sets[0].Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.101" {
 		t.Fatalf("expected first set served by 192.0.2.101, got %#v", sets[0].Args["servers"])
 	}
 
-	// Second set: only ns1 with its two glue addresses, served by parent two.
+	// Second set: only ns1, served by parent two.
 	second, ok := sets[1].Args["ns_set_servers"].([]map[string]any)
-	if !ok || len(second) != 2 {
-		t.Fatalf("expected 2 typed ns_set_servers elements, got %#v", sets[1].Args["ns_set_servers"])
+	if !ok || len(second) != 1 {
+		t.Fatalf("expected 1 typed ns_set_servers element, got %#v", sets[1].Args["ns_set_servers"])
 	}
 	servers, ok = sets[1].Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.102" {
@@ -1295,8 +1298,10 @@ func TestConsistency05DelegationNSSetGlueDifference(t *testing.T) {
 
 	stubConsistency05Child(t, ctx)
 
-	// Same NS names on both parents, but one glue address differs; that is
-	// still two distinct delegation NS sets.
+	// Same NS names on both parents, one glue address differs. The
+	// delegation is the NS name set, so this is one set and no warning.
+	// Differing addresses for the same name are an address fault, reported
+	// by the glue comparison, not a delegation disagreement.
 	glueTwo := map[string][]string{
 		"ns1.example": {"192.0.2.1", "2001:db8::1"},
 		"ns2.example": {"192.0.2.99", "2001:db8::2"},
@@ -1316,12 +1321,67 @@ func TestConsistency05DelegationNSSetGlueDifference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	multiple := firstEntryByTag(entries, "MULTIPLE_DELEGATION_NS_SET")
-	if multiple == nil {
-		t.Fatalf("expected MULTIPLE_DELEGATION_NS_SET for a glue-only difference")
+	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
+		t.Fatalf("glue-only difference must not report a delegation disagreement")
 	}
-	if count, ok := multiple.Args["count"].(int); !ok || count != 2 {
-		t.Fatalf("expected count=2, got %#v", multiple.Args["count"])
+	if hasEntryTag(entries, "DELEGATION_NS_SET") {
+		t.Fatalf("did not expect DELEGATION_NS_SET for a single delegation set")
+	}
+}
+
+// The reported false positive: every root serves the same ten NS names for
+// se, but each trims the additional section its own way at 512 bytes, so the
+// four observed glue shapes used to read as four delegations. Group sizes are
+// taken from the recorded run: 20, 16, 13 and 15 address records.
+func TestConsistency05DelegationNSSetTrimmedGlueIsOneDelegation(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	full := fullTestGlue()
+	ipv4Only := map[string][]string{
+		"ns1.example": {"192.0.2.1"},
+		"ns2.example": {"192.0.2.2"},
+	}
+	ipv6Only := map[string][]string{
+		"ns1.example": {"2001:db8::1"},
+		"ns2.example": {"2001:db8::2"},
+	}
+	// The harshest trim: one name loses every address, as seven root
+	// addresses do for four of the thirteen gtld-servers.net names.
+	partial := map[string][]string{
+		"ns1.example": {"192.0.2.1", "2001:db8::1"},
+		"ns2.example": nil,
+	}
+
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, full, "192.0.2.101"),
+				glueParentPacket(name, ipv4Only, "192.0.2.102"),
+				glueParentPacket(name, ipv6Only, "192.0.2.103"),
+				glueParentPacket(name, partial, "192.0.2.104"),
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
+		t.Fatalf("trimmed glue must not split the delegation")
+	}
+	// Every parent carries both names, so the union of glue still matches
+	// the child and the address comparison stays clean.
+	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
+		t.Fatalf("expected ADDRESSES_MATCH, glue union covers the child data")
 	}
 }
 
@@ -1399,6 +1459,229 @@ func TestConsistency05DelegationNSSetIgnoresParentWithoutNSRecords(t *testing.T)
 	}
 	if hasEntryTag(entries, "DELEGATION_NS_SET") {
 		t.Fatalf("a parent without NS records must not produce DELEGATION_NS_SET")
+	}
+}
+
+// A parent that also serves the child zone answers authoritatively instead of
+// referring. arpa is the live case: the root servers serve it directly, and
+// each trims the additional section of that answer differently. Such a
+// response is not a referral and must not take part in the comparison.
+func TestConsistency05DelegationNSSetIgnoresAuthoritativeParent(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	// Two parents answer from the answer section with AA set, carrying
+	// differently trimmed glue. Both are ignored, so nothing is compared.
+	authoritative := func(owner string, glue map[string][]string, answerFrom string) packet.Packet {
+		names := make([]string, 0, len(glue))
+		for name := range glue {
+			names = append(names, name)
+		}
+		sort.Strings(names)
+		p := nsPacket(owner, names)
+		for _, name := range names {
+			for _, address := range glue[name] {
+				ip, err := netip.ParseAddr(address)
+				if err != nil {
+					continue
+				}
+				hdr := dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
+				if ip.Is4() {
+					aRR := &dns.A{Hdr: hdr}
+					aRR.Addr = ip.Unmap()
+					p.Msg.Extra = append(p.Msg.Extra, aRR)
+				} else {
+					aaaaRR := &dns.AAAA{Hdr: hdr}
+					aaaaRR.Addr = ip
+					p.Msg.Extra = append(p.Msg.Extra, aaaaRR)
+				}
+			}
+		}
+		p.AnswerFrom = answerFrom
+		return p
+	}
+	trimmed := map[string][]string{
+		"ns1.example": {"192.0.2.1"},
+		"ns2.example": {"192.0.2.2", "2001:db8::2"},
+	}
+
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				authoritative(name, fullTestGlue(), "192.0.2.101"),
+				authoritative(name, trimmed, "192.0.2.102"),
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
+		t.Fatalf("an authoritative parent answer must not produce a delegation set")
+	}
+	if hasEntryTag(entries, "DELEGATION_NS_SET") {
+		t.Fatalf("an authoritative parent answer must not produce DELEGATION_NS_SET")
+	}
+}
+
+// RFC 2181 section 9 lets a truncated response carry the partial RRset that
+// did not fit. With resolver.defaults.fallback disabled the transport hands
+// that response back as is, so the testcase must skip it rather than read a
+// short NS RRset as a different delegation.
+func TestConsistency05DelegationNSSetIgnoresTruncatedResponse(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	truncated := glueParentPacket("example", map[string][]string{
+		"ns1.example": {"192.0.2.1"},
+	}, "192.0.2.102")
+	truncated.Msg.Truncated = true
+
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, fullTestGlue(), "192.0.2.101"),
+				truncated,
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
+		t.Fatalf("a truncated response must not produce a delegation set")
+	}
+	// The truncated response contributes no glue either, so the remaining
+	// parent's complete glue still matches the child.
+	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
+		t.Fatalf("expected ADDRESSES_MATCH")
+	}
+}
+
+// An upward referral answers with the root NS RRset instead of delegating the
+// queried zone. The owner name does not match, so it is not a usable referral.
+func TestConsistency05DelegationNSSetIgnoresUpwardReferral(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	upward := referralPacket(".", []string{"a.root-servers.net", "b.root-servers.net"})
+	upward.AnswerFrom = "192.0.2.102"
+
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, fullTestGlue(), "192.0.2.101"),
+				upward,
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
+		t.Fatalf("an upward referral must not produce a delegation set")
+	}
+}
+
+// The delegation is the authority-section NS RRset. NS records that appear
+// elsewhere in a referral are not part of it, so a parent that repeats or
+// pads NS records in the additional section still serves one delegation.
+func TestConsistency05DelegationNSSetReadsAuthoritySectionOnly(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	padded := glueParentPacket("example", fullTestGlue(), "192.0.2.102")
+	extraNS := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+	extraNS.Ns = dnsutil.Fqdn("ns3.example")
+	padded.Msg.Extra = append(padded.Msg.Extra, extraNS)
+
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, fullTestGlue(), "192.0.2.101"),
+				padded,
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
+		t.Fatalf("NS records outside the authority section must not split the delegation")
+	}
+}
+
+// Glue is only credible for names the same response delegates to. An address
+// record for an unrelated owner in the additional section is not glue.
+func TestConsistency05GlueIgnoresOwnerOutsideAuthoritySet(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	// The referral delegates ns1 and ns2 but also carries an address record
+	// for an undelegated name. Treating that as glue would report it as
+	// unconfirmed by the child.
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			p := glueParentPacket(name, fullTestGlue(), "192.0.2.101")
+			strayRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn("stray.example"), Class: dns.ClassINET, TTL: 60}}
+			strayRR.Addr = netip.MustParseAddr("192.0.2.66")
+			p.Msg.Extra = append(p.Msg.Extra, strayRR)
+			return []packet.Packet{p}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
+		t.Fatalf("an address record outside the authority NS set must not count as glue")
+	}
+	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
+		t.Fatalf("expected ADDRESSES_MATCH")
 	}
 }
 
@@ -1606,6 +1889,21 @@ func nsPacketTTL(owner string, nsNames []string, ttl uint32) packet.Packet {
 	return packet.Packet{Msg: msg}
 }
 
+// referralPacket builds a parent referral for owner: NS records in the
+// authority section, an empty answer section and AA clear. This is what a
+// delegating parent actually sends, as opposed to nsPacket, which models an
+// authoritative answer from a server that holds the zone itself.
+func referralPacket(owner string, nsNames []string) packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	for _, nsName := range nsNames {
+		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+		nsRR.Ns = dnsutil.Fqdn(nsName)
+		msg.Ns = append(msg.Ns, nsRR)
+	}
+	return packet.Packet{Msg: msg}
+}
+
 // nsPacketWithGlue builds a referral carrying NS records plus glue (A/AAAA)
 // in the additional section, keyed by owner name.
 func nsPacketWithGlue(owner string, glue map[string][]string) packet.Packet {
@@ -1615,7 +1913,7 @@ func nsPacketWithGlue(owner string, glue map[string][]string) packet.Packet {
 	}
 	sort.Strings(names)
 
-	p := nsPacket(owner, names)
+	p := referralPacket(owner, names)
 	for _, name := range names {
 		for _, address := range glue[name] {
 			ip, err := netip.ParseAddr(address)

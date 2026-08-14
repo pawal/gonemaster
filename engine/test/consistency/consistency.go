@@ -823,34 +823,15 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
-	var nsRecords []dns.RR
+	// Glue comes only from a usable referral, and only for names that same
+	// response delegates to.
 	for _, resp := range nsResponses {
-		if resp.Msg == nil {
-			continue
-		}
-		nsRecords = append(nsRecords, resp.GetRecordsForName("NS", z.Name)...)
-	}
-
-	childNSNames := map[string]dnsname.Name{}
-	for _, rr := range nsRecords {
-		nsRR, ok := rr.(*dns.NS)
+		authNames, ok := referralNSNames(z, resp)
 		if !ok {
 			continue
 		}
-		name := dnsname.New(strings.ToLower(nsRR.Ns))
-		childNSNames[name.String()] = name
-	}
-
-	childKeys := slices.Sorted(maps.Keys(childNSNames))
-
-	// Glue comes only from the referral additional section. A parent that
-	// answers out-of-domain names directly must not poison the glue set.
-	for _, resp := range nsResponses {
-		if resp.Msg == nil {
-			continue
-		}
-		for _, key := range childKeys {
-			nsName := childNSNames[key]
+		for _, key := range slices.Sorted(maps.Keys(authNames)) {
+			nsName := authNames[key]
 			for _, rr := range resp.GetRecordsForName("A", nsName, "additional") {
 				aRR, ok := rr.(*dns.A)
 				if !ok {
@@ -1283,48 +1264,38 @@ func appendChildNSNamesFromServers(ctx context.Context, z *zone.Zone, names []dn
 	return out
 }
 
-// delegationNSSets groups responding parent servers by the delegation NS set
-// they serve; non-responding parents are not part of any set.
+// referralNSNames returns the delegation NS names of a usable referral for the
+// zone. TC-set responses are skipped: RFC 2181 section 9 allows a partial RRset.
+func referralNSNames(z *zone.Zone, resp packet.Packet) (map[string]dnsname.Name, bool) {
+	if resp.Msg == nil || resp.TC() || resp.Type() != "referral" {
+		return nil, false
+	}
+	names := map[string]dnsname.Name{}
+	for _, rr := range resp.GetRecordsForName("NS", z.Name, "authority") {
+		nsRR, ok := rr.(*dns.NS)
+		if !ok {
+			continue
+		}
+		name := dnsname.New(strings.ToLower(nsRR.Ns))
+		names[name.String()] = name
+	}
+	if len(names) == 0 {
+		return nil, false
+	}
+	return names, true
+}
+
+// delegationNSSets groups parent servers by the delegation NS name set they
+// serve. Glue is not part of the key: it may be trimmed without any signal.
 func delegationNSSets(z *zone.Zone, responses []packet.Packet) ([]string, map[string][]string) {
 	order := []string{}
 	setServers := map[string][]string{}
 	for _, resp := range responses {
-		if resp.Msg == nil {
+		nameSet, ok := referralNSNames(z, resp)
+		if !ok {
 			continue
 		}
-		nameSet := map[string]dnsname.Name{}
-		for _, rr := range resp.GetRecordsForName("NS", z.Name) {
-			nsRR, ok := rr.(*dns.NS)
-			if !ok {
-				continue
-			}
-			name := dnsname.New(strings.ToLower(nsRR.Ns))
-			nameSet[name.String()] = name
-		}
-		if len(nameSet) == 0 {
-			continue
-		}
-		var elements []string
-		for _, key := range slices.Sorted(maps.Keys(nameSet)) {
-			nsName := nameSet[key]
-			glues := map[string]bool{}
-			for _, rr := range resp.GetRecordsForName("A", nsName, "additional") {
-				if aRR, ok := rr.(*dns.A); ok {
-					glues[key+"/"+aRR.Addr.String()] = true
-				}
-			}
-			for _, rr := range resp.GetRecordsForName("AAAA", nsName, "additional") {
-				if aaaaRR, ok := rr.(*dns.AAAA); ok {
-					glues[key+"/"+aaaaRR.Addr.String()] = true
-				}
-			}
-			if len(glues) == 0 {
-				elements = append(elements, key)
-				continue
-			}
-			elements = append(elements, sortedKeys(glues)...)
-		}
-		setKey := strings.Join(elements, ";")
+		setKey := strings.Join(slices.Sorted(maps.Keys(nameSet)), ";")
 		if _, ok := setServers[setKey]; !ok {
 			order = append(order, setKey)
 		}

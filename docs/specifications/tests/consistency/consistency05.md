@@ -3,7 +3,7 @@
 Status: Final
 
 ## Purpose
-- Compare the delegation NS set (NS names plus attached glue) served by each responding parent nameserver.
+- Compare the delegation NS name set served by each responding parent nameserver.
 - Compare delegation glue addresses against child authoritative address data for in-domain nameservers.
 - Compare not-in-domain glue addresses against recursive public lookup results.
 
@@ -11,7 +11,7 @@ Status: Final
 - Preconditions:
   - A `zone.Zone` object is available.
 - Required inputs:
-  - Parent-side NS referral responses via `queryParentAll`; glue A and AAAA records are read from the additional section of those responses.
+  - Parent-side NS responses via `queryParentAll`; NS records and glue A and AAAA records are read only from responses that qualify as usable referrals (step 3).
   - Child-side nameserver names via [`AllNSNames`](../../nameserver-resolution.md#allnsnames).
   - Child-side nameserver servers via [`AllNameservers`](../../nameserver-resolution.md#allnameservers).
   - Recursive lookup results via `recurse` for not-in-domain checks and referral fallbacks.
@@ -20,50 +20,63 @@ Status: Final
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
-2. Query parent for child-zone NS records; collect unique child NS names.
-3. Read glue items `owner/ip` from the additional section of the parent NS referral responses, keeping only owners that match a child NS name. Glue is never taken from separate address queries to the parent, so a parent that answers out-of-domain names directly cannot contribute bogus glue.
-4. Group responding parent servers by the delegation NS set they serve:
-   - Per parent response, build a canonical element set from that response only: each NS name with glue in the same response's additional section contributes one `name/ip` element per glue record; an NS name without glue contributes a bare `name` element.
-   - A parent server that does not respond, or whose response has no NS records for the child zone, contributes no set and is excluded from the comparison.
+2. Query parent for child-zone NS records.
+3. Classify each parent response. A response is a **usable referral** when all of the following hold:
+   - TC is clear,
+   - RCODE is NOERROR,
+   - the answer section is empty,
+   - the authority section holds NS records owned by the child zone.
+
+   A response failing any condition contributes neither NS names nor glue. AA is not consulted, since parents that set AA on referrals are still serving a referral.
+4. Collect unique child NS names from the authority section of the usable referrals.
+5. Read glue items `owner/ip` from the additional section of each usable referral, keeping only owners present in the authority NS set of that same response. Glue is never taken from separate address queries to the parent, so a parent that answers out-of-domain names directly cannot contribute bogus glue.
+6. Group usable referrals by the delegation NS name set they carry:
+   - The per-parent key is the sorted set of lowercased NS names from that response's authority section. Glue addresses and TTLs are not part of the key.
+   - A parent server that does not respond, or whose response is not a usable referral, contributes no set and is excluded from the comparison.
    - With more than one distinct set, emit `MULTIPLE_DELEGATION_NS_SET` (with the distinct-set count) and one `DELEGATION_NS_SET` per distinct set naming the set elements and the parent servers that served it.
    - With zero or one distinct set, emit nothing.
-5. Split parent glue into:
+7. Split parent glue into:
    - in-domain strict glue (`strictGlue`),
    - not-in-domain extended glue (`extendedGlue` grouped by NS name).
-6. Build in-domain NS name set from [`AllNSNames`](../../nameserver-resolution.md#allnsnames), and in-domain child NS servers from [`AllNameservers`](../../nameserver-resolution.md#allnameservers) (respecting enabled IP versions).
-7. If [`AllNameservers`](../../nameserver-resolution.md#allnameservers) yields no usable in-domain child NS servers:
+8. Build in-domain NS name set from [`AllNSNames`](../../nameserver-resolution.md#allnsnames), and in-domain child NS servers from [`AllNameservers`](../../nameserver-resolution.md#allnameservers) (respecting enabled IP versions).
+9. If [`AllNameservers`](../../nameserver-resolution.md#allnameservers) yields no usable in-domain child NS servers:
    - Materialize child NS server endpoints from in-domain strict glue, respecting enabled IP versions.
    - Query those endpoints for the child-zone NS set and merge any in-domain names into the in-domain NS name set.
-8. For each in-domain NS name:
+10. For each in-domain NS name:
    - Query every in-domain child NS server for A and AAAA with RD off (`getAddrRRs`).
    - `getAddrRRs` emits `NO_RESPONSE` on no response and `CHILD_NS_FAILED` on unusable non-referral/non-NXDOMAIN authoritative behavior.
    - Referral responses trigger recursive fallback lookup and use resulting answer data if available.
    - Otherwise accumulate child authoritative `owner/ip` pairs.
-9. If no in-domain address lookup path was usable for any in-domain NS name, emit `CHILD_ZONE_LAME`, emit `TEST_CASE_END`, and return.
-10. Compare in-domain sets:
+11. If no in-domain address lookup path was usable for any in-domain NS name, emit `CHILD_ZONE_LAME`, emit `TEST_CASE_END`, and return.
+12. Compare in-domain sets:
    - Parent-only items -> emit `IN_BAILIWICK_ADDR_MISMATCH`.
    - Child-only items -> emit `EXTRA_ADDRESS_CHILD`.
-11. For each not-in-domain NS name in extended glue:
+13. For each not-in-domain NS name in extended glue:
    - Recurse A and AAAA, build child/public `owner/ip` set.
    - If any parent glue item for that name is missing from child/public set, emit `OUT_OF_BAILIWICK_ADDR_MISMATCH`.
-12. If none of the three mismatch tags were emitted, emit `ADDRESSES_MATCH`. The delegation NS-set tags from step 4 do not affect this guard.
-13. Emit `TEST_CASE_END`.
+14. If none of the three mismatch tags were emitted, emit `ADDRESSES_MATCH`. The delegation NS-set tags from step 6 do not affect this guard.
+15. Emit `TEST_CASE_END`.
 
-### Parent Glue and Child Address Lookup (steps 2-8)
+### Parent Glue and Child Address Lookup (steps 2-10)
 
 {{% expand "Show diagram" %}}
 ```
 queryParentAll(z, "NS")
- +- collect distinct child NS names from NS records
- +- read glue (A / AAAA) from the referral additional section,
-      keeping only owners that match a child NS name
+ +- usable referral test, per response:
+      resp.Msg != nil AND NOT resp.TC() AND rcode NOERROR
+      AND answer section empty
+      AND NS records owned by z in the authority section
+      (AA is not consulted)
+ +- collect distinct child NS names from the authority section
+      of usable referrals
+ +- read glue (A / AAAA) from the additional section of the same
+      usable referral, keeping only owners in that response's
+      authority NS set
       -> (owner lower / addr) glue items
 
-group responding parents by delegation NS set (per response):
-   resp without Msg or without NS records for z -> not part of any set
-   elements = one "name/ip" per glue record in the same response,
-              bare "name" for NS names without glue
-   key = sorted elements joined by ";"
+group usable referrals by delegation NS name set (per response):
+   resp that is not a usable referral -> not part of any set
+   key = sorted lowercased NS names joined by ";" (no glue, no TTL)
    setServers[key] += resp.AnswerFrom (first-seen key order kept)
    >1 distinct key -> MULTIPLE_DELEGATION_NS_SET (count)
                       DELEGATION_NS_SET per key (ns_set_servers, servers)
@@ -97,7 +110,7 @@ For each in-domain NS name:
 ```
 {{% /expand %}}
 
-### Domain-Relation Comparison and Final Emission (steps 9-13)
+### Domain-Relation Comparison and Final Emission (steps 11-15)
 
 {{% expand "Show diagram" %}}
 ```
@@ -131,10 +144,10 @@ emit TEST_CASE_END
 | `ADDRESSES_MATCH` | No in-domain mismatch, no extra child address, and no not-in-domain mismatch were found. |
 | `CHILD_NS_FAILED` | Child nameserver response for in-domain address lookup was unusable (non-AA/no referral/no accepted RCODE path). |
 | `CHILD_ZONE_LAME` | Every in-domain address lookup path failed for all in-domain NS names. |
-| `DELEGATION_NS_SET` | One distinct delegation NS set (with the parent servers serving it), emitted per set when parents disagree. |
+| `DELEGATION_NS_SET` | One distinct delegation NS name set (with the parent servers serving it), emitted per set when parents disagree. |
 | `EXTRA_ADDRESS_CHILD` | Child authoritative in-domain address set contains addresses not present in strict glue. |
 | `IN_BAILIWICK_ADDR_MISMATCH` | Strict in-domain glue contains addresses not found in child authoritative data. |
-| `MULTIPLE_DELEGATION_NS_SET` | Responding parent nameservers serve more than one distinct delegation NS set. |
+| `MULTIPLE_DELEGATION_NS_SET` | Responding parent nameservers serve more than one distinct delegation NS name set. |
 | `NO_RESPONSE` | A child nameserver did not return a response for an in-domain A/AAAA lookup. |
 | `OUT_OF_BAILIWICK_ADDR_MISMATCH` | Not-in-domain glue contains addresses not found in recursive public A/AAAA results. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -147,7 +160,7 @@ emit TEST_CASE_END
 | `CHILD_NS_FAILED` | `ns` | `string` | Child nameserver identity (`ns` name only; use `address` for IP) that failed authoritative child lookup requirements. |
 | `CHILD_NS_FAILED` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CHILD_ZONE_LAME` | `-` | `-` | No arguments. |
-| `DELEGATION_NS_SET` | `ns_set_servers` | `array<object>` | Structured delegation NS-set elements; glue-backed names as `{ "ns": "...", "address": "..." }`, glueless names as `{ "ns": "..." }`. |
+| `DELEGATION_NS_SET` | `ns_set_servers` | `array<object>` | Structured delegation NS-set elements, one `{ "ns": "..." }` per NS name in the set. |
 | `DELEGATION_NS_SET` | `servers` | `array<object>` | Structured parent server endpoints that served this set. |
 | `EXTRA_ADDRESS_CHILD` | `addresses` | `array<string>` | Structured `owner/ip` entries found only in child authoritative data. |
 | `IN_BAILIWICK_ADDR_MISMATCH` | `parent_servers` | `array<object>` | Structured parent strict-glue endpoint list; each item is `{ "ns": "...", "address": "..." }`. |
@@ -181,15 +194,32 @@ emit TEST_CASE_END
   - Upstream: does not explicitly define this detail. Gonemaster: Referral handling explicitly falls back to recursive lookup for the same qtype and owner.
   - Upstream: the short-circuit wording can be read per in-domain NS name. Gonemaster: `CHILD_ZONE_LAME` is emitted only when all in-domain address lookup paths fail, so disjoint parent/child NS sets can still be classified as address mismatches.
   - Upstream: does not explicitly define this detail. Gonemaster: If [`AllNameservers`](../../nameserver-resolution.md#allnameservers) cannot produce usable in-domain child NS endpoints, strict glue endpoints are used as a fallback for child-side address checks and child NS name discovery.
-  - Upstream: does not compare delegations between parent nameservers in this test case. Gonemaster: groups responding parent servers by the delegation NS set they serve and reports `MULTIPLE_DELEGATION_NS_SET` plus per-set `DELEGATION_NS_SET` details when the sets differ, using the NS responses already collected for glue extraction (no extra queries).
+  - Upstream: does not compare delegations between parent nameservers in this test case. Gonemaster: groups responding parent servers by the delegation NS name set they serve and reports `MULTIPLE_DELEGATION_NS_SET` plus per-set `DELEGATION_NS_SET` details when the sets differ, using the NS responses already collected for glue extraction (no extra queries).
 - Potential upstream report:
   - `no`
 
+## Implementation Notes
+
+The delegation comparison is bounded by what the protocol lets a server omit without signalling it. Four rules apply, and they differ by section and response type:
+
+- **RFC 9471 section 3.1**: a referral MUST carry all available glue for in-domain names, or set TC=1 when it does not fit.
+- **RFC 9471 section 3.2**: sibling-domain glue SHOULD be included; when it does not fit the server MAY set TC=1 but is not obliged to.
+- **RFC 9609 section 4.2**: a priming response is an answer and not a referral, so RFC 9471 does not apply; addresses may be omitted from its additional section with no expectation that TC is set.
+- **RFC 2181 section 9**: a response with TC=1 may carry the partial RRset that did not fit, so its body must not be consumed; the query is retried over a transport that fits the whole answer.
+
+Deployed parents do omit in-domain referral glue with TC clear, contrary to RFC 9471 section 3.1, so neither lawful trimming nor a compliant TC signal can be assumed. Two consequences follow:
+
+- **Cross-parent equality uses the authority section only**. An incomplete NS RRset can reach the client only together with TC=1, so a difference observed between TC-clear authority sections is real. Glue may arrive incomplete with no signal at all, so it cannot key a cross-parent equality check; glue faults are instead reported from the union of glue across all parents, where omission can only hide a fault and never invent one.
+- **TC-set responses are skipped by this testcase**, not only by the transport. Truncated responses are normally replaced by a TCP retry (`resolver.defaults.fallback`), but with fallback disabled the truncated UDP response is returned as is, and per RFC 2181 section 9 its partial authority section would otherwise fabricate a set difference.
+
 ## Edge Cases And Limitations
-- Glue is taken only from the referral additional section, so a parent name server that answers out-of-domain names (for example via a catch-all or wildcard zone) does not inject spurious glue and cannot trigger a false `OUT_OF_BAILIWICK_ADDR_MISMATCH`.
-- A parent server that does not respond, or responds without NS records for the child zone, is not part of any delegation NS set; non-response can never produce `MULTIPLE_DELEGATION_NS_SET`. With fewer than two responding parent servers the delegation comparison is skipped entirely.
+- Glue is taken only from the additional section of a usable referral, so a parent name server that answers out-of-domain names (for example via a catch-all or wildcard zone) does not inject spurious glue and cannot trigger a false `OUT_OF_BAILIWICK_ADDR_MISMATCH`.
+- A parent server that does not respond, or whose response is not a usable referral, is not part of any delegation NS set; non-response can never produce `MULTIPLE_DELEGATION_NS_SET`. With fewer than two usable referrals the delegation comparison is skipped entirely.
 - The delegation NS-set comparison is silent when all responding parents agree; there is no positive confirmation tag, and `ADDRESSES_MATCH` remains governed only by the address comparisons.
-- Undelegated tests and the root zone produce no (or synthetic, identical) parent referrals, so the delegation NS-set comparison stays silent there.
+- Glue trimmed from the additional section, whether lawfully or not, does not split the delegation, because the per-parent key holds NS names only.
+- A parent that is also authoritative for the child zone answers from the answer section instead of referring. `arpa` is the live case: the root servers serve it directly. Such responses are not usable referrals and contribute no delegation set and no glue.
+- The root zone is its own parent, so a test of `.` sends priming queries. Per RFC 9609 the responses are answers and not referrals, so they are not usable referrals: a test of the root produces no delegation NS-set finding.
+- Undelegated tests produce synthetic, identical delegations, so the delegation NS-set comparison stays silent there.
 - `CHILD_ZONE_LAME` short-circuits testcase execution and suppresses later mismatch checks when no usable in-domain address lookup path was found.
 - Not-in-domain mismatch reporting is per NS name group; each emission includes full parent list for that group.
 - Disabled IP versions affect child authoritative probes indirectly by filtering queried child servers.

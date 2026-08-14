@@ -33,8 +33,8 @@ Status: Final
 6. Group usable referrals by the delegation NS name set they carry:
    - The per-parent key is the sorted set of lowercased NS names from that response's authority section. Glue addresses and TTLs are not part of the key.
    - A parent server that does not respond, or whose response is not a usable referral, contributes no set and is excluded from the comparison.
-   - With more than one distinct set, emit `MULTIPLE_DELEGATION_NS_SET` (with the distinct-set count) and one `DELEGATION_NS_SET` per distinct set naming the set elements and the parent servers that served it.
-   - With zero or one distinct set, emit nothing.
+   - With more than one distinct set, emit `MULTIPLE_DELEGATION_NS_SET` with the distinct-set count and `ns_names`, the NS names not served by every parent (the union of all sets minus their intersection), and one `DELEGATION_NS_SET` per distinct set naming the set elements and the parent servers that served it.
+   - With zero or one distinct set, emit nothing. More than one distinct set implies a non-empty `ns_names`, since sets that differ must differ by at least one name.
 7. Split parent glue into:
    - in-domain strict glue (`strictGlue`),
    - not-in-domain extended glue (`extendedGlue` grouped by NS name).
@@ -78,7 +78,8 @@ group usable referrals by delegation NS name set (per response):
    resp that is not a usable referral -> not part of any set
    key = sorted lowercased NS names joined by ";" (no glue, no TTL)
    setServers[key] += resp.AnswerFrom (first-seen key order kept)
-   >1 distinct key -> MULTIPLE_DELEGATION_NS_SET (count)
+   >1 distinct key -> ns_names = union(keys) minus intersection(keys)
+                      MULTIPLE_DELEGATION_NS_SET (count, ns_names)
                       DELEGATION_NS_SET per key (ns_set_servers, servers)
    0 or 1 distinct key -> no emission
 
@@ -165,7 +166,8 @@ emit TEST_CASE_END
 | `EXTRA_ADDRESS_CHILD` | `addresses` | `array<string>` | Structured `owner/ip` entries found only in child authoritative data. |
 | `IN_BAILIWICK_ADDR_MISMATCH` | `parent_servers` | `array<object>` | Structured parent strict-glue endpoint list; each item is `{ "ns": "...", "address": "..." }`. |
 | `IN_BAILIWICK_ADDR_MISMATCH` | `zone_servers` | `array<object>` | Structured child authoritative in-domain endpoint list; each item is `{ "ns": "...", "address": "..." }`. |
-| `MULTIPLE_DELEGATION_NS_SET` | `count` | `int` | Number of distinct delegation NS sets observed. |
+| `MULTIPLE_DELEGATION_NS_SET` | `count` | `int` | Number of distinct delegation NS name sets observed. |
+| `MULTIPLE_DELEGATION_NS_SET` | `ns_names` | `array<string>` | Sorted NS names not served by every parent: the union of the observed sets minus their intersection. Never empty when the tag is emitted. |
 | `NO_RESPONSE` | `ns` | `string` | Child nameserver identity (`ns` name only; use `address` for IP) with no response. |
 | `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `parent_servers` | `array<object>` | Structured parent not-in-domain glue endpoint list for one NS name. |

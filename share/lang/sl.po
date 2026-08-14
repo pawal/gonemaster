@@ -755,8 +755,8 @@ msgid "Name servers serve the zone's NS records with {count} distinct TTL values
 msgstr "Imenski strežniki strežejo zapise NS cone z {count} različnimi vrednostmi TTL."
 
 msgctxt "CONSISTENCY:MULTIPLE_DELEGATION_NS_SET"
-msgid "Found {count} different delegation NS sets at the parent name servers."
-msgstr "Najdenih {count} različnih NS nizov v delegaciji na domenskih strežnikih starševske cone."
+msgid "Found {count} different delegation NS sets at the parent name servers. Name server names not served by all parents: ({ns_names})."
+msgstr "Najdenih {count} različnih NS nizov v delegaciji na domenskih strežnikih starševske cone. Imena domenskih strežnikov, ki jih ne vrnejo vsi starševski strežniki: ({ns_names})."
 
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."

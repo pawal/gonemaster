@@ -855,7 +855,8 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	setOrder, setServers := delegationNSSets(z, nsResponses)
 	if len(setOrder) > 1 {
 		if err := appendLog(ctx, &results, testcase, "MULTIPLE_DELEGATION_NS_SET", map[string]any{
-			"count": len(setOrder),
+			"count":    len(setOrder),
+			"ns_names": disagreeingNSNames(setOrder),
 		}); err != nil {
 			return results, err
 		}
@@ -1283,6 +1284,29 @@ func referralNSNames(z *zone.Zone, resp packet.Packet) (map[string]dnsname.Name,
 		return nil, false
 	}
 	return names, true
+}
+
+// disagreeingNSNames returns the NS names not served by every parent: the
+// union of the observed delegation sets minus their intersection.
+func disagreeingNSNames(setKeys []string) []string {
+	counts := map[string]int{}
+	for _, setKey := range setKeys {
+		for _, name := range strings.Split(setKey, ";") {
+			if name == "" {
+				continue
+			}
+			counts[name]++
+		}
+	}
+
+	var out []string
+	for name, count := range counts {
+		if count < len(setKeys) {
+			out = append(out, name)
+		}
+	}
+	sort.Strings(out)
+	return out
 }
 
 // delegationNSSets groups parent servers by the delegation NS name set they

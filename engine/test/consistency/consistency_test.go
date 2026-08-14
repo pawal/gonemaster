@@ -3,6 +3,7 @@ package consistency
 import (
 	"context"
 	"net/netip"
+	"slices"
 	"sort"
 	"strings"
 	"testing"
@@ -1244,6 +1245,15 @@ func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
 	if count, ok := multiple.Args["count"].(int); !ok || count != 2 {
 		t.Fatalf("expected count=2, got %#v", multiple.Args["count"])
 	}
+	// ns1 is served by both parents, so only the two names parent two
+	// omits are named as the disagreement.
+	names, ok := multiple.Args["ns_names"].([]string)
+	if !ok {
+		t.Fatalf("expected ns_names, got %#v", multiple.Args["ns_names"])
+	}
+	if len(names) != 2 || names[0] != "ns2.example" || names[1] != "ns3.other.test" {
+		t.Fatalf("unexpected ns_names: %#v", names)
+	}
 
 	var sets []*logger.Entry
 	for _, entry := range entries {
@@ -1459,6 +1469,108 @@ func TestConsistency05DelegationNSSetIgnoresParentWithoutNSRecords(t *testing.T)
 	}
 	if hasEntryTag(entries, "DELEGATION_NS_SET") {
 		t.Fatalf("a parent without NS records must not produce DELEGATION_NS_SET")
+	}
+}
+
+// ns_names names the disputed names only: the union of the observed sets
+// minus their intersection. Names every parent serves are not the problem and
+// would only pad the message.
+func TestDisagreeingNSNames(t *testing.T) {
+	cases := []struct {
+		name    string
+		setKeys []string
+		want    []string
+	}{
+		{
+			name:    "one parent omits a name",
+			setKeys: []string{"ns1.example;ns2.example", "ns1.example"},
+			want:    []string{"ns2.example"},
+		},
+		{
+			name:    "disjoint sets put every name in dispute",
+			setKeys: []string{"ns1.example", "ns2.example"},
+			want:    []string{"ns1.example", "ns2.example"},
+		},
+		{
+			name:    "shared names are excluded, result is sorted",
+			setKeys: []string{"a.example;shared.example", "shared.example;b.example"},
+			want:    []string{"a.example", "b.example"},
+		},
+		{
+			name:    "three sets, a name missing from just one is in dispute",
+			setKeys: []string{"ns1.example;ns2.example", "ns1.example;ns2.example;ns3.example", "ns1.example;ns2.example"},
+			want:    []string{"ns3.example"},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := disagreeingNSNames(tc.setKeys)
+			if !slices.Equal(got, tc.want) {
+				t.Fatalf("got %#v, want %#v", got, tc.want)
+			}
+		})
+	}
+}
+
+// The warning is emitted if and only if ns_names is non-empty: distinct sets
+// must differ by at least one name, and identical sets collapse to one key.
+func TestConsistency05MultipleDelegationNSSetImpliesNSNames(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	cases := []struct {
+		name        string
+		second      map[string][]string
+		wantWarning bool
+	}{
+		{
+			name:        "same names, trimmed glue",
+			second:      map[string][]string{"ns1.example": {"192.0.2.1"}, "ns2.example": nil},
+			wantWarning: false,
+		},
+		{
+			name:        "a name is missing",
+			second:      map[string][]string{"ns1.example": {"192.0.2.1", "2001:db8::1"}},
+			wantWarning: true,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+				if strings.EqualFold(qtype, "NS") {
+					return []packet.Packet{
+						glueParentPacket(name, fullTestGlue(), "192.0.2.101"),
+						glueParentPacket(name, tc.second, "192.0.2.102"),
+					}, nil
+				}
+				return []packet.Packet{}, nil
+			}
+
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := Consistency05(ctx, &z)
+			if err != nil {
+				t.Fatalf("consistency05: %v", err)
+			}
+
+			multiple := firstEntryByTag(entries, "MULTIPLE_DELEGATION_NS_SET")
+			if got := multiple != nil; got != tc.wantWarning {
+				t.Fatalf("warning emitted = %v, want %v", got, tc.wantWarning)
+			}
+			if multiple == nil {
+				return
+			}
+			names, ok := multiple.Args["ns_names"].([]string)
+			if !ok || len(names) == 0 {
+				t.Fatalf("warning must carry a non-empty ns_names, got %#v", multiple.Args["ns_names"])
+			}
+		})
 	}
 }
 

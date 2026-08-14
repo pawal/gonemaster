@@ -777,8 +777,8 @@ msgid "Name servers serve the zone's NS records with {count} distinct TTL values
 msgstr "Nimipalvelimet palvelevat vyöhykkeen NS-tietueita {count} eri TTL-arvolla."
 
 msgctxt "CONSISTENCY:MULTIPLE_DELEGATION_NS_SET"
-msgid "Found {count} different delegation NS sets at the parent name servers."
-msgstr "Ylemmän vyöhykkeen nimipalvelimilta löydettiin {count} erilaista delegoinnin NS-joukkoa."
+msgid "Found {count} different delegation NS sets at the parent name servers. Name server names not served by all parents: ({ns_names})."
+msgstr "Ylemmän vyöhykkeen nimipalvelimilta löydettiin {count} erilaista delegoinnin NS-joukkoa. Nimipalvelinten nimet, joita kaikki ylemmän vyöhykkeen palvelimet eivät palauta: ({ns_names})."
 
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."

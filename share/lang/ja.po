@@ -638,8 +638,8 @@ msgid "Name servers serve the zone's NS records with {count} distinct TTL values
 msgstr "ネームサーバーがゾーンの NS レコードを {count} 種類の異なる TTL 値で応答しています。"
 
 msgctxt "CONSISTENCY:MULTIPLE_DELEGATION_NS_SET"
-msgid "Found {count} different delegation NS sets at the parent name servers."
-msgstr "親ゾーンのネームサーバーから {count} 種類の異なる委任 NS セットが見つかりました。"
+msgid "Found {count} different delegation NS sets at the parent name servers. Name server names not served by all parents: ({ns_names})."
+msgstr "親ゾーンのネームサーバーから {count} 種類の異なる委任 NS セットが見つかりました。すべての親サーバーが返すわけではないネームサーバー名: ({ns_names})。"
 
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."

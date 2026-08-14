@@ -74,4 +74,4 @@ Header: Parent nameservers serve different delegations
 
 Description:
 
-The parent zone's nameservers do not all hand out the same delegation for your zone - the NS names or glue addresses differ depending on which parent server is asked. This is normal for a short time after a delegation change; if it persists, resolvers keep being steered to different nameserver sets and some may reach servers that no longer host your zone.
+The parent zone's nameservers do not all hand out the same delegation for your zone - the set of NS names differs depending on which parent server is asked. This is normal for a short time after a delegation change; if it persists, resolvers keep being steered to different nameserver sets and some may reach servers that no longer host your zone.

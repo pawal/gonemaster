@@ -789,8 +789,8 @@ msgid "Name servers serve the zone's NS records with {count} distinct TTL values
 msgstr "Los servidores de nombres sirven los registros NS de la zona con {count} valores de TTL distintos."
 
 msgctxt "CONSISTENCY:MULTIPLE_DELEGATION_NS_SET"
-msgid "Found {count} different delegation NS sets at the parent name servers."
-msgstr "Se encontraron {count} grupos de NS diferentes en la delegación de los servidores de nombres de la zona padre."
+msgid "Found {count} different delegation NS sets at the parent name servers. Name server names not served by all parents: ({ns_names})."
+msgstr "Se encontraron {count} grupos de NS diferentes en la delegación de los servidores de nombres de la zona padre. Nombres de servidores de nombres que no entregan todos los servidores padre: ({ns_names})."
 
 msgctxt "CONSISTENCY:MULTIPLE_NS_SET"
 msgid "Found {count} NS set(s)."

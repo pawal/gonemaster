@@ -21,6 +21,28 @@ gonemaster-server --workers 16 --max-concurrent-jobs 16
 Raise concurrency only after measuring both throughput and latency. Increasing
 `--workers` above `--max-concurrent-jobs` has no effect on engine concurrency.
 
+## Per-Address Concurrency
+
+`nameserver_concurrency` limits how many queries run at once against one
+nameserver address. The default is `0`, unlimited. Testing at 16 to 64 workers
+found no batch that lost findings to its own query rate, so it stays off.
+
+The limit applies to every address, so there is nothing to aim at a particular
+nameserver. It only takes effect where a batch is concentrated: 500 `.se`
+domains that all delegate to `ns1.example.net` and `ns2.example.net` send their
+whole query volume to two addresses and hit the limit constantly, while 500
+unrelated domains spread it over hundreds and rarely reach it at all. On the
+server the limit is shared by all running jobs, so it bounds the batch, not
+each job.
+
+Cost at 64 workers: a limit of 3 changed nothing on a batch with many different
+nameservers, and added about a third to the run time when every query went to
+three addresses.
+
+```json
+{ "resolver": { "defaults": { "nameserver_concurrency": 3 } } }
+```
+
 ## Cross-Job Hot Cache
 
 The cross-job hot cache shares warmed nameserver data across nearby jobs with

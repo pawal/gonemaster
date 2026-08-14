@@ -30,7 +30,7 @@ accepted bounds.
 | `positive_cache_ttl` | `0` | seconds (0-86400) | `--positive-cache-ttl` | Cache positive responses across runs. `0` disables. |
 | `negative_cache_ttl` | `30` | seconds (0-86400) | `--negative-cache-ttl` | Cache negative responses across runs. |
 | `fast_fail_timeout_count` | `3` | count (0-100) | - | Skip a nameserver/protocol after this many consecutive timeouts. `0` disables. Reacts to silence only. |
-| `nameserver_concurrency` | `0` | count (0-256) | - | Maximum concurrent queries to one nameserver address. `0` is unlimited. |
+| `nameserver_concurrency` | `0` | count (0-256) | - | Maximum concurrent queries to one nameserver address. `0` is unlimited. On the server the cap is shared across concurrent jobs; see [server performance](server/performance.md). |
 | `nameserver_max_total_ms` | `0` | milliseconds (0-600000) | - | Skip a nameserver address once cumulative query time in a run exceeds this. `0` disables. Unlike fast-fail it also bounds slow-but-responding servers. See [Bounding Slow Nameservers](server/configuration.md#bounding-slow-nameservers). |
 | `debug` | `false` | bool | `--debug-queries` | Emit a per-attempt query trace (including timeouts) and the control decisions taken. No overhead when off. |
 

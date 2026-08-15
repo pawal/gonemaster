@@ -1199,7 +1199,15 @@ func defaultQueryParentAll(ctx context.Context, z *zone.Zone, name string, qtype
 	if err != nil || parent == nil {
 		return nil, err
 	}
-	return parent.QueryAll(ctx, name, qtype, nil)
+	return parent.QueryAll(ctx, name, qtype, parentReferralQueryOptions())
+}
+
+// parentReferralQueryOptions advertises a payload size that fits a full
+// referral, so glue arrives complete instead of trimmed to 512 bytes. The
+// global default is left alone; it feeds the EDNS and nameserver testcases.
+func parentReferralQueryOptions() *nameserver.QueryOptions {
+	ednsSize := uint16(constants.EDNSUDPPayloadDNSSECDefault)
+	return &nameserver.QueryOptions{EDNSSize: &ednsSize}
 }
 
 func defaultRecurse(ctx context.Context, z *zone.Zone, name string, qtype string) (packet.Packet, error) {

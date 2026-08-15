@@ -12,6 +12,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -1485,6 +1486,24 @@ func TestConsistency05DelegationNSSetIgnoresParentWithoutNSRecords(t *testing.T)
 	}
 	if hasEntryTag(entries, "DELEGATION_NS_SET") {
 		t.Fatalf("a parent without NS records must not produce DELEGATION_NS_SET")
+	}
+}
+
+// Without an advertised EDNS payload size the parent caps the referral at 512
+// bytes and trims glue, which leaves the glue union dependent on each parent
+// implementation trimming differently. RFC 9471 section 3.1 requires a
+// compliant parent to either fit all in-domain glue or set TC, and at 1232
+// the referral fits.
+func TestParentReferralQueryAdvertisesFullPayload(t *testing.T) {
+	opts := parentReferralQueryOptions()
+	if opts == nil || opts.EDNSSize == nil {
+		t.Fatalf("expected an advertised EDNS payload size, got %#v", opts)
+	}
+	if *opts.EDNSSize != constants.EDNSUDPPayloadDNSSECDefault {
+		t.Fatalf("EDNSSize = %d, want %d", *opts.EDNSSize, constants.EDNSUDPPayloadDNSSECDefault)
+	}
+	if *opts.EDNSSize <= constants.EDNSUDPPayloadDefault {
+		t.Fatalf("advertised size %d does not exceed the 512-byte default", *opts.EDNSSize)
 	}
 }
 

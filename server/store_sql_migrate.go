@@ -562,6 +562,16 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN last_materialized_at VARCHAR(64) NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		// Retire the bailiwick tag identifiers. entries.tag is the only
+		// stored copy, so rewriting it keeps tag history continuous.
+		version: 7,
+		stmts: []string{
+			`UPDATE entries SET tag = 'IN_DOMAIN_ADDR_MISMATCH' WHERE tag = 'IN_BAILIWICK_ADDR_MISMATCH'`,
+			`UPDATE entries SET tag = 'NOT_IN_DOMAIN_ADDR_MISMATCH' WHERE tag = 'OUT_OF_BAILIWICK_ADDR_MISMATCH'`,
+			`UPDATE entries SET tag = 'IN_DOMAIN_GLUE_MISSING' WHERE tag = 'IN_BAILIWICK_GLUE_MISSING'`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies

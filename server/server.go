@@ -410,7 +410,9 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /robots.txt", s.handleRobotsTxt)
 	s.mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
 	s.mux.Handle("/public/", http.StripPrefix("/public", serverpublic.Handler(s.cfg.PublicURL)))
-	s.mux.Handle("/analysis/", http.StripPrefix("/analysis", serveranalysisui.Handler(s.cfg.PublicURL)))
+	s.mux.Handle("/analysis/", legacyTagRedirect(
+		http.StripPrefix("/analysis", serveranalysisui.Handler(s.cfg.PublicURL)),
+	))
 	s.mux.HandleFunc("/analysis", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/analysis/", http.StatusMovedPermanently)
 	})

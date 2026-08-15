@@ -335,7 +335,7 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	want := []int{1, 2, 3, 4, 5, 6}
+	want := []int{1, 2, 3, 4, 5, 6, 7}
 	if len(versions) != len(want) {
 		t.Fatalf("expected %d versions, got %d: %v", len(want), len(versions), versions)
 	}
@@ -343,6 +343,74 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		if versions[i] != v {
 			t.Fatalf("expected versions %v, got %v", want, versions)
 		}
+	}
+}
+
+func TestRunMigrationsRenamesBailiwickTags(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	// Re-arm the rename so it sees the legacy rows inserted below, the way it
+	// would on a database written before the rename landed.
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version = 7`); err != nil {
+		t.Fatalf("reset migration 7: %v", err)
+	}
+
+	insert := func(runID, tag string) {
+		t.Helper()
+		if _, err := db.Exec(
+			`INSERT INTO entries (run_id, domain_id, timestamp, module, testcase, tag, level, args_json)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			runID, 1, 0.0, "Consistency", "Consistency05", tag, "ERROR", "{}",
+		); err != nil {
+			t.Fatalf("insert %s: %v", tag, err)
+		}
+	}
+
+	legacy := map[string]string{
+		"IN_BAILIWICK_ADDR_MISMATCH":     "IN_DOMAIN_ADDR_MISMATCH",
+		"OUT_OF_BAILIWICK_ADDR_MISMATCH": "NOT_IN_DOMAIN_ADDR_MISMATCH",
+		"IN_BAILIWICK_GLUE_MISSING":      "IN_DOMAIN_GLUE_MISSING",
+	}
+	i := 0
+	for old := range legacy {
+		insert(fmt.Sprintf("job_legacy_%d", i), old)
+		i++
+	}
+	// An unrelated tag must survive the backfill untouched.
+	insert("job_untouched", "ADDRESSES_MATCH")
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("rerun migrations: %v", err)
+	}
+
+	count := func(tag string) int {
+		t.Helper()
+		var n int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM entries WHERE tag = ?`, tag).Scan(&n); err != nil {
+			t.Fatalf("count %s: %v", tag, err)
+		}
+		return n
+	}
+
+	for old, renamed := range legacy {
+		if got := count(old); got != 0 {
+			t.Fatalf("legacy tag %s still present in %d rows", old, got)
+		}
+		if got := count(renamed); got != 1 {
+			t.Fatalf("renamed tag %s: got %d rows, want 1", renamed, got)
+		}
+	}
+	if got := count("ADDRESSES_MATCH"); got != 1 {
+		t.Fatalf("unrelated tag ADDRESSES_MATCH: got %d rows, want 1", got)
 	}
 }
 

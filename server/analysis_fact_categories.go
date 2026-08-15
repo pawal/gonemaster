@@ -198,11 +198,15 @@ var dnskeyAlgorithmMnemonics = map[int]string{
 	14: "ECDSAP384SHA384",
 	15: "ED25519",
 	16: "ED448",
+	17: "SM2SM3",
+	18: "MLDSA44",
+	23: "ECC-GOST12",
 }
 
 // dnskeyAlgorithmTones colors each algorithm by current best-practice:
 // modern curves green, SHA-256 RSA blue (acceptable), SHA-1 family red
-// (deprecated), unknown/private neutral.
+// (deprecated), unknown/private neutral. Regional national-standard curves
+// are sound but not the default choice, so they get the acceptable tone.
 var dnskeyAlgorithmTones = map[int]string{
 	1:  "error",
 	3:  "error",
@@ -216,6 +220,9 @@ var dnskeyAlgorithmTones = map[int]string{
 	14: "ok",
 	15: "ok",
 	16: "ok",
+	17: "notice",
+	18: "ok",
+	23: "notice",
 }
 
 func dnskeyAlgorithmKeyLabel(key string) string {

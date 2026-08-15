@@ -317,7 +317,8 @@ func TestDNSSEC01TagForKeyAlgorithmTable(t *testing.T) {
 		{13, "DS01_KEY_ALGO_OK"},
 		{16, "DS01_KEY_ALGO_OK"},
 		{17, "DS01_KEY_ALGO_OK"},
-		{18, "DS01_KEY_ALGO_UNASSIGNED"},
+		{18, "DS01_KEY_ALGO_OK"},
+		{19, "DS01_KEY_ALGO_UNASSIGNED"},
 		{22, "DS01_KEY_ALGO_UNASSIGNED"},
 		{23, "DS01_KEY_ALGO_OK"},
 		{24, "DS01_KEY_ALGO_UNASSIGNED"},
@@ -1769,6 +1770,71 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 	}
 	if !hasEntryTag(entries, "DS05_ALGO_OK") {
 		t.Fatalf("expected DS05_ALGO_OK for algorithm 17 (SM2SM3)")
+	}
+}
+
+func TestDNSSEC05AlgoMLDSA44(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origDel := delegationNameservers
+	origZone := zoneNameservers
+	t.Cleanup(func() {
+		delegationNameservers = origDel
+		zoneNameservers = origZone
+	})
+
+	newNameserver(t, ctx, "ns1.example", "192.0.2.33", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
+		if qtype != "DNSKEY" {
+			return packet.Packet{}
+		}
+		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+		key.Flags = dns.FlagZONE
+		key.Protocol = 3
+		key.Algorithm = 18 // ML-DSA-44, IANA-assigned post-quantum signing algorithm
+		key.PublicKey = "AwEAAc=="
+		return dnskeyPacket(qname, key)
+	})
+
+	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{
+			{
+				Name:       dnsname.New("ns1.example"),
+				Address:    netip.MustParseAddr("192.0.2.33"),
+				HasAddress: true,
+			},
+		}, nil
+	}
+	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC05(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec05: %v", err)
+	}
+	entry := firstEntryByTag(entries, "DS05_ALGO_OK")
+	if entry == nil {
+		t.Fatalf("expected DS05_ALGO_OK for algorithm 18 (ML-DSA-44)")
+	}
+	// The tag alone would still pass with a stale algorithm table, so assert the
+	// rendered name too: before algorithm 18 was assigned it fell in the
+	// unassigned range and reported the mnemonic UNASSIGNED.
+	if entry.Args["algo_num"] != uint8(18) {
+		t.Fatalf("expected algo_num 18, got %#v", entry.Args["algo_num"])
+	}
+	if entry.Args["algo_descr"] != "ML-DSA-44" {
+		t.Fatalf("expected algo_descr ML-DSA-44, got %#v", entry.Args["algo_descr"])
+	}
+	if entry.Args["algo_mnemo"] != "MLDSA44" {
+		t.Fatalf("expected algo_mnemo MLDSA44, got %#v", entry.Args["algo_mnemo"])
 	}
 }
 

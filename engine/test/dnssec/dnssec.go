@@ -83,6 +83,7 @@ var algoProperties = map[uint8]algoProperty{
 	15:  {description: "Ed25519", mnemonic: "ED25519"},
 	16:  {description: "Ed448", mnemonic: "ED448"},
 	17:  {description: "SM2 signing algo w SM3 hash algo", mnemonic: "SM2SM3"},
+	18:  {description: "ML-DSA-44", mnemonic: "MLDSA44"},
 	23:  {description: "GOST R 34.10-2012", mnemonic: "ECC-GOST12"},
 	252: {description: "Reserved for Indirect Keys", mnemonic: "INDIRECT"},
 	253: {description: "private algorithm", mnemonic: "PRIVATEDNS"},
@@ -7621,7 +7622,9 @@ func dnssec05TagForAlgorithm(algo uint8) string {
 		return "DS05_ALGO_OK"
 	case algo == 17:
 		return "DS05_ALGO_OK"
-	case algo >= 18 && algo <= 22:
+	case algo == 18:
+		return "DS05_ALGO_OK"
+	case algo >= 19 && algo <= 22:
 		return "DS05_ALGO_UNASSIGNED"
 	case algo == 23:
 		return "DS05_ALGO_OK"
@@ -8600,7 +8603,7 @@ func algoPropertyFor(algo uint8) algoProperty {
 		return prop
 	}
 	switch {
-	case algo >= 18 && algo <= 22:
+	case algo >= 19 && algo <= 22:
 		return algoProperty{description: "Unassigned", mnemonic: "UNASSIGNED"}
 	case algo >= 24 && algo <= 122:
 		return algoProperty{description: "Unassigned", mnemonic: "UNASSIGNED"}

@@ -20,6 +20,8 @@ Reworks Consistency05, which no longer reports a false delegation disagreement o
 - engine: Consistency05 compares delegations on the NS names in a referral's authority section, so trimmed glue, truncated responses and parents that serve the child zone themselves no longer report a false `MULTIPLE_DELEGATION_NS_SET` (RFC 9471, RFC 9609, RFC 2181)
 - engine: DNSSEC checks work on copies of cached records, so concurrent runs sharing a warmed cache can no longer report a valid signature as bad
 - server: out-of-range `--retry` and `--retrans` are refused at startup, and a profile compatibility fix no longer marks the whole profile as reviewed
+- engine: DNSSEC algorithm 18 (ML-DSA-44) is recognised, no longer reported as unassigned
+- server: the analysis dashboard names DNSKEY algorithms 17, 18 and 23
 
 ### Changed
 

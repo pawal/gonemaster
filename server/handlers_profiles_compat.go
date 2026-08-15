@@ -248,6 +248,9 @@ type profilePatchRequest struct {
 //	reset_test_cases        - remove test_cases override (profile inherits all defaults)
 //	reset_test_levels       - remove one test_levels module (requires module field)
 //	mark_reviewed           - bump schema_version without touching config
+//
+// The fix ops change config only; a fixed profile then reports compatible on
+// its own merits. Only mark_reviewed declares remaining gaps intentional.
 func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -279,6 +282,10 @@ func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var newConfigJSON string
+	// Only mark_reviewed bumps schema_version. A fix op that also bumped it
+	// would silence the checks for every issue it did not fix, since a
+	// profile at the current version is reported compatible unconditionally.
+	markReviewed := false
 	switch req.Op {
 	case "add_missing_test_cases":
 		newConfigJSON, err = applyAddMissingTestCases(stored.Config, defaultP)
@@ -295,6 +302,7 @@ func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 	case "mark_reviewed":
 		// no config change - just bump schema_version below
 		newConfigJSON = stored.Config
+		markReviewed = true
 	default:
 		writeError(w, http.StatusBadRequest, "invalid_op", fmt.Sprintf("unknown op %q", req.Op), nil)
 		return
@@ -306,7 +314,9 @@ func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stored.Config = newConfigJSON
-	stored.SchemaVersion = engine.VersionFull()
+	if markReviewed {
+		stored.SchemaVersion = engine.VersionFull()
+	}
 	if err := s.store.UpdateProfile(stored); err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 		return

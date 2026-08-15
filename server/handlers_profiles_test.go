@@ -948,6 +948,87 @@ func TestPatchProfileAddMissingTestLevels(t *testing.T) {
 	}
 }
 
+// A fix op must not bump schema_version. The compatibility check reports any
+// profile at the current engine version as compatible without inspecting it,
+// so bumping on a partial fix hides every issue the op did not address: the
+// admin UI then drops the remaining fix buttons and the profile looks clean
+// while still missing tags.
+func TestPatchProfileFixDoesNotHideRemainingIssues(t *testing.T) {
+	srv := New(DefaultConfig())
+
+	respD := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(respD, httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil))
+	var defaults ProfileDefaults
+	if err := json.NewDecoder(respD.Body).Decode(&defaults); err != nil {
+		t.Fatalf("decode defaults: %v", err)
+	}
+
+	// One module overridden with a single tag, plus a pinned test_cases list.
+	// That is two independent issues: missing test levels and missing test
+	// cases.
+	var module, oneTag, oneLevel string
+	for mod, tags := range defaults.TestLevels {
+		if len(tags) < 2 {
+			continue
+		}
+		module = mod
+		for tag, level := range tags {
+			oneTag, oneLevel = tag, level
+			break
+		}
+		break
+	}
+	if module == "" {
+		t.Skip("no module with >= 2 tags")
+	}
+
+	levelsJSON, _ := json.Marshal(map[string]map[string]string{module: {oneTag: oneLevel}})
+	profile := createProfile(t, srv, `{"name":"partial-fix","config":{"test_cases":["address01"],"test_levels":`+string(levelsJSON)+`}}`)
+	markProfileStale(t, srv, profile.ID)
+
+	before := fetchCompatibility(t, srv, profile.ID)
+	if before.Compatible {
+		t.Fatalf("expected the profile to start incompatible, got %+v", before)
+	}
+	if !hasIssueType(before.Issues, "missing_test_case") || !hasIssueType(before.Issues, "missing_test_levels") {
+		t.Fatalf("expected both issue types before the fix, got %+v", before.Issues)
+	}
+
+	// Fix only the test levels.
+	updated := patchProfile(t, srv, profile.ID, `{"op":"add_missing_test_levels"}`)
+	if updated.SchemaVersion != "old-version" {
+		t.Fatalf("a fix op must leave schema_version alone, got %q", updated.SchemaVersion)
+	}
+
+	after := fetchCompatibility(t, srv, profile.ID)
+	if after.Compatible {
+		t.Fatalf("test_cases is still incomplete, so the profile must stay incompatible: %+v", after)
+	}
+	if hasIssueType(after.Issues, "missing_test_levels") {
+		t.Fatalf("the test levels issue should be resolved, got %+v", after.Issues)
+	}
+	if !hasIssueType(after.Issues, "missing_test_case") {
+		t.Fatalf("the untouched test_cases issue must still be reported, got %+v", after.Issues)
+	}
+
+	// Fixing the second issue clears compatibility on the merits, with no
+	// schema_version bump involved.
+	patchProfile(t, srv, profile.ID, `{"op":"add_missing_test_cases"}`)
+	final := fetchCompatibility(t, srv, profile.ID)
+	if !final.Compatible || len(final.Issues) != 0 {
+		t.Fatalf("expected a fully fixed profile to be compatible, got %+v", final)
+	}
+}
+
+func hasIssueType(issues []CompatibilityIssue, want string) bool {
+	for _, issue := range issues {
+		if issue.Type == want {
+			return true
+		}
+	}
+	return false
+}
+
 func TestPatchProfileInvalidOp(t *testing.T) {
 	srv := New(DefaultConfig())
 	profile := createProfile(t, srv, `{"name":"inv-op","config":{}}`)

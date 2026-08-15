@@ -15,6 +15,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - server: out-of-range `--retry` and `--retrans` are refused at startup
+- server: a profile compatibility fix no longer marks the profile as reviewed, which reported every remaining issue as resolved and hid the other fix buttons in the admin UI
 - engine: Consistency05 compares delegations on the NS names in a referral's authority section, so trimmed glue, truncated responses and parents that serve the child zone themselves no longer report a false `MULTIPLE_DELEGATION_NS_SET` (RFC 9471, RFC 9609, RFC 2181)
 
 ### Changed

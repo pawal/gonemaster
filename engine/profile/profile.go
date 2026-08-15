@@ -356,7 +356,46 @@ func decodeProfileJSON(data []byte) (map[string]any, error) {
 	if err := decoder.Decode(&out); err != nil {
 		return nil, err
 	}
+	migrateRenamedTags(out)
 	return out, nil
+}
+
+// renamedTags maps retired message tag identifiers to their current names.
+var renamedTags = map[string]string{
+	"IN_BAILIWICK_ADDR_MISMATCH":     "IN_DOMAIN_ADDR_MISMATCH",
+	"OUT_OF_BAILIWICK_ADDR_MISMATCH": "NOT_IN_DOMAIN_ADDR_MISMATCH",
+	"IN_BAILIWICK_GLUE_MISSING":      "IN_DOMAIN_GLUE_MISSING",
+}
+
+// RenamedTag reports the current name of a retired message tag identifier.
+func RenamedTag(tag string) (string, bool) {
+	current, ok := renamedTags[tag]
+	return current, ok
+}
+
+// migrateRenamedTags rewrites retired tag keys in test_levels so stored
+// overrides survive a rename. An explicit current key wins.
+func migrateRenamedTags(data map[string]any) {
+	levels, ok := data["test_levels"].(map[string]any)
+	if !ok {
+		return
+	}
+	for _, raw := range levels {
+		tags, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		for old, current := range renamedTags {
+			level, found := tags[old]
+			if !found {
+				continue
+			}
+			delete(tags, old)
+			if _, exists := tags[current]; !exists {
+				tags[current] = level
+			}
+		}
+	}
 }
 
 func mustDefault() *Profile {

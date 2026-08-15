@@ -21,6 +21,58 @@ func TestDefaultProfileLoads(t *testing.T) {
 	}
 }
 
+func TestFromJSONMigratesRenamedTagKeys(t *testing.T) {
+	// A profile stored before the bailiwick identifiers were retired must keep
+	// its severity overrides, now attached to the current tag names. Without
+	// the rewrite the overrides would be dropped and the tags would silently
+	// fall back to the engine default severity.
+	p, err := FromJSON(`{"test_levels": {
+		"CONSISTENCY": {
+			"IN_BAILIWICK_ADDR_MISMATCH": "WARNING",
+			"OUT_OF_BAILIWICK_ADDR_MISMATCH": "NOTICE"
+		},
+		"DELEGATION": {"IN_BAILIWICK_GLUE_MISSING": "WARNING"}
+	}}`)
+	if err != nil {
+		t.Fatalf("from json: %v", err)
+	}
+
+	for _, tc := range []struct{ module, tag, want string }{
+		{"CONSISTENCY", "IN_DOMAIN_ADDR_MISMATCH", "WARNING"},
+		{"CONSISTENCY", "NOT_IN_DOMAIN_ADDR_MISMATCH", "NOTICE"},
+		{"DELEGATION", "IN_DOMAIN_GLUE_MISSING", "WARNING"},
+	} {
+		if got := p.TestLevels[tc.module][tc.tag]; got != tc.want {
+			t.Fatalf("%s:%s = %q, want %q", tc.module, tc.tag, got, tc.want)
+		}
+	}
+
+	for _, tc := range []struct{ module, tag string }{
+		{"CONSISTENCY", "IN_BAILIWICK_ADDR_MISMATCH"},
+		{"CONSISTENCY", "OUT_OF_BAILIWICK_ADDR_MISMATCH"},
+		{"DELEGATION", "IN_BAILIWICK_GLUE_MISSING"},
+	} {
+		if _, ok := p.TestLevels[tc.module][tc.tag]; ok {
+			t.Fatalf("retired identifier %s:%s survived the load", tc.module, tc.tag)
+		}
+	}
+}
+
+func TestFromJSONRenamedTagCurrentKeyWins(t *testing.T) {
+	// A profile carrying both spellings must keep the current one rather than
+	// let the legacy key overwrite it.
+	p, err := FromJSON(`{"test_levels": {"CONSISTENCY": {
+		"IN_BAILIWICK_ADDR_MISMATCH": "DEBUG",
+		"IN_DOMAIN_ADDR_MISMATCH": "ERROR"
+	}}}`)
+	if err != nil {
+		t.Fatalf("from json: %v", err)
+	}
+	if got := p.TestLevels["CONSISTENCY"]["IN_DOMAIN_ADDR_MISMATCH"]; got != "ERROR" {
+		t.Fatalf("IN_DOMAIN_ADDR_MISMATCH = %q, want ERROR", got)
+	}
+}
+
 func TestSystemSeverityParity(t *testing.T) {
 	p, err := Default()
 	if err != nil {

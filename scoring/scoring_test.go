@@ -1,6 +1,8 @@
 package scoring
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 )
 
@@ -471,6 +473,66 @@ func TestCompute_NoDisabledStacks(t *testing.T) {
 }
 
 // ---- TagPenalties tests -----------------------------------------------------
+
+func TestLoadConfig_MigratesRenamedTagPenalties(t *testing.T) {
+	// A scoring configuration written before the bailiwick identifiers were
+	// retired must keep overriding the same tags under their current names.
+	// Stored configurations are full snapshots, so without this rewrite the
+	// override would simply stop applying.
+	path := filepath.Join(t.TempDir(), "scoring.json")
+	body := `{"tag_penalties": {
+		"IN_BAILIWICK_ADDR_MISMATCH": 40,
+		"OUT_OF_BAILIWICK_ADDR_MISMATCH": 30,
+		"IN_BAILIWICK_GLUE_MISSING": 25
+	}}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	loaded, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	for tag, want := range map[string]int{
+		"IN_DOMAIN_ADDR_MISMATCH":     40,
+		"NOT_IN_DOMAIN_ADDR_MISMATCH": 30,
+		"IN_DOMAIN_GLUE_MISSING":      25,
+	} {
+		if got := loaded.TagPenalties[tag]; got != want {
+			t.Errorf("penalty for %s = %d, want %d", tag, got, want)
+		}
+	}
+	for _, tag := range []string{
+		"IN_BAILIWICK_ADDR_MISMATCH",
+		"OUT_OF_BAILIWICK_ADDR_MISMATCH",
+		"IN_BAILIWICK_GLUE_MISSING",
+	} {
+		if _, ok := loaded.TagPenalties[tag]; ok {
+			t.Errorf("retired identifier %s survived the load", tag)
+		}
+	}
+}
+
+func TestLoadConfig_RenamedTagCurrentKeyWins(t *testing.T) {
+	// A configuration carrying both spellings must keep the current one.
+	path := filepath.Join(t.TempDir(), "scoring.json")
+	body := `{"tag_penalties": {
+		"IN_BAILIWICK_ADDR_MISMATCH": 40,
+		"IN_DOMAIN_ADDR_MISMATCH": 7
+	}}`
+	if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	loaded, err := LoadConfig(path)
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if got := loaded.TagPenalties["IN_DOMAIN_ADDR_MISMATCH"]; got != 7 {
+		t.Errorf("penalty for IN_DOMAIN_ADDR_MISMATCH = %d, want 7", got)
+	}
+}
 
 func TestCompute_TagPenaltyOverridesSeverity(t *testing.T) {
 	// DS07_NOT_SIGNED is WARNING (5 pts by severity) but gets 20 pts via TagPenalties.

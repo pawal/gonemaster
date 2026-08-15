@@ -71,7 +71,31 @@ func LoadConfig(path string) (Config, error) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return Config{}, fmt.Errorf("parsing scoring config %q: %w", path, err)
 	}
+	migrateRenamedTags(cfg.TagPenalties)
 	return cfg, nil
+}
+
+// renamedTags maps retired message tag identifiers to their current names.
+// Local copy: this package depends on neither the engine nor the server.
+var renamedTags = map[string]string{
+	"IN_BAILIWICK_ADDR_MISMATCH":     "IN_DOMAIN_ADDR_MISMATCH",
+	"OUT_OF_BAILIWICK_ADDR_MISMATCH": "NOT_IN_DOMAIN_ADDR_MISMATCH",
+	"IN_BAILIWICK_GLUE_MISSING":      "IN_DOMAIN_GLUE_MISSING",
+}
+
+// migrateRenamedTags rewrites retired tag keys in a stored penalty map so the
+// override survives a rename. An explicit current key wins.
+func migrateRenamedTags(penalties map[string]int) {
+	for old, current := range renamedTags {
+		penalty, found := penalties[old]
+		if !found {
+			continue
+		}
+		delete(penalties, old)
+		if _, exists := penalties[current]; !exists {
+			penalties[current] = penalty
+		}
+	}
 }
 
 // DefaultConfig returns the recommended configuration suitable for public DNS

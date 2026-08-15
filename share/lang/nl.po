@@ -483,7 +483,7 @@ msgctxt "CONSISTENCY:EXTRA_ADDRESS_CHILD"
 msgid "Child has extra nameserver IP address(es) not listed at parent ({addresses})."
 msgstr "De onderliggende zone heeft extra naamserver-IP-adres(sen) die niet bij de bovenliggende zone staan vermeld ({addresses})."
 
-msgctxt "CONSISTENCY:IN_BAILIWICK_ADDR_MISMATCH"
+msgctxt "CONSISTENCY:IN_DOMAIN_ADDR_MISMATCH"
 msgid ""
 "In-domain name server {ns} listed at parent has a mismatch between glue "
 "data at parent ({parent_servers}) and the address records in the child "
@@ -574,7 +574,7 @@ msgctxt "CONSISTENCY:ONE_SOA_TIME_PARAMETER_SET"
 msgid "A single SOA time parameter set was seen (REFRESH={refresh},RETRY={retry},EXPIRE={expire},MINIMUM={minimum})."
 msgstr "Eén set SOA-tijdparameters gezien (REFRESH={refresh},RETRY={retry},EXPIRE={expire},MINIMUM={minimum})."
 
-msgctxt "CONSISTENCY:OUT_OF_BAILIWICK_ADDR_MISMATCH"
+msgctxt "CONSISTENCY:NOT_IN_DOMAIN_ADDR_MISMATCH"
 msgid "Not-in-domain name server listed at parent with glue record has a mismatch between the glue at the parent ({parent_servers}) and any equivalent address record found in authoritative zone ({zone_servers})."
 msgstr "Een not-in-domain-naamserver die met een glue-record bij de bovenliggende zone staat vermeld, heeft een verschil tussen de glue bij de bovenliggende zone ({parent_servers}) en een eventueel overeenkomend adresrecord dat in de autoritatieve zone is gevonden ({zone_servers})."
 
@@ -2332,7 +2332,7 @@ msgctxt "DELEGATION:EXTRA_NAME_PARENT"
 msgid "Parent has nameserver(s) not listed at the child ({extra})."
 msgstr "De bovenliggende zone heeft naamserver(s) die niet in de onderliggende zone zijn vermeld ({extra})."
 
-msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING"
 msgid "In-domain nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
 msgstr "In-domain naamserver {ns} heeft geen glue-adresrecord (A of AAAA) in de verwijzing (referral) van de bovenliggende zone."
 

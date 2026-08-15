@@ -483,7 +483,7 @@ msgctxt "CONSISTENCY:EXTRA_ADDRESS_CHILD"
 msgid "Child has extra nameserver IP address(es) not listed at parent ({addresses})."
 msgstr "Podřízená strana má další IP adresy jmenných serverů, které nejsou uvedeny u nadřazené strany ({addresses})."
 
-msgctxt "CONSISTENCY:IN_BAILIWICK_ADDR_MISMATCH"
+msgctxt "CONSISTENCY:IN_DOMAIN_ADDR_MISMATCH"
 msgid ""
 "In-domain name server {ns} listed at parent has a mismatch between glue "
 "data at parent ({parent_servers}) and the address records in the child "
@@ -573,7 +573,7 @@ msgctxt "CONSISTENCY:ONE_SOA_TIME_PARAMETER_SET"
 msgid "A single SOA time parameter set was seen (REFRESH={refresh},RETRY={retry},EXPIRE={expire},MINIMUM={minimum})."
 msgstr "Byla zjištěna jediná sada časových parametrů SOA (REFRESH={refresh},RETRY={retry},EXPIRE={expire},MINIMUM={minimum})."
 
-msgctxt "CONSISTENCY:OUT_OF_BAILIWICK_ADDR_MISMATCH"
+msgctxt "CONSISTENCY:NOT_IN_DOMAIN_ADDR_MISMATCH"
 msgid "Not-in-domain name server listed at parent with glue record has a mismatch between the glue at the parent ({parent_servers}) and any equivalent address record found in authoritative zone ({zone_servers})."
 msgstr "Jmenný server mimo doménu uvedený u nadřazené strany s GLUE záznamem má nesoulad mezi GLUE u nadřazené strany ({parent_servers}) a jakýmkoli odpovídajícím adresním záznamem nalezeným v autoritativní zóně ({zone_servers})."
 
@@ -2332,7 +2332,7 @@ msgctxt "DELEGATION:EXTRA_NAME_PARENT"
 msgid "Parent has nameserver(s) not listed at the child ({extra})."
 msgstr "Nadřazená zóna má jmenný server/servery neuvedené v podřízené zóně ({extra})."
 
-msgctxt "DELEGATION:IN_BAILIWICK_GLUE_MISSING"
+msgctxt "DELEGATION:IN_DOMAIN_GLUE_MISSING"
 msgid "In-domain nameserver {ns} has no glue address record (A or AAAA) in the parent referral."
 msgstr "Jmenný server {ns} v rámci domény nemá GLUE adresní záznam (A nebo AAAA) v odkazu z nadřazené zóny."
 

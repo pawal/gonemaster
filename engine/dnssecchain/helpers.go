@@ -62,7 +62,7 @@ func cdnskeyRefs(resp packet.Packet, zone dnsname.Name) []uint16 {
 	var out []uint16
 	for _, rr := range resp.GetRecordsForName("CDNSKEY", zone, "answer") {
 		if ck, ok := rr.(*dns.CDNSKEY); ok && ck.Algorithm != 0 {
-			out = append(out, ck.KeyTag())
+			out = append(out, dnssecutil.KeyTag(&ck.DNSKEY))
 		}
 	}
 	return out
@@ -172,7 +172,7 @@ func sigState(sig *dns.RRSIG, rrset []dns.RR, keys []*dns.DNSKEY, at time.Time) 
 	}
 	var matching []*dns.DNSKEY
 	for _, k := range keys {
-		if k.KeyTag() == sig.KeyTag {
+		if dnssecutil.KeyTag(k) == sig.KeyTag {
 			matching = append(matching, k)
 		}
 	}

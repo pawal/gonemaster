@@ -168,7 +168,7 @@ func (e *extractor) extractParent(ctx context.Context, in Input) {
 			state := sigState(sig, dsRRset, parentKeys, e.at)
 			e.addRRSIG(&e.summary.Parent.DSRRSIG, sig, state, ip)
 			for _, pk := range parentKeys {
-				if pk.KeyTag() == sig.KeyTag {
+				if dnssecutil.KeyTag(pk) == sig.KeyTag {
 					e.addParentDNSKEY(pk, ip)
 				}
 			}
@@ -485,7 +485,7 @@ func (e *extractor) addDNSKEY(key *dns.DNSKEY, server string) {
 	if key == nil {
 		return
 	}
-	keytag := key.KeyTag()
+	keytag := dnssecutil.KeyTag(key)
 	id := fmt.Sprintf("%d|%d|%d", keytag, key.Algorithm, key.Flags)
 	if idx, ok := e.keyIndex[id]; ok {
 		e.summary.Child.DNSKEYs[idx].Servers = append(e.summary.Child.DNSKEYs[idx].Servers, server)
@@ -511,7 +511,7 @@ func (e *extractor) addParentDNSKEY(key *dns.DNSKEY, server string) {
 	if key == nil {
 		return
 	}
-	keytag := key.KeyTag()
+	keytag := dnssecutil.KeyTag(key)
 	id := fmt.Sprintf("%d|%d|%d", keytag, key.Algorithm, key.Flags)
 	if idx, ok := e.parentKeyIndex[id]; ok {
 		e.summary.Parent.DNSKEYs[idx].Servers = append(e.summary.Parent.DNSKEYs[idx].Servers, server)

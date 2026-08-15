@@ -23,6 +23,16 @@ func AlgorithmSupported(algo uint8) bool {
 	}
 }
 
+// KeyTag returns the key tag without memoizing it into the caller's record,
+// which may be a cached record shared between concurrent runs.
+func KeyTag(key *dns.DNSKEY) uint16 {
+	if key == nil {
+		return 0
+	}
+	local := *key
+	return local.KeyTag()
+}
+
 // DigestSupported reports whether the DS digest type is a known IANA type.
 func DigestSupported(digest uint8) bool {
 	switch digest {
@@ -123,5 +133,19 @@ func VerifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) 
 			err = fmt.Errorf("dns library panic during RRSIG verification: %v", r)
 		}
 	}()
-	return sig.Verify(key, rrset, &dns.SignOption{})
+	// Verification canonicalizes in place, and cached records are shared between
+	// concurrent runs, so verify on copies.
+	local := *sig
+	keyCopy, ok := key.Clone().(*dns.DNSKEY)
+	if !ok {
+		return errors.New("dnskey copy changed type")
+	}
+	copies := make([]dns.RR, 0, len(rrset))
+	for _, rr := range rrset {
+		if rr == nil {
+			continue
+		}
+		copies = append(copies, rr.Clone())
+	}
+	return local.Verify(keyCopy, copies, &dns.SignOption{})
 }

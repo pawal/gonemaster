@@ -1209,7 +1209,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					hasAlgoMatchCandidate := false
 
 					for _, key := range dnskeyRecords {
-						if ds.KeyTag == key.KeyTag() {
+						if ds.KeyTag == keyTag(key) {
 							matchingKeytagDNSKEYs = append(matchingKeytagDNSKEYs, key)
 						}
 					}
@@ -1266,7 +1266,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 
-					dnskeyMatchingDS[matchingDNSKEY] = matchingDNSKEY.KeyTag()
+					dnskeyMatchingDS[matchingDNSKEY] = keyTag(matchingDNSKEY)
 					outcome.hasDNSKEYMatchDS = true
 
 					rrset := dnskeyRRset(dnskeyRecords)
@@ -2148,7 +2148,7 @@ func DNSSEC05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 					algo := key.Algorithm
-					keytag := key.KeyTag()
+					keytag := keyTag(key)
 					tag := dnssec05TagForAlgorithm(algo)
 					if sets[tag] == nil {
 						continue
@@ -2794,7 +2794,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 					var matchingDNSKEYs []*dns.DNSKEY
 					for _, dnskey := range dnskeyRecords {
-						if dnskey.KeyTag() == sig.KeyTag {
+						if keyTag(dnskey) == sig.KeyTag {
 							matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
 						}
 					}
@@ -3126,7 +3126,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 					var matchingDNSKEYs []*dns.DNSKEY
 					for _, dnskey := range dnskeyRecords {
-						if dnskey.KeyTag() == sig.KeyTag {
+						if keyTag(dnskey) == sig.KeyTag {
 							matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
 						}
 					}
@@ -3528,7 +3528,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								keytag := sig.KeyTag
 								var matchingDNSKEYs []*dns.DNSKEY
 								for _, dnskey := range dnskeyRecords {
-									if dnskey.KeyTag() == keytag {
+									if keyTag(dnskey) == keytag {
 										matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
 									}
 								}
@@ -3551,7 +3551,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 										break
 									} else if idx == len(matchingDNSKEYs)-1 {
 										if errors.Is(err, dns.ErrAlg) {
-											key := dnskey.KeyTag()
+											key := keyTag(dnskey)
 											if outcome.algoNotSupportedByZM[key] == nil {
 												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 											}
@@ -3607,7 +3607,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								keytag := sig.KeyTag
 								var matchingDNSKEYs []*dns.DNSKEY
 								for _, dnskey := range dnskeyRecords {
-									if dnskey.KeyTag() == keytag {
+									if keyTag(dnskey) == keytag {
 										matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
 									}
 								}
@@ -3630,7 +3630,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 										break
 									} else if idx == len(matchingDNSKEYs)-1 {
 										if errors.Is(err, dns.ErrAlg) {
-											key := dnskey.KeyTag()
+											key := keyTag(dnskey)
 											if outcome.algoNotSupportedByZM[key] == nil {
 												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 											}
@@ -3703,7 +3703,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 								keytag := sig.KeyTag
 								var matchingDNSKEYs []*dns.DNSKEY
 								for _, dnskey := range dnskeyRecords {
-									if dnskey.KeyTag() == keytag {
+									if keyTag(dnskey) == keytag {
 										matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
 									}
 								}
@@ -3726,7 +3726,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 										break
 									} else if idx == len(matchingDNSKEYs)-1 {
 										if errors.Is(err, dns.ErrAlg) {
-											key := dnskey.KeyTag()
+											key := keyTag(dnskey)
 											if outcome.algoNotSupportedByZM[key] == nil {
 												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 											}
@@ -4941,7 +4941,7 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 
 		keysize := dnskeyKeySize(key)
-		keytag := key.KeyTag()
+		keytag := keyTag(key)
 		keyRef := strconv.Itoa(int(keytag)) + ":" + strconv.Itoa(keysize) + ":" + strconv.Itoa(int(algo))
 		if investigatedKeys[keyRef] {
 			continue
@@ -5178,7 +5178,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, cds := range cdsRecords {
 				matched := false
 				for _, cdnskey := range cdnskeyRecords {
-					if (cds.KeyTag == cdnskey.KeyTag() && cds.Algorithm == cdnskey.Algorithm) || (cds.Algorithm == 0 && cdnskey.Algorithm == 0) {
+					if (cds.KeyTag == keyTag(&cdnskey.DNSKEY) && cds.Algorithm == cdnskey.Algorithm) || (cds.Algorithm == 0 && cdnskey.Algorithm == 0) {
 						matched = true
 						break
 					}
@@ -5191,7 +5191,7 @@ func DNSSEC15(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			for _, cdnskey := range cdnskeyRecords {
 				matched := false
 				for _, cds := range cdsRecords {
-					if (cdnskey.KeyTag() == cds.KeyTag && cdnskey.Algorithm == cds.Algorithm) || (cdnskey.Algorithm == 0 && cds.Algorithm == 0) {
+					if (keyTag(&cdnskey.DNSKEY) == cds.KeyTag && cdnskey.Algorithm == cds.Algorithm) || (cdnskey.Algorithm == 0 && cds.Algorithm == 0) {
 						matched = true
 						break
 					}
@@ -5492,7 +5492,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					keytag := cds.KeyTag
 					var matchingDNSKEYs []*dns.DNSKEY
 					for _, dnskey := range dnskeys {
-						if dnskey.KeyTag() == keytag {
+						if keyTag(dnskey) == keytag {
 							matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
 						}
 					}
@@ -5541,7 +5541,7 @@ func DNSSEC16(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						keytag := sig.KeyTag
 						var matchingDNSKEYs []*dns.DNSKEY
 						for _, dnskey := range dnskeys {
-							if dnskey.KeyTag() == keytag {
+							if keyTag(dnskey) == keytag {
 								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
 							}
 						}
@@ -6005,7 +6005,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					if cdnskey.Algorithm == 0 {
 						continue
 					}
-					keytag := cdnskey.KeyTag()
+					keytag := keyTag(&cdnskey.DNSKEY)
 					if cdnskey.Flags&dns.FlagZONE == 0 {
 						outcome.cdnskeyIsNonZone[keytag] = true
 						continue
@@ -6016,7 +6016,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 					var matchingDNSKEYs []*dns.DNSKEY
 					for _, dnskey := range dnskeys {
-						if dnskey.KeyTag() == keytag {
+						if keyTag(dnskey) == keytag {
 							matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
 						}
 					}
@@ -6044,7 +6044,7 @@ func DNSSEC17(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						keytag := sig.KeyTag
 						var matchingDNSKEYs []*dns.DNSKEY
 						for _, dnskey := range dnskeys {
-							if dnskey.KeyTag() == keytag {
+							if keyTag(dnskey) == keytag {
 								matchingDNSKEYs = append(matchingDNSKEYs, dnskey)
 							}
 						}
@@ -6764,12 +6764,12 @@ func DNSSEC18(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			sepKeytags := make(map[uint16]bool)
 			for _, key := range dnskeys {
 				if key.Flags&dns.FlagSEP != 0 {
-					sepKeytags[key.KeyTag()] = true
+					sepKeytags[keyTag(key)] = true
 				}
 			}
 			dnskeyKeytagSet := make(map[uint16]bool)
 			for _, key := range dnskeys {
-				dnskeyKeytagSet[key.KeyTag()] = true
+				dnskeyKeytagSet[keyTag(key)] = true
 			}
 			dsKeytags := make(map[uint16]bool)
 			for _, ds := range dsRecords {
@@ -6964,7 +6964,7 @@ func DNSSEC19(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						continue
 					}
 
-					keyID := dnssec19Key{keytag: key.KeyTag(), algo: key.Algorithm}
+					keyID := dnssec19Key{keytag: keyTag(key), algo: key.Algorithm}
 					if len(findings) == 0 {
 						outcome.ok[keyID] = append(outcome.ok[keyID], servers...)
 						continue
@@ -7332,7 +7332,7 @@ func dnskeyHasKeytag(rrs []*dns.DNSKEY, keytag uint16) bool {
 		if dnskey == nil {
 			continue
 		}
-		if dnskey.KeyTag() == keytag {
+		if keyTag(dnskey) == keytag {
 			return true
 		}
 	}
@@ -7759,7 +7759,7 @@ func cdnskeyContentMatchesDS(cdnskeyRecs []*dns.CDNSKEY, dsRecs []*dns.DS) bool 
 		dsSet[makeDSContentKey(ds)] = true
 	}
 	for _, cdnskey := range cdnskeyRecs {
-		if !dsKeytagSet[cdnskey.KeyTag()] {
+		if !dsKeytagSet[keyTag(&cdnskey.DNSKEY)] {
 			return false
 		}
 	}
@@ -7815,7 +7815,7 @@ func keytags16FromDS(recs []*dns.DS) []uint16 {
 func keytags16FromCDNSKEY(recs []*dns.CDNSKEY) []uint16 {
 	seen := make(map[uint16]bool, len(recs))
 	for _, cdnskey := range recs {
-		seen[cdnskey.KeyTag()] = true
+		seen[keyTag(&cdnskey.DNSKEY)] = true
 	}
 	return sortedKeytags16(seen)
 }
@@ -7976,6 +7976,7 @@ func rrsigTypeString(typeCovered uint16) string {
 var (
 	dnssecAlgorithmSupported = dnssecutil.AlgorithmSupported
 	verifyRRSIG              = dnssecutil.VerifyRRSIG
+	keyTag                   = dnssecutil.KeyTag
 )
 
 // DNSSEC20 runs the DNSSEC20 test case.
@@ -8387,7 +8388,7 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				var matchingKeys []*dns.DNSKEY
 				for _, k := range parentKeys {
-					if k.KeyTag() == sig.KeyTag {
+					if keyTag(k) == sig.KeyTag {
 						matchingKeys = append(matchingKeys, k)
 					}
 				}

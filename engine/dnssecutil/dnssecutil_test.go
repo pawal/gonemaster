@@ -170,3 +170,124 @@ func TestKeySizeUnaffected(t *testing.T) {
 		}
 	}
 }
+
+// The DNS library verifies by canonicalizing the records it is handed: owner
+// names are lowercased, every covered record is forced to the RRSIG original
+// TTL, and the RRset is sorted. Those writes used to land on the caller's
+// records, which are pointers into a packet cache shared between concurrent
+// runs. Verification must leave the caller's records untouched.
+func TestVerifyRRSIGDoesNotMutateCallerRecords(t *testing.T) {
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("Example.Test"), Class: dns.ClassINET, TTL: 3600}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = dns.ECDSAP256SHA256
+	priv, err := key.Generate(256)
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	signer, ok := priv.(crypto.Signer)
+	if !ok {
+		t.Fatalf("private key does not implement crypto.Signer")
+	}
+
+	// Two records with distinct TTLs and mixed-case owner names, in an order
+	// the canonical sort would change.
+	second := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn("B.Example.Test"), Class: dns.ClassINET, TTL: 900}}
+	second.Addr = netip.MustParseAddr("192.0.2.2")
+	first := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn("a.Example.Test"), Class: dns.ClassINET, TTL: 300}}
+	first.Addr = netip.MustParseAddr("192.0.2.1")
+	rrset := []dns.RR{second, first}
+
+	now := time.Now().UTC()
+	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn("Example.Test"), Class: dns.ClassINET, TTL: 3600}}
+	sig.TypeCovered = dns.TypeA
+	sig.Algorithm = key.Algorithm
+	sig.Labels = uint8(dnsutil.Labels(dnsutil.Fqdn("a.Example.Test")))
+	sig.OrigTTL = 7200
+	sig.Inception = uint32(now.Add(-time.Hour).Unix())
+	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
+	sig.KeyTag = key.KeyTag()
+	sig.SignerName = key.Hdr.Name
+	if err := sig.Sign(signer, rrset, &dns.SignOption{}); err != nil {
+		t.Fatalf("sign RRset: %v", err)
+	}
+
+	// Signing canonicalizes as well, so put the records back into the shape a
+	// cached response holds: wire TTLs, mixed-case owner names, answer order.
+	// Verification has to cope with that and hand it back unchanged.
+	second.Hdr.Name = dnsutil.Fqdn("B.Example.Test")
+	second.Hdr.TTL = 900
+	first.Hdr.Name = dnsutil.Fqdn("a.Example.Test")
+	first.Hdr.TTL = 300
+	sig.Hdr.Name = dnsutil.Fqdn("Example.Test")
+	rrset = []dns.RR{second, first}
+
+	wantOrder := []dns.RR{rrset[0], rrset[1]}
+	wantNames := []string{rrset[0].Header().Name, rrset[1].Header().Name}
+	wantTTLs := []uint32{rrset[0].Header().TTL, rrset[1].Header().TTL}
+	wantSigName := sig.Hdr.Name
+	wantSignature := sig.Signature
+
+	if err := VerifyRRSIG(sig, rrset, key, now); err != nil {
+		t.Fatalf("valid signature should verify: %v", err)
+	}
+
+	for i := range rrset {
+		if rrset[i] != wantOrder[i] {
+			t.Errorf("record %d: the RRset was reordered", i)
+		}
+		if got := rrset[i].Header().Name; got != wantNames[i] {
+			t.Errorf("record %d: owner name changed to %q, want %q", i, got, wantNames[i])
+		}
+		if got := rrset[i].Header().TTL; got != wantTTLs[i] {
+			t.Errorf("record %d: TTL changed to %d, want %d", i, got, wantTTLs[i])
+		}
+	}
+	if sig.Hdr.Name != wantSigName {
+		t.Errorf("RRSIG owner name changed to %q, want %q", sig.Hdr.Name, wantSigName)
+	}
+	if sig.Signature != wantSignature {
+		t.Error("RRSIG signature field was rewritten")
+	}
+}
+
+// The library's KeyTag method memoizes its result into the record it is called
+// on. Engine code calls it on DNSKEYs that live in a packet cache shared with
+// concurrent runs, so the helper has to return the same value while leaving the
+// caller's record alone.
+func TestKeyTagDoesNotMemoizeIntoCallerRecord(t *testing.T) {
+	if got := KeyTag(nil); got != 0 {
+		t.Errorf("nil key: got %d, want 0", got)
+	}
+
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example.test"), Class: dns.ClassINET, TTL: 3600}}
+	key.Flags = dns.FlagZONE
+	key.Protocol = 3
+	key.Algorithm = dns.ECDSAP256SHA256
+	if _, err := key.Generate(256); err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+
+	// A reference copy carries the memoized tag; the caller's record must not.
+	reference := *key
+	want := reference.KeyTag()
+
+	if got := KeyTag(key); got != want {
+		t.Errorf("KeyTag = %d, want %d", got, want)
+	}
+	if key.Tag != 0 {
+		t.Errorf("the caller's record was memoized into: Tag = %d, want 0", key.Tag)
+	}
+
+	// Repeat calls must stay stable even though nothing is cached on the record.
+	if got := KeyTag(key); got != want {
+		t.Errorf("second KeyTag = %d, want %d", got, want)
+	}
+
+	// A record that already carries a tag is answered with the same value.
+	memoized := *key
+	memoized.Tag = want
+	if got := KeyTag(&memoized); got != want {
+		t.Errorf("pre-memoized key: KeyTag = %d, want %d", got, want)
+	}
+}

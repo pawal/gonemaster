@@ -331,6 +331,13 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		engineMinLevel = lowerLevel(minLevel, "INFO")
 	}
 
+	// --count tallies every entry it is handed, including levels below the
+	// display floor, so that run has to capture everything.
+	captureMinLevel := engineMinLevel
+	if count {
+		captureMinLevel = ""
+	}
+
 	hasPacketCacheFlags := strings.TrimSpace(savePacketCachePath) != "" || strings.TrimSpace(restorePacketCachePath) != ""
 	if hasPacketCacheFlags && showVersion {
 		fmt.Fprintln(errOut, "--save/--restore cannot be combined with --version")
@@ -565,6 +572,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		Testcases:             []string(testcases),
 		Profile:               profile,
 		MinLevel:              engineMinLevel,
+		CaptureMinLevel:       captureMinLevel,
 		Debug:                 debugFlag,
 		IPv4:                  ipv4Override,
 		IPv6:                  ipv6Override,

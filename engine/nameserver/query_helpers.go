@@ -195,9 +195,11 @@ func (ns Nameserver) fakeDSResponse(name string, qtype string, qclass string, op
 	}
 	logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
 	logSystemWithLogger(runLog, "FAKE_DS_RETURNED", logArgs)
-	logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
-		"packet": resp.String(),
-	})
+	if runLog.Wants(systemModuleName, "FAKE_PACKET_RETURNED") {
+		logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
+			"packet": resp.String(),
+		})
+	}
 	return resp, true
 }
 
@@ -247,9 +249,11 @@ func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass st
 		}
 		logargs.SetNS(logArgs, ns.NameString(), ns.AddressString())
 		logSystemWithLogger(runLog, "FAKE_DELEGATION_RETURNED", logArgs)
-		logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
-			"packet": resp.String(),
-		})
+		if runLog.Wants(systemModuleName, "FAKE_PACKET_RETURNED") {
+			logSystemWithLogger(runLog, "FAKE_PACKET_RETURNED", map[string]any{
+				"packet": resp.String(),
+			})
+		}
 		return resp, true
 	}
 	return packet.Packet{}, false

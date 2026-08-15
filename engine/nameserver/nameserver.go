@@ -552,7 +552,8 @@ func logSystemWithLogger(log *logger.Logger, tag string, args map[string]any) {
 }
 
 func logCachedReturnWithLogger(log *logger.Logger, resp packet.Packet) {
-	if log == nil {
+	// Rendering the packet is expensive, so skip it when nothing captures the entry.
+	if log == nil || !log.Wants(systemModuleName, "CACHED_RETURN") {
 		return
 	}
 	args := map[string]any{"packet": "undef"}

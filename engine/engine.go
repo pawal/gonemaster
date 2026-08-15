@@ -53,6 +53,10 @@ type RunRequest struct {
 	ProfileData string
 	// MinLevel controls minimum emitted output level (for example "INFO").
 	MinLevel string
+	// CaptureMinLevel drops entries below this level before they are stored or
+	// streamed to LogCallback. Empty captures everything, and the level is
+	// clamped to MinLevel so results never lose entries.
+	CaptureMinLevel string
 	// IPv4 overrides net.ipv4 when non-nil.
 	IPv4 *bool
 	// IPv6 overrides net.ipv6 when non-nil.
@@ -509,6 +513,9 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	if runner.Logger == nil {
 		return nil, fmt.Errorf("runner logger is required")
 	}
+	if err := applyCaptureLevel(runner.Logger, req); err != nil {
+		return nil, err
+	}
 	if runner.NameserverCache == nil {
 		if req.NameserverCache != nil {
 			runner.NameserverCache = req.NameserverCache
@@ -830,6 +837,24 @@ func emitDNSSECChain(ctx context.Context, req RunRequest, z *zone.Zone) {
 	if summary := dnssecchain.Extract(ctx, in); summary != nil {
 		req.DNSSECChainSink(summary)
 	}
+}
+
+// applyCaptureLevel sets the run's capture level, clamped to MinLevel so an
+// entry that would be returned is never dropped.
+func applyCaptureLevel(log *logger.Logger, req RunRequest) error {
+	capture := strings.ToUpper(strings.TrimSpace(req.CaptureMinLevel))
+	if capture == "" {
+		return nil
+	}
+	levels := logger.Levels()
+	captureValue, ok := levels[capture]
+	if !ok {
+		return fmt.Errorf("unknown capture min level %q", req.CaptureMinLevel)
+	}
+	if minValue, ok := levels[strings.ToUpper(strings.TrimSpace(req.MinLevel))]; ok && minValue < captureValue {
+		capture = strings.ToUpper(strings.TrimSpace(req.MinLevel))
+	}
+	return log.SetCaptureLevel(capture)
 }
 
 func convertEntries(entries []*logger.Entry, minLevel string) ([]LogEntry, error) {

@@ -67,6 +67,18 @@ func newEntryWithTimestamp(tag string, args map[string]any, testcase string, mod
 	return entry, nil
 }
 
+// levelForTag returns the configured level for a module/tag pair, defaulting to
+// DEBUG when the profile does not name it.
+func levelForTag(levelConfig map[string]map[string]string, module string, tag string) string {
+	if levelConfig == nil {
+		return "DEBUG"
+	}
+	if value, ok := levelConfig[strings.ToUpper(module)][strings.ToUpper(tag)]; ok {
+		return strings.ToUpper(value)
+	}
+	return "DEBUG"
+}
+
 // Level returns the log level for this entry.
 func (e *Entry) Level() string {
 	if e == nil {
@@ -76,15 +88,7 @@ func (e *Entry) Level() string {
 		return e.level
 	}
 
-	level := "DEBUG"
-	if e.levelConfig != nil {
-		moduleLevels := e.levelConfig[strings.ToUpper(e.Module)]
-		if moduleLevels != nil {
-			if value, ok := moduleLevels[strings.ToUpper(e.Tag)]; ok {
-				level = strings.ToUpper(value)
-			}
-		}
-	}
+	level := levelForTag(e.levelConfig, e.Module, e.Tag)
 
 	if _, ok := numericLevels[level]; !ok {
 		panic(fmt.Errorf("unknown level string: %s", level))

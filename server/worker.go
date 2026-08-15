@@ -365,6 +365,9 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, er
 		}
 	}
 	req.LogCallback = chainLogCallbacks(callbacks...)
+	// The callbacks read EXTERNAL_QUERY and the testcase markers, all DEBUG; the
+	// engine clamps this to the job's min level, so a DEBUG2/3 job still gets them.
+	req.CaptureMinLevel = "DEBUG"
 
 	// Public jobs only; multi-testcase jobs keep the summary with most evidence.
 	var chainSummary *dnssecchain.Summary

@@ -1436,3 +1436,101 @@ func TestRunAllowNonGlobalFlag(t *testing.T) {
 		t.Fatalf("expected AllowNonGlobalTargets unset by default, got %#v", captured.AllowNonGlobalTargets)
 	}
 }
+
+// The CLI tells the engine how much to capture. Anything the run itself will
+// return has to stay capturable, so the capture level tracks the level the CLI
+// asked the engine for rather than the user's display level.
+func TestRunPassesCaptureMinLevelMatchingTheEngineLevel(t *testing.T) {
+	var captured engine.RunRequest
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		captured = req
+		return nil, nil
+	}
+	t.Cleanup(func() {
+		runEngine = previous
+	})
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	if code := run([]string{"--domain", "example.com", "--json"}, &out, &errOut); code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+
+	if captured.MinLevel == "" {
+		t.Fatal("expected the run to request a min level")
+	}
+	if captured.CaptureMinLevel != captured.MinLevel {
+		t.Fatalf("capture level %q, want the engine min level %q", captured.CaptureMinLevel, captured.MinLevel)
+	}
+}
+
+// --count tallies every entry it is handed, including levels far below the
+// display floor, so that run must capture everything.
+func TestRunCountCapturesEverything(t *testing.T) {
+	var captured engine.RunRequest
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		captured = req
+		return nil, nil
+	}
+	t.Cleanup(func() {
+		runEngine = previous
+	})
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	if code := run([]string{"--domain", "example.com", "--count"}, &out, &errOut); code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+
+	if captured.CaptureMinLevel != "" {
+		t.Fatalf("capture level %q, want empty so --count sees every entry", captured.CaptureMinLevel)
+	}
+}
+
+// The packet cache is written from the nameserver cache, not from log entries,
+// so capturing fewer entries must not change what --save produces.
+func TestRunSavePacketCacheUnaffectedByCaptureLevel(t *testing.T) {
+	dir := t.TempDir()
+	savePath := filepath.Join(dir, "saved-cache.json")
+	fixture := samplePacketCacheFile(t)
+
+	var captured engine.RunRequest
+	previous := runEngine
+	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		captured = req
+		if req.NameserverCache == nil {
+			t.Fatalf("expected nameserver cache in request")
+		}
+		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor, req.ASNCache); importErr != nil {
+			t.Fatalf("import fixture into run cache: %v", importErr)
+		}
+		return nil, nil
+	}
+	t.Cleanup(func() {
+		runEngine = previous
+	})
+
+	var out bytes.Buffer
+	var errOut bytes.Buffer
+	if code := run([]string{"--domain", "example.com", "--save", savePath}, &out, &errOut); code != 0 {
+		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
+	}
+
+	if captured.CaptureMinLevel == "" {
+		t.Fatal("expected the save run to be gated, otherwise this test proves nothing")
+	}
+
+	payloadBytes, err := os.ReadFile(savePath)
+	if err != nil {
+		t.Fatalf("read saved cache file: %v", err)
+	}
+	var payload cachefile.File
+	if err := json.Unmarshal(payloadBytes, &payload); err != nil {
+		t.Fatalf("unmarshal saved cache: %v", err)
+	}
+	if len(payload.Entries) != 1 || payload.Entries[0].Key != "fixture.key" {
+		t.Fatalf("unexpected saved cache contents: %+v", payload.Entries)
+	}
+}

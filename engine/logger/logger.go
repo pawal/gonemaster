@@ -31,6 +31,8 @@ type Logger struct {
 	configMu        sync.RWMutex
 	logFilter       map[string]map[string][]profile.LogFilterRule
 	testLevels      map[string]map[string]string
+	captureFloor    int
+	hasCapture      bool
 }
 
 // New creates a new Logger.
@@ -54,7 +56,67 @@ func (l *Logger) SetProfile(p *profile.Profile) {
 	l.configMu.Unlock()
 }
 
-// CopyConfigFrom copies log filtering and levels from another logger.
+// SetCaptureLevel drops entries below level before they are stored or passed to
+// callbacks. An empty level captures everything.
+func (l *Logger) SetCaptureLevel(level string) error {
+	if l == nil {
+		return nil
+	}
+	level = strings.ToUpper(strings.TrimSpace(level))
+	if level == "" {
+		l.configMu.Lock()
+		l.captureFloor = 0
+		l.hasCapture = false
+		l.configMu.Unlock()
+		return nil
+	}
+	value, ok := numericLevels[level]
+	if !ok {
+		return fmt.Errorf("unknown level %q", level)
+	}
+	l.configMu.Lock()
+	l.captureFloor = value
+	l.hasCapture = true
+	l.configMu.Unlock()
+	return nil
+}
+
+// Wants reports whether an entry with this tag would be captured. Callers use it
+// to skip building expensive arguments for entries nothing will read.
+func (l *Logger) Wants(module string, tag string) bool {
+	if l == nil {
+		return false
+	}
+	l.configMu.RLock()
+	floor, has := l.captureFloor, l.hasCapture
+	testLevels, logFilter := l.testLevels, l.logFilter
+	l.configMu.RUnlock()
+	if !has {
+		return true
+	}
+	if module == "" {
+		module = l.defaultModule
+	}
+	// A filter rule can raise the level from the arguments, so never gate those.
+	if len(logFilter[strings.ToUpper(module)][strings.ToUpper(tag)]) > 0 {
+		return true
+	}
+	value, ok := numericLevels[levelForTag(testLevels, module, tag)]
+	if !ok {
+		return true
+	}
+	return value >= floor
+}
+
+// captured reports whether the entry is at or above the capture level.
+func (l *Logger) captured(entry *Entry) bool {
+	l.configMu.RLock()
+	floor, has := l.captureFloor, l.hasCapture
+	l.configMu.RUnlock()
+	return !has || entry.NumericLevel() >= floor
+}
+
+// CopyConfigFrom copies log filtering, levels and capture level from another logger.
 func (l *Logger) CopyConfigFrom(other *Logger) {
 	if l == nil || other == nil {
 		return
@@ -62,11 +124,15 @@ func (l *Logger) CopyConfigFrom(other *Logger) {
 	other.configMu.RLock()
 	logFilter := other.logFilter
 	testLevels := other.testLevels
+	captureFloor := other.captureFloor
+	hasCapture := other.hasCapture
 	other.configMu.RUnlock()
 
 	l.configMu.Lock()
 	l.logFilter = logFilter
 	l.testLevels = testLevels
+	l.captureFloor = captureFloor
+	l.hasCapture = hasCapture
 	l.configMu.Unlock()
 }
 
@@ -116,6 +182,10 @@ func (l *Logger) Add(tag string, args map[string]any, module string, testcase st
 	}
 
 	l.checkFilter(entry, logFilter)
+	// Filters run first: a rule can raise an entry above the capture level.
+	if !l.captured(entry) {
+		return entry, nil
+	}
 	l.mu.Lock()
 	l.entries = append(l.entries, entry)
 	if l.Callback == nil {
@@ -151,6 +221,9 @@ func (l *Logger) AddWithoutCallback(tag string, args map[string]any, module stri
 		return nil, err
 	}
 	l.checkFilter(entry, logFilter)
+	if !l.captured(entry) {
+		return entry, nil
+	}
 	l.mu.Lock()
 	l.entries = append(l.entries, entry)
 	l.mu.Unlock()
@@ -163,7 +236,7 @@ func (l *Logger) Append(entries ...*Entry) error {
 		return fmt.Errorf("logger is nil")
 	}
 	for _, entry := range entries {
-		if entry == nil {
+		if entry == nil || !l.captured(entry) {
 			continue
 		}
 		l.appendExisting(entry)
@@ -176,14 +249,17 @@ func (l *Logger) AppendWithoutCallback(entries ...*Entry) error {
 	if l == nil {
 		return fmt.Errorf("logger is nil")
 	}
-	l.mu.Lock()
-	defer l.mu.Unlock()
+	// Decide before taking the entry lock: captured reads the config lock.
+	keep := make([]*Entry, 0, len(entries))
 	for _, entry := range entries {
-		if entry == nil {
+		if entry == nil || !l.captured(entry) {
 			continue
 		}
-		l.entries = append(l.entries, entry)
+		keep = append(keep, entry)
 	}
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.entries = append(l.entries, keep...)
 	return nil
 }
 

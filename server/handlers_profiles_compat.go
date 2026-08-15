@@ -21,19 +21,24 @@ type CompatibilityIssue struct {
 }
 
 // CompatibilityResult is the response body for GET /profiles/{id}/compatibility.
+// A reviewed profile reports its remaining gaps as waived issues rather than
+// hiding them, so the review can be inspected and undone.
 type CompatibilityResult struct {
 	Compatible     bool                 `json:"compatible"`
+	Reviewed       bool                 `json:"reviewed"`
 	SchemaVersion  string               `json:"schema_version"`
 	CurrentVersion string               `json:"current_version"`
 	Issues         []CompatibilityIssue `json:"issues"`
+	WaivedIssues   []CompatibilityIssue `json:"waived_issues,omitempty"`
 }
 
 // CompatibilitySummary is one entry in the GET /profiles/compatibility response.
 type CompatibilitySummary struct {
-	ID         int64  `json:"id"`
-	Name       string `json:"name"`
-	Compatible bool   `json:"compatible"`
-	IssueCount int    `json:"issue_count"`
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Compatible  bool   `json:"compatible"`
+	IssueCount  int    `json:"issue_count"`
+	WaivedCount int    `json:"waived_count"`
 }
 
 // ProfileDefaults is the response body for GET /profiles/defaults.
@@ -82,10 +87,11 @@ func (s *Server) handleProfilesCompatibility(w http.ResponseWriter, r *http.Requ
 	for _, p := range profiles {
 		result := checkProfileCompatibility(p.Config, p.SchemaVersion, defaultP)
 		summaries = append(summaries, CompatibilitySummary{
-			ID:         p.ID,
-			Name:       p.Name,
-			Compatible: result.Compatible,
-			IssueCount: len(result.Issues),
+			ID:          p.ID,
+			Name:        p.Name,
+			Compatible:  result.Compatible,
+			IssueCount:  len(result.Issues),
+			WaivedCount: len(result.WaivedIssues),
 		})
 	}
 	writeJSON(w, http.StatusOK, summaries)
@@ -131,10 +137,15 @@ func (s *Server) handleProfileDefaults(w http.ResponseWriter, r *http.Request) {
 
 // checkProfileCompatibility returns the compatibility result for a stored profile
 // config JSON against the provided engine default profile.
+//
+// The comparison always runs. A profile reviewed against the current engine
+// version keeps reporting compatible, but its remaining gaps are listed as
+// waived issues instead of being dropped silently.
 func checkProfileCompatibility(configJSON, schemaVersion string, defaultP *engineprofile.Profile) CompatibilityResult {
 	currentVersion := engine.VersionFull()
 	result := CompatibilityResult{
 		Compatible:     true,
+		Reviewed:       schemaVersion == currentVersion,
 		SchemaVersion:  schemaVersion,
 		CurrentVersion: currentVersion,
 		Issues:         []CompatibilityIssue{},
@@ -142,6 +153,8 @@ func checkProfileCompatibility(configJSON, schemaVersion string, defaultP *engin
 
 	storedP, err := engineprofile.FromJSON(configJSON)
 	if err != nil {
+		// A config the engine cannot parse is broken whatever the stamp says,
+		// so this issue is never waived.
 		result.Compatible = false
 		result.Issues = append(result.Issues, CompatibilityIssue{
 			Type:       "invalid_config",
@@ -151,11 +164,7 @@ func checkProfileCompatibility(configJSON, schemaVersion string, defaultP *engin
 		return result
 	}
 
-	// A profile reviewed against the current engine version is compatible;
-	// any test_cases/test_levels it omits are intentional.
-	if schemaVersion == currentVersion {
-		return result
-	}
+	var found []CompatibilityIssue
 
 	// Check test_cases: if the stored profile explicitly sets test_cases,
 	// compare against default's test_cases.
@@ -178,8 +187,7 @@ func checkProfileCompatibility(configJSON, schemaVersion string, defaultP *engin
 		}
 		if len(missing) > 0 {
 			sort.Strings(missing)
-			result.Compatible = false
-			result.Issues = append(result.Issues, CompatibilityIssue{
+			found = append(found, CompatibilityIssue{
 				Type:       "missing_test_case",
 				Detail:     fmt.Sprintf("Profile sets test_cases but is missing: %s", joinStrings(missing)),
 				Suggestion: `Add the missing test case IDs to test_cases, or remove test_cases entirely to inherit all defaults.`,
@@ -208,8 +216,7 @@ func checkProfileCompatibility(configJSON, schemaVersion string, defaultP *engin
 			}
 			if len(missing) > 0 {
 				sort.Strings(missing)
-				result.Compatible = false
-				result.Issues = append(result.Issues, CompatibilityIssue{
+				found = append(found, CompatibilityIssue{
 					Type:       "missing_test_levels",
 					Module:     module,
 					Detail:     fmt.Sprintf("Profile overrides %s test_levels but is missing tags: %s", module, joinStrings(missing)),
@@ -219,6 +226,16 @@ func checkProfileCompatibility(configJSON, schemaVersion string, defaultP *engin
 		}
 	}
 
+	// A reviewed profile declares its remaining gaps intentional, so they are
+	// waived rather than reported - but they stay visible.
+	if result.Reviewed {
+		result.WaivedIssues = found
+		return result
+	}
+	if len(found) > 0 {
+		result.Compatible = false
+		result.Issues = found
+	}
 	return result
 }
 
@@ -248,9 +265,11 @@ type profilePatchRequest struct {
 //	reset_test_cases        - remove test_cases override (profile inherits all defaults)
 //	reset_test_levels       - remove one test_levels module (requires module field)
 //	mark_reviewed           - bump schema_version without touching config
+//	clear_reviewed          - clear schema_version without touching config
 //
 // The fix ops change config only; a fixed profile then reports compatible on
-// its own merits. Only mark_reviewed declares remaining gaps intentional.
+// its own merits. Only mark_reviewed declares remaining gaps intentional, and
+// clear_reviewed takes that declaration back.
 func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPatch {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -286,6 +305,7 @@ func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 	// would silence the checks for every issue it did not fix, since a
 	// profile at the current version is reported compatible unconditionally.
 	markReviewed := false
+	clearReviewed := false
 	switch req.Op {
 	case "add_missing_test_cases":
 		newConfigJSON, err = applyAddMissingTestCases(stored.Config, defaultP)
@@ -303,6 +323,10 @@ func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 		// no config change - just bump schema_version below
 		newConfigJSON = stored.Config
 		markReviewed = true
+	case "clear_reviewed":
+		// no config change - just clear schema_version below
+		newConfigJSON = stored.Config
+		clearReviewed = true
 	default:
 		writeError(w, http.StatusBadRequest, "invalid_op", fmt.Sprintf("unknown op %q", req.Op), nil)
 		return
@@ -314,8 +338,11 @@ func (s *Server) handlePatchProfile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stored.Config = newConfigJSON
-	if markReviewed {
+	switch {
+	case markReviewed:
 		stored.SchemaVersion = engine.VersionFull()
+	case clearReviewed:
+		stored.SchemaVersion = ""
 	}
 	if err := s.store.UpdateProfile(stored); err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)

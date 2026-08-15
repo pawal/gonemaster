@@ -4,31 +4,28 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+Reworks Consistency05, which no longer reports a false delegation disagreement on large delegations and now reports glue faults per name server name instead of as one aggregate finding. Adds per-nameserver response measurement with run and cohort diff tooling, and a profile editor that shows what a profile actually changes against the engine defaults.
+
+**Breaking:** the last three message tags carrying the retired "bailiwick" term are renamed to `IN_DOMAIN_ADDR_MISMATCH`, `NOT_IN_DOMAIN_ADDR_MISMATCH` and `IN_DOMAIN_GLUE_MISSING`, completing the move to RFC 9499 terminology. Stored runs, profiles, scoring configurations and already-published tag links are migrated automatically, so only external scripts matching on the old strings need attention.
+
 ### Added
 
-- engine, server: per-nameserver timeout and REFUSED counts are recorded per address and stored with the nameserver timings
-- cli: `--nstimes` reports the per-nameserver timeout and refused counts in two new columns
-- client: `runs diff` compares two runs at the tag level and exits non-zero when the findings differ
-- client: `batches diff` compares two batches of the same corpus domain by domain and rolls up which tags moved
-- engine: Consistency05 reports `MISSING_ADDRESS_CHILD` at NOTICE when a glued name server has no address record in the child zone, previously an ERROR-level glue mismatch
-- server: `POST /profiles/diff` compares a profile config against the engine defaults, reporting deviations, redundant restatements, and missing or unknown keys; the config travels in the body so an unsaved draft can be compared
-- admin-ui: the profile editor shows what a profile actually changes, with a per-property table and a one-click action that strips the overrides which only restate the default
-- server, admin-ui: a reviewed profile lists the issues its review is waiving instead of reporting nothing, and a new `clear_reviewed` patch op re-runs the full check from the editor
-- admin-ui: "Mark all as reviewed" names the profiles and issue counts it is about to waive before it fires
+- engine, server, cli: per-nameserver response measurement, with timeout and REFUSED counts kept per address, stored alongside the nameserver timings and reported by `--nstimes`
+- client: `runs diff` and `batches diff` compare two runs or two cohorts at the tag level and exit non-zero when the findings differ
+- server, admin-ui: a profile can be compared against the engine defaults from the editor or over `POST /profiles/diff`, with a per-property table, a one-click action that strips overrides which only restate the default, and a review state that names the issues it waives and can be cleared
+- engine: Consistency05 reports `MISSING_ADDRESS_CHILD` at NOTICE when a glued name server has no address record in the child zone, previously part of an ERROR-level glue mismatch
 
 ### Fixed
 
-- server: out-of-range `--retry` and `--retrans` are refused at startup
-- server: a profile compatibility fix no longer marks the profile as reviewed, which reported every remaining issue as resolved and hid the other fix buttons in the admin UI
 - engine: Consistency05 compares delegations on the NS names in a referral's authority section, so trimmed glue, truncated responses and parents that serve the child zone themselves no longer report a false `MULTIPLE_DELEGATION_NS_SET` (RFC 9471, RFC 9609, RFC 2181)
+- server: out-of-range `--retry` and `--retrans` are refused at startup, and a profile compatibility fix no longer marks the whole profile as reviewed
 
 ### Changed
 
+- engine, server: the message tags using the retired bailiwick term are renamed to `IN_DOMAIN_ADDR_MISMATCH`, `NOT_IN_DOMAIN_ADDR_MISMATCH` and `IN_DOMAIN_GLUE_MISSING`; severities and behaviour are unchanged, stored runs and configurations are migrated on startup, and old tag links redirect
+- engine: Consistency05 names the disagreeing servers in a new `ns_names` argument, advertises a 1232-byte EDNS payload size on the parent referral query so glue arrives complete, and reports in-domain glue mismatches once per name server name, which scales the penalty with the number of affected names
 - engine: reachability backoff for unreachable name server addresses belongs to the run instead of the process, so one run can no longer change another run's findings; the cache is now bounded
 - ci: the race detector runs on every push over the engine and the server tests that share a cache store
-- engine: `MULTIPLE_DELEGATION_NS_SET` names the disagreeing name servers in a new `ns_names` argument
-- engine: Consistency05 advertises a 1232-byte EDNS payload size on the parent referral query, so glue arrives complete instead of trimmed to 512 bytes; the global default is unchanged
-- engine: `IN_BAILIWICK_ADDR_MISMATCH` is reported once per name server name, with an `ns` argument and only that name's unconfirmed glue addresses; zones with several affected names therefore take one ERROR penalty per name
 
 ## [v1.6.5] - 2026-08-10
 

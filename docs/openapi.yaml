@@ -588,7 +588,7 @@ paths:
       parameters:
         - name: category
           in: query
-          description: Filter to one module (alias: module)
+          description: "Filter to one module (alias: module)"
           schema:
             type: string
       responses:
@@ -1017,6 +1017,45 @@ paths:
         '500':
           $ref: '#/components/responses/ErrorResponse'
 
+  /profiles/diff:
+    post:
+      tags: [Profiles]
+      summary: Compare a profile config against the engine defaults
+      description: |
+        Compares the supplied profile config against the current engine default
+        profile and reports, per overridden property, whether it deviates from
+        the default or merely restates it. The config travels in the request
+        body, so an unsaved editor draft can be compared without being stored.
+        The endpoint changes no state.
+
+        Only properties the config actually sets take part: an unset property is
+        inherited and never a deviation. A property reported `redundant`
+        restates the default exactly, so removing it leaves the merged profile
+        the engine runs unchanged.
+      operationId: diffProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  type: object
+                  description: Profile config to compare. Defaults to an empty object.
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Diff result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileDiff'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
   /profiles/mark-all-reviewed:
     post:
       tags: [Profiles]
@@ -1037,7 +1076,10 @@ paths:
     get:
       tags: [Profiles]
       summary: Detailed compatibility result for one stored profile
-      description: Compares the stored profile against the current engine default and returns the list of gaps with suggested remediations. The profile is considered incompatible only when it explicitly overrides a key (`test_cases` or a `test_levels` module) in a way that no longer covers what the current default ships.
+      description: |
+        Compares the stored profile against the current engine default and returns the list of gaps with suggested remediations. The profile is considered incompatible only when it explicitly overrides a key (`test_cases` or a `test_levels` module) in a way that no longer covers what the current default ships.
+
+        The comparison always runs. When `schema_version` equals the current engine version the profile is `reviewed`: it stays `compatible`, `issues` is empty, and any gaps found are listed in `waived_issues` so the review can be inspected and undone with the `clear_reviewed` patch op. An unparseable config is never waived.
       operationId: getProfileCompatibility
       parameters:
         - name: id
@@ -1115,14 +1157,16 @@ paths:
       tags: [Profiles]
       summary: Apply a targeted compatibility fix to a stored profile
       description: |
-        Applies one of several targeted operations and bumps `schema_version` to
-        the current engine version. The supported operations are:
+        Applies one targeted operation. The fix ops change the config only, so a
+        fixed profile then reports compatible on its own merits; only the review
+        ops touch `schema_version`. The supported operations are:
 
         - `add_missing_test_cases` - append default test cases missing from the profile's `test_cases` array. No-op if the profile does not explicitly set `test_cases`.
         - `add_missing_test_levels` - for each `test_levels` module already overridden by the profile, fill any tags present in the default but missing in the override.
         - `reset_test_cases` - remove the `test_cases` override entirely so the profile inherits all defaults.
         - `reset_test_levels` - remove one module from the `test_levels` override (requires `module`).
-        - `mark_reviewed` - leave the config unchanged but bump `schema_version` so the compatibility warning goes away.
+        - `mark_reviewed` - leave the config unchanged but bump `schema_version` so the remaining gaps are reported as waived instead of open.
+        - `clear_reviewed` - leave the config unchanged but clear `schema_version`, so the next compatibility fetch runs the full check and the waived issues return as open ones.
       operationId: patchProfile
       parameters:
         - name: id
@@ -3623,11 +3667,14 @@ components:
 
     CompatibilityResult:
       type: object
-      required: [compatible, schema_version, current_version, issues]
+      required: [compatible, reviewed, schema_version, current_version, issues]
       properties:
         compatible:
           type: boolean
-          description: True when the profile has no compatibility issues against the current engine.
+          description: True when the profile has no open compatibility issues against the current engine. A reviewed profile stays compatible even when it waives issues.
+        reviewed:
+          type: boolean
+          description: True when `schema_version` equals the current engine version.
         schema_version:
           type: string
           description: The profile's stored `schema_version`.
@@ -3636,12 +3683,18 @@ components:
           description: The current engine version.
         issues:
           type: array
+          description: Open issues. Always empty for a reviewed profile, except for an unparseable config.
+          items:
+            $ref: '#/components/schemas/CompatibilityIssue'
+        waived_issues:
+          type: array
+          description: Gaps found despite the review stamp. Present only when `reviewed` is true.
           items:
             $ref: '#/components/schemas/CompatibilityIssue'
 
     CompatibilitySummary:
       type: object
-      required: [id, name, compatible, issue_count]
+      required: [id, name, compatible, issue_count, waived_count]
       properties:
         id:
           type: integer
@@ -3652,6 +3705,107 @@ components:
           type: boolean
         issue_count:
           type: integer
+        waived_count:
+          type: integer
+          description: Number of issues the profile's review is waiving. Zero unless the profile is reviewed.
+
+    ProfileDiffKey:
+      type: object
+      required: [key, default, value]
+      properties:
+        key:
+          type: string
+        default:
+          description: The value in the engine default profile.
+        value:
+          description: The value the profile sets.
+
+    ProfileDiffModule:
+      type: object
+      required: [module]
+      description: Per-key findings for one module of a keyed map property. Modules identical to the default are omitted.
+      properties:
+        module:
+          type: string
+        changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfileDiffKey'
+        missing:
+          type: array
+          description: Keys the engine default has and the profile does not restate.
+          items:
+            type: string
+        unknown:
+          type: array
+          description: Keys the profile sets that the engine default does not have.
+          items:
+            type: string
+
+    ProfileDiffProperty:
+      type: object
+      required: [path, kind, redundant]
+      properties:
+        path:
+          type: string
+          description: Profile property path, for example `resolver.defaults.timeout`.
+        kind:
+          type: string
+          enum: [changed, redundant, set, map]
+          description: |
+            `changed` and `redundant` are scalar or opaque properties compared by value;
+            `set` is the order-insensitive `test_cases` comparison;
+            `map` is a per-key comparison of `test_levels` or `test_cases_vars`.
+        redundant:
+          type: boolean
+          description: True when the property restates the engine default exactly, so removing it leaves the merged profile unchanged.
+        wholesale:
+          type: boolean
+          description: True when overriding the property replaces the whole default table (`test_cases`, `test_levels`), which makes omitted entries dangerous rather than inherited.
+        default:
+          description: The engine default value. Set for kind `changed`.
+        value:
+          description: The value the profile sets. Set for kind `changed`.
+        excluded:
+          type: array
+          description: Test cases the engine default runs and the profile does not. Set for kind `set`.
+          items:
+            type: string
+        unknown:
+          type: array
+          description: Test cases the profile lists that the engine default does not know. Set for kind `set`.
+          items:
+            type: string
+        modules:
+          type: array
+          description: Per-module findings. Set for kind `map`.
+          items:
+            $ref: '#/components/schemas/ProfileDiffModule'
+
+    ProfileDiff:
+      type: object
+      required: [summary, properties]
+      properties:
+        summary:
+          type: object
+          required: [deviations, redundant, missing, unknown]
+          properties:
+            deviations:
+              type: integer
+              description: Properties that differ from the engine default.
+            redundant:
+              type: integer
+              description: Properties that restate the engine default.
+            missing:
+              type: integer
+              description: Keys the engine default has and an overridden map property does not restate. Excluded test cases are not counted here.
+            unknown:
+              type: integer
+              description: Keys and test cases the profile sets that the engine default does not know.
+        properties:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfileDiffProperty'
 
     ProfilePatchRequest:
       type: object
@@ -3665,6 +3819,7 @@ components:
             - reset_test_cases
             - reset_test_levels
             - mark_reviewed
+            - clear_reviewed
           description: Targeted compatibility operation to apply to the stored profile.
         module:
           type: string

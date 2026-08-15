@@ -80,3 +80,43 @@ Only the keys that differ from the default are needed:
   }
 }
 ```
+
+## Inheritance and wholesale replacement
+
+A property the override does not set is inherited from the default, so sparse
+overrides are safe and restating a default value changes nothing.
+
+Two properties are the exception: `test_cases` and `test_levels` replace the
+default table as a whole rather than merging into it.
+
+- A testcase absent from an overridden `test_cases` list does not run.
+- A tag absent from an overridden `test_levels` module resolves to DEBUG, which
+  keeps it out of reports and out of the score.
+
+That makes a full restatement of the defaults a maintenance liability: when a
+release adds a testcase or a tag, the override silently keeps the old set. The
+`test_cases_vars` tunables are individual properties, so omitting one there just
+inherits it.
+
+## Comparing a profile against the defaults
+
+`POST /api/v1/profiles/diff` compares a profile config against the current
+engine defaults and reports, for every property the config sets, whether it
+deviates from the default or merely restates it, plus the missing and unknown
+keys inside overridden maps. The config travels in the request body, so an
+unsaved draft can be compared without being stored.
+
+The admin UI profile editor shows this above the config editor: a summary line,
+an expandable per-property table, and a "Strip redundant overrides" action that
+removes the properties which restate the default. Stripping never changes the
+merged profile the engine runs, and it never prunes individual keys out of a
+wholesale-replace map.
+
+## Review state
+
+A stored profile carries a `schema_version`: the engine version it was last
+saved or reviewed against. When it matches the running engine, the profile is
+reviewed - its remaining gaps are treated as deliberate and reported as
+`waived_issues` rather than open issues, and the editor names them instead of
+staying silent. "Check again" (the `clear_reviewed` patch op) drops the stamp so
+the full check runs again and the gaps return as open issues.

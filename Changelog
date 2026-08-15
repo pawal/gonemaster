@@ -11,6 +11,10 @@ All notable changes to all gonemaster components will be documented in this file
 - client: `runs diff` compares two runs at the tag level and exits non-zero when the findings differ
 - client: `batches diff` compares two batches of the same corpus domain by domain and rolls up which tags moved
 - engine: Consistency05 reports `MISSING_ADDRESS_CHILD` at NOTICE when a glued name server has no address record in the child zone, previously an ERROR-level glue mismatch
+- server: `POST /profiles/diff` compares a profile config against the engine defaults, reporting deviations, redundant restatements, and missing or unknown keys; the config travels in the body so an unsaved draft can be compared
+- admin-ui: the profile editor shows what a profile actually changes, with a per-property table and a one-click action that strips the overrides which only restate the default
+- server, admin-ui: a reviewed profile lists the issues its review is waiving instead of reporting nothing, and a new `clear_reviewed` patch op re-runs the full check from the editor
+- admin-ui: "Mark all as reviewed" names the profiles and issue counts it is about to waive before it fires
 
 ### Fixed
 

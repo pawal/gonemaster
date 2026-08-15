@@ -299,9 +299,9 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 }
 
 func TestDNSSEC01TagForKeyAlgorithmTable(t *testing.T) {
-	// Covers every range boundary of the classification. The mapping must use
-	// the exact same value ranges as dnssec05TagForAlgorithm, with only the
-	// tag prefix swapped, so each case also cross-checks against it.
+	// Covers every range boundary of the classification. Agreement with
+	// dnssec05TagForAlgorithm is a separate invariant, checked over the whole
+	// algorithm domain by TestDNSSEC01TagMirrorsDNSSEC05.
 	cases := []struct {
 		algo uint8
 		want string
@@ -331,13 +331,33 @@ func TestDNSSEC01TagForKeyAlgorithmTable(t *testing.T) {
 		{255, "DS01_KEY_ALGO_RESERVED"},
 	}
 	for _, tc := range cases {
-		got := dnssec01TagForKeyAlgorithm(tc.algo)
-		if got != tc.want {
+		if got := dnssec01TagForKeyAlgorithm(tc.algo); got != tc.want {
 			t.Errorf("algo %d: got %s, want %s", tc.algo, got, tc.want)
 		}
-		fromDS05 := "DS01_KEY_ALGO_" + strings.TrimPrefix(dnssec05TagForAlgorithm(tc.algo), "DS05_ALGO_")
-		if got != fromDS05 {
-			t.Errorf("algo %d: DS01 class %s diverges from DS05 class %s", tc.algo, got, fromDS05)
+	}
+}
+
+func TestDNSSEC01TagMirrorsDNSSEC05(t *testing.T) {
+	// DS01 classifies the DNSKEY algorithm a DS record points at and DS05
+	// classifies the DNSKEY algorithm itself, so the two must never disagree
+	// about what a given number means. dnssec01TagForKeyAlgorithm currently
+	// guarantees that by deriving its tag from dnssec05TagForAlgorithm, which
+	// makes this hold by construction. It earns its keep the day that
+	// delegation is replaced by a second switch: unlike the boundary table
+	// above, it walks the whole uint8 domain, so a fork that drifts on an
+	// untabulated algorithm number cannot slip through.
+	for i := 0; i < 256; i++ {
+		algo := uint8(i)
+		ds05 := dnssec05TagForAlgorithm(algo)
+		// TrimPrefix silently returns the string unchanged when the prefix is
+		// absent, which would hand DS01 a malformed tag rather than fail.
+		if !strings.HasPrefix(ds05, "DS05_ALGO_") {
+			t.Errorf("algo %d: DS05 tag %s lacks the DS05_ALGO_ prefix", algo, ds05)
+			continue
+		}
+		want := "DS01_KEY_ALGO_" + strings.TrimPrefix(ds05, "DS05_ALGO_")
+		if got := dnssec01TagForKeyAlgorithm(algo); got != want {
+			t.Errorf("algo %d: DS01 class %s diverges from DS05 class %s", algo, got, ds05)
 		}
 	}
 }

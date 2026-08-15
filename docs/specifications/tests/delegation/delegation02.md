@@ -100,7 +100,7 @@ emit TEST_CASE_END
 - If yes, include:
   - Upstream expected behavior: Scope is delegation-side and child-side duplicate detection.
   - Gonemaster observed behavior: Adds combined-scope duplicate detection and extra tags.
-  - evidence: `docs/specifications/upstream/tests/Delegation-TP/delegation02.md`, `engine/test/delegation/delegation.go`
+  - evidence: `engine/test/delegation/delegation.go`
   - report status: `not filed`
 
 ## Edge Cases And Limitations

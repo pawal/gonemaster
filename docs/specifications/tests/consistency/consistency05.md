@@ -203,11 +203,13 @@ emit TEST_CASE_END
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: does not explicitly define this detail. Gonemaster: In-domain processing queries all discovered in-domain child servers and emits one `NO_RESPONSE` or `CHILD_NS_FAILED` entry per failing nameserver before final mismatch classification.
-  - Upstream: does not explicitly define this detail. Gonemaster: Referral handling explicitly falls back to recursive lookup for the same qtype and owner.
-  - Upstream: the short-circuit wording can be read per in-domain NS name. Gonemaster: `CHILD_ZONE_LAME` is emitted only when all in-domain address lookup paths fail, so disjoint parent/child NS sets can still be classified as address mismatches.
-  - Upstream: does not explicitly define this detail. Gonemaster: If [`AllNameservers`](../../nameserver-resolution.md#allnameservers) cannot produce usable in-domain child NS endpoints, strict glue endpoints are used as a fallback for child-side address checks and child NS name discovery.
-  - Upstream: does not compare delegations between parent nameservers in this test case. Gonemaster: groups responding parent servers by the delegation NS name set they serve and reports `MULTIPLE_DELEGATION_NS_SET` plus per-set `DELEGATION_NS_SET` details when the sets differ, using the NS responses already collected for glue extraction (no extra queries).
+  - Upstream: names the mismatch tags `IN_BAILIWICK_ADDR_MISMATCH` and `OUT_OF_BAILIWICK_ADDR_MISMATCH`. Gonemaster: uses RFC 9499 terminology, `IN_DOMAIN_ADDR_MISMATCH` and `NOT_IN_DOMAIN_ADDR_MISMATCH`; the upstream names stay accepted as profile aliases.
+  - Upstream: outputs `IN_BAILIWICK_ADDR_MISMATCH` (`ERROR`) per unconfirmed glue address, including when the child serves no address at all for the name. Gonemaster: reports once per NS name, and splits the serves-nothing case out as `MISSING_ADDRESS_CHILD` (`NOTICE`).
+  - Upstream: outputs `EXTRA_ADDRESS_CHILD` per child address missing from glue, for every in-domain name including names with no glue. Gonemaster: aggregates them into one `EXTRA_ADDRESS_CHILD` and compares only names that carry glue, because trimmed glue cannot be told from glue that never existed; Delegation01 reports glue missing from the delegation.
+  - Upstream: emits `CHILD_ZONE_LAME` when every server fails for one in-domain NS name. Gonemaster: emits it only when every in-domain NS name failed on every server, so disjoint parent/child NS sets can still be classified as address mismatches.
+  - Upstream: builds the child-side address server set from parent glue and child address records together. Gonemaster: uses [`AllNameservers`](../../nameserver-resolution.md#allnameservers), and falls back to strict-glue endpoints only when that yields no usable endpoint.
+  - Upstream: follows a referral with a recursive lookup only when it points into a sub-zone of the child zone. Gonemaster: applies that fallback to any referral response.
+  - Upstream: does not compare delegations between parent nameservers. Gonemaster: groups responding parents by the delegation NS name set they serve and reports `MULTIPLE_DELEGATION_NS_SET` with one `DELEGATION_NS_SET` per set, reusing the NS responses already collected for glue (no extra queries).
 - Potential upstream report:
   - `no`
 

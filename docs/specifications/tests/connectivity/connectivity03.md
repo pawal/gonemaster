@@ -137,8 +137,8 @@ emit TEST_CASE_END
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: does not explicitly define this detail. Gonemaster: emits additional per-IP debug observability tags (`ASN_INFOS_RAW`, `ASN_INFOS_ANNOUNCE_BY`, `ASN_INFOS_ANNOUNCE_IN`).
-  - Upstream: does not explicitly define this detail. Gonemaster: Diversity summary tags are computed from IPs that returned ASN data; IPs with `EMPTY_ASN_SET`/`ERROR_ASN_DATABASE` do not contribute ASN values to summary classification.
+  - Upstream: defines no output for the raw ASN lookup data. Gonemaster: emits per-IP debug tags `ASN_INFOS_RAW`, `ASN_INFOS_ANNOUNCE_BY`, and `ASN_INFOS_ANNOUNCE_IN`.
+  - Upstream: does not say whether an IP whose ASN lookup failed counts toward the diversity summary. Gonemaster: excludes it; only IPs that returned ASN data contribute, so `EMPTY_ASN_SET` and `ERROR_ASN_DATABASE` IPs do not affect the classification.
 - Potential upstream report:
   - `no`
 

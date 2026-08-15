@@ -84,8 +84,8 @@ Status: Final
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: does not explicitly define this detail. Gonemaster: emits `SOA_TIME_PARAMETER_SET` detail entries for each observed timer tuple.
-  - Upstream: does not explicitly define this detail. Gonemaster: Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.
+  - Upstream: outputs only the aggregate `ONE_SOA_TIME_PARAMETER_SET` / `MULTIPLE_SOA_TIME_PARAMETER_SET` verdict. Gonemaster: also emits a `SOA_TIME_PARAMETER_SET` entry per observed timer tuple.
+  - Upstream: requires a message for results ignored because a transport is disabled, without naming a tag. Gonemaster: emits `IPV4_DISABLED` / `IPV6_DISABLED` per query.
 - Potential upstream report:
   - `no`
 

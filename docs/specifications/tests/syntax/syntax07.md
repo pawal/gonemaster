@@ -68,7 +68,7 @@ Status: Final
 - If yes, include:
   - Upstream expected behavior: Explicit hostname length validation.
   - Gonemaster observed behavior: No length checks in shared syntax validator.
-  - evidence: `docs/specifications/upstream/tests/Syntax-TP/syntax07.md`, `engine/test/syntax/syntax.go` (`checkNameSyntaxWithLogger`).
+  - evidence: `engine/test/syntax/syntax.go` (`checkNameSyntaxWithLogger`).
   - report status: `not filed`
 
 ## Edge Cases And Limitations

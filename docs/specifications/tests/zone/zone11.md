@@ -144,7 +144,7 @@ emit TEST_CASE_END
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
   - Upstream: defines SPF syntax against RFC7208 ABNF semantics. Gonemaster: uses local `spfSyntaxOk`/`spfTermOk` checks, which are intentionally narrower and implementation-defined.
-  - Upstream: does not explicitly define testcase boundary markers. Gonemaster: runtime emits shared `TEST_CASE_START`/`TEST_CASE_END`, but these markers are not part of current Zone11 metadata inventory.
+  - Upstream: defines no testcase boundary markers. Gonemaster: the runtime emits the shared `TEST_CASE_START` / `TEST_CASE_END`, which are not part of the Zone11 metadata inventory.
 - Potential upstream report:
   - `no`
 

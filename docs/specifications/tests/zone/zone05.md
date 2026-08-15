@@ -75,7 +75,7 @@ Status: Final
 - If yes, include:
   - Upstream expected behavior: Upstream prose defines fixed-threshold fail semantics for both expire checks.
   - Gonemaster observed behavior: Threshold is profile-driven and outcomes are tag/severity based (default warnings plus an explicit OK tag branch).
-  - evidence: `docs/specifications/upstream/tests/Zone-TP/zone05.md`, `engine/test/zone/zone.go`, `share/profile.json`
+  - evidence: `engine/test/zone/zone.go`, `share/profile.json`
   - report status: `not filed`
 
 ## Edge Cases And Limitations

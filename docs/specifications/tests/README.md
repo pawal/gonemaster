@@ -85,10 +85,22 @@ Every testcase spec MUST contain all sections below.
 - If level can vary by profile/rule, document default and override behavior.
 
 ### Differences From Upstream
+
+In this section "Upstream" means the Zonemaster test plan document for the
+corresponding test case (`docs/public/specifications/tests/<Module>-TP/`),
+not the Perl implementation. When the two disagree with each other, say which
+one the bullet is about.
+
 - Link relevant upstream spec text.
 - Explicitly document behavioral mismatch and rationale.
 - Each difference bullet MUST label both sides explicitly using this pattern:
   `Upstream: ... Gonemaster: ...`.
+- The `Upstream:` half MUST state what upstream says, or name the specific
+  thing upstream leaves open. Filler such as "does not explicitly define this
+  detail" is not acceptable: "this detail" has no antecedent, so the bullet
+  reduces to "gonemaster does X" and the reader learns nothing about upstream.
+- If a test case has no upstream counterpart, say that once instead of pairing
+  every bullet against silence.
 - If mismatch appears report-worthy upstream, include tracking status/evidence.
 
 ### Edge Cases / Known Limitations

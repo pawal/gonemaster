@@ -86,7 +86,7 @@ Status: Final
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
   - NS-set equality is based on sorted NS target names only. The upstream `consistency04` specification text additionally lists TTL as part of NS-set equality, but the upstream implementation compares NS target names only and ignores TTL; Gonemaster keeps name-set equality name-only and reports differing apex NS RRset TTLs separately via `INCONSISTENT_NS_TTL` (`NOTICE`).
-  - Upstream: does not explicitly define this detail. Gonemaster: Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.
+  - Upstream: requires a message for results ignored because a transport is disabled, without naming a tag. Gonemaster: emits `IPV4_DISABLED` / `IPV6_DISABLED` per query.
 - Potential upstream report:
   - `yes` (reported upstream: the upstream `consistency04` spec lists TTL as part of NS-set equality, but the implementation never compares the RR TTL).
 

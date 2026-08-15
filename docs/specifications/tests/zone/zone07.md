@@ -73,7 +73,7 @@ Status: Final
 - If yes, include:
   - Upstream expected behavior: Zone07 spec text and outcome framing should match actual engine behavior and recursive side effects.
   - Gonemaster observed behavior: Current behavior tracks upstream engine behavior and exposes additional emitted outcomes that are not fully reflected in upstream spec wording.
-  - evidence: `docs/specifications/upstream/tests/Zone-TP/zone07.md`, `engine/test/zone/zone.go`, `docs/specifications/known-behavior-divergences.md`, [zonemaster#1467](https://github.com/zonemaster/zonemaster/issues/1467), [zonemaster-engine#1500](https://github.com/zonemaster/zonemaster-engine/issues/1500)
+  - evidence: `engine/test/zone/zone.go`, `docs/specifications/known-behavior-divergences.md`, [zonemaster#1467](https://github.com/zonemaster/zonemaster/issues/1467), [zonemaster-engine#1500](https://github.com/zonemaster/zonemaster-engine/issues/1500)
   - report status: `reported`
 
 ## Edge Cases And Limitations

@@ -35,7 +35,6 @@ The Zonemaster project have been used as an upstream reference during migration 
 ## Source-Of-Truth Rules
 - Gonemaster implementation is the runtime source of truth.
 - `docs/specifications/tests/` is the documentation source of truth for expected behavior.
-- `docs/specifications/upstream/` is reference-only and can differ from gonemaster.
 - Any intentional divergence from upstream must be documented in the gonemaster testcase spec.
 - Outside the `plans` directory tree, gonemaster docs must not reference files in `plans`.
 

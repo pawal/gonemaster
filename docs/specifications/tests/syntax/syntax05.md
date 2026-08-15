@@ -61,7 +61,7 @@ Status: Final
 - If yes, include:
   - Upstream expected behavior: Explicit Syntax05->Syntax08 dependency.
   - Gonemaster observed behavior: `Syntax08` is independent and always runs when enabled.
-  - evidence: `docs/specifications/upstream/tests/Syntax-TP/syntax05.md`, `engine/test/syntax/syntax.go` (`All`, `Syntax05`, `Syntax08`).
+  - evidence: `engine/test/syntax/syntax.go` (`All`, `Syntax05`, `Syntax08`).
   - report status: `not filed`
 
 ## Edge Cases And Limitations

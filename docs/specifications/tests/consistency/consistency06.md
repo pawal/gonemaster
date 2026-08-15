@@ -78,8 +78,8 @@ Status: Final
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: does not explicitly define this detail. Gonemaster: emits `SOA_MNAME` detail entries for each observed MNAME value.
-  - Upstream: does not explicitly define this detail. Gonemaster: Per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted when transport is disabled.
+  - Upstream: outputs only the aggregate `ONE_SOA_MNAME` / `MULTIPLE_SOA_MNAMES` verdict. Gonemaster: also emits a `SOA_MNAME` entry per observed MNAME value.
+  - Upstream: requires a message for results ignored because a transport is disabled, without naming a tag. Gonemaster: emits `IPV4_DISABLED` / `IPV6_DISABLED` per query.
 - Potential upstream report:
   - `no`
 

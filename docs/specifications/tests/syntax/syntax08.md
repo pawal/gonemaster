@@ -71,7 +71,7 @@ Status: Final
 - If yes, include:
   - Upstream expected behavior: Explicit length checks and syntax05-linked dependency.
   - Gonemaster observed behavior: No length checks and no syntax05 data dependency.
-  - evidence: `docs/specifications/upstream/tests/Syntax-TP/syntax08.md`, `engine/test/syntax/syntax.go` (`All`, `checkNameSyntaxWithLogger`, `Syntax08`).
+  - evidence: `engine/test/syntax/syntax.go` (`All`, `checkNameSyntaxWithLogger`, `Syntax08`).
   - report status: `not filed`
 
 ## Edge Cases And Limitations

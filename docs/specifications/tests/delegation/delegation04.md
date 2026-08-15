@@ -111,7 +111,7 @@ emit TEST_CASE_END
 - If yes, include:
   - Upstream expected behavior: Uniqueness and evaluation unit are described at address-record granularity.
   - Gonemaster observed behavior: Uniqueness and evaluation are keyed by NS name.
-  - evidence: `docs/specifications/upstream/tests/Delegation-TP/delegation04.md`, `engine/test/delegation/delegation.go`
+  - evidence: `engine/test/delegation/delegation.go`
   - report status: `not filed`
 
 ## Edge Cases And Limitations

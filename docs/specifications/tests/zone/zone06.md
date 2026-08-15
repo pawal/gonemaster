@@ -73,7 +73,7 @@ Status: Final
 - If yes, include:
   - Upstream expected behavior: Upstream prose defines fixed numeric bounds and explicit fail semantics.
   - Gonemaster observed behavior: Bounds are profile-driven and out-of-range branches are tagged findings (`NOTICE` by default).
-  - evidence: `docs/specifications/upstream/tests/Zone-TP/zone06.md`, `engine/test/zone/zone.go`, `share/profile.json`
+  - evidence: `engine/test/zone/zone.go`, `share/profile.json`
   - report status: `not filed`
 
 ## Edge Cases And Limitations

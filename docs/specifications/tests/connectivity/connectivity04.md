@@ -129,14 +129,14 @@ emit TEST_CASE_END
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: does not explicitly define this detail. Gonemaster: emits additional debug observability tags (`CN04_ASN_INFOS_RAW`, `CN04_ASN_INFOS_ANNOUNCE_IN`).
-  - Upstream: does not explicitly define this detail. Gonemaster: Multiple nameserver names sharing the same IP are collapsed to one first-seen nameserver name before prefix grouping.
+  - Upstream: defines no output for the raw prefix lookup data. Gonemaster: emits debug tags `CN04_ASN_INFOS_RAW` and `CN04_ASN_INFOS_ANNOUNCE_IN`.
+  - Upstream: groups prefixes over nameserver name-and-IP members. Gonemaster: deduplicates by IP first, so several names sharing one IP collapse to the first-seen name.
 - Potential upstream report:
   - `yes`
 - If yes, include:
   - Upstream expected behavior: Prefix grouping is described over nameserver name-and-IP members collected from Methodsv2 sets.
   - Gonemaster observed behavior: Prefix grouping deduplicates by IP before grouping, so alternate names sharing the same IP are not independently represented.
-  - evidence: `docs/specifications/upstream/tests/Connectivity-TP/connectivity04.md`, `engine/test/connectivity/connectivity.go` (`Connectivity04` dedup via `processed[version][ip.String()]`).
+  - evidence: `engine/test/connectivity/connectivity.go` (`Connectivity04` dedup via `processed[version][ip.String()]`).
   - report status: `not filed`
 
 ## Edge Cases And Limitations

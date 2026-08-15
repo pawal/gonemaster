@@ -77,7 +77,7 @@ Status: Final
 - If yes, include:
   - Upstream expected behavior: Address-record uniqueness is the evaluation unit.
   - Gonemaster observed behavior: NS-name uniqueness is the evaluation unit.
-  - evidence: `docs/specifications/upstream/tests/Delegation-TP/delegation06.md`, `engine/test/delegation/delegation.go`
+  - evidence: `engine/test/delegation/delegation.go`
   - report status: `not filed`
 
 ## Edge Cases And Limitations

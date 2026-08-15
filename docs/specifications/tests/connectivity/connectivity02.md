@@ -159,8 +159,8 @@ A nameserver counts as "ok" only if both SOA and NS qtypes pass every check.
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: does not explicitly define this detail. Gonemaster: emits additional per-query transport debug tags (`IPV4_DISABLED`, `IPV6_DISABLED`) when transport is disabled.
-  - Upstream: does not explicitly define this detail. Gonemaster: Owner-name validation checks the first answer record owner for the queried rrtype.
+  - Upstream: says to skip queries over a disabled transport, without reporting the skip. Gonemaster: emits `IPV4_DISABLED` / `IPV6_DISABLED` per query.
+  - Upstream: does not say which answer record's owner name is compared when several are present. Gonemaster: compares the owner of the first answer record of the queried type.
 - Potential upstream report:
   - `no`
 

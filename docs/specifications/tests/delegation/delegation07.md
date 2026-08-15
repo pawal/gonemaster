@@ -98,7 +98,7 @@ emit TEST_CASE_END
 - If yes, include:
   - Upstream expected behavior: Parent-side NS set membership in child-side NS set is the decisive condition.
   - Gonemaster observed behavior: Symmetric, count-aware comparison with additional tags for child extras and total mismatch.
-  - evidence: `docs/specifications/upstream/tests/Delegation-TP/delegation07.md`, `engine/test/delegation/delegation.go`
+  - evidence: `engine/test/delegation/delegation.go`
   - report status: `not filed`
 
 ## Edge Cases And Limitations

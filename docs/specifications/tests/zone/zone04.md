@@ -66,7 +66,7 @@ Status: Final
 - If yes, include:
   - Upstream expected behavior: Upstream prose defines below-threshold retry as testcase failure with fixed numeric minimum.
   - Gonemaster observed behavior: Threshold is profile-driven and below-threshold result is a tagged finding (`NOTICE` by default), not a fixed fail primitive.
-  - evidence: `docs/specifications/upstream/tests/Zone-TP/zone04.md`, `engine/test/zone/zone.go`, `share/profile.json`
+  - evidence: `engine/test/zone/zone.go`, `share/profile.json`
   - report status: `not filed`
 
 ## Edge Cases And Limitations

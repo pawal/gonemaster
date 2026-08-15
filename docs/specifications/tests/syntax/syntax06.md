@@ -92,13 +92,13 @@ Status: Final
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
   - Upstream outcome table lists `RNAME_MAIL_DOMAIN_INVALID`, `RNAME_MAIL_DOMAIN_LOCALHOST`, and `RNAME_MAIL_ILLEGAL_CNAME` as `WARNING`; Gonemaster profile still maps `RNAME_MAIL_DOMAIN_INVALID` to `NOTICE`.
-  - Upstream: does not explicitly define this detail. Gonemaster: Transport skip tags (`IPV4_DISABLED`, `IPV6_DISABLED`) are emitted but not listed in upstream metadata summary.
+  - Upstream: requires a message for results ignored because a transport is disabled, without naming a tag. Gonemaster: emits `IPV4_DISABLED` / `IPV6_DISABLED`.
 - Potential upstream report:
   - `yes`
 - If yes, include:
   - Upstream expected behavior: Warning-level outcomes for invalid/localhost/illegal-cname mail domain checks.
   - Gonemaster observed behavior: `NOTICE` for invalid domain and `WARNING` for localhost/illegal-cname.
-  - evidence: `docs/specifications/upstream/tests/Syntax-TP/syntax06.md`, `share/profile.json`, `engine/test/syntax/syntax.go`.
+  - evidence: `share/profile.json`, `engine/test/syntax/syntax.go`.
   - report status: `not filed`
 
 ## Edge Cases And Limitations

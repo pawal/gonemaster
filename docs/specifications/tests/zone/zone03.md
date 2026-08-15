@@ -65,7 +65,7 @@ Status: Final
 - If yes, include:
   - Upstream expected behavior: Upstream prose defines `retry >= refresh` as failure condition.
   - Gonemaster observed behavior: The failure branch is an informational tag (`REFRESH_LOWER_THAN_RETRY`) under default profile.
-  - evidence: `docs/specifications/upstream/tests/Zone-TP/zone03.md`, `engine/test/zone/zone.go`, `share/profile.json`
+  - evidence: `engine/test/zone/zone.go`, `share/profile.json`
   - report status: `not filed`
 
 ## Edge Cases And Limitations

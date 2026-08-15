@@ -52,7 +52,7 @@ Status: Final
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: No material behavioral difference identified. Gonemaster: Matches upstream behavior for this testcase.
+  - None identified; gonemaster matches the upstream testcase.
 - Potential upstream report:
   - `no`
 

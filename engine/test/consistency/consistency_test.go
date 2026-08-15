@@ -784,6 +784,9 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	if mismatch == nil {
 		t.Fatalf("missing IN_BAILIWICK_ADDR_MISMATCH entry")
 	}
+	if got := mismatch.Args["ns"]; got != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", got)
+	}
 	parent := serverEndpointsAtKey(mismatch.Args, "parent_servers")
 	if len(parent) != 1 || parent[0] != "ns1.example/192.0.2.1" {
 		t.Fatalf("expected parent_servers [ns1.example/192.0.2.1], got %v", parent)
@@ -873,11 +876,24 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 	if hasEntryTag(entries, "CHILD_ZONE_LAME") {
 		t.Fatalf("did not expect CHILD_ZONE_LAME")
 	}
-	if !hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
-		t.Fatalf("expected IN_BAILIWICK_ADDR_MISMATCH")
+	// The parent glues ns1 and the child answers NXDOMAIN for it, so the
+	// child serves no address for a glued name. That is a missing record,
+	// not glue pointing at the wrong address.
+	missing := firstEntryByTag(entries, "MISSING_ADDRESS_CHILD")
+	if missing == nil {
+		t.Fatalf("expected MISSING_ADDRESS_CHILD")
 	}
-	if !hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
-		t.Fatalf("expected EXTRA_ADDRESS_CHILD")
+	if got := missing.Args["ns"]; got != "ns1.example" {
+		t.Fatalf("expected ns=ns1.example, got %#v", got)
+	}
+	if hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
+		t.Fatalf("a name the child has no address for is missing, not mismatched")
+	}
+	// ns2 is served only by the child and carries no glue, so it is outside
+	// the address comparison. The parent/child NS disagreement is reported
+	// by the NS set comparison, not as an extra address here.
+	if hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
+		t.Fatalf("a name without glue must not produce EXTRA_ADDRESS_CHILD")
 	}
 }
 
@@ -1469,6 +1485,206 @@ func TestConsistency05DelegationNSSetIgnoresParentWithoutNSRecords(t *testing.T)
 	}
 	if hasEntryTag(entries, "DELEGATION_NS_SET") {
 		t.Fatalf("a parent without NS records must not produce DELEGATION_NS_SET")
+	}
+}
+
+// Wrong glue is reported per name, so a zone with several faulty names gets
+// one entry each, naming only that name's unconfirmed addresses. This is the
+// change from a single aggregate entry that dumped every address at once.
+func TestConsistency05InBailiwickMismatchIsPerName(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origNames := allNSNames
+	origNS := allNameservers
+	origParent := queryParentAll
+	t.Cleanup(func() {
+		allNSNames = origNames
+		allNameservers = origNS
+		queryParentAll = origParent
+	})
+
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
+	}
+
+	// The child serves .11 and .12; the parent glues .1 and .2 instead, so
+	// both names carry glue the child does not confirm.
+	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
+		if !strings.EqualFold(qtype, "A") {
+			return packet.Packet{}
+		}
+		switch strings.ToLower(qname) {
+		case "ns1.example":
+			return addrPacket(qname, "A", "192.0.2.11")
+		case "ns2.example":
+			return addrPacket(qname, "A", "192.0.2.12")
+		}
+		return packet.Packet{}
+	})
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{authNS}, nil
+	}
+
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{glueParentPacket(name, map[string][]string{
+				"ns1.example": {"192.0.2.1"},
+				"ns2.example": {"192.0.2.2"},
+			}, "192.0.2.101")}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+
+	var mismatches []*logger.Entry
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "IN_BAILIWICK_ADDR_MISMATCH" {
+			mismatches = append(mismatches, entry)
+		}
+	}
+	if len(mismatches) != 2 {
+		t.Fatalf("expected one entry per affected name, got %d", len(mismatches))
+	}
+
+	want := map[string]string{"ns1.example": "ns1.example/192.0.2.1", "ns2.example": "ns2.example/192.0.2.2"}
+	for _, entry := range mismatches {
+		nsName, _ := entry.Args["ns"].(string)
+		wantEndpoint, ok := want[nsName]
+		if !ok {
+			t.Fatalf("unexpected ns %#v", entry.Args["ns"])
+		}
+		delete(want, nsName)
+		parent := serverEndpointsAtKey(entry.Args, "parent_servers")
+		if len(parent) != 1 || parent[0] != wantEndpoint {
+			t.Fatalf("expected parent_servers [%s], got %v", wantEndpoint, parent)
+		}
+	}
+	if len(want) != 0 {
+		t.Fatalf("missing entries for %v", want)
+	}
+}
+
+// A name whose glue every parent trimmed cannot be told from one that never
+// had glue, so it stays out of the address comparison. Reporting it would
+// turn lawful trimming into a finding, and Delegation01 already reports glue
+// missing from the delegation.
+func TestConsistency05NameWithoutGlueIsNotCompared(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	origNames := allNSNames
+	origNS := allNameservers
+	origParent := queryParentAll
+	t.Cleanup(func() {
+		allNSNames = origNames
+		allNameservers = origNS
+		queryParentAll = origParent
+	})
+
+	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
+	}
+
+	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
+		if !strings.EqualFold(qtype, "A") {
+			return packet.Packet{}
+		}
+		switch strings.ToLower(qname) {
+		case "ns1.example":
+			return addrPacket(qname, "A", "192.0.2.1")
+		case "ns2.example":
+			return addrPacket(qname, "A", "192.0.2.2")
+		}
+		return packet.Packet{}
+	})
+	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{authNS}, nil
+	}
+
+	// The referral delegates both names but glues only ns1. The child
+	// serves an address for ns2 that no glue mentions.
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{glueParentPacket(name, map[string][]string{
+				"ns1.example": {"192.0.2.1"},
+				"ns2.example": nil,
+			}, "192.0.2.101")}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	if hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
+		t.Fatalf("a name without glue must not produce EXTRA_ADDRESS_CHILD")
+	}
+	if hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
+		t.Fatalf("a name without glue must not produce IN_BAILIWICK_ADDR_MISMATCH")
+	}
+	if hasEntryTag(entries, "MISSING_ADDRESS_CHILD") {
+		t.Fatalf("a name without glue must not produce MISSING_ADDRESS_CHILD")
+	}
+	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
+		t.Fatalf("expected ADDRESSES_MATCH, ns1 glue matches the child")
+	}
+}
+
+// Trimming removes records from the union but never adds any, so a glue
+// subset spread across parents still reconstructs the full set and must not
+// produce an address finding.
+func TestConsistency05TrimmedGlueUnionMatchesChild(t *testing.T) {
+	ctx := testCtx()
+	t.Cleanup(profile.ResetEffective)
+
+	util.SetLogger(logger.New())
+	t.Cleanup(func() { util.SetLogger(nil) })
+
+	stubConsistency05Child(t, ctx)
+
+	// No parent carries the whole delegation glue; together they do.
+	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{
+				glueParentPacket(name, map[string][]string{
+					"ns1.example": {"192.0.2.1", "2001:db8::1"},
+					"ns2.example": nil,
+				}, "192.0.2.101"),
+				glueParentPacket(name, map[string][]string{
+					"ns1.example": nil,
+					"ns2.example": {"192.0.2.2", "2001:db8::2"},
+				}, "192.0.2.102"),
+			}, nil
+		}
+		return []packet.Packet{}, nil
+	}
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	for _, tag := range []string{"IN_BAILIWICK_ADDR_MISMATCH", "MISSING_ADDRESS_CHILD", "EXTRA_ADDRESS_CHILD", "MULTIPLE_DELEGATION_NS_SET"} {
+		if hasEntryTag(entries, tag) {
+			t.Fatalf("unexpected %s for a glue union that matches the child", tag)
+		}
+	}
+	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
+		t.Fatalf("expected ADDRESSES_MATCH")
 	}
 }
 

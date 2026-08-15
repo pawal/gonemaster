@@ -20,6 +20,7 @@ _Do not edit by hand - regenerate with the command above._
 | `IN_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `IPV4_DISABLED` | `DEBUG2` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |
 | `IPV6_DISABLED` | `DEBUG2` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |
+| `MISSING_ADDRESS_CHILD` | `NOTICE` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `MULTIPLE_DELEGATION_NS_SET` | `WARNING` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `MULTIPLE_NS_SET` | `NOTICE` | [consistency04](../tests/consistency/consistency04.md) | yes |
 | `MULTIPLE_SOA_MNAMES` | `NOTICE` | [consistency06](../tests/consistency/consistency06.md) | yes |

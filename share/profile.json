@@ -161,6 +161,7 @@
             "IN_BAILIWICK_ADDR_MISMATCH": "ERROR",
             "IPV4_DISABLED": "DEBUG2",
             "IPV6_DISABLED": "DEBUG2",
+            "MISSING_ADDRESS_CHILD": "NOTICE",
             "MULTIPLE_DELEGATION_NS_SET": "WARNING",
             "MULTIPLE_NS_SET": "NOTICE",
             "MULTIPLE_SOA_MNAMES": "NOTICE",

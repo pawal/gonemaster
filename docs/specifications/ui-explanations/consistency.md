@@ -60,6 +60,14 @@ Description:
 
 The parent zone publishes a glue address for one of your nameservers that is not in the matching A or AAAA records in your own zone. Resolvers initially use the glue, so traffic will go to the address the parent advertises - which is not the one your zone says is correct. The two sides must be brought back into agreement or some clients will hit a stale or wrong server.
 
+## Tag MISSING_ADDRESS_CHILD
+
+Header: Nameserver has glue but no address record in your zone
+
+Description:
+
+The parent zone publishes a glue address for one of your nameservers, but your own zone serves no A or AAAA record for that name at all. Resolution keeps working while the glue is served, so this is not urgent, but the glue is then the only thing that can be verified against. Add the matching address records to your zone so the nameserver's address is published where it belongs.
+
 ## Tag OUT_OF_BAILIWICK_ADDR_MISMATCH
 
 Header: Glue address disagrees with public DNS

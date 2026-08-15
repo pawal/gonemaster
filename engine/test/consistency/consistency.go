@@ -157,6 +157,7 @@ func Metadata() map[string][]string {
 			"DELEGATION_NS_SET",
 			"EXTRA_ADDRESS_CHILD",
 			"IN_BAILIWICK_ADDR_MISMATCH",
+			"MISSING_ADDRESS_CHILD",
 			"MULTIPLE_DELEGATION_NS_SET",
 			"NO_RESPONSE",
 			"OUT_OF_BAILIWICK_ADDR_MISMATCH",
@@ -951,26 +952,40 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return appendTestCaseEnd(ctx, results, testcase)
 	}
 
-	ibMismatch := []string{}
-	for key := range strictGlue {
-		if !childIBStrings[key] {
-			ibMismatch = append(ibMismatch, key)
-		}
-	}
-	ibExtraChild := []string{}
-	for key := range childIBStrings {
-		if !strictGlue[key] {
-			ibExtraChild = append(ibExtraChild, key)
-		}
-	}
+	// Compare per NS name. Only names with glue take part: a name every
+	// parent trimmed cannot be told from one that never had glue, and
+	// Delegation01 reports glue missing from the delegation.
+	glueByName := addrKeysByName(sortedKeys(strictGlue))
+	childByName := addrKeysByName(sortedKeys(childIBStrings))
 
-	if len(ibMismatch) > 0 {
-		args := map[string]any{}
-		setTypedServersFromAddrKeysAtKey(args, "parent_servers", sortedKeys(strictGlue))
-		setTypedServersFromAddrKeysAtKey(args, "zone_servers", sortedKeys(childIBStrings))
-		if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_ADDR_MISMATCH", args); err != nil {
-			return results, err
+	ibFaults := 0
+	ibExtraChild := []string{}
+	for _, nsName := range slices.Sorted(maps.Keys(glueByName)) {
+		glueAddrs := glueByName[nsName]
+		childAddrs := childByName[nsName]
+
+		if len(childAddrs) == 0 {
+			ibFaults++
+			if err := appendLog(ctx, &results, testcase, "MISSING_ADDRESS_CHILD", map[string]any{
+				"ns": logargs.EndpointName(nsName),
+			}); err != nil {
+				return results, err
+			}
+			continue
 		}
+
+		unconfirmed := addrKeysNotIn(glueAddrs, childAddrs)
+		if len(unconfirmed) > 0 {
+			ibFaults++
+			args := map[string]any{"ns": logargs.EndpointName(nsName)}
+			setTypedServersFromAddrKeysAtKey(args, "parent_servers", unconfirmed)
+			setTypedServersFromAddrKeysAtKey(args, "zone_servers", childAddrs)
+			if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_ADDR_MISMATCH", args); err != nil {
+				return results, err
+			}
+		}
+
+		ibExtraChild = append(ibExtraChild, addrKeysNotIn(childAddrs, glueAddrs)...)
 	}
 
 	if len(ibExtraChild) > 0 {
@@ -1027,7 +1042,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if len(ibExtraChild) == 0 && len(ibMismatch) == 0 && len(oobMismatch) == 0 {
+	if len(ibExtraChild) == 0 && ibFaults == 0 && len(oobMismatch) == 0 {
 		if err := appendLog(ctx, &results, testcase, "ADDRESSES_MATCH", map[string]any{}); err != nil {
 			return results, err
 		}
@@ -1448,6 +1463,39 @@ func addrKey(rr dns.RR) string {
 func sortedKeys(m map[string]bool) []string {
 	keys := slices.Sorted(maps.Keys(m))
 	return keys
+}
+
+// addrKeysByName groups "name/address" keys by their canonical name,
+// preserving the order of the input within each group.
+func addrKeysByName(keys []string) map[string][]string {
+	out := map[string][]string{}
+	for _, key := range keys {
+		nsName, address := parseAddrKey(key)
+		if nsName == "" || address == "" {
+			continue
+		}
+		name := dnsname.New(strings.ToLower(nsName)).String()
+		out[name] = append(out[name], key)
+	}
+	return out
+}
+
+// addrKeysNotIn returns the keys of a that are absent from b.
+func addrKeysNotIn(a []string, b []string) []string {
+	if len(a) == 0 {
+		return nil
+	}
+	inB := make(map[string]bool, len(b))
+	for _, key := range b {
+		inB[key] = true
+	}
+	var out []string
+	for _, key := range a {
+		if !inB[key] {
+			out = append(out, key)
+		}
+	}
+	return out
 }
 
 func addressesFromAddrKeys(values []string) []string {

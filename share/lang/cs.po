@@ -484,12 +484,26 @@ msgid "Child has extra nameserver IP address(es) not listed at parent ({addresse
 msgstr "Podřízená strana má další IP adresy jmenných serverů, které nejsou uvedeny u nadřazené strany ({addresses})."
 
 msgctxt "CONSISTENCY:IN_BAILIWICK_ADDR_MISMATCH"
-msgid "In-domain name server listed at parent has a mismatch between glue data at parent ({parent_servers}) and any equivalent address record in child zone ({zone_servers})."
-msgstr "Jmenný server v doméně uvedený u nadřazené strany má nesoulad mezi GLUE daty u nadřazené strany ({parent_servers}) a jakýmkoli odpovídajícím adresním záznamem v podřízené zóně ({zone_servers})."
+msgid ""
+"In-domain name server {ns} listed at parent has a mismatch between glue "
+"data at parent ({parent_servers}) and the address records in the child "
+"zone ({zone_servers})."
+msgstr ""
+"Jmenný server {ns} v doméně uvedený u nadřazené strany má nesoulad mezi "
+"GLUE daty u nadřazené strany ({parent_servers}) a adresními záznamy "
+"v podřízené zóně ({zone_servers})."
 
 msgctxt "CONSISTENCY:INCONSISTENT_NS_TTL"
 msgid "Name servers serve the zone's NS records with {count} distinct TTL values."
 msgstr "Jmenné servery poskytují NS záznamy zóny s {count} různými hodnotami TTL."
+
+msgctxt "CONSISTENCY:MISSING_ADDRESS_CHILD"
+msgid ""
+"In-domain name server {ns} has glue in the delegation but no address "
+"record in the child zone."
+msgstr ""
+"Jmenný server {ns} v doméně má GLUE data v delegaci, ale v podřízené "
+"zóně pro něj není žádný adresní záznam."
 
 msgctxt "CONSISTENCY:MULTIPLE_DELEGATION_NS_SET"
 msgid "Found {count} different delegation NS sets at the parent name servers. Name server names not served by all parents: ({ns_names})."

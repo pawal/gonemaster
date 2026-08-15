@@ -10,15 +10,19 @@ All notable changes to all gonemaster components will be documented in this file
 - cli: `--nstimes` reports the per-nameserver timeout and refused counts in two new columns
 - client: `runs diff` compares two runs at the tag level and exits non-zero when the findings differ
 - client: `batches diff` compares two batches of the same corpus domain by domain and rolls up which tags moved
+- engine: Consistency05 reports `MISSING_ADDRESS_CHILD` at NOTICE when a glued name server has no address record in the child zone, previously an ERROR-level glue mismatch
 
 ### Fixed
 
 - server: out-of-range `--retry` and `--retrans` are refused at startup
+- engine: Consistency05 compares delegations on the NS names in a referral's authority section, so trimmed glue, truncated responses and parents that serve the child zone themselves no longer report a false `MULTIPLE_DELEGATION_NS_SET` (RFC 9471, RFC 9609, RFC 2181)
 
 ### Changed
 
 - engine: reachability backoff for unreachable name server addresses belongs to the run instead of the process, so one run can no longer change another run's findings; the cache is now bounded
 - ci: the race detector runs on every push over the engine and the server tests that share a cache store
+- engine: `MULTIPLE_DELEGATION_NS_SET` names the disagreeing name servers in a new `ns_names` argument
+- engine: `IN_BAILIWICK_ADDR_MISMATCH` is reported once per name server name, with an `ns` argument and only that name's unconfirmed glue addresses; zones with several affected names therefore take one ERROR penalty per name
 
 ## [v1.6.5] - 2026-08-10
 

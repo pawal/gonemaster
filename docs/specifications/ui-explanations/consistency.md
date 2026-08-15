@@ -52,7 +52,7 @@ Description:
 
 A nameserver whose name is inside your zone (such as `ns1.example.com` for `example.com`) did not answer authoritatively for its own A or AAAA records on any of the paths tried. Resolvers that rely on the child zone to confirm the server's address will fail to reach it, so the delegation loses this nameserver as a working fallback.
 
-## Tag IN_BAILIWICK_ADDR_MISMATCH
+## Tag IN_DOMAIN_ADDR_MISMATCH
 
 Header: Glue address not present in the zone
 
@@ -68,7 +68,7 @@ Description:
 
 The parent zone publishes a glue address for one of your nameservers, but your own zone serves no A or AAAA record for that name at all. Resolution keeps working while the glue is served, so this is not urgent, but the glue is then the only thing that can be verified against. Add the matching address records to your zone so the nameserver's address is published where it belongs.
 
-## Tag OUT_OF_BAILIWICK_ADDR_MISMATCH
+## Tag NOT_IN_DOMAIN_ADDR_MISMATCH
 
 Header: Glue address disagrees with public DNS
 

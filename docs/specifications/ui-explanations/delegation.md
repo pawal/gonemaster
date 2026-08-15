@@ -194,7 +194,7 @@ Description:
 
 The set of nameservers in the parent zone's delegation and the set of nameservers your zone itself publishes have no names in common. Resolvers and validators that compare the two will treat your domain as misconfigured; depending on which side a resolver trusts, it may pick an entirely different server than what you currently run.
 
-## Tag IN_BAILIWICK_GLUE_MISSING
+## Tag IN_DOMAIN_GLUE_MISSING
 
 Header: Nameserver inside the zone is missing its glue
 

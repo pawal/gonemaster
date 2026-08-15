@@ -50,11 +50,11 @@ Status: Final
 11. If no in-domain address lookup path was usable for any in-domain NS name, emit `CHILD_ZONE_LAME`, emit `TEST_CASE_END`, and return.
 12. Compare in-domain glue against child address data, per NS name. Only names carrying at least one glue address take part; a name with no glue anywhere in the union is not compared, and is reported as missing glue by Delegation01 instead. For each such name, in sorted order:
    - Child serves no address record for the name -> emit `MISSING_ADDRESS_CHILD` with `ns`, and compare nothing further for that name.
-   - Otherwise, glue addresses the child does not serve -> emit `IN_BAILIWICK_ADDR_MISMATCH` with `ns`, `parent_servers` holding only those unconfirmed glue addresses, and `zone_servers` holding the child addresses for that name.
+   - Otherwise, glue addresses the child does not serve -> emit `IN_DOMAIN_ADDR_MISMATCH` with `ns`, `parent_servers` holding only those unconfirmed glue addresses, and `zone_servers` holding the child addresses for that name.
    - Independently, child addresses absent from that name's glue accumulate into the aggregate `EXTRA_ADDRESS_CHILD`. A name may therefore produce both an in-domain mismatch and a contribution to the extra-address list.
 13. For each not-in-domain NS name in extended glue:
    - Recurse A and AAAA, build child/public `owner/ip` set.
-   - If any parent glue item for that name is missing from child/public set, emit `OUT_OF_BAILIWICK_ADDR_MISMATCH`.
+   - If any parent glue item for that name is missing from child/public set, emit `NOT_IN_DOMAIN_ADDR_MISMATCH`.
 14. If no address fault was found, emit `ADDRESSES_MATCH`. A delegation carrying no glue at all reaches this point with nothing to disagree about and is reported as matching. The delegation NS-set tags from step 6 do not affect this guard.
 15. Emit `TEST_CASE_END`.
 
@@ -124,7 +124,7 @@ compare in-domain glue per NS name (sorted, only names with glue):
   childAddrs = child authoritative addresses for the name
   childAddrs empty -> MISSING_ADDRESS_CHILD (ns); next name
   unconfirmed = glueAddrs NOT in childAddrs
-     non-empty -> IN_BAILIWICK_ADDR_MISMATCH (ns, parent_servers=unconfirmed,
+     non-empty -> IN_DOMAIN_ADDR_MISMATCH (ns, parent_servers=unconfirmed,
                                               zone_servers=childAddrs)
   ibExtraChild += childAddrs NOT in glueAddrs
   ibExtraChild non-empty -> EXTRA_ADDRESS_CHILD (addresses)
@@ -138,7 +138,7 @@ not-in-domain (per nsName in extendedGlue, sorted):
   for each parent glue string at nsName missing from childOOB:
      append to mismatchForGlue and oobMismatch
   mismatchForGlue non-empty
-     -> OUT_OF_BAILIWICK_ADDR_MISMATCH (parent_servers, zone_servers)
+     -> NOT_IN_DOMAIN_ADDR_MISMATCH (parent_servers, zone_servers)
 
 no address fault emitted                  -> ADDRESSES_MATCH
 
@@ -154,11 +154,11 @@ emit TEST_CASE_END
 | `CHILD_ZONE_LAME` | Every in-domain address lookup path failed for all in-domain NS names. |
 | `DELEGATION_NS_SET` | One distinct delegation NS name set (with the parent servers serving it), emitted per set when parents disagree. |
 | `EXTRA_ADDRESS_CHILD` | For names that have glue, the child serves addresses not present in that name's glue. |
-| `IN_BAILIWICK_ADDR_MISMATCH` | An in-domain name's glue contains addresses the child does not serve, while the child serves at least one address for it. Emitted once per affected name. |
+| `IN_DOMAIN_ADDR_MISMATCH` | An in-domain name's glue contains addresses the child does not serve, while the child serves at least one address for it. Emitted once per affected name. |
 | `MISSING_ADDRESS_CHILD` | An in-domain name has glue in the delegation but the child zone serves no address record for it. Emitted once per affected name. |
 | `MULTIPLE_DELEGATION_NS_SET` | Responding parent nameservers serve more than one distinct delegation NS name set. |
 | `NO_RESPONSE` | A child nameserver did not return a response for an in-domain A/AAAA lookup. |
-| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | Not-in-domain glue contains addresses not found in recursive public A/AAAA results. |
+| `NOT_IN_DOMAIN_ADDR_MISMATCH` | Not-in-domain glue contains addresses not found in recursive public A/AAAA results. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -172,16 +172,16 @@ emit TEST_CASE_END
 | `DELEGATION_NS_SET` | `ns_set_servers` | `array<object>` | Structured delegation NS-set elements, one `{ "ns": "..." }` per NS name in the set. |
 | `DELEGATION_NS_SET` | `servers` | `array<object>` | Structured parent server endpoints that served this set. |
 | `EXTRA_ADDRESS_CHILD` | `addresses` | `array<string>` | Structured `owner/ip` entries found only in child authoritative data. |
-| `IN_BAILIWICK_ADDR_MISMATCH` | `ns` | `string` | The in-domain nameserver name this mismatch belongs to. |
-| `IN_BAILIWICK_ADDR_MISMATCH` | `parent_servers` | `array<object>` | Structured list of this name's glue addresses that the child does not serve; each item is `{ "ns": "...", "address": "..." }`. |
-| `IN_BAILIWICK_ADDR_MISMATCH` | `zone_servers` | `array<object>` | Structured list of the child authoritative addresses for the same name; each item is `{ "ns": "...", "address": "..." }`. |
+| `IN_DOMAIN_ADDR_MISMATCH` | `ns` | `string` | The in-domain nameserver name this mismatch belongs to. |
+| `IN_DOMAIN_ADDR_MISMATCH` | `parent_servers` | `array<object>` | Structured list of this name's glue addresses that the child does not serve; each item is `{ "ns": "...", "address": "..." }`. |
+| `IN_DOMAIN_ADDR_MISMATCH` | `zone_servers` | `array<object>` | Structured list of the child authoritative addresses for the same name; each item is `{ "ns": "...", "address": "..." }`. |
 | `MISSING_ADDRESS_CHILD` | `ns` | `string` | The in-domain nameserver name that has glue but no address record in the child zone. |
 | `MULTIPLE_DELEGATION_NS_SET` | `count` | `int` | Number of distinct delegation NS name sets observed. |
 | `MULTIPLE_DELEGATION_NS_SET` | `ns_names` | `array<string>` | Sorted NS names not served by every parent: the union of the observed sets minus their intersection. Never empty when the tag is emitted. |
 | `NO_RESPONSE` | `ns` | `string` | Child nameserver identity (`ns` name only; use `address` for IP) with no response. |
 | `NO_RESPONSE` | `address` | `string` | Nameserver IP address for the same endpoint. |
-| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `parent_servers` | `array<object>` | Structured parent not-in-domain glue endpoint list for one NS name. |
-| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `zone_servers` | `array<object>` | Structured recursively resolved endpoint list for the same NS name. |
+| `NOT_IN_DOMAIN_ADDR_MISMATCH` | `parent_servers` | `array<object>` | Structured parent not-in-domain glue endpoint list for one NS name. |
+| `NOT_IN_DOMAIN_ADDR_MISMATCH` | `zone_servers` | `array<object>` | Structured recursively resolved endpoint list for the same NS name. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Consistency05`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Consistency05`). |
 
@@ -193,11 +193,11 @@ emit TEST_CASE_END
 | `CHILD_ZONE_LAME` | `ERROR` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `DELEGATION_NS_SET` | `INFO` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `EXTRA_ADDRESS_CHILD` | `NOTICE` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
-| `IN_BAILIWICK_ADDR_MISMATCH` | `ERROR` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `IN_DOMAIN_ADDR_MISMATCH` | `ERROR` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `MISSING_ADDRESS_CHILD` | `NOTICE` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `MULTIPLE_DELEGATION_NS_SET` | `WARNING` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `NO_RESPONSE` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
-| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `ERROR` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
+| `NOT_IN_DOMAIN_ADDR_MISMATCH` | `ERROR` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 | `TEST_CASE_START` | `DEBUG` | Default from `share/profile.json` (`test_levels.CONSISTENCY`). |
 
@@ -228,11 +228,11 @@ Deployed parents do omit in-domain referral glue with TC clear, contrary to RFC 
 The same asymmetry governs the address comparison:
 
 - **Glue is compared as a union across all parents**, so a name's glue is the set of addresses any parent supplied for it. Trimming can only shrink that union, never add to it, so it can hide a fault but cannot invent one.
-- **Names with no glue in the union are not compared at all.** A parent that never had glue for a name cannot be told apart from parents that all trimmed the same name, so comparing such a name would report trimming as a fault. Glue absent from the delegation is reported once per name by Delegation01's `IN_BAILIWICK_GLUE_MISSING`.
+- **Names with no glue in the union are not compared at all.** A parent that never had glue for a name cannot be told apart from parents that all trimmed the same name, so comparing such a name would report trimming as a fault. Glue absent from the delegation is reported once per name by Delegation01's `IN_DOMAIN_GLUE_MISSING`.
 - **A missing address record is not a wrong one.** Glue that the child zone does not confirm misdirects resolvers and stays an ERROR. A glued name for which the child serves no address at all still resolves while the glue is served, and is reported separately at NOTICE.
 
 ## Edge Cases And Limitations
-- Glue is taken only from the additional section of a usable referral, so a parent name server that answers out-of-domain names (for example via a catch-all or wildcard zone) does not inject spurious glue and cannot trigger a false `OUT_OF_BAILIWICK_ADDR_MISMATCH`.
+- Glue is taken only from the additional section of a usable referral, so a parent name server that answers out-of-domain names (for example via a catch-all or wildcard zone) does not inject spurious glue and cannot trigger a false `NOT_IN_DOMAIN_ADDR_MISMATCH`.
 - A parent server that does not respond, or whose response is not a usable referral, is not part of any delegation NS set; non-response can never produce `MULTIPLE_DELEGATION_NS_SET`. With fewer than two usable referrals the delegation comparison is skipped entirely.
 - The delegation NS-set comparison is silent when all responding parents agree; there is no positive confirmation tag, and `ADDRESSES_MATCH` remains governed only by the address comparisons.
 - Glue trimmed from the additional section, whether lawfully or not, does not split the delegation, because the per-parent key holds NS names only.
@@ -240,8 +240,8 @@ The same asymmetry governs the address comparison:
 - The root zone is its own parent, so a test of `.` sends priming queries. Per RFC 9609 the responses are answers and not referrals, so they are not usable referrals: a test of the root produces no delegation NS-set finding.
 - Undelegated tests produce synthetic, identical delegations, so the delegation NS-set comparison stays silent there.
 - `CHILD_ZONE_LAME` short-circuits testcase execution and suppresses later mismatch checks when no usable in-domain address lookup path was found.
-- In-domain mismatch reporting is per NS name: a zone with several names carrying wrong glue produces one `IN_BAILIWICK_ADDR_MISMATCH` per name, each naming only that name's unconfirmed addresses.
-- A single name can produce both `IN_BAILIWICK_ADDR_MISMATCH` and a contribution to `EXTRA_ADDRESS_CHILD`, when its glue and its child addresses each hold entries the other lacks.
+- In-domain mismatch reporting is per NS name: a zone with several names carrying wrong glue produces one `IN_DOMAIN_ADDR_MISMATCH` per name, each naming only that name's unconfirmed addresses.
+- A single name can produce both `IN_DOMAIN_ADDR_MISMATCH` and a contribution to `EXTRA_ADDRESS_CHILD`, when its glue and its child addresses each hold entries the other lacks.
 - A zone whose parents supply no usable glue, including the root zone and a delegation whose nameservers are all not-in-domain, has nothing to compare and reports `ADDRESSES_MATCH`.
 - Not-in-domain mismatch reporting is per NS name group; each emission includes full parent list for that group.
 - Disabled IP versions affect child authoritative probes indirectly by filtering queried child servers.

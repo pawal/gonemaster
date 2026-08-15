@@ -352,7 +352,7 @@ func TestDelegation01InBailiwickGlueMissing(t *testing.T) {
 		t.Fatalf("delegation01: %v", err)
 	}
 
-	flagged := collectArgValues(entries, "IN_BAILIWICK_GLUE_MISSING", "ns")
+	flagged := collectArgValues(entries, "IN_DOMAIN_GLUE_MISSING", "ns")
 	if len(flagged) != 1 || flagged[0] != "ns1.example" {
 		t.Fatalf("expected only ns1.example flagged for missing glue, got %v", flagged)
 	}
@@ -384,8 +384,8 @@ func TestDelegation01InBailiwickGluePresent(t *testing.T) {
 		t.Fatalf("delegation01: %v", err)
 	}
 
-	if hasEntryTag(entries, "IN_BAILIWICK_GLUE_MISSING") {
-		t.Fatalf("did not expect IN_BAILIWICK_GLUE_MISSING when all in-bailiwick names carry glue")
+	if hasEntryTag(entries, "IN_DOMAIN_GLUE_MISSING") {
+		t.Fatalf("did not expect IN_DOMAIN_GLUE_MISSING when all in-bailiwick names carry glue")
 	}
 }
 

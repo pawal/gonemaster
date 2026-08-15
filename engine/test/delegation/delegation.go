@@ -137,7 +137,7 @@ func Metadata() map[string][]string {
 			"NO_IPV4_NS_DEL",
 			"NO_IPV6_NS_CHILD",
 			"NO_IPV6_NS_DEL",
-			"IN_BAILIWICK_GLUE_MISSING",
+			"IN_DOMAIN_GLUE_MISSING",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -345,7 +345,7 @@ func Delegation01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 	for _, name := range missingInBailiwickGlue(delItems, z.Name) {
-		if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_GLUE_MISSING", map[string]any{
+		if err := appendLog(ctx, &results, testcase, "IN_DOMAIN_GLUE_MISSING", map[string]any{
 			"ns": logargs.EndpointName(name),
 		}); err != nil {
 			return results, err

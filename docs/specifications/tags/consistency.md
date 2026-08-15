@@ -17,7 +17,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DELEGATION_NS_SET` | `INFO` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `EXTRA_ADDRESS_CHILD` | `NOTICE` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `INCONSISTENT_NS_TTL` | `NOTICE` | [consistency04](../tests/consistency/consistency04.md) | yes |
-| `IN_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
+| `IN_DOMAIN_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `IPV4_DISABLED` | `DEBUG2` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |
 | `IPV6_DISABLED` | `DEBUG2` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency06](../tests/consistency/consistency06.md) | yes |
 | `MISSING_ADDRESS_CHILD` | `NOTICE` | [consistency05](../tests/consistency/consistency05.md) | yes |
@@ -27,6 +27,7 @@ _Do not edit by hand - regenerate with the command above._
 | `MULTIPLE_SOA_RNAMES` | `NOTICE` | [consistency02](../tests/consistency/consistency02.md) | yes |
 | `MULTIPLE_SOA_SERIALS` | `WARNING` | [consistency01](../tests/consistency/consistency01.md) | yes |
 | `MULTIPLE_SOA_TIME_PARAMETER_SET` | `NOTICE` | [consistency03](../tests/consistency/consistency03.md) | yes |
+| `NOT_IN_DOMAIN_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `NO_RESPONSE` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency04](../tests/consistency/consistency04.md), [consistency05](../tests/consistency/consistency05.md), [consistency06](../tests/consistency/consistency06.md) | yes |
 | `NO_RESPONSE_NS_QUERY` | `DEBUG` | [consistency04](../tests/consistency/consistency04.md) | yes |
 | `NO_RESPONSE_SOA_QUERY` | `DEBUG` | [consistency01](../tests/consistency/consistency01.md), [consistency02](../tests/consistency/consistency02.md), [consistency03](../tests/consistency/consistency03.md), [consistency06](../tests/consistency/consistency06.md) | yes |
@@ -36,7 +37,6 @@ _Do not edit by hand - regenerate with the command above._
 | `ONE_SOA_RNAME` | `INFO` | [consistency02](../tests/consistency/consistency02.md) | yes |
 | `ONE_SOA_SERIAL` | `INFO` | [consistency01](../tests/consistency/consistency01.md) | yes |
 | `ONE_SOA_TIME_PARAMETER_SET` | `INFO` | [consistency03](../tests/consistency/consistency03.md) | yes |
-| `OUT_OF_BAILIWICK_ADDR_MISMATCH` | `ERROR` | [consistency05](../tests/consistency/consistency05.md) | yes |
 | `SOA_MNAME` | `-` | [consistency06](../tests/consistency/consistency06.md) | yes |
 | `SOA_RNAME` | `INFO` | [consistency02](../tests/consistency/consistency02.md) | yes |
 | `SOA_SERIAL` | `INFO` | [consistency01](../tests/consistency/consistency01.md) | yes |

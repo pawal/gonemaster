@@ -156,11 +156,11 @@ func Metadata() map[string][]string {
 			"CHILD_ZONE_LAME",
 			"DELEGATION_NS_SET",
 			"EXTRA_ADDRESS_CHILD",
-			"IN_BAILIWICK_ADDR_MISMATCH",
+			"IN_DOMAIN_ADDR_MISMATCH",
 			"MISSING_ADDRESS_CHILD",
 			"MULTIPLE_DELEGATION_NS_SET",
 			"NO_RESPONSE",
-			"OUT_OF_BAILIWICK_ADDR_MISMATCH",
+			"NOT_IN_DOMAIN_ADDR_MISMATCH",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -980,7 +980,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			args := map[string]any{"ns": logargs.EndpointName(nsName)}
 			setTypedServersFromAddrKeysAtKey(args, "parent_servers", unconfirmed)
 			setTypedServersFromAddrKeysAtKey(args, "zone_servers", childAddrs)
-			if err := appendLog(ctx, &results, testcase, "IN_BAILIWICK_ADDR_MISMATCH", args); err != nil {
+			if err := appendLog(ctx, &results, testcase, "IN_DOMAIN_ADDR_MISMATCH", args); err != nil {
 				return results, err
 			}
 		}
@@ -1036,7 +1036,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			args := map[string]any{}
 			setTypedServersFromAddrKeysAtKey(args, "parent_servers", glueStrings)
 			setTypedServersFromAddrKeysAtKey(args, "zone_servers", sortedKeys(childOOB))
-			if err := appendLog(ctx, &results, testcase, "OUT_OF_BAILIWICK_ADDR_MISMATCH", args); err != nil {
+			if err := appendLog(ctx, &results, testcase, "NOT_IN_DOMAIN_ADDR_MISMATCH", args); err != nil {
 				return results, err
 			}
 		}

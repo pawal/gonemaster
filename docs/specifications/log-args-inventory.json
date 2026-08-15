@@ -8,7 +8,7 @@
     "logSystem(tag, args), logSystemWithLogger(..., tag, args)"
   ],
   "summary": {
-    "file_count": 117,
+    "file_count": 118,
     "log_call_count": 728,
     "unique_tag_count": 523,
     "unique_key_count": 89,
@@ -2240,7 +2240,7 @@
     "ns": {
       "tags": [
         "B02_NS_NO_IP_ADDR",
-        "IN_BAILIWICK_GLUE_MISSING",
+        "IN_DOMAIN_GLUE_MISSING",
         "MISSING_ADDRESS_CHILD",
         "NAMESERVER_IP_PTR_MISMATCH",
         "NAMESERVER_IP_WITHOUT_REVERSE",
@@ -2270,7 +2270,7 @@
           "shape": "unknown"
         },
         {
-          "tag": "IN_BAILIWICK_GLUE_MISSING",
+          "tag": "IN_DOMAIN_GLUE_MISSING",
           "file": "engine/test/delegation/delegation.go",
           "line": 348,
           "shape": "unknown"
@@ -2352,13 +2352,13 @@
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
           "line": 562,
-          "shape": "string"
+          "shape": "unknown"
         },
         {
           "tag": "CACHED_RETURN",
           "file": "engine/nameserver/nameserver.go",
           "line": 562,
-          "shape": "unknown"
+          "shape": "string"
         },
         {
           "tag": "FAKE_PACKET_RETURNED",
@@ -3632,7 +3632,7 @@
     {
       "tag": "CHILD_NS_FAILED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1371,
+      "line": 1379,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3692,7 +3692,7 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1440,
+      "line": 1448,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3782,7 +3782,7 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1430,
+      "line": 1438,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3932,7 +3932,7 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1351,
+      "line": 1359,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {

@@ -778,12 +778,12 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if !hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
-		t.Fatalf("expected IN_BAILIWICK_ADDR_MISMATCH")
+	if !hasEntryTag(entries, "IN_DOMAIN_ADDR_MISMATCH") {
+		t.Fatalf("expected IN_DOMAIN_ADDR_MISMATCH")
 	}
-	mismatch := firstEntryByTag(entries, "IN_BAILIWICK_ADDR_MISMATCH")
+	mismatch := firstEntryByTag(entries, "IN_DOMAIN_ADDR_MISMATCH")
 	if mismatch == nil {
-		t.Fatalf("missing IN_BAILIWICK_ADDR_MISMATCH entry")
+		t.Fatalf("missing IN_DOMAIN_ADDR_MISMATCH entry")
 	}
 	if got := mismatch.Args["ns"]; got != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", got)
@@ -887,7 +887,7 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 	if got := missing.Args["ns"]; got != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", got)
 	}
-	if hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
+	if hasEntryTag(entries, "IN_DOMAIN_ADDR_MISMATCH") {
 		t.Fatalf("a name the child has no address for is missing, not mismatched")
 	}
 	// ns2 is served only by the child and carries no glue, so it is outside
@@ -941,12 +941,12 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if !hasEntryTag(entries, "OUT_OF_BAILIWICK_ADDR_MISMATCH") {
-		t.Fatalf("expected OUT_OF_BAILIWICK_ADDR_MISMATCH")
+	if !hasEntryTag(entries, "NOT_IN_DOMAIN_ADDR_MISMATCH") {
+		t.Fatalf("expected NOT_IN_DOMAIN_ADDR_MISMATCH")
 	}
-	mismatch := firstEntryByTag(entries, "OUT_OF_BAILIWICK_ADDR_MISMATCH")
+	mismatch := firstEntryByTag(entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
 	if mismatch == nil {
-		t.Fatalf("missing OUT_OF_BAILIWICK_ADDR_MISMATCH entry")
+		t.Fatalf("missing NOT_IN_DOMAIN_ADDR_MISMATCH entry")
 	}
 	parent := serverEndpointsAtKey(mismatch.Args, "parent_servers")
 	if len(parent) != 1 || parent[0] != "ns1.other/192.0.2.1" {
@@ -964,7 +964,7 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 }
 
 // A glueless out-of-bailiwick delegation must yield ADDRESSES_MATCH, not a
-// spurious OUT_OF_BAILIWICK_ADDR_MISMATCH. gonemaster only compares glue the
+// spurious NOT_IN_DOMAIN_ADDR_MISMATCH. gonemaster only compares glue the
 // parent actually returns, so an empty parent side never fabricates localhost
 // glue. Mirrors upstream consistency05 scenarios ADDRESSES-MATCH-8/9
 // (zonemaster-engine#1537).
@@ -1044,8 +1044,8 @@ func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
 			if !hasEntryTag(entries, "ADDRESSES_MATCH") {
 				t.Fatalf("expected ADDRESSES_MATCH for glueless OOB delegation")
 			}
-			if hasEntryTag(entries, "OUT_OF_BAILIWICK_ADDR_MISMATCH") {
-				t.Fatalf("unexpected OUT_OF_BAILIWICK_ADDR_MISMATCH for glueless OOB delegation")
+			if hasEntryTag(entries, "NOT_IN_DOMAIN_ADDR_MISMATCH") {
+				t.Fatalf("unexpected NOT_IN_DOMAIN_ADDR_MISMATCH for glueless OOB delegation")
 			}
 		})
 	}
@@ -1115,8 +1115,8 @@ func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "OUT_OF_BAILIWICK_ADDR_MISMATCH") {
-		t.Fatalf("loopback answered by parent for an out-of-domain name must not produce OUT_OF_BAILIWICK_ADDR_MISMATCH")
+	if hasEntryTag(entries, "NOT_IN_DOMAIN_ADDR_MISMATCH") {
+		t.Fatalf("loopback answered by parent for an out-of-domain name must not produce NOT_IN_DOMAIN_ADDR_MISMATCH")
 	}
 	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
 		t.Fatalf("expected ADDRESSES_MATCH when the referral carries no glue")
@@ -1566,7 +1566,7 @@ func TestConsistency05InBailiwickMismatchIsPerName(t *testing.T) {
 
 	var mismatches []*logger.Entry
 	for _, entry := range entries {
-		if entry != nil && entry.Tag == "IN_BAILIWICK_ADDR_MISMATCH" {
+		if entry != nil && entry.Tag == "IN_DOMAIN_ADDR_MISMATCH" {
 			mismatches = append(mismatches, entry)
 		}
 	}
@@ -1652,8 +1652,8 @@ func TestConsistency05NameWithoutGlueIsNotCompared(t *testing.T) {
 	if hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
 		t.Fatalf("a name without glue must not produce EXTRA_ADDRESS_CHILD")
 	}
-	if hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
-		t.Fatalf("a name without glue must not produce IN_BAILIWICK_ADDR_MISMATCH")
+	if hasEntryTag(entries, "IN_DOMAIN_ADDR_MISMATCH") {
+		t.Fatalf("a name without glue must not produce IN_DOMAIN_ADDR_MISMATCH")
 	}
 	if hasEntryTag(entries, "MISSING_ADDRESS_CHILD") {
 		t.Fatalf("a name without glue must not produce MISSING_ADDRESS_CHILD")
@@ -1697,7 +1697,7 @@ func TestConsistency05TrimmedGlueUnionMatchesChild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	for _, tag := range []string{"IN_BAILIWICK_ADDR_MISMATCH", "MISSING_ADDRESS_CHILD", "EXTRA_ADDRESS_CHILD", "MULTIPLE_DELEGATION_NS_SET"} {
+	for _, tag := range []string{"IN_DOMAIN_ADDR_MISMATCH", "MISSING_ADDRESS_CHILD", "EXTRA_ADDRESS_CHILD", "MULTIPLE_DELEGATION_NS_SET"} {
 		if hasEntryTag(entries, tag) {
 			t.Fatalf("unexpected %s for a glue union that matches the child", tag)
 		}
@@ -2024,7 +2024,7 @@ func TestConsistency05GlueIgnoresOwnerOutsideAuthoritySet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "IN_BAILIWICK_ADDR_MISMATCH") {
+	if hasEntryTag(entries, "IN_DOMAIN_ADDR_MISMATCH") {
 		t.Fatalf("an address record outside the authority NS set must not count as glue")
 	}
 	if !hasEntryTag(entries, "ADDRESSES_MATCH") {

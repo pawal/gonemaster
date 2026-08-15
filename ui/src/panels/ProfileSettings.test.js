@@ -79,6 +79,7 @@ describe("ProfileSettings", () => {
 
   const compatResultCompatible = () => ({
     compatible: true,
+    reviewed: false,
     schema_version: "v1.0.0",
     current_version: "v1.0.0",
     issues: []
@@ -86,6 +87,7 @@ describe("ProfileSettings", () => {
 
   const compatResultIncompatible = () => ({
     compatible: false,
+    reviewed: false,
     schema_version: "v0.9.0",
     current_version: "v1.0.0",
     issues: [
@@ -97,21 +99,74 @@ describe("ProfileSettings", () => {
     ]
   });
 
-  const sampleCompatSummaries = (incompatibleId = null) => sampleProfiles().map((p) => ({
+  // A profile stamped with the current engine version: compatible, but the
+  // review is waiving a real gap.
+  const compatResultReviewed = () => ({
+    compatible: true,
+    reviewed: true,
+    schema_version: "v1.0.0",
+    current_version: "v1.0.0",
+    issues: [],
+    waived_issues: [
+      {
+        type: "missing_test_case",
+        detail: "Profile sets test_cases but is missing: zone15",
+        suggestion: "Add zone15 to test_cases, or remove test_cases to inherit all defaults."
+      }
+    ]
+  });
+
+  const sampleCompatSummaries = (incompatibleId = null, waivedId = null) => sampleProfiles().map((p) => ({
     id: p.id,
     name: p.name,
     compatible: p.id !== incompatibleId,
-    issue_count: p.id === incompatibleId ? 1 : 0
+    issue_count: p.id === incompatibleId ? 1 : 0,
+    waived_count: p.id === waivedId ? 3 : 0
   }));
+
+  const sampleDiff = () => ({
+    summary: { deviations: 2, redundant: 2, missing: 1, unknown: 0 },
+    properties: [
+      {
+        path: "resolver.defaults.nameserver_max_total_ms",
+        kind: "changed",
+        redundant: false,
+        default: 0,
+        value: 60000
+      },
+      { path: "badkeys.path", kind: "redundant", redundant: true },
+      {
+        path: "test_levels",
+        kind: "map",
+        redundant: false,
+        wholesale: true,
+        modules: [
+          {
+            module: "CONSISTENCY",
+            changed: [{ key: "EXTRA_ADDRESS_CHILD", default: "NOTICE", value: "WARNING" }],
+            missing: ["MISSING_ADDRESS_CHILD"],
+            unknown: []
+          }
+        ]
+      },
+      { path: "test_cases_vars", kind: "map", redundant: true, wholesale: false, modules: [] }
+    ]
+  });
 
   const installProfileFetch = (scenario = {}) => {
     let profiles = sampleProfiles();
-    let compatSummaries = sampleCompatSummaries(scenario.incompatibleProfileId || null);
+    let compatSummaries = sampleCompatSummaries(
+      scenario.incompatibleProfileId || null,
+      scenario.waivedProfileId || null
+    );
     const tags = sampleTags();
     const createdBodies = [];
     const updatedBodies = [];
     const patchedBodies = [];
+    const diffBodies = [];
     let markAllReviewedCalls = 0;
+    const reviewedIds = new Set(scenario.reviewedProfileId ? [scenario.reviewedProfileId] : []);
+    const clearedIds = new Set();
 
     global.fetch.mockImplementation((url, requestOptions = {}) => {
       const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
@@ -155,10 +210,26 @@ describe("ProfileSettings", () => {
         if (scenario.patchError) {
           return jsonResponse({ error: { message: scenario.patchError } }, false);
         }
+        if (body.op === "clear_reviewed") {
+          // The stamp is gone, so the waived issues come back as real ones.
+          reviewedIds.delete(2);
+          clearedIds.add(2);
+          const cleared = { ...profiles.find((p) => p.id === 2), schema_version: "" };
+          profiles = profiles.map((p) => p.id === 2 ? cleared : p);
+          compatSummaries = sampleCompatSummaries(2);
+          return jsonResponse(cleared);
+        }
         const patched = { ...profiles.find((p) => p.id === 2), schema_version: "v1.0.0" };
         profiles = profiles.map((p) => p.id === 2 ? patched : p);
         compatSummaries = sampleCompatSummaries(null);
         return jsonResponse(patched);
+      }
+      if (value === "/api/v1/profiles/diff" && method === "POST") {
+        diffBodies.push(JSON.parse(requestOptions.body));
+        if (scenario.diffError) {
+          return jsonResponse({ error: { message: scenario.diffError } }, false);
+        }
+        return jsonResponse(scenario.diff || sampleDiff());
       }
       if (value === "/api/v1/profiles/3" && method === "DELETE") {
         profiles = profiles.filter((profile) => profile.id !== 3);
@@ -177,12 +248,10 @@ describe("ProfileSettings", () => {
         return jsonResponse({ updated });
       }
       if (/\/api\/v1\/profiles\/\d+\/compatibility$/.test(value)) {
-        if (scenario.incompatibleProfileId) {
-          const id = parseInt(value.match(/\/profiles\/(\d+)\//)?.[1]);
-          return jsonResponse(id === scenario.incompatibleProfileId
-            ? compatResultIncompatible()
-            : compatResultCompatible());
-        }
+        const id = parseInt(value.match(/\/profiles\/(\d+)\//)?.[1]);
+        if (clearedIds.has(id)) return jsonResponse(compatResultIncompatible());
+        if (reviewedIds.has(id)) return jsonResponse(compatResultReviewed());
+        if (id === scenario.incompatibleProfileId) return jsonResponse(compatResultIncompatible());
         return jsonResponse(compatResultCompatible());
       }
       if (value === "/api/v1/tags?limit=500") return jsonResponse(tags);
@@ -193,6 +262,7 @@ describe("ProfileSettings", () => {
       createdBodies,
       updatedBodies,
       patchedBodies,
+      diffBodies,
       getMarkAllReviewedCalls: () => markAllReviewedCalls,
       getProfiles: () => profiles
     };
@@ -736,7 +806,7 @@ describe("ProfileSettings", () => {
     expect(screen.getByRole("button", { name: /mark all as reviewed/i })).toBeInTheDocument();
   });
 
-  it("clicking 'Mark all as reviewed' calls POST /profiles/mark-all-reviewed", async () => {
+  it("clicking 'Mark all as reviewed' asks for confirmation before posting", async () => {
     const state = installProfileFetch({ incompatibleProfileId: 2 });
 
     render(ProfileSettings);
@@ -745,9 +815,32 @@ describe("ProfileSettings", () => {
     const btn = await screen.findByRole("button", { name: /mark all as reviewed/i });
     await fireEvent.click(btn);
 
+    // The confirmation names every profile it is about to waive issues on.
+    expect(await screen.findByText("Mark all profiles as reviewed?")).toBeInTheDocument();
+    expect(screen.getByText("beta: 1 issue(s)")).toBeInTheDocument();
+    expect(state.getMarkAllReviewedCalls()).toBe(0);
+
+    await fireEvent.click(screen.getByRole("button", { name: /mark all as reviewed/i }));
+
     await waitFor(() => {
       expect(state.getMarkAllReviewedCalls()).toBe(1);
     });
+  });
+
+  it("cancelling the mark-all confirmation sends nothing and restores the banner", async () => {
+    const state = installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+    await findLibraryRow("alpha");
+
+    await fireEvent.click(await screen.findByRole("button", { name: /mark all as reviewed/i }));
+    await screen.findByText("Mark all profiles as reviewed?");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(await screen.findByText(/1 profile\(s\) need review/i)).toBeInTheDocument();
+    expect(screen.queryByText("Mark all profiles as reviewed?")).not.toBeInTheDocument();
+    expect(state.getMarkAllReviewedCalls()).toBe(0);
   });
 
   it("summary line disappears after mark all reviewed", async () => {
@@ -757,6 +850,8 @@ describe("ProfileSettings", () => {
     await findLibraryRow("alpha");
 
     await screen.findByText(/1 profile\(s\) need review/i);
+    await fireEvent.click(screen.getByRole("button", { name: /mark all as reviewed/i }));
+    await screen.findByText("Mark all profiles as reviewed?");
     await fireEvent.click(screen.getByRole("button", { name: /mark all as reviewed/i }));
 
     await waitFor(() => {
@@ -772,7 +867,226 @@ describe("ProfileSettings", () => {
 
     await screen.findByText(/1 profile\(s\) need review/i);
     await fireEvent.click(screen.getByRole("button", { name: /mark all as reviewed/i }));
+    await screen.findByText("Mark all profiles as reviewed?");
+    await fireEvent.click(screen.getByRole("button", { name: /mark all as reviewed/i }));
 
     expect(await screen.findByText(/Failed to apply fix: db unavailable/i)).toBeInTheDocument();
+  });
+
+  it("shows a waived badge on library rows that carry one", async () => {
+    installProfileFetch({ waivedProfileId: 1 });
+
+    render(ProfileSettings);
+
+    const alphaRow = await findLibraryRow("alpha");
+    expect(await within(alphaRow).findByText("3 waived")).toBeInTheDocument();
+
+    const betaRow = await findLibraryRow("beta");
+    expect(within(betaRow).queryByText(/waived/)).not.toBeInTheDocument();
+  });
+
+  // ── review state ───────────────────────────────────────────────────────────
+
+  it("shows the reviewed line with the waived issues for a reviewed profile", async () => {
+    installProfileFetch({ reviewedProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    expect(await screen.findByText("Reviewed against v1.0.0")).toBeInTheDocument();
+    expect(screen.getByText("1 issue(s) waived by this review")).toBeInTheDocument();
+    // The waived issues stay collapsed until asked for.
+    expect(screen.queryAllByText(/zone15/)).toHaveLength(0);
+
+    await fireEvent.click(screen.getByRole("button", { name: "Show waived issues" }));
+    expect(screen.getAllByText(/zone15/).length).toBeGreaterThan(0);
+  });
+
+  it("re-checking a reviewed profile clears the stamp and brings the banner back", async () => {
+    const state = installProfileFetch({ reviewedProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    await screen.findByText("Reviewed against v1.0.0");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Check again" }));
+
+    await waitFor(() => {
+      expect(state.patchedBodies).toHaveLength(1);
+    });
+    expect(state.patchedBodies[0]).toEqual({ op: "clear_reviewed" });
+
+    // The normal incompatible banner and its fix buttons take over.
+    expect(await screen.findByRole("alert")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Add missing test cases" })).toBeInTheDocument();
+    expect(screen.queryByText("Reviewed against v1.0.0")).not.toBeInTheDocument();
+  });
+
+  it("shows no reviewed line for an unreviewed profile", async () => {
+    installProfileFetch({ incompatibleProfileId: 2 });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    await screen.findByRole("alert");
+    expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
+  });
+
+  // ── diff panel ─────────────────────────────────────────────────────────────
+
+  it("shows the diff summary for the selected profile", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    expect(await screen.findByText("Differences from engine defaults")).toBeInTheDocument();
+    expect(screen.getByText(
+      "2 deviation(s), 2 redundant override(s), 1 missing key(s), 0 unknown key(s)"
+    )).toBeInTheDocument();
+  });
+
+  it("sends the unsaved draft config to the diff endpoint", async () => {
+    const state = installProfileFetch();
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    await screen.findByText("Differences from engine defaults");
+
+    await fireEvent.input(screen.getByLabelText("Config JSON"), {
+      target: { value: '{"net":{"ipv6":false}}' }
+    });
+
+    await waitFor(() => {
+      expect(state.diffBodies.at(-1)).toEqual({ config: { net: { ipv6: false } } });
+    });
+  });
+
+  it("expands the diff into a table of per-property rows", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    await screen.findByText("Differences from engine defaults");
+
+    await fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+
+    expect(screen.getByText("resolver.defaults.nameserver_max_total_ms")).toBeInTheDocument();
+    expect(screen.getByText("60000")).toBeInTheDocument();
+    // Two properties restate the default: the scalar and the tunables map.
+    expect(screen.getAllByText("Restates the engine default")).toHaveLength(2);
+    expect(screen.getByText("EXTRA_ADDRESS_CHILD: NOTICE -> WARNING")).toBeInTheDocument();
+  });
+
+  it("marks missing keys of a wholesale property as the dangerous class", async () => {
+    installProfileFetch();
+
+    const { container } = render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    await screen.findByText("Differences from engine defaults");
+    await fireEvent.click(screen.getByRole("button", { name: "Show details" }));
+
+    const danger = container.querySelector(".diff-danger");
+    expect(danger).toBeTruthy();
+    expect(danger.textContent).toContain("MISSING_ADDRESS_CHILD");
+    expect(screen.getByText(/omitted tags resolve to DEBUG/)).toBeInTheDocument();
+  });
+
+  it("strips only the wholly redundant properties from the draft", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    await screen.findByText("Differences from engine defaults");
+
+    await fireEvent.input(screen.getByLabelText("Config JSON"), {
+      target: {
+        value: JSON.stringify({
+          badkeys: { path: "" },
+          test_levels: { BASIC: { B01_CHILD_FOUND: "INFO" } },
+          test_cases_vars: { zone13: { SPF_LOOKUP_LIMIT: 10 } },
+          resolver: { defaults: { nameserver_max_total_ms: 60000 } }
+        })
+      }
+    });
+
+    const strip = await screen.findByRole("button", { name: "Strip 2 redundant override(s)" });
+    await fireEvent.click(strip);
+
+    const config = JSON.parse(screen.getByLabelText("Config JSON").value);
+    // Redundant: removed, and the emptied parent object pruned with it.
+    expect(config.badkeys).toBeUndefined();
+    expect(config.test_cases_vars).toBeUndefined();
+    // Deviating: kept, including the partially redundant wholesale-replace map.
+    expect(config.test_levels).toEqual({ BASIC: { B01_CHILD_FOUND: "INFO" } });
+    expect(config.resolver).toEqual({ defaults: { nameserver_max_total_ms: 60000 } });
+    // The draft is dirty and can be saved.
+    expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(false);
+  });
+
+  it("disables the strip button when nothing is redundant", async () => {
+    installProfileFetch({
+      diff: {
+        summary: { deviations: 1, redundant: 0, missing: 0, unknown: 0 },
+        properties: [
+          { path: "net.ipv6", kind: "changed", redundant: false, default: true, value: false }
+        ]
+      }
+    });
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+
+    const strip = await screen.findByRole("button", { name: "No redundant overrides" });
+    expect(strip.disabled).toBe(true);
+  });
+
+  it("shows no diff panel on the default profile view", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+    await findLibraryRow("default");
+
+    // The default profile view opens on load and is read-only.
+    expect(screen.getByRole("heading", { name: "default" })).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.queryByText("Differences from engine defaults")).not.toBeInTheDocument();
+    });
+  });
+
+  it("hides the diff panel while the draft config is not valid JSON", async () => {
+    installProfileFetch();
+
+    render(ProfileSettings);
+
+    const betaRow = await findLibraryRow("beta");
+    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    await screen.findByText("Differences from engine defaults");
+
+    await fireEvent.input(screen.getByLabelText("Config JSON"), {
+      target: { value: "not valid json" }
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByText("Differences from engine defaults")).not.toBeInTheDocument();
+    });
   });
 });

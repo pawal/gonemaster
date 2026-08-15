@@ -10,6 +10,9 @@
   let { apiBase = "/api/v1", onprofileschanged } = $props();
 
   const defaultProfileKey = "__default__";
+  // Longest excluded/missing/unknown list rendered before collapsing to a count.
+  const diffListLimit = 12;
+  const diffDebounceMs = 250;
 
   let loading = $state(false);
   let saving = $state(false);
@@ -20,6 +23,12 @@
   let compatibility = $state(null);
   let compatSummaries = $state([]);
   let markingAllReviewed = $state(false);
+  let markAllConfirm = $state(false);
+  let waivedExpanded = $state(false);
+  let diff = $state(null);
+  let diffExpanded = $state(false);
+  let diffRequestId = 0;
+  let diffAbort = null;
   let storedProfiles = $state([]);
   let filteredProfiles = $state([]);
   let usageCounts = $state({});
@@ -128,12 +137,85 @@
 
   const loadCompatibility = async (profileId) => {
     compatibility = null;
+    waivedExpanded = false;
     try {
       compatibility = await apiFetch(`/profiles/${profileId}/compatibility`);
     } catch (_) {
       // Ignore - compatibility is best-effort; don't surface load errors
     }
   };
+
+  // The draft travels in the request body, so the diff reflects unsaved edits.
+  const loadDiff = async (configText) => {
+    const parsed = parseConfigText(configText);
+    if (!parsed) {
+      diff = null;
+      return;
+    }
+    const requestId = ++diffRequestId;
+    diffAbort?.abort();
+    diffAbort = typeof AbortController === "function" ? new AbortController() : null;
+    try {
+      const result = await apiFetch("/profiles/diff", {
+        method: "POST",
+        body: JSON.stringify({ config: parsed }),
+        signal: diffAbort?.signal
+      });
+      if (requestId !== diffRequestId) return;
+      diff = result;
+    } catch (_) {
+      // Ignore - the diff is best-effort, like the compatibility check.
+      if (requestId === diffRequestId) diff = null;
+    }
+  };
+
+  const parseConfigText = (configText) => {
+    try {
+      const parsed = JSON.parse(configText || "{}");
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return null;
+      return parsed;
+    } catch (_) {
+      return null;
+    }
+  };
+
+  // Removes one dotted property path, then prunes the objects it emptied.
+  const removeConfigPath = (root, path) => {
+    const parts = String(path || "").split(".");
+    const parents = [];
+    let node = root;
+    for (let i = 0; i < parts.length - 1; i += 1) {
+      if (!node || typeof node !== "object") return;
+      parents.push([node, parts[i]]);
+      node = node[parts[i]];
+    }
+    if (!node || typeof node !== "object") return;
+    delete node[parts[parts.length - 1]];
+    for (let i = parents.length - 1; i >= 0; i -= 1) {
+      const [parent, key] = parents[i];
+      const child = parent[key];
+      const empty = child && typeof child === "object" && !Array.isArray(child) && Object.keys(child).length === 0;
+      if (!empty) break;
+      delete parent[key];
+    }
+  };
+
+  // Only properties the diff calls redundant are removed, so the merged
+  // profile the engine runs stays exactly the same.
+  const stripRedundant = () => {
+    if (redundantPaths.length === 0) return;
+    const config = parseConfigText(draft.configText);
+    if (!config) return;
+    for (const path of redundantPaths) {
+      removeConfigPath(config, path);
+    }
+    draft = { ...draft, configText: JSON.stringify(config, null, 2) };
+    setNotice($t("profile_diff_stripped", { count: redundantPaths.length }), "ok");
+  };
+
+  const diffValueText = (value) => (typeof value === "string" ? value : JSON.stringify(value));
+  const diffListText = (items = []) => items.slice(0, diffListLimit).join(", ");
+  const diffListMore = (items = []) => Math.max(0, items.length - diffListLimit);
 
   const applyCompatFix = async (op, module = null) => {
     if (!editingProfileId || applyingFix) return;
@@ -155,6 +237,7 @@
 
   const markAllReviewed = async () => {
     if (markingAllReviewed) return;
+    markAllConfirm = false;
     markingAllReviewed = true;
     try {
       await apiFetch("/profiles/mark-all-reviewed", { method: "POST", body: "{}" });
@@ -395,8 +478,13 @@
   };
 
   let libraryProfiles = $derived(defaultProfile ? [defaultProfile, ...storedProfiles] : storedProfiles);
-  let incompatibleIds = $derived(new Set(compatSummaries.filter(s => !s.compatible).map(s => s.id)));
+  let incompatibleSummaries = $derived(compatSummaries.filter(s => !s.compatible));
+  let incompatibleIds = $derived(new Set(incompatibleSummaries.map(s => s.id)));
   let incompatibleCount = $derived(incompatibleIds.size);
+  let waivedCounts = $derived(new Map(compatSummaries.map(s => [s.id, Number(s.waived_count) || 0])));
+  let waivedIssues = $derived(compatibility?.waived_issues || []);
+  let diffProperties = $derived(diff?.properties || []);
+  let redundantPaths = $derived(diffProperties.filter(entry => entry.redundant).map(entry => entry.path));
   $effect(() => {
     filteredProfiles = libraryProfiles.filter(profileMatchesFilter);
   });
@@ -419,8 +507,23 @@
     : false);
   let canSave = $derived(isEditableWorkspace && hasDirtyChanges && !draftValidation.error && !saving);
 
+  // Debounced so a burst of keystrokes in the config editor sends one request.
+  $effect(() => {
+    const configText = draft.configText;
+    if (!isEditableWorkspace) {
+      diffRequestId += 1;
+      diff = null;
+      return;
+    }
+    const timer = setTimeout(() => loadDiff(configText), diffDebounceMs);
+    return () => clearTimeout(timer);
+  });
+
   $effect(() => { dirtyGuard.register(hasDirtyChanges, $t("settings_discard_confirm")); });
-  onDestroy(() => dirtyGuard.clear());
+  onDestroy(() => {
+    dirtyGuard.clear();
+    diffAbort?.abort();
+  });
 
   onMount(() => {
     loadProfiles();
@@ -469,14 +572,39 @@
         </div>
       </div>
 
-      {#if incompatibleCount > 0}
+      {#if incompatibleCount > 0 && markAllConfirm}
+        <div class="library-compat-confirm" role="group" aria-label={$t("profile_library_mark_all_confirm_title")}>
+          <strong>{$t("profile_library_mark_all_confirm_title")}</strong>
+          <span class="small">{$t("profile_library_mark_all_confirm_body")}</span>
+          <ul class="mark-all-list">
+            {#each incompatibleSummaries as summary (summary.id)}
+              <li class="small">
+                {$t("profile_library_mark_all_confirm_item", { name: summary.name, count: summary.issue_count })}
+              </li>
+            {/each}
+          </ul>
+          <div class="row compat-actions">
+            <button
+              class="ghost mini-button"
+              type="button"
+              disabled={markingAllReviewed}
+              onclick={markAllReviewed}
+            >{markingAllReviewed ? $t("submitting") : $t("profile_library_mark_all_reviewed")}</button>
+            <button
+              class="ghost mini-button"
+              type="button"
+              onclick={() => (markAllConfirm = false)}
+            >{$t("cancel")}</button>
+          </div>
+        </div>
+      {:else if incompatibleCount > 0}
         <div class="library-compat-warning" role="status">
           <span class="small">{$t("profile_library_compat_warning", { count: incompatibleCount })}</span>
           <button
             class="ghost mini-button"
             type="button"
             disabled={markingAllReviewed}
-            onclick={markAllReviewed}
+            onclick={() => (markAllConfirm = true)}
           >{markingAllReviewed ? $t("submitting") : $t("profile_library_mark_all_reviewed")}</button>
         </div>
       {/if}
@@ -505,6 +633,8 @@
                       {/if}
                       {#if incompatibleIds.has(profile.id)}
                         <span class="badge warn-badge">{$t("profile_compat_needs_review")}</span>
+                      {:else if (waivedCounts.get(profile.id) || 0) > 0}
+                        <span class="badge waived-badge">{$t("profile_compat_waived_badge", { count: waivedCounts.get(profile.id) })}</span>
                       {/if}
                     </div>
                   </div>
@@ -670,6 +800,40 @@
           </div>
         {/if}
 
+        {#if workspace.type === "edit" && compatibility?.reviewed}
+          <div class="review-line">
+            <div class="review-line-main">
+              <span class="small">{$t("profile_compat_reviewed_line", { version: compatibility.schema_version })}</span>
+              {#if waivedIssues.length > 0}
+                <span class="badge waived-badge">{$t("profile_compat_waived_heading", { count: waivedIssues.length })}</span>
+              {/if}
+            </div>
+            <div class="row compat-actions">
+              {#if waivedIssues.length > 0}
+                <button class="ghost mini-button" type="button" onclick={() => (waivedExpanded = !waivedExpanded)}>
+                  {waivedExpanded ? $t("profile_compat_waived_hide") : $t("profile_compat_waived_show")}
+                </button>
+              {/if}
+              <button
+                class="ghost mini-button"
+                type="button"
+                disabled={applyingFix || hasDirtyChanges}
+                onclick={() => applyCompatFix("clear_reviewed")}
+              >{$t("profile_compat_recheck")}</button>
+            </div>
+          </div>
+          {#if waivedExpanded && waivedIssues.length > 0}
+            <ul class="compat-issue-list">
+              {#each waivedIssues as issue}
+                <li class="compat-issue">
+                  <span class="compat-issue-detail">{issue.detail}</span>
+                  <span class="compat-issue-suggestion small">{issue.suggestion}</span>
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {/if}
+
         <div class="stack">
           <label for="profile-editor-name">{$t("profile_preview_name_label")}</label>
           <input id="profile-editor-name" type="text" bind:value={draft.name} />
@@ -685,6 +849,127 @@
           <input id="profile-editor-public" type="checkbox" bind:checked={draft.public} />
         </label>
         <div class="small">{$t("profile_editor_public_hint")}</div>
+
+        {#if diff}
+          <div class="diff-panel">
+            <div class="diff-head">
+              <div class="diff-head-main">
+                <strong>{$t("profile_diff_heading")}</strong>
+                {#if diffProperties.length === 0}
+                  <span class="small">{$t("profile_diff_inherits_all")}</span>
+                {:else}
+                  <span class="small">{$t("profile_diff_summary", {
+                    deviations: diff.summary.deviations,
+                    redundant: diff.summary.redundant,
+                    missing: diff.summary.missing,
+                    unknown: diff.summary.unknown
+                  })}</span>
+                {/if}
+              </div>
+              <div class="row compat-actions">
+                {#if diffProperties.length > 0}
+                  <button class="ghost mini-button" type="button" onclick={() => (diffExpanded = !diffExpanded)}>
+                    {diffExpanded ? $t("profile_diff_hide_details") : $t("profile_diff_show_details")}
+                  </button>
+                {/if}
+                <button
+                  class="ghost mini-button"
+                  type="button"
+                  disabled={redundantPaths.length === 0}
+                  onclick={stripRedundant}
+                >
+                  {redundantPaths.length === 0
+                    ? $t("profile_diff_strip_none")
+                    : $t("profile_diff_strip_button", { count: redundantPaths.length })}
+                </button>
+              </div>
+            </div>
+
+            {#if diffExpanded && diffProperties.length > 0}
+              <div class="diff-table-wrap">
+                <table class="diff-table">
+                  <thead>
+                    <tr>
+                      <th>{$t("profile_diff_col_property")}</th>
+                      <th>{$t("profile_diff_col_default")}</th>
+                      <th>{$t("profile_diff_col_value")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {#each diffProperties as entry (entry.path)}
+                      <tr>
+                        <td class="diff-path"><code>{entry.path}</code></td>
+                        {#if entry.kind === "changed"}
+                          <td><code>{diffValueText(entry.default)}</code></td>
+                          <td><code>{diffValueText(entry.value)}</code></td>
+                        {:else if entry.kind === "redundant"}
+                          <td class="diff-detail" colspan="2">
+                            <span class="small diff-muted">{$t("profile_diff_redundant_label")}</span>
+                          </td>
+                        {:else}
+                          <td class="diff-detail" colspan="2">
+                            {#if entry.redundant}
+                              <span class="small diff-muted">{$t("profile_diff_redundant_label")}</span>
+                            {/if}
+                            {#if entry.excluded?.length}
+                              <span class="small diff-danger">
+                                {$t("profile_diff_excluded_label", { list: diffListText(entry.excluded) })}
+                                {#if diffListMore(entry.excluded) > 0}
+                                  {$t("profile_diff_more", { count: diffListMore(entry.excluded) })}
+                                {/if}
+                              </span>
+                            {/if}
+                            {#if entry.unknown?.length}
+                              <span class="small">
+                                {$t("profile_diff_unknown_label", { list: diffListText(entry.unknown) })}
+                                {#if diffListMore(entry.unknown) > 0}
+                                  {$t("profile_diff_more", { count: diffListMore(entry.unknown) })}
+                                {/if}
+                              </span>
+                            {/if}
+                            {#each entry.modules || [] as module (module.module)}
+                              <div class="diff-module">
+                                <code>{module.module}</code>
+                                {#each module.changed || [] as change (change.key)}
+                                  <span class="small">{$t("profile_diff_key_change", {
+                                    key: change.key,
+                                    default: diffValueText(change.default),
+                                    value: diffValueText(change.value)
+                                  })}</span>
+                                {/each}
+                                {#if module.missing?.length}
+                                  <span class={`small ${entry.wholesale ? "diff-danger" : "diff-muted"}`}>
+                                    {$t("profile_diff_missing_label", { list: diffListText(module.missing) })}
+                                    {#if diffListMore(module.missing) > 0}
+                                      {$t("profile_diff_more", { count: diffListMore(module.missing) })}
+                                    {/if}
+                                  </span>
+                                {/if}
+                                {#if module.unknown?.length}
+                                  <span class="small">
+                                    {$t("profile_diff_unknown_label", { list: diffListText(module.unknown) })}
+                                    {#if diffListMore(module.unknown) > 0}
+                                      {$t("profile_diff_more", { count: diffListMore(module.unknown) })}
+                                    {/if}
+                                  </span>
+                                {/if}
+                              </div>
+                            {/each}
+                            {#if entry.wholesale}
+                              <span class="small diff-hint">{$t("profile_diff_wholesale_hint")}</span>
+                            {:else}
+                              <span class="small diff-hint">{$t("profile_diff_inherited_hint")}</span>
+                            {/if}
+                          </td>
+                        {/if}
+                      </tr>
+                    {/each}
+                  </tbody>
+                </table>
+              </div>
+            {/if}
+          </div>
+        {/if}
 
         <div class="stack">
           <label for="profile-editor-config">{$t("profile_preview_config_label")}</label>
@@ -901,6 +1186,126 @@
     background: rgba(202, 138, 4, 0.1);
     border: 1px solid rgba(202, 138, 4, 0.3);
     margin-bottom: 4px;
+  }
+
+  .library-compat-confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    background: rgba(202, 138, 4, 0.1);
+    border: 1px solid rgba(202, 138, 4, 0.3);
+    margin-bottom: 4px;
+  }
+
+  .mark-all-list {
+    margin: 0;
+    padding: 0 0 0 1.2em;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+
+  .waived-badge {
+    background: rgba(100, 116, 139, 0.16);
+    color: #475569;
+  }
+
+  .review-line {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--card);
+  }
+
+  .review-line-main {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+  }
+
+  .diff-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card);
+  }
+
+  .diff-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .diff-head-main {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .diff-table-wrap {
+    overflow-x: auto;
+  }
+
+  .diff-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.82rem;
+  }
+
+  .diff-table th,
+  .diff-table td {
+    text-align: left;
+    vertical-align: top;
+    padding: 5px 8px;
+    border-top: 1px solid var(--border);
+  }
+
+  .diff-table th {
+    border-top: none;
+    color: var(--muted);
+    font-weight: 600;
+  }
+
+  .diff-path {
+    white-space: nowrap;
+  }
+
+  .diff-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .diff-module {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    padding-left: 10px;
+    border-left: 2px solid var(--border);
+  }
+
+  .diff-muted,
+  .diff-hint {
+    color: var(--muted);
+  }
+
+  .diff-danger {
+    color: #92400e;
   }
 
   .workspace-summary {

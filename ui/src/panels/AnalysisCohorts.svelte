@@ -90,6 +90,10 @@
   // animates and small/fast rebuilds don't slip past unobserved.
   let pollTimer = null;
   const POLL_INTERVAL_MS = 250;
+  // A rebuild started here reports no work total until its first progress
+  // write, so keep polling for a bounded number of ticks to bridge that gap.
+  const POLL_GRACE_TICKS = 120;
+  let pollGraceTicks = $state(0);
 
   function emptyDraft() {
     return {
@@ -324,6 +328,8 @@
           sort_order: Number(draft.sort_order) || 0,
         }),
       });
+      // The server rebuilds a new cohort right away when analysis is on.
+      if (draft.analysis_enabled) pollGraceTicks = POLL_GRACE_TICKS;
       draft = emptyDraft();
       candidateBatches = [];
       promoteBatchIds = new Set();
@@ -403,7 +409,10 @@
     }
   }
 
-  const rebuildCohort = (cohort) => triggerAction(cohort, "rebuild", "analysis_cohorts_rebuild_ok");
+  const rebuildCohort = (cohort) => {
+    pollGraceTicks = POLL_GRACE_TICKS;
+    return triggerAction(cohort, "rebuild", "analysis_cohorts_rebuild_ok");
+  };
   const clearCohort = (cohort) => triggerAction(cohort, "clear", "analysis_cohorts_clear_ok");
 
   const snapshotKey = (cohortId, slug) => `${cohortId}/${slug}`;
@@ -679,9 +688,13 @@
     return `${id.slice(0, 14)}...${id.slice(-8)}`;
   }
 
-  // Any cohort still projecting -> keep polling. Ready + failed rows are
-  // stable and don't need refreshing until the user clicks Rebuild again.
-  const anyPending = $derived(cohorts.some((c) => c.materialization_status === "pending"));
+  // "pending" also marks a cohort that was never built or was cleared, which
+  // is a resting state, so a published work total is what tells a rebuild in
+  // flight from an idle row. Ready + failed rows are stable too.
+  const isRebuilding = (row) =>
+    row?.materialization_status === "pending" && Number(row?.materialization_total) > 0;
+
+  const anyPending = $derived(cohorts.some(isRebuilding));
 
   function progressPercent(cohort) {
     const total = Number(cohort?.materialization_total) || 0;
@@ -697,7 +710,7 @@
   // Any loaded snapshot mid-rebuild -> keep polling that cohort's list.
   const anySnapshotMaterializing = $derived(
     Object.values(snapshotsByCohortId).some((list) =>
-      Array.isArray(list) && list.some((s) => s.materialization_status === "pending"),
+      Array.isArray(list) && list.some(isRebuilding),
     ),
   );
 
@@ -715,6 +728,7 @@
   };
 
   async function pollCohortsQuietly() {
+    if (pollGraceTicks > 0) pollGraceTicks -= 1;
     try {
       const result = await apiFetch("/analysis/cohorts");
       if (Array.isArray(result)) cohorts = result;
@@ -722,14 +736,17 @@
       // Silent: a transient fetch error shouldn't overwrite the visible
       // notice area while a rebuild is running.
     }
+    // End the grace window early once the rebuild we started has finished.
+    if (pollGraceTicks > 0 && !cohorts.some((c) => c.materialization_status === "pending")) {
+      pollGraceTicks = 0;
+    }
     // Refresh the expanded cohort's snapshot list while either the cohort is
     // rebuilding or one of its snapshots is being rematerialized, so the
     // per-snapshot progress bar and counts advance without a manual reload.
     if (expandedSnapshotCohortId != null) {
       const cohort = cohorts.find((c) => c.id === expandedSnapshotCohortId);
       const snaps = snapshotsByCohortId[expandedSnapshotCohortId] ?? [];
-      const snapPending = snaps.some((s) => s.materialization_status === "pending");
-      if (cohort?.materialization_status === "pending" || snapPending) {
+      if (isRebuilding(cohort) || snaps.some(isRebuilding)) {
         loadSnapshots(cohort, { refresh: true });
       }
     }
@@ -737,8 +754,8 @@
 
   $effect(() => {
     // Poll while a cohort rebuild or a snapshot rematerialize is in flight;
-    // stop once everything is ready/failed so the UI is idle in steady state.
-    const active = anyPending || anySnapshotMaterializing;
+    // stop once nothing is running so a quiet page makes no requests at all.
+    const active = anyPending || anySnapshotMaterializing || pollGraceTicks > 0;
     if (active && pollTimer == null) {
       pollTimer = setInterval(pollCohortsQuietly, POLL_INTERVAL_MS);
     } else if (!active && pollTimer != null) {

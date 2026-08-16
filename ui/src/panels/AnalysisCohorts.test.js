@@ -681,6 +681,59 @@ describe("AnalysisCohorts", () => {
     expect(screen.queryByRole("progressbar")).toBeNull();
   });
 
+  const countCohortListGets = () => global.fetch.mock.calls.filter(
+    (args) => args[0] === "/api/v1/analysis/cohorts" && (args[1]?.method || "GET") === "GET",
+  ).length;
+
+  const pendingCohort = (extra) => ([{
+    ...sampleCohorts()[0],
+    materialization_status: "pending",
+    materialization_done: 0,
+    materialization_total: 0,
+    last_materialized_at: "",
+    ...extra,
+  }]);
+
+  it("does not poll a cohort left pending because it was never materialized", async () => {
+    // The server also uses "pending" for a cohort that was just created or
+    // cleared. Nothing is running in that state, so an open page must not keep
+    // requesting the cohort list.
+    installSnapshotFetch({ initialCohorts: pendingCohort() });
+    render(AnalysisCohorts);
+    await screen.findByText("tld");
+
+    const before = countCohortListGets();
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    expect(countCohortListGets()).toBe(before);
+  });
+
+  it("polls while a cohort rebuild reports a work total", async () => {
+    installSnapshotFetch({
+      initialCohorts: pendingCohort({ materialization_done: 1, materialization_total: 4 }),
+    });
+    render(AnalysisCohorts);
+    await screen.findByText("tld");
+
+    const before = countCohortListGets();
+    await waitFor(() => expect(countCohortListGets()).toBeGreaterThan(before));
+  });
+
+  it("polls after starting a rebuild, before the server reports a work total", async () => {
+    // A rebuild is dispatched server-side and only publishes its total on the
+    // first progress write; until then the row looks exactly like an idle one.
+    installSnapshotFetch({ initialCohorts: pendingCohort() });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Rebuild/i }));
+    // Wait for the action's own reload to land, so what follows is the poll.
+    await screen.findByText(/Rebuild triggered for cohort tld/i);
+
+    const before = countCohortListGets();
+    await waitFor(() => expect(countCohortListGets()).toBeGreaterThan(before + 1));
+  });
+
   it("sorts the snapshot table when a column header is clicked", async () => {
     // Two captured snapshots; default order is newest-captured-first. Clicking
     // the Snapshot header sorts by display name (slug) ascending, and the

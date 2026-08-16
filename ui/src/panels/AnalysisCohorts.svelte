@@ -91,8 +91,10 @@
   let pollTimer = null;
   const POLL_INTERVAL_MS = 250;
   // A rebuild started here reports no work total until its first progress
-  // write, so keep polling for a bounded number of ticks to bridge that gap.
+  // write, so watch the cohorts we kicked off until they leave pending. The
+  // tick budget bounds the wait in case that report never lands.
   const POLL_GRACE_TICKS = 120;
+  let pollGraceIds = $state(new Set());
   let pollGraceTicks = $state(0);
 
   function emptyDraft() {
@@ -315,7 +317,7 @@
           // best-effort: cohort create still proceeds
         }
       }
-      await apiFetch("/analysis/cohorts", {
+      const created = await apiFetch("/analysis/cohorts", {
         method: "POST",
         body: JSON.stringify({
           source_type: "tag",
@@ -329,7 +331,7 @@
         }),
       });
       // The server rebuilds a new cohort right away when analysis is on.
-      if (draft.analysis_enabled) pollGraceTicks = POLL_GRACE_TICKS;
+      if (draft.analysis_enabled) watchRebuild(created?.id);
       draft = emptyDraft();
       candidateBatches = [];
       promoteBatchIds = new Set();
@@ -410,7 +412,7 @@
   }
 
   const rebuildCohort = (cohort) => {
-    pollGraceTicks = POLL_GRACE_TICKS;
+    watchRebuild(cohort.id);
     return triggerAction(cohort, "rebuild", "analysis_cohorts_rebuild_ok");
   };
   const clearCohort = (cohort) => triggerAction(cohort, "clear", "analysis_cohorts_clear_ok");
@@ -727,8 +729,31 @@
     snapshotSort = nextTableSort(snapshotSort, key, defaultDir);
   };
 
+  // Watch a cohort whose rebuild this client just started.
+  function watchRebuild(cohortId) {
+    if (cohortId == null) return;
+    pollGraceIds = new Set(pollGraceIds).add(cohortId);
+    pollGraceTicks = POLL_GRACE_TICKS;
+  }
+
+  // Drop the cohorts whose rebuild has landed; other rows resting in pending
+  // are none of this window's business.
+  function releaseFinishedRebuilds() {
+    if (pollGraceIds.size === 0) return;
+    const running = new Set();
+    for (const id of pollGraceIds) {
+      const row = cohorts.find((c) => c.id === id);
+      if (row?.materialization_status === "pending") running.add(id);
+    }
+    if (running.size !== pollGraceIds.size) pollGraceIds = running;
+    if (running.size === 0) pollGraceTicks = 0;
+  }
+
   async function pollCohortsQuietly() {
-    if (pollGraceTicks > 0) pollGraceTicks -= 1;
+    if (pollGraceTicks > 0) {
+      pollGraceTicks -= 1;
+      if (pollGraceTicks === 0) pollGraceIds = new Set();
+    }
     try {
       const result = await apiFetch("/analysis/cohorts");
       if (Array.isArray(result)) cohorts = result;
@@ -736,10 +761,7 @@
       // Silent: a transient fetch error shouldn't overwrite the visible
       // notice area while a rebuild is running.
     }
-    // End the grace window early once the rebuild we started has finished.
-    if (pollGraceTicks > 0 && !cohorts.some((c) => c.materialization_status === "pending")) {
-      pollGraceTicks = 0;
-    }
+    releaseFinishedRebuilds();
     // Refresh the expanded cohort's snapshot list while either the cohort is
     // rebuilding or one of its snapshots is being rematerialized, so the
     // per-snapshot progress bar and counts advance without a manual reload.
@@ -755,7 +777,7 @@
   $effect(() => {
     // Poll while a cohort rebuild or a snapshot rematerialize is in flight;
     // stop once nothing is running so a quiet page makes no requests at all.
-    const active = anyPending || anySnapshotMaterializing || pollGraceTicks > 0;
+    const active = anyPending || anySnapshotMaterializing || pollGraceIds.size > 0;
     if (active && pollTimer == null) {
       pollTimer = setInterval(pollCohortsQuietly, POLL_INTERVAL_MS);
     } else if (!active && pollTimer != null) {

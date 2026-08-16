@@ -734,6 +734,39 @@ describe("AnalysisCohorts", () => {
     await waitFor(() => expect(countCohortListGets()).toBeGreaterThan(before + 1));
   });
 
+  it("stops polling when the rebuild it started finishes, despite another idle pending cohort", async () => {
+    // The second cohort rests in "pending" forever (never materialized), so the
+    // poll must key off the cohort whose rebuild was actually started here.
+    const rows = [
+      {
+        ...sampleCohorts()[0],
+        materialization_status: "pending", materialization_done: 0,
+        materialization_total: 0, last_materialized_at: "",
+      },
+      {
+        ...sampleCohorts()[1], analysis_enabled: true,
+        materialization_status: "pending", materialization_done: 0,
+        materialization_total: 0, last_materialized_at: "",
+      },
+    ];
+    installSnapshotFetch({ initialCohorts: rows });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Rebuild/i }));
+    await screen.findByText(/Rebuild triggered for cohort tld/i);
+
+    // The server finishes that rebuild; the other cohort stays pending.
+    rows[0].materialization_status = "ready";
+    rows[0].last_materialized_at = "2026-04-17T12:00:00Z";
+    await within((await screen.findByText("tld")).closest("tr")).findByText("ready");
+
+    const before = countCohortListGets();
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    expect(countCohortListGets()).toBe(before);
+  });
+
   it("sorts the snapshot table when a column header is clicked", async () => {
     // Two captured snapshots; default order is newest-captured-first. Clicking
     // the Snapshot header sorts by display name (slug) ascending, and the

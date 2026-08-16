@@ -8,7 +8,8 @@ import (
 )
 
 const analysisCohortSnapshotCols = `id, cohort_id, batch_id, slug, label, description,
-	profile_id, profile_name, captured_at, first_run_at, last_run_at,
+	profile_id, profile_name, engine_version, mixed_engine_version,
+	captured_at, first_run_at, last_run_at,
 	run_count, domain_count, status, is_default, is_public,
 	tag_view_min_level,
 	materialization_status, materialization_done, materialization_total,
@@ -30,6 +31,8 @@ func (s *SQLJobStore) scanAnalysisCohortSnapshot(row rowScanner) (AnalysisCohort
 		description    string
 		label          string
 		profileName    string
+		engineVersion  string
+		mixedEngine    int
 	)
 	if err := row.Scan(
 		&snap.ID,
@@ -40,6 +43,8 @@ func (s *SQLJobStore) scanAnalysisCohortSnapshot(row rowScanner) (AnalysisCohort
 		&description,
 		&profileID,
 		&profileName,
+		&engineVersion,
+		&mixedEngine,
 		&capturedAt,
 		&firstRunAt,
 		&lastRunAt,
@@ -63,6 +68,8 @@ func (s *SQLJobStore) scanAnalysisCohortSnapshot(row rowScanner) (AnalysisCohort
 	snap.Description = description
 	snap.ProfileID = nullInt64Ptr(profileID)
 	snap.ProfileName = profileName
+	snap.EngineVersion = engineVersion
+	snap.MixedEngineVersion = intToBool(mixedEngine)
 	snap.CapturedAt = parseTimestampStr(capturedAt)
 	snap.FirstRunAt = parseTimestampStr(firstRunAt)
 	snap.LastRunAt = parseTimestampStr(lastRunAt)
@@ -226,6 +233,8 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 				description = %s,
 				profile_id = %s,
 				profile_name = %s,
+				engine_version = %s,
+				mixed_engine_version = %s,
 				captured_at = %s,
 				first_run_at = %s,
 				last_run_at = %s,
@@ -240,13 +249,15 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 				s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5),
 				s.ph(6), s.ph(7), s.ph(8), s.ph(9), s.ph(10),
 				s.ph(11), s.ph(12), s.ph(13), s.ph(14), s.ph(15),
-				s.ph(16),
+				s.ph(16), s.ph(17), s.ph(18),
 			),
 			snap.Slug,
 			snap.Label,
 			snap.Description,
 			nullInt64Value(snap.ProfileID),
 			snap.ProfileName,
+			snap.EngineVersion,
+			boolToInt(snap.MixedEngineVersion),
 			snapshotStoredTimestamp(snap.CapturedAt),
 			snapshotStoredTimestamp(snap.FirstRunAt),
 			snapshotStoredTimestamp(snap.LastRunAt),
@@ -278,11 +289,12 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 	_, err := s.db.Exec(
 		fmt.Sprintf(`INSERT INTO analysis_cohort_snapshots (
 			cohort_id, batch_id, slug, label, description,
-			profile_id, profile_name, captured_at, first_run_at, last_run_at,
+			profile_id, profile_name, engine_version, mixed_engine_version,
+			captured_at, first_run_at, last_run_at,
 			run_count, domain_count, status, is_default, is_public,
 			tag_view_min_level,
 			created_at, updated_at
-		) VALUES (%s)`, s.phRange(1, 18)),
+		) VALUES (%s)`, s.phRange(1, 20)),
 		snap.CohortID,
 		snap.BatchID,
 		snap.Slug,
@@ -290,6 +302,8 @@ func (s *SQLJobStore) UpsertAnalysisCohortSnapshot(snap AnalysisCohortSnapshot) 
 		snap.Description,
 		nullInt64Value(snap.ProfileID),
 		snap.ProfileName,
+		snap.EngineVersion,
+		boolToInt(snap.MixedEngineVersion),
 		snapshotStoredTimestamp(snap.CapturedAt),
 		snapshotStoredTimestamp(snap.FirstRunAt),
 		snapshotStoredTimestamp(snap.LastRunAt),

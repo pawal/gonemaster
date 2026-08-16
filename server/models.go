@@ -443,23 +443,31 @@ type Batch struct {
 // (cohort_id, batch_id); the slug is a separate human-readable handle that
 // is unique within a cohort.
 type AnalysisCohortSnapshot struct {
-	ID              int64     `json:"id"`
-	CohortID        int64     `json:"cohort_id"`
-	BatchID         string    `json:"batch_id"`
-	Slug            string    `json:"slug"`
-	Label           string    `json:"label,omitempty"`
-	Description     string    `json:"description,omitempty"`
-	ProfileID       *int64    `json:"profile_id,omitempty"`
-	ProfileName     string    `json:"profile_name,omitempty"`
-	CapturedAt      time.Time `json:"captured_at"`
-	FirstRunAt      time.Time `json:"first_run_at"`
-	LastRunAt       time.Time `json:"last_run_at"`
-	RunCount        int       `json:"run_count"`
-	DomainCount     int       `json:"domain_count"`
-	Status          string    `json:"status"`
-	IsDefault       bool      `json:"is_default"`
-	IsPublic        bool      `json:"is_public"`
-	TagViewMinLevel string    `json:"tag_view_min_level,omitempty"`
+	ID          int64  `json:"id"`
+	CohortID    int64  `json:"cohort_id"`
+	BatchID     string `json:"batch_id"`
+	Slug        string `json:"slug"`
+	Label       string `json:"label,omitempty"`
+	Description string `json:"description,omitempty"`
+	ProfileID   *int64 `json:"profile_id,omitempty"`
+	ProfileName string `json:"profile_name,omitempty"`
+	// EngineVersion is the gonemaster version that produced this snapshot's
+	// runs, read from their GLOBAL_VERSION entries. Empty means unknown -
+	// the runs predate provenance stamping, or their entries were purged.
+	// Never defaulted to the running build: that would invent provenance.
+	EngineVersion string `json:"engine_version,omitempty"`
+	// MixedEngineVersion marks a batch that spanned an engine upgrade, so
+	// its numbers mix two measurement regimes.
+	MixedEngineVersion bool      `json:"mixed_engine_version,omitempty"`
+	CapturedAt         time.Time `json:"captured_at"`
+	FirstRunAt         time.Time `json:"first_run_at"`
+	LastRunAt          time.Time `json:"last_run_at"`
+	RunCount           int       `json:"run_count"`
+	DomainCount        int       `json:"domain_count"`
+	Status             string    `json:"status"`
+	IsDefault          bool      `json:"is_default"`
+	IsPublic           bool      `json:"is_public"`
+	TagViewMinLevel    string    `json:"tag_view_min_level,omitempty"`
 	// Rematerialize progress; distinct from the capture-lifecycle Status.
 	MaterializationStatus    string    `json:"materialization_status,omitempty"`
 	MaterializationDone      int       `json:"materialization_done,omitempty"`

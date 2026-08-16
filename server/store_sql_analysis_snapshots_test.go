@@ -113,6 +113,80 @@ func TestSQLJobStoreUpsertAnalysisCohortSnapshot(t *testing.T) {
 	}
 }
 
+// Engine provenance has to survive the round trip like any other column, and
+// the "unknown" case has to stay distinguishable from a real version string.
+// An empty EngineVersion means we could not recover the provenance; it must
+// never be silently filled in, so this asserts empty stays empty.
+func TestSQLJobStoreAnalysisCohortSnapshotEngineVersionRoundTrip(t *testing.T) {
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			s := testStoreForBackend(t, b)
+			cohortID := seedCohortForSnapshotTest(t, s, "tld")
+
+			stamped, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+				CohortID:      cohortID,
+				BatchID:       "batch-stamped",
+				Slug:          "2026-08-15-stamped",
+				Status:        AnalysisSnapshotStatusCaptured,
+				EngineVersion: "v1.6.6",
+			})
+			if err != nil {
+				t.Fatalf("upsert stamped: %v", err)
+			}
+			if stamped.EngineVersion != "v1.6.6" {
+				t.Fatalf("EngineVersion: got %q want v1.6.6", stamped.EngineVersion)
+			}
+			if stamped.MixedEngineVersion {
+				t.Fatal("MixedEngineVersion should default to false")
+			}
+
+			// A batch that spanned an upgrade keeps a sample version *and*
+			// the mixed flag; the flag is what tells a reader the number is
+			// confounded, so losing either half defeats the purpose.
+			mixed, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+				CohortID:           cohortID,
+				BatchID:            "batch-mixed",
+				Slug:               "2026-08-15-mixed",
+				Status:             AnalysisSnapshotStatusCaptured,
+				EngineVersion:      "v1.6.3",
+				MixedEngineVersion: true,
+			})
+			if err != nil {
+				t.Fatalf("upsert mixed: %v", err)
+			}
+			if mixed.EngineVersion != "v1.6.3" || !mixed.MixedEngineVersion {
+				t.Fatalf("mixed snapshot: got version=%q mixed=%v want v1.6.3/true",
+					mixed.EngineVersion, mixed.MixedEngineVersion)
+			}
+
+			// Pre-instrumentation snapshots carry no version at all.
+			unknown, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+				CohortID: cohortID,
+				BatchID:  "batch-unknown",
+				Slug:     "2026-05-05-unknown",
+				Status:   AnalysisSnapshotStatusCaptured,
+			})
+			if err != nil {
+				t.Fatalf("upsert unknown: %v", err)
+			}
+			if unknown.EngineVersion != "" {
+				t.Fatalf("EngineVersion should stay empty when unknown, got %q", unknown.EngineVersion)
+			}
+
+			// Re-read through a different accessor to prove the columns are in
+			// the shared column list, not just echoed back by the writer.
+			reread, ok := s.GetAnalysisCohortSnapshotByBatch(cohortID, "batch-mixed")
+			if !ok {
+				t.Fatal("GetAnalysisCohortSnapshotByBatch: not found")
+			}
+			if reread.EngineVersion != "v1.6.3" || !reread.MixedEngineVersion {
+				t.Fatalf("re-read: got version=%q mixed=%v want v1.6.3/true",
+					reread.EngineVersion, reread.MixedEngineVersion)
+			}
+		})
+	}
+}
+
 func TestSQLJobStoreUpsertAnalysisCohortSnapshotValidates(t *testing.T) {
 	s := testStoreForBackend(t, testBackends(t)[0])
 	if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{}); err == nil {

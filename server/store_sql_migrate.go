@@ -572,6 +572,16 @@ var sqlMigrations = []sqlMigration{
 			`UPDATE entries SET tag = 'IN_DOMAIN_GLUE_MISSING' WHERE tag = 'IN_BAILIWICK_GLUE_MISSING'`,
 		},
 	},
+	{
+		// Snapshot provenance: which engine produced a snapshot's runs, and
+		// whether the batch spanned an upgrade. Without it a trend line
+		// cannot separate engine change from cohort change.
+		version: 8,
+		stmts: []string{
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN engine_version VARCHAR(64) NOT NULL DEFAULT ''`,
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN mixed_engine_version INTEGER NOT NULL DEFAULT 0`,
+		},
+	},
 }
 
 // runMigrations creates the schema_migrations tracking table and applies

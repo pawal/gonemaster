@@ -257,6 +257,26 @@
     {#if formatTimestamp(data.snapshot.captured_at)}
       <span class="snapshot-captured">Built {formatTimestamp(data.snapshot.captured_at)}</span>
     {/if}
+    {#if data.snapshot.engine_version}
+      <span
+        class="snapshot-engine"
+        title="Engine version that produced these runs. Comparisons across different versions can reflect engine changes, not cohort changes."
+      >
+        Engine {data.snapshot.engine_version}
+      </span>
+    {:else}
+      <span class="snapshot-engine unknown" title="Provenance could not be recovered for this snapshot.">
+        Engine unknown
+      </span>
+    {/if}
+    {#if data.snapshot.mixed_engine_version}
+      <span
+        class="snapshot-engine mixed"
+        title="This batch spanned an engine upgrade, so its numbers mix two measurement regimes."
+      >
+        Mixed engine versions
+      </span>
+    {/if}
     {#if data.diffFrom}
       <a class="snapshot-diff-link" href={fullDiffHref}>Diff vs previous</a>
     {/if}
@@ -1063,6 +1083,20 @@
     font-size: var(--text-xs);
     border-left: 1px solid var(--border);
     padding-left: 8px;
+  }
+  .snapshot-engine {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    border-left: 1px solid var(--border);
+    padding-left: 8px;
+    font-variant-numeric: tabular-nums;
+  }
+  .snapshot-engine.unknown {
+    font-style: italic;
+  }
+  .snapshot-engine.mixed {
+    color: var(--sev-warning-fg);
+    font-weight: 600;
   }
   .snapshot-diff-link {
     color: var(--accent-2);

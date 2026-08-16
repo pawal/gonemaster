@@ -216,3 +216,62 @@ describe("diff page rendering", () => {
     expect(section.getByText(/not available/i)).toBeInTheDocument();
   });
 });
+
+// The diff page is where an engine upgrade is most likely to be misread as
+// a wave of regressions, so the banner is load-bearing, not decoration.
+describe("diff engine provenance", () => {
+  it("warns when the two snapshots ran different engine versions", () => {
+    const { container } = render(DiffPage, {
+      data: pageData({
+        diff: {
+          ...sampleDiff,
+          engine: {
+            from_engine_version: "v1.6.3",
+            to_engine_version: "v1.6.6",
+            crossed_engine_versions: true
+          }
+        }
+      })
+    });
+    const banner = container.querySelector(".engine-banner");
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain("v1.6.3");
+    expect(banner?.textContent).toContain("v1.6.6");
+  });
+
+  it("stays quiet when both snapshots ran the same engine version", () => {
+    const { container } = render(DiffPage, {
+      data: pageData({
+        diff: {
+          ...sampleDiff,
+          engine: {
+            from_engine_version: "v1.6.3",
+            to_engine_version: "v1.6.3",
+            crossed_engine_versions: false
+          }
+        }
+      })
+    });
+    expect(container.querySelector(".engine-banner")).toBeNull();
+  });
+
+  // Unknown provenance is its own message: we are not claiming the engines
+  // matched, we are saying we cannot tell.
+  it("says so when provenance is unknown on one side", () => {
+    const { container } = render(DiffPage, {
+      data: pageData({
+        diff: {
+          ...sampleDiff,
+          engine: { to_engine_version: "v1.6.6", crossed_engine_versions: false, engine_version_unknown: true }
+        }
+      })
+    });
+    const banner = container.querySelector(".engine-banner");
+    expect(banner?.textContent).toContain("unknown");
+  });
+
+  it("renders without a banner when the server sent no provenance at all", () => {
+    const { container } = render(DiffPage, { data: pageData() });
+    expect(container.querySelector(".engine-banner")).toBeNull();
+  });
+});

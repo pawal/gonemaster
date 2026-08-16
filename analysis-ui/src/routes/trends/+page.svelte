@@ -118,12 +118,17 @@
     label: string;
     slug: string;
     sourceDate: string;
+    engineVersion: string;
+    mixedEngine: boolean;
+    // True when this snapshot ran a different engine than the one before
+    // it, so the step into this row is confounded by an engine change.
+    crossesEngineBoundary: boolean;
     buckets: Array<{ key: string; count: number }>;
   };
 
   const series = $derived.by<Series[]>(() => {
     const snapshotBySlug = new Map((layoutData.snapshots ?? []).map((snap) => [snap.slug, snap]));
-    return data.points.map((point) => {
+    return data.points.map((point, index) => {
       const meta = snapshotBySlug.get(point.slug);
       const snapshot = {
         slug: point.slug,
@@ -137,10 +142,20 @@
         ? Object.entries(payload).map(([key, count]) => ({ key, count: Number(count) || 0 }))
         : [];
       buckets.sort((a, b) => compareBuckets(a.key, b.key));
+      const engineVersion = point.engine_version ?? meta?.engine_version ?? "";
+      const prev = data.points[index - 1];
+      const prevVersion = prev
+        ? (prev.engine_version ?? snapshotBySlug.get(prev.slug)?.engine_version ?? "")
+        : "";
       return {
         label: snapshotDisplayLabel(snapshot),
         slug: point.slug,
         sourceDate: snapshotSourceDate(snapshot),
+        engineVersion,
+        mixedEngine: Boolean(point.mixed_engine_version ?? meta?.mixed_engine_version),
+        // Unknown on either side means we cannot claim a boundary.
+        crossesEngineBoundary:
+          Boolean(engineVersion) && Boolean(prevVersion) && engineVersion !== prevVersion,
         buckets
       };
     });
@@ -341,11 +356,27 @@
     <ol class="trend-list" aria-label="Stacked distribution per snapshot">
       {#each series as s, i (s.slug)}
         {@const diffHref = diffRowHref(i)}
-        <li class="trend-row">
+        <li class="trend-row" class:engine-boundary={s.crossesEngineBoundary}>
+          {#if s.crossesEngineBoundary}
+            <p class="engine-boundary-note">
+              Engine changed to {s.engineVersion} here. Differences from the previous
+              row may be new engine capability rather than cohort change.
+            </p>
+          {/if}
           <div class="trend-meta">
             <span class="trend-slug" title={`Snapshot ${s.slug}`}>{s.label}</span>
             {#if s.sourceDate && s.sourceDate !== s.label}
               <span class="trend-captured">{s.sourceDate}</span>
+            {/if}
+            {#if s.engineVersion}
+              <span class="trend-engine" title={`Engine ${s.engineVersion}`}>{s.engineVersion}</span>
+            {:else}
+              <span class="trend-engine unknown" title="Engine version unknown for this snapshot">
+                engine ?
+              </span>
+            {/if}
+            {#if s.mixedEngine}
+              <span class="trend-engine mixed" title="This batch spanned an engine upgrade">mixed</span>
             {/if}
             {#if diffHref}
               <a class="trend-diff-link" href={diffHref}>Diff vs previous</a>
@@ -482,6 +513,28 @@
     font-weight: 600;
   }
   .trend-captured {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+  }
+  .trend-engine {
+    color: var(--ink-2);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
+  }
+  .trend-engine.unknown {
+    font-style: italic;
+  }
+  .trend-engine.mixed {
+    color: var(--sev-warning-fg);
+    font-weight: 600;
+  }
+  /* Spans every grid column so the boundary reads as a band across the
+     whole series, not a note attached to one cell. */
+  .engine-boundary-note {
+    grid-column: 1 / -1;
+    margin: var(--space-2) 0 0;
+    padding: 4px var(--space-2);
+    border-top: 1px dashed var(--border);
     color: var(--ink-2);
     font-size: var(--text-xs);
   }

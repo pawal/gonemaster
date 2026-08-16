@@ -472,3 +472,47 @@ function nsView(nameserver: string, p50: number): NameserverView {
     latency_samples: 6
   };
 }
+
+describe("overview snapshot provenance", () => {
+  it("shows the engine version on the snapshot pill", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    const { container } = render(OverviewPage, {
+      data: overviewData({
+        snapshot: {
+          slug: "s2",
+          captured_at: "2026-04-20T00:00:00Z",
+          run_count: 1,
+          domain_count: 120,
+          engine_version: "v1.6.6"
+        }
+      })
+    });
+    expect(container.querySelector(".snapshot-engine")?.textContent).toContain("v1.6.6");
+  });
+
+  // "Unknown" must be stated rather than left blank, so a reader never
+  // assumes the snapshot was produced by the current build.
+  it("says the engine is unknown when the snapshot carries no version", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    const { container } = render(OverviewPage, { data: overviewData() });
+    const engine = container.querySelector(".snapshot-engine.unknown");
+    expect(engine?.textContent).toContain("unknown");
+  });
+
+  it("flags a snapshot whose batch spanned an engine upgrade", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    const { container } = render(OverviewPage, {
+      data: overviewData({
+        snapshot: {
+          slug: "s2",
+          captured_at: "2026-04-20T00:00:00Z",
+          run_count: 1,
+          domain_count: 120,
+          engine_version: "v1.6.3",
+          mixed_engine_version: true
+        }
+      })
+    });
+    expect(container.querySelector(".snapshot-engine.mixed")).not.toBeNull();
+  });
+});

@@ -65,6 +65,10 @@
     goto(`${page.url.pathname}?${params.toString()}`, { replaceState: true, noScroll: true });
   }
 
+  // Either granularity carries the same provenance header; the domain diff
+  // is the one that is always loaded, so prefer it.
+  const engine = $derived(data.diff?.engine ?? data.tagDiff?.engine);
+
   const summary = $derived(summarizeDiff(data.diff));
   const matrix = $derived(buildGradeMatrix(data.diff?.grade_changed ?? []));
 
@@ -209,6 +213,19 @@
     <p class="hint">
       Comparing against the previous snapshot (<code>{data.fromSlug}</code>).
       Pick a <strong>From</strong> snapshot to change it.
+    </p>
+  {/if}
+  {#if engine?.crossed_engine_versions}
+    <p class="status-banner warn engine-banner">
+      These snapshots ran different engine versions
+      (<code>{engine.from_engine_version}</code> → <code>{engine.to_engine_version}</code>).
+      Findings that appear or clear across this step may be new engine
+      capability rather than a change in the cohort.
+    </p>
+  {:else if engine?.engine_version_unknown}
+    <p class="status-banner engine-banner">
+      Engine provenance is unknown for at least one of these snapshots, so
+      changes here cannot be attributed to the cohort or to the engine.
     </p>
   {/if}
 </section>

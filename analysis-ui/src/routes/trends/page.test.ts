@@ -266,3 +266,74 @@ describe("trends page rendering", () => {
     expect(links[0].getAttribute("href")).toContain("tab=grade_changed");
   });
 });
+
+// Provenance rendering. A trend line whose steps cross engine versions is
+// the single most misleading thing this dashboard can show, so the boundary
+// has to be visible on the row where it happens.
+describe("trends engine provenance", () => {
+  function twoPoints(fromVersion?: string, toVersion?: string) {
+    return trendsData({
+      points: [
+        {
+          slug: "2026-07-31",
+          captured_at: "2026-07-31T00:00:00Z",
+          engine_version: fromVersion,
+          payload: { ok: 8, critical: 2 }
+        },
+        {
+          slug: "2026-08-15",
+          captured_at: "2026-08-15T00:00:00Z",
+          engine_version: toVersion,
+          payload: { ok: 6, critical: 4 }
+        }
+      ]
+    });
+  }
+
+  it("shows the engine version on each snapshot row", () => {
+    const { container } = render(TrendsPage, { data: twoPoints("v1.6.3", "v1.6.3") });
+    const versions = Array.from(container.querySelectorAll(".trend-engine")).map((el) =>
+      el.textContent?.trim()
+    );
+    expect(versions).toEqual(["v1.6.3", "v1.6.3"]);
+  });
+
+  it("marks the row where the engine version changed", () => {
+    const { container } = render(TrendsPage, { data: twoPoints("v1.6.3", "v1.6.6") });
+    const notes = container.querySelectorAll(".engine-boundary-note");
+    // Only the second row crosses a boundary; the first has nothing before it.
+    expect(notes.length).toBe(1);
+    expect(notes[0].textContent).toContain("v1.6.6");
+    expect(container.querySelectorAll(".trend-row.engine-boundary").length).toBe(1);
+  });
+
+  it("does not mark a boundary when both snapshots ran the same engine", () => {
+    const { container } = render(TrendsPage, { data: twoPoints("v1.6.3", "v1.6.3") });
+    expect(container.querySelector(".engine-boundary-note")).toBeNull();
+  });
+
+  // An unknown version on either side means we cannot claim a boundary; a
+  // false "engine changed" note is as misleading as a missing one.
+  it("does not claim a boundary when a version is unknown", () => {
+    const { container } = render(TrendsPage, { data: twoPoints(undefined, "v1.6.6") });
+    expect(container.querySelector(".engine-boundary-note")).toBeNull();
+    const unknown = container.querySelector(".trend-engine.unknown");
+    expect(unknown).not.toBeNull();
+  });
+
+  it("flags a snapshot whose batch spanned an upgrade", () => {
+    const data = trendsData({
+      points: [
+        {
+          slug: "2026-08-15",
+          captured_at: "2026-08-15T00:00:00Z",
+          engine_version: "v1.6.3",
+          mixed_engine_version: true,
+          payload: { ok: 8, critical: 2 }
+        }
+      ]
+    });
+    const { container } = render(TrendsPage, { data });
+    expect(container.querySelector(".trend-engine.mixed")?.textContent?.trim()).toBe("mixed");
+  });
+});

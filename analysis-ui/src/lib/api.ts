@@ -19,6 +19,10 @@ export type SnapshotView = {
   domain_count: number;
   profile_name?: string;
   tag_view_min_level?: string;
+  // Absent engine_version means provenance could not be recovered for
+  // this snapshot; it is not the same as "current version".
+  engine_version?: string;
+  mixed_engine_version?: boolean;
 };
 
 export type Cohort = {
@@ -346,6 +350,8 @@ export type SnapshotListEntry = {
   profile_name?: string;
   is_default?: boolean;
   tag_view_min_level?: string;
+  engine_version?: string;
+  mixed_engine_version?: boolean;
 };
 
 export type SnapshotListResponse = {
@@ -365,6 +371,8 @@ export type SnapshotDetail = {
   run_count: number;
   domain_count: number;
   profile_name?: string;
+  engine_version?: string;
+  mixed_engine_version?: boolean;
   is_default: boolean;
   aggregates?: Record<string, unknown>;
 };
@@ -375,6 +383,8 @@ export type TrendPoint = {
   captured_at: string;
   first_run_at?: string;
   last_run_at?: string;
+  engine_version?: string;
+  mixed_engine_version?: boolean;
   payload: unknown;
 };
 
@@ -400,10 +410,23 @@ export type DiffEntry = {
   worst_level?: string;
 };
 
+// Provenance header on a diff. crossed_engine_versions means the two sides
+// ran different engines, so some change may be new engine capability rather
+// than the cohort moving. engine_version_unknown means we cannot tell.
+export type EngineDelta = {
+  from_engine_version?: string;
+  to_engine_version?: string;
+  crossed_engine_versions: boolean;
+  engine_version_unknown?: boolean;
+};
+
 export type DiffResponse = {
   dataset_tag: string;
   from_slug: string;
   to_slug: string;
+  // Optional so a client can still parse a response from a server that
+  // predates provenance.
+  engine?: EngineDelta;
   added: DiffEntry[];
   removed: DiffEntry[];
   grade_changed: DiffEntry[];
@@ -426,6 +449,7 @@ export type TagDiffResponse = {
   from_slug: string;
   to_slug: string;
   granularity: "tags";
+  engine?: EngineDelta;
   appeared: TagDiffEntry[];
   cleared: TagDiffEntry[];
   level_changed: TagDiffEntry[];

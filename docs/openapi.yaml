@@ -3357,6 +3357,14 @@ components:
           format: int64
         profile_name:
           type: string
+        engine_version:
+          type: string
+          description: >-
+            gonemaster version that produced this snapshot's runs. Absent when
+            provenance could not be recovered; never defaults to the running build.
+        mixed_engine_version:
+          type: boolean
+          description: Batch spanned an engine upgrade, so its numbers mix two measurement regimes.
         captured_at:
           type: string
           format: date-time
@@ -3443,6 +3451,14 @@ components:
           type: integer
         profile_name:
           type: string
+        engine_version:
+          type: string
+          description: >-
+            gonemaster version that produced this snapshot's runs. Absent when
+            provenance could not be recovered; never defaults to the running build.
+        mixed_engine_version:
+          type: boolean
+          description: Batch spanned an engine upgrade, so its numbers mix two measurement regimes.
         is_default:
           type: boolean
 
@@ -3498,6 +3514,10 @@ components:
               last_run_at:
                 type: string
                 format: date-time
+              engine_version:
+                type: string
+              mixed_engine_version:
+                type: boolean
               payload:
                 type: object
                 additionalProperties: true
@@ -3512,6 +3532,8 @@ components:
           type: string
         to_slug:
           type: string
+        engine:
+          $ref: '#/components/schemas/PublicAnalysisEngineDelta'
         added:
           type: array
           items:
@@ -3528,6 +3550,24 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/PublicAnalysisDiffEntry'
+
+    PublicAnalysisEngineDelta:
+      type: object
+      required: [crossed_engine_versions]
+      description: >-
+        Engine provenance for the two sides of a diff. crossed_engine_versions
+        means they ran different versions, so a finding that appears or clears
+        may be new engine capability rather than cohort change.
+      properties:
+        from_engine_version:
+          type: string
+        to_engine_version:
+          type: string
+        crossed_engine_versions:
+          type: boolean
+        engine_version_unknown:
+          type: boolean
+          description: One side has no recoverable version, so no comparison can be made.
 
     PublicAnalysisDiffEntry:
       type: object
@@ -3559,6 +3599,8 @@ components:
         granularity:
           type: string
           enum: [tags]
+        engine:
+          $ref: '#/components/schemas/PublicAnalysisEngineDelta'
         appeared:
           type: array
           items:

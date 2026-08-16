@@ -333,7 +333,7 @@ describe("AnalysisCohorts", () => {
       if (value === "/api/v1/tags?limit=500" && method === "GET") return jsonResponse([]);
       if (value === "/api/v1/analysis/cohorts" && method === "GET") return jsonResponse(cohorts);
       if (value === "/api/v1/analysis/status" && method === "GET") {
-        return jsonResponse({ backend_supported: true });
+        return jsonResponse({ backend_supported: scenario.backendSupported !== false });
       }
       const listSnaps = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots$/);
       if (listSnaps && method === "GET") {
@@ -732,6 +732,23 @@ describe("AnalysisCohorts", () => {
 
     const before = countCohortListGets();
     await waitFor(() => expect(countCohortListGets()).toBeGreaterThan(before + 1));
+  });
+
+  it("does not poll when the storage backend cannot materialize analysis facts", async () => {
+    // The in-memory store has no analysis controller, so no rebuild is ever
+    // dispatched and a cohort stays pending for good: nothing to watch.
+    installSnapshotFetch({
+      backendSupported: false,
+      initialCohorts: pendingCohort({ materialization_done: 1, materialization_total: 4 }),
+    });
+    render(AnalysisCohorts);
+    // The banner confirms the status response landed before we start counting.
+    await screen.findByText("Analysis backend not configured");
+
+    const before = countCohortListGets();
+    await new Promise((resolve) => setTimeout(resolve, 700));
+
+    expect(countCohortListGets()).toBe(before);
   });
 
   it("stops polling when the rebuild it started finishes, despite another idle pending cohort", async () => {

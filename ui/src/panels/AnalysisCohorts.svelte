@@ -731,7 +731,7 @@
 
   // Watch a cohort whose rebuild this client just started.
   function watchRebuild(cohortId) {
-    if (cohortId == null) return;
+    if (cohortId == null || !backendStatus.backend_supported) return;
     pollGraceIds = new Set(pollGraceIds).add(cohortId);
     pollGraceTicks = POLL_GRACE_TICKS;
   }
@@ -777,7 +777,10 @@
   $effect(() => {
     // Poll while a cohort rebuild or a snapshot rematerialize is in flight;
     // stop once nothing is running so a quiet page makes no requests at all.
-    const active = anyPending || anySnapshotMaterializing || pollGraceIds.size > 0;
+    // A backend that cannot materialize never leaves a cohort pending, so
+    // there is nothing to watch there at all.
+    const active = backendStatus.backend_supported
+      && (anyPending || anySnapshotMaterializing || pollGraceIds.size > 0);
     if (active && pollTimer == null) {
       pollTimer = setInterval(pollCohortsQuietly, POLL_INTERVAL_MS);
     } else if (!active && pollTimer != null) {

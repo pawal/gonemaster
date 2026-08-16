@@ -570,21 +570,47 @@
     openRunMenuCohortId = openRunMenuCohortId === cohort.id ? null : cohort.id;
   }
 
-  // Close the run-options menu on Escape or any click/focus outside its
-  // split button. Listeners are scoped to the mounted menu and removed on
-  // destroy; the menu only renders while open.
-  function runMenuDismiss(node) {
+  // Place the run-options menu and close it on Escape or any click/focus
+  // outside its split button. The table wrapper scrolls horizontally, which
+  // makes it clip vertically too, so the menu is positioned against the
+  // section around the wrapper: an absolutely positioned box whose containing
+  // block sits outside a scroll box is neither clipped nor scrolled by it.
+  // Coordinates come from measured rects because the CSP forbids inline
+  // styles. Listeners are scoped to the mounted menu and removed on destroy;
+  // the menu only renders while open.
+  function runMenuPopup(node) {
     const scope = node.closest(".run-split") || node;
+    const origin = node.closest(".cohort-section");
+    const gap = 4;
+    const place = () => {
+      if (!origin) return;
+      const base = origin.getBoundingClientRect();
+      const anchor = scope.getBoundingClientRect();
+      const menu = node.getBoundingClientRect();
+      const viewport = window.innerHeight || document.documentElement.clientHeight || 0;
+      const fitsBelow = anchor.bottom + gap + menu.height <= viewport;
+      const fitsAbove = anchor.top - gap - menu.height >= 0;
+      const top = !fitsBelow && fitsAbove
+        ? anchor.top - gap - menu.height
+        : anchor.bottom + gap;
+      node.style.top = `${top - base.top}px`;
+      node.style.left = `${anchor.right - menu.width - base.left}px`;
+    };
     const onKey = (e) => { if (e.key === "Escape") openRunMenuCohortId = null; };
     const onOutside = (e) => { if (!scope.contains(e.target)) openRunMenuCohortId = null; };
+    place();
     window.addEventListener("keydown", onKey);
     window.addEventListener("click", onOutside, true);
     window.addEventListener("focusin", onOutside, true);
+    window.addEventListener("scroll", place, true);
+    window.addEventListener("resize", place);
     return {
       destroy() {
         window.removeEventListener("keydown", onKey);
         window.removeEventListener("click", onOutside, true);
         window.removeEventListener("focusin", onOutside, true);
+        window.removeEventListener("scroll", place, true);
+        window.removeEventListener("resize", place);
       },
     };
   }
@@ -878,7 +904,7 @@
                         <span aria-hidden="true">&#9662;</span>
                       </button>
                       {#if openRunMenuCohortId === cohort.id}
-                        <div class="run-menu" role="menu" use:runMenuDismiss>
+                        <div class="run-menu" role="menu" use:runMenuPopup>
                           <button type="button" class="run-menu-item" role="menuitem"
                                   onclick={() => runSnapshot(cohort, { promoteDefault: true })}>
                             {$t("analysis_cohorts_run_snapshot_default")}
@@ -1172,6 +1198,12 @@
   .subtitle { margin-bottom: 12px; }
   .notice-detail { margin-top: 4px; }
 
+  /* Positioning origin for the run-options menu, kept outside the wrapper's
+     overflow so the menu can overlay the page instead of scrolling it. */
+  .cohort-section {
+    position: relative;
+  }
+
   .cohort-section + .cohort-section {
     margin-top: 28px;
   }
@@ -1413,8 +1445,9 @@
     background: color-mix(in srgb, var(--accent-2) 8%, var(--surface-2));
   }
 
+  /* Not positioned: the run menu must resolve against .cohort-section, which
+     lies outside the scrolling table wrapper. */
   .run-split {
-    position: relative;
     display: inline-flex;
   }
 
@@ -1435,8 +1468,8 @@
 
   .run-menu {
     position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
+    top: 0;
+    left: 0;
     z-index: 20;
     min-width: max-content;
     padding: 4px;

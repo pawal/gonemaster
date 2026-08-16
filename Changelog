@@ -22,6 +22,7 @@ Reworks Consistency05, which no longer reports a false delegation disagreement o
 - server: out-of-range `--retry` and `--retrans` are refused at startup, and a profile compatibility fix no longer marks the whole profile as reviewed
 - engine: DNSSEC algorithm 18 (ML-DSA-44) is recognised, no longer reported as unassigned
 - server: the analysis dashboard names DNSKEY algorithms 17, 18 and 23
+- admin-ui: the cohort run-options menu is no longer clipped by the table's scroll box
 
 ### Changed
 

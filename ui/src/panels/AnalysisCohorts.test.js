@@ -435,6 +435,76 @@ describe("AnalysisCohorts", () => {
     await waitFor(() => expect(within(tldRow).queryByRole("menuitem")).toBeNull());
   });
 
+  // jsdom performs no layout, so the geometry the placement logic reads is faked
+  // per element class: the section is the positioning origin the menu's top/left
+  // are relative to, the split button is the anchor the menu hangs off, and the
+  // menu supplies its own size. Everything else keeps jsdom's all-zero rect.
+  const fakeRects = (byClass) => {
+    const original = Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect = function fake() {
+      for (const [className, box] of Object.entries(byClass)) {
+        if (this.classList.contains(className)) {
+          const { top, bottom, left = 0, right = 0 } = box;
+          return {
+            top, bottom, left, right,
+            height: bottom - top, width: right - left,
+            x: left, y: top, toJSON() { return this; },
+          };
+        }
+      }
+      return original.call(this);
+    };
+    return () => { Element.prototype.getBoundingClientRect = original; };
+  };
+
+  it("places the run-options menu below its button, relative to the section", async () => {
+    installSnapshotFetch();
+    // Plenty of room below the anchor within the 768px jsdom viewport.
+    const restoreRects = fakeRects({
+      "cohort-section": { top: 100, bottom: 400, left: 20, right: 900 },
+      "run-split": { top: 160, bottom: 190, left: 700, right: 860 },
+      "run-menu": { top: 0, bottom: 40, left: 0, right: 150 },
+    });
+    try {
+      render(AnalysisCohorts);
+
+      const tldRow = (await screen.findByText("tld")).closest("tr");
+      await fireEvent.click(within(tldRow).getByRole("button", { name: /More run options/i }));
+      await within(tldRow).findByRole("menuitem", { name: /Run \+ set as default/i });
+
+      const menu = tldRow.querySelector(".run-menu");
+      // 190 (anchor bottom) + 4 (gap) - 100 (section top), and the menu's right
+      // edge lines up with the button's: 860 - 150 (width) - 20 (section left).
+      expect(menu.style.top).toBe("94px");
+      expect(menu.style.left).toBe("690px");
+    } finally {
+      restoreRects();
+    }
+  });
+
+  it("places the run-options menu above its button when the viewport bottom is close", async () => {
+    installSnapshotFetch();
+    // jsdom's viewport is 768px tall; the anchor sits just above its bottom edge.
+    const restoreRects = fakeRects({
+      "cohort-section": { top: 100, bottom: 760, left: 20, right: 900 },
+      "run-split": { top: 700, bottom: 740, left: 700, right: 860 },
+      "run-menu": { top: 0, bottom: 40, left: 0, right: 150 },
+    });
+    try {
+      render(AnalysisCohorts);
+
+      const tldRow = (await screen.findByText("tld")).closest("tr");
+      await fireEvent.click(within(tldRow).getByRole("button", { name: /More run options/i }));
+      await within(tldRow).findByRole("menuitem", { name: /Run \+ set as default/i });
+
+      const menu = tldRow.querySelector(".run-menu");
+      // 700 (anchor top) - 4 (gap) - 40 (menu height) - 100 (section top).
+      expect(menu.style.top).toBe("556px");
+    } finally {
+      restoreRects();
+    }
+  });
+
   it("lists snapshots with a mixed-profile banner when one is flagged", async () => {
     const snapshotsByCohort = {
       1: [

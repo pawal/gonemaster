@@ -43,6 +43,7 @@ type ControlStore interface {
 	GetBatch(id string) (serverpkg.Batch, bool)
 	UpsertAnalysisCohortSnapshot(snap serverpkg.AnalysisCohortSnapshot) (serverpkg.AnalysisCohortSnapshot, error)
 	GetAnalysisCohortSnapshotByBatch(cohortID int64, batchID string) (serverpkg.AnalysisCohortSnapshot, bool)
+	ListAnalysisCohortSnapshots(cohortID int64) []serverpkg.AnalysisCohortSnapshot
 	ListPendingAnalysisCohortSnapshots() []serverpkg.AnalysisCohortSnapshot
 	ClearAnalysisCohortSnapshots(cohortID int64) error
 	CountBatchSnapshotRuns(cohortID int64, batchID string) (runCount, domainCount int, firstFinished, lastFinished time.Time, err error)
@@ -313,6 +314,11 @@ func cloneInt64Ptr(v *int64) *int64 {
 // at startup when all that changed is a handful of runs completing while
 // the server was down.
 func (c *Controller) RepairAllCohorts(ctx context.Context) error {
+	// Snapshots captured before provenance was recorded still have their
+	// runs, so stamp them before any rebuild decision.
+	if err := c.BackfillSnapshotEngineVersions(ctx); err != nil {
+		return err
+	}
 	for _, cohort := range c.store.ListAnalysisCohorts() {
 		if err := ctx.Err(); err != nil {
 			return err

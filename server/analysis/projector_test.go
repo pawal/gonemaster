@@ -71,16 +71,49 @@ func (s *fakeStore) GetRun(id string) (serverpkg.Run, bool) {
 	return run, ok
 }
 
+// QueryEntries supports the three filter shapes the analysis code actually
+// issues: by run (the projector's per-run load), and by batch and/or entry
+// tag (the provenance backfill's batch-wide GLOBAL_VERSION sweep).
 func (s *fakeStore) QueryEntries(filter serverpkg.EntryFilter) serverpkg.EntryList {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	items := append([]serverpkg.Entry(nil), s.entries[filter.RunID]...)
+
+	var items []serverpkg.Entry
+	if filter.RunID != "" {
+		items = append(items, s.entries[filter.RunID]...)
+	} else {
+		// Batch-scoped sweep: walk every run, in a stable order so the
+		// resulting entry list does not depend on map iteration.
+		runIDs := make([]string, 0, len(s.entries))
+		for runID := range s.entries {
+			runIDs = append(runIDs, runID)
+		}
+		sort.Strings(runIDs)
+		for _, runID := range runIDs {
+			if filter.BatchID != "" && s.runs[runID].BatchID != filter.BatchID {
+				continue
+			}
+			items = append(items, s.entries[runID]...)
+		}
+	}
+
+	if filter.EntryTag != "" {
+		kept := items[:0]
+		for _, entry := range items {
+			if entry.Tag == filter.EntryTag {
+				kept = append(kept, entry)
+			}
+		}
+		items = kept
+	}
+
+	total := len(items)
 	if filter.Limit > 0 && len(items) > filter.Limit {
 		items = items[:filter.Limit]
 	}
 	return serverpkg.EntryList{
 		Items:  items,
-		Total:  len(s.entries[filter.RunID]),
+		Total:  total,
 		Limit:  filter.Limit,
 		Offset: filter.Offset,
 	}
@@ -489,6 +522,20 @@ func (s *fakeStore) GetAnalysisCohortSnapshotByBatch(cohortID int64, batchID str
 	s.ensureSnapshotMaps()
 	snap, ok := s.snapshots[snapshotKey{cohortID: cohortID, batchID: batchID}]
 	return snap, ok
+}
+
+func (s *fakeStore) ListAnalysisCohortSnapshots(cohortID int64) []serverpkg.AnalysisCohortSnapshot {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.ensureSnapshotMaps()
+	out := make([]serverpkg.AnalysisCohortSnapshot, 0)
+	for _, snap := range s.snapshots {
+		if snap.CohortID == cohortID {
+			out = append(out, snap)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].BatchID < out[j].BatchID })
+	return out
 }
 
 func (s *fakeStore) ListPendingAnalysisCohortSnapshots() []serverpkg.AnalysisCohortSnapshot {

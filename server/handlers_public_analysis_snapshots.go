@@ -22,6 +22,9 @@ type PublicAnalysisSnapshotListEntry struct {
 	ProfileName     string    `json:"profile_name,omitempty"`
 	IsDefault       bool      `json:"is_default,omitempty"`
 	TagViewMinLevel string    `json:"tag_view_min_level,omitempty"`
+	// Empty engine_version means provenance could not be recovered.
+	EngineVersion      string `json:"engine_version,omitempty"`
+	MixedEngineVersion bool   `json:"mixed_engine_version,omitempty"`
 }
 
 // PublicAnalysisSnapshotListResponse envelopes the list + cohort anchor.
@@ -34,28 +37,34 @@ type PublicAnalysisSnapshotListResponse struct {
 // PublicAnalysisSnapshotDetail is the /snapshots/{slug} response shape:
 // metadata plus the captured aggregates the trends/diff views consume.
 type PublicAnalysisSnapshotDetail struct {
-	DatasetTag  string                     `json:"dataset_tag"`
-	Slug        string                     `json:"slug"`
-	Label       string                     `json:"label,omitempty"`
-	Description string                     `json:"description,omitempty"`
-	CapturedAt  time.Time                  `json:"captured_at"`
-	FirstRunAt  time.Time                  `json:"first_run_at"`
-	LastRunAt   time.Time                  `json:"last_run_at"`
-	RunCount    int                        `json:"run_count"`
-	DomainCount int                        `json:"domain_count"`
-	ProfileName string                     `json:"profile_name,omitempty"`
-	IsDefault   bool                       `json:"is_default"`
-	Aggregates  map[string]json.RawMessage `json:"aggregates,omitempty"`
+	DatasetTag         string                     `json:"dataset_tag"`
+	Slug               string                     `json:"slug"`
+	Label              string                     `json:"label,omitempty"`
+	Description        string                     `json:"description,omitempty"`
+	CapturedAt         time.Time                  `json:"captured_at"`
+	FirstRunAt         time.Time                  `json:"first_run_at"`
+	LastRunAt          time.Time                  `json:"last_run_at"`
+	RunCount           int                        `json:"run_count"`
+	DomainCount        int                        `json:"domain_count"`
+	ProfileName        string                     `json:"profile_name,omitempty"`
+	EngineVersion      string                     `json:"engine_version,omitempty"`
+	MixedEngineVersion bool                       `json:"mixed_engine_version,omitempty"`
+	IsDefault          bool                       `json:"is_default"`
+	Aggregates         map[string]json.RawMessage `json:"aggregates,omitempty"`
 }
 
 // PublicAnalysisTrendPoint is one (snapshot, payload) pair in a trend series.
+// The engine fields let a reader see which steps cross a version boundary
+// before drawing conclusions from the shape of the line.
 type PublicAnalysisTrendPoint struct {
-	Slug       string          `json:"slug"`
-	Label      string          `json:"label,omitempty"`
-	CapturedAt time.Time       `json:"captured_at"`
-	FirstRunAt time.Time       `json:"first_run_at"`
-	LastRunAt  time.Time       `json:"last_run_at"`
-	Payload    json.RawMessage `json:"payload"`
+	Slug               string          `json:"slug"`
+	Label              string          `json:"label,omitempty"`
+	CapturedAt         time.Time       `json:"captured_at"`
+	FirstRunAt         time.Time       `json:"first_run_at"`
+	LastRunAt          time.Time       `json:"last_run_at"`
+	EngineVersion      string          `json:"engine_version,omitempty"`
+	MixedEngineVersion bool            `json:"mixed_engine_version,omitempty"`
+	Payload            json.RawMessage `json:"payload"`
 }
 
 // PublicAnalysisFactKeyMeta is per-key display metadata sent alongside
@@ -98,6 +107,18 @@ type PublicAnalysisTagDiffEntry struct {
 	DomainDelta     int    `json:"domain_delta"`
 }
 
+// PublicAnalysisEngineDelta is the provenance header on a diff. Crossed
+// means the two sides ran different engine versions, so some of the change
+// may be new engine capability rather than the cohort moving.
+type PublicAnalysisEngineDelta struct {
+	FromEngineVersion string `json:"from_engine_version,omitempty"`
+	ToEngineVersion   string `json:"to_engine_version,omitempty"`
+	Crossed           bool   `json:"crossed_engine_versions"`
+	// Unknown when either side has no recoverable version, so Crossed
+	// cannot be trusted either way.
+	Unknown bool `json:"engine_version_unknown,omitempty"`
+}
+
 // PublicAnalysisTagDiffResponse is the granularity=tags diff shape: which
 // finding tags appeared, cleared, or changed worst severity cohort-wide.
 type PublicAnalysisTagDiffResponse struct {
@@ -105,6 +126,7 @@ type PublicAnalysisTagDiffResponse struct {
 	FromSlug     string                       `json:"from_slug"`
 	ToSlug       string                       `json:"to_slug"`
 	Granularity  string                       `json:"granularity"`
+	Engine       PublicAnalysisEngineDelta    `json:"engine"`
 	Appeared     []PublicAnalysisTagDiffEntry `json:"appeared"`
 	Cleared      []PublicAnalysisTagDiffEntry `json:"cleared"`
 	LevelChanged []PublicAnalysisTagDiffEntry `json:"level_changed"`
@@ -116,10 +138,22 @@ type PublicAnalysisDiffResponse struct {
 	DatasetTag   string                    `json:"dataset_tag"`
 	FromSlug     string                    `json:"from_slug"`
 	ToSlug       string                    `json:"to_slug"`
+	Engine       PublicAnalysisEngineDelta `json:"engine"`
 	Added        []PublicAnalysisDiffEntry `json:"added"`
 	Removed      []PublicAnalysisDiffEntry `json:"removed"`
 	GradeChanged []PublicAnalysisDiffEntry `json:"grade_changed"`
 	LevelChanged []PublicAnalysisDiffEntry `json:"level_changed"`
+}
+
+// engineDelta builds the diff provenance header from the two snapshots.
+func engineDelta(from, to AnalysisCohortSnapshot) PublicAnalysisEngineDelta {
+	unknown := from.EngineVersion == "" || to.EngineVersion == ""
+	return PublicAnalysisEngineDelta{
+		FromEngineVersion: from.EngineVersion,
+		ToEngineVersion:   to.EngineVersion,
+		Crossed:           !unknown && from.EngineVersion != to.EngineVersion,
+		Unknown:           unknown,
+	}
 }
 
 // handlePublicAnalysisSnapshots handles GET /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots.
@@ -149,17 +183,19 @@ func (s *Server) handlePublicAnalysisSnapshots(w http.ResponseWriter, r *http.Re
 			continue
 		}
 		entries = append(entries, PublicAnalysisSnapshotListEntry{
-			Slug:            snap.Slug,
-			Label:           snap.Label,
-			Description:     snap.Description,
-			CapturedAt:      snap.CapturedAt,
-			FirstRunAt:      snap.FirstRunAt,
-			LastRunAt:       snap.LastRunAt,
-			RunCount:        snap.RunCount,
-			DomainCount:     snap.DomainCount,
-			ProfileName:     snap.ProfileName,
-			IsDefault:       snap.ID == defaultID,
-			TagViewMinLevel: snap.TagViewMinLevel,
+			Slug:               snap.Slug,
+			Label:              snap.Label,
+			Description:        snap.Description,
+			CapturedAt:         snap.CapturedAt,
+			FirstRunAt:         snap.FirstRunAt,
+			LastRunAt:          snap.LastRunAt,
+			RunCount:           snap.RunCount,
+			DomainCount:        snap.DomainCount,
+			ProfileName:        snap.ProfileName,
+			IsDefault:          snap.ID == defaultID,
+			TagViewMinLevel:    snap.TagViewMinLevel,
+			EngineVersion:      snap.EngineVersion,
+			MixedEngineVersion: snap.MixedEngineVersion,
 		})
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
@@ -203,18 +239,20 @@ func (s *Server) handlePublicAnalysisSnapshotDetail(w http.ResponseWriter, r *ht
 	}
 	def, _ := readStore.GetDefaultSnapshotForCohort(cohort.ID)
 	resp := PublicAnalysisSnapshotDetail{
-		DatasetTag:  cohort.SourceTag,
-		Slug:        snap.Slug,
-		Label:       snap.Label,
-		Description: snap.Description,
-		CapturedAt:  snap.CapturedAt,
-		FirstRunAt:  snap.FirstRunAt,
-		LastRunAt:   snap.LastRunAt,
-		RunCount:    snap.RunCount,
-		DomainCount: snap.DomainCount,
-		ProfileName: snap.ProfileName,
-		IsDefault:   snap.ID == def.ID,
-		Aggregates:  aggregates,
+		DatasetTag:         cohort.SourceTag,
+		Slug:               snap.Slug,
+		Label:              snap.Label,
+		Description:        snap.Description,
+		CapturedAt:         snap.CapturedAt,
+		FirstRunAt:         snap.FirstRunAt,
+		LastRunAt:          snap.LastRunAt,
+		RunCount:           snap.RunCount,
+		DomainCount:        snap.DomainCount,
+		ProfileName:        snap.ProfileName,
+		EngineVersion:      snap.EngineVersion,
+		MixedEngineVersion: snap.MixedEngineVersion,
+		IsDefault:          snap.ID == def.ID,
+		Aggregates:         aggregates,
 	}
 	writeJSON(w, http.StatusOK, resp)
 }
@@ -297,12 +335,14 @@ func (s *Server) handlePublicAnalysisTrends(w http.ResponseWriter, r *http.Reque
 			continue
 		}
 		points = append(points, PublicAnalysisTrendPoint{
-			Slug:       snap.Slug,
-			Label:      snap.Label,
-			CapturedAt: snap.CapturedAt,
-			FirstRunAt: snap.FirstRunAt,
-			LastRunAt:  snap.LastRunAt,
-			Payload:    payload,
+			Slug:               snap.Slug,
+			Label:              snap.Label,
+			CapturedAt:         snap.CapturedAt,
+			FirstRunAt:         snap.FirstRunAt,
+			LastRunAt:          snap.LastRunAt,
+			EngineVersion:      snap.EngineVersion,
+			MixedEngineVersion: snap.MixedEngineVersion,
+			Payload:            payload,
 		})
 		if toSlug != "" && snap.Slug == toSlug {
 			break
@@ -468,6 +508,7 @@ func (s *Server) handlePublicAnalysisDiff(w http.ResponseWriter, r *http.Request
 		DatasetTag:   cohort.SourceTag,
 		FromSlug:     fromSnap.Slug,
 		ToSlug:       toSnap.Slug,
+		Engine:       engineDelta(fromSnap, toSnap),
 		Added:        added,
 		Removed:      removed,
 		GradeChanged: gradeChanged,
@@ -510,6 +551,7 @@ func (s *Server) writeTagDiff(w http.ResponseWriter, cohort AnalysisCohort, from
 		FromSlug:     fromSnap.Slug,
 		ToSlug:       toSnap.Slug,
 		Granularity:  "tags",
+		Engine:       engineDelta(fromSnap, toSnap),
 		Appeared:     appeared,
 		Cleared:      cleared,
 		LevelChanged: levelChanged,

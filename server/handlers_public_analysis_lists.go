@@ -221,19 +221,24 @@ type PublicAnalysisSnapshotView struct {
 	DomainCount     int       `json:"domain_count"`
 	ProfileName     string    `json:"profile_name,omitempty"`
 	TagViewMinLevel string    `json:"tag_view_min_level,omitempty"`
+	// Empty engine_version means provenance could not be recovered.
+	EngineVersion      string `json:"engine_version,omitempty"`
+	MixedEngineVersion bool   `json:"mixed_engine_version,omitempty"`
 }
 
 func publicAnalysisSnapshotView(snap AnalysisCohortSnapshot) PublicAnalysisSnapshotView {
 	return PublicAnalysisSnapshotView{
-		Slug:            snap.Slug,
-		Label:           snap.Label,
-		CapturedAt:      snap.CapturedAt,
-		FirstRunAt:      snap.FirstRunAt,
-		LastRunAt:       snap.LastRunAt,
-		RunCount:        snap.RunCount,
-		DomainCount:     snap.DomainCount,
-		ProfileName:     snap.ProfileName,
-		TagViewMinLevel: snap.TagViewMinLevel,
+		Slug:               snap.Slug,
+		Label:              snap.Label,
+		CapturedAt:         snap.CapturedAt,
+		FirstRunAt:         snap.FirstRunAt,
+		LastRunAt:          snap.LastRunAt,
+		RunCount:           snap.RunCount,
+		DomainCount:        snap.DomainCount,
+		ProfileName:        snap.ProfileName,
+		TagViewMinLevel:    snap.TagViewMinLevel,
+		EngineVersion:      snap.EngineVersion,
+		MixedEngineVersion: snap.MixedEngineVersion,
 	}
 }
 

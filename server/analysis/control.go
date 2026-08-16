@@ -139,8 +139,9 @@ func (c *Controller) ProjectRun(runID string) error {
 	if projectedAt.IsZero() {
 		projectedAt = time.Now().UTC()
 	}
+	engineVersion := runEngineVersion(input.Entries)
 	for _, cohort := range input.MatchingCohorts {
-		if err := c.accumulateSnapshot(cohort, batch, input.Run); err != nil {
+		if err := c.accumulateSnapshot(cohort, batch, input.Run, engineVersion); err != nil {
 			return err
 		}
 		if err := c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationReady, projectedAt, ""); err != nil {
@@ -150,19 +151,27 @@ func (c *Controller) ProjectRun(runID string) error {
 	return nil
 }
 
+// snapshotSample is the run whose provenance denormalizes onto the snapshot.
+// The force flags carry disagreements the rebuild loop saw across other runs
+// in the batch, which a single sample cannot show.
+type snapshotSample struct {
+	run               serverpkg.Run
+	engineVersion     string
+	forceMixedProfile bool
+	forceMixedVersion bool
+}
+
 // accumulateSnapshot is the per-run wrapper around applySnapshotState used
-// by the realtime ProjectRun path; mixed-profile detection compares one
-// run against the snapshot's stored profile.
-func (c *Controller) accumulateSnapshot(cohort serverpkg.AnalysisCohort, batch serverpkg.Batch, run serverpkg.Run) error {
-	return c.applySnapshotState(cohort, batch, run, false)
+// by the realtime ProjectRun path.
+func (c *Controller) accumulateSnapshot(cohort serverpkg.AnalysisCohort, batch serverpkg.Batch, run serverpkg.Run, engineVersion string) error {
+	return c.applySnapshotState(cohort, batch, snapshotSample{run: run, engineVersion: engineVersion})
 }
 
 // applySnapshotState find-or-creates the pending snapshot for one
 // (cohort, batch) and refreshes its denormalized counters/timestamps.
-// forceMixed lets callers that have observed multiple runs across the
-// rebuild loop record the failed_mixed_profiles state without needing
-// this helper to see every run individually.
-func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch serverpkg.Batch, sampleRun serverpkg.Run, forceMixed bool) error {
+func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch serverpkg.Batch, sample snapshotSample) error {
+	sampleRun := sample.run
+	forceMixed := sample.forceMixedProfile
 	existing, found := c.store.GetAnalysisCohortSnapshotByBatch(cohort.ID, batch.ID)
 	runCount, domainCount, firstRunAt, lastRunAt, err := c.store.CountBatchSnapshotRuns(cohort.ID, batch.ID)
 	if err != nil {
@@ -184,6 +193,8 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 		snap.Description = existing.Description
 		snap.ProfileID = existing.ProfileID
 		snap.ProfileName = existing.ProfileName
+		snap.EngineVersion = existing.EngineVersion
+		snap.MixedEngineVersion = existing.MixedEngineVersion
 		snap.CapturedAt = existing.CapturedAt
 		snap.Status = existing.Status
 		snap.IsDefault = existing.IsDefault
@@ -195,6 +206,7 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 		snap.IsPublic = true
 		snap.ProfileID = cloneInt64Ptr(sampleRun.ProfileID)
 		snap.ProfileName = sampleRun.ProfileName
+		snap.EngineVersion = sample.engineVersion
 	}
 	snap.TagViewMinLevel = c.resolveTagViewMinLevel(cohort.TagViewMinLevel)
 
@@ -203,6 +215,17 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 			snap.Status = serverpkg.AnalysisSnapshotStatusFailedMixedProfiles
 			snap.IsPublic = false
 		}
+	}
+
+	// Flagged, not failed: a mid-batch upgrade still yields usable data,
+	// it just has to be read as confounded.
+	if !snap.MixedEngineVersion {
+		snap.MixedEngineVersion = sample.forceMixedVersion ||
+			mixedEngineVersions(snap.EngineVersion, sample.engineVersion)
+	}
+	// An unknown version can still be learned from a later run in the batch.
+	if snap.EngineVersion == "" {
+		snap.EngineVersion = sample.engineVersion
 	}
 
 	if _, err := c.store.UpsertAnalysisCohortSnapshot(snap); err != nil {
@@ -418,10 +441,12 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 		batchID  string
 	}
 	type pendingSnap struct {
-		cohort serverpkg.AnalysisCohort
-		batch  serverpkg.Batch
-		sample serverpkg.Run
-		mixed  bool
+		cohort        serverpkg.AnalysisCohort
+		batch         serverpkg.Batch
+		sample        serverpkg.Run
+		engineVersion string
+		mixed         bool
+		mixedVersion  bool
 	}
 	pending := map[pendingKey]*pendingSnap{}
 	var pendingMu sync.Mutex
@@ -466,6 +491,7 @@ pages:
 					return fmt.Errorf("project run %s for cohort %d: %w", run.ID, cohort.ID, err)
 				}
 				if contributed {
+					engineVersion := runEngineVersion(input.Entries)
 					pendingMu.Lock()
 					for _, mc := range input.MatchingCohorts {
 						key := pendingKey{cohortID: mc.ID, batchID: batch.ID}
@@ -473,8 +499,19 @@ pages:
 							if !ps.mixed && mixedProfiles(ps.sample.ProfileID, ps.sample.ProfileName, run.ProfileID, run.ProfileName) {
 								ps.mixed = true
 							}
+							if !ps.mixedVersion && mixedEngineVersions(ps.engineVersion, engineVersion) {
+								ps.mixedVersion = true
+							}
+							if ps.engineVersion == "" {
+								ps.engineVersion = engineVersion
+							}
 						} else {
-							pending[key] = &pendingSnap{cohort: mc, batch: batch, sample: run}
+							pending[key] = &pendingSnap{
+								cohort:        mc,
+								batch:         batch,
+								sample:        run,
+								engineVersion: engineVersion,
+							}
 						}
 					}
 					pendingMu.Unlock()
@@ -499,7 +536,13 @@ pages:
 	progress.flush()
 
 	for _, ps := range pending {
-		if err := c.applySnapshotState(ps.cohort, ps.batch, ps.sample, ps.mixed); err != nil {
+		sample := snapshotSample{
+			run:               ps.sample,
+			engineVersion:     ps.engineVersion,
+			forceMixedProfile: ps.mixed,
+			forceMixedVersion: ps.mixedVersion,
+		}
+		if err := c.applySnapshotState(ps.cohort, ps.batch, sample); err != nil {
 			_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())
 			return fmt.Errorf("finalize snapshot for cohort %d batch %s: %w", ps.cohort.ID, ps.batch.ID, err)
 		}
@@ -730,8 +773,9 @@ func (c *Controller) projectAndAccumulate(runID string, catalog []serverpkg.Anal
 	if err := c.projector.ProjectLoaded(input); err != nil {
 		return false, fmt.Errorf("project run %s: %w", runID, err)
 	}
+	engineVersion := runEngineVersion(input.Entries)
 	for _, cohort := range input.MatchingCohorts {
-		if err := c.accumulateSnapshot(cohort, batch, input.Run); err != nil {
+		if err := c.accumulateSnapshot(cohort, batch, input.Run, engineVersion); err != nil {
 			return false, err
 		}
 	}

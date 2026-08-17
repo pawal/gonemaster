@@ -17,9 +17,9 @@ Reworks Consistency05, which no longer reports a false delegation disagreement o
 
 ### Fixed
 
-- server: a job whose result cannot be stored is marked failed instead of being left at `running` forever, which used to leave callers polling until their own timeout, hold the in-flight gauge up and stall batch snapshot capture
-- server: database contention that aborts a whole transaction is retried on a fresh one, so two runs of the same domain finishing at the same moment both complete; this is what MariaDB 11.6.2 and later raise as error 1020 with `innodb_snapshot_isolation` on by default, and deadlocks and lock wait timeouts are covered too
-- server: startup recovery no longer refuses to start the server when a single orphaned job cannot be graduated
+- server: a job whose result cannot be stored is marked failed instead of being left at `running` forever
+- server: database contention that aborts a transaction is retried, including MariaDB error 1020 under `innodb_snapshot_isolation`
+- server: one orphaned job that cannot be graduated no longer blocks startup
 - engine: Consistency05 compares delegations on the NS names in a referral's authority section, so trimmed glue, truncated responses and parents that serve the child zone themselves no longer report a false `MULTIPLE_DELEGATION_NS_SET` (RFC 9471, RFC 9609, RFC 2181)
 - engine: DNSSEC checks work on copies of cached records, so concurrent runs sharing a warmed cache can no longer report a valid signature as bad
 - server: out-of-range `--retry` and `--retrans` are refused at startup, and a profile compatibility fix no longer marks the whole profile as reviewed

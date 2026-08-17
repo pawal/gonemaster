@@ -2,9 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.0] - 2026-08-17
 
-Reworks Consistency05, which no longer reports a false delegation disagreement on large delegations and now reports glue faults per name server name instead of as one aggregate finding. Adds per-nameserver response measurement with run and cohort diff tooling, and a profile editor that shows what a profile actually changes against the engine defaults.
+Reworks Consistency05, which no longer reports a false delegation disagreement on large delegations and now reports glue faults per name server name instead of as one aggregate finding. Adds per-nameserver response measurement with run and cohort diff tooling, a profile editor that shows what a profile actually changes against the engine defaults, and engine provenance on cohort snapshots so a trend line separates engine change from cohort change.
 
 **Breaking:** the last three message tags carrying the retired "bailiwick" term are renamed to `IN_DOMAIN_ADDR_MISMATCH`, `NOT_IN_DOMAIN_ADDR_MISMATCH` and `IN_DOMAIN_GLUE_MISSING`, completing the move to RFC 9499 terminology. Stored runs, profiles, scoring configurations and already-published tag links are migrated automatically, so only external scripts matching on the old strings need attention.
 
@@ -14,6 +14,7 @@ Reworks Consistency05, which no longer reports a false delegation disagreement o
 - client: `runs diff` and `batches diff` compare two runs or two cohorts at the tag level and exit non-zero when the findings differ
 - server, admin-ui: a profile can be compared against the engine defaults from the editor or over `POST /profiles/diff`, with a per-property table, a one-click action that strips overrides which only restate the default, and a review state that names the issues it waives and can be cleared
 - engine: Consistency05 reports `MISSING_ADDRESS_CHILD` at NOTICE when a glued name server has no address record in the child zone, previously part of an ERROR-level glue mismatch
+- server, analysis-ui: cohort snapshots record the engine version that produced their runs, exposed on the public analysis API and shown on the snapshot pill, trend lines and diffs, with a warning when a batch spanned an engine upgrade
 
 ### Fixed
 
@@ -35,6 +36,7 @@ Reworks Consistency05, which no longer reports a false delegation disagreement o
 - engine: Consistency05 names the disagreeing servers in a new `ns_names` argument, advertises a 1232-byte EDNS payload size on the parent referral query so glue arrives complete, and reports in-domain glue mismatches once per name server name, which scales the penalty with the number of affected names
 - engine: reachability backoff for unreachable name server addresses belongs to the run instead of the process, so one run can no longer change another run's findings; the cache is now bounded
 - ci: the race detector runs on every push over the engine and the server tests that share a cache store
+- deps: bump codeberg.org/miekg/dns to v0.6.90
 - engine, server, cli: log entries below the level a run will return are no longer built or kept, which cuts a run's peak heap by roughly two thirds
 
 ## [v1.6.5] - 2026-08-10

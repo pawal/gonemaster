@@ -582,6 +582,47 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN mixed_engine_version INTEGER NOT NULL DEFAULT 0`,
 		},
 	},
+	{
+		// Migration 7 missed the analysis layer's own copies of a tag, which
+		// left a renamed tag page empty on snapshots captured before it.
+		version: 9,
+		stmts:   renameAnalysisTagStmts(),
+	},
+}
+
+// retiredAnalysisTags is frozen at migration 9; a later rename needs its
+// own migration.
+var retiredAnalysisTags = [][2]string{
+	{"IN_BAILIWICK_ADDR_MISMATCH", "IN_DOMAIN_ADDR_MISMATCH"},
+	{"OUT_OF_BAILIWICK_ADDR_MISMATCH", "NOT_IN_DOMAIN_ADDR_MISMATCH"},
+	{"IN_BAILIWICK_GLUE_MISSING", "IN_DOMAIN_GLUE_MISSING"},
+}
+
+// renameAnalysisTagStmts rewrites a retired tag everywhere the analysis
+// layer stores one. A snapshot spanning the rename carries both names, so
+// the retired row is dropped rather than colliding on (snapshot_id, tag).
+func renameAnalysisTagStmts() []string {
+	stmts := make([]string, 0, len(retiredAnalysisTags)*5)
+	for _, pair := range retiredAnalysisTags {
+		old, current := pair[0], pair[1]
+		stmts = append(stmts,
+			// The derived table lets MariaDB read the table it deletes from,
+			// and DISTINCT keeps it from being merged back into the DELETE.
+			fmt.Sprintf(`DELETE FROM analysis_snapshot_tag_view
+				WHERE tag = '%s'
+				  AND snapshot_id IN (
+					SELECT snapshot_id FROM (
+						SELECT DISTINCT snapshot_id FROM analysis_snapshot_tag_view WHERE tag = '%s'
+					) already_renamed
+				)`, old, current),
+			fmt.Sprintf(`UPDATE analysis_snapshot_tag_view SET tag = '%s' WHERE tag = '%s'`, current, old),
+			fmt.Sprintf(`UPDATE analysis_run_tag_summary SET tag = '%s' WHERE tag = '%s'`, current, old),
+			// LIKE reads "_" as a wildcard; REPLACE still matches exactly.
+			fmt.Sprintf(`UPDATE analysis_snapshot_domain_view SET tags_json = REPLACE(tags_json, '%s', '%s') WHERE tags_json LIKE '%%%s%%'`, old, current, old),
+			fmt.Sprintf(`UPDATE analysis_snapshot_overview_view SET top_tags_json = REPLACE(top_tags_json, '%s', '%s') WHERE top_tags_json LIKE '%%%s%%'`, old, current, old),
+		)
+	}
+	return stmts
 }
 
 // runMigrations creates the schema_migrations tracking table and applies

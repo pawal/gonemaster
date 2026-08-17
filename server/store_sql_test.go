@@ -341,7 +341,7 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	want := []int{1, 2, 3, 4, 5, 6, 7, 8}
+	want := []int{1, 2, 3, 4, 5, 6, 7, 8, 9}
 	if len(versions) != len(want) {
 		t.Fatalf("expected %d versions, got %d: %v", len(want), len(versions), versions)
 	}
@@ -417,6 +417,219 @@ func TestRunMigrationsRenamesBailiwickTags(t *testing.T) {
 	}
 	if got := count("ADDRESSES_MATCH"); got != 1 {
 		t.Fatalf("unrelated tag ADDRESSES_MATCH: got %d rows, want 1", got)
+	}
+}
+
+// The analysis layer keeps its own copies of a message tag, so migration 7
+// alone left every snapshot captured before the rename serving the retired
+// name: the tag page for the current name found nothing.
+func TestRunMigrationsRenamesBailiwickTagsInAnalysisViews(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	// Re-arm the rename so it sees the legacy rows inserted below, the way it
+	// would on a database materialized before the rename landed.
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version = 9`); err != nil {
+		t.Fatalf("reset migration 9: %v", err)
+	}
+
+	tagView := func(snapshotID int64, tag string, domainCount int) {
+		t.Helper()
+		if _, err := db.Exec(
+			`INSERT INTO analysis_snapshot_tag_view
+			   (snapshot_id, tag, module, testcase, level, domain_count, occurrence_count, domains_json)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			snapshotID, tag, "Consistency", "Consistency05", "ERROR", domainCount, domainCount, `["example.test"]`,
+		); err != nil {
+			t.Fatalf("insert tag view %s: %v", tag, err)
+		}
+	}
+	runSummary := func(runID, tag string) {
+		t.Helper()
+		if _, err := db.Exec(
+			`INSERT INTO analysis_run_tag_summary
+			   (cohort_id, run_id, domain_id, tag, module, testcase, level, occurrence_count)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			1, runID, 1, tag, "Consistency", "Consistency05", "ERROR", 1,
+		); err != nil {
+			t.Fatalf("insert run summary %s: %v", tag, err)
+		}
+	}
+
+	legacy := [][2]string{
+		{"IN_BAILIWICK_ADDR_MISMATCH", "IN_DOMAIN_ADDR_MISMATCH"},
+		{"OUT_OF_BAILIWICK_ADDR_MISMATCH", "NOT_IN_DOMAIN_ADDR_MISMATCH"},
+		{"IN_BAILIWICK_GLUE_MISSING", "IN_DOMAIN_GLUE_MISSING"},
+	}
+	for i, pair := range legacy {
+		tagView(1, pair[0], 7)
+		runSummary(fmt.Sprintf("run_legacy_%d", i), pair[0])
+	}
+	// An unrelated tag must survive the rewrite untouched.
+	tagView(1, "ADDRESSES_MATCH", 3)
+	runSummary("run_untouched", "ADDRESSES_MATCH")
+
+	if _, err := db.Exec(
+		`INSERT INTO analysis_snapshot_domain_view
+		   (snapshot_id, domain_id, domain_name, score, grade, worst_level, tags_json)
+		 VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		1, 1, "example.test", 50, "C", "ERROR",
+		`[{"tag":"OUT_OF_BAILIWICK_ADDR_MISMATCH","level":"ERROR"},{"tag":"ADDRESSES_MATCH","level":"INFO"}]`,
+	); err != nil {
+		t.Fatalf("insert domain view: %v", err)
+	}
+	if _, err := db.Exec(
+		`INSERT INTO analysis_snapshot_overview_view (snapshot_id, domain_count, top_tags_json)
+		 VALUES (?, ?, ?)`,
+		1, 1, `[{"tag":"IN_BAILIWICK_GLUE_MISSING","domain_count":7}]`,
+	); err != nil {
+		t.Fatalf("insert overview view: %v", err)
+	}
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("rerun migrations: %v", err)
+	}
+
+	count := func(query, tag string) int {
+		t.Helper()
+		var n int
+		if err := db.QueryRow(query, tag).Scan(&n); err != nil {
+			t.Fatalf("count %s: %v", tag, err)
+		}
+		return n
+	}
+	const countTagView = `SELECT COUNT(*) FROM analysis_snapshot_tag_view WHERE tag = ?`
+	const countRunSummary = `SELECT COUNT(*) FROM analysis_run_tag_summary WHERE tag = ?`
+
+	for _, pair := range legacy {
+		old, current := pair[0], pair[1]
+		if got := count(countTagView, old); got != 0 {
+			t.Fatalf("tag view still holds %s in %d rows", old, got)
+		}
+		if got := count(countTagView, current); got != 1 {
+			t.Fatalf("tag view %s: got %d rows, want 1", current, got)
+		}
+		if got := count(countRunSummary, old); got != 0 {
+			t.Fatalf("run summary still holds %s in %d rows", old, got)
+		}
+		if got := count(countRunSummary, current); got != 1 {
+			t.Fatalf("run summary %s: got %d rows, want 1", current, got)
+		}
+	}
+	if got := count(countTagView, "ADDRESSES_MATCH"); got != 1 {
+		t.Fatalf("unrelated tag view row: got %d, want 1", got)
+	}
+	if got := count(countRunSummary, "ADDRESSES_MATCH"); got != 1 {
+		t.Fatalf("unrelated run summary row: got %d, want 1", got)
+	}
+
+	// The counts must ride along with the rename, not reset.
+	var domainCount int
+	if err := db.QueryRow(
+		`SELECT domain_count FROM analysis_snapshot_tag_view WHERE tag = ?`,
+		"IN_DOMAIN_ADDR_MISMATCH",
+	).Scan(&domainCount); err != nil {
+		t.Fatalf("read renamed domain_count: %v", err)
+	}
+	if domainCount != 7 {
+		t.Fatalf("renamed tag domain_count: got %d, want 7", domainCount)
+	}
+
+	var tagsJSON, topTagsJSON string
+	if err := db.QueryRow(`SELECT tags_json FROM analysis_snapshot_domain_view`).Scan(&tagsJSON); err != nil {
+		t.Fatalf("read tags_json: %v", err)
+	}
+	if strings.Contains(tagsJSON, "BAILIWICK") {
+		t.Fatalf("tags_json still names a retired tag: %s", tagsJSON)
+	}
+	if !strings.Contains(tagsJSON, `"NOT_IN_DOMAIN_ADDR_MISMATCH"`) {
+		t.Fatalf("tags_json missing the renamed tag: %s", tagsJSON)
+	}
+	if !strings.Contains(tagsJSON, `"ADDRESSES_MATCH"`) {
+		t.Fatalf("tags_json dropped an unrelated tag: %s", tagsJSON)
+	}
+	if err := db.QueryRow(`SELECT top_tags_json FROM analysis_snapshot_overview_view`).Scan(&topTagsJSON); err != nil {
+		t.Fatalf("read top_tags_json: %v", err)
+	}
+	if !strings.Contains(topTagsJSON, `"IN_DOMAIN_GLUE_MISSING"`) {
+		t.Fatalf("top_tags_json missing the renamed tag: %s", topTagsJSON)
+	}
+}
+
+// A batch that spanned the rename leaves both names in one snapshot, which
+// would collide on the tag view's (snapshot_id, tag) key.
+func TestRunMigrationsDropsRetiredTagOnRenameCollision(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version = 9`); err != nil {
+		t.Fatalf("reset migration 9: %v", err)
+	}
+
+	insert := func(snapshotID int64, tag string, domainCount int) {
+		t.Helper()
+		if _, err := db.Exec(
+			`INSERT INTO analysis_snapshot_tag_view
+			   (snapshot_id, tag, module, testcase, level, domain_count, occurrence_count, domains_json)
+			 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+			snapshotID, tag, "Consistency", "Consistency05", "ERROR", domainCount, domainCount, `[]`,
+		); err != nil {
+			t.Fatalf("insert %s: %v", tag, err)
+		}
+	}
+	insert(1, "OUT_OF_BAILIWICK_ADDR_MISMATCH", 4)
+	insert(1, "NOT_IN_DOMAIN_ADDR_MISMATCH", 9)
+	// A different snapshot holding only the retired name still renames.
+	insert(2, "OUT_OF_BAILIWICK_ADDR_MISMATCH", 5)
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("rerun migrations: %v", err)
+	}
+
+	var count int
+	if err := db.QueryRow(
+		`SELECT COUNT(*) FROM analysis_snapshot_tag_view WHERE tag = ?`,
+		"OUT_OF_BAILIWICK_ADDR_MISMATCH",
+	).Scan(&count); err != nil {
+		t.Fatalf("count retired: %v", err)
+	}
+	if count != 0 {
+		t.Fatalf("retired tag survived in %d rows", count)
+	}
+
+	var domainCount int
+	if err := db.QueryRow(
+		`SELECT domain_count FROM analysis_snapshot_tag_view WHERE snapshot_id = 1 AND tag = ?`,
+		"NOT_IN_DOMAIN_ADDR_MISMATCH",
+	).Scan(&domainCount); err != nil {
+		t.Fatalf("read surviving row: %v", err)
+	}
+	if domainCount != 9 {
+		t.Fatalf("collision kept the wrong row: domain_count %d, want 9", domainCount)
+	}
+	if err := db.QueryRow(
+		`SELECT domain_count FROM analysis_snapshot_tag_view WHERE snapshot_id = 2 AND tag = ?`,
+		"NOT_IN_DOMAIN_ADDR_MISMATCH",
+	).Scan(&domainCount); err != nil {
+		t.Fatalf("read renamed row on the uncontested snapshot: %v", err)
+	}
+	if domainCount != 5 {
+		t.Fatalf("uncontested snapshot domain_count: got %d, want 5", domainCount)
 	}
 }
 

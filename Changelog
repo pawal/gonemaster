@@ -18,6 +18,7 @@ Reworks Consistency05, which no longer reports a false delegation disagreement o
 
 ### Fixed
 
+- server: snapshots captured before the tag rename answer on the current tag names
 - server: a job whose result cannot be stored is marked failed instead of being left at `running` forever
 - server: a sweep fails jobs abandoned at `running`, after `stuck_job_timeout_minutes` (default 20, 0 disables)
 - server: database contention that aborts a transaction is retried, including MariaDB error 1020 under `innodb_snapshot_isolation`

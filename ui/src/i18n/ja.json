@@ -556,6 +556,8 @@
   "settings_help_worker_count": "ジョブを処理するバックグラウンドワーカーの数。",
   "settings_label_max_concurrent_jobs": "最大同時実行ジョブ数",
   "settings_help_max_concurrent_jobs": "同時エンジン実行の上限 (0 = 無制限)。",
+  "settings_label_stuck_job_timeout_minutes": "スタックしたジョブのタイムアウト (分)",
+  "settings_help_stuck_job_timeout_minutes": "放置された実行中ジョブをこの分数の経過後に失敗にします (0 = 無効)。",
   "settings_label_min_level": "最小ログレベル",
   "settings_help_min_level": "新しいジョブ結果の最小重大度レベル。",
   "settings_label_retention_days": "保持日数",

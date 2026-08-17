@@ -93,23 +93,28 @@ Prometheus output ignores JSON-only query parameters.
 
 A job only leaves `running` when the worker writes its result. If that write
 cannot commit, the worker marks the job `failed` with an error beginning
-`graduation failed:` rather than leaving it `running`, so callers stop
-polling and the in-flight gauge drains.
+`graduation failed:`, so callers stop polling and the in-flight gauge drains.
 
-Watch for these in the server log:
+As a backstop, a sweep every minute fails any job left at `running` with no
+worker on it for longer than `stuck_job_timeout_minutes` (default 20, `0`
+disables it). Reaped jobs are logged as `reaped stuck job`.
 
-- `job graduation failed` - one job's result could not be stored. The next
-  lines name the underlying database error.
+This assumes one server process per database. Two servers sharing one
+database will reap each other's live jobs, so set the timeout to `0` on
+such a deployment.
+
+Log lines to watch:
+
+- `job graduation failed` - a result could not be stored; the underlying
+  database error follows.
 - `marking ungraduated job failed did not persist` - the fallback write
-  failed too. The job row is stale until the next restart, when startup
-  recovery graduates it.
-- `startup recovery left orphan jobs ungraduated` - recovery could not
-  clear some rows but started the server anyway.
+  failed too; the reaper or the next restart clears it.
+- `startup recovery left orphan jobs ungraduated` - recovery skipped some
+  rows and started anyway.
 
-Database contention is retried automatically, so an occasional retry does
-not appear here at all. A steady stream of `job graduation failed` points
-at the database rather than at any one job; on MariaDB see the snapshot
-isolation notes in [database-setup.md](database-setup.md).
+Database contention is retried and does not appear here. A steady stream of
+`job graduation failed` points at the database; on MariaDB see
+[database-setup.md](database-setup.md).
 
 ## Logging
 

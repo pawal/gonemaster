@@ -292,29 +292,13 @@ large purge to update planner statistics.
 
 ### Snapshot isolation (MariaDB 11.6.2 and later)
 
-From MariaDB 11.6.2 the `innodb_snapshot_isolation` option is enabled by
-default. Under the default REPEATABLE READ isolation level, a transaction
-that tries to lock a row whose current version is not in its read view no
-longer waits and re-reads: it aborts with error 1020, `ER_CHECKREAD`,
-"Record has changed since last read in table". MariaDB documents this as an
-error to be handled like a deadlock, by retrying the transaction.
+`innodb_snapshot_isolation` is on by default from MariaDB 11.6.2. Write-write
+conflicts then abort the transaction with error 1020, `ER_CHECKREAD`, instead
+of waiting.
 
-gonemaster does exactly that. Errors 1020, 1213 (deadlock) and 1205 (lock
-wait timeout) are retried on a fresh transaction with a jittered backoff,
-so concurrent test runs of the same domain, which contend on that domain's
-row, complete normally.
-
-You should not need to change the setting. If you are running a gonemaster
-older than the release that added this retry and see 1020 in the server
-log, the workaround is:
-
-```ini
-[mariadb]
-innodb_snapshot_isolation = OFF
-```
-
-Upgrading gonemaster is the better fix, because the retry also covers the
-deadlock and lock-wait-timeout cases that this setting does not affect.
+No action needed: gonemaster retries 1020, 1213 (deadlock) and 1205 (lock
+wait timeout) on a fresh transaction. On older gonemaster versions, set
+`innodb_snapshot_isolation = OFF` under `[mariadb]` until you can upgrade.
 
 ### Quick start
 

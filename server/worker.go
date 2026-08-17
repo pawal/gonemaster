@@ -48,6 +48,8 @@ func (s *Server) Start() {
 	// a restart.
 	startPurgeLoop(ctx, s.store, &s.retentionDays, &s.purgeIntervalSec, s.metrics, s.logger)
 
+	s.startStuckJobReaper(ctx)
+
 	if s.rateLimiter != nil {
 		go func() {
 			ticker := time.NewTicker(time.Minute)

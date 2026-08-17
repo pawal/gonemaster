@@ -556,6 +556,8 @@
   "settings_help_worker_count": "Antall bakgrunnsworkers som behandler jobber.",
   "settings_label_max_concurrent_jobs": "Maks samtidige jobber",
   "settings_help_max_concurrent_jobs": "Grense for samtidige motorkjøringer (0 = ubegrenset).",
+  "settings_label_stuck_job_timeout_minutes": "Tidsavbrudd for fastlåste jobber (minutter)",
+  "settings_help_stuck_job_timeout_minutes": "Merk forlatte kjørende jobber som mislykket etter så mange minutter (0 = deaktivert).",
   "settings_label_min_level": "Minimum loggnivå",
   "settings_help_min_level": "Minimum alvorlighetsnivå for nye jobbresultater.",
   "settings_label_retention_days": "Oppbevaringsdager",

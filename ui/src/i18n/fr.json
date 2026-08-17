@@ -556,6 +556,8 @@
   "settings_help_worker_count": "Nombre de goroutines de workers traitant les jobs en arrière-plan.",
   "settings_label_max_concurrent_jobs": "Jobs simultanés max",
   "settings_help_max_concurrent_jobs": "Limite de runs moteur simultanés (0 = illimité).",
+  "settings_label_stuck_job_timeout_minutes": "Délai des jobs bloqués (minutes)",
+  "settings_help_stuck_job_timeout_minutes": "Marque en échec les jobs abandonnés en cours après ce nombre de minutes (0 = désactivé).",
   "settings_label_min_level": "Niveau de log minimum",
   "settings_help_min_level": "Niveau de sévérité minimum pour les résultats de nouveaux jobs.",
   "settings_label_retention_days": "Jours de rétention",

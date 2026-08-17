@@ -556,6 +556,8 @@
   "settings_help_worker_count": "Število Worker gorutin v ozadju, ki obdelujejo opravila.",
   "settings_label_max_concurrent_jobs": "Največje število sočasnih opravil",
   "settings_help_max_concurrent_jobs": "Omejitev sočasnih izvajanj pogona (0 = neomejeno).",
+  "settings_label_stuck_job_timeout_minutes": "Časovna omejitev zataknjenih opravil (minute)",
+  "settings_help_stuck_job_timeout_minutes": "Označi zapuščena izvajajoča se opravila kot neuspešna po toliko minutah (0 = onemogočeno).",
   "settings_label_min_level": "Najmanjša raven dnevnika",
   "settings_help_min_level": "Najmanjša raven resnosti za rezultate novih opravil.",
   "settings_label_retention_days": "Dnevi hrambe",

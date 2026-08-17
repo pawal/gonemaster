@@ -556,6 +556,8 @@
   "settings_help_worker_count": "Töitä käsittelevien taustatyöntekijöiden määrä.",
   "settings_label_max_concurrent_jobs": "Samanaikaisten töiden enimmäismäärä",
   "settings_help_max_concurrent_jobs": "Samanaikaisten moottorin ajojen raja (0 = rajoittamaton).",
+  "settings_label_stuck_job_timeout_minutes": "Jumittuneen työn aikakatkaisu (minuuttia)",
+  "settings_help_stuck_job_timeout_minutes": "Merkitse hylätyt käynnissä olevat työt epäonnistuneiksi tämän minuuttimäärän jälkeen (0 = pois käytöstä).",
   "settings_label_min_level": "Vähimmäislokitaso",
   "settings_help_min_level": "Vähimmäisvakavuustaso uusille työtuloksille.",
   "settings_label_retention_days": "Säilytyspäivät",

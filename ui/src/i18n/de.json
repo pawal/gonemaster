@@ -229,6 +229,8 @@
   "settings_help_worker_count": "Anzahl der Hintergrund-Worker-Goroutinen, die Jobs verarbeiten.",
   "settings_label_max_concurrent_jobs": "Max. gleichzeitige Jobs",
   "settings_help_max_concurrent_jobs": "Obergrenze für gleichzeitige Engine-Läufe (0 = unbegrenzt).",
+  "settings_label_stuck_job_timeout_minutes": "Zeitlimit für hängende Jobs (Minuten)",
+  "settings_help_stuck_job_timeout_minutes": "Verwaiste laufende Jobs nach so vielen Minuten als fehlgeschlagen markieren (0 = deaktiviert).",
   "settings_label_min_level": "Mindest-Log-Stufe",
   "settings_help_min_level": "Mindest-Schweregrad für neue Job-Ergebnisse.",
   "settings_label_retention_days": "Aufbewahrungsdauer (Tage)",

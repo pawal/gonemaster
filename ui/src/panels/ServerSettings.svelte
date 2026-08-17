@@ -20,6 +20,7 @@
         { key: "listen_addr", type: "text", readonly: true },
         { key: "worker_count", type: "number" },
         { key: "max_concurrent_jobs", type: "number" },
+        { key: "stuck_job_timeout_minutes", type: "number" },
         { key: "min_level", type: "select", options: ["INFO", "NOTICE", "WARNING", "ERROR", "CRITICAL"] },
         { key: "public_url", type: "text" },
       ],

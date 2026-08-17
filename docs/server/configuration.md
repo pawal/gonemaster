@@ -27,6 +27,7 @@ gonemaster-server --dump-config
 | `max_body_size` | Maximum request body size. |
 | `worker_count` | Number of workers that dequeue jobs. |
 | `max_concurrent_jobs` | Maximum number of engine runs at once. |
+| `stuck_job_timeout_minutes` | Fail abandoned running jobs after this many minutes (0 = disable). |
 | `cross_job_hot_cache` | Enables cross-job nameserver cache sharing. |
 | `cross_job_hot_cache_ttl_seconds` | TTL for cross-job hot-cache entries. |
 | `min_level` | Minimum log level stored and returned in results. |
@@ -50,6 +51,7 @@ gonemaster-server --dump-config
 | `GONEMASTER_LISTEN` | `listen_addr` |
 | `GONEMASTER_WORKER_COUNT` | `worker_count` |
 | `GONEMASTER_MAX_CONCURRENT_JOBS` | `max_concurrent_jobs` |
+| `GONEMASTER_STUCK_JOB_TIMEOUT` | `stuck_job_timeout_minutes` |
 | `GONEMASTER_MIN_LEVEL` | `min_level` |
 | `GONEMASTER_PROFILE` | `profile_path` |
 | `GONEMASTER_DEBUG` | `debug` |

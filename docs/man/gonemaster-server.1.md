@@ -50,6 +50,9 @@ variables, CLI flags. Later sources override earlier ones.
 **--max-concurrent-jobs** *N*
 : Maximum concurrent engine runs (0 = unlimited).
 
+**--stuck-job-timeout** *N*
+: Fail abandoned running jobs after N minutes (0 = disable, default 20).
+
 ### Resolver
 
 **--profile** *PATH*
@@ -149,6 +152,9 @@ variables, CLI flags. Later sources override earlier ones.
 
 **GONEMASTER_MAX_CONCURRENT_JOBS**
 : Equivalent to **--max-concurrent-jobs**.
+
+**GONEMASTER_STUCK_JOB_TIMEOUT**
+: Equivalent to **--stuck-job-timeout**.
 
 **GONEMASTER_MIN_LEVEL**
 : Equivalent to **--min-level**.

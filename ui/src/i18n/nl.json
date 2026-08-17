@@ -229,6 +229,8 @@
   "settings_help_worker_count": "Aantal achtergrond-worker-goroutines die taken verwerken.",
   "settings_label_max_concurrent_jobs": "Max. gelijktijdige taken",
   "settings_help_max_concurrent_jobs": "Maximum aantal gelijktijdige engine-uitvoeringen (0 = onbeperkt).",
+  "settings_label_stuck_job_timeout_minutes": "Time-out voor vastgelopen taken (minuten)",
+  "settings_help_stuck_job_timeout_minutes": "Markeer verlaten lopende taken als mislukt na dit aantal minuten (0 = uitgeschakeld).",
   "settings_label_min_level": "Minimaal logniveau",
   "settings_help_min_level": "Minimale ernst voor nieuwe taakresultaten.",
   "settings_label_retention_days": "Bewaardagen",

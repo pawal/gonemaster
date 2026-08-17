@@ -104,6 +104,13 @@ const defaultCrossJobHotCacheTTLSeconds = 60
 
 const defaultPurgeIntervalSeconds = 3600
 
+// defaultStuckJobTimeoutMinutes is the age at which a "running" job with no
+// worker on it is considered abandoned.
+const defaultStuckJobTimeoutMinutes = 20
+
+// stuckJobSweepInterval is how often the reaper looks for abandoned jobs.
+const stuckJobSweepInterval = time.Minute
+
 // Config controls HTTP server behavior.
 type Config struct {
 	ListenAddr  string `json:"listen_addr"`
@@ -112,6 +119,9 @@ type Config struct {
 	WorkerCount int    `json:"worker_count"`
 	// MaxConcurrentJobs caps engine runs across workers when >0.
 	MaxConcurrentJobs int `json:"max_concurrent_jobs"`
+	// StuckJobTimeoutMinutes is how long a job may sit at "running" with no
+	// worker on it before the reaper fails it. Zero disables the reaper.
+	StuckJobTimeoutMinutes int `json:"stuck_job_timeout_minutes"`
 	// CrossJobHotCache enables sharing of warmed nameserver query/error caches
 	// across consecutive jobs. Caches are keyed by profile and network settings
 	// so jobs with different resolver configs get independent stores.
@@ -218,6 +228,7 @@ type FileConfig struct {
 	Debug                       *bool                `json:"debug"`
 	WorkerCount                 *int                 `json:"worker_count"`
 	MaxConcurrentJobs           *int                 `json:"max_concurrent_jobs"`
+	StuckJobTimeoutMinutes      *int                 `json:"stuck_job_timeout_minutes,omitempty"`
 	PositiveCacheTTL            *int                 `json:"positive_cache_ttl"`
 	NegativeCacheTTL            *int                 `json:"negative_cache_ttl"`
 	Timeout                     *int                 `json:"timeout"`
@@ -257,6 +268,7 @@ func DefaultConfig() Config {
 		Debug:                       false,
 		WorkerCount:                 16,
 		MaxConcurrentJobs:           0,
+		StuckJobTimeoutMinutes:      defaultStuckJobTimeoutMinutes,
 		MinLevel:                    "INFO",
 		LogFormat:                   "text",
 		LogLevel:                    "info",
@@ -289,6 +301,15 @@ func (c Config) EffectiveCrossJobHotCacheTTL() time.Duration {
 		secs = defaultCrossJobHotCacheTTLSeconds
 	}
 	return time.Duration(secs) * time.Second
+}
+
+// EffectiveStuckJobTimeout returns the stuck-job age limit as a Duration.
+// A zero or negative setting disables the reaper.
+func (c Config) EffectiveStuckJobTimeout() time.Duration {
+	if c.StuckJobTimeoutMinutes <= 0 {
+		return 0
+	}
+	return time.Duration(c.StuckJobTimeoutMinutes) * time.Minute
 }
 
 // EffectivePurgeInterval returns the retention purge interval as a time.Duration.
@@ -329,6 +350,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.MaxConcurrentJobs != nil {
 		c.MaxConcurrentJobs = *file.MaxConcurrentJobs
+	}
+	if file.StuckJobTimeoutMinutes != nil {
+		c.StuckJobTimeoutMinutes = *file.StuckJobTimeoutMinutes
 	}
 	if file.PositiveCacheTTL != nil {
 		c.PositiveCacheTTL = file.PositiveCacheTTL

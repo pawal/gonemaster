@@ -18,6 +18,7 @@ Reworks Consistency05, which no longer reports a false delegation disagreement o
 ### Fixed
 
 - server: a job whose result cannot be stored is marked failed instead of being left at `running` forever
+- server: a sweep fails jobs abandoned at `running`, after `stuck_job_timeout_minutes` (default 20, 0 disables)
 - server: database contention that aborts a transaction is retried, including MariaDB error 1020 under `innodb_snapshot_isolation`
 - server: one orphaned job that cannot be graduated no longer blocks startup
 - engine: Consistency05 compares delegations on the NS names in a referral's authority section, so trimmed glue, truncated responses and parents that serve the child zone themselves no longer report a false `MULTIPLE_DELEGATION_NS_SET` (RFC 9471, RFC 9609, RFC 2181)

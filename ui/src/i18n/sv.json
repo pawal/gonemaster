@@ -556,6 +556,8 @@
   "settings_help_worker_count": "Antal bakgrundsworkers som bearbetar jobb.",
   "settings_label_max_concurrent_jobs": "Max samtidiga jobb",
   "settings_help_max_concurrent_jobs": "Gräns för samtidiga motorkörningar (0 = obegränsat).",
+  "settings_label_stuck_job_timeout_minutes": "Tidsgräns för fastnade jobb (minuter)",
+  "settings_help_stuck_job_timeout_minutes": "Markera övergivna körande jobb som misslyckade efter så här många minuter (0 = avstängt).",
   "settings_label_min_level": "Minsta loggnivå",
   "settings_help_min_level": "Minsta allvarlighetsgrad för nya jobbresultat.",
   "settings_label_retention_days": "Lagringstid i dagar",

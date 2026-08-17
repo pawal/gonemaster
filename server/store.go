@@ -560,6 +560,7 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 		Score:             &scoreVal,
 		Grade:             &gradeVal,
 		NameserverTimings: cloneNameserverTimings(job.NameserverTimings),
+		Error:             job.Error,
 	}
 	run.SeverityTotals = map[string]int{
 		"NOTICE":   sevNotice,

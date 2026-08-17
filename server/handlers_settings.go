@@ -78,6 +78,10 @@ func (s *Server) applySetting(key, val string) {
 		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
 			s.cfg.MaxConcurrentJobs = v
 		}
+	case "stuck_job_timeout_minutes":
+		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
+			s.cfg.StuckJobTimeoutMinutes = v
+		}
 	case "min_level":
 		s.cfg.MinLevel = val
 	case "retention_days":
@@ -196,6 +200,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"profile_path":                    {Value: cfg.ProfilePath, Source: s.settingSource("profile_path"), Readonly: true},
 		"worker_count":                    {Value: cfg.WorkerCount, Source: s.settingSource("worker_count")},
 		"max_concurrent_jobs":             {Value: cfg.MaxConcurrentJobs, Source: s.settingSource("max_concurrent_jobs")},
+		"stuck_job_timeout_minutes":       {Value: cfg.StuckJobTimeoutMinutes, Source: s.settingSource("stuck_job_timeout_minutes")},
 		"min_level":                       {Value: cfg.MinLevel, Source: s.settingSource("min_level")},
 		"retention_days":                  {Value: cfg.Database.RetentionDays, Source: s.settingSource("retention_days")},
 		"purge_interval_seconds":          {Value: int(cfg.EffectivePurgeInterval() / time.Second), Source: s.settingSource("purge_interval_seconds")},

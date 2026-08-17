@@ -229,6 +229,8 @@
   "settings_help_worker_count": "Počet pracovních goroutin na pozadí, které zpracovávají úlohy.",
   "settings_label_max_concurrent_jobs": "Maximum souběžných úloh",
   "settings_help_max_concurrent_jobs": "Omezení počtu souběžných běhů enginu (0 = bez omezení).",
+  "settings_label_stuck_job_timeout_minutes": "Časový limit uvázlé úlohy (minuty)",
+  "settings_help_stuck_job_timeout_minutes": "Označí opuštěné běžící úlohy jako neúspěšné po tomto počtu minut (0 = vypnuto).",
   "settings_label_min_level": "Minimální úroveň protokolu",
   "settings_help_min_level": "Minimální úroveň závažnosti pro nové výsledky úloh.",
   "settings_label_retention_days": "Doba uchování (dny)",

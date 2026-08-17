@@ -556,6 +556,8 @@
   "settings_help_worker_count": "Número de goroutines de workers procesando trabajos en segundo plano.",
   "settings_label_max_concurrent_jobs": "Trabajos simultáneos máx.",
   "settings_help_max_concurrent_jobs": "Límite de ejecuciones simultáneas del motor (0 = ilimitado).",
+  "settings_label_stuck_job_timeout_minutes": "Tiempo límite de trabajos atascados (minutos)",
+  "settings_help_stuck_job_timeout_minutes": "Marca como fallidos los trabajos abandonados en ejecución tras estos minutos (0 = desactivado).",
   "settings_label_min_level": "Nivel de log mínimo",
   "settings_help_min_level": "Nivel de severidad mínimo para resultados de nuevos trabajos.",
   "settings_label_retention_days": "Días de retención",

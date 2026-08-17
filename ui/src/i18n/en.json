@@ -229,6 +229,8 @@
   "settings_help_worker_count": "Number of background worker goroutines processing jobs.",
   "settings_label_max_concurrent_jobs": "Max concurrent jobs",
   "settings_help_max_concurrent_jobs": "Cap on concurrent engine runs (0 = unlimited).",
+  "settings_label_stuck_job_timeout_minutes": "Stuck job timeout (minutes)",
+  "settings_help_stuck_job_timeout_minutes": "Fail abandoned running jobs after this many minutes (0 = disable).",
   "settings_label_min_level": "Minimum log level",
   "settings_help_min_level": "Minimum severity level for new job results.",
   "settings_label_retention_days": "Retention days",

@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 )
 
@@ -19,6 +20,7 @@ func RecoverJobs(store JobStore, queue Queue) error {
 	now := time.Now().UTC()
 
 	orphans := s.List(JobFilter{Limit: 100000})
+	failed := 0
 	for _, job := range orphans.Items {
 		if job.Status == JobQueued || job.Status == JobPaused {
 			continue
@@ -31,8 +33,17 @@ func RecoverJobs(store JobStore, queue Queue) error {
 			job.FinishedAt = now
 		}
 		if err := s.GraduateJob(job, nil); err != nil {
-			return fmt.Errorf("graduate orphan job %s: %w", job.ID, err)
+			// Restarting is the fix for a stuck job, so one bad row must
+			// not block startup.
+			slog.Warn("graduate orphan job failed", "job_id", job.ID, "err", err)
+			if updateErr := s.Update(job); updateErr != nil {
+				slog.Error("orphan job left unrecovered", "job_id", job.ID, "err", updateErr)
+			}
+			failed++
 		}
+	}
+	if failed > 0 {
+		slog.Warn("startup recovery left orphan jobs ungraduated", "count", failed)
 	}
 
 	rows, err := s.db.Query(

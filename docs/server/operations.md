@@ -89,6 +89,28 @@ The JSON metrics endpoint accepts:
 
 Prometheus output ignores JSON-only query parameters.
 
+## Jobs that will not finish
+
+A job only leaves `running` when the worker writes its result. If that write
+cannot commit, the worker marks the job `failed` with an error beginning
+`graduation failed:` rather than leaving it `running`, so callers stop
+polling and the in-flight gauge drains.
+
+Watch for these in the server log:
+
+- `job graduation failed` - one job's result could not be stored. The next
+  lines name the underlying database error.
+- `marking ungraduated job failed did not persist` - the fallback write
+  failed too. The job row is stale until the next restart, when startup
+  recovery graduates it.
+- `startup recovery left orphan jobs ungraduated` - recovery could not
+  clear some rows but started the server anyway.
+
+Database contention is retried automatically, so an occasional retry does
+not appear here at all. A steady stream of `job graduation failed` points
+at the database rather than at any one job; on MariaDB see the snapshot
+isolation notes in [database-setup.md](database-setup.md).
+
 ## Logging
 
 The server writes operational logs (lifecycle, access log, warnings, errors) to

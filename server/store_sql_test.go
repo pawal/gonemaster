@@ -27,6 +27,9 @@ func (d *spyDialect) Placeholder(n int) string      { d.placeholderCalls++; retu
 func (d *spyDialect) TimestampVal(t time.Time) any  { return d.inner.TimestampVal(t) }
 func (d *spyDialect) DriverName() string            { return d.inner.DriverName() }
 func (d *spyDialect) IsDuplicateKey(err error) bool { return d.inner.IsDuplicateKey(err) }
+func (d *spyDialect) IsRetryableConflict(err error) bool {
+	return d.inner.IsRetryableConflict(err)
+}
 func (d *spyDialect) SupportsOnConflictReturning() bool {
 	return d.inner.SupportsOnConflictReturning()
 }
@@ -41,6 +44,9 @@ func (testDollarDialect) TimestampVal(t time.Time) any { return sqliteDialect{}.
 func (testDollarDialect) DriverName() string           { return "test-dollar" }
 func (testDollarDialect) IsDuplicateKey(err error) bool {
 	return strings.Contains(err.Error(), "duplicate key value violates unique constraint")
+}
+func (testDollarDialect) IsRetryableConflict(err error) bool {
+	return postgresDialect{}.IsRetryableConflict(err)
 }
 func (testDollarDialect) SupportsOnConflictReturning() bool { return true }
 func (testDollarDialect) Least(a, b string) string          { return fmt.Sprintf("LEAST(%s, %s)", a, b) }

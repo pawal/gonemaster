@@ -460,7 +460,7 @@ func (c *Controller) RebuildCohort(ctx context.Context, cohortID int64) error {
 
 	dimCache := newRebuildDimCache()
 	wrapWriter := func(w WriteStore) WriteStore {
-		return &cachingWriteStore{inner: w, cache: dimCache}
+		return newCachingWriteStore(w, dimCache)
 	}
 
 	g, gctx := errgroup.WithContext(ctx)
@@ -630,76 +630,118 @@ func newRebuildDimCache() *rebuildDimCache {
 // cachingWriteStore wraps a WriteStore and short-circuits the dimension
 // upserts via rebuildDimCache. Replace*/Upsert per-run methods pass
 // through unchanged - only the dimension entities benefit from caching.
+// IDs stage locally until CommitStaged, so a rolled back attempt cannot
+// hand an ID for a nonexistent row to the next run.
 type cachingWriteStore struct {
-	inner WriteStore
-	cache *rebuildDimCache
+	inner   WriteStore
+	cache   *rebuildDimCache
+	stagedM sync.Mutex
+	staged  rebuildDimCache
+}
+
+func newCachingWriteStore(inner WriteStore, cache *rebuildDimCache) *cachingWriteStore {
+	return &cachingWriteStore{inner: inner, cache: cache, staged: *newRebuildDimCache()}
+}
+
+// CommitStaged publishes this attempt's IDs once the tx has committed.
+func (c *cachingWriteStore) CommitStaged() {
+	c.stagedM.Lock()
+	defer c.stagedM.Unlock()
+	c.cache.mu.Lock()
+	defer c.cache.mu.Unlock()
+	for name, id := range c.staged.nameservers {
+		c.cache.nameservers[name] = id
+	}
+	for address, id := range c.staged.addresses {
+		c.cache.addresses[address] = id
+	}
+	for prefix, id := range c.staged.prefixes {
+		c.cache.prefixes[prefix] = id
+	}
+	for asn := range c.staged.asns {
+		c.cache.asns[asn] = struct{}{}
+	}
+	c.staged = *newRebuildDimCache()
+}
+
+// lookupID checks this attempt's staged IDs, then the committed cache.
+func (c *cachingWriteStore) lookupID(pick func(*rebuildDimCache) (int64, bool)) (int64, bool) {
+	c.stagedM.Lock()
+	id, ok := pick(&c.staged)
+	c.stagedM.Unlock()
+	if ok {
+		return id, true
+	}
+	c.cache.mu.Lock()
+	defer c.cache.mu.Unlock()
+	return pick(c.cache)
 }
 
 func (c *cachingWriteStore) UpsertAnalysisNameserver(name string, seenAt time.Time) (serverpkg.AnalysisNameserver, error) {
-	c.cache.mu.Lock()
-	if id, ok := c.cache.nameservers[name]; ok {
-		c.cache.mu.Unlock()
+	if id, ok := c.lookupID(func(d *rebuildDimCache) (int64, bool) {
+		id, ok := d.nameservers[name]
+		return id, ok
+	}); ok {
 		return serverpkg.AnalysisNameserver{ID: id, Name: name, FirstSeenAt: seenAt, LastSeenAt: seenAt}, nil
 	}
-	c.cache.mu.Unlock()
 	ns, err := c.inner.UpsertAnalysisNameserver(name, seenAt)
 	if err != nil {
 		return ns, err
 	}
-	c.cache.mu.Lock()
-	c.cache.nameservers[name] = ns.ID
-	c.cache.mu.Unlock()
+	c.stagedM.Lock()
+	c.staged.nameservers[name] = ns.ID
+	c.stagedM.Unlock()
 	return ns, nil
 }
 
 func (c *cachingWriteStore) UpsertAnalysisAddress(address, family string, seenAt time.Time) (serverpkg.AnalysisAddress, error) {
-	c.cache.mu.Lock()
-	if id, ok := c.cache.addresses[address]; ok {
-		c.cache.mu.Unlock()
+	if id, ok := c.lookupID(func(d *rebuildDimCache) (int64, bool) {
+		id, ok := d.addresses[address]
+		return id, ok
+	}); ok {
 		return serverpkg.AnalysisAddress{ID: id, Address: address, Family: family, FirstSeenAt: seenAt, LastSeenAt: seenAt}, nil
 	}
-	c.cache.mu.Unlock()
 	addr, err := c.inner.UpsertAnalysisAddress(address, family, seenAt)
 	if err != nil {
 		return addr, err
 	}
-	c.cache.mu.Lock()
-	c.cache.addresses[address] = addr.ID
-	c.cache.mu.Unlock()
+	c.stagedM.Lock()
+	c.staged.addresses[address] = addr.ID
+	c.stagedM.Unlock()
 	return addr, nil
 }
 
 func (c *cachingWriteStore) UpsertAnalysisPrefix(prefix, family string, seenAt time.Time) (serverpkg.AnalysisPrefix, error) {
-	c.cache.mu.Lock()
-	if id, ok := c.cache.prefixes[prefix]; ok {
-		c.cache.mu.Unlock()
+	if id, ok := c.lookupID(func(d *rebuildDimCache) (int64, bool) {
+		id, ok := d.prefixes[prefix]
+		return id, ok
+	}); ok {
 		return serverpkg.AnalysisPrefix{ID: id, Prefix: prefix, Family: family, FirstSeenAt: seenAt, LastSeenAt: seenAt}, nil
 	}
-	c.cache.mu.Unlock()
 	pfx, err := c.inner.UpsertAnalysisPrefix(prefix, family, seenAt)
 	if err != nil {
 		return pfx, err
 	}
-	c.cache.mu.Lock()
-	c.cache.prefixes[prefix] = pfx.ID
-	c.cache.mu.Unlock()
+	c.stagedM.Lock()
+	c.staged.prefixes[prefix] = pfx.ID
+	c.stagedM.Unlock()
 	return pfx, nil
 }
 
 func (c *cachingWriteStore) UpsertAnalysisASN(asn int64, label string, seenAt time.Time) (serverpkg.AnalysisASN, error) {
-	c.cache.mu.Lock()
-	if _, ok := c.cache.asns[asn]; ok {
-		c.cache.mu.Unlock()
+	if _, ok := c.lookupID(func(d *rebuildDimCache) (int64, bool) {
+		_, ok := d.asns[asn]
+		return 0, ok
+	}); ok {
 		return serverpkg.AnalysisASN{ASN: asn, Label: label, FirstSeenAt: seenAt, LastSeenAt: seenAt}, nil
 	}
-	c.cache.mu.Unlock()
 	out, err := c.inner.UpsertAnalysisASN(asn, label, seenAt)
 	if err != nil {
 		return out, err
 	}
-	c.cache.mu.Lock()
-	c.cache.asns[asn] = struct{}{}
-	c.cache.mu.Unlock()
+	c.stagedM.Lock()
+	c.staged.asns[asn] = struct{}{}
+	c.stagedM.Unlock()
 	return out, nil
 }
 

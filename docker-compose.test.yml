@@ -30,8 +30,13 @@ services:
       retries: 10
       start_period: 10s
 
+  # Pinned to the 11.8 LTS series that Ubuntu 26.04 ships, with
+  # innodb_snapshot_isolation set explicitly rather than inherited: it is
+  # the default from 11.6.2 on and turns concurrent writes to one row into
+  # ER_CHECKREAD, which the graduation retry has to absorb.
   mariadb:
-    image: mariadb:11
+    image: mariadb:11.8
+    command: --innodb-snapshot-isolation=ON
     environment:
       MARIADB_USER: gonemaster
       MARIADB_PASSWORD: gonemaster

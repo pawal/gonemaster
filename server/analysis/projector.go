@@ -174,18 +174,33 @@ func (p *Projector) ProjectLoaded(input RunInput) error {
 // to deduplicate dimension upserts across its worker pool.
 type WriteStoreWrapper func(WriteStore) WriteStore
 
+// stagedWriteStore is a wrapper that holds state derived from rows in
+// the transaction until it commits. The tx may be retried.
+type stagedWriteStore interface {
+	CommitStaged()
+}
+
 func (p *Projector) ProjectLoadedWith(input RunInput, wrap WriteStoreWrapper) error {
 	if len(input.MatchingCohorts) == 0 {
 		return nil
 	}
 	prepared := p.prepareRun(input)
 	if tx, ok := p.store.(txCapableStore); ok {
-		return tx.WithAnalysisWriteTx(func(writer WriteStore) error {
+		var staged stagedWriteStore
+		err := tx.WithAnalysisWriteTx(func(writer WriteStore) error {
 			if wrap != nil {
 				writer = wrap(writer)
 			}
+			staged, _ = writer.(stagedWriteStore)
 			return p.writePrepared(prepared, writer)
 		})
+		if err != nil {
+			return err
+		}
+		if staged != nil {
+			staged.CommitStaged()
+		}
+		return nil
 	}
 	if wrap != nil {
 		return p.writePrepared(prepared, wrap(p.store))

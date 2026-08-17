@@ -23,6 +23,11 @@ type spyJobStore struct {
 	mu         sync.Mutex
 	inner      *InMemoryJobStore
 	progresses []int
+	// graduateErr, when set, makes GraduateJob fail without graduating,
+	// standing in for a database that will not commit the transaction.
+	graduateErr error
+	// updateHook, when set, runs before each Update and can fail it.
+	updateHook func(job Job) error
 }
 
 func newSpyJobStore() *spyJobStore {
@@ -44,7 +49,13 @@ func (s *spyJobStore) GetByPublicID(publicID string) (Job, bool) {
 func (s *spyJobStore) Update(job Job) error {
 	s.mu.Lock()
 	s.progresses = append(s.progresses, job.Progress)
+	hook := s.updateHook
 	s.mu.Unlock()
+	if hook != nil {
+		if err := hook(job); err != nil {
+			return err
+		}
+	}
 	return s.inner.Update(job)
 }
 
@@ -53,6 +64,12 @@ func (s *spyJobStore) List(filter JobFilter) JobList {
 }
 
 func (s *spyJobStore) GraduateJob(job Job, entries []engine.LogEntry) error {
+	s.mu.Lock()
+	failure := s.graduateErr
+	s.mu.Unlock()
+	if failure != nil {
+		return failure
+	}
 	return s.inner.GraduateJob(job, entries)
 }
 

@@ -32,6 +32,10 @@ type sqlDialect interface {
 	// IsDuplicateKey returns true when err represents a unique-constraint
 	// violation. Each driver surfaces this differently.
 	IsDuplicateKey(err error) bool
+	// IsRetryableConflict returns true when err aborted the whole
+	// transaction on contention rather than on a defect in the statement.
+	// The caller must restart from Begin.
+	IsRetryableConflict(err error) bool
 	// SupportsOnConflictReturning reports whether this dialect supports
 	// `INSERT ... ON CONFLICT (col) DO UPDATE ... RETURNING`. Postgres and
 	// modern SQLite do; MySQL/MariaDB uses a different syntax and returns
@@ -59,6 +63,17 @@ func (sqliteDialect) DriverName() string { return "sqlite" }
 func (sqliteDialect) IsDuplicateKey(err error) bool {
 	return strings.Contains(err.Error(), "UNIQUE constraint failed")
 }
+
+// IsRetryableConflict detects SQLITE_BUSY / SQLITE_LOCKED.
+func (sqliteDialect) IsRetryableConflict(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "database is locked") ||
+		strings.Contains(msg, "database table is locked") ||
+		strings.Contains(msg, "SQLITE_BUSY")
+}
 func (sqliteDialect) SupportsOnConflictReturning() bool { return true }
 func (sqliteDialect) Least(a, b string) string          { return fmt.Sprintf("min(%s, %s)", a, b) }
 func (sqliteDialect) Greatest(a, b string) string       { return fmt.Sprintf("max(%s, %s)", a, b) }
@@ -81,6 +96,16 @@ func (postgresDialect) IsDuplicateKey(err error) bool {
 	var pqErr *pq.Error
 	return errors.As(err, &pqErr) && pqErr.Code == "23505"
 }
+
+// IsRetryableConflict detects SQLSTATE 40001 (serialization_failure) and
+// 40P01 (deadlock_detected).
+func (postgresDialect) IsRetryableConflict(err error) bool {
+	var pqErr *pq.Error
+	if !errors.As(err, &pqErr) {
+		return false
+	}
+	return pqErr.Code == "40001" || pqErr.Code == "40P01"
+}
 func (postgresDialect) SupportsOnConflictReturning() bool { return true }
 func (postgresDialect) Least(a, b string) string          { return fmt.Sprintf("LEAST(%s, %s)", a, b) }
 func (postgresDialect) Greatest(a, b string) string       { return fmt.Sprintf("GREATEST(%s, %s)", a, b) }
@@ -102,6 +127,28 @@ func (mariadbDialect) DriverName() string { return "mysql" }
 func (mariadbDialect) IsDuplicateKey(err error) bool {
 	var mysqlErr *mysql.MySQLError
 	return errors.As(err, &mysqlErr) && mysqlErr.Number == 1062
+}
+
+// MariaDB/MySQL errors that roll the transaction back and are safe to retry.
+const (
+	erLockWaitTimeout = 1205 // ER_LOCK_WAIT_TIMEOUT
+	erLockDeadlock    = 1213 // ER_LOCK_DEADLOCK
+	erCheckRead       = 1020 // ER_CHECKREAD, "record has changed since last read"
+)
+
+// IsRetryableConflict detects the three contention aborts. ER_CHECKREAD
+// needs innodb_snapshot_isolation, on by default since MariaDB 11.6.2.
+func (mariadbDialect) IsRetryableConflict(err error) bool {
+	var mysqlErr *mysql.MySQLError
+	if !errors.As(err, &mysqlErr) {
+		return false
+	}
+	switch mysqlErr.Number {
+	case erCheckRead, erLockDeadlock, erLockWaitTimeout:
+		return true
+	default:
+		return false
+	}
 }
 
 // MariaDB uses INSERT ... ON DUPLICATE KEY UPDATE and does not support

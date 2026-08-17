@@ -471,28 +471,42 @@ func (s *SQLJobStore) List(filter JobFilter) JobList {
 	return list
 }
 
+// graduationValues is computed before the tx opens, so a retried attempt
+// recomputes nothing.
+type graduationValues struct {
+	sevNotice             int
+	sevWarning            int
+	sevError              int
+	sevCritical           int
+	worstLevel            string
+	durationMs            int64
+	scoreVal              sql.NullInt64
+	gradeVal              sql.NullString
+	nameserverTimingsJSON any
+}
+
 // GraduateJob atomically creates a run, inserts entries, upserts the domain
 // record, updates domain latest_* fields, and deletes the job from the queue.
+// Contention aborts are retried on a fresh transaction.
 func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) error {
 	// Compute severity totals and worst level.
-	sevNotice, sevWarning, sevError, sevCritical := 0, 0, 0, 0
+	vals := graduationValues{}
 	for _, e := range engineEntries {
 		switch strings.ToUpper(strings.TrimSpace(e.Level)) {
 		case "NOTICE":
-			sevNotice++
+			vals.sevNotice++
 		case "WARNING":
-			sevWarning++
+			vals.sevWarning++
 		case "ERROR":
-			sevError++
+			vals.sevError++
 		case "CRITICAL":
-			sevCritical++
+			vals.sevCritical++
 		}
 	}
-	worstLevel := computeWorstLevel(sevNotice, sevWarning, sevError, sevCritical)
+	vals.worstLevel = computeWorstLevel(vals.sevNotice, vals.sevWarning, vals.sevError, vals.sevCritical)
 
-	var durationMs int64
 	if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
-		durationMs = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
+		vals.durationMs = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
 	}
 
 	// Compute score eagerly at graduation time.
@@ -501,19 +515,28 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
 	}
 	scoreResult := scoring.Compute(job.Domain, scoringEntries, s.scoringCfg)
-	scoreVal := sql.NullInt64{Int64: int64(scoreResult.Score), Valid: true}
-	gradeVal := sql.NullString{String: scoreResult.Grade, Valid: true}
+	vals.scoreVal = sql.NullInt64{Int64: int64(scoreResult.Score), Valid: true}
+	vals.gradeVal = sql.NullString{String: scoreResult.Grade, Valid: true}
 	nameserverTimingsJSON, err := toNullJSON(job.NameserverTimings)
 	if err != nil {
 		return fmt.Errorf("marshal nameserver timings: %w", err)
 	}
+	vals.nameserverTimingsJSON = nameserverTimingsJSON
 
+	return s.retryOnConflict("graduate job", func() error {
+		return s.graduateJobOnce(job, engineEntries, vals)
+	})
+}
+
+// graduateJobOnce runs one graduation transaction. A rolled back attempt
+// leaves nothing behind, so the caller can just run it again.
+func (s *SQLJobStore) graduateJobOnce(job Job, engineEntries []engine.LogEntry, vals graduationValues) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin graduation tx: %w", err)
 	}
 
-	// Check the job still exists.
+	// Check the job still exists. This opens the transaction's read view.
 	var exists int
 	if err := tx.QueryRow(
 		fmt.Sprintf("SELECT COUNT(*) FROM jobs WHERE id = %s", s.ph(1)), job.ID,
@@ -526,7 +549,8 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 		return errors.New("job not found")
 	}
 
-	// Upsert domain.
+	// Locks the domain row up front, so a competing graduation of the same
+	// domain conflicts here rather than after the entry inserts.
 	domainID, err := s.upsertDomainTx(tx, job.Domain)
 	if err != nil {
 		_ = tx.Rollback()
@@ -544,12 +568,12 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 			error
 		) VALUES (%s)`, s.phRange(1, 25)),
 		job.ID, domainID, job.Domain, job.BatchID, string(job.Status),
-		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), durationMs,
-		sevNotice, sevWarning, sevError, sevCritical,
-		worstLevel, len(engineEntries), job.Profile, nullInt64Value(job.ProfileID), job.ProfileName,
+		s.ts(job.CreatedAt), s.ts(job.StartedAt), s.ts(job.FinishedAt), vals.durationMs,
+		vals.sevNotice, vals.sevWarning, vals.sevError, vals.sevCritical,
+		vals.worstLevel, len(engineEntries), job.Profile, nullInt64Value(job.ProfileID), job.ProfileName,
 		job.EffectiveProfile,
 		sql.NullString{String: job.PublicID, Valid: job.PublicID != ""},
-		int(job.Priority), scoreVal, gradeVal, nameserverTimingsJSON,
+		int(job.Priority), vals.scoreVal, vals.gradeVal, vals.nameserverTimingsJSON,
 		job.Error,
 	); err != nil {
 		_ = tx.Rollback()
@@ -572,7 +596,7 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 		 WHERE id=%s`,
 			s.ph(1), s.ph(2), s.ph(3), s.ph(4), s.ph(5), s.ph(6), s.ph(7)),
 		job.ID, s.ts(job.FinishedAt), string(job.Status),
-		worstLevel, scoreVal, gradeVal, domainID,
+		vals.worstLevel, vals.scoreVal, vals.gradeVal, domainID,
 	); err != nil {
 		_ = tx.Rollback()
 		return fmt.Errorf("update domain: %w", err)
@@ -643,11 +667,22 @@ func (s *SQLJobStore) upsertDomainTx(tx *sql.Tx, name string) (int64, error) {
 	}
 	var id int64
 	if err := tx.QueryRow(
-		fmt.Sprintf("SELECT id FROM domains WHERE name = %s", s.ph(1)), name,
+		fmt.Sprintf("SELECT id FROM domains WHERE name = %s%s", s.ph(1), s.forUpdate()), name,
 	).Scan(&id); err != nil {
 		return 0, fmt.Errorf("get domain id: %w", err)
 	}
 	return id, nil
+}
+
+// forUpdate returns the row-locking suffix for a SELECT, empty on SQLite
+// which serialises writes on a single connection instead.
+func (s *SQLJobStore) forUpdate() string {
+	switch s.dialect.(type) {
+	case postgresDialect, mariadbDialect:
+		return " FOR UPDATE"
+	default:
+		return ""
+	}
 }
 
 const insertEntriesBatchSize = 200

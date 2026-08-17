@@ -91,8 +91,16 @@ func (t *analysisWriteTxStore) SetAnalysisProjectionState(item AnalysisProjectio
 // WithAnalysisWriteTx runs fn inside one transaction and commits if fn
 // returns nil. The projector calls this so every per-run upsert and
 // replace-block for one ProjectLoaded call commits together instead of
-// paying one fsync per statement.
+// paying one fsync per statement. The dimension rows are shared across
+// all domains, so concurrent projections contend on them and a contention
+// abort is retried; fn must be re-runnable.
 func (s *SQLJobStore) WithAnalysisWriteTx(fn func(AnalysisWriteStore) error) error {
+	return s.retryOnConflict("analysis write tx", func() error {
+		return s.analysisWriteTxOnce(fn)
+	})
+}
+
+func (s *SQLJobStore) analysisWriteTxOnce(fn func(AnalysisWriteStore) error) error {
 	tx, err := s.db.Begin()
 	if err != nil {
 		return fmt.Errorf("begin analysis write tx: %w", err)

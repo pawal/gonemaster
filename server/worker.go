@@ -204,6 +204,10 @@ func (s *Server) runJob(jobID string) error {
 	job.StartedAt = now
 	job.Progress = 0
 	if _, _, _, err := s.updateJobWithMetricsTransition(job); err != nil {
+		// Already off the in-memory queue but still queued in the store.
+		if enqueueErr := s.queue.Enqueue(job.ID, job.Priority); enqueueErr != nil {
+			s.logger.Error("re-enqueue after start failed", "job_id", job.ID, "err", enqueueErr)
+		}
 		return err
 	}
 	s.initProgressWriteState(job.ID, 0, now)
@@ -235,6 +239,7 @@ func (s *Server) runJob(jobID string) error {
 
 	if err := s.store.GraduateJob(job, art.entries); err != nil {
 		s.logger.Error("job graduation failed", "job_id", job.ID, "err", err)
+		s.failUngraduatedJob(job, err)
 		return err
 	}
 
@@ -259,6 +264,21 @@ func (s *Server) runJob(jobID string) error {
 	}
 
 	return runErr
+}
+
+// failUngraduatedJob parks a job the worker has stopped running at a
+// terminal status. Left at "running" it would wedge: callers poll
+// forever and batch snapshot capture never completes.
+func (s *Server) failUngraduatedJob(job Job, cause error) {
+	job.Status = JobFailed
+	job.Error = fmt.Sprintf("graduation failed: %v", cause)
+	if job.FinishedAt.IsZero() {
+		job.FinishedAt = time.Now().UTC()
+	}
+	if _, _, _, err := s.updateJobWithMetricsTransition(job); err != nil {
+		s.logger.Error("marking ungraduated job failed did not persist",
+			"job_id", job.ID, "err", err, "cause", cause)
+	}
 }
 
 type jobQueryStats struct {

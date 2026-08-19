@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- deps: bump codeberg.org/miekg/dns to v0.6.96
+
 ## [v1.7.0] - 2026-08-17
 
 Reworks Consistency05, which no longer reports a false delegation disagreement on large delegations and now reports glue faults per name server name instead of as one aggregate finding. Adds per-nameserver response measurement with run and cohort diff tooling, a profile editor that shows what a profile actually changes against the engine defaults, and engine provenance on cohort snapshots so a trend line separates engine change from cohort change.

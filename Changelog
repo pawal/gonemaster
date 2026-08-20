@@ -4,9 +4,14 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- engine: ML-DSA-44 (algorithm 18) signatures are verified
+
 ### Changed
 
 - build: Go 1.27 is now required
+- deps: bump codeberg.org/miekg/dns to v0.6.98
 
 ### Fixed
 

@@ -4,9 +4,9 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
-### Changed
+### Fixed
 
-- deps: bump codeberg.org/miekg/dns to v0.6.96
+- i18n: the DNSKEY "algorithm not supported" notices no longer name another project
 
 ## [v1.7.0] - 2026-08-17
 

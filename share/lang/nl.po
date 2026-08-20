@@ -623,16 +623,16 @@ msgid "DS record for zone {domain} with keytag {keytag} was created with an unas
 msgstr "DS-record voor zone {domain} met keytag {keytag} is aangemaakt met een niet-toegewezen digest-algoritme (algoritmenummer {ds_algo_num}). Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM"
-msgid "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}) by this installation of Zonemaster. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie van Zonemaster. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+msgid "DNSKEY with tag {keytag} uses algorithm {algo_num} ({algo_mnemo}), which is not supported by this installation. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS08_ALGO_NOT_SUPPORTED_BY_ZM"
-msgid "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}) by this installation of Zonemaster. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie van Zonemaster. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+msgid "DNSKEY with tag {keytag} uses algorithm {algo_num} ({algo_mnemo}), which is not supported by this installation. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS09_ALGO_NOT_SUPPORTED_BY_ZM"
-msgid "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}) by this installation of Zonemaster. Fetched from the nameservers with IP addresses \"{addresses}\"."
-msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie van Zonemaster. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
+msgid "DNSKEY with tag {keytag} uses algorithm {algo_num} ({algo_mnemo}), which is not supported by this installation. Fetched from the nameservers with IP addresses \"{addresses}\"."
+msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie. Opgehaald van de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_DNSKEY_NOT_FOR_ZONE_SIGNING"
 msgid "Flags field of DNSKEY record with tag {keytag} has not ZONE bit set although DS with same tag is present in parent. Fetched from the nameservers with IP addresses \"{addresses}\"."
@@ -807,8 +807,8 @@ msgid "The SOA RRset has valid RRSIG records. Found at the nameservers with IP a
 msgstr "De SOA-RRset heeft geldige RRSIG-records. Gevonden op de naamservers met IP-adressen \"{addresses}\"."
 
 msgctxt "DNSSEC:DS10_ALGO_NOT_SUPPORTED_BY_ZM"
-msgid "DNSKEY with tag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}) by this installation of Zonemaster. Fetched from name servers \"{addresses}\"."
-msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie van Zonemaster. Opgehaald van naamservers \"{addresses}\"."
+msgid "DNSKEY with tag {keytag} uses algorithm {algo_num} ({algo_mnemo}), which is not supported by this installation. Fetched from name servers \"{addresses}\"."
+msgstr "DNSKEY met tag {keytag} gebruikt algoritme {algo_num} ({algo_mnemo}) dat niet wordt ondersteund door deze installatie. Opgehaald van naamservers \"{addresses}\"."
 
 msgctxt "DNSSEC:DS10_ERR_MULT_NSEC"
 msgid "Multiple NSEC records when one is expected. Fetched from name servers \"{servers}\"."

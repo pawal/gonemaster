@@ -99,8 +99,8 @@ type PublicAnalysisDomainAddress struct {
 	Status string `json:"status,omitempty"`
 }
 
-// PublicAnalysisDomainEntry is one log entry emitted by a Zonemaster testcase
-// run, carried through with a translated human-readable message so the UI can
+// PublicAnalysisDomainEntry is one log entry emitted by a testcase run,
+// carried through with a translated human-readable message so the UI can
 // render a results view instead of just a bag of tags.
 type PublicAnalysisDomainEntry struct {
 	Timestamp float64 `json:"timestamp"`

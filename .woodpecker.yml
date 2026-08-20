@@ -23,7 +23,7 @@ steps:
       - npm --prefix ui run build
 
   spec_check:
-    image: golang:1.26
+    image: golang:1.27
     commands:
       - go run ./tools/specifications/validate
       - go run ./tools/specifications/generate-tag-catalog --check
@@ -31,12 +31,12 @@ steps:
       - go run ./tools/i18n/check-placeholders
 
   architecture_check:
-    image: golang:1.26
+    image: golang:1.27
     commands:
       - go run ./tools/architecture-check
 
   gofmt_check:
-    image: golang:1.26
+    image: golang:1.27
     commands:
       - |
         set -eu
@@ -48,7 +48,7 @@ steps:
         fi
 
   go_test:
-    image: golang:1.26
+    image: golang:1.27
     depends_on:
       - ui_checks
     commands:
@@ -57,12 +57,12 @@ steps:
   # -race requires cgo, so this step must stay on the Debian-based golang
   # image and must never inherit CGO_ENABLED=0.
   race_test:
-    image: golang:1.26
+    image: golang:1.27
     commands:
       - make race-ci
 
   integration_test:
-    image: golang:1.26
+    image: golang:1.27
     depends_on:
       - go_test
     environment:
@@ -74,7 +74,7 @@ steps:
       - go test ./server/... -count=1 -timeout 120s
 
   build_server_with_ui:
-    image: golang:1.26
+    image: golang:1.27
     depends_on:
       - ui_checks
     commands:
@@ -118,7 +118,7 @@ steps:
       - npm --prefix ui run build
 
   build_artifacts:
-    image: golang:1.26
+    image: golang:1.27
     depends_on:
       - ui_build
     commands:

@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Changed
+
+- build: Go 1.27 is now required
+
 ### Fixed
 
 - i18n: the DNSKEY "algorithm not supported" notices no longer name another project

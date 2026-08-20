@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { layoutChain, truncateName, worstSigTone } from "./dnssecChainLayout.js";
+import { layoutChain, truncateName, worstSigTone, algoMnemonic } from "./dnssecChainLayout.js";
 
 // tipParams returns the params of the tip line with the given i18n key.
 function tipParams(el, k) {
@@ -37,6 +37,29 @@ function secureChain(overrides = {}) {
     ...overrides,
   };
 }
+
+describe("algoMnemonic", () => {
+  // The diagram keeps its own algorithm table, so a new algorithm reads as a
+  // bare number until it is added here. ML-DSA-44 shipped verifying but shown
+  // as "alg 18", which looks unsupported.
+  it("names ML-DSA-44 instead of showing a bare algorithm number", () => {
+    expect(algoMnemonic(18)).toBe("MLDSA44");
+
+    const chain = secureChain();
+    chain.parent.ds[0].algorithm = 18;
+    chain.child.dnskeys[0].algorithm = 18;
+    const g = layoutChain(chain);
+
+    const ds = g.nodes.find((n) => n.kind === "ds");
+    expect(tipParams(ds, "pub.dnssec_chain_tip_algorithm").algo).toBe("MLDSA44 (alg 18)");
+  });
+
+  // Unassigned numbers have no mnemonic, so the raw value is the right
+  // fallback, not a missing entry.
+  it("falls back to the raw number for an unassigned algorithm", () => {
+    expect(algoMnemonic(19)).toBe("19");
+  });
+});
 
 describe("truncateName", () => {
   it("leaves short names untouched", () => {

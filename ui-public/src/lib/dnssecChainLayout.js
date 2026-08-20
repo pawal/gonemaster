@@ -11,10 +11,13 @@ const PAD_BOTTOM = 16;
 const LOOP_PAD = 36; // right margin so a key self-loop is not clipped
 const REF_BOW = 46; // sideways bow of a CDS/CDNSKEY reference edge
 
+// Mnemonics by IANA algorithm number. algoProperties in the engine is the
+// source of truth; an entry missing here renders as a bare number.
 const ALGO = {
   1: "RSAMD5", 3: "DSA", 5: "RSASHA1", 6: "DSA-NSEC3-SHA1", 7: "RSASHA1-NSEC3-SHA1",
   8: "RSASHA256", 10: "RSASHA512", 12: "ECC-GOST", 13: "ECDSAP256SHA256",
-  14: "ECDSAP384SHA384", 15: "ED25519", 16: "ED448", 17: "SM2SM3", 23: "ECC-GOST12",
+  14: "ECDSAP384SHA384", 15: "ED25519", 16: "ED448", 17: "SM2SM3", 18: "MLDSA44",
+  23: "ECC-GOST12",
 };
 
 function algoLabel(algo) {

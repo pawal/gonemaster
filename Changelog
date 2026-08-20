@@ -2,11 +2,22 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.1] - 2026-08-20
+
+Verifies DNSSEC signatures made with ML-DSA-44. Building now requires Go 1.27.
+
+### Added
+
+- engine: ML-DSA-44 (algorithm 18) signatures are verified
 
 ### Changed
 
-- deps: bump codeberg.org/miekg/dns to v0.6.96
+- build: Go 1.27 is now required
+- deps: bump codeberg.org/miekg/dns to v0.6.98
+
+### Fixed
+
+- i18n: the DNSKEY "algorithm not supported" notices no longer name another project
 
 ## [v1.7.0] - 2026-08-17
 

@@ -16,7 +16,7 @@ import (
 // AlgorithmSupported reports whether the signing algorithm can be verified.
 func AlgorithmSupported(algo uint8) bool {
 	switch algo {
-	case dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519:
+	case dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519, dns.MLDSA44:
 		return true
 	default:
 		return false

@@ -11,7 +11,7 @@ import (
 )
 
 func TestAlgorithmSupported(t *testing.T) {
-	supported := []uint8{dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519}
+	supported := []uint8{dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519, dns.MLDSA44}
 	for _, algo := range supported {
 		if !AlgorithmSupported(algo) {
 			t.Errorf("algorithm %d should be supported", algo)

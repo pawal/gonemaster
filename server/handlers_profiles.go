@@ -310,16 +310,16 @@ func storedAndAPIProfileFromRequest(req profileUpsertRequest) (StoredProfile, Pr
 		return StoredProfile{}, Profile{}, err
 	}
 	return StoredProfile{
-			Name:        name,
-			Description: strings.TrimSpace(req.Description),
-			Config:      configJSON,
-			Public:      req.Public,
-		}, Profile{
-			Name:        name,
-			Description: strings.TrimSpace(req.Description),
-			Config:      configMap,
-			Public:      req.Public,
-		}, nil
+		Name:        name,
+		Description: strings.TrimSpace(req.Description),
+		Config:      configJSON,
+		Public:      req.Public,
+	}, Profile{
+		Name:        name,
+		Description: strings.TrimSpace(req.Description),
+		Config:      configMap,
+		Public:      req.Public,
+	}, nil
 }
 
 func apiProfileFromStored(stored StoredProfile) (Profile, error) {

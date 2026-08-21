@@ -5,7 +5,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
@@ -61,103 +61,71 @@ func TestZone05ExpireLowerThanRefreshAndMinimum(t *testing.T) {
 }
 
 func TestZone10ParallelQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(id string) func(context.Context, string, string, string, *ens.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, _ string, qtype string, _ string, _ *ens.QueryOptions) (packet.Packet, error) {
-			if qtype == "SOA" {
-				select {
-				case started <- id:
-				default:
+		gate := tctest.NewGate()
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if q.Type == "SOA" {
+					gate.Arrive(id)
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
+				return packet.Packet{}
 			}
-			return packet.Packet{}, nil
 		}
-	}
 
-	ns1, err := ens.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", hook("ns1"))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", hook("ns2"))
 
-	ns2, err := ens.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
+		tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+			return []ens.Nameserver{ns1, ns2}, nil
+		})
 
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns1, ns2}, nil
-	})
+		z := zonepkg.Zone{Name: dnsname.New("example")}
 
-	z := zonepkg.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var zoneErr error
+		go func() {
+			entries, zoneErr = Zone10(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var zoneErr error
-	go func() {
-		entries, zoneErr = Zone10(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel SOA queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if zoneErr != nil {
 			t.Fatalf("zone10: %v", zoneErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("zone10 did not finish")
-	}
 
-	var order []string
-	var addresses []string
-	for _, entry := range tctest.All(entries, "NO_RESPONSE") {
-		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
-		if ns, ok := entry.Args["ns"].(string); ok {
-			order = append(order, ns)
+		var order []string
+		var addresses []string
+		for _, entry := range tctest.All(entries, "NO_RESPONSE") {
+			tctest.RequireArgShape(t, entry, tctest.ArgShape{})
+			if ns, ok := entry.Args["ns"].(string); ok {
+				order = append(order, ns)
+			}
+			if address, ok := entry.Args["address"].(string); ok {
+				addresses = append(addresses, address)
+			}
 		}
-		if address, ok := entry.Args["address"].(string); ok {
-			addresses = append(addresses, address)
+		if len(order) != 2 {
+			t.Fatalf("expected 2 no-response entries, got %v", order)
 		}
-	}
-	if len(order) != 2 {
-		t.Fatalf("expected 2 no-response entries, got %v", order)
-	}
-	if order[0] != "ns1.example" || order[1] != "ns2.example" {
-		t.Fatalf("expected deterministic nameserver order, got %v", order)
-	}
-	if len(addresses) != 2 {
-		t.Fatalf("expected 2 no-response addresses, got %v", addresses)
-	}
-	if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic address order, got %v", addresses)
-	}
+		if order[0] != "ns1.example" || order[1] != "ns2.example" {
+			t.Fatalf("expected deterministic nameserver order, got %v", order)
+		}
+		if len(addresses) != 2 {
+			t.Fatalf("expected 2 no-response addresses, got %v", addresses)
+		}
+		if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+			t.Fatalf("expected deterministic address order, got %v", addresses)
+		}
+	})
 }
 
 func TestZone10WrongSOAUsesQueryName(t *testing.T) {

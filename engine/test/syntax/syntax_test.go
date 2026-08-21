@@ -5,16 +5,14 @@ import (
 	"net"
 	"strings"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -131,103 +129,58 @@ func TestSyntax05NoResponseSOAQuery(t *testing.T) {
 }
 
 func TestSyntax06ParallelMailServers(t *testing.T) {
-	baseCtx, prof, _ := testhelpers.Context(t)
-	prof.Resolver.Defaults.Parallel = 2
+	synctest.Test(t, func(t *testing.T) {
+		baseCtx, prof, _ := testhelpers.Context(t)
+		prof.Resolver.Defaults.Parallel = 2
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+		r := tctest.Recursor(t, map[string]map[string][]string{
+			".": {"a.root": {"192.0.2.1"}},
+		})
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	root, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	root.SetQueryHook(func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
-		switch {
-		case name == "." && kind == "NS":
-			return nsPacket(".", "a.root"), nil
-		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.example.com."), nil
-		case name == "example.com" && kind == "MX":
-			return mxPacketMulti("example.com", "mail1.example.com.", "mail2.example.com."), nil
-		case name == "mail1.example.com" && kind == "A":
-			select {
-			case started <- "mail1":
+		tctest.NSOn(t, baseCtx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+			name := strings.ToLower(q.Name)
+			kind := strings.ToUpper(q.Type)
+			switch {
+			case name == "." && kind == "NS":
+				return nsPacket(".", "a.root")
+			case name == "." && kind == "SOA":
+				return soaPacket(".", "a.root", "hostmaster.example.com.")
+			case name == "example.com" && kind == "MX":
+				return mxPacketMulti("example.com", "mail1.example.com.", "mail2.example.com.")
+			case name == "mail1.example.com" && kind == "A":
+				gate.Arrive("mail1")
+				return aPacket("mail1.example.com", net.IPv4(192, 0, 2, 10))
+			case name == "mail2.example.com" && kind == "A":
+				gate.Arrive("mail2")
+				return aPacket("mail2.example.com", net.IPv4(192, 0, 2, 11))
 			default:
+				return packet.Packet{}
 			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			return aPacket("mail1.example.com", net.IPv4(192, 0, 2, 10)), nil
-		case name == "mail2.example.com" && kind == "A":
-			select {
-			case started <- "mail2":
-			default:
-			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			return aPacket("mail2.example.com", net.IPv4(192, 0, 2, 11)), nil
-		case name == "mail1.example.com" && kind == "AAAA":
-			return packet.Packet{}, nil
-		case name == "mail2.example.com" && kind == "AAAA":
-			return packet.Packet{}, nil
-		default:
-			return packet.Packet{}, nil
-		}
-	})
+		})
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+		z := tctest.Zone(t, ".", r)
 
-	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var syntaxErr error
+		go func() {
+			entries, syntaxErr = Syntax06(baseCtx, z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var syntaxErr error
-	go func() {
-		entries, syntaxErr = Syntax06(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "mail1", "mail2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case id := <-started:
-			got[id] = true
-		case <-deadline:
-			t.Fatalf("expected parallel mail queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if syntaxErr != nil {
 			t.Fatalf("syntax06: %v", syntaxErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("syntax06 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "RNAME_RFC822_VALID")
+		tctest.RequireTags(t, entries, "RNAME_RFC822_VALID")
+	})
 }
 
 func TestSyntax06MailDomainInvalidUsesProfileLevel(t *testing.T) {

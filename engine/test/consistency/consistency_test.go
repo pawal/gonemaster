@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
@@ -315,99 +315,67 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 }
 
 func TestConsistency04ParallelNSQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(id string, nsNames []string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			if strings.EqualFold(qtype, "NS") {
-				select {
-				case started <- id:
-				default:
+		gate := tctest.NewGate()
+		hook := func(id string, nsNames []string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if strings.EqualFold(q.Type, "NS") {
+					gate.Arrive(id)
+					return nsPacket(q.Name, nsNames)
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
-				return nsPacket(qname, nsNames), nil
+				return packet.Packet{}
 			}
-			return packet.Packet{}, nil
 		}
-	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1", []string{"ns1.example"}))
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", hook("ns1", []string{"ns1.example"}))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", hook("ns2", []string{"ns1.example", "ns2.example"}))
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2", []string{"ns1.example", "ns2.example"}))
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns1}, nil
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns2}, nil
+		})
 
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns1}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns2}, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var consErr error
+		go func() {
+			entries, consErr = Consistency04(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var consErr error
-	go func() {
-		entries, consErr = Consistency04(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel NS queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if consErr != nil {
 			t.Fatalf("consistency04: %v", consErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("consistency04 did not finish")
-	}
 
-	var order []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "NS_SET" {
-			continue
+		var order []string
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "NS_SET" {
+				continue
+			}
+			if name := tctest.FirstServerName(entry.Args); name != "" {
+				order = append(order, name)
+			}
 		}
-		if name := tctest.FirstServerName(entry.Args); name != "" {
-			order = append(order, name)
+		if len(order) != 2 {
+			t.Fatalf("expected 2 NS_SET entries, got %v", order)
 		}
-	}
-	if len(order) != 2 {
-		t.Fatalf("expected 2 NS_SET entries, got %v", order)
-	}
-	if order[0] != "ns1.example" || order[1] != "ns2.example" {
-		t.Fatalf("expected deterministic log order, got %v", order)
-	}
+		if order[0] != "ns1.example" || order[1] != "ns2.example" {
+			t.Fatalf("expected deterministic log order, got %v", order)
+		}
+	})
 }
 
 // Two servers serving the same NS names but with different apex NS RRset TTLs must

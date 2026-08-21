@@ -23,6 +23,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -66,9 +67,7 @@ func TestDNSSEC01AlgoOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
-	if !hasEntryTag(entries, "DS01_DS_ALGO_OK") {
-		t.Fatalf("expected DS01_DS_ALGO_OK")
-	}
+	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
 }
 
 func TestDNSSEC01DigestGOST12(t *testing.T) {
@@ -110,9 +109,7 @@ func TestDNSSEC01DigestGOST12(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
-	if !hasEntryTag(entries, "DS01_DS_ALGO_OK") {
-		t.Fatalf("expected DS01_DS_ALGO_OK for digest algorithm 5 (GOST R 34.11-2012)")
-	}
+	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
 }
 
 func TestDNSSEC01DigestSM3(t *testing.T) {
@@ -154,9 +151,7 @@ func TestDNSSEC01DigestSM3(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
-	if !hasEntryTag(entries, "DS01_DS_ALGO_OK") {
-		t.Fatalf("expected DS01_DS_ALGO_OK for digest algorithm 6 (SM3)")
-	}
+	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
 }
 
 func TestDNSSEC01Algo2Missing(t *testing.T) {
@@ -198,9 +193,7 @@ func TestDNSSEC01Algo2Missing(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
-	if !hasEntryTag(entries, "DS01_DS_ALGO_2_MISSING") {
-		t.Fatalf("expected DS01_DS_ALGO_2_MISSING")
-	}
+	tctest.RequireTags(t, entries, "DS01_DS_ALGO_2_MISSING")
 }
 
 func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
@@ -269,12 +262,8 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
-	if !hasEntryTag(entries, "DS01_DS_ALGO_OK") {
-		t.Fatalf("expected DS01_DS_ALGO_OK from fake DS in undelegated mode")
-	}
-	if hasEntryTag(entries, "DS01_UNDEL_N_NO_UNDEL_DS") {
-		t.Fatalf("did not expect DS01_UNDEL_N_NO_UNDEL_DS when fake DS is provided")
-	}
+	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
+	tctest.RequireNoTag(t, entries, "DS01_UNDEL_N_NO_UNDEL_DS")
 
 	foundFakeSource := false
 	for _, entry := range entries {
@@ -402,10 +391,7 @@ func TestDNSSEC01KeyAlgoPrivate(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
-	entry := firstEntryByTag(entries, "DS01_KEY_ALGO_PRIVATE")
-	if entry == nil {
-		t.Fatalf("expected DS01_KEY_ALGO_PRIVATE for DS algorithm field 253")
-	}
+	entry := tctest.RequireTag(t, entries, "DS01_KEY_ALGO_PRIVATE")
 	if entry.Args["ds_key_algo_num"] != uint8(253) {
 		t.Fatalf("expected ds_key_algo_num 253, got %#v", entry.Args["ds_key_algo_num"])
 	}
@@ -457,17 +443,12 @@ func TestDNSSEC01KeyAlgoOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
-	entry := firstEntryByTag(entries, "DS01_KEY_ALGO_OK")
-	if entry == nil {
-		t.Fatalf("expected DS01_KEY_ALGO_OK for DS algorithm field 13")
-	}
+	entry := tctest.RequireTag(t, entries, "DS01_KEY_ALGO_OK")
 	if entry.Args["ds_key_algo_num"] != uint8(13) {
 		t.Fatalf("expected ds_key_algo_num 13, got %#v", entry.Args["ds_key_algo_num"])
 	}
 	// The digest classification must be unaffected by the new tags.
-	if !hasEntryTag(entries, "DS01_DS_ALGO_OK") {
-		t.Fatalf("expected DS01_DS_ALGO_OK for digest algorithm 2")
-	}
+	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
 }
 
 func TestDNSSEC01KeyAlgoUndelegated(t *testing.T) {
@@ -536,10 +517,7 @@ func TestDNSSEC01KeyAlgoUndelegated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec01: %v", err)
 	}
-	entry := firstEntryByTag(entries, "DS01_KEY_ALGO_PRIVATE")
-	if entry == nil {
-		t.Fatalf("expected DS01_KEY_ALGO_PRIVATE from undelegated fake DS")
-	}
+	entry := tctest.RequireTag(t, entries, "DS01_KEY_ALGO_PRIVATE")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected one server for undelegated fake DS, got %#v", entry.Args["servers"])
@@ -645,9 +623,7 @@ func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 		t.Fatalf("dnssec01 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS01_DS_ALGO_OK") {
-		t.Fatalf("expected DS01_DS_ALGO_OK")
-	}
+	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
 
 	var gotServers []map[string]any
 	for _, entry := range entries {
@@ -723,12 +699,7 @@ func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec02: %v", err)
 	}
-	if !hasEntryTag(entries, "DS02_NO_DNSKEY_FOR_DS") {
-		t.Fatalf("expected DS02_NO_DNSKEY_FOR_DS")
-	}
-	if !hasEntryTag(entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS") {
-		t.Fatalf("expected DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
-	}
+	tctest.RequireTags(t, entries, "DS02_NO_DNSKEY_FOR_DS", "DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
 }
 
 func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
@@ -786,9 +757,7 @@ func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec02: %v", err)
 	}
-	if !hasEntryTag(entries, "DS02_DNSKEY_NOT_FOR_ZONE_SIGNING") {
-		t.Fatalf("expected DS02_DNSKEY_NOT_FOR_ZONE_SIGNING")
-	}
+	tctest.RequireTags(t, entries, "DS02_DNSKEY_NOT_FOR_ZONE_SIGNING")
 }
 
 // signedDNSKEYPair generates a real ECDSAP256SHA256 zone key and a valid
@@ -888,10 +857,7 @@ func TestDNSSEC02DSAlgorithmMismatch(t *testing.T) {
 		t.Fatalf("dnssec02: %v", err)
 	}
 
-	entry := firstEntryByTag(entries, "DS02_DS_ALGO_DNSKEY_MISMATCH")
-	if entry == nil {
-		t.Fatalf("expected DS02_DS_ALGO_DNSKEY_MISMATCH")
-	}
+	entry := tctest.RequireTag(t, entries, "DS02_DS_ALGO_DNSKEY_MISMATCH")
 	if entry.Args["ds_key_algo_num"] != uint8(253) {
 		t.Fatalf("expected ds_key_algo_num 253, got %#v", entry.Args["ds_key_algo_num"])
 	}
@@ -910,16 +876,10 @@ func TestDNSSEC02DSAlgorithmMismatch(t *testing.T) {
 
 	// The mismatched DS must not count as a match even though keytag and
 	// digest agree and the DNSKEY RRSIG is valid.
-	if hasEntryTag(entries, "DS02_MATCH_DS_DNSKEY") {
-		t.Fatalf("did not expect DS02_MATCH_DS_DNSKEY for algorithm-mismatched DS")
-	}
+	tctest.RequireNoTag(t, entries, "DS02_MATCH_DS_DNSKEY")
 	// The specific mismatch tag replaces the generic digest-mismatch tag.
-	if hasEntryTag(entries, "DS02_NO_MATCH_DS_DNSKEY") {
-		t.Fatalf("did not expect DS02_NO_MATCH_DS_DNSKEY for algorithm-mismatched DS")
-	}
-	if !hasEntryTag(entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS") {
-		t.Fatalf("expected DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
-	}
+	tctest.RequireNoTag(t, entries, "DS02_NO_MATCH_DS_DNSKEY")
+	tctest.RequireTags(t, entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
 }
 
 func TestDNSSEC02DSAlgorithmMismatchAlongsideValidDS(t *testing.T) {
@@ -962,15 +922,8 @@ func TestDNSSEC02DSAlgorithmMismatchAlongsideValidDS(t *testing.T) {
 		t.Fatalf("dnssec02: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS02_MATCH_DS_DNSKEY") {
-		t.Fatalf("expected DS02_MATCH_DS_DNSKEY from the correct DS")
-	}
-	if !hasEntryTag(entries, "DS02_DS_ALGO_DNSKEY_MISMATCH") {
-		t.Fatalf("expected DS02_DS_ALGO_DNSKEY_MISMATCH from the mismatched DS")
-	}
-	if hasEntryTag(entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS") {
-		t.Fatalf("did not expect DS02_NO_VALID_DNSKEY_FOR_ANY_DS when a correct DS matches")
-	}
+	tctest.RequireTags(t, entries, "DS02_MATCH_DS_DNSKEY", "DS02_DS_ALGO_DNSKEY_MISMATCH")
+	tctest.RequireNoTag(t, entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
 }
 
 func TestDNSSEC02DSAlgorithmMismatchUnsupportedDigest(t *testing.T) {
@@ -1015,15 +968,9 @@ func TestDNSSEC02DSAlgorithmMismatchUnsupportedDigest(t *testing.T) {
 		t.Fatalf("dnssec02: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS02_DS_ALGO_DNSKEY_MISMATCH") {
-		t.Fatalf("expected DS02_DS_ALGO_DNSKEY_MISMATCH on the unsupported-digest branch")
-	}
-	if hasEntryTag(entries, "DS02_MATCH_DS_DNSKEY") {
-		t.Fatalf("did not expect DS02_MATCH_DS_DNSKEY for algorithm-mismatched DS with unsupported digest")
-	}
-	if !hasEntryTag(entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS") {
-		t.Fatalf("expected DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
-	}
+	tctest.RequireTags(t, entries, "DS02_DS_ALGO_DNSKEY_MISMATCH")
+	tctest.RequireNoTag(t, entries, "DS02_MATCH_DS_DNSKEY")
+	tctest.RequireTags(t, entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
 }
 
 func TestDNSSEC02MatchWithoutAlgorithmMismatch(t *testing.T) {
@@ -1065,15 +1012,8 @@ func TestDNSSEC02MatchWithoutAlgorithmMismatch(t *testing.T) {
 
 	// Happy path: a DS whose algorithm field equals the DNSKEY algorithm
 	// still matches, and the mismatch tag never appears.
-	if !hasEntryTag(entries, "DS02_MATCH_DS_DNSKEY") {
-		t.Fatalf("expected DS02_MATCH_DS_DNSKEY for the correct DS")
-	}
-	if hasEntryTag(entries, "DS02_DS_ALGO_DNSKEY_MISMATCH") {
-		t.Fatalf("did not expect DS02_DS_ALGO_DNSKEY_MISMATCH for the correct DS")
-	}
-	if hasEntryTag(entries, "DS02_NO_VALID_DNSKEY_FOR_ANY_DS") {
-		t.Fatalf("did not expect DS02_NO_VALID_DNSKEY_FOR_ANY_DS for the correct DS")
-	}
+	tctest.RequireTags(t, entries, "DS02_MATCH_DS_DNSKEY")
+	tctest.RequireNoTag(t, entries, "DS02_DS_ALGO_DNSKEY_MISMATCH", "DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
 }
 
 func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
@@ -1188,9 +1128,7 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 		t.Fatalf("dnssec02 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS") {
-		t.Fatalf("expected DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS")
-	}
+	tctest.RequireTags(t, entries, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS")
 
 	var gotAddresses []string
 	for _, entry := range entries {
@@ -1250,13 +1188,7 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec03: %v", err)
 	}
-	if !hasEntryTag(entries, "DS03_NO_NSEC3") {
-		t.Fatalf("expected DS03_NO_NSEC3")
-	}
-	noNSEC3 := firstEntryByTag(entries, "DS03_NO_NSEC3")
-	if noNSEC3 == nil {
-		t.Fatalf("missing DS03_NO_NSEC3 entry")
-	}
+	noNSEC3 := tctest.RequireTag(t, entries, "DS03_NO_NSEC3")
 	noNSEC3Servers, ok := noNSEC3.Args["servers"].([]map[string]any)
 	if !ok || len(noNSEC3Servers) != 1 {
 		t.Fatalf("expected one typed server for DS03_NO_NSEC3, got %#v", noNSEC3.Args["servers"])
@@ -1314,13 +1246,7 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec03: %v", err)
 	}
-	if !hasEntryTag(entries, "DS03_ILLEGAL_HASH_ALGO") {
-		t.Fatalf("expected DS03_ILLEGAL_HASH_ALGO")
-	}
-	illegal := firstEntryByTag(entries, "DS03_ILLEGAL_HASH_ALGO")
-	if illegal == nil {
-		t.Fatalf("missing DS03_ILLEGAL_HASH_ALGO entry")
-	}
+	illegal := tctest.RequireTag(t, entries, "DS03_ILLEGAL_HASH_ALGO")
 	illegalServers, ok := illegal.Args["servers"].([]map[string]any)
 	if !ok || len(illegalServers) != 1 {
 		t.Fatalf("expected one typed server for DS03_ILLEGAL_HASH_ALGO, got %#v", illegal.Args["servers"])
@@ -1431,9 +1357,7 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("dnssec03 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS03_NO_NSEC3") {
-		t.Fatalf("expected DS03_NO_NSEC3")
-	}
+	tctest.RequireTags(t, entries, "DS03_NO_NSEC3")
 
 	var gotServers []map[string]any
 	for _, entry := range entries {
@@ -1508,10 +1432,7 @@ func TestDNSSEC04ExpiredRRSIG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec04: %v", err)
 	}
-	expirationEntry := firstEntryByTag(entries, "RRSIG_EXPIRATION")
-	if expirationEntry == nil {
-		t.Fatalf("expected RRSIG_EXPIRATION")
-	}
+	expirationEntry := tctest.RequireTag(t, entries, "RRSIG_EXPIRATION")
 	dateRaw, ok := expirationEntry.Args["date"].(string)
 	if !ok || dateRaw == "" {
 		t.Fatalf("expected non-empty RFC3339 date string, got %#v", expirationEntry.Args["date"])
@@ -1524,9 +1445,7 @@ func TestDNSSEC04ExpiredRRSIG(t *testing.T) {
 	if !parsed.Equal(wantExpiration) {
 		t.Fatalf("expected expiration %s, got %s", wantExpiration.Format(time.RFC3339), parsed.Format(time.RFC3339))
 	}
-	if !hasEntryTag(entries, "RRSIG_EXPIRED") {
-		t.Fatalf("expected RRSIG_EXPIRED")
-	}
+	tctest.RequireTags(t, entries, "RRSIG_EXPIRED")
 }
 
 func TestDNSSEC04DurationOK(t *testing.T) {
@@ -1578,9 +1497,7 @@ func TestDNSSEC04DurationOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec04: %v", err)
 	}
-	if !hasEntryTag(entries, "DURATION_OK") {
-		t.Fatalf("expected DURATION_OK")
-	}
+	tctest.RequireTags(t, entries, "DURATION_OK")
 }
 
 func TestDNSSEC04ParallelQueries(t *testing.T) {
@@ -1684,9 +1601,7 @@ func TestDNSSEC04ParallelQueries(t *testing.T) {
 		t.Fatalf("dnssec04 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DURATION_OK") {
-		t.Fatalf("expected DURATION_OK")
-	}
+	tctest.RequireTags(t, entries, "DURATION_OK")
 }
 
 func TestDNSSEC05AlgoOK(t *testing.T) {
@@ -1736,9 +1651,7 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
-	if !hasEntryTag(entries, "DS05_ALGO_OK") {
-		t.Fatalf("expected DS05_ALGO_OK")
-	}
+	tctest.RequireTags(t, entries, "DS05_ALGO_OK")
 }
 
 func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
@@ -1788,9 +1701,7 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
-	if !hasEntryTag(entries, "DS05_ALGO_OK") {
-		t.Fatalf("expected DS05_ALGO_OK for algorithm 17 (SM2SM3)")
-	}
+	tctest.RequireTags(t, entries, "DS05_ALGO_OK")
 }
 
 func TestDNSSEC05AlgoMLDSA44(t *testing.T) {
@@ -1840,10 +1751,7 @@ func TestDNSSEC05AlgoMLDSA44(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
-	entry := firstEntryByTag(entries, "DS05_ALGO_OK")
-	if entry == nil {
-		t.Fatalf("expected DS05_ALGO_OK for algorithm 18 (ML-DSA-44)")
-	}
+	entry := tctest.RequireTag(t, entries, "DS05_ALGO_OK")
 	// The tag alone would still pass with a stale algorithm table, so assert the
 	// rendered name too: before algorithm 18 was assigned it fell in the
 	// unassigned range and reported the mnemonic UNASSIGNED.
@@ -1905,9 +1813,7 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
-	if !hasEntryTag(entries, "DS05_ALGO_OK") {
-		t.Fatalf("expected DS05_ALGO_OK for algorithm 23 (ECC-GOST12)")
-	}
+	tctest.RequireTags(t, entries, "DS05_ALGO_OK")
 }
 
 func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
@@ -2007,9 +1913,7 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("dnssec05 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS05_ALGO_OK") {
-		t.Fatalf("expected DS05_ALGO_OK")
-	}
+	tctest.RequireTags(t, entries, "DS05_ALGO_OK")
 
 	var gotServers []map[string]any
 	for _, entry := range entries {
@@ -2077,9 +1981,7 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
-	if !hasEntryTag(entries, "DS05_ZONE_NO_DNSSEC") {
-		t.Fatalf("expected DS05_ZONE_NO_DNSSEC")
-	}
+	tctest.RequireTags(t, entries, "DS05_ZONE_NO_DNSSEC")
 }
 
 func TestDNSSEC05NoResponse(t *testing.T) {
@@ -2124,9 +2026,7 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec05: %v", err)
 	}
-	if !hasEntryTag(entries, "DS05_NO_RESPONSE") {
-		t.Fatalf("expected DS05_NO_RESPONSE")
-	}
+	tctest.RequireTags(t, entries, "DS05_NO_RESPONSE")
 }
 
 func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
@@ -2162,13 +2062,7 @@ func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec06: %v", err)
 	}
-	if !hasEntryTag(entries, "EXTRA_PROCESSING_OK") {
-		t.Fatalf("expected EXTRA_PROCESSING_OK")
-	}
-	entry := firstEntryByTag(entries, "EXTRA_PROCESSING_OK")
-	if entry == nil {
-		t.Fatalf("missing EXTRA_PROCESSING_OK entry")
-	}
+	entry := tctest.RequireTag(t, entries, "EXTRA_PROCESSING_OK")
 	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.30" {
 		t.Fatalf("expected address=192.0.2.30, got %#v", entry.Args["address"])
 	}
@@ -2209,13 +2103,7 @@ func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec06: %v", err)
 	}
-	if !hasEntryTag(entries, "EXTRA_PROCESSING_BROKEN") {
-		t.Fatalf("expected EXTRA_PROCESSING_BROKEN")
-	}
-	entry := firstEntryByTag(entries, "EXTRA_PROCESSING_BROKEN")
-	if entry == nil {
-		t.Fatalf("missing EXTRA_PROCESSING_BROKEN entry")
-	}
+	entry := tctest.RequireTag(t, entries, "EXTRA_PROCESSING_BROKEN")
 	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.31" {
 		t.Fatalf("expected address=192.0.2.31, got %#v", entry.Args["address"])
 	}
@@ -2303,13 +2191,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
-	if !hasEntryTag(entries, "DS07_SIGNED_ON_SERVER") {
-		t.Fatalf("expected DS07_SIGNED_ON_SERVER")
-	}
-	signedOnServer := firstEntryByTag(entries, "DS07_SIGNED_ON_SERVER")
-	if signedOnServer == nil {
-		t.Fatalf("missing DS07_SIGNED_ON_SERVER entry")
-	}
+	signedOnServer := tctest.RequireTag(t, entries, "DS07_SIGNED_ON_SERVER")
 	signedServers, ok := signedOnServer.Args["servers"].([]map[string]any)
 	if !ok || len(signedServers) != 1 {
 		t.Fatalf("expected typed servers for DS07_SIGNED_ON_SERVER, got %#v", signedOnServer.Args["servers"])
@@ -2320,16 +2202,8 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	if _, ok := signedOnServer.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", signedOnServer.Args)
 	}
-	if !hasEntryTag(entries, "DS07_SIGNED") {
-		t.Fatalf("expected DS07_SIGNED")
-	}
-	if !hasEntryTag(entries, "DS07_DS_ON_PARENT_SERVER") {
-		t.Fatalf("expected DS07_DS_ON_PARENT_SERVER")
-	}
-	dsOnParent := firstEntryByTag(entries, "DS07_DS_ON_PARENT_SERVER")
-	if dsOnParent == nil {
-		t.Fatalf("missing DS07_DS_ON_PARENT_SERVER entry")
-	}
+	tctest.RequireTags(t, entries, "DS07_SIGNED", "DS07_DS_ON_PARENT_SERVER")
+	dsOnParent := tctest.RequireTag(t, entries, "DS07_DS_ON_PARENT_SERVER")
 	parentServers, ok := dsOnParent.Args["servers"].([]map[string]any)
 	if !ok || len(parentServers) != 1 {
 		t.Fatalf("expected typed servers for DS07_DS_ON_PARENT_SERVER, got %#v", dsOnParent.Args["servers"])
@@ -2340,9 +2214,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	if _, ok := dsOnParent.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", dsOnParent.Args)
 	}
-	if !hasEntryTag(entries, "DS07_DS_FOR_SIGNED_ZONE") {
-		t.Fatalf("expected DS07_DS_FOR_SIGNED_ZONE")
-	}
+	tctest.RequireTags(t, entries, "DS07_DS_FOR_SIGNED_ZONE")
 }
 
 func TestDNSSEC07ParallelChildQueries(t *testing.T) {
@@ -2470,12 +2342,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 		t.Fatalf("dnssec07 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS07_NOT_SIGNED_ON_SERVER") {
-		t.Fatalf("expected DS07_NOT_SIGNED_ON_SERVER")
-	}
-	if !hasEntryTag(entries, "DS07_NOT_SIGNED") {
-		t.Fatalf("expected DS07_NOT_SIGNED")
-	}
+	tctest.RequireTags(t, entries, "DS07_NOT_SIGNED_ON_SERVER", "DS07_NOT_SIGNED")
 
 	var gotServers []map[string]any
 	for _, entry := range entries {
@@ -2725,13 +2592,7 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
-	if !hasEntryTag(entries, "DS07_NOT_SIGNED_ON_SERVER") {
-		t.Fatalf("expected DS07_NOT_SIGNED_ON_SERVER")
-	}
-	notSignedOnServer := firstEntryByTag(entries, "DS07_NOT_SIGNED_ON_SERVER")
-	if notSignedOnServer == nil {
-		t.Fatalf("missing DS07_NOT_SIGNED_ON_SERVER entry")
-	}
+	notSignedOnServer := tctest.RequireTag(t, entries, "DS07_NOT_SIGNED_ON_SERVER")
 	notSignedServers, ok := notSignedOnServer.Args["servers"].([]map[string]any)
 	if !ok || len(notSignedServers) != 1 {
 		t.Fatalf("expected typed servers for DS07_NOT_SIGNED_ON_SERVER, got %#v", notSignedOnServer.Args["servers"])
@@ -2742,9 +2603,7 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 	if _, ok := notSignedOnServer.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", notSignedOnServer.Args)
 	}
-	if !hasEntryTag(entries, "DS07_NOT_SIGNED") {
-		t.Fatalf("expected DS07_NOT_SIGNED")
-	}
+	tctest.RequireTags(t, entries, "DS07_NOT_SIGNED")
 }
 
 func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
@@ -2851,19 +2710,11 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
-	if !hasEntryTag(entries, "DS07_NO_RESPONSE_DNSKEY") {
-		t.Fatalf("expected DS07_NO_RESPONSE_DNSKEY")
-	}
-	if !hasEntryTag(entries, "DS07_NON_AUTH_RESPONSE_DNSKEY") {
-		t.Fatalf("expected DS07_NON_AUTH_RESPONSE_DNSKEY")
-	}
-	if !hasEntryTag(entries, "DS07_UNEXP_RCODE_RESP_DNSKEY") {
-		t.Fatalf("expected DS07_UNEXP_RCODE_RESP_DNSKEY")
-	}
+	tctest.RequireTags(t, entries, "DS07_NO_RESPONSE_DNSKEY", "DS07_NON_AUTH_RESPONSE_DNSKEY", "DS07_UNEXP_RCODE_RESP_DNSKEY")
 
-	noResp := firstEntryByTag(entries, "DS07_NO_RESPONSE_DNSKEY")
-	noAuth := firstEntryByTag(entries, "DS07_NON_AUTH_RESPONSE_DNSKEY")
-	unexp := firstEntryByTag(entries, "DS07_UNEXP_RCODE_RESP_DNSKEY")
+	noResp := tctest.First(entries, "DS07_NO_RESPONSE_DNSKEY")
+	noAuth := tctest.First(entries, "DS07_NON_AUTH_RESPONSE_DNSKEY")
+	unexp := tctest.First(entries, "DS07_UNEXP_RCODE_RESP_DNSKEY")
 	if noResp == nil || noAuth == nil || unexp == nil {
 		t.Fatalf("expected child outcome entries to be present")
 	}
@@ -2978,13 +2829,7 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
-	if !hasEntryTag(entries, "DS07_NO_DS_ON_PARENT_SERVER") {
-		t.Fatalf("expected DS07_NO_DS_ON_PARENT_SERVER")
-	}
-	noDS := firstEntryByTag(entries, "DS07_NO_DS_ON_PARENT_SERVER")
-	if noDS == nil {
-		t.Fatalf("missing DS07_NO_DS_ON_PARENT_SERVER entry")
-	}
+	noDS := tctest.RequireTag(t, entries, "DS07_NO_DS_ON_PARENT_SERVER")
 	servers, ok := noDS.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected typed servers for DS07_NO_DS_ON_PARENT_SERVER, got %#v", noDS.Args["servers"])
@@ -2995,9 +2840,7 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 	if _, ok := noDS.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", noDS.Args)
 	}
-	if hasEntryTag(entries, "DS07_NO_DS_FOR_SIGNED_ZONE") {
-		t.Fatalf("DS07_NO_DS_FOR_SIGNED_ZONE should not fire when at least one parent serves DS")
-	}
+	tctest.RequireNoTag(t, entries, "DS07_NO_DS_FOR_SIGNED_ZONE")
 }
 
 func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
@@ -3085,12 +2928,8 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec07: %v", err)
 	}
-	if !hasEntryTag(entries, "DS07_NO_DS_FOR_SIGNED_ZONE") {
-		t.Fatalf("expected DS07_NO_DS_FOR_SIGNED_ZONE when no parent serves DS")
-	}
-	if hasEntryTag(entries, "DS07_NO_DS_ON_PARENT_SERVER") {
-		t.Fatalf("DS07_NO_DS_ON_PARENT_SERVER should be suppressed when every parent fails to return DS")
-	}
+	tctest.RequireTags(t, entries, "DS07_NO_DS_FOR_SIGNED_ZONE")
+	tctest.RequireNoTag(t, entries, "DS07_NO_DS_ON_PARENT_SERVER")
 }
 
 func TestDNSSECAllParallelOutputStable(t *testing.T) {
@@ -3176,15 +3015,15 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 	sequentialEntries := runAll(1)
 	parallelEntries := runAll(2)
 
-	if !hasEntryTag(sequentialEntries, "DS07_NOT_SIGNED_ON_SERVER") || !hasEntryTag(sequentialEntries, "DS07_NOT_SIGNED") {
+	if !tctest.Has(sequentialEntries, "DS07_NOT_SIGNED_ON_SERVER") || !tctest.Has(sequentialEntries, "DS07_NOT_SIGNED") {
 		t.Fatalf("expected unsigned DNSSEC07 tags in sequential run")
 	}
-	if !hasEntryTag(parallelEntries, "DS07_NOT_SIGNED_ON_SERVER") || !hasEntryTag(parallelEntries, "DS07_NOT_SIGNED") {
+	if !tctest.Has(parallelEntries, "DS07_NOT_SIGNED_ON_SERVER") || !tctest.Has(parallelEntries, "DS07_NOT_SIGNED") {
 		t.Fatalf("expected unsigned DNSSEC07 tags in parallel run")
 	}
 
-	sequentialNormalized := normalizeEntriesForComparison(sequentialEntries)
-	parallelNormalized := normalizeEntriesForComparison(parallelEntries)
+	sequentialNormalized := tctest.NormalizeStable(sequentialEntries)
+	parallelNormalized := tctest.NormalizeStable(parallelEntries)
 	if len(sequentialNormalized) != len(parallelNormalized) {
 		t.Fatalf("entry count changed with parallelism: sequential=%v parallel=%v", sequentialNormalized, parallelNormalized)
 	}
@@ -3307,19 +3146,14 @@ func TestDNSSECAllUnsignedStaleParentDS(t *testing.T) {
 		t.Fatalf("dnssec all: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS07_NOT_SIGNED") {
-		t.Fatalf("expected DS07_NOT_SIGNED")
-	}
-	if !hasEntryTag(entries, "DS11_DS_BUT_UNSIGNED_ZONE") {
-		t.Fatalf("expected DS11_DS_BUT_UNSIGNED_ZONE for a stale parent DS on an unsigned zone")
-	}
+	tctest.RequireTags(t, entries, "DS07_NOT_SIGNED", "DS11_DS_BUT_UNSIGNED_ZONE")
 	// The short-circuit must still fire after DNSSEC11: only dnssec07 and
 	// dnssec11 may run, so exactly two TEST_CASE_START entries, and no dnssec01
 	// output despite it being enabled.
-	if got := countEntryTag(entries, "TEST_CASE_START"); got != 2 {
+	if got := tctest.Count(entries, "TEST_CASE_START"); got != 2 {
 		t.Fatalf("expected exactly 2 testcases to run (dnssec07, dnssec11), got %d TEST_CASE_START", got)
 	}
-	if hasEntryTag(entries, "DS01_DS_ALGO_OK") || hasEntryTag(entries, "DS01_PARENT_ZONE_NO_DS") {
+	if tctest.Has(entries, "DS01_DS_ALGO_OK") || tctest.Has(entries, "DS01_PARENT_ZONE_NO_DS") {
 		t.Fatalf("dnssec01 ran despite the DS07_NOT_SIGNED short-circuit")
 	}
 }
@@ -3359,16 +3193,9 @@ func TestDNSSECAllUnsignedNoParentDS(t *testing.T) {
 		t.Fatalf("dnssec all: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS07_NOT_SIGNED") {
-		t.Fatalf("expected DS07_NOT_SIGNED")
-	}
-	if !hasEntryTag(entries, "DS11_NO_PARENT_DS") {
-		t.Fatalf("expected DS11_NO_PARENT_DS for an unsigned zone with no parent DS")
-	}
-	if hasEntryTag(entries, "DS11_DS_BUT_UNSIGNED_ZONE") {
-		t.Fatalf("did not expect DS11_DS_BUT_UNSIGNED_ZONE when the parent has no DS")
-	}
-	if got := countEntryTag(entries, "TEST_CASE_START"); got != 2 {
+	tctest.RequireTags(t, entries, "DS07_NOT_SIGNED", "DS11_NO_PARENT_DS")
+	tctest.RequireNoTag(t, entries, "DS11_DS_BUT_UNSIGNED_ZONE")
+	if got := tctest.Count(entries, "TEST_CASE_START"); got != 2 {
 		t.Fatalf("expected exactly 2 testcases to run (dnssec07, dnssec11), got %d TEST_CASE_START", got)
 	}
 }
@@ -3412,9 +3239,7 @@ func TestDNSSEC08MissingRRSIG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec08: %v", err)
 	}
-	if !hasEntryTag(entries, "DS08_MISSING_RRSIG_IN_RESPONSE") {
-		t.Fatalf("expected DS08_MISSING_RRSIG_IN_RESPONSE")
-	}
+	tctest.RequireTags(t, entries, "DS08_MISSING_RRSIG_IN_RESPONSE")
 }
 
 func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
@@ -3460,9 +3285,7 @@ func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec08: %v", err)
 	}
-	if !hasEntryTag(entries, "DS08_DNSKEY_RRSIG_NOT_YET_VALID") {
-		t.Fatalf("expected DS08_DNSKEY_RRSIG_NOT_YET_VALID")
-	}
+	tctest.RequireTags(t, entries, "DS08_DNSKEY_RRSIG_NOT_YET_VALID")
 }
 
 func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
@@ -3508,9 +3331,7 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec08: %v", err)
 	}
-	if !hasEntryTag(entries, "DS08_RRSIG_NOT_VALID_BY_DNSKEY") {
-		t.Fatalf("expected DS08_RRSIG_NOT_VALID_BY_DNSKEY")
-	}
+	tctest.RequireTags(t, entries, "DS08_RRSIG_NOT_VALID_BY_DNSKEY")
 }
 
 func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
@@ -3609,9 +3430,7 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("dnssec08 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS08_MISSING_RRSIG_IN_RESPONSE") {
-		t.Fatalf("expected DS08_MISSING_RRSIG_IN_RESPONSE")
-	}
+	tctest.RequireTags(t, entries, "DS08_MISSING_RRSIG_IN_RESPONSE")
 
 	var gotAddresses []string
 	for _, entry := range entries {
@@ -3677,9 +3496,7 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec09: %v", err)
 	}
-	if !hasEntryTag(entries, "DS09_MISSING_RRSIG_IN_RESPONSE") {
-		t.Fatalf("expected DS09_MISSING_RRSIG_IN_RESPONSE")
-	}
+	tctest.RequireTags(t, entries, "DS09_MISSING_RRSIG_IN_RESPONSE")
 }
 
 // lvKSK42018Pub is the real .lv KSK public key (RSASHA256, 2048-bit, public
@@ -3757,9 +3574,7 @@ func TestDNSSEC02RSAExponentUnsupported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec02: %v", err)
 	}
-	if !hasEntryTag(entries, "DS02_RSA_EXPONENT_UNSUPPORTED") {
-		t.Fatalf("expected DS02_RSA_EXPONENT_UNSUPPORTED")
-	}
+	tctest.RequireTags(t, entries, "DS02_RSA_EXPONENT_UNSUPPORTED")
 	// None of the false-failure tags may fire for the indeterminate key.
 	for _, tag := range []string{
 		"DS02_RRSIG_NOT_VALID_BY_DNSKEY",
@@ -3767,7 +3582,7 @@ func TestDNSSEC02RSAExponentUnsupported(t *testing.T) {
 		"DS02_NO_MATCHING_DNSKEY_RRSIG",
 		"DS02_NO_VALID_DNSKEY_FOR_ANY_DS",
 	} {
-		if hasEntryTag(entries, tag) {
+		if tctest.Has(entries, tag) {
 			t.Errorf("did not expect %s for a large-exponent DS-linked key", tag)
 		}
 	}
@@ -3837,12 +3652,8 @@ func TestDNSSEC02RRSIGNotValidByDNSKEYNormalExponent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec02: %v", err)
 	}
-	if hasEntryTag(entries, "DS02_RSA_EXPONENT_UNSUPPORTED") {
-		t.Fatalf("did not expect DS02_RSA_EXPONENT_UNSUPPORTED for a normal 65537 exponent")
-	}
-	if !hasEntryTag(entries, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS") {
-		t.Fatalf("expected DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS for a genuinely bad signature")
-	}
+	tctest.RequireNoTag(t, entries, "DS02_RSA_EXPONENT_UNSUPPORTED")
+	tctest.RequireTags(t, entries, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS")
 }
 
 // DNSSEC08 must reclassify the same way: a DNSKEY RRSIG that cannot be checked
@@ -3887,11 +3698,9 @@ func TestDNSSEC08RSAExponentUnsupported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec08: %v", err)
 	}
-	if !hasEntryTag(entries, "DS08_RSA_EXPONENT_UNSUPPORTED") {
-		t.Fatalf("expected DS08_RSA_EXPONENT_UNSUPPORTED")
-	}
+	tctest.RequireTags(t, entries, "DS08_RSA_EXPONENT_UNSUPPORTED")
 	for _, tag := range []string{"DS08_RRSIG_NOT_VALID_BY_DNSKEY", "DS08_DNSKEY_RRSIG_VALID"} {
-		if hasEntryTag(entries, tag) {
+		if tctest.Has(entries, tag) {
 			t.Errorf("did not expect %s for a large-exponent key", tag)
 		}
 	}
@@ -3943,11 +3752,9 @@ func TestDNSSEC09RSAExponentUnsupported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec09: %v", err)
 	}
-	if !hasEntryTag(entries, "DS09_RSA_EXPONENT_UNSUPPORTED") {
-		t.Fatalf("expected DS09_RSA_EXPONENT_UNSUPPORTED")
-	}
+	tctest.RequireTags(t, entries, "DS09_RSA_EXPONENT_UNSUPPORTED")
 	for _, tag := range []string{"DS09_RRSIG_NOT_VALID_BY_DNSKEY", "DS09_SOA_RRSIG_VALID"} {
-		if hasEntryTag(entries, tag) {
+		if tctest.Has(entries, tag) {
 			t.Errorf("did not expect %s for a large-exponent key", tag)
 		}
 	}
@@ -4053,9 +3860,7 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 		t.Fatalf("dnssec09 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS09_MISSING_RRSIG_IN_RESPONSE") {
-		t.Fatalf("expected DS09_MISSING_RRSIG_IN_RESPONSE")
-	}
+	tctest.RequireTags(t, entries, "DS09_MISSING_RRSIG_IN_RESPONSE")
 
 	var gotAddresses []string
 	for _, entry := range entries {
@@ -4150,9 +3955,7 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec10: %v", err)
 	}
-	if !hasEntryTag(entries, "DS10_NSEC_MISSING_SIGNATURE") {
-		t.Fatalf("expected DS10_NSEC_MISSING_SIGNATURE")
-	}
+	tctest.RequireTags(t, entries, "DS10_NSEC_MISSING_SIGNATURE")
 }
 
 func TestDNSSEC10ParallelQueries(t *testing.T) {
@@ -4265,9 +4068,7 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 		t.Fatalf("dnssec10 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS10_NSEC_QUERY_RESPONSE_ERR") {
-		t.Fatalf("expected DS10_NSEC_QUERY_RESPONSE_ERR")
-	}
+	tctest.RequireTags(t, entries, "DS10_NSEC_QUERY_RESPONSE_ERR")
 
 	var gotServers []map[string]any
 	for _, entry := range entries {
@@ -4380,12 +4181,7 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec10: %v", err)
 	}
-	if hasEntryTag(entries, "DS10_NSEC3PARAM_MISMATCHES_APEX") {
-		t.Fatalf("unexpected DS10_NSEC3PARAM_MISMATCHES_APEX when all NSEC3PARAM RRs are at apex")
-	}
-	if hasEntryTag(entries, "DS10_ERR_MULT_NSEC3PARAM") {
-		t.Fatalf("retired tag DS10_ERR_MULT_NSEC3PARAM must not be emitted")
-	}
+	tctest.RequireNoTag(t, entries, "DS10_NSEC3PARAM_MISMATCHES_APEX", "DS10_ERR_MULT_NSEC3PARAM")
 }
 
 // Two NSEC3PARAM RRs where one has the wrong owner must trigger
@@ -4469,37 +4265,8 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec10: %v", err)
 	}
-	if !hasEntryTag(entries, "DS10_NSEC3PARAM_MISMATCHES_APEX") {
-		t.Fatalf("expected DS10_NSEC3PARAM_MISMATCHES_APEX when one of multiple NSEC3PARAM RRs is off-apex")
-	}
-	if hasEntryTag(entries, "DS10_ERR_MULT_NSEC3PARAM") {
-		t.Fatalf("retired tag DS10_ERR_MULT_NSEC3PARAM must not be emitted")
-	}
-}
-
-// serverRows normalises the `servers` log argument (which `setTypedServersFromNames`
-// can construct as either []any{map[string]any{...}} or
-// []map[string]any{...}, depending on the call site) to a single shape so
-// tests can read it. Each row is the {ns, address} object.
-func serverRows(t *testing.T, v any) []map[string]any {
-	t.Helper()
-	switch s := v.(type) {
-	case []map[string]any:
-		return s
-	case []any:
-		out := make([]map[string]any, 0, len(s))
-		for _, item := range s {
-			row, ok := item.(map[string]any)
-			if !ok {
-				t.Fatalf("server entry has unexpected type %T (%#v)", item, item)
-			}
-			out = append(out, row)
-		}
-		return out
-	default:
-		t.Fatalf("'servers' arg has unexpected type %T (%#v)", v, v)
-		return nil
-	}
+	tctest.RequireTags(t, entries, "DS10_NSEC3PARAM_MISMATCHES_APEX")
+	tctest.RequireNoTag(t, entries, "DS10_ERR_MULT_NSEC3PARAM")
 }
 
 // nsecAuthorityNSECResponse builds a NODATA response to an NSEC query that
@@ -4619,20 +4386,11 @@ func TestDNSSEC10NonstandardNSECResponseEmitted(t *testing.T) {
 		t.Fatalf("dnssec10: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE") {
-		t.Fatalf("expected DS10_NONSTANDARD_NSEC_RESPONSE when NSEC arrives in authority section")
-	}
-	if hasEntryTag(entries, "DS10_INCONSISTENT_NSEC") {
-		t.Fatalf("DS10_INCONSISTENT_NSEC must not fire for a single NSEC-in-authority responder")
-	}
-	if !hasEntryTag(entries, "DS10_HAS_NSEC") {
-		t.Fatalf("authority-section NSEC must still count as NSEC evidence (DS10_HAS_NSEC)")
-	}
+	tctest.RequireTags(t, entries, "DS10_NONSTANDARD_NSEC_RESPONSE")
+	tctest.RequireNoTag(t, entries, "DS10_INCONSISTENT_NSEC")
+	tctest.RequireTags(t, entries, "DS10_HAS_NSEC")
 
-	entry := firstEntryByTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE")
-	if entry == nil {
-		t.Fatalf("entry lookup returned nil after positive hasEntryTag")
-	}
+	entry := tctest.RequireTag(t, entries, "DS10_NONSTANDARD_NSEC_RESPONSE")
 	if !strings.EqualFold(entry.Level(), "NOTICE") {
 		t.Fatalf("DS10_NONSTANDARD_NSEC_RESPONSE level = %q, want NOTICE", entry.Level())
 	}
@@ -4640,7 +4398,7 @@ func TestDNSSEC10NonstandardNSECResponseEmitted(t *testing.T) {
 	if !ok {
 		t.Fatalf("DS10_NONSTANDARD_NSEC_RESPONSE missing 'servers' arg, got args=%v", entry.Args)
 	}
-	rows := serverRows(t, servers)
+	rows := tctest.Servers(t, servers)
 	if len(rows) != 1 {
 		t.Fatalf("DS10_NONSTANDARD_NSEC_RESPONSE 'servers' length = %d, want 1 (got %#v)", len(rows), servers)
 	}
@@ -4707,12 +4465,8 @@ func TestDNSSEC10NonstandardNSECResponseNotEmittedForStandard(t *testing.T) {
 		t.Fatalf("dnssec10: %v", err)
 	}
 
-	if hasEntryTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE") {
-		t.Fatalf("DS10_NONSTANDARD_NSEC_RESPONSE must not fire for conventional NSEC-in-answer responders")
-	}
-	if !hasEntryTag(entries, "DS10_HAS_NSEC") {
-		t.Fatalf("expected DS10_HAS_NSEC for a normal NSEC zone")
-	}
+	tctest.RequireNoTag(t, entries, "DS10_NONSTANDARD_NSEC_RESPONSE")
+	tctest.RequireTags(t, entries, "DS10_HAS_NSEC")
 }
 
 // TestDNSSEC10NonstandardNSECResponseMixedServers checks the mixed case: one
@@ -4795,18 +4549,12 @@ func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
 		t.Fatalf("dnssec10: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE") {
-		t.Fatalf("expected DS10_NONSTANDARD_NSEC_RESPONSE for the authority-section responder")
-	}
-	if hasEntryTag(entries, "DS10_INCONSISTENT_NSEC") {
-		t.Fatalf("DS10_INCONSISTENT_NSEC must not fire when authority-section NSEC is treated as equivalent evidence")
-	}
-	if !hasEntryTag(entries, "DS10_HAS_NSEC") {
-		t.Fatalf("expected DS10_HAS_NSEC when both nameservers present NSEC evidence")
-	}
+	tctest.RequireTags(t, entries, "DS10_NONSTANDARD_NSEC_RESPONSE")
+	tctest.RequireNoTag(t, entries, "DS10_INCONSISTENT_NSEC")
+	tctest.RequireTags(t, entries, "DS10_HAS_NSEC")
 
-	entry := firstEntryByTag(entries, "DS10_NONSTANDARD_NSEC_RESPONSE")
-	rows := serverRows(t, entry.Args["servers"])
+	entry := tctest.First(entries, "DS10_NONSTANDARD_NSEC_RESPONSE")
+	rows := tctest.Servers(t, entry.Args["servers"])
 	if len(rows) != 1 {
 		t.Fatalf("'servers' length = %d, want 1 (only the non-standard responder)", len(rows))
 	}
@@ -4925,15 +4673,7 @@ func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 		t.Fatalf("dnssec11 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS11_INCONSISTENT_DS") {
-		t.Fatalf("expected DS11_INCONSISTENT_DS")
-	}
-	if !hasEntryTag(entries, "DS11_PARENT_WITHOUT_DS") {
-		t.Fatalf("expected DS11_PARENT_WITHOUT_DS")
-	}
-	if !hasEntryTag(entries, "DS11_PARENT_WITH_DS") {
-		t.Fatalf("expected DS11_PARENT_WITH_DS")
-	}
+	tctest.RequireTags(t, entries, "DS11_INCONSISTENT_DS", "DS11_PARENT_WITHOUT_DS", "DS11_PARENT_WITH_DS")
 }
 
 func TestDNSSEC11ParallelChildQueries(t *testing.T) {
@@ -5050,15 +4790,7 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 		t.Fatalf("dnssec11 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS11_INCONSISTENT_SIGNED_ZONE") {
-		t.Fatalf("expected DS11_INCONSISTENT_SIGNED_ZONE")
-	}
-	if !hasEntryTag(entries, "DS11_NS_WITH_UNSIGNED_ZONE") {
-		t.Fatalf("expected DS11_NS_WITH_UNSIGNED_ZONE")
-	}
-	if !hasEntryTag(entries, "DS11_NS_WITH_SIGNED_ZONE") {
-		t.Fatalf("expected DS11_NS_WITH_SIGNED_ZONE")
-	}
+	tctest.RequireTags(t, entries, "DS11_INCONSISTENT_SIGNED_ZONE", "DS11_NS_WITH_UNSIGNED_ZONE", "DS11_NS_WITH_SIGNED_ZONE")
 }
 
 func TestDNSSEC11InconsistentDS(t *testing.T) {
@@ -5114,15 +4846,7 @@ func TestDNSSEC11InconsistentDS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec11: %v", err)
 	}
-	if !hasEntryTag(entries, "DS11_INCONSISTENT_DS") {
-		t.Fatalf("expected DS11_INCONSISTENT_DS")
-	}
-	if !hasEntryTag(entries, "DS11_PARENT_WITHOUT_DS") {
-		t.Fatalf("expected DS11_PARENT_WITHOUT_DS")
-	}
-	if !hasEntryTag(entries, "DS11_PARENT_WITH_DS") {
-		t.Fatalf("expected DS11_PARENT_WITH_DS")
-	}
+	tctest.RequireTags(t, entries, "DS11_INCONSISTENT_DS", "DS11_PARENT_WITHOUT_DS", "DS11_PARENT_WITH_DS")
 }
 
 func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
@@ -5182,9 +4906,7 @@ func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec11: %v", err)
 	}
-	if !hasEntryTag(entries, "DS11_DS_BUT_UNSIGNED_ZONE") {
-		t.Fatalf("expected DS11_DS_BUT_UNSIGNED_ZONE")
-	}
+	tctest.RequireTags(t, entries, "DS11_DS_BUT_UNSIGNED_ZONE")
 }
 
 func TestDNSSEC13AlgoNotSigned(t *testing.T) {
@@ -5245,15 +4967,7 @@ func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec13: %v", err)
 	}
-	if !hasEntryTag(entries, "DS13_ALGO_NOT_SIGNED_DNSKEY") {
-		t.Fatalf("expected DS13_ALGO_NOT_SIGNED_DNSKEY")
-	}
-	if !hasEntryTag(entries, "DS13_ALGO_NOT_SIGNED_SOA") {
-		t.Fatalf("expected DS13_ALGO_NOT_SIGNED_SOA")
-	}
-	if !hasEntryTag(entries, "DS13_ALGO_NOT_SIGNED_NS") {
-		t.Fatalf("expected DS13_ALGO_NOT_SIGNED_NS")
-	}
+	tctest.RequireTags(t, entries, "DS13_ALGO_NOT_SIGNED_DNSKEY", "DS13_ALGO_NOT_SIGNED_SOA", "DS13_ALGO_NOT_SIGNED_NS")
 }
 
 func TestDNSSEC13ParallelQueries(t *testing.T) {
@@ -5368,12 +5082,7 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 		t.Fatalf("dnssec13 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS13_ALGO_NOT_SIGNED_SOA") {
-		t.Fatalf("expected DS13_ALGO_NOT_SIGNED_SOA")
-	}
-	if !hasEntryTag(entries, "DS13_ALGO_NOT_SIGNED_NS") {
-		t.Fatalf("expected DS13_ALGO_NOT_SIGNED_NS")
-	}
+	tctest.RequireTags(t, entries, "DS13_ALGO_NOT_SIGNED_SOA", "DS13_ALGO_NOT_SIGNED_NS")
 
 	var gotAddresses []string
 	for _, entry := range entries {
@@ -5437,9 +5146,7 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec14: %v", err)
 	}
-	if !hasEntryTag(entries, "DNSKEY_SMALLER_THAN_REC") {
-		t.Fatalf("expected DNSKEY_SMALLER_THAN_REC")
-	}
+	tctest.RequireTags(t, entries, "DNSKEY_SMALLER_THAN_REC")
 }
 
 func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
@@ -5540,9 +5247,7 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 		t.Fatalf("dnssec14 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DNSKEY_SMALLER_THAN_REC") {
-		t.Fatalf("expected DNSKEY_SMALLER_THAN_REC")
-	}
+	tctest.RequireTags(t, entries, "DNSKEY_SMALLER_THAN_REC")
 }
 
 func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
@@ -5578,22 +5283,8 @@ func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec14: %v", err)
 	}
-	entry := firstEntryByTag(entries, "NO_RESPONSE")
-	if entry == nil {
-		t.Fatalf("expected NO_RESPONSE")
-	}
-	if _, ok := entry.Args["arg_schema"]; ok {
-		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-	}
-	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
-		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
-	}
-	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
-		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
-	}
-	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.141" {
-		t.Fatalf("expected address=192.0.2.141, got %#v", entry.Args["address"])
-	}
+	entry := tctest.RequireTag(t, entries, "NO_RESPONSE")
+	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "ns1.example", Address: "192.0.2.141"})
 }
 
 func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
@@ -5629,22 +5320,8 @@ func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec14: %v", err)
 	}
-	entry := firstEntryByTag(entries, "NO_RESPONSE_DNSKEY")
-	if entry == nil {
-		t.Fatalf("expected NO_RESPONSE_DNSKEY")
-	}
-	if _, ok := entry.Args["arg_schema"]; ok {
-		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-	}
-	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
-		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
-	}
-	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
-		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
-	}
-	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.142" {
-		t.Fatalf("expected address=192.0.2.142, got %#v", entry.Args["address"])
-	}
+	entry := tctest.RequireTag(t, entries, "NO_RESPONSE_DNSKEY")
+	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "ns1.example", Address: "192.0.2.142"})
 }
 
 func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
@@ -5676,22 +5353,8 @@ func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec14: %v", err)
 	}
-	entry := firstEntryByTag(entries, "IPV4_DISABLED")
-	if entry == nil {
-		t.Fatalf("expected IPV4_DISABLED")
-	}
-	if _, ok := entry.Args["arg_schema"]; ok {
-		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-	}
-	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "ns1.example" {
-		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
-	}
-	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
-		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
-	}
-	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.143" {
-		t.Fatalf("expected address=192.0.2.143, got %#v", entry.Args["address"])
-	}
+	entry := tctest.RequireTag(t, entries, "IPV4_DISABLED")
+	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "ns1.example", Address: "192.0.2.143"})
 }
 
 func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
@@ -5731,9 +5394,7 @@ func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec15: %v", err)
 	}
-	if !hasEntryTag(entries, "DS15_NO_CDS_CDNSKEY") {
-		t.Fatalf("expected DS15_NO_CDS_CDNSKEY")
-	}
+	tctest.RequireTags(t, entries, "DS15_NO_CDS_CDNSKEY")
 }
 
 func TestDNSSEC15ParallelQueries(t *testing.T) {
@@ -5836,9 +5497,7 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 		t.Fatalf("dnssec15 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS15_HAS_CDS_NO_CDNSKEY") {
-		t.Fatalf("expected DS15_HAS_CDS_NO_CDNSKEY")
-	}
+	tctest.RequireTags(t, entries, "DS15_HAS_CDS_NO_CDNSKEY")
 
 	var gotAddresses []string
 	for _, entry := range entries {
@@ -5929,16 +5588,11 @@ func TestDNSSEC15IgnoresNonMUSTCDSDigest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec15: %v", err)
 	}
-	if hasEntryTag(entries, "DS15_INCONSISTENT_CDS") {
-		t.Fatalf("DS15_INCONSISTENT_CDS must not fire when only the SHA-1 CDS diverges across servers (RFC 9975 digest filter)")
-	}
+	tctest.RequireNoTag(t, entries, "DS15_INCONSISTENT_CDS")
 	// The filter only silences the false-positive ERROR. The operator still
 	// needs to know they published an inert record, so the NOTICE must fire,
 	// and it must name the IP of the server that returned the SHA-1 CDS.
-	notice := firstEntryByTag(entries, "DS15_CDS_NON_MUST_DIGEST")
-	if notice == nil {
-		t.Fatalf("DS15_CDS_NON_MUST_DIGEST must fire when a server returns a CDS with a non-MUST digest type")
-	}
+	notice := tctest.RequireTag(t, entries, "DS15_CDS_NON_MUST_DIGEST")
 	gotAddresses, ok := notice.Args["addresses"].([]string)
 	if !ok {
 		t.Fatalf("DS15_CDS_NON_MUST_DIGEST addresses arg has unexpected type: %#v", notice.Args["addresses"])
@@ -6010,9 +5664,7 @@ func TestDNSSEC15InconsistencyOnMUSTCDSDigest(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec15: %v", err)
 	}
-	if !hasEntryTag(entries, "DS15_INCONSISTENT_CDS") {
-		t.Fatalf("expected DS15_INCONSISTENT_CDS when MUST-digest CDS records diverge across servers")
-	}
+	tctest.RequireTags(t, entries, "DS15_INCONSISTENT_CDS")
 }
 
 // TestDNSSEC15MismatchOnAlgorithmDifference verifies that the CDS/CDNSKEY
@@ -6073,9 +5725,7 @@ func TestDNSSEC15MismatchOnAlgorithmDifference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec15: %v", err)
 	}
-	if !hasEntryTag(entries, "DS15_MISMATCH_CDS_CDNSKEY") {
-		t.Fatalf("expected DS15_MISMATCH_CDS_CDNSKEY when CDS and CDNSKEY share a key tag but use different DNSSEC algorithms")
-	}
+	tctest.RequireTags(t, entries, "DS15_MISMATCH_CDS_CDNSKEY")
 }
 
 func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
@@ -6121,9 +5771,7 @@ func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec16: %v", err)
 	}
-	if !hasEntryTag(entries, "DS16_CDS_WITHOUT_DNSKEY") {
-		t.Fatalf("expected DS16_CDS_WITHOUT_DNSKEY")
-	}
+	tctest.RequireTags(t, entries, "DS16_CDS_WITHOUT_DNSKEY")
 }
 
 func TestDNSSEC16ParallelQueries(t *testing.T) {
@@ -6226,9 +5874,7 @@ func TestDNSSEC16ParallelQueries(t *testing.T) {
 		t.Fatalf("dnssec16 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS16_CDS_WITHOUT_DNSKEY") {
-		t.Fatalf("expected DS16_CDS_WITHOUT_DNSKEY")
-	}
+	tctest.RequireTags(t, entries, "DS16_CDS_WITHOUT_DNSKEY")
 
 	var gotAddresses []string
 	for _, entry := range entries {
@@ -6294,9 +5940,7 @@ func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec17: %v", err)
 	}
-	if !hasEntryTag(entries, "DS17_CDNSKEY_WITHOUT_DNSKEY") {
-		t.Fatalf("expected DS17_CDNSKEY_WITHOUT_DNSKEY")
-	}
+	tctest.RequireTags(t, entries, "DS17_CDNSKEY_WITHOUT_DNSKEY")
 }
 
 func TestDNSSEC17ParallelQueries(t *testing.T) {
@@ -6399,9 +6043,7 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 		t.Fatalf("dnssec17 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS17_CDNSKEY_WITHOUT_DNSKEY") {
-		t.Fatalf("expected DS17_CDNSKEY_WITHOUT_DNSKEY")
-	}
+	tctest.RequireTags(t, entries, "DS17_CDNSKEY_WITHOUT_DNSKEY")
 
 	var gotAddresses []string
 	for _, entry := range entries {
@@ -6503,12 +6145,7 @@ func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_NO_MATCH_CDS_RRSIG_DS") {
-		t.Fatalf("expected DS18_NO_MATCH_CDS_RRSIG_DS")
-	}
-	if !hasEntryTag(entries, "DS18_NO_MATCH_CDNSKEY_RRSIG_DS") {
-		t.Fatalf("expected DS18_NO_MATCH_CDNSKEY_RRSIG_DS")
-	}
+	tctest.RequireTags(t, entries, "DS18_NO_MATCH_CDS_RRSIG_DS", "DS18_NO_MATCH_CDNSKEY_RRSIG_DS")
 }
 
 func TestDNSSEC18ParallelQueries(t *testing.T) {
@@ -6648,12 +6285,7 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 		t.Fatalf("dnssec18 did not finish")
 	}
 
-	if !hasEntryTag(entries, "DS18_NO_MATCH_CDS_RRSIG_DS") {
-		t.Fatalf("expected DS18_NO_MATCH_CDS_RRSIG_DS")
-	}
-	if !hasEntryTag(entries, "DS18_NO_MATCH_CDNSKEY_RRSIG_DS") {
-		t.Fatalf("expected DS18_NO_MATCH_CDNSKEY_RRSIG_DS")
-	}
+	tctest.RequireTags(t, entries, "DS18_NO_MATCH_CDS_RRSIG_DS", "DS18_NO_MATCH_CDNSKEY_RRSIG_DS")
 
 	var gotAddresses []string
 	for _, entry := range entries {
@@ -6766,7 +6398,7 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 		if err != nil {
 			t.Fatalf("dnssec18: %v", err)
 		}
-		if !hasEntryTag(entries, "DS18_NO_MATCH_CDS_RRSIG_DS") || !hasEntryTag(entries, "DS18_NO_MATCH_CDNSKEY_RRSIG_DS") {
+		if !tctest.Has(entries, "DS18_NO_MATCH_CDS_RRSIG_DS") || !tctest.Has(entries, "DS18_NO_MATCH_CDNSKEY_RRSIG_DS") {
 			t.Fatalf("expected no-match tags in dnssec18 output")
 		}
 		return entries
@@ -6775,8 +6407,8 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 	sequentialEntries := runDNSSEC18(1)
 	parallelEntries := runDNSSEC18(2)
 
-	sequentialNormalized := normalizeEntriesForComparison(sequentialEntries)
-	parallelNormalized := normalizeEntriesForComparison(parallelEntries)
+	sequentialNormalized := tctest.NormalizeStable(sequentialEntries)
+	parallelNormalized := tctest.NormalizeStable(parallelEntries)
 	if len(sequentialNormalized) != len(parallelNormalized) {
 		t.Fatalf("entry count changed with parallelism: sequential=%v parallel=%v", sequentialNormalized, parallelNormalized)
 	}
@@ -6885,13 +6517,9 @@ func TestDNSSEC18CDSMatchesDS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_CDS_MATCHES_DS") {
-		t.Fatal("expected DS18_CDS_MATCHES_DS")
-	}
-	if hasEntryTag(entries, "DS18_CDS_ROLLOVER_SIGNALED") {
-		t.Fatal("unexpected DS18_CDS_ROLLOVER_SIGNALED when CDS matches DS")
-	}
-	e := firstEntryByTag(entries, "DS18_CDS_MATCHES_DS")
+	tctest.RequireTags(t, entries, "DS18_CDS_MATCHES_DS")
+	tctest.RequireNoTag(t, entries, "DS18_CDS_ROLLOVER_SIGNALED")
+	e := tctest.First(entries, "DS18_CDS_MATCHES_DS")
 	cdsKTs, ok := e.Args["cds_keytags"].([]uint16)
 	if !ok || len(cdsKTs) != 1 || cdsKTs[0] != keytag {
 		t.Errorf("expected cds_keytags=[%d], got %v", keytag, e.Args["cds_keytags"])
@@ -6952,14 +6580,10 @@ func TestDNSSEC18CDSRolloverSignaled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_CDS_ROLLOVER_SIGNALED") {
-		t.Fatal("expected DS18_CDS_ROLLOVER_SIGNALED")
-	}
-	if hasEntryTag(entries, "DS18_CDS_MATCHES_DS") {
-		t.Fatal("unexpected DS18_CDS_MATCHES_DS when CDS differs from DS")
-	}
+	tctest.RequireTags(t, entries, "DS18_CDS_ROLLOVER_SIGNALED")
+	tctest.RequireNoTag(t, entries, "DS18_CDS_MATCHES_DS")
 	// Verify keytag args are present and correct.
-	e := firstEntryByTag(entries, "DS18_CDS_ROLLOVER_SIGNALED")
+	e := tctest.First(entries, "DS18_CDS_ROLLOVER_SIGNALED")
 	if e == nil {
 		t.Fatal("no entry for DS18_CDS_ROLLOVER_SIGNALED")
 	}
@@ -7012,13 +6636,9 @@ func TestDNSSEC18CDNSKEYMatchesDS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_CDNSKEY_MATCHES_DS") {
-		t.Fatal("expected DS18_CDNSKEY_MATCHES_DS")
-	}
-	if hasEntryTag(entries, "DS18_CDNSKEY_ROLLOVER_SIGNALED") {
-		t.Fatal("unexpected DS18_CDNSKEY_ROLLOVER_SIGNALED when CDNSKEY matches DS")
-	}
-	e := firstEntryByTag(entries, "DS18_CDNSKEY_MATCHES_DS")
+	tctest.RequireTags(t, entries, "DS18_CDNSKEY_MATCHES_DS")
+	tctest.RequireNoTag(t, entries, "DS18_CDNSKEY_ROLLOVER_SIGNALED")
+	e := tctest.First(entries, "DS18_CDNSKEY_MATCHES_DS")
 	cdnsKTs, ok := e.Args["cdnskey_keytags"].([]uint16)
 	if !ok || len(cdnsKTs) != 1 || cdnsKTs[0] != keytag {
 		t.Errorf("expected cdnskey_keytags=[%d], got %v", keytag, e.Args["cdnskey_keytags"])
@@ -7071,12 +6691,8 @@ func TestDNSSEC18CDNSKEYRolloverSignaled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_CDNSKEY_ROLLOVER_SIGNALED") {
-		t.Fatal("expected DS18_CDNSKEY_ROLLOVER_SIGNALED")
-	}
-	if hasEntryTag(entries, "DS18_CDNSKEY_MATCHES_DS") {
-		t.Fatal("unexpected DS18_CDNSKEY_MATCHES_DS when CDNSKEY differs from DS")
-	}
+	tctest.RequireTags(t, entries, "DS18_CDNSKEY_ROLLOVER_SIGNALED")
+	tctest.RequireNoTag(t, entries, "DS18_CDNSKEY_MATCHES_DS")
 }
 
 func TestDNSSEC18RolloverEvidenceMultiKSK(t *testing.T) {
@@ -7123,19 +6739,13 @@ func TestDNSSEC18RolloverEvidenceMultiKSK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_MULTI_KSK") {
-		t.Fatal("expected DS18_ROLLOVER_EVIDENCE_MULTI_KSK")
-	}
-	e := firstEntryByTag(entries, "DS18_ROLLOVER_EVIDENCE_MULTI_KSK")
+	e := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_MULTI_KSK")
 	kts, ok := e.Args["keytags"].([]uint16)
 	if !ok || len(kts) != 2 {
 		t.Errorf("expected keytags with 2 entries, got %v", e.Args["keytags"])
 	}
 	// key2 has no DS → DNSKEY_WITHOUT_DS also fires.
-	if !hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS") {
-		t.Fatal("expected DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS for key2")
-	}
-	e2 := firstEntryByTag(entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS")
+	e2 := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS")
 	kts2, ok := e2.Args["keytags"].([]uint16)
 	if !ok || len(kts2) != 1 || kts2[0] != keytag2 {
 		t.Errorf("expected keytags=[%d], got %v", keytag2, e2.Args["keytags"])
@@ -7187,10 +6797,7 @@ func TestDNSSEC18RolloverEvidenceDoubleSig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG") {
-		t.Fatal("expected DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG")
-	}
-	e := firstEntryByTag(entries, "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG")
+	e := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG")
 	kts, ok := e.Args["keytags"].([]uint16)
 	if !ok || len(kts) != 2 {
 		t.Errorf("expected 2 signer keytags, got %v", e.Args["keytags"])
@@ -7241,10 +6848,7 @@ func TestDNSSEC18RolloverEvidenceDSWithoutDNSKEY(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY") {
-		t.Fatal("expected DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY")
-	}
-	e := firstEntryByTag(entries, "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY")
+	e := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY")
 	kts, ok := e.Args["keytags"].([]uint16)
 	if !ok || len(kts) != 1 || kts[0] != keytagOld {
 		t.Errorf("expected orphaned keytag [%d], got %v", keytagOld, e.Args["keytags"])
@@ -7295,10 +6899,7 @@ func TestDNSSEC18RolloverEvidenceDNSKEYWithoutDS(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS") {
-		t.Fatal("expected DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS")
-	}
-	e := firstEntryByTag(entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS")
+	e := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS")
 	kts, ok := e.Args["keytags"].([]uint16)
 	if !ok || len(kts) != 1 || kts[0] != keytagNew {
 		t.Errorf("expected orphaned keytag [%d], got %v", keytagNew, e.Args["keytags"])
@@ -7347,13 +6948,9 @@ func TestDNSSEC18NoCDSCDNSKEYButRolloverEvidence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE") {
-		t.Fatal("expected DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE")
-	}
+	tctest.RequireTags(t, entries, "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE")
 	// Underlying evidence that triggered the tag must also be present.
-	if !hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_MULTI_KSK") {
-		t.Fatal("expected DS18_ROLLOVER_EVIDENCE_MULTI_KSK as supporting evidence")
-	}
+	tctest.RequireTags(t, entries, "DS18_ROLLOVER_EVIDENCE_MULTI_KSK")
 }
 
 // TestDNSSEC18CDSDeleteOnlySkipsContentComparison verifies that a CDS RRset
@@ -7407,12 +7004,7 @@ func TestDNSSEC18CDSDeleteOnlySkipsContentComparison(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if hasEntryTag(entries, "DS18_CDS_MATCHES_DS") {
-		t.Fatal("unexpected DS18_CDS_MATCHES_DS for DELETE-only CDS RRset")
-	}
-	if hasEntryTag(entries, "DS18_CDS_ROLLOVER_SIGNALED") {
-		t.Fatal("unexpected DS18_CDS_ROLLOVER_SIGNALED for DELETE-only CDS RRset")
-	}
+	tctest.RequireNoTag(t, entries, "DS18_CDS_MATCHES_DS", "DS18_CDS_ROLLOVER_SIGNALED")
 }
 
 // TestDNSSEC18CDSBothOldAndNewKeyMidRollover verifies that a CDS RRset listing
@@ -7473,13 +7065,9 @@ func TestDNSSEC18CDSBothOldAndNewKeyMidRollover(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_CDS_ROLLOVER_SIGNALED") {
-		t.Fatal("expected DS18_CDS_ROLLOVER_SIGNALED when CDS lists both old and new keys")
-	}
-	if hasEntryTag(entries, "DS18_CDS_MATCHES_DS") {
-		t.Fatal("unexpected DS18_CDS_MATCHES_DS when CDS is a strict superset of DS")
-	}
-	e := firstEntryByTag(entries, "DS18_CDS_ROLLOVER_SIGNALED")
+	tctest.RequireTags(t, entries, "DS18_CDS_ROLLOVER_SIGNALED")
+	tctest.RequireNoTag(t, entries, "DS18_CDS_MATCHES_DS")
+	e := tctest.First(entries, "DS18_CDS_ROLLOVER_SIGNALED")
 	cdsKTs, _ := e.Args["cds_keytags"].([]uint16)
 	if len(cdsKTs) != 2 {
 		t.Errorf("expected 2 CDS keytags (old+new), got %v", cdsKTs)
@@ -7543,19 +7131,9 @@ func TestDNSSEC18NoCDSCDNSKEYButOnlyDoubleSig(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC18: %v", err)
 	}
-	if !hasEntryTag(entries, "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE") {
-		t.Fatal("expected DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE")
-	}
-	if !hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG") {
-		t.Fatal("expected DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG")
-	}
+	tctest.RequireTags(t, entries, "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE", "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG")
 	// Both keys are in DS, so these orphan tags must NOT fire.
-	if hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS") {
-		t.Fatal("unexpected DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS when DS covers all KSKs")
-	}
-	if hasEntryTag(entries, "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY") {
-		t.Fatal("unexpected DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY when DNSKEY covers all DS")
-	}
+	tctest.RequireNoTag(t, entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS", "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY")
 }
 
 func TestDNSSEC19CleanZone(t *testing.T) {
@@ -7603,12 +7181,7 @@ func TestDNSSEC19CleanZone(t *testing.T) {
 		t.Fatalf("dnssec19: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS19_KEY_OK") {
-		t.Fatalf("expected DS19_KEY_OK")
-	}
-	if !hasEntryTag(entries, "DS19_BLOCKLIST_NOT_FOUND") {
-		t.Fatalf("expected DS19_BLOCKLIST_NOT_FOUND")
-	}
+	tctest.RequireTags(t, entries, "DS19_KEY_OK", "DS19_BLOCKLIST_NOT_FOUND")
 }
 
 func TestDNSSEC19BlocklistedKey(t *testing.T) {
@@ -7659,20 +7232,10 @@ func TestDNSSEC19BlocklistedKey(t *testing.T) {
 		t.Fatalf("dnssec19: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS19_BADKEY_BLOCKLIST") {
-		t.Fatalf("expected DS19_BADKEY_BLOCKLIST")
-	}
-	if hasEntryTag(entries, "DS19_KEY_OK") {
-		t.Fatalf("did not expect DS19_KEY_OK for blocklisted key")
-	}
-	if hasEntryTag(entries, "DS19_BLOCKLIST_NOT_FOUND") {
-		t.Fatalf("did not expect DS19_BLOCKLIST_NOT_FOUND when fixture blocklist exists")
-	}
+	tctest.RequireTags(t, entries, "DS19_BADKEY_BLOCKLIST")
+	tctest.RequireNoTag(t, entries, "DS19_KEY_OK", "DS19_BLOCKLIST_NOT_FOUND")
 
-	blocklisted := firstEntryByTag(entries, "DS19_BADKEY_BLOCKLIST")
-	if blocklisted == nil {
-		t.Fatalf("missing DS19_BADKEY_BLOCKLIST entry")
-	}
+	blocklisted := tctest.RequireTag(t, entries, "DS19_BADKEY_BLOCKLIST")
 	if got, _ := blocklisted.Args["blocklist_name"].(string); got != "unit-blocklist" {
 		t.Fatalf("unexpected blocklist_name: got %q want %q", got, "unit-blocklist")
 	}
@@ -7723,12 +7286,8 @@ func TestDNSSEC19NoDNSKEY(t *testing.T) {
 		t.Fatalf("dnssec19: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS19_NO_DNSKEY") {
-		t.Fatalf("expected DS19_NO_DNSKEY")
-	}
-	if hasEntryTag(entries, "DS19_NO_RESPONSE") {
-		t.Fatalf("did not expect DS19_NO_RESPONSE when nameserver answered without DNSKEY")
-	}
+	tctest.RequireTags(t, entries, "DS19_NO_DNSKEY")
+	tctest.RequireNoTag(t, entries, "DS19_NO_RESPONSE")
 }
 
 func TestDNSSEC19NoResponse(t *testing.T) {
@@ -7773,12 +7332,8 @@ func TestDNSSEC19NoResponse(t *testing.T) {
 		t.Fatalf("dnssec19: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS19_NO_RESPONSE") {
-		t.Fatalf("expected DS19_NO_RESPONSE")
-	}
-	if hasEntryTag(entries, "DS19_NO_DNSKEY") {
-		t.Fatalf("did not expect DS19_NO_DNSKEY when nameserver did not respond")
-	}
+	tctest.RequireTags(t, entries, "DS19_NO_RESPONSE")
+	tctest.RequireNoTag(t, entries, "DS19_NO_DNSKEY")
 }
 
 func TestDNSSEC19TransportDisabled(t *testing.T) {
@@ -7829,9 +7384,7 @@ func TestDNSSEC19TransportDisabled(t *testing.T) {
 		t.Fatalf("dnssec19: %v", err)
 	}
 
-	if !hasEntryTag(entries, "IPV4_DISABLED") {
-		t.Fatalf("expected IPV4_DISABLED")
-	}
+	tctest.RequireTags(t, entries, "IPV4_DISABLED")
 }
 
 func testCtx() context.Context {
@@ -7854,65 +7407,6 @@ func newNameserver(t *testing.T, ctx context.Context, name string, ip string, ha
 		return handler(qname, qtype, opts), nil
 	})
 	return ns
-}
-
-func hasEntryTag(entries []*logger.Entry, tag string) bool {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return true
-		}
-	}
-	return false
-}
-
-func countEntryTag(entries []*logger.Entry, tag string) int {
-	count := 0
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			count++
-		}
-	}
-	return count
-}
-
-func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return entry
-		}
-	}
-	return nil
-}
-
-func normalizeEntriesForComparison(entries []*logger.Entry) []string {
-	normalized := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if strings.EqualFold(entry.Module, "System") &&
-			strings.EqualFold(entry.Testcase, "Unspecified") &&
-			strings.HasPrefix(strings.ToUpper(entry.Level()), "DEBUG") {
-			// System debug entries are intentionally verbose and their emission
-			// order can vary under parallel execution.
-			continue
-		}
-		item := entry.Module + ":" + entry.Testcase + ":" + entry.Tag
-		if args := entry.ArgString(); args != "" {
-			item += " " + args
-		}
-		normalized = append(normalized, item)
-	}
-	return normalized
 }
 
 func dsPacket(owner string, keytag uint16, algo uint8, digestType uint8) packet.Packet {
@@ -8087,12 +7581,8 @@ func TestDNSSEC20BitmapOK(t *testing.T) {
 		t.Fatalf("dnssec20: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS20_BITMAP_OK") {
-		t.Fatalf("expected DS20_BITMAP_OK, got tags: %v", entryTags(entries))
-	}
-	if hasEntryTag(entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE") {
-		t.Fatalf("unexpected DS20_NSEC_BITMAP_MISMATCHES_RRTYPE")
-	}
+	tctest.RequireTags(t, entries, "DS20_BITMAP_OK")
+	tctest.RequireNoTag(t, entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE")
 }
 
 func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
@@ -8145,19 +7635,14 @@ func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
 		t.Fatalf("dnssec20: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE") {
-		t.Fatalf("expected DS20_NSEC_BITMAP_MISMATCHES_RRTYPE, got tags: %v", entryTags(entries))
-	}
-	entry := firstEntryByTag(entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE")
+	entry := tctest.RequireTag(t, entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE")
 	if entry == nil {
 		t.Fatal("missing DS20_NSEC_BITMAP_MISMATCHES_RRTYPE entry")
 	}
 	if rrtype, _ := entry.Args["query_type"].(string); rrtype != "A" {
 		t.Fatalf("expected rrtype=A, got %q", rrtype)
 	}
-	if hasEntryTag(entries, "DS20_BITMAP_OK") {
-		t.Fatalf("unexpected DS20_BITMAP_OK when bitmap has mismatches")
-	}
+	tctest.RequireNoTag(t, entries, "DS20_BITMAP_OK")
 }
 
 func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
@@ -8221,9 +7706,7 @@ func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
 		t.Fatalf("dnssec20: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE") {
-		t.Fatalf("expected DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE, got tags: %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE")
 	// Both A and AAAA should be missing from the bitmap.
 	count := 0
 	for _, e := range entries {
@@ -8272,19 +7755,7 @@ func TestDNSSEC20NoDNSSEC(t *testing.T) {
 		t.Fatalf("dnssec20: %v", err)
 	}
 
-	if !hasEntryTag(entries, "DS20_NO_DNSSEC") {
-		t.Fatalf("expected DS20_NO_DNSSEC, got tags: %v", entryTags(entries))
-	}
-}
-
-func entryTags(entries []*logger.Entry) []string {
-	var tags []string
-	for _, e := range entries {
-		if e != nil {
-			tags = append(tags, e.Tag)
-		}
-	}
-	return tags
+	tctest.RequireTags(t, entries, "DS20_NO_DNSSEC")
 }
 
 func writeDNSSEC19BlocklistFixture(t *testing.T, dir string, algo uint8, publicKey string, sourceID byte, sourceName string) {
@@ -8505,13 +7976,9 @@ func TestDNSSEC21Verified(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
-	if !hasEntryTag(entries, "DS21_DS_RRSIG_VERIFIED") {
-		t.Fatalf("expected DS21_DS_RRSIG_VERIFIED, got tags: %v", entryTagsDS21(entries))
-	}
+	tctest.RequireTags(t, entries, "DS21_DS_RRSIG_VERIFIED")
 	for _, badTag := range []string{"DS21_DS_RRSIG_NOT_VERIFIABLE", "DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY", "DS21_NO_DS_RRSIG", "DS21_PARENT_DNSKEY_MISSING"} {
-		if hasEntryTag(entries, badTag) {
-			t.Fatalf("did not expect %s, got tags: %v", badTag, entryTagsDS21(entries))
-		}
+		tctest.RequireNoTag(t, entries, badTag)
 	}
 }
 
@@ -8553,15 +8020,8 @@ func TestDNSSEC21RRSIGNotVerifiable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
-	if !hasEntryTag(entries, "DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY") {
-		t.Fatalf("expected DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY, got tags: %v", entryTagsDS21(entries))
-	}
-	if !hasEntryTag(entries, "DS21_DS_RRSIG_NOT_VERIFIABLE") {
-		t.Fatalf("expected DS21_DS_RRSIG_NOT_VERIFIABLE, got tags: %v", entryTagsDS21(entries))
-	}
-	if hasEntryTag(entries, "DS21_DS_RRSIG_VERIFIED") {
-		t.Fatalf("did not expect DS21_DS_RRSIG_VERIFIED, got tags: %v", entryTagsDS21(entries))
-	}
+	tctest.RequireTags(t, entries, "DS21_DS_RRSIG_NOT_VALID_BY_DNSKEY", "DS21_DS_RRSIG_NOT_VERIFIABLE")
+	tctest.RequireNoTag(t, entries, "DS21_DS_RRSIG_VERIFIED")
 }
 
 func TestDNSSEC21NoParentDNSKEY(t *testing.T) {
@@ -8590,12 +8050,8 @@ func TestDNSSEC21NoParentDNSKEY(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
-	if !hasEntryTag(entries, "DS21_PARENT_DNSKEY_MISSING") {
-		t.Fatalf("expected DS21_PARENT_DNSKEY_MISSING, got tags: %v", entryTagsDS21(entries))
-	}
-	if hasEntryTag(entries, "DS21_DS_RRSIG_VERIFIED") {
-		t.Fatalf("did not expect DS21_DS_RRSIG_VERIFIED")
-	}
+	tctest.RequireTags(t, entries, "DS21_PARENT_DNSKEY_MISSING")
+	tctest.RequireNoTag(t, entries, "DS21_DS_RRSIG_VERIFIED")
 }
 
 func TestDNSSEC21NoDSRRSIG(t *testing.T) {
@@ -8621,9 +8077,7 @@ func TestDNSSEC21NoDSRRSIG(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
-	if !hasEntryTag(entries, "DS21_NO_DS_RRSIG") {
-		t.Fatalf("expected DS21_NO_DS_RRSIG, got tags: %v", entryTagsDS21(entries))
-	}
+	tctest.RequireTags(t, entries, "DS21_NO_DS_RRSIG")
 }
 
 func TestDNSSEC21RootZone(t *testing.T) {
@@ -8644,9 +8098,7 @@ func TestDNSSEC21RootZone(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DNSSEC21: %v", err)
 	}
-	if !hasEntryTag(entries, "DS21_NO_PARENT_ZONE") {
-		t.Fatalf("expected DS21_NO_PARENT_ZONE, got tags: %v", entryTagsDS21(entries))
-	}
+	tctest.RequireTags(t, entries, "DS21_NO_PARENT_ZONE")
 }
 
 func TestDNSSEC21UnsignedDelegation(t *testing.T) {
@@ -8680,23 +8132,8 @@ func TestDNSSEC21UnsignedDelegation(t *testing.T) {
 		"DS21_NO_DS_RRSIG",
 		"DS21_PARENT_DNSKEY_MISSING",
 	} {
-		if hasEntryTag(entries, badTag) {
-			t.Fatalf("unsigned delegation should emit no DS21 findings, got %s", badTag)
-		}
+		tctest.RequireNoTag(t, entries, badTag)
 	}
-}
-
-func entryTagsDS21(entries []*logger.Entry) []string {
-	tags := []string{}
-	for _, e := range entries {
-		if e == nil {
-			continue
-		}
-		if strings.HasPrefix(e.Tag, "DS21_") {
-			tags = append(tags, e.Tag)
-		}
-	}
-	return tags
 }
 
 func (f dnssec21Fixture) signedDSResponseForcedKeytag(t *testing.T, sigKey *dns.DNSKEY, sigPriv crypto.PrivateKey, forcedKeytag uint16) packet.Packet {

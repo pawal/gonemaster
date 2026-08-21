@@ -13,6 +13,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -98,11 +99,9 @@ func TestDNSSEC08MLDSA44Valid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec08: %v", err)
 	}
-	if !hasEntryTag(entries, "DS08_DNSKEY_RRSIG_VALID") {
-		t.Fatalf("expected DS08_DNSKEY_RRSIG_VALID for a valid ML-DSA-44 signature")
-	}
+	tctest.RequireTags(t, entries, "DS08_DNSKEY_RRSIG_VALID")
 	for _, tag := range []string{"DS08_ALGO_NOT_SUPPORTED_BY_ZM", "DS08_RRSIG_NOT_VALID_BY_DNSKEY", "DS08_NO_MATCHING_DNSKEY"} {
-		if hasEntryTag(entries, tag) {
+		if tctest.Has(entries, tag) {
 			t.Errorf("did not expect %s for a valid ML-DSA-44 signature", tag)
 		}
 	}
@@ -155,11 +154,9 @@ func TestDNSSEC09MLDSA44Valid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("dnssec09: %v", err)
 	}
-	if !hasEntryTag(entries, "DS09_SOA_RRSIG_VALID") {
-		t.Fatalf("expected DS09_SOA_RRSIG_VALID for a valid ML-DSA-44 signature")
-	}
+	tctest.RequireTags(t, entries, "DS09_SOA_RRSIG_VALID")
 	for _, tag := range []string{"DS09_ALGO_NOT_SUPPORTED_BY_ZM", "DS09_RRSIG_NOT_VALID_BY_DNSKEY", "DS09_NO_MATCHING_DNSKEY"} {
-		if hasEntryTag(entries, tag) {
+		if tctest.Has(entries, tag) {
 			t.Errorf("did not expect %s for a valid ML-DSA-44 signature", tag)
 		}
 	}

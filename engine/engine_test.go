@@ -5,6 +5,7 @@ import (
 	"sync"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -154,7 +155,7 @@ func TestRunEmitsStartupTags(t *testing.T) {
 
 	required := []string{"GLOBAL_VERSION", "START_TIME", "TEST_TARGET", "MODULE_END"}
 	for _, tag := range required {
-		if !logHasTag(log, tag) {
+		if !dnstest.HasTag(log.Entries(), tag) {
 			t.Errorf("expected %s tag in run output", tag)
 		}
 	}
@@ -172,7 +173,7 @@ func TestRunEmitsSkipIPv4Disabled(t *testing.T) {
 	}
 	_, _ = RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner)
 
-	if !logHasTag(log, "SKIP_IPV4_DISABLED") {
+	if !dnstest.HasTag(log.Entries(), "SKIP_IPV4_DISABLED") {
 		t.Fatalf("expected SKIP_IPV4_DISABLED when IPv4 disabled")
 	}
 }
@@ -192,7 +193,7 @@ func TestRunEmitsNoNetwork(t *testing.T) {
 	if err != nil {
 		t.Fatalf("run: %v", err)
 	}
-	if !logHasTag(log, "NO_NETWORK") {
+	if !dnstest.HasTag(log.Entries(), "NO_NETWORK") {
 		t.Fatalf("expected NO_NETWORK when both IPv4 and IPv6 disabled")
 	}
 	// Should produce no test results when there's no network.
@@ -211,7 +212,7 @@ func TestRunWithRunnerEmitsUnknownModule(t *testing.T) {
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)
 	}
-	if !logHasTag(log, "UNKNOWN_MODULE") {
+	if !dnstest.HasTag(log.Entries(), "UNKNOWN_MODULE") {
 		t.Fatalf("expected UNKNOWN_MODULE tag for invalid module")
 	}
 }
@@ -224,18 +225,9 @@ func TestRunWithRunnerEmitsUnknownMethod(t *testing.T) {
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)
 	}
-	if !logHasTag(log, "UNKNOWN_METHOD") {
+	if !dnstest.HasTag(log.Entries(), "UNKNOWN_METHOD") {
 		t.Fatalf("expected UNKNOWN_METHOD tag for invalid testcase")
 	}
-}
-
-func logHasTag(log *logger.Logger, tag string) bool {
-	for _, entry := range log.Entries() {
-		if entry != nil && entry.Tag == tag {
-			return true
-		}
-	}
-	return false
 }
 
 func logHasDomain(log *logger.Logger, domain string) bool {

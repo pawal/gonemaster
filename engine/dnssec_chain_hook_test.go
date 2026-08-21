@@ -9,6 +9,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -17,15 +18,8 @@ import (
 )
 
 func dnskeyAnswer(owner string, key *dns.DNSKEY) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeDNSKEY)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = append(msg.Answer, key)
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.Question(owner, dns.TypeDNSKEY), dnstest.Reply(),
+		dnstest.Answers(key), dnstest.Secure())
 }
 
 // undelegatedZone builds a zone whose NS set resolves from fake glue, with a

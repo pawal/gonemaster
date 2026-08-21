@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
@@ -66,7 +67,7 @@ func TestQuerySkipsAddressOverLatencyBudget(t *testing.T) {
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 	opts := &QueryOptions{BlacklistingDisabled: true}
 
-	rec := &recordingTrace{}
+	rec := &dnstest.RecordingTrace{}
 	ctx = querytrace.WithContext(ctx, rec)
 
 	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.250", nil)
@@ -90,10 +91,10 @@ func TestQuerySkipsAddressOverLatencyBudget(t *testing.T) {
 	if calls != 2 {
 		t.Fatalf("expected the latency budget to suppress the 3rd network call, got %d hook calls", calls)
 	}
-	if got := rec.decisionsOfKind(querytrace.DecisionLatencyBudgetBlocked); len(got) != 1 {
+	if got := rec.DecisionsOfKind(querytrace.DecisionLatencyBudgetBlocked); len(got) != 1 {
 		t.Fatalf("expected exactly 1 latency-budget block decision, got %d: %+v", len(got), got)
 	}
-	if got := rec.decisionsOfKind(querytrace.DecisionSkippedLatencyBudget); len(got) == 0 {
+	if got := rec.DecisionsOfKind(querytrace.DecisionSkippedLatencyBudget); len(got) == 0 {
 		t.Fatalf("expected a skipped-latency-budget decision on the suppressed query, got none")
 	}
 }

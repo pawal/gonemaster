@@ -3,15 +3,14 @@ package zone
 import (
 	"context"
 	"math/rand"
-	"net/netip"
 	"sort"
 	"strings"
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -22,14 +21,8 @@ import (
 // case folding, deduplication, error propagation, and property invariants.
 
 func apexNsAnswerPacket(zoneName string, nsNames ...string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	for _, nsName := range nsNames {
-		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
-		nsRR.Ns = dnsutil.Fqdn(nsName)
-		msg.Answer = append(msg.Answer, nsRR)
-	}
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Answers(dnstest.NSRRs(zoneName, nsNames...)...))
 }
 
 func apexNewRootRecursor(t *testing.T, data map[string][]string) *recursor.Recursor {
@@ -71,25 +64,11 @@ func apexSetHookWithPacket(ctx context.Context, t *testing.T, r *recursor.Recurs
 
 // apexMixedRecordsPacket builds an apex response mixing NS, A, and SOA RRs.
 func apexMixedRecordsPacket(zoneName string, nsNames []string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-
-	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 3600}}
-	soa.Ns = dnsutil.Fqdn("ns1." + zoneName)
-	soa.Mbox = dnsutil.Fqdn("hostmaster." + zoneName)
-	msg.Answer = append(msg.Answer, soa)
-
-	for _, nsName := range nsNames {
-		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
-		nsRR.Ns = dnsutil.Fqdn(nsName)
-		msg.Answer = append(msg.Answer, nsRR)
-	}
-
-	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn("decoy." + zoneName), Class: dns.ClassINET, TTL: 60}}
-	aRR.Addr = netip.MustParseAddr("192.0.2.99")
-	msg.Answer = append(msg.Answer, aRR)
-
-	return packet.Packet{Msg: msg}
+	soa := dnstest.SOARR(zoneName, dnstest.MName("ns1."+zoneName))
+	soa.Hdr.TTL = 3600
+	answer := append([]dns.RR{soa}, dnstest.NSRRs(zoneName, nsNames...)...)
+	answer = append(answer, dnstest.ARR("decoy."+zoneName, "192.0.2.99"))
+	return dnstest.Response(dnstest.NotAuthoritative(), dnstest.Answers(answer...))
 }
 
 // TestZoneGlueNamesReturnsGlueFromZone verifies that GlueNames returns the

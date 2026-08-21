@@ -3,13 +3,10 @@ package nsdiscovery
 import (
 	"context"
 	"fmt"
-	"net/netip"
 	"sync"
 	"testing"
 
-	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
-
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -100,36 +97,16 @@ func TestParentNameserversSkipsOnIntermediateNoResponse(t *testing.T) {
 	}
 
 	rootSOA := func(name string) packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		msg.Authoritative = true
-		soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET}}
-		soaRR.Ns = "ns.example."
-		soaRR.Mbox = "hostmaster.example."
-		soaRR.Serial = 1
-		msg.Answer = []dns.RR{soaRR}
-		return packet.Packet{Msg: msg}
+		soa := dnstest.SOARR(name, dnstest.MName("ns.example."), dnstest.RName("hostmaster.example."))
+		return dnstest.Response(dnstest.Answers(dnstest.TTL(0, soa)...))
 	}
 
 	rootNS := func() packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		msg.Authoritative = true
-		ns1RR := &dns.NS{}
-		ns1RR.Hdr = dns.Header{Name: ".", Class: dns.ClassINET}
-		ns1RR.Ns = "ns1.root."
-		ns2RR := &dns.NS{}
-		ns2RR.Hdr = dns.Header{Name: ".", Class: dns.ClassINET}
-		ns2RR.Ns = "ns2.root."
-		msg.Answer = []dns.RR{ns1RR, ns2RR}
-		a1RR := &dns.A{}
-		a1RR.Hdr = dns.Header{Name: "ns1.root.", Class: dns.ClassINET}
-		a1RR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 1})
-		a2RR := &dns.A{}
-		a2RR.Hdr = dns.Header{Name: "ns2.root.", Class: dns.ClassINET}
-		a2RR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 2})
-		msg.Extra = []dns.RR{a1RR, a2RR}
-		return packet.Packet{Msg: msg}
+		return dnstest.Response(
+			dnstest.Answers(dnstest.TTL(0, dnstest.NSRRs(".", "ns1.root.", "ns2.root.")...)...),
+			dnstest.Additional(dnstest.TTL(0,
+				dnstest.ARR("ns1.root.", "192.0.2.1"),
+				dnstest.ARR("ns2.root.", "192.0.2.2"))...))
 	}
 
 	ns1, err := nameserver.NewWithContext(ctx, "ns1.root", "192.0.2.1", r.Client())
@@ -202,76 +179,35 @@ func TestParentNameserversAcceptsRFC8020ContradictionAtIntermediate(t *testing.T
 	}
 
 	rootSOA := func() packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		msg.Authoritative = true
-		soaRR := &dns.SOA{Hdr: dns.Header{Name: ".", Class: dns.ClassINET}}
-		soaRR.Ns = "ns.root."
-		soaRR.Mbox = "hostmaster."
-		soaRR.Serial = 1
-		msg.Answer = []dns.RR{soaRR}
-		return packet.Packet{Msg: msg}
+		soa := dnstest.SOARR(".", dnstest.MName("ns.root."), dnstest.RName("hostmaster."))
+		return dnstest.Response(dnstest.Answers(dnstest.TTL(0, soa)...))
 	}
 	rootNS := func() packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		msg.Authoritative = true
-		nsRR := &dns.NS{Hdr: dns.Header{Name: ".", Class: dns.ClassINET}}
-		nsRR.Ns = "ns.root."
-		msg.Answer = []dns.RR{nsRR}
-		aRR := &dns.A{Hdr: dns.Header{Name: "ns.root.", Class: dns.ClassINET}}
-		aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 1})
-		msg.Extra = []dns.RR{aRR}
-		return packet.Packet{Msg: msg}
+		return dnstest.Response(
+			dnstest.Answers(dnstest.TTL(0, dnstest.NSRR(".", "ns.root."))...),
+			dnstest.Additional(dnstest.TTL(0, dnstest.ARR("ns.root.", "192.0.2.1"))...))
 	}
 	rootReferralExample := func() packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		nsRR := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
-		nsRR.Ns = "ns.example."
-		msg.Ns = []dns.RR{nsRR}
-		aRR := &dns.A{Hdr: dns.Header{Name: "ns.example.", Class: dns.ClassINET}}
-		aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 2})
-		msg.Extra = []dns.RR{aRR}
-		return packet.Packet{Msg: msg}
+		return dnstest.Response(dnstest.NotAuthoritative(),
+			dnstest.Authority(dnstest.TTL(0, dnstest.NSRR("example.", "ns.example."))...),
+			dnstest.Additional(dnstest.TTL(0, dnstest.ARR("ns.example.", "192.0.2.2"))...))
 	}
 
 	exampleSOA := func() packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		msg.Authoritative = true
-		soaRR := &dns.SOA{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
-		soaRR.Ns = "ns.example."
-		soaRR.Mbox = "hostmaster.example."
-		soaRR.Serial = 1
-		msg.Answer = []dns.RR{soaRR}
-		return packet.Packet{Msg: msg}
+		soa := dnstest.SOARR("example.", dnstest.MName("ns.example."), dnstest.RName("hostmaster.example."))
+		return dnstest.Response(dnstest.Answers(dnstest.TTL(0, soa)...))
 	}
 	exampleNS := func() packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		msg.Authoritative = true
-		nsRR := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
-		nsRR.Ns = "ns.example."
-		msg.Answer = []dns.RR{nsRR}
-		aRR := &dns.A{Hdr: dns.Header{Name: "ns.example.", Class: dns.ClassINET}}
-		aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 2})
-		msg.Extra = []dns.RR{aRR}
-		return packet.Packet{Msg: msg}
+		return dnstest.Response(
+			dnstest.Answers(dnstest.TTL(0, dnstest.NSRR("example.", "ns.example."))...),
+			dnstest.Additional(dnstest.TTL(0, dnstest.ARR("ns.example.", "192.0.2.2"))...))
 	}
 	nxdomainAA := func() packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeNameError
-		msg.Authoritative = true
-		return packet.Packet{Msg: msg}
+		return dnstest.Response(dnstest.NXDOMAIN())
 	}
 	childReferral := func() packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		nsRR := &dns.NS{Hdr: dns.Header{Name: "c.b.example.", Class: dns.ClassINET}}
-		nsRR.Ns = "ns.child.example."
-		msg.Ns = []dns.RR{nsRR}
-		return packet.Packet{Msg: msg}
+		return dnstest.Response(dnstest.NotAuthoritative(),
+			dnstest.Authority(dnstest.TTL(0, dnstest.NSRR("c.b.example.", "ns.child.example."))...))
 	}
 
 	nsRoot, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.1", r.Client())

@@ -5,10 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 	"syscall"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
@@ -208,41 +208,6 @@ func TestFastFailIgnoresOuterContextCancellation(t *testing.T) {
 	}
 }
 
-// recordingTrace is a concurrency-safe QueryTrace test double that captures
-// every attempt and decision event for later assertions. The engine fires
-// these events from multiple goroutines in a real run, so the double locks
-// even though the tests here drive it serially.
-type recordingTrace struct {
-	mu        sync.Mutex
-	attempts  []querytrace.AttemptEvent
-	decisions []querytrace.DecisionEvent
-}
-
-func (r *recordingTrace) AttemptDone(ev querytrace.AttemptEvent) {
-	r.mu.Lock()
-	r.attempts = append(r.attempts, ev)
-	r.mu.Unlock()
-}
-
-func (r *recordingTrace) Decision(ev querytrace.DecisionEvent) {
-	r.mu.Lock()
-	r.decisions = append(r.decisions, ev)
-	r.mu.Unlock()
-}
-
-// decisionsOfKind returns the captured decisions matching kind.
-func (r *recordingTrace) decisionsOfKind(kind querytrace.DecisionKind) []querytrace.DecisionEvent {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	var out []querytrace.DecisionEvent
-	for _, d := range r.decisions {
-		if d.Kind == kind {
-			out = append(out, d)
-		}
-	}
-	return out
-}
-
 // TestQueryEmitsFastFailDecision is the step-4 verification. With fast-fail set
 // to engage after 3 consecutive timeouts, the run's QueryTrace must see exactly
 // one DecisionFastFailBlocked event - emitted on the threshold-tripping query -
@@ -256,7 +221,7 @@ func TestQueryEmitsFastFailDecision(t *testing.T) {
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 	opts := &QueryOptions{BlacklistingDisabled: true}
 
-	rec := &recordingTrace{}
+	rec := &dnstest.RecordingTrace{}
 	ctx = querytrace.WithContext(ctx, rec)
 
 	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.242", nil)
@@ -275,7 +240,7 @@ func TestQueryEmitsFastFailDecision(t *testing.T) {
 	for _, qname := range []string{"a.example", "b.example", "c.example"} {
 		_, _ = ns.QueryWithOptions(ctx, qname, "A", opts)
 	}
-	if got := rec.decisionsOfKind(querytrace.DecisionFastFailBlocked); len(got) != 1 {
+	if got := rec.DecisionsOfKind(querytrace.DecisionFastFailBlocked); len(got) != 1 {
 		t.Fatalf("expected exactly 1 fast-fail block decision after 3 timeouts, got %d: %+v", len(got), got)
 	}
 	if calls != 3 {
@@ -288,7 +253,7 @@ func TestQueryEmitsFastFailDecision(t *testing.T) {
 	if calls != 3 {
 		t.Fatalf("expected fast-fail to suppress the 4th network call, got %d hook calls", calls)
 	}
-	if got := rec.decisionsOfKind(querytrace.DecisionSkippedFastFail); len(got) == 0 {
+	if got := rec.DecisionsOfKind(querytrace.DecisionSkippedFastFail); len(got) == 0 {
 		t.Fatalf("expected a skipped-fast-fail decision on the suppressed query, got none")
 	}
 }

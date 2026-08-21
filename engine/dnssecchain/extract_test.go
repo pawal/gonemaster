@@ -2,7 +2,6 @@ package dnssecchain
 
 import (
 	"context"
-	"crypto"
 	"encoding/json"
 	"strings"
 	"sync/atomic"
@@ -13,6 +12,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -25,57 +25,15 @@ const (
 
 var fixedAt = time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
 
-// keypair is a generated DNSKEY with its signer.
-type keypair struct {
-	key  *dns.DNSKEY
-	priv crypto.Signer
-}
-
-func genKey(t *testing.T, owner string, sep bool) keypair {
+// genKey generates an ECDSA P-256 zone key for owner.
+func genKey(t *testing.T, owner string, sep bool) dnstest.Keypair {
 	t.Helper()
-	k := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}
-	k.Flags = dns.FlagZONE
-	if sep {
-		k.Flags |= dns.FlagSEP
-	}
-	k.Protocol = 3
-	k.Algorithm = dns.ECDSAP256SHA256
-	priv, err := k.Generate(256)
-	if err != nil {
-		t.Fatalf("generate key for %s: %v", owner, err)
-	}
-	signer, ok := priv.(crypto.Signer)
-	if !ok {
-		t.Fatalf("key for %s is not a crypto.Signer", owner)
-	}
-	return keypair{key: k, priv: signer}
-}
-
-// signRRset produces an RRSIG over rrset signed by kp, valid across window.
-func signRRset(t *testing.T, kp keypair, rrset []dns.RR, owner string, signer string, inception, expiration time.Time) *dns.RRSIG {
-	t.Helper()
-	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}
-	sig.Algorithm = kp.key.Algorithm
-	sig.Inception = uint32(inception.Unix())
-	sig.Expiration = uint32(expiration.Unix())
-	sig.KeyTag = kp.key.KeyTag()
-	sig.SignerName = dnsutil.Fqdn(signer)
-	if err := sig.Sign(kp.priv, rrset, &dns.SignOption{}); err != nil {
-		t.Fatalf("sign rrset for %s: %v", owner, err)
-	}
-	return sig
+	return dnstest.GenKey(t, owner, dns.ECDSAP256SHA256, sep)
 }
 
 func dnssecAnswer(owner string, qtype uint16, answers ...dns.RR) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), qtype)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = append(msg.Answer, answers...)
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.Question(owner, qtype), dnstest.Reply(),
+		dnstest.Answers(answers...), dnstest.Secure())
 }
 
 type hookFn func(qname, qtype string, opts *nameserver.QueryOptions) packet.Packet
@@ -138,16 +96,16 @@ func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
 	childZSK := genKey(t, testZone, false)
 	parentKSK := genKey(t, testParent, true)
 
-	dnskeyRRset := []dns.RR{childKSK.key, childZSK.key}
+	dnskeyRRset := []dns.RR{childKSK.Key, childZSK.Key}
 	keyInception := fixedAt.Add(-24 * time.Hour)
 	keyExpiration := fixedAt.Add(24 * time.Hour)
 	if opts.expiredKeySig {
 		keyInception = fixedAt.Add(-48 * time.Hour)
 		keyExpiration = fixedAt.Add(-24 * time.Hour)
 	}
-	dnskeySig := signRRset(t, childKSK, dnskeyRRset, testZone, testZone, keyInception, keyExpiration)
+	dnskeySig := dnstest.SignRRset(t, childKSK, dnskeyRRset, testZone, testZone, keyInception, keyExpiration)
 
-	ds := childKSK.key.ToDS(dns.SHA256)
+	ds := childKSK.Key.ToDS(dns.SHA256)
 	if ds == nil {
 		t.Fatalf("child KSK ToDS returned nil")
 	}
@@ -163,10 +121,10 @@ func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
 		wrong.Algorithm = 253
 		dsRRset = append(dsRRset, &wrong)
 	}
-	dsSig := signRRset(t, parentKSK, dsRRset, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	dsSig := dnstest.SignRRset(t, parentKSK, dsRRset, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 
-	parentKeyRRset := []dns.RR{parentKSK.key}
-	parentKeySig := signRRset(t, parentKSK, parentKeyRRset, testParent, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	parentKeyRRset := []dns.RR{parentKSK.Key}
+	parentKeySig := dnstest.SignRRset(t, parentKSK, parentKeyRRset, testParent, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 
 	childHook := func(qname, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
@@ -174,7 +132,7 @@ func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
 			if opts.noDNSKEY {
 				return dnssecAnswer(testZone, dns.TypeDNSKEY)
 			}
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.key, childZSK.key, dnskeySig)
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.Key, childZSK.Key, dnskeySig)
 		}
 		return packet.Packet{}
 	}
@@ -188,7 +146,7 @@ func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
 			return dnssecAnswer(testZone, dns.TypeDS, answers...)
 		case "DNSKEY":
 			if qname == dnsutil.Fqdn(testParent) || qname == testParent {
-				return dnssecAnswer(testParent, dns.TypeDNSKEY, parentKSK.key, parentKeySig)
+				return dnssecAnswer(testParent, dns.TypeDNSKEY, parentKSK.Key, parentKeySig)
 			}
 		}
 		return packet.Packet{}
@@ -275,9 +233,9 @@ func TestExtractSignedRRsets(t *testing.T) {
 
 	childKSK := genKey(t, testZone, true)
 	childZSK := genKey(t, testZone, false)
-	dnskeyRRset := []dns.RR{childKSK.key, childZSK.key}
-	win := func(rr []dns.RR, signer keypair) *dns.RRSIG {
-		return signRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	dnskeyRRset := []dns.RR{childKSK.Key, childZSK.Key}
+	win := func(rr []dns.RR, signer dnstest.Keypair) *dns.RRSIG {
+		return dnstest.SignRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 	}
 	dnskeySig := win(dnskeyRRset, childKSK)
 
@@ -292,14 +250,14 @@ func TestExtractSignedRRsets(t *testing.T) {
 	soa.Minttl = 3600
 	soaSig := win([]dns.RR{soa}, childZSK)
 
-	ds := childKSK.key.ToDS(dns.SHA256)
+	ds := childKSK.Key.ToDS(dns.SHA256)
 	cds := &dns.CDS{DS: *ds}
 	cdsSig := win([]dns.RR{cds}, childKSK)
 
 	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.key, childZSK.key, dnskeySig)
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.Key, childZSK.Key, dnskeySig)
 		case "SOA":
 			return dnssecAnswer(testZone, dns.TypeSOA, soa, soaSig)
 		case "CDS":
@@ -349,8 +307,8 @@ func TestExtractSignedRRsets(t *testing.T) {
 	}
 	// The CDS record names the KSK by tag; SOA carries no ref.
 	cdsEntry := got.Child.Signed[1]
-	if len(cdsEntry.Refs) != 1 || cdsEntry.Refs[0] != childKSK.key.KeyTag() {
-		t.Errorf("CDS refs = %v, want [%d]", cdsEntry.Refs, childKSK.key.KeyTag())
+	if len(cdsEntry.Refs) != 1 || cdsEntry.Refs[0] != childKSK.Key.KeyTag() {
+		t.Errorf("CDS refs = %v, want [%d]", cdsEntry.Refs, childKSK.Key.KeyTag())
 	}
 	// CDS names the same key the parent DS anchors: a steady-state match.
 	if cdsEntry.DSMatch != CDSMatchExact || len(cdsEntry.NewKeys) != 0 {
@@ -370,26 +328,26 @@ func TestExtractCDSRolloverSignaled(t *testing.T) {
 	oldKSK := genKey(t, testZone, true)
 	newKSK := genKey(t, testZone, true)
 	zsk := genKey(t, testZone, false)
-	dnskeyRRset := []dns.RR{oldKSK.key, newKSK.key, zsk.key}
-	win := func(rr []dns.RR, signer keypair) *dns.RRSIG {
-		return signRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	dnskeyRRset := []dns.RR{oldKSK.Key, newKSK.Key, zsk.Key}
+	win := func(rr []dns.RR, signer dnstest.Keypair) *dns.RRSIG {
+		return dnstest.SignRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 	}
 	dnskeySig := win(dnskeyRRset, oldKSK)
 
 	// Parent publishes DS only for the old KSK.
-	ds := oldKSK.key.ToDS(dns.SHA256)
+	ds := oldKSK.Key.ToDS(dns.SHA256)
 
-	cdsOld := &dns.CDS{DS: *oldKSK.key.ToDS(dns.SHA256)}
-	cdsNew := &dns.CDS{DS: *newKSK.key.ToDS(dns.SHA256)}
+	cdsOld := &dns.CDS{DS: *oldKSK.Key.ToDS(dns.SHA256)}
+	cdsNew := &dns.CDS{DS: *newKSK.Key.ToDS(dns.SHA256)}
 	cdsSig := win([]dns.RR{cdsOld, cdsNew}, oldKSK)
-	cdnskeyOld := &dns.CDNSKEY{DNSKEY: *oldKSK.key}
-	cdnskeyNew := &dns.CDNSKEY{DNSKEY: *newKSK.key}
+	cdnskeyOld := &dns.CDNSKEY{DNSKEY: *oldKSK.Key}
+	cdnskeyNew := &dns.CDNSKEY{DNSKEY: *newKSK.Key}
 	cdnskeySig := win([]dns.RR{cdnskeyOld, cdnskeyNew}, oldKSK)
 
 	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, oldKSK.key, newKSK.key, zsk.key, dnskeySig)
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, oldKSK.Key, newKSK.Key, zsk.Key, dnskeySig)
 		case "CDS":
 			return dnssecAnswer(testZone, dns.TypeCDS, cdsOld, cdsNew, cdsSig)
 		case "CDNSKEY":
@@ -428,8 +386,8 @@ func TestExtractCDSRolloverSignaled(t *testing.T) {
 		if s.DSMatch != CDSMatchRollover {
 			t.Errorf("%s ds_match = %q, want rollover", s.Type, s.DSMatch)
 		}
-		if len(s.NewKeys) != 1 || s.NewKeys[0] != newKSK.key.KeyTag() {
-			t.Errorf("%s new_keys = %v, want [%d]", s.Type, s.NewKeys, newKSK.key.KeyTag())
+		if len(s.NewKeys) != 1 || s.NewKeys[0] != newKSK.Key.KeyTag() {
+			t.Errorf("%s new_keys = %v, want [%d]", s.Type, s.NewKeys, newKSK.Key.KeyTag())
 		}
 	}
 }
@@ -443,18 +401,18 @@ func TestExtractAnchoredMarksOnlyDSMatchedKSK(t *testing.T) {
 	anchoredKSK := genKey(t, testZone, true)
 	incomingKSK := genKey(t, testZone, true)
 	zsk := genKey(t, testZone, false)
-	dnskeyRRset := []dns.RR{anchoredKSK.key, incomingKSK.key, zsk.key}
-	win := func(rr []dns.RR, signer keypair) *dns.RRSIG {
-		return signRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	dnskeyRRset := []dns.RR{anchoredKSK.Key, incomingKSK.Key, zsk.Key}
+	win := func(rr []dns.RR, signer dnstest.Keypair) *dns.RRSIG {
+		return dnstest.SignRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 	}
 	// Both KSKs sign the DNSKEY RRset (double-signature phase).
 	sigAnchored := win(dnskeyRRset, anchoredKSK)
 	sigIncoming := win(dnskeyRRset, incomingKSK)
 
-	ds := anchoredKSK.key.ToDS(dns.SHA256)
+	ds := anchoredKSK.Key.ToDS(dns.SHA256)
 	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DNSKEY" {
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, anchoredKSK.key, incomingKSK.key, zsk.key, sigAnchored, sigIncoming)
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, anchoredKSK.Key, incomingKSK.Key, zsk.Key, sigAnchored, sigIncoming)
 		}
 		return packet.Packet{}
 	}
@@ -481,7 +439,7 @@ func TestExtractAnchoredMarksOnlyDSMatchedKSK(t *testing.T) {
 		t.Fatal("expected a summary")
 	}
 	for _, k := range got.Child.DNSKEYs {
-		want := k.KeyTag == anchoredKSK.key.KeyTag()
+		want := k.KeyTag == anchoredKSK.Key.KeyTag()
 		if k.Anchored != want {
 			t.Errorf("key %d anchored = %v, want %v", k.KeyTag, k.Anchored, want)
 		}
@@ -498,17 +456,17 @@ func TestExtractCDSNoParentDSLeavesMatchEmpty(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
 	ksk := genKey(t, testZone, true)
-	win := func(rr []dns.RR, signer keypair) *dns.RRSIG {
-		return signRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	win := func(rr []dns.RR, signer dnstest.Keypair) *dns.RRSIG {
+		return dnstest.SignRRset(t, signer, rr, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 	}
-	dnskeySig := win([]dns.RR{ksk.key}, ksk)
-	cds := &dns.CDS{DS: *ksk.key.ToDS(dns.SHA256)}
+	dnskeySig := win([]dns.RR{ksk.Key}, ksk)
+	cds := &dns.CDS{DS: *ksk.Key.ToDS(dns.SHA256)}
 	cdsSig := win([]dns.RR{cds}, ksk)
 
 	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		switch qtype {
 		case "DNSKEY":
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, ksk.key, dnskeySig)
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, ksk.Key, dnskeySig)
 		case "CDS":
 			return dnssecAnswer(testZone, dns.TypeCDS, cds, cdsSig)
 		}
@@ -723,13 +681,13 @@ func TestExtractUndelegatedFakeDS(t *testing.T) {
 
 	childKSK := genKey(t, testZone, true)
 	childZSK := genKey(t, testZone, false)
-	dnskeyRRset := []dns.RR{childKSK.key, childZSK.key}
-	dnskeySig := signRRset(t, childKSK, dnskeyRRset, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
-	ds := childKSK.key.ToDS(dns.SHA256)
+	dnskeyRRset := []dns.RR{childKSK.Key, childZSK.Key}
+	dnskeySig := dnstest.SignRRset(t, childKSK, dnskeyRRset, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	ds := childKSK.Key.ToDS(dns.SHA256)
 
 	childHook := func(qname, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DNSKEY" {
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.key, childZSK.key, dnskeySig)
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.Key, childZSK.Key, dnskeySig)
 		}
 		return packet.Packet{}
 	}
@@ -785,14 +743,14 @@ func TestExtractPerServerDisagreement(t *testing.T) {
 
 	childKSK := genKey(t, testZone, true)
 	childZSK := genKey(t, testZone, false)
-	dnskeyRRset := []dns.RR{childKSK.key, childZSK.key}
-	dnskeySig := signRRset(t, childKSK, dnskeyRRset, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
-	ds := childKSK.key.ToDS(dns.SHA256)
-	dsSig := signRRset(t, childKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	dnskeyRRset := []dns.RR{childKSK.Key, childZSK.Key}
+	dnskeySig := dnstest.SignRRset(t, childKSK, dnskeyRRset, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	ds := childKSK.Key.ToDS(dns.SHA256)
+	dsSig := dnstest.SignRRset(t, childKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 
 	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DNSKEY" {
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.key, childZSK.key, dnskeySig)
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.Key, childZSK.Key, dnskeySig)
 		}
 		return packet.Packet{}
 	}
@@ -843,15 +801,15 @@ func TestExtractNoQueryGuarantee(t *testing.T) {
 	var calls int64
 	childKSK := genKey(t, testZone, true)
 	childZSK := genKey(t, testZone, false)
-	dnskeyRRset := []dns.RR{childKSK.key, childZSK.key}
-	dnskeySig := signRRset(t, childKSK, dnskeyRRset, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
-	ds := childKSK.key.ToDS(dns.SHA256)
-	dsSig := signRRset(t, childKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	dnskeyRRset := []dns.RR{childKSK.Key, childZSK.Key}
+	dnskeySig := dnstest.SignRRset(t, childKSK, dnskeyRRset, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	ds := childKSK.Key.ToDS(dns.SHA256)
+	dsSig := dnstest.SignRRset(t, childKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 
 	countingChild := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		atomic.AddInt64(&calls, 1)
 		if qtype == "DNSKEY" {
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.key, childZSK.key, dnskeySig)
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.Key, childZSK.Key, dnskeySig)
 		}
 		return packet.Packet{}
 	}
@@ -891,14 +849,14 @@ func TestExtractCacheKeyParity(t *testing.T) {
 
 	childKSK := genKey(t, testZone, true)
 	childZSK := genKey(t, testZone, false)
-	dnskeyRRset := []dns.RR{childKSK.key, childZSK.key}
-	dnskeySig := signRRset(t, childKSK, dnskeyRRset, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
-	ds := childKSK.key.ToDS(dns.SHA256)
-	dsSig := signRRset(t, childKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	dnskeyRRset := []dns.RR{childKSK.Key, childZSK.Key}
+	dnskeySig := dnstest.SignRRset(t, childKSK, dnskeyRRset, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	ds := childKSK.Key.ToDS(dns.SHA256)
+	dsSig := dnstest.SignRRset(t, childKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 
 	childNS := hookedNS(t, ctx, "ns1."+testZone, "203.0.113.1", func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DNSKEY" {
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.key, childZSK.key, dnskeySig)
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.Key, childZSK.Key, dnskeySig)
 		}
 		return packet.Packet{}
 	})
@@ -992,15 +950,15 @@ func TestDSLinkStatusMatchesAnyKeyWithTag(t *testing.T) {
 	// every key with the tag instead of only the first one seen.
 	k1 := genKey(t, testZone, true)
 	k2 := genKey(t, testZone, true)
-	real := k2.key.ToDS(dns.SHA256)
+	real := k2.Key.ToDS(dns.SHA256)
 	if real == nil {
 		t.Fatal("ToDS returned nil")
 	}
 	ds := DS{KeyTag: real.KeyTag, Algorithm: real.Algorithm, DigestType: real.DigestType, Digest: strings.ToLower(real.Digest)}
-	if got := dsLinkStatus(ds, []*dns.DNSKEY{k1.key, k2.key}); got != LinkMatch {
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{k1.Key, k2.Key}); got != LinkMatch {
 		t.Errorf("status = %q, want %q", got, LinkMatch)
 	}
-	if got := dsLinkStatus(ds, []*dns.DNSKEY{k1.key}); got != LinkDigestMismatch {
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{k1.Key}); got != LinkDigestMismatch {
 		t.Errorf("status = %q, want %q", got, LinkDigestMismatch)
 	}
 }
@@ -1013,17 +971,17 @@ func TestDSLinkStatusAlgorithmMismatchPrecedence(t *testing.T) {
 	// not digest_mismatch.
 	right := genKey(t, testZone, true)
 	wrong := genKey(t, testZone, true)
-	wrong.key.Algorithm = dns.RSASHA256 // rewrite before deriving the DS
-	real := wrong.key.ToDS(dns.SHA256)
+	wrong.Key.Algorithm = dns.RSASHA256 // rewrite before deriving the DS
+	real := wrong.Key.ToDS(dns.SHA256)
 	if real == nil {
 		t.Fatal("ToDS returned nil")
 	}
 	ds := DS{KeyTag: real.KeyTag, Algorithm: dns.ECDSAP256SHA256, DigestType: real.DigestType, Digest: strings.ToLower(real.Digest)}
-	if got := dsLinkStatus(ds, []*dns.DNSKEY{right.key, wrong.key}); got != LinkAlgorithmMismatch {
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{right.Key, wrong.Key}); got != LinkAlgorithmMismatch {
 		t.Errorf("status = %q, want %q", got, LinkAlgorithmMismatch)
 	}
 	// A lone wrong-algorithm key with a matching digest classifies the same.
-	if got := dsLinkStatus(ds, []*dns.DNSKEY{wrong.key}); got != LinkAlgorithmMismatch {
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{wrong.Key}); got != LinkAlgorithmMismatch {
 		t.Errorf("status = %q, want %q", got, LinkAlgorithmMismatch)
 	}
 }
@@ -1033,8 +991,8 @@ func TestDSLinkStatusGOSTDigestUnsupported(t *testing.T) {
 	// compute it (ToDS returns nil). That must classify as unsupported_digest,
 	// never as digest_mismatch: we cannot prove a mismatch we cannot compute.
 	k := genKey(t, testZone, true)
-	ds := DS{KeyTag: k.key.KeyTag(), Algorithm: k.key.Algorithm, DigestType: 3, Digest: "abcd"}
-	if got := dsLinkStatus(ds, []*dns.DNSKEY{k.key}); got != LinkUnsupportedDigest {
+	ds := DS{KeyTag: k.Key.KeyTag(), Algorithm: k.Key.Algorithm, DigestType: 3, Digest: "abcd"}
+	if got := dsLinkStatus(ds, []*dns.DNSKEY{k.Key}); got != LinkUnsupportedDigest {
 		t.Errorf("status = %q, want %q", got, LinkUnsupportedDigest)
 	}
 }
@@ -1071,11 +1029,11 @@ func TestExtractIndeterminateWithoutChildEvidence(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
 	childKSK := genKey(t, testZone, true)
-	ds := childKSK.key.ToDS(dns.SHA256)
+	ds := childKSK.Key.ToDS(dns.SHA256)
 	if ds == nil {
 		t.Fatal("ToDS returned nil")
 	}
-	dsSig := signRRset(t, childKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	dsSig := dnstest.SignRRset(t, childKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 
 	parentHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DS" {
@@ -1127,30 +1085,6 @@ func TestZeroTTLIsSerialized(t *testing.T) {
 	}
 }
 
-// Real DNSKEY public keys captured 2026-07-14 (same fixtures as the dnssecutil
-// package test).
-const (
-	// .lv KSK, keytag 42018: RSASHA256, 2048-bit, public exponent 2^32+1
-	// (5 bytes). miekg/dns and crypto/rsa both reject exponents this large, so
-	// gonemaster cannot verify its signatures locally even though .lv validates
-	// on public resolvers. This is the key that drives the partial status.
-	lvKSK42018Pub = "BQEAAAAByLU9dUcHHcl1eLgjLidTJKlwxsU9a580xierZ+WyfRBI47L3LLXAZZ0ub6Sea3qKP2mhP5ZBG/reXvyh3OSlHa39WoMiUUZFcuouCajBg7XeLGVPL4U1Ja1UW9wq/Oc8WU1dq4e+2Q8Dt8tipFvbL0AD0BhJAsfQuT3wperedwQAUKId0/JQOFNTWhEJaYN2P5IIhyRKWQp8OhtKmdNYQ5jfqqpXVO4zyqV+4ZxWurXJS8c7bKrE3OAewWEGAtTjeElfQ2CFAKWVjMOLeZ86+mgw7p3UHhGB+KuRaKg6fAtTcQYBF78Xe40wuj9EgGL19mp9v6tDwFe+Epow4SFSPQ=="
-
-	// .lb KSK, keytag 3842: RSASHA256, 2048-bit, exponent 65537 (normal).
-	// Negative control: a normal RSA key whose signature merely fails to verify
-	// must stay bogus, never get reclassified as unverifiable.
-	lbKSK3842Pub = "AwEAAcOaB0E27SPJIT/u/dQzN6NYXhVrBVGWPuh7gMJPHY1DULKuzAbZr4EwA/RcNnkBVygzDrZVxkJuBrT9uqjiuqK67VAupJDnTW3zKYzxmOpBQJW01B9LHyYMe3JYopl4BagGvzK3W5EGQBHuTk35/3y1a+d/M7Iky+9XRNBGwFbGlcXCBTg6uvdnGbyQkF2/ESmYOhXVw114YKREcFI3KBD5d6N+3nb6dy2nV3Oq+N7JRiepcxEzrXrjNo7yRoSToLJH4SfzVl/rdcJmqi59OgBfAFBQDTdwIddWkFSfOcEWYGxKCWvqmHbLCAKlmKaWcHvLIvABO0VTMnJz18JnVoE="
-)
-
-func rsaDNSKEY(owner string, flags uint16, pub string) *dns.DNSKEY {
-	k := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}
-	k.Flags = flags
-	k.Protocol = 3
-	k.Algorithm = dns.RSASHA256
-	k.PublicKey = pub
-	return k
-}
-
 // dummyRRSIG builds a well-formed DNSKEY RRSIG for keytag. The signature bytes
 // are deliberately not real: verification of a large-exponent key fails on the
 // key before the math runs, so any parseable RRSIG exercises the path, and for
@@ -1171,8 +1105,8 @@ func dummyRRSIG(keytag uint16) *dns.RRSIG {
 }
 
 func TestSigStateRSAExponentUnsupported(t *testing.T) {
-	lv := rsaDNSKEY(testZone, 257, lvKSK42018Pub)
-	lb := rsaDNSKEY(testZone, 257, lbKSK3842Pub)
+	lv := dnstest.RSADNSKEY(testZone, 257, dnstest.LVKSK42018)
+	lb := dnstest.RSADNSKEY(testZone, 257, dnstest.LBKSK3842)
 
 	// The .lv KSK exponent is beyond the local verifier, so its signature is
 	// unproven (unsupported_key), not invalid.
@@ -1193,7 +1127,7 @@ func TestExtractRSAExponentPartial(t *testing.T) {
 	// 2^32+1 exponent the local verifier cannot use. The DS still digest-matches
 	// the key (digests do not touch the exponent), so the chain is anchored, but
 	// the DNSKEY signature cannot be checked -> partial, not broken.
-	ksk := rsaDNSKEY(testZone, 257, lvKSK42018Pub)
+	ksk := dnstest.RSADNSKEY(testZone, 257, dnstest.LVKSK42018)
 	keytag := ksk.KeyTag()
 	dnskeySig := dummyRRSIG(keytag)
 
@@ -1202,7 +1136,7 @@ func TestExtractRSAExponentPartial(t *testing.T) {
 		t.Fatal("KSK ToDS returned nil")
 	}
 	parentKSK := genKey(t, testParent, true)
-	dsSig := signRRset(t, parentKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	dsSig := dnstest.SignRRset(t, parentKSK, []dns.RR{ds}, testZone, testParent, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
 
 	childHook := func(_, qtype string, _ *nameserver.QueryOptions) packet.Packet {
 		if qtype == "DNSKEY" {

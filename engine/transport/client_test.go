@@ -5,7 +5,6 @@ import (
 	"encoding/binary"
 	"net"
 	"net/netip"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -881,36 +880,6 @@ func TestExchangeReturnsPromptlyOnContextCancel(t *testing.T) {
 	}
 }
 
-// recordingTrace is a QueryTrace that captures every event for assertions. It
-// guards its slices with a mutex because the transport layer may fire events
-// from multiple goroutines; the tests below are single-threaded but the engine
-// is not, and we want the test double to model the real contract.
-type recordingTrace struct {
-	mu        sync.Mutex
-	attemptEv []querytrace.AttemptEvent
-	decisions []querytrace.DecisionEvent
-}
-
-func (r *recordingTrace) AttemptDone(ev querytrace.AttemptEvent) {
-	r.mu.Lock()
-	r.attemptEv = append(r.attemptEv, ev)
-	r.mu.Unlock()
-}
-
-func (r *recordingTrace) Decision(ev querytrace.DecisionEvent) {
-	r.mu.Lock()
-	r.decisions = append(r.decisions, ev)
-	r.mu.Unlock()
-}
-
-func (r *recordingTrace) attempts() []querytrace.AttemptEvent {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	out := make([]querytrace.AttemptEvent, len(r.attemptEv))
-	copy(out, r.attemptEv)
-	return out
-}
-
 // TestExchangeEmitsAttemptEventPerTimeout is the step-3 verification: a
 // nameserver that accepts UDP packets but never answers must produce exactly
 // one timeout AttemptEvent per attempt in the (1 + retries) budget. This
@@ -922,7 +891,7 @@ func TestExchangeEmitsAttemptEventPerTimeout(t *testing.T) {
 	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {})
 	defer shutdown()
 
-	rec := &recordingTrace{}
+	rec := &dnstest.RecordingTrace{}
 	ctx := querytrace.WithContext(context.Background(), rec)
 
 	client := &Client{}
@@ -937,7 +906,7 @@ func TestExchangeEmitsAttemptEventPerTimeout(t *testing.T) {
 		t.Fatal("expected a timeout error from a non-responding server, got nil")
 	}
 
-	events := rec.attempts()
+	events := rec.Attempts()
 	if len(events) != 3 {
 		t.Fatalf("expected 3 attempt events (1 + 2 retries), got %d: %+v", len(events), events)
 	}
@@ -979,7 +948,7 @@ func TestExchangeWithRetriesDisabledMakesOneAttempt(t *testing.T) {
 		t.Fatal("shipped profile must carry a non-zero retry for this test to mean anything")
 	}
 
-	rec := &recordingTrace{}
+	rec := &dnstest.RecordingTrace{}
 	ctx := querytrace.WithContext(context.Background(), rec)
 
 	client := &Client{}
@@ -999,7 +968,7 @@ func TestExchangeWithRetriesDisabledMakesOneAttempt(t *testing.T) {
 		t.Fatal("expected a timeout error from a non-responding server, got nil")
 	}
 
-	events := rec.attempts()
+	events := rec.Attempts()
 	if len(events) != 1 {
 		t.Fatalf("expected exactly 1 attempt event with retries disabled, got %d: %+v", len(events), events)
 	}
@@ -1020,7 +989,7 @@ func TestExchangeEmitsAttemptEventOnSuccess(t *testing.T) {
 	})
 	defer shutdown()
 
-	rec := &recordingTrace{}
+	rec := &dnstest.RecordingTrace{}
 	ctx := querytrace.WithContext(context.Background(), rec)
 
 	client := &Client{}
@@ -1031,7 +1000,7 @@ func TestExchangeEmitsAttemptEventOnSuccess(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	events := rec.attempts()
+	events := rec.Attempts()
 	if len(events) != 1 {
 		t.Fatalf("expected exactly 1 attempt event on success, got %d: %+v", len(events), events)
 	}

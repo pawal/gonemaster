@@ -1592,7 +1592,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		ns.state.blacklisted[false] = true
 
 		_, _ = ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{BlacklistingDisabled: false})
-		assertOnlyTagFired(t, log, "IS_BLACKLISTED", []string{"FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP", "ERROR_CACHE_SKIP", "LATENCY_BUDGET_SKIP"})
+		dnstest.AssertOnlyTag(t, log.Entries(), "IS_BLACKLISTED", []string{"FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP", "ERROR_CACHE_SKIP", "LATENCY_BUDGET_SKIP"})
 	})
 
 	t.Run("error-cache beats blacklist", func(t *testing.T) {
@@ -1614,7 +1614,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		ns.state.blacklisted[false] = true
 
 		_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
-		assertOnlyTagFired(t, log, "ERROR_CACHE_SKIP", []string{"IS_BLACKLISTED", "FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP", "LATENCY_BUDGET_SKIP"})
+		dnstest.AssertOnlyTag(t, log.Entries(), "ERROR_CACHE_SKIP", []string{"IS_BLACKLISTED", "FAST_FAIL_SKIP", "REACHABILITY_CACHE_SKIP", "LATENCY_BUDGET_SKIP"})
 	})
 
 	t.Run("reachability beats error-cache", func(t *testing.T) {
@@ -1638,7 +1638,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		ns.state.errorCache.set(key, 60*time.Second)
 
 		_, _ = ns.QueryWithOptions(ctx, "example", "A", nil)
-		assertOnlyTagFired(t, log, "REACHABILITY_CACHE_SKIP", []string{"ERROR_CACHE_SKIP", "IS_BLACKLISTED", "FAST_FAIL_SKIP", "LATENCY_BUDGET_SKIP"})
+		dnstest.AssertOnlyTag(t, log.Entries(), "REACHABILITY_CACHE_SKIP", []string{"ERROR_CACHE_SKIP", "IS_BLACKLISTED", "FAST_FAIL_SKIP", "LATENCY_BUDGET_SKIP"})
 	})
 
 	t.Run("fast-fail beats latency-budget", func(t *testing.T) {
@@ -1659,30 +1659,8 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		ns.state.latency.observe(time.Second, time.Millisecond)
 
 		_, _ = ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{BlacklistingDisabled: true})
-		assertOnlyTagFired(t, log, "FAST_FAIL_SKIP", []string{"LATENCY_BUDGET_SKIP", "IS_BLACKLISTED", "REACHABILITY_CACHE_SKIP", "ERROR_CACHE_SKIP"})
+		dnstest.AssertOnlyTag(t, log.Entries(), "FAST_FAIL_SKIP", []string{"LATENCY_BUDGET_SKIP", "IS_BLACKLISTED", "REACHABILITY_CACHE_SKIP", "ERROR_CACHE_SKIP"})
 	})
-}
-
-func assertOnlyTagFired(t *testing.T, log *logger.Logger, want string, mustNot []string) {
-	t.Helper()
-	wantSeen := false
-	for _, entry := range log.Entries() {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == want {
-			wantSeen = true
-			continue
-		}
-		for _, banned := range mustNot {
-			if entry.Tag == banned {
-				t.Fatalf("expected only %s to fire, also saw %s", want, banned)
-			}
-		}
-	}
-	if !wantSeen {
-		t.Fatalf("expected %s to fire, none of %v saw it", want, want)
-	}
 }
 
 func TestBlacklistingEmitsTags(t *testing.T) {

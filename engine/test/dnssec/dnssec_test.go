@@ -19,6 +19,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
@@ -2319,15 +2320,11 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 	tctest.RequireTags(t, entries, "DS09_MISSING_RRSIG_IN_RESPONSE")
 }
 
-// lvKSK42018Pub is the real .lv KSK public key (RSASHA256, 2048-bit, public
-// exponent 2^32+1). Both miekg/dns and crypto/rsa reject an exponent this
-// large, so verifyRRSIG can never succeed for it. The key is otherwise
-// well-formed: it matches a DS built from it, which is what makes it a DS-linked
-// key in DNSSEC02.
-const lvKSK42018Pub = "BQEAAAAByLU9dUcHHcl1eLgjLidTJKlwxsU9a580xierZ+WyfRBI47L3LLXAZZ0ub6Sea3qKP2mhP5ZBG/reXvyh3OSlHa39WoMiUUZFcuouCajBg7XeLGVPL4U1Ja1UW9wq/Oc8WU1dq4e+2Q8Dt8tipFvbL0AD0BhJAsfQuT3wperedwQAUKId0/JQOFNTWhEJaYN2P5IIhyRKWQp8OhtKmdNYQ5jfqqpXVO4zyqV+4ZxWurXJS8c7bKrE3OAewWEGAtTjeElfQ2CFAKWVjMOLeZ86+mgw7p3UHhGB+KuRaKg6fAtTcQYBF78Xe40wuj9EgGL19mp9v6tDwFe+Epow4SFSPQ=="
-
+// The .lv KSK is otherwise well-formed: it matches a DS built from it, which is
+// what makes it a DS-linked key in DNSSEC02, but its exponent puts it beyond
+// what verifyRRSIG can check.
 func lvLargeExponentKSK(owner string) *dns.DNSKEY {
-	key := tctest.DNSKEYRR(owner, 8, tctest.SEP(), tctest.PublicKey(lvKSK42018Pub)) // RSASHA256
+	key := tctest.DNSKEYRR(owner, 8, tctest.SEP(), tctest.PublicKey(dnstest.LVKSK42018)) // RSASHA256
 	return key
 }
 

@@ -1,11 +1,11 @@
 package engine
 
 import (
-	"fmt"
-	"sort"
+	"slices"
 	"sync"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -96,13 +96,13 @@ func TestRunConcurrentIdenticalFindings(t *testing.T) {
 // excluding the System module (framework diagnostics such as query and cache
 // tracing, which legitimately differ with cache warmth).
 func findingSignature(log *logger.Logger) []string {
-	var out []string
+	var findings []*logger.Entry
 	for _, entry := range log.Entries() {
-		if entry == nil || entry.Module == "System" {
-			continue
+		if entry != nil && entry.Module != "System" {
+			findings = append(findings, entry)
 		}
-		out = append(out, fmt.Sprintf("%s/%s/%s/%s", entry.Module, entry.Testcase, entry.Tag, entry.Level()))
 	}
-	sort.Strings(out)
+	out := dnstest.Signature(findings)
+	slices.Sort(out)
 	return out
 }

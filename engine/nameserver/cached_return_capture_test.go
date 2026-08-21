@@ -46,15 +46,6 @@ func cachedReturnFixture(t *testing.T, log *logger.Logger) (context.Context, Nam
 	return ctx, ns, qname
 }
 
-func cachedReturnEntry(entries []*logger.Entry) *logger.Entry {
-	for _, entry := range entries {
-		if entry != nil && strings.EqualFold(entry.Tag, "CACHED_RETURN") {
-			return entry
-		}
-	}
-	return nil
-}
-
 // CACHED_RETURN carries a full text rendering of the cached response, which is
 // the most expensive log argument the engine builds. Below the capture level no
 // entry may be stored.
@@ -73,7 +64,7 @@ func TestCachedReturnNotStoredWhenNotCaptured(t *testing.T) {
 	if resp.Msg == nil {
 		t.Fatal("expected the cached answer to be returned")
 	}
-	if entry := cachedReturnEntry(log.Entries()[before:]); entry != nil {
+	if entry := dnstest.EntryByTag(log.Entries()[before:], "CACHED_RETURN"); entry != nil {
 		t.Fatalf("CACHED_RETURN was stored below the capture level: %+v", entry)
 	}
 }
@@ -116,7 +107,7 @@ func TestCachedReturnRenderedWhenCaptured(t *testing.T) {
 		t.Fatalf("cached query: %v", err)
 	}
 
-	entry := cachedReturnEntry(log.Entries()[before:])
+	entry := dnstest.EntryByTag(log.Entries()[before:], "CACHED_RETURN")
 	if entry == nil {
 		t.Fatal("expected a CACHED_RETURN entry when everything is captured")
 	}
@@ -139,7 +130,7 @@ func TestCachedReturnKeptAtDebug3CaptureLevel(t *testing.T) {
 	if _, err := ns.QueryWithOptions(ctx, qname, "A", nil); err != nil {
 		t.Fatalf("cached query: %v", err)
 	}
-	if entry := cachedReturnEntry(log.Entries()[before:]); entry == nil {
+	if entry := dnstest.EntryByTag(log.Entries()[before:], "CACHED_RETURN"); entry == nil {
 		t.Fatal("expected a CACHED_RETURN entry at a DEBUG3 capture level")
 	}
 }

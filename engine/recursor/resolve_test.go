@@ -12,9 +12,9 @@ import (
 	"time"
 
 	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -1557,12 +1557,10 @@ func TestSnapshotStateMapsConcurrentMutation(t *testing.T) {
 	}
 }
 
+// The recursor fixtures keep TTL 0 so a cached answer never outlives its test.
 func packetWithA(name string, addr netip.Addr) packet.Packet {
-	msg := new(dns.Msg)
-	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET}}
-	aRR.Addr = addr
-	msg.Answer = []dns.RR{aRR}
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Answers(dnstest.TTL(0, dnstest.ARR(name, addr.String()))...))
 }
 
 type testQueryer struct {
@@ -1663,29 +1661,21 @@ func (q loggingQueryer) QueryWithClass(ctx context.Context, _ string, _ string, 
 }
 
 func packetWithReferral(zone string, nsName string) packet.Packet {
-	msg := new(dns.Msg)
-	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zone), Class: dns.ClassINET}}
-	nsRR.Ns = dnsutil.Fqdn(nsName)
-	msg.Ns = []dns.RR{nsRR}
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Authority(dnstest.TTL(0, dnstest.NSRR(zone, nsName))...))
 }
 
 func packetWithAAAA(name string, addr netip.Addr) packet.Packet {
-	msg := new(dns.Msg)
-	aaaa := &dns.AAAA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET}}
-	aaaa.Addr = addr
-	msg.Answer = []dns.RR{aaaa}
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Answers(dnstest.TTL(0, dnstest.AAAARR(name, addr.String()))...))
 }
 
 func packetWithARecords(name string, addrs []netip.Addr) packet.Packet {
-	msg := new(dns.Msg)
+	rrs := make([]dns.RR, 0, len(addrs))
 	for _, addr := range addrs {
-		aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET}}
-		aRR.Addr = addr
-		msg.Answer = append(msg.Answer, aRR)
+		rrs = append(rrs, dnstest.ARR(name, addr.String()))
 	}
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.NotAuthoritative(), dnstest.Answers(dnstest.TTL(0, rrs...)...))
 }
 
 func TestRedirectNameNoNS(t *testing.T) {

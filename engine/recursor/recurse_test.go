@@ -15,6 +15,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -557,22 +558,12 @@ func TestResolveCNAMEDoesNotShareInProgress(t *testing.T) {
 }
 
 func ptrAnswer(owner string, target string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	ptrRR := &dns.PTR{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	ptrRR.Ptr = dnsutil.Fqdn(target)
-	msg.Answer = []dns.RR{ptrRR}
-	return packet.Packet{Msg: msg, AnswerFrom: "192.0.2.10"}
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Answers(dnstest.PTRRR(owner, target)), dnstest.AnswerFrom("192.0.2.10"))
 }
 
 func noDataPacket(name string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
-	soaRR.Ns = "ns." + dnsutil.Fqdn(name)
-	soaRR.Mbox = "hostmaster." + dnsutil.Fqdn(name)
-	msg.Ns = []dns.RR{soaRR}
-	return packet.Packet{Msg: msg, AnswerFrom: "192.0.2.53"}
+	return dnstest.From(dnstest.NoData(name), dnstest.AnswerFrom("192.0.2.53"))
 }
 
 func TestRecurseEmitsRecurseDebugLogs(t *testing.T) {
@@ -644,37 +635,23 @@ func TestRecurseLogsLoopProtection(t *testing.T) {
 }
 
 func referralPacket(zone string, answerFrom string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	zone = dnsutil.Fqdn(zone)
-	nsRR := &dns.NS{Hdr: dns.Header{Name: zone, Class: dns.ClassINET, TTL: 3600}}
-	nsRR.Ns = "ns1." + zone
-	msg.Ns = []dns.RR{nsRR}
-	return packet.Packet{Msg: msg, AnswerFrom: answerFrom}
+	ns := dnstest.TTL(3600, dnstest.NSRR(zone, "ns1."+dnsutil.Fqdn(zone)))
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Authority(ns...), dnstest.AnswerFrom(answerFrom))
 }
 
 func nxdomainPacket(answerFrom string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeNameError
-	return packet.Packet{Msg: msg, AnswerFrom: answerFrom}
+	return dnstest.Response(dnstest.NotAuthoritative(), dnstest.NXDOMAIN(), dnstest.AnswerFrom(answerFrom))
 }
 
 func answerPacket(qname string, answerFrom string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
-	aRR.Addr = netip.AddrFrom4([4]byte{192, 0, 2, 1})
-	msg.Answer = []dns.RR{aRR}
-	return packet.Packet{Msg: msg, AnswerFrom: answerFrom}
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Answers(dnstest.ARR(qname, "192.0.2.1")), dnstest.AnswerFrom(answerFrom))
 }
 
 func cnamePacket(qname string, target string, answerFrom string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	cnameRR := &dns.CNAME{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
-	cnameRR.Target = dnsutil.Fqdn(target)
-	msg.Answer = []dns.RR{cnameRR}
-	return packet.Packet{Msg: msg, AnswerFrom: answerFrom}
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Answers(dnstest.CNAMERR(qname, target)), dnstest.AnswerFrom(answerFrom))
 }
 
 type incrementingReferralQueryer struct {

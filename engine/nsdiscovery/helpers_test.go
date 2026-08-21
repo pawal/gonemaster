@@ -4,9 +4,7 @@ import (
 	"context"
 	"testing"
 
-	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
-
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
@@ -17,28 +15,13 @@ import (
 // nsAnswerPacket builds an NS answer packet listing nsNames as authoritative
 // nameservers for zoneName.
 func nsAnswerPacket(zoneName string, nsNames ...string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	for _, nsName := range nsNames {
-		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
-		nsRR.Ns = dnsutil.Fqdn(nsName)
-		msg.Answer = append(msg.Answer, nsRR)
-	}
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Answers(dnstest.NSRRs(zoneName, nsNames...)...))
 }
 
 // authoritativeNSPacket builds an authoritative NS answer packet.
 func authoritativeNSPacket(zoneName string, nsNames ...string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	for _, nsName := range nsNames {
-		nsRR := &dns.NS{}
-		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}
-		nsRR.Ns = dnsutil.Fqdn(nsName)
-		msg.Answer = append(msg.Answer, nsRR)
-	}
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.Answers(dnstest.NSRRs(zoneName, nsNames...)...))
 }
 
 // newRootRecursor builds a recursor pre-seeded with fake addresses at the root.

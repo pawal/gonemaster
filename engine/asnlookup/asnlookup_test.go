@@ -9,6 +9,7 @@ import (
 
 	dns "codeberg.org/miekg/dns"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -25,28 +26,22 @@ func (f fakeResolver) Recurse(ctx context.Context, name string, qtype string, qc
 }
 
 func packetFor(rcode int, answer []dns.RR, authority []dns.RR) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = uint16(rcode)
-	msg.Answer = answer
-	msg.Ns = authority
-	return packet.New(msg)
+	return dnstest.Response(dnstest.NotAuthoritative(), dnstest.Rcode(uint16(rcode)),
+		dnstest.Answers(answer...), dnstest.Authority(authority...))
 }
 
 func txtRR(name string, txt string) *dns.TXT {
-	rr := &dns.TXT{Hdr: dns.Header{Name: name, Class: dns.ClassINET, TTL: 3600}}
-	rr.Txt = []string{txt}
+	rr := dnstest.TXTRR(name, txt)
+	rr.Hdr.TTL = 3600
 	return rr
 }
 
+// The timers are arbitrary but fixed; minttl in particular drives the negative
+// cache TTL the lookup derives from an NXDOMAIN.
 func soaRR(name string, mname string, rname string) *dns.SOA {
-	rr := &dns.SOA{Hdr: dns.Header{Name: name, Class: dns.ClassINET, TTL: 3600}}
-	rr.Ns = mname
-	rr.Mbox = rname
-	rr.Serial = 1
-	rr.Refresh = 2
-	rr.Retry = 3
-	rr.Expire = 4
-	rr.Minttl = 5
+	rr := dnstest.SOARR(name, dnstest.MName(mname), dnstest.RName(rname),
+		dnstest.Serial(1), dnstest.SOATimers(2, 3, 4, 5))
+	rr.Hdr.TTL = 3600
 	return rr
 }
 

@@ -2,7 +2,6 @@ package nameserver
 
 import (
 	"context"
-	"crypto"
 	"sync"
 	"testing"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnssecutil"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
@@ -22,33 +22,11 @@ import (
 func signedDNSKEYResponse(t *testing.T, qname string) *dns.Msg {
 	t.Helper()
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 3600}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = dns.ECDSAP256SHA256
-	priv, err := key.Generate(256)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	signer, ok := priv.(crypto.Signer)
-	if !ok {
-		t.Fatalf("private key does not implement crypto.Signer")
-	}
-
+	kp := dnstest.GenKey(t, qname, dns.ECDSAP256SHA256, false)
+	key := kp.Key
 	rrset := []dns.RR{key}
 	now := time.Now().UTC()
-	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 3600}}
-	sig.TypeCovered = dns.TypeDNSKEY
-	sig.Algorithm = key.Algorithm
-	sig.Labels = uint8(dnsutil.Labels(dnsutil.Fqdn(qname)))
-	sig.OrigTTL = 3600
-	sig.Inception = uint32(now.Add(-time.Hour).Unix())
-	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
-	sig.KeyTag = key.KeyTag()
-	sig.SignerName = key.Hdr.Name
-	if err := sig.Sign(signer, rrset, &dns.SignOption{}); err != nil {
-		t.Fatalf("sign DNSKEY RRset: %v", err)
-	}
+	sig := dnstest.SignRRset(t, kp, rrset, qname, qname, now.Add(-time.Hour), now.Add(24*time.Hour))
 
 	msg := dnsutil.SetQuestion(&dns.Msg{}, dnsutil.Fqdn(qname), dns.TypeDNSKEY)
 	msg.Response = true

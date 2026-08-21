@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -278,44 +278,21 @@ func TestZoneNameserversUndelegatedInBailiwickUsesProvidedGlue(t *testing.T) {
 // delegationPacket builds a referral response for zoneName with NS records
 // pointing to the given nsNames and optional A glue for in-bailiwick names.
 func delegationPacket(zoneName string, nsGlue map[string]string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = false
-	for nsName := range nsGlue {
-		nsRR := &dns.NS{}
-		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}
-		nsRR.Ns = dnsutil.Fqdn(nsName)
-		msg.Ns = append(msg.Ns, nsRR)
-	}
+	var nsNames []string
+	var glue []dns.RR
 	for nsName, addr := range nsGlue {
-		if addr == "" {
-			continue
-		}
-		ip, err := netip.ParseAddr(addr)
-		if err != nil {
-			continue
-		}
-		if ip.Is4() {
-			aRR := &dns.A{}
-			aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(nsName), Class: dns.ClassINET, TTL: 60}
-			aRR.Addr = ip
-			msg.Extra = append(msg.Extra, aRR)
+		nsNames = append(nsNames, nsName)
+		if ip, err := netip.ParseAddr(addr); err == nil && ip.Is4() {
+			glue = append(glue, dnstest.ARR(nsName, addr))
 		}
 	}
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.NotAuthoritative(),
+		dnstest.Authority(dnstest.NSRRs(zoneName, nsNames...)...), dnstest.Additional(glue...))
 }
 
 // authoritativeAPacket builds an authoritative A response.
 func authoritativeAPacket(name string, addr string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	ip, _ := netip.ParseAddr(addr)
-	aRR := &dns.A{}
-	aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
-	aRR.Addr = ip
-	msg.Answer = append(msg.Answer, aRR)
-	return packet.Packet{Msg: msg}
+	return dnstest.Response(dnstest.Answers(dnstest.ARR(name, addr)))
 }
 
 // ibTestRootHook returns a query hook for a root server that delegates

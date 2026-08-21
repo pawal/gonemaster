@@ -10,6 +10,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/dnssecutil"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -338,7 +339,7 @@ func Sign(t TB, key *dns.DNSKEY, signer crypto.Signer, typeCovered uint16, rrset
 		t.Fatalf("cannot sign an empty rrset")
 	}
 	sig := RRSIGRR(rrset[0].Header().Name, typeCovered,
-		SigAlgo(key.Algorithm), KeyTag(key.KeyTag()), Signer(key.Hdr.Name),
+		SigAlgo(key.Algorithm), KeyTag(dnssecutil.KeyTag(key)), Signer(key.Hdr.Name),
 		SigTTL(key.Hdr.TTL))
 	sig.OrigTTL = rrset[0].Header().TTL
 	for _, opt := range opts {

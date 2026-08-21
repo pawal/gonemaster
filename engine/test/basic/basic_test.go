@@ -440,8 +440,10 @@ func TestBasic02NoIPAddress(t *testing.T) {
 	}
 }
 
-func TestBasic03HasARecords(t *testing.T) {
-	ctx, _, _ := testhelpers.Context(t)
+// basic03Delegation wires the root -> example delegation the Basic03 cases
+// share; wwwA answers the www.example/A query.
+func basic03Delegation(t *testing.T, ctx context.Context, wwwA func() packet.Packet) *zone.Zone {
+	t.Helper()
 
 	r := tctest.Recursor(t, map[string]map[string][]string{
 		".": {
@@ -472,111 +474,58 @@ func TestBasic03HasARecords(t *testing.T) {
 		case name == "example" && kind == "SOA":
 			return soaPacket("example", "ns1.example", "hostmaster.example")
 		case name == "www.example" && kind == "A":
-			return aPacket("www.example", net.IPv4(192, 0, 2, 99))
+			return wwwA()
 		default:
 			return packet.Packet{}
 		}
 	})
 
-	z := tctest.Zone(t, "example", r)
-
-	entries, err := Basic03(ctx, z)
-	if err != nil {
-		t.Fatalf("basic03: %v", err)
-	}
-	tctest.RequireTags(t, entries, "HAS_A_RECORDS")
-	tctest.RequireNoTag(t, entries, "A_QUERY_NO_RESPONSES")
+	return tctest.Zone(t, "example", r)
 }
 
-func TestBasic03NoARecords(t *testing.T) {
-	ctx, _, _ := testhelpers.Context(t)
-
-	r := tctest.Recursor(t, map[string]map[string][]string{
-		".": {
-			"a.root": {"192.0.2.1"},
+func TestBasic03ARecords(t *testing.T) {
+	cases := []struct {
+		name      string
+		wwwA      func() packet.Packet
+		wantTag   string
+		wantNoTag string
+	}{
+		{
+			name:      "HasARecords",
+			wwwA:      func() packet.Packet { return aPacket("www.example", net.IPv4(192, 0, 2, 99)) },
+			wantTag:   "HAS_A_RECORDS",
+			wantNoTag: "A_QUERY_NO_RESPONSES",
 		},
-		"example": {
-			"ns1.example": {"192.0.2.53"},
+		{
+			name:      "NoARecords",
+			wwwA:      emptyAnswerPacket,
+			wantTag:   "NO_A_RECORDS",
+			wantNoTag: "HAS_A_RECORDS",
 		},
-	})
-
-	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		name := strings.ToLower(q.Name)
-		kind := strings.ToUpper(q.Type)
-		switch {
-		case name == "example" && (kind == "SOA" || kind == "NS"):
-			return referralPacket("example", "ns1.example", net.IPv4(192, 0, 2, 53))
-		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.root")
-		default:
-			return packet.Packet{}
-		}
-	})
-
-	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
-		name := strings.ToLower(q.Name)
-		kind := strings.ToUpper(q.Type)
-		switch {
-		case name == "example" && kind == "SOA":
-			return soaPacket("example", "ns1.example", "hostmaster.example")
-		case name == "www.example" && kind == "A":
-			return emptyAnswerPacket()
-		default:
-			return packet.Packet{}
-		}
-	})
-
-	z := tctest.Zone(t, "example", r)
-
-	entries, err := Basic03(ctx, z)
-	if err != nil {
-		t.Fatalf("basic03: %v", err)
+		{
+			// No answer at all, not even an empty one.
+			name:    "NoResponses",
+			wwwA:    func() packet.Packet { return packet.Packet{} },
+			wantTag: "A_QUERY_NO_RESPONSES",
+		},
 	}
-	tctest.RequireTags(t, entries, "NO_A_RECORDS")
-	tctest.RequireNoTag(t, entries, "HAS_A_RECORDS")
-}
 
-func TestBasic03NoResponses(t *testing.T) {
-	ctx, _, _ := testhelpers.Context(t)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx, _, _ := testhelpers.Context(t)
 
-	r := tctest.Recursor(t, map[string]map[string][]string{
-		".": {
-			"a.root": {"192.0.2.1"},
-		},
-		"example": {
-			"ns1.example": {"192.0.2.53"},
-		},
-	})
+			z := basic03Delegation(t, ctx, tc.wwwA)
 
-	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		name := strings.ToLower(q.Name)
-		kind := strings.ToUpper(q.Type)
-		switch {
-		case name == "example" && (kind == "SOA" || kind == "NS"):
-			return referralPacket("example", "ns1.example", net.IPv4(192, 0, 2, 53))
-		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.root")
-		default:
-			return packet.Packet{}
-		}
-	})
-
-	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
-		name := strings.ToLower(q.Name)
-		kind := strings.ToUpper(q.Type)
-		if name == "example" && kind == "SOA" {
-			return soaPacket("example", "ns1.example", "hostmaster.example")
-		}
-		return packet.Packet{}
-	})
-
-	z := tctest.Zone(t, "example", r)
-
-	entries, err := Basic03(ctx, z)
-	if err != nil {
-		t.Fatalf("basic03: %v", err)
+			entries, err := Basic03(ctx, z)
+			if err != nil {
+				t.Fatalf("basic03: %v", err)
+			}
+			tctest.RequireTags(t, entries, tc.wantTag)
+			if tc.wantNoTag != "" {
+				tctest.RequireNoTag(t, entries, tc.wantNoTag)
+			}
+		})
 	}
-	tctest.RequireTags(t, entries, "A_QUERY_NO_RESPONSES")
 }
 
 func TestBasic03ParallelQueries(t *testing.T) {

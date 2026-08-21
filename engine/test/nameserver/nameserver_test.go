@@ -26,31 +26,28 @@ import (
 )
 
 func TestNameserver01RecursorAndNoRecursor(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	// A genuine open recursor advertises recursion available (RA=1); when
 	// asked for a name outside any zone it serves it recurses and returns a
 	// non-authoritative NXDOMAIN. The RA bit is what separates it from an
 	// authoritative-only server that also answers NXDOMAIN (see
 	// TestNameserver01NxdomainWithoutRANotRecursor).
-	nsRecursor := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	nsRecursor := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeNameError
 		msg.RecursionAvailable = true
 		return packet.Packet{Msg: msg}
 	})
-	nsNoRecursor := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	nsNoRecursor := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		return packet.Packet{Msg: msg}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsRecursor, nsNoRecursor}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver01(ctx, &z)
@@ -61,23 +58,20 @@ func TestNameserver01RecursorAndNoRecursor(t *testing.T) {
 }
 
 func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	// Server returns NXDOMAIN with AA=1 on all probes (fake root authority).
 	// This should NOT be classified as a recursor.
-	nsFakeRoot := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	nsFakeRoot := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeNameError
 		msg.Authoritative = true
 		return packet.Packet{Msg: msg}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsFakeRoot}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver01(ctx, &z)
@@ -89,10 +83,7 @@ func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
 }
 
 func TestNameserver01NxdomainWithoutRANotRecursor(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	// Regression for the last.org false positive: Cloudflare-hosted
 	// nameservers answer names outside the zones they serve with a
@@ -100,15 +91,15 @@ func TestNameserver01NxdomainWithoutRANotRecursor(t *testing.T) {
 	// RA=0 proves the server is not recursing (even a globally resolvable
 	// name comes back NXDOMAIN), so it must be classified NO_RECURSOR, not
 	// IS_A_RECURSOR. Before the RA guard, branch 2 flagged this as a recursor.
-	nsCloudflare := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	nsCloudflare := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeNameError
 		return packet.Packet{Msg: msg}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsCloudflare}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver01(ctx, &z)
@@ -120,27 +111,24 @@ func TestNameserver01NxdomainWithoutRANotRecursor(t *testing.T) {
 }
 
 func TestNameserver01RAWithAnswerIsRecursor(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	// Server returns NOERROR with RA=1 and a real ANSWER record for the
 	// out-of-bailiwick probe. That is recursion: the server resolved a name
 	// it has no authority over and returned data.
-	nsRAAnswer := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qname string, _ string, _ *ens.QueryOptions) packet.Packet {
+	nsRAAnswer := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.RecursionAvailable = true
-		a := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+		a := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Type), Class: dns.ClassINET, TTL: 60}}
 		a.Addr = netip.MustParseAddr("203.0.113.1")
 		msg.Answer = []dns.RR{a}
 		return packet.Packet{Msg: msg}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsRAAnswer}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver01(ctx, &z)
@@ -151,29 +139,26 @@ func TestNameserver01RAWithAnswerIsRecursor(t *testing.T) {
 }
 
 func TestNameserver01RAReferralIsNotRecursor(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	// Authoritative-only server that returns NOERROR + RA=1 + empty
 	// ANSWER + non-empty AUTHORITY (a referral). This is the leaked-RA
 	// pattern observed against ns1.kptc.kp in the cohort: a referral,
 	// not recursion. The new rule must NOT flag this as a recursor.
-	nsRAReferral := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qname string, _ string, _ *ens.QueryOptions) packet.Packet {
+	nsRAReferral := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.RecursionAvailable = true
-		_ = qname
+		_ = q.Type
 		nsRR := &dns.NS{Hdr: dns.Header{Name: ".", Class: dns.ClassINET, TTL: 3600}}
 		nsRR.Ns = "a.root-servers.net."
 		msg.Ns = []dns.RR{nsRR}
 		return packet.Packet{Msg: msg}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsRAReferral}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver01(ctx, &z)
@@ -185,22 +170,19 @@ func TestNameserver01RAReferralIsNotRecursor(t *testing.T) {
 }
 
 func TestNameserver01RAOnSomeAnswerIsRecursor(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	// One probe gets a recursive answer (RA=1 + real ANSWER record); the
 	// other two get authoritative-style NXDOMAIN responses. A single
 	// recursive response is enough to classify the server as a recursor.
 	queries := 0
-	nsMixed := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qname string, _ string, _ *ens.QueryOptions) packet.Packet {
+	nsMixed := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
 		queries++
 		msg := new(dns.Msg)
 		if queries == 1 {
 			msg.Rcode = dns.RcodeSuccess
 			msg.RecursionAvailable = true
-			a := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 60}}
+			a := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Type), Class: dns.ClassINET, TTL: 60}}
 			a.Addr = netip.MustParseAddr("203.0.113.1")
 			msg.Answer = []dns.RR{a}
 			return packet.Packet{Msg: msg}
@@ -210,9 +192,9 @@ func TestNameserver01RAOnSomeAnswerIsRecursor(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsMixed}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver01(ctx, &z)
@@ -223,16 +205,13 @@ func TestNameserver01RAOnSomeAnswerIsRecursor(t *testing.T) {
 }
 
 func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	// A recursor (RA=1) returns NXDOMAIN on all probes, but only some have
 	// AA=1. Since not ALL NXDOMAIN responses are authoritative and recursion
 	// is available, classify as recursor.
 	queryCount := 0
-	nsMixed := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	nsMixed := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeNameError
 		msg.RecursionAvailable = true
@@ -243,9 +222,9 @@ func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{nsMixed}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver01(ctx, &z)
@@ -256,10 +235,7 @@ func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
 }
 
 func TestNameserver01ParallelQueries(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
@@ -300,9 +276,9 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -367,21 +343,18 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 }
 
 func TestNameserver02EDNS0Support(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.3", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.3", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacketWithEdns("example", 0, 0, nil)
 		}
 		return packet.Packet{}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver02(ctx, &z)
@@ -392,12 +365,9 @@ func TestNameserver02EDNS0Support(t *testing.T) {
 }
 
 func TestNameserver03AXFRAvailable(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.4", nil)
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.4", nil)
 	soaRR := soaRecord("example")
 	ns1.SetAXFRHook(func(_ context.Context, _ string, callback func(dns.RR) bool, _ string) error {
 		if callback != nil {
@@ -406,9 +376,9 @@ func TestNameserver03AXFRAvailable(t *testing.T) {
 		return nil
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver03(ctx, &z)
@@ -422,9 +392,7 @@ func TestNameserver03AXFRAvailable(t *testing.T) {
 // no-network profile so a restored transfer must be replayed from cache.
 func axfrRestoreContext(t *testing.T, store *ens.CacheStore) context.Context {
 	t.Helper()
-	t.Cleanup(profile.ResetEffective)
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	tctest.Setup(t)
 	prof, err := profile.Default()
 	if err != nil {
 		t.Fatalf("profile default: %v", err)
@@ -453,12 +421,10 @@ func TestNameserver03AXFRRestoredAvailable(t *testing.T) {
 	}
 	ctx := axfrRestoreContext(t, store)
 
-	origM := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM })
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.4", nil) // no AXFR hook
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.4", nil) // no AXFR hook
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver03(ctx, &z)
@@ -478,12 +444,10 @@ func TestNameserver03AXFRRestoredFailure(t *testing.T) {
 	}
 	ctx := axfrRestoreContext(t, store)
 
-	origM := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM })
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.4", nil)
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.4", nil)
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver03(ctx, &z)
@@ -495,20 +459,17 @@ func TestNameserver03AXFRRestoredFailure(t *testing.T) {
 }
 
 func TestNameserver04DifferentSourceIP(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.5", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.5", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		return packet.Packet{Msg: msg, AnswerFrom: "192.0.2.99:53"}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver04(ctx, &z)
@@ -519,24 +480,21 @@ func TestNameserver04DifferentSourceIP(t *testing.T) {
 }
 
 func TestNameserver05AAAAWellProcessed(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.6", func(qname string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		switch strings.ToUpper(qtype) {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.6", func(q tctest.Query) packet.Packet {
+		switch strings.ToUpper(q.Type) {
 		case "A":
-			return aPacket(qname, "192.0.2.10")
+			return aPacket(q.Name, "192.0.2.10")
 		case "AAAA":
-			return aaaaPacket(qname, "2001:db8::1")
+			return aaaaPacket(q.Name, "2001:db8::1")
 		}
 		return packet.Packet{}
 	})
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver05(ctx, &z)
@@ -547,10 +505,7 @@ func TestNameserver05AAAAWellProcessed(t *testing.T) {
 }
 
 func TestNameserver05ParallelQueries(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
@@ -586,9 +541,9 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2"))
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -647,27 +602,18 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 }
 
 func TestNameserver06NotResolved(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM2 := glueNames
-	origM3 := apexNSNames
-	origM4and5 := allNameservers
-	t.Cleanup(func() {
-		glueNames = origM2
-		apexNSNames = origM3
-		allNameservers = origM4and5
-	})
-
-	glueNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	tctest.Stub(t, &glueNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
-	}
-	apexNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	})
+	tctest.Stub(t, &apexNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns2.example")}, nil
-	}
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.7", nil)
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	})
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.7", nil)
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver06(ctx, &z)
@@ -685,19 +631,16 @@ func TestNameserver06NotResolved(t *testing.T) {
 }
 
 func TestNameserver07NoUpwardReferral(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.8", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.8", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		return packet.Packet{Msg: msg}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver07(ctx, &z)
@@ -715,25 +658,19 @@ func TestNameserver07NoUpwardReferral(t *testing.T) {
 }
 
 func TestNameserver08QNameCaseInsensitive(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	origScramble := scrambleCaseFunc
-	t.Cleanup(func() {
-		authoritativeNS = origM4and5
-		scrambleCaseFunc = origScramble
-	})
 	fixedRand := rand.New(rand.NewSource(42))
-	scrambleCaseFunc = func(s string) string { return util.ScrambleCaseWith(s, fixedRand) }
+	tctest.Stub(t, &scrambleCaseFunc, func(s string) string { return util.ScrambleCaseWith(s, fixedRand) })
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.9", func(qname string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.9", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
-		dnsutil.SetQuestion(msg, dnsutil.Fqdn(strings.ToLower(qname)), dns.TypeSOA)
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(strings.ToLower(q.Name)), dns.TypeSOA)
 		return packet.Packet{Msg: msg}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver08(ctx, &z)
@@ -744,23 +681,16 @@ func TestNameserver08QNameCaseInsensitive(t *testing.T) {
 }
 
 func TestNameserver08DoesNotReuseDifferentCaseCachedPacket(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	origScramble := scrambleCaseFunc
-	t.Cleanup(func() {
-		authoritativeNS = origM4and5
-		scrambleCaseFunc = origScramble
-	})
+	ctx := tctest.Context(t)
 
 	var calls int
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.98", func(qname string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.98", func(q tctest.Query) packet.Packet {
 		calls++
 		msg := new(dns.Msg)
-		dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.StringToType[qtype])
+		dnsutil.SetQuestion(msg, dnsutil.Fqdn(q.Name), dns.StringToType[q.Type])
 		msg.Authoritative = true
 		msg.Rcode = dns.RcodeSuccess
-		cname := &dns.CNAME{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 3600}}
+		cname := &dns.CNAME{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 3600}}
 		cname.Target = "alias.example."
 		msg.Answer = []dns.RR{cname}
 		return packet.Packet{Msg: msg}
@@ -770,10 +700,10 @@ func TestNameserver08DoesNotReuseDifferentCaseCachedPacket(t *testing.T) {
 		t.Fatalf("prime lower-case cache entry: %v", err)
 	}
 
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
-	scrambleCaseFunc = func(string) string { return "wWw.eXaMpLe" }
+	})
+	tctest.Stub(t, &scrambleCaseFunc, func(string) string { return "wWw.eXaMpLe" })
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver08(ctx, &z)
@@ -788,23 +718,17 @@ func TestNameserver08DoesNotReuseDifferentCaseCachedPacket(t *testing.T) {
 }
 
 func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	origScramble := scrambleCaseFunc
-	t.Cleanup(func() {
-		authoritativeNS = origM4and5
-		scrambleCaseFunc = origScramble
-	})
 	fixedRand := rand.New(rand.NewSource(42))
-	scrambleCaseFunc = func(s string) string { return util.ScrambleCaseWith(s, fixedRand) }
+	tctest.Stub(t, &scrambleCaseFunc, func(s string) string { return util.ScrambleCaseWith(s, fixedRand) })
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.10", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.10", func(q tctest.Query) packet.Packet {
 		return soaPacket("example")
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver09(ctx, &z)
@@ -815,25 +739,22 @@ func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
 }
 
 func TestNameserver10NoResponseEDNS1(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.11", func(_ string, _ string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if opts != nil && opts.EDNSDetails != nil && opts.EDNSDetails.Version != nil {
-			if *opts.EDNSDetails.Version == 0 {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.11", func(q tctest.Query) packet.Packet {
+		if q.Opts != nil && q.Opts.EDNSDetails != nil && q.Opts.EDNSDetails.Version != nil {
+			if *q.Opts.EDNSDetails.Version == 0 {
 				return soaPacket("example")
 			}
-			if *opts.EDNSDetails.Version == 1 {
+			if *q.Opts.EDNSDetails.Version == 1 {
 				return packet.Packet{}
 			}
 		}
 		return packet.Packet{}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver10(ctx, &z)
@@ -865,20 +786,17 @@ func TestNameserver10NoResponseEDNS1(t *testing.T) {
 }
 
 func TestNameserver11ReturnsUnknownOption(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.12", func(_ string, _ string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if opts != nil && opts.EDNSDetails != nil && len(opts.EDNSDetails.Data) > 0 {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.12", func(q tctest.Query) packet.Packet {
+		if q.Opts != nil && q.Opts.EDNSDetails != nil && len(q.Opts.EDNSDetails.Data) > 0 {
 			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{&dns.ERFC3597{EDNS0Code: 137}})
 		}
 		return soaPacketWithEdns("example", 0, 0, nil)
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver11(ctx, &z)
@@ -910,17 +828,14 @@ func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 }
 
 func TestNameserver12ZFlagsNotClear(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.13", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.13", func(q tctest.Query) packet.Packet {
 		return soaPacketWithEdns("example", 0, 3, nil)
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver12(ctx, &z)
@@ -931,20 +846,17 @@ func TestNameserver12ZFlagsNotClear(t *testing.T) {
 }
 
 func TestNameserver13MissingOptInTruncated(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.14", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.14", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Truncated = true
 		return packet.Packet{Msg: msg}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver13(ctx, &z)
@@ -955,20 +867,17 @@ func TestNameserver13MissingOptInTruncated(t *testing.T) {
 }
 
 func TestNameserver13NoEdnsSupport(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.14", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.14", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeFormatError
 		// No EDNS OPT record in response
 		return packet.Packet{Msg: msg}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver13(ctx, &z)
@@ -979,17 +888,14 @@ func TestNameserver13NoEdnsSupport(t *testing.T) {
 }
 
 func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.15", func(qname string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		switch strings.ToUpper(qtype) {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.15", func(q tctest.Query) packet.Packet {
+		switch strings.ToUpper(q.Type) {
 		case "SOA":
 			return soaPacket("example")
 		case "TXT":
-			if strings.EqualFold(qname, "version.bind") {
+			if strings.EqualFold(q.Name, "version.bind") {
 				return txtPacket("version.bind", "bind 9", dns.ClassINET)
 			}
 			msg := new(dns.Msg)
@@ -998,9 +904,9 @@ func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 		}
 		return packet.Packet{}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver15(ctx, &z)
@@ -1032,34 +938,6 @@ func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 	if servers[0]["address"] != "192.0.2.15" {
 		t.Fatalf("expected server address in N15_SOFTWARE_VERSION payload, got %#v", servers[0])
 	}
-}
-
-func setupTest(t *testing.T) context.Context {
-	t.Helper()
-
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-	return ens.WithCache(context.Background(), ens.NewCacheStore())
-}
-
-func newNameserver(t *testing.T, ctx context.Context, name string, ip string, handler func(qname string, qtype string, qclass string, opts *ens.QueryOptions) packet.Packet) ens.Nameserver {
-	t.Helper()
-
-	ns, err := ens.NewWithContext(ctx, name, ip, nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	if handler == nil {
-		handler = func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
-			return packet.Packet{}
-		}
-	}
-	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, qclass string, opts *ens.QueryOptions) (packet.Packet, error) {
-		return handler(qname, qtype, qclass, opts), nil
-	})
-	return ns
 }
 
 func soaRecord(owner string) dns.RR {
@@ -1133,23 +1011,20 @@ func txtPacket(name string, value string, class uint16) packet.Packet {
 }
 
 func TestNameserver16HasNSID(t *testing.T) {
-	ctx := setupTest(t)
-
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	nsidValue := "ns1.example"
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) == "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.16", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) == "SOA" {
 			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{
 				&dns.NSID{Nsid: fmt.Sprintf("%x", nsidValue)},
 			})
 		}
 		return packet.Packet{}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver16(ctx, &z)
@@ -1182,20 +1057,17 @@ func TestNameserver16HasNSID(t *testing.T) {
 }
 
 func TestNameserver16NoNSID(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) == "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.16", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) == "SOA" {
 			return soaPacket("example")
 		}
 		return packet.Packet{}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver16(ctx, &z)
@@ -1276,22 +1148,19 @@ func TestNSIDValue(t *testing.T) {
 // TestNameserver16BinaryNSID confirms an opaque binary NSID reaches the
 // N16_HAS_NSID arg in dig's lossless hex+ASCII form rather than as mojibake.
 func TestNameserver16BinaryNSID(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.16", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) == "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.16", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) == "SOA" {
 			return soaPacketWithEdns("example", 0, 0, []dns.EDNS0{
 				&dns.NSID{Nsid: hex.EncodeToString(binaryNSID)},
 			})
 		}
 		return packet.Packet{}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver16(ctx, &z)
@@ -1355,23 +1224,21 @@ func soaPacketWithCookieRcode(owner string, rcode int, cookieHex string) packet.
 }
 
 func TestNameserver17Supported(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
-		c := cookieFromOpts(opts)
+		c := cookieFromOpts(q.Opts)
 		if len(c) == 16 { // query 1: return a well-formed 24-byte full cookie
 			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(c)+cookieServer16)
 		}
 		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, c) // query 2: accept it
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1387,21 +1254,19 @@ func TestNameserver17Supported(t *testing.T) {
 }
 
 func TestNameserver17NoCookie(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	calls := 0
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
 		calls++
 		return soaPacket("example") // NOERROR, no COOKIE option
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1416,21 +1281,19 @@ func TestNameserver17NoCookie(t *testing.T) {
 }
 
 func TestNameserver17NonNoerrorQuery1(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeRefused
 		return packet.Packet{Msg: msg}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1443,19 +1306,17 @@ func TestNameserver17NonNoerrorQuery1(t *testing.T) {
 }
 
 func TestNameserver17ClientOnly(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
-		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(cookieFromOpts(opts)))
+		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(cookieFromOpts(q.Opts)))
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1467,20 +1328,18 @@ func TestNameserver17ClientOnly(t *testing.T) {
 
 func TestNameserver17Malformed(t *testing.T) {
 	t.Run("invalid length", func(t *testing.T) {
-		ctx := setupTest(t)
-		origM4and5 := authoritativeNS
-		t.Cleanup(func() { authoritativeNS = origM4and5 })
+		ctx := tctest.Context(t)
 
-		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-			if strings.ToUpper(qtype) != "SOA" {
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+			if strings.ToUpper(q.Type) != "SOA" {
 				return packet.Packet{}
 			}
 			// 12-byte cookie: client (8) + 4-byte server tail = invalid length.
-			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(cookieFromOpts(opts))+"aabbccdd")
+			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(cookieFromOpts(q.Opts))+"aabbccdd")
 		})
-		authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 			return []ens.Nameserver{ns1}, nil
-		}
+		})
 
 		z := zone.Zone{Name: dnsname.New("example")}
 		entries, err := Nameserver17(ctx, &z)
@@ -1494,20 +1353,18 @@ func TestNameserver17Malformed(t *testing.T) {
 	})
 
 	t.Run("wrong client echo", func(t *testing.T) {
-		ctx := setupTest(t)
-		origM4and5 := authoritativeNS
-		t.Cleanup(func() { authoritativeNS = origM4and5 })
+		ctx := tctest.Context(t)
 
-		ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-			if strings.ToUpper(qtype) != "SOA" {
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+			if strings.ToUpper(q.Type) != "SOA" {
 				return packet.Packet{}
 			}
 			// Valid length (24 B) but the client portion does not echo ours.
 			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, "ffffffffffffffff"+cookieServer16)
 		})
-		authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 			return []ens.Nameserver{ns1}, nil
-		}
+		})
 
 		z := zone.Zone{Name: dnsname.New("example")}
 		entries, err := Nameserver17(ctx, &z)
@@ -1519,16 +1376,14 @@ func TestNameserver17Malformed(t *testing.T) {
 }
 
 func TestNameserver17SelfRejectAfterRetry(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	calls := 0
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
-		c := cookieFromOpts(opts)
+		c := cookieFromOpts(q.Opts)
 		client := clientPortion(c)
 		if len(c) == 16 { // query 1: well-formed cookie
 			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, client+cookieServer16)
@@ -1539,9 +1394,9 @@ func TestNameserver17SelfRejectAfterRetry(t *testing.T) {
 		fresh := fmt.Sprintf("%016x%016x", uint64(calls), uint64(calls))
 		return soaPacketWithCookieRcode("example", dns.RcodeBadCookie, client+fresh)
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1556,17 +1411,15 @@ func TestNameserver17SelfRejectAfterRetry(t *testing.T) {
 }
 
 func TestNameserver17RotationNotFlagged(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	const freshA = "11111111111111112222222222222222"
 	calls := 0
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
-		c := cookieFromOpts(opts)
+		c := cookieFromOpts(q.Opts)
 		client := clientPortion(c)
 		if len(c) == 16 { // query 1
 			return soaPacketWithCookieRcode("example", dns.RcodeSuccess, client+cookieServer16)
@@ -1577,9 +1430,9 @@ func TestNameserver17RotationNotFlagged(t *testing.T) {
 		}
 		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, client+freshA) // retry accepted
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1596,23 +1449,21 @@ func TestNameserver17RotationNotFlagged(t *testing.T) {
 // the full cookie on the round-trip. That must report N17_COOKIE_ENFORCED (not
 // the plain N17_COOKIE_SUPPORTED) together with N17_COOKIE_ROUNDTRIP_OK.
 func TestNameserver17RequireServerCookie(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
-		c := cookieFromOpts(opts)
+		c := cookieFromOpts(q.Opts)
 		if len(c) == 16 { // query 1: client-only cookie rejected with a fresh Server Cookie
 			return soaPacketWithCookieRcode("example", dns.RcodeBadCookie, clientPortion(c)+cookieServer16)
 		}
 		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, c) // query 2: accepts the full cookie
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1633,21 +1484,19 @@ func TestNameserver17RequireServerCookie(t *testing.T) {
 // Client Cookie is echoed) is not the enforcing signal and must stay a generic
 // RCODE anomaly (graded by basic/N16) - no cookie verdict and no round-trip.
 func TestNameserver17BadCookieWithoutServerCookie(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	calls := 0
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
 		calls++
-		return soaPacketWithCookieRcode("example", dns.RcodeBadCookie, clientPortion(cookieFromOpts(opts)))
+		return soaPacketWithCookieRcode("example", dns.RcodeBadCookie, clientPortion(cookieFromOpts(q.Opts)))
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1663,16 +1512,14 @@ func TestNameserver17BadCookieWithoutServerCookie(t *testing.T) {
 }
 
 func TestNameserver17NoResponse(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
 		return packet.Packet{} // no response
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1683,18 +1530,16 @@ func TestNameserver17NoResponse(t *testing.T) {
 }
 
 func TestNameserver17Truncated(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	calls := 0
 	sawTCP := false
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
 		calls++
-		if opts != nil && opts.UseVC != nil && *opts.UseVC {
+		if q.Opts != nil && q.Opts.UseVC != nil && *q.Opts.UseVC {
 			sawTCP = true
 		}
 		msg := new(dns.Msg)
@@ -1702,9 +1547,9 @@ func TestNameserver17Truncated(t *testing.T) {
 		msg.Truncated = true
 		return packet.Packet{Msg: msg}
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1721,20 +1566,18 @@ func TestNameserver17Truncated(t *testing.T) {
 }
 
 func TestNameserver17OversizedCookieSafe(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
 		// 41-byte cookie (client + 33-byte server tail): exceeds the 40-byte max.
-		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(cookieFromOpts(opts))+strings.Repeat("a", 66))
+		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, clientPortion(cookieFromOpts(q.Opts))+strings.Repeat("a", 66))
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1748,20 +1591,18 @@ func TestNameserver17OversizedCookieSafe(t *testing.T) {
 }
 
 func TestNameserver17UndersizedCookieSafe(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
 		// 4-byte cookie (8 hex): shorter than a Client Cookie; must not panic.
 		return soaPacketWithCookieRcode("example", dns.RcodeSuccess, "aabbccdd")
 	})
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver17(ctx, &z)
@@ -1775,9 +1616,7 @@ func TestNameserver17UndersizedCookieSafe(t *testing.T) {
 }
 
 func TestNameserver17ClientCookieStable(t *testing.T) {
-	ctx := setupTest(t)
-	origM4and5 := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origM4and5 })
+	ctx := tctest.Context(t)
 
 	var mu sync.Mutex
 	var seen []string
@@ -1786,18 +1625,18 @@ func TestNameserver17ClientCookieStable(t *testing.T) {
 		defer mu.Unlock()
 		seen = append(seen, cookieFromOpts(opts))
 	}
-	handler := func(_ string, qtype string, _ string, opts *ens.QueryOptions) packet.Packet {
-		if strings.ToUpper(qtype) != "SOA" {
+	handler := func(q tctest.Query) packet.Packet {
+		if strings.ToUpper(q.Type) != "SOA" {
 			return packet.Packet{}
 		}
-		record(opts)
+		record(q.Opts)
 		return soaPacket("example") // cookieless: keeps each server to a single probe
 	}
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.17", handler)
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.18", handler)
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.17", handler)
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.18", handler)
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return []ens.Nameserver{ns1, ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	if _, err := Nameserver17(ctx, &z); err != nil {
@@ -1876,8 +1715,8 @@ func TestClassifyCookie(t *testing.T) {
 // ns18Server builds a fake nameserver whose SOA reply carries the given rcode and EDE options.
 func ns18Server(t *testing.T, ctx context.Context, name, ip string, rcode uint16, edes ...*dns.EDE) ens.Nameserver {
 	t.Helper()
-	return newNameserver(t, ctx, name, ip, func(_ string, qtype string, _ string, _ *ens.QueryOptions) packet.Packet {
-		if !strings.EqualFold(qtype, "SOA") {
+	return tctest.NS(t, ctx, name, ip, func(q tctest.Query) packet.Packet {
+		if !strings.EqualFold(q.Type, "SOA") {
 			return packet.Packet{}
 		}
 		msg := new(dns.Msg)
@@ -1896,11 +1735,9 @@ func ns18Server(t *testing.T, ctx context.Context, name, ip string, rcode uint16
 // runNameserver18 stubs the authoritative set and runs the testcase against zone "example".
 func runNameserver18(t *testing.T, ctx context.Context, servers ...ens.Nameserver) []*logger.Entry {
 	t.Helper()
-	orig := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = orig })
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
 		return servers, nil
-	}
+	})
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Nameserver18(ctx, &z)
 	if err != nil {
@@ -1910,13 +1747,13 @@ func runNameserver18(t *testing.T, ctx context.Context, servers ...ens.Nameserve
 }
 
 func TestNameserver18NoEDE(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess))
 	tctest.RequireTags(t, entries, "N18_NO_EXTENDED_ERROR")
 }
 
 func TestNameserver18ServerError(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: "lame"}))
 	e := tctest.RequireTag(t, entries, "N18_SERVER_ERROR_REPORTED")
 	if e.Args["info_code"] != 20 {
@@ -1935,20 +1772,20 @@ func TestNameserver18ServerError(t *testing.T) {
 }
 
 func TestNameserver18ResolverRoleConfusion(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	// Stale Answer (3) is a resolver/cache code, observable at DO=0.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 3}))
 	tctest.RequireTags(t, entries, "N18_RESOLVER_BEHAVIOR_REPORTED")
 }
 
 func TestNameserver18Filtered(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 15}))
 	tctest.RequireTags(t, entries, "N18_FILTERED_RESPONSE")
 }
 
 func TestNameserver18BenignAnnotation(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	// Not Ready (14) is a named, benign/transient annotation.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 14}))
 	e := tctest.RequireTag(t, entries, "N18_EXTENDED_ERROR_REPORTED")
@@ -1958,7 +1795,7 @@ func TestNameserver18BenignAnnotation(t *testing.T) {
 }
 
 func TestNameserver18UnnamedCode(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	// 49152 is private-use: permanently unnamed in any IANA-tracking library, so this
 	// proves the "code N" fallback regardless of the dns library version.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 49152}))
@@ -1969,7 +1806,7 @@ func TestNameserver18UnnamedCode(t *testing.T) {
 }
 
 func TestNameserver18MultipleEDE(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	// One response carrying two EDE options of different classes -> two findings.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess,
 		&dns.EDE{InfoCode: 20}, &dns.EDE{InfoCode: 15}))
@@ -1979,7 +1816,7 @@ func TestNameserver18MultipleEDE(t *testing.T) {
 }
 
 func TestNameserver18MultipleServersSameCode(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	s1 := ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: "x"})
 	s2 := ns18Server(t, ctx, "ns2.example", "192.0.2.2", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: "x"})
 	entries := runNameserver18(t, ctx, s1, s2)
@@ -1992,7 +1829,7 @@ func TestNameserver18MultipleServersSameCode(t *testing.T) {
 }
 
 func TestNameserver18NonNoerrorWithEDE(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	// EDE rides on REFUSED; it is captured, and the clean tag must NOT appear.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeRefused, &dns.EDE{InfoCode: 18}))
 	tctest.RequireTags(t, entries, "N18_SERVER_ERROR_REPORTED")
@@ -2000,7 +1837,7 @@ func TestNameserver18NonNoerrorWithEDE(t *testing.T) {
 }
 
 func TestNameserver18NonNoerrorNoEDE(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	// REFUSED without EDE is left to other testcases: no clean tag, no observed-EDE tag.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeRefused))
 	for _, tag := range []string{"N18_NO_EXTENDED_ERROR", "N18_SERVER_ERROR_REPORTED", "N18_EXTENDED_ERROR_REPORTED", "N18_FILTERED_RESPONSE", "N18_RESOLVER_BEHAVIOR_REPORTED"} {
@@ -2009,8 +1846,8 @@ func TestNameserver18NonNoerrorNoEDE(t *testing.T) {
 }
 
 func TestNameserver18NoResponse(t *testing.T) {
-	ctx := setupTest(t)
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, _ string, _ string, _ *ens.QueryOptions) packet.Packet {
+	ctx := tctest.Context(t)
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
 		return packet.Packet{}
 	})
 	entries := runNameserver18(t, ctx, ns1)
@@ -2018,7 +1855,7 @@ func TestNameserver18NoResponse(t *testing.T) {
 }
 
 func TestNameserver18ExtraTextSanitized(t *testing.T) {
-	ctx := setupTest(t)
+	ctx := tctest.Context(t)
 	// Invalid UTF-8 bytes, an over-length payload, and a trailing NUL.
 	raw := "start" + string([]byte{0xff, 0xfe}) + strings.Repeat("a", 300) + "\x00"
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: raw}))

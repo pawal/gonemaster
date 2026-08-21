@@ -27,13 +27,19 @@ type Query struct {
 // Handler answers one query from a test nameserver.
 type Handler func(Query) packet.Packet
 
-// Context returns a context carrying a fresh nameserver cache. The global
-// logger is replaced for the test and the effective profile is reset after it.
-func Context(t TB) context.Context {
+// Setup replaces the global logger for the test and resets the effective
+// profile afterwards. Use it when the test builds its own context.
+func Setup(t TB) {
 	t.Helper()
 	t.Cleanup(profile.ResetEffective)
 	util.SetLogger(logger.New())
 	t.Cleanup(func() { util.SetLogger(nil) })
+}
+
+// Context returns a context carrying a fresh nameserver cache, set up as Setup.
+func Context(t TB) context.Context {
+	t.Helper()
+	Setup(t)
 	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
 }
 

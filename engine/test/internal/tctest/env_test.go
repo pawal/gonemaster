@@ -34,6 +34,19 @@ func TestContextCarriesCacheAndLogger(t *testing.T) {
 	}
 }
 
+func TestSetupClearsGlobalLoggerAfterTest(t *testing.T) {
+	var testLogger any
+
+	t.Run("inner", func(t *testing.T) {
+		Setup(t)
+		testLogger = util.Logger()
+	})
+
+	if util.Logger() == testLogger {
+		t.Fatalf("expected the global logger to be cleared after the test")
+	}
+}
+
 func TestNSAnswersThroughHandler(t *testing.T) {
 	ctx := Context(t)
 	var seen Query

@@ -85,12 +85,8 @@ func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
 func TestNameserver01NxdomainWithoutRANotRecursor(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	// Regression for the last.org false positive: Cloudflare-hosted
-	// nameservers answer names outside the zones they serve with a
-	// non-authoritative NXDOMAIN (AA=0) and recursion NOT available (RA=0).
-	// RA=0 proves the server is not recursing (even a globally resolvable
-	// name comes back NXDOMAIN), so it must be classified NO_RECURSOR, not
-	// IS_A_RECURSOR. Before the RA guard, branch 2 flagged this as a recursor.
+	// Regression for the last.org false positive: a non-authoritative NXDOMAIN
+	// with RA=0 proves the server is not recursing, so it must be NO_RECURSOR.
 	nsCloudflare := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeNameError

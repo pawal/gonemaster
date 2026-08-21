@@ -124,17 +124,9 @@ func TestBasic01ParentFoundTypedArgs(t *testing.T) {
 	}
 }
 
-// TestBasic01EmitsCNAMETagOnNSLookup exercises the cnamelog integration:
-// when Basic01 walks the parent zone and tries to resolve an
-// out-of-bailiwick NS hostname whose A/AAAA recursion produces a typed
-// *recursor.CNAMEError, the matching CNAME_* tag must appear in the
-// emitted entries instead of disappearing silently.
-//
-// Setup: pre-populate the recursor cache with the CNAMEError for
-// "ns.outside.test" A and AAAA via recursortest.SeedCNAMEError. The root server's NS
-// response for "." carries an extra NS "ns.outside.test" without glue,
-// so Basic01 calls rec.Recurse(ctx, "ns.outside.test", ...) which hits
-// the cache and surfaces the typed error to cnamelog.Log.
+// A typed *recursor.CNAMEError from an out-of-bailiwick NS lookup must surface
+// as a CNAME_* tag, not vanish. The root NS response carries "ns.outside.test"
+// without glue, so the seeded cache error reaches cnamelog.Log.
 func TestBasic01EmitsCNAMETagOnNSLookup(t *testing.T) {
 	cases := []struct {
 		name       string
@@ -1063,15 +1055,10 @@ func TestBasic01MixedNXDomainContradiction(t *testing.T) {
 	}
 }
 
-// TestBasic01ParentNXDomainHidesDelegationFromRecordedCache replays a real
-// recorded DNS trace against the live zone 0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa
-// (whose parent at Bahnhof returns authoritative NXDOMAIN for the
-// intermediate ENT "b.9.1.b.9.0.1.0.0.2.ip6.arpa" while still delegating the
-// child to flashdance.cx). The fixture was captured with
-// `gonemaster --testcase basic01 --save bahnhof.cache 0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa`
-// then trimmed (recursor entries and IPv6 nameserver endpoints dropped) and
-// is replayed offline (no_network=true, IPv6 disabled in the profile) so
-// the test never touches the network.
+// Recorded trace where the parent returns authoritative NXDOMAIN for an
+// intermediate ENT while still delegating the child. Captured with
+// `gonemaster --testcase basic01 --save bahnhof.cache 0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa`,
+// then trimmed; replayed offline (no_network, IPv6 off) so it never queries.
 func TestBasic01ParentNXDomainHidesDelegationFromRecordedCache(t *testing.T) {
 
 	ctx, prof, _ := testhelpers.Context(t)

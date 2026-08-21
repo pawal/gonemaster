@@ -156,11 +156,8 @@ func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 	tctest.RequireTags(t, entries, "NAMESERVER_IP_WITHOUT_REVERSE")
 }
 
-// TestAddress02ReverseThroughCNAME locks in handling of a reverse (PTR) lookup
-// whose path goes through a CNAME, as permitted by RFC 2181 section 10.2. The
-// reverse name is a CNAME to a target that carries the PTR. Address02 must
-// follow the CNAME and report NAMESERVERS_IP_WITH_REVERSE, not
-// NAMESERVER_IP_WITHOUT_REVERSE or NO_RESPONSE_PTR_QUERY. The target is kept
+// A reverse lookup may run through a CNAME (RFC 2181 section 10.2): Address02
+// must follow it and report NAMESERVERS_IP_WITH_REVERSE. The target is kept
 // in-bailiwick so the fake recursor resolves it without cross-zone delegation.
 func TestAddress02ReverseThroughCNAME(t *testing.T) {
 	ctx := testContext(t)

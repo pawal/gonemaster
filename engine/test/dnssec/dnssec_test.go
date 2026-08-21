@@ -197,14 +197,9 @@ func TestDNSSEC01TagForKeyAlgorithmTable(t *testing.T) {
 }
 
 func TestDNSSEC01TagMirrorsDNSSEC05(t *testing.T) {
-	// DS01 classifies the DNSKEY algorithm a DS record points at and DS05
-	// classifies the DNSKEY algorithm itself, so the two must never disagree
-	// about what a given number means. dnssec01TagForKeyAlgorithm currently
-	// guarantees that by deriving its tag from dnssec05TagForAlgorithm, which
-	// makes this hold by construction. It earns its keep the day that
-	// delegation is replaced by a second switch: unlike the boundary table
-	// above, it walks the whole uint8 domain, so a fork that drifts on an
-	// untabulated algorithm number cannot slip through.
+	// DS01 and DS05 classify the same algorithm numbers, so their tags must
+	// never disagree. Unlike the boundary table above this walks the whole
+	// uint8 domain, so a fork that drifts on an untabulated number is caught.
 	for i := 0; i < 256; i++ {
 		algo := uint8(i)
 		ds05 := dnssec05TagForAlgorithm(algo)
@@ -2001,14 +1996,9 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 	}
 }
 
-// stubAllDNSSECDiscovery points both DNSSEC07's and DNSSEC11's nameserver
-// discovery at a fixed parent/child topology so All() can be exercised on an
-// unsigned zone without touching the network. DNSSEC07 finds the child via
-// delegationNameservers/zoneNameservers and never queries the parent for an
-// unsigned zone; DNSSEC11 finds the parent via parentApexNameservers and the
-// child via glueNameservers. parentNameservers and zoneParent are stubbed to
-// no-ops because DNSSEC07 still calls them before deciding the zone is
-// unsigned.
+// stubAllDNSSECDiscovery points DNSSEC07's and DNSSEC11's discovery at a fixed
+// parent/child topology. parentNameservers and zoneParent are stubbed to
+// no-ops because DNSSEC07 calls them before deciding the zone is unsigned.
 func stubAllDNSSECDiscovery(t *testing.T, parentNS, childNS nameserver.Nameserver) {
 	t.Helper()
 
@@ -3637,16 +3627,11 @@ func TestDNSSEC15ParallelQueries(t *testing.T) {
 	})
 }
 
-// TestDNSSEC15IgnoresNonMUSTCDSDigest verifies the RFC 9975 digest-type
-// filter: CDS records whose digest type is not designated MUST in IANA's
-// "Implement for DNSSEC Delegation" column must not participate in the
-// cross-server consistency check.
-//
-// NS1 publishes both a SHA-256 (digest type 2, MUST) and a SHA-1
-// (digest type 1, MUST NOT) CDS for the same key. NS2 publishes only the
-// SHA-256 CDS. The raw RRsets differ; the MUST-only views are identical.
-// Before the filter was added, this scenario produced
-// DS15_INCONSISTENT_CDS. After the filter it must not.
+// RFC 9975 digest-type filter: a CDS whose digest type is not MUST in IANA's
+// "Implement for DNSSEC Delegation" column must not join the cross-server
+// consistency check. NS1 publishes SHA-256 (MUST) and SHA-1 (MUST NOT), NS2
+// only SHA-256, so the raw RRsets differ but the MUST-only views match and
+// DS15_INCONSISTENT_CDS must not fire.
 func TestDNSSEC15IgnoresNonMUSTCDSDigest(t *testing.T) {
 	ctx := tctest.Context(t)
 

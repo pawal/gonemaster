@@ -59,8 +59,7 @@ func benchmarkSave(b *testing.B, n int, compress bool) {
 		opts = append(opts, WithCompression())
 	}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Save(path, cache, nil, nil, opts...); err != nil {
 			b.Fatalf("save: %v", err)
 		}
@@ -78,8 +77,7 @@ func benchmarkRestore(b *testing.B, n int, compress bool) {
 		b.Fatalf("save: %v", err)
 	}
 	b.ReportAllocs()
-	b.ResetTimer()
-	for i := 0; i < b.N; i++ {
+	for b.Loop() {
 		if err := Restore(path, nameserver.NewCacheStore(), nil, nil); err != nil {
 			b.Fatalf("restore: %v", err)
 		}

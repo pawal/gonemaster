@@ -117,11 +117,14 @@ func BenchmarkDNSSEC18Parallel(b *testing.B) {
 		}
 
 		b.ReportAllocs()
-		b.ResetTimer()
-		for i := 0; i < b.N; i++ {
+		// Each iteration uses its own zone name so the run never reads a
+		// previous iteration's cache entries.
+		i := 0
+		for b.Loop() {
 			ctx := profile.WithContext(context.Background(), p)
 			ctx = logger.WithContext(ctx, logger.New())
 			z := zone.Zone{Name: dnsname.New(fmt.Sprintf("bench-%d.example", i))}
+			i++
 
 			if _, err := DNSSEC18(ctx, &z); err != nil {
 				b.Fatalf("dnssec18: %v", err)

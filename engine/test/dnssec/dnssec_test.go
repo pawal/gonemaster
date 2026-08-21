@@ -4007,115 +4007,84 @@ func TestDNSSEC16CDSWithoutDNSKEY(t *testing.T) {
 }
 
 func TestDNSSEC16ParallelQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
-	cds.KeyTag = 12345
-	cds.Algorithm = 8
-	cds.DigestType = 2
-	cds.Digest = "DEADBEEF"
+		cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
+		cds.KeyTag = 12345
+		cds.Algorithm = 8
+		cds.DigestType = 2
+		cds.Digest = "DEADBEEF"
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			switch qtype {
-			case "CDS":
-				select {
-				case started <- id:
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "CDS":
+					gate.Arrive(id)
+					return answerPacket(q.Name, dns.TypeCDS, cds)
+				case "DNSKEY":
+					return answerPacket(q.Name, dns.TypeDNSKEY)
 				default:
+					return packet.Packet{}
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
-				return answerPacket(qname, dns.TypeCDS, cds), nil
-			case "DNSKEY":
-				return answerPacket(qname, dns.TypeDNSKEY), nil
-			default:
-				return packet.Packet{}, nil
 			}
 		}
-	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.241", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.241", hook("ns1"))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.242", hook("ns2"))
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.242", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns1, ns2}, nil
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		})
 
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns1, ns2}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC16(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC16(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel CDS queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec16: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec16 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DS16_CDS_WITHOUT_DNSKEY")
+		tctest.RequireTags(t, entries, "DS16_CDS_WITHOUT_DNSKEY")
 
-	var gotAddresses []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "DS16_CDS_WITHOUT_DNSKEY" {
-			continue
+		var gotAddresses []string
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "DS16_CDS_WITHOUT_DNSKEY" {
+				continue
+			}
+			if addresses, ok := entry.Args["addresses"].([]string); ok {
+				gotAddresses = addresses
+			}
+			if _, ok := entry.Args["ns_ip_list"]; ok {
+				t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+			}
+			break
 		}
-		if addresses, ok := entry.Args["addresses"].([]string); ok {
-			gotAddresses = addresses
+		if len(gotAddresses) == 0 {
+			t.Fatalf("expected addresses for DS16_CDS_WITHOUT_DNSKEY")
 		}
-		if _, ok := entry.Args["ns_ip_list"]; ok {
-			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		if strings.Join(gotAddresses, ";") != "192.0.2.241;192.0.2.242" {
+			t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 		}
-		break
-	}
-	if len(gotAddresses) == 0 {
-		t.Fatalf("expected addresses for DS16_CDS_WITHOUT_DNSKEY")
-	}
-	if strings.Join(gotAddresses, ";") != "192.0.2.241;192.0.2.242" {
-		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
-	}
+	})
 }
 
 func TestDNSSEC17CDNSKEYWithoutDNSKEY(t *testing.T) {

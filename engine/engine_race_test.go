@@ -9,7 +9,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
-	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 // Concurrent runs over one shared cache lineage must produce identical
@@ -53,13 +52,8 @@ func TestRunConcurrentIdenticalFindings(t *testing.T) {
 			// same deterministic way in every run.
 			p.NoNetwork = true
 
-			log := logger.New()
-			runner := &Runner{
-				Profile:         p,
-				Logger:          log,
-				Limiter:         transport.NewLimiter(4),
-				NameserverCache: base.SnapshotForRun(),
-			}
+			runner := newTestRunner(t, withProfile(p), withRunLimits(4), withCache(base.SnapshotForRun()))
+			log := runner.Logger
 			req := RunRequest{Domain: "example.com", Testcases: []string{"syntax01", "basic01"}}
 			if _, err := RunWithRunner(req, runner); err != nil {
 				results[i] = result{index: i, err: err}

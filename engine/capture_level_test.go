@@ -4,10 +4,7 @@ import (
 	"fmt"
 	"testing"
 
-	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
-	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 // captureRun executes an offline run and returns both the converted result and
@@ -16,17 +13,10 @@ import (
 func captureRun(t *testing.T, minLevel string, captureMinLevel string) ([]LogEntry, []*logger.Entry, error) {
 	t.Helper()
 
-	p := testhelpers.DefaultProfile(t)
+	runner := newTestRunner(t, withRunLimits(4))
 	// Offline: no traffic leaves the test and every query fails identically.
-	p.NoNetwork = true
-
-	log := logger.New()
-	runner := &Runner{
-		Profile:         p,
-		Logger:          log,
-		Limiter:         transport.NewLimiter(4),
-		NameserverCache: nameserver.NewCacheStore(),
-	}
+	runner.Profile.NoNetwork = true
+	log := runner.Logger
 	req := RunRequest{
 		Domain:          "example.com",
 		Testcases:       []string{"syntax01", "basic01"},

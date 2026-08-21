@@ -6,10 +6,7 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
-	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
-	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 func TestRunUnknownModule(t *testing.T) {
@@ -20,8 +17,7 @@ func TestRunUnknownModule(t *testing.T) {
 }
 
 func TestRunWithRunnerUnknownModule(t *testing.T) {
-	p := testhelpers.DefaultProfile(t)
-	runner := &Runner{Profile: p, Logger: logger.New()}
+	runner := newTestRunner(t)
 	_, err := RunWithRunner(RunRequest{Domain: "example.com", Module: "unknown"}, runner)
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)
@@ -29,14 +25,13 @@ func TestRunWithRunnerUnknownModule(t *testing.T) {
 }
 
 func TestEffectiveProfileUsesRunner(t *testing.T) {
-	p := testhelpers.DefaultProfile(t)
-	runner := &Runner{Profile: p, Logger: logger.New()}
+	runner := newTestRunner(t)
 	req := RunRequest{Runner: runner}
 	got, err := EffectiveProfile(req)
 	if err != nil {
 		t.Fatalf("effective profile: %v", err)
 	}
-	if got != p {
+	if got != runner.Profile {
 		t.Fatalf("expected runner profile")
 	}
 }
@@ -84,24 +79,9 @@ func TestEffectiveProfileDebugOverride(t *testing.T) {
 func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
 	// Timeout-bound; safe to overlap: all run state is per-Runner.
 	t.Parallel()
-	p1 := testhelpers.DefaultProfile(t)
-	p2 := testhelpers.DefaultProfile(t)
-
-	log1 := logger.New()
-	log2 := logger.New()
-
-	runner1 := &Runner{
-		Profile:         p1,
-		Logger:          log1,
-		Limiter:         transport.NewLimiter(1),
-		NameserverCache: nameserver.NewCacheStore(),
-	}
-	runner2 := &Runner{
-		Profile:         p2,
-		Logger:          log2,
-		Limiter:         transport.NewLimiter(2),
-		NameserverCache: nameserver.NewCacheStore(),
-	}
+	runner1 := newTestRunner(t, withRunLimits(1))
+	runner2 := newTestRunner(t, withRunLimits(2))
+	log1, log2 := runner1.Logger, runner2.Logger
 
 	req1 := RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}
 	req2 := RunRequest{Domain: "example.net", Testcases: []string{"syntax01"}}
@@ -143,14 +123,8 @@ func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
 func TestRunEmitsStartupTags(t *testing.T) {
 	// Timeout-bound; safe to overlap: all run state is per-Runner.
 	t.Parallel()
-	p := testhelpers.DefaultProfile(t)
-	log := logger.New()
-	runner := &Runner{
-		Profile:         p,
-		Logger:          log,
-		Limiter:         transport.NewLimiter(1),
-		NameserverCache: nameserver.NewCacheStore(),
-	}
+	runner := newTestRunner(t, withRunLimits(1))
+	log := runner.Logger
 	_, _ = RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner)
 
 	required := []string{"GLOBAL_VERSION", "START_TIME", "TEST_TARGET", "MODULE_END"}
@@ -162,15 +136,9 @@ func TestRunEmitsStartupTags(t *testing.T) {
 }
 
 func TestRunEmitsSkipIPv4Disabled(t *testing.T) {
-	p := testhelpers.DefaultProfile(t)
-	p.Net.IPv4 = false
-	log := logger.New()
-	runner := &Runner{
-		Profile:         p,
-		Logger:          log,
-		Limiter:         transport.NewLimiter(1),
-		NameserverCache: nameserver.NewCacheStore(),
-	}
+	runner := newTestRunner(t, withRunLimits(1))
+	runner.Profile.Net.IPv4 = false
+	log := runner.Logger
 	_, _ = RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner)
 
 	if !dnstest.HasTag(log.Entries(), "SKIP_IPV4_DISABLED") {
@@ -179,16 +147,10 @@ func TestRunEmitsSkipIPv4Disabled(t *testing.T) {
 }
 
 func TestRunEmitsNoNetwork(t *testing.T) {
-	p := testhelpers.DefaultProfile(t)
-	p.Net.IPv4 = false
-	p.Net.IPv6 = false
-	log := logger.New()
-	runner := &Runner{
-		Profile:         p,
-		Logger:          log,
-		Limiter:         transport.NewLimiter(1),
-		NameserverCache: nameserver.NewCacheStore(),
-	}
+	runner := newTestRunner(t, withRunLimits(1))
+	runner.Profile.Net.IPv4 = false
+	runner.Profile.Net.IPv6 = false
+	log := runner.Logger
 	entries, err := RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner)
 	if err != nil {
 		t.Fatalf("run: %v", err)
@@ -205,9 +167,8 @@ func TestRunEmitsNoNetwork(t *testing.T) {
 }
 
 func TestRunWithRunnerEmitsUnknownModule(t *testing.T) {
-	p := testhelpers.DefaultProfile(t)
-	log := logger.New()
-	runner := &Runner{Profile: p, Logger: log}
+	runner := newTestRunner(t)
+	log := runner.Logger
 	_, err := RunWithRunner(RunRequest{Domain: "example.com", Module: "nonexistent"}, runner)
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)
@@ -218,9 +179,8 @@ func TestRunWithRunnerEmitsUnknownModule(t *testing.T) {
 }
 
 func TestRunWithRunnerEmitsUnknownMethod(t *testing.T) {
-	p := testhelpers.DefaultProfile(t)
-	log := logger.New()
-	runner := &Runner{Profile: p, Logger: log}
+	runner := newTestRunner(t)
+	log := runner.Logger
 	_, err := RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"nonexistent99"}}, runner)
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)

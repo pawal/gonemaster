@@ -4,11 +4,51 @@ import (
 	"context"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
+
+// runnerOpt overrides a field of the runner newTestRunner builds.
+type runnerOpt func(*Runner)
+
+// withProfile uses the caller's profile instead of a fresh default one.
+func withProfile(p *profile.Profile) runnerOpt {
+	return func(r *Runner) { r.Profile = p }
+}
+
+// withRunLimits adds the limiter and per-run nameserver cache a real run needs;
+// the error paths that fail before any query do not.
+func withRunLimits(parallel int) runnerOpt {
+	return func(r *Runner) {
+		r.Limiter = transport.NewLimiter(parallel)
+		r.NameserverCache = nameserver.NewCacheStore()
+	}
+}
+
+// withCache uses the caller's nameserver cache.
+func withCache(cache *nameserver.CacheStore) runnerOpt {
+	return func(r *Runner) { r.NameserverCache = cache }
+}
+
+// newTestRunner returns a runner with a default profile and a fresh logger.
+// Callers read back runner.Profile and runner.Logger to set up and assert.
+func newTestRunner(t *testing.T, opts ...runnerOpt) *Runner {
+	t.Helper()
+	runner := &Runner{}
+	for _, opt := range opts {
+		opt(runner)
+	}
+	if runner.Profile == nil {
+		runner.Profile = testhelpers.DefaultProfile(t)
+	}
+	if runner.Logger == nil {
+		runner.Logger = logger.New()
+	}
+	return runner
+}
 
 func TestRunnerContextRoundTrip(t *testing.T) {
 	runner := &Runner{}

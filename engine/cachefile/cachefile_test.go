@@ -128,15 +128,7 @@ func TestCachefileMixedRoundTrip(t *testing.T) {
 }
 
 func TestCachefileSaveAndRestore(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	rec := &recursor.Recursor{}
-	seedNameserverCache(t, ns)
-	seedRecursorCache(t, rec)
-
-	path := filepath.Join(t.TempDir(), "cache.json")
-	if err := Save(path, ns, rec, nil); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "cache.json", withRecursor())
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -431,15 +423,7 @@ func TestCachefileRestoreUnknownFieldWarning(t *testing.T) {
 }
 
 func TestCachefileSaveRestoreChecksumRoundTrip(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	rec := &recursor.Recursor{}
-	seedNameserverCache(t, ns)
-	seedRecursorCache(t, rec)
-
-	path := filepath.Join(t.TempDir(), "cache.json")
-	if err := Save(path, ns, rec, nil); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "cache.json", withRecursor())
 
 	// Strict restore must succeed on a freshly written file.
 	if err := Restore(path, nameserver.NewCacheStore(), &recursor.Recursor{}, nil, WithStrict()); err != nil {
@@ -465,6 +449,79 @@ func TestCachefileSaveRestoreChecksumRoundTrip(t *testing.T) {
 	if !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("unexpected error: %v", err)
 	}
+}
+
+// savedSpec is the cache file savedCache writes.
+type savedSpec struct {
+	nameservers bool
+	recursor    bool
+	asn         bool
+	reuseNS     *nameserver.CacheStore
+	saveOptions []SaveOption
+}
+
+// savedOpt shapes the file savedCache writes.
+type savedOpt func(*savedSpec)
+
+// withRecursor adds a seeded recursor cache to the file.
+func withRecursor() savedOpt {
+	return func(spec *savedSpec) { spec.recursor = true }
+}
+
+// withASN adds a seeded ASN cache to the file.
+func withASN() savedOpt {
+	return func(spec *savedSpec) { spec.asn = true }
+}
+
+// withoutNameservers omits the nameserver cache.
+func withoutNameservers() savedOpt {
+	return func(spec *savedSpec) { spec.nameservers = false }
+}
+
+// reusingNameservers writes the caller's cache instead of a freshly seeded one.
+func reusingNameservers(ns *nameserver.CacheStore) savedOpt {
+	return func(spec *savedSpec) { spec.reuseNS = ns }
+}
+
+// savingWith passes options through to Save.
+func savingWith(opts ...SaveOption) savedOpt {
+	return func(spec *savedSpec) { spec.saveOptions = opts }
+}
+
+// savedCache seeds the requested caches, writes them to name under the test's
+// temp dir and returns the path.
+func savedCache(t *testing.T, name string, opts ...savedOpt) string {
+	t.Helper()
+
+	spec := savedSpec{nameservers: true}
+	for _, opt := range opts {
+		opt(&spec)
+	}
+
+	var ns *nameserver.CacheStore
+	switch {
+	case spec.reuseNS != nil:
+		ns = spec.reuseNS
+	case spec.nameservers:
+		ns = nameserver.NewCacheStore()
+		seedNameserverCache(t, ns)
+	}
+	var rec *recursor.Recursor
+	if spec.recursor {
+		rec = &recursor.Recursor{}
+		seedRecursorCache(t, rec)
+	}
+	var asn *asnlookup.Cache
+	if spec.asn {
+		asn = asnlookup.NewCache()
+		seedASNCache(t, asn)
+	}
+
+	path := filepath.Join(t.TempDir(), name)
+	if err := Save(path, ns, rec, asn, spec.saveOptions...); err != nil {
+		t.Fatalf("save %s: %v", name, err)
+	}
+	return path
 }
 
 func seedASNCache(t *testing.T, c *asnlookup.Cache) {
@@ -516,13 +573,7 @@ func TestCachefileMixedRoundTripWithASN(t *testing.T) {
 }
 
 func TestCachefileSaveRestoreASNRoundTrip(t *testing.T) {
-	asn := asnlookup.NewCache()
-	seedASNCache(t, asn)
-
-	path := filepath.Join(t.TempDir(), "asn-cache.json")
-	if err := Save(path, nil, nil, asn); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "asn-cache.json", withoutNameservers(), withASN())
 
 	restored := asnlookup.NewCache()
 	if err := Restore(path, nameserver.NewCacheStore(), &recursor.Recursor{}, restored, WithStrict()); err != nil {
@@ -580,15 +631,7 @@ func TestCachefileASNStrictRejectsMalformed(t *testing.T) {
 }
 
 func TestCachefileSaveCompressedRoundTrip(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	rec := &recursor.Recursor{}
-	seedNameserverCache(t, ns)
-	seedRecursorCache(t, rec)
-
-	path := filepath.Join(t.TempDir(), "cache.json")
-	if err := Save(path, ns, rec, nil, WithCompression()); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "cache.json", withRecursor(), savingWith(WithCompression()))
 
 	data, err := os.ReadFile(path)
 	if err != nil {
@@ -612,13 +655,7 @@ func TestCachefileSaveCompressedRoundTrip(t *testing.T) {
 }
 
 func TestCachefileSaveGzSuffixImpliesCompression(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns)
-
-	path := filepath.Join(t.TempDir(), "cache.json.gz")
-	if err := Save(path, ns, nil, nil); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "cache.json.gz")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read file: %v", err)
@@ -632,13 +669,7 @@ func TestCachefileSaveGzSuffixImpliesCompression(t *testing.T) {
 }
 
 func TestCachefileSaveGzSuffixCaseInsensitive(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns)
-
-	path := filepath.Join(t.TempDir(), "cache.JSON.GZ")
-	if err := Save(path, ns, nil, nil); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "cache.JSON.GZ")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read file: %v", err)
@@ -649,14 +680,8 @@ func TestCachefileSaveGzSuffixCaseInsensitive(t *testing.T) {
 }
 
 func TestCachefileRestoreSniffsGzipRegardlessOfName(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns)
-
-	// Write with explicit compression but a non-.gz name.
-	path := filepath.Join(t.TempDir(), "cache.bin")
-	if err := Save(path, ns, nil, nil, WithCompression()); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	// Written with explicit compression but a non-.gz name.
+	path := savedCache(t, "cache.bin", savingWith(WithCompression()))
 
 	if err := Restore(path, nameserver.NewCacheStore(), nil, nil, WithStrict()); err != nil {
 		t.Fatalf("restore should sniff gzip magic regardless of file name: %v", err)
@@ -664,13 +689,7 @@ func TestCachefileRestoreSniffsGzipRegardlessOfName(t *testing.T) {
 }
 
 func TestCachefileRestorePlainStillWorks(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns)
-
-	path := filepath.Join(t.TempDir(), "cache.json")
-	if err := Save(path, ns, nil, nil); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "cache.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read: %v", err)
@@ -684,13 +703,7 @@ func TestCachefileRestorePlainStillWorks(t *testing.T) {
 }
 
 func TestCachefileRestoreCorruptedGzip(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns)
-
-	path := filepath.Join(t.TempDir(), "cache.json.gz")
-	if err := Save(path, ns, nil, nil); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "cache.json.gz")
 
 	// Corrupt the gzip body (keep the magic so we still try to decompress).
 	data, err := os.ReadFile(path)
@@ -713,13 +726,7 @@ func TestCachefileRestoreCorruptedGzip(t *testing.T) {
 }
 
 func TestCachefileSaveMaxEntriesUnderLimitPasses(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns) // 2 entries
-
-	path := filepath.Join(t.TempDir(), "cache.json")
-	if err := Save(path, ns, nil, nil, WithMaxEntries(5)); err != nil {
-		t.Fatalf("save under limit: %v", err)
-	}
+	path := savedCache(t, "cache.json", savingWith(WithMaxEntries(5))) // 2 entries, limit 5
 	if _, err := os.Stat(path); err != nil {
 		t.Fatalf("expected file to exist when under limit: %v", err)
 	}
@@ -743,13 +750,9 @@ func TestCachefileSaveMaxEntriesOverLimitFails(t *testing.T) {
 }
 
 func TestCachefileSaveMaxEntriesZeroMeansUnlimited(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns)
-
-	path := filepath.Join(t.TempDir(), "cache.json")
-	if err := Save(path, ns, nil, nil, WithMaxEntries(0)); err != nil {
-		t.Fatalf("save with WithMaxEntries(0) should be unlimited: %v", err)
-	}
+	// savedCache fails the test if Save errors, so writing at all is the
+	// assertion: a zero limit must not reject.
+	savedCache(t, "cache.json", savingWith(WithMaxEntries(0)))
 }
 
 func TestCachefileSaveMaxEntriesCountsAllKinds(t *testing.T) {
@@ -772,17 +775,11 @@ func TestCachefileSaveMaxEntriesCountsAllKinds(t *testing.T) {
 }
 
 func TestCachefileLoadRoundTrip(t *testing.T) {
+	// Two entries of each kind. The nameserver cache is built here because the
+	// test asserts Load leaves it untouched.
 	ns := nameserver.NewCacheStore()
-	rec := &recursor.Recursor{}
-	asn := asnlookup.NewCache()
-	seedNameserverCache(t, ns) // 2
-	seedRecursorCache(t, rec)  // 2
-	seedASNCache(t, asn)       // 2
-
-	path := filepath.Join(t.TempDir(), "cache.json")
-	if err := Save(path, ns, rec, asn); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	seedNameserverCache(t, ns)
+	path := savedCache(t, "cache.json", reusingNameservers(ns), withRecursor(), withASN())
 
 	file, err := Load(path, WithStrict())
 	if err != nil {
@@ -798,13 +795,7 @@ func TestCachefileLoadRoundTrip(t *testing.T) {
 }
 
 func TestCachefileLoadGzipAndStrict(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns)
-
-	path := filepath.Join(t.TempDir(), "cache.json.gz")
-	if err := Save(path, ns, nil, nil); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "cache.json.gz")
 	if _, err := Load(path, WithStrict()); err != nil {
 		t.Fatalf("load gzip: %v", err)
 	}
@@ -822,12 +813,7 @@ func TestCachefileLoadStrictRejectsUnknownField(t *testing.T) {
 }
 
 func TestCachefileLoadRejectsChecksumMismatch(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns)
-	path := filepath.Join(t.TempDir(), "cache.json")
-	if err := Save(path, ns, nil, nil); err != nil {
-		t.Fatalf("save: %v", err)
-	}
+	path := savedCache(t, "cache.json")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read: %v", err)

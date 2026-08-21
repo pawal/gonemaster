@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
@@ -460,106 +460,74 @@ func TestDelegation04NotAuthoritative(t *testing.T) {
 }
 
 func TestDelegation04ParallelQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, _ string, qtype string, _ string, opts *nameserver.QueryOptions) (packet.Packet, error) {
-			if strings.EqualFold(qtype, "SOA") && opts != nil && opts.UseVC != nil && !*opts.UseVC {
-				select {
-				case started <- id:
-				default:
+		gate := tctest.NewGate()
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if strings.EqualFold(q.Type, "SOA") && q.Opts != nil && q.Opts.UseVC != nil && !*q.Opts.UseVC {
+					gate.Arrive(id)
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
+				return soaPacket("example", false)
 			}
-			return soaPacket("example", false), nil
 		}
-	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", hook("ns1"))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", hook("ns2"))
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns1}, nil
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns2}, nil
+		})
 
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns1}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns2}, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var delErr error
+		go func() {
+			entries, delErr = Delegation04(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var delErr error
-	go func() {
-		entries, delErr = Delegation04(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel SOA queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if delErr != nil {
 			t.Fatalf("delegation04: %v", delErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("delegation04 did not finish")
-	}
 
-	var order []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "IS_NOT_AUTHORITATIVE" {
-			continue
+		var order []string
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "IS_NOT_AUTHORITATIVE" {
+				continue
+			}
+			if _, ok := entry.Args["arg_schema"]; ok {
+				t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+			}
+			ns, _ := entry.Args["ns"].(string)
+			if strings.Contains(ns, "/") {
+				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+			}
+			address, _ := entry.Args["address"].(string)
+			proto, _ := entry.Args["proto"].(string)
+			order = append(order, ns+"|"+address+"|"+proto)
 		}
-		if _, ok := entry.Args["arg_schema"]; ok {
-			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
+		if len(order) != 4 {
+			t.Fatalf("expected 4 not-authoritative entries, got %v", order)
 		}
-		ns, _ := entry.Args["ns"].(string)
-		if strings.Contains(ns, "/") {
-			t.Fatalf("expected nameserver-only ns argument, got %q", ns)
+		if order[0] != "ns1.example|192.0.2.1|UDP" || order[1] != "ns1.example|192.0.2.1|TCP" ||
+			order[2] != "ns2.example|192.0.2.2|UDP" || order[3] != "ns2.example|192.0.2.2|TCP" {
+			t.Fatalf("expected deterministic log order, got %v", order)
 		}
-		address, _ := entry.Args["address"].(string)
-		proto, _ := entry.Args["proto"].(string)
-		order = append(order, ns+"|"+address+"|"+proto)
-	}
-	if len(order) != 4 {
-		t.Fatalf("expected 4 not-authoritative entries, got %v", order)
-	}
-	if order[0] != "ns1.example|192.0.2.1|UDP" || order[1] != "ns1.example|192.0.2.1|TCP" ||
-		order[2] != "ns2.example|192.0.2.2|UDP" || order[3] != "ns2.example|192.0.2.2|TCP" {
-		t.Fatalf("expected deterministic log order, got %v", order)
-	}
+	})
 }
 
 func TestDelegation05InBailiwickCNAME(t *testing.T) {
@@ -597,110 +565,77 @@ func TestDelegation05InBailiwickCNAME(t *testing.T) {
 }
 
 func TestDelegation05ParallelQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			if strings.EqualFold(qtype, "A") && strings.EqualFold(qname, "ns1.example") {
-				select {
-				case started <- id:
-				default:
+		gate := tctest.NewGate()
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if strings.EqualFold(q.Type, "A") && strings.EqualFold(q.Name, "ns1.example") {
+					gate.Arrive(id)
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
-				return packet.Packet{}, nil
+				return packet.Packet{}
 			}
-			return packet.Packet{}, nil
 		}
-	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", hook("ns1"))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", hook("ns2"))
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
+		tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+			return []dnsname.Name{dnsname.New("ns1.example")}, nil
+		})
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns1}, nil
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns2}, nil
+		})
 
-	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
-		return []dnsname.Name{dnsname.New("ns1.example")}, nil
-	})
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns1}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns2}, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var delErr error
+		go func() {
+			entries, delErr = Delegation05(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var delErr error
-	go func() {
-		entries, delErr = Delegation05(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel A queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if delErr != nil {
 			t.Fatalf("delegation05: %v", delErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("delegation05 did not finish")
-	}
 
-	var order []string
-	var addresses []string
-	for _, entry := range tctest.All(entries, "NO_RESPONSE") {
-		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
-		if ns, ok := entry.Args["ns"].(string); ok {
-			order = append(order, ns)
+		var order []string
+		var addresses []string
+		for _, entry := range tctest.All(entries, "NO_RESPONSE") {
+			tctest.RequireArgShape(t, entry, tctest.ArgShape{})
+			if ns, ok := entry.Args["ns"].(string); ok {
+				order = append(order, ns)
+			}
+			if address, ok := entry.Args["address"].(string); ok {
+				addresses = append(addresses, address)
+			}
 		}
-		if address, ok := entry.Args["address"].(string); ok {
-			addresses = append(addresses, address)
+		if len(order) != 2 {
+			t.Fatalf("expected 2 no-response entries, got %v", order)
 		}
-	}
-	if len(order) != 2 {
-		t.Fatalf("expected 2 no-response entries, got %v", order)
-	}
-	if order[0] != "ns1.example" || order[1] != "ns2.example" {
-		t.Fatalf("expected deterministic nameserver order, got %v", order)
-	}
-	if len(addresses) != 2 {
-		t.Fatalf("expected 2 no-response addresses, got %v", addresses)
-	}
-	if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic address order, got %v", addresses)
-	}
+		if order[0] != "ns1.example" || order[1] != "ns2.example" {
+			t.Fatalf("expected deterministic nameserver order, got %v", order)
+		}
+		if len(addresses) != 2 {
+			t.Fatalf("expected 2 no-response addresses, got %v", addresses)
+		}
+		if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+			t.Fatalf("expected deterministic address order, got %v", addresses)
+		}
+	})
 }
 
 func TestDelegation05OutOfBailiwickNoCNAME(t *testing.T) {

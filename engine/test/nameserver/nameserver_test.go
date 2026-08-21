@@ -20,6 +20,7 @@ import (
 	ens "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -56,12 +57,7 @@ func TestNameserver01RecursorAndNoRecursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver01: %v", err)
 	}
-	if !hasEntryTag(entries, "IS_A_RECURSOR") {
-		t.Fatalf("expected IS_A_RECURSOR")
-	}
-	if !hasEntryTag(entries, "NO_RECURSOR") {
-		t.Fatalf("expected NO_RECURSOR")
-	}
+	tctest.RequireTags(t, entries, "IS_A_RECURSOR", "NO_RECURSOR")
 }
 
 func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
@@ -88,12 +84,8 @@ func TestNameserver01NxdomainWithAANotRecursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver01: %v", err)
 	}
-	if hasEntryTag(entries, "IS_A_RECURSOR") {
-		t.Fatalf("did not expect IS_A_RECURSOR for server with AA+NXDOMAIN")
-	}
-	if !hasEntryTag(entries, "NO_RECURSOR") {
-		t.Fatalf("expected NO_RECURSOR for server with AA+NXDOMAIN")
-	}
+	tctest.RequireNoTag(t, entries, "IS_A_RECURSOR")
+	tctest.RequireTags(t, entries, "NO_RECURSOR")
 }
 
 func TestNameserver01NxdomainWithoutRANotRecursor(t *testing.T) {
@@ -123,12 +115,8 @@ func TestNameserver01NxdomainWithoutRANotRecursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver01: %v", err)
 	}
-	if hasEntryTag(entries, "IS_A_RECURSOR") {
-		t.Fatalf("did not expect IS_A_RECURSOR for non-authoritative NXDOMAIN with RA=0")
-	}
-	if !hasEntryTag(entries, "NO_RECURSOR") {
-		t.Fatalf("expected NO_RECURSOR for non-authoritative NXDOMAIN with RA=0")
-	}
+	tctest.RequireNoTag(t, entries, "IS_A_RECURSOR")
+	tctest.RequireTags(t, entries, "NO_RECURSOR")
 }
 
 func TestNameserver01RAWithAnswerIsRecursor(t *testing.T) {
@@ -159,9 +147,7 @@ func TestNameserver01RAWithAnswerIsRecursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver01: %v", err)
 	}
-	if !hasEntryTag(entries, "IS_A_RECURSOR") {
-		t.Fatalf("expected IS_A_RECURSOR when RA is set and ANSWER section is non-empty")
-	}
+	tctest.RequireTags(t, entries, "IS_A_RECURSOR")
 }
 
 func TestNameserver01RAReferralIsNotRecursor(t *testing.T) {
@@ -194,12 +180,8 @@ func TestNameserver01RAReferralIsNotRecursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver01: %v", err)
 	}
-	if hasEntryTag(entries, "IS_A_RECURSOR") {
-		t.Fatalf("did not expect IS_A_RECURSOR for RA-only referral response")
-	}
-	if !hasEntryTag(entries, "NO_RECURSOR") {
-		t.Fatalf("expected NO_RECURSOR for RA-only referral response")
-	}
+	tctest.RequireNoTag(t, entries, "IS_A_RECURSOR")
+	tctest.RequireTags(t, entries, "NO_RECURSOR")
 }
 
 func TestNameserver01RAOnSomeAnswerIsRecursor(t *testing.T) {
@@ -237,9 +219,7 @@ func TestNameserver01RAOnSomeAnswerIsRecursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver01: %v", err)
 	}
-	if !hasEntryTag(entries, "IS_A_RECURSOR") {
-		t.Fatalf("expected IS_A_RECURSOR when one probe response has RA=1 and ANSWER records")
-	}
+	tctest.RequireTags(t, entries, "IS_A_RECURSOR")
 }
 
 func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
@@ -272,9 +252,7 @@ func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver01: %v", err)
 	}
-	if !hasEntryTag(entries, "IS_A_RECURSOR") {
-		t.Fatalf("expected IS_A_RECURSOR when not all NXDOMAIN responses have AA")
-	}
+	tctest.RequireTags(t, entries, "IS_A_RECURSOR")
 }
 
 func TestNameserver01ParallelQueries(t *testing.T) {
@@ -410,9 +388,7 @@ func TestNameserver02EDNS0Support(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver02: %v", err)
 	}
-	if !hasEntryTag(entries, "EDNS0_SUPPORT") {
-		t.Fatalf("expected EDNS0_SUPPORT")
-	}
+	tctest.RequireTags(t, entries, "EDNS0_SUPPORT")
 }
 
 func TestNameserver03AXFRAvailable(t *testing.T) {
@@ -439,9 +415,7 @@ func TestNameserver03AXFRAvailable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver03: %v", err)
 	}
-	if !hasEntryTag(entries, "AXFR_AVAILABLE") {
-		t.Fatalf("expected AXFR_AVAILABLE")
-	}
+	tctest.RequireTags(t, entries, "AXFR_AVAILABLE")
 }
 
 // axfrRestoreContext builds a context with a controllable AXFR cache and a
@@ -491,12 +465,8 @@ func TestNameserver03AXFRRestoredAvailable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver03: %v", err)
 	}
-	if !hasEntryTag(entries, "AXFR_AVAILABLE") {
-		t.Fatalf("expected AXFR_AVAILABLE from restored cache offline")
-	}
-	if hasEntryTag(entries, "AXFR_FAILURE") {
-		t.Fatalf("did not expect AXFR_FAILURE")
-	}
+	tctest.RequireTags(t, entries, "AXFR_AVAILABLE")
+	tctest.RequireNoTag(t, entries, "AXFR_FAILURE")
 }
 
 func TestNameserver03AXFRRestoredFailure(t *testing.T) {
@@ -520,12 +490,8 @@ func TestNameserver03AXFRRestoredFailure(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver03: %v", err)
 	}
-	if !hasEntryTag(entries, "AXFR_FAILURE") {
-		t.Fatalf("expected AXFR_FAILURE from restored no-transfer entry offline")
-	}
-	if hasEntryTag(entries, "AXFR_AVAILABLE") {
-		t.Fatalf("did not expect AXFR_AVAILABLE")
-	}
+	tctest.RequireTags(t, entries, "AXFR_FAILURE")
+	tctest.RequireNoTag(t, entries, "AXFR_AVAILABLE")
 }
 
 func TestNameserver04DifferentSourceIP(t *testing.T) {
@@ -549,9 +515,7 @@ func TestNameserver04DifferentSourceIP(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver04: %v", err)
 	}
-	if !hasEntryTag(entries, "DIFFERENT_SOURCE_IP") {
-		t.Fatalf("expected DIFFERENT_SOURCE_IP")
-	}
+	tctest.RequireTags(t, entries, "DIFFERENT_SOURCE_IP")
 }
 
 func TestNameserver05AAAAWellProcessed(t *testing.T) {
@@ -579,9 +543,7 @@ func TestNameserver05AAAAWellProcessed(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver05: %v", err)
 	}
-	if !hasEntryTag(entries, "AAAA_WELL_PROCESSED") {
-		t.Fatalf("expected AAAA_WELL_PROCESSED")
-	}
+	tctest.RequireTags(t, entries, "AAAA_WELL_PROCESSED")
 }
 
 func TestNameserver05ParallelQueries(t *testing.T) {
@@ -720,13 +682,7 @@ func TestNameserver06NotResolved(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver06: %v", err)
 	}
-	if !hasEntryTag(entries, "CAN_NOT_BE_RESOLVED") {
-		t.Fatalf("expected CAN_NOT_BE_RESOLVED")
-	}
-	entry := firstEntryByTag(entries, "CAN_NOT_BE_RESOLVED")
-	if entry == nil {
-		t.Fatalf("missing CAN_NOT_BE_RESOLVED entry")
-	}
+	entry := tctest.RequireTag(t, entries, "CAN_NOT_BE_RESOLVED")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns2.example" {
 		t.Fatalf("expected typed unresolved nameserver list, got %#v", entry.Args["servers"])
@@ -756,13 +712,7 @@ func TestNameserver07NoUpwardReferral(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver07: %v", err)
 	}
-	if !hasEntryTag(entries, "NO_UPWARD_REFERRAL") {
-		t.Fatalf("expected NO_UPWARD_REFERRAL")
-	}
-	entry := firstEntryByTag(entries, "NO_UPWARD_REFERRAL")
-	if entry == nil {
-		t.Fatalf("missing NO_UPWARD_REFERRAL entry")
-	}
+	entry := tctest.RequireTag(t, entries, "NO_UPWARD_REFERRAL")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed nameserver list for NO_UPWARD_REFERRAL, got %#v", entry.Args["servers"])
@@ -798,9 +748,7 @@ func TestNameserver08QNameCaseInsensitive(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver08: %v", err)
 	}
-	if !hasEntryTag(entries, "QNAME_CASE_INSENSITIVE") {
-		t.Fatalf("expected QNAME_CASE_INSENSITIVE")
-	}
+	tctest.RequireTags(t, entries, "QNAME_CASE_INSENSITIVE")
 }
 
 func TestNameserver08DoesNotReuseDifferentCaseCachedPacket(t *testing.T) {
@@ -843,12 +791,8 @@ func TestNameserver08DoesNotReuseDifferentCaseCachedPacket(t *testing.T) {
 	if calls != 2 {
 		t.Fatalf("expected mixed-case query to bypass differently cased cached packet, got %d network calls", calls)
 	}
-	if !hasEntryTag(entries, "QNAME_CASE_SENSITIVE") {
-		t.Fatalf("expected QNAME_CASE_SENSITIVE")
-	}
-	if hasEntryTag(entries, "QNAME_CASE_INSENSITIVE") {
-		t.Fatalf("unexpected QNAME_CASE_INSENSITIVE from differently cased cached packet")
-	}
+	tctest.RequireTags(t, entries, "QNAME_CASE_SENSITIVE")
+	tctest.RequireNoTag(t, entries, "QNAME_CASE_INSENSITIVE")
 }
 
 func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
@@ -875,12 +819,7 @@ func TestNameserver09CaseQueriesSameAnswer(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver09: %v", err)
 	}
-	if !hasEntryTag(entries, "CASE_QUERY_SAME_ANSWER") {
-		t.Fatalf("expected CASE_QUERY_SAME_ANSWER")
-	}
-	if !hasEntryTag(entries, "CASE_QUERIES_RESULTS_OK") {
-		t.Fatalf("expected CASE_QUERIES_RESULTS_OK")
-	}
+	tctest.RequireTags(t, entries, "CASE_QUERY_SAME_ANSWER", "CASE_QUERIES_RESULTS_OK")
 }
 
 func TestNameserver10NoResponseEDNS1(t *testing.T) {
@@ -909,9 +848,7 @@ func TestNameserver10NoResponseEDNS1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver10: %v", err)
 	}
-	if !hasEntryTag(entries, "N10_NO_RESPONSE_EDNS1_QUERY") {
-		t.Fatalf("expected N10_NO_RESPONSE_EDNS1_QUERY")
-	}
+	tctest.RequireTags(t, entries, "N10_NO_RESPONSE_EDNS1_QUERY")
 
 	var entry *logger.Entry
 	for _, item := range entries {
@@ -956,9 +893,7 @@ func TestNameserver11ReturnsUnknownOption(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver11: %v", err)
 	}
-	if !hasEntryTag(entries, "N11_RETURNS_UNKNOWN_OPTION_CODE") {
-		t.Fatalf("expected N11_RETURNS_UNKNOWN_OPTION_CODE")
-	}
+	tctest.RequireTags(t, entries, "N11_RETURNS_UNKNOWN_OPTION_CODE")
 
 	var entry *logger.Entry
 	for _, item := range entries {
@@ -1000,9 +935,7 @@ func TestNameserver12ZFlagsNotClear(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver12: %v", err)
 	}
-	if !hasEntryTag(entries, "Z_FLAGS_NOTCLEAR") {
-		t.Fatalf("expected Z_FLAGS_NOTCLEAR")
-	}
+	tctest.RequireTags(t, entries, "Z_FLAGS_NOTCLEAR")
 }
 
 func TestNameserver13MissingOptInTruncated(t *testing.T) {
@@ -1026,9 +959,7 @@ func TestNameserver13MissingOptInTruncated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver13: %v", err)
 	}
-	if !hasEntryTag(entries, "MISSING_OPT_IN_TRUNCATED") {
-		t.Fatalf("expected MISSING_OPT_IN_TRUNCATED")
-	}
+	tctest.RequireTags(t, entries, "MISSING_OPT_IN_TRUNCATED")
 }
 
 func TestNameserver13NoEdnsSupport(t *testing.T) {
@@ -1052,9 +983,7 @@ func TestNameserver13NoEdnsSupport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver13: %v", err)
 	}
-	if !hasEntryTag(entries, "NO_EDNS_SUPPORT") {
-		t.Fatalf("expected NO_EDNS_SUPPORT")
-	}
+	tctest.RequireTags(t, entries, "NO_EDNS_SUPPORT")
 }
 
 func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
@@ -1086,12 +1015,7 @@ func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver15: %v", err)
 	}
-	if !hasEntryTag(entries, "N15_SOFTWARE_VERSION") {
-		t.Fatalf("expected N15_SOFTWARE_VERSION")
-	}
-	if !hasEntryTag(entries, "N15_WRONG_CLASS") {
-		t.Fatalf("expected N15_WRONG_CLASS")
-	}
+	tctest.RequireTags(t, entries, "N15_SOFTWARE_VERSION", "N15_WRONG_CLASS")
 
 	var software *logger.Entry
 	for _, item := range entries {
@@ -1144,30 +1068,6 @@ func newNameserver(t *testing.T, ctx context.Context, name string, ip string, ha
 		return handler(qname, qtype, qclass, opts), nil
 	})
 	return ns
-}
-
-func hasEntryTag(entries []*logger.Entry, tag string) bool {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return true
-		}
-	}
-	return false
-}
-
-func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return entry
-		}
-	}
-	return nil
 }
 
 func soaRecord(owner string) dns.RR {
@@ -1264,12 +1164,8 @@ func TestNameserver16HasNSID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver16: %v", err)
 	}
-	if !hasEntryTag(entries, "N16_HAS_NSID") {
-		t.Fatalf("expected N16_HAS_NSID")
-	}
-	if hasEntryTag(entries, "N16_NO_NSID_REVEALED") {
-		t.Fatalf("unexpected N16_NO_NSID_REVEALED")
-	}
+	tctest.RequireTags(t, entries, "N16_HAS_NSID")
+	tctest.RequireNoTag(t, entries, "N16_NO_NSID_REVEALED")
 
 	var hasNSID *logger.Entry
 	for _, item := range entries {
@@ -1314,12 +1210,8 @@ func TestNameserver16NoNSID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver16: %v", err)
 	}
-	if hasEntryTag(entries, "N16_HAS_NSID") {
-		t.Fatalf("unexpected N16_HAS_NSID")
-	}
-	if !hasEntryTag(entries, "N16_NO_NSID_REVEALED") {
-		t.Fatalf("expected N16_NO_NSID_REVEALED")
-	}
+	tctest.RequireNoTag(t, entries, "N16_HAS_NSID")
+	tctest.RequireTags(t, entries, "N16_NO_NSID_REVEALED")
 
 	var noNSID *logger.Entry
 	for _, item := range entries {
@@ -1494,13 +1386,8 @@ func TestNameserver17Supported(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	if !hasEntryTag(entries, "N17_COOKIE_SUPPORTED") {
-		t.Fatalf("expected N17_COOKIE_SUPPORTED")
-	}
-	if !hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
-		t.Fatalf("expected N17_COOKIE_ROUNDTRIP_OK")
-	}
-	entry := firstEntryByTag(entries, "N17_COOKIE_SUPPORTED")
+	tctest.RequireTags(t, entries, "N17_COOKIE_SUPPORTED", "N17_COOKIE_ROUNDTRIP_OK")
+	entry := tctest.RequireTag(t, entries, "N17_COOKIE_SUPPORTED")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for N17_COOKIE_SUPPORTED, got %#v", entry.Args["servers"])
@@ -1529,12 +1416,8 @@ func TestNameserver17NoCookie(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	if !hasEntryTag(entries, "N17_NO_COOKIE") {
-		t.Fatalf("expected N17_NO_COOKIE")
-	}
-	if hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
-		t.Fatalf("did not expect a round-trip query for a cookieless response")
-	}
+	tctest.RequireTags(t, entries, "N17_NO_COOKIE")
+	tctest.RequireNoTag(t, entries, "N17_COOKIE_ROUNDTRIP_OK")
 	if calls != 1 {
 		t.Fatalf("expected exactly one query (no round-trip), got %d", calls)
 	}
@@ -1563,9 +1446,7 @@ func TestNameserver17NonNoerrorQuery1(t *testing.T) {
 		t.Fatalf("nameserver17: %v", err)
 	}
 	for _, tag := range []string{"N17_NO_COOKIE", "N17_COOKIE_SUPPORTED", "N17_COOKIE_MALFORMED", "N17_COOKIE_CLIENT_ONLY", "N17_NO_RESPONSE"} {
-		if hasEntryTag(entries, tag) {
-			t.Fatalf("RCODE anomaly must not produce a cookie verdict, got %s", tag)
-		}
+		tctest.RequireNoTag(t, entries, tag)
 	}
 }
 
@@ -1589,9 +1470,7 @@ func TestNameserver17ClientOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	if !hasEntryTag(entries, "N17_COOKIE_CLIENT_ONLY") {
-		t.Fatalf("expected N17_COOKIE_CLIENT_ONLY")
-	}
+	tctest.RequireTags(t, entries, "N17_COOKIE_CLIENT_ONLY")
 }
 
 func TestNameserver17Malformed(t *testing.T) {
@@ -1616,10 +1495,7 @@ func TestNameserver17Malformed(t *testing.T) {
 		if err != nil {
 			t.Fatalf("nameserver17: %v", err)
 		}
-		entry := firstEntryByTag(entries, "N17_COOKIE_MALFORMED")
-		if entry == nil {
-			t.Fatalf("expected N17_COOKIE_MALFORMED")
-		}
+		entry := tctest.RequireTag(t, entries, "N17_COOKIE_MALFORMED")
 		if entry.Args["cookie_bytes"] != 12 {
 			t.Fatalf("expected cookie_bytes=12, got %#v", entry.Args["cookie_bytes"])
 		}
@@ -1646,9 +1522,7 @@ func TestNameserver17Malformed(t *testing.T) {
 		if err != nil {
 			t.Fatalf("nameserver17: %v", err)
 		}
-		if !hasEntryTag(entries, "N17_COOKIE_MALFORMED") {
-			t.Fatalf("expected N17_COOKIE_MALFORMED for a wrong client-cookie echo")
-		}
+		tctest.RequireTags(t, entries, "N17_COOKIE_MALFORMED")
 	})
 }
 
@@ -1682,12 +1556,8 @@ func TestNameserver17SelfRejectAfterRetry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	if !hasEntryTag(entries, "N17_COOKIE_SELF_REJECT") {
-		t.Fatalf("expected N17_COOKIE_SELF_REJECT")
-	}
-	if hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
-		t.Fatalf("did not expect N17_COOKIE_ROUNDTRIP_OK on a double BADCOOKIE")
-	}
+	tctest.RequireTags(t, entries, "N17_COOKIE_SELF_REJECT")
+	tctest.RequireNoTag(t, entries, "N17_COOKIE_ROUNDTRIP_OK")
 	if calls != 2 {
 		t.Fatalf("expected query 2 plus one corroborating retry, got %d round-trip queries", calls)
 	}
@@ -1724,12 +1594,8 @@ func TestNameserver17RotationNotFlagged(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	if !hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
-		t.Fatalf("expected N17_COOKIE_ROUNDTRIP_OK after a successful retry")
-	}
-	if hasEntryTag(entries, "N17_COOKIE_SELF_REJECT") {
-		t.Fatalf("rotation must not be flagged as a self-reject")
-	}
+	tctest.RequireTags(t, entries, "N17_COOKIE_ROUNDTRIP_OK")
+	tctest.RequireNoTag(t, entries, "N17_COOKIE_SELF_REJECT")
 }
 
 // TestNameserver17RequireServerCookie covers the strongest cookie posture: an
@@ -1761,16 +1627,9 @@ func TestNameserver17RequireServerCookie(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	if !hasEntryTag(entries, "N17_COOKIE_ENFORCED") {
-		t.Fatalf("expected N17_COOKIE_ENFORCED for a require-server-cookie server")
-	}
-	if !hasEntryTag(entries, "N17_COOKIE_ROUNDTRIP_OK") {
-		t.Fatalf("expected N17_COOKIE_ROUNDTRIP_OK after the enforcing server accepted its own cookie")
-	}
-	if hasEntryTag(entries, "N17_COOKIE_SUPPORTED") {
-		t.Fatalf("an enforcing server must report N17_COOKIE_ENFORCED, not N17_COOKIE_SUPPORTED")
-	}
-	entry := firstEntryByTag(entries, "N17_COOKIE_ENFORCED")
+	tctest.RequireTags(t, entries, "N17_COOKIE_ENFORCED", "N17_COOKIE_ROUNDTRIP_OK")
+	tctest.RequireNoTag(t, entries, "N17_COOKIE_SUPPORTED")
+	entry := tctest.RequireTag(t, entries, "N17_COOKIE_ENFORCED")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for N17_COOKIE_ENFORCED, got %#v", entry.Args["servers"])
@@ -1804,9 +1663,7 @@ func TestNameserver17BadCookieWithoutServerCookie(t *testing.T) {
 		t.Fatalf("nameserver17: %v", err)
 	}
 	for _, tag := range []string{"N17_COOKIE_ENFORCED", "N17_COOKIE_SUPPORTED", "N17_COOKIE_CLIENT_ONLY", "N17_COOKIE_MALFORMED", "N17_NO_COOKIE", "N17_COOKIE_ROUNDTRIP_OK"} {
-		if hasEntryTag(entries, tag) {
-			t.Fatalf("a BADCOOKIE without a well-formed Server Cookie must not produce %s", tag)
-		}
+		tctest.RequireNoTag(t, entries, tag)
 	}
 	if calls != 1 {
 		t.Fatalf("expected a single query 1 with no round-trip, got %d", calls)
@@ -1830,9 +1687,7 @@ func TestNameserver17NoResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	if !hasEntryTag(entries, "N17_NO_RESPONSE") {
-		t.Fatalf("expected N17_NO_RESPONSE")
-	}
+	tctest.RequireTags(t, entries, "N17_NO_RESPONSE")
 }
 
 func TestNameserver17Truncated(t *testing.T) {
@@ -1864,9 +1719,7 @@ func TestNameserver17Truncated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	if !hasEntryTag(entries, "N17_NO_RESPONSE") {
-		t.Fatalf("expected N17_NO_RESPONSE for a truncated probe")
-	}
+	tctest.RequireTags(t, entries, "N17_NO_RESPONSE")
 	if calls != 1 {
 		t.Fatalf("expected a single probe with no follow-up, got %d", calls)
 	}
@@ -1896,10 +1749,7 @@ func TestNameserver17OversizedCookieSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	entry := firstEntryByTag(entries, "N17_COOKIE_MALFORMED")
-	if entry == nil {
-		t.Fatalf("expected N17_COOKIE_MALFORMED for an oversized cookie")
-	}
+	entry := tctest.RequireTag(t, entries, "N17_COOKIE_MALFORMED")
 	if entry.Args["cookie_bytes"] != 41 {
 		t.Fatalf("expected cookie_bytes=41, got %#v", entry.Args["cookie_bytes"])
 	}
@@ -1926,10 +1776,7 @@ func TestNameserver17UndersizedCookieSafe(t *testing.T) {
 	if err != nil {
 		t.Fatalf("nameserver17: %v", err)
 	}
-	entry := firstEntryByTag(entries, "N17_COOKIE_MALFORMED")
-	if entry == nil {
-		t.Fatalf("expected N17_COOKIE_MALFORMED for an undersized cookie")
-	}
+	entry := tctest.RequireTag(t, entries, "N17_COOKIE_MALFORMED")
 	if entry.Args["cookie_bytes"] != 4 {
 		t.Fatalf("expected cookie_bytes=4, got %#v", entry.Args["cookie_bytes"])
 	}
@@ -2070,41 +1917,16 @@ func runNameserver18(t *testing.T, ctx context.Context, servers ...ens.Nameserve
 	return entries
 }
 
-func entryTags(entries []*logger.Entry) []string {
-	var out []string
-	for _, e := range entries {
-		if e != nil {
-			out = append(out, e.Tag)
-		}
-	}
-	return out
-}
-
-func countTag(entries []*logger.Entry, tag string) int {
-	var n int
-	for _, e := range entries {
-		if e != nil && e.Tag == tag {
-			n++
-		}
-	}
-	return n
-}
-
 func TestNameserver18NoEDE(t *testing.T) {
 	ctx := setupTest(t)
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess))
-	if !hasEntryTag(entries, "N18_NO_EXTENDED_ERROR") {
-		t.Fatalf("expected N18_NO_EXTENDED_ERROR, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "N18_NO_EXTENDED_ERROR")
 }
 
 func TestNameserver18ServerError(t *testing.T) {
 	ctx := setupTest(t)
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: "lame"}))
-	e := firstEntryByTag(entries, "N18_SERVER_ERROR_REPORTED")
-	if e == nil {
-		t.Fatalf("expected N18_SERVER_ERROR_REPORTED, got %v", entryTags(entries))
-	}
+	e := tctest.RequireTag(t, entries, "N18_SERVER_ERROR_REPORTED")
 	if e.Args["info_code"] != 20 {
 		t.Fatalf("info_code = %v, want 20", e.Args["info_code"])
 	}
@@ -2124,27 +1946,20 @@ func TestNameserver18ResolverRoleConfusion(t *testing.T) {
 	ctx := setupTest(t)
 	// Stale Answer (3) is a resolver/cache code, observable at DO=0.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 3}))
-	if !hasEntryTag(entries, "N18_RESOLVER_BEHAVIOR_REPORTED") {
-		t.Fatalf("expected N18_RESOLVER_BEHAVIOR_REPORTED, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "N18_RESOLVER_BEHAVIOR_REPORTED")
 }
 
 func TestNameserver18Filtered(t *testing.T) {
 	ctx := setupTest(t)
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 15}))
-	if !hasEntryTag(entries, "N18_FILTERED_RESPONSE") {
-		t.Fatalf("expected N18_FILTERED_RESPONSE, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "N18_FILTERED_RESPONSE")
 }
 
 func TestNameserver18BenignAnnotation(t *testing.T) {
 	ctx := setupTest(t)
 	// Not Ready (14) is a named, benign/transient annotation.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 14}))
-	e := firstEntryByTag(entries, "N18_EXTENDED_ERROR_REPORTED")
-	if e == nil {
-		t.Fatalf("expected N18_EXTENDED_ERROR_REPORTED, got %v", entryTags(entries))
-	}
+	e := tctest.RequireTag(t, entries, "N18_EXTENDED_ERROR_REPORTED")
 	if e.Args["info_name"] != "Not Ready" {
 		t.Fatalf("info_name = %v, want \"Not Ready\"", e.Args["info_name"])
 	}
@@ -2155,10 +1970,7 @@ func TestNameserver18UnnamedCode(t *testing.T) {
 	// 49152 is private-use: permanently unnamed in any IANA-tracking library, so this
 	// proves the "code N" fallback regardless of the dns library version.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 49152}))
-	e := firstEntryByTag(entries, "N18_EXTENDED_ERROR_REPORTED")
-	if e == nil {
-		t.Fatalf("expected N18_EXTENDED_ERROR_REPORTED, got %v", entryTags(entries))
-	}
+	e := tctest.RequireTag(t, entries, "N18_EXTENDED_ERROR_REPORTED")
 	if e.Args["info_name"] != "code 49152" {
 		t.Fatalf("info_name = %v, want \"code 49152\"", e.Args["info_name"])
 	}
@@ -2169,8 +1981,8 @@ func TestNameserver18MultipleEDE(t *testing.T) {
 	// One response carrying two EDE options of different classes -> two findings.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess,
 		&dns.EDE{InfoCode: 20}, &dns.EDE{InfoCode: 15}))
-	if !hasEntryTag(entries, "N18_SERVER_ERROR_REPORTED") || !hasEntryTag(entries, "N18_FILTERED_RESPONSE") {
-		t.Fatalf("expected both server-error and filtered tags, got %v", entryTags(entries))
+	if !tctest.Has(entries, "N18_SERVER_ERROR_REPORTED") || !tctest.Has(entries, "N18_FILTERED_RESPONSE") {
+		t.Fatalf("expected both server-error and filtered tags, got %v", tctest.Tags(entries))
 	}
 }
 
@@ -2179,10 +1991,8 @@ func TestNameserver18MultipleServersSameCode(t *testing.T) {
 	s1 := ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: "x"})
 	s2 := ns18Server(t, ctx, "ns2.example", "192.0.2.2", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: "x"})
 	entries := runNameserver18(t, ctx, s1, s2)
-	if n := countTag(entries, "N18_SERVER_ERROR_REPORTED"); n != 1 {
-		t.Fatalf("expected exactly 1 N18_SERVER_ERROR_REPORTED, got %d (%v)", n, entryTags(entries))
-	}
-	e := firstEntryByTag(entries, "N18_SERVER_ERROR_REPORTED")
+	tctest.RequireCount(t, entries, "N18_SERVER_ERROR_REPORTED", 1)
+	e := tctest.RequireTag(t, entries, "N18_SERVER_ERROR_REPORTED")
 	servers, ok := e.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected both servers listed, got %#v", e.Args["servers"])
@@ -2193,12 +2003,8 @@ func TestNameserver18NonNoerrorWithEDE(t *testing.T) {
 	ctx := setupTest(t)
 	// EDE rides on REFUSED; it is captured, and the clean tag must NOT appear.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeRefused, &dns.EDE{InfoCode: 18}))
-	if !hasEntryTag(entries, "N18_SERVER_ERROR_REPORTED") {
-		t.Fatalf("expected N18_SERVER_ERROR_REPORTED, got %v", entryTags(entries))
-	}
-	if hasEntryTag(entries, "N18_NO_EXTENDED_ERROR") {
-		t.Fatalf("did not expect N18_NO_EXTENDED_ERROR on a REFUSED+EDE response")
-	}
+	tctest.RequireTags(t, entries, "N18_SERVER_ERROR_REPORTED")
+	tctest.RequireNoTag(t, entries, "N18_NO_EXTENDED_ERROR")
 }
 
 func TestNameserver18NonNoerrorNoEDE(t *testing.T) {
@@ -2206,9 +2012,7 @@ func TestNameserver18NonNoerrorNoEDE(t *testing.T) {
 	// REFUSED without EDE is left to other testcases: no clean tag, no observed-EDE tag.
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeRefused))
 	for _, tag := range []string{"N18_NO_EXTENDED_ERROR", "N18_SERVER_ERROR_REPORTED", "N18_EXTENDED_ERROR_REPORTED", "N18_FILTERED_RESPONSE", "N18_RESOLVER_BEHAVIOR_REPORTED"} {
-		if hasEntryTag(entries, tag) {
-			t.Fatalf("did not expect %s for REFUSED without EDE, got %v", tag, entryTags(entries))
-		}
+		tctest.RequireNoTag(t, entries, tag)
 	}
 }
 
@@ -2218,9 +2022,7 @@ func TestNameserver18NoResponse(t *testing.T) {
 		return packet.Packet{}
 	})
 	entries := runNameserver18(t, ctx, ns1)
-	if !hasEntryTag(entries, "N18_NO_RESPONSE") {
-		t.Fatalf("expected N18_NO_RESPONSE, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "N18_NO_RESPONSE")
 }
 
 func TestNameserver18ExtraTextSanitized(t *testing.T) {
@@ -2228,10 +2030,7 @@ func TestNameserver18ExtraTextSanitized(t *testing.T) {
 	// Invalid UTF-8 bytes, an over-length payload, and a trailing NUL.
 	raw := "start" + string([]byte{0xff, 0xfe}) + strings.Repeat("a", 300) + "\x00"
 	entries := runNameserver18(t, ctx, ns18Server(t, ctx, "ns1.example", "192.0.2.1", dns.RcodeSuccess, &dns.EDE{InfoCode: 20, ExtraText: raw}))
-	e := firstEntryByTag(entries, "N18_SERVER_ERROR_REPORTED")
-	if e == nil {
-		t.Fatalf("expected N18_SERVER_ERROR_REPORTED, got %v", entryTags(entries))
-	}
+	e := tctest.RequireTag(t, entries, "N18_SERVER_ERROR_REPORTED")
 	text, ok := e.Args["extra_text"].(string)
 	if !ok {
 		t.Fatalf("extra_text not a string: %#v", e.Args["extra_text"])

@@ -2,7 +2,6 @@ package zone
 
 import (
 	"context"
-	"net/netip"
 	"strings"
 	"sync"
 	"testing"
@@ -475,26 +474,17 @@ type mxRR struct {
 
 // mxPacket builds an authoritative MX answer for owner at the given TTL.
 func mxPacket(owner string, ttl uint32, rrs ...mxRR) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeMX)
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
+	answers := make([]dns.RR, 0, len(rrs))
 	for _, r := range rrs {
-		mx := &dns.MX{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: ttl}}
-		mx.Mx = dnsutil.Fqdn(r.target)
-		mx.Preference = r.pref
-		msg.Answer = append(msg.Answer, mx)
+		answers = append(answers, tctest.MXRR(owner, r.pref, r.target))
 	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(owner, dns.TypeMX),
+		tctest.Answers(tctest.TTL(ttl, answers...)...))
 }
 
 // noMXPacket builds an authoritative NOERROR response with no MX records.
 func noMXPacket(owner string) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeMX)
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(owner, dns.TypeMX))
 }
 
 // TestEncodeMXRRSetRDATA verifies the MX consistency key: it is built from
@@ -727,11 +717,7 @@ func TestZone11SpfSyntaxError(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{{
-			Name:       dnsname.New("ns1.example.com"),
-			Address:    netip.MustParseAddr("192.0.2.10"),
-			HasAddress: true,
-		}}, nil
+		return tctest.NSItems("ns1.example.com/192.0.2.10"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
@@ -761,11 +747,7 @@ func TestZone11NoSpfNonMailDomain(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{{
-			Name:       dnsname.New("ns1.se"),
-			Address:    netip.MustParseAddr("192.0.2.10"),
-			HasAddress: true,
-		}}, nil
+		return tctest.NSItems("ns1.se/192.0.2.10"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
 		return nil, nil
@@ -791,44 +773,23 @@ func TestZone11NoSpfNonMailDomain(t *testing.T) {
 }
 
 func soaPacket(owner string, serial uint32, refresh uint32, retry uint32, expire uint32, minimum uint32) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeSOA)
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	soaRR.Ns = dnsutil.Fqdn("ns1.example")
-	soaRR.Mbox = dnsutil.Fqdn("hostmaster.example")
-	soaRR.Serial = serial
-	soaRR.Refresh = refresh
-	soaRR.Retry = retry
-	soaRR.Expire = expire
-	soaRR.Minttl = minimum
-	msg.Answer = []dns.RR{soaRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(owner, dns.TypeSOA),
+		tctest.Answers(tctest.SOARR(owner, tctest.MName("ns1.example"),
+			tctest.RName("hostmaster.example"), tctest.Serial(serial),
+			tctest.SOATimers(refresh, retry, expire, minimum))))
 }
 
 func txtPacket(name string, value string) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeTXT)
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	txtRR := &dns.TXT{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
-	txtRR.Txt = []string{value}
-	msg.Answer = []dns.RR{txtRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(name, dns.TypeTXT),
+		tctest.Answers(tctest.TXTRR(name, value)))
 }
 
 func csyncPacket(name string, serial uint32, flags uint16, types []uint16) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	csync := &dns.CSYNC{}
-	csync.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}
+	csync := &dns.CSYNC{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}}
 	csync.CSYNC.Serial = serial
 	csync.CSYNC.Flags = flags
 	csync.CSYNC.TypeBitMap = types
-	msg.Answer = []dns.RR{csync}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(csync))
 }
 
 func TestZone12CSYNCFound(t *testing.T) {
@@ -1058,13 +1019,8 @@ func spfTxtPacket(name string, spf string) packet.Packet {
 
 // recurseTxtPacket creates a non-authoritative TXT response (for recursive lookups).
 func recurseTxtPacket(name string, value string) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeTXT)
-	msg.Rcode = dns.RcodeSuccess
-	txtRR := &dns.TXT{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
-	txtRR.Txt = []string{value}
-	msg.Answer = []dns.RR{txtRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(), tctest.Question(name, dns.TypeTXT),
+		tctest.Answers(tctest.TXTRR(name, value)))
 }
 
 func TestZone13LookupCountOK_NoLookups(t *testing.T) {
@@ -1349,19 +1305,16 @@ type zonemdRecord struct {
 }
 
 func zonemdPacket(name string, records []zonemdRecord) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
+	answers := make([]dns.RR, 0, len(records))
 	for _, r := range records {
-		zm := &dns.ZONEMD{}
-		zm.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}
+		zm := &dns.ZONEMD{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}}
 		zm.ZONEMD.Serial = r.serial
 		zm.ZONEMD.Scheme = r.scheme
 		zm.ZONEMD.Hash = r.hash
 		zm.ZONEMD.Digest = r.digest
-		msg.Answer = append(msg.Answer, zm)
+		answers = append(answers, zm)
 	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(answers...))
 }
 
 func TestZone14ZONEMDFound(t *testing.T) {
@@ -1902,29 +1855,21 @@ type caaRecord struct {
 // records at the owner name. Passing no records yields the "authoritative, but
 // the CAA RRset is empty" case, which is how a zone without CAA answers.
 func caaPacket(name string, records []caaRecord) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeCAA)
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
+	answers := make([]dns.RR, 0, len(records))
 	for _, r := range records {
-		caa := &dns.CAA{}
-		caa.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}
+		caa := &dns.CAA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 300}}
 		caa.CAA.Flag = r.flags
 		caa.CAA.Tag = r.tag
 		caa.CAA.Value = r.value
-		msg.Answer = append(msg.Answer, caa)
+		answers = append(answers, caa)
 	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(name, dns.TypeCAA), tctest.Answers(answers...))
 }
 
 // caaRcodePacket builds an authoritative response carrying only an RCODE, for
 // the servers that answer the CAA query with a failure.
 func caaRcodePacket(name string, rcode uint16) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(name), dns.TypeCAA)
-	msg.Authoritative = true
-	msg.Rcode = rcode
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(name, dns.TypeCAA), tctest.Rcode(rcode))
 }
 
 // caaHandler answers CAA queries with the given packet and stays silent for

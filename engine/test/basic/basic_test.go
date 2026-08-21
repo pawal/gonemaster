@@ -22,6 +22,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/recursor/recursortest"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -45,12 +46,7 @@ func TestBasic01Root(t *testing.T) {
 	if entries[len(entries)-1].Tag != "TEST_CASE_END" {
 		t.Fatalf("expected TEST_CASE_END, got %q", entries[len(entries)-1].Tag)
 	}
-	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
-		t.Fatalf("expected B01_CHILD_FOUND")
-	}
-	if !hasEntryTag(entries, "B01_ROOT_HAS_NO_PARENT") {
-		t.Fatalf("expected B01_ROOT_HAS_NO_PARENT")
-	}
+	tctest.RequireTags(t, entries, "B01_CHILD_FOUND", "B01_ROOT_HAS_NO_PARENT")
 }
 
 func TestBasic01Undelegated(t *testing.T) {
@@ -72,12 +68,7 @@ func TestBasic01Undelegated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
-	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
-		t.Fatalf("expected B01_CHILD_FOUND")
-	}
-	if !hasEntryTag(entries, "B01_PARENT_DISREGARDED") {
-		t.Fatalf("expected B01_PARENT_DISREGARDED")
-	}
+	tctest.RequireTags(t, entries, "B01_CHILD_FOUND", "B01_PARENT_DISREGARDED")
 }
 
 func TestBasic01ParentFoundTypedArgs(t *testing.T) {
@@ -131,13 +122,7 @@ func TestBasic01ParentFoundTypedArgs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
-	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
-		t.Fatalf("expected B01_PARENT_FOUND")
-	}
-	entry := firstEntryByTag(entries, "B01_PARENT_FOUND")
-	if entry == nil {
-		t.Fatalf("missing B01_PARENT_FOUND entry")
-	}
+	entry := tctest.RequireTag(t, entries, "B01_PARENT_FOUND")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected two typed servers for B01_PARENT_FOUND, got %#v", entry.Args["servers"])
@@ -246,13 +231,7 @@ func TestBasic01EmitsCNAMETagOnNSLookup(t *testing.T) {
 			if err != nil {
 				t.Fatalf("basic01: %v", err)
 			}
-			if !hasEntryTag(entries, tc.wantTag) {
-				t.Fatalf("expected %s, got tags: %v", tc.wantTag, entryTags(entries))
-			}
-			entry := firstEntryByTag(entries, tc.wantTag)
-			if entry == nil {
-				t.Fatalf("missing %s entry", tc.wantTag)
-			}
+			entry := tctest.RequireTag(t, entries, tc.wantTag)
 			for k, want := range tc.wantArgs {
 				if got := entry.Args[k]; got != want {
 					t.Fatalf("%s arg %q: got %#v, want %#v", tc.wantTag, k, got, want)
@@ -260,17 +239,6 @@ func TestBasic01EmitsCNAMETagOnNSLookup(t *testing.T) {
 			}
 		})
 	}
-}
-
-func entryTags(entries []*logger.Entry) []string {
-	out := make([]string, 0, len(entries))
-	for _, e := range entries {
-		if e == nil {
-			continue
-		}
-		out = append(out, e.Tag)
-	}
-	return out
 }
 
 func TestBasic02NoDelegation(t *testing.T) {
@@ -286,9 +254,7 @@ func TestBasic02NoDelegation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
-	if !hasEntryTag(entries, "B02_NO_DELEGATION") {
-		t.Fatalf("expected B02_NO_DELEGATION")
-	}
+	tctest.RequireTags(t, entries, "B02_NO_DELEGATION")
 	if entries[0].Tag != "TEST_CASE_START" || entries[len(entries)-1].Tag != "TEST_CASE_END" {
 		t.Fatalf("expected test case start/end markers")
 	}
@@ -330,10 +296,7 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
-	if !hasEntryTag(entries, "B02_AUTH_RESPONSE_SOA") {
-		t.Fatalf("expected B02_AUTH_RESPONSE_SOA")
-	}
-	entry := firstEntryByTag(entries, "B02_AUTH_RESPONSE_SOA")
+	entry := tctest.RequireTag(t, entries, "B02_AUTH_RESPONSE_SOA")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected one typed server for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["servers"])
@@ -472,13 +435,7 @@ func TestBasic02ParallelQueries(t *testing.T) {
 	if enabledAddresses[0] != "192.0.2.1" || enabledAddresses[1] != "192.0.2.2" {
 		t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
 	}
-	if !hasEntryTag(entries, "B02_AUTH_RESPONSE_SOA") {
-		t.Fatalf("expected B02_AUTH_RESPONSE_SOA")
-	}
-	entry := firstEntryByTag(entries, "B02_AUTH_RESPONSE_SOA")
-	if entry == nil {
-		t.Fatalf("missing B02_AUTH_RESPONSE_SOA entry")
-	}
+	entry := tctest.RequireTag(t, entries, "B02_AUTH_RESPONSE_SOA")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected two typed servers for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["servers"])
@@ -537,12 +494,7 @@ func TestBasic02UnexpectedRcode(t *testing.T) {
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
-	if !hasEntryTag(entries, "B02_NO_WORKING_NS") {
-		t.Fatalf("expected B02_NO_WORKING_NS")
-	}
-	if !hasEntryTag(entries, "B02_UNEXPECTED_RCODE") {
-		t.Fatalf("expected B02_UNEXPECTED_RCODE")
-	}
+	tctest.RequireTags(t, entries, "B02_NO_WORKING_NS", "B02_UNEXPECTED_RCODE")
 }
 
 func TestBasic02NoIPAddress(t *testing.T) {
@@ -577,13 +529,7 @@ func TestBasic02NoIPAddress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
-	if !hasEntryTag(entries, "B02_NS_NO_IP_ADDR") {
-		t.Fatalf("expected B02_NS_NO_IP_ADDR")
-	}
-	entry := firstEntryByTag(entries, "B02_NS_NO_IP_ADDR")
-	if entry == nil {
-		t.Fatalf("expected B02_NS_NO_IP_ADDR entry")
-	}
+	entry := tctest.RequireTag(t, entries, "B02_NS_NO_IP_ADDR")
 	if ns, _ := entry.Args["ns"].(string); ns != "b.root" {
 		t.Fatalf("expected ns=b.root in B02_NS_NO_IP_ADDR, got %#v", entry.Args["ns"])
 	}
@@ -650,12 +596,8 @@ func TestBasic03HasARecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("basic03: %v", err)
 	}
-	if !hasEntryTag(entries, "HAS_A_RECORDS") {
-		t.Fatalf("expected HAS_A_RECORDS")
-	}
-	if hasEntryTag(entries, "A_QUERY_NO_RESPONSES") {
-		t.Fatalf("unexpected A_QUERY_NO_RESPONSES")
-	}
+	tctest.RequireTags(t, entries, "HAS_A_RECORDS")
+	tctest.RequireNoTag(t, entries, "A_QUERY_NO_RESPONSES")
 }
 
 func TestBasic03NoARecords(t *testing.T) {
@@ -716,12 +658,8 @@ func TestBasic03NoARecords(t *testing.T) {
 	if err != nil {
 		t.Fatalf("basic03: %v", err)
 	}
-	if !hasEntryTag(entries, "NO_A_RECORDS") {
-		t.Fatalf("expected NO_A_RECORDS")
-	}
-	if hasEntryTag(entries, "HAS_A_RECORDS") {
-		t.Fatalf("unexpected HAS_A_RECORDS")
-	}
+	tctest.RequireTags(t, entries, "NO_A_RECORDS")
+	tctest.RequireNoTag(t, entries, "HAS_A_RECORDS")
 }
 
 func TestBasic03NoResponses(t *testing.T) {
@@ -778,9 +716,7 @@ func TestBasic03NoResponses(t *testing.T) {
 	if err != nil {
 		t.Fatalf("basic03: %v", err)
 	}
-	if !hasEntryTag(entries, "A_QUERY_NO_RESPONSES") {
-		t.Fatalf("expected A_QUERY_NO_RESPONSES")
-	}
+	tctest.RequireTags(t, entries, "A_QUERY_NO_RESPONSES")
 }
 
 func TestBasic03ParallelQueries(t *testing.T) {
@@ -928,9 +864,7 @@ func TestBasic03ParallelQueries(t *testing.T) {
 	if enabledAddresses[0] != "192.0.2.53" || enabledAddresses[1] != "192.0.2.54" {
 		t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
 	}
-	if !hasEntryTag(entries, "HAS_A_RECORDS") {
-		t.Fatalf("expected HAS_A_RECORDS")
-	}
+	tctest.RequireTags(t, entries, "HAS_A_RECORDS")
 }
 
 func TestBasic03ParallelOutputStable(t *testing.T) {
@@ -1008,17 +942,15 @@ func TestBasic03ParallelOutputStable(t *testing.T) {
 		if err != nil {
 			t.Fatalf("basic03: %v", err)
 		}
-		if !hasEntryTag(entries, "HAS_A_RECORDS") {
-			t.Fatalf("expected HAS_A_RECORDS")
-		}
+		tctest.RequireTags(t, entries, "HAS_A_RECORDS")
 		return entries
 	}
 
 	sequentialEntries := runBasic03(1)
 	parallelEntries := runBasic03(2)
 
-	sequentialNormalized := normalizeEntriesForComparison(sequentialEntries)
-	parallelNormalized := normalizeEntriesForComparison(parallelEntries)
+	sequentialNormalized := tctest.Normalize(sequentialEntries)
+	parallelNormalized := tctest.Normalize(parallelEntries)
 
 	if len(sequentialNormalized) != len(parallelNormalized) {
 		t.Fatalf("entry count changed with parallelism: sequential=%v parallel=%v", sequentialNormalized, parallelNormalized)
@@ -1080,23 +1012,10 @@ func TestBasic01NoChild(t *testing.T) {
 		t.Fatalf("basic01: %v", err)
 	}
 
-	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
-		t.Fatalf("expected B01_PARENT_FOUND")
-	}
-	if !hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("expected B01_NO_CHILD")
-	}
-	if hasEntryTag(entries, "B01_CHILD_FOUND") {
-		t.Fatalf("did not expect B01_CHILD_FOUND")
-	}
-	if hasEntryTag(entries, "B01_INCONSISTENT_DELEGATION") {
-		t.Fatalf("did not expect B01_INCONSISTENT_DELEGATION")
-	}
+	tctest.RequireTags(t, entries, "B01_PARENT_FOUND", "B01_NO_CHILD")
+	tctest.RequireNoTag(t, entries, "B01_CHILD_FOUND", "B01_INCONSISTENT_DELEGATION")
 
-	noChild := firstEntryByTag(entries, "B01_NO_CHILD")
-	if noChild == nil {
-		t.Fatalf("missing B01_NO_CHILD entry")
-	}
+	noChild := tctest.RequireTag(t, entries, "B01_NO_CHILD")
 	if noChild.Args["domain_child"] != "example" {
 		t.Fatalf("expected domain_child=example, got %#v", noChild.Args["domain_child"])
 	}
@@ -1171,23 +1090,10 @@ func TestBasic01InconsistentDelegation(t *testing.T) {
 		t.Fatalf("basic01: %v", err)
 	}
 
-	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
-		t.Fatalf("expected B01_PARENT_FOUND")
-	}
-	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
-		t.Fatalf("expected B01_CHILD_FOUND")
-	}
-	if !hasEntryTag(entries, "B01_INCONSISTENT_DELEGATION") {
-		t.Fatalf("expected B01_INCONSISTENT_DELEGATION")
-	}
-	if hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("did not expect B01_NO_CHILD")
-	}
+	tctest.RequireTags(t, entries, "B01_PARENT_FOUND", "B01_CHILD_FOUND", "B01_INCONSISTENT_DELEGATION")
+	tctest.RequireNoTag(t, entries, "B01_NO_CHILD")
 
-	inconsistent := firstEntryByTag(entries, "B01_INCONSISTENT_DELEGATION")
-	if inconsistent == nil {
-		t.Fatalf("missing B01_INCONSISTENT_DELEGATION entry")
-	}
+	inconsistent := tctest.RequireTag(t, entries, "B01_INCONSISTENT_DELEGATION")
 	if inconsistent.Args["domain_child"] != "example" {
 		t.Fatalf("expected domain_child=example, got %#v", inconsistent.Args["domain_child"])
 	}
@@ -1270,26 +1176,10 @@ func TestBasic01ParentNXDomainHidesDelegation(t *testing.T) {
 		t.Fatalf("basic01: %v", err)
 	}
 
-	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
-		t.Fatalf("expected B01_PARENT_FOUND")
-	}
-	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
-		t.Fatalf("expected B01_CHILD_FOUND")
-	}
-	if !hasEntryTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION") {
-		t.Fatalf("expected B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
-	}
-	if hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("did not expect B01_NO_CHILD")
-	}
-	if hasEntryTag(entries, "B01_INCONSISTENT_DELEGATION") {
-		t.Fatalf("did not expect B01_INCONSISTENT_DELEGATION")
-	}
+	tctest.RequireTags(t, entries, "B01_PARENT_FOUND", "B01_CHILD_FOUND", "B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
+	tctest.RequireNoTag(t, entries, "B01_NO_CHILD", "B01_INCONSISTENT_DELEGATION")
 
-	entry := firstEntryByTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
-	if entry == nil {
-		t.Fatalf("missing B01_PARENT_NXDOMAIN_HIDES_DELEGATION entry")
-	}
+	entry := tctest.RequireTag(t, entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
 	if entry.Args["ns"] != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
 	}
@@ -1365,20 +1255,10 @@ func TestBasic01ParentNXDomainNoDelegation(t *testing.T) {
 		t.Fatalf("basic01: %v", err)
 	}
 
-	if !hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("expected B01_NO_CHILD")
-	}
-	if hasEntryTag(entries, "B01_CHILD_FOUND") {
-		t.Fatalf("did not expect B01_CHILD_FOUND")
-	}
-	if hasEntryTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION") {
-		t.Fatalf("did not expect B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
-	}
+	tctest.RequireTags(t, entries, "B01_NO_CHILD")
+	tctest.RequireNoTag(t, entries, "B01_CHILD_FOUND", "B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
 
-	noChild := firstEntryByTag(entries, "B01_NO_CHILD")
-	if noChild == nil {
-		t.Fatalf("missing B01_NO_CHILD entry")
-	}
+	noChild := tctest.RequireTag(t, entries, "B01_NO_CHILD")
 	if noChild.Args["domain_child"] != "child.mid.example" {
 		t.Fatalf("expected domain_child=child.mid.example, got %#v", noChild.Args["domain_child"])
 	}
@@ -1482,18 +1362,8 @@ func TestBasic01MixedNXDomainContradiction(t *testing.T) {
 		t.Fatalf("basic01: %v", err)
 	}
 
-	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
-		t.Fatalf("expected B01_CHILD_FOUND")
-	}
-	if !hasEntryTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION") {
-		t.Fatalf("expected B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
-	}
-	if hasEntryTag(entries, "B01_INCONSISTENT_DELEGATION") {
-		t.Fatalf("did not expect B01_INCONSISTENT_DELEGATION (broken NS was diverted to delegationFound)")
-	}
-	if hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("did not expect B01_NO_CHILD")
-	}
+	tctest.RequireTags(t, entries, "B01_CHILD_FOUND", "B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
+	tctest.RequireNoTag(t, entries, "B01_INCONSISTENT_DELEGATION", "B01_NO_CHILD")
 
 	count := 0
 	for _, entry := range entries {
@@ -1556,23 +1426,10 @@ func TestBasic01ParentNXDomainHidesDelegationFromRecordedCache(t *testing.T) {
 		t.Fatalf("basic01: %v", err)
 	}
 
-	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
-		t.Fatalf("expected B01_PARENT_FOUND")
-	}
-	if !hasEntryTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION") {
-		t.Fatalf("expected B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
-	}
-	if !hasEntryTag(entries, "B01_CHILD_FOUND") {
-		t.Fatalf("expected B01_CHILD_FOUND")
-	}
-	if hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("did not expect B01_NO_CHILD")
-	}
+	tctest.RequireTags(t, entries, "B01_PARENT_FOUND", "B01_PARENT_NXDOMAIN_HIDES_DELEGATION", "B01_CHILD_FOUND")
+	tctest.RequireNoTag(t, entries, "B01_NO_CHILD")
 
-	entry := firstEntryByTag(entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
-	if entry == nil {
-		t.Fatalf("missing B01_PARENT_NXDOMAIN_HIDES_DELEGATION entry")
-	}
+	entry := tctest.RequireTag(t, entries, "B01_PARENT_NXDOMAIN_HIDES_DELEGATION")
 	if entry.Args["domain_child"] != "0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa" {
 		t.Fatalf("expected domain_child=0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa, got %#v", entry.Args["domain_child"])
 	}
@@ -1625,26 +1482,12 @@ func TestBasic01ChildAlias(t *testing.T) {
 		t.Fatalf("basic01: %v", err)
 	}
 
-	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
-		t.Fatalf("expected B01_PARENT_FOUND")
-	}
-	if hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("did not expect B01_NO_CHILD for DNAME alias")
-	}
-	if !hasEntryTag(entries, "B01_CHILD_IS_ALIAS") {
-		t.Fatalf("expected B01_CHILD_IS_ALIAS")
-	}
-	if hasEntryTag(entries, "B01_CHILD_FOUND") {
-		t.Fatalf("did not expect B01_CHILD_FOUND")
-	}
-	if hasEntryTag(entries, "B01_INCONSISTENT_ALIAS") {
-		t.Fatalf("did not expect B01_INCONSISTENT_ALIAS")
-	}
+	tctest.RequireTags(t, entries, "B01_PARENT_FOUND")
+	tctest.RequireNoTag(t, entries, "B01_NO_CHILD")
+	tctest.RequireTags(t, entries, "B01_CHILD_IS_ALIAS")
+	tctest.RequireNoTag(t, entries, "B01_CHILD_FOUND", "B01_INCONSISTENT_ALIAS")
 
-	alias := firstEntryByTag(entries, "B01_CHILD_IS_ALIAS")
-	if alias == nil {
-		t.Fatalf("missing B01_CHILD_IS_ALIAS entry")
-	}
+	alias := tctest.RequireTag(t, entries, "B01_CHILD_IS_ALIAS")
 	if alias.Args["domain_child"] != "example" {
 		t.Fatalf("expected domain_child=example, got %#v", alias.Args["domain_child"])
 	}
@@ -1704,18 +1547,9 @@ func TestBasic01InconsistentAlias(t *testing.T) {
 		t.Fatalf("basic01: %v", err)
 	}
 
-	if !hasEntryTag(entries, "B01_PARENT_FOUND") {
-		t.Fatalf("expected B01_PARENT_FOUND")
-	}
-	if hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("did not expect B01_NO_CHILD for DNAME alias")
-	}
-	if !hasEntryTag(entries, "B01_CHILD_IS_ALIAS") {
-		t.Fatalf("expected B01_CHILD_IS_ALIAS")
-	}
-	if !hasEntryTag(entries, "B01_INCONSISTENT_ALIAS") {
-		t.Fatalf("expected B01_INCONSISTENT_ALIAS")
-	}
+	tctest.RequireTags(t, entries, "B01_PARENT_FOUND")
+	tctest.RequireNoTag(t, entries, "B01_NO_CHILD")
+	tctest.RequireTags(t, entries, "B01_CHILD_IS_ALIAS", "B01_INCONSISTENT_ALIAS")
 
 	targets := map[string]bool{}
 	for _, entry := range entries {
@@ -1730,10 +1564,7 @@ func TestBasic01InconsistentAlias(t *testing.T) {
 		t.Fatalf("expected both sister.example and brother.example targets, got %v", targets)
 	}
 
-	inconsistentAlias := firstEntryByTag(entries, "B01_INCONSISTENT_ALIAS")
-	if inconsistentAlias == nil {
-		t.Fatalf("missing B01_INCONSISTENT_ALIAS entry")
-	}
+	inconsistentAlias := tctest.RequireTag(t, entries, "B01_INCONSISTENT_ALIAS")
 	if inconsistentAlias.Args["domain"] != "example" {
 		t.Fatalf("expected domain=example, got %#v", inconsistentAlias.Args["domain"])
 	}
@@ -1784,15 +1615,8 @@ func TestBasic01DNAMEAliasNoCritical(t *testing.T) {
 		t.Fatalf("All: %v", err)
 	}
 
-	if !hasEntryTag(entries, "B01_CHILD_IS_ALIAS") {
-		t.Fatalf("expected B01_CHILD_IS_ALIAS")
-	}
-	if hasEntryTag(entries, "B01_NO_CHILD") {
-		t.Fatalf("did not expect B01_NO_CHILD for DNAME alias")
-	}
-	if hasEntryTag(entries, "B02_NO_DELEGATION") {
-		t.Fatalf("did not expect B02_NO_DELEGATION for DNAME alias")
-	}
+	tctest.RequireTags(t, entries, "B01_CHILD_IS_ALIAS")
+	tctest.RequireNoTag(t, entries, "B01_NO_CHILD", "B02_NO_DELEGATION")
 	if !IsDNAMEAlias(entries) {
 		t.Fatalf("expected IsDNAMEAlias to return true")
 	}
@@ -1804,45 +1628,6 @@ func TestBasic01DNAMEAliasNoCritical(t *testing.T) {
 			t.Fatalf("unexpected CRITICAL entry: %s", e.Tag)
 		}
 	}
-}
-
-func hasEntryTag(entries []*logger.Entry, tag string) bool {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return true
-		}
-	}
-	return false
-}
-
-func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return entry
-		}
-	}
-	return nil
-}
-
-func normalizeEntriesForComparison(entries []*logger.Entry) []string {
-	normalized := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		item := entry.Module + ":" + entry.Testcase + ":" + entry.Tag
-		if args := entry.ArgString(); args != "" {
-			item += " " + args
-		}
-		normalized = append(normalized, item)
-	}
-	return normalized
 }
 
 func soaPacket(owner string, mname string, rname string) packet.Packet {

@@ -83,6 +83,14 @@ func TTL(ttl uint32, rrs ...dns.RR) []dns.RR {
 	return rrs
 }
 
+// Class returns the records with their class set, for the rare non-IN test.
+func Class(class uint16, rrs ...dns.RR) []dns.RR {
+	for _, rr := range rrs {
+		rr.Header().Class = class
+	}
+	return rrs
+}
+
 func header(owner string) dns.Header {
 	return dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: defaultTTL}
 }

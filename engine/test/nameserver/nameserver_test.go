@@ -941,23 +941,11 @@ func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 }
 
 func soaRecord(owner string) dns.RR {
-	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	soaRR.Ns = dnsutil.Fqdn("ns1.example")
-	soaRR.Mbox = dnsutil.Fqdn("hostmaster.example")
-	soaRR.Serial = 1
-	soaRR.Refresh = 3600
-	soaRR.Retry = 600
-	soaRR.Expire = 86400
-	soaRR.Minttl = 60
-	return soaRR
+	return tctest.SOARR(owner, tctest.MName("ns1.example"), tctest.RName("hostmaster.example"))
 }
 
 func soaMsg(owner string) *dns.Msg {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	msg.Answer = []dns.RR{soaRecord(owner)}
-	return msg
+	return tctest.Response(tctest.Answers(soaRecord(owner))).Msg
 }
 
 func soaPacket(owner string) packet.Packet {
@@ -980,34 +968,18 @@ func soaPacketWithEdns(owner string, version uint8, z uint16, options []dns.EDNS
 	return packet.Packet{Msg: msg}
 }
 
+// The address and TXT answers model recursor replies, so AA stays clear.
 func aPacket(name string, address string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	aRR := &dns.A{}
-	aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
-	aRR.Addr = netip.MustParseAddr(address)
-	msg.Answer = []dns.RR{aRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(), tctest.Answers(tctest.ARR(name, address)))
 }
 
 func aaaaPacket(name string, address string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	aaaaRR := &dns.AAAA{}
-	aaaaRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
-	aaaaRR.Addr = netip.MustParseAddr(address)
-	msg.Answer = []dns.RR{aaaaRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(), tctest.Answers(tctest.AAAARR(name, address)))
 }
 
 func txtPacket(name string, value string, class uint16) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	txtRR := &dns.TXT{}
-	txtRR.Hdr = dns.Header{Name: dnsutil.Fqdn(name), Class: class, TTL: 60}
-	txtRR.Txt = []string{value}
-	msg.Answer = []dns.RR{txtRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(),
+		tctest.Answers(tctest.Class(class, tctest.TXTRR(name, value))...))
 }
 
 func TestNameserver16HasNSID(t *testing.T) {

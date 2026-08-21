@@ -131,6 +131,14 @@ func TestTTLRewritesHeaders(t *testing.T) {
 	}
 }
 
+func TestClassRewritesHeaders(t *testing.T) {
+	rrs := Class(dns.ClassCHAOS, TXTRR("example", "hello"))
+
+	if rrs[0].Header().Class != dns.ClassCHAOS {
+		t.Fatalf("expected the CH class, got %d", rrs[0].Header().Class)
+	}
+}
+
 func TestDNSKEYAndDS(t *testing.T) {
 	key := DNSKEYRR("example", dns.RSASHA256, PublicKey("AwEAAc=="))
 	if key.Flags != dns.FlagZONE || key.Protocol != 3 || key.Algorithm != dns.RSASHA256 {

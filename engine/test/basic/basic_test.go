@@ -5,13 +5,11 @@ import (
 	_ "embed"
 	"encoding/json"
 	"net"
-	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/cachefile"
@@ -1374,33 +1372,13 @@ func TestBasic01DNAMEAliasNoCritical(t *testing.T) {
 }
 
 func soaPacket(owner string, mname string, rname string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	soaRR.Ns = dnsutil.Fqdn(mname)
-	soaRR.Mbox = dnsutil.Fqdn(rname)
-	soaRR.Serial = 1
-	soaRR.Refresh = 3600
-	soaRR.Retry = 600
-	soaRR.Expire = 86400
-	soaRR.Minttl = 60
-	msg.Answer = []dns.RR{soaRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.SOARR(owner,
+		tctest.MName(mname), tctest.RName(rname))))
 }
 
+// Referrals carry the delegation in the authority section with AA clear.
 func referralPacket(zoneName string, nsName string, nsAddr net.IP) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	nsRR := &dns.NS{}
-	nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}
-	nsRR.Ns = dnsutil.Fqdn(nsName)
-	msg.Ns = []dns.RR{nsRR}
-	aRR := &dns.A{}
-	aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(nsName), Class: dns.ClassINET, TTL: 60}
-	aRR.Addr = netip.AddrFrom4([4]byte(nsAddr.To4()))
-	msg.Extra = []dns.RR{aRR}
-	return packet.Packet{Msg: msg}
+	return referralPacketMulti(zoneName, []nsEntry{{name: nsName, addr: nsAddr}})
 }
 
 type nsEntry struct {
@@ -1409,83 +1387,39 @@ type nsEntry struct {
 }
 
 func referralPacketMulti(zoneName string, entries []nsEntry) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
+	opts := []tctest.MsgOpt{tctest.NotAuthoritative()}
 	for _, entry := range entries {
-		nsRR := &dns.NS{}
-		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}
-		nsRR.Ns = dnsutil.Fqdn(entry.name)
-		msg.Ns = append(msg.Ns, nsRR)
-		aRR := &dns.A{}
-		aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(entry.name), Class: dns.ClassINET, TTL: 60}
-		aRR.Addr = netip.AddrFrom4([4]byte(entry.addr.To4()))
-		msg.Extra = append(msg.Extra, aRR)
+		opts = append(opts,
+			tctest.Authority(tctest.NSRR(zoneName, entry.name)),
+			tctest.Additional(tctest.ARR(entry.name, entry.addr.String())))
 	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(opts...)
 }
 
 func aPacket(owner string, addr net.IP) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	aRR := &dns.A{}
-	aRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
-	aRR.Addr = netip.AddrFrom4([4]byte(addr.To4()))
-	msg.Answer = []dns.RR{aRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.ARR(owner, addr.String())))
 }
 
 func nsPacket(owner string, nsname string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	nsRR := &dns.NS{}
-	nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
-	nsRR.Ns = dnsutil.Fqdn(nsname)
-	msg.Answer = []dns.RR{nsRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.NSRR(owner, nsname)))
 }
 
 func nsPacketMulti(owner string, nsnames ...string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	for _, nsname := range nsnames {
-		nsRR := &dns.NS{}
-		nsRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
-		nsRR.Ns = dnsutil.Fqdn(nsname)
-		msg.Answer = append(msg.Answer, nsRR)
-	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.NSRRs(owner, nsnames...)...))
 }
 
 func rcodePacket(rcode uint16) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = rcode
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(), tctest.Rcode(rcode))
 }
 
 func emptyAnswerPacket() packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response()
 }
 
 func nxdomainAAPacket() packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeNameError
-	msg.Authoritative = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NXDOMAIN())
 }
 
 func dnameAnswerPacket(owner string, target string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	dnameRR := &dns.DNAME{}
-	dnameRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
-	dnameRR.Target = dnsutil.Fqdn(target)
-	msg.Answer = []dns.RR{dnameRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.DNAMERR(owner, target)))
 }

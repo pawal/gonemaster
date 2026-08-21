@@ -309,17 +309,19 @@ func storedAndAPIProfileFromRequest(req profileUpsertRequest) (StoredProfile, Pr
 	if err != nil {
 		return StoredProfile{}, Profile{}, err
 	}
-	return StoredProfile{
+	stored := StoredProfile{
 		Name:        name,
 		Description: strings.TrimSpace(req.Description),
 		Config:      configJSON,
 		Public:      req.Public,
-	}, Profile{
+	}
+	api := Profile{
 		Name:        name,
 		Description: strings.TrimSpace(req.Description),
 		Config:      configMap,
 		Public:      req.Public,
-	}, nil
+	}
+	return stored, api, nil
 }
 
 func apiProfileFromStored(stored StoredProfile) (Profile, error) {

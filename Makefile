@@ -20,7 +20,7 @@ CMD ?= all
 	build-gonemaster build-gonemaster-badkeys-embed build-gonemaster-server build-gonemaster-server-noui \
 	build-gonemaster-server-badkeys-embed build-gonemaster-server-noui-badkeys-embed build-gonemaster-client \
 	build-gonemaster-nagios build-gonemaster-mcp install-gonemaster install-gonemaster-badkeys-embed install-gonemaster-server install-gonemaster-client \
-	install-gonemaster-nagios install-gonemaster-mcp ui-check test-go test-integration vet race race-ci \
+	install-gonemaster-nagios install-gonemaster-mcp ui-check test-go test-integration vet fmt-check race race-ci \
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-export-testcase-descriptions spec-check-testcase-descriptions \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-i18n-placeholders \
@@ -235,7 +235,7 @@ ui-csp-check:
 	fi
 	@echo "OK - no inline styles found."
 
-test: ui-test ui-public-test ui-analysis-test test-go spec-check ui-csp-check
+test: fmt-check ui-test ui-public-test ui-analysis-test test-go spec-check ui-csp-check
 
 install:
 	@if [ "$(CMD)" = "all" ]; then \
@@ -266,6 +266,15 @@ install-gonemaster-mcp:
 
 vet:
 	$(GO) vet ./...
+
+# Same check CI runs in the gofmt_check step.
+fmt-check:
+	@unformatted=$$(gofmt -l $$(git ls-files '*.go')); \
+	if [ -n "$$unformatted" ]; then \
+		echo "These files are not gofmt-clean:"; \
+		echo "$$unformatted"; \
+		exit 1; \
+	fi
 
 race:
 	$(GO) test -race ./...

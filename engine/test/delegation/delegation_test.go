@@ -18,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -62,10 +63,8 @@ func TestDelegation01Counts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation01: %v", err)
 	}
-	if !hasEntryTag(entries, "ENOUGH_NS_DEL") {
-		t.Fatalf("expected ENOUGH_NS_DEL")
-	}
-	entry := firstEntryByTag(entries, "ENOUGH_NS_DEL")
+	tctest.RequireTags(t, entries, "ENOUGH_NS_DEL")
+	entry := tctest.First(entries, "ENOUGH_NS_DEL")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected typed server list for ENOUGH_NS_DEL, got %#v", entry.Args["servers"])
@@ -73,10 +72,8 @@ func TestDelegation01Counts(t *testing.T) {
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
-	if !hasEntryTag(entries, "NOT_ENOUGH_NS_CHILD") {
-		t.Fatalf("expected NOT_ENOUGH_NS_CHILD")
-	}
-	entry = firstEntryByTag(entries, "NOT_ENOUGH_NS_CHILD")
+	tctest.RequireTags(t, entries, "NOT_ENOUGH_NS_CHILD")
+	entry = tctest.First(entries, "NOT_ENOUGH_NS_CHILD")
 	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for NOT_ENOUGH_NS_CHILD, got %#v", entry.Args["servers"])
@@ -84,13 +81,7 @@ func TestDelegation01Counts(t *testing.T) {
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
-	if !hasEntryTag(entries, "NOT_ENOUGH_IPV4_NS_DEL") {
-		t.Fatalf("expected NOT_ENOUGH_IPV4_NS_DEL")
-	}
-	entry = firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_DEL")
-	if entry == nil {
-		t.Fatalf("missing NOT_ENOUGH_IPV4_NS_DEL entry")
-	}
+	entry = tctest.RequireTag(t, entries, "NOT_ENOUGH_IPV4_NS_DEL")
 	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_DEL, got %#v", entry.Args["servers"])
@@ -105,13 +96,7 @@ func TestDelegation01Counts(t *testing.T) {
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
-	if !hasEntryTag(entries, "NOT_ENOUGH_IPV6_NS_DEL") {
-		t.Fatalf("expected NOT_ENOUGH_IPV6_NS_DEL")
-	}
-	entry = firstEntryByTag(entries, "NOT_ENOUGH_IPV6_NS_DEL")
-	if entry == nil {
-		t.Fatalf("missing NOT_ENOUGH_IPV6_NS_DEL entry")
-	}
+	entry = tctest.RequireTag(t, entries, "NOT_ENOUGH_IPV6_NS_DEL")
 	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV6_NS_DEL, got %#v", entry.Args["servers"])
@@ -126,10 +111,8 @@ func TestDelegation01Counts(t *testing.T) {
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
-	if !hasEntryTag(entries, "NOT_ENOUGH_IPV4_NS_CHILD") {
-		t.Fatalf("expected NOT_ENOUGH_IPV4_NS_CHILD")
-	}
-	entry = firstEntryByTag(entries, "NOT_ENOUGH_IPV4_NS_CHILD")
+	tctest.RequireTags(t, entries, "NOT_ENOUGH_IPV4_NS_CHILD")
+	entry = tctest.First(entries, "NOT_ENOUGH_IPV4_NS_CHILD")
 	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["servers"])
@@ -144,9 +127,7 @@ func TestDelegation01Counts(t *testing.T) {
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
-	if !hasEntryTag(entries, "NO_IPV6_NS_CHILD") {
-		t.Fatalf("expected NO_IPV6_NS_CHILD")
-	}
+	tctest.RequireTags(t, entries, "NO_IPV6_NS_CHILD")
 }
 
 func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
@@ -198,13 +179,7 @@ func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation01: %v", err)
 	}
-	if !hasEntryTag(entries, "ENOUGH_IPV4_NS_CHILD") {
-		t.Fatalf("expected ENOUGH_IPV4_NS_CHILD")
-	}
-	entry := firstEntryByTag(entries, "ENOUGH_IPV4_NS_CHILD")
-	if entry == nil {
-		t.Fatalf("missing ENOUGH_IPV4_NS_CHILD entry")
-	}
+	entry := tctest.RequireTag(t, entries, "ENOUGH_IPV4_NS_CHILD")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected two typed servers for ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["servers"])
@@ -268,13 +243,7 @@ func TestDelegation01NoIPv4ChildNoLegacyKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation01: %v", err)
 	}
-	if !hasEntryTag(entries, "NO_IPV4_NS_CHILD") {
-		t.Fatalf("expected NO_IPV4_NS_CHILD")
-	}
-	entry := firstEntryByTag(entries, "NO_IPV4_NS_CHILD")
-	if entry == nil {
-		t.Fatalf("missing NO_IPV4_NS_CHILD entry")
-	}
+	entry := tctest.RequireTag(t, entries, "NO_IPV4_NS_CHILD")
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
@@ -308,21 +277,6 @@ func stubDelegation01Counts(t *testing.T) {
 	apexNameservers = emptyNS
 }
 
-// collectArgValues returns the string value of arg key for every entry that
-// carries the given tag, preserving emission order.
-func collectArgValues(entries []*logger.Entry, tag string, key string) []string {
-	var out []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != tag {
-			continue
-		}
-		if v, ok := entry.Args[key].(string); ok {
-			out = append(out, v)
-		}
-	}
-	return out
-}
-
 // TestDelegation01InBailiwickGlueMissing verifies that an in-bailiwick
 // delegation NS name shipped by the parent without A/AAAA glue is flagged,
 // while an in-bailiwick name that does carry glue and an out-of-bailiwick name
@@ -352,7 +306,7 @@ func TestDelegation01InBailiwickGlueMissing(t *testing.T) {
 		t.Fatalf("delegation01: %v", err)
 	}
 
-	flagged := collectArgValues(entries, "IN_DOMAIN_GLUE_MISSING", "ns")
+	flagged := tctest.ArgValues(entries, "IN_DOMAIN_GLUE_MISSING", "ns")
 	if len(flagged) != 1 || flagged[0] != "ns1.example" {
 		t.Fatalf("expected only ns1.example flagged for missing glue, got %v", flagged)
 	}
@@ -384,9 +338,7 @@ func TestDelegation01InBailiwickGluePresent(t *testing.T) {
 		t.Fatalf("delegation01: %v", err)
 	}
 
-	if hasEntryTag(entries, "IN_DOMAIN_GLUE_MISSING") {
-		t.Fatalf("did not expect IN_DOMAIN_GLUE_MISSING when all in-bailiwick names carry glue")
-	}
+	tctest.RequireNoTag(t, entries, "IN_DOMAIN_GLUE_MISSING")
 }
 
 func TestDelegation02DuplicateIPs(t *testing.T) {
@@ -418,10 +370,8 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation02: %v", err)
 	}
-	if !hasEntryTag(entries, "DEL_NS_SAME_IP") {
-		t.Fatalf("expected DEL_NS_SAME_IP")
-	}
-	entry := firstEntryByTag(entries, "DEL_NS_SAME_IP")
+	tctest.RequireTags(t, entries, "DEL_NS_SAME_IP")
+	entry := tctest.First(entries, "DEL_NS_SAME_IP")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected typed server list for DEL_NS_SAME_IP, got %#v", entry.Args["servers"])
@@ -435,13 +385,8 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
-	if !hasEntryTag(entries, "CHILD_DISTINCT_NS_IP") {
-		t.Fatalf("expected CHILD_DISTINCT_NS_IP")
-	}
-	if !hasEntryTag(entries, "SAME_IP_ADDRESS") {
-		t.Fatalf("expected SAME_IP_ADDRESS")
-	}
-	entry = firstEntryByTag(entries, "SAME_IP_ADDRESS")
+	tctest.RequireTags(t, entries, "CHILD_DISTINCT_NS_IP", "SAME_IP_ADDRESS")
+	entry = tctest.First(entries, "SAME_IP_ADDRESS")
 	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected typed server list for SAME_IP_ADDRESS, got %#v", entry.Args["servers"])
@@ -490,9 +435,7 @@ func TestDelegation03ReferralSizeOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation03: %v", err)
 	}
-	if !hasEntryTag(entries, "REFERRAL_SIZE_OK") {
-		t.Fatalf("expected REFERRAL_SIZE_OK")
-	}
+	tctest.RequireTags(t, entries, "REFERRAL_SIZE_OK")
 }
 
 // referralNSNames builds n distinct long delegation NS names so the
@@ -539,10 +482,7 @@ func TestDelegation03ReferralSizeLarge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation03: %v", err)
 	}
-	entry := firstEntryByTag(entries, "REFERRAL_SIZE_LARGE")
-	if entry == nil {
-		t.Fatalf("expected REFERRAL_SIZE_LARGE")
-	}
+	entry := tctest.RequireTag(t, entries, "REFERRAL_SIZE_LARGE")
 	size, ok := entry.Args["size"].(int)
 	if !ok {
 		t.Fatalf("expected int size arg, got %#v", entry.Args["size"])
@@ -585,10 +525,7 @@ func TestDelegation03ReferralSizeTooLarge(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation03: %v", err)
 	}
-	entry := firstEntryByTag(entries, "REFERRAL_SIZE_TOO_LARGE")
-	if entry == nil {
-		t.Fatalf("expected REFERRAL_SIZE_TOO_LARGE")
-	}
+	entry := tctest.RequireTag(t, entries, "REFERRAL_SIZE_TOO_LARGE")
 	size, ok := entry.Args["size"].(int)
 	if !ok {
 		t.Fatalf("expected int size arg, got %#v", entry.Args["size"])
@@ -630,10 +567,8 @@ func TestDelegation04Authoritative(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation04: %v", err)
 	}
-	if !hasEntryTag(entries, "ARE_AUTHORITATIVE") {
-		t.Fatalf("expected ARE_AUTHORITATIVE")
-	}
-	entry := firstEntryByTag(entries, "ARE_AUTHORITATIVE")
+	tctest.RequireTags(t, entries, "ARE_AUTHORITATIVE")
+	entry := tctest.First(entries, "ARE_AUTHORITATIVE")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for ARE_AUTHORITATIVE, got %#v", entry.Args["servers"])
@@ -675,9 +610,7 @@ func TestDelegation04NotAuthoritative(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation04: %v", err)
 	}
-	if !hasEntryTag(entries, "IS_NOT_AUTHORITATIVE") {
-		t.Fatalf("expected IS_NOT_AUTHORITATIVE")
-	}
+	tctest.RequireTags(t, entries, "IS_NOT_AUTHORITATIVE")
 }
 
 func TestDelegation04ParallelQueries(t *testing.T) {
@@ -831,22 +764,14 @@ func TestDelegation05InBailiwickCNAME(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation05: %v", err)
 	}
-	if !hasEntryTag(entries, "NS_IS_CNAME") {
-		t.Fatalf("expected NS_IS_CNAME")
-	}
-	entry := firstEntryByTag(entries, "NS_IS_CNAME")
-	if entry == nil {
-		t.Fatalf("expected NS_IS_CNAME entry")
-	}
+	entry := tctest.RequireTag(t, entries, "NS_IS_CNAME")
 	if ns, _ := entry.Args["ns"].(string); ns != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", entry.Args["ns"])
 	}
 	if _, ok := entry.Args["nsname"]; ok {
 		t.Fatalf("legacy key nsname should not be present: %#v", entry.Args)
 	}
-	if hasEntryTag(entries, "NO_NS_CNAME") {
-		t.Fatalf("did not expect NO_NS_CNAME")
-	}
+	tctest.RequireNoTag(t, entries, "NO_NS_CNAME")
 }
 
 func TestDelegation05ParallelQueries(t *testing.T) {
@@ -1013,9 +938,7 @@ func TestDelegation05OutOfBailiwickNoCNAME(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation05: %v", err)
 	}
-	if !hasEntryTag(entries, "NO_NS_CNAME") {
-		t.Fatalf("expected NO_NS_CNAME")
-	}
+	tctest.RequireTags(t, entries, "NO_NS_CNAME")
 }
 
 func TestDelegation06SOANotExists(t *testing.T) {
@@ -1050,9 +973,7 @@ func TestDelegation06SOANotExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation06: %v", err)
 	}
-	if !hasEntryTag(entries, "SOA_NOT_EXISTS") {
-		t.Fatalf("expected SOA_NOT_EXISTS")
-	}
+	tctest.RequireTags(t, entries, "SOA_NOT_EXISTS")
 }
 
 func TestDelegation06SOAExists(t *testing.T) {
@@ -1087,9 +1008,7 @@ func TestDelegation06SOAExists(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation06: %v", err)
 	}
-	if !hasEntryTag(entries, "SOA_EXISTS") {
-		t.Fatalf("expected SOA_EXISTS")
-	}
+	tctest.RequireTags(t, entries, "SOA_EXISTS")
 }
 
 func TestDelegation07NameMismatch(t *testing.T) {
@@ -1118,12 +1037,7 @@ func TestDelegation07NameMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation07: %v", err)
 	}
-	if !hasEntryTag(entries, "EXTRA_NAME_PARENT") {
-		t.Fatalf("expected EXTRA_NAME_PARENT")
-	}
-	if !hasEntryTag(entries, "EXTRA_NAME_CHILD") {
-		t.Fatalf("expected EXTRA_NAME_CHILD")
-	}
+	tctest.RequireTags(t, entries, "EXTRA_NAME_PARENT", "EXTRA_NAME_CHILD")
 }
 
 func TestDelegation07NamesMatch(t *testing.T) {
@@ -1152,13 +1066,7 @@ func TestDelegation07NamesMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation07: %v", err)
 	}
-	if !hasEntryTag(entries, "NAMES_MATCH") {
-		t.Fatalf("expected NAMES_MATCH")
-	}
-	entry := firstEntryByTag(entries, "NAMES_MATCH")
-	if entry == nil {
-		t.Fatalf("expected NAMES_MATCH entry")
-	}
+	entry := tctest.RequireTag(t, entries, "NAMES_MATCH")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for NAMES_MATCH, got %#v", entry.Args["servers"])
@@ -1236,15 +1144,8 @@ func TestDelegation07UndelegatedReportsExtraNameChild(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation07: %v", err)
 	}
-	if !hasEntryTag(entries, "EXTRA_NAME_PARENT") {
-		t.Fatalf("expected EXTRA_NAME_PARENT")
-	}
-	if !hasEntryTag(entries, "EXTRA_NAME_CHILD") {
-		t.Fatalf("expected EXTRA_NAME_CHILD")
-	}
-	if hasEntryTag(entries, "NAMES_MATCH") {
-		t.Fatalf("did not expect NAMES_MATCH")
-	}
+	tctest.RequireTags(t, entries, "EXTRA_NAME_PARENT", "EXTRA_NAME_CHILD")
+	tctest.RequireNoTag(t, entries, "NAMES_MATCH")
 }
 
 func testCtx() context.Context {
@@ -1278,30 +1179,6 @@ func newNameserver(t *testing.T, ctx context.Context, name string, ip string, ha
 		return handler(qname, qtype, opts), nil
 	})
 	return ns
-}
-
-func hasEntryTag(entries []*logger.Entry, tag string) bool {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return true
-		}
-	}
-	return false
-}
-
-func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return entry
-		}
-	}
-	return nil
 }
 
 func soaPacket(owner string, authoritative bool) packet.Packet {

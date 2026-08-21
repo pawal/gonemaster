@@ -6,7 +6,7 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
@@ -303,211 +303,131 @@ func TestAddress03PTRMismatch(t *testing.T) {
 }
 
 func TestAddress02ParallelPTRQueries(t *testing.T) {
-	baseCtx, prof, _ := testhelpers.Context(t)
-	prof.Resolver.Defaults.Parallel = 2
+	synctest.Test(t, func(t *testing.T) {
+		baseCtx, prof, _ := testhelpers.Context(t)
+		prof.Resolver.Defaults.Parallel = 2
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+		r := tctest.Recursor(t, map[string]map[string][]string{
+			".": {
+				"a.root": {"192.0.2.1"},
+				"b.root": {"192.0.2.2"},
+			},
+		})
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		if strings.EqualFold(qtype, "PTR") {
-			select {
-			case started <- qname:
-			default:
+		gate := tctest.NewGate()
+		hook := func(q tctest.Query) packet.Packet {
+			if strings.EqualFold(q.Type, "PTR") {
+				gate.Arrive(q.Name)
+				return noAnswerPacket(q.Name, "PTR")
 			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			return noAnswerPacket(qname, "PTR"), nil
+			return packet.Packet{}
 		}
-		return packet.Packet{}, nil
-	}
 
-	ns1, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook)
+		tctest.NSOn(t, baseCtx, r, "a.root", "192.0.2.1", hook)
+		tctest.NSOn(t, baseCtx, r, "b.root", "192.0.2.2", hook)
 
-	ns2, err := nameserver.NewWithContext(baseCtx, "b.root", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook)
+		z := tctest.Zone(t, ".", r)
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var addrErr error
+		go func() {
+			entries, addrErr = Address02(baseCtx, z)
+			close(done)
+		}()
 
-	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
-	defer cancel()
+		ptr1 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
+		ptr2 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.2"))
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var addrErr error
-	go func() {
-		entries, addrErr = Address02(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, ptr1, ptr2)
+		gate.Release()
 
-	want := map[string]bool{}
-	ptr1 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
-	ptr2 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.2"))
-	want[ptr1] = true
-	want[ptr2] = true
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel PTR queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if addrErr != nil {
 			t.Fatalf("address02: %v", addrErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("address02 did not finish")
-	}
 
-	for name := range want {
-		if !got[name] {
-			t.Fatalf("missing PTR query for %q", name)
+		var ips []string
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "NAMESERVER_IP_WITHOUT_REVERSE" {
+				continue
+			}
+			if ip, ok := entry.Args["address"].(string); ok {
+				ips = append(ips, ip)
+			}
 		}
-	}
-
-	var ips []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "NAMESERVER_IP_WITHOUT_REVERSE" {
-			continue
+		if len(ips) != 2 {
+			t.Fatalf("expected 2 reverse-missing entries, got %v", ips)
 		}
-		if ip, ok := entry.Args["address"].(string); ok {
-			ips = append(ips, ip)
+		if ips[0] != "192.0.2.1" || ips[1] != "192.0.2.2" {
+			t.Fatalf("expected deterministic log order, got %v", ips)
 		}
-	}
-	if len(ips) != 2 {
-		t.Fatalf("expected 2 reverse-missing entries, got %v", ips)
-	}
-	if ips[0] != "192.0.2.1" || ips[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic log order, got %v", ips)
-	}
+	})
 }
 
 func TestAddress03ParallelPTRQueries(t *testing.T) {
-	baseCtx, prof, _ := testhelpers.Context(t)
-	prof.Resolver.Defaults.Parallel = 2
+	synctest.Test(t, func(t *testing.T) {
+		baseCtx, prof, _ := testhelpers.Context(t)
+		prof.Resolver.Defaults.Parallel = 2
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+		r := tctest.Recursor(t, map[string]map[string][]string{
+			".": {
+				"a.root": {"192.0.2.1"},
+				"b.root": {"192.0.2.2"},
+			},
+		})
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		if strings.EqualFold(qtype, "PTR") {
-			select {
-			case started <- qname:
-			default:
+		gate := tctest.NewGate()
+		hook := func(q tctest.Query) packet.Packet {
+			if strings.EqualFold(q.Type, "PTR") {
+				gate.Arrive(q.Name)
+				return ptrPacket(q.Name, "ptr.example.")
 			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			return ptrPacket(qname, "ptr.example."), nil
+			return packet.Packet{}
 		}
-		return packet.Packet{}, nil
-	}
 
-	ns1, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook)
+		tctest.NSOn(t, baseCtx, r, "a.root", "192.0.2.1", hook)
+		tctest.NSOn(t, baseCtx, r, "b.root", "192.0.2.2", hook)
 
-	ns2, err := nameserver.NewWithContext(baseCtx, "b.root", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook)
+		z := tctest.Zone(t, ".", r)
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var addrErr error
+		go func() {
+			entries, addrErr = Address03(baseCtx, z)
+			close(done)
+		}()
 
-	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
-	defer cancel()
+		ptr1 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
+		ptr2 := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.2"))
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var addrErr error
-	go func() {
-		entries, addrErr = Address03(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, ptr1, ptr2)
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel PTR queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if addrErr != nil {
 			t.Fatalf("address03: %v", addrErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("address03 did not finish")
-	}
 
-	var ips []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "NAMESERVER_IP_PTR_MISMATCH" {
-			continue
+		var ips []string
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "NAMESERVER_IP_PTR_MISMATCH" {
+				continue
+			}
+			if ip, ok := entry.Args["address"].(string); ok {
+				ips = append(ips, ip)
+			}
 		}
-		if ip, ok := entry.Args["address"].(string); ok {
-			ips = append(ips, ip)
+		if len(ips) != 2 {
+			t.Fatalf("expected 2 mismatch entries, got %v", ips)
 		}
-	}
-	if len(ips) != 2 {
-		t.Fatalf("expected 2 mismatch entries, got %v", ips)
-	}
-	if ips[0] != "192.0.2.1" || ips[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic log order, got %v", ips)
-	}
+		if ips[0] != "192.0.2.1" || ips[1] != "192.0.2.2" {
+			t.Fatalf("expected deterministic log order, got %v", ips)
+		}
+	})
 }
 
 func testContext(t *testing.T) context.Context {

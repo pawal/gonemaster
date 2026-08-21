@@ -17,6 +17,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	zonepkg "codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -41,9 +42,7 @@ func TestZone02RefreshBelowMinimum(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone02: %v", err)
 	}
-	if !hasEntryTag(entries, "REFRESH_MINIMUM_VALUE_LOWER") {
-		t.Fatalf("expected REFRESH_MINIMUM_VALUE_LOWER")
-	}
+	tctest.RequireTags(t, entries, "REFRESH_MINIMUM_VALUE_LOWER")
 }
 
 func TestZone05ExpireLowerThanRefreshAndMinimum(t *testing.T) {
@@ -66,12 +65,7 @@ func TestZone05ExpireLowerThanRefreshAndMinimum(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone05: %v", err)
 	}
-	if !hasEntryTag(entries, "EXPIRE_MINIMUM_VALUE_LOWER") {
-		t.Fatalf("expected EXPIRE_MINIMUM_VALUE_LOWER")
-	}
-	if !hasEntryTag(entries, "EXPIRE_LOWER_THAN_REFRESH") {
-		t.Fatalf("expected EXPIRE_LOWER_THAN_REFRESH")
-	}
+	tctest.RequireTags(t, entries, "EXPIRE_MINIMUM_VALUE_LOWER", "EXPIRE_LOWER_THAN_REFRESH")
 }
 
 func TestZone10ParallelQueries(t *testing.T) {
@@ -218,9 +212,7 @@ func TestZone10WrongSOAUsesQueryName(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone10: %v", err)
 	}
-	if !hasEntryTag(entries, "WRONG_SOA") {
-		t.Fatalf("expected WRONG_SOA")
-	}
+	tctest.RequireTags(t, entries, "WRONG_SOA")
 	var entry *logger.Entry
 	for _, e := range entries {
 		if e != nil && e.Tag == "WRONG_SOA" {
@@ -269,12 +261,8 @@ func TestZone10ApexCNAME(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone10: %v", err)
 	}
-	if !hasEntryTag(entries, "SOA_AND_CNAME") {
-		t.Fatalf("expected SOA_AND_CNAME, got %v", entryTags(entries))
-	}
-	if hasEntryTag(entries, "APEX_DNAME") {
-		t.Fatalf("unexpected APEX_DNAME")
-	}
+	tctest.RequireTags(t, entries, "SOA_AND_CNAME")
+	tctest.RequireNoTag(t, entries, "APEX_DNAME")
 }
 
 func TestZone10ApexDNAME(t *testing.T) {
@@ -308,12 +296,8 @@ func TestZone10ApexDNAME(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone10: %v", err)
 	}
-	if !hasEntryTag(entries, "APEX_DNAME") {
-		t.Fatalf("expected APEX_DNAME, got %v", entryTags(entries))
-	}
-	if hasEntryTag(entries, "SOA_AND_CNAME") {
-		t.Fatalf("unexpected SOA_AND_CNAME")
-	}
+	tctest.RequireTags(t, entries, "APEX_DNAME")
+	tctest.RequireNoTag(t, entries, "SOA_AND_CNAME")
 }
 
 func TestZone10ApexDNAMEAndCNAME(t *testing.T) {
@@ -355,12 +339,7 @@ func TestZone10ApexDNAMEAndCNAME(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone10: %v", err)
 	}
-	if !hasEntryTag(entries, "SOA_AND_CNAME") {
-		t.Fatalf("expected SOA_AND_CNAME for DNAME+CNAME collision, got %v", entryTags(entries))
-	}
-	if !hasEntryTag(entries, "APEX_DNAME") {
-		t.Fatalf("expected APEX_DNAME for DNAME+CNAME collision, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "SOA_AND_CNAME", "APEX_DNAME")
 }
 
 func TestZone10CleanApex(t *testing.T) {
@@ -384,15 +363,8 @@ func TestZone10CleanApex(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone10: %v", err)
 	}
-	if hasEntryTag(entries, "SOA_AND_CNAME") {
-		t.Fatalf("unexpected SOA_AND_CNAME on clean apex")
-	}
-	if hasEntryTag(entries, "APEX_DNAME") {
-		t.Fatalf("unexpected APEX_DNAME on clean apex")
-	}
-	if !hasEntryTag(entries, "ONE_SOA") {
-		t.Fatalf("expected ONE_SOA on clean apex")
-	}
+	tctest.RequireNoTag(t, entries, "SOA_AND_CNAME", "APEX_DNAME")
+	tctest.RequireTags(t, entries, "ONE_SOA")
 }
 
 func TestZone09MXQueryDisablesFallback(t *testing.T) {
@@ -824,9 +796,7 @@ func TestZone11SpfSyntaxError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone11: %v", err)
 	}
-	if !hasEntryTag(entries, "Z11_SPF_SYNTAX_ERROR") {
-		t.Fatalf("expected Z11_SPF_SYNTAX_ERROR")
-	}
+	tctest.RequireTags(t, entries, "Z11_SPF_SYNTAX_ERROR")
 }
 
 func TestZone11NoSpfNonMailDomain(t *testing.T) {
@@ -976,9 +946,7 @@ func TestZone12CSYNCFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone12: %v", err)
 	}
-	if !hasEntryTag(entries, "Z12_CSYNC_FOUND") {
-		t.Fatalf("expected Z12_CSYNC_FOUND")
-	}
+	tctest.RequireTags(t, entries, "Z12_CSYNC_FOUND")
 }
 
 func TestZone12NoCSYNC(t *testing.T) {
@@ -1009,9 +977,7 @@ func TestZone12NoCSYNC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone12: %v", err)
 	}
-	if !hasEntryTag(entries, "Z12_NO_CSYNC") {
-		t.Fatalf("expected Z12_NO_CSYNC")
-	}
+	tctest.RequireTags(t, entries, "Z12_NO_CSYNC")
 }
 
 func TestZone12SerialMismatch(t *testing.T) {
@@ -1039,9 +1005,7 @@ func TestZone12SerialMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone12: %v", err)
 	}
-	if !hasEntryTag(entries, "Z12_SERIAL_MISMATCH") {
-		t.Fatalf("expected Z12_SERIAL_MISMATCH")
-	}
+	tctest.RequireTags(t, entries, "Z12_SERIAL_MISMATCH")
 }
 
 func TestZone12SerialMismatchSoaMinimumNewerCSYNC(t *testing.T) {
@@ -1069,9 +1033,7 @@ func TestZone12SerialMismatchSoaMinimumNewerCSYNC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone12: %v", err)
 	}
-	if !hasEntryTag(entries, "Z12_SERIAL_MISMATCH") {
-		t.Fatalf("expected Z12_SERIAL_MISMATCH")
-	}
+	tctest.RequireTags(t, entries, "Z12_SERIAL_MISMATCH")
 }
 
 func TestZone12SerialMismatchSoaMinimumOlderCSYNCNotMismatch(t *testing.T) {
@@ -1099,9 +1061,7 @@ func TestZone12SerialMismatchSoaMinimumOlderCSYNCNotMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone12: %v", err)
 	}
-	if hasEntryTag(entries, "Z12_SERIAL_MISMATCH") {
-		t.Fatalf("did not expect Z12_SERIAL_MISMATCH")
-	}
+	tctest.RequireNoTag(t, entries, "Z12_SERIAL_MISMATCH")
 }
 
 func TestZone12MultipleCSYNC(t *testing.T) {
@@ -1135,9 +1095,7 @@ func TestZone12MultipleCSYNC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone12: %v", err)
 	}
-	if !hasEntryTag(entries, "Z12_MULTIPLE_CSYNC") {
-		t.Fatalf("expected Z12_MULTIPLE_CSYNC")
-	}
+	tctest.RequireTags(t, entries, "Z12_MULTIPLE_CSYNC")
 }
 
 func TestZone12InconsistentCSYNC(t *testing.T) {
@@ -1168,9 +1126,7 @@ func TestZone12InconsistentCSYNC(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone12: %v", err)
 	}
-	if !hasEntryTag(entries, "Z12_INCONSISTENT_CSYNC") {
-		t.Fatalf("expected Z12_INCONSISTENT_CSYNC")
-	}
+	tctest.RequireTags(t, entries, "Z12_INCONSISTENT_CSYNC")
 }
 
 func TestZone12MixedPresence(t *testing.T) {
@@ -1204,9 +1160,7 @@ func TestZone12MixedPresence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone12: %v", err)
 	}
-	if !hasEntryTag(entries, "Z12_MIXED_PRESENCE") {
-		t.Fatalf("expected Z12_MIXED_PRESENCE")
-	}
+	tctest.RequireTags(t, entries, "Z12_MIXED_PRESENCE")
 }
 
 // --- Zone13 tests ---
@@ -1251,9 +1205,7 @@ func TestZone13LookupCountOK_NoLookups(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
-		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK")
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_LOOKUP_COUNT_OK")
 	for _, e := range entries {
 		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_OK" {
 			if count, ok := e.Args["count"].(int); !ok || count != 0 {
@@ -1283,9 +1235,7 @@ func TestZone13LookupCountOK_Boundary(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
-		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK, got tags: %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_LOOKUP_COUNT_OK")
 	for _, e := range entries {
 		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_OK" {
 			if count, ok := e.Args["count"].(int); !ok || count != 10 {
@@ -1308,13 +1258,9 @@ func TestZone13LookupCountExceeded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_EXCEEDED") {
-		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_EXCEEDED, got tags: %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_LOOKUP_COUNT_EXCEEDED")
 	// Also should get ptr deprecated
-	if !hasEntryTag(entries, "Z13_SPF_PTR_DEPRECATED") {
-		t.Fatalf("expected Z13_SPF_PTR_DEPRECATED")
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_PTR_DEPRECATED")
 }
 
 func TestZone13IncludeLoop(t *testing.T) {
@@ -1335,9 +1281,7 @@ func TestZone13IncludeLoop(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_LOOP") {
-		t.Fatalf("expected Z13_SPF_LOOKUP_LOOP, got tags: %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_LOOKUP_LOOP")
 }
 
 func TestZone13RecursiveError(t *testing.T) {
@@ -1355,9 +1299,7 @@ func TestZone13RecursiveError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_RECURSIVE_ERROR") {
-		t.Fatalf("expected Z13_SPF_RECURSIVE_ERROR, got tags: %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_RECURSIVE_ERROR")
 }
 
 func TestZone13PtrDeprecated(t *testing.T) {
@@ -1372,12 +1314,7 @@ func TestZone13PtrDeprecated(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_PTR_DEPRECATED") {
-		t.Fatalf("expected Z13_SPF_PTR_DEPRECATED")
-	}
-	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
-		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK")
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_PTR_DEPRECATED", "Z13_SPF_LOOKUP_COUNT_OK")
 }
 
 func TestZone13NoSpfFound(t *testing.T) {
@@ -1396,9 +1333,7 @@ func TestZone13NoSpfFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_NO_SPF_FOUND") {
-		t.Fatalf("expected Z13_NO_SPF_FOUND, got tags: %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z13_NO_SPF_FOUND")
 }
 
 func TestZone13CustomLimit(t *testing.T) {
@@ -1416,9 +1351,7 @@ func TestZone13CustomLimit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_EXCEEDED") {
-		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_EXCEEDED with limit=5, got tags: %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_LOOKUP_COUNT_EXCEEDED")
 	for _, e := range entries {
 		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_EXCEEDED" {
 			if limit, ok := e.Args["limit"].(int); !ok || limit != 5 {
@@ -1447,15 +1380,9 @@ func TestZone13MacroInInclude(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_MACRO_TARGET") {
-		t.Fatalf("expected Z13_SPF_MACRO_TARGET, got tags: %v", entryTags(entries))
-	}
-	if hasEntryTag(entries, "Z13_SPF_RECURSIVE_ERROR") {
-		t.Fatalf("did not expect Z13_SPF_RECURSIVE_ERROR for a macro-laden target")
-	}
-	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
-		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK, got tags: %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_MACRO_TARGET")
+	tctest.RequireNoTag(t, entries, "Z13_SPF_RECURSIVE_ERROR")
+	tctest.RequireTags(t, entries, "Z13_SPF_LOOKUP_COUNT_OK")
 	for _, e := range entries {
 		if e == nil {
 			continue
@@ -1494,12 +1421,8 @@ func TestZone13MacroInRedirect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_MACRO_TARGET") {
-		t.Fatalf("expected Z13_SPF_MACRO_TARGET, got tags: %v", entryTags(entries))
-	}
-	if hasEntryTag(entries, "Z13_SPF_RECURSIVE_ERROR") {
-		t.Fatalf("did not expect Z13_SPF_RECURSIVE_ERROR for a macro-laden redirect")
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_MACRO_TARGET")
+	tctest.RequireNoTag(t, entries, "Z13_SPF_RECURSIVE_ERROR")
 	for _, e := range entries {
 		if e != nil && e.Tag == "Z13_SPF_MACRO_TARGET" {
 			if got, _ := e.Args["target"].(string); got != macroTarget {
@@ -1532,12 +1455,7 @@ func TestZone13MacroAndResolvableIncludeCoexist(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone13: %v", err)
 	}
-	if !hasEntryTag(entries, "Z13_SPF_MACRO_TARGET") {
-		t.Fatalf("expected Z13_SPF_MACRO_TARGET, got tags: %v", entryTags(entries))
-	}
-	if !hasEntryTag(entries, "Z13_SPF_LOOKUP_COUNT_OK") {
-		t.Fatalf("expected Z13_SPF_LOOKUP_COUNT_OK, got tags: %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z13_SPF_MACRO_TARGET", "Z13_SPF_LOOKUP_COUNT_OK")
 	for _, e := range entries {
 		if e != nil && e.Tag == "Z13_SPF_LOOKUP_COUNT_OK" {
 			if count, ok := e.Args["count"].(int); !ok || count != 4 {
@@ -1597,12 +1515,8 @@ func TestZone14ZONEMDFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone14: %v", err)
 	}
-	if !hasEntryTag(entries, "Z14_ZONEMD_FOUND") {
-		t.Fatalf("expected Z14_ZONEMD_FOUND")
-	}
-	if hasEntryTag(entries, "Z14_SERIAL_MISMATCH") {
-		t.Fatalf("did not expect Z14_SERIAL_MISMATCH when serials match")
-	}
+	tctest.RequireTags(t, entries, "Z14_ZONEMD_FOUND")
+	tctest.RequireNoTag(t, entries, "Z14_SERIAL_MISMATCH")
 }
 
 func TestZone14NoZONEMD(t *testing.T) {
@@ -1629,9 +1543,7 @@ func TestZone14NoZONEMD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone14: %v", err)
 	}
-	if !hasEntryTag(entries, "Z14_NO_ZONEMD") {
-		t.Fatalf("expected Z14_NO_ZONEMD")
-	}
+	tctest.RequireTags(t, entries, "Z14_NO_ZONEMD")
 }
 
 func TestZone14SerialMismatch(t *testing.T) {
@@ -1658,9 +1570,7 @@ func TestZone14SerialMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone14: %v", err)
 	}
-	if !hasEntryTag(entries, "Z14_SERIAL_MISMATCH") {
-		t.Fatalf("expected Z14_SERIAL_MISMATCH")
-	}
+	tctest.RequireTags(t, entries, "Z14_SERIAL_MISMATCH")
 }
 
 func TestZone14DuplicateSchemeHash(t *testing.T) {
@@ -1687,9 +1597,7 @@ func TestZone14DuplicateSchemeHash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone14: %v", err)
 	}
-	if !hasEntryTag(entries, "Z14_DUPLICATE_SCHEME_HASH") {
-		t.Fatalf("expected Z14_DUPLICATE_SCHEME_HASH")
-	}
+	tctest.RequireTags(t, entries, "Z14_DUPLICATE_SCHEME_HASH")
 }
 
 func TestZone14MultipleZONEMD(t *testing.T) {
@@ -1725,9 +1633,7 @@ func TestZone14MultipleZONEMD(t *testing.T) {
 	if foundCount != 2 {
 		t.Fatalf("expected 2 Z14_ZONEMD_FOUND, got %d", foundCount)
 	}
-	if hasEntryTag(entries, "Z14_DUPLICATE_SCHEME_HASH") {
-		t.Fatalf("did not expect Z14_DUPLICATE_SCHEME_HASH for distinct (scheme, hash) pairs")
-	}
+	tctest.RequireNoTag(t, entries, "Z14_DUPLICATE_SCHEME_HASH")
 }
 
 func TestZone14InconsistentZONEMD(t *testing.T) {
@@ -1757,9 +1663,7 @@ func TestZone14InconsistentZONEMD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone14: %v", err)
 	}
-	if !hasEntryTag(entries, "Z14_INCONSISTENT_ZONEMD") {
-		t.Fatalf("expected Z14_INCONSISTENT_ZONEMD")
-	}
+	tctest.RequireTags(t, entries, "Z14_INCONSISTENT_ZONEMD")
 }
 
 func TestZone14MixedPresence(t *testing.T) {
@@ -1792,9 +1696,7 @@ func TestZone14MixedPresence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone14: %v", err)
 	}
-	if !hasEntryTag(entries, "Z14_MIXED_PRESENCE") {
-		t.Fatalf("expected Z14_MIXED_PRESENCE")
-	}
+	tctest.RequireTags(t, entries, "Z14_MIXED_PRESENCE")
 }
 
 func TestZone14ConsolidatedFound(t *testing.T) {
@@ -1834,9 +1736,7 @@ func TestZone14ConsolidatedFound(t *testing.T) {
 	if len(foundEntries) != 1 {
 		t.Fatalf("expected exactly 1 consolidated Z14_ZONEMD_FOUND, got %d", len(foundEntries))
 	}
-	if hasEntryTag(entries, "Z14_INCONSISTENT_ZONEMD") {
-		t.Fatalf("did not expect Z14_INCONSISTENT_ZONEMD when content is identical")
-	}
+	tctest.RequireNoTag(t, entries, "Z14_INCONSISTENT_ZONEMD")
 }
 
 func TestZone14NonAuthoritativeSkipped(t *testing.T) {
@@ -1899,12 +1799,7 @@ func TestZone14UnsupportedHash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone14: %v", err)
 	}
-	if !hasEntryTag(entries, "Z14_UNSUPPORTED_HASH") {
-		t.Fatalf("expected Z14_UNSUPPORTED_HASH for hash=99")
-	}
-	if !hasEntryTag(entries, "Z14_ZONEMD_FOUND") {
-		t.Fatalf("expected Z14_ZONEMD_FOUND alongside Z14_UNSUPPORTED_HASH")
-	}
+	tctest.RequireTags(t, entries, "Z14_UNSUPPORTED_HASH", "Z14_ZONEMD_FOUND")
 }
 
 func TestZone14UnsupportedHashConsolidated(t *testing.T) {
@@ -1964,12 +1859,8 @@ func TestZone14SOAUnavailable(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone14: %v", err)
 	}
-	if !hasEntryTag(entries, "Z14_ZONEMD_FOUND") {
-		t.Fatalf("expected Z14_ZONEMD_FOUND")
-	}
-	if hasEntryTag(entries, "Z14_SERIAL_MISMATCH") {
-		t.Fatalf("did not expect Z14_SERIAL_MISMATCH when SOA is unavailable")
-	}
+	tctest.RequireTags(t, entries, "Z14_ZONEMD_FOUND")
+	tctest.RequireNoTag(t, entries, "Z14_SERIAL_MISMATCH")
 }
 
 func TestZone14MixedPresenceAndInconsistent(t *testing.T) {
@@ -2008,32 +1899,7 @@ func TestZone14MixedPresenceAndInconsistent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone14: %v", err)
 	}
-	if !hasEntryTag(entries, "Z14_MIXED_PRESENCE") {
-		t.Fatalf("expected Z14_MIXED_PRESENCE")
-	}
-	if !hasEntryTag(entries, "Z14_INCONSISTENT_ZONEMD") {
-		t.Fatalf("expected Z14_INCONSISTENT_ZONEMD")
-	}
-}
-
-func entryTags(entries []*logger.Entry) []string {
-	var tags []string
-	for _, e := range entries {
-		if e != nil {
-			tags = append(tags, e.Tag)
-		}
-	}
-	return tags
-}
-
-// findEntryByTag returns the first entry with the given tag, or nil.
-func findEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
-	for _, e := range entries {
-		if e != nil && e.Tag == tag {
-			return e
-		}
-	}
-	return nil
+	tctest.RequireTags(t, entries, "Z14_MIXED_PRESENCE", "Z14_INCONSISTENT_ZONEMD")
 }
 
 // runZone09 wires a single-nameserver zone09 run for a given zone name and MX
@@ -2074,16 +1940,11 @@ func TestZone09ArpaEmailDomain(t *testing.T) {
 	entries := runZone09(t, "in-addr.arpa", func() packet.Packet {
 		return mxPacket("in-addr.arpa", 300, mxRR{10, "mail.example."})
 	})
-	arpa := findEntryByTag(entries, "Z09_ARPA_EMAIL_DOMAIN")
-	if arpa == nil {
-		t.Fatalf("expected Z09_ARPA_EMAIL_DOMAIN, got %v", entryTags(entries))
-	}
+	arpa := tctest.RequireTag(t, entries, "Z09_ARPA_EMAIL_DOMAIN")
 	if targets, ok := arpa.Args["mail_targets"].([]string); !ok || len(targets) != 1 || targets[0] != "mail.example" {
 		t.Fatalf("expected mail_targets [mail.example], got %#v", arpa.Args["mail_targets"])
 	}
-	if hasEntryTag(entries, "Z09_MX_DATA") {
-		t.Fatalf("arpa zone with MX must not emit Z09_MX_DATA, got %v", entryTags(entries))
-	}
+	tctest.RequireNoTag(t, entries, "Z09_MX_DATA")
 }
 
 // TestZone09TLDEmailDomainReportsMailTargets verifies the TLD email-domain
@@ -2092,10 +1953,7 @@ func TestZone09TLDEmailDomainReportsMailTargets(t *testing.T) {
 	entries := runZone09(t, "example", func() packet.Packet {
 		return mxPacket("example", 300, mxRR{0, "no.mx.example."})
 	})
-	tld := findEntryByTag(entries, "Z09_TLD_EMAIL_DOMAIN")
-	if tld == nil {
-		t.Fatalf("expected Z09_TLD_EMAIL_DOMAIN, got %v", entryTags(entries))
-	}
+	tld := tctest.RequireTag(t, entries, "Z09_TLD_EMAIL_DOMAIN")
 	if targets, ok := tld.Args["mail_targets"].([]string); !ok || len(targets) != 1 || targets[0] != "no.mx.example" {
 		t.Fatalf("expected mail_targets [no.mx.example], got %#v", tld.Args["mail_targets"])
 	}
@@ -2108,12 +1966,8 @@ func TestZone09NoMXFoundOrExpectedForNonMailDomain(t *testing.T) {
 	entries := runZone09(t, "example", func() packet.Packet {
 		return noMXPacket("example")
 	})
-	if !hasEntryTag(entries, "Z09_NO_MX_FOUND_OR_EXPECTED") {
-		t.Fatalf("expected Z09_NO_MX_FOUND_OR_EXPECTED, got %v", entryTags(entries))
-	}
-	if hasEntryTag(entries, "Z09_MISSING_MAIL_TARGET") {
-		t.Fatalf("non-mail domain must not emit Z09_MISSING_MAIL_TARGET, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z09_NO_MX_FOUND_OR_EXPECTED")
+	tctest.RequireNoTag(t, entries, "Z09_MISSING_MAIL_TARGET")
 }
 
 // TestZone09MissingMailTargetForNormalDomain verifies an ordinary domain with
@@ -2122,12 +1976,8 @@ func TestZone09MissingMailTargetForNormalDomain(t *testing.T) {
 	entries := runZone09(t, "example.com", func() packet.Packet {
 		return noMXPacket("example.com")
 	})
-	if !hasEntryTag(entries, "Z09_MISSING_MAIL_TARGET") {
-		t.Fatalf("expected Z09_MISSING_MAIL_TARGET, got %v", entryTags(entries))
-	}
-	if hasEntryTag(entries, "Z09_NO_MX_FOUND_OR_EXPECTED") {
-		t.Fatalf("normal domain must not emit Z09_NO_MX_FOUND_OR_EXPECTED, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z09_MISSING_MAIL_TARGET")
+	tctest.RequireNoTag(t, entries, "Z09_NO_MX_FOUND_OR_EXPECTED")
 }
 
 // TestZone09ValidNullMX verifies that a single zero-preference null MX is
@@ -2136,13 +1986,9 @@ func TestZone09ValidNullMX(t *testing.T) {
 	entries := runZone09(t, "example.com", func() packet.Packet {
 		return mxPacket("example.com", 300, mxRR{0, "."})
 	})
-	if !hasEntryTag(entries, "Z09_VALID_NULL_MX") {
-		t.Fatalf("expected Z09_VALID_NULL_MX, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z09_VALID_NULL_MX")
 	for _, tag := range []string{"Z09_NULL_MX_WITH_OTHER_MX", "Z09_NULL_MX_NON_ZERO_PREF", "Z09_MX_DATA"} {
-		if hasEntryTag(entries, tag) {
-			t.Fatalf("valid null MX must not emit %s, got %v", tag, entryTags(entries))
-		}
+		tctest.RequireNoTag(t, entries, tag)
 	}
 }
 
@@ -2152,12 +1998,8 @@ func TestZone09ValidNullMXSuppressedWithNonZeroPref(t *testing.T) {
 	entries := runZone09(t, "example.com", func() packet.Packet {
 		return mxPacket("example.com", 300, mxRR{10, "."})
 	})
-	if !hasEntryTag(entries, "Z09_NULL_MX_NON_ZERO_PREF") {
-		t.Fatalf("expected Z09_NULL_MX_NON_ZERO_PREF, got %v", entryTags(entries))
-	}
-	if hasEntryTag(entries, "Z09_VALID_NULL_MX") {
-		t.Fatalf("non-zero-preference null MX must not emit Z09_VALID_NULL_MX, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z09_NULL_MX_NON_ZERO_PREF")
+	tctest.RequireNoTag(t, entries, "Z09_VALID_NULL_MX")
 }
 
 // TestZone09NoServersMXResponse verifies that when servers pass SOA gating but
@@ -2167,12 +2009,7 @@ func TestZone09NoServersMXResponse(t *testing.T) {
 	entries := runZone09(t, "example.com", func() packet.Packet {
 		return packet.Packet{}
 	})
-	if !hasEntryTag(entries, "Z09_NO_SERVERS_MX_RESPONSE") {
-		t.Fatalf("expected Z09_NO_SERVERS_MX_RESPONSE, got %v", entryTags(entries))
-	}
-	if !hasEntryTag(entries, "Z09_NO_RESPONSE_MX_QUERY") {
-		t.Fatalf("expected Z09_NO_RESPONSE_MX_QUERY, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z09_NO_SERVERS_MX_RESPONSE", "Z09_NO_RESPONSE_MX_QUERY")
 }
 
 // TestZone09NoServersMXResponseSkippedWithoutServers verifies the aggregate tag
@@ -2192,9 +2029,7 @@ func TestZone09NoServersMXResponseSkippedWithoutServers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone09: %v", err)
 	}
-	if hasEntryTag(entries, "Z09_NO_SERVERS_MX_RESPONSE") {
-		t.Fatalf("no servers to query; Z09_NO_SERVERS_MX_RESPONSE must not fire, got %v", entryTags(entries))
-	}
+	tctest.RequireNoTag(t, entries, "Z09_NO_SERVERS_MX_RESPONSE")
 }
 
 // TestZone09EvaluatesMXWithoutSOA verifies the MX query has no SOA precondition:
@@ -2224,9 +2059,7 @@ func TestZone09EvaluatesMXWithoutSOA(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone09: %v", err)
 	}
-	if !hasEntryTag(entries, "Z09_MX_DATA") {
-		t.Fatalf("expected Z09_MX_DATA without a SOA precondition, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z09_MX_DATA")
 }
 
 // --- Zone15 (CAA at the zone apex) ---------------------------------------
@@ -2301,34 +2134,6 @@ func runZone15(t *testing.T, ctx context.Context, zoneName string) []*logger.Ent
 	return entries
 }
 
-func entriesWithTag(entries []*logger.Entry, tag string) []*logger.Entry {
-	var out []*logger.Entry
-	for _, entry := range entries {
-		if entry != nil && entry.Tag == tag {
-			out = append(out, entry)
-		}
-	}
-	return out
-}
-
-func firstEntryWithTag(t *testing.T, entries []*logger.Entry, tag string) *logger.Entry {
-	t.Helper()
-	found := entriesWithTag(entries, tag)
-	if len(found) == 0 {
-		t.Fatalf("expected %s, got %v", tag, entryTags(entries))
-	}
-	return found[0]
-}
-
-func requireNoTag(t *testing.T, entries []*logger.Entry, tags ...string) {
-	t.Helper()
-	for _, tag := range tags {
-		if hasEntryTag(entries, tag) {
-			t.Fatalf("did not expect %s, got %v", tag, entryTags(entries))
-		}
-	}
-}
-
 func TestZone15CAAFound(t *testing.T) {
 	ctx := setupTest(t)
 
@@ -2339,7 +2144,7 @@ func TestZone15CAAFound(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	found := firstEntryWithTag(t, entries, "Z15_CAA_FOUND")
+	found := tctest.RequireTag(t, entries, "Z15_CAA_FOUND")
 	if got, ok := found.Args["caa_flags"].(uint8); !ok || got != 0 {
 		t.Fatalf("expected caa_flags=0, got %#v", found.Args["caa_flags"])
 	}
@@ -2351,7 +2156,7 @@ func TestZone15CAAFound(t *testing.T) {
 	}
 	// A single well-formed permitting record is a clean result: no defect tag,
 	// and no policy verdict since issuance is not forbidden.
-	requireNoTag(t, entries,
+	tctest.RequireNoTag(t, entries,
 		"Z15_NO_CAA", "Z15_NO_CAA_TLD", "Z15_RESERVED_FLAGS", "Z15_INVALID_PROPERTY_TAG",
 		"Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL", "Z15_INVALID_ISSUE_VALUE",
 		"Z15_ISSUANCE_FORBIDDEN", "Z15_ISSUE_CONTRADICTION")
@@ -2369,7 +2174,7 @@ func TestZone15ConsolidatedFound(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	found := entriesWithTag(entries, "Z15_CAA_FOUND")
+	found := tctest.All(entries, "Z15_CAA_FOUND")
 	if len(found) != 1 {
 		t.Fatalf("expected one consolidated Z15_CAA_FOUND, got %d", len(found))
 	}
@@ -2377,7 +2182,7 @@ func TestZone15ConsolidatedFound(t *testing.T) {
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected both name servers in servers, got %#v", found[0].Args["servers"])
 	}
-	requireNoTag(t, entries, "Z15_INCONSISTENT_CAA", "Z15_MIXED_PRESENCE")
+	tctest.RequireNoTag(t, entries, "Z15_INCONSISTENT_CAA", "Z15_MIXED_PRESENCE")
 }
 
 func TestZone15NoCAA(t *testing.T) {
@@ -2390,13 +2195,13 @@ func TestZone15NoCAA(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	noCAA := firstEntryWithTag(t, entries, "Z15_NO_CAA")
+	noCAA := tctest.RequireTag(t, entries, "Z15_NO_CAA")
 	servers, ok := noCAA.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected one server in Z15_NO_CAA, got %#v", noCAA.Args["servers"])
 	}
 	// A normal delegated domain must not get the TLD wording.
-	requireNoTag(t, entries, "Z15_NO_CAA_TLD", "Z15_MIXED_PRESENCE")
+	tctest.RequireNoTag(t, entries, "Z15_NO_CAA_TLD", "Z15_MIXED_PRESENCE")
 }
 
 func TestZone15NoCAATLD(t *testing.T) {
@@ -2413,10 +2218,8 @@ func TestZone15NoCAATLD(t *testing.T) {
 
 			entries := runZone15(t, ctx, zoneName)
 
-			if !hasEntryTag(entries, "Z15_NO_CAA_TLD") {
-				t.Fatalf("expected Z15_NO_CAA_TLD for %q, got %v", zoneName, entryTags(entries))
-			}
-			requireNoTag(t, entries, "Z15_NO_CAA")
+			tctest.RequireTags(t, entries, "Z15_NO_CAA_TLD")
+			tctest.RequireNoTag(t, entries, "Z15_NO_CAA")
 		})
 	}
 }
@@ -2437,10 +2240,8 @@ func TestZone15PublicSuffixIsNotATLD(t *testing.T) {
 
 			entries := runZone15(t, ctx, zoneName)
 
-			if !hasEntryTag(entries, "Z15_NO_CAA") {
-				t.Fatalf("expected Z15_NO_CAA for public suffix %q, got %v", zoneName, entryTags(entries))
-			}
-			requireNoTag(t, entries, "Z15_NO_CAA_TLD")
+			tctest.RequireTags(t, entries, "Z15_NO_CAA")
+			tctest.RequireNoTag(t, entries, "Z15_NO_CAA_TLD")
 		})
 	}
 }
@@ -2453,13 +2254,13 @@ func TestZone15NoResponse(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	noResp := firstEntryWithTag(t, entries, "Z15_NO_RESPONSE_CAA_QUERY")
+	noResp := tctest.RequireTag(t, entries, "Z15_NO_RESPONSE_CAA_QUERY")
 	addrs, ok := noResp.Args["addresses"].([]string)
 	if !ok || len(addrs) != 1 || addrs[0] != "192.0.2.1" {
 		t.Fatalf("expected silent endpoint [192.0.2.1], got %#v", noResp.Args["addresses"])
 	}
 	// A server that never answered is not a server that "has no CAA".
-	requireNoTag(t, entries, "Z15_NO_CAA", "Z15_NO_CAA_TLD", "Z15_MIXED_PRESENCE")
+	tctest.RequireNoTag(t, entries, "Z15_NO_CAA", "Z15_NO_CAA_TLD", "Z15_MIXED_PRESENCE")
 }
 
 func TestZone15UnexpectedRcode(t *testing.T) {
@@ -2472,7 +2273,7 @@ func TestZone15UnexpectedRcode(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	bad := firstEntryWithTag(t, entries, "Z15_UNEXPECTED_RCODE_CAA")
+	bad := tctest.RequireTag(t, entries, "Z15_UNEXPECTED_RCODE_CAA")
 	if got, ok := bad.Args["rcode"].(string); !ok || got != "SERVFAIL" {
 		t.Fatalf("expected rcode=SERVFAIL, got %#v", bad.Args["rcode"])
 	}
@@ -2480,7 +2281,7 @@ func TestZone15UnexpectedRcode(t *testing.T) {
 	if !ok || len(addrs) != 1 || addrs[0] != "192.0.2.1" {
 		t.Fatalf("expected failing endpoint [192.0.2.1], got %#v", bad.Args["addresses"])
 	}
-	requireNoTag(t, entries, "Z15_NO_CAA", "Z15_MIXED_PRESENCE")
+	tctest.RequireNoTag(t, entries, "Z15_NO_CAA", "Z15_MIXED_PRESENCE")
 }
 
 func TestZone15NonAuthoritativeSkipped(t *testing.T) {
@@ -2495,12 +2296,10 @@ func TestZone15NonAuthoritativeSkipped(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	requireNoTag(t, entries,
+	tctest.RequireNoTag(t, entries,
 		"Z15_CAA_FOUND", "Z15_NO_CAA", "Z15_NO_CAA_TLD", "Z15_MIXED_PRESENCE",
 		"Z15_INCONSISTENT_CAA", "Z15_NO_RESPONSE_CAA_QUERY", "Z15_UNEXPECTED_RCODE_CAA")
-	if !hasEntryTag(entries, "TEST_CASE_END") {
-		t.Fatalf("expected TEST_CASE_END even when every server is skipped")
-	}
+	tctest.RequireTags(t, entries, "TEST_CASE_END")
 }
 
 func TestZone15MixedPresence(t *testing.T) {
@@ -2516,11 +2315,9 @@ func TestZone15MixedPresence(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if !hasEntryTag(entries, "Z15_MIXED_PRESENCE") {
-		t.Fatalf("expected Z15_MIXED_PRESENCE, got %v", entryTags(entries))
-	}
-	if !hasEntryTag(entries, "Z15_CAA_FOUND") || !hasEntryTag(entries, "Z15_NO_CAA") {
-		t.Fatalf("expected both presence groups reported, got %v", entryTags(entries))
+	tctest.RequireTags(t, entries, "Z15_MIXED_PRESENCE")
+	if !tctest.Has(entries, "Z15_CAA_FOUND") || !tctest.Has(entries, "Z15_NO_CAA") {
+		t.Fatalf("expected both presence groups reported, got %v", tctest.Tags(entries))
 	}
 }
 
@@ -2537,13 +2334,11 @@ func TestZone15Inconsistent(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if !hasEntryTag(entries, "Z15_INCONSISTENT_CAA") {
-		t.Fatalf("expected Z15_INCONSISTENT_CAA, got %v", entryTags(entries))
-	}
-	if got := len(entriesWithTag(entries, "Z15_CAA_FOUND")); got != 2 {
+	tctest.RequireTags(t, entries, "Z15_INCONSISTENT_CAA")
+	if got := len(tctest.All(entries, "Z15_CAA_FOUND")); got != 2 {
 		t.Fatalf("expected one Z15_CAA_FOUND per distinct content, got %d", got)
 	}
-	requireNoTag(t, entries, "Z15_MIXED_PRESENCE")
+	tctest.RequireNoTag(t, entries, "Z15_MIXED_PRESENCE")
 }
 
 func TestZone15ReservedFlags(t *testing.T) {
@@ -2562,10 +2357,10 @@ func TestZone15ReservedFlags(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if got := len(entriesWithTag(entries, "Z15_RESERVED_FLAGS")); got != 2 {
+	if got := len(tctest.All(entries, "Z15_RESERVED_FLAGS")); got != 2 {
 		t.Fatalf("expected Z15_RESERVED_FLAGS per offending record, got %d", got)
 	}
-	requireNoTag(t, entries, "Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL")
+	tctest.RequireNoTag(t, entries, "Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL")
 }
 
 func TestZone15InvalidPropertyTag(t *testing.T) {
@@ -2584,12 +2379,12 @@ func TestZone15InvalidPropertyTag(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if got := len(entriesWithTag(entries, "Z15_INVALID_PROPERTY_TAG")); got != 3 {
+	if got := len(tctest.All(entries, "Z15_INVALID_PROPERTY_TAG")); got != 3 {
 		t.Fatalf("expected Z15_INVALID_PROPERTY_TAG per offending record, got %d", got)
 	}
 	// An unusable tag is not classified further: there is no property to
 	// validate the value against, and the critical flag is not set.
-	requireNoTag(t, entries,
+	tctest.RequireNoTag(t, entries,
 		"Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL", "Z15_INVALID_ISSUE_VALUE")
 }
 
@@ -2607,10 +2402,8 @@ func TestZone15InvalidPropertyTagCritical(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if !hasEntryTag(entries, "Z15_INVALID_PROPERTY_TAG") {
-		t.Fatalf("expected Z15_INVALID_PROPERTY_TAG, got %v", entryTags(entries))
-	}
-	critical := firstEntryWithTag(t, entries, "Z15_UNKNOWN_PROPERTY_CRITICAL")
+	tctest.RequireTags(t, entries, "Z15_INVALID_PROPERTY_TAG")
+	critical := tctest.RequireTag(t, entries, "Z15_UNKNOWN_PROPERTY_CRITICAL")
 	if got, ok := critical.Args["caa_flags"].(uint8); !ok || got != 128 {
 		t.Fatalf("expected caa_flags=128, got %#v", critical.Args["caa_flags"])
 	}
@@ -2639,11 +2432,9 @@ func TestZone15UnknownProperty(t *testing.T) {
 
 			entries := runZone15(t, ctx, "example.com")
 
-			if !hasEntryTag(entries, tc.wantTag) {
-				t.Fatalf("expected %s, got %v", tc.wantTag, entryTags(entries))
-			}
-			requireNoTag(t, entries, tc.otherTag)
-			prop := firstEntryWithTag(t, entries, tc.wantTag)
+			tctest.RequireTags(t, entries, tc.wantTag)
+			tctest.RequireNoTag(t, entries, tc.otherTag)
+			prop := tctest.RequireTag(t, entries, tc.wantTag)
 			if got, ok := prop.Args["caa_property"].(string); !ok || got != "futureprop" {
 				t.Fatalf("expected caa_property=futureprop, got %#v", prop.Args["caa_property"])
 			}
@@ -2663,10 +2454,10 @@ func TestZone15KnownPropertyCaseInsensitive(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	requireNoTag(t, entries,
+	tctest.RequireNoTag(t, entries,
 		"Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL", "Z15_INVALID_PROPERTY_TAG")
 	// The value is still validated against the issue-value grammar.
-	requireNoTag(t, entries, "Z15_INVALID_ISSUE_VALUE")
+	tctest.RequireNoTag(t, entries, "Z15_INVALID_ISSUE_VALUE")
 }
 
 func TestZone15RegisteredPropertiesKnown(t *testing.T) {
@@ -2686,7 +2477,7 @@ func TestZone15RegisteredPropertiesKnown(t *testing.T) {
 	useNameservers(t, ns1)
 
 	entries := runZone15(t, ctx, "example.com")
-	requireNoTag(t, entries, "Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL")
+	tctest.RequireNoTag(t, entries, "Z15_UNKNOWN_PROPERTY", "Z15_UNKNOWN_PROPERTY_CRITICAL")
 
 	// The Reserved entries are deliberately treated as unknown: RFC 8659
 	// reserved them so they can never be assigned a meaning, so no CA will
@@ -2700,9 +2491,7 @@ func TestZone15RegisteredPropertiesKnown(t *testing.T) {
 			useNameservers(t, ns)
 
 			entries := runZone15(t, ctx, "example.com")
-			if !hasEntryTag(entries, "Z15_UNKNOWN_PROPERTY") {
-				t.Fatalf("expected reserved tag %q to be reported unknown, got %v", tag, entryTags(entries))
-			}
+			tctest.RequireTags(t, entries, "Z15_UNKNOWN_PROPERTY")
 		})
 	}
 }
@@ -2720,7 +2509,7 @@ func TestZone15InvalidIssueValue(t *testing.T) {
 
 			entries := runZone15(t, ctx, "example.com")
 
-			bad := firstEntryWithTag(t, entries, "Z15_INVALID_ISSUE_VALUE")
+			bad := tctest.RequireTag(t, entries, "Z15_INVALID_ISSUE_VALUE")
 			if got, ok := bad.Args["caa_property"].(string); !ok || got != property {
 				t.Fatalf("expected caa_property=%s, got %#v", property, bad.Args["caa_property"])
 			}
@@ -2744,7 +2533,7 @@ func TestZone15IssueParametersValid(t *testing.T) {
 	useNameservers(t, ns1)
 
 	entries := runZone15(t, ctx, "example.com")
-	requireNoTag(t, entries, "Z15_INVALID_ISSUE_VALUE", "Z15_ISSUANCE_FORBIDDEN")
+	tctest.RequireNoTag(t, entries, "Z15_INVALID_ISSUE_VALUE", "Z15_ISSUANCE_FORBIDDEN")
 }
 
 func TestZone15InvalidIodef(t *testing.T) {
@@ -2772,7 +2561,7 @@ func TestZone15InvalidIodef(t *testing.T) {
 
 			entries := runZone15(t, ctx, "example.com")
 
-			got := hasEntryTag(entries, "Z15_INVALID_IODEF_VALUE")
+			got := tctest.Has(entries, "Z15_INVALID_IODEF_VALUE")
 			if got != tc.wantBad {
 				t.Fatalf("iodef %q: got Z15_INVALID_IODEF_VALUE=%v, want %v", tc.value, got, tc.wantBad)
 			}
@@ -2791,11 +2580,9 @@ func TestZone15IssuanceForbidden(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if !hasEntryTag(entries, "Z15_ISSUANCE_FORBIDDEN") {
-		t.Fatalf("expected Z15_ISSUANCE_FORBIDDEN, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z15_ISSUANCE_FORBIDDEN")
 	// Nothing contradicts it, and ";" is valid syntax rather than an error.
-	requireNoTag(t, entries, "Z15_ISSUE_CONTRADICTION", "Z15_INVALID_ISSUE_VALUE")
+	tctest.RequireNoTag(t, entries, "Z15_ISSUE_CONTRADICTION", "Z15_INVALID_ISSUE_VALUE")
 }
 
 func TestZone15MalformedIssueForbids(t *testing.T) {
@@ -2811,12 +2598,7 @@ func TestZone15MalformedIssueForbids(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if !hasEntryTag(entries, "Z15_INVALID_ISSUE_VALUE") {
-		t.Fatalf("expected Z15_INVALID_ISSUE_VALUE, got %v", entryTags(entries))
-	}
-	if !hasEntryTag(entries, "Z15_ISSUANCE_FORBIDDEN") {
-		t.Fatalf("expected a malformed issue value to forbid issuance, got %v", entryTags(entries))
-	}
+	tctest.RequireTags(t, entries, "Z15_INVALID_ISSUE_VALUE", "Z15_ISSUANCE_FORBIDDEN")
 }
 
 func TestZone15IssueWildOverridesForbidden(t *testing.T) {
@@ -2834,7 +2616,7 @@ func TestZone15IssueWildOverridesForbidden(t *testing.T) {
 		useNameservers(t, ns1)
 
 		entries := runZone15(t, ctx, "example.com")
-		requireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN")
+		tctest.RequireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN")
 	})
 
 	t.Run("issuewild also forbids", func(t *testing.T) {
@@ -2848,9 +2630,7 @@ func TestZone15IssueWildOverridesForbidden(t *testing.T) {
 		useNameservers(t, ns1)
 
 		entries := runZone15(t, ctx, "example.com")
-		if !hasEntryTag(entries, "Z15_ISSUANCE_FORBIDDEN") {
-			t.Fatalf("expected Z15_ISSUANCE_FORBIDDEN when both properties forbid, got %v", entryTags(entries))
-		}
+		tctest.RequireTags(t, entries, "Z15_ISSUANCE_FORBIDDEN")
 	})
 }
 
@@ -2870,11 +2650,11 @@ func TestZone15IssueContradiction(t *testing.T) {
 
 			entries := runZone15(t, ctx, "example.com")
 
-			contradiction := firstEntryWithTag(t, entries, "Z15_ISSUE_CONTRADICTION")
+			contradiction := tctest.RequireTag(t, entries, "Z15_ISSUE_CONTRADICTION")
 			if got, ok := contradiction.Args["caa_property"].(string); !ok || got != property {
 				t.Fatalf("expected caa_property=%s, got %#v", property, contradiction.Args["caa_property"])
 			}
-			requireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN")
+			tctest.RequireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN")
 		})
 	}
 }
@@ -2895,10 +2675,8 @@ func TestZone15PolicySuppressedWhenInconsistent(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if !hasEntryTag(entries, "Z15_INCONSISTENT_CAA") {
-		t.Fatalf("expected Z15_INCONSISTENT_CAA, got %v", entryTags(entries))
-	}
-	requireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN", "Z15_ISSUE_CONTRADICTION")
+	tctest.RequireTags(t, entries, "Z15_INCONSISTENT_CAA")
+	tctest.RequireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN", "Z15_ISSUE_CONTRADICTION")
 }
 
 func TestZone15RootNoPolicyVerdict(t *testing.T) {
@@ -2914,10 +2692,8 @@ func TestZone15RootNoPolicyVerdict(t *testing.T) {
 
 	entries := runZone15(t, ctx, ".")
 
-	if !hasEntryTag(entries, "Z15_CAA_FOUND") {
-		t.Fatalf("expected Z15_CAA_FOUND at the root, got %v", entryTags(entries))
-	}
-	requireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN", "Z15_ISSUE_CONTRADICTION")
+	tctest.RequireTags(t, entries, "Z15_CAA_FOUND")
+	tctest.RequireNoTag(t, entries, "Z15_ISSUANCE_FORBIDDEN", "Z15_ISSUE_CONTRADICTION")
 }
 
 func TestZone15PartialFailure(t *testing.T) {
@@ -2936,13 +2712,8 @@ func TestZone15PartialFailure(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if !hasEntryTag(entries, "Z15_UNEXPECTED_RCODE_CAA") {
-		t.Fatalf("expected Z15_UNEXPECTED_RCODE_CAA, got %v", entryTags(entries))
-	}
-	if !hasEntryTag(entries, "Z15_CAA_FOUND") {
-		t.Fatalf("expected Z15_CAA_FOUND from the healthy server, got %v", entryTags(entries))
-	}
-	requireNoTag(t, entries, "Z15_MIXED_PRESENCE", "Z15_INCONSISTENT_CAA")
+	tctest.RequireTags(t, entries, "Z15_UNEXPECTED_RCODE_CAA", "Z15_CAA_FOUND")
+	tctest.RequireNoTag(t, entries, "Z15_MIXED_PRESENCE", "Z15_INCONSISTENT_CAA")
 }
 
 func TestZone15ApexCNAME(t *testing.T) {
@@ -2963,10 +2734,8 @@ func TestZone15ApexCNAME(t *testing.T) {
 
 	entries := runZone15(t, ctx, "example.com")
 
-	if !hasEntryTag(entries, "Z15_NO_CAA") {
-		t.Fatalf("expected a CNAME answer to count as absence, got %v", entryTags(entries))
-	}
-	requireNoTag(t, entries, "Z15_CAA_FOUND", "Z15_ISSUANCE_FORBIDDEN")
+	tctest.RequireTags(t, entries, "Z15_NO_CAA")
+	tctest.RequireNoTag(t, entries, "Z15_CAA_FOUND", "Z15_ISSUANCE_FORBIDDEN")
 }
 
 func TestParseCAAIssueValue(t *testing.T) {

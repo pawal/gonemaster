@@ -124,6 +124,45 @@ func TestZoneWithAddrsResolvesFakeAddresses(t *testing.T) {
 	}
 }
 
+func TestRecursorNSOnAndZone(t *testing.T) {
+	ctx := Context(t)
+	r := Recursor(t, map[string]map[string][]string{
+		".":       {"a.root": {"192.0.2.1"}},
+		"example": {"ns1.example": {"192.0.2.53"}},
+	})
+	if !r.HasFakeAddresses("example") {
+		t.Fatalf("expected fake addresses for example")
+	}
+	if addrs := r.GetFakeAddresses(".", "a.root"); len(addrs) != 1 {
+		t.Fatalf("expected one root address, got %v", addrs)
+	}
+
+	ns := NSOn(t, ctx, r, "ns1.example", "192.0.2.53", func(Query) packet.Packet {
+		return soaAnswer("example")
+	})
+	p, err := ns.Query(ctx, "example", "SOA")
+	if err != nil {
+		t.Fatalf("query: %v", err)
+	}
+	if p.Msg == nil || len(p.Msg.Answer) != 1 {
+		t.Fatalf("expected the handler answer, got %#v", p.Msg)
+	}
+
+	z := Zone(t, "example", r)
+	if got := z.Name.String(); got != "example" {
+		t.Fatalf("expected the example zone, got %s", got)
+	}
+	if z.Recursor() != r {
+		t.Fatalf("expected the zone to use the given recursor")
+	}
+}
+
+func TestRecursorRejectsBadAddress(t *testing.T) {
+	mustFail(t, "add fake addresses for example", func(tb TB) {
+		Recursor(tb, map[string]map[string][]string{"example": {"ns1.example": {"not-an-ip"}}})
+	})
+}
+
 // seam stands in for a package-level function variable a testcase overrides.
 var seam = func() string { return "real" }
 

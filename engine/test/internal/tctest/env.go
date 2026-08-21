@@ -50,26 +50,48 @@ func NS(t TB, ctx context.Context, name string, ip string, handler Handler) name
 	return newNS(t, ctx, name, ip, nil, handler)
 }
 
+// Recursor returns a recursor resolving the given fake addresses, keyed by
+// domain and then by nameserver name.
+func Recursor(t TB, fakes map[string]map[string][]string) *recursor.Recursor {
+	t.Helper()
+	r := &recursor.Recursor{}
+	for domain, data := range fakes {
+		if err := r.AddFakeAddresses(domain, data); err != nil {
+			t.Fatalf("add fake addresses for %s: %v", domain, err)
+		}
+	}
+	return r
+}
+
+// NSOn returns a nameserver on the recursor's client, answering via handler.
+func NSOn(t TB, ctx context.Context, r *recursor.Recursor, name string, ip string, handler Handler) nameserver.Nameserver {
+	t.Helper()
+	return newNS(t, ctx, name, ip, r.Client(), handler)
+}
+
+// Zone returns a zone served by the recursor.
+func Zone(t TB, name string, r *recursor.Recursor) *zone.Zone {
+	t.Helper()
+	z, err := zone.NewWithRecursor(name, r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+	return &z
+}
+
 // RootZone returns the root zone served by a single fake nameserver answering
 // through handler.
 func RootZone(t TB, ctx context.Context, handler Handler) *zone.Zone {
 	t.Helper()
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", rootHints); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-	newNS(t, ctx, "a.root", "192.0.2.1", r.Client(), handler)
-	return newZone(t, ".", r)
+	r := Recursor(t, map[string]map[string][]string{".": rootHints})
+	NSOn(t, ctx, r, "a.root", "192.0.2.1", handler)
+	return Zone(t, ".", r)
 }
 
 // ZoneWithAddrs returns a zone whose recursor resolves the given fake addresses.
 func ZoneWithAddrs(t TB, name string, data map[string][]string) *zone.Zone {
 	t.Helper()
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(name, data); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
-	return newZone(t, name, r)
+	return Zone(t, name, Recursor(t, map[string]map[string][]string{name: data}))
 }
 
 // Stub replaces a package seam for the duration of the test.
@@ -93,13 +115,4 @@ func newNS(t TB, ctx context.Context, name string, ip string, client *transport.
 		return handler(Query{Name: qname, Type: qtype, Class: qclass, Opts: opts}), nil
 	})
 	return ns
-}
-
-func newZone(t TB, name string, r *recursor.Recursor) *zone.Zone {
-	t.Helper()
-	z, err := zone.NewWithRecursor(name, r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
-	return &z
 }

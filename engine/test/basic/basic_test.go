@@ -52,19 +52,11 @@ func TestBasic01Root(t *testing.T) {
 func TestBasic01Undelegated(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
+	z := tctest.ZoneWithAddrs(t, "example", map[string][]string{
 		"ns1.example": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
-
-	entries, err := Basic01(ctx, &z)
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -74,15 +66,14 @@ func TestBasic01Undelegated(t *testing.T) {
 func TestBasic01ParentFoundTypedArgs(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"b.root": {"192.0.2.2"},
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"b.root": {"192.0.2.2"},
+			"a.root": {"192.0.2.1"},
+		},
+	})
 
-	rootHook := func(owner string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+	rootHook := func(owner string) tctest.RawHandler {
 		return func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 			name := strings.ToLower(qname)
 			kind := strings.ToUpper(qtype)
@@ -101,24 +92,13 @@ func TestBasic01ParentFoundTypedArgs(t *testing.T) {
 		}
 	}
 
-	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(rootHook("a.root"))
+	tctest.NSRaw(t, ctx, r, "a.root", "192.0.2.1", rootHook("a.root"))
 
-	broot, err := nameserver.NewWithContext(ctx, "b.root", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	broot.SetQueryHook(rootHook("b.root"))
+	tctest.NSRaw(t, ctx, r, "b.root", "192.0.2.2", rootHook("b.root"))
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "example", r)
 
-	entries, err := Basic01(ctx, &z)
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -195,12 +175,11 @@ func TestBasic01EmitsCNAMETagOnNSLookup(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx, _, _ := testhelpers.Context(t)
 
-			r := &recursor.Recursor{}
-			if err := r.AddFakeAddresses(".", map[string][]string{
-				"a.root": {"192.0.2.1"},
-			}); err != nil {
-				t.Fatalf("add fake root: %v", err)
-			}
+			r := tctest.Recursor(t, map[string]map[string][]string{
+				".": {
+					"a.root": {"192.0.2.1"},
+				},
+			})
 			r.SetNegativeCacheTTL(60 * time.Second)
 			recursortest.SeedCNAMEError(r, tc.seedErr, "ns.outside.test", []string{"A", "AAAA"})
 
@@ -216,18 +195,11 @@ func TestBasic01EmitsCNAMETagOnNSLookup(t *testing.T) {
 				return packet.Packet{}, nil
 			}
 
-			aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-			if err != nil {
-				t.Fatalf("new root nameserver: %v", err)
-			}
-			aroot.SetQueryHook(rootHook)
+			tctest.NSRaw(t, ctx, r, "a.root", "192.0.2.1", rootHook)
 
-			z, err := zone.NewWithRecursor("example", r)
-			if err != nil {
-				t.Fatalf("new zone: %v", err)
-			}
+			z := tctest.Zone(t, "example", r)
 
-			entries, err := Basic01(ctx, &z)
+			entries, err := Basic01(ctx, z)
 			if err != nil {
 				t.Fatalf("basic01: %v", err)
 			}
@@ -244,13 +216,9 @@ func TestBasic01EmitsCNAMETagOnNSLookup(t *testing.T) {
 func TestBasic02NoDelegation(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "example", tctest.Recursor(t, nil))
 
-	entries, err := Basic02(ctx, &z)
+	entries, err := Basic02(ctx, z)
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
@@ -263,36 +231,28 @@ func TestBasic02NoDelegation(t *testing.T) {
 func TestBasic02AuthResponseSOA(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
+	})
 
-	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
 		switch {
 		case name == "." && kind == "NS":
-			return nsPacket(".", "a.root"), nil
+			return nsPacket(".", "a.root")
 		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.root"), nil
+			return soaPacket(".", "a.root", "hostmaster.root")
 		default:
-			return packet.Packet{}, nil
+			return packet.Packet{}
 		}
 	})
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, ".", r)
 
-	entries, err := Basic02(ctx, &z)
+	entries, err := Basic02(ctx, z)
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
@@ -317,18 +277,17 @@ func TestBasic02ParallelQueries(t *testing.T) {
 	baseCtx, prof, _ := testhelpers.Context(t)
 	prof.Resolver.Defaults.Parallel = 2
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+			"b.root": {"192.0.2.2"},
+		},
+	})
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
 
-	hook := func(id string, block bool) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+	hook := func(id string, block bool) tctest.RawHandler {
 		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 			name := strings.ToLower(qname)
 			kind := strings.ToUpper(qtype)
@@ -354,22 +313,11 @@ func TestBasic02ParallelQueries(t *testing.T) {
 		}
 	}
 
-	aroot, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(hook("a.root", true))
+	tctest.NSRaw(t, baseCtx, r, "a.root", "192.0.2.1", hook("a.root", true))
 
-	broot, err := nameserver.NewWithContext(baseCtx, "b.root", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	broot.SetQueryHook(hook("b.root", false))
+	tctest.NSRaw(t, baseCtx, r, "b.root", "192.0.2.2", hook("b.root", false))
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, ".", r)
 
 	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 	defer cancel()
@@ -378,7 +326,7 @@ func TestBasic02ParallelQueries(t *testing.T) {
 	var entries []*logger.Entry
 	var basicErr error
 	go func() {
-		entries, basicErr = Basic02(ctx, &z)
+		entries, basicErr = Basic02(ctx, z)
 		close(done)
 	}()
 
@@ -453,36 +401,28 @@ func TestBasic02ParallelQueries(t *testing.T) {
 func TestBasic02UnexpectedRcode(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
+	})
 
-	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
 		switch {
 		case name == "." && kind == "NS":
-			return nsPacket(".", "a.root"), nil
+			return nsPacket(".", "a.root")
 		case name == "." && kind == "SOA":
-			return rcodePacket(dns.RcodeServerFailure), nil
+			return rcodePacket(dns.RcodeServerFailure)
 		default:
-			return packet.Packet{}, nil
+			return packet.Packet{}
 		}
 	})
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, ".", r)
 
-	entries, err := Basic02(ctx, &z)
+	entries, err := Basic02(ctx, z)
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
@@ -492,32 +432,24 @@ func TestBasic02UnexpectedRcode(t *testing.T) {
 func TestBasic02NoIPAddress(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-
-	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
-		if name == "." && kind == "NS" {
-			return nsPacket(".", "b.root"), nil
-		}
-		return packet.Packet{}, nil
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
 	})
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
+		if name == "." && kind == "NS" {
+			return nsPacket(".", "b.root")
+		}
+		return packet.Packet{}
+	})
 
-	entries, err := Basic02(ctx, &z)
+	z := tctest.Zone(t, ".", r)
+
+	entries, err := Basic02(ctx, z)
 	if err != nil {
 		t.Fatalf("basic02: %v", err)
 	}
@@ -533,58 +465,44 @@ func TestBasic02NoIPAddress(t *testing.T) {
 func TestBasic03HasARecords(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
+		"example": {
+			"ns1.example": {"192.0.2.53"},
+		},
+	})
 
-	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
 		switch {
 		case name == "example" && (kind == "SOA" || kind == "NS"):
-			return referralPacket("example", "ns1.example", net.IPv4(192, 0, 2, 53)), nil
+			return referralPacket("example", "ns1.example", net.IPv4(192, 0, 2, 53))
 		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.root"), nil
+			return soaPacket(".", "a.root", "hostmaster.root")
 		default:
-			return packet.Packet{}, nil
+			return packet.Packet{}
 		}
 	})
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
-	if err != nil {
-		t.Fatalf("new ns1: %v", err)
-	}
-	ns1.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
+	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
 		switch {
 		case name == "example" && kind == "SOA":
-			return soaPacket("example", "ns1.example", "hostmaster.example"), nil
+			return soaPacket("example", "ns1.example", "hostmaster.example")
 		case name == "www.example" && kind == "A":
-			return aPacket("www.example", net.IPv4(192, 0, 2, 99)), nil
+			return aPacket("www.example", net.IPv4(192, 0, 2, 99))
 		default:
-			return packet.Packet{}, nil
+			return packet.Packet{}
 		}
 	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "example", r)
 
-	entries, err := Basic03(ctx, &z)
+	entries, err := Basic03(ctx, z)
 	if err != nil {
 		t.Fatalf("basic03: %v", err)
 	}
@@ -595,58 +513,44 @@ func TestBasic03HasARecords(t *testing.T) {
 func TestBasic03NoARecords(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
+		"example": {
+			"ns1.example": {"192.0.2.53"},
+		},
+	})
 
-	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
 		switch {
 		case name == "example" && (kind == "SOA" || kind == "NS"):
-			return referralPacket("example", "ns1.example", net.IPv4(192, 0, 2, 53)), nil
+			return referralPacket("example", "ns1.example", net.IPv4(192, 0, 2, 53))
 		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.root"), nil
+			return soaPacket(".", "a.root", "hostmaster.root")
 		default:
-			return packet.Packet{}, nil
+			return packet.Packet{}
 		}
 	})
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
-	if err != nil {
-		t.Fatalf("new ns1: %v", err)
-	}
-	ns1.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
+	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
 		switch {
 		case name == "example" && kind == "SOA":
-			return soaPacket("example", "ns1.example", "hostmaster.example"), nil
+			return soaPacket("example", "ns1.example", "hostmaster.example")
 		case name == "www.example" && kind == "A":
-			return emptyAnswerPacket(), nil
+			return emptyAnswerPacket()
 		default:
-			return packet.Packet{}, nil
+			return packet.Packet{}
 		}
 	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "example", r)
 
-	entries, err := Basic03(ctx, &z)
+	entries, err := Basic03(ctx, z)
 	if err != nil {
 		t.Fatalf("basic03: %v", err)
 	}
@@ -657,54 +561,40 @@ func TestBasic03NoARecords(t *testing.T) {
 func TestBasic03NoResponses(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
+		"example": {
+			"ns1.example": {"192.0.2.53"},
+		},
+	})
 
-	root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
 		switch {
 		case name == "example" && (kind == "SOA" || kind == "NS"):
-			return referralPacket("example", "ns1.example", net.IPv4(192, 0, 2, 53)), nil
+			return referralPacket("example", "ns1.example", net.IPv4(192, 0, 2, 53))
 		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.root"), nil
+			return soaPacket(".", "a.root", "hostmaster.root")
 		default:
-			return packet.Packet{}, nil
+			return packet.Packet{}
 		}
 	})
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
-	if err != nil {
-		t.Fatalf("new ns1: %v", err)
-	}
-	ns1.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
+	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
 		if name == "example" && kind == "SOA" {
-			return soaPacket("example", "ns1.example", "hostmaster.example"), nil
+			return soaPacket("example", "ns1.example", "hostmaster.example")
 		}
-		return packet.Packet{}, nil
+		return packet.Packet{}
 	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "example", r)
 
-	entries, err := Basic03(ctx, &z)
+	entries, err := Basic03(ctx, z)
 	if err != nil {
 		t.Fatalf("basic03: %v", err)
 	}
@@ -715,24 +605,17 @@ func TestBasic03ParallelQueries(t *testing.T) {
 	baseCtx, prof, _ := testhelpers.Context(t)
 	prof.Resolver.Defaults.Parallel = 2
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.53"},
-		"ns2.example": {"192.0.2.54"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
+		"example": {
+			"ns1.example": {"192.0.2.53"},
+			"ns2.example": {"192.0.2.54"},
+		},
+	})
 
-	root, err := nameserver.NewWithContext(baseCtx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSRaw(t, baseCtx, r, "a.root", "192.0.2.1", func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		name := strings.ToLower(qname)
 		kind := strings.ToUpper(qtype)
 		switch {
@@ -750,7 +633,7 @@ func TestBasic03ParallelQueries(t *testing.T) {
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
-	nsHook := func(id string, addr net.IP, block bool) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+	nsHook := func(id string, addr net.IP, block bool) tctest.RawHandler {
 		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 			name := strings.ToLower(qname)
 			kind := strings.ToUpper(qtype)
@@ -775,22 +658,11 @@ func TestBasic03ParallelQueries(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.NewWithContext(baseCtx, "ns1.example", "192.0.2.53", r.Client())
-	if err != nil {
-		t.Fatalf("new ns1: %v", err)
-	}
-	ns1.SetQueryHook(nsHook("ns1.example", net.IPv4(192, 0, 2, 53), true))
+	tctest.NSRaw(t, baseCtx, r, "ns1.example", "192.0.2.53", nsHook("ns1.example", net.IPv4(192, 0, 2, 53), true))
 
-	ns2, err := nameserver.NewWithContext(baseCtx, "ns2.example", "192.0.2.54", r.Client())
-	if err != nil {
-		t.Fatalf("new ns2: %v", err)
-	}
-	ns2.SetQueryHook(nsHook("ns2.example", net.IPv4(192, 0, 2, 54), false))
+	tctest.NSRaw(t, baseCtx, r, "ns2.example", "192.0.2.54", nsHook("ns2.example", net.IPv4(192, 0, 2, 54), false))
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "example", r)
 
 	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
 	defer cancel()
@@ -799,7 +671,7 @@ func TestBasic03ParallelQueries(t *testing.T) {
 	var entries []*logger.Entry
 	var basicErr error
 	go func() {
-		entries, basicErr = Basic03(ctx, &z)
+		entries, basicErr = Basic03(ctx, z)
 		close(done)
 	}()
 
@@ -857,24 +729,17 @@ func TestBasic03ParallelOutputStable(t *testing.T) {
 		ctx, prof, _ := testhelpers.Context(t)
 		prof.Resolver.Defaults.Parallel = parallel
 
-		r := &recursor.Recursor{}
-		if err := r.AddFakeAddresses(".", map[string][]string{
-			"a.root": {"192.0.2.1"},
-		}); err != nil {
-			t.Fatalf("add root hints: %v", err)
-		}
-		if err := r.AddFakeAddresses("example", map[string][]string{
-			"ns1.example": {"192.0.2.53"},
-			"ns2.example": {"192.0.2.54"},
-		}); err != nil {
-			t.Fatalf("add fake addresses: %v", err)
-		}
+		r := tctest.Recursor(t, map[string]map[string][]string{
+			".": {
+				"a.root": {"192.0.2.1"},
+			},
+			"example": {
+				"ns1.example": {"192.0.2.53"},
+				"ns2.example": {"192.0.2.54"},
+			},
+		})
 
-		root, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-		if err != nil {
-			t.Fatalf("new root nameserver: %v", err)
-		}
-		root.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		tctest.NSRaw(t, ctx, r, "a.root", "192.0.2.1", func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 			name := strings.ToLower(qname)
 			kind := strings.ToUpper(qtype)
 			switch {
@@ -890,7 +755,7 @@ func TestBasic03ParallelOutputStable(t *testing.T) {
 			}
 		})
 
-		nsHook := func(owner string, addr net.IP) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		nsHook := func(owner string, addr net.IP) tctest.RawHandler {
 			return func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 				name := strings.ToLower(qname)
 				kind := strings.ToUpper(qtype)
@@ -905,24 +770,13 @@ func TestBasic03ParallelOutputStable(t *testing.T) {
 			}
 		}
 
-		ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
-		if err != nil {
-			t.Fatalf("new ns1: %v", err)
-		}
-		ns1.SetQueryHook(nsHook("ns1.example", net.IPv4(192, 0, 2, 53)))
+		tctest.NSRaw(t, ctx, r, "ns1.example", "192.0.2.53", nsHook("ns1.example", net.IPv4(192, 0, 2, 53)))
 
-		ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.54", r.Client())
-		if err != nil {
-			t.Fatalf("new ns2: %v", err)
-		}
-		ns2.SetQueryHook(nsHook("ns2.example", net.IPv4(192, 0, 2, 54)))
+		tctest.NSRaw(t, ctx, r, "ns2.example", "192.0.2.54", nsHook("ns2.example", net.IPv4(192, 0, 2, 54)))
 
-		z, err := zone.NewWithRecursor("example", r)
-		if err != nil {
-			t.Fatalf("new zone: %v", err)
-		}
+		z := tctest.Zone(t, "example", r)
 
-		entries, err := Basic03(ctx, &z)
+		entries, err := Basic03(ctx, z)
 		if err != nil {
 			t.Fatalf("basic03: %v", err)
 		}
@@ -949,49 +803,37 @@ func TestBasic03ParallelOutputStable(t *testing.T) {
 func TestBasic01NoChild(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+			"b.root": {"192.0.2.2"},
+		},
+	})
 
-	rootHook := func(owner string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			name := strings.ToLower(qname)
-			kind := strings.ToUpper(qtype)
+	rootHook := func(owner string) tctest.Handler {
+		return func(q tctest.Query) packet.Packet {
+			name := strings.ToLower(q.Name)
+			kind := strings.ToUpper(q.Type)
 			switch {
 			case name == "." && kind == "SOA":
-				return soaPacket(".", owner, "hostmaster.root"), nil
+				return soaPacket(".", owner, "hostmaster.root")
 			case name == "." && kind == "NS":
-				return nsPacketMulti(".", "a.root", "b.root"), nil
+				return nsPacketMulti(".", "a.root", "b.root")
 			case name == "example" && kind == "SOA":
-				return nxdomainAAPacket(), nil
+				return nxdomainAAPacket()
 			default:
-				return packet.Packet{}, nil
+				return packet.Packet{}
 			}
 		}
 	}
 
-	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(rootHook("a.root"))
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", rootHook("a.root"))
 
-	broot, err := nameserver.NewWithContext(ctx, "b.root", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	broot.SetQueryHook(rootHook("b.root"))
+	tctest.NSOn(t, ctx, r, "b.root", "192.0.2.2", rootHook("b.root"))
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "example", r)
 
-	entries, err := Basic01(ctx, &z)
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -1011,13 +853,12 @@ func TestBasic01NoChild(t *testing.T) {
 func TestBasic01InconsistentDelegation(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+			"b.root": {"192.0.2.2"},
+		},
+	})
 
 	commonRoot := func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, bool) {
 		name := strings.ToLower(qname)
@@ -1031,11 +872,7 @@ func TestBasic01InconsistentDelegation(t *testing.T) {
 		return packet.Packet{}, false
 	}
 
-	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(func(ctx context.Context, qname string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSRaw(t, ctx, r, "a.root", "192.0.2.1", func(ctx context.Context, qname string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
 		if pkt, ok := commonRoot(ctx, qname, qtype, qclass, opts); ok {
 			return pkt, nil
 		}
@@ -1047,11 +884,7 @@ func TestBasic01InconsistentDelegation(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	broot, err := nameserver.NewWithContext(ctx, "b.root", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	broot.SetQueryHook(func(ctx context.Context, qname string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSRaw(t, ctx, r, "b.root", "192.0.2.2", func(ctx context.Context, qname string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
 		if pkt, ok := commonRoot(ctx, qname, qtype, qclass, opts); ok {
 			return pkt, nil
 		}
@@ -1064,12 +897,9 @@ func TestBasic01InconsistentDelegation(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "example", r)
 
-	entries, err := Basic01(ctx, &z)
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -1101,18 +931,13 @@ func TestBasic01InconsistentDelegation(t *testing.T) {
 func TestBasic01ParentNXDomainHidesDelegation(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
+	})
 
-	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSRaw(t, ctx, r, "a.root", "192.0.2.1", func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		name := strings.ToLower(qname)
 		kind := strings.ToUpper(qtype)
 		switch {
@@ -1128,11 +953,7 @@ func TestBasic01ParentNXDomainHidesDelegation(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	nsExample, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
-	if err != nil {
-		t.Fatalf("new ns1.example: %v", err)
-	}
-	nsExample.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSRaw(t, ctx, r, "ns1.example", "192.0.2.53", func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		name := strings.ToLower(qname)
 		kind := strings.ToUpper(qtype)
 		switch {
@@ -1150,12 +971,9 @@ func TestBasic01ParentNXDomainHidesDelegation(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	z, err := zone.NewWithRecursor("child.mid.example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "child.mid.example", r)
 
-	entries, err := Basic01(ctx, &z)
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -1184,18 +1002,13 @@ func TestBasic01ParentNXDomainHidesDelegation(t *testing.T) {
 func TestBasic01ParentNXDomainNoDelegation(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
+	})
 
-	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSRaw(t, ctx, r, "a.root", "192.0.2.1", func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		name := strings.ToLower(qname)
 		kind := strings.ToUpper(qtype)
 		switch {
@@ -1211,30 +1024,23 @@ func TestBasic01ParentNXDomainNoDelegation(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	nsExample, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
-	if err != nil {
-		t.Fatalf("new ns1.example: %v", err)
-	}
-	nsExample.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
+	tctest.NSOn(t, ctx, r, "ns1.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
 		switch {
 		case name == "example" && kind == "SOA":
-			return soaPacket("example", "ns1.example", "hostmaster.example"), nil
+			return soaPacket("example", "ns1.example", "hostmaster.example")
 		case name == "example" && kind == "NS":
-			return nsPacketMulti("example", "ns1.example"), nil
+			return nsPacketMulti("example", "ns1.example")
 		case (name == "mid.example" || name == "child.mid.example") && kind == "SOA":
-			return nxdomainAAPacket(), nil
+			return nxdomainAAPacket()
 		}
-		return packet.Packet{}, nil
+		return packet.Packet{}
 	})
 
-	z, err := zone.NewWithRecursor("child.mid.example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "child.mid.example", r)
 
-	entries, err := Basic01(ctx, &z)
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -1260,18 +1066,13 @@ func TestBasic01ParentNXDomainNoDelegation(t *testing.T) {
 func TestBasic01MixedNXDomainContradiction(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
+	})
 
-	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSRaw(t, ctx, r, "a.root", "192.0.2.1", func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		name := strings.ToLower(qname)
 		kind := strings.ToUpper(qtype)
 		switch {
@@ -1290,11 +1091,7 @@ func TestBasic01MixedNXDomainContradiction(t *testing.T) {
 
 	// ns1.example: well-behaved, returns NODATA at mid.example and a
 	// referral at child.mid.example.
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
-	if err != nil {
-		t.Fatalf("new ns1.example: %v", err)
-	}
-	ns1.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSRaw(t, ctx, r, "ns1.example", "192.0.2.53", func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		name := strings.ToLower(qname)
 		kind := strings.ToUpper(qtype)
 		switch {
@@ -1314,11 +1111,7 @@ func TestBasic01MixedNXDomainContradiction(t *testing.T) {
 
 	// ns2.example: NXDOMAIN at mid.example, referral at child.mid.example
 	// (the RFC 8020 contradiction).
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.54", r.Client())
-	if err != nil {
-		t.Fatalf("new ns2.example: %v", err)
-	}
-	ns2.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSRaw(t, ctx, r, "ns2.example", "192.0.2.54", func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		name := strings.ToLower(qname)
 		kind := strings.ToUpper(qtype)
 		switch {
@@ -1336,12 +1129,9 @@ func TestBasic01MixedNXDomainContradiction(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	z, err := zone.NewWithRecursor("child.mid.example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "child.mid.example", r)
 
-	entries, err := Basic01(ctx, &z)
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -1400,12 +1190,9 @@ func TestBasic01ParentNXDomainHidesDelegationFromRecordedCache(t *testing.T) {
 
 	ctx = nameserver.WithCache(ctx, nsCache)
 
-	z, err := zone.NewWithRecursor("0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa", rec)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "0.d.b.9.1.b.9.0.1.0.0.2.ip6.arpa", rec)
 
-	entries, err := Basic01(ctx, &z)
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -1429,39 +1216,31 @@ func TestBasic01ParentNXDomainHidesDelegationFromRecordedCache(t *testing.T) {
 func TestBasic01ChildAlias(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-
-	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
-		switch {
-		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.root"), nil
-		case name == "." && kind == "NS":
-			return nsPacket(".", "a.root"), nil
-		case name == "example" && kind == "SOA":
-			return emptyAnswerPacket(), nil
-		case name == "example" && kind == "DNAME":
-			return dnameAnswerPacket("example", "sister.example"), nil
-		}
-		return packet.Packet{}, nil
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
 	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
+		switch {
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.root")
+		case name == "." && kind == "NS":
+			return nsPacket(".", "a.root")
+		case name == "example" && kind == "SOA":
+			return emptyAnswerPacket()
+		case name == "example" && kind == "DNAME":
+			return dnameAnswerPacket("example", "sister.example")
+		}
+		return packet.Packet{}
+	})
 
-	entries, err := Basic01(ctx, &z)
+	z := tctest.Zone(t, "example", r)
+
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -1483,50 +1262,38 @@ func TestBasic01ChildAlias(t *testing.T) {
 func TestBasic01InconsistentAlias(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+			"b.root": {"192.0.2.2"},
+		},
+	})
 
-	rootHook := func(target string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			name := strings.ToLower(qname)
-			kind := strings.ToUpper(qtype)
+	rootHook := func(target string) tctest.Handler {
+		return func(q tctest.Query) packet.Packet {
+			name := strings.ToLower(q.Name)
+			kind := strings.ToUpper(q.Type)
 			switch {
 			case name == "." && kind == "SOA":
-				return soaPacket(".", "a.root", "hostmaster.root"), nil
+				return soaPacket(".", "a.root", "hostmaster.root")
 			case name == "." && kind == "NS":
-				return nsPacketMulti(".", "a.root", "b.root"), nil
+				return nsPacketMulti(".", "a.root", "b.root")
 			case name == "example" && kind == "SOA":
-				return emptyAnswerPacket(), nil
+				return emptyAnswerPacket()
 			case name == "example" && kind == "DNAME":
-				return dnameAnswerPacket("example", target), nil
+				return dnameAnswerPacket("example", target)
 			}
-			return packet.Packet{}, nil
+			return packet.Packet{}
 		}
 	}
 
-	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(rootHook("sister.example"))
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", rootHook("sister.example"))
 
-	broot, err := nameserver.NewWithContext(ctx, "b.root", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	broot.SetQueryHook(rootHook("brother.example"))
+	tctest.NSOn(t, ctx, r, "b.root", "192.0.2.2", rootHook("brother.example"))
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := tctest.Zone(t, "example", r)
 
-	entries, err := Basic01(ctx, &z)
+	entries, err := Basic01(ctx, z)
 	if err != nil {
 		t.Fatalf("basic01: %v", err)
 	}
@@ -1562,39 +1329,31 @@ func TestBasic01InconsistentAlias(t *testing.T) {
 func TestBasic01DNAMEAliasNoCritical(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-
-	aroot, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	aroot.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
-		switch {
-		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.root"), nil
-		case name == "." && kind == "NS":
-			return nsPacket(".", "a.root"), nil
-		case name == "example" && kind == "SOA":
-			return emptyAnswerPacket(), nil
-		case name == "example" && kind == "DNAME":
-			return dnameAnswerPacket("example", "target.example"), nil
-		}
-		return packet.Packet{}, nil
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".": {
+			"a.root": {"192.0.2.1"},
+		},
 	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	tctest.NSOn(t, ctx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		name := strings.ToLower(q.Name)
+		kind := strings.ToUpper(q.Type)
+		switch {
+		case name == "." && kind == "SOA":
+			return soaPacket(".", "a.root", "hostmaster.root")
+		case name == "." && kind == "NS":
+			return nsPacket(".", "a.root")
+		case name == "example" && kind == "SOA":
+			return emptyAnswerPacket()
+		case name == "example" && kind == "DNAME":
+			return dnameAnswerPacket("example", "target.example")
+		}
+		return packet.Packet{}
+	})
 
-	entries, err := All(ctx, &z)
+	z := tctest.Zone(t, "example", r)
+
+	entries, err := All(ctx, z)
 	if err != nil {
 		t.Fatalf("All: %v", err)
 	}
@@ -1604,7 +1363,7 @@ func TestBasic01DNAMEAliasNoCritical(t *testing.T) {
 	if !IsDNAMEAlias(entries) {
 		t.Fatalf("expected IsDNAMEAlias to return true")
 	}
-	if CanContinue(ctx, &z, entries) {
+	if CanContinue(ctx, z, entries) {
 		t.Fatalf("expected CanContinue to return false for DNAME alias (no further tests needed)")
 	}
 	for _, e := range entries {

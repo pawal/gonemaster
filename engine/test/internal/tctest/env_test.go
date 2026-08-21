@@ -2,6 +2,7 @@ package tctest
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
@@ -154,6 +155,23 @@ func TestRecursorNSOnAndZone(t *testing.T) {
 	}
 	if z.Recursor() != r {
 		t.Fatalf("expected the zone to use the given recursor")
+	}
+}
+
+func TestNSRawSeesContextAndErrors(t *testing.T) {
+	ctx := Context(t)
+	r := Recursor(t, map[string]map[string][]string{".": {"a.root": {"192.0.2.1"}}})
+	wantErr := errors.New("hook failed")
+	ns := NSRaw(t, ctx, r, "a.root", "192.0.2.1",
+		func(hookCtx context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			if hookCtx == nil {
+				t.Errorf("expected the query context in the hook")
+			}
+			return packet.Packet{}, wantErr
+		})
+
+	if _, err := ns.Query(ctx, "example", "SOA"); !errors.Is(err, wantErr) {
+		t.Fatalf("expected the hook error, got %v", err)
 	}
 }
 

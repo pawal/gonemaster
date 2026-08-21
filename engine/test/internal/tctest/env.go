@@ -27,6 +27,10 @@ type Query struct {
 // Handler answers one query from a test nameserver.
 type Handler func(Query) packet.Packet
 
+// RawHandler is the nameserver query hook signature, for handlers that need the
+// query context or must fail with an error.
+type RawHandler func(ctx context.Context, name string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error)
+
 // Setup replaces the global logger for the test and resets the effective
 // profile afterwards. Use it when the test builds its own context.
 func Setup(t TB) {
@@ -67,6 +71,18 @@ func Recursor(t TB, fakes map[string]map[string][]string) *recursor.Recursor {
 func NSOn(t TB, ctx context.Context, r *recursor.Recursor, name string, ip string, handler Handler) nameserver.Nameserver {
 	t.Helper()
 	return newNS(t, ctx, name, ip, r.Client(), handler)
+}
+
+// NSRaw returns a nameserver on the recursor's client, answering via a raw
+// query hook.
+func NSRaw(t TB, ctx context.Context, r *recursor.Recursor, name string, ip string, hook RawHandler) nameserver.Nameserver {
+	t.Helper()
+	ns, err := nameserver.NewWithContext(ctx, name, ip, r.Client())
+	if err != nil {
+		t.Fatalf("new nameserver: %v", err)
+	}
+	ns.SetQueryHook(hook)
+	return ns
 }
 
 // Zone returns a zone served by the recursor.

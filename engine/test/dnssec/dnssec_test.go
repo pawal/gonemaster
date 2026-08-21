@@ -3557,90 +3557,59 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 }
 
 func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := tctest.DNSKEYRR("example", 8)
-	if _, err := key.Generate(1024); err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			if qtype != "DNSKEY" {
-				return packet.Packet{}, nil
-			}
-			select {
-			case started <- id:
-			default:
-			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			return dnskeyPacket(qname, key), nil
+		key := tctest.DNSKEYRR("example", 8)
+		if _, err := key.Generate(1024); err != nil {
+			t.Fatalf("generate key: %v", err)
 		}
-	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.131", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		gate := tctest.NewGate()
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.132", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
-
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns1, ns2}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC14(ctx, &z)
-		close(done)
-	}()
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel DNSKEY queries to start, got %v", got)
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if q.Type != "DNSKEY" {
+					return packet.Packet{}
+				}
+				gate.Arrive(id)
+				return dnskeyPacket(q.Name, key)
+			}
 		}
-	}
 
-	close(release)
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.131", hook("ns1"))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.132", hook("ns2"))
 
-	select {
-	case <-done:
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns1, ns2}, nil
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		})
+
+		z := zone.Zone{Name: dnsname.New("example")}
+
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC14(ctx, &z)
+			close(done)
+		}()
+
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
+
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec14: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec14 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DNSKEY_SMALLER_THAN_REC")
+		tctest.RequireTags(t, entries, "DNSKEY_SMALLER_THAN_REC")
+	})
 }
 
 func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {

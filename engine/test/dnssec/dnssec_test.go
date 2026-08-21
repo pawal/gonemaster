@@ -970,111 +970,80 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 }
 
 func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			switch qtype {
-			case "DNSKEY":
-				select {
-				case started <- id:
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "DNSKEY":
+					gate.Arrive(id)
+					return dnskeyPacket(q.Name, key)
+				case "NSEC":
+					return nsecPacket(q.Name)
 				default:
+					return packet.Packet{}
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
-				return dnskeyPacket(qname, key), nil
-			case "NSEC":
-				return nsecPacket(qname), nil
-			default:
-				return packet.Packet{}, nil
 			}
 		}
-	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.201", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.201", hook("ns1"))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.202", hook("ns2"))
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.202", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
+		tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns1, ns2}, nil
+		})
 
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns1, ns2}, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC03(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC03(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel DNSKEY queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec03: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec03 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DS03_NO_NSEC3")
+		tctest.RequireTags(t, entries, "DS03_NO_NSEC3")
 
-	var gotServers []map[string]any
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "DS03_NO_NSEC3" {
-			continue
+		var gotServers []map[string]any
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "DS03_NO_NSEC3" {
+				continue
+			}
+			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+				gotServers = servers
+			}
+			if _, ok := entry.Args["ns_list"]; ok {
+				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+			}
+			break
 		}
-		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-			gotServers = servers
+		if len(gotServers) == 0 {
+			t.Fatalf("expected typed servers for DS03_NO_NSEC3")
 		}
-		if _, ok := entry.Args["ns_list"]; ok {
-			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		if len(gotServers) != 2 {
+			t.Fatalf("expected two typed servers for DS03_NO_NSEC3, got %#v", gotServers)
 		}
-		break
-	}
-	if len(gotServers) == 0 {
-		t.Fatalf("expected typed servers for DS03_NO_NSEC3")
-	}
-	if len(gotServers) != 2 {
-		t.Fatalf("expected two typed servers for DS03_NO_NSEC3, got %#v", gotServers)
-	}
-	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
-		t.Fatalf("expected deterministic server order, got %#v", gotServers)
-	}
+		if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+			t.Fatalf("expected deterministic server order, got %#v", gotServers)
+		}
+	})
 }
 
 func TestDNSSEC04ExpiredRRSIG(t *testing.T) {

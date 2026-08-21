@@ -19,25 +19,17 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
-	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func TestConnectivity01IPv6Disabled(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origMethod := authoritativeNS
-	t.Cleanup(func() { authoritativeNS = origMethod })
-
-	ns4 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
-	ns6 := newNameserver(t, ctx, "ns2.example", "2001:db8::1", nil)
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	ns4 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", nil)
+	ns6 := tctest.NS(t, ctx, "ns2.example", "2001:db8::1", nil)
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns4, ns6}, nil
-	}
+	})
 
 	profile.Effective().Net.IPv6 = false
 
@@ -61,35 +53,24 @@ func TestConnectivity01IPv6Disabled(t *testing.T) {
 // Connectivity01 emits the matching CNAME_* tag. authoritativeNS is stubbed to
 // return a resolvable nameserver so the rest of the testcase proceeds normally.
 func TestConnectivity01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origAuth := authoritativeNS
-	origZone := zoneNameservers
-	t.Cleanup(func() {
-		authoritativeNS = origAuth
-		zoneNameservers = origZone
-	})
-
-	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", nil)
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
-	}
+	})
 	cnameErr := &recursor.CNAMEError{
 		Reason: recursor.CNAMEUnresolved,
 		Name:   "ns.outside.test",
 		Target: "loop.outside.test",
 		Detail: "loop",
 	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{
 			{Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.1"), HasAddress: true},
 			{Name: dnsname.New("ns.outside.test"), Err: cnameErr},
 		}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Connectivity01(ctx, &z)
@@ -104,13 +85,9 @@ func TestConnectivity01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
 }
 
 func TestConnectivityLoopNoResponse(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", nil)
 	results := []*logger.Entry{}
 
 	if err := connectivityLoop(ctx, "Connectivity01", dnsname.New("example"), []nameserver.Nameserver{ns}, &results); err != nil {
@@ -120,14 +97,10 @@ func TestConnectivityLoopNoResponse(t *testing.T) {
 }
 
 func TestConnectivityLoopWrongSOAOwner(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(qname string, qtype string) packet.Packet {
-		switch strings.ToUpper(qtype) {
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		switch strings.ToUpper(q.Type) {
 		case "SOA":
 			return soaPacket("wrong.example", "ns1.example", "hostmaster.example")
 		case "NS":
@@ -145,37 +118,26 @@ func TestConnectivityLoopWrongSOAOwner(t *testing.T) {
 }
 
 func TestConnectivity03SameASNSet(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origMethod := authoritativeNS
-	origLookup := lookupASN
-	t.Cleanup(func() {
-		authoritativeNS = origMethod
-		lookupASN = origLookup
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", nil)
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", nil)
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", nil)
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
-	}
+	})
 
 	prefix, err := netip.ParsePrefix("192.0.2.0/24")
 	if err != nil {
 		t.Fatalf("parse prefix: %v", err)
 	}
-	lookupASN = func(_ context.Context, _ asnlookup.Resolver, _ netip.Addr) (asnlookup.Result, error) {
+	tctest.Stub(t, &lookupASN, func(_ context.Context, _ asnlookup.Resolver, _ netip.Addr) (asnlookup.Result, error) {
 		return asnlookup.Result{
 			ASNs:   []int{64500, 64501},
 			Prefix: &prefix,
 			Raw:    "64500 64501 | 192.0.2.0/24 | test",
 			Code:   asnlookup.CodeFound,
 		}, nil
-	}
+	})
 
 	z, err := zone.New("example")
 	if err != nil {
@@ -212,11 +174,7 @@ func TestConnectivity03SameASNSet(t *testing.T) {
 }
 
 func TestConnectivityLoopParallelQueries(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
@@ -309,26 +267,15 @@ func TestConnectivityLoopParallelQueries(t *testing.T) {
 }
 
 func TestConnectivity03ParallelASNLookups(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origMethod := authoritativeNS
-	origLookup := lookupASN
-	t.Cleanup(func() {
-		authoritativeNS = origMethod
-		lookupASN = origLookup
-	})
+	ctx := tctest.Context(t)
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", nil)
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", nil)
-	authoritativeNS = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", nil)
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", nil)
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1, ns2}, nil
-	}
+	})
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -336,7 +283,7 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parse prefix: %v", err)
 	}
-	lookupASN = func(ctx context.Context, _ asnlookup.Resolver, ip netip.Addr) (asnlookup.Result, error) {
+	tctest.Stub(t, &lookupASN, func(ctx context.Context, _ asnlookup.Resolver, ip netip.Addr) (asnlookup.Result, error) {
 		select {
 		case started <- ip.String():
 		default:
@@ -351,7 +298,7 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 			Prefix: &prefix,
 			Code:   asnlookup.CodeFound,
 		}, nil
-	}
+	})
 
 	z, err := zone.New("example")
 	if err != nil {
@@ -409,20 +356,7 @@ func TestConnectivity03ParallelASNLookups(t *testing.T) {
 }
 
 func TestConnectivity04SinglePrefix(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origDel := delegationNameservers
-	origZone := zoneNameservers
-	origLookup := lookupASN
-	t.Cleanup(func() {
-		delegationNameservers = origDel
-		zoneNameservers = origZone
-		lookupASN = origLookup
-	})
+	ctx := tctest.Context(t)
 
 	items := []nsdiscovery.NSItem{
 		{
@@ -436,24 +370,24 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 			HasAddress: true,
 		},
 	}
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return items, nil
-	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
-	}
+	})
 
 	prefix, err := netip.ParsePrefix("192.0.2.0/24")
 	if err != nil {
 		t.Fatalf("parse prefix: %v", err)
 	}
-	lookupASN = func(_ context.Context, _ asnlookup.Resolver, _ netip.Addr) (asnlookup.Result, error) {
+	tctest.Stub(t, &lookupASN, func(_ context.Context, _ asnlookup.Resolver, _ netip.Addr) (asnlookup.Result, error) {
 		return asnlookup.Result{
 			Prefix: &prefix,
 			Raw:    "64500 | 192.0.2.0/24 | test",
 			Code:   asnlookup.CodeFound,
 		}, nil
-	}
+	})
 
 	z, err := zone.New("example")
 	if err != nil {
@@ -487,28 +421,6 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 		t.Fatalf("expected announce prefixes [192.0.2.0/24], got %v", announcePrefixes)
 	}
 	tctest.RequireTags(t, entries, "CN04_IPV4_SINGLE_PREFIX")
-}
-
-func testCtx() context.Context {
-	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
-}
-
-func newNameserver(t *testing.T, ctx context.Context, name string, ip string, handler func(qname string, qtype string) packet.Packet) nameserver.Nameserver {
-	t.Helper()
-
-	ns, err := nameserver.NewWithContext(ctx, name, ip, nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	if handler == nil {
-		handler = func(_ string, _ string) packet.Packet {
-			return packet.Packet{}
-		}
-	}
-	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		return handler(qname, qtype), nil
-	})
-	return ns
 }
 
 func soaPacket(owner string, mname string, rname string) packet.Packet {

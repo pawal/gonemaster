@@ -3,7 +3,6 @@ package connectivity
 import (
 	"context"
 	"net/netip"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -46,17 +46,11 @@ func TestConnectivity01IPv6Disabled(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connectivity01: %v", err)
 	}
-	if !hasEntryTag(entries, "CN01_IPV6_DISABLED") {
-		t.Fatalf("expected CN01_IPV6_DISABLED")
-	}
-	entry := findEntry(entries, "CN01_IPV6_DISABLED")
-	if entry == nil {
-		t.Fatalf("expected CN01_IPV6_DISABLED entry")
-	}
+	entry := tctest.RequireTag(t, entries, "CN01_IPV6_DISABLED")
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("did not expect legacy ns_list key in args")
 	}
-	names := serverNamesFromArgs(t, entry.Args)
+	names := tctest.ServerNames(t, entry.Args)
 	if len(names) != 1 || names[0] != "ns2.example" {
 		t.Fatalf("expected typed servers with ns2.example, got %v", names)
 	}
@@ -103,10 +97,7 @@ func TestConnectivity01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
 		t.Fatalf("connectivity01: %v", err)
 	}
 
-	entry := findEntry(entries, "CNAME_TARGET_UNRESOLVED")
-	if entry == nil {
-		t.Fatalf("expected CNAME_TARGET_UNRESOLVED entry")
-	}
+	entry := tctest.RequireTag(t, entries, "CNAME_TARGET_UNRESOLVED")
 	if got := entry.Args["query_name"]; got != "ns.outside.test" {
 		t.Fatalf("query_name: got %#v, want ns.outside.test", got)
 	}
@@ -125,9 +116,7 @@ func TestConnectivityLoopNoResponse(t *testing.T) {
 	if err := connectivityLoop(ctx, "Connectivity01", dnsname.New("example"), []nameserver.Nameserver{ns}, &results); err != nil {
 		t.Fatalf("connectivity loop: %v", err)
 	}
-	if !hasEntryTag(results, "CN01_NO_RESPONSE_UDP") {
-		t.Fatalf("expected CN01_NO_RESPONSE_UDP")
-	}
+	tctest.RequireTags(t, results, "CN01_NO_RESPONSE_UDP")
 }
 
 func TestConnectivityLoopWrongSOAOwner(t *testing.T) {
@@ -152,9 +141,7 @@ func TestConnectivityLoopWrongSOAOwner(t *testing.T) {
 	if err := connectivityLoop(ctx, "Connectivity01", dnsname.New("example"), []nameserver.Nameserver{ns}, &results); err != nil {
 		t.Fatalf("connectivity loop: %v", err)
 	}
-	if !hasEntryTag(results, "CN01_WRONG_SOA_RECORD_UDP") {
-		t.Fatalf("expected CN01_WRONG_SOA_RECORD_UDP")
-	}
+	tctest.RequireTags(t, results, "CN01_WRONG_SOA_RECORD_UDP")
 }
 
 func TestConnectivity03SameASNSet(t *testing.T) {
@@ -198,39 +185,27 @@ func TestConnectivity03SameASNSet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connectivity03: %v", err)
 	}
-	if !hasEntryTag(entries, "IPV4_SAME_ASN") {
-		t.Fatalf("expected IPV4_SAME_ASN")
-	}
-	sameASN := findEntry(entries, "IPV4_SAME_ASN")
-	if sameASN == nil {
-		t.Fatalf("expected IPV4_SAME_ASN entry")
-	}
+	sameASN := tctest.RequireTag(t, entries, "IPV4_SAME_ASN")
 	if _, ok := sameASN.Args["asn_list"]; ok {
 		t.Fatalf("did not expect legacy asn_list key in args")
 	}
-	asns := intSliceFromArgs(t, sameASN.Args, "asns")
+	asns := tctest.Ints(t, sameASN.Args, "asns")
 	if len(asns) != 2 || asns[0] != 64500 || asns[1] != 64501 {
 		t.Fatalf("expected asns [64500 64501], got %v", asns)
 	}
-	announce := findEntry(entries, "ASN_INFOS_ANNOUNCE_BY")
-	if announce == nil {
-		t.Fatalf("expected ASN_INFOS_ANNOUNCE_BY entry")
-	}
+	announce := tctest.RequireTag(t, entries, "ASN_INFOS_ANNOUNCE_BY")
 	if _, ok := announce.Args["asn"]; ok {
 		t.Fatalf("did not expect legacy asn key in ASN_INFOS_ANNOUNCE_BY args")
 	}
-	announceASNs := intSliceFromArgs(t, announce.Args, "asns")
+	announceASNs := tctest.Ints(t, announce.Args, "asns")
 	if len(announceASNs) != 2 || announceASNs[0] != 64500 || announceASNs[1] != 64501 {
 		t.Fatalf("expected announce asns [64500 64501], got %v", announceASNs)
 	}
-	announceIn := findEntry(entries, "ASN_INFOS_ANNOUNCE_IN")
-	if announceIn == nil {
-		t.Fatalf("expected ASN_INFOS_ANNOUNCE_IN entry")
-	}
+	announceIn := tctest.RequireTag(t, entries, "ASN_INFOS_ANNOUNCE_IN")
 	if _, ok := announceIn.Args["prefix"]; ok {
 		t.Fatalf("did not expect legacy prefix key in ASN_INFOS_ANNOUNCE_IN args")
 	}
-	prefixes := stringSliceFromArgs(t, announceIn.Args, "prefixes")
+	prefixes := tctest.Strings(t, announceIn.Args, "prefixes")
 	if len(prefixes) != 1 || prefixes[0] != "192.0.2.0/24" {
 		t.Fatalf("expected prefixes [192.0.2.0/24], got %v", prefixes)
 	}
@@ -496,97 +471,30 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 	if err != nil {
 		t.Fatalf("connectivity04: %v", err)
 	}
-	if !hasEntryTag(entries, "CN04_IPV4_SAME_PREFIX") {
-		t.Fatalf("expected CN04_IPV4_SAME_PREFIX")
-	}
-	samePrefix := findEntry(entries, "CN04_IPV4_SAME_PREFIX")
-	if samePrefix == nil {
-		t.Fatalf("expected CN04_IPV4_SAME_PREFIX entry")
-	}
+	samePrefix := tctest.RequireTag(t, entries, "CN04_IPV4_SAME_PREFIX")
 	if _, ok := samePrefix.Args["ns_list"]; ok {
 		t.Fatalf("did not expect legacy ns_list key in args")
 	}
 	if _, ok := samePrefix.Args["ip_prefix"]; ok {
 		t.Fatalf("did not expect legacy ip_prefix key in args")
 	}
-	names := serverNamesFromArgs(t, samePrefix.Args)
+	names := tctest.ServerNames(t, samePrefix.Args)
 	if len(names) != 2 || names[0] != "ns1.example" || names[1] != "ns2.example" {
 		t.Fatalf("expected typed servers [ns1.example ns2.example], got %v", names)
 	}
-	prefixes := stringSliceFromArgs(t, samePrefix.Args, "prefixes")
+	prefixes := tctest.Strings(t, samePrefix.Args, "prefixes")
 	if len(prefixes) != 1 || prefixes[0] != "192.0.2.0/24" {
 		t.Fatalf("expected prefixes [192.0.2.0/24], got %v", prefixes)
 	}
-	announceIn := findEntry(entries, "CN04_ASN_INFOS_ANNOUNCE_IN")
-	if announceIn == nil {
-		t.Fatalf("expected CN04_ASN_INFOS_ANNOUNCE_IN entry")
-	}
+	announceIn := tctest.RequireTag(t, entries, "CN04_ASN_INFOS_ANNOUNCE_IN")
 	if _, ok := announceIn.Args["prefix"]; ok {
 		t.Fatalf("did not expect legacy prefix key in CN04_ASN_INFOS_ANNOUNCE_IN args")
 	}
-	announcePrefixes := stringSliceFromArgs(t, announceIn.Args, "prefixes")
+	announcePrefixes := tctest.Strings(t, announceIn.Args, "prefixes")
 	if len(announcePrefixes) != 1 || announcePrefixes[0] != "192.0.2.0/24" {
 		t.Fatalf("expected announce prefixes [192.0.2.0/24], got %v", announcePrefixes)
 	}
-	if !hasEntryTag(entries, "CN04_IPV4_SINGLE_PREFIX") {
-		t.Fatalf("expected CN04_IPV4_SINGLE_PREFIX")
-	}
-}
-
-func intSliceFromArgs(t *testing.T, args map[string]any, key string) []int {
-	t.Helper()
-	raw, ok := args[key]
-	if !ok {
-		t.Fatalf("expected %s key in args", key)
-	}
-	switch items := raw.(type) {
-	case []int:
-		out := append([]int{}, items...)
-		sort.Ints(out)
-		return out
-	case []any:
-		out := make([]int, 0, len(items))
-		for _, item := range items {
-			switch v := item.(type) {
-			case int:
-				out = append(out, v)
-			case float64:
-				out = append(out, int(v))
-			default:
-				t.Fatalf("unexpected %s element type: %T", key, item)
-			}
-		}
-		sort.Ints(out)
-		return out
-	default:
-		t.Fatalf("unexpected %s type: %T", key, raw)
-	}
-	return nil
-}
-
-func stringSliceFromArgs(t *testing.T, args map[string]any, key string) []string {
-	t.Helper()
-	raw, ok := args[key]
-	if !ok {
-		t.Fatalf("expected %s key in args", key)
-	}
-	switch items := raw.(type) {
-	case []string:
-		return append([]string{}, items...)
-	case []any:
-		out := make([]string, 0, len(items))
-		for _, item := range items {
-			value, ok := item.(string)
-			if !ok {
-				t.Fatalf("unexpected %s element type: %T", key, item)
-			}
-			out = append(out, value)
-		}
-		return out
-	default:
-		t.Fatalf("unexpected %s type: %T", key, raw)
-	}
-	return nil
+	tctest.RequireTags(t, entries, "CN04_IPV4_SINGLE_PREFIX")
 }
 
 func testCtx() context.Context {
@@ -609,63 +517,6 @@ func newNameserver(t *testing.T, ctx context.Context, name string, ip string, ha
 		return handler(qname, qtype), nil
 	})
 	return ns
-}
-
-func hasEntryTag(entries []*logger.Entry, tag string) bool {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return true
-		}
-	}
-	return false
-}
-
-func findEntry(entries []*logger.Entry, tag string) *logger.Entry {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return entry
-		}
-	}
-	return nil
-}
-
-func serverNamesFromArgs(t *testing.T, args map[string]any) []string {
-	t.Helper()
-	raw, ok := args["servers"]
-	if !ok {
-		t.Fatalf("expected servers key in args")
-	}
-
-	var names []string
-	switch items := raw.(type) {
-	case []map[string]any:
-		for _, item := range items {
-			if ns, ok := item["ns"].(string); ok && ns != "" {
-				names = append(names, ns)
-			}
-		}
-	case []any:
-		for _, item := range items {
-			m, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			if ns, ok := m["ns"].(string); ok && ns != "" {
-				names = append(names, ns)
-			}
-		}
-	default:
-		t.Fatalf("unexpected servers type: %T", raw)
-	}
-
-	sort.Strings(names)
-	return names
 }
 
 func soaPacket(owner string, mname string, rname string) packet.Packet {

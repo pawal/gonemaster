@@ -9,53 +9,13 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 // Property-style tests: invariants that must hold across many input shapes.
 // Each test runs several seeded scenarios; if any fails the seed is logged.
-
-// randomNameSet returns a slice of N pseudo-random label names under
-// "example.com". Names may include duplicates and mixed case so callers can
-// verify deduplication and case folding.
-func randomNameSet(rng *rand.Rand, n int) []string {
-	letters := []byte("abcdefghijklmnopqrstuvwxyz")
-	out := make([]string, 0, n)
-	for i := 0; i < n; i++ {
-		label := make([]byte, 1+rng.Intn(4))
-		for j := range label {
-			c := letters[rng.Intn(len(letters))]
-			if rng.Intn(10) < 3 {
-				c -= 32
-			}
-			label[j] = c
-		}
-		out = append(out, string(label)+".example.com")
-	}
-	return out
-}
-
-func isSortedLowercase(names []string) bool {
-	cmp := make([]string, len(names))
-	for i, n := range names {
-		cmp[i] = strings.ToLower(n)
-	}
-	return sort.StringsAreSorted(cmp)
-}
-
-func hasNoDuplicates(names []string) bool {
-	seen := map[string]bool{}
-	for _, n := range names {
-		key := strings.ToLower(n)
-		if seen[key] {
-			return false
-		}
-		seen[key] = true
-	}
-	return true
-}
 
 // runAllNSNamesProperty sets up an undelegated zone where the glue and the
 // apex-reported NS sets may overlap or diverge. Returns AllNSNames's output
@@ -67,10 +27,7 @@ func runAllNSNamesProperty(t *testing.T, glueNames []string, apexNames []string)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 	glue := map[string][]string{}
 	for i, name := range glueNames {
 		glue[strings.ToLower(name)] = []string{fmt.Sprintf("192.0.2.%d", 20+i)}
@@ -105,14 +62,14 @@ func TestAllNSNamesPropertyAlwaysSortedAndDeduped(t *testing.T) {
 	for trial := 0; trial < 20; trial++ {
 		seed := int64(trial * 31)
 		rng := rand.New(rand.NewSource(seed))
-		glue := randomNameSet(rng, 1+rng.Intn(4))
-		apex := randomNameSet(rng, 1+rng.Intn(4))
+		glue := nstest.RandomNameSet(rng, 1+rng.Intn(4), "example.com")
+		apex := nstest.RandomNameSet(rng, 1+rng.Intn(4), "example.com")
 		t.Run(fmt.Sprintf("seed=%d", seed), func(t *testing.T) {
 			out := runAllNSNamesProperty(t, glue, apex)
-			if !isSortedLowercase(out) {
+			if !nstest.IsSortedLowercase(out) {
 				t.Errorf("output not sorted: %#v (glue=%#v apex=%#v)", out, glue, apex)
 			}
-			if !hasNoDuplicates(out) {
+			if !nstest.HasNoDuplicates(out) {
 				t.Errorf("output has duplicates: %#v (glue=%#v apex=%#v)", out, glue, apex)
 			}
 		})
@@ -126,16 +83,13 @@ func TestAllNameserversPropertyAlwaysSortedAndDedupedByString(t *testing.T) {
 	for trial := 0; trial < 20; trial++ {
 		seed := int64(trial * 13)
 		rng := rand.New(rand.NewSource(seed))
-		glue := randomNameSet(rng, 1+rng.Intn(4))
+		glue := nstest.RandomNameSet(rng, 1+rng.Intn(4), "example.com")
 
 		ctx, prof, _ := testhelpers.Context(t)
 		prof.Net.IPv4 = true
 		prof.Net.IPv6 = true
 
-		r := &recursor.Recursor{}
-		if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-			t.Fatalf("add root: %v", err)
-		}
+		r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 		fakes := map[string][]string{}
 		for i, name := range glue {
 			fakes[strings.ToLower(name)] = []string{fmt.Sprintf("192.0.2.%d", 30+i)}
@@ -188,10 +142,7 @@ func TestDelegationNameserversNoNilNamesInOutput(t *testing.T) {
 		prof.Net.IPv4 = true
 		prof.Net.IPv6 = true
 
-		r := &recursor.Recursor{}
-		if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-			t.Fatalf("add root: %v", err)
-		}
+		r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 		glue := map[string][]string{}
 		for i := 0; i < size; i++ {
 			labelLen := 1 + rng.Intn(4)

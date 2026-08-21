@@ -3,16 +3,14 @@ package zone
 import (
 	"context"
 	"math/rand"
-	"sort"
-	"strings"
 	"testing"
 
 	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 )
@@ -25,41 +23,19 @@ func apexNsAnswerPacket(zoneName string, nsNames ...string) packet.Packet {
 		dnstest.Answers(dnstest.NSRRs(zoneName, nsNames...)...))
 }
 
-func apexNewRootRecursor(t *testing.T, data map[string][]string) *recursor.Recursor {
-	t.Helper()
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", data); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
-	return r
-}
-
+// apexSetNSHook registers a nameserver answering NS queries at the zone apex
+// with the given NS names.
 func apexSetNSHook(ctx context.Context, t *testing.T, r *recursor.Recursor, name string, addr string, zoneName string, nsNames ...string) {
 	t.Helper()
-	ns, err := nameserver.NewWithContext(ctx, name, addr, r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		if qname != zoneName || qtype != "NS" {
-			return packet.Packet{}, nil
-		}
-		return apexNsAnswerPacket(zoneName, nsNames...), nil
-	})
+	nstest.HookedNS(t, ctx, r, name, addr,
+		nstest.AnswerHook(zoneName, "NS", apexNsAnswerPacket(zoneName, nsNames...)))
 }
 
+// apexSetHookWithPacket registers a nameserver answering NS queries at the zone
+// apex with a caller-supplied packet.
 func apexSetHookWithPacket(ctx context.Context, t *testing.T, r *recursor.Recursor, name string, addr string, zoneName string, p packet.Packet) {
 	t.Helper()
-	ns, err := nameserver.NewWithContext(ctx, name, addr, r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		if qname != zoneName || qtype != "NS" {
-			return packet.Packet{}, nil
-		}
-		return p, nil
-	})
+	nstest.HookedNS(t, ctx, r, name, addr, nstest.AnswerHook(zoneName, "NS", p))
 }
 
 // apexMixedRecordsPacket builds an apex response mixing NS, A, and SOA RRs.
@@ -79,7 +55,7 @@ func TestZoneGlueNamesReturnsGlueFromZone(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := apexNewRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 		"b.root": {"192.0.2.2"},
 	})
@@ -118,7 +94,7 @@ func TestZoneApexNSNamesNoNSRecordsReturnsEmpty(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := apexNewRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 	})
 	empty := packet.Packet{Msg: new(dns.Msg)}
@@ -154,7 +130,7 @@ func TestZoneApexNSNamesSkipsNonNSRecords(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := apexNewRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 	})
 	apexSetHookWithPacket(ctx, t, r, "a.root", "192.0.2.1", ".",
@@ -187,7 +163,7 @@ func TestZoneApexNSNamesSkipsNilMsgResponses(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := apexNewRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 		"b.root": {"192.0.2.2"},
 	})
@@ -222,7 +198,7 @@ func TestZoneApexNSNamesDedupesAcrossMultipleServers(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := apexNewRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 		"b.root": {"192.0.2.2"},
 	})
@@ -256,7 +232,7 @@ func TestZoneApexNSNamesCaseFoldedDeduplication(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := apexNewRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 		"b.root": {"192.0.2.2"},
 	})
@@ -287,7 +263,7 @@ func TestZoneApexNSNamesDedupAndSort(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := apexNewRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 		"b.root": {"192.0.2.2"},
 	})
@@ -323,7 +299,7 @@ func TestZoneApexNSNamesUndelegatedUsesApexRecords(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := apexNewRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 		"b.root": {"192.0.2.2"},
 	})
@@ -383,10 +359,7 @@ func runZoneApexNSNamesProperty(t *testing.T, names []string) []string {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 	if err := r.AddFakeAddresses("example.com", map[string][]string{
 		"ns1.example.com": {"192.0.2.11"},
 	}); err != nil {
@@ -414,54 +387,16 @@ func runZoneApexNSNamesProperty(t *testing.T, names []string) []string {
 // with random NS name lists (varying sizes, duplicates, mixed case) and
 // asserts the output is always lowercase-sorted and contains no duplicates.
 func TestZoneApexNSNamesPropertyAlwaysSortedAndDeduped(t *testing.T) {
-	letters := []byte("abcdefghijklmnopqrstuvwxyz")
-	randomNames := func(rng *rand.Rand, n int) []string {
-		out := make([]string, 0, n)
-		for i := 0; i < n; i++ {
-			label := make([]byte, 1+rng.Intn(4))
-			for j := range label {
-				c := letters[rng.Intn(len(letters))]
-				if rng.Intn(10) < 3 {
-					c -= 32
-				}
-				label[j] = c
-			}
-			out = append(out, string(label)+".example.com")
-		}
-		return out
-	}
-
-	isSortedLower := func(names []string) bool {
-		cmp := make([]string, len(names))
-		for i, n := range names {
-			cmp[i] = strings.ToLower(n)
-		}
-		return sort.StringsAreSorted(cmp)
-	}
-
-	noDups := func(names []string) bool {
-		seen := map[string]bool{}
-		for _, n := range names {
-			key := strings.ToLower(n)
-			if seen[key] {
-				return false
-			}
-			seen[key] = true
-		}
-		return true
-	}
-
 	for trial := 0; trial < 30; trial++ {
 		seed := int64(trial * 17)
 		rng := rand.New(rand.NewSource(seed))
-		size := 1 + rng.Intn(8)
-		names := randomNames(rng, size)
+		names := nstest.RandomNameSet(rng, 1+rng.Intn(8), "example.com")
 		t.Run("trial", func(t *testing.T) {
 			out := runZoneApexNSNamesProperty(t, names)
-			if !isSortedLower(out) {
+			if !nstest.IsSortedLowercase(out) {
 				t.Errorf("output not sorted: %#v (input: %#v)", out, names)
 			}
-			if !noDups(out) {
+			if !nstest.HasNoDuplicates(out) {
 				t.Errorf("output has duplicates: %#v (input: %#v)", out, names)
 			}
 		})

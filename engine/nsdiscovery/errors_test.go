@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/recursor/recursortest"
@@ -37,10 +38,7 @@ func TestParentNameserversReturnsEmptyWhenRootEmpty(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, NewCache())
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{}})
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {
@@ -67,10 +65,7 @@ func TestDelegationNameserversReturnsEmptyWhenAllDelegationServersUnreachable(t 
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, NewCache())
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{}})
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {
@@ -145,10 +140,7 @@ func TestZoneNameserversReturnsEmptyWhenDelegationEmpty(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, NewCache())
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
 		t.Fatalf("add zone: %v", err)
 	}

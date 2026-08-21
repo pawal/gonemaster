@@ -11,35 +11,20 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 )
 
-func newHookedNameserver(ctx context.Context, t *testing.T, name string, addr string, hook func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error)) nameserver.Nameserver {
-	t.Helper()
-	ns, err := nameserver.NewWithContext(ctx, name, addr, nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(hook)
-	return ns
-}
-
 func TestZoneQueryOneSkipsDisabledIP(t *testing.T) {
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = false
 	prof.Net.IPv6 = true
 
-	ns4, err := nameserver.NewWithContext(ctx, "ns4.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns6, err := nameserver.NewWithContext(ctx, "ns6.example", "2001:db8::1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns4 := nstest.NS(t, ctx, nil, "ns4.example", "192.0.2.1")
+	ns6 := nstest.NS(t, ctx, nil, "ns6.example", "2001:db8::1")
 
 	var calls4 int
 	ns4.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
@@ -104,8 +89,8 @@ func TestZoneQueryAllParallel(t *testing.T) {
 		}
 	}
 
-	ns1 := newHookedNameserver(baseCtx, t, "ns1.example", "192.0.2.50", hook("ns1"))
-	ns2 := newHookedNameserver(baseCtx, t, "ns2.example", "192.0.2.51", hook("ns2"))
+	ns1 := nstest.HookedNS(t, baseCtx, nil, "ns1.example", "192.0.2.50", hook("ns1"))
+	ns2 := nstest.HookedNS(t, baseCtx, nil, "ns2.example", "192.0.2.51", hook("ns2"))
 
 	z := Zone{
 		Name:  dnsname.New("example"),
@@ -187,14 +172,12 @@ func TestZoneGlueUsesFakeAddresses(t *testing.T) {
 }
 
 func TestZoneNSNamesUndelegatedUsesFakeDelegation(t *testing.T) {
-	r := &recursor.Recursor{}
-	err := r.AddFakeAddresses("example", map[string][]string{
-		"ns2.example.net": {},
-		"ns1.example":     {"192.0.2.55"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": {
+			"ns2.example.net": {},
+			"ns1.example":     {"192.0.2.55"},
+		},
 	})
-	if err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 
 	z, err := NewWithRecursor("example", r)
 	if err != nil {
@@ -214,14 +197,12 @@ func TestZoneNSNamesUndelegatedUsesFakeDelegation(t *testing.T) {
 }
 
 func TestZoneNSUndelegatedUsesProvidedGlueOnly(t *testing.T) {
-	r := &recursor.Recursor{}
-	err := r.AddFakeAddresses("example", map[string][]string{
-		"ns2.example.net": {},
-		"ns1.example":     {"192.0.2.55"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": {
+			"ns2.example.net": {},
+			"ns1.example":     {"192.0.2.55"},
+		},
 	})
-	if err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 
 	z, err := NewWithRecursor("example", r)
 	if err != nil {
@@ -267,7 +248,7 @@ func TestZoneParentMissingRecursor(t *testing.T) {
 
 func TestZoneGlueNamesFromParent(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	parentNS := newHookedNameserver(ctx, t, "ns.parent.example", "192.0.2.10", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	parentNS := nstest.HookedNS(t, ctx, nil, "ns.parent.example", "192.0.2.10", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		nsRR1 := &dns.NS{Hdr: dns.Header{Name: "child.example.", Class: dns.ClassINET}}
@@ -308,7 +289,7 @@ func TestZoneGlueNamesFromParent(t *testing.T) {
 
 func TestZoneGlueAddressesFromParent(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	parentNS := newHookedNameserver(ctx, t, "ns.parent.example", "192.0.2.11", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	parentNS := nstest.HookedNS(t, ctx, nil, "ns.parent.example", "192.0.2.11", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		aRR := &dns.A{Hdr: dns.Header{Name: "ns1.child.example.", Class: dns.ClassINET}}
@@ -365,7 +346,7 @@ func TestZoneNSNamesRootSorted(t *testing.T) {
 
 func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	ns1 := newHookedNameserver(ctx, t, "ns1.example", "192.0.2.20", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns1 := nstest.HookedNS(t, ctx, nil, "ns1.example", "192.0.2.20", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		nsRR := &dns.NS{Hdr: dns.Header{Name: "other.example.", Class: dns.ClassINET}}
@@ -373,7 +354,7 @@ func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
 		msg.Answer = []dns.RR{nsRR}
 		return packet.Packet{Msg: msg}, nil
 	})
-	ns2 := newHookedNameserver(ctx, t, "ns2.example", "192.0.2.21", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns2 := nstest.HookedNS(t, ctx, nil, "ns2.example", "192.0.2.21", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		nsRR := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
@@ -402,7 +383,7 @@ func TestZoneQueryPersistentSelectsAnswer(t *testing.T) {
 
 func TestZoneQueryPersistentAcceptsAuthority(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	ns := newHookedNameserver(ctx, t, "ns1.example", "192.0.2.31", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns := nstest.HookedNS(t, ctx, nil, "ns1.example", "192.0.2.31", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		nsRR := &dns.NS{Hdr: dns.Header{Name: "child.example.", Class: dns.ClassINET}}
@@ -431,7 +412,7 @@ func TestZoneQueryPersistentAcceptsAuthority(t *testing.T) {
 
 func TestZoneIsInZone(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	ns := newHookedNameserver(ctx, t, "ns1.example", "192.0.2.30", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	ns := nstest.HookedNS(t, ctx, nil, "ns1.example", "192.0.2.30", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
 		msg.Authoritative = true
@@ -499,16 +480,8 @@ func TestZoneApexNSNamesUnionsAcrossServers(t *testing.T) {
 		}
 	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example.com", "192.0.2.11", r.Client())
-	if err != nil {
-		t.Fatalf("ns1: %v", err)
-	}
-	ns1.SetQueryHook(mkHook("NS1.Example.com.", "ns3.example.com."))
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example.com", "192.0.2.12", r.Client())
-	if err != nil {
-		t.Fatalf("ns2: %v", err)
-	}
-	ns2.SetQueryHook(mkHook("ns2.example.com.", "ns3.example.com."))
+	nstest.HookedNS(t, ctx, r, "ns1.example.com", "192.0.2.11", mkHook("NS1.Example.com.", "ns3.example.com."))
+	nstest.HookedNS(t, ctx, r, "ns2.example.com", "192.0.2.12", mkHook("ns2.example.com.", "ns3.example.com."))
 
 	z, err := NewWithRecursor("example.com", r)
 	if err != nil {
@@ -573,10 +546,7 @@ func TestCachedNSReturnsMemoizedCopy(t *testing.T) {
 	}
 
 	ctx, _, _ := testhelpers.Context(t)
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns1 := nstest.NS(t, ctx, nil, "ns1.example", "192.0.2.1")
 	z := &Zone{Name: dnsname.New("example"), ns: []nameserver.Nameserver{ns1}, nsSet: true}
 	got, ok := z.CachedNS()
 	if !ok || len(got) != 1 {

@@ -10,6 +10,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
@@ -198,14 +199,8 @@ func TestBuildUndelegatedDSData(t *testing.T) {
 
 func TestApplyUndelegatedDS(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	ns1, err := nameserver.NewWithContext(ctx, "a.gtld-servers.net", "192.5.6.30", nil)
-	if err != nil {
-		t.Fatalf("new nameserver 1: %v", err)
-	}
-	ns2, err := nameserver.NewWithContext(ctx, "b.gtld-servers.net", "192.33.14.30", nil)
-	if err != nil {
-		t.Fatalf("new nameserver 2: %v", err)
-	}
+	ns1 := nstest.NS(t, ctx, nil, "a.gtld-servers.net", "192.5.6.30")
+	ns2 := nstest.NS(t, ctx, nil, "b.gtld-servers.net", "192.33.14.30")
 
 	ds := []UndelegatedDSInfo{
 		{
@@ -330,10 +325,7 @@ func TestBuildUndelegatedFakeDelegationOutOfBailiwickNoFillEmitsNoIP(t *testing.
 
 func TestFakeDelegationToSelf(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	ns, err := nameserver.NewWithContext(ctx, "ns1.example.com", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := nstest.NS(t, ctx, nil, "ns1.example.com", "192.0.2.1")
 
 	if !fakeDelegationToSelf(ns, map[string][]string{
 		"ns1.example.com": {"192.0.2.1"},

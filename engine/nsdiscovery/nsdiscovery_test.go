@@ -8,6 +8,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/zone"
@@ -31,7 +32,7 @@ func TestGlueNameserversReturnsGlueFromZone(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 		"b.root": {"192.0.2.2"},
 	})
@@ -89,7 +90,7 @@ func TestApexNameserversReturnsApexNameservers(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 		"b.root": {"192.0.2.2"},
 	})
@@ -139,7 +140,7 @@ func TestAllNSNamesUnionSorted(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.3"},
 		"b.root": {"192.0.2.4"},
 	})
@@ -174,7 +175,7 @@ func TestAllNSNamesEmptyInputs(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 	})
 	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
@@ -203,7 +204,7 @@ func TestAllNSNamesOnlyGlueWhenApexReturnsNoNS(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 	})
 	if err := r.AddFakeAddresses("example.com", map[string][]string{
@@ -245,7 +246,7 @@ func TestAllNSNamesOverlapDedupedCaseInsensitively(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 	})
 	if err := r.AddFakeAddresses("example.com", map[string][]string{
@@ -285,7 +286,7 @@ func TestAllNameserversUnionSorted(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.5"},
 		"b.root": {"192.0.2.6"},
 		"c.root": {"192.0.2.7"},
@@ -325,7 +326,7 @@ func TestAllNameserversEmptyInputs(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 	})
 	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
@@ -355,7 +356,7 @@ func TestAllNameserversOnlyGlueWhenApexHasNoServers(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 	})
 	if err := r.AddFakeAddresses("example.com", map[string][]string{
@@ -387,7 +388,7 @@ func TestAllNameserversDedupesByNameserverString(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 	})
 	if err := r.AddFakeAddresses("example.com", map[string][]string{
@@ -442,7 +443,7 @@ func TestApexNSNamesSkipsNonNSRecords(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := newRootRecursor(t, map[string][]string{
+	r := nstest.RootRecursor(t, map[string][]string{
 		"a.root": {"192.0.2.1"},
 	})
 	setHookWithPacket(ctx, t, r, "a.root", "192.0.2.1", ".",

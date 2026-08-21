@@ -10,6 +10,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -20,13 +21,12 @@ import (
 func TestDelegationNameserversUndelegated(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example":     {"192.0.2.1"},
-		"ns2.example.net": {"192.0.2.2"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": map[string][]string{
+			"ns1.example":     {"192.0.2.1"},
+			"ns2.example.net": {"192.0.2.2"},
+		},
+	})
 	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
@@ -59,12 +59,11 @@ func TestZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example.net": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": map[string][]string{
+			"ns1.example.net": {"192.0.2.53"},
+		},
+	})
 	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
@@ -92,13 +91,12 @@ func TestZoneNameserversOutOfBailiwick(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example.net": {"192.0.2.53"},
-		"ns2.example.net": {"192.0.2.54"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": map[string][]string{
+			"ns1.example.net": {"192.0.2.53"},
+			"ns2.example.net": {"192.0.2.54"},
+		},
+	})
 	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
@@ -134,23 +132,16 @@ func TestDelegationNameserversUndelegatedLookupWhenNoIP(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"root.test": {"192.0.2.9"},
-	}); err != nil {
-		t.Fatalf("add fake root addresses: %v", err)
-	}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example.net": {},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{
+			"root.test": {"192.0.2.9"},
+		},
+		"example": map[string][]string{
+			"ns1.example.net": {},
+		},
+	})
 
-	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.9", r.Client())
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "root.test", "192.0.2.9", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		if name != "ns1.example.net" || qtype != "A" {
 			return packet.Packet{}, nil
 		}
@@ -186,12 +177,11 @@ func TestDelegationNameserversUndelegatedLookupWhenNoIP(t *testing.T) {
 func TestDelegationNameserversUndelegatedKeepsInBailiwickNameWithoutIP(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": map[string][]string{
+			"ns1.example": {},
+		},
+	})
 	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
@@ -212,13 +202,12 @@ func TestDelegationNameserversUndelegatedKeepsInBailiwickNameWithoutIP(t *testin
 func TestZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns2.example.net": {"192.0.2.54"},
-		"ns1.example":     {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": map[string][]string{
+			"ns2.example.net": {"192.0.2.54"},
+			"ns1.example":     {"192.0.2.53"},
+		},
+	})
 	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
@@ -239,21 +228,17 @@ func TestZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
 func TestZoneNameserversUndelegatedInBailiwickUsesProvidedGlue(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": map[string][]string{
+			"ns1.example": {"192.0.2.53"},
+		},
+	})
 	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
 	}
 
-	ns, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := nstest.NS(t, ctx, r, "ns1.example", "192.0.2.53")
 	queryCalls := 0
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		queryCalls++

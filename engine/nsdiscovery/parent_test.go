@@ -7,10 +7,10 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -21,10 +21,7 @@ func TestParentCacheStoresSnapshotData(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, cache)
 
-	ns, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.53", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := nstest.NS(t, ctx, nil, "ns1.example", "192.0.2.53")
 
 	cache.store("example", []nameserver.Nameserver{ns}, true)
 
@@ -62,12 +59,11 @@ func TestParentNameserversUndelegated(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, NewCache())
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": map[string][]string{
+			"ns1.example": {"192.0.2.1"},
+		},
+	})
 	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
@@ -88,13 +84,12 @@ func TestParentNameserversSkipsOnIntermediateNoResponse(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"ns1.root": {"192.0.2.1"},
-		"ns2.root": {"192.0.2.2"},
-	}); err != nil {
-		t.Fatalf("add fake root addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{
+			"ns1.root": {"192.0.2.1"},
+			"ns2.root": {"192.0.2.2"},
+		},
+	})
 
 	rootSOA := func(name string) packet.Packet {
 		soa := dnstest.SOARR(name, dnstest.MName("ns.example."), dnstest.RName("hostmaster.example."))
@@ -109,11 +104,7 @@ func TestParentNameserversSkipsOnIntermediateNoResponse(t *testing.T) {
 				dnstest.ARR("ns2.root.", "192.0.2.2"))...))
 	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new ns1: %v", err)
-	}
-	ns1.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "ns1.root", "192.0.2.1", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		switch {
 		case name == "." && qtype == "SOA":
 			return rootSOA("."), nil
@@ -126,11 +117,7 @@ func TestParentNameserversSkipsOnIntermediateNoResponse(t *testing.T) {
 		}
 	})
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.root", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new ns2: %v", err)
-	}
-	ns2.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "ns2.root", "192.0.2.2", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		switch {
 		case name == "." && qtype == "SOA":
 			return rootSOA("."), nil
@@ -171,12 +158,11 @@ func TestParentNameserversAcceptsRFC8020ContradictionAtIntermediate(t *testing.T
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"ns.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake root addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{
+			"ns.root": {"192.0.2.1"},
+		},
+	})
 
 	rootSOA := func() packet.Packet {
 		soa := dnstest.SOARR(".", dnstest.MName("ns.root."), dnstest.RName("hostmaster."))
@@ -210,11 +196,7 @@ func TestParentNameserversAcceptsRFC8020ContradictionAtIntermediate(t *testing.T
 			dnstest.Authority(dnstest.TTL(0, dnstest.NSRR("c.b.example.", "ns.child.example."))...))
 	}
 
-	nsRoot, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new ns.root: %v", err)
-	}
-	nsRoot.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "ns.root", "192.0.2.1", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		switch {
 		case name == "." && qtype == "SOA":
 			return rootSOA(), nil
@@ -226,11 +208,7 @@ func TestParentNameserversAcceptsRFC8020ContradictionAtIntermediate(t *testing.T
 		return packet.Packet{}, nil
 	})
 
-	nsExample, err := nameserver.NewWithContext(ctx, "ns.example", "192.0.2.2", r.Client())
-	if err != nil {
-		t.Fatalf("new ns.example: %v", err)
-	}
-	nsExample.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "ns.example", "192.0.2.2", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		switch {
 		case name == "example" && qtype == "SOA":
 			return exampleSOA(), nil
@@ -268,12 +246,11 @@ func TestParentNameserversUsesCacheOnSecondCall(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, cache)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{
+			"a.root": {"192.0.2.1"},
+		},
+	})
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {
@@ -302,10 +279,7 @@ func TestCacheClearRemovesAllEntries(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, cache)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 
 	seedParentCache(ctx, t, r, cache, "example.com.", "ns.example", "203.0.113.1")
 	seedParentCache(ctx, t, r, cache, "example.org.", "ns.example", "203.0.113.2")
@@ -329,10 +303,7 @@ func TestParentNameserversCachesPerInstance(t *testing.T) {
 	cacheB := NewCache()
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 
 	zA, err := zone.NewWithRecursor("alpha.test", r)
 	if err != nil {
@@ -379,12 +350,11 @@ func TestParentNameserversCachesPerInstance(t *testing.T) {
 func TestParentNameserversNoCacheStillWorks(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		"example": map[string][]string{
+			"ns1.example": {"192.0.2.1"},
+		},
+	})
 	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
@@ -407,10 +377,7 @@ func TestParentNameserversConcurrentCallsSameZone(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, cache)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {
@@ -445,10 +412,7 @@ func TestParentNameserversConcurrentCallsDifferentZones(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, cache)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 
 	const NZones = 10
 	zones := make([]zone.Zone, NZones)
@@ -498,10 +462,7 @@ func TestCacheClearConcurrentWithParentNameservers(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, cache)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {

@@ -4,8 +4,8 @@ import (
 	"sort"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -29,18 +29,15 @@ func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-		"ns2.example.com": {"192.0.2.12"},
-	}); err != nil {
-		t.Fatalf("add example.com: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{
+			"a.root": {"192.0.2.1"},
+		},
+		"example.com": map[string][]string{
+			"ns1.example.com": {"192.0.2.11"},
+			"ns2.example.com": {"192.0.2.12"},
+		},
+	})
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns2.example.com")
 	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns2.example.com")
 
@@ -95,18 +92,15 @@ func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) 
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.net": {"192.0.2.53"},
-		"ns2.example.net": {"192.0.2.54"},
-	}); err != nil {
-		t.Fatalf("add example.com: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{
+			"a.root": {"192.0.2.1"},
+		},
+		"example.com": map[string][]string{
+			"ns1.example.net": {"192.0.2.53"},
+			"ns2.example.net": {"192.0.2.54"},
+		},
+	})
 	setNSHook(ctx, t, r, "ns1.example.net", "192.0.2.53", "example.com", "ns1.example.net", "ns2.example.net")
 	setNSHook(ctx, t, r, "ns2.example.net", "192.0.2.54", "example.com", "ns1.example.net", "ns2.example.net")
 
@@ -151,10 +145,7 @@ func TestAllNameserversVsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
 		t.Fatalf("add empty: %v", err)
 	}

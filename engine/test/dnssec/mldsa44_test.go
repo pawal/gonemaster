@@ -9,12 +9,9 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
-	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
-	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -61,11 +58,7 @@ func mldsa44Sig(t *testing.T, owner string, typeCovered uint16, key *dns.DNSKEY,
 // dnssecAlgorithmSupported before verifying, so a correctly signed ML-DSA-44
 // zone used to draw DS08_ALGO_NOT_SUPPORTED_BY_ZM at NOTICE.
 func TestDNSSEC08MLDSA44Valid(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	origM4 := glueNameservers
 	origM5 := apexNameservers
@@ -78,11 +71,11 @@ func TestDNSSEC08MLDSA44Valid(t *testing.T) {
 	key, signer := mldsa44Key(t, "example")
 	sig := mldsa44Sig(t, "example", dns.TypeDNSKEY, key, signer, []dns.RR{key}, now)
 
-	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.96", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
-		if qtype != "DNSKEY" {
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.96", func(q tctest.Query) packet.Packet {
+		if q.Type != "DNSKEY" {
 			return packet.Packet{}
 		}
-		pkt := answerPacket(qname, dns.TypeDNSKEY, key, sig)
+		pkt := answerPacket(q.Name, dns.TypeDNSKEY, key, sig)
 		pkt.Timestamp = now
 		return pkt
 	})
@@ -109,11 +102,7 @@ func TestDNSSEC08MLDSA44Valid(t *testing.T) {
 
 // The same change on the SOA RRSIG path.
 func TestDNSSEC09MLDSA44Valid(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	origM4 := glueNameservers
 	origM5 := apexNameservers
@@ -127,14 +116,14 @@ func TestDNSSEC09MLDSA44Valid(t *testing.T) {
 	soa := soaRecord("example")
 	sig := mldsa44Sig(t, "example", dns.TypeSOA, key, signer, []dns.RR{soa}, now)
 
-	ns := newNameserver(t, ctx, "ns1.example", "192.0.2.97", func(qname string, qtype string, _ *nameserver.QueryOptions) packet.Packet {
-		switch qtype {
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.97", func(q tctest.Query) packet.Packet {
+		switch q.Type {
 		case "DNSKEY":
-			pkt := dnskeyPacket(qname, key)
+			pkt := dnskeyPacket(q.Name, key)
 			pkt.Timestamp = now
 			return pkt
 		case "SOA":
-			pkt := answerPacket(qname, dns.TypeSOA, soa, sig)
+			pkt := answerPacket(q.Name, dns.TypeSOA, soa, sig)
 			pkt.Timestamp = now
 			return pkt
 		default:

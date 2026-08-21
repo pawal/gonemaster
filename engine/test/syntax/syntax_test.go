@@ -3,13 +3,11 @@ package syntax
 import (
 	"context"
 	"net"
-	"net/netip"
 	"strings"
 	"testing"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
@@ -413,62 +411,30 @@ func testContext(t *testing.T) context.Context {
 	return ctx
 }
 
+// The NS and single-MX answers come from a recursor, so they leave AA clear.
 func nsPacket(zoneName string, nsName string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
-	nsRR.Ns = dnsutil.Fqdn(nsName)
-	msg.Answer = []dns.RR{nsRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(),
+		tctest.Answers(tctest.NSRR(zoneName, nsName)))
 }
 
 func soaPacket(zoneName string, mname string, rname string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
-	soaRR.Ns = dnsutil.Fqdn(mname)
-	soaRR.Mbox = dnsutil.Fqdn(rname)
-	soaRR.Serial = 1
-	soaRR.Refresh = 3600
-	soaRR.Retry = 600
-	soaRR.Expire = 86400
-	soaRR.Minttl = 60
-	msg.Answer = []dns.RR{soaRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.SOARR(zoneName,
+		tctest.MName(mname), tctest.RName(rname))))
 }
 
 func mxPacket(zoneName string, exchange string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	mxRR := &dns.MX{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
-	mxRR.Preference = 10
-	mxRR.Mx = dnsutil.Fqdn(exchange)
-	msg.Answer = []dns.RR{mxRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(),
+		tctest.Answers(tctest.MXRR(zoneName, 10, exchange)))
 }
 
 func mxPacketMulti(zoneName string, exchanges ...string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
+	rrs := make([]dns.RR, 0, len(exchanges))
 	for i, exchange := range exchanges {
-		mxRR := &dns.MX{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
-		mxRR.Preference = uint16(10 + i)
-		mxRR.Mx = dnsutil.Fqdn(exchange)
-		msg.Answer = append(msg.Answer, mxRR)
+		rrs = append(rrs, tctest.MXRR(zoneName, uint16(10+i), exchange))
 	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(rrs...))
 }
 
 func aPacket(owner string, addr net.IP) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	if ip4 := addr.To4(); ip4 != nil {
-		aRR.Addr = netip.AddrFrom4([4]byte(ip4))
-	}
-	msg.Answer = []dns.RR{aRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.ARR(owner, addr.String())))
 }

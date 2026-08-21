@@ -2,7 +2,6 @@ package delegation
 
 import (
 	"context"
-	"net/netip"
 	"strings"
 	"testing"
 	"time"
@@ -227,11 +226,7 @@ func TestDelegation01InBailiwickGlueMissing(t *testing.T) {
 	stubDelegation01Counts(t)
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{Name: dnsname.New("ns1.example")},
-			{Name: dnsname.New("ns2.example"), Address: netip.MustParseAddr("192.0.2.1"), HasAddress: true},
-			{Name: dnsname.New("ns.example.net")},
-		}, nil
+		return tctest.NSItems("ns1.example", "ns2.example/192.0.2.1", "ns.example.net"), nil
 	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
@@ -254,10 +249,7 @@ func TestDelegation01InBailiwickGluePresent(t *testing.T) {
 	stubDelegation01Counts(t)
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.1"), HasAddress: true},
-			{Name: dnsname.New("ns2.example"), Address: netip.MustParseAddr("2001:db8::1"), HasAddress: true},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.1", "ns2.example/2001:db8::1"), nil
 	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
@@ -887,35 +879,18 @@ func stubNoDelegationGlueGap(t *testing.T) {
 }
 
 func soaPacket(owner string, authoritative bool) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = authoritative
-	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	soaRR.Ns = "ns1.example."
-	soaRR.Mbox = "hostmaster.example."
-	soaRR.Serial = 1
-	soaRR.Refresh = 3600
-	soaRR.Retry = 600
-	soaRR.Expire = 86400
-	soaRR.Minttl = 60
-	msg.Answer = []dns.RR{soaRR}
-	return packet.Packet{Msg: msg}
+	opts := []tctest.MsgOpt{tctest.Answers(tctest.SOARR(owner,
+		tctest.MName("ns1.example"), tctest.RName("hostmaster.example")))}
+	if !authoritative {
+		opts = append(opts, tctest.NotAuthoritative())
+	}
+	return tctest.Response(opts...)
 }
 
 func cnamePacket(owner string, target string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	cnameRR := &dns.CNAME{}
-	cnameRR.Hdr = dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}
-	cnameRR.Target = dnsutil.Fqdn(target)
-	msg.Answer = []dns.RR{cnameRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.CNAMERR(owner, target)))
 }
 
 func noAnswerPacket() packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response()
 }

@@ -516,41 +516,29 @@ func testContext(t *testing.T) context.Context {
 	return ctx
 }
 
+// These responses come from a recursor, so none of them set the AA bit.
 func nsPacket(zoneName string, nsName string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(zoneName), Class: dns.ClassINET, TTL: 60}}
-	nsRR.Ns = dnsutil.Fqdn(nsName)
-	msg.Answer = []dns.RR{nsRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(),
+		tctest.Answers(tctest.NSRR(zoneName, nsName)))
 }
 
 func ptrPacket(owner string, targets ...string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
+	rrs := make([]dns.RR, 0, len(targets))
 	for _, target := range targets {
-		ptrRR := &dns.PTR{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-		ptrRR.Ptr = dnsutil.Fqdn(target)
-		msg.Answer = append(msg.Answer, ptrRR)
+		rrs = append(rrs, tctest.PTRRR(owner, target))
 	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(), tctest.Answers(rrs...))
 }
 
 func cnamePacket(owner string, target string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	cnameRR := &dns.CNAME{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	cnameRR.Target = dnsutil.Fqdn(target)
-	msg.Answer = []dns.RR{cnameRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(),
+		tctest.Answers(tctest.CNAMERR(owner, target)))
 }
 
 func noAnswerPacket(owner string, qtype string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
 	if qtype == "" {
 		qtype = "A"
 	}
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.StringToType[strings.ToUpper(qtype)])
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(),
+		tctest.Question(owner, dns.StringToType[strings.ToUpper(qtype)]))
 }

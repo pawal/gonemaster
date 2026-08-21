@@ -7,9 +7,6 @@ import (
 	"testing"
 	"time"
 
-	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
-
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -424,27 +421,10 @@ func TestConnectivity04SinglePrefix(t *testing.T) {
 }
 
 func soaPacket(owner string, mname string, rname string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	soaRR.Ns = dnsutil.Fqdn(mname)
-	soaRR.Mbox = dnsutil.Fqdn(rname)
-	soaRR.Serial = 2024010101
-	soaRR.Refresh = 3600
-	soaRR.Retry = 600
-	soaRR.Expire = 86400
-	soaRR.Minttl = 60
-	msg.Answer = []dns.RR{soaRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.SOARR(owner,
+		tctest.MName(mname), tctest.RName(rname), tctest.Serial(2024010101))))
 }
 
 func nsPacket(owner string, nsname string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	nsRR.Ns = dnsutil.Fqdn(nsname)
-	msg.Answer = []dns.RR{nsRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.NSRR(owner, nsname)))
 }

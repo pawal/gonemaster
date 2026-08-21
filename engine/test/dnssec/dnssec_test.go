@@ -1138,94 +1138,64 @@ func TestDNSSEC04DurationOK(t *testing.T) {
 }
 
 func TestDNSSEC04ParallelQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	now := time.Unix(1700000000, 0).UTC()
-	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
-	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	soa.Ns = "ns1.example."
-	soa.Mbox = "hostmaster.example."
-	soa.Serial = 1
-	soa.Refresh = 60
-	soa.Retry = 60
-	soa.Expire = 60
-	soa.Minttl = 60
-	okSig := rrsigRecord("example", dns.TypeDNSKEY, 54321, now.Unix()-86400, now.Unix()+172800)
+		now := time.Unix(1700000000, 0).UTC()
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+		soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+		soa.Ns = "ns1.example."
+		soa.Mbox = "hostmaster.example."
+		soa.Serial = 1
+		soa.Refresh = 60
+		soa.Retry = 60
+		soa.Expire = 60
+		soa.Minttl = 60
+		okSig := rrsigRecord("example", dns.TypeDNSKEY, 54321, now.Unix()-86400, now.Unix()+172800)
 
-	dnskeyResp := answerPacket("example", dns.TypeDNSKEY, key, okSig)
-	dnskeyResp.Timestamp = now
-	soaResp := answerPacket("example", dns.TypeSOA, soa)
-	soaResp.Timestamp = now
+		dnskeyResp := answerPacket("example", dns.TypeDNSKEY, key, okSig)
+		dnskeyResp.Timestamp = now
+		soaResp := answerPacket("example", dns.TypeSOA, soa)
+		soaResp.Timestamp = now
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	tctest.Stub(t, &zoneQueryOne, func(ctx context.Context, _ *zone.Zone, _ string, rrtype string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		switch rrtype {
-		case "DNSKEY":
-			select {
-			case started <- rrtype:
+		tctest.Stub(t, &zoneQueryOne, func(_ context.Context, _ *zone.Zone, _ string, rrtype string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+			switch rrtype {
+			case "DNSKEY":
+				gate.Arrive(rrtype)
+				return dnskeyResp, nil
+			case "SOA":
+				gate.Arrive(rrtype)
+				return soaResp, nil
 			default:
+				return packet.Packet{}, nil
 			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			return dnskeyResp, nil
-		case "SOA":
-			select {
-			case started <- rrtype:
-			default:
-			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			return soaResp, nil
-		default:
-			return packet.Packet{}, nil
-		}
-	})
+		})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC04(ctx, &z)
-		close(done)
-	}()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC04(ctx, &z)
+			close(done)
+		}()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel DNSKEY/SOA queries to start, got %v", got)
-		}
-	}
+		synctest.Wait()
+		gate.RequireInFlight(t, "DNSKEY", "SOA")
+		gate.Release()
 
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec04: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec04 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DURATION_OK")
+		tctest.RequireTags(t, entries, "DURATION_OK")
+	})
 }
 
 func TestDNSSEC05AlgoOK(t *testing.T) {

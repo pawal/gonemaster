@@ -3438,123 +3438,92 @@ func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 }
 
 func TestDNSSEC13ParallelQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	now := time.Now().UTC()
-	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
-	keySig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+		now := time.Now().UTC()
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+		keySig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
 
-	soaSig := rrsigRecord("example", dns.TypeSOA, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
-	soaSig.Algorithm = 13
-	nsSig := rrsigRecord("example", dns.TypeNS, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
-	nsSig.Algorithm = 13
+		soaSig := rrsigRecord("example", dns.TypeSOA, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+		soaSig.Algorithm = 13
+		nsSig := rrsigRecord("example", dns.TypeNS, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
+		nsSig.Algorithm = 13
 
-	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	nsRR.Ns = dnsutil.Fqdn("ns.example")
+		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
+		nsRR.Ns = dnsutil.Fqdn("ns.example")
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			switch qtype {
-			case "DNSKEY":
-				select {
-				case started <- id:
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "DNSKEY":
+					gate.Arrive(id)
+					return answerPacket(q.Name, dns.TypeDNSKEY, key, keySig)
+				case "SOA":
+					return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name), soaSig)
+				case "NS":
+					return answerPacket(q.Name, dns.TypeNS, nsRR, nsSig)
 				default:
+					return packet.Packet{}
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
-				return answerPacket(qname, dns.TypeDNSKEY, key, keySig), nil
-			case "SOA":
-				return answerPacket(qname, dns.TypeSOA, soaRecord(qname), soaSig), nil
-			case "NS":
-				return answerPacket(qname, dns.TypeNS, nsRR, nsSig), nil
-			default:
-				return packet.Packet{}, nil
 			}
 		}
-	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.121", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.121", hook("ns1"))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.122", hook("ns2"))
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.122", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns1, ns2}, nil
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		})
 
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns1, ns2}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC13(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC13(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel DNSKEY queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec13: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec13 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DS13_ALGO_NOT_SIGNED_SOA", "DS13_ALGO_NOT_SIGNED_NS")
+		tctest.RequireTags(t, entries, "DS13_ALGO_NOT_SIGNED_SOA", "DS13_ALGO_NOT_SIGNED_NS")
 
-	var gotAddresses []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "DS13_ALGO_NOT_SIGNED_SOA" {
-			continue
+		var gotAddresses []string
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "DS13_ALGO_NOT_SIGNED_SOA" {
+				continue
+			}
+			if addresses, ok := entry.Args["addresses"].([]string); ok {
+				gotAddresses = addresses
+			}
+			if _, ok := entry.Args["ns_ip_list"]; ok {
+				t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+			}
+			break
 		}
-		if addresses, ok := entry.Args["addresses"].([]string); ok {
-			gotAddresses = addresses
+		if len(gotAddresses) == 0 {
+			t.Fatalf("expected addresses for DS13_ALGO_NOT_SIGNED_SOA")
 		}
-		if _, ok := entry.Args["ns_ip_list"]; ok {
-			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		if strings.Join(gotAddresses, ";") != "192.0.2.121;192.0.2.122" {
+			t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 		}
-		break
-	}
-	if len(gotAddresses) == 0 {
-		t.Fatalf("expected addresses for DS13_ALGO_NOT_SIGNED_SOA")
-	}
-	if strings.Join(gotAddresses, ";") != "192.0.2.121;192.0.2.122" {
-		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
-	}
+	})
 }
 
 func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {

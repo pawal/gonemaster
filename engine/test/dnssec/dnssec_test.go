@@ -2361,107 +2361,76 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 }
 
 func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			if qtype != "DNSKEY" {
-				return packet.Packet{}, nil
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if q.Type != "DNSKEY" {
+					return packet.Packet{}
+				}
+				gate.Arrive(id)
+				return dnskeyPacket(q.Name, key)
 			}
-			select {
-			case started <- id:
-			default:
-			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			return dnskeyPacket(qname, key), nil
 		}
-	}
 
-	child1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.101", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	child1.SetQueryHook(hook("child1"))
+		child1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.101", hook("child1"))
+		child2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.102", hook("child2"))
 
-	child2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.102", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	child2.SetQueryHook(hook("child2"))
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{child1, child2}, nil
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		})
 
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{child1, child2}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC08(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC08(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "child1", "child2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel DNSKEY queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec08: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec08 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DS08_MISSING_RRSIG_IN_RESPONSE")
+		tctest.RequireTags(t, entries, "DS08_MISSING_RRSIG_IN_RESPONSE")
 
-	var gotAddresses []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "DS08_MISSING_RRSIG_IN_RESPONSE" {
-			continue
+		var gotAddresses []string
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "DS08_MISSING_RRSIG_IN_RESPONSE" {
+				continue
+			}
+			if addresses, ok := entry.Args["addresses"].([]string); ok {
+				gotAddresses = addresses
+			}
+			if _, ok := entry.Args["ns_ip_list"]; ok {
+				t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+			}
+			break
 		}
-		if addresses, ok := entry.Args["addresses"].([]string); ok {
-			gotAddresses = addresses
+		if len(gotAddresses) == 0 {
+			t.Fatalf("expected addresses for DS08_MISSING_RRSIG_IN_RESPONSE")
 		}
-		if _, ok := entry.Args["ns_ip_list"]; ok {
-			t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
+		if strings.Join(gotAddresses, ";") != "192.0.2.101;192.0.2.102" {
+			t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
 		}
-		break
-	}
-	if len(gotAddresses) == 0 {
-		t.Fatalf("expected addresses for DS08_MISSING_RRSIG_IN_RESPONSE")
-	}
-	if strings.Join(gotAddresses, ";") != "192.0.2.101;192.0.2.102" {
-		t.Fatalf("expected deterministic addresses order, got %#v", gotAddresses)
-	}
+	})
 }
 
 func TestDNSSEC09MissingRRSIG(t *testing.T) {

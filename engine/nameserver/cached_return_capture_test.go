@@ -9,6 +9,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -20,10 +21,7 @@ import (
 func cachedReturnFixture(t *testing.T, log *logger.Logger) (context.Context, Nameserver, string) {
 	t.Helper()
 
-	prof, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	prof := dnstest.DefaultProfile(t)
 	log.SetProfile(prof)
 	ctx := profile.WithContext(context.Background(), prof)
 	ctx = logger.WithContext(ctx, log)

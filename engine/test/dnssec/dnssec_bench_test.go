@@ -10,6 +10,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -108,10 +109,7 @@ func BenchmarkDNSSEC18Parallel(b *testing.B) {
 			return nil, nil
 		}
 
-		p, err := profile.Default()
-		if err != nil {
-			b.Fatalf("profile default: %v", err)
-		}
+		p := dnstest.DefaultProfile(b)
 		if err := p.Set("resolver.defaults.parallel", parallel); err != nil {
 			b.Fatalf("set parallel: %v", err)
 		}

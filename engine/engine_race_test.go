@@ -41,6 +41,9 @@ func TestRunConcurrentIdenticalFindings(t *testing.T) {
 	for i := range runs {
 		go func() {
 			defer wg.Done()
+			// Raw profile.Default, not dnstest.DefaultProfile: this runs in a
+			// goroutine, where the error is an assertion input rather than a
+			// reason to fail the test from off the test goroutine.
 			p, err := profile.Default()
 			if err != nil {
 				results[i] = result{index: i, err: err}

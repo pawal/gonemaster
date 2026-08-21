@@ -16,6 +16,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -349,10 +350,7 @@ func TestEnsureStateOnZeroValueNameserverPanics(t *testing.T) {
 }
 
 func TestDefaultProfileErrorCacheTTLIsNonZero(t *testing.T) {
-	prof, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	prof := dnstest.DefaultProfile(t)
 	if prof.Resolver.Defaults.ErrorCacheTTL <= 0 {
 		t.Fatalf("default error_cache_ttl must be > 0 so a transport timeout suppresses repeat queries to the same NS within a run; got %d", prof.Resolver.Defaults.ErrorCacheTTL)
 	}
@@ -1763,18 +1761,12 @@ func TestPacketBigEmitted(t *testing.T) {
 	t.Fatalf("expected PACKET_BIG tag for large response")
 }
 
+// testContext is testhelpers.Context for this package, which cannot import it:
+// testhelpers imports nameserver.
 func testContext(t *testing.T) (context.Context, *profile.Profile) {
 	t.Helper()
-	prof, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
-	log := logger.New()
-	ctx := context.Background()
-	ctx = profile.WithContext(ctx, prof)
-	ctx = logger.WithContext(ctx, log)
-	ctx = WithCache(ctx, NewCacheStore())
-	return ctx, prof
+	ctx, prof, _ := dnstest.Context(t)
+	return WithCache(ctx, NewCacheStore()), prof
 }
 
 func TestNonGlobalQueryGuard(t *testing.T) {

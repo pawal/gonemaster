@@ -19,7 +19,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
@@ -58,7 +57,7 @@ func TestAddFakeAddressesDedupAndRemove(t *testing.T) {
 }
 
 func TestRootServersSorted(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{
@@ -147,7 +146,7 @@ func TestCacheStoreBoundsCacheSize(t *testing.T) {
 }
 
 func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -222,7 +221,7 @@ func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
 }
 
 func TestRecurseInflightLookupCoalescing(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -308,7 +307,7 @@ func TestRecurseInflightLookupCoalescing(t *testing.T) {
 }
 
 func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -379,7 +378,7 @@ func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
 }
 
 func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -455,7 +454,7 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 }
 
 func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &Recursor{
 		fakeAddresses: map[string]map[string][]netip.Addr{},
@@ -505,7 +504,7 @@ func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
 }
 
 func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	msg := new(dns.Msg)
 	nsRR2 := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
@@ -537,7 +536,7 @@ func TestGetNSFromUsesGlueAndLazy(t *testing.T) {
 }
 
 func TestGetNSFromIgnoresOutOfBailiwickAndUnrelatedGlue(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	msg := new(dns.Msg)
 	nsRR4 := &dns.NS{Hdr: dns.Header{Name: "example.", Class: dns.ClassINET}}
@@ -755,7 +754,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 }
 
 func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &Recursor{client: &transport.Client{}}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -832,7 +831,7 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 }
 
 func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 
 	r := &Recursor{client: &transport.Client{}}
 	if err := r.AddFakeAddresses(".", map[string][]string{
@@ -1763,10 +1762,7 @@ func TestPositiveEntryStillNotEvictedByNegativeLookup(t *testing.T) {
 }
 
 func TestDefaultProfileNegativeCacheTTLIsNonZero(t *testing.T) {
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p := testhelpers.DefaultProfile(t)
 	if p.Resolver.Defaults.NegativeCacheTTL <= 0 {
 		t.Fatalf("default negative_cache_ttl must be > 0 so indeterminate recursions dedupe within a run; got %d", p.Resolver.Defaults.NegativeCacheTTL)
 	}
@@ -1822,8 +1818,4 @@ type countingQueryer struct {
 func (q *countingQueryer) QueryWithClass(_ context.Context, _ string, _ string, _ string) (packet.Packet, error) {
 	q.count.Add(1)
 	return q.resp, q.err
-}
-
-func testCtx() context.Context {
-	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
 }

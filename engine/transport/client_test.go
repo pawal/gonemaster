@@ -14,7 +14,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
-	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
 
@@ -35,10 +35,7 @@ func TestBuildQueryWithClass(t *testing.T) {
 }
 
 func TestApplyProfileDefaultsDoesNotOverrideExplicit(t *testing.T) {
-	prof, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	prof := dnstest.DefaultProfile(t)
 
 	client := &Client{}
 	client.SetRecursionDesired(true)
@@ -977,10 +974,7 @@ func TestExchangeWithRetriesDisabledMakesOneAttempt(t *testing.T) {
 	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {})
 	defer shutdown()
 
-	prof, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	prof := dnstest.DefaultProfile(t)
 	if prof.Resolver.Defaults.Retry == 0 {
 		t.Fatal("shipped profile must carry a non-zero retry for this test to mean anything")
 	}
@@ -1000,7 +994,7 @@ func TestExchangeWithRetriesDisabledMakesOneAttempt(t *testing.T) {
 		t.Fatalf("ApplyProfileDefaults restored Retries to %d, so an explicit zero is a no-op", client.Retries)
 	}
 
-	_, err = client.Exchange(ctx, addr, BuildQuery("degraded.example.", dns.TypeSOA))
+	_, err := client.Exchange(ctx, addr, BuildQuery("degraded.example.", dns.TypeSOA))
 	if err == nil {
 		t.Fatal("expected a timeout error from a non-responding server, got nil")
 	}

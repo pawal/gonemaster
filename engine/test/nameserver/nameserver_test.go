@@ -16,6 +16,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	ens "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -357,10 +358,7 @@ func TestNameserver03AXFRAvailable(t *testing.T) {
 func axfrRestoreContext(t *testing.T, store *ens.CacheStore) context.Context {
 	t.Helper()
 	tctest.Setup(t)
-	prof, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	prof := dnstest.DefaultProfile(t)
 	prof.NoNetwork = true
 	ctx := ens.WithCache(context.Background(), store)
 	return profile.WithContext(ctx, prof)

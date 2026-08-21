@@ -45,6 +45,8 @@ func TestAddDefaultsAndString(t *testing.T) {
 	}
 }
 
+// These tests build profiles by hand rather than through dnstest.DefaultProfile:
+// dnstest imports logger, so this package cannot import dnstest.
 func TestLevelFromProfile(t *testing.T) {
 	log := New()
 	prof, err := profile.Default()

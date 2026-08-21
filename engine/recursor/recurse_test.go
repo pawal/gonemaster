@@ -74,10 +74,7 @@ func refusedPacket(answerFrom string) packet.Packet {
 // RETURN response (answer), and goroutine 2 blocks. After processing #1 the
 // recursor cancels the batch; #2 must observe context.Cause == ErrRaceLost.
 func TestRecurseOrderedRaceLossSetsCause(t *testing.T) {
-	prof, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	prof := testhelpers.DefaultProfile(t)
 	prof.Resolver.Defaults.Parallel = 3
 	prof.Resolver.Defaults.Unordered = false
 	ctx := profile.WithContext(context.Background(), prof)
@@ -120,10 +117,7 @@ func TestRecurseOrderedRaceLossSetsCause(t *testing.T) {
 
 // TestRecurseUnorderedRaceLossSetsCause exercises the unordered fan-out.
 func TestRecurseUnorderedRaceLossSetsCause(t *testing.T) {
-	prof, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	prof := testhelpers.DefaultProfile(t)
 	prof.Resolver.Defaults.Parallel = 2
 	prof.Resolver.Defaults.Unordered = true
 	ctx := profile.WithContext(context.Background(), prof)
@@ -239,7 +233,7 @@ func TestRecurseIgnoresRootReferral(t *testing.T) {
 }
 
 func TestRecurseFollowsOutOfBailiwickCNAME(t *testing.T) {
-	ctx := testCtx()
+	ctx, _, _ := testhelpers.Context(t)
 	r := &Recursor{
 		client:       &transport.Client{},
 		recurseCache: map[string]map[string]map[string]*recurseCacheEntry{},

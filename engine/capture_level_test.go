@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
@@ -16,10 +16,7 @@ import (
 func captureRun(t *testing.T, minLevel string, captureMinLevel string) ([]LogEntry, []*logger.Entry, error) {
 	t.Helper()
 
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p := testhelpers.DefaultProfile(t)
 	// Offline: no traffic leaves the test and every query fails identically.
 	p.NoNetwork = true
 

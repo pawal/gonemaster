@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -12,21 +13,12 @@ import (
 // DefaultProfile returns a default profile or fails the test.
 func DefaultProfile(t *testing.T) *profile.Profile {
 	t.Helper()
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("load default profile: %v", err)
-	}
-	return p
+	return dnstest.DefaultProfile(t)
 }
 
 // Context returns a context preloaded with a default profile, logger, and nameserver cache.
 func Context(t *testing.T) (context.Context, *profile.Profile, *logger.Logger) {
 	t.Helper()
-	p := DefaultProfile(t)
-	log := logger.New()
-	ctx := context.Background()
-	ctx = profile.WithContext(ctx, p)
-	ctx = logger.WithContext(ctx, log)
-	ctx = nameserver.WithCache(ctx, nameserver.NewCacheStore())
-	return ctx, p, log
+	ctx, p, log := dnstest.Context(t)
+	return nameserver.WithCache(ctx, nameserver.NewCacheStore()), p, log
 }

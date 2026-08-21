@@ -5,9 +5,9 @@ import (
 	"sync"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
@@ -19,22 +19,16 @@ func TestRunUnknownModule(t *testing.T) {
 }
 
 func TestRunWithRunnerUnknownModule(t *testing.T) {
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p := testhelpers.DefaultProfile(t)
 	runner := &Runner{Profile: p, Logger: logger.New()}
-	_, err = RunWithRunner(RunRequest{Domain: "example.com", Module: "unknown"}, runner)
+	_, err := RunWithRunner(RunRequest{Domain: "example.com", Module: "unknown"}, runner)
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)
 	}
 }
 
 func TestEffectiveProfileUsesRunner(t *testing.T) {
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p := testhelpers.DefaultProfile(t)
 	runner := &Runner{Profile: p, Logger: logger.New()}
 	req := RunRequest{Runner: runner}
 	got, err := EffectiveProfile(req)
@@ -89,14 +83,8 @@ func TestEffectiveProfileDebugOverride(t *testing.T) {
 func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
 	// Timeout-bound; safe to overlap: all run state is per-Runner.
 	t.Parallel()
-	p1, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
-	p2, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p1 := testhelpers.DefaultProfile(t)
+	p2 := testhelpers.DefaultProfile(t)
 
 	log1 := logger.New()
 	log2 := logger.New()
@@ -154,10 +142,7 @@ func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
 func TestRunEmitsStartupTags(t *testing.T) {
 	// Timeout-bound; safe to overlap: all run state is per-Runner.
 	t.Parallel()
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p := testhelpers.DefaultProfile(t)
 	log := logger.New()
 	runner := &Runner{
 		Profile:         p,
@@ -176,10 +161,7 @@ func TestRunEmitsStartupTags(t *testing.T) {
 }
 
 func TestRunEmitsSkipIPv4Disabled(t *testing.T) {
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p := testhelpers.DefaultProfile(t)
 	p.Net.IPv4 = false
 	log := logger.New()
 	runner := &Runner{
@@ -196,10 +178,7 @@ func TestRunEmitsSkipIPv4Disabled(t *testing.T) {
 }
 
 func TestRunEmitsNoNetwork(t *testing.T) {
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p := testhelpers.DefaultProfile(t)
 	p.Net.IPv4 = false
 	p.Net.IPv6 = false
 	log := logger.New()
@@ -225,13 +204,10 @@ func TestRunEmitsNoNetwork(t *testing.T) {
 }
 
 func TestRunWithRunnerEmitsUnknownModule(t *testing.T) {
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p := testhelpers.DefaultProfile(t)
 	log := logger.New()
 	runner := &Runner{Profile: p, Logger: log}
-	_, err = RunWithRunner(RunRequest{Domain: "example.com", Module: "nonexistent"}, runner)
+	_, err := RunWithRunner(RunRequest{Domain: "example.com", Module: "nonexistent"}, runner)
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)
 	}
@@ -241,13 +217,10 @@ func TestRunWithRunnerEmitsUnknownModule(t *testing.T) {
 }
 
 func TestRunWithRunnerEmitsUnknownMethod(t *testing.T) {
-	p, err := profile.Default()
-	if err != nil {
-		t.Fatalf("profile default: %v", err)
-	}
+	p := testhelpers.DefaultProfile(t)
 	log := logger.New()
 	runner := &Runner{Profile: p, Logger: log}
-	_, err = RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"nonexistent99"}}, runner)
+	_, err := RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"nonexistent99"}}, runner)
 	if !errors.Is(err, ErrNotImplemented) {
 		t.Fatalf("expected not implemented error, got %v", err)
 	}

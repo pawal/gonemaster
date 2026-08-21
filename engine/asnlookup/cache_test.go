@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
@@ -15,7 +16,7 @@ func TestCacheHitSkipsLookup(t *testing.T) {
 	c.set(ip, Result{ASNs: []int{64496}, Prefix: &prefix, Code: CodeFound})
 
 	ctx := context.Background()
-	p, _ := profile.Default()
+	p := dnstest.DefaultProfile(t)
 	ctx = profile.WithContext(ctx, p)
 	ctx = WithCache(ctx, c)
 

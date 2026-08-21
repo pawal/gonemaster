@@ -63,8 +63,7 @@ func TestDelegation01Counts(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation01: %v", err)
 	}
-	tctest.RequireTags(t, entries, "ENOUGH_NS_DEL")
-	entry := tctest.First(entries, "ENOUGH_NS_DEL")
+	entry := tctest.RequireTag(t, entries, "ENOUGH_NS_DEL")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected typed server list for ENOUGH_NS_DEL, got %#v", entry.Args["servers"])
@@ -72,8 +71,7 @@ func TestDelegation01Counts(t *testing.T) {
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
-	tctest.RequireTags(t, entries, "NOT_ENOUGH_NS_CHILD")
-	entry = tctest.First(entries, "NOT_ENOUGH_NS_CHILD")
+	entry = tctest.RequireTag(t, entries, "NOT_ENOUGH_NS_CHILD")
 	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for NOT_ENOUGH_NS_CHILD, got %#v", entry.Args["servers"])
@@ -111,8 +109,7 @@ func TestDelegation01Counts(t *testing.T) {
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
-	tctest.RequireTags(t, entries, "NOT_ENOUGH_IPV4_NS_CHILD")
-	entry = tctest.First(entries, "NOT_ENOUGH_IPV4_NS_CHILD")
+	entry = tctest.RequireTag(t, entries, "NOT_ENOUGH_IPV4_NS_CHILD")
 	servers, ok = entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 {
 		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["servers"])
@@ -370,8 +367,7 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation02: %v", err)
 	}
-	tctest.RequireTags(t, entries, "DEL_NS_SAME_IP")
-	entry := tctest.First(entries, "DEL_NS_SAME_IP")
+	entry := tctest.RequireTag(t, entries, "DEL_NS_SAME_IP")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected typed server list for DEL_NS_SAME_IP, got %#v", entry.Args["servers"])
@@ -567,8 +563,7 @@ func TestDelegation04Authoritative(t *testing.T) {
 	if err != nil {
 		t.Fatalf("delegation04: %v", err)
 	}
-	tctest.RequireTags(t, entries, "ARE_AUTHORITATIVE")
-	entry := tctest.First(entries, "ARE_AUTHORITATIVE")
+	entry := tctest.RequireTag(t, entries, "ARE_AUTHORITATIVE")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for ARE_AUTHORITATIVE, got %#v", entry.Args["servers"])
@@ -871,17 +866,9 @@ func TestDelegation05ParallelQueries(t *testing.T) {
 
 	var order []string
 	var addresses []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "NO_RESPONSE" {
-			continue
-		}
-		if _, ok := entry.Args["arg_schema"]; ok {
-			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-		}
+	for _, entry := range tctest.All(entries, "NO_RESPONSE") {
+		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
 		if ns, ok := entry.Args["ns"].(string); ok {
-			if strings.Contains(ns, "/") {
-				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
-			}
 			order = append(order, ns)
 		}
 		if address, ok := entry.Args["address"].(string); ok {

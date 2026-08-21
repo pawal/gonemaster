@@ -626,17 +626,9 @@ func TestNameserver05ParallelQueries(t *testing.T) {
 
 	var order []string
 	var addresses []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "NO_RESPONSE" {
-			continue
-		}
-		if _, ok := entry.Args["arg_schema"]; ok {
-			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-		}
+	for _, entry := range tctest.All(entries, "NO_RESPONSE") {
+		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
 		if ns, ok := entry.Args["ns"].(string); ok {
-			if strings.Contains(ns, "/") {
-				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
-			}
 			order = append(order, ns)
 		}
 		if address, ok := entry.Args["address"].(string); ok {

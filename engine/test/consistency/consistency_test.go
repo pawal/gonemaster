@@ -378,8 +378,7 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency04: %v", err)
 	}
-	tctest.RequireTags(t, entries, "ONE_NS_SET")
-	entry := tctest.First(entries, "ONE_NS_SET")
+	entry := tctest.RequireTag(t, entries, "ONE_NS_SET")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected typed server list for ONE_NS_SET, got %#v", entry.Args["servers"])
@@ -661,8 +660,7 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	tctest.RequireTags(t, entries, "CHILD_NS_FAILED")
-	entry := tctest.First(entries, "CHILD_NS_FAILED")
+	entry := tctest.RequireTag(t, entries, "CHILD_NS_FAILED")
 	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "auth.example", Address: "192.0.2.53"})
 	tctest.RequireTags(t, entries, "CHILD_ZONE_LAME")
 }

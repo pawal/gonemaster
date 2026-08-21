@@ -406,17 +406,9 @@ func TestBasic02ParallelQueries(t *testing.T) {
 
 	var enabled []string
 	var enabledAddresses []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "IPV4_ENABLED" {
-			continue
-		}
-		if _, ok := entry.Args["arg_schema"]; ok {
-			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-		}
+	for _, entry := range tctest.All(entries, "IPV4_ENABLED") {
+		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
 		if ns, ok := entry.Args["ns"].(string); ok {
-			if strings.Contains(ns, "/") {
-				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
-			}
 			enabled = append(enabled, ns)
 		}
 		if address, ok := entry.Args["address"].(string); ok {
@@ -835,17 +827,9 @@ func TestBasic03ParallelQueries(t *testing.T) {
 
 	var enabled []string
 	var enabledAddresses []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "IPV4_ENABLED" {
-			continue
-		}
-		if _, ok := entry.Args["arg_schema"]; ok {
-			t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-		}
+	for _, entry := range tctest.All(entries, "IPV4_ENABLED") {
+		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
 		if ns, ok := entry.Args["ns"].(string); ok {
-			if strings.Contains(ns, "/") {
-				t.Fatalf("expected nameserver-only ns argument, got %q", ns)
-			}
 			enabled = append(enabled, ns)
 		}
 		if address, ok := entry.Args["address"].(string); ok {

@@ -1327,100 +1327,82 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 }
 
 func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	handler := func(id string) tctest.Handler {
-		return func(q tctest.Query) packet.Packet {
-			if q.Type != "DNSKEY" {
-				return packet.Packet{}
+		handler := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if q.Type != "DNSKEY" {
+					return packet.Packet{}
+				}
+				gate.Arrive(id)
+				return dnskeyPacket(q.Name, key)
 			}
-			select {
-			case started <- id:
-			default:
-			}
-			<-release
-			return dnskeyPacket(q.Name, key)
 		}
-	}
 
-	tctest.NS(t, ctx, "ns1.example", "192.0.2.220", handler("ns1"))
-	tctest.NS(t, ctx, "ns2.example", "192.0.2.221", handler("ns2"))
+		tctest.NS(t, ctx, "ns1.example", "192.0.2.220", handler("ns1"))
+		tctest.NS(t, ctx, "ns2.example", "192.0.2.221", handler("ns2"))
 
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return tctest.NSItems("ns1.example/192.0.2.220", "ns2.example/192.0.2.221"), nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{}, nil
-	})
+		tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+			return tctest.NSItems("ns1.example/192.0.2.220", "ns2.example/192.0.2.221"), nil
+		})
+		tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+			return []nsdiscovery.NSItem{}, nil
+		})
 
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC05(ctx, &z)
-		close(done)
-	}()
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel DNSKEY queries to start, got %v", got)
+		z, err := zone.New("example")
+		if err != nil {
+			t.Fatalf("zone new: %v", err)
 		}
-	}
 
-	close(release)
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC05(ctx, &z)
+			close(done)
+		}()
 
-	select {
-	case <-done:
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
+
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec05: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec05 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DS05_ALGO_OK")
+		tctest.RequireTags(t, entries, "DS05_ALGO_OK")
 
-	var gotServers []map[string]any
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "DS05_ALGO_OK" {
-			continue
+		var gotServers []map[string]any
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "DS05_ALGO_OK" {
+				continue
+			}
+			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+				gotServers = servers
+			}
+			if _, ok := entry.Args["ns_list"]; ok {
+				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+			}
+			break
 		}
-		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-			gotServers = servers
+		if len(gotServers) == 0 {
+			t.Fatalf("expected typed servers for DS05_ALGO_OK")
 		}
-		if _, ok := entry.Args["ns_list"]; ok {
-			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		if len(gotServers) != 2 {
+			t.Fatalf("expected two typed servers for DS05_ALGO_OK, got %#v", gotServers)
 		}
-		break
-	}
-	if len(gotServers) == 0 {
-		t.Fatalf("expected typed servers for DS05_ALGO_OK")
-	}
-	if len(gotServers) != 2 {
-		t.Fatalf("expected two typed servers for DS05_ALGO_OK, got %#v", gotServers)
-	}
-	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
-		t.Fatalf("expected deterministic server order, got %#v", gotServers)
-	}
+		if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+			t.Fatalf("expected deterministic server order, got %#v", gotServers)
+		}
+	})
 }
 
 func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {

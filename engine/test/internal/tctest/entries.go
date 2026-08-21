@@ -9,6 +9,7 @@ import (
 // TB is the subset of testing.TB the assertion helpers use.
 type TB interface {
 	Helper()
+	Cleanup(func())
 	Fatalf(format string, args ...any)
 }
 

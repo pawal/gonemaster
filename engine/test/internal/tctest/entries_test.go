@@ -16,10 +16,24 @@ var errFatal = fmt.Errorf("fatal")
 // fakeTB records the first Fatalf message instead of failing the test, so the
 // helpers' failure paths can be asserted on.
 type fakeTB struct {
-	msg string
+	msg      string
+	cleanups []func()
 }
 
 func (f *fakeTB) Helper() {}
+
+// Cleanup collects the functions a helper registers so tests can run them.
+func (f *fakeTB) Cleanup(fn func()) {
+	f.cleanups = append(f.cleanups, fn)
+}
+
+// runCleanups runs the collected cleanups in reverse registration order.
+func (f *fakeTB) runCleanups() {
+	for i := len(f.cleanups) - 1; i >= 0; i-- {
+		f.cleanups[i]()
+	}
+	f.cleanups = nil
+}
 
 func (f *fakeTB) Fatalf(format string, args ...any) {
 	f.msg = fmt.Sprintf(format, args...)

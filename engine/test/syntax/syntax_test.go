@@ -17,6 +17,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -28,9 +29,7 @@ func TestSyntax01AllowedChars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax01: %v", err)
 	}
-	if !hasEntryTag(entries, "ONLY_ALLOWED_CHARS") {
-		t.Fatalf("expected ONLY_ALLOWED_CHARS")
-	}
+	tctest.RequireTags(t, entries, "ONLY_ALLOWED_CHARS")
 }
 
 func TestSyntax01NonAllowedChars(t *testing.T) {
@@ -41,9 +40,7 @@ func TestSyntax01NonAllowedChars(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax01: %v", err)
 	}
-	if !hasEntryTag(entries, "NON_ALLOWED_CHARS") {
-		t.Fatalf("expected NON_ALLOWED_CHARS")
-	}
+	tctest.RequireTags(t, entries, "NON_ALLOWED_CHARS")
 }
 
 func TestSyntax02HyphenTags(t *testing.T) {
@@ -54,12 +51,7 @@ func TestSyntax02HyphenTags(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax02: %v", err)
 	}
-	if !hasEntryTag(entries, "INITIAL_HYPHEN") {
-		t.Fatalf("expected INITIAL_HYPHEN")
-	}
-	if !hasEntryTag(entries, "TERMINAL_HYPHEN") {
-		t.Fatalf("expected TERMINAL_HYPHEN")
-	}
+	tctest.RequireTags(t, entries, "INITIAL_HYPHEN", "TERMINAL_HYPHEN")
 }
 
 func TestSyntax02NoEndingHyphens(t *testing.T) {
@@ -70,9 +62,7 @@ func TestSyntax02NoEndingHyphens(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax02: %v", err)
 	}
-	if !hasEntryTag(entries, "NO_ENDING_HYPHENS") {
-		t.Fatalf("expected NO_ENDING_HYPHENS")
-	}
+	tctest.RequireTags(t, entries, "NO_ENDING_HYPHENS")
 }
 
 func TestSyntax03DoubleDash(t *testing.T) {
@@ -83,9 +73,7 @@ func TestSyntax03DoubleDash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax03: %v", err)
 	}
-	if !hasEntryTag(entries, "DISCOURAGED_DOUBLE_DASH") {
-		t.Fatalf("expected DISCOURAGED_DOUBLE_DASH")
-	}
+	tctest.RequireTags(t, entries, "DISCOURAGED_DOUBLE_DASH")
 }
 
 func TestSyntax03NoDoubleDash(t *testing.T) {
@@ -96,9 +84,7 @@ func TestSyntax03NoDoubleDash(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax03: %v", err)
 	}
-	if !hasEntryTag(entries, "NO_DOUBLE_DASH") {
-		t.Fatalf("expected NO_DOUBLE_DASH")
-	}
+	tctest.RequireTags(t, entries, "NO_DOUBLE_DASH")
 }
 
 func TestSyntax04NameserverSyntaxOK(t *testing.T) {
@@ -114,9 +100,7 @@ func TestSyntax04NameserverSyntaxOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax04: %v", err)
 	}
-	if !hasEntryTag(entries, "NAMESERVER_SYNTAX_OK") {
-		t.Fatalf("expected NAMESERVER_SYNTAX_OK")
-	}
+	tctest.RequireTags(t, entries, "NAMESERVER_SYNTAX_OK")
 }
 
 func TestSyntax05MisusedAtSign(t *testing.T) {
@@ -132,9 +116,7 @@ func TestSyntax05MisusedAtSign(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax05: %v", err)
 	}
-	if !hasEntryTag(entries, "RNAME_MISUSED_AT_SIGN") {
-		t.Fatalf("expected RNAME_MISUSED_AT_SIGN")
-	}
+	tctest.RequireTags(t, entries, "RNAME_MISUSED_AT_SIGN")
 }
 
 func TestSyntax05NoResponseSOAQuery(t *testing.T) {
@@ -147,9 +129,7 @@ func TestSyntax05NoResponseSOAQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax05: %v", err)
 	}
-	if !hasEntryTag(entries, "NO_RESPONSE_SOA_QUERY") {
-		t.Fatalf("expected NO_RESPONSE_SOA_QUERY")
-	}
+	tctest.RequireTags(t, entries, "NO_RESPONSE_SOA_QUERY")
 }
 
 func TestSyntax06ParallelMailServers(t *testing.T) {
@@ -249,9 +229,7 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 		t.Fatalf("syntax06 did not finish")
 	}
 
-	if !hasEntryTag(entries, "RNAME_RFC822_VALID") {
-		t.Fatalf("expected RNAME_RFC822_VALID")
-	}
+	tctest.RequireTags(t, entries, "RNAME_RFC822_VALID")
 }
 
 func TestSyntax06MailDomainInvalidUsesProfileLevel(t *testing.T) {
@@ -276,10 +254,7 @@ func TestSyntax06MailDomainInvalidUsesProfileLevel(t *testing.T) {
 		t.Fatalf("syntax06: %v", err)
 	}
 
-	entry := firstEntryByTag(entries, "RNAME_MAIL_DOMAIN_INVALID")
-	if entry == nil {
-		t.Fatalf("expected RNAME_MAIL_DOMAIN_INVALID")
-	}
+	entry := tctest.RequireTag(t, entries, "RNAME_MAIL_DOMAIN_INVALID")
 
 	wantLevel := "NOTICE"
 	if moduleLevels := prof.TestLevels["SYNTAX"]; moduleLevels != nil {
@@ -308,12 +283,8 @@ func TestSyntax06RnameSingleLabelDomainInvalid(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax06: %v", err)
 	}
-	if !hasEntryTag(entries, "RNAME_RFC822_INVALID") {
-		t.Fatalf("expected RNAME_RFC822_INVALID")
-	}
-	if hasEntryTag(entries, "RNAME_RFC822_VALID") {
-		t.Fatalf("did not expect RNAME_RFC822_VALID")
-	}
+	tctest.RequireTags(t, entries, "RNAME_RFC822_INVALID")
+	tctest.RequireNoTag(t, entries, "RNAME_RFC822_VALID")
 }
 
 func TestSyntax06NoResponseArgsSplit(t *testing.T) {
@@ -329,22 +300,8 @@ func TestSyntax06NoResponseArgsSplit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax06: %v", err)
 	}
-	entry := firstEntryByTag(entries, "NO_RESPONSE")
-	if entry == nil {
-		t.Fatalf("expected NO_RESPONSE")
-	}
-	if _, ok := entry.Args["arg_schema"]; ok {
-		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-	}
-	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "a.root" {
-		t.Fatalf("expected ns=a.root, got %#v", entry.Args["ns"])
-	}
-	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.1" {
-		t.Fatalf("expected address=192.0.2.1, got %#v", entry.Args["address"])
-	}
-	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
-		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
-	}
+	entry := tctest.RequireTag(t, entries, "NO_RESPONSE")
+	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "a.root", Address: "192.0.2.1"})
 }
 
 func TestSyntax06IPv4DisabledArgsSplit(t *testing.T) {
@@ -362,27 +319,13 @@ func TestSyntax06IPv4DisabledArgsSplit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax06: %v", err)
 	}
-	entry := firstEntryByTag(entries, "IPV4_DISABLED")
-	if entry == nil {
-		t.Fatalf("expected IPV4_DISABLED")
-	}
-	if _, ok := entry.Args["arg_schema"]; ok {
-		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-	}
-	if nsArg, ok := entry.Args["ns"].(string); !ok || nsArg != "a.root" {
-		t.Fatalf("expected ns=a.root, got %#v", entry.Args["ns"])
-	}
-	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.1" {
-		t.Fatalf("expected address=192.0.2.1, got %#v", entry.Args["address"])
-	}
+	entry := tctest.RequireTag(t, entries, "IPV4_DISABLED")
+	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "a.root", Address: "192.0.2.1"})
 	if _, ok := entry.Args["rrtype"]; ok {
 		t.Fatalf("did not expect legacy rrtype in args: %#v", entry.Args["rrtype"])
 	}
 	if qtype, ok := entry.Args["query_type"].(string); !ok || qtype != "SOA" {
 		t.Fatalf("expected query_type=SOA, got %#v", entry.Args["query_type"])
-	}
-	if nsArg, _ := entry.Args["ns"].(string); strings.Contains(nsArg, "/") {
-		t.Fatalf("expected nameserver-only ns argument, got %q", nsArg)
 	}
 }
 
@@ -399,9 +342,7 @@ func TestSyntax07MNameSyntaxOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax07: %v", err)
 	}
-	if !hasEntryTag(entries, "MNAME_SYNTAX_OK") {
-		t.Fatalf("expected MNAME_SYNTAX_OK")
-	}
+	tctest.RequireTags(t, entries, "MNAME_SYNTAX_OK")
 }
 
 func TestSyntax08MxSyntaxOK(t *testing.T) {
@@ -417,9 +358,7 @@ func TestSyntax08MxSyntaxOK(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax08: %v", err)
 	}
-	if !hasEntryTag(entries, "MX_SYNTAX_OK") {
-		t.Fatalf("expected MX_SYNTAX_OK")
-	}
+	tctest.RequireTags(t, entries, "MX_SYNTAX_OK")
 }
 
 func TestSyntax08NoResponseMXQuery(t *testing.T) {
@@ -432,9 +371,7 @@ func TestSyntax08NoResponseMXQuery(t *testing.T) {
 	if err != nil {
 		t.Fatalf("syntax08: %v", err)
 	}
-	if !hasEntryTag(entries, "NO_RESPONSE_MX_QUERY") {
-		t.Fatalf("expected NO_RESPONSE_MX_QUERY")
-	}
+	tctest.RequireTags(t, entries, "NO_RESPONSE_MX_QUERY")
 }
 
 func TestCheckNameSyntaxNumericTLD(t *testing.T) {
@@ -442,9 +379,7 @@ func TestCheckNameSyntaxNumericTLD(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check name syntax: %v", err)
 	}
-	if !hasEntryTag(entries, "NAMESERVER_NUMERIC_TLD") {
-		t.Fatalf("expected NAMESERVER_NUMERIC_TLD")
-	}
+	tctest.RequireTags(t, entries, "NAMESERVER_NUMERIC_TLD")
 }
 
 func TestRnameToEmailEscapedDots(t *testing.T) {
@@ -559,29 +494,4 @@ func aPacket(owner string, addr net.IP) packet.Packet {
 	}
 	msg.Answer = []dns.RR{aRR}
 	return packet.Packet{Msg: msg}
-}
-
-// hasEntryTag reports whether a tag is present in the entries.
-func hasEntryTag(entries []*logger.Entry, tag string) bool {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return true
-		}
-	}
-	return false
-}
-
-func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return entry
-		}
-	}
-	return nil
 }

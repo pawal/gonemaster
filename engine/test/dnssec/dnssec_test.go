@@ -546,11 +546,7 @@ func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
 		if q.Type != "DNSKEY" {
 			return packet.Packet{}
 		}
-		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-		key.Flags = dns.FlagZONE
-		key.Protocol = 3
-		key.Algorithm = 8
-		key.PublicKey = "AwEAAc=="
+		key := tctest.DNSKEYRR(q.Name, 8, tctest.PublicKey("AwEAAc=="))
 		return dnskeyPacket(q.Name, key)
 	})
 
@@ -575,11 +571,7 @@ func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {
 func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagSEP
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.Flags(dns.FlagSEP), tctest.PublicKey("AwEAAc=="))
 	ds := key.ToDS(2)
 	if ds == nil {
 		t.Fatal("expected DS from DNSKEY")
@@ -623,30 +615,8 @@ func TestDNSSEC02DNSKEYNotForZoneSigning(t *testing.T) {
 func signedDNSKEYPair(t *testing.T, owner string) (*dns.DNSKEY, *dns.RRSIG) {
 	t.Helper()
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}
-	key.Flags = dns.FlagZONE | dns.FlagSEP
-	key.Protocol = 3
-	key.Algorithm = dns.ECDSAP256SHA256
-	priv, err := key.Generate(256)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-
-	now := time.Now().UTC()
-	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}
-	sig.Algorithm = key.Algorithm
-	sig.Inception = uint32(now.Add(-time.Hour).Unix())
-	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
-	sig.KeyTag = key.KeyTag()
-	sig.SignerName = dnsutil.Fqdn(owner)
-	signer, ok := priv.(crypto.Signer)
-	if !ok {
-		t.Fatalf("private key does not implement crypto.Signer")
-	}
-	if err := sig.Sign(signer, []dns.RR{key}, &dns.SignOption{}); err != nil {
-		t.Fatalf("sign DNSKEY rrset: %v", err)
-	}
-	return key, sig
+	key, signer := tctest.SignedKey(t, owner, dns.ECDSAP256SHA256, tctest.SEP(), tctest.KeyTTL(3600))
+	return key, tctest.Sign(t, key, signer, dns.TypeDNSKEY, []dns.RR{key})
 }
 
 func dnssec02Wire(t *testing.T, parentNS nameserver.Nameserver, childNS nameserver.Nameserver) func() {
@@ -862,11 +832,7 @@ func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE | dns.FlagSEP
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.SEP(), tctest.PublicKey("AwEAAc=="))
 	ds := key.ToDS(2)
 	if ds == nil {
 		t.Fatal("expected DS from DNSKEY")
@@ -985,11 +951,7 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.4", func(q tctest.Query) packet.Packet {
 		switch q.Type {
 		case "DNSKEY":
-			key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-			key.Flags = dns.FlagZONE
-			key.Protocol = 3
-			key.Algorithm = 8
-			key.PublicKey = "AwEAAc=="
+			key := tctest.DNSKEYRR(q.Name, 8, tctest.PublicKey("AwEAAc=="))
 			return dnskeyPacket(q.Name, key)
 		case "NSEC":
 			return nsecPacket(q.Name)
@@ -1026,11 +988,7 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.13", func(q tctest.Query) packet.Packet {
 		switch q.Type {
 		case "DNSKEY":
-			key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-			key.Flags = dns.FlagZONE
-			key.Protocol = 3
-			key.Algorithm = 8
-			key.PublicKey = "AwEAAc=="
+			key := tctest.DNSKEYRR(q.Name, 8, tctest.PublicKey("AwEAAc=="))
 			return dnskeyPacket(q.Name, key)
 		case "NSEC":
 			nsec3 := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
@@ -1077,11 +1035,7 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -1188,11 +1142,7 @@ func TestDNSSEC04ExpiredRRSIG(t *testing.T) {
 	ctx := tctest.Context(t)
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
 	soa.Ns = "ns1.example."
 	soa.Mbox = "hostmaster.example."
@@ -1244,11 +1194,7 @@ func TestDNSSEC04DurationOK(t *testing.T) {
 	ctx := tctest.Context(t)
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
 	soa.Ns = "ns1.example."
 	soa.Mbox = "hostmaster.example."
@@ -1289,11 +1235,7 @@ func TestDNSSEC04ParallelQueries(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	soa := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
 	soa.Ns = "ns1.example."
 	soa.Mbox = "hostmaster.example."
@@ -1385,22 +1327,12 @@ func TestDNSSEC05AlgoOK(t *testing.T) {
 		if q.Type != "DNSKEY" {
 			return packet.Packet{}
 		}
-		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-		key.Flags = dns.FlagZONE
-		key.Protocol = 3
-		key.Algorithm = 8
-		key.PublicKey = "AwEAAc=="
+		key := tctest.DNSKEYRR(q.Name, 8, tctest.PublicKey("AwEAAc=="))
 		return dnskeyPacket(q.Name, key)
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.20"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.20"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -1424,22 +1356,12 @@ func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
 		if q.Type != "DNSKEY" {
 			return packet.Packet{}
 		}
-		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-		key.Flags = dns.FlagZONE
-		key.Protocol = 3
-		key.Algorithm = 17 // SM2SM3 (RFC 9563)
-		key.PublicKey = "AwEAAc=="
+		key := tctest.DNSKEYRR(q.Name, 17, tctest.PublicKey("AwEAAc==")) // SM2SM3 (RFC 9563)
 		return dnskeyPacket(q.Name, key)
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.33"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.33"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -1463,22 +1385,12 @@ func TestDNSSEC05AlgoMLDSA44(t *testing.T) {
 		if q.Type != "DNSKEY" {
 			return packet.Packet{}
 		}
-		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-		key.Flags = dns.FlagZONE
-		key.Protocol = 3
-		key.Algorithm = 18 // ML-DSA-44, IANA-assigned post-quantum signing algorithm
-		key.PublicKey = "AwEAAc=="
+		key := tctest.DNSKEYRR(q.Name, 18, tctest.PublicKey("AwEAAc==")) // ML-DSA-44, IANA-assigned post-quantum signing algorithm
 		return dnskeyPacket(q.Name, key)
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.33"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.33"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -1514,22 +1426,12 @@ func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
 		if q.Type != "DNSKEY" {
 			return packet.Packet{}
 		}
-		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-		key.Flags = dns.FlagZONE
-		key.Protocol = 3
-		key.Algorithm = 23 // ECC-GOST12 (RFC 9558)
-		key.PublicKey = "AwEAAc=="
+		key := tctest.DNSKEYRR(q.Name, 23, tctest.PublicKey("AwEAAc==")) // ECC-GOST12 (RFC 9558)
 		return dnskeyPacket(q.Name, key)
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.34"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.34"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -1551,11 +1453,7 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -1578,18 +1476,7 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 	tctest.NS(t, ctx, "ns2.example", "192.0.2.221", handler("ns2"))
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.220"),
-				HasAddress: true,
-			},
-			{
-				Name:       dnsname.New("ns2.example"),
-				Address:    netip.MustParseAddr("192.0.2.221"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.220", "ns2.example/192.0.2.221"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -1669,13 +1556,7 @@ func TestDNSSEC05ZoneNoDNSSEC(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns2.example"),
-				Address:    netip.MustParseAddr("192.0.2.21"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns2.example/192.0.2.21"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -1703,13 +1584,7 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns3.example"),
-				Address:    netip.MustParseAddr("192.0.2.22"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns3.example/192.0.2.22"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -1729,11 +1604,7 @@ func TestDNSSEC05NoResponse(t *testing.T) {
 func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 12345, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 	resp := answerPacket("example", dns.TypeDNSKEY, key, sig)
 	resp.AnswerFrom = "192.0.2.30"
@@ -1762,11 +1633,7 @@ func TestDNSSEC06ExtraProcessingOK(t *testing.T) {
 func TestDNSSEC06ExtraProcessingBroken(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	resp := answerPacket("example", dns.TypeDNSKEY, key)
 	resp.AnswerFrom = "192.0.2.31"
 
@@ -1798,11 +1665,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 		return nil, nil
 	})
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	tctest.NS(t, ctx, "ns1.example", "192.0.2.40", func(q tctest.Query) packet.Packet {
@@ -1816,11 +1679,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 		}
 	})
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = 11111
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", 11111, 8, 2, "DEADBEEF")
 	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	tctest.NS(t, ctx, "ns-parent.example", "192.0.2.41", func(q tctest.Query) packet.Packet {
@@ -1831,13 +1690,7 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.40"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.40"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -1893,11 +1746,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 		return nil, nil
 	})
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -1937,18 +1786,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 	ns2.SetQueryHook(hook("ns2"))
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.60"),
-				HasAddress: true,
-			},
-			{
-				Name:       dnsname.New("ns2.example"),
-				Address:    netip.MustParseAddr("192.0.2.61"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.60", "ns2.example/192.0.2.61"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -2026,11 +1864,7 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 		return nil, nil
 	})
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	tctest.NS(t, ctx, "ns-child.example", "192.0.2.62", func(q tctest.Query) packet.Packet {
@@ -2045,23 +1879,13 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns-child.example"),
-				Address:    netip.MustParseAddr("192.0.2.62"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns-child.example/192.0.2.62"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
 	})
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = 11111
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", 11111, 8, 2, "DEADBEEF")
 	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	started := make(chan string, 2)
@@ -2170,11 +1994,7 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 		return nil, nil
 	})
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	tctest.NS(t, ctx, "ns2.example", "192.0.2.42", func(q tctest.Query) packet.Packet {
 		switch q.Type {
@@ -2188,13 +2008,7 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns2.example"),
-				Address:    netip.MustParseAddr("192.0.2.42"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns2.example/192.0.2.42"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -2235,11 +2049,7 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 		return nil, nil
 	})
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	tctest.NS(t, ctx, "ns-noresp.example", "192.0.2.170", func(q tctest.Query) packet.Packet {
 		switch q.Type {
@@ -2270,37 +2080,15 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 		case "SOA":
 			return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
 		case "DNSKEY":
-			msg := new(dns.Msg)
-			dnsutil.SetQuestion(msg, dnsutil.Fqdn(q.Name), dns.TypeDNSKEY)
-			msg.Response = true
-			msg.Authoritative = true
-			msg.Rcode = dns.RcodeServerFailure
-			msg.UDPSize = 1232
-			msg.Security = true
-			return packet.Packet{Msg: msg}
+			return tctest.Response(tctest.Question(q.Name, dns.TypeDNSKEY),
+				tctest.Rcode(dns.RcodeServerFailure), tctest.Secure())
 		default:
 			return packet.Packet{}
 		}
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns-noresp.example"),
-				Address:    netip.MustParseAddr("192.0.2.170"),
-				HasAddress: true,
-			},
-			{
-				Name:       dnsname.New("ns-noauth.example"),
-				Address:    netip.MustParseAddr("192.0.2.171"),
-				HasAddress: true,
-			},
-			{
-				Name:       dnsname.New("ns-rcode.example"),
-				Address:    netip.MustParseAddr("192.0.2.172"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns-noresp.example/192.0.2.170", "ns-noauth.example/192.0.2.171", "ns-rcode.example/192.0.2.172"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -2352,11 +2140,7 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 		return nil, nil
 	})
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	tctest.NS(t, ctx, "ns1.example", "192.0.2.180", func(q tctest.Query) packet.Packet {
@@ -2370,11 +2154,7 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 		}
 	})
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = 11111
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", 11111, 8, 2, "DEADBEEF")
 
 	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
@@ -2393,13 +2173,7 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.180"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.180"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -2439,11 +2213,7 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 		return nil, nil
 	})
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 	tctest.NS(t, ctx, "ns1.example", "192.0.2.180", func(q tctest.Query) packet.Packet {
@@ -2457,11 +2227,7 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 		}
 	})
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = 11111
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", 11111, 8, 2, "DEADBEEF")
 
 	tctest.NS(t, ctx, "ns-parent-a.example", "192.0.2.181", func(q tctest.Query) packet.Packet {
 		if q.Type == "DS" {
@@ -2477,13 +2243,7 @@ func TestDNSSEC07NoDSOnAllParentServersSuppressesPerServerTag(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.180"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.180"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -2515,18 +2275,7 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 		return nil, nil
 	})
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.160"),
-				HasAddress: true,
-			},
-			{
-				Name:       dnsname.New("ns2.example"),
-				Address:    netip.MustParseAddr("192.0.2.161"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.160", "ns2.example/192.0.2.161"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -2542,11 +2291,7 @@ func TestDNSSECAllParallelOutputStable(t *testing.T) {
 		}
 
 		ctx := tctest.Context(t)
-		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-		key.Flags = dns.FlagZONE
-		key.Protocol = 3
-		key.Algorithm = 8
-		key.PublicKey = "AwEAAc=="
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 		handler := func(q tctest.Query) packet.Packet {
 			switch q.Type {
 			case "SOA":
@@ -2605,9 +2350,7 @@ func stubAllDNSSECDiscovery(t *testing.T, parentNS, childNS nameserver.Nameserve
 	t.Helper()
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.160"), HasAddress: true},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.160"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -2655,11 +2398,7 @@ func TestDNSSECAllUnsignedStaleParentDS(t *testing.T) {
 
 	ctx := tctest.Context(t)
 
-	staleDS := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	staleDS.KeyTag = 54321
-	staleDS.Algorithm = 8
-	staleDS.DigestType = 2
-	staleDS.Digest = "DEADBEEF"
+	staleDS := tctest.DSRR("example", 54321, 8, 2, "DEADBEEF")
 
 	parentNS := tctest.NS(t, ctx, "ns.parent", "192.0.2.200", func(q tctest.Query) packet.Packet {
 		if q.Type == "DS" {
@@ -2737,11 +2476,7 @@ func TestDNSSECAllUnsignedNoParentDS(t *testing.T) {
 func TestDNSSEC08MissingRRSIG(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.50", func(q tctest.Query) packet.Packet {
 		if q.Type != "DNSKEY" {
@@ -2769,11 +2504,7 @@ func TestDNSSEC08RRSIGNotYetValid(t *testing.T) {
 	ctx := tctest.Context(t)
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	sig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(time.Hour).Unix(), now.Add(2*time.Hour).Unix())
 
 	ns := tctest.NS(t, ctx, "ns2.example", "192.0.2.51", func(q tctest.Query) packet.Packet {
@@ -2804,11 +2535,7 @@ func TestDNSSEC08RRSIGNotValidByDNSKEY(t *testing.T) {
 	ctx := tctest.Context(t)
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	sig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
 
 	ns := tctest.NS(t, ctx, "ns3.example", "192.0.2.52", func(q tctest.Query) packet.Packet {
@@ -2840,11 +2567,7 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -2946,11 +2669,7 @@ func TestDNSSEC08ParallelDNSKEYQueries(t *testing.T) {
 func TestDNSSEC09MissingRRSIG(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.60", func(q tctest.Query) packet.Packet {
 		switch q.Type {
@@ -2986,11 +2705,7 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 const lvKSK42018Pub = "BQEAAAAByLU9dUcHHcl1eLgjLidTJKlwxsU9a580xierZ+WyfRBI47L3LLXAZZ0ub6Sea3qKP2mhP5ZBG/reXvyh3OSlHa39WoMiUUZFcuouCajBg7XeLGVPL4U1Ja1UW9wq/Oc8WU1dq4e+2Q8Dt8tipFvbL0AD0BhJAsfQuT3wperedwQAUKId0/JQOFNTWhEJaYN2P5IIhyRKWQp8OhtKmdNYQ5jfqqpXVO4zyqV+4ZxWurXJS8c7bKrE3OAewWEGAtTjeElfQ2CFAKWVjMOLeZ86+mgw7p3UHhGB+KuRaKg6fAtTcQYBF78Xe40wuj9EgGL19mp9v6tDwFe+Epow4SFSPQ=="
 
 func lvLargeExponentKSK(owner string) *dns.DNSKEY {
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE | dns.FlagSEP
-	key.Protocol = 3
-	key.Algorithm = 8 // RSASHA256
-	key.PublicKey = lvKSK42018Pub
+	key := tctest.DNSKEYRR(owner, 8, tctest.SEP(), tctest.PublicKey(lvKSK42018Pub)) // RSASHA256
 	return key
 }
 
@@ -3061,10 +2776,7 @@ func TestDNSSEC02RRSIGNotValidByDNSKEYNormalExponent(t *testing.T) {
 	ctx := tctest.Context(t)
 
 	now := time.Unix(1700000000, 0).UTC()
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE | dns.FlagSEP
-	key.Protocol = 3
-	key.Algorithm = 8
+	key := tctest.DNSKEYRR("example", 8, tctest.SEP())
 	if _, err := key.Generate(1024); err != nil {
 		t.Fatalf("generate key: %v", err)
 	}
@@ -3196,11 +2908,7 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -3306,11 +3014,7 @@ func TestDNSSEC09ParallelQueries(t *testing.T) {
 func TestDNSSEC10MissingSignature(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	nsec := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
 	nsec.NextDomain = dnsutil.Fqdn("next.example")
 	nsec.TypeBitMap = []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeNSEC, dns.TypeRRSIG}
@@ -3320,37 +3024,16 @@ func TestDNSSEC10MissingSignature(t *testing.T) {
 		case "DNSKEY":
 			return dnskeyPacket(q.Name, key)
 		case "NSEC":
-			msg := new(dns.Msg)
-			dnsutil.SetQuestion(msg, dnsutil.Fqdn(q.Name), dns.TypeNSEC)
-			msg.Response = true
-			msg.Authoritative = true
-			msg.Rcode = dns.RcodeSuccess
-			msg.UDPSize = 1232
-			msg.Security = true
-			return packet.Packet{Msg: msg}
+			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC), tctest.Secure())
 		case "NSEC3PARAM":
-			msg := new(dns.Msg)
-			dnsutil.SetQuestion(msg, dnsutil.Fqdn(q.Name), dns.TypeNSEC3PARAM)
-			msg.Response = true
-			msg.Authoritative = true
-			msg.Rcode = dns.RcodeSuccess
-			msg.Ns = append(msg.Ns, nsec, soaRecord(q.Name))
-			msg.UDPSize = 1232
-			msg.Security = true
-			return packet.Packet{Msg: msg}
+			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC3PARAM), tctest.Secure(), tctest.Authority(nsec, soaRecord(q.Name)))
 		default:
 			return packet.Packet{}
 		}
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.70"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.70"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -3372,11 +3055,7 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -3412,18 +3091,7 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 	ns2.SetQueryHook(hook("ns2"))
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.201"),
-				HasAddress: true,
-			},
-			{
-				Name:       dnsname.New("ns2.example"),
-				Address:    netip.MustParseAddr("192.0.2.202"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.201", "ns2.example/192.0.2.202"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -3501,11 +3169,7 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 
 	apex := dnsutil.Fqdn("example")
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: apex, Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR(apex, 8, tctest.PublicKey("AwEAAc=="))
 
 	param1 := &dns.NSEC3PARAM{Hdr: dns.Header{Name: apex, Class: dns.ClassINET, TTL: 60}}
 	param1.Hash = 1
@@ -3524,37 +3188,16 @@ func TestDNSSEC10MultipleNSEC3PARAMAllApex(t *testing.T) {
 		case "DNSKEY":
 			return dnskeyPacket(q.Name, key)
 		case "NSEC":
-			msg := new(dns.Msg)
-			dnsutil.SetQuestion(msg, dnsutil.Fqdn(q.Name), dns.TypeNSEC)
-			msg.Response = true
-			msg.Authoritative = true
-			msg.Rcode = dns.RcodeSuccess
-			msg.UDPSize = 1232
-			msg.Security = true
-			return packet.Packet{Msg: msg}
+			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC), tctest.Secure())
 		case "NSEC3PARAM":
-			msg := new(dns.Msg)
-			dnsutil.SetQuestion(msg, dnsutil.Fqdn(q.Name), dns.TypeNSEC3PARAM)
-			msg.Response = true
-			msg.Authoritative = true
-			msg.Rcode = dns.RcodeSuccess
-			msg.Answer = append(msg.Answer, param1, param2)
-			msg.UDPSize = 1232
-			msg.Security = true
-			return packet.Packet{Msg: msg}
+			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC3PARAM), tctest.Secure(), tctest.Answers(param1, param2))
 		default:
 			return packet.Packet{}
 		}
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.80"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.80"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -3580,11 +3223,7 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 	apex := dnsutil.Fqdn("example")
 	offApex := dnsutil.Fqdn("sub.example")
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: apex, Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR(apex, 8, tctest.PublicKey("AwEAAc=="))
 
 	apexParam := &dns.NSEC3PARAM{Hdr: dns.Header{Name: apex, Class: dns.ClassINET, TTL: 60}}
 	apexParam.Hash = 1
@@ -3597,37 +3236,16 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 		case "DNSKEY":
 			return dnskeyPacket(q.Name, key)
 		case "NSEC":
-			msg := new(dns.Msg)
-			dnsutil.SetQuestion(msg, dnsutil.Fqdn(q.Name), dns.TypeNSEC)
-			msg.Response = true
-			msg.Authoritative = true
-			msg.Rcode = dns.RcodeSuccess
-			msg.UDPSize = 1232
-			msg.Security = true
-			return packet.Packet{Msg: msg}
+			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC), tctest.Secure())
 		case "NSEC3PARAM":
-			msg := new(dns.Msg)
-			dnsutil.SetQuestion(msg, dnsutil.Fqdn(q.Name), dns.TypeNSEC3PARAM)
-			msg.Response = true
-			msg.Authoritative = true
-			msg.Rcode = dns.RcodeSuccess
-			msg.Answer = append(msg.Answer, apexParam, offApexParam)
-			msg.UDPSize = 1232
-			msg.Security = true
-			return packet.Packet{Msg: msg}
+			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC3PARAM), tctest.Secure(), tctest.Answers(apexParam, offApexParam))
 		default:
 			return packet.Packet{}
 		}
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.81"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.81"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -3651,52 +3269,31 @@ func TestDNSSEC10MultipleNSEC3PARAMOneOffApex(t *testing.T) {
 // checks pass; no RRSIG is included (the test deliberately ignores signature
 // coverage).
 func nsecAuthorityNSECResponse(qname string, apex string) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
 	nsec := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
 	nsec.NextDomain = dnsutil.Fqdn("next." + apex)
 	nsec.TypeBitMap = []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeRRSIG}
-	msg.Ns = append(msg.Ns, soaRecord(apex), nsec)
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(qname, dns.TypeNSEC), tctest.Secure(),
+		tctest.Authority(soaRecord(apex), nsec))
 }
 
 // nsecInAnswerResponse builds a standard NSEC query response with the NSEC RR
 // in the answer section (the conventional, non-RFC-4470 shape).
 func nsecInAnswerResponse(qname string, apex string) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
 	nsec := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
 	nsec.NextDomain = dnsutil.Fqdn("next." + apex)
 	nsec.TypeBitMap = []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeNSEC, dns.TypeRRSIG}
-	msg.Answer = []dns.RR{nsec}
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(qname, dns.TypeNSEC), tctest.Secure(),
+		tctest.Answers(nsec))
 }
 
 // emptyNSEC3PARAMResponse builds a NODATA NSEC3PARAM response for an NSEC
 // zone: NSEC in authority confirms NSEC3PARAM does not exist at the apex.
 func emptyNSEC3PARAMResponse(qname string, apex string) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(qname), dns.TypeNSEC3PARAM)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
 	nsec := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
 	nsec.NextDomain = dnsutil.Fqdn("next." + apex)
 	nsec.TypeBitMap = []uint16{dns.TypeSOA, dns.TypeNS, dns.TypeDNSKEY, dns.TypeNSEC, dns.TypeRRSIG}
-	msg.Ns = append(msg.Ns, soaRecord(apex), nsec)
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(qname, dns.TypeNSEC3PARAM), tctest.Secure(),
+		tctest.Authority(soaRecord(apex), nsec))
 }
 
 // TestDNSSEC10NonstandardNSECResponseEmitted exercises the single-nameserver
@@ -3712,11 +3309,7 @@ func TestDNSSEC10NonstandardNSECResponseEmitted(t *testing.T) {
 	util.SetLogger(log)
 
 	apex := "example"
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR(apex, 8, tctest.PublicKey("AwEAAc=="))
 
 	tctest.NS(t, ctx, "ns1.example", "192.0.2.90", func(q tctest.Query) packet.Packet {
 		switch q.Type {
@@ -3732,13 +3325,7 @@ func TestDNSSEC10NonstandardNSECResponseEmitted(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.90"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.90"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -3782,11 +3369,7 @@ func TestDNSSEC10NonstandardNSECResponseNotEmittedForStandard(t *testing.T) {
 	util.SetLogger(log)
 
 	apex := "example"
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR(apex, 8, tctest.PublicKey("AwEAAc=="))
 
 	tctest.NS(t, ctx, "ns1.example", "192.0.2.91", func(q tctest.Query) packet.Packet {
 		switch q.Type {
@@ -3802,13 +3385,7 @@ func TestDNSSEC10NonstandardNSECResponseNotEmittedForStandard(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.91"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.91"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -3840,11 +3417,7 @@ func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
 	util.SetLogger(log)
 
 	apex := "example"
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(apex), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR(apex, 8, tctest.PublicKey("AwEAAc=="))
 
 	tctest.NS(t, ctx, "ns1.example", "192.0.2.92", func(q tctest.Query) packet.Packet {
 		switch q.Type {
@@ -3872,18 +3445,7 @@ func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
 	})
 
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{
-			{
-				Name:       dnsname.New("ns1.example"),
-				Address:    netip.MustParseAddr("192.0.2.92"),
-				HasAddress: true,
-			},
-			{
-				Name:       dnsname.New("ns2.example"),
-				Address:    netip.MustParseAddr("192.0.2.93"),
-				HasAddress: true,
-			},
-		}, nil
+		return tctest.NSItems("ns1.example/192.0.2.92", "ns2.example/192.0.2.93"), nil
 	})
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
@@ -3918,11 +3480,7 @@ func TestDNSSEC11ParallelParentQueries(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 2
 	tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool { return false })
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = 12345
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", 12345, 8, 2, "DEADBEEF")
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -4016,11 +3574,7 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 2
 	tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool { return false })
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
 	started := make(chan string, 2)
 	release := make(chan struct{})
@@ -4115,11 +3669,7 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 func TestDNSSEC11InconsistentDS(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = 12345
-	ds.Algorithm = 8
-	ds.DigestType = 1
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", 12345, 8, 1, "DEADBEEF")
 
 	nsWithDS := tctest.NS(t, ctx, "ns1.example", "192.0.2.80", func(q tctest.Query) packet.Packet {
 		if q.Type == "DS" {
@@ -4158,11 +3708,7 @@ func TestDNSSEC11InconsistentDS(t *testing.T) {
 func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = 54321
-	ds.Algorithm = 8
-	ds.DigestType = 1
-	ds.Digest = "FEEDBEEF"
+	ds := tctest.DSRR("example", 54321, 8, 1, "FEEDBEEF")
 
 	parentNS := tctest.NS(t, ctx, "ns1.example", "192.0.2.82", func(q tctest.Query) packet.Packet {
 		if q.Type == "DS" {
@@ -4205,11 +3751,7 @@ func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 func TestDNSSEC13AlgoNotSigned(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
 	nsRR.Ns = "ns1.example."
 
@@ -4258,11 +3800,7 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
 	now := time.Now().UTC()
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	keySig := rrsigRecord("example", dns.TypeDNSKEY, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
 
 	soaSig := rrsigRecord("example", dns.TypeSOA, key.KeyTag(), now.Add(-time.Hour).Unix(), now.Add(time.Hour).Unix())
@@ -4379,10 +3917,7 @@ func TestDNSSEC13ParallelQueries(t *testing.T) {
 func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
+	key := tctest.DNSKEYRR("example", 8)
 	if _, err := key.Generate(1024); err != nil {
 		t.Fatalf("generate key: %v", err)
 	}
@@ -4414,10 +3949,7 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
+	key := tctest.DNSKEYRR("example", 8)
 	if _, err := key.Generate(1024); err != nil {
 		t.Fatalf("generate key: %v", err)
 	}
@@ -5186,18 +4718,10 @@ func TestDNSSEC17ParallelQueries(t *testing.T) {
 func TestDNSSEC18NoMatchRRSIGDS(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	keytag := key.KeyTag()
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytag
-	ds.Algorithm = 8
-	ds.DigestType = 1
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", keytag, 8, 1, "DEADBEEF")
 
 	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
 	cds.KeyTag = keytag
@@ -5257,18 +4781,10 @@ func TestDNSSEC18ParallelQueries(t *testing.T) {
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = 8
-	key.PublicKey = "AwEAAc=="
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 	keytag := key.KeyTag()
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytag
-	ds.Algorithm = 8
-	ds.DigestType = 1
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", keytag, 8, 1, "DEADBEEF")
 
 	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
 	cds.KeyTag = keytag
@@ -5409,18 +4925,10 @@ func TestDNSSEC18ParallelOutputStable(t *testing.T) {
 
 		ctx := tctest.Context(t)
 
-		key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-		key.Flags = dns.FlagZONE
-		key.Protocol = 3
-		key.Algorithm = 8
-		key.PublicKey = "AwEAAc=="
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 		keytag := key.KeyTag()
 
-		ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-		ds.KeyTag = keytag
-		ds.Algorithm = 8
-		ds.DigestType = 1
-		ds.Digest = "DEADBEEF"
+		ds := tctest.DSRR("example", keytag, 8, 1, "DEADBEEF")
 
 		cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
 		cds.KeyTag = keytag
@@ -5521,11 +5029,7 @@ func setDNSSEC18Mocks(
 
 // makeSEPKey returns a DNSKEY with the zone and SEP flags set.
 func makeSEPKey(owner string, pubKey string) *dns.DNSKEY {
-	k := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	k.Flags = dns.FlagZONE | dns.FlagSEP
-	k.Protocol = 3
-	k.Algorithm = 8
-	k.PublicKey = pubKey
+	k := tctest.DNSKEYRR(owner, 8, tctest.SEP(), tctest.PublicKey(pubKey))
 	return k
 }
 
@@ -5536,11 +5040,7 @@ func TestDNSSEC18CDSMatchesDS(t *testing.T) {
 	keytag := key.KeyTag()
 
 	// DS and CDS have identical (KeyTag,Algorithm,DigestType,Digest) tuples.
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytag
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", keytag, 8, 2, "DEADBEEF")
 
 	cds := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
 	cds.KeyTag = keytag
@@ -5596,11 +5096,7 @@ func TestDNSSEC18CDSRolloverSignaled(t *testing.T) {
 	key := makeSEPKey("example", "AwEAAc==")
 	keytag := key.KeyTag()
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytag
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "AAAABBBB"
+	ds := tctest.DSRR("example", keytag, 8, 2, "AAAABBBB")
 
 	// CDS has a different keytag/digest than the parent DS → rollover signaled.
 	newKeytag := keytag + 1
@@ -5764,11 +5260,7 @@ func TestDNSSEC18RolloverEvidenceMultiKSK(t *testing.T) {
 	key2 := makeSEPKey("example", "AwEAAb0=")
 	keytag2 := key2.KeyTag()
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytag1
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "AABB"
+	ds := tctest.DSRR("example", keytag1, 8, 2, "AABB")
 
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
 
@@ -5821,11 +5313,7 @@ func TestDNSSEC18RolloverEvidenceDoubleSig(t *testing.T) {
 	key2 := makeSEPKey("example", "AwEAAb0=")
 	keytag2 := key2.KeyTag()
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytag1
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "AABB"
+	ds := tctest.DSRR("example", keytag1, 8, 2, "AABB")
 
 	// Two RRSIGs from two different KSKs.
 	dnskeyRRSIG1 := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
@@ -5873,11 +5361,7 @@ func TestDNSSEC18RolloverEvidenceDSWithoutDNSKEY(t *testing.T) {
 	keyNew := makeSEPKey("example", "AwEAAb0=")
 	keytagNew := keyNew.KeyTag()
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytagOld
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "AABB"
+	ds := tctest.DSRR("example", keytagOld, 8, 2, "AABB")
 
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytagNew, 1, 2)
 
@@ -5924,11 +5408,7 @@ func TestDNSSEC18RolloverEvidenceDNSKEYWithoutDS(t *testing.T) {
 	keyNew := makeSEPKey("example", "AwEAAb0=")
 	keytagNew := keyNew.KeyTag()
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytagOld
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "AABB"
+	ds := tctest.DSRR("example", keytagOld, 8, 2, "AABB")
 
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytagOld, 1, 2)
 
@@ -5974,11 +5454,7 @@ func TestDNSSEC18NoCDSCDNSKEYButRolloverEvidence(t *testing.T) {
 	keytag1 := key1.KeyTag()
 	key2 := makeSEPKey("example", "AwEAAb0=")
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytag1
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "AABB"
+	ds := tctest.DSRR("example", keytag1, 8, 2, "AABB")
 
 	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
 
@@ -6022,11 +5498,7 @@ func TestDNSSEC18CDSDeleteOnlySkipsContentComparison(t *testing.T) {
 	key := makeSEPKey("example", "AwEAAc==")
 	keytag := key.KeyTag()
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytag
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "DEADBEEF"
+	ds := tctest.DSRR("example", keytag, 8, 2, "DEADBEEF")
 
 	// DELETE sentinel: Algorithm == 0 per RFC 8078.
 	cdsDelete := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
@@ -6078,11 +5550,7 @@ func TestDNSSEC18CDSBothOldAndNewKeyMidRollover(t *testing.T) {
 	keyNew := makeSEPKey("example", "AwEAAb0=")
 	keytagNew := keyNew.KeyTag()
 
-	ds := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds.KeyTag = keytagOld
-	ds.Algorithm = 8
-	ds.DigestType = 2
-	ds.Digest = "AABB"
+	ds := tctest.DSRR("example", keytagOld, 8, 2, "AABB")
 
 	cdsOld := &dns.CDS{DS: dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}}
 	cdsOld.KeyTag = keytagOld
@@ -6150,17 +5618,9 @@ func TestDNSSEC18NoCDSCDNSKEYButOnlyDoubleSig(t *testing.T) {
 	key2 := makeSEPKey("example", "AwEAAb0=")
 	keytag2 := key2.KeyTag()
 
-	ds1 := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds1.KeyTag = keytag1
-	ds1.Algorithm = 8
-	ds1.DigestType = 2
-	ds1.Digest = "AABB"
+	ds1 := tctest.DSRR("example", keytag1, 8, 2, "AABB")
 
-	ds2 := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 60}}
-	ds2.KeyTag = keytag2
-	ds2.Algorithm = 8
-	ds2.DigestType = 2
-	ds2.Digest = "CCDD"
+	ds2 := tctest.DSRR("example", keytag2, 8, 2, "CCDD")
 
 	dnskeyRRSIG1 := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
 	dnskeyRRSIG2 := rrsigRecord("example", dns.TypeDNSKEY, keytag2, 1, 2)
@@ -6393,118 +5853,60 @@ func TestDNSSEC19TransportDisabled(t *testing.T) {
 }
 
 func dsPacket(owner string, keytag uint16, algo uint8, digestType uint8) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeDS)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	dsRR := &dns.DS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	dsRR.KeyTag = keytag
-	dsRR.Algorithm = algo
-	dsRR.DigestType = digestType
-	dsRR.Digest = "DEADBEEF"
-	msg.Answer = []dns.RR{dsRR}
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return dsPacketFromDS(owner, tctest.DSRR(owner, keytag, algo, digestType, "DEADBEEF"))
 }
 
 func dsPacketFromDS(owner string, ds *dns.DS) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeDS)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
+	opts := []tctest.MsgOpt{tctest.Question(owner, dns.TypeDS), tctest.Secure()}
 	if ds != nil {
-		msg.Answer = append(msg.Answer, ds)
+		opts = append(opts, tctest.Answers(ds))
 	}
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(opts...)
 }
 
 func dnskeyPacket(owner string, key *dns.DNSKEY) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeDNSKEY)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
+	opts := []tctest.MsgOpt{tctest.Question(owner, dns.TypeDNSKEY), tctest.Secure()}
 	if key != nil {
 		// Clone so each caller gets its own copy; DNSKEY.KeyTag() lazily
 		// writes a cached field, which races with Len() when callers share
 		// the same pointer across goroutines.
 		keyCopy := *key
-		msg.Answer = append(msg.Answer, &keyCopy)
+		opts = append(opts, tctest.Answers(&keyCopy))
 	}
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(opts...)
 }
 
+// nsecPacket is the one NSEC reply built without the DNSSEC response bits.
 func nsecPacket(owner string) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeNSEC)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(owner, dns.TypeNSEC))
 }
 
 func nsec3Packet(owner string, nsec3 *dns.NSEC3) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.TypeNSEC)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
+	opts := []tctest.MsgOpt{tctest.Question(owner, dns.TypeNSEC), tctest.Secure()}
 	if nsec3 != nil {
-		msg.Ns = append(msg.Ns, nsec3)
+		opts = append(opts, tctest.Authority(nsec3))
 	}
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(opts...)
 }
 
 func rrsigRecord(owner string, typeCovered uint16, keytag uint16, inception int64, expiration int64) *dns.RRSIG {
-	rr := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	rr.TypeCovered = typeCovered
-	rr.Algorithm = 8
-	rr.Inception = uint32(inception)
-	rr.Expiration = uint32(expiration)
-	rr.KeyTag = keytag
-	rr.SignerName = dnsutil.Fqdn(owner)
-	return rr
+	return tctest.RRSIGRR(owner, typeCovered, tctest.SigAlgo(dns.RSASHA256),
+		tctest.KeyTag(keytag), tctest.Inception(time.Unix(inception, 0)),
+		tctest.Expiration(time.Unix(expiration, 0)))
 }
 
 func answerPacket(owner string, qtype uint16, answers ...dns.RR) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), qtype)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = append(msg.Answer, answers...)
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(owner, qtype), tctest.Secure(),
+		tctest.Answers(answers...))
 }
 
 func soaRecord(owner string) *dns.SOA {
-	rr := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	rr.Ns = "ns1.example."
-	rr.Mbox = "hostmaster.example."
-	rr.Serial = 1
-	rr.Refresh = 60
-	rr.Retry = 60
-	rr.Expire = 60
-	rr.Minttl = 60
-	return rr
+	return tctest.SOARR(owner, tctest.MName("ns1.example"),
+		tctest.RName("hostmaster.example"), tctest.SOATimers(60, 60, 60, 60))
 }
 
 func dnssec19P256Key(owner string) *dns.DNSKEY {
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = dns.ECDSAP256SHA256
-	key.PublicKey = "GojIhhXUN/u4v54ZQqGSnyhWJwaubCvTmeexv7bR6edbkrSqQpF64cYbcB7wNcP+e+MAnLr+Wi9xMWyQLc8NAA=="
+	key := tctest.DNSKEYRR(owner, dns.ECDSAP256SHA256, tctest.PublicKey("GojIhhXUN/u4v54ZQqGSnyhWJwaubCvTmeexv7bR6edbkrSqQpF64cYbcB7wNcP+e+MAnLr+Wi9xMWyQLc8NAA=="))
 	return key
 }
 
@@ -6748,20 +6150,13 @@ func newDNSSEC21Fixture(t *testing.T) dnssec21Fixture {
 	parentName := "parent"
 	childName := "child.parent"
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(parentName), Class: dns.ClassINET, TTL: 3600}}
-	key.Flags = dns.FlagZONE | dns.FlagSEP
-	key.Protocol = 3
-	key.Algorithm = dns.RSASHA256
+	key := tctest.DNSKEYRR(parentName, dns.RSASHA256, tctest.SEP(), tctest.KeyTTL(3600))
 	priv, err := key.Generate(1024)
 	if err != nil {
 		t.Fatalf("generate parent key: %v", err)
 	}
 
-	childKey := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(childName), Class: dns.ClassINET, TTL: 3600}}
-	childKey.Flags = dns.FlagZONE | dns.FlagSEP
-	childKey.Protocol = 3
-	childKey.Algorithm = dns.RSASHA256
-	childKey.PublicKey = "AwEAAc=="
+	childKey := tctest.DNSKEYRR(childName, dns.RSASHA256, tctest.SEP(), tctest.KeyTTL(3600), tctest.PublicKey("AwEAAc=="))
 	ds := childKey.ToDS(dns.SHA256)
 	if ds == nil {
 		t.Fatalf("child DS is nil")
@@ -6778,81 +6173,31 @@ func newDNSSEC21Fixture(t *testing.T) dnssec21Fixture {
 
 func (f dnssec21Fixture) signedDSResponse(t *testing.T, sigKey *dns.DNSKEY, sigPriv crypto.PrivateKey) packet.Packet {
 	t.Helper()
-	ds := *f.childDS
-	dsRRset := []dns.RR{&ds}
-	now := time.Now().UTC()
-	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(f.childName), Class: dns.ClassINET, TTL: 3600}}
-	sig.Algorithm = sigKey.Algorithm
-	sig.Inception = uint32(now.Add(-time.Hour).Unix())
-	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
-	sig.KeyTag = sigKey.KeyTag()
-	sig.SignerName = dnsutil.Fqdn(f.parentName)
-	signer, ok := sigPriv.(crypto.Signer)
-	if !ok {
-		t.Fatalf("private key does not implement crypto.Signer")
-	}
-	if err := sig.Sign(signer, dsRRset, &dns.SignOption{}); err != nil {
-		t.Fatalf("sign DS RRset: %v", err)
-	}
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.childName), dns.TypeDS)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{&ds, sig}
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return f.signedDSResponseForcedKeytag(t, sigKey, sigPriv, 0)
 }
 
 func (f dnssec21Fixture) unsignedDSResponse() packet.Packet {
 	ds := *f.childDS
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.childName), dns.TypeDS)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{&ds}
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(f.childName, dns.TypeDS), tctest.Secure(),
+		tctest.Answers(&ds))
 }
 
 func (f dnssec21Fixture) parentDNSKEYResponse(keys ...*dns.DNSKEY) packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.parentName), dns.TypeDNSKEY)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
+	answers := make([]dns.RR, 0, len(keys))
 	for _, k := range keys {
 		copyKey := *k
-		msg.Answer = append(msg.Answer, &copyKey)
+		answers = append(answers, &copyKey)
 	}
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(f.parentName, dns.TypeDNSKEY), tctest.Secure(),
+		tctest.Answers(answers...))
 }
 
 func (f dnssec21Fixture) emptyDNSKEYResponse() packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.parentName), dns.TypeDNSKEY)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(f.parentName, dns.TypeDNSKEY), tctest.Secure())
 }
 
 func (f dnssec21Fixture) emptyDSResponse() packet.Packet {
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.childName), dns.TypeDS)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(f.childName, dns.TypeDS), tctest.Secure())
 }
 
 func (f dnssec21Fixture) installMocks(t *testing.T, parentNS nameserver.Nameserver) {
@@ -6906,10 +6251,7 @@ func TestDNSSEC21RRSIGNotVerifiable(t *testing.T) {
 
 	f := newDNSSEC21Fixture(t)
 	// Sign the DS RRset with a key that is NOT published at the parent.
-	otherKey := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(f.parentName), Class: dns.ClassINET, TTL: 3600}}
-	otherKey.Flags = dns.FlagZONE | dns.FlagSEP
-	otherKey.Protocol = 3
-	otherKey.Algorithm = dns.RSASHA256
+	otherKey := tctest.DNSKEYRR(f.parentName, dns.RSASHA256, tctest.SEP(), tctest.KeyTTL(3600))
 	otherPriv, err := otherKey.Generate(1024)
 	if err != nil {
 		t.Fatalf("generate impostor key: %v", err)
@@ -7055,32 +6397,19 @@ func TestDNSSEC21UnsignedDelegation(t *testing.T) {
 	}
 }
 
+// A non-zero forcedKeytag replaces the key tag after signing, which models a DS
+// RRSIG pointing at a parent key that did not sign it.
 func (f dnssec21Fixture) signedDSResponseForcedKeytag(t *testing.T, sigKey *dns.DNSKEY, sigPriv crypto.PrivateKey, forcedKeytag uint16) packet.Packet {
 	t.Helper()
-	ds := *f.childDS
-	dsRRset := []dns.RR{&ds}
-	now := time.Now().UTC()
-	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(f.childName), Class: dns.ClassINET, TTL: 3600}}
-	sig.Algorithm = sigKey.Algorithm
-	sig.Inception = uint32(now.Add(-time.Hour).Unix())
-	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
-	sig.KeyTag = sigKey.KeyTag()
-	sig.SignerName = dnsutil.Fqdn(f.parentName)
 	signer, ok := sigPriv.(crypto.Signer)
 	if !ok {
 		t.Fatalf("private key does not implement crypto.Signer")
 	}
-	if err := sig.Sign(signer, dsRRset, &dns.SignOption{}); err != nil {
-		t.Fatalf("sign DS RRset: %v", err)
+	ds := *f.childDS
+	sig := tctest.Sign(t, sigKey, signer, dns.TypeDS, []dns.RR{&ds}, tctest.Signer(f.parentName))
+	if forcedKeytag != 0 {
+		sig.KeyTag = forcedKeytag
 	}
-	sig.KeyTag = forcedKeytag
-	msg := new(dns.Msg)
-	dnsutil.SetQuestion(msg, dnsutil.Fqdn(f.childName), dns.TypeDS)
-	msg.Response = true
-	msg.Authoritative = true
-	msg.Rcode = dns.RcodeSuccess
-	msg.Answer = []dns.RR{&ds, sig}
-	msg.UDPSize = 1232
-	msg.Security = true
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Question(f.childName, dns.TypeDS), tctest.Secure(),
+		tctest.Answers(&ds, sig))
 }

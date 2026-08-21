@@ -7,7 +7,6 @@ import (
 	"time"
 
 	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -15,23 +14,9 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-// mldsa44Key generates an ML-DSA-44 zone key; Generate takes the seed size,
-// not a modulus size.
 func mldsa44Key(t *testing.T, owner string) (*dns.DNSKEY, crypto.Signer) {
 	t.Helper()
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	key.Flags = dns.FlagZONE | dns.FlagSEP
-	key.Protocol = 3
-	key.Algorithm = dns.MLDSA44
-	priv, err := key.Generate(256)
-	if err != nil {
-		t.Fatalf("generate ML-DSA-44 key: %v", err)
-	}
-	signer, ok := priv.(crypto.Signer)
-	if !ok {
-		t.Fatalf("ML-DSA-44 private key is not a crypto.Signer")
-	}
-	return key, signer
+	return tctest.SignedKey(t, owner, dns.MLDSA44, tctest.SEP())
 }
 
 // mldsa44Sig produces a real RRSIG over rrset. Unlike rrsigRecord's unsigned
@@ -39,19 +24,9 @@ func mldsa44Key(t *testing.T, owner string) (*dns.DNSKEY, crypto.Signer) {
 // runs for algorithm 18 instead of being skipped.
 func mldsa44Sig(t *testing.T, owner string, typeCovered uint16, key *dns.DNSKEY, signer crypto.Signer, rrset []dns.RR, now time.Time) *dns.RRSIG {
 	t.Helper()
-	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	sig.TypeCovered = typeCovered
-	sig.Algorithm = key.Algorithm
-	sig.Labels = uint8(dnsutil.Labels(dnsutil.Fqdn(owner)))
-	sig.OrigTTL = 60
-	sig.Inception = uint32(now.Add(-time.Hour).Unix())
-	sig.Expiration = uint32(now.Add(time.Hour).Unix())
-	sig.KeyTag = key.KeyTag()
-	sig.SignerName = dnsutil.Fqdn(owner)
-	if err := sig.Sign(signer, rrset, &dns.SignOption{}); err != nil {
-		t.Fatalf("sign %s RRset with ML-DSA-44: %v", dns.TypeToString[typeCovered], err)
-	}
-	return sig
+	return tctest.Sign(t, key, signer, typeCovered, rrset,
+		tctest.Signer(owner), tctest.Inception(now.Add(-time.Hour)),
+		tctest.Expiration(now.Add(time.Hour)))
 }
 
 // The user-visible half of ML-DSA-44 validation. DNSSEC08 checks

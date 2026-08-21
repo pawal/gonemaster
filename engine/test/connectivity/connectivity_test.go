@@ -5,7 +5,7 @@ import (
 	"net/netip"
 	"strings"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
@@ -171,185 +171,132 @@ func TestConnectivity03SameASNSet(t *testing.T) {
 }
 
 func TestConnectivityLoopParallelQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		if strings.EqualFold(qtype, "SOA") {
-			select {
-			case started <- qname:
-			default:
+		gate := tctest.NewGate()
+		hook := func(q tctest.Query) packet.Packet {
+			if strings.EqualFold(q.Type, "SOA") {
+				gate.Arrive(q.Name)
 			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
+			return packet.Packet{}
 		}
-		return packet.Packet{}, nil
-	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook)
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", hook)
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", hook)
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook)
+		done := make(chan struct{})
+		var results []*logger.Entry
+		var loopErr error
+		go func() {
+			loopErr = connectivityLoop(ctx, "Connectivity01", dnsname.New("example"), []nameserver.Nameserver{ns1, ns2}, &results)
+			close(done)
+		}()
 
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	var results []*logger.Entry
-	var loopErr error
-	go func() {
-		loopErr = connectivityLoop(ctx, "Connectivity01", dnsname.New("example"), []nameserver.Nameserver{ns1, ns2}, &results)
-		close(done)
-	}()
-
-	count := 0
-	deadline := time.After(1 * time.Second)
-	for count < 2 {
-		select {
-		case <-started:
-			count++
-		case <-deadline:
-			t.Fatalf("expected parallel SOA queries to start, got %d", count)
+		// Both servers are asked for the same name, so count arrivals.
+		synctest.Wait()
+		if got := gate.InFlight(); len(got) != 2 {
+			t.Fatalf("expected parallel SOA queries to start, got %v", got)
 		}
-	}
+		gate.Release()
 
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if loopErr != nil {
 			t.Fatalf("connectivity loop: %v", loopErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("connectivity loop did not finish")
-	}
 
-	var order []string
-	var addresses []string
-	for _, entry := range tctest.All(results, "CN01_NO_RESPONSE_UDP") {
-		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
-		if ns, ok := entry.Args["ns"].(string); ok {
-			order = append(order, ns)
+		var order []string
+		var addresses []string
+		for _, entry := range tctest.All(results, "CN01_NO_RESPONSE_UDP") {
+			tctest.RequireArgShape(t, entry, tctest.ArgShape{})
+			if ns, ok := entry.Args["ns"].(string); ok {
+				order = append(order, ns)
+			}
+			if address, ok := entry.Args["address"].(string); ok {
+				addresses = append(addresses, address)
+			}
 		}
-		if address, ok := entry.Args["address"].(string); ok {
-			addresses = append(addresses, address)
+		if len(order) != 2 {
+			t.Fatalf("expected 2 no-response entries, got %v", order)
 		}
-	}
-	if len(order) != 2 {
-		t.Fatalf("expected 2 no-response entries, got %v", order)
-	}
-	if order[0] != "ns1.example" || order[1] != "ns2.example" {
-		t.Fatalf("expected deterministic nameserver order, got %v", order)
-	}
-	if len(addresses) != 2 {
-		t.Fatalf("expected 2 no-response addresses, got %v", addresses)
-	}
-	if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic address order, got %v", addresses)
-	}
+		if order[0] != "ns1.example" || order[1] != "ns2.example" {
+			t.Fatalf("expected deterministic nameserver order, got %v", order)
+		}
+		if len(addresses) != 2 {
+			t.Fatalf("expected 2 no-response addresses, got %v", addresses)
+		}
+		if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+			t.Fatalf("expected deterministic address order, got %v", addresses)
+		}
+	})
 }
 
 func TestConnectivity03ParallelASNLookups(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", nil)
-	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", nil)
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns1, ns2}, nil
-	})
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", nil)
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", nil)
+		tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{ns1, ns2}, nil
+		})
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-	prefix, err := netip.ParsePrefix("192.0.2.0/24")
-	if err != nil {
-		t.Fatalf("parse prefix: %v", err)
-	}
-	tctest.Stub(t, &lookupASN, func(ctx context.Context, _ asnlookup.Resolver, ip netip.Addr) (asnlookup.Result, error) {
-		select {
-		case started <- ip.String():
-		default:
+		gate := tctest.NewGate()
+		prefix, err := netip.ParsePrefix("192.0.2.0/24")
+		if err != nil {
+			t.Fatalf("parse prefix: %v", err)
 		}
-		select {
-		case <-release:
-		case <-ctx.Done():
-			return asnlookup.Result{}, ctx.Err()
+		tctest.Stub(t, &lookupASN, func(_ context.Context, _ asnlookup.Resolver, ip netip.Addr) (asnlookup.Result, error) {
+			gate.Arrive(ip.String())
+			return asnlookup.Result{
+				ASNs:   []int{64500},
+				Prefix: &prefix,
+				Code:   asnlookup.CodeFound,
+			}, nil
+		})
+
+		z, err := zone.New("example")
+		if err != nil {
+			t.Fatalf("new zone: %v", err)
 		}
-		return asnlookup.Result{
-			ASNs:   []int{64500},
-			Prefix: &prefix,
-			Code:   asnlookup.CodeFound,
-		}, nil
-	})
 
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var connErr error
+		go func() {
+			entries, connErr = Connectivity03(ctx, &z)
+			close(done)
+		}()
 
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		synctest.Wait()
+		gate.RequireInFlight(t, "192.0.2.1", "192.0.2.2")
+		gate.Release()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var connErr error
-	go func() {
-		entries, connErr = Connectivity03(ctx, &z)
-		close(done)
-	}()
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel ASN lookups to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if connErr != nil {
 			t.Fatalf("connectivity03: %v", connErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("connectivity03 did not finish")
-	}
 
-	var order []string
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "ASN_INFOS_ANNOUNCE_BY" {
-			continue
+		var order []string
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "ASN_INFOS_ANNOUNCE_BY" {
+				continue
+			}
+			if ip, ok := entry.Args["address"].(string); ok {
+				order = append(order, ip)
+			}
 		}
-		if ip, ok := entry.Args["address"].(string); ok {
-			order = append(order, ip)
+		if len(order) != 2 {
+			t.Fatalf("expected 2 announce-by entries, got %v", order)
 		}
-	}
-	if len(order) != 2 {
-		t.Fatalf("expected 2 announce-by entries, got %v", order)
-	}
-	if order[0] != "192.0.2.1" || order[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic log order, got %v", order)
-	}
+		if order[0] != "192.0.2.1" || order[1] != "192.0.2.2" {
+			t.Fatalf("expected deterministic log order, got %v", order)
+		}
+	})
 }
 
 func TestConnectivity04SinglePrefix(t *testing.T) {

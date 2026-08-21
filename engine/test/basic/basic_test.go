@@ -7,6 +7,7 @@ import (
 	"net"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -272,128 +273,107 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 }
 
 func TestBasic02ParallelQueries(t *testing.T) {
-	baseCtx, prof, _ := testhelpers.Context(t)
-	prof.Resolver.Defaults.Parallel = 2
+	synctest.Test(t, func(t *testing.T) {
+		baseCtx, prof, _ := testhelpers.Context(t)
+		prof.Resolver.Defaults.Parallel = 2
 
-	r := tctest.Recursor(t, map[string]map[string][]string{
-		".": {
-			"a.root": {"192.0.2.1"},
-			"b.root": {"192.0.2.2"},
-		},
-	})
+		r := tctest.Recursor(t, map[string]map[string][]string{
+			".": {
+				"a.root": {"192.0.2.1"},
+				"b.root": {"192.0.2.2"},
+			},
+		})
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	hook := func(id string, block bool) tctest.RawHandler {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			name := strings.ToLower(qname)
-			kind := strings.ToUpper(qtype)
-			switch {
-			case name == "." && kind == "NS":
-				return nsPacketMulti(".", "a.root", "b.root"), nil
-			case name == "." && kind == "SOA":
-				select {
-				case started <- id:
-				default:
-				}
-				if block {
-					select {
-					case <-release:
-					case <-ctx.Done():
-						return packet.Packet{}, ctx.Err()
+		// Only a.root blocks; b.root records its arrival and answers.
+		hook := func(id string, block bool) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				name := strings.ToLower(q.Name)
+				kind := strings.ToUpper(q.Type)
+				switch {
+				case name == "." && kind == "NS":
+					return nsPacketMulti(".", "a.root", "b.root")
+				case name == "." && kind == "SOA":
+					if block {
+						gate.Arrive(id)
+					} else {
+						gate.Record(id)
 					}
+					return soaPacket(".", id, "hostmaster.root")
+				default:
+					return packet.Packet{}
 				}
-				return soaPacket(".", id, "hostmaster.root"), nil
-			default:
-				return packet.Packet{}, nil
 			}
 		}
-	}
 
-	tctest.NSRaw(t, baseCtx, r, "a.root", "192.0.2.1", hook("a.root", true))
+		tctest.NSOn(t, baseCtx, r, "a.root", "192.0.2.1", hook("a.root", true))
+		tctest.NSOn(t, baseCtx, r, "b.root", "192.0.2.2", hook("b.root", false))
 
-	tctest.NSRaw(t, baseCtx, r, "b.root", "192.0.2.2", hook("b.root", false))
+		z := tctest.Zone(t, ".", r)
 
-	z := tctest.Zone(t, ".", r)
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var basicErr error
+		go func() {
+			entries, basicErr = Basic02(baseCtx, z)
+			close(done)
+		}()
 
-	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
-	defer cancel()
+		synctest.Wait()
+		gate.RequireInFlight(t, "a.root", "b.root")
+		gate.Release()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var basicErr error
-	go func() {
-		entries, basicErr = Basic02(ctx, z)
-		close(done)
-	}()
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case id := <-started:
-			got[id] = true
-		case <-deadline:
-			t.Fatalf("expected parallel SOA queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if basicErr != nil {
 			t.Fatalf("basic02: %v", basicErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("basic02 did not finish")
-	}
 
-	var enabled []string
-	var enabledAddresses []string
-	for _, entry := range tctest.All(entries, "IPV4_ENABLED") {
-		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
-		if ns, ok := entry.Args["ns"].(string); ok {
-			enabled = append(enabled, ns)
+		var enabled []string
+		var enabledAddresses []string
+		for _, entry := range tctest.All(entries, "IPV4_ENABLED") {
+			tctest.RequireArgShape(t, entry, tctest.ArgShape{})
+			if ns, ok := entry.Args["ns"].(string); ok {
+				enabled = append(enabled, ns)
+			}
+			if address, ok := entry.Args["address"].(string); ok {
+				enabledAddresses = append(enabledAddresses, address)
+			}
 		}
-		if address, ok := entry.Args["address"].(string); ok {
-			enabledAddresses = append(enabledAddresses, address)
+		if len(enabled) < 2 {
+			t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
 		}
-	}
-	if len(enabled) < 2 {
-		t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
-	}
-	if enabled[0] != "a.root" || enabled[1] != "b.root" {
-		t.Fatalf("expected deterministic nameserver order, got %v", enabled)
-	}
-	if len(enabledAddresses) < 2 {
-		t.Fatalf("expected IPV4_ENABLED address args for both nameservers, got %v", enabledAddresses)
-	}
-	if enabledAddresses[0] != "192.0.2.1" || enabledAddresses[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
-	}
-	entry := tctest.RequireTag(t, entries, "B02_AUTH_RESPONSE_SOA")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
-		t.Fatalf("expected two typed servers for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["servers"])
-	}
-	if servers[0]["ns"] != "a.root" || servers[0]["address"] != "192.0.2.1" {
-		t.Fatalf("unexpected first typed server payload: %#v", servers[0])
-	}
-	if servers[1]["ns"] != "b.root" || servers[1]["address"] != "192.0.2.2" {
-		t.Fatalf("unexpected second typed server payload: %#v", servers[1])
-	}
-	addresses, ok := entry.Args["addresses"].([]string)
-	if !ok || len(addresses) != 2 {
-		t.Fatalf("expected two typed addresses for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["addresses"])
-	}
-	if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic address order, got %v", addresses)
-	}
-	if _, ok := entry.Args["ns_list"]; ok {
-		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
-	}
+		if enabled[0] != "a.root" || enabled[1] != "b.root" {
+			t.Fatalf("expected deterministic nameserver order, got %v", enabled)
+		}
+		if len(enabledAddresses) < 2 {
+			t.Fatalf("expected IPV4_ENABLED address args for both nameservers, got %v", enabledAddresses)
+		}
+		if enabledAddresses[0] != "192.0.2.1" || enabledAddresses[1] != "192.0.2.2" {
+			t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
+		}
+		entry := tctest.RequireTag(t, entries, "B02_AUTH_RESPONSE_SOA")
+		servers, ok := entry.Args["servers"].([]map[string]any)
+		if !ok || len(servers) != 2 {
+			t.Fatalf("expected two typed servers for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["servers"])
+		}
+		if servers[0]["ns"] != "a.root" || servers[0]["address"] != "192.0.2.1" {
+			t.Fatalf("unexpected first typed server payload: %#v", servers[0])
+		}
+		if servers[1]["ns"] != "b.root" || servers[1]["address"] != "192.0.2.2" {
+			t.Fatalf("unexpected second typed server payload: %#v", servers[1])
+		}
+		addresses, ok := entry.Args["addresses"].([]string)
+		if !ok || len(addresses) != 2 {
+			t.Fatalf("expected two typed addresses for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["addresses"])
+		}
+		if addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+			t.Fatalf("expected deterministic address order, got %v", addresses)
+		}
+		if _, ok := entry.Args["ns_list"]; ok {
+			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		}
+	})
 }
 
 func TestBasic02UnexpectedRcode(t *testing.T) {
@@ -600,125 +580,105 @@ func TestBasic03NoResponses(t *testing.T) {
 }
 
 func TestBasic03ParallelQueries(t *testing.T) {
-	baseCtx, prof, _ := testhelpers.Context(t)
-	prof.Resolver.Defaults.Parallel = 2
+	synctest.Test(t, func(t *testing.T) {
+		baseCtx, prof, _ := testhelpers.Context(t)
+		prof.Resolver.Defaults.Parallel = 2
 
-	r := tctest.Recursor(t, map[string]map[string][]string{
-		".": {
-			"a.root": {"192.0.2.1"},
-		},
-		"example": {
-			"ns1.example": {"192.0.2.53"},
-			"ns2.example": {"192.0.2.54"},
-		},
-	})
+		r := tctest.Recursor(t, map[string]map[string][]string{
+			".": {
+				"a.root": {"192.0.2.1"},
+			},
+			"example": {
+				"ns1.example": {"192.0.2.53"},
+				"ns2.example": {"192.0.2.54"},
+			},
+		})
 
-	tctest.NSRaw(t, baseCtx, r, "a.root", "192.0.2.1", func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		name := strings.ToLower(qname)
-		kind := strings.ToUpper(qtype)
-		switch {
-		case name == "example" && (kind == "SOA" || kind == "NS"):
-			return referralPacketMulti("example", []nsEntry{
-				{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
-				{name: "ns2.example", addr: net.IPv4(192, 0, 2, 54)},
-			}), nil
-		case name == "." && kind == "SOA":
-			return soaPacket(".", "a.root", "hostmaster.root"), nil
-		default:
-			return packet.Packet{}, nil
-		}
-	})
+		tctest.NSOn(t, baseCtx, r, "a.root", "192.0.2.1", func(q tctest.Query) packet.Packet {
+			name := strings.ToLower(q.Name)
+			kind := strings.ToUpper(q.Type)
+			switch {
+			case name == "example" && (kind == "SOA" || kind == "NS"):
+				return referralPacketMulti("example", []nsEntry{
+					{name: "ns1.example", addr: net.IPv4(192, 0, 2, 53)},
+					{name: "ns2.example", addr: net.IPv4(192, 0, 2, 54)},
+				})
+			case name == "." && kind == "SOA":
+				return soaPacket(".", "a.root", "hostmaster.root")
+			default:
+				return packet.Packet{}
+			}
+		})
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-	nsHook := func(id string, addr net.IP, block bool) tctest.RawHandler {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			name := strings.ToLower(qname)
-			kind := strings.ToUpper(qtype)
-			if name == "www.example" && kind == "A" {
-				select {
-				case started <- id:
-				default:
-				}
-				if block {
-					select {
-					case <-release:
-					case <-ctx.Done():
-						return packet.Packet{}, ctx.Err()
+		gate := tctest.NewGate()
+
+		// Only ns1.example blocks; ns2.example records its arrival and answers.
+		nsHook := func(id string, addr net.IP, block bool) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				name := strings.ToLower(q.Name)
+				kind := strings.ToUpper(q.Type)
+				if name == "www.example" && kind == "A" {
+					if block {
+						gate.Arrive(id)
+					} else {
+						gate.Record(id)
 					}
+					return aPacket("www.example", addr)
 				}
-				return aPacket("www.example", addr), nil
+				if name == "example" && kind == "SOA" {
+					return soaPacket("example", "ns1.example", "hostmaster.example")
+				}
+				return packet.Packet{}
 			}
-			if name == "example" && kind == "SOA" {
-				return soaPacket("example", "ns1.example", "hostmaster.example"), nil
-			}
-			return packet.Packet{}, nil
 		}
-	}
 
-	tctest.NSRaw(t, baseCtx, r, "ns1.example", "192.0.2.53", nsHook("ns1.example", net.IPv4(192, 0, 2, 53), true))
+		tctest.NSOn(t, baseCtx, r, "ns1.example", "192.0.2.53", nsHook("ns1.example", net.IPv4(192, 0, 2, 53), true))
+		tctest.NSOn(t, baseCtx, r, "ns2.example", "192.0.2.54", nsHook("ns2.example", net.IPv4(192, 0, 2, 54), false))
 
-	tctest.NSRaw(t, baseCtx, r, "ns2.example", "192.0.2.54", nsHook("ns2.example", net.IPv4(192, 0, 2, 54), false))
+		z := tctest.Zone(t, "example", r)
 
-	z := tctest.Zone(t, "example", r)
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var basicErr error
+		go func() {
+			entries, basicErr = Basic03(baseCtx, z)
+			close(done)
+		}()
 
-	ctx, cancel := context.WithTimeout(baseCtx, 2*time.Second)
-	defer cancel()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1.example", "ns2.example")
+		gate.Release()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var basicErr error
-	go func() {
-		entries, basicErr = Basic03(ctx, z)
-		close(done)
-	}()
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case id := <-started:
-			got[id] = true
-		case <-deadline:
-			t.Fatalf("expected parallel A queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if basicErr != nil {
 			t.Fatalf("basic03: %v", basicErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("basic03 did not finish")
-	}
 
-	var enabled []string
-	var enabledAddresses []string
-	for _, entry := range tctest.All(entries, "IPV4_ENABLED") {
-		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
-		if ns, ok := entry.Args["ns"].(string); ok {
-			enabled = append(enabled, ns)
+		var enabled []string
+		var enabledAddresses []string
+		for _, entry := range tctest.All(entries, "IPV4_ENABLED") {
+			tctest.RequireArgShape(t, entry, tctest.ArgShape{})
+			if ns, ok := entry.Args["ns"].(string); ok {
+				enabled = append(enabled, ns)
+			}
+			if address, ok := entry.Args["address"].(string); ok {
+				enabledAddresses = append(enabledAddresses, address)
+			}
 		}
-		if address, ok := entry.Args["address"].(string); ok {
-			enabledAddresses = append(enabledAddresses, address)
+		if len(enabled) < 2 {
+			t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
 		}
-	}
-	if len(enabled) < 2 {
-		t.Fatalf("expected IPV4_ENABLED entries for both nameservers, got %v", enabled)
-	}
-	if enabled[0] != "ns1.example" || enabled[1] != "ns2.example" {
-		t.Fatalf("expected deterministic nameserver order, got %v", enabled)
-	}
-	if len(enabledAddresses) < 2 {
-		t.Fatalf("expected IPV4_ENABLED address args for both nameservers, got %v", enabledAddresses)
-	}
-	if enabledAddresses[0] != "192.0.2.53" || enabledAddresses[1] != "192.0.2.54" {
-		t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
-	}
-	tctest.RequireTags(t, entries, "HAS_A_RECORDS")
+		if enabled[0] != "ns1.example" || enabled[1] != "ns2.example" {
+			t.Fatalf("expected deterministic nameserver order, got %v", enabled)
+		}
+		if len(enabledAddresses) < 2 {
+			t.Fatalf("expected IPV4_ENABLED address args for both nameservers, got %v", enabledAddresses)
+		}
+		if enabledAddresses[0] != "192.0.2.53" || enabledAddresses[1] != "192.0.2.54" {
+			t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
+		}
+		tctest.RequireTags(t, entries, "HAS_A_RECORDS")
+	})
 }
 
 func TestBasic03ParallelOutputStable(t *testing.T) {

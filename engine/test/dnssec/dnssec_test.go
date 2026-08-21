@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"testing/synctest"
@@ -29,120 +30,53 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-func TestDNSSEC01AlgoOK(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
-		return nil, nil
-	})
-	tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool {
-		return false
-	})
-
-	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		if q.Type != "DS" {
-			return packet.Packet{}
-		}
-		return dsPacket(q.Name, 12345, 8, 2)
-	})
-
-	tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns}, nil
-	})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC01(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec01: %v", err)
+func TestDNSSEC01DigestMatrix(t *testing.T) {
+	cases := []struct {
+		name    string
+		ip      string
+		keytag  uint16
+		algo    uint8
+		digest  uint8
+		wantTag string
+	}{
+		{name: "AlgoOK", ip: "192.0.2.1", keytag: 12345, algo: 8, digest: 2, wantTag: "DS01_DS_ALGO_OK"},
+		// digest 5 = GOST R 34.11-2012 (RFC 9558)
+		{name: "DigestGOST12", ip: "192.0.2.31", keytag: 12345, algo: 8, digest: 5, wantTag: "DS01_DS_ALGO_OK"},
+		// digest 6 = SM3 (RFC 9563)
+		{name: "DigestSM3", ip: "192.0.2.32", keytag: 12345, algo: 8, digest: 6, wantTag: "DS01_DS_ALGO_OK"},
+		{name: "Algo2Missing", ip: "192.0.2.10", keytag: 54321, algo: 8, digest: 1, wantTag: "DS01_DS_ALGO_2_MISSING"},
 	}
-	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
-}
 
-func TestDNSSEC01DigestGOST12(t *testing.T) {
-	ctx := tctest.Context(t)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
 
-	tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
-		return nil, nil
-	})
-	tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool {
-		return false
-	})
+			tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+				return nil, nil
+			})
+			tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool {
+				return false
+			})
 
-	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.31", func(q tctest.Query) packet.Packet {
-		if q.Type != "DS" {
-			return packet.Packet{}
-		}
-		return dsPacket(q.Name, 12345, 8, 5) // digest 5 = GOST R 34.11-2012 (RFC 9558)
-	})
+			ns := tctest.NS(t, ctx, "ns1.example", tc.ip, func(q tctest.Query) packet.Packet {
+				if q.Type != "DS" {
+					return packet.Packet{}
+				}
+				return dsPacket(q.Name, tc.keytag, tc.algo, tc.digest)
+			})
 
-	tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns}, nil
-	})
+			tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns}, nil
+			})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC01(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec01: %v", err)
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := DNSSEC01(ctx, &z)
+			if err != nil {
+				t.Fatalf("dnssec01: %v", err)
+			}
+			tctest.RequireTags(t, entries, tc.wantTag)
+		})
 	}
-	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
-}
-
-func TestDNSSEC01DigestSM3(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
-		return nil, nil
-	})
-	tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool {
-		return false
-	})
-
-	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.32", func(q tctest.Query) packet.Packet {
-		if q.Type != "DS" {
-			return packet.Packet{}
-		}
-		return dsPacket(q.Name, 12345, 8, 6) // digest 6 = SM3 (RFC 9563)
-	})
-
-	tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns}, nil
-	})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC01(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec01: %v", err)
-	}
-	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
-}
-
-func TestDNSSEC01Algo2Missing(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
-		return nil, nil
-	})
-	tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool {
-		return false
-	})
-
-	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.10", func(q tctest.Query) packet.Packet {
-		if q.Type != "DS" {
-			return packet.Packet{}
-		}
-		return dsPacket(q.Name, 54321, 8, 1)
-	})
-
-	tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns}, nil
-	})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC01(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec01: %v", err)
-	}
-	tctest.RequireTags(t, entries, "DS01_DS_ALGO_2_MISSING")
 }
 
 func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
@@ -1198,132 +1132,64 @@ func TestDNSSEC04ParallelQueries(t *testing.T) {
 	})
 }
 
-func TestDNSSEC05AlgoOK(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	tctest.NS(t, ctx, "ns1.example", "192.0.2.20", func(q tctest.Query) packet.Packet {
-		if q.Type != "DNSKEY" {
-			return packet.Packet{}
-		}
-		key := tctest.DNSKEYRR(q.Name, 8, tctest.PublicKey("AwEAAc=="))
-		return dnskeyPacket(q.Name, key)
-	})
-
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return tctest.NSItems("ns1.example/192.0.2.20"), nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{}, nil
-	})
-
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
+func TestDNSSEC05AlgorithmMatrix(t *testing.T) {
+	cases := []struct {
+		name     string
+		ip       string
+		algo     uint8
+		wantArgs map[string]any
+	}{
+		{name: "AlgoOK", ip: "192.0.2.20", algo: 8},
+		// 17 = SM2SM3 (RFC 9563)
+		{name: "AlgoSM2SM3", ip: "192.0.2.33", algo: 17},
+		// 18 = ML-DSA-44, IANA-assigned post-quantum signing algorithm. The tag
+		// alone would still pass with a stale algorithm table, so the rendered
+		// name is asserted too: before algorithm 18 was assigned it fell in the
+		// unassigned range and reported the mnemonic UNASSIGNED.
+		{name: "AlgoMLDSA44", ip: "192.0.2.33", algo: 18, wantArgs: map[string]any{
+			"algo_num":   uint8(18),
+			"algo_descr": "ML-DSA-44",
+			"algo_mnemo": "MLDSA44",
+		}},
+		// 23 = ECC-GOST12 (RFC 9558)
+		{name: "AlgoECCGOST12", ip: "192.0.2.34", algo: 23},
 	}
-	entries, err := DNSSEC05(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec05: %v", err)
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+
+			tctest.NS(t, ctx, "ns1.example", tc.ip, func(q tctest.Query) packet.Packet {
+				if q.Type != "DNSKEY" {
+					return packet.Packet{}
+				}
+				key := tctest.DNSKEYRR(q.Name, tc.algo, tctest.PublicKey("AwEAAc=="))
+				return dnskeyPacket(q.Name, key)
+			})
+
+			tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+				return tctest.NSItems("ns1.example/" + tc.ip), nil
+			})
+			tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+				return []nsdiscovery.NSItem{}, nil
+			})
+
+			z, err := zone.New("example")
+			if err != nil {
+				t.Fatalf("zone new: %v", err)
+			}
+			entries, err := DNSSEC05(ctx, &z)
+			if err != nil {
+				t.Fatalf("dnssec05: %v", err)
+			}
+			entry := tctest.RequireTag(t, entries, "DS05_ALGO_OK")
+			for arg, want := range tc.wantArgs {
+				if entry.Args[arg] != want {
+					t.Fatalf("expected %s %v, got %#v", arg, want, entry.Args[arg])
+				}
+			}
+		})
 	}
-	tctest.RequireTags(t, entries, "DS05_ALGO_OK")
-}
-
-func TestDNSSEC05AlgoSM2SM3(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	tctest.NS(t, ctx, "ns1.example", "192.0.2.33", func(q tctest.Query) packet.Packet {
-		if q.Type != "DNSKEY" {
-			return packet.Packet{}
-		}
-		key := tctest.DNSKEYRR(q.Name, 17, tctest.PublicKey("AwEAAc==")) // SM2SM3 (RFC 9563)
-		return dnskeyPacket(q.Name, key)
-	})
-
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return tctest.NSItems("ns1.example/192.0.2.33"), nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{}, nil
-	})
-
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	entries, err := DNSSEC05(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec05: %v", err)
-	}
-	tctest.RequireTags(t, entries, "DS05_ALGO_OK")
-}
-
-func TestDNSSEC05AlgoMLDSA44(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	tctest.NS(t, ctx, "ns1.example", "192.0.2.33", func(q tctest.Query) packet.Packet {
-		if q.Type != "DNSKEY" {
-			return packet.Packet{}
-		}
-		key := tctest.DNSKEYRR(q.Name, 18, tctest.PublicKey("AwEAAc==")) // ML-DSA-44, IANA-assigned post-quantum signing algorithm
-		return dnskeyPacket(q.Name, key)
-	})
-
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return tctest.NSItems("ns1.example/192.0.2.33"), nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{}, nil
-	})
-
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	entries, err := DNSSEC05(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec05: %v", err)
-	}
-	entry := tctest.RequireTag(t, entries, "DS05_ALGO_OK")
-	// The tag alone would still pass with a stale algorithm table, so assert the
-	// rendered name too: before algorithm 18 was assigned it fell in the
-	// unassigned range and reported the mnemonic UNASSIGNED.
-	if entry.Args["algo_num"] != uint8(18) {
-		t.Fatalf("expected algo_num 18, got %#v", entry.Args["algo_num"])
-	}
-	if entry.Args["algo_descr"] != "ML-DSA-44" {
-		t.Fatalf("expected algo_descr ML-DSA-44, got %#v", entry.Args["algo_descr"])
-	}
-	if entry.Args["algo_mnemo"] != "MLDSA44" {
-		t.Fatalf("expected algo_mnemo MLDSA44, got %#v", entry.Args["algo_mnemo"])
-	}
-}
-
-func TestDNSSEC05AlgoECCGOST12(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	tctest.NS(t, ctx, "ns1.example", "192.0.2.34", func(q tctest.Query) packet.Packet {
-		if q.Type != "DNSKEY" {
-			return packet.Packet{}
-		}
-		key := tctest.DNSKEYRR(q.Name, 23, tctest.PublicKey("AwEAAc==")) // ECC-GOST12 (RFC 9558)
-		return dnskeyPacket(q.Name, key)
-	})
-
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return tctest.NSItems("ns1.example/192.0.2.34"), nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{}, nil
-	})
-
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	entries, err := DNSSEC05(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec05: %v", err)
-	}
-	tctest.RequireTags(t, entries, "DS05_ALGO_OK")
 }
 
 func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
@@ -3612,78 +3478,54 @@ func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 	})
 }
 
-func TestDNSSEC14NoResponseArgsSplit(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.141", func(q tctest.Query) packet.Packet {
-		if q.Type == "DNSKEY" {
-			return packet.Packet{}
-		}
-		return packet.Packet{}
-	})
-
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC14(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec14: %v", err)
+func TestDNSSEC14ArgsSplit(t *testing.T) {
+	cases := []struct {
+		name         string
+		ip           string
+		handler      tctest.Handler
+		ipv4Disabled bool
+		wantTag      string
+	}{
+		{name: "NoResponse", ip: "192.0.2.141", wantTag: "NO_RESPONSE"},
+		{
+			name: "NoResponseDNSKEY",
+			ip:   "192.0.2.142",
+			handler: func(q tctest.Query) packet.Packet {
+				if q.Type == "DNSKEY" {
+					return answerPacket(q.Name, dns.TypeDNSKEY)
+				}
+				return packet.Packet{}
+			},
+			wantTag: "NO_RESPONSE_DNSKEY",
+		},
+		{name: "IPv4Disabled", ip: "192.0.2.143", ipv4Disabled: true, wantTag: "IPV4_DISABLED"},
 	}
-	entry := tctest.RequireTag(t, entries, "NO_RESPONSE")
-	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "ns1.example", Address: "192.0.2.141"})
-}
 
-func TestDNSSEC14NoResponseDNSKEYArgsSplit(t *testing.T) {
-	ctx := tctest.Context(t)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
 
-	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.142", func(q tctest.Query) packet.Packet {
-		if q.Type == "DNSKEY" {
-			return answerPacket(q.Name, dns.TypeDNSKEY)
-		}
-		return packet.Packet{}
-	})
+			if tc.ipv4Disabled {
+				profile.Effective().Net.IPv4 = false
+			}
 
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
+			ns := tctest.NS(t, ctx, "ns1.example", tc.ip, tc.handler)
+			tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns}, nil
+			})
+			tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return nil, nil
+			})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC14(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec14: %v", err)
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := DNSSEC14(ctx, &z)
+			if err != nil {
+				t.Fatalf("dnssec14: %v", err)
+			}
+			entry := tctest.RequireTag(t, entries, tc.wantTag)
+			tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "ns1.example", Address: tc.ip})
+		})
 	}
-	entry := tctest.RequireTag(t, entries, "NO_RESPONSE_DNSKEY")
-	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "ns1.example", Address: "192.0.2.142"})
-}
-
-func TestDNSSEC14IPv4DisabledArgsSplit(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	profile.Effective().Net.IPv4 = false
-
-	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.143", nil)
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{ns}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC14(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec14: %v", err)
-	}
-	entry := tctest.RequireTag(t, entries, "IPV4_DISABLED")
-	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "ns1.example", Address: "192.0.2.143"})
 }
 
 func TestDNSSEC15NoCDSCDNSKEY(t *testing.T) {
@@ -4708,198 +4550,113 @@ func TestDNSSEC18CDNSKEYRolloverSignaled(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS18_CDNSKEY_MATCHES_DS")
 }
 
-func TestDNSSEC18RolloverEvidenceMultiKSK(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	// key1 has DS at parent; key2 is a new SEP awaiting DS publication.
-	key1 := makeSEPKey("example", "AwEAAc==")
-	keytag1 := key1.KeyTag()
-	key2 := makeSEPKey("example", "AwEAAb0=")
-	keytag2 := key2.KeyTag()
-
-	ds := tctest.DSRR("example", keytag1, 8, 2, "AABB")
-
-	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
-
-	parentNS := tctest.NS(t, ctx, "pns1.example", "192.0.2.78", func(q tctest.Query) packet.Packet {
-		if q.Type == "DS" {
-			return dsPacketFromDS("example", ds)
-		}
-		return packet.Packet{}
-	})
-	childNS := tctest.NS(t, ctx, "ns1.example", "192.0.2.79", func(q tctest.Query) packet.Packet {
-		switch q.Type {
-		case "CDS":
-			return answerPacket(q.Name, dns.TypeCDS)
-		case "CDNSKEY":
-			return answerPacket(q.Name, dns.TypeCDNSKEY)
-		case "DNSKEY":
-			// Both keys published, only signed by key1.
-			return answerPacket(q.Name, dns.TypeDNSKEY, key1, key2, dnskeyRRSIG)
-		default:
-			return packet.Packet{}
-		}
-	})
-
-	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(ctx, &z)
-	if err != nil {
-		t.Fatalf("DNSSEC18: %v", err)
-	}
-	e := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_MULTI_KSK")
-	kts, ok := e.Args["keytags"].([]uint16)
-	if !ok || len(kts) != 2 {
-		t.Errorf("expected keytags with 2 entries, got %v", e.Args["keytags"])
-	}
-	// key2 has no DS → DNSKEY_WITHOUT_DS also fires.
-	e2 := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS")
-	kts2, ok := e2.Args["keytags"].([]uint16)
-	if !ok || len(kts2) != 1 || kts2[0] != keytag2 {
-		t.Errorf("expected keytags=[%d], got %v", keytag2, e2.Args["keytags"])
-	}
-}
-
-func TestDNSSEC18RolloverEvidenceDoubleSig(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	// Both keys sign the DNSKEY RRset: classic double-signature phase.
-	key1 := makeSEPKey("example", "AwEAAc==")
-	keytag1 := key1.KeyTag()
-	key2 := makeSEPKey("example", "AwEAAb0=")
-	keytag2 := key2.KeyTag()
-
-	ds := tctest.DSRR("example", keytag1, 8, 2, "AABB")
-
-	// Two RRSIGs from two different KSKs.
-	dnskeyRRSIG1 := rrsigRecord("example", dns.TypeDNSKEY, keytag1, 1, 2)
-	dnskeyRRSIG2 := rrsigRecord("example", dns.TypeDNSKEY, keytag2, 1, 2)
-
-	parentNS := tctest.NS(t, ctx, "pns1.example", "192.0.2.80", func(q tctest.Query) packet.Packet {
-		if q.Type == "DS" {
-			return dsPacketFromDS("example", ds)
-		}
-		return packet.Packet{}
-	})
-	childNS := tctest.NS(t, ctx, "ns1.example", "192.0.2.81", func(q tctest.Query) packet.Packet {
-		switch q.Type {
-		case "CDS":
-			return answerPacket(q.Name, dns.TypeCDS)
-		case "CDNSKEY":
-			return answerPacket(q.Name, dns.TypeCDNSKEY)
-		case "DNSKEY":
-			return answerPacket(q.Name, dns.TypeDNSKEY, key1, key2, dnskeyRRSIG1, dnskeyRRSIG2)
-		default:
-			return packet.Packet{}
-		}
-	})
-
-	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(ctx, &z)
-	if err != nil {
-		t.Fatalf("DNSSEC18: %v", err)
-	}
-	e := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG")
-	kts, ok := e.Args["keytags"].([]uint16)
-	if !ok || len(kts) != 2 {
-		t.Errorf("expected 2 signer keytags, got %v", e.Args["keytags"])
-	}
-}
-
-func TestDNSSEC18RolloverEvidenceDSWithoutDNSKEY(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	// Parent still has DS for old key but child DNSKEY RRset no longer contains it.
+func TestDNSSEC18RolloverEvidence(t *testing.T) {
+	// keyOld carries the DS at the parent; keyNew is the incoming SEP. Each case
+	// publishes a different DNSKEY RRset and RRSIG set over the same pair.
 	keyOld := makeSEPKey("example", "AwEAAc==")
-	keytagOld := keyOld.KeyTag()
 	keyNew := makeSEPKey("example", "AwEAAb0=")
-	keytagNew := keyNew.KeyTag()
+	keytagOld, keytagNew := keyOld.KeyTag(), keyNew.KeyTag()
 
-	ds := tctest.DSRR("example", keytagOld, 8, 2, "AABB")
+	sigOld := rrsigRecord("example", dns.TypeDNSKEY, keytagOld, 1, 2)
+	sigNew := rrsigRecord("example", dns.TypeDNSKEY, keytagNew, 1, 2)
 
-	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytagNew, 1, 2)
-
-	parentNS := tctest.NS(t, ctx, "pns1.example", "192.0.2.82", func(q tctest.Query) packet.Packet {
-		if q.Type == "DS" {
-			return dsPacketFromDS("example", ds)
-		}
-		return packet.Packet{}
-	})
-	childNS := tctest.NS(t, ctx, "ns1.example", "192.0.2.83", func(q tctest.Query) packet.Packet {
-		switch q.Type {
-		case "CDS":
-			return answerPacket(q.Name, dns.TypeCDS)
-		case "CDNSKEY":
-			return answerPacket(q.Name, dns.TypeCDNSKEY)
-		case "DNSKEY":
-			// Only new key; old key already removed from DNSKEY RRset.
-			return answerPacket(q.Name, dns.TypeDNSKEY, keyNew, dnskeyRRSIG)
-		default:
-			return packet.Packet{}
-		}
-	})
-
-	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(ctx, &z)
-	if err != nil {
-		t.Fatalf("DNSSEC18: %v", err)
+	// want is one expected entry: the tag, its keytags count, and the exact
+	// keytags where the case pins them.
+	type want struct {
+		tag     string
+		count   int
+		keytags []uint16
 	}
-	e := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY")
-	kts, ok := e.Args["keytags"].([]uint16)
-	if !ok || len(kts) != 1 || kts[0] != keytagOld {
-		t.Errorf("expected orphaned keytag [%d], got %v", keytagOld, e.Args["keytags"])
+
+	cases := []struct {
+		name     string
+		parentIP string
+		childIP  string
+		dnskeys  []dns.RR
+		wants    []want
+	}{
+		{
+			// Both keys published, only signed by the old one.
+			name:     "MultiKSK",
+			parentIP: "192.0.2.78",
+			childIP:  "192.0.2.79",
+			dnskeys:  []dns.RR{keyOld, keyNew, sigOld},
+			wants: []want{
+				{tag: "DS18_ROLLOVER_EVIDENCE_MULTI_KSK", count: 2},
+				// keyNew has no DS, so DNSKEY_WITHOUT_DS also fires.
+				{tag: "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS", count: 1, keytags: []uint16{keytagNew}},
+			},
+		},
+		{
+			// Both keys sign the DNSKEY RRset: classic double-signature phase.
+			name:     "DoubleSig",
+			parentIP: "192.0.2.80",
+			childIP:  "192.0.2.81",
+			dnskeys:  []dns.RR{keyOld, keyNew, sigOld, sigNew},
+			wants:    []want{{tag: "DS18_ROLLOVER_EVIDENCE_DOUBLE_SIG", count: 2}},
+		},
+		{
+			// Parent still has the DS but the old key left the DNSKEY RRset.
+			name:     "DSWithoutDNSKEY",
+			parentIP: "192.0.2.82",
+			childIP:  "192.0.2.83",
+			dnskeys:  []dns.RR{keyNew, sigNew},
+			wants:    []want{{tag: "DS18_ROLLOVER_EVIDENCE_DS_WITHOUT_DNSKEY", count: 1, keytags: []uint16{keytagOld}}},
+		},
+		{
+			// Both keys published, DS only for the old one.
+			name:     "DNSKEYWithoutDS",
+			parentIP: "192.0.2.84",
+			childIP:  "192.0.2.85",
+			dnskeys:  []dns.RR{keyOld, keyNew, sigOld},
+			wants:    []want{{tag: "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS", count: 1, keytags: []uint16{keytagNew}}},
+		},
 	}
-}
 
-func TestDNSSEC18RolloverEvidenceDNSKEYWithoutDS(t *testing.T) {
-	ctx := tctest.Context(t)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
 
-	// Old key still in DS; new key published in DNSKEY but DS not yet updated.
-	keyOld := makeSEPKey("example", "AwEAAc==")
-	keytagOld := keyOld.KeyTag()
-	keyNew := makeSEPKey("example", "AwEAAb0=")
-	keytagNew := keyNew.KeyTag()
+			ds := tctest.DSRR("example", keytagOld, 8, 2, "AABB")
 
-	ds := tctest.DSRR("example", keytagOld, 8, 2, "AABB")
+			parentNS := tctest.NS(t, ctx, "pns1.example", tc.parentIP, func(q tctest.Query) packet.Packet {
+				if q.Type == "DS" {
+					return dsPacketFromDS("example", ds)
+				}
+				return packet.Packet{}
+			})
+			childNS := tctest.NS(t, ctx, "ns1.example", tc.childIP, func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "CDS":
+					return answerPacket(q.Name, dns.TypeCDS)
+				case "CDNSKEY":
+					return answerPacket(q.Name, dns.TypeCDNSKEY)
+				case "DNSKEY":
+					return answerPacket(q.Name, dns.TypeDNSKEY, tc.dnskeys...)
+				default:
+					return packet.Packet{}
+				}
+			})
 
-	dnskeyRRSIG := rrsigRecord("example", dns.TypeDNSKEY, keytagOld, 1, 2)
+			setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
 
-	parentNS := tctest.NS(t, ctx, "pns1.example", "192.0.2.84", func(q tctest.Query) packet.Packet {
-		if q.Type == "DS" {
-			return dsPacketFromDS("example", ds)
-		}
-		return packet.Packet{}
-	})
-	childNS := tctest.NS(t, ctx, "ns1.example", "192.0.2.85", func(q tctest.Query) packet.Packet {
-		switch q.Type {
-		case "CDS":
-			return answerPacket(q.Name, dns.TypeCDS)
-		case "CDNSKEY":
-			return answerPacket(q.Name, dns.TypeCDNSKEY)
-		case "DNSKEY":
-			// Both old and new key; DS only for old.
-			return answerPacket(q.Name, dns.TypeDNSKEY, keyOld, keyNew, dnskeyRRSIG)
-		default:
-			return packet.Packet{}
-		}
-	})
-
-	setDNSSEC18Mocks(t, []nameserver.Nameserver{parentNS}, []nameserver.Nameserver{childNS})
-
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := DNSSEC18(ctx, &z)
-	if err != nil {
-		t.Fatalf("DNSSEC18: %v", err)
-	}
-	e := tctest.RequireTag(t, entries, "DS18_ROLLOVER_EVIDENCE_DNSKEY_WITHOUT_DS")
-	kts, ok := e.Args["keytags"].([]uint16)
-	if !ok || len(kts) != 1 || kts[0] != keytagNew {
-		t.Errorf("expected orphaned keytag [%d], got %v", keytagNew, e.Args["keytags"])
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := DNSSEC18(ctx, &z)
+			if err != nil {
+				t.Fatalf("DNSSEC18: %v", err)
+			}
+			for _, w := range tc.wants {
+				e := tctest.RequireTag(t, entries, w.tag)
+				kts, ok := e.Args["keytags"].([]uint16)
+				if !ok || len(kts) != w.count {
+					t.Errorf("expected %s keytags with %d entries, got %v", w.tag, w.count, e.Args["keytags"])
+					continue
+				}
+				if w.keytags != nil && !slices.Equal(kts, w.keytags) {
+					t.Errorf("expected %s keytags=%v, got %v", w.tag, w.keytags, kts)
+				}
+			}
+		})
 	}
 }
 

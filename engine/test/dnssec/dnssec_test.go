@@ -1608,7 +1608,6 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 			t.Fatalf("zone new: %v", err)
 		}
 
-
 		done := make(chan struct{})
 		var entries []*logger.Entry
 		var dsErr error

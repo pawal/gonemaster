@@ -18,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -61,19 +62,8 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency01: %v", err)
 	}
-	if !hasEntryTag(entries, "MULTIPLE_SOA_SERIALS") {
-		t.Fatalf("expected MULTIPLE_SOA_SERIALS")
-	}
-	if !hasEntryTag(entries, "SOA_SERIAL_VARIATION") {
-		t.Fatalf("expected SOA_SERIAL_VARIATION")
-	}
-	if !hasEntryTag(entries, "SOA_SERIAL") {
-		t.Fatalf("expected SOA_SERIAL")
-	}
-	entry := firstEntryByTag(entries, "SOA_SERIAL")
-	if entry == nil {
-		t.Fatalf("missing SOA_SERIAL entry")
-	}
+	tctest.RequireTags(t, entries, "MULTIPLE_SOA_SERIALS", "SOA_SERIAL_VARIATION", "SOA_SERIAL")
+	entry := tctest.RequireTag(t, entries, "SOA_SERIAL")
 	if _, ok := entry.Args["servers"]; !ok {
 		t.Fatalf("expected typed servers in SOA_SERIAL args: %#v", entry.Args)
 	}
@@ -129,17 +119,14 @@ func TestConsistency01LexicalTrapSerialVariation(t *testing.T) {
 		t.Fatalf("consistency01: %v", err)
 	}
 
-	entry := firstEntryByTag(entries, "SOA_SERIAL_VARIATION")
-	if entry == nil {
-		t.Fatalf("expected SOA_SERIAL_VARIATION for serials 9 and 100 (numeric ordering)")
-	}
+	entry := tctest.RequireTag(t, entries, "SOA_SERIAL_VARIATION")
 	if got := entry.Args["serial_min"]; got != "9" {
 		t.Fatalf("expected serial_min=9 (oldest), got %#v", got)
 	}
 	if got := entry.Args["serial_max"]; got != "100" {
 		t.Fatalf("expected serial_max=100 (newest), got %#v", got)
 	}
-	behind := serverEndpointsAtKey(entry.Args, "servers_behind")
+	behind := tctest.EndpointsAt(entry.Args, "servers_behind")
 	if len(behind) != 1 || behind[0] != "ns1.example/192.0.2.1" {
 		t.Fatalf("expected servers_behind to name ns1.example/192.0.2.1, got %v", behind)
 	}
@@ -187,17 +174,14 @@ func TestConsistency01SerialWraparound(t *testing.T) {
 		t.Fatalf("consistency01: %v", err)
 	}
 
-	entry := firstEntryByTag(entries, "SOA_SERIAL_VARIATION")
-	if entry == nil {
-		t.Fatalf("expected SOA_SERIAL_VARIATION across the wrap boundary")
-	}
+	entry := tctest.RequireTag(t, entries, "SOA_SERIAL_VARIATION")
 	if got := entry.Args["serial_min"]; got != "4294967294" {
 		t.Fatalf("expected serial_min=4294967294 (oldest under RFC 1982), got %#v", got)
 	}
 	if got := entry.Args["serial_max"]; got != "1" {
 		t.Fatalf("expected serial_max=1 (newest under RFC 1982), got %#v", got)
 	}
-	behind := serverEndpointsAtKey(entry.Args, "servers_behind")
+	behind := tctest.EndpointsAt(entry.Args, "servers_behind")
 	if len(behind) != 1 || behind[0] != "ns1.example/192.0.2.1" {
 		t.Fatalf("expected servers_behind to name ns1.example/192.0.2.1 (serving the older serial), got %v", behind)
 	}
@@ -242,16 +226,8 @@ func TestConsistency02MultipleRnames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency02: %v", err)
 	}
-	if !hasEntryTag(entries, "MULTIPLE_SOA_RNAMES") {
-		t.Fatalf("expected MULTIPLE_SOA_RNAMES")
-	}
-	if !hasEntryTag(entries, "SOA_RNAME") {
-		t.Fatalf("expected SOA_RNAME")
-	}
-	entry := firstEntryByTag(entries, "SOA_RNAME")
-	if entry == nil {
-		t.Fatalf("missing SOA_RNAME entry")
-	}
+	tctest.RequireTags(t, entries, "MULTIPLE_SOA_RNAMES", "SOA_RNAME")
+	entry := tctest.RequireTag(t, entries, "SOA_RNAME")
 	if _, ok := entry.Args["servers"]; !ok {
 		t.Fatalf("expected typed servers in SOA_RNAME args: %#v", entry.Args)
 	}
@@ -299,16 +275,8 @@ func TestConsistency03MultipleTimeSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency03: %v", err)
 	}
-	if !hasEntryTag(entries, "MULTIPLE_SOA_TIME_PARAMETER_SET") {
-		t.Fatalf("expected MULTIPLE_SOA_TIME_PARAMETER_SET")
-	}
-	if !hasEntryTag(entries, "SOA_TIME_PARAMETER_SET") {
-		t.Fatalf("expected SOA_TIME_PARAMETER_SET")
-	}
-	entry := firstEntryByTag(entries, "SOA_TIME_PARAMETER_SET")
-	if entry == nil {
-		t.Fatalf("missing SOA_TIME_PARAMETER_SET entry")
-	}
+	tctest.RequireTags(t, entries, "MULTIPLE_SOA_TIME_PARAMETER_SET", "SOA_TIME_PARAMETER_SET")
+	entry := tctest.RequireTag(t, entries, "SOA_TIME_PARAMETER_SET")
 	if _, ok := entry.Args["servers"]; !ok {
 		t.Fatalf("expected typed servers in SOA_TIME_PARAMETER_SET args: %#v", entry.Args)
 	}
@@ -356,16 +324,8 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency04: %v", err)
 	}
-	if !hasEntryTag(entries, "MULTIPLE_NS_SET") {
-		t.Fatalf("expected MULTIPLE_NS_SET")
-	}
-	if !hasEntryTag(entries, "NS_SET") {
-		t.Fatalf("expected NS_SET")
-	}
-	entry := firstEntryByTag(entries, "NS_SET")
-	if entry == nil {
-		t.Fatalf("expected NS_SET entry")
-	}
+	tctest.RequireTags(t, entries, "MULTIPLE_NS_SET", "NS_SET")
+	entry := tctest.RequireTag(t, entries, "NS_SET")
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
@@ -418,10 +378,8 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency04: %v", err)
 	}
-	if !hasEntryTag(entries, "ONE_NS_SET") {
-		t.Fatalf("expected ONE_NS_SET")
-	}
-	entry := firstEntryByTag(entries, "ONE_NS_SET")
+	tctest.RequireTags(t, entries, "ONE_NS_SET")
+	entry := tctest.First(entries, "ONE_NS_SET")
 	servers, ok := entry.Args["servers"].([]map[string]any)
 	if !ok || len(servers) != 2 {
 		t.Fatalf("expected typed server list for ONE_NS_SET, got %#v", entry.Args["servers"])
@@ -432,9 +390,7 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
-	if hasEntryTag(entries, "INCONSISTENT_NS_TTL") {
-		t.Fatalf("did not expect INCONSISTENT_NS_TTL when all servers share one TTL")
-	}
+	tctest.RequireNoTag(t, entries, "INCONSISTENT_NS_TTL")
 }
 
 func TestConsistency04ParallelNSQueries(t *testing.T) {
@@ -532,7 +488,7 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 		if entry == nil || entry.Tag != "NS_SET" {
 			continue
 		}
-		if name := firstServerName(entry.Args); name != "" {
+		if name := tctest.FirstServerName(entry.Args); name != "" {
 			order = append(order, name)
 		}
 	}
@@ -587,13 +543,8 @@ func TestConsistency04InconsistentNSTTL(t *testing.T) {
 		t.Fatalf("consistency04: %v", err)
 	}
 
-	if !hasEntryTag(entries, "ONE_NS_SET") {
-		t.Fatalf("expected ONE_NS_SET for matching NS names")
-	}
-	entry := firstEntryByTag(entries, "INCONSISTENT_NS_TTL")
-	if entry == nil {
-		t.Fatalf("expected INCONSISTENT_NS_TTL for differing apex NS RRset TTLs")
-	}
+	tctest.RequireTags(t, entries, "ONE_NS_SET")
+	entry := tctest.RequireTag(t, entries, "INCONSISTENT_NS_TTL")
 	if got := entry.Args["count"]; got != 2 {
 		t.Fatalf("expected count=2, got %#v", got)
 	}
@@ -664,9 +615,7 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
-		t.Fatalf("expected ADDRESSES_MATCH")
-	}
+	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
 
 func TestConsistency05ChildZoneLame(t *testing.T) {
@@ -712,25 +661,10 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if !hasEntryTag(entries, "CHILD_NS_FAILED") {
-		t.Fatalf("expected CHILD_NS_FAILED")
-	}
-	entry := firstEntryByTag(entries, "CHILD_NS_FAILED")
-	if _, ok := entry.Args["arg_schema"]; ok {
-		t.Fatalf("did not expect arg_schema in args: %#v", entry.Args["arg_schema"])
-	}
-	if ns, ok := entry.Args["ns"].(string); !ok || ns != "auth.example" {
-		t.Fatalf("expected CHILD_NS_FAILED ns=auth.example, got %#v", entry.Args["ns"])
-	}
-	if ns, _ := entry.Args["ns"].(string); strings.Contains(ns, "/") {
-		t.Fatalf("expected nameserver-only ns argument, got %q", ns)
-	}
-	if address, ok := entry.Args["address"].(string); !ok || address != "192.0.2.53" {
-		t.Fatalf("expected CHILD_NS_FAILED address=192.0.2.53, got %#v", entry.Args["address"])
-	}
-	if !hasEntryTag(entries, "CHILD_ZONE_LAME") {
-		t.Fatalf("expected CHILD_ZONE_LAME")
-	}
+	tctest.RequireTags(t, entries, "CHILD_NS_FAILED")
+	entry := tctest.First(entries, "CHILD_NS_FAILED")
+	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "auth.example", Address: "192.0.2.53"})
+	tctest.RequireTags(t, entries, "CHILD_ZONE_LAME")
 }
 
 func TestConsistency05InBailiwickMismatch(t *testing.T) {
@@ -778,21 +712,15 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if !hasEntryTag(entries, "IN_DOMAIN_ADDR_MISMATCH") {
-		t.Fatalf("expected IN_DOMAIN_ADDR_MISMATCH")
-	}
-	mismatch := firstEntryByTag(entries, "IN_DOMAIN_ADDR_MISMATCH")
-	if mismatch == nil {
-		t.Fatalf("missing IN_DOMAIN_ADDR_MISMATCH entry")
-	}
+	mismatch := tctest.RequireTag(t, entries, "IN_DOMAIN_ADDR_MISMATCH")
 	if got := mismatch.Args["ns"]; got != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", got)
 	}
-	parent := serverEndpointsAtKey(mismatch.Args, "parent_servers")
+	parent := tctest.EndpointsAt(mismatch.Args, "parent_servers")
 	if len(parent) != 1 || parent[0] != "ns1.example/192.0.2.1" {
 		t.Fatalf("expected parent_servers [ns1.example/192.0.2.1], got %v", parent)
 	}
-	zone := serverEndpointsAtKey(mismatch.Args, "zone_servers")
+	zone := tctest.EndpointsAt(mismatch.Args, "zone_servers")
 	if len(zone) != 1 || zone[0] != "ns1.example/192.0.2.2" {
 		t.Fatalf("expected zone_servers [ns1.example/192.0.2.2], got %v", zone)
 	}
@@ -802,13 +730,7 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	if _, ok := mismatch.Args["zone_addresses"]; ok {
 		t.Fatalf("legacy key zone_addresses should not be present: %#v", mismatch.Args)
 	}
-	if !hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
-		t.Fatalf("expected EXTRA_ADDRESS_CHILD")
-	}
-	entry := firstEntryByTag(entries, "EXTRA_ADDRESS_CHILD")
-	if entry == nil {
-		t.Fatalf("missing EXTRA_ADDRESS_CHILD entry")
-	}
+	entry := tctest.RequireTag(t, entries, "EXTRA_ADDRESS_CHILD")
 	addresses, ok := entry.Args["addresses"].([]string)
 	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.2" {
 		t.Fatalf("expected typed addresses [192.0.2.2], got %#v", entry.Args["addresses"])
@@ -874,28 +796,19 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "CHILD_ZONE_LAME") {
-		t.Fatalf("did not expect CHILD_ZONE_LAME")
-	}
+	tctest.RequireNoTag(t, entries, "CHILD_ZONE_LAME")
 	// The parent glues ns1 and the child answers NXDOMAIN for it, so the
 	// child serves no address for a glued name. That is a missing record,
 	// not glue pointing at the wrong address.
-	missing := firstEntryByTag(entries, "MISSING_ADDRESS_CHILD")
-	if missing == nil {
-		t.Fatalf("expected MISSING_ADDRESS_CHILD")
-	}
+	missing := tctest.RequireTag(t, entries, "MISSING_ADDRESS_CHILD")
 	if got := missing.Args["ns"]; got != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", got)
 	}
-	if hasEntryTag(entries, "IN_DOMAIN_ADDR_MISMATCH") {
-		t.Fatalf("a name the child has no address for is missing, not mismatched")
-	}
+	tctest.RequireNoTag(t, entries, "IN_DOMAIN_ADDR_MISMATCH")
 	// ns2 is served only by the child and carries no glue, so it is outside
 	// the address comparison. The parent/child NS disagreement is reported
 	// by the NS set comparison, not as an extra address here.
-	if hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
-		t.Fatalf("a name without glue must not produce EXTRA_ADDRESS_CHILD")
-	}
+	tctest.RequireNoTag(t, entries, "EXTRA_ADDRESS_CHILD")
 }
 
 func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
@@ -941,18 +854,12 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if !hasEntryTag(entries, "NOT_IN_DOMAIN_ADDR_MISMATCH") {
-		t.Fatalf("expected NOT_IN_DOMAIN_ADDR_MISMATCH")
-	}
-	mismatch := firstEntryByTag(entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
-	if mismatch == nil {
-		t.Fatalf("missing NOT_IN_DOMAIN_ADDR_MISMATCH entry")
-	}
-	parent := serverEndpointsAtKey(mismatch.Args, "parent_servers")
+	mismatch := tctest.RequireTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
+	parent := tctest.EndpointsAt(mismatch.Args, "parent_servers")
 	if len(parent) != 1 || parent[0] != "ns1.other/192.0.2.1" {
 		t.Fatalf("expected parent_servers [ns1.other/192.0.2.1], got %v", parent)
 	}
-	if zone := serverEndpointsAtKey(mismatch.Args, "zone_servers"); len(zone) != 0 {
+	if zone := tctest.EndpointsAt(mismatch.Args, "zone_servers"); len(zone) != 0 {
 		t.Fatalf("expected empty zone_servers for OOB mismatch, got %v", zone)
 	}
 	if _, ok := mismatch.Args["parent_addresses"]; ok {
@@ -1041,12 +948,8 @@ func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
 			if err != nil {
 				t.Fatalf("consistency05: %v", err)
 			}
-			if !hasEntryTag(entries, "ADDRESSES_MATCH") {
-				t.Fatalf("expected ADDRESSES_MATCH for glueless OOB delegation")
-			}
-			if hasEntryTag(entries, "NOT_IN_DOMAIN_ADDR_MISMATCH") {
-				t.Fatalf("unexpected NOT_IN_DOMAIN_ADDR_MISMATCH for glueless OOB delegation")
-			}
+			tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
+			tctest.RequireNoTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
 		})
 	}
 }
@@ -1115,12 +1018,8 @@ func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "NOT_IN_DOMAIN_ADDR_MISMATCH") {
-		t.Fatalf("loopback answered by parent for an out-of-domain name must not produce NOT_IN_DOMAIN_ADDR_MISMATCH")
-	}
-	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
-		t.Fatalf("expected ADDRESSES_MATCH when the referral carries no glue")
-	}
+	tctest.RequireNoTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
+	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
 
 // stubConsistency05Child installs the child-side stubs shared by the
@@ -1211,15 +1110,8 @@ func TestConsistency05DelegationNSSetConsistentParents(t *testing.T) {
 		t.Fatalf("consistency05: %v", err)
 	}
 	// Two parents serving the identical delegation must stay silent.
-	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
-		t.Fatalf("did not expect MULTIPLE_DELEGATION_NS_SET for identical parent delegations")
-	}
-	if hasEntryTag(entries, "DELEGATION_NS_SET") {
-		t.Fatalf("did not expect DELEGATION_NS_SET for identical parent delegations")
-	}
-	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
-		t.Fatalf("expected ADDRESSES_MATCH")
-	}
+	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
+	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
 
 func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
@@ -1255,10 +1147,7 @@ func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
 		t.Fatalf("consistency05: %v", err)
 	}
 
-	multiple := firstEntryByTag(entries, "MULTIPLE_DELEGATION_NS_SET")
-	if multiple == nil {
-		t.Fatalf("expected MULTIPLE_DELEGATION_NS_SET")
-	}
+	multiple := tctest.RequireTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 	if count, ok := multiple.Args["count"].(int); !ok || count != 2 {
 		t.Fatalf("expected count=2, got %#v", multiple.Args["count"])
 	}
@@ -1348,12 +1237,7 @@ func TestConsistency05DelegationNSSetGlueDifference(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
-		t.Fatalf("glue-only difference must not report a delegation disagreement")
-	}
-	if hasEntryTag(entries, "DELEGATION_NS_SET") {
-		t.Fatalf("did not expect DELEGATION_NS_SET for a single delegation set")
-	}
+	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
 }
 
 // The reported false positive: every root serves the same ten NS names for
@@ -1402,14 +1286,10 @@ func TestConsistency05DelegationNSSetTrimmedGlueIsOneDelegation(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
-		t.Fatalf("trimmed glue must not split the delegation")
-	}
+	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 	// Every parent carries both names, so the union of glue still matches
 	// the child and the address comparison stays clean.
-	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
-		t.Fatalf("expected ADDRESSES_MATCH, glue union covers the child data")
-	}
+	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
 
 func TestConsistency05DelegationNSSetIgnoresNonRespondingParent(t *testing.T) {
@@ -1440,12 +1320,7 @@ func TestConsistency05DelegationNSSetIgnoresNonRespondingParent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
-		t.Fatalf("a non-responding parent must not produce MULTIPLE_DELEGATION_NS_SET")
-	}
-	if hasEntryTag(entries, "DELEGATION_NS_SET") {
-		t.Fatalf("a non-responding parent must not produce DELEGATION_NS_SET")
-	}
+	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
 }
 
 func TestConsistency05DelegationNSSetIgnoresParentWithoutNSRecords(t *testing.T) {
@@ -1481,12 +1356,7 @@ func TestConsistency05DelegationNSSetIgnoresParentWithoutNSRecords(t *testing.T)
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
-		t.Fatalf("a parent without NS records must not produce MULTIPLE_DELEGATION_NS_SET")
-	}
-	if hasEntryTag(entries, "DELEGATION_NS_SET") {
-		t.Fatalf("a parent without NS records must not produce DELEGATION_NS_SET")
-	}
+	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
 }
 
 // Without an advertised EDNS payload size the parent caps the referral at 512
@@ -1582,7 +1452,7 @@ func TestConsistency05InBailiwickMismatchIsPerName(t *testing.T) {
 			t.Fatalf("unexpected ns %#v", entry.Args["ns"])
 		}
 		delete(want, nsName)
-		parent := serverEndpointsAtKey(entry.Args, "parent_servers")
+		parent := tctest.EndpointsAt(entry.Args, "parent_servers")
 		if len(parent) != 1 || parent[0] != wantEndpoint {
 			t.Fatalf("expected parent_servers [%s], got %v", wantEndpoint, parent)
 		}
@@ -1649,18 +1519,8 @@ func TestConsistency05NameWithoutGlueIsNotCompared(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "EXTRA_ADDRESS_CHILD") {
-		t.Fatalf("a name without glue must not produce EXTRA_ADDRESS_CHILD")
-	}
-	if hasEntryTag(entries, "IN_DOMAIN_ADDR_MISMATCH") {
-		t.Fatalf("a name without glue must not produce IN_DOMAIN_ADDR_MISMATCH")
-	}
-	if hasEntryTag(entries, "MISSING_ADDRESS_CHILD") {
-		t.Fatalf("a name without glue must not produce MISSING_ADDRESS_CHILD")
-	}
-	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
-		t.Fatalf("expected ADDRESSES_MATCH, ns1 glue matches the child")
-	}
+	tctest.RequireNoTag(t, entries, "EXTRA_ADDRESS_CHILD", "IN_DOMAIN_ADDR_MISMATCH", "MISSING_ADDRESS_CHILD")
+	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
 
 // Trimming removes records from the union but never adds any, so a glue
@@ -1698,13 +1558,9 @@ func TestConsistency05TrimmedGlueUnionMatchesChild(t *testing.T) {
 		t.Fatalf("consistency05: %v", err)
 	}
 	for _, tag := range []string{"IN_DOMAIN_ADDR_MISMATCH", "MISSING_ADDRESS_CHILD", "EXTRA_ADDRESS_CHILD", "MULTIPLE_DELEGATION_NS_SET"} {
-		if hasEntryTag(entries, tag) {
-			t.Fatalf("unexpected %s for a glue union that matches the child", tag)
-		}
+		tctest.RequireNoTag(t, entries, tag)
 	}
-	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
-		t.Fatalf("expected ADDRESSES_MATCH")
-	}
+	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
 
 // ns_names names the disputed names only: the union of the observed sets
@@ -1794,7 +1650,7 @@ func TestConsistency05MultipleDelegationNSSetImpliesNSNames(t *testing.T) {
 				t.Fatalf("consistency05: %v", err)
 			}
 
-			multiple := firstEntryByTag(entries, "MULTIPLE_DELEGATION_NS_SET")
+			multiple := tctest.First(entries, "MULTIPLE_DELEGATION_NS_SET")
 			if got := multiple != nil; got != tc.wantWarning {
 				t.Fatalf("warning emitted = %v, want %v", got, tc.wantWarning)
 			}
@@ -1872,12 +1728,7 @@ func TestConsistency05DelegationNSSetIgnoresAuthoritativeParent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
-		t.Fatalf("an authoritative parent answer must not produce a delegation set")
-	}
-	if hasEntryTag(entries, "DELEGATION_NS_SET") {
-		t.Fatalf("an authoritative parent answer must not produce DELEGATION_NS_SET")
-	}
+	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
 }
 
 // RFC 2181 section 9 lets a truncated response carry the partial RRset that
@@ -1913,14 +1764,10 @@ func TestConsistency05DelegationNSSetIgnoresTruncatedResponse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
-		t.Fatalf("a truncated response must not produce a delegation set")
-	}
+	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 	// The truncated response contributes no glue either, so the remaining
 	// parent's complete glue still matches the child.
-	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
-		t.Fatalf("expected ADDRESSES_MATCH")
-	}
+	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
 
 // An upward referral answers with the root NS RRset instead of delegating the
@@ -1952,9 +1799,7 @@ func TestConsistency05DelegationNSSetIgnoresUpwardReferral(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
-		t.Fatalf("an upward referral must not produce a delegation set")
-	}
+	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 }
 
 // The delegation is the authority-section NS RRset. NS records that appear
@@ -1989,9 +1834,7 @@ func TestConsistency05DelegationNSSetReadsAuthoritySectionOnly(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "MULTIPLE_DELEGATION_NS_SET") {
-		t.Fatalf("NS records outside the authority section must not split the delegation")
-	}
+	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 }
 
 // Glue is only credible for names the same response delegates to. An address
@@ -2024,12 +1867,8 @@ func TestConsistency05GlueIgnoresOwnerOutsideAuthoritySet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency05: %v", err)
 	}
-	if hasEntryTag(entries, "IN_DOMAIN_ADDR_MISMATCH") {
-		t.Fatalf("an address record outside the authority NS set must not count as glue")
-	}
-	if !hasEntryTag(entries, "ADDRESSES_MATCH") {
-		t.Fatalf("expected ADDRESSES_MATCH")
-	}
+	tctest.RequireNoTag(t, entries, "IN_DOMAIN_ADDR_MISMATCH")
+	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
 
 func TestConsistency06MultipleMnames(t *testing.T) {
@@ -2071,16 +1910,8 @@ func TestConsistency06MultipleMnames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("consistency06: %v", err)
 	}
-	if !hasEntryTag(entries, "MULTIPLE_SOA_MNAMES") {
-		t.Fatalf("expected MULTIPLE_SOA_MNAMES")
-	}
-	if !hasEntryTag(entries, "SOA_MNAME") {
-		t.Fatalf("expected SOA_MNAME")
-	}
-	entry := firstEntryByTag(entries, "SOA_MNAME")
-	if entry == nil {
-		t.Fatalf("missing SOA_MNAME entry")
-	}
+	tctest.RequireTags(t, entries, "MULTIPLE_SOA_MNAMES", "SOA_MNAME")
+	entry := tctest.RequireTag(t, entries, "SOA_MNAME")
 	if _, ok := entry.Args["servers"]; !ok {
 		t.Fatalf("expected typed servers in SOA_MNAME args: %#v", entry.Args)
 	}
@@ -2109,99 +1940,6 @@ func newNameserver(t *testing.T, ctx context.Context, name string, ip string, ha
 		return handler(qname, qtype), nil
 	})
 	return ns
-}
-
-func hasEntryTag(entries []*logger.Entry, tag string) bool {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return true
-		}
-	}
-	return false
-}
-
-func firstEntryByTag(entries []*logger.Entry, tag string) *logger.Entry {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return entry
-		}
-	}
-	return nil
-}
-
-func firstServerName(args map[string]any) string {
-	if args == nil {
-		return ""
-	}
-	switch servers := args["servers"].(type) {
-	case []map[string]any:
-		if len(servers) == 0 {
-			return ""
-		}
-		name, _ := servers[0]["ns"].(string)
-		return name
-	case []any:
-		if len(servers) == 0 {
-			return ""
-		}
-		item, _ := servers[0].(map[string]any)
-		name, _ := item["ns"].(string)
-		return name
-	default:
-		return ""
-	}
-}
-
-func serverEndpointsAtKey(args map[string]any, key string) []string {
-	if args == nil {
-		return nil
-	}
-	raw, ok := args[key]
-	if !ok {
-		return nil
-	}
-	toEndpoint := func(ns string, address string) string {
-		ns = strings.TrimSpace(ns)
-		address = strings.TrimSpace(address)
-		switch {
-		case ns != "" && address != "":
-			return ns + "/" + address
-		case ns != "":
-			return ns
-		case address != "":
-			return address
-		default:
-			return ""
-		}
-	}
-	var out []string
-	switch items := raw.(type) {
-	case []map[string]any:
-		for _, item := range items {
-			ns, _ := item["ns"].(string)
-			address, _ := item["address"].(string)
-			if endpoint := toEndpoint(ns, address); endpoint != "" {
-				out = append(out, endpoint)
-			}
-		}
-	case []any:
-		for _, rawItem := range items {
-			item, _ := rawItem.(map[string]any)
-			ns, _ := item["ns"].(string)
-			address, _ := item["address"].(string)
-			if endpoint := toEndpoint(ns, address); endpoint != "" {
-				out = append(out, endpoint)
-			}
-		}
-	}
-	sort.Strings(out)
-	return out
 }
 
 func soaPacket(owner string, serial uint32, mname string, rname string, refresh uint32, retry uint32, expire uint32, minimum uint32) packet.Packet {

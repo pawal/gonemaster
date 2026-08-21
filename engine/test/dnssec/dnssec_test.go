@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -424,112 +425,81 @@ func TestDNSSEC01KeyAlgoUndelegated(t *testing.T) {
 }
 
 func TestDNSSEC01ParallelParentQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
-		return nil, nil
-	})
-	tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool {
-		return false
-	})
+		tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+			return nil, nil
+		})
+		tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool {
+			return false
+		})
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			if qtype != "DS" {
-				return packet.Packet{}, nil
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if q.Type != "DS" {
+					return packet.Packet{}
+				}
+				gate.Arrive(id)
+				return dsPacket(q.Name, 12345, 8, 2)
 			}
-			select {
-			case started <- id:
-			default:
-			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			return dsPacket(qname, 12345, 8, 2), nil
 		}
-	}
 
-	parent1, err := nameserver.NewWithContext(ctx, "ns-parent1.example", "192.0.2.80", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	parent1.SetQueryHook(hook("parent1"))
+		parent1 := tctest.NS(t, ctx, "ns-parent1.example", "192.0.2.80", hook("parent1"))
+		parent2 := tctest.NS(t, ctx, "ns-parent2.example", "192.0.2.81", hook("parent2"))
 
-	parent2, err := nameserver.NewWithContext(ctx, "ns-parent2.example", "192.0.2.81", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	parent2.SetQueryHook(hook("parent2"))
+		tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{parent1, parent2}, nil
+		})
 
-	tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{parent1, parent2}, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC01(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC01(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "parent1", "parent2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel DS queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec01: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec01 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
+		tctest.RequireTags(t, entries, "DS01_DS_ALGO_OK")
 
-	var gotServers []map[string]any
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "DS01_DS_ALGO_OK" {
-			continue
+		var gotServers []map[string]any
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "DS01_DS_ALGO_OK" {
+				continue
+			}
+			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+				gotServers = servers
+			}
+			if _, ok := entry.Args["ns_list"]; ok {
+				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+			}
+			break
 		}
-		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-			gotServers = servers
+		if len(gotServers) == 0 {
+			t.Fatalf("expected typed servers for DS01_DS_ALGO_OK")
 		}
-		if _, ok := entry.Args["ns_list"]; ok {
-			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		if len(gotServers) != 2 {
+			t.Fatalf("expected two typed servers for DS01_DS_ALGO_OK, got %#v", gotServers)
 		}
-		break
-	}
-	if len(gotServers) == 0 {
-		t.Fatalf("expected typed servers for DS01_DS_ALGO_OK")
-	}
-	if len(gotServers) != 2 {
-		t.Fatalf("expected two typed servers for DS01_DS_ALGO_OK, got %#v", gotServers)
-	}
-	if gotServers[0]["ns"] != "ns-parent1.example" || gotServers[1]["ns"] != "ns-parent2.example" {
-		t.Fatalf("expected deterministic server order, got %#v", gotServers)
-	}
+		if gotServers[0]["ns"] != "ns-parent1.example" || gotServers[1]["ns"] != "ns-parent2.example" {
+			t.Fatalf("expected deterministic server order, got %#v", gotServers)
+		}
+	})
 }
 
 func TestDNSSEC02NoDNSKEYForDS(t *testing.T) {

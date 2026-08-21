@@ -1,7 +1,7 @@
 package tctest
 
 import (
-	"sort"
+	"slices"
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -46,7 +46,7 @@ func ServerNames(t TB, args map[string]any) []string {
 			names = append(names, ns)
 		}
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	return names
 }
 
@@ -135,7 +135,7 @@ func Ints(t TB, args map[string]any, key string) []int {
 		t.Fatalf("unexpected %s type: %T", key, raw)
 		return nil
 	}
-	sort.Ints(out)
+	slices.Sort(out)
 	return out
 }
 
@@ -222,6 +222,6 @@ func endpoints(rows []map[string]any) []string {
 			out = append(out, address)
 		}
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }

@@ -9,7 +9,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"time"
+	"testing/synctest"
 	"unicode/utf8"
 
 	dns "codeberg.org/miekg/dns"
@@ -235,111 +235,79 @@ func TestNameserver01NxdomainMixedAAIsRecursor(t *testing.T) {
 }
 
 func TestNameserver01ParallelQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(id string) func(context.Context, string, string, string, *ens.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *ens.QueryOptions) (packet.Packet, error) {
-			if strings.EqualFold(qtype, "A") && strings.EqualFold(qname, nonExistentNames[0]) {
-				select {
-				case started <- id:
-				default:
+		gate := tctest.NewGate()
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if strings.EqualFold(q.Type, "A") && strings.EqualFold(q.Name, nonExistentNames[0]) {
+					gate.Arrive(id)
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
+				msg := new(dns.Msg)
+				msg.Rcode = dns.RcodeNameError
+				// RA=1 so both servers classify as recursors; this test
+				// exercises parallel fan-out and the consolidated entry.
+				msg.RecursionAvailable = true
+				return packet.Packet{Msg: msg}
 			}
-			msg := new(dns.Msg)
-			msg.Rcode = dns.RcodeNameError
-			// RA=1 so both servers classify as recursors; this test
-			// exercises parallel fan-out and the consolidated entry.
-			msg.RecursionAvailable = true
-			return packet.Packet{Msg: msg}, nil
 		}
-	}
 
-	ns1, err := ens.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", hook("ns1"))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", hook("ns2"))
 
-	ns2, err := ens.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
+		tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+			return []ens.Nameserver{ns1, ns2}, nil
+		})
 
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns1, ns2}, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var nsErr error
+		go func() {
+			entries, nsErr = Nameserver01(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var nsErr error
-	go func() {
-		entries, nsErr = Nameserver01(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel A queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if nsErr != nil {
 			t.Fatalf("nameserver01: %v", nsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("nameserver01 did not finish")
-	}
 
-	var found *logger.Entry
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "IS_A_RECURSOR" {
-			continue
+		var found *logger.Entry
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "IS_A_RECURSOR" {
+				continue
+			}
+			if found != nil {
+				t.Fatalf("expected single consolidated IS_A_RECURSOR entry, got multiple")
+			}
+			found = entry
 		}
-		if found != nil {
-			t.Fatalf("expected single consolidated IS_A_RECURSOR entry, got multiple")
+		if found == nil {
+			t.Fatalf("expected IS_A_RECURSOR entry, got none")
 		}
-		found = entry
-	}
-	if found == nil {
-		t.Fatalf("expected IS_A_RECURSOR entry, got none")
-	}
-	servers, ok := found.Args["servers"].([]map[string]any)
-	if !ok {
-		t.Fatalf("expected servers array in IS_A_RECURSOR args, got %#v", found.Args)
-	}
-	if len(servers) != 2 {
-		t.Fatalf("expected 2 servers in consolidated entry, got %d", len(servers))
-	}
-	if servers[0]["ns"] != "ns1.example" || servers[1]["ns"] != "ns2.example" {
-		t.Fatalf("expected sorted ns1/ns2, got %v", servers)
-	}
-	if servers[0]["address"] != "192.0.2.1" || servers[1]["address"] != "192.0.2.2" {
-		t.Fatalf("expected addresses 192.0.2.1/192.0.2.2, got %v", servers)
-	}
+		servers, ok := found.Args["servers"].([]map[string]any)
+		if !ok {
+			t.Fatalf("expected servers array in IS_A_RECURSOR args, got %#v", found.Args)
+		}
+		if len(servers) != 2 {
+			t.Fatalf("expected 2 servers in consolidated entry, got %d", len(servers))
+		}
+		if servers[0]["ns"] != "ns1.example" || servers[1]["ns"] != "ns2.example" {
+			t.Fatalf("expected sorted ns1/ns2, got %v", servers)
+		}
+		if servers[0]["address"] != "192.0.2.1" || servers[1]["address"] != "192.0.2.2" {
+			t.Fatalf("expected addresses 192.0.2.1/192.0.2.2, got %v", servers)
+		}
+	})
 }
 
 func TestNameserver02EDNS0Support(t *testing.T) {
@@ -505,100 +473,68 @@ func TestNameserver05AAAAWellProcessed(t *testing.T) {
 }
 
 func TestNameserver05ParallelQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(id string) func(context.Context, string, string, string, *ens.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *ens.QueryOptions) (packet.Packet, error) {
-			if strings.EqualFold(qtype, "A") && strings.EqualFold(qname, "example") {
-				select {
-				case started <- id:
-				default:
+		gate := tctest.NewGate()
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if strings.EqualFold(q.Type, "A") && strings.EqualFold(q.Name, "example") {
+					gate.Arrive(id)
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
+				return packet.Packet{}
 			}
-			return packet.Packet{}, nil
 		}
-	}
 
-	ns1, err := ens.NewWithContext(ctx, "ns1.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", hook("ns1"))
+		ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", hook("ns2"))
 
-	ns2, err := ens.NewWithContext(ctx, "ns2.example", "192.0.2.2", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
+		tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+			return []ens.Nameserver{ns1, ns2}, nil
+		})
 
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns1, ns2}, nil
-	})
+		z := zone.Zone{Name: dnsname.New("example")}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var nsErr error
+		go func() {
+			entries, nsErr = Nameserver05(ctx, &z)
+			close(done)
+		}()
 
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var nsErr error
-	go func() {
-		entries, nsErr = Nameserver05(ctx, &z)
-		close(done)
-	}()
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
 
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel A queries to start, got %v", got)
-		}
-	}
-
-	close(release)
-
-	select {
-	case <-done:
+		<-done
 		if nsErr != nil {
 			t.Fatalf("nameserver05: %v", nsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("nameserver05 did not finish")
-	}
 
-	var order []string
-	var addresses []string
-	for _, entry := range tctest.All(entries, "NO_RESPONSE") {
-		tctest.RequireArgShape(t, entry, tctest.ArgShape{})
-		if ns, ok := entry.Args["ns"].(string); ok {
-			order = append(order, ns)
+		var order []string
+		var addresses []string
+		for _, entry := range tctest.All(entries, "NO_RESPONSE") {
+			tctest.RequireArgShape(t, entry, tctest.ArgShape{})
+			if ns, ok := entry.Args["ns"].(string); ok {
+				order = append(order, ns)
+			}
+			if address, ok := entry.Args["address"].(string); ok {
+				addresses = append(addresses, address)
+			}
 		}
-		if address, ok := entry.Args["address"].(string); ok {
-			addresses = append(addresses, address)
+		if len(order) != 2 {
+			t.Fatalf("expected 2 no-response entries, got %v", order)
 		}
-	}
-	if len(order) != 2 {
-		t.Fatalf("expected 2 no-response entries, got %v", order)
-	}
-	if order[0] != "ns1.example" || order[1] != "ns2.example" {
-		t.Fatalf("expected deterministic log order, got %v", order)
-	}
-	if len(addresses) != 2 || addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
-		t.Fatalf("expected deterministic address order, got %v", addresses)
-	}
+		if order[0] != "ns1.example" || order[1] != "ns2.example" {
+			t.Fatalf("expected deterministic log order, got %v", order)
+		}
+		if len(addresses) != 2 || addresses[0] != "192.0.2.1" || addresses[1] != "192.0.2.2" {
+			t.Fatalf("expected deterministic address order, got %v", addresses)
+		}
+	})
 }
 
 func TestNameserver06NotResolved(t *testing.T) {

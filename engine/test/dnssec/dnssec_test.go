@@ -3180,195 +3180,133 @@ func TestDNSSEC10NonstandardNSECResponseMixedServers(t *testing.T) {
 }
 
 func TestDNSSEC11ParallelParentQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
-	tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool { return false })
+		profile.Effective().Resolver.Defaults.Parallel = 2
+		tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool { return false })
 
-	ds := tctest.DSRR("example", 12345, 8, 2, "DEADBEEF")
+		ds := tctest.DSRR("example", 12345, 8, 2, "DEADBEEF")
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	hook := func(id string, withDS bool) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			if qtype != "DS" {
-				return packet.Packet{}, nil
+		hook := func(id string, withDS bool) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if q.Type != "DS" {
+					return packet.Packet{}
+				}
+				gate.Arrive(id)
+				if withDS {
+					return dsPacketFromDS(q.Name, ds)
+				}
+				return dsPacketFromDS(q.Name, nil)
 			}
-			select {
-			case started <- id:
-			default:
-			}
-			select {
-			case <-release:
-			case <-ctx.Done():
-				return packet.Packet{}, ctx.Err()
-			}
-			if withDS {
-				return dsPacketFromDS(qname, ds), nil
-			}
-			return dsPacketFromDS(qname, nil), nil
 		}
-	}
 
-	parent1, err := nameserver.NewWithContext(ctx, "ns-parent1.example", "192.0.2.80", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	parent1.SetQueryHook(hook("parent1", true))
+		parent1 := tctest.NS(t, ctx, "ns-parent1.example", "192.0.2.80", hook("parent1", true))
+		parent2 := tctest.NS(t, ctx, "ns-parent2.example", "192.0.2.81", hook("parent2", false))
 
-	parent2, err := nameserver.NewWithContext(ctx, "ns-parent2.example", "192.0.2.81", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	parent2.SetQueryHook(hook("parent2", false))
+		tctest.Stub(t, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{parent1, parent2}, nil
+		})
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		})
 
-	tctest.Stub(t, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{parent1, parent2}, nil
-	})
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
-
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC11(ctx, &z)
-		close(done)
-	}()
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel DS queries to start, got %v", got)
+		z, err := zone.New("example")
+		if err != nil {
+			t.Fatalf("zone new: %v", err)
 		}
-	}
 
-	close(release)
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC11(ctx, &z)
+			close(done)
+		}()
 
-	select {
-	case <-done:
+		synctest.Wait()
+		gate.RequireInFlight(t, "parent1", "parent2")
+		gate.Release()
+
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec11: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec11 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DS11_INCONSISTENT_DS", "DS11_PARENT_WITHOUT_DS", "DS11_PARENT_WITH_DS")
+		tctest.RequireTags(t, entries, "DS11_INCONSISTENT_DS", "DS11_PARENT_WITHOUT_DS", "DS11_PARENT_WITH_DS")
+	})
 }
 
 func TestDNSSEC11ParallelChildQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
-	tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool { return false })
+		profile.Effective().Resolver.Defaults.Parallel = 2
+		tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool { return false })
 
-	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	hook := func(id string, withDNSKEY bool) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			switch qtype {
-			case "SOA":
-				select {
-				case started <- id:
+		hook := func(id string, withDNSKEY bool) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "SOA":
+					gate.Arrive(id)
+					return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+				case "DNSKEY":
+					if withDNSKEY {
+						return dnskeyPacket(q.Name, key)
+					}
+					return dnskeyPacket(q.Name, nil)
 				default:
+					return packet.Packet{}
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
-				return answerPacket(qname, dns.TypeSOA, soaRecord(qname)), nil
-			case "DNSKEY":
-				if withDNSKEY {
-					return dnskeyPacket(qname, key), nil
-				}
-				return dnskeyPacket(qname, nil), nil
-			default:
-				return packet.Packet{}, nil
 			}
 		}
-	}
 
-	child1, err := nameserver.NewWithContext(ctx, "ns-child1.example", "192.0.2.90", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	child1.SetQueryHook(hook("child1", true))
+		child1 := tctest.NS(t, ctx, "ns-child1.example", "192.0.2.90", hook("child1", true))
+		child2 := tctest.NS(t, ctx, "ns-child2.example", "192.0.2.91", hook("child2", false))
 
-	child2, err := nameserver.NewWithContext(ctx, "ns-child2.example", "192.0.2.91", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	child2.SetQueryHook(hook("child2", false))
+		tctest.Stub(t, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		})
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{child1, child2}, nil
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		})
 
-	tctest.Stub(t, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
-	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{child1, child2}, nil
-	})
-	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
-
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC11(ctx, &z)
-		close(done)
-	}()
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel SOA queries to start, got %v", got)
+		z, err := zone.New("example")
+		if err != nil {
+			t.Fatalf("zone new: %v", err)
 		}
-	}
 
-	close(release)
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC11(ctx, &z)
+			close(done)
+		}()
 
-	select {
-	case <-done:
+		synctest.Wait()
+		gate.RequireInFlight(t, "child1", "child2")
+		gate.Release()
+
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec11: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec11 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DS11_INCONSISTENT_SIGNED_ZONE", "DS11_NS_WITH_UNSIGNED_ZONE", "DS11_NS_WITH_SIGNED_ZONE")
+		tctest.RequireTags(t, entries, "DS11_INCONSISTENT_SIGNED_ZONE", "DS11_NS_WITH_UNSIGNED_ZONE", "DS11_NS_WITH_SIGNED_ZONE")
+	})
 }
 
 func TestDNSSEC11InconsistentDS(t *testing.T) {

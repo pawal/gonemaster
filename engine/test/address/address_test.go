@@ -24,7 +24,7 @@ import (
 
 func TestAddress01DocumentationAddr(t *testing.T) {
 	ctx := testContext(t)
-	z := newZoneWithFakeAddresses(t, "example", map[string][]string{
+	z := tctest.ZoneWithAddrs(t, "example", map[string][]string{
 		"ns1.example": {"192.0.2.1"},
 	})
 
@@ -46,7 +46,7 @@ func TestAddress01DocumentationAddr(t *testing.T) {
 
 func TestAddress01NoNameServersFound(t *testing.T) {
 	ctx := testContext(t)
-	z := newZoneWithFakeAddresses(t, "example", map[string][]string{
+	z := tctest.ZoneWithAddrs(t, "example", map[string][]string{
 		"ns.other": {},
 	})
 
@@ -65,13 +65,6 @@ func TestAddress01NoNameServersFound(t *testing.T) {
 func TestAddress01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
 	ctx := testContext(t)
 
-	origDel := delegationNameservers
-	origZone := zoneNameservers
-	t.Cleanup(func() {
-		delegationNameservers = origDel
-		zoneNameservers = origZone
-	})
-
 	cnameErr := &recursor.CNAMEError{
 		Reason: recursor.CNAMEUnresolved,
 		Name:   "ns.outside.test",
@@ -85,12 +78,12 @@ func TestAddress01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
 	zoneItems := []nsdiscovery.NSItem{
 		{Name: dnsname.New("ns.outside.test"), Err: cnameErr},
 	}
-	delegationNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return delItems, nil
-	}
-	zoneNameservers = func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return zoneItems, nil
-	}
+	})
 
 	z, err := zone.New("example")
 	if err != nil {
@@ -125,12 +118,12 @@ func TestAddress02NameserversIPWithReverse(t *testing.T) {
 	ctx := testContext(t)
 	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS") {
 			return nsPacket(".", "a.root.")
 		}
-		if strings.EqualFold(qname, ptrName) && strings.EqualFold(qtype, "PTR") {
-			return ptrPacket(qname, "a.root.")
+		if strings.EqualFold(q.Name, ptrName) && strings.EqualFold(q.Type, "PTR") {
+			return ptrPacket(q.Name, "a.root.")
 		}
 		return packet.Packet{}
 	})
@@ -146,12 +139,12 @@ func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 	ctx := testContext(t)
 	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS") {
 			return nsPacket(".", "a.root.")
 		}
-		if strings.EqualFold(qname, ptrName) && strings.EqualFold(qtype, "PTR") {
-			return noAnswerPacket(qname, "PTR")
+		if strings.EqualFold(q.Name, ptrName) && strings.EqualFold(q.Type, "PTR") {
+			return noAnswerPacket(q.Name, "PTR")
 		}
 		return packet.Packet{}
 	})
@@ -174,14 +167,14 @@ func TestAddress02ReverseThroughCNAME(t *testing.T) {
 	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 	const cnameTarget = "host.1.2.0.192.in-addr.arpa."
 
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS") {
 			return nsPacket(".", "a.root.")
 		}
-		if strings.EqualFold(qname, ptrName) && strings.EqualFold(qtype, "PTR") {
-			return cnamePacket(qname, cnameTarget)
+		if strings.EqualFold(q.Name, ptrName) && strings.EqualFold(q.Type, "PTR") {
+			return cnamePacket(q.Name, cnameTarget)
 		}
-		if strings.EqualFold(qname, cnameTarget) && strings.EqualFold(qtype, "PTR") {
+		if strings.EqualFold(q.Name, cnameTarget) && strings.EqualFold(q.Type, "PTR") {
 			return ptrPacket(cnameTarget, "a.root.")
 		}
 		return packet.Packet{}
@@ -203,27 +196,20 @@ func TestAddress02CNAMEFailure(t *testing.T) {
 	t.Run("cname error logs tag and continues", func(t *testing.T) {
 		ctx := testContext(t)
 
-		origGlue := glueNameservers
-		origApex := apexNameservers
-		t.Cleanup(func() {
-			glueNameservers = origGlue
-			apexNameservers = origApex
-		})
-
 		cnameErr := &recursor.CNAMEError{
 			Reason: recursor.CNAMEUnresolved,
 			Name:   "ns.outside.test",
 			Target: "loop.outside.test",
 			Detail: "loop",
 		}
-		glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return nil, cnameErr
-		}
-		apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		})
+		tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return nil, nil
-		}
+		})
 
-		z := newZoneWithFakeAddresses(t, "example", map[string][]string{"ns1.example": {"192.0.2.1"}})
+		z := tctest.ZoneWithAddrs(t, "example", map[string][]string{"ns1.example": {"192.0.2.1"}})
 
 		entries, err := Address02(ctx, z)
 		if err != nil {
@@ -235,15 +221,12 @@ func TestAddress02CNAMEFailure(t *testing.T) {
 	t.Run("non-cname error still aborts", func(t *testing.T) {
 		ctx := testContext(t)
 
-		origGlue := glueNameservers
-		t.Cleanup(func() { glueNameservers = origGlue })
-
 		boom := errors.New("resolver failure")
-		glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return nil, boom
-		}
+		})
 
-		z := newZoneWithFakeAddresses(t, "example", map[string][]string{"ns1.example": {"192.0.2.1"}})
+		z := tctest.ZoneWithAddrs(t, "example", map[string][]string{"ns1.example": {"192.0.2.1"}})
 
 		entries, err := Address02(ctx, z)
 		if !errors.Is(err, boom) {
@@ -259,19 +242,16 @@ func TestAddress02CNAMEFailure(t *testing.T) {
 func TestAddress03CNAMEFailureLogsTagAndContinues(t *testing.T) {
 	ctx := testContext(t)
 
-	origApex := apexNameservers
-	t.Cleanup(func() { apexNameservers = origApex })
-
 	cnameErr := &recursor.CNAMEError{
 		Reason: recursor.CNAMEChainTooLong,
 		Name:   "ns.outside.test",
 		Target: "deep.outside.test",
 	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, cnameErr
-	}
+	})
 
-	z := newZoneWithFakeAddresses(t, "example", map[string][]string{"ns1.example": {"192.0.2.1"}})
+	z := tctest.ZoneWithAddrs(t, "example", map[string][]string{"ns1.example": {"192.0.2.1"}})
 
 	entries, err := Address03(ctx, z)
 	if err != nil {
@@ -284,12 +264,12 @@ func TestAddress03PTRMatch(t *testing.T) {
 	ctx := testContext(t)
 	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS") {
 			return nsPacket(".", "a.root.")
 		}
-		if strings.EqualFold(qname, ptrName) && strings.EqualFold(qtype, "PTR") {
-			return ptrPacket(qname, "a.root.")
+		if strings.EqualFold(q.Name, ptrName) && strings.EqualFold(q.Type, "PTR") {
+			return ptrPacket(q.Name, "a.root.")
 		}
 		return packet.Packet{}
 	})
@@ -305,12 +285,12 @@ func TestAddress03PTRMismatch(t *testing.T) {
 	ctx := testContext(t)
 	ptrName := dnsutil.ReverseAddr(netip.MustParseAddr("192.0.2.1"))
 
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS") {
 			return nsPacket(".", "a.root.")
 		}
-		if strings.EqualFold(qname, ptrName) && strings.EqualFold(qtype, "PTR") {
-			return ptrPacket(qname, "ptr.example.")
+		if strings.EqualFold(q.Name, ptrName) && strings.EqualFold(q.Type, "PTR") {
+			return ptrPacket(q.Name, "ptr.example.")
 		}
 		return packet.Packet{}
 	})
@@ -534,44 +514,6 @@ func testContext(t *testing.T) context.Context {
 	t.Helper()
 	ctx, _, _ := testhelpers.Context(t)
 	return ctx
-}
-
-func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname string, qtype string) packet.Packet) *zone.Zone {
-	t.Helper()
-
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-
-	ns, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		return handler(qname, qtype), nil
-	})
-
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
-	return &z
-}
-
-func newZoneWithFakeAddresses(t *testing.T, zoneName string, data map[string][]string) *zone.Zone {
-	t.Helper()
-
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(zoneName, data); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
-
-	z, err := zone.NewWithRecursor(zoneName, r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
-	return &z
 }
 
 func nsPacket(zoneName string, nsName string) packet.Packet {

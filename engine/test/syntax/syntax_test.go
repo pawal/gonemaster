@@ -89,8 +89,8 @@ func TestSyntax03NoDoubleDash(t *testing.T) {
 
 func TestSyntax04NameserverSyntaxOK(t *testing.T) {
 	ctx := testContext(t)
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS") {
 			return nsPacket(".", "ns1.example.")
 		}
 		return packet.Packet{}
@@ -105,8 +105,8 @@ func TestSyntax04NameserverSyntaxOK(t *testing.T) {
 
 func TestSyntax05MisusedAtSign(t *testing.T) {
 	ctx := testContext(t)
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "SOA") {
 			return soaPacket(".", "a.root.", "user@example.")
 		}
 		return packet.Packet{}
@@ -121,7 +121,7 @@ func TestSyntax05MisusedAtSign(t *testing.T) {
 
 func TestSyntax05NoResponseSOAQuery(t *testing.T) {
 	ctx := testContext(t)
-	z := newRootZoneWithHook(ctx, t, func(_ string, _ string) packet.Packet {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
 		return packet.Packet{}
 	})
 
@@ -236,13 +236,13 @@ func TestSyntax06MailDomainInvalidUsesProfileLevel(t *testing.T) {
 	ctx, prof, log := testhelpers.Context(t)
 	log.SetProfile(prof)
 
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
 		switch {
-		case strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS"):
+		case strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS"):
 			return nsPacket(".", "a.root.")
-		case strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA"):
+		case strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "SOA"):
 			return soaPacket(".", "a.root.", "hostmaster.example.com.")
-		case strings.EqualFold(qname, "example.com") && strings.EqualFold(qtype, "MX"):
+		case strings.EqualFold(q.Name, "example.com") && strings.EqualFold(q.Type, "MX"):
 			return mxPacket("example.com", "mail.example.com.")
 		default:
 			return packet.Packet{}
@@ -269,11 +269,11 @@ func TestSyntax06MailDomainInvalidUsesProfileLevel(t *testing.T) {
 
 func TestSyntax06RnameSingleLabelDomainInvalid(t *testing.T) {
 	ctx := testContext(t)
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS") {
 			return nsPacket(".", "a.root.")
 		}
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA") {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "SOA") {
 			return soaPacket(".", "a.root.", "dnsadmin.mo.")
 		}
 		return packet.Packet{}
@@ -289,8 +289,8 @@ func TestSyntax06RnameSingleLabelDomainInvalid(t *testing.T) {
 
 func TestSyntax06NoResponseArgsSplit(t *testing.T) {
 	ctx := testContext(t)
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS") {
 			return nsPacket(".", "a.root.")
 		}
 		return packet.Packet{}
@@ -308,8 +308,8 @@ func TestSyntax06IPv4DisabledArgsSplit(t *testing.T) {
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv4 = false
 
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "NS") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "NS") {
 			return nsPacket(".", "a.root.")
 		}
 		return packet.Packet{}
@@ -331,8 +331,8 @@ func TestSyntax06IPv4DisabledArgsSplit(t *testing.T) {
 
 func TestSyntax07MNameSyntaxOK(t *testing.T) {
 	ctx := testContext(t)
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "SOA") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "SOA") {
 			return soaPacket(".", "ns1.example.", "hostmaster.example.")
 		}
 		return packet.Packet{}
@@ -347,8 +347,8 @@ func TestSyntax07MNameSyntaxOK(t *testing.T) {
 
 func TestSyntax08MxSyntaxOK(t *testing.T) {
 	ctx := testContext(t)
-	z := newRootZoneWithHook(ctx, t, func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, ".") && strings.EqualFold(qtype, "MX") {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, ".") && strings.EqualFold(q.Type, "MX") {
 			return mxPacket(".", "mail.example.")
 		}
 		return packet.Packet{}
@@ -363,7 +363,7 @@ func TestSyntax08MxSyntaxOK(t *testing.T) {
 
 func TestSyntax08NoResponseMXQuery(t *testing.T) {
 	ctx := testContext(t)
-	z := newRootZoneWithHook(ctx, t, func(_ string, _ string) packet.Packet {
+	z := tctest.RootZone(t, ctx, func(q tctest.Query) packet.Packet {
 		return packet.Packet{}
 	})
 
@@ -411,29 +411,6 @@ func testContext(t *testing.T) context.Context {
 	t.Helper()
 	ctx, _, _ := testhelpers.Context(t)
 	return ctx
-}
-
-func newRootZoneWithHook(ctx context.Context, t *testing.T, handler func(qname string, qtype string) packet.Packet) *zone.Zone {
-	t.Helper()
-
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{"a.root": {"192.0.2.1"}}); err != nil {
-		t.Fatalf("add root hints: %v", err)
-	}
-
-	ns, err := nameserver.NewWithContext(ctx, "a.root", "192.0.2.1", r.Client())
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		return handler(qname, qtype), nil
-	})
-
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
-	return &z
 }
 
 func nsPacket(zoneName string, nsName string) packet.Packet {

@@ -464,11 +464,7 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 		return []packet.Packet{}, nil
 	})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
 
@@ -497,11 +493,7 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 		return []packet.Packet{}, nil
 	})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	entry := tctest.RequireTag(t, entries, "CHILD_NS_FAILED")
 	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "auth.example", Address: "192.0.2.53"})
 	tctest.RequireTags(t, entries, "CHILD_ZONE_LAME")
@@ -534,11 +526,7 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 		return []packet.Packet{}, nil
 	})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	mismatch := tctest.RequireTag(t, entries, "IN_DOMAIN_ADDR_MISMATCH")
 	if got := mismatch.Args["ns"]; got != "ns1.example" {
 		t.Fatalf("expected ns=ns1.example, got %#v", got)
@@ -605,11 +593,7 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 		return []packet.Packet{}, nil
 	})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "CHILD_ZONE_LAME")
 	// The parent glues ns1 and the child answers NXDOMAIN for it, so the
 	// child serves no address for a glued name. That is a missing record,
@@ -648,11 +632,7 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	mismatch := tctest.RequireTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
 	parent := tctest.EndpointsAt(mismatch.Args, "parent_servers")
 	if len(parent) != 1 || parent[0] != "ns1.other/192.0.2.1" {
@@ -727,11 +707,7 @@ func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
 				return packet.Packet{}, nil
 			})
 
-			z := zone.Zone{Name: dnsname.New(sc.zone)}
-			entries, err := Consistency05(ctx, &z)
-			if err != nil {
-				t.Fatalf("consistency05: %v", err)
-			}
+			entries := runConsistency05(t, ctx, sc.zone)
 			tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 			tctest.RequireNoTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
 		})
@@ -782,11 +758,7 @@ func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
 	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
@@ -860,11 +832,7 @@ func TestConsistency05DelegationNSSetConsistentParents(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	// Two parents serving the identical delegation must stay silent.
 	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
 	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
@@ -893,11 +861,7 @@ func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 
 	multiple := tctest.RequireTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 	if count, ok := multiple.Args["count"].(int); !ok || count != 2 {
@@ -980,11 +944,7 @@ func TestConsistency05DelegationNSSetGlueDifference(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
 }
 
@@ -1025,11 +985,7 @@ func TestConsistency05DelegationNSSetTrimmedGlueIsOneDelegation(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 	// Every parent carries both names, so the union of glue still matches
 	// the child and the address comparison stays clean.
@@ -1055,11 +1011,7 @@ func TestConsistency05DelegationNSSetIgnoresNonRespondingParent(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
 }
 
@@ -1087,11 +1039,7 @@ func TestConsistency05DelegationNSSetIgnoresParentWithoutNSRecords(t *testing.T)
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
 }
 
@@ -1151,11 +1099,7 @@ func TestConsistency05InBailiwickMismatchIsPerName(t *testing.T) {
 		return []packet.Packet{}, nil
 	})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 
 	var mismatches []*logger.Entry
 	for _, entry := range entries {
@@ -1224,11 +1168,7 @@ func TestConsistency05NameWithoutGlueIsNotCompared(t *testing.T) {
 		return []packet.Packet{}, nil
 	})
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "EXTRA_ADDRESS_CHILD", "IN_DOMAIN_ADDR_MISMATCH", "MISSING_ADDRESS_CHILD")
 	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
@@ -1258,11 +1198,7 @@ func TestConsistency05TrimmedGlueUnionMatchesChild(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	for _, tag := range []string{"IN_DOMAIN_ADDR_MISMATCH", "MISSING_ADDRESS_CHILD", "EXTRA_ADDRESS_CHILD", "MULTIPLE_DELEGATION_NS_SET"} {
 		tctest.RequireNoTag(t, entries, tag)
 	}
@@ -1346,11 +1282,7 @@ func TestConsistency05MultipleDelegationNSSetImpliesNSNames(t *testing.T) {
 				return []packet.Packet{}, nil
 			}
 
-			z := zone.Zone{Name: dnsname.New("example")}
-			entries, err := Consistency05(ctx, &z)
-			if err != nil {
-				t.Fatalf("consistency05: %v", err)
-			}
+			entries := runConsistency05(t, ctx, "example")
 
 			multiple := tctest.First(entries, "MULTIPLE_DELEGATION_NS_SET")
 			if got := multiple != nil; got != tc.wantWarning {
@@ -1421,11 +1353,7 @@ func TestConsistency05DelegationNSSetIgnoresAuthoritativeParent(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET", "DELEGATION_NS_SET")
 }
 
@@ -1453,11 +1381,7 @@ func TestConsistency05DelegationNSSetIgnoresTruncatedResponse(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 	// The truncated response contributes no glue either, so the remaining
 	// parent's complete glue still matches the child.
@@ -1484,11 +1408,7 @@ func TestConsistency05DelegationNSSetIgnoresUpwardReferral(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 }
 
@@ -1515,11 +1435,7 @@ func TestConsistency05DelegationNSSetReadsAuthoritySectionOnly(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "MULTIPLE_DELEGATION_NS_SET")
 }
 
@@ -1544,11 +1460,7 @@ func TestConsistency05GlueIgnoresOwnerOutsideAuthoritySet(t *testing.T) {
 		return []packet.Packet{}, nil
 	}
 
-	z := zone.Zone{Name: dnsname.New("example")}
-	entries, err := Consistency05(ctx, &z)
-	if err != nil {
-		t.Fatalf("consistency05: %v", err)
-	}
+	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "IN_DOMAIN_ADDR_MISMATCH")
 	tctest.RequireTags(t, entries, "ADDRESSES_MATCH")
 }
@@ -1612,6 +1524,18 @@ func nsPacketTTL(owner string, nsNames []string, ttl uint32) packet.Packet {
 func referralPacket(owner string, nsNames []string) packet.Packet {
 	return tctest.Response(tctest.NotAuthoritative(),
 		tctest.Authority(tctest.NSRRs(owner, nsNames...)...))
+}
+
+// runConsistency05 runs Consistency05 over zoneName and fails on error.
+func runConsistency05(t *testing.T, ctx context.Context, zoneName string) []*logger.Entry {
+	t.Helper()
+
+	z := zone.Zone{Name: dnsname.New(zoneName)}
+	entries, err := Consistency05(ctx, &z)
+	if err != nil {
+		t.Fatalf("consistency05: %v", err)
+	}
+	return entries
 }
 
 // nsPacketWithGlue builds a referral carrying NS records plus glue (A/AAAA)

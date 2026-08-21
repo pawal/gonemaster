@@ -1595,256 +1595,194 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 }
 
 func TestDNSSEC07ParallelChildQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
-		return nil, nil
-	})
-	tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return nil, nil
-	})
+		tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+			return nil, nil
+		})
+		tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return nil, nil
+		})
 
-	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
 
-	started := make(chan string, 2)
-	release := make(chan struct{})
+		gate := tctest.NewGate()
 
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			switch qtype {
-			case "SOA":
-				select {
-				case started <- id:
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				switch q.Type {
+				case "SOA":
+					gate.Arrive(id)
+					return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+				case "DNSKEY":
+					return dnskeyPacket(q.Name, key)
 				default:
+					return packet.Packet{}
 				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
-				return answerPacket(qname, dns.TypeSOA, soaRecord(qname)), nil
-			case "DNSKEY":
-				return dnskeyPacket(qname, key), nil
-			default:
-				return packet.Packet{}, nil
 			}
 		}
-	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.60", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns1.SetQueryHook(hook("ns1"))
+		tctest.NS(t, ctx, "ns1.example", "192.0.2.60", hook("ns1"))
+		tctest.NS(t, ctx, "ns2.example", "192.0.2.61", hook("ns2"))
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.61", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns2.SetQueryHook(hook("ns2"))
+		tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+			return tctest.NSItems("ns1.example/192.0.2.60", "ns2.example/192.0.2.61"), nil
+		})
+		tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+			return []nsdiscovery.NSItem{}, nil
+		})
 
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return tctest.NSItems("ns1.example/192.0.2.60", "ns2.example/192.0.2.61"), nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{}, nil
-	})
-
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC07(ctx, &z)
-		close(done)
-	}()
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel SOA queries to start, got %v", got)
+		z, err := zone.New("example")
+		if err != nil {
+			t.Fatalf("zone new: %v", err)
 		}
-	}
 
-	close(release)
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC07(ctx, &z)
+			close(done)
+		}()
 
-	select {
-	case <-done:
+		synctest.Wait()
+		gate.RequireInFlight(t, "ns1", "ns2")
+		gate.Release()
+
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec07: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec07 did not finish")
-	}
 
-	tctest.RequireTags(t, entries, "DS07_NOT_SIGNED_ON_SERVER", "DS07_NOT_SIGNED")
+		tctest.RequireTags(t, entries, "DS07_NOT_SIGNED_ON_SERVER", "DS07_NOT_SIGNED")
 
-	var gotServers []map[string]any
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "DS07_NOT_SIGNED_ON_SERVER" {
-			continue
+		var gotServers []map[string]any
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "DS07_NOT_SIGNED_ON_SERVER" {
+				continue
+			}
+			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+				gotServers = servers
+			}
+			if _, ok := entry.Args["ns_list"]; ok {
+				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+			}
+			break
 		}
-		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-			gotServers = servers
+		if len(gotServers) == 0 {
+			t.Fatalf("expected typed servers for DS07_NOT_SIGNED_ON_SERVER")
 		}
-		if _, ok := entry.Args["ns_list"]; ok {
-			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		if len(gotServers) != 2 {
+			t.Fatalf("expected two typed servers for DS07_NOT_SIGNED_ON_SERVER, got %#v", gotServers)
 		}
-		break
-	}
-	if len(gotServers) == 0 {
-		t.Fatalf("expected typed servers for DS07_NOT_SIGNED_ON_SERVER")
-	}
-	if len(gotServers) != 2 {
-		t.Fatalf("expected two typed servers for DS07_NOT_SIGNED_ON_SERVER, got %#v", gotServers)
-	}
-	if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
-		t.Fatalf("expected deterministic server order, got %#v", gotServers)
-	}
+		if gotServers[0]["ns"] != "ns1.example" || gotServers[1]["ns"] != "ns2.example" {
+			t.Fatalf("expected deterministic server order, got %#v", gotServers)
+		}
+	})
 }
 
 func TestDNSSEC07ParallelParentQueries(t *testing.T) {
-	ctx := tctest.Context(t)
+	synctest.Test(t, func(t *testing.T) {
+		ctx := tctest.Context(t)
 
-	profile.Effective().Resolver.Defaults.Parallel = 2
+		profile.Effective().Resolver.Defaults.Parallel = 2
 
-	tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
-		return nil, nil
-	})
+		tctest.Stub(t, &zoneParent, func(_ context.Context, _ *zone.Zone) (*zone.Zone, error) {
+			return nil, nil
+		})
 
-	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
-	sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+		sig := rrsigRecord("example", dns.TypeDNSKEY, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
-	tctest.NS(t, ctx, "ns-child.example", "192.0.2.62", func(q tctest.Query) packet.Packet {
-		switch q.Type {
-		case "SOA":
-			return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
-		case "DNSKEY":
-			return answerPacket(q.Name, dns.TypeDNSKEY, key, sig)
-		default:
-			return packet.Packet{}
-		}
-	})
-
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return tctest.NSItems("ns-child.example/192.0.2.62"), nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{}, nil
-	})
-
-	ds := tctest.DSRR("example", 11111, 8, 2, "DEADBEEF")
-	dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
-
-	started := make(chan string, 2)
-	release := make(chan struct{})
-
-	hook := func(id string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return func(ctx context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			if qtype == "DS" {
-				select {
-				case started <- id:
-				default:
-				}
-				select {
-				case <-release:
-				case <-ctx.Done():
-					return packet.Packet{}, ctx.Err()
-				}
-				return answerPacket(qname, dns.TypeDS, ds, dsSig), nil
+		tctest.NS(t, ctx, "ns-child.example", "192.0.2.62", func(q tctest.Query) packet.Packet {
+			switch q.Type {
+			case "SOA":
+				return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+			case "DNSKEY":
+				return answerPacket(q.Name, dns.TypeDNSKEY, key, sig)
+			default:
+				return packet.Packet{}
 			}
-			return packet.Packet{}, nil
+		})
+
+		tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+			return tctest.NSItems("ns-child.example/192.0.2.62"), nil
+		})
+		tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+			return []nsdiscovery.NSItem{}, nil
+		})
+
+		ds := tctest.DSRR("example", 11111, 8, 2, "DEADBEEF")
+		dsSig := rrsigRecord("example", dns.TypeDS, 11111, time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+
+		gate := tctest.NewGate()
+
+		hook := func(id string) tctest.Handler {
+			return func(q tctest.Query) packet.Packet {
+				if q.Type == "DS" {
+					gate.Arrive(id)
+					return answerPacket(q.Name, dns.TypeDS, ds, dsSig)
+				}
+				return packet.Packet{}
+			}
 		}
-	}
 
-	parent1, err := nameserver.NewWithContext(ctx, "ns-parent1.example", "192.0.2.70", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	parent1.SetQueryHook(hook("parent1"))
+		parent1 := tctest.NS(t, ctx, "ns-parent1.example", "192.0.2.70", hook("parent1"))
+		parent2 := tctest.NS(t, ctx, "ns-parent2.example", "192.0.2.71", hook("parent2"))
 
-	parent2, err := nameserver.NewWithContext(ctx, "ns-parent2.example", "192.0.2.71", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	parent2.SetQueryHook(hook("parent2"))
+		tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			return []nameserver.Nameserver{parent1, parent2}, nil
+		})
 
-	tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{parent1, parent2}, nil
-	})
-
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
-	defer cancel()
-
-	done := make(chan struct{})
-	var entries []*logger.Entry
-	var dsErr error
-	go func() {
-		entries, dsErr = DNSSEC07(ctx, &z)
-		close(done)
-	}()
-
-	got := map[string]bool{}
-	deadline := time.After(1 * time.Second)
-	for len(got) < 2 {
-		select {
-		case name := <-started:
-			got[name] = true
-		case <-deadline:
-			t.Fatalf("expected parallel DS queries to start, got %v", got)
+		z, err := zone.New("example")
+		if err != nil {
+			t.Fatalf("zone new: %v", err)
 		}
-	}
 
-	close(release)
 
-	select {
-	case <-done:
+		done := make(chan struct{})
+		var entries []*logger.Entry
+		var dsErr error
+		go func() {
+			entries, dsErr = DNSSEC07(ctx, &z)
+			close(done)
+		}()
+
+		synctest.Wait()
+		gate.RequireInFlight(t, "parent1", "parent2")
+		gate.Release()
+
+		<-done
 		if dsErr != nil {
 			t.Fatalf("dnssec07: %v", dsErr)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("dnssec07 did not finish")
-	}
 
-	var gotServers []map[string]any
-	for _, entry := range entries {
-		if entry == nil || entry.Tag != "DS07_DS_ON_PARENT_SERVER" {
-			continue
+		var gotServers []map[string]any
+		for _, entry := range entries {
+			if entry == nil || entry.Tag != "DS07_DS_ON_PARENT_SERVER" {
+				continue
+			}
+			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
+				gotServers = servers
+			}
+			if _, ok := entry.Args["ns_list"]; ok {
+				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+			}
+			break
 		}
-		if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-			gotServers = servers
+		if len(gotServers) == 0 {
+			t.Fatalf("expected typed servers for DS07_DS_ON_PARENT_SERVER")
 		}
-		if _, ok := entry.Args["ns_list"]; ok {
-			t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
+		if len(gotServers) != 2 {
+			t.Fatalf("expected two typed servers for DS07_DS_ON_PARENT_SERVER, got %#v", gotServers)
 		}
-		break
-	}
-	if len(gotServers) == 0 {
-		t.Fatalf("expected typed servers for DS07_DS_ON_PARENT_SERVER")
-	}
-	if len(gotServers) != 2 {
-		t.Fatalf("expected two typed servers for DS07_DS_ON_PARENT_SERVER, got %#v", gotServers)
-	}
-	if gotServers[0]["ns"] != "ns-parent1.example" || gotServers[1]["ns"] != "ns-parent2.example" {
-		t.Fatalf("expected deterministic server order, got %#v", gotServers)
-	}
+		if gotServers[0]["ns"] != "ns-parent1.example" || gotServers[1]["ns"] != "ns-parent2.example" {
+			t.Fatalf("expected deterministic server order, got %#v", gotServers)
+		}
+	})
 }
 
 func TestDNSSEC07NotSigned(t *testing.T) {

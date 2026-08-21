@@ -1624,35 +1624,17 @@ func TestConsistency06MultipleMnames(t *testing.T) {
 }
 
 func soaPacket(owner string, serial uint32, mname string, rname string, refresh uint32, retry uint32, expire uint32, minimum uint32) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-	soaRR.Ns = dnsutil.Fqdn(mname)
-	soaRR.Mbox = dnsutil.Fqdn(rname)
-	soaRR.Serial = serial
-	soaRR.Refresh = refresh
-	soaRR.Retry = retry
-	soaRR.Expire = expire
-	soaRR.Minttl = minimum
-	msg.Answer = []dns.RR{soaRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.SOARR(owner,
+		tctest.MName(mname), tctest.RName(rname), tctest.Serial(serial),
+		tctest.SOATimers(refresh, retry, expire, minimum))))
 }
 
 func nsPacket(owner string, nsNames []string) packet.Packet {
-	return nsPacketTTL(owner, nsNames, 60)
+	return tctest.Response(tctest.Answers(tctest.NSRRs(owner, nsNames...)...))
 }
 
 func nsPacketTTL(owner string, nsNames []string, ttl uint32) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-	for _, nsName := range nsNames {
-		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: ttl}}
-		nsRR.Ns = dnsutil.Fqdn(nsName)
-		msg.Answer = append(msg.Answer, nsRR)
-	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(tctest.TTL(ttl, tctest.NSRRs(owner, nsNames...)...)...))
 }
 
 // referralPacket builds a parent referral for owner: NS records in the
@@ -1660,14 +1642,8 @@ func nsPacketTTL(owner string, nsNames []string, ttl uint32) packet.Packet {
 // delegating parent actually sends, as opposed to nsPacket, which models an
 // authoritative answer from a server that holds the zone itself.
 func referralPacket(owner string, nsNames []string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	for _, nsName := range nsNames {
-		nsRR := &dns.NS{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-		nsRR.Ns = dnsutil.Fqdn(nsName)
-		msg.Ns = append(msg.Ns, nsRR)
-	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NotAuthoritative(),
+		tctest.Authority(tctest.NSRRs(owner, nsNames...)...))
 }
 
 // nsPacketWithGlue builds a referral carrying NS records plus glue (A/AAAA)
@@ -1682,56 +1658,34 @@ func nsPacketWithGlue(owner string, glue map[string][]string) packet.Packet {
 	p := referralPacket(owner, names)
 	for _, name := range names {
 		for _, address := range glue[name] {
-			ip, err := netip.ParseAddr(address)
-			if err != nil {
+			if _, err := netip.ParseAddr(address); err != nil {
 				continue
 			}
-			hdr := dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}
-			if ip.Is4() {
-				aRR := &dns.A{Hdr: hdr}
-				aRR.Addr = ip.Unmap()
-				p.Msg.Extra = append(p.Msg.Extra, aRR)
-			} else {
-				aaaaRR := &dns.AAAA{Hdr: hdr}
-				aaaaRR.Addr = ip
-				p.Msg.Extra = append(p.Msg.Extra, aaaaRR)
-			}
+			p.Msg.Extra = append(p.Msg.Extra, tctest.AddrRR(name, address))
 		}
 	}
 	return p
 }
 
 func addrPacket(name string, qtype string, address string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeSuccess
-	msg.Authoritative = true
-
-	addr, err := netip.ParseAddr(address)
-	if err != nil {
+	if _, err := netip.ParseAddr(address); err != nil {
 		return packet.Packet{}
 	}
+	var rr dns.RR
 	switch strings.ToUpper(qtype) {
 	case "A":
-		aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
-		aRR.Addr = addr.Unmap()
-		msg.Answer = []dns.RR{aRR}
+		rr = tctest.ARR(name, address)
 	case "AAAA":
-		aaaaRR := &dns.AAAA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
-		aaaaRR.Addr = addr
-		msg.Answer = []dns.RR{aaaaRR}
+		rr = tctest.AAAARR(name, address)
 	default:
 		return packet.Packet{}
 	}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.Answers(rr))
 }
 
+// The NXDOMAIN SOA only marks the negative answer, so its timers stay zero.
 func nxdomainPacket(name string) packet.Packet {
-	msg := new(dns.Msg)
-	msg.Rcode = dns.RcodeNameError
-	msg.Authoritative = true
-	soaRR := &dns.SOA{Hdr: dns.Header{Name: dnsutil.Fqdn(name), Class: dns.ClassINET, TTL: 60}}
-	soaRR.Ns = dnsutil.Fqdn("ns1.example")
-	soaRR.Mbox = dnsutil.Fqdn("hostmaster.example")
-	msg.Ns = []dns.RR{soaRR}
-	return packet.Packet{Msg: msg}
+	return tctest.Response(tctest.NXDOMAIN(),
+		tctest.Authority(tctest.SOARR(name, tctest.MName("ns1.example"),
+			tctest.RName("hostmaster.example"), tctest.Serial(0), tctest.SOATimers(0, 0, 0, 0))))
 }

@@ -73,7 +73,7 @@ func TestSOARRDefaultsAndOverrides(t *testing.T) {
 
 	// A zero override must stick, which rules out zero-value defaulting.
 	soa = SOARR(".", MName("a.root"), RName("hostmaster.root"), Serial(0),
-		Refresh(1), Retry(2), Expire(3), Minttl(0))
+		SOATimers(1, 2, 3, 0))
 	if soa.Hdr.Name != "." || soa.Ns != "a.root." || soa.Mbox != "hostmaster.root." {
 		t.Fatalf("unexpected root SOA: %#v", soa)
 	}

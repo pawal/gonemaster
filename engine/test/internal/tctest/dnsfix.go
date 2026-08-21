@@ -105,24 +105,14 @@ func Serial(v uint32) SOAOpt {
 	return func(soa *dns.SOA) { soa.Serial = v }
 }
 
-// Refresh sets the SOA refresh timer.
-func Refresh(v uint32) SOAOpt {
-	return func(soa *dns.SOA) { soa.Refresh = v }
-}
-
-// Retry sets the SOA retry timer.
-func Retry(v uint32) SOAOpt {
-	return func(soa *dns.SOA) { soa.Retry = v }
-}
-
-// Expire sets the SOA expire timer.
-func Expire(v uint32) SOAOpt {
-	return func(soa *dns.SOA) { soa.Expire = v }
-}
-
-// Minttl sets the SOA negative-caching TTL.
-func Minttl(v uint32) SOAOpt {
-	return func(soa *dns.SOA) { soa.Minttl = v }
+// SOATimers sets the SOA refresh, retry, expire and negative-caching timers.
+func SOATimers(refresh uint32, retry uint32, expire uint32, minttl uint32) SOAOpt {
+	return func(soa *dns.SOA) {
+		soa.Refresh = refresh
+		soa.Retry = retry
+		soa.Expire = expire
+		soa.Minttl = minttl
+	}
 }
 
 // SOARR builds a SOA record with the standard test timers.
@@ -168,7 +158,7 @@ func NSRRs(owner string, targets ...string) []dns.RR {
 // ARR builds an A record.
 func ARR(owner string, addr string) *dns.A {
 	rr := &dns.A{Hdr: header(owner)}
-	rr.Addr = mustAddr(addr)
+	rr.Addr = mustAddr(addr).Unmap()
 	return rr
 }
 

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"net/netip"
-	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -19,6 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -32,23 +32,13 @@ func TestAddress01DocumentationAddr(t *testing.T) {
 	if err != nil {
 		t.Fatalf("address01: %v", err)
 	}
-	if !hasEntryTag(entries, "A01_DOCUMENTATION_ADDR") {
-		t.Fatalf("expected A01_DOCUMENTATION_ADDR")
-	}
-	if !hasEntryTag(entries, "A01_NO_GLOBALLY_REACHABLE_ADDR") {
-		t.Fatalf("expected A01_NO_GLOBALLY_REACHABLE_ADDR")
-	}
-	if hasEntryTag(entries, "A01_GLOBALLY_REACHABLE_ADDR") {
-		t.Fatalf("did not expect A01_GLOBALLY_REACHABLE_ADDR")
-	}
-	entry := findEntry(entries, "A01_DOCUMENTATION_ADDR")
-	if entry == nil {
-		t.Fatalf("expected A01_DOCUMENTATION_ADDR entry")
-	}
+	tctest.RequireTags(t, entries, "A01_DOCUMENTATION_ADDR", "A01_NO_GLOBALLY_REACHABLE_ADDR")
+	tctest.RequireNoTag(t, entries, "A01_GLOBALLY_REACHABLE_ADDR")
+	entry := tctest.RequireTag(t, entries, "A01_DOCUMENTATION_ADDR")
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("did not expect legacy ns_list key in args")
 	}
-	endpoints := serverEndpointsFromArgs(t, entry.Args)
+	endpoints := tctest.ServerEndpoints(t, entry.Args)
 	if len(endpoints) != 1 || endpoints[0] != "ns1.example/192.0.2.1" {
 		t.Fatalf("expected typed servers [ns1.example/192.0.2.1], got %v", endpoints)
 	}
@@ -64,9 +54,7 @@ func TestAddress01NoNameServersFound(t *testing.T) {
 	if err != nil {
 		t.Fatalf("address01: %v", err)
 	}
-	if !hasEntryTag(entries, "A01_NO_NAME_SERVERS_FOUND") {
-		t.Fatalf("expected A01_NO_NAME_SERVERS_FOUND")
-	}
+	tctest.RequireTags(t, entries, "A01_NO_NAME_SERVERS_FOUND")
 }
 
 // TestAddress01EmitsCNAMETagForUnresolvableNS verifies that when the
@@ -124,10 +112,7 @@ func TestAddress01EmitsCNAMETagForUnresolvableNS(t *testing.T) {
 		t.Fatalf("expected exactly one CNAME_TARGET_UNRESOLVED entry, got %d", count)
 	}
 
-	entry := findEntry(entries, "CNAME_TARGET_UNRESOLVED")
-	if entry == nil {
-		t.Fatalf("missing CNAME_TARGET_UNRESOLVED entry")
-	}
+	entry := tctest.RequireTag(t, entries, "CNAME_TARGET_UNRESOLVED")
 	if got := entry.Args["query_name"]; got != "ns.outside.test" {
 		t.Fatalf("query_name: got %#v, want ns.outside.test", got)
 	}
@@ -154,9 +139,7 @@ func TestAddress02NameserversIPWithReverse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("address02: %v", err)
 	}
-	if !hasEntryTag(entries, "NAMESERVERS_IP_WITH_REVERSE") {
-		t.Fatalf("expected NAMESERVERS_IP_WITH_REVERSE")
-	}
+	tctest.RequireTags(t, entries, "NAMESERVERS_IP_WITH_REVERSE")
 }
 
 func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
@@ -177,9 +160,7 @@ func TestAddress02NameserverIPWithoutReverse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("address02: %v", err)
 	}
-	if !hasEntryTag(entries, "NAMESERVER_IP_WITHOUT_REVERSE") {
-		t.Fatalf("expected NAMESERVER_IP_WITHOUT_REVERSE")
-	}
+	tctest.RequireTags(t, entries, "NAMESERVER_IP_WITHOUT_REVERSE")
 }
 
 // TestAddress02ReverseThroughCNAME locks in handling of a reverse (PTR) lookup
@@ -210,15 +191,8 @@ func TestAddress02ReverseThroughCNAME(t *testing.T) {
 	if err != nil {
 		t.Fatalf("address02: %v", err)
 	}
-	if !hasEntryTag(entries, "NAMESERVERS_IP_WITH_REVERSE") {
-		t.Fatalf("expected NAMESERVERS_IP_WITH_REVERSE for a PTR reached through a CNAME")
-	}
-	if hasEntryTag(entries, "NAMESERVER_IP_WITHOUT_REVERSE") {
-		t.Fatalf("did not expect NAMESERVER_IP_WITHOUT_REVERSE")
-	}
-	if hasEntryTag(entries, "NO_RESPONSE_PTR_QUERY") {
-		t.Fatalf("did not expect NO_RESPONSE_PTR_QUERY")
-	}
+	tctest.RequireTags(t, entries, "NAMESERVERS_IP_WITH_REVERSE")
+	tctest.RequireNoTag(t, entries, "NAMESERVER_IP_WITHOUT_REVERSE", "NO_RESPONSE_PTR_QUERY")
 }
 
 // TestAddress02CNAMEFailure locks in the decided behavior for Address02: a
@@ -255,9 +229,7 @@ func TestAddress02CNAMEFailure(t *testing.T) {
 		if err != nil {
 			t.Fatalf("address02 must continue past a CNAME failure, got error: %v", err)
 		}
-		if !hasEntryTag(entries, "CNAME_TARGET_UNRESOLVED") {
-			t.Fatalf("expected CNAME_TARGET_UNRESOLVED")
-		}
+		tctest.RequireTags(t, entries, "CNAME_TARGET_UNRESOLVED")
 	})
 
 	t.Run("non-cname error still aborts", func(t *testing.T) {
@@ -277,9 +249,7 @@ func TestAddress02CNAMEFailure(t *testing.T) {
 		if !errors.Is(err, boom) {
 			t.Fatalf("expected the non-CNAME error to propagate, got: %v", err)
 		}
-		if hasEntryTag(entries, "CNAME_TARGET_UNRESOLVED") {
-			t.Fatalf("did not expect a CNAME tag for a non-CNAME error")
-		}
+		tctest.RequireNoTag(t, entries, "CNAME_TARGET_UNRESOLVED")
 	})
 }
 
@@ -307,9 +277,7 @@ func TestAddress03CNAMEFailureLogsTagAndContinues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("address03 must continue past a CNAME failure, got error: %v", err)
 	}
-	if !hasEntryTag(entries, "CNAME_CHAIN_TOO_LONG") {
-		t.Fatalf("expected CNAME_CHAIN_TOO_LONG")
-	}
+	tctest.RequireTags(t, entries, "CNAME_CHAIN_TOO_LONG")
 }
 
 func TestAddress03PTRMatch(t *testing.T) {
@@ -330,9 +298,7 @@ func TestAddress03PTRMatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("address03: %v", err)
 	}
-	if !hasEntryTag(entries, "NAMESERVER_IP_PTR_MATCH") {
-		t.Fatalf("expected NAMESERVER_IP_PTR_MATCH")
-	}
+	tctest.RequireTags(t, entries, "NAMESERVER_IP_PTR_MATCH")
 }
 
 func TestAddress03PTRMismatch(t *testing.T) {
@@ -353,9 +319,7 @@ func TestAddress03PTRMismatch(t *testing.T) {
 	if err != nil {
 		t.Fatalf("address03: %v", err)
 	}
-	if !hasEntryTag(entries, "NAMESERVER_IP_PTR_MISMATCH") {
-		t.Fatalf("expected NAMESERVER_IP_PTR_MISMATCH")
-	}
+	tctest.RequireTags(t, entries, "NAMESERVER_IP_PTR_MISMATCH")
 }
 
 func TestAddress02ParallelPTRQueries(t *testing.T) {
@@ -647,74 +611,4 @@ func noAnswerPacket(owner string, qtype string) packet.Packet {
 	}
 	dnsutil.SetQuestion(msg, dnsutil.Fqdn(owner), dns.StringToType[strings.ToUpper(qtype)])
 	return packet.Packet{Msg: msg}
-}
-
-func hasEntryTag(entries []*logger.Entry, tag string) bool {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return true
-		}
-	}
-	return false
-}
-
-func findEntry(entries []*logger.Entry, tag string) *logger.Entry {
-	for _, entry := range entries {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == tag {
-			return entry
-		}
-	}
-	return nil
-}
-
-func serverEndpointsFromArgs(t *testing.T, args map[string]any) []string {
-	t.Helper()
-	raw, ok := args["servers"]
-	if !ok {
-		t.Fatalf("expected servers key in args")
-	}
-
-	var endpoints []string
-	appendEndpoint := func(ns string, address string) {
-		ns = strings.TrimSpace(ns)
-		address = strings.TrimSpace(address)
-		switch {
-		case ns != "" && address != "":
-			endpoints = append(endpoints, ns+"/"+address)
-		case ns != "":
-			endpoints = append(endpoints, ns)
-		case address != "":
-			endpoints = append(endpoints, address)
-		}
-	}
-
-	switch items := raw.(type) {
-	case []map[string]any:
-		for _, item := range items {
-			ns, _ := item["ns"].(string)
-			address, _ := item["address"].(string)
-			appendEndpoint(ns, address)
-		}
-	case []any:
-		for _, item := range items {
-			m, ok := item.(map[string]any)
-			if !ok {
-				continue
-			}
-			ns, _ := m["ns"].(string)
-			address, _ := m["address"].(string)
-			appendEndpoint(ns, address)
-		}
-	default:
-		t.Fatalf("unexpected servers type: %T", raw)
-	}
-
-	sort.Strings(endpoints)
-	return endpoints
 }

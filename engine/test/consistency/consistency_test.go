@@ -19,43 +19,31 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
-	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func TestConsistency01MultipleSerials(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 1, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 2, "ns2.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency01(ctx, &z)
@@ -80,38 +68,27 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 // "100" before "9" and computes a negative delta, which previously hid the variation
 // entirely. The oldest must be 9, the newest 100, and ns1 (serving 9) is the laggard.
 func TestConsistency01LexicalTrapSerialVariation(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 9, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 100, "ns2.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency01(ctx, &z)
@@ -135,38 +112,27 @@ func TestConsistency01LexicalTrapSerialVariation(t *testing.T) {
 // Near the 32-bit wrap boundary serial 1 is newer than 4294967294 under RFC 1982,
 // so newest/oldest selection and the wrap-safe distance must treat 1 as the newest.
 func TestConsistency01SerialWraparound(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 4294967294, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 1, "ns2.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency01(ctx, &z)
@@ -188,38 +154,27 @@ func TestConsistency01SerialWraparound(t *testing.T) {
 }
 
 func TestConsistency02MultipleRnames(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 1, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 1, "ns2.example", "admin.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency02(ctx, &z)
@@ -237,38 +192,27 @@ func TestConsistency02MultipleRnames(t *testing.T) {
 }
 
 func TestConsistency03MultipleTimeSets(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 1, "ns1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 1, "ns2.example", "hostmaster.example", 7200, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency03(ctx, &z)
@@ -286,38 +230,27 @@ func TestConsistency03MultipleTimeSets(t *testing.T) {
 }
 
 func TestConsistency04MultipleNSSets(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "NS") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "NS") {
 			return nsPacket("example", []string{"ns1.example"})
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "NS") {
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "NS") {
 			return nsPacket("example", []string{"ns1.example", "ns2.example"})
 		}
 		return packet.Packet{}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency04(ctx, &z)
@@ -340,38 +273,27 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 }
 
 func TestConsistency04OneNSSetTypedServers(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "NS") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "NS") {
 			return nsPacket("example", []string{"ns1.example", "ns2.example"})
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "NS") {
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "NS") {
 			return nsPacket("example", []string{"ns1.example", "ns2.example"})
 		}
 		return packet.Packet{}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency04(ctx, &z)
@@ -393,18 +315,7 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 }
 
 func TestConsistency04ParallelNSQueries(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
+	ctx := tctest.Context(t)
 
 	profile.Effective().Resolver.Defaults.Parallel = 2
 
@@ -441,12 +352,12 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 	}
 	ns2.SetQueryHook(hook("ns2", []string{"ns1.example", "ns2.example"}))
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
@@ -503,38 +414,27 @@ func TestConsistency04ParallelNSQueries(t *testing.T) {
 // raise INCONSISTENT_NS_TTL with the observed min/max bounds, while the name-set
 // comparison still reports a single consistent NS set.
 func TestConsistency04InconsistentNSTTL(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "NS") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "NS") {
 			return nsPacketTTL("example", []string{"ns1.example", "ns2.example"}, 3600)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "NS") {
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "NS") {
 			return nsPacketTTL("example", []string{"ns1.example", "ns2.example"}, 86400)
 		}
 		return packet.Packet{}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency04(ctx, &z)
@@ -556,50 +456,37 @@ func TestConsistency04InconsistentNSTTL(t *testing.T) {
 }
 
 func TestConsistency05AddressesMatch(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM23 := allNSNames
-	origM45 := allNameservers
-	origParent := queryParentAll
-	t.Cleanup(func() {
-		allNSNames = origM23
-		allNameservers = origM45
-		queryParentAll = origParent
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
 	})
 
-	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
-		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
-	}
-
-	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
-		switch strings.ToUpper(qtype) {
+	authNS := tctest.NS(t, ctx, "auth.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		switch strings.ToUpper(q.Type) {
 		case "A":
-			switch strings.ToLower(qname) {
+			switch strings.ToLower(q.Name) {
 			case "ns1.example":
-				return addrPacket(qname, "A", "192.0.2.1")
+				return addrPacket(q.Name, "A", "192.0.2.1")
 			case "ns2.example":
-				return addrPacket(qname, "A", "192.0.2.2")
+				return addrPacket(q.Name, "A", "192.0.2.2")
 			}
 		case "AAAA":
-			switch strings.ToLower(qname) {
+			switch strings.ToLower(q.Name) {
 			case "ns1.example":
-				return addrPacket(qname, "AAAA", "2001:db8::1")
+				return addrPacket(q.Name, "AAAA", "2001:db8::1")
 			case "ns2.example":
-				return addrPacket(qname, "AAAA", "2001:db8::2")
+				return addrPacket(q.Name, "AAAA", "2001:db8::2")
 			}
 		}
 		return packet.Packet{}
 	})
 
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{authNS}, nil
-	}
+	})
 
-	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 		if strings.EqualFold(qtype, "NS") {
 			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
 				"ns1.example": {"192.0.2.1", "2001:db8::1"},
@@ -607,7 +494,7 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 			})}, nil
 		}
 		return []packet.Packet{}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency05(ctx, &z)
@@ -618,24 +505,11 @@ func TestConsistency05AddressesMatch(t *testing.T) {
 }
 
 func TestConsistency05ChildZoneLame(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM23 := allNSNames
-	origM45 := allNameservers
-	origParent := queryParentAll
-	t.Cleanup(func() {
-		allNSNames = origM23
-		allNameservers = origM45
-		queryParentAll = origParent
-	})
-
-	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example")}, nil
-	}
+	})
 
 	nonAAPacket := func() packet.Packet {
 		msg := new(dns.Msg)
@@ -643,17 +517,17 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 		return packet.Packet{Msg: msg}
 	}
 
-	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(_ string, _ string) packet.Packet {
+	authNS := tctest.NS(t, ctx, "auth.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
 		return nonAAPacket()
 	})
 
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{authNS}, nil
-	}
+	})
 
-	queryParentAll = func(_ context.Context, _ *zone.Zone, _ string, _ string) ([]packet.Packet, error) {
+	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, _ string, _ string) ([]packet.Packet, error) {
 		return []packet.Packet{}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency05(ctx, &z)
@@ -666,44 +540,31 @@ func TestConsistency05ChildZoneLame(t *testing.T) {
 }
 
 func TestConsistency05InBailiwickMismatch(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM23 := allNSNames
-	origM45 := allNameservers
-	origParent := queryParentAll
-	t.Cleanup(func() {
-		allNSNames = origM23
-		allNameservers = origM45
-		queryParentAll = origParent
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	})
 
-	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
-		return []dnsname.Name{dnsname.New("ns1.example")}, nil
-	}
-
-	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "A") && strings.EqualFold(qname, "ns1.example") {
-			return addrPacket(qname, "A", "192.0.2.2")
+	authNS := tctest.NS(t, ctx, "auth.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "A") && strings.EqualFold(q.Name, "ns1.example") {
+			return addrPacket(q.Name, "A", "192.0.2.2")
 		}
 		return packet.Packet{}
 	})
 
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{authNS}, nil
-	}
+	})
 
-	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 		if strings.EqualFold(qtype, "NS") {
 			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
 				"ns1.example": {"192.0.2.1"},
 			})}, nil
 		}
 		return []packet.Packet{}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency05(ctx, &z)
@@ -739,55 +600,42 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 }
 
 func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM23 := allNSNames
-	origM45 := allNameservers
-	origParent := queryParentAll
-	t.Cleanup(func() {
-		allNSNames = origM23
-		allNameservers = origM45
-		queryParentAll = origParent
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example")}, nil
 	})
 
-	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
-		return []dnsname.Name{dnsname.New("ns1.example")}, nil
-	}
-
-	newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(qname string, qtype string) packet.Packet {
-		if strings.EqualFold(qname, "example") && strings.EqualFold(qtype, "NS") {
-			return nsPacket(qname, []string{"ns2.example"})
+	tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, "example") && strings.EqualFold(q.Type, "NS") {
+			return nsPacket(q.Name, []string{"ns2.example"})
 		}
-		if strings.EqualFold(qname, "ns1.example") {
-			return nxdomainPacket(qname)
+		if strings.EqualFold(q.Name, "ns1.example") {
+			return nxdomainPacket(q.Name)
 		}
-		if strings.EqualFold(qname, "ns2.example") {
-			switch strings.ToUpper(qtype) {
+		if strings.EqualFold(q.Name, "ns2.example") {
+			switch strings.ToUpper(q.Type) {
 			case "A":
-				return addrPacket(qname, "A", "192.0.2.2")
+				return addrPacket(q.Name, "A", "192.0.2.2")
 			case "AAAA":
-				return addrPacket(qname, "AAAA", "2001:db8::2")
+				return addrPacket(q.Name, "AAAA", "2001:db8::2")
 			}
 		}
 		return packet.Packet{}
 	})
 
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
-	}
+	})
 
-	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 		if strings.EqualFold(qtype, "NS") {
 			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
 				"ns1.example": {"192.0.2.1"},
 			})}, nil
 		}
 		return []packet.Packet{}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency05(ctx, &z)
@@ -810,42 +658,27 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 }
 
 func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM23 := allNSNames
-	origM45 := allNameservers
-	origParent := queryParentAll
-	origRecurse := recurse
-	t.Cleanup(func() {
-		allNSNames = origM23
-		allNameservers = origM45
-		queryParentAll = origParent
-		recurse = origRecurse
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{}, nil
+	})
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{}, nil
 	})
 
-	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
-		return []dnsname.Name{}, nil
-	}
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-		return []nameserver.Nameserver{}, nil
-	}
-
-	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 		if strings.EqualFold(qtype, "NS") {
 			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
 				"ns1.other": {"192.0.2.1"},
 			})}, nil
 		}
 		return []packet.Packet{}, nil
-	}
+	})
 
-	recurse = func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
+	tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
 		return packet.Packet{}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency05(ctx, &z)
@@ -874,16 +707,16 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 // glue. Mirrors upstream consistency05 scenarios ADDRESSES-MATCH-8/9
 // (zonemaster-engine#1537).
 func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
-	addrHandler := func(name, v4, v6 string) func(string, string) packet.Packet {
-		return func(qname, qtype string) packet.Packet {
-			if !strings.EqualFold(qname, name) {
+	addrHandler := func(name, v4, v6 string) tctest.Handler {
+		return func(q tctest.Query) packet.Packet {
+			if !strings.EqualFold(q.Name, name) {
 				return packet.Packet{}
 			}
-			switch strings.ToUpper(qtype) {
+			switch strings.ToUpper(q.Type) {
 			case "A":
-				return addrPacket(qname, "A", v4)
+				return addrPacket(q.Name, "A", v4)
 			case "AAAA":
-				return addrPacket(qname, "AAAA", v6)
+				return addrPacket(q.Name, "AAAA", v6)
 			}
 			return packet.Packet{}
 		}
@@ -901,45 +734,30 @@ func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
 
 	for _, sc := range scenarios {
 		t.Run(sc.name, func(t *testing.T) {
-			ctx := testCtx()
-			t.Cleanup(profile.ResetEffective)
-
-			util.SetLogger(logger.New())
-			t.Cleanup(func() { util.SetLogger(nil) })
-
-			origNames := allNSNames
-			origNS := allNameservers
-			origParent := queryParentAll
-			origRecurse := recurse
-			t.Cleanup(func() {
-				allNSNames = origNames
-				allNameservers = origNS
-				queryParentAll = origParent
-				recurse = origRecurse
-			})
+			ctx := tctest.Context(t)
 
 			// Child NS names are out-of-bailiwick under the xb tree.
-			allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+			tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 				return []dnsname.Name{dnsname.New(sc.ns41), dnsname.New(sc.ns42)}, nil
-			}
+			})
 
-			ns41 := newNameserver(t, ctx, sc.ns41, "127.14.5.41", addrHandler(sc.ns41, "127.14.5.41", "fda1:b2:c3:0:127:14:5:41"))
-			ns42 := newNameserver(t, ctx, sc.ns42, "127.14.5.42", addrHandler(sc.ns42, "127.14.5.42", "fda1:b2:c3:0:127:14:5:42"))
-			allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+			ns41 := tctest.NS(t, ctx, sc.ns41, "127.14.5.41", addrHandler(sc.ns41, "127.14.5.41", "fda1:b2:c3:0:127:14:5:41"))
+			ns42 := tctest.NS(t, ctx, sc.ns42, "127.14.5.42", addrHandler(sc.ns42, "127.14.5.42", "fda1:b2:c3:0:127:14:5:42"))
+			tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 				return []nameserver.Nameserver{ns41, ns42}, nil
-			}
+			})
 
 			// Glueless delegation: the parent refers but carries no glue.
-			queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+			tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 				if strings.EqualFold(qtype, "NS") {
 					return []packet.Packet{referralPacket(name, []string{sc.ns41, sc.ns42})}, nil
 				}
 				return []packet.Packet{}, nil
-			}
+			})
 
-			recurse = func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
+			tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
 				return packet.Packet{}, nil
-			}
+			})
 
 			z := zone.Zone{Name: dnsname.New(sc.zone)}
 			entries, err := Consistency05(ctx, &z)
@@ -958,33 +776,18 @@ func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
 // out-of-domain glue and no spurious mismatch, even though the parent would
 // answer ns1.other/A with 127.0.0.1 (zonemaster-engine#1537).
 func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM23 := allNSNames
-	origM45 := allNameservers
-	origParent := queryParentAll
-	origRecurse := recurse
-	t.Cleanup(func() {
-		allNSNames = origM23
-		allNameservers = origM45
-		queryParentAll = origParent
-		recurse = origRecurse
-	})
-
-	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{}, nil
-	}
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
-	}
+	})
 
 	// Glueless referral, but the parent answers direct out-of-domain address
 	// queries with loopback. The referral additional section carries no glue.
-	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 		switch strings.ToUpper(qtype) {
 		case "NS":
 			return []packet.Packet{referralPacket(name, []string{"ns1.other"})}, nil
@@ -998,10 +801,10 @@ func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
 			}
 		}
 		return []packet.Packet{}, nil
-	}
+	})
 
 	// Public resolution returns the real addresses, not loopback.
-	recurse = func(_ context.Context, _ *zone.Zone, _ string, qtype string) (packet.Packet, error) {
+	tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, _ string, qtype string) (packet.Packet, error) {
 		switch strings.ToUpper(qtype) {
 		case "A":
 			return addrPacket("ns1.other", "A", "192.0.2.9"), nil
@@ -1009,7 +812,7 @@ func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
 			return addrPacket("ns1.other", "AAAA", "2001:db8::9"), nil
 		}
 		return packet.Packet{}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency05(ctx, &z)
@@ -1028,42 +831,33 @@ func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
 func stubConsistency05Child(t *testing.T, ctx context.Context) {
 	t.Helper()
 
-	origM23 := allNSNames
-	origM45 := allNameservers
-	origParent := queryParentAll
-	t.Cleanup(func() {
-		allNSNames = origM23
-		allNameservers = origM45
-		queryParentAll = origParent
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
 	})
 
-	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
-		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
-	}
-
-	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
-		switch strings.ToUpper(qtype) {
+	authNS := tctest.NS(t, ctx, "auth.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		switch strings.ToUpper(q.Type) {
 		case "A":
-			switch strings.ToLower(qname) {
+			switch strings.ToLower(q.Name) {
 			case "ns1.example":
-				return addrPacket(qname, "A", "192.0.2.1")
+				return addrPacket(q.Name, "A", "192.0.2.1")
 			case "ns2.example":
-				return addrPacket(qname, "A", "192.0.2.2")
+				return addrPacket(q.Name, "A", "192.0.2.2")
 			}
 		case "AAAA":
-			switch strings.ToLower(qname) {
+			switch strings.ToLower(q.Name) {
 			case "ns1.example":
-				return addrPacket(qname, "AAAA", "2001:db8::1")
+				return addrPacket(q.Name, "AAAA", "2001:db8::1")
 			case "ns2.example":
-				return addrPacket(qname, "AAAA", "2001:db8::2")
+				return addrPacket(q.Name, "AAAA", "2001:db8::2")
 			}
 		}
 		return packet.Packet{}
 	})
 
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{authNS}, nil
-	}
+	})
 }
 
 // fullTestGlue is the glue set matching what stubConsistency05Child's
@@ -1084,11 +878,7 @@ func glueParentPacket(owner string, glue map[string][]string, answerFrom string)
 }
 
 func TestConsistency05DelegationNSSetConsistentParents(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1113,11 +903,7 @@ func TestConsistency05DelegationNSSetConsistentParents(t *testing.T) {
 }
 
 func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1204,11 +990,7 @@ func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
 }
 
 func TestConsistency05DelegationNSSetGlueDifference(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1243,11 +1025,7 @@ func TestConsistency05DelegationNSSetGlueDifference(t *testing.T) {
 // four observed glue shapes used to read as four delegations. Group sizes are
 // taken from the recorded run: 20, 16, 13 and 15 address records.
 func TestConsistency05DelegationNSSetTrimmedGlueIsOneDelegation(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1291,11 +1069,7 @@ func TestConsistency05DelegationNSSetTrimmedGlueIsOneDelegation(t *testing.T) {
 }
 
 func TestConsistency05DelegationNSSetIgnoresNonRespondingParent(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1322,11 +1096,7 @@ func TestConsistency05DelegationNSSetIgnoresNonRespondingParent(t *testing.T) {
 }
 
 func TestConsistency05DelegationNSSetIgnoresParentWithoutNSRecords(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1379,44 +1149,31 @@ func TestParentReferralQueryAdvertisesFullPayload(t *testing.T) {
 // one entry each, naming only that name's unconfirmed addresses. This is the
 // change from a single aggregate entry that dumped every address at once.
 func TestConsistency05InBailiwickMismatchIsPerName(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origNames := allNSNames
-	origNS := allNameservers
-	origParent := queryParentAll
-	t.Cleanup(func() {
-		allNSNames = origNames
-		allNameservers = origNS
-		queryParentAll = origParent
-	})
-
-	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
-	}
+	})
 
 	// The child serves .11 and .12; the parent glues .1 and .2 instead, so
 	// both names carry glue the child does not confirm.
-	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
-		if !strings.EqualFold(qtype, "A") {
+	authNS := tctest.NS(t, ctx, "auth.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		if !strings.EqualFold(q.Type, "A") {
 			return packet.Packet{}
 		}
-		switch strings.ToLower(qname) {
+		switch strings.ToLower(q.Name) {
 		case "ns1.example":
-			return addrPacket(qname, "A", "192.0.2.11")
+			return addrPacket(q.Name, "A", "192.0.2.11")
 		case "ns2.example":
-			return addrPacket(qname, "A", "192.0.2.12")
+			return addrPacket(q.Name, "A", "192.0.2.12")
 		}
 		return packet.Packet{}
 	})
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{authNS}, nil
-	}
+	})
 
-	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 		if strings.EqualFold(qtype, "NS") {
 			return []packet.Packet{glueParentPacket(name, map[string][]string{
 				"ns1.example": {"192.0.2.1"},
@@ -1424,7 +1181,7 @@ func TestConsistency05InBailiwickMismatchIsPerName(t *testing.T) {
 			}, "192.0.2.101")}, nil
 		}
 		return []packet.Packet{}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency05(ctx, &z)
@@ -1465,44 +1222,31 @@ func TestConsistency05InBailiwickMismatchIsPerName(t *testing.T) {
 // turn lawful trimming into a finding, and Delegation01 already reports glue
 // missing from the delegation.
 func TestConsistency05NameWithoutGlueIsNotCompared(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origNames := allNSNames
-	origNS := allNameservers
-	origParent := queryParentAll
-	t.Cleanup(func() {
-		allNSNames = origNames
-		allNameservers = origNS
-		queryParentAll = origParent
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
 	})
 
-	allNSNames = func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
-		return []dnsname.Name{dnsname.New("ns1.example"), dnsname.New("ns2.example")}, nil
-	}
-
-	authNS := newNameserver(t, ctx, "auth.example", "192.0.2.53", func(qname string, qtype string) packet.Packet {
-		if !strings.EqualFold(qtype, "A") {
+	authNS := tctest.NS(t, ctx, "auth.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		if !strings.EqualFold(q.Type, "A") {
 			return packet.Packet{}
 		}
-		switch strings.ToLower(qname) {
+		switch strings.ToLower(q.Name) {
 		case "ns1.example":
-			return addrPacket(qname, "A", "192.0.2.1")
+			return addrPacket(q.Name, "A", "192.0.2.1")
 		case "ns2.example":
-			return addrPacket(qname, "A", "192.0.2.2")
+			return addrPacket(q.Name, "A", "192.0.2.2")
 		}
 		return packet.Packet{}
 	})
-	allNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{authNS}, nil
-	}
+	})
 
 	// The referral delegates both names but glues only ns1. The child
 	// serves an address for ns2 that no glue mentions.
-	queryParentAll = func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 		if strings.EqualFold(qtype, "NS") {
 			return []packet.Packet{glueParentPacket(name, map[string][]string{
 				"ns1.example": {"192.0.2.1"},
@@ -1510,7 +1254,7 @@ func TestConsistency05NameWithoutGlueIsNotCompared(t *testing.T) {
 			}, "192.0.2.101")}, nil
 		}
 		return []packet.Packet{}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency05(ctx, &z)
@@ -1525,11 +1269,7 @@ func TestConsistency05NameWithoutGlueIsNotCompared(t *testing.T) {
 // subset spread across parents still reconstructs the full set and must not
 // produce an address finding.
 func TestConsistency05TrimmedGlueUnionMatchesChild(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1605,11 +1345,7 @@ func TestDisagreeingNSNames(t *testing.T) {
 // The warning is emitted if and only if ns_names is non-empty: distinct sets
 // must differ by at least one name, and identical sets collapse to one key.
 func TestConsistency05MultipleDelegationNSSetImpliesNSNames(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1668,11 +1404,7 @@ func TestConsistency05MultipleDelegationNSSetImpliesNSNames(t *testing.T) {
 // each trims the additional section of that answer differently. Such a
 // response is not a referral and must not take part in the comparison.
 func TestConsistency05DelegationNSSetIgnoresAuthoritativeParent(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1734,11 +1466,7 @@ func TestConsistency05DelegationNSSetIgnoresAuthoritativeParent(t *testing.T) {
 // that response back as is, so the testcase must skip it rather than read a
 // short NS RRset as a different delegation.
 func TestConsistency05DelegationNSSetIgnoresTruncatedResponse(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1771,11 +1499,7 @@ func TestConsistency05DelegationNSSetIgnoresTruncatedResponse(t *testing.T) {
 // An upward referral answers with the root NS RRset instead of delegating the
 // queried zone. The owner name does not match, so it is not a usable referral.
 func TestConsistency05DelegationNSSetIgnoresUpwardReferral(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1804,11 +1528,7 @@ func TestConsistency05DelegationNSSetIgnoresUpwardReferral(t *testing.T) {
 // elsewhere in a referral are not part of it, so a parent that repeats or
 // pads NS records in the additional section still serves one delegation.
 func TestConsistency05DelegationNSSetReadsAuthoritySectionOnly(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1838,11 +1558,7 @@ func TestConsistency05DelegationNSSetReadsAuthoritySectionOnly(t *testing.T) {
 // Glue is only credible for names the same response delegates to. An address
 // record for an unrelated owner in the additional section is not glue.
 func TestConsistency05GlueIgnoresOwnerOutsideAuthoritySet(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
-
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
+	ctx := tctest.Context(t)
 
 	stubConsistency05Child(t, ctx)
 
@@ -1870,38 +1586,27 @@ func TestConsistency05GlueIgnoresOwnerOutsideAuthoritySet(t *testing.T) {
 }
 
 func TestConsistency06MultipleMnames(t *testing.T) {
-	ctx := testCtx()
-	t.Cleanup(profile.ResetEffective)
+	ctx := tctest.Context(t)
 
-	util.SetLogger(logger.New())
-	t.Cleanup(func() { util.SetLogger(nil) })
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
-	ns1 := newNameserver(t, ctx, "ns1.example", "192.0.2.1", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 1, "mname1.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
-	ns2 := newNameserver(t, ctx, "ns2.example", "192.0.2.2", func(_ string, qtype string) packet.Packet {
-		if strings.EqualFold(qtype, "SOA") {
+	ns2 := tctest.NS(t, ctx, "ns2.example", "192.0.2.2", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "SOA") {
 			return soaPacket("example", 1, "mname2.example", "hostmaster.example", 3600, 600, 86400, 60)
 		}
 		return packet.Packet{}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns1}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns2}, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := Consistency06(ctx, &z)
@@ -1916,28 +1621,6 @@ func TestConsistency06MultipleMnames(t *testing.T) {
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
-}
-
-func testCtx() context.Context {
-	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
-}
-
-func newNameserver(t *testing.T, ctx context.Context, name string, ip string, handler func(qname string, qtype string) packet.Packet) nameserver.Nameserver {
-	t.Helper()
-
-	ns, err := nameserver.NewWithContext(ctx, name, ip, nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	if handler == nil {
-		handler = func(_ string, _ string) packet.Packet {
-			return packet.Packet{}
-		}
-	}
-	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		return handler(qname, qtype), nil
-	})
-	return ns
 }
 
 func soaPacket(owner string, serial uint32, mname string, rname string, refresh uint32, retry uint32, expire uint32, minimum uint32) packet.Packet {

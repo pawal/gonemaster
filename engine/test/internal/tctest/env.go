@@ -40,11 +40,13 @@ func Setup(t TB) {
 	t.Cleanup(func() { util.SetLogger(nil) })
 }
 
-// Context returns a context carrying a fresh nameserver cache, set up as Setup.
+// Context returns the test context carrying a fresh nameserver cache, set up as
+// Setup. It is cancelled when the test ends, so no engine goroutine outlives the
+// test; nothing may query through it from a cleanup.
 func Context(t TB) context.Context {
 	t.Helper()
 	Setup(t)
-	return nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
+	return nameserver.WithCache(t.Context(), nameserver.NewCacheStore())
 }
 
 // NS returns a nameserver answering every query through handler. A nil handler

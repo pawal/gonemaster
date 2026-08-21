@@ -1,6 +1,7 @@
 package tctest
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -21,6 +22,8 @@ type fakeTB struct {
 }
 
 func (f *fakeTB) Helper() {}
+
+func (f *fakeTB) Context() context.Context { return context.Background() }
 
 // Cleanup collects the functions a helper registers so tests can run them.
 func (f *fakeTB) Cleanup(fn func()) {

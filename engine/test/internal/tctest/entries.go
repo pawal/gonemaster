@@ -1,6 +1,7 @@
 package tctest
 
 import (
+	"context"
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -10,6 +11,7 @@ import (
 type TB interface {
 	Helper()
 	Cleanup(func())
+	Context() context.Context
 	Fatalf(format string, args ...any)
 }
 

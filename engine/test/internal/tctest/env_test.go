@@ -35,6 +35,23 @@ func TestContextCarriesCacheAndLogger(t *testing.T) {
 	}
 }
 
+func TestContextIsCancelledAfterTest(t *testing.T) {
+	var inner context.Context
+
+	t.Run("inner", func(t *testing.T) {
+		inner = Context(t)
+		if err := inner.Err(); err != nil {
+			t.Fatalf("expected a live context during the test, got %v", err)
+		}
+	})
+
+	// Context builds on t.Context(), so an engine goroutine still holding it is
+	// cancelled once the test that made it finishes.
+	if !errors.Is(inner.Err(), context.Canceled) {
+		t.Fatalf("expected the context to be cancelled after the test, got %v", inner.Err())
+	}
+}
+
 func TestSetupClearsGlobalLoggerAfterTest(t *testing.T) {
 	var testLogger any
 

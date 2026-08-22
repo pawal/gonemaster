@@ -146,8 +146,8 @@ func TestPublicAnalysisASNsSortByLatency(t *testing.T) {
 	f.seedEndpoint("r4", "d.example", "ns3.example", "203.0.113.10", "ipv4", ts, 64700, "203.0.113.0/24", 200)
 	f.seedEndpoint("r5", "e.example", "ns3.example", "203.0.113.11", "ipv4", ts, 64700, "203.0.113.0/24", 220)
 
-	asc := decodeJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
-		t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_asc")))
+	asc := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
+		t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_asc")), http.StatusOK)
 	if len(asc.Items) != 3 || asc.Items[0].ASN != 64500 || asc.Items[2].ASN != 64700 {
 		t.Fatalf("asc order wrong: %+v", asc.Items)
 	}
@@ -155,15 +155,15 @@ func TestPublicAnalysisASNsSortByLatency(t *testing.T) {
 		t.Fatalf("AS64500 p50 = %v, want 20", asc.Items[0].LatencyP50MS)
 	}
 
-	desc := decodeJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
-		t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_desc")))
+	desc := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
+		t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_desc")), http.StatusOK)
 	if len(desc.Items) != 3 || desc.Items[0].ASN != 64700 || desc.Items[2].ASN != 64500 {
 		t.Fatalf("desc order wrong: %+v", desc.Items)
 	}
 
 	// min_latency_samples=2 drops the single-sample AS64600.
-	filtered := decodeJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
-		t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_desc&min_latency_samples=2")))
+	filtered := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
+		t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_desc&min_latency_samples=2")), http.StatusOK)
 	if filtered.Total != 2 {
 		t.Fatalf("min_latency_samples=2 total = %d, want 2 (%+v)", filtered.Total, filtered.Items)
 	}

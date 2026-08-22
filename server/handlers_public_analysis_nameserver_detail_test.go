@@ -170,7 +170,7 @@ func TestNameserverDetailPerFamilyLatency(t *testing.T) {
 	f.seedEndpoint("run-a", "a.example", "ns.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24", 10)
 	f.seedEndpoint("run-b", "b.example", "ns.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32", 50)
 
-	got := decodeJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns.example")))
+	got := mustJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns.example")), http.StatusOK)
 	if got.LatencyIPv4 == nil || got.LatencyIPv4.LatencyP50MS == nil || *got.LatencyIPv4.LatencyP50MS != 10 {
 		t.Fatalf("IPv4 latency = %+v, want p50 10", got.LatencyIPv4)
 	}
@@ -186,7 +186,7 @@ func TestNameserverDetailPerFamilyLatencySingleStack(t *testing.T) {
 	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
 	f.seedEndpoint("run-a", "a.example", "ns4.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24", 10)
 
-	got := decodeJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns4.example")))
+	got := mustJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns4.example")), http.StatusOK)
 	if got.LatencyIPv4 == nil || got.LatencyIPv4.LatencyP50MS == nil || *got.LatencyIPv4.LatencyP50MS != 10 {
 		t.Fatalf("IPv4 latency = %+v, want p50 10", got.LatencyIPv4)
 	}

@@ -55,14 +55,14 @@ func withRequest(fn func(*http.Request)) reqOpt {
 
 // doJSON serves method and path against srv's root handler and returns the
 // recorder. See requestBody for how body is encoded.
-func doJSON(t *testing.T, srv *Server, method string, path string, body any, opts ...reqOpt) *httptest.ResponseRecorder {
+func doJSON(t testing.TB, srv *Server, method string, path string, body any, opts ...reqOpt) *httptest.ResponseRecorder {
 	t.Helper()
 	return doHandler(t, srv.Handler(), method, path, body, opts...)
 }
 
 // doHandler is doJSON against a handler built by the test, for the middleware
 // and router tests that deliberately bypass srv.Handler().
-func doHandler(t *testing.T, h http.Handler, method string, path string, body any, opts ...reqOpt) *httptest.ResponseRecorder {
+func doHandler(t testing.TB, h http.Handler, method string, path string, body any, opts ...reqOpt) *httptest.ResponseRecorder {
 	t.Helper()
 	req := httptest.NewRequest(method, path, requestBody(t, body))
 	if body != nil {
@@ -79,7 +79,7 @@ func doHandler(t *testing.T, h http.Handler, method string, path string, body an
 // requestBody encodes a doJSON body: nil sends no body, a string or []byte is
 // sent verbatim, an io.Reader is passed through, anything else is marshalled.
 // An empty string still sends a body, which some handlers distinguish.
-func requestBody(t *testing.T, body any) io.Reader {
+func requestBody(t testing.TB, body any) io.Reader {
 	t.Helper()
 	switch v := body.(type) {
 	case nil:
@@ -97,4 +97,37 @@ func requestBody(t *testing.T, body any) io.Reader {
 		}
 		return bytes.NewReader(raw)
 	}
+}
+
+// mustJSON checks the response status and decodes the body into T.
+func mustJSON[T any](t testing.TB, resp *httptest.ResponseRecorder, wantStatus int) T {
+	t.Helper()
+	raw := resp.Body.Bytes()
+	if resp.Code != wantStatus {
+		t.Fatalf("status = %d, want %d: %s", resp.Code, wantStatus, raw)
+	}
+	var out T
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decode response: %v: %s", err, raw)
+	}
+	return out
+}
+
+// wantStatus checks the response status, for the calls with no body to decode.
+func wantStatus(t testing.TB, resp *httptest.ResponseRecorder, want int) {
+	t.Helper()
+	if resp.Code != want {
+		t.Fatalf("status = %d, want %d: %s", resp.Code, want, resp.Body.String())
+	}
+}
+
+// wantErrorCode checks the status and the error code writeError produced, and
+// returns the body for the tests that also assert on the message or details.
+func wantErrorCode(t testing.TB, resp *httptest.ResponseRecorder, status int, code string) ErrorResponse {
+	t.Helper()
+	body := mustJSON[ErrorResponse](t, resp, status)
+	if body.Error.Code != code {
+		t.Errorf("error code = %q, want %q", body.Error.Code, code)
+	}
+	return body
 }

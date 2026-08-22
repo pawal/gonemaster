@@ -331,7 +331,7 @@ func TestDomainDetailIncludesNameserverTimings(t *testing.T) {
 	f.seedEndpoint(runID, "alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 	f.seedEndpoint(runID, "alpha.example", "ns1.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32")
 
-	got := decodeJSON[PublicAnalysisDomainDetail](t, getPublic(t, f.srv, f.publicURL("domains/alpha.example")))
+	got := mustJSON[PublicAnalysisDomainDetail](t, getPublic(t, f.srv, f.publicURL("domains/alpha.example")), http.StatusOK)
 	if len(got.NameserverTimings) != 2 {
 		t.Fatalf("nameserver_timings len = %d, want 2 (%+v)", len(got.NameserverTimings), got.NameserverTimings)
 	}

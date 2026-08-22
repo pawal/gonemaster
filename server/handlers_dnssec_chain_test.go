@@ -77,10 +77,7 @@ func TestPublicDNSSECChainUnknownIDReturnsNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/nosuchid1/dnssec-chain", nil)
 	srv.Handler().ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
-	assertErrorCode(t, resp, "not_found")
+	wantErrorCode(t, resp, http.StatusNotFound, "not_found")
 	if cc := resp.Header().Get("Cache-Control"); cc != "" {
 		t.Errorf("no cache header expected on 404, got %q", cc)
 	}
@@ -95,10 +92,7 @@ func TestPublicDNSSECChainRunWithoutBlobReturnsNoChainData(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
 	srv.Handler().ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
-	assertErrorCode(t, resp, "no_chain_data")
+	wantErrorCode(t, resp, http.StatusNotFound, "no_chain_data")
 	if cc := resp.Header().Get("Cache-Control"); cc != "" {
 		t.Errorf("no cache header expected on no_chain_data, got %q", cc)
 	}
@@ -114,11 +108,8 @@ func TestPublicDNSSECChainFlagOffReturnsNotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
 	srv.Handler().ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 when flag off, got %d", resp.Code)
-	}
 	// Flag-off is indistinguishable from an unknown id: not_found, not no_chain_data.
-	assertErrorCode(t, resp, "not_found")
+	wantErrorCode(t, resp, http.StatusNotFound, "not_found")
 }
 
 func TestPublicDNSSECChainMarkerMaskedWhenFlagOff(t *testing.T) {
@@ -183,10 +174,7 @@ func TestPublicDNSSECChainLookupErrorReturns500(t *testing.T) {
 
 	// A lookup failure must not masquerade as absent data (404), or the UI
 	// would latch a permanent "no chain data" note for data that exists.
-	if resp.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body.String())
-	}
-	assertErrorCode(t, resp, "lookup_failed")
+	wantErrorCode(t, resp, http.StatusInternalServerError, "lookup_failed")
 	if cc := resp.Header().Get("Cache-Control"); cc != "" {
 		t.Errorf("no cache header expected on 500, got %q", cc)
 	}
@@ -205,24 +193,5 @@ func TestAdminDNSSECChainLookupErrorReturns500(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/"+job.ID+"/dnssec-chain", nil)
 	srv.Handler().ServeHTTP(resp, req)
 
-	if resp.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body.String())
-	}
-	assertErrorCode(t, resp, "lookup_failed")
-}
-
-// assertErrorCode decodes a writeError body and checks its error code.
-func assertErrorCode(t *testing.T, resp *httptest.ResponseRecorder, want string) {
-	t.Helper()
-	var body struct {
-		Error struct {
-			Code string `json:"code"`
-		} `json:"error"`
-	}
-	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
-		t.Fatalf("decode error body: %v (%s)", err, resp.Body.String())
-	}
-	if body.Error.Code != want {
-		t.Errorf("error code = %q, want %q", body.Error.Code, want)
-	}
+	wantErrorCode(t, resp, http.StatusInternalServerError, "lookup_failed")
 }

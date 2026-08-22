@@ -232,9 +232,7 @@ func decodeDomainList(t *testing.T, body *httptest.ResponseRecorder) PublicAnaly
 func TestPublicAnalysisDomainsEmpty(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	resp := getPublic(t, f.srv, f.publicURL("domains"))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	got := decodeDomainList(t, resp)
 	if got.Total != 0 || len(got.Items) != 0 {
 		t.Fatalf("expected empty list, got %+v", got)
@@ -253,9 +251,7 @@ func TestPublicAnalysisDomainsReturnsLatestPerDomain(t *testing.T) {
 	f.seedDomainSummary("beta.example", "run-beta-1", t1, 80, "B", "WARNING")
 
 	resp := getPublic(t, f.srv, f.publicURL("domains"))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	got := decodeDomainList(t, resp)
 	if got.Total != 2 || len(got.Items) != 2 {
 		t.Fatalf("expected 2 items (latest per domain), got total=%d len=%d", got.Total, len(got.Items))
@@ -296,9 +292,7 @@ func TestPublicAnalysisDomainsFilterByWorstLevel(t *testing.T) {
 	for _, c := range cases {
 		t.Run(c.bucket, func(t *testing.T) {
 			resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=")+c.bucket)
-			if resp.Code != http.StatusOK {
-				t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-			}
+			wantStatus(t, resp, http.StatusOK)
 			got := decodeDomainList(t, resp)
 			if got.Total != len(c.domains) {
 				t.Fatalf("bucket %q: expected %d, got %d (items=%+v)",
@@ -318,9 +312,7 @@ func TestPublicAnalysisDomainsFilterByWorstLevel(t *testing.T) {
 
 	// Lowercase input is accepted and normalized to the same bucket.
 	resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=error"))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200 on lowercase filter, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if got := decodeDomainList(t, resp); got.Total != 2 {
 		t.Fatalf("expected lowercase filter to match 2 ERROR domains, got %d", got.Total)
 	}
@@ -335,9 +327,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 	f.seedDomainSummary("f1.example", "run-f1", ts, 10, "F", "CRITICAL")
 
 	resp := getPublic(t, f.srv, f.publicURL("domains?grade=A"))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	got := decodeDomainList(t, resp)
 	if got.Total != 2 {
 		t.Fatalf("expected 2 A-grade domains, got %d (items=%+v)", got.Total, got.Items)
@@ -352,9 +342,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 	// not match "A" because custom scoring profiles may legitimately use
 	// distinct labels differing only in case.
 	resp = getPublic(t, f.srv, f.publicURL("domains?grade=a"))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if got := decodeDomainList(t, resp); got.Total != 0 {
 		t.Fatalf("lowercase filter should not match uppercase grades, got %d", got.Total)
 	}
@@ -362,9 +350,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 	// Unknown grade returns empty without 400 - the filter is
 	// pluggable-config-friendly, not enum-validated.
 	resp = getPublic(t, f.srv, f.publicURL("domains?grade=Z"))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200 on unknown grade, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if got := decodeDomainList(t, resp); got.Total != 0 {
 		t.Fatalf("unknown grade should match zero domains, got %d", got.Total)
 	}
@@ -373,9 +359,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 func TestPublicAnalysisDomainsRejectsInvalidWorstLevel(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=bogus"))
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 	if !strings.Contains(resp.Body.String(), "invalid_worst_level") {
 		t.Fatalf("expected invalid_worst_level error code, got %s", resp.Body)
 	}
@@ -418,9 +402,7 @@ func TestPublicAnalysisDomainsSearchAndPagination(t *testing.T) {
 func TestPublicAnalysisDomainsRejectsInvalidLimit(t *testing.T) {
 	f := newAnalysisAPITestFixture(t)
 	resp := getPublic(t, f.srv, f.publicURL("domains?limit=99999"))
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestPublicAnalysisDomainsSortScoreDesc(t *testing.T) {

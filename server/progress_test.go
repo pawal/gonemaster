@@ -9,7 +9,7 @@ import (
 )
 
 func TestProgressUpdatesForFullSuite(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyJobStore()
 	srv.store = spy
 

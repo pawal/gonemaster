@@ -3,7 +3,6 @@ package server
 import (
 	"database/sql"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -24,13 +23,9 @@ func TestAnalysisTimeoutMiddlewareReturnsTimeout(t *testing.T) {
 	})
 	wrapped := analysisTimeoutMiddleware(50*time.Millisecond, slow)
 
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/analysis/nameservers", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
+	rr := doHandler(t, wrapped, http.MethodGet, "/pub/api/v1/analysis/nameservers", nil)
 
-	if rr.Code != http.StatusServiceUnavailable {
-		t.Fatalf("status = %d, want 503", rr.Code)
-	}
+	wantStatus(t, rr, http.StatusServiceUnavailable)
 	if !strings.Contains(rr.Body.String(), "request_timeout") {
 		t.Errorf("body = %q, want request_timeout", rr.Body.String())
 	}
@@ -45,13 +40,9 @@ func TestAnalysisTimeoutMiddlewareLetsFastRequestsThrough(t *testing.T) {
 	})
 	wrapped := analysisTimeoutMiddleware(time.Second, fast)
 
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/analysis/nameservers", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
+	rr := doHandler(t, wrapped, http.MethodGet, "/pub/api/v1/analysis/nameservers", nil)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rr.Code)
-	}
+	wantStatus(t, rr, http.StatusOK)
 }
 
 // TestAnalysisTimeoutMiddlewareSkipsNonAnalysisPaths verifies that
@@ -67,13 +58,9 @@ func TestAnalysisTimeoutMiddlewareSkipsNonAnalysisPaths(t *testing.T) {
 	})
 	wrapped := analysisTimeoutMiddleware(20*time.Millisecond, next)
 
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/abc", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
+	rr := doHandler(t, wrapped, http.MethodGet, "/pub/api/v1/jobs/abc", nil)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200 (timeout must not apply outside /analysis/)", rr.Code)
-	}
+	wantStatus(t, rr, http.StatusOK)
 	if hits != 1 {
 		t.Fatalf("next handler hits = %d, want 1", hits)
 	}
@@ -89,12 +76,8 @@ func TestAnalysisTimeoutMiddlewareDisabledOnZeroDuration(t *testing.T) {
 	if wrapped == nil {
 		t.Fatal("middleware must not return nil on zero duration")
 	}
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/analysis/nameservers", nil)
-	rr := httptest.NewRecorder()
-	wrapped.ServeHTTP(rr, req)
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rr.Code)
-	}
+	rr := doHandler(t, wrapped, http.MethodGet, "/pub/api/v1/analysis/nameservers", nil)
+	wantStatus(t, rr, http.StatusOK)
 }
 
 // TestConfigurePoolWithOverrides exercises the operator-tunable pool

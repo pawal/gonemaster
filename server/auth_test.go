@@ -81,14 +81,14 @@ func TestNewTokenSetRejectsBadHash(t *testing.T) {
 }
 
 func TestServerAuthModeOpenByDefault(t *testing.T) {
-	s := New(DefaultConfig())
+	s := newTestServer(t)
 	if mode, n := s.authMode(); mode != "open" || n != 0 {
 		t.Fatalf("expected open mode, got %q n=%d", mode, n)
 	}
 }
 
 func TestServerReloadAuth(t *testing.T) {
-	s := New(DefaultConfig())
+	s := newTestServer(t)
 	tok := "gm_reloadtest"
 	if err := s.ReloadAuth(AuthConfig{AdminTokens: []AdminToken{{Label: "a", Hash: hashToken(tok)}}}); err != nil {
 		t.Fatal(err)
@@ -108,7 +108,7 @@ func TestServerReloadAuth(t *testing.T) {
 }
 
 func TestAuthMiddlewareOpenModeAllows(t *testing.T) {
-	s := New(DefaultConfig())
+	s := newTestServer(t)
 	if rec := authGet(s, "/api/v1/locales", nil); rec.Code == http.StatusUnauthorized {
 		t.Fatalf("open mode should not require auth, got %d", rec.Code)
 	}
@@ -142,11 +142,9 @@ func TestAuthMiddlewareTokenMode(t *testing.T) {
 }
 
 func TestWhoamiOpenMode(t *testing.T) {
-	s := New(DefaultConfig())
+	s := newTestServer(t)
 	rec := authGet(s, "/api/v1/whoami", nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("want 200, got %d", rec.Code)
-	}
+	wantStatus(t, rec, http.StatusOK)
 	if !strings.Contains(rec.Body.String(), `"mode":"open"`) || !strings.Contains(rec.Body.String(), `"authenticated":true`) {
 		t.Fatalf("unexpected whoami body: %s", rec.Body.String())
 	}
@@ -169,9 +167,7 @@ func TestSessionLoginAndUseCookie(t *testing.T) {
 	tok := "gm_session"
 	s := tokenServer(t, tok)
 	rec := authDo(s, http.MethodPost, "/api/v1/session", `{"token":"`+tok+`"}`, nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("login want 200, got %d: %s", rec.Code, rec.Body.String())
-	}
+	wantStatus(t, rec, http.StatusOK)
 	cookie := cookieNamed(rec, adminCookieName)
 	if cookie == nil {
 		t.Fatal("login did not set admin cookie")
@@ -188,9 +184,7 @@ func TestSessionLoginAndUseCookie(t *testing.T) {
 func TestSessionLoginRejectsBadToken(t *testing.T) {
 	s := tokenServer(t, "gm_real")
 	rec := authDo(s, http.MethodPost, "/api/v1/session", `{"token":"wrong"}`, nil)
-	if rec.Code != http.StatusUnauthorized {
-		t.Fatalf("want 401, got %d", rec.Code)
-	}
+	wantStatus(t, rec, http.StatusUnauthorized)
 	if cookieNamed(rec, adminCookieName) != nil {
 		t.Fatal("no cookie should be set on a failed login")
 	}
@@ -199,9 +193,7 @@ func TestSessionLoginRejectsBadToken(t *testing.T) {
 func TestSessionLogoutClearsCookie(t *testing.T) {
 	s := tokenServer(t, "gm_logout")
 	rec := authDo(s, http.MethodDelete, "/api/v1/session", "", nil)
-	if rec.Code != http.StatusOK {
-		t.Fatalf("logout want 200, got %d", rec.Code)
-	}
+	wantStatus(t, rec, http.StatusOK)
 	c := cookieNamed(rec, adminCookieName)
 	if c == nil || c.MaxAge >= 0 {
 		t.Fatalf("logout should clear the admin cookie, got %+v", c)
@@ -260,7 +252,7 @@ func TestAuthEndToEndOverHTTP(t *testing.T) {
 }
 
 func TestReloadAuthRejectsBadHashKeepsPrevious(t *testing.T) {
-	s := New(DefaultConfig())
+	s := newTestServer(t)
 	good := "gm_keepme"
 	if err := s.ReloadAuth(AuthConfig{AdminTokens: []AdminToken{{Hash: hashToken(good)}}}); err != nil {
 		t.Fatal(err)

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -192,13 +191,9 @@ func TestRateLimitMiddlewareAllowsGETUnconditionally(t *testing.T) {
 	})
 	h := rateLimitMiddleware(rl, nil, ok)
 
-	for i := range 5 {
-		resp := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodGet, "/whatever", nil)
-		h.ServeHTTP(resp, r)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("GET request %d: expected 200, got %d", i+1, resp.Code)
-		}
+	for range 5 {
+		resp := doHandler(t, h, http.MethodGet, "/whatever", nil)
+		wantStatus(t, resp, http.StatusOK)
 	}
 }
 
@@ -209,23 +204,13 @@ func TestRateLimitMiddlewareBlocks429WithRetryAfter(t *testing.T) {
 	})
 	h := rateLimitMiddleware(rl, nil, ok)
 
-	for i := range 2 {
-		resp := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{}`))
-		r.RemoteAddr = "1.2.3.4:5000"
-		h.ServeHTTP(resp, r)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("request %d should pass, got %d", i+1, resp.Code)
-		}
+	for range 2 {
+		resp := doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr("1.2.3.4:5000"), noContentType())
+		wantStatus(t, resp, http.StatusCreated)
 	}
 
-	resp := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{}`))
-	r.RemoteAddr = "1.2.3.4:5000"
-	h.ServeHTTP(resp, r)
-	if resp.Code != http.StatusTooManyRequests {
-		t.Fatalf("expected 429, got %d", resp.Code)
-	}
+	resp := doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr("1.2.3.4:5000"), noContentType())
+	wantStatus(t, resp, http.StatusTooManyRequests)
 	if resp.Header().Get("Retry-After") == "" {
 		t.Fatal("expected Retry-After header on 429 response")
 	}
@@ -240,11 +225,7 @@ func TestRateLimitMiddlewareXForwardedForRespectedFromTrustedProxy(t *testing.T)
 	h := rateLimitMiddleware(rl, trusted, ok)
 
 	makePost := func(xff string) int {
-		resp := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{}`))
-		r.RemoteAddr = "10.0.0.1:1234"
-		r.Header.Set("X-Forwarded-For", xff)
-		h.ServeHTTP(resp, r)
+		resp := doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr("10.0.0.1:1234"), withHeader("X-Forwarded-For", xff), noContentType())
 		return resp.Code
 	}
 
@@ -272,11 +253,7 @@ func TestRateLimitMiddlewareIgnoresSpoofedXForwardedFor(t *testing.T) {
 	h := rateLimitMiddleware(rl, nil, ok)
 
 	makePost := func(xff string) int {
-		resp := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/jobs", bytes.NewBufferString(`{}`))
-		r.RemoteAddr = "203.0.113.99:1234"
-		r.Header.Set("X-Forwarded-For", xff)
-		h.ServeHTTP(resp, r)
+		resp := doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr("203.0.113.99:1234"), withHeader("X-Forwarded-For", xff), noContentType())
 		return resp.Code
 	}
 
@@ -295,16 +272,9 @@ func TestServerRateLimitDisabledByDefault(t *testing.T) {
 	cfg := DefaultConfig()
 	// Rate limiting is off by default - repeated POSTs must all pass.
 	srv := New(cfg)
-	for i := range 5 {
-		resp := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-			bytes.NewBufferString(`{"domain":"example.com"}`))
-		r.Header.Set("Content-Type", "application/json")
-		r.RemoteAddr = "1.2.3.4:1234"
-		srv.Handler().ServeHTTP(resp, r)
-		if resp.Code != http.StatusCreated {
-			t.Fatalf("request %d: expected 201, got %d", i+1, resp.Code)
-		}
+	for range 5 {
+		resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withRemoteAddr("1.2.3.4:1234"))
+		wantStatus(t, resp, http.StatusCreated)
 	}
 }
 
@@ -316,12 +286,7 @@ func TestServerRateLimitEnabledBlocks429(t *testing.T) {
 	srv := New(cfg)
 
 	makePost := func() int {
-		resp := httptest.NewRecorder()
-		r := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-			bytes.NewBufferString(`{"domain":"example.com"}`))
-		r.Header.Set("Content-Type", "application/json")
-		r.RemoteAddr = "1.2.3.4:1234"
-		srv.Handler().ServeHTTP(resp, r)
+		resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withRemoteAddr("1.2.3.4:1234"))
 		return resp.Code
 	}
 
@@ -349,11 +314,6 @@ func TestServerRateLimitDoesNotApplyToGET(t *testing.T) {
 		t.Fatalf("Create: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+job.PublicID, nil)
-	r.RemoteAddr = "1.2.3.4:1234"
-	srv.Handler().ServeHTTP(resp, r)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("GET should not be rate-limited, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+job.PublicID, nil, withRemoteAddr("1.2.3.4:1234"))
+	wantStatus(t, resp, http.StatusOK)
 }

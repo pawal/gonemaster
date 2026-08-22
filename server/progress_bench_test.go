@@ -239,7 +239,7 @@ func BenchmarkProgressWriteContention(b *testing.B) {
 
 func benchmarkProgressWriteContention(b *testing.B, name string, minStep int, minInterval time.Duration) {
 	b.Run(name, func(b *testing.B) {
-		srv := New(DefaultConfig())
+		srv := newTestServer(b)
 		store := newCountingJobStore()
 		srv.store = store
 		srv.progressWriteMinStep = minStep

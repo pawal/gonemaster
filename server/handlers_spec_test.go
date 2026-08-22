@@ -27,9 +27,7 @@ func TestEveryImplementedTestcaseHasDescription(t *testing.T) {
 
 func getSpec(t *testing.T, srv *Server, path string, out any) *httptest.ResponseRecorder {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, path, nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, path, nil)
 	if out != nil && resp.Code == http.StatusOK {
 		if err := json.NewDecoder(resp.Body).Decode(out); err != nil {
 			t.Fatalf("decode %s: %v", path, err)
@@ -39,12 +37,10 @@ func getSpec(t *testing.T, srv *Server, path string, out any) *httptest.Response
 }
 
 func TestSpecTestcasesList(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	var list SpecTestcaseList
 	resp := getSpec(t, srv, "/api/v1/spec/testcases", &list)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if list.Total == 0 || len(list.Items) != list.Total {
 		t.Fatalf("expected non-empty list with consistent total, got total=%d items=%d", list.Total, len(list.Items))
 	}
@@ -67,7 +63,7 @@ func TestSpecTestcasesList(t *testing.T) {
 }
 
 func TestSpecTestcasesFilterByCategory(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	var list SpecTestcaseList
 	getSpec(t, srv, "/api/v1/spec/testcases?category=dnssec", &list)
 	if list.Total == 0 {
@@ -81,12 +77,10 @@ func TestSpecTestcasesFilterByCategory(t *testing.T) {
 }
 
 func TestSpecTestcaseDetail(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	var detail SpecTestcaseDetail
 	resp := getSpec(t, srv, "/api/v1/spec/testcases/basic01", &detail)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if detail.ID != "basic01" || detail.Module != "basic" {
 		t.Errorf("detail id/module wrong: %+v", detail.SpecTestcase)
 	}
@@ -112,21 +106,17 @@ func TestSpecTestcaseDetail(t *testing.T) {
 }
 
 func TestSpecTestcaseCaseInsensitive(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	var detail SpecTestcaseDetail
 	resp := getSpec(t, srv, "/api/v1/spec/testcases/BASIC01", &detail)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200 for uppercase id, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if detail.ID != "basic01" {
 		t.Errorf("id = %q, want basic01", detail.ID)
 	}
 }
 
 func TestSpecTestcaseNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	resp := getSpec(t, srv, "/api/v1/spec/testcases/nope99", nil)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusNotFound)
 }

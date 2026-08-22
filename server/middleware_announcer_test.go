@@ -69,9 +69,7 @@ func fetch(t *testing.T, h http.Handler, path string) string {
 	t.Helper()
 	w := httptest.NewRecorder()
 	h.ServeHTTP(w, httptest.NewRequest(http.MethodGet, path, nil))
-	if w.Code != http.StatusOK {
-		t.Fatalf("GET %s: expected 200, got %d", path, w.Code)
-	}
+	wantStatus(t, w, http.StatusOK)
 	body, err := io.ReadAll(w.Body)
 	if err != nil {
 		t.Fatalf("read %s: %v", path, err)

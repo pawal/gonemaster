@@ -96,7 +96,7 @@ func TestServerStartTriggersAnalysisRepair(t *testing.T) {
 }
 
 func TestRunJobInvokesAnalysisProjector(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyAnalysisController()
 	srv.SetAnalysisController(spy)
 	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
@@ -128,7 +128,7 @@ func TestRunJobInvokesAnalysisProjector(t *testing.T) {
 }
 
 func TestRunJobIgnoresAnalysisProjectionErrors(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyAnalysisController()
 	spy.projectRunErr = errors.New("boom")
 	srv.SetAnalysisController(spy)

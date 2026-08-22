@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -48,12 +47,8 @@ func queueJobInBatch(t *testing.T, srv *Server, batchID, domain string) {
 
 func listBatches(t *testing.T, srv *Server, query string) BatchListResponse {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches"+query, nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches"+query, nil)
+	wantStatus(t, resp, http.StatusOK)
 	var body BatchListResponse
 	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
 		t.Fatalf("unmarshal: %v", err)
@@ -62,7 +57,7 @@ func listBatches(t *testing.T, srv *Server, query string) BatchListResponse {
 }
 
 func TestHandleListBatches(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	old := time.Now().UTC().Add(-2 * time.Hour)
 	recent := time.Now().UTC().Add(-1 * time.Hour)
 
@@ -113,7 +108,7 @@ func TestHandleListBatches(t *testing.T) {
 }
 
 func TestHandleListBatchesEmpty(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	body := listBatches(t, srv, "")
 	if body.Total != 0 || len(body.Items) != 0 {
 		t.Fatalf("empty store should yield no batches, got %+v", body)
@@ -121,7 +116,7 @@ func TestHandleListBatchesEmpty(t *testing.T) {
 }
 
 func TestHandleListBatchesLabelFilter(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	now := time.Now().UTC()
 	if err := srv.store.CreateBatch(Batch{ID: "b1", Tag: "tld-weekly", DomainCount: 1, CreatedAt: now}); err != nil {
 		t.Fatalf("CreateBatch: %v", err)

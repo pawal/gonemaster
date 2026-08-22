@@ -127,9 +127,7 @@ func TestGzipPassesThroughNotModified(t *testing.T) {
 	})
 
 	resp := runGzip(t, h, "gzip")
-	if resp.Code != http.StatusNotModified {
-		t.Fatalf("status = %d, want 304", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusNotModified)
 	if got := resp.Header().Get("Content-Encoding"); got != "" {
 		t.Fatalf("304 had Content-Encoding = %q", got)
 	}

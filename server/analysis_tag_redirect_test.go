@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"net/url"
 	"testing"
 )
@@ -115,14 +114,9 @@ func TestLegacyTagRedirectServesPermanentRedirect(t *testing.T) {
 	})
 	h := legacyTagRedirect(next)
 
-	req := httptest.NewRequest(http.MethodGet,
-		"/analysis/tags/OUT_OF_BAILIWICK_ADDR_MISMATCH?search=OUT_OF_BAILIWICK_ADDR_MISMATCH", nil)
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
+	rec := doHandler(t, h, http.MethodGet, "/analysis/tags/OUT_OF_BAILIWICK_ADDR_MISMATCH?search=OUT_OF_BAILIWICK_ADDR_MISMATCH", nil)
 
-	if rec.Code != http.StatusMovedPermanently {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMovedPermanently)
-	}
+	wantStatus(t, rec, http.StatusMovedPermanently)
 	location := rec.Header().Get("Location")
 	got, err := url.Parse(location)
 	if err != nil {
@@ -140,16 +134,11 @@ func TestAnalysisRouteRedirectsLegacyTag(t *testing.T) {
 	// Through the real router, so the redirect cannot be lost by a rewiring of
 	// the /analysis/ mount. Independent of whether the SPA bundle is built,
 	// since the redirect answers before the request reaches the UI handler.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	req := httptest.NewRequest(http.MethodGet,
-		"/analysis/tags/OUT_OF_BAILIWICK_ADDR_MISMATCH?search=OUT_OF_BAILIWICK_ADDR_MISMATCH", nil)
-	rec := httptest.NewRecorder()
-	srv.mux.ServeHTTP(rec, req)
+	rec := doHandler(t, srv.mux, http.MethodGet, "/analysis/tags/OUT_OF_BAILIWICK_ADDR_MISMATCH?search=OUT_OF_BAILIWICK_ADDR_MISMATCH", nil)
 
-	if rec.Code != http.StatusMovedPermanently {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusMovedPermanently)
-	}
+	wantStatus(t, rec, http.StatusMovedPermanently)
 	got, err := url.Parse(rec.Header().Get("Location"))
 	if err != nil {
 		t.Fatalf("parse Location: %v", err)
@@ -170,14 +159,10 @@ func TestLegacyTagRedirectPassesCurrentURLThrough(t *testing.T) {
 	})
 	h := legacyTagRedirect(next)
 
-	req := httptest.NewRequest(http.MethodGet, "/analysis/tags/NOT_IN_DOMAIN_ADDR_MISMATCH", nil)
-	rec := httptest.NewRecorder()
-	h.ServeHTTP(rec, req)
+	rec := doHandler(t, h, http.MethodGet, "/analysis/tags/NOT_IN_DOMAIN_ADDR_MISMATCH", nil)
 
 	if !called {
 		t.Fatal("expected the request to reach the analysis UI handler")
 	}
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
-	}
+	wantStatus(t, rec, http.StatusOK)
 }

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -33,9 +32,7 @@ func getPublicNoRedirect(t *testing.T, srv *Server, path string) *httptest.Respo
 func getPublicNoFollow(t *testing.T, srv *Server, path string, maxHops int) *httptest.ResponseRecorder {
 	t.Helper()
 	for hop := 0; ; hop++ {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		srv.Handler().ServeHTTP(resp, req)
+		resp := doJSON(t, srv, http.MethodGet, path, nil)
 		if hop >= maxHops {
 			return resp
 		}
@@ -54,22 +51,16 @@ func getPublicNoFollow(t *testing.T, srv *Server, path string, maxHops int) *htt
 }
 
 func TestPublicAnalysisCatalogEmpty(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	resp := getPublic(t, srv, "/pub/api/v1/analysis/catalog")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var got PublicAnalysisCatalogResponse
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	got := mustJSON[PublicAnalysisCatalogResponse](t, resp, http.StatusOK)
 	if len(got.Cohorts) != 0 || got.SelectorEnabled || got.DefaultTag != "" {
 		t.Fatalf("expected empty catalog, got %+v", got)
 	}
 }
 
 func TestPublicAnalysisCatalogResolvesDefault(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedCohort(t, srv, AnalysisCohort{
 		SourceType: "tag", SourceTag: "tld", Label: "TLD",
 		AnalysisEnabled: true, PublicEnabled: true, IsDefault: true, SortOrder: 10,
@@ -84,13 +75,7 @@ func TestPublicAnalysisCatalogResolvesDefault(t *testing.T) {
 	})
 
 	resp := getPublic(t, srv, "/pub/api/v1/analysis/catalog")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var got PublicAnalysisCatalogResponse
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	got := mustJSON[PublicAnalysisCatalogResponse](t, resp, http.StatusOK)
 	if got.DefaultTag != "tld" {
 		t.Fatalf("expected default_tag=tld, got %q", got.DefaultTag)
 	}
@@ -106,7 +91,7 @@ func TestPublicAnalysisCatalogResolvesDefault(t *testing.T) {
 }
 
 func TestPublicAnalysisCatalogRedactsInternalFields(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedCohort(t, srv, AnalysisCohort{
 		SourceType: "tag", SourceTag: "tld", Label: "TLD",
 		AnalysisEnabled: true, PublicEnabled: true, IsDefault: true,
@@ -126,26 +111,20 @@ func TestPublicAnalysisCatalogRedactsInternalFields(t *testing.T) {
 }
 
 func TestPublicAnalysisCohortsEndpoint(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedCohort(t, srv, AnalysisCohort{
 		SourceType: "tag", SourceTag: "tld", Label: "TLD",
 		AnalysisEnabled: true, PublicEnabled: true,
 	})
 	resp := getPublic(t, srv, "/pub/api/v1/analysis/cohorts")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var views []PublicAnalysisCohortView
-	if err := json.NewDecoder(resp.Body).Decode(&views); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	views := mustJSON[[]PublicAnalysisCohortView](t, resp, http.StatusOK)
 	if len(views) != 1 || views[0].DatasetTag != "tld" {
 		t.Fatalf("unexpected views: %+v", views)
 	}
 }
 
 func TestPublicAnalysisOverviewRedactsInternalFields(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedCohort(t, srv, AnalysisCohort{
 		SourceType: "tag", SourceTag: "tld", Label: "TLD",
 		AnalysisEnabled: true, PublicEnabled: true, IsDefault: true,
@@ -162,13 +141,11 @@ func TestPublicAnalysisOverviewRedactsInternalFields(t *testing.T) {
 }
 
 func TestPublicAnalysisCatalogRejectsInvalidCatalogState(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedCohort(t, srv, AnalysisCohort{
 		SourceType: "tag", SourceTag: "broken", Label: "Broken",
 		AnalysisEnabled: false, PublicEnabled: true,
 	})
 	resp := getPublic(t, srv, "/pub/api/v1/analysis/catalog")
-	if resp.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusInternalServerError)
 }

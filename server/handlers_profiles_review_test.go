@@ -1,9 +1,7 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine"
@@ -12,16 +10,8 @@ import (
 
 func fetchCompatibilitySummaries(t *testing.T, srv *Server) []CompatibilitySummary {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("fetchCompatibilitySummaries: expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var summaries []CompatibilitySummary
-	if err := json.NewDecoder(resp.Body).Decode(&summaries); err != nil {
-		t.Fatalf("decode summaries: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/compatibility", nil)
+	summaries := mustJSON[[]CompatibilitySummary](t, resp, http.StatusOK)
 	return summaries
 }
 
@@ -118,7 +108,7 @@ func TestCheckProfileCompatibilityInvalidConfigIsNeverWaived(t *testing.T) {
 }
 
 func TestProfilesCompatibilitySummaryCarriesWaivedCount(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	// Created through the API, so it carries the current schema_version stamp.
 	profile := createProfile(t, srv, `{"name":"waiver","config":{"test_cases":["address01"]}}`)
 
@@ -135,7 +125,7 @@ func TestProfilesCompatibilitySummaryCarriesWaivedCount(t *testing.T) {
 }
 
 func TestPatchProfileClearReviewed(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"clear-rev","config":{"test_cases":["address01"]}}`)
 
 	// Freshly saved profiles are stamped, so the gaps start out waived.
@@ -170,7 +160,7 @@ func TestPatchProfileClearReviewed(t *testing.T) {
 }
 
 func TestPatchProfileClearReviewedThenFixConvergesOnMerits(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"converge","config":{"test_cases":["address01"]}}`)
 
 	patchProfile(t, srv, profile.ID, `{"op":"clear_reviewed"}`)

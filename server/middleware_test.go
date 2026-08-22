@@ -85,12 +85,9 @@ func TestAccessLogRouteFromMatchedPattern(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var buf bytes.Buffer
-			srv := New(DefaultConfig())
-			srv.logger = newLogger("json", "info", &buf)
+			srv := newTestServer(t, withLogTo(&buf, "info"))
 
-			resp := httptest.NewRecorder()
-			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
-			srv.Handler().ServeHTTP(resp, req)
+			doJSON(t, srv, http.MethodGet, tc.path, nil)
 
 			line := findLogLine(t, &buf, "http_request")
 			if got := line["route"]; got != tc.wantRoute {
@@ -116,19 +113,15 @@ func findLogLine(t *testing.T, buf *bytes.Buffer, want string) map[string]any {
 }
 
 func TestRecoverMiddlewareReturnsCleanError(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	canary := "secret-stack-frame-marker-XYZ123"
 	panicker := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		panic(canary)
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/whatever", nil)
-	srv.recoverMiddleware(panicker).ServeHTTP(resp, req)
+	resp := doHandler(t, srv.recoverMiddleware(panicker), http.MethodGet, "/whatever", nil)
 
-	if resp.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusInternalServerError)
 	body := resp.Body.String()
 	if strings.Contains(body, canary) {
 		t.Fatalf("response leaked panic value: %s", body)
@@ -146,33 +139,31 @@ func TestRecoverMiddlewareReturnsCleanError(t *testing.T) {
 }
 
 func TestRecoverMiddlewarePassesThroughNormalRequests(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	ok := http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusTeapot)
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/whatever", nil)
-	srv.recoverMiddleware(ok).ServeHTTP(resp, req)
+	resp := doHandler(t, srv.recoverMiddleware(ok), http.MethodGet, "/whatever", nil)
 
-	if resp.Code != http.StatusTeapot {
-		t.Fatalf("expected 418, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusTeapot)
 	if got := srv.metrics.Snapshot().API.PanicsTotal; got != 0 {
 		t.Fatalf("panics_total = %d, want 0 for non-panicking handler", got)
 	}
 }
 
+const (
+	untrustedAddr    = "203.0.113.7:1234"
+	trustedProxyAddr = "127.0.0.1:5000"
+)
+
 func TestRequestIDMiddlewareGeneratesForUntrusted(t *testing.T) {
-	srv := New(DefaultConfig()) // no trusted proxies
+	srv := newTestServer(t) // no trusted proxies
 	handler := srv.requestIDMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/healthz", nil)
-	req.RemoteAddr = "203.0.113.7:1234" // untrusted
-	handler.ServeHTTP(resp, req)
+	resp := doHandler(t, handler, http.MethodGet, "/api/v1/healthz", nil, withRemoteAddr(untrustedAddr))
 
 	got := resp.Header().Get("X-Request-Id")
 	if got == "" {
@@ -191,11 +182,7 @@ func TestRequestIDMiddlewareEchoesFromTrustedProxy(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/healthz", nil)
-	req.RemoteAddr = "127.0.0.1:5000" // trusted proxy
-	req.Header.Set("X-Request-Id", "edge-abc123")
-	handler.ServeHTTP(resp, req)
+	resp := doHandler(t, handler, http.MethodGet, "/api/v1/healthz", nil, withRemoteAddr(trustedProxyAddr), withHeader("X-Request-Id", "edge-abc123"))
 
 	if got := resp.Header().Get("X-Request-Id"); got != "edge-abc123" {
 		t.Fatalf("expected trusted inbound ID echoed, got %q", got)
@@ -203,16 +190,12 @@ func TestRequestIDMiddlewareEchoesFromTrustedProxy(t *testing.T) {
 }
 
 func TestRequestIDMiddlewareIgnoresUntrustedInbound(t *testing.T) {
-	srv := New(DefaultConfig()) // trusts nothing
+	srv := newTestServer(t) // trusts nothing
 	handler := srv.requestIDMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/healthz", nil)
-	req.RemoteAddr = "203.0.113.7:1234" // untrusted
-	req.Header.Set("X-Request-Id", "spoofed")
-	handler.ServeHTTP(resp, req)
+	resp := doHandler(t, handler, http.MethodGet, "/api/v1/healthz", nil, withRemoteAddr(untrustedAddr), withHeader("X-Request-Id", "spoofed"))
 
 	got := resp.Header().Get("X-Request-Id")
 	if got == "spoofed" {
@@ -234,8 +217,7 @@ func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 	}
 	for _, tc := range cases {
 		var buf bytes.Buffer
-		srv := New(DefaultConfig())
-		srv.logger = newLogger("json", "info", &buf)
+		srv := newTestServer(t, withLogTo(&buf, "info"))
 
 		// requestID wraps accessLog so the line carries a request_id.
 		handler := srv.requestIDMiddleware(srv.accessLogMiddleware(
@@ -243,9 +225,7 @@ func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 				w.WriteHeader(tc.status)
 			})))
 
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/j1", nil)
-		handler.ServeHTTP(resp, req)
+		doHandler(t, handler, http.MethodGet, "/api/v1/jobs/j1", nil)
 
 		lines := decodeLogLines(t, &buf)
 		if len(lines) != 1 {
@@ -278,7 +258,7 @@ func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 
 func TestAccessLogMiddlewareOmitsBodyByDefault(t *testing.T) {
 	var buf bytes.Buffer
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.logger = newLogger("json", "info", &buf) // info: no body capture
 
 	handler := srv.accessLogMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -294,7 +274,7 @@ func TestAccessLogMiddlewareOmitsBodyByDefault(t *testing.T) {
 
 func TestAccessLogMiddlewareCapturesBodyAtDebug(t *testing.T) {
 	var buf bytes.Buffer
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.logger = newLogger("json", "debug", &buf) // debug: body captured
 
 	handler := srv.accessLogMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -314,8 +294,7 @@ func TestAccessLogMiddlewareCapturesBodyAtDebug(t *testing.T) {
 
 func TestRecoverMiddlewareLogsStructuredPanicWithRequestID(t *testing.T) {
 	var buf bytes.Buffer
-	srv := New(DefaultConfig())
-	srv.logger = newLogger("json", "info", &buf)
+	srv := newTestServer(t, withLogTo(&buf, "info"))
 
 	canary := "panic-canary-42"
 	panicker := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
@@ -324,13 +303,9 @@ func TestRecoverMiddlewareLogsStructuredPanicWithRequestID(t *testing.T) {
 	// requestID wraps recover so the panic line carries a request_id.
 	handler := srv.requestIDMiddleware(srv.recoverMiddleware(panicker))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs", nil)
-	handler.ServeHTTP(resp, req)
+	resp := doHandler(t, handler, http.MethodGet, "/api/v1/jobs", nil)
 
-	if resp.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusInternalServerError)
 	lines := decodeLogLines(t, &buf)
 	if len(lines) != 1 {
 		t.Fatalf("expected 1 panic line, got %d", len(lines))
@@ -351,10 +326,8 @@ func TestRecoverMiddlewareLogsStructuredPanicWithRequestID(t *testing.T) {
 }
 
 func TestSecurityHeadersPermissionsPolicy(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/public/", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/public/", nil)
 	pp := resp.Header().Get("Permissions-Policy")
 	if pp == "" {
 		t.Fatal("missing Permissions-Policy header")
@@ -383,7 +356,7 @@ func TestSecurityHeadersPermissionsPolicy(t *testing.T) {
 }
 
 func TestSecurityHeadersCSPDropsUnsafeInlineStyles(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	cases := []struct {
 		path        string
 		mustHave    []string
@@ -411,9 +384,7 @@ func TestSecurityHeadersCSPDropsUnsafeInlineStyles(t *testing.T) {
 		},
 	}
 	for _, tc := range cases {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
-		srv.Handler().ServeHTTP(resp, req)
+		resp := doJSON(t, srv, http.MethodGet, tc.path, nil)
 		csp := resp.Header().Get("Content-Security-Policy")
 		if csp == "" {
 			t.Fatalf("%s: missing Content-Security-Policy header", tc.path)
@@ -432,7 +403,7 @@ func TestSecurityHeadersCSPDropsUnsafeInlineStyles(t *testing.T) {
 }
 
 func TestRecoverMiddlewareDoesNotSwallowErrAbortHandler(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	panicker := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		panic(http.ErrAbortHandler)
 	})
@@ -444,8 +415,6 @@ func TestRecoverMiddlewareDoesNotSwallowErrAbortHandler(t *testing.T) {
 		}
 	}()
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/whatever", nil)
-	srv.recoverMiddleware(panicker).ServeHTTP(resp, req)
+	doHandler(t, srv.recoverMiddleware(panicker), http.MethodGet, "/whatever", nil)
 	t.Fatal("expected panic to propagate")
 }

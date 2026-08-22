@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 )
@@ -35,16 +34,12 @@ func graduatePublicJobWithChain(t *testing.T, srv *Server, chain string) string 
 }
 
 func TestPublicDNSSECChainReturnsBlobWithCacheHeader(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if cc := resp.Header().Get("Cache-Control"); cc != "public, max-age=300" {
 		t.Errorf("Cache-Control = %q, want public, max-age=300", cc)
 	}
@@ -54,12 +49,10 @@ func TestPublicDNSSECChainReturnsBlobWithCacheHeader(t *testing.T) {
 }
 
 func TestPublicDNSSECChainMarkerInResult(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/result", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/result", nil)
 
 	var result JobResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -71,11 +64,9 @@ func TestPublicDNSSECChainMarkerInResult(t *testing.T) {
 }
 
 func TestPublicDNSSECChainUnknownIDReturnsNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/nosuchid1/dnssec-chain", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/nosuchid1/dnssec-chain", nil)
 
 	wantErrorCode(t, resp, http.StatusNotFound, "not_found")
 	if cc := resp.Header().Get("Cache-Control"); cc != "" {
@@ -84,13 +75,11 @@ func TestPublicDNSSECChainUnknownIDReturnsNotFound(t *testing.T) {
 }
 
 func TestPublicDNSSECChainRunWithoutBlobReturnsNoChainData(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	// Graduate a public job without a chain blob.
 	publicID := graduatePublicJobWithChain(t, srv, "")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
 
 	wantErrorCode(t, resp, http.StatusNotFound, "no_chain_data")
 	if cc := resp.Header().Get("Cache-Control"); cc != "" {
@@ -104,9 +93,7 @@ func TestPublicDNSSECChainFlagOffReturnsNotFound(t *testing.T) {
 	srv := New(cfg)
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
 
 	// Flag-off is indistinguishable from an unknown id: not_found, not no_chain_data.
 	wantErrorCode(t, resp, http.StatusNotFound, "not_found")
@@ -118,9 +105,7 @@ func TestPublicDNSSECChainMarkerMaskedWhenFlagOff(t *testing.T) {
 	srv := New(cfg)
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/result", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/result", nil)
 
 	var result JobResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -132,20 +117,16 @@ func TestPublicDNSSECChainMarkerMaskedWhenFlagOff(t *testing.T) {
 }
 
 func TestAdminDNSSECChainTwin(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
 	job, ok := srv.store.GetByPublicID(publicID)
 	if !ok {
 		t.Fatal("expected job")
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/"+job.ID+"/dnssec-chain", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs/"+job.ID+"/dnssec-chain", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if body := resp.Body.String(); body != handlerChainJSON {
 		t.Errorf("body = %q, want %q", body, handlerChainJSON)
 	}
@@ -164,13 +145,11 @@ func (e errChainStore) GetRunDNSSECChain(string) (string, bool, error) {
 }
 
 func TestPublicDNSSECChainLookupErrorReturns500(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
 	srv.store = errChainStore{JobStore: srv.store, err: errors.New("db down")}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
 
 	// A lookup failure must not masquerade as absent data (404), or the UI
 	// would latch a permanent "no chain data" note for data that exists.
@@ -181,7 +160,7 @@ func TestPublicDNSSECChainLookupErrorReturns500(t *testing.T) {
 }
 
 func TestAdminDNSSECChainLookupErrorReturns500(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
 	job, ok := srv.store.GetByPublicID(publicID)
 	if !ok {
@@ -189,9 +168,7 @@ func TestAdminDNSSECChainLookupErrorReturns500(t *testing.T) {
 	}
 	srv.store = errChainStore{JobStore: srv.store, err: errors.New("db down")}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/"+job.ID+"/dnssec-chain", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs/"+job.ID+"/dnssec-chain", nil)
 
 	wantErrorCode(t, resp, http.StatusInternalServerError, "lookup_failed")
 }

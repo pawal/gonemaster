@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -12,10 +11,7 @@ import (
 
 func postProfileDiff(t *testing.T, srv *Server, body string) (int, *httptest.ResponseRecorder) {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/diff", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/profiles/diff", body)
 	return resp.Code, resp
 }
 
@@ -38,7 +34,7 @@ func diffProperty(result engineprofile.DiffResult, path string) *engineprofile.D
 }
 
 func TestProfileDiffEndpoint(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	code, resp := postProfileDiff(t, srv, `{"config":{
 		"resolver":{"defaults":{"timeout":5,"nameserver_max_total_ms":60000}}
@@ -62,7 +58,7 @@ func TestProfileDiffEndpoint(t *testing.T) {
 }
 
 func TestProfileDiffEndpointEmptyConfig(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	code, resp := postProfileDiff(t, srv, `{}`)
 	if code != http.StatusOK {
@@ -75,7 +71,7 @@ func TestProfileDiffEndpointEmptyConfig(t *testing.T) {
 }
 
 func TestProfileDiffEndpointInvalidConfig(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	code, resp := postProfileDiff(t, srv, `{"config":{"not_a_property":1}}`)
 	if code != http.StatusBadRequest {
@@ -84,7 +80,7 @@ func TestProfileDiffEndpointInvalidConfig(t *testing.T) {
 }
 
 func TestProfileDiffEndpointInvalidJSON(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	code, _ := postProfileDiff(t, srv, `not json`)
 	if code != http.StatusBadRequest {
@@ -93,7 +89,7 @@ func TestProfileDiffEndpointInvalidJSON(t *testing.T) {
 }
 
 func TestProfileDiffEndpointStoresNothing(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// The draft config travels in the body and must never reach the store.
 	code, _ := postProfileDiff(t, srv, `{"config":{"net":{"ipv6":false}}}`)
@@ -106,7 +102,7 @@ func TestProfileDiffEndpointStoresNothing(t *testing.T) {
 }
 
 func TestProfileDiffEndpointTestLevelsMissingTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	code, resp := postProfileDiff(t, srv, `{"config":{
 		"test_levels":{"BASIC":{"B01_CHILD_FOUND":"WARNING"}}

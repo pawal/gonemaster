@@ -2,30 +2,21 @@ package server
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
 func TestPublicLookupEndpointAccessible(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/lookup/example.com", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/lookup/example.com", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200 from /pub/api/v1/lookup/example.com, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusOK)
 }
 
 func TestPublicLookupMissingDomainReturns400(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/lookup/%20", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/lookup/%20", nil)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 }

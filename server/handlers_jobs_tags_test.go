@@ -30,8 +30,7 @@ func TestCreateJobWithTags(t *testing.T) {
 
 func TestCreateJobLogsDomain(t *testing.T) {
 	var buf bytes.Buffer
-	srv := newTestServer(t)
-	srv.logger = newLogger("json", "info", &buf)
+	srv := newTestServer(t, withLogTo(&buf, "info"))
 
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
 	wantStatus(t, resp, http.StatusCreated)

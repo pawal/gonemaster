@@ -1,11 +1,8 @@
 package server
 
 import (
-	"bytes"
-	"encoding/json"
-	"fmt"
 	"net/http"
-	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -47,24 +44,12 @@ func TestIsBlockedPublicNameserverIP(t *testing.T) {
 }
 
 func TestPublicCreateJobRejectsPrivateUndelegatedIP(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	body := `{"domain":"example.com","nameservers":[{"ns":"ns1.attacker.example","ip":"169.254.169.254"}]}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "private_undelegated_ip" {
-		t.Fatalf("expected code private_undelegated_ip, got %q (msg=%q)", out.Error.Code, out.Error.Message)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "private_undelegated_ip")
 }
 
 func TestPublicCreateJobAllowsPrivateUndelegatedIPWhenEnabled(t *testing.T) {
@@ -73,54 +58,32 @@ func TestPublicCreateJobAllowsPrivateUndelegatedIPWhenEnabled(t *testing.T) {
 	srv := New(cfg)
 
 	body := `{"domain":"example.com","nameservers":[{"ns":"ns1.internal.example","ip":"10.0.0.1"}]}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201 with override enabled, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusCreated)
 }
 
 func TestPublicCreateJobAllowsPublicUndelegatedIP(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	body := `{"domain":"example.com","nameservers":[{"ns":"ns1.example.","ip":"198.51.100.1"}]}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusCreated)
 }
 
 func TestPublicCreateJobRejectsAnyPrivateIPInList(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	body := `{"domain":"example.com","nameservers":[` +
 		`{"ns":"ns1.example.","ip":"198.51.100.1"},` +
 		`{"ns":"ns2.attacker.example","ip":"127.0.0.1"}` +
 		`]}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "private_undelegated_ip" {
-		t.Fatalf("expected private_undelegated_ip, got %q", out.Error.Code)
-	}
+	out := wantErrorCode(t, resp, http.StatusBadRequest, "private_undelegated_ip")
 	// Mention the offending index for operator clarity.
-	if !bytes.Contains(fmt.Appendf(nil, "%v", out.Error.Message), []byte("[1]")) {
+	if !strings.Contains(out.Error.Message, "[1]") {
 		t.Logf("note: error message should reference the offending index: %q", out.Error.Message)
 	}
 }

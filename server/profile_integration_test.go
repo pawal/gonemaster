@@ -1,11 +1,9 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine"
@@ -18,44 +16,25 @@ func addDomainsToTag(t *testing.T, srv *Server, tag string, domains []string) {
 	if err != nil {
 		t.Fatalf("marshal domains: %v", err)
 	}
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags/"+tag+"/domains", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("addDomainsToTag: expected 204, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags/"+tag+"/domains", body)
+	wantStatus(t, resp, http.StatusNoContent)
 }
 
 func setTagProfile(t *testing.T, srv *Server, tag string, profileID int64) {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/tags/"+tag+"/profile",
-		bytes.NewBufferString(fmt.Sprintf(`{"profile_id":%d}`, profileID)))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("setTagProfile: expected 204, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/tags/"+tag+"/profile", fmt.Sprintf(`{"profile_id":%d}`, profileID))
+	wantStatus(t, resp, http.StatusNoContent)
 }
 
 func getRunByAPI(t *testing.T, srv *Server, id string) Run {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/"+id, nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("getRunByAPI: expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var run Run
-	if err := json.NewDecoder(resp.Body).Decode(&run); err != nil {
-		t.Fatalf("decode run: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs/"+id, nil)
+	run := mustJSON[Run](t, resp, http.StatusOK)
 	return run
 }
 
 func TestProfileIntegrationBatchFromTagSnapshotsStoredProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return []engine.LogEntry{{Module: "BASIC", Testcase: "basic01", Tag: "BASIC01", Level: "NOTICE"}}, nil
 	}
@@ -68,14 +47,8 @@ func TestProfileIntegrationBatchFromTagSnapshotsStoredProfile(t *testing.T) {
 	addDomainsToTag(t, srv, "ops", []string{"example.com"})
 	setTagProfile(t, srv, "ops", storedProfile.ID)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(`{"from_tag":"ops"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"from_tag":"ops"}`)
+	wantStatus(t, resp, http.StatusAccepted)
 
 	var batchResp JobBatchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
@@ -114,7 +87,7 @@ func TestProfileIntegrationBatchFromTagSnapshotsStoredProfile(t *testing.T) {
 }
 
 func TestProfileIntegrationJobOverridesAppearInRunSnapshot(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return nil, nil
 	}
@@ -124,18 +97,12 @@ func TestProfileIntegrationJobOverridesAppearInRunSnapshot(t *testing.T) {
 		"config":{"net":{"ipv4":false},"resolver":{"defaults":{"timeout":5}}}
 	}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(fmt.Sprintf(`{
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", fmt.Sprintf(`{
 			"domain":"example.com",
 			"profile_id":%d,
 			"profile_overrides":{"resolver":{"defaults":{"timeout":7}}}
-		}`, storedProfile.ID)))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
+		}`, storedProfile.ID))
+	wantStatus(t, resp, http.StatusCreated)
 
 	var created Job
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
@@ -192,7 +159,7 @@ func TestProfileIntegrationJobOverridesAppearInRunSnapshot(t *testing.T) {
 // "The test run failed. Please try again." because JobCreateRequest lacked
 // the field and readJSON's DisallowUnknownFields rejected the payload.
 func TestPublicAPIDisableIPv6IntegrationReachesEngineAndEffectiveProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	var capturedIPv4, capturedIPv6 *bool
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -202,19 +169,9 @@ func TestPublicAPIDisableIPv6IntegrationReachesEngineAndEffectiveProfile(t *test
 	}
 
 	// POST the exact body shape the public UI sends.
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com","ipv6_disabled":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com","ipv6_disabled":true}`)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var created PublicJobView
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := mustJSON[PublicJobView](t, resp, http.StatusCreated)
 
 	// Resolve internal job ID via the store so we can drive the worker.
 	stored, ok := srv.store.GetByPublicID(created.PublicID)

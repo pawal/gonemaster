@@ -63,9 +63,7 @@ func seedBatchRuns(t *testing.T, srv *Server, batchID string, runs []seedRun) {
 
 func getTagValues(t *testing.T, srv *Server, query string) (*httptest.ResponseRecorder, BatchTagValuesResponse) {
 	t.Helper()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+query, nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches/"+query, nil)
 	var body BatchTagValuesResponse
 	if resp.Code == http.StatusOK {
 		if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
@@ -86,7 +84,7 @@ func nsidEntry(v string) engine.LogEntry {
 func TestHandleBatchTagValuesScalar(t *testing.T) {
 	// Three domains carry nsid values A, B, A. The rollup must count A twice
 	// and B once, ranked by count descending (A first).
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedBatchRuns(t, srv, "batch_nsid", []seedRun{
 		{domain: "alpha", entries: []engine.LogEntry{nsidEntry("A")}},
 		{domain: "beta", entries: []engine.LogEntry{nsidEntry("B")}},
@@ -94,9 +92,7 @@ func TestHandleBatchTagValuesScalar(t *testing.T) {
 	})
 
 	resp, body := getTagValues(t, srv, "batch_nsid/tag-values?tag=N16_HAS_NSID&arg=nsid")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if body.Tag != "N16_HAS_NSID" || body.Arg != "nsid" || body.MinCount != 1 {
 		t.Fatalf("unexpected echo fields: %+v", body)
 	}
@@ -117,7 +113,7 @@ func TestHandleBatchTagValuesScalar(t *testing.T) {
 func TestHandleBatchTagValuesListUnpack(t *testing.T) {
 	// A list-valued arg is unpacked: a single run whose nameservers arg holds
 	// three hosts contributes one count to each host.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	listEntry := engine.LogEntry{
 		Timestamp: 1.0, Module: "Delegation", Testcase: "Delegation01",
 		Tag: "DEL_NS", Level: "INFO",
@@ -128,9 +124,7 @@ func TestHandleBatchTagValuesListUnpack(t *testing.T) {
 	})
 
 	resp, body := getTagValues(t, srv, "batch_list/tag-values?tag=DEL_NS&arg=nameservers")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if len(body.Values) != 3 {
 		t.Fatalf("expected three unpacked values, got %+v", body.Values)
 	}
@@ -147,16 +141,14 @@ func TestHandleBatchTagValuesListUnpack(t *testing.T) {
 func TestHandleBatchTagValuesWeightByScore(t *testing.T) {
 	// With weight_by_score, every value row carries an avg_score and the
 	// response echoes the flag.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedBatchRuns(t, srv, "batch_w", []seedRun{
 		{domain: "alpha", entries: []engine.LogEntry{nsidEntry("A")}},
 		{domain: "beta", entries: []engine.LogEntry{nsidEntry("B")}},
 	})
 
 	resp, body := getTagValues(t, srv, "batch_w/tag-values?tag=N16_HAS_NSID&arg=nsid&weight_by_score=true")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if body.WeightByScore != true {
 		t.Fatalf("expected weight_by_score echo true, got %+v", body)
 	}
@@ -170,7 +162,7 @@ func TestHandleBatchTagValuesWeightByScore(t *testing.T) {
 func TestHandleBatchTagValuesValidation(t *testing.T) {
 	// tag and arg are required; min_count, limit, and weight_by_score must
 	// parse when supplied.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedBatchRuns(t, srv, "batch_val", []seedRun{{domain: "alpha", entries: []engine.LogEntry{nsidEntry("A")}}})
 
 	bad := []string{
@@ -192,7 +184,7 @@ func TestHandleBatchTagValuesValidation(t *testing.T) {
 
 func TestHandleBatchTagValuesMinCount(t *testing.T) {
 	// min_count drops values that fewer than that many domains carry.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedBatchRuns(t, srv, "batch_mc", []seedRun{
 		{domain: "alpha", entries: []engine.LogEntry{nsidEntry("A")}},
 		{domain: "beta", entries: []engine.LogEntry{nsidEntry("A")}},
@@ -200,26 +192,22 @@ func TestHandleBatchTagValuesMinCount(t *testing.T) {
 	})
 
 	resp, body := getTagValues(t, srv, "batch_mc/tag-values?tag=N16_HAS_NSID&arg=nsid&min_count=2")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if len(body.Values) != 1 || body.Values[0].Value != "A" {
 		t.Fatalf("min_count=2 should leave only A, got %+v", body.Values)
 	}
 }
 
 func TestHandleBatchTagValuesNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	resp, _ := getTagValues(t, srv, "missing/tag-values?tag=N16_HAS_NSID&arg=nsid")
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestHandleBatchTagValuesIncomplete(t *testing.T) {
 	// A batch with a still-queued job is not complete, so the rollup is
 	// refused with 409 rather than returning a partial answer.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	now := time.Now().UTC()
 	if err := srv.store.CreateBatch(Batch{ID: "batch_busy", CreatedAt: now}); err != nil {
 		t.Fatalf("CreateBatch: %v", err)
@@ -236,7 +224,5 @@ func TestHandleBatchTagValuesIncomplete(t *testing.T) {
 	}
 
 	resp, _ := getTagValues(t, srv, "batch_busy/tag-values?tag=N16_HAS_NSID&arg=nsid")
-	if resp.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusConflict)
 }

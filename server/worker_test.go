@@ -265,7 +265,7 @@ func (s *spyJobStore) Progresses() []int {
 }
 
 func TestProgressUpdatesForMultipleTests(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyJobStore()
 	srv.store = spy
 
@@ -300,7 +300,7 @@ func TestProgressUpdatesForMultipleTests(t *testing.T) {
 }
 
 func TestUpdateJobProgressCoalescesSmallIncrements(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyJobStore()
 	srv.store = spy
 	srv.progressWriteMinStep = 10
@@ -334,7 +334,7 @@ func TestUpdateJobProgressCoalescesSmallIncrements(t *testing.T) {
 }
 
 func TestUpdateJobProgressAlwaysPersistsTerminal100(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyJobStore()
 	srv.store = spy
 	srv.progressWriteMinStep = 200
@@ -538,7 +538,7 @@ func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
 }
 
 func TestRunEngineForJobPassesIPDisableFlags(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	var captured engine.RunRequest
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -695,7 +695,7 @@ func TestRunEngineForJobHotCacheReportsWarmQueryMetrics(t *testing.T) {
 }
 
 func TestRunJobSnapshotsEffectiveProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyJobStore()
 	srv.store = spy
 
@@ -760,7 +760,7 @@ func TestRunJobSnapshotsEffectiveProfile(t *testing.T) {
 }
 
 func TestRunJobPersistsNameserverTimingsForDelegatedNameserversOnly(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyJobStore()
 	srv.store = spy
 	srv.delegationLookup = func(_ context.Context, domain string) DelegationInfo {
@@ -827,7 +827,7 @@ func TestRunEngineForJobClampsNonGlobalGuard(t *testing.T) {
 	}
 
 	// Default instance: the guard is enforced and the override is clamped off.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	var captured engine.RunRequest
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) { captured = req; return nil, nil }
 	artDefault, err := srv.runEngineForJob(makeJob(), context.Background())

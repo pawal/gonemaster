@@ -3,7 +3,6 @@ package server
 import (
 	"bytes"
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -135,13 +134,7 @@ func TestAdminSnapshotPatchLabelAndSlug(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodPost, path, `{"slug":"2026-04-20-relabeled","label":"April 2026","description":"Monthly rollover"}`)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("patch: got %d, want 200: %s", resp.Code, resp.Body)
-	}
-	var view AdminAnalysisSnapshotView
-	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	view := mustJSON[AdminAnalysisSnapshotView](t, resp, http.StatusOK)
 	if view.Slug != "2026-04-20-relabeled" {
 		t.Fatalf("Slug = %q, want 2026-04-20-relabeled", view.Slug)
 	}
@@ -174,9 +167,7 @@ func TestAdminSnapshotPatchRejectsSlugCollision(t *testing.T) {
 	}
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodPost, path, `{"slug":"2026-04-10-other"}`)
-	if resp.Code != http.StatusConflict {
-		t.Fatalf("expected 409 slug collision, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusConflict)
 }
 
 // TestAdminSnapshotPatchSetDefaultPinsCohort covers is_default=true: the
@@ -186,9 +177,7 @@ func TestAdminSnapshotPatchSetDefaultPinsCohort(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodPost, path, `{"is_default":true}`)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("patch: got %d, want 200: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	cohort, _ := f.store.GetAnalysisCohort(f.cohort.ID)
 	if cohort.DefaultSnapshotPolicy != DefaultSnapshotPolicyPinned {
 		t.Fatalf("policy = %q, want pinned", cohort.DefaultSnapshotPolicy)
@@ -199,9 +188,7 @@ func TestAdminSnapshotPatchSetDefaultPinsCohort(t *testing.T) {
 
 	// Unpin via is_default=false restores auto_latest.
 	resp = f.call(http.MethodPost, path, `{"is_default":false}`)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("unpin: got %d, want 200: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	cohort, _ = f.store.GetAnalysisCohort(f.cohort.ID)
 	if cohort.DefaultSnapshotPolicy != DefaultSnapshotPolicyAutoLatest {
 		t.Fatalf("policy after unpin = %q, want auto_latest", cohort.DefaultSnapshotPolicy)
@@ -217,9 +204,7 @@ func TestAdminSnapshotRetireSoftDeletes(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodDelete, path, "")
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("retire: got %d, want 204: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusNoContent)
 	snap, found := f.store.GetAnalysisCohortSnapshotBySlug(f.cohort.ID, f.snapshot.Slug)
 	if !found {
 		t.Fatal("expected retired snapshot row to remain; soft delete should not drop it")
@@ -248,9 +233,7 @@ func TestAdminSnapshotPurgeHardDeletes(t *testing.T) {
 	}
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s?purge=true", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodDelete, path, "")
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("purge: got %d, want 204: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusNoContent)
 	if _, found := f.store.GetAnalysisCohortSnapshotBySlug(f.cohort.ID, f.snapshot.Slug); found {
 		t.Fatal("expected snapshot row to be hard-deleted")
 	}
@@ -314,9 +297,7 @@ func TestAdminSnapshotRematerialize(t *testing.T) {
 	}
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s/rematerialize", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodPost, path, "")
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("rematerialize: got %d, want 202: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusAccepted)
 	snap, ok := f.waitForMaterialization(f.snapshot.ID, AnalysisMaterializationReady)
 	if !ok {
 		t.Fatalf("snapshot did not reach ready: status=%q done=%d/%d",
@@ -352,9 +333,7 @@ func TestAdminSnapshotRematerializeRejectsPurgedSource(t *testing.T) {
 	}
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s/rematerialize", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodPost, path, "")
-	if resp.Code != http.StatusConflict {
-		t.Fatalf("got %d, want 409: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusConflict)
 	if !strings.Contains(resp.Body.String(), "source_runs_purged") {
 		t.Fatalf("expected source_runs_purged error code, got %s", resp.Body)
 	}
@@ -377,13 +356,7 @@ func TestAdminSnapshotListExposesSourceRunsAvailable(t *testing.T) {
 	}
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots", f.cohort.ID)
 	resp := f.call(http.MethodGet, path, "")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("list: got %d, want 200: %s", resp.Code, resp.Body)
-	}
-	var list []AdminAnalysisSnapshotView
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list := mustJSON[[]AdminAnalysisSnapshotView](t, resp, http.StatusOK)
 	got := map[string]bool{}
 	for _, snap := range list {
 		got[snap.Slug] = snap.SourceRunsAvailable
@@ -404,17 +377,13 @@ func TestAdminSnapshotCSRFRejectsMismatchedOrigin(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
 	resp := f.callWithOrigin(http.MethodPost, path, "https://evil.example", `{"label":"injected"}`)
-	if resp.Code != http.StatusForbidden {
-		t.Fatalf("expected 403 on cross-origin POST, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusForbidden)
 	if !strings.Contains(resp.Body.String(), "csrf_origin_mismatch") {
 		t.Fatalf("expected csrf_origin_mismatch error, got %s", resp.Body)
 	}
 	// Same origin still works.
 	resp = f.callWithOrigin(http.MethodPost, path, "http://example.com", `{"label":"ok"}`)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200 on matching-origin POST, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 }
 
 // TestAdminSnapshotNotFound covers 404 for unknown cohort and unknown
@@ -424,23 +393,17 @@ func TestAdminSnapshotNotFound(t *testing.T) {
 	// Unknown cohort id.
 	for _, method := range []string{http.MethodPost, http.MethodDelete} {
 		resp := f.call(method, "/api/v1/analysis/cohorts/99999/snapshots/whatever", "{}")
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("%s unknown cohort: got %d: %s", method, resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	}
 	// Unknown slug on known cohort.
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/missing", f.cohort.ID)
 	for _, method := range []string{http.MethodPost, http.MethodDelete} {
 		resp := f.call(method, path, "{}")
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("%s missing slug: got %d: %s", method, resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	}
 	// Rematerialize a missing slug.
 	resp := f.call(http.MethodPost, path+"/rematerialize", "")
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("rematerialize missing slug: got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 // TestAdminSnapshotListReturnsAllStatuses covers the admin list endpoint
@@ -457,13 +420,7 @@ func TestAdminSnapshotListReturnsAllStatuses(t *testing.T) {
 	}
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots", f.cohort.ID)
 	resp := f.call(http.MethodGet, path, "")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("list: got %d, want 200: %s", resp.Code, resp.Body)
-	}
-	var list []AdminAnalysisSnapshotView
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list := mustJSON[[]AdminAnalysisSnapshotView](t, resp, http.StatusOK)
 	if len(list) != 2 {
 		t.Fatalf("expected 2 snapshots (captured + retired), got %d", len(list))
 	}
@@ -481,9 +438,7 @@ func TestAdminSnapshotRestoreViaStatus(t *testing.T) {
 	}
 	// Restore via status=captured.
 	resp := f.call(http.MethodPost, path, `{"status":"captured","is_public":true}`)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("restore: got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	snap, _ := f.store.GetAnalysisCohortSnapshotBySlug(f.cohort.ID, f.snapshot.Slug)
 	if snap.Status != AnalysisSnapshotStatusCaptured {
 		t.Fatalf("Status after restore = %q, want captured", snap.Status)
@@ -499,9 +454,7 @@ func TestAdminSnapshotPatchRejectsInvalidStatus(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodPost, path, `{"status":"pending"}`)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for invalid status, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 // TestAdminSnapshotMethodNotAllowed pins GET/PUT as not allowed on the
@@ -510,11 +463,7 @@ func TestAdminSnapshotMethodNotAllowed(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
 	resp := f.call(http.MethodPut, path, `{}`)
-	if resp.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("PUT: got %d, want 405: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusMethodNotAllowed)
 	resp = f.call(http.MethodGet, path, "")
-	if resp.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("GET: got %d, want 405: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusMethodNotAllowed)
 }

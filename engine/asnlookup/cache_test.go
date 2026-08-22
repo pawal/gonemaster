@@ -76,21 +76,23 @@ func TestExportImportRoundTrip(t *testing.T) {
 }
 
 func TestImportValidationErrors(t *testing.T) {
-	c := NewCache()
-	if err := c.ImportEntries([]CacheEntry{{IP: "bad", Code: CodeFound}}); err == nil {
-		t.Fatal("expected invalid ip error")
+	tests := []struct {
+		name  string
+		entry CacheEntry
+	}{
+		{name: "invalid ip", entry: CacheEntry{IP: "bad", Code: CodeFound}},
+		{name: "negative ASN", entry: CacheEntry{IP: "192.0.2.1", ASNs: []int{-1}, Code: CodeFound}},
+		{name: "unknown code", entry: CacheEntry{IP: "192.0.2.1", Code: "BOGUS"}},
+		{name: "missing code", entry: CacheEntry{IP: "192.0.2.1"}},
+		{name: "invalid prefix", entry: CacheEntry{IP: "192.0.2.1", Prefix: "bad", Code: CodeFound}},
 	}
-	if err := c.ImportEntries([]CacheEntry{{IP: "192.0.2.1", ASNs: []int{-1}, Code: CodeFound}}); err == nil {
-		t.Fatal("expected negative ASN error")
-	}
-	if err := c.ImportEntries([]CacheEntry{{IP: "192.0.2.1", Code: "BOGUS"}}); err == nil {
-		t.Fatal("expected unknown code error")
-	}
-	if err := c.ImportEntries([]CacheEntry{{IP: "192.0.2.1"}}); err == nil {
-		t.Fatal("expected missing code error")
-	}
-	if err := c.ImportEntries([]CacheEntry{{IP: "192.0.2.1", Prefix: "bad", Code: CodeFound}}); err == nil {
-		t.Fatal("expected invalid prefix error")
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := NewCache().ImportEntries([]CacheEntry{tc.entry}); err == nil {
+				t.Fatalf("expected %s to be rejected", tc.name)
+			}
+		})
 	}
 }
 

@@ -94,21 +94,21 @@ func TestCacheStoreExportsTimeoutAsNoMessage(t *testing.T) {
 }
 
 func TestCacheStoreImportValidationErrors(t *testing.T) {
-	cache := NewCacheStore()
-
-	if err := cache.ImportEntries([]Entry{{Address: "not-an-ip", Key: "k1"}}); err == nil {
-		t.Fatalf("expected invalid address error")
+	tests := []struct {
+		name  string
+		entry Entry
+	}{
+		{name: "invalid address", entry: Entry{Address: "not-an-ip", Key: "k1"}},
+		{name: "empty key", entry: Entry{Address: "192.0.2.53", Key: ""}},
+		{name: "missing message", entry: Entry{Address: "192.0.2.53", Key: "k"}},
+		{name: "unpackable message", entry: Entry{Address: "192.0.2.53", Key: "k", Message: []byte{0xff, 0xff}}},
 	}
 
-	if err := cache.ImportEntries([]Entry{{Address: "192.0.2.53", Key: ""}}); err == nil {
-		t.Fatalf("expected empty key error")
-	}
-
-	if err := cache.ImportEntries([]Entry{{Address: "192.0.2.53", Key: "k"}}); err == nil {
-		t.Fatalf("expected missing message error")
-	}
-
-	if err := cache.ImportEntries([]Entry{{Address: "192.0.2.53", Key: "k", Message: []byte{0xff, 0xff}}}); err == nil {
-		t.Fatalf("expected unpack error for malformed message")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if err := NewCacheStore().ImportEntries([]Entry{tc.entry}); err == nil {
+				t.Fatalf("expected %s to be rejected", tc.name)
+			}
+		})
 	}
 }

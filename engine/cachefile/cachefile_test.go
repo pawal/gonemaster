@@ -159,32 +159,46 @@ func TestCachefileSaveAndRestore(t *testing.T) {
 }
 
 func TestCachefileImportValidationErrors(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	rec := &recursor.Recursor{}
+	tests := []struct {
+		name   string
+		file   File
+		strict bool
+	}{
+		{name: "missing format", file: File{Version: Version}},
+		{name: "unsupported format", file: File{Format: "other", Version: Version}},
+		{name: "unsupported version", file: File{Format: Format, Version: Version + 1}},
+		{
+			name:   "unknown entry kind",
+			file:   File{Format: Format, Version: Version, Entries: []Entry{{Kind: "other"}}},
+			strict: true,
+		},
+		{
+			name:   "missing entry kind",
+			file:   File{Format: Format, Version: Version, Entries: []Entry{{}}},
+			strict: true,
+		},
+		{
+			name: "message is not base64",
+			file: File{Format: Format, Version: Version, Entries: []Entry{{
+				Kind:    KindNameserver,
+				Address: "192.0.2.53",
+				Key:     "k",
+				Message: "!!!",
+			}}},
+		},
+	}
 
-	if err := Import(File{Version: Version}, ns, rec, nil); err == nil {
-		t.Fatalf("expected missing format error")
-	}
-	if err := Import(File{Format: "other", Version: Version}, ns, rec, nil); err == nil {
-		t.Fatalf("expected unsupported format error")
-	}
-	if err := Import(File{Format: Format, Version: Version + 1}, ns, rec, nil); err == nil {
-		t.Fatalf("expected unsupported version error")
-	}
-	if err := Import(File{Format: Format, Version: Version, Entries: []Entry{{Kind: "other"}}}, ns, rec, nil, WithStrict()); err == nil {
-		t.Fatalf("expected unknown kind error in strict mode")
-	}
-	if err := Import(File{Format: Format, Version: Version, Entries: []Entry{{}}}, ns, rec, nil, WithStrict()); err == nil {
-		t.Fatalf("expected missing kind error in strict mode")
-	}
-	badBase64 := File{Format: Format, Version: Version, Entries: []Entry{{
-		Kind:    KindNameserver,
-		Address: "192.0.2.53",
-		Key:     "k",
-		Message: "!!!",
-	}}}
-	if err := Import(badBase64, ns, rec, nil); err == nil {
-		t.Fatalf("expected base64 decode error")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var opts []Option
+			if tc.strict {
+				opts = append(opts, WithStrict())
+			}
+			err := Import(tc.file, nameserver.NewCacheStore(), &recursor.Recursor{}, nil, opts...)
+			if err == nil {
+				t.Fatalf("expected %s to be rejected", tc.name)
+			}
+		})
 	}
 }
 

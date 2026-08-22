@@ -95,23 +95,30 @@ func TestRecursorExportImportNSEntry(t *testing.T) {
 }
 
 func TestRecursorImportValidationErrors(t *testing.T) {
-	r := &Recursor{}
+	tests := []struct {
+		name  string
+		entry CacheEntry
+	}{
+		{name: "missing name", entry: CacheEntry{QType: "A"}},
+		{name: "missing qtype", entry: CacheEntry{Name: "example.com."}},
+		{name: "missing message", entry: CacheEntry{Name: "example.com.", QType: "A"}},
+		{
+			name: "invalid nameserver address",
+			entry: CacheEntry{
+				Name:        "example.com.",
+				QType:       "A",
+				Nameservers: []NameserverRef{{Name: "ns1.example.", Address: "not-an-ip"}},
+				Message:     []byte{0x00},
+			},
+		},
+	}
 
-	if err := r.ImportCacheEntries([]CacheEntry{{QType: "A"}}); err == nil {
-		t.Fatalf("expected missing name error")
-	}
-	if err := r.ImportCacheEntries([]CacheEntry{{Name: "example.com."}}); err == nil {
-		t.Fatalf("expected missing qtype error")
-	}
-	if err := r.ImportCacheEntries([]CacheEntry{{Name: "example.com.", QType: "A"}}); err == nil {
-		t.Fatalf("expected missing message error")
-	}
-	if err := r.ImportCacheEntries([]CacheEntry{{
-		Name:        "example.com.",
-		QType:       "A",
-		Nameservers: []NameserverRef{{Name: "ns1.example.", Address: "not-an-ip"}},
-		Message:     []byte{0x00},
-	}}); err == nil {
-		t.Fatalf("expected invalid nameserver address error")
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := &Recursor{}
+			if err := r.ImportCacheEntries([]CacheEntry{tc.entry}); err == nil {
+				t.Fatalf("expected %s to be rejected", tc.name)
+			}
+		})
 	}
 }

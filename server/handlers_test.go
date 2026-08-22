@@ -24,19 +24,11 @@ var prometheusSampleLine = regexp.MustCompile(`^[a-zA-Z_:][a-zA-Z0-9_:]*(\{[^{}]
 
 func getMetricsSnapshot(t *testing.T, srv *Server) MetricsSnapshot {
 	t.Helper()
-	resp := httptest.NewRecorder()
 	nonce := atomic.AddUint32(&metricsRequestNonce, 1)
 	limit := int((nonce % 100) + 1)
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/metrics?limit_domains=%d&limit_batches=%d", limit, limit), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var snapshot MetricsSnapshot
-	if err := json.NewDecoder(resp.Body).Decode(&snapshot); err != nil {
-		t.Fatalf("decode metrics: %v", err)
-	}
-	return snapshot
+	resp := doJSON(t, srv, http.MethodGet,
+		fmt.Sprintf("/api/v1/metrics?limit_domains=%d&limit_batches=%d", limit, limit), nil)
+	return mustJSON[MetricsSnapshot](t, resp, http.StatusOK)
 }
 
 func findAPIRouteMetrics(t *testing.T, snapshot MetricsSnapshot, method string, route string) MetricsAPIRouteMetrics {
@@ -76,30 +68,17 @@ func assertPrometheusTextWellFormed(t *testing.T, body string) {
 }
 
 func TestCreateAndGetJob(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d", resp.Code)
-	}
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 	if created.ID == "" {
 		t.Fatalf("expected job id")
 	}
 
-	resp = httptest.NewRecorder()
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+created.ID, nil)
-	srv.Handler().ServeHTTP(resp, getReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/jobs/"+created.ID, nil)
+	wantStatus(t, resp, http.StatusOK)
 }
 
 func TestGetJobResultOmitsNameserverTimingsWhenAdminDisplayDisabled(t *testing.T) {
@@ -126,12 +105,8 @@ func TestGetJobResultOmitsNameserverTimingsWhenAdminDisplayDisabled(t *testing.T
 		t.Fatalf("graduate job: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+job.ID+"/result", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected status 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs/"+job.ID+"/result", nil)
+	wantStatus(t, resp, http.StatusOK)
 
 	var result JobResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -143,56 +118,31 @@ func TestGetJobResultOmitsNameserverTimingsWhenAdminDisplayDisabled(t *testing.T
 }
 
 func TestCreateJobCSRFRejectsMismatchedOrigin(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", "http://evil.example")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`, withOrigin("http://evil.example"))
 
-	if resp.Code != http.StatusForbidden {
-		t.Fatalf("expected status 403, got %d", resp.Code)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	out := mustJSON[ErrorResponse](t, resp, http.StatusForbidden)
 	if out.Error.Code != "csrf_origin_mismatch" {
 		t.Fatalf("expected csrf_origin_mismatch, got %q", out.Error.Code)
 	}
 }
 
 func TestCreateJobCSRFAcceptsMatchingOrigin(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", "http://example.com")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`, withOrigin("http://example.com"))
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusCreated)
 }
 
 func TestCreateJobMinLevel(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	payload := `{"domain":"example.com","min_level":"WARNING"}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", payload)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected status 201, got %d", resp.Code)
-	}
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 	stored, ok := srv.store.Get(created.ID)
 	if !ok {
 		t.Fatalf("expected job in store")
@@ -203,19 +153,14 @@ func TestCreateJobMinLevel(t *testing.T) {
 }
 
 func TestCreateJobValidation(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":""}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":""}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestCreateJobWithUndelegatedInput(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	payload := `{
 		"domain":"Example.COM",
@@ -228,18 +173,9 @@ func TestCreateJobWithUndelegatedInput(t *testing.T) {
 			{"keytag":12345,"algorithm":13,"digtype":2,"digest":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}
 		]
 	}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", payload)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", resp.Code)
-	}
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 	stored, ok := srv.store.Get(created.ID)
 	if !ok {
 		t.Fatalf("expected job in store")
@@ -268,72 +204,41 @@ func TestCreateJobWithUndelegatedInput(t *testing.T) {
 }
 
 func TestCreateJobRejectsMalformedUndelegatedInput(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	payload := `{
 		"domain":"example.com",
 		"nameservers":[{"ns":"ns1.example.com","ip":"not-an-ip"}]
 	}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", payload)
+	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
 	if out.Error.Code != "invalid_undelegated" {
 		t.Fatalf("expected invalid_undelegated, got %q", out.Error.Code)
 	}
 }
 
 func TestCreateJobRejectsMalformedUndelegatedDSInput(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	payload := `{
 		"domain":"example.com",
 		"ds_info":[{"keytag":12345,"algorithm":13,"digtype":2,"digest":"not-hex"}]
 	}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", payload)
+	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
 	if out.Error.Code != "invalid_undelegated" {
 		t.Fatalf("expected invalid_undelegated, got %q", out.Error.Code)
 	}
 }
 
 func TestListJobs(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
+	wantStatus(t, resp, http.StatusCreated)
 
-	resp = httptest.NewRecorder()
-	listReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs", nil)
-	srv.Handler().ServeHTTP(resp, listReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list JobList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/jobs", nil)
+	list := mustJSON[JobList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total 1, got %d", list.Total)
 	}
@@ -342,7 +247,7 @@ func TestListJobs(t *testing.T) {
 // A severity filter is applied server-side to graduated runs (by their sev_*
 // totals) and excludes in-flight jobs, which have no results yet.
 func TestListJobsFiltersBySeverity(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	now := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
 
 	// One in-flight (queued) job.
@@ -364,15 +269,8 @@ func TestListJobsFiltersBySeverity(t *testing.T) {
 	graduate("job_err", "err.example", "ERROR")
 
 	domainsFor := func(query string) map[string]bool {
-		resp := httptest.NewRecorder()
-		srv.Handler().ServeHTTP(resp, httptest.NewRequest(http.MethodGet, query, nil))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("GET %s: %d %s", query, resp.Code, resp.Body)
-		}
-		var l JobList
-		if err := json.NewDecoder(resp.Body).Decode(&l); err != nil {
-			t.Fatalf("decode %s: %v", query, err)
-		}
+		resp := doJSON(t, srv, http.MethodGet, query, nil)
+		l := mustJSON[JobList](t, resp, http.StatusOK)
 		out := map[string]bool{}
 		for _, it := range l.Items {
 			out[it.Domain] = true
@@ -405,23 +303,15 @@ func TestListJobsFiltersBySeverity(t *testing.T) {
 }
 
 func TestListJobsPaginationAndSort(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
 
 	_, _ = srv.store.Create(Job{ID: "job1", Domain: "gamma.example", Status: JobQueued, CreatedAt: base})
 	_, _ = srv.store.Create(Job{ID: "job2", Domain: "alpha.example", Status: JobQueued, CreatedAt: base.Add(time.Second)})
 	_, _ = srv.store.Create(Job{ID: "job3", Domain: "beta.example", Status: JobQueued, CreatedAt: base.Add(2 * time.Second)})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=2&sort=domain_asc&page=1", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var first JobList
-	if err := json.NewDecoder(resp.Body).Decode(&first); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?limit=2&sort=domain_asc&page=1", nil)
+	first := mustJSON[JobList](t, resp, http.StatusOK)
 	if first.Total != 3 || len(first.Items) != 2 {
 		t.Fatalf("expected first page with 2 of 3 jobs")
 	}
@@ -432,16 +322,8 @@ func TestListJobsPaginationAndSort(t *testing.T) {
 		t.Fatalf("expected next cursor and sort metadata")
 	}
 
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/jobs?limit=2&sort=domain_asc&cursor=2", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var second JobList
-	if err := json.NewDecoder(resp.Body).Decode(&second); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/jobs?limit=2&sort=domain_asc&cursor=2", nil)
+	second := mustJSON[JobList](t, resp, http.StatusOK)
 	if len(second.Items) != 1 || second.Items[0].ID != "job1" {
 		t.Fatalf("expected second page to contain only job1")
 	}
@@ -451,68 +333,40 @@ func TestListJobsPaginationAndSort(t *testing.T) {
 }
 
 func TestListJobsRejectsInvalidCursor(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?cursor=not-a-number", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?cursor=not-a-number", nil)
+	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
 	if out.Error.Code != "invalid_cursor" {
 		t.Fatalf("expected invalid_cursor, got %q", out.Error.Code)
 	}
 }
 
 func TestListJobsFiltersByDomainAndTimeRange(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
 
 	_, _ = srv.store.Create(Job{ID: "job1", Domain: "alpha.example", Status: JobQueued, CreatedAt: base})
 	_, _ = srv.store.Create(Job{ID: "job2", Domain: "beta.example", Status: JobQueued, CreatedAt: base.Add(time.Second)})
 	_, _ = srv.store.Create(Job{ID: "job3", Domain: "alpha.internal", Status: JobQueued, CreatedAt: base.Add(2 * time.Second)})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/api/v1/jobs?domain=alpha&created_after=2026-02-03T00:00:00Z&created_before=2026-02-03T00:00:01Z",
-		nil,
-	)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list JobList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?domain=alpha&created_after=2026-02-03T00:00:00Z&created_before=2026-02-03T00:00:01Z", nil)
+	list := mustJSON[JobList](t, resp, http.StatusOK)
 	if list.Total != 1 || len(list.Items) != 1 || list.Items[0].ID != "job1" {
 		t.Fatalf("expected only job1 to match filters, got %+v", list.Items)
 	}
 }
 
 func TestListJobsFiltersByBatchIDAndSupportsBatchSort(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
 
 	_, _ = srv.store.Create(Job{ID: "job1", BatchID: "batch_b", Domain: "alpha.example", Status: JobQueued, CreatedAt: base})
 	_, _ = srv.store.Create(Job{ID: "job2", BatchID: "batch_a", Domain: "beta.example", Status: JobQueued, CreatedAt: base.Add(time.Second)})
 	_, _ = srv.store.Create(Job{ID: "job3", BatchID: "batch_b", Domain: "gamma.example", Status: JobQueued, CreatedAt: base.Add(2 * time.Second)})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort=batch_id_asc", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list JobList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?sort=batch_id_asc", nil)
+	list := mustJSON[JobList](t, resp, http.StatusOK)
 	if list.Sort != string(JobSortBatchIDAsc) {
 		t.Fatalf("expected sort metadata %q, got %q", JobSortBatchIDAsc, list.Sort)
 	}
@@ -520,12 +374,8 @@ func TestListJobsFiltersByBatchIDAndSupportsBatchSort(t *testing.T) {
 		t.Fatalf("expected batch_id_asc to order batch_a before batch_b")
 	}
 
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/jobs?batch_id=batch_b&sort=batch_id_desc", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/jobs?batch_id=batch_b&sort=batch_id_desc", nil)
+	wantStatus(t, resp, http.StatusOK)
 	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -541,23 +391,15 @@ func TestListJobsFiltersByBatchIDAndSupportsBatchSort(t *testing.T) {
 
 func TestListJobsSortBySeverityAcceptsParam(t *testing.T) {
 	// error_desc and critical_desc are accepted sort params (fall back to started_at for in-flight jobs).
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
 
 	_, _ = srv.store.Create(Job{ID: "job1", Domain: "alpha.example", Status: JobQueued, CreatedAt: base})
 	_, _ = srv.store.Create(Job{ID: "job2", Domain: "beta.example", Status: JobQueued, CreatedAt: base.Add(time.Second)})
 
 	for _, sort := range []string{"error_desc", "critical_desc"} {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort="+sort, nil)
-		srv.Handler().ServeHTTP(resp, req)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("sort=%s: expected 200, got %d", sort, resp.Code)
-		}
-		var list JobList
-		if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-			t.Fatalf("sort=%s: decode: %v", sort, err)
-		}
+		resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?sort="+sort, nil)
+		list := mustJSON[JobList](t, resp, http.StatusOK)
 		if list.Total != 2 {
 			t.Fatalf("sort=%s: expected 2 items, got %d", sort, list.Total)
 		}
@@ -565,68 +407,36 @@ func TestListJobsSortBySeverityAcceptsParam(t *testing.T) {
 }
 
 func TestListJobsRejectsInvalidSort(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?sort=bad_sort", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?sort=bad_sort", nil)
+	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
 	if out.Error.Code != "invalid_sort" {
 		t.Fatalf("expected invalid_sort, got %q", out.Error.Code)
 	}
 }
 
 func TestListJobsRejectsInvalidSeverity(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?severity=bad_filter", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?severity=bad_filter", nil)
+	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
 	if out.Error.Code != "invalid_severity" {
 		t.Fatalf("expected invalid_severity, got %q", out.Error.Code)
 	}
 }
 
 func TestListJobsRejectsInvalidCreatedBeforeAndRange(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs?created_before=not-a-date", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?created_before=not-a-date", nil)
+	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
 	if out.Error.Code != "invalid_created_before" {
 		t.Fatalf("expected invalid_created_before, got %q", out.Error.Code)
 	}
 
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(
-		http.MethodGet,
-		"/api/v1/jobs?created_after=2026-02-03T00:00:02Z&created_before=2026-02-03T00:00:01Z",
-		nil,
-	)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/jobs?created_after=2026-02-03T00:00:02Z&created_before=2026-02-03T00:00:01Z", nil)
+	wantStatus(t, resp, http.StatusBadRequest)
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -636,21 +446,12 @@ func TestListJobsRejectsInvalidCreatedBeforeAndRange(t *testing.T) {
 }
 
 func TestBatchSubmit(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	payload := `{"domains":["example.com","example.net"]}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", payload)
 
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d", resp.Code)
-	}
-	var out JobBatchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	out := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 	if out.BatchID == "" || len(out.JobIDs) != 2 {
 		t.Fatalf("expected batch id and 2 job ids")
 	}
@@ -663,18 +464,9 @@ func TestBatchSubmit(t *testing.T) {
 func TestBatchSubmitRecordsPromoteDefaultIntent(t *testing.T) {
 	submit := func(t *testing.T, payload string) (*Server, string) {
 		t.Helper()
-		srv := New(DefaultConfig())
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch", bytes.NewBufferString(payload))
-		req.Header.Set("Content-Type", "application/json")
-		srv.Handler().ServeHTTP(resp, req)
-		if resp.Code != http.StatusAccepted {
-			t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
-		}
-		var out JobBatchResponse
-		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		srv := newTestServer(t)
+		resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", payload)
+		out := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 		return srv, out.BatchID
 	}
 
@@ -702,52 +494,26 @@ func TestBatchSubmitRecordsPromoteDefaultIntent(t *testing.T) {
 }
 
 func TestBatchSubmitRejectsUndelegatedFields(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	payload := `{"domains":["example.com"],"nameservers":[{"ns":"ns1.example.com","ip":"192.0.2.1"}]}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", payload)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
 	if out.Error.Code != "undelegated_not_supported_for_batch" {
 		t.Fatalf("expected undelegated_not_supported_for_batch, got %q", out.Error.Code)
 	}
 }
 
 func TestBatchSummary(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	payload := `{"domains":["example.com","example.net"]}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d", resp.Code)
-	}
-	var batch JobBatchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&batch); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", payload)
+	batch := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 
-	resp = httptest.NewRecorder()
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batch.BatchID, nil)
-	srv.Handler().ServeHTTP(resp, getReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var summary BatchSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/batches/"+batch.BatchID, nil)
+	summary := mustJSON[BatchSummary](t, resp, http.StatusOK)
 	if summary.BatchID != batch.BatchID {
 		t.Fatalf("expected batch id %s, got %s", batch.BatchID, summary.BatchID)
 	}
@@ -763,7 +529,7 @@ func TestBatchSummary(t *testing.T) {
 }
 
 func TestBatchSummaryIncludesTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Create a batch record with a tag directly in the store.
 	batchID := "batch_tagged"
@@ -776,23 +542,15 @@ func TestBatchSummaryIncludesTag(t *testing.T) {
 	// Add a job to the batch so the summary has content.
 	srv.store.Create(Job{ID: "job_t1", Domain: "example.se", BatchID: batchID, Status: JobQueued, CreatedAt: time.Now()})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batchID, nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var summary BatchSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches/"+batchID, nil)
+	summary := mustJSON[BatchSummary](t, resp, http.StatusOK)
 	if summary.Tag != "se-domains" {
 		t.Fatalf("expected tag 'se-domains', got %q", summary.Tag)
 	}
 }
 
 func TestBatchSummaryPaginationAndSort(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
 	batchID := "batch_1"
 
@@ -819,16 +577,8 @@ func TestBatchSummaryPaginationAndSort(t *testing.T) {
 		FinishedAt: base.Add(3 * time.Second),
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batchID+"?limit=1&sort=created_at_asc&cursor=1", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var summary BatchSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches/"+batchID+"?limit=1&sort=created_at_asc&cursor=1", nil)
+	summary := mustJSON[BatchSummary](t, resp, http.StatusOK)
 	if summary.Total != 3 || len(summary.Items) != 1 || summary.Items[0].ID != "job2" {
 		t.Fatalf("expected paginated batch summary with one middle item")
 	}
@@ -844,7 +594,7 @@ func TestBatchSummaryPaginationAndSort(t *testing.T) {
 }
 
 func TestBatchSummarySupportsFiltersAndEmptyMatches(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
 	batchID := "batch_filters"
 
@@ -863,20 +613,8 @@ func TestBatchSummarySupportsFiltersAndEmptyMatches(t *testing.T) {
 		CreatedAt: base.Add(time.Second),
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(
-		http.MethodGet,
-		"/api/v1/batches/"+batchID+"?status=failed&domain=beta&created_after=2026-02-03T00:00:00Z&sort=domain_asc",
-		nil,
-	)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var summary BatchSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches/"+batchID+"?status=failed&domain=beta&created_after=2026-02-03T00:00:00Z&sort=domain_asc", nil)
+	summary := mustJSON[BatchSummary](t, resp, http.StatusOK)
 	if summary.Total != 1 || len(summary.Items) != 1 || summary.Items[0].ID != "job2" {
 		t.Fatalf("expected filtered batch summary with job2 only, got %+v", summary.Items)
 	}
@@ -887,12 +625,8 @@ func TestBatchSummarySupportsFiltersAndEmptyMatches(t *testing.T) {
 		t.Fatalf("expected full-batch status counts, got %+v", summary.StatusCounts)
 	}
 
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batchID+"?status=running", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200 for empty filtered result, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/batches/"+batchID+"?status=running", nil)
+	wantStatus(t, resp, http.StatusOK)
 	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
@@ -902,7 +636,7 @@ func TestBatchSummarySupportsFiltersAndEmptyMatches(t *testing.T) {
 }
 
 func TestBatchSummaryIncludesGrades(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	batchID := "batch_grades"
 
 	// Graduate two jobs in the same batch.
@@ -927,16 +661,8 @@ func TestBatchSummaryIncludesGrades(t *testing.T) {
 		_ = srv.store.CreateBatch(Batch{ID: batchID, CreatedAt: now, DomainCount: 2})
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches/"+batchID, nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var summary BatchSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches/"+batchID, nil)
+	summary := mustJSON[BatchSummary](t, resp, http.StatusOK)
 	if len(summary.Grades) == 0 {
 		t.Fatal("expected non-empty grades map in batch summary")
 	}
@@ -950,24 +676,15 @@ func TestBatchSummaryIncludesGrades(t *testing.T) {
 }
 
 func TestCancelJob(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
+	wantStatus(t, resp, http.StatusCreated)
 	var created Job
 	_ = json.NewDecoder(resp.Body).Decode(&created)
 
-	resp = httptest.NewRecorder()
-	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
-	srv.Handler().ServeHTTP(resp, cancelReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
+	wantStatus(t, resp, http.StatusOK)
 	var canceled Job
 	_ = json.NewDecoder(resp.Body).Decode(&canceled)
 	if canceled.Status != JobCanceled {
@@ -976,29 +693,15 @@ func TestCancelJob(t *testing.T) {
 }
 
 func TestCancelJobCSRFRejectsMismatchedOrigin(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
+	wantStatus(t, resp, http.StatusCreated)
 	var created Job
 	_ = json.NewDecoder(resp.Body).Decode(&created)
 
-	resp = httptest.NewRecorder()
-	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
-	cancelReq.Header.Set("Origin", "https://attacker.example")
-	srv.Handler().ServeHTTP(resp, cancelReq)
-	if resp.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", resp.Code)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil, withOrigin("https://attacker.example"))
+	out := mustJSON[ErrorResponse](t, resp, http.StatusForbidden)
 	if out.Error.Code != "csrf_origin_mismatch" {
 		t.Fatalf("expected csrf_origin_mismatch, got %q", out.Error.Code)
 	}
@@ -1013,7 +716,7 @@ func TestCancelJobCSRFRejectsMismatchedOrigin(t *testing.T) {
 }
 
 func TestCancelJobTriggersContextCancel(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	job := Job{
 		ID:        "job-running",
@@ -1030,12 +733,8 @@ func TestCancelJobTriggersContextCancel(t *testing.T) {
 	var once sync.Once
 	srv.registerCancel(job.ID, func() { once.Do(func() { close(canceled) }) })
 
-	resp := httptest.NewRecorder()
-	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+job.ID+"/cancel", nil)
-	srv.Handler().ServeHTTP(resp, cancelReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/"+job.ID+"/cancel", nil)
+	wantStatus(t, resp, http.StatusOK)
 	select {
 	case <-canceled:
 	default:
@@ -1050,38 +749,24 @@ func TestCancelJobTriggersContextCancel(t *testing.T) {
 }
 
 func TestQueueEndpoints(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	pauseReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/pause", nil)
-	srv.Handler().ServeHTTP(resp, pauseReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/queue/pause", nil)
+	wantStatus(t, resp, http.StatusOK)
 
-	resp = httptest.NewRecorder()
-	resumeReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/resume", nil)
-	srv.Handler().ServeHTTP(resp, resumeReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/queue/resume", nil)
+	wantStatus(t, resp, http.StatusOK)
 }
 
 func TestQueueReorderValidation(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	payload := `{"job_ids":["job1"]}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/queue/reorder", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/queue/reorder", `{"job_ids":["job1"]}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestQueueRemove(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	now := time.Now().UTC()
 	job := Job{
 		ID:        "job1",
@@ -1096,14 +781,8 @@ func TestQueueRemove(t *testing.T) {
 		t.Fatalf("enqueue: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	payload := `{"job_ids":["job1"]}`
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/queue/remove", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/queue/remove", `{"job_ids":["job1"]}`)
+	wantStatus(t, resp, http.StatusOK)
 
 	// After queue remove, the job is graduated and only accessible via GetRun/Get.
 	stored, ok := srv.store.Get(job.ID)
@@ -1124,22 +803,13 @@ func TestQueueRemove(t *testing.T) {
 }
 
 func TestMetricsTracksCreateAndRunLifecycle(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return nil, nil
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", resp.Code)
-	}
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 
 	snapshot := getMetricsSnapshot(t, srv)
 	if snapshot.Jobs.SubmittedTotal != 1 {
@@ -1178,37 +848,20 @@ func TestMetricsTracksCreateAndRunLifecycle(t *testing.T) {
 }
 
 func TestMetricsTracksPauseResumeAndCancel(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", resp.Code)
-	}
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 
-	resp = httptest.NewRecorder()
-	pauseReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/pause", nil)
-	srv.Handler().ServeHTTP(resp, pauseReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/queue/pause", nil)
+	wantStatus(t, resp, http.StatusOK)
 	snapshot := getMetricsSnapshot(t, srv)
 	if !snapshot.Health.QueuePaused {
 		t.Fatal("queue_paused = false, want true")
 	}
 
-	resp = httptest.NewRecorder()
-	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
-	srv.Handler().ServeHTTP(resp, cancelReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
+	wantStatus(t, resp, http.StatusOK)
 	snapshot = getMetricsSnapshot(t, srv)
 	if snapshot.Jobs.CanceledTotal != 1 {
 		t.Fatalf("canceled_total = %d, want 1", snapshot.Jobs.CanceledTotal)
@@ -1223,12 +876,8 @@ func TestMetricsTracksPauseResumeAndCancel(t *testing.T) {
 		t.Fatalf("status_counts[canceled] = %d, want 1", snapshot.Jobs.StatusCounts[string(JobCanceled)])
 	}
 
-	resp = httptest.NewRecorder()
-	resumeReq := httptest.NewRequest(http.MethodPost, "/api/v1/queue/resume", nil)
-	srv.Handler().ServeHTTP(resp, resumeReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/queue/resume", nil)
+	wantStatus(t, resp, http.StatusOK)
 	snapshot = getMetricsSnapshot(t, srv)
 	if snapshot.Health.QueuePaused {
 		t.Fatal("queue_paused = true, want false")
@@ -1236,30 +885,17 @@ func TestMetricsTracksPauseResumeAndCancel(t *testing.T) {
 }
 
 func TestMetricsTracksAPIRequestsByRouteMethodStatusAndErrorCode(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/healthz", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/healthz", nil)
+	wantStatus(t, resp, http.StatusOK)
 
-	resp = httptest.NewRecorder()
 	payload := `{"job_ids":["missing"]}`
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/queue/reorder", bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/queue/reorder", payload)
+	wantStatus(t, resp, http.StatusBadRequest)
 
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/jobs/job-missing/cancel", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/job-missing/cancel", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 
 	snapshot := srv.metrics.Snapshot()
 	if snapshot.API.RequestsTotal != 3 {
@@ -1298,7 +934,7 @@ func TestMetricsTracksAPIRequestsByRouteMethodStatusAndErrorCode(t *testing.T) {
 }
 
 func TestMetricsTracksQualityAcrossMixedOutcomesAndLocaleRequests(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	callCount := 0
 	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		callCount++
@@ -1335,31 +971,14 @@ func TestMetricsTracksQualityAcrossMixedOutcomesAndLocaleRequests(t *testing.T) 
 		t.Fatal("expected run error for failure job")
 	}
 
-	resp := httptest.NewRecorder()
-	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"cancel.example"}`))
-	createReq.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, createReq)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", resp.Code)
-	}
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode created job: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"cancel.example"}`)
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 
-	resp = httptest.NewRecorder()
-	cancelReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
-	srv.Handler().ServeHTTP(resp, cancelReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
+	wantStatus(t, resp, http.StatusOK)
 
-	resp = httptest.NewRecorder()
-	resultReq := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/"+jobSuccess.ID+"/result?locale=sv", nil)
-	srv.Handler().ServeHTTP(resp, resultReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/jobs/"+jobSuccess.ID+"/result?locale=sv", nil)
+	wantStatus(t, resp, http.StatusOK)
 
 	snapshot := srv.metrics.Snapshot()
 	if snapshot.Quality.Outcomes.SuccessTotal != 1 || snapshot.Quality.Outcomes.FailedTotal != 1 || snapshot.Quality.Outcomes.CanceledTotal != 1 {
@@ -1383,7 +1002,7 @@ func TestMetricsTracksQualityAcrossMixedOutcomesAndLocaleRequests(t *testing.T) 
 }
 
 func TestMetricsEndpointValidatesQueryParams(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	tests := []struct {
 		path     string
 		wantCode string
@@ -1396,16 +1015,8 @@ func TestMetricsEndpointValidatesQueryParams(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, tc.path, nil)
-		srv.Handler().ServeHTTP(resp, req)
-		if resp.Code != http.StatusBadRequest {
-			t.Fatalf("%s: expected 400, got %d", tc.path, resp.Code)
-		}
-		var out ErrorResponse
-		if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-			t.Fatalf("%s: decode error: %v", tc.path, err)
-		}
+		resp := doJSON(t, srv, http.MethodGet, tc.path, nil)
+		out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
 		if out.Error.Code != tc.wantCode {
 			t.Fatalf("%s: error code = %q, want %q", tc.path, out.Error.Code, tc.wantCode)
 		}
@@ -1413,7 +1024,7 @@ func TestMetricsEndpointValidatesQueryParams(t *testing.T) {
 }
 
 func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	now := time.Date(2026, 2, 9, 10, 0, 0, 0, time.UTC)
 	srv.metrics.nowFn = func() time.Time { return now }
 	srv.metrics.ObserveJobSubmittedWithContext("batch-a", "alpha.example", JobQueued)
@@ -1428,12 +1039,8 @@ func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	})
 	srv.metrics.ObserveCacheMetrics(9, 3, 1)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics?include=health,insights,trends&window=1h&limit_domains=1&limit_batches=1", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/metrics?include=health,insights,trends&window=1h&limit_domains=1&limit_batches=1", nil)
+	wantStatus(t, resp, http.StatusOK)
 
 	var payload map[string]any
 	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
@@ -1520,7 +1127,7 @@ func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 }
 
 func TestMetricsEndpointSupportsPrometheusFormat(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.metrics.ObserveQueuePaused(true)
 	srv.metrics.ObserveDNSQueries(11, 7)
 	srv.metrics.ObserveCacheMetrics(9, 3, 1)
@@ -1535,12 +1142,8 @@ func TestMetricsEndpointSupportsPrometheusFormat(t *testing.T) {
 	srv.metrics.ObserveAPIRequest("/api/v1/jobs", http.MethodGet, http.StatusBadRequest, 90*time.Millisecond, "invalid_domain")
 	srv.metrics.ObserveResultLocale("sv-SE")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics?format=prom&include=trends&window=1h&limit_domains=1&limit_batches=1", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/metrics?format=prom&include=trends&window=1h&limit_domains=1&limit_batches=1", nil)
+	wantStatus(t, resp, http.StatusOK)
 	if got := resp.Header().Get("Content-Type"); got != prometheusMetricsContentType {
 		t.Fatalf("expected %q content-type, got %q", prometheusMetricsContentType, got)
 	}
@@ -1577,45 +1180,24 @@ func TestMetricsEndpointSupportsPrometheusFormat(t *testing.T) {
 }
 
 func TestMetricsEndpointCachesByQueryForOneSecond(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	base := time.Date(2026, 2, 9, 10, 0, 0, 0, time.UTC)
 	now := base
 	srv.metrics.nowFn = func() time.Time { return now }
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var first MetricsSnapshot
-	if err := json.NewDecoder(resp.Body).Decode(&first); err != nil {
-		t.Fatalf("decode first metrics: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/metrics", nil)
+	first := mustJSON[MetricsSnapshot](t, resp, http.StatusOK)
 	if first.Jobs.SubmittedTotal != 0 {
 		t.Fatalf("first submitted_total = %d, want 0", first.Jobs.SubmittedTotal)
 	}
 
 	now = base.Add(100 * time.Millisecond)
-	createResp := httptest.NewRecorder()
-	createReq := httptest.NewRequest(http.MethodPost, "/api/v1/jobs", bytes.NewBufferString(`{"domain":"cached.example"}`))
-	createReq.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(createResp, createReq)
-	if createResp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d", createResp.Code)
-	}
+	createResp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"cached.example"}`)
+	wantStatus(t, createResp, http.StatusCreated)
 
 	now = base.Add(500 * time.Millisecond)
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var second MetricsSnapshot
-	if err := json.NewDecoder(resp.Body).Decode(&second); err != nil {
-		t.Fatalf("decode second metrics: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/metrics", nil)
+	second := mustJSON[MetricsSnapshot](t, resp, http.StatusOK)
 	if !second.GeneratedAt.Equal(first.GeneratedAt) {
 		t.Fatalf("second generated_at = %s, want cached %s", second.GeneratedAt, first.GeneratedAt)
 	}
@@ -1624,16 +1206,8 @@ func TestMetricsEndpointCachesByQueryForOneSecond(t *testing.T) {
 	}
 
 	now = base.Add(2 * time.Second)
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var third MetricsSnapshot
-	if err := json.NewDecoder(resp.Body).Decode(&third); err != nil {
-		t.Fatalf("decode third metrics: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/metrics", nil)
+	third := mustJSON[MetricsSnapshot](t, resp, http.StatusOK)
 	if !third.GeneratedAt.After(second.GeneratedAt) {
 		t.Fatalf("third generated_at = %s, want after %s", third.GeneratedAt, second.GeneratedAt)
 	}
@@ -1643,21 +1217,13 @@ func TestMetricsEndpointCachesByQueryForOneSecond(t *testing.T) {
 }
 
 func TestHealthAndMetrics(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	healthReq := httptest.NewRequest(http.MethodGet, "/api/v1/healthz", nil)
-	srv.Handler().ServeHTTP(resp, healthReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/healthz", nil)
+	wantStatus(t, resp, http.StatusOK)
 
-	resp = httptest.NewRecorder()
-	metricsReq := httptest.NewRequest(http.MethodGet, "/api/v1/metrics", nil)
-	srv.Handler().ServeHTTP(resp, metricsReq)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/metrics", nil)
+	wantStatus(t, resp, http.StatusOK)
 	if got := resp.Header().Get("Content-Type"); got != "application/json" {
 		t.Fatalf("expected application/json content-type, got %q", got)
 	}
@@ -1677,16 +1243,12 @@ func TestHealthAndMetrics(t *testing.T) {
 }
 
 func TestLocalesEndpoint(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	t.Run("GET returns locales list", func(t *testing.T) {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/locales", nil)
-		srv.Handler().ServeHTTP(resp, req)
+		resp := doJSON(t, srv, http.MethodGet, "/api/v1/locales", nil)
 
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		if ct := resp.Header().Get("Content-Type"); ct != "application/json" {
 			t.Fatalf("expected application/json, got %q", ct)
 		}
@@ -1707,12 +1269,8 @@ func TestLocalesEndpoint(t *testing.T) {
 	})
 
 	t.Run("POST returns 405", func(t *testing.T) {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/locales", nil)
-		srv.Handler().ServeHTTP(resp, req)
-		if resp.Code != http.StatusMethodNotAllowed {
-			t.Fatalf("expected 405, got %d", resp.Code)
-		}
+		resp := doJSON(t, srv, http.MethodPost, "/api/v1/locales", nil)
+		wantStatus(t, resp, http.StatusMethodNotAllowed)
 	})
 }
 
@@ -1725,19 +1283,14 @@ func TestHandleJobsPurge(t *testing.T) {
 		} else {
 			reqBody = &bytes.Buffer{}
 		}
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/purge", reqBody)
-		req.Header.Set("Content-Type", "application/json")
-		srv.Handler().ServeHTTP(resp, req)
+		resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/purge", reqBody)
 		return resp
 	}
 
 	t.Run("400 when no retention configured and no body", func(t *testing.T) {
-		srv := New(DefaultConfig())
+		srv := newTestServer(t)
 		resp := postPurge(srv, "")
-		if resp.Code != http.StatusBadRequest {
-			t.Fatalf("expected 400, got %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusBadRequest)
 		var body map[string]any
 		_ = json.NewDecoder(resp.Body).Decode(&body)
 		if errObj, _ := body["error"].(map[string]any); errObj["code"] != "retention_not_configured" {
@@ -1746,7 +1299,7 @@ func TestHandleJobsPurge(t *testing.T) {
 	})
 
 	t.Run("200 with older_than_days in body", func(t *testing.T) {
-		srv := New(DefaultConfig())
+		srv := newTestServer(t)
 		old := time.Now().UTC().Add(-48 * time.Hour)
 		job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
 		if _, err := srv.store.Create(job); err != nil {
@@ -1757,9 +1310,7 @@ func TestHandleJobsPurge(t *testing.T) {
 		}
 
 		resp := postPurge(srv, `{"older_than_days":1}`)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		var body map[string]int64
 		_ = json.NewDecoder(resp.Body).Decode(&body)
 		if body["purged_jobs"] != 1 {
@@ -1781,9 +1332,7 @@ func TestHandleJobsPurge(t *testing.T) {
 		}
 
 		resp := postPurge(srv, "")
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		var body map[string]int64
 		_ = json.NewDecoder(resp.Body).Decode(&body)
 		if body["purged_jobs"] != 1 {
@@ -1792,11 +1341,9 @@ func TestHandleJobsPurge(t *testing.T) {
 	})
 
 	t.Run("200 with zero purged when no old jobs", func(t *testing.T) {
-		srv := New(DefaultConfig())
+		srv := newTestServer(t)
 		resp := postPurge(srv, `{"older_than_days":90}`)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		var body map[string]int64
 		_ = json.NewDecoder(resp.Body).Decode(&body)
 		if body["purged_jobs"] != 0 {
@@ -1805,13 +1352,9 @@ func TestHandleJobsPurge(t *testing.T) {
 	})
 
 	t.Run("GET returns 405", func(t *testing.T) {
-		srv := New(DefaultConfig())
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/jobs/purge", nil)
-		srv.Handler().ServeHTTP(resp, req)
-		if resp.Code != http.StatusMethodNotAllowed {
-			t.Fatalf("expected 405, got %d", resp.Code)
-		}
+		srv := newTestServer(t)
+		resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs/purge", nil)
+		wantStatus(t, resp, http.StatusMethodNotAllowed)
 	})
 }
 
@@ -1830,19 +1373,9 @@ func intFromAny(v any) int {
 }
 
 func TestCreateJobHasNormalPriority(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 	if created.Priority != PriorityNormal {
 		t.Fatalf("response priority: expected PriorityNormal(0), got %d", created.Priority)
 	}
@@ -1856,20 +1389,10 @@ func TestCreateJobHasNormalPriority(t *testing.T) {
 }
 
 func TestBatchSubmitHasBatchPriority(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	payload := `{"domains":["example.com","example.net"]}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(payload))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var out JobBatchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", payload)
+	out := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 	for _, jobID := range out.JobIDs {
 		job, ok := srv.store.Get(jobID)
 		if !ok {
@@ -1909,18 +1432,10 @@ func TestRobotsTxt(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.PublicURL = tt.publicURL
-			srv := New(cfg)
+			srv := newTestServer(t, withConfig(func(cfg *Config) { cfg.PublicURL = tt.publicURL }))
 
-			req := httptest.NewRequest(http.MethodGet, "/robots.txt", nil)
-			req.Host = tt.host
-			rr := httptest.NewRecorder()
-			srv.Handler().ServeHTTP(rr, req)
-
-			if rr.Code != http.StatusOK {
-				t.Fatalf("status = %d, want 200", rr.Code)
-			}
+			rr := doJSON(t, srv, http.MethodGet, "/robots.txt", nil, withHost(tt.host))
+			wantStatus(t, rr, http.StatusOK)
 			if ct := rr.Header().Get("Content-Type"); ct != "text/plain; charset=utf-8" {
 				t.Fatalf("Content-Type = %q", ct)
 			}
@@ -1960,18 +1475,10 @@ func TestSitemapXML(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := DefaultConfig()
-			cfg.PublicURL = tt.publicURL
-			srv := New(cfg)
+			srv := newTestServer(t, withConfig(func(cfg *Config) { cfg.PublicURL = tt.publicURL }))
 
-			req := httptest.NewRequest(http.MethodGet, "/sitemap.xml", nil)
-			req.Host = tt.host
-			rr := httptest.NewRecorder()
-			srv.Handler().ServeHTTP(rr, req)
-
-			if rr.Code != http.StatusOK {
-				t.Fatalf("status = %d, want 200", rr.Code)
-			}
+			rr := doJSON(t, srv, http.MethodGet, "/sitemap.xml", nil, withHost(tt.host))
+			wantStatus(t, rr, http.StatusOK)
 			if ct := rr.Header().Get("Content-Type"); ct != "application/xml; charset=utf-8" {
 				t.Fatalf("Content-Type = %q", ct)
 			}

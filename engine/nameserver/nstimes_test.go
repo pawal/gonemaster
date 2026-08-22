@@ -13,74 +13,90 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
-func TestComputeTimingStatsEmpty(t *testing.T) {
-	stats := ComputeTimingStats(nil)
-	if stats.Count != 0 {
-		t.Fatalf("expected Count=0, got %d", stats.Count)
+func TestComputeTimingStats(t *testing.T) {
+	ms := func(values ...int) []time.Duration {
+		out := make([]time.Duration, 0, len(values))
+		for _, v := range values {
+			out = append(out, time.Duration(v)*time.Millisecond)
+		}
+		return out
 	}
-}
 
-func TestComputeTimingStatsSingle(t *testing.T) {
-	stats := ComputeTimingStats([]time.Duration{10 * time.Millisecond})
-	if stats.Count != 1 {
-		t.Fatalf("expected Count=1, got %d", stats.Count)
+	tests := []struct {
+		name       string
+		times      []time.Duration
+		wantCount  int
+		wantMin    float64
+		wantMax    float64
+		wantAvg    float64
+		wantMedian float64
+		wantTotal  float64
+		wantStddev float64
+	}{
+		{
+			name:  "empty",
+			times: nil,
+		},
+		{
+			name:       "single",
+			times:      ms(10),
+			wantCount:  1,
+			wantMin:    10,
+			wantMax:    10,
+			wantAvg:    10,
+			wantMedian: 10,
+			wantTotal:  10,
+		},
+		{
+			name:       "odd count",
+			times:      ms(10, 20, 30, 40, 50),
+			wantCount:  5,
+			wantMin:    10,
+			wantMax:    50,
+			wantAvg:    30,
+			wantMedian: 30,
+			wantTotal:  150,
+			wantStddev: math.Sqrt(200),
+		},
+		{
+			name:       "even count averages the two middle samples",
+			times:      ms(10, 20, 30, 40),
+			wantCount:  4,
+			wantMin:    10,
+			wantMax:    40,
+			wantAvg:    25,
+			wantMedian: 25,
+			wantTotal:  100,
+			wantStddev: math.Sqrt(125),
+		},
 	}
-	if stats.Min != 10 || stats.Max != 10 || stats.Avg != 10 || stats.Median != 10 {
-		t.Fatalf("expected all 10ms, got min=%f max=%f avg=%f median=%f", stats.Min, stats.Max, stats.Avg, stats.Median)
-	}
-	if stats.Stddev != 0 {
-		t.Fatalf("expected stddev=0, got %f", stats.Stddev)
-	}
-	if stats.Total != 10 {
-		t.Fatalf("expected total=10, got %f", stats.Total)
-	}
-}
 
-func TestComputeTimingStatsMultiple(t *testing.T) {
-	times := []time.Duration{
-		10 * time.Millisecond,
-		20 * time.Millisecond,
-		30 * time.Millisecond,
-		40 * time.Millisecond,
-		50 * time.Millisecond,
-	}
-	stats := ComputeTimingStats(times)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			stats := ComputeTimingStats(tc.times)
 
-	if stats.Count != 5 {
-		t.Fatalf("Count = %d, want 5", stats.Count)
-	}
-	if stats.Min != 10 {
-		t.Fatalf("Min = %f, want 10", stats.Min)
-	}
-	if stats.Max != 50 {
-		t.Fatalf("Max = %f, want 50", stats.Max)
-	}
-	if stats.Total != 150 {
-		t.Fatalf("Total = %f, want 150", stats.Total)
-	}
-	if stats.Avg != 30 {
-		t.Fatalf("Avg = %f, want 30", stats.Avg)
-	}
-	if stats.Median != 30 {
-		t.Fatalf("Median = %f, want 30", stats.Median)
-	}
-	// stddev of {10,20,30,40,50} = sqrt(200) ≈ 14.14
-	if math.Abs(stats.Stddev-math.Sqrt(200)) > 0.01 {
-		t.Fatalf("Stddev = %f, want ≈ %f", stats.Stddev, math.Sqrt(200))
-	}
-}
-
-func TestComputeTimingStatsEvenCount(t *testing.T) {
-	times := []time.Duration{
-		10 * time.Millisecond,
-		20 * time.Millisecond,
-		30 * time.Millisecond,
-		40 * time.Millisecond,
-	}
-	stats := ComputeTimingStats(times)
-	// median of {10,20,30,40} = (20+30)/2 = 25
-	if stats.Median != 25 {
-		t.Fatalf("Median = %f, want 25", stats.Median)
+			if stats.Count != tc.wantCount {
+				t.Fatalf("Count = %d, want %d", stats.Count, tc.wantCount)
+			}
+			if stats.Min != tc.wantMin {
+				t.Fatalf("Min = %f, want %f", stats.Min, tc.wantMin)
+			}
+			if stats.Max != tc.wantMax {
+				t.Fatalf("Max = %f, want %f", stats.Max, tc.wantMax)
+			}
+			if stats.Avg != tc.wantAvg {
+				t.Fatalf("Avg = %f, want %f", stats.Avg, tc.wantAvg)
+			}
+			if stats.Median != tc.wantMedian {
+				t.Fatalf("Median = %f, want %f", stats.Median, tc.wantMedian)
+			}
+			if stats.Total != tc.wantTotal {
+				t.Fatalf("Total = %f, want %f", stats.Total, tc.wantTotal)
+			}
+			if math.Abs(stats.Stddev-tc.wantStddev) > 0.01 {
+				t.Fatalf("Stddev = %f, want %f", stats.Stddev, tc.wantStddev)
+			}
+		})
 	}
 }
 

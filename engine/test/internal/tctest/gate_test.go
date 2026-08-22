@@ -1,6 +1,7 @@
 package tctest
 
 import (
+	"codeberg.org/pawal/gonemaster/internal/tbtest"
 	"testing"
 	"testing/synctest"
 )
@@ -99,7 +100,7 @@ func TestGateConcurrentRecordIsRaceFree(t *testing.T) {
 func TestGateRequireInFlightReportsMismatch(t *testing.T) {
 	g := NewGate()
 	g.Record("ns1")
-	mustFail(t, "expected parallel queries from [ns1 ns2], got [ns1]", func(tb TB) {
+	tbtest.MustFail(t, "expected parallel queries from [ns1 ns2], got [ns1]", func(tb *tbtest.TB) {
 		g.RequireInFlight(tb, "ns1", "ns2")
 	})
 }

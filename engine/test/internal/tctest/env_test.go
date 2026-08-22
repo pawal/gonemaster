@@ -11,6 +11,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/util"
+	"codeberg.org/pawal/gonemaster/internal/tbtest"
 )
 
 func TestContextCarriesCacheAndLogger(t *testing.T) {
@@ -103,7 +104,7 @@ func TestNSWithoutHandlerAnswersEmpty(t *testing.T) {
 
 func TestNSRejectsBadAddress(t *testing.T) {
 	ctx := Context(t)
-	mustFail(t, "new nameserver", func(tb TB) { NS(tb, ctx, "ns1.example", "not-an-ip", nil) })
+	tbtest.MustFail(t, "new nameserver", func(tb *tbtest.TB) { NS(tb, ctx, "ns1.example", "not-an-ip", nil) })
 }
 
 func TestRootZoneServesHandler(t *testing.T) {
@@ -193,7 +194,7 @@ func TestNSRawSeesContextAndErrors(t *testing.T) {
 }
 
 func TestRecursorRejectsBadAddress(t *testing.T) {
-	mustFail(t, "add fake addresses for example", func(tb TB) {
+	tbtest.MustFail(t, "add fake addresses for example", func(tb *tbtest.TB) {
 		Recursor(tb, map[string]map[string][]string{"example": {"ns1.example": {"not-an-ip"}}})
 	})
 }

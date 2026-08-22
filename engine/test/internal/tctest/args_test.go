@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/internal/tbtest"
 )
 
 // serverArgs builds a servers arg in the []map[string]any shape the engine emits.
@@ -30,8 +31,8 @@ func TestServersAcceptsBothShapes(t *testing.T) {
 }
 
 func TestServersRejectsOtherTypes(t *testing.T) {
-	mustFail(t, "unexpected type string", func(tb TB) { Servers(tb, "ns1.example") })
-	mustFail(t, "server entry has unexpected type", func(tb TB) { Servers(tb, []any{"ns1.example"}) })
+	tbtest.MustFail(t, "unexpected type string", func(tb *tbtest.TB) { Servers(tb, "ns1.example") })
+	tbtest.MustFail(t, "server entry has unexpected type", func(tb *tbtest.TB) { Servers(tb, []any{"ns1.example"}) })
 }
 
 func TestServerNamesSortsAndSkipsEmpty(t *testing.T) {
@@ -48,8 +49,8 @@ func TestServerNamesSortsAndSkipsEmpty(t *testing.T) {
 }
 
 func TestServerNamesFailsOnMissingOrWrongType(t *testing.T) {
-	mustFail(t, "expected servers key", func(tb TB) { ServerNames(tb, map[string]any{}) })
-	mustFail(t, "unexpected servers type", func(tb TB) { ServerNames(tb, map[string]any{"servers": 7}) })
+	tbtest.MustFail(t, "expected servers key", func(tb *tbtest.TB) { ServerNames(tb, map[string]any{}) })
+	tbtest.MustFail(t, "unexpected servers type", func(tb *tbtest.TB) { ServerNames(tb, map[string]any{"servers": 7}) })
 }
 
 func TestFirstServerName(t *testing.T) {
@@ -86,7 +87,7 @@ func TestServerEndpointsJoinsNameAndAddress(t *testing.T) {
 	if got := ServerEndpoints(t, args); !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
-	mustFail(t, "expected servers key", func(tb TB) { ServerEndpoints(tb, map[string]any{}) })
+	tbtest.MustFail(t, "expected servers key", func(tb *tbtest.TB) { ServerEndpoints(tb, map[string]any{}) })
 }
 
 func TestEndpointsAtIsLenient(t *testing.T) {
@@ -113,9 +114,9 @@ func TestStrings(t *testing.T) {
 	if got, want := Strings(t, map[string]any{"k": []any{"a", "b"}}, "k"), []string{"a", "b"}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
-	mustFail(t, "expected k key in args", func(tb TB) { Strings(tb, map[string]any{}, "k") })
-	mustFail(t, "unexpected k element type: int", func(tb TB) { Strings(tb, map[string]any{"k": []any{1}}, "k") })
-	mustFail(t, "unexpected k type: int", func(tb TB) { Strings(tb, map[string]any{"k": 1}, "k") })
+	tbtest.MustFail(t, "expected k key in args", func(tb *tbtest.TB) { Strings(tb, map[string]any{}, "k") })
+	tbtest.MustFail(t, "unexpected k element type: int", func(tb *tbtest.TB) { Strings(tb, map[string]any{"k": []any{1}}, "k") })
+	tbtest.MustFail(t, "unexpected k type: int", func(tb *tbtest.TB) { Strings(tb, map[string]any{"k": 1}, "k") })
 }
 
 func TestIntsSortsAndAcceptsFloats(t *testing.T) {
@@ -125,9 +126,9 @@ func TestIntsSortsAndAcceptsFloats(t *testing.T) {
 	if got, want := Ints(t, map[string]any{"k": []any{3, float64(1)}}, "k"), []int{1, 3}; !reflect.DeepEqual(got, want) {
 		t.Fatalf("expected %v, got %v", want, got)
 	}
-	mustFail(t, "expected k key in args", func(tb TB) { Ints(tb, map[string]any{}, "k") })
-	mustFail(t, "unexpected k element type: string", func(tb TB) { Ints(tb, map[string]any{"k": []any{"1"}}, "k") })
-	mustFail(t, "unexpected k type: string", func(tb TB) { Ints(tb, map[string]any{"k": "1"}, "k") })
+	tbtest.MustFail(t, "expected k key in args", func(tb *tbtest.TB) { Ints(tb, map[string]any{}, "k") })
+	tbtest.MustFail(t, "unexpected k element type: string", func(tb *tbtest.TB) { Ints(tb, map[string]any{"k": []any{"1"}}, "k") })
+	tbtest.MustFail(t, "unexpected k type: string", func(tb *tbtest.TB) { Ints(tb, map[string]any{"k": "1"}, "k") })
 }
 
 func TestArgValuesKeepsEmissionOrder(t *testing.T) {
@@ -153,13 +154,13 @@ func TestRequireArgShape(t *testing.T) {
 	RequireArgShape(t, split, ArgShape{})
 	RequireArgShape(t, split, ArgShape{NS: "a.root", Address: "192.0.2.1"})
 
-	mustFail(t, "expected an entry", func(tb TB) { RequireArgShape(tb, nil, ArgShape{}) })
-	mustFail(t, "did not expect arg_schema", func(tb TB) {
+	tbtest.MustFail(t, "expected an entry", func(tb *tbtest.TB) { RequireArgShape(tb, nil, ArgShape{}) })
+	tbtest.MustFail(t, "did not expect arg_schema", func(tb *tbtest.TB) {
 		RequireArgShape(tb, entry("T", map[string]any{"arg_schema": "ns_ip"}), ArgShape{})
 	})
-	mustFail(t, "nameserver-only ns argument", func(tb TB) {
+	tbtest.MustFail(t, "nameserver-only ns argument", func(tb *tbtest.TB) {
 		RequireArgShape(tb, entry("T", map[string]any{"ns": "a.root/192.0.2.1"}), ArgShape{})
 	})
-	mustFail(t, "expected ns=b.root", func(tb TB) { RequireArgShape(tb, split, ArgShape{NS: "b.root"}) })
-	mustFail(t, "expected address=192.0.2.2", func(tb TB) { RequireArgShape(tb, split, ArgShape{Address: "192.0.2.2"}) })
+	tbtest.MustFail(t, "expected ns=b.root", func(tb *tbtest.TB) { RequireArgShape(tb, split, ArgShape{NS: "b.root"}) })
+	tbtest.MustFail(t, "expected address=192.0.2.2", func(tb *tbtest.TB) { RequireArgShape(tb, split, ArgShape{Address: "192.0.2.2"}) })
 }

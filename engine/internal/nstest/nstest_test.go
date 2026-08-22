@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/internal/tbtest"
 )
 
 func TestRecursorAddsFakeAddressesPerZone(t *testing.T) {
@@ -23,15 +24,9 @@ func TestRecursorAddsFakeAddressesPerZone(t *testing.T) {
 }
 
 func TestRecursorFailsOnABadAddress(t *testing.T) {
-	tb := &fakeTB{}
-	func() {
-		defer func() {
-			if recover() != errFatal {
-				t.Fatal("expected Recursor to fail on an unparseable address")
-			}
-		}()
+	tbtest.MustFail(t, "add fake addresses for .", func(tb *tbtest.TB) {
 		Recursor(tb, map[string]map[string][]string{".": {"a.root": {"not-an-ip"}}})
-	}()
+	})
 }
 
 func TestRootRecursorSeedsTheRootOnly(t *testing.T) {
@@ -58,15 +53,9 @@ func TestHintedRecursorSeedsTheRootHints(t *testing.T) {
 }
 
 func TestHintedRecursorFailsOnABadAddress(t *testing.T) {
-	tb := &fakeTB{}
-	func() {
-		defer func() {
-			if recover() != errFatal {
-				t.Fatal("expected HintedRecursor to fail on an unparseable address")
-			}
-		}()
+	tbtest.MustFail(t, "add fake addresses for example.test", func(tb *tbtest.TB) {
 		HintedRecursor(tb, map[string]map[string][]string{"example.test": {"ns1.example.test": {"nope"}}})
-	}()
+	})
 }
 
 func TestHookedNSAnswersThroughTheHook(t *testing.T) {

@@ -6,6 +6,7 @@ import (
 	"time"
 
 	dns "codeberg.org/miekg/dns"
+	"codeberg.org/pawal/gonemaster/internal/tbtest"
 )
 
 func TestResponseDefaultsAndSections(t *testing.T) {
@@ -202,7 +203,7 @@ func TestSignedKeyProducesVerifiableSignature(t *testing.T) {
 func TestSignRejectsEmptyRRset(t *testing.T) {
 	key, signer := SignedKey(t, "example", dns.ECDSAP256SHA256)
 
-	mustFail(t, "empty rrset", func(tb TB) { Sign(tb, key, signer, dns.TypeDNSKEY, nil) })
+	tbtest.MustFail(t, "empty rrset", func(tb *tbtest.TB) { Sign(tb, key, signer, dns.TypeDNSKEY, nil) })
 }
 
 func TestNSItems(t *testing.T) {

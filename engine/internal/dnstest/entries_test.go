@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
+	"codeberg.org/pawal/gonemaster/internal/tbtest"
 )
 
 // entry builds a log entry directly so tests can pick module/testcase freely.
@@ -54,8 +55,8 @@ func TestRequireEntryByTagAndStringArg(t *testing.T) {
 		t.Fatalf("unexpected ns arg: %#v", got.Args["ns"])
 	}
 
-	mustFail(t, "expected a MISSING entry", func(tb testing.TB) { RequireEntryByTag(tb, entries, "MISSING") })
-	mustFail(t, "expected string arg n", func(tb testing.TB) { RequireStringArg(tb, got, "n") })
+	tbtest.MustFail(t, "expected a MISSING entry", func(tb *tbtest.TB) { RequireEntryByTag(tb, entries, "MISSING") })
+	tbtest.MustFail(t, "expected string arg n", func(tb *tbtest.TB) { RequireStringArg(tb, got, "n") })
 }
 
 func TestAssertOnlyTag(t *testing.T) {
@@ -63,10 +64,10 @@ func TestAssertOnlyTag(t *testing.T) {
 
 	AssertOnlyTag(t, entries, "WANTED", []string{"NOT_FIRED"})
 
-	mustFail(t, "expected MISSING to fire", func(tb testing.TB) {
+	tbtest.MustFail(t, "expected MISSING to fire", func(tb *tbtest.TB) {
 		AssertOnlyTag(tb, entries, "MISSING", nil)
 	})
-	mustFail(t, "expected ALSO not to fire alongside WANTED", func(tb testing.TB) {
+	tbtest.MustFail(t, "expected ALSO not to fire alongside WANTED", func(tb *tbtest.TB) {
 		AssertOnlyTag(tb, entries, "WANTED", []string{"ALSO"})
 	})
 }

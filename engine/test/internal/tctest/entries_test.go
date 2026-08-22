@@ -1,65 +1,13 @@
 package tctest
 
 import (
-	"context"
-	"fmt"
 	"reflect"
-	"strings"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/internal/tbtest"
 )
-
-// errFatal aborts a fakeTB the way testing.T.Fatalf aborts a real test.
-var errFatal = fmt.Errorf("fatal")
-
-// fakeTB records the first Fatalf message instead of failing the test, so the
-// helpers' failure paths can be asserted on.
-type fakeTB struct {
-	msg      string
-	cleanups []func()
-}
-
-func (f *fakeTB) Helper() {}
-
-func (f *fakeTB) Context() context.Context { return context.Background() }
-
-// Cleanup collects the functions a helper registers so tests can run them.
-func (f *fakeTB) Cleanup(fn func()) {
-	f.cleanups = append(f.cleanups, fn)
-}
-
-// runCleanups runs the collected cleanups in reverse registration order.
-func (f *fakeTB) runCleanups() {
-	for i := len(f.cleanups) - 1; i >= 0; i-- {
-		f.cleanups[i]()
-	}
-	f.cleanups = nil
-}
-
-func (f *fakeTB) Fatalf(format string, args ...any) {
-	f.msg = fmt.Sprintf(format, args...)
-	panic(errFatal)
-}
-
-// mustFail runs fn with a fakeTB and checks the message it failed with.
-func mustFail(t *testing.T, wantMsg string, fn func(tb TB)) {
-	t.Helper()
-	tb := &fakeTB{}
-	func() {
-		defer func() {
-			if r := recover(); r != errFatal {
-				panic(r)
-			}
-		}()
-		fn(tb)
-		t.Fatalf("expected the helper to fail, got no failure")
-	}()
-	if wantMsg != "" && !strings.Contains(tb.msg, wantMsg) {
-		t.Fatalf("expected failure mentioning %q, got %q", wantMsg, tb.msg)
-	}
-}
 
 // entry builds a log entry directly so tests can pick module/testcase freely.
 func entry(tag string, args map[string]any) *logger.Entry {
@@ -132,19 +80,19 @@ func TestRequireHelpersFail(t *testing.T) {
 	entries := []*logger.Entry{entry("A", nil)}
 
 	t.Run("missing tag", func(t *testing.T) {
-		mustFail(t, "expected B", func(tb TB) { RequireTag(tb, entries, "B") })
+		tbtest.MustFail(t, "expected B", func(tb *tbtest.TB) { RequireTag(tb, entries, "B") })
 	})
 	t.Run("missing tag in list", func(t *testing.T) {
-		mustFail(t, "expected B", func(tb TB) { RequireTags(tb, entries, "A", "B") })
+		tbtest.MustFail(t, "expected B", func(tb *tbtest.TB) { RequireTags(tb, entries, "A", "B") })
 	})
 	t.Run("unwanted tag", func(t *testing.T) {
-		mustFail(t, "did not expect A", func(tb TB) { RequireNoTag(tb, entries, "A") })
+		tbtest.MustFail(t, "did not expect A", func(tb *tbtest.TB) { RequireNoTag(tb, entries, "A") })
 	})
 	t.Run("wrong count", func(t *testing.T) {
-		mustFail(t, "expected 2 A entries", func(tb TB) { RequireCount(tb, entries, "A", 2) })
+		tbtest.MustFail(t, "expected 2 A entries", func(tb *tbtest.TB) { RequireCount(tb, entries, "A", 2) })
 	})
 	t.Run("no entries at all", func(t *testing.T) {
-		mustFail(t, "expected A", func(tb TB) { RequireTag(tb, nil, "A") })
+		tbtest.MustFail(t, "expected A", func(tb *tbtest.TB) { RequireTag(tb, nil, "A") })
 	})
 }
 

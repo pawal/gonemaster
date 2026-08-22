@@ -11,6 +11,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/dnssecutil"
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
@@ -96,48 +97,34 @@ func header(owner string) dns.Header {
 	return dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: defaultTTL}
 }
 
-// SOAOpt overrides one SOA field.
-type SOAOpt func(*dns.SOA)
+// The record builders below are dnstest's, re-exported so the testcase suites
+// and the engine-core tests build identical records. Only SOARR wraps its
+// dnstest counterpart, because the suites depend on the older defaults.
+type SOAOpt = dnstest.SOAOpt
 
-// MName sets the SOA primary server.
-func MName(name string) SOAOpt {
-	return func(soa *dns.SOA) { soa.Ns = dnsutil.Fqdn(name) }
-}
+var (
+	MName     = dnstest.MName
+	RName     = dnstest.RName
+	Serial    = dnstest.Serial
+	SOATimers = dnstest.SOATimers
+	NSRR      = dnstest.NSRR
+	NSRRs     = dnstest.NSRRs
+	ARR       = dnstest.ARR
+	AAAARR    = dnstest.AAAARR
+	AddrRR    = dnstest.AddrRR
+	TXTRR     = dnstest.TXTRR
+	CNAMERR   = dnstest.CNAMERR
+	PTRRR     = dnstest.PTRRR
+)
 
-// RName sets the SOA mailbox.
-func RName(name string) SOAOpt {
-	return func(soa *dns.SOA) { soa.Mbox = dnsutil.Fqdn(name) }
-}
-
-// Serial sets the SOA serial.
-func Serial(v uint32) SOAOpt {
-	return func(soa *dns.SOA) { soa.Serial = v }
-}
-
-// SOATimers sets the SOA refresh, retry, expire and negative-caching timers.
-func SOATimers(refresh uint32, retry uint32, expire uint32, minttl uint32) SOAOpt {
-	return func(soa *dns.SOA) {
-		soa.Refresh = refresh
-		soa.Retry = retry
-		soa.Expire = expire
-		soa.Minttl = minttl
-	}
-}
-
-// SOARR builds a SOA record with the standard test timers.
+// SOARR builds a SOA record with the suites' primary server and expire, then
+// applies opts. dnstest defaults to ns/604800, the suites to ns1./86400.
 func SOARR(owner string, opts ...SOAOpt) *dns.SOA {
-	soa := &dns.SOA{Hdr: header(owner)}
-	soa.Ns = dnsutil.Fqdn("ns1." + trimRoot(owner))
-	soa.Mbox = dnsutil.Fqdn("hostmaster." + trimRoot(owner))
-	soa.Serial = 1
-	soa.Refresh = 3600
-	soa.Retry = 600
-	soa.Expire = 86400
-	soa.Minttl = defaultTTL
-	for _, opt := range opts {
-		opt(soa)
+	defaults := []SOAOpt{
+		dnstest.MName("ns1." + trimRoot(owner)),
+		dnstest.SOATimers(3600, 600, 86400, defaultTTL),
 	}
-	return soa
+	return dnstest.SOARR(owner, append(defaults, opts...)...)
 }
 
 // trimRoot makes owner usable as a label prefix, root included.
@@ -148,51 +135,6 @@ func trimRoot(owner string) string {
 	return owner
 }
 
-// NSRR builds an NS record.
-func NSRR(owner string, target string) *dns.NS {
-	ns := &dns.NS{Hdr: header(owner)}
-	ns.Ns = dnsutil.Fqdn(target)
-	return ns
-}
-
-// NSRRs builds one NS record per target.
-func NSRRs(owner string, targets ...string) []dns.RR {
-	rrs := make([]dns.RR, 0, len(targets))
-	for _, target := range targets {
-		rrs = append(rrs, NSRR(owner, target))
-	}
-	return rrs
-}
-
-// ARR builds an A record.
-func ARR(owner string, addr string) *dns.A {
-	rr := &dns.A{Hdr: header(owner)}
-	rr.Addr = mustAddr(addr).Unmap()
-	return rr
-}
-
-// AAAARR builds an AAAA record.
-func AAAARR(owner string, addr string) *dns.AAAA {
-	rr := &dns.AAAA{Hdr: header(owner)}
-	rr.Addr = mustAddr(addr)
-	return rr
-}
-
-// AddrRR builds an A or AAAA record, matching the address family.
-func AddrRR(owner string, addr string) dns.RR {
-	if mustAddr(addr).Is4() {
-		return ARR(owner, addr)
-	}
-	return AAAARR(owner, addr)
-}
-
-// TXTRR builds a TXT record.
-func TXTRR(owner string, values ...string) *dns.TXT {
-	rr := &dns.TXT{Hdr: header(owner)}
-	rr.Txt = values
-	return rr
-}
-
 // MXRR builds an MX record.
 func MXRR(owner string, preference uint16, exchange string) *dns.MX {
 	rr := &dns.MX{Hdr: header(owner)}
@@ -201,24 +143,10 @@ func MXRR(owner string, preference uint16, exchange string) *dns.MX {
 	return rr
 }
 
-// CNAMERR builds a CNAME record.
-func CNAMERR(owner string, target string) *dns.CNAME {
-	rr := &dns.CNAME{Hdr: header(owner)}
-	rr.Target = dnsutil.Fqdn(target)
-	return rr
-}
-
 // DNAMERR builds a DNAME record.
 func DNAMERR(owner string, target string) *dns.DNAME {
 	rr := &dns.DNAME{Hdr: header(owner)}
 	rr.Target = dnsutil.Fqdn(target)
-	return rr
-}
-
-// PTRRR builds a PTR record.
-func PTRRR(owner string, target string) *dns.PTR {
-	rr := &dns.PTR{Hdr: header(owner)}
-	rr.Ptr = dnsutil.Fqdn(target)
 	return rr
 }
 
@@ -369,8 +297,4 @@ func NSItems(specs ...string) []nsdiscovery.NSItem {
 		items = append(items, NSItem(name, address))
 	}
 	return items
-}
-
-func mustAddr(addr string) netip.Addr {
-	return netip.MustParseAddr(addr)
 }

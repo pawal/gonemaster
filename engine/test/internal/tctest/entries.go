@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
@@ -53,15 +54,7 @@ func All(entries []*logger.Entry, tag string) []*logger.Entry {
 }
 
 // Tags returns the tags of all entries, in emission order.
-func Tags(entries []*logger.Entry) []string {
-	out := make([]string, 0, len(entries))
-	for _, entry := range entries {
-		if entry != nil {
-			out = append(out, entry.Tag)
-		}
-	}
-	return out
-}
+var Tags = dnstest.Tags
 
 // TagsWithPrefix returns the tags starting with prefix, in emission order.
 func TagsWithPrefix(entries []*logger.Entry, prefix string) []string {

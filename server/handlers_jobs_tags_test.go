@@ -29,18 +29,38 @@ func TestCreateJobWithTags(t *testing.T) {
 }
 
 func TestCreateJobLogsDomain(t *testing.T) {
-	var buf bytes.Buffer
-	srv := newTestServer(t, withLogTo(&buf, "info"))
+	for _, tc := range []struct {
+		name   string
+		path   string
+		origin string
+		opts   []reqOpt
+	}{
+		{name: "admin", path: "/api/v1/jobs", origin: JobOriginAdmin},
+		{name: "public", path: "/pub/api/v1/jobs", origin: JobOriginPublic, opts: []reqOpt{sameOrigin()}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var buf bytes.Buffer
+			srv := newTestServer(t, withLogTo(&buf, "info"))
 
-	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
-	wantStatus(t, resp, http.StatusCreated)
+			resp := doJSON(t, srv, http.MethodPost, tc.path, `{"domain":"Example.COM"}`, tc.opts...)
+			wantStatus(t, resp, http.StatusCreated)
 
-	line := findLogLine(t, &buf, "job created")
-	if line["domain"] != "example.com" {
-		t.Fatalf("domain = %v, want example.com", line["domain"])
-	}
-	if line["origin"] != JobOriginAdmin {
-		t.Fatalf("origin = %v, want %q", line["origin"], JobOriginAdmin)
+			line := findLogLine(t, &buf, "job created")
+			// The logged domain is the normalized form, not the request input.
+			if line["domain"] != "example.com" {
+				t.Fatalf("domain = %v, want example.com", line["domain"])
+			}
+			if line["origin"] != tc.origin {
+				t.Fatalf("origin = %v, want %q", line["origin"], tc.origin)
+			}
+			if pid, ok := line["public_id"].(string); !ok || pid == "" {
+				t.Fatalf("missing public_id, got %v", line["public_id"])
+			}
+			// The event shares the request's correlation ID with the access log.
+			if id, ok := line["request_id"].(string); !ok || id == "" {
+				t.Fatalf("missing request_id, got %v", line["request_id"])
+			}
+		})
 	}
 }
 

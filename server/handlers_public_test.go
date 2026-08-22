@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -105,30 +104,6 @@ func TestPublicCreateJobCSRFAcceptsSameOrigin(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, sameOrigin())
 
 	wantStatus(t, resp, http.StatusCreated)
-}
-
-func TestPublicCreateJobLogsDomain(t *testing.T) {
-	var buf bytes.Buffer
-	srv := newTestServer(t, withLogTo(&buf, "info"))
-
-	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"Example.COM"}`, sameOrigin())
-
-	wantStatus(t, resp, http.StatusCreated)
-	line := findLogLine(t, &buf, "job created")
-	// The logged domain is the normalized form, not the raw request input.
-	if line["domain"] != "example.com" {
-		t.Fatalf("domain = %v, want example.com", line["domain"])
-	}
-	if pid, ok := line["public_id"].(string); !ok || pid == "" {
-		t.Fatalf("missing public_id, got %v", line["public_id"])
-	}
-	if line["origin"] != JobOriginPublic {
-		t.Fatalf("origin = %v, want %q", line["origin"], JobOriginPublic)
-	}
-	// The event shares the request's correlation ID with the access-log line.
-	if id, ok := line["request_id"].(string); !ok || id == "" {
-		t.Fatalf("missing request_id, got %v", line["request_id"])
-	}
 }
 
 func TestPublicCreateJobCSRFAcceptsHTTPSOriginViaTrustedProxy(t *testing.T) {

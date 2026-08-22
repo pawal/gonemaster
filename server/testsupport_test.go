@@ -409,6 +409,20 @@ func graduate(t testing.TB, store JobStore, job Job, entries []engine.LogEntry) 
 	return job
 }
 
+// forEachStore runs fn as a subtest against the in-memory store and every SQL
+// backend, for the contract tests that must hold for all of them.
+func forEachStore(t *testing.T, fn func(t *testing.T, s JobStore)) {
+	t.Helper()
+	t.Run("inmemory", func(t *testing.T) {
+		fn(t, NewInMemoryJobStore())
+	})
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			fn(t, testStoreForBackend(t, b))
+		})
+	}
+}
+
 // createAndGraduate creates and graduates a job the caller built, for the store
 // tests that set fields runSpec deliberately does not model (priority, profile
 // snapshot, an explicit domain id).

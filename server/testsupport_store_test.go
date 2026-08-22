@@ -2,6 +2,7 @@ package server
 
 import (
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -368,5 +369,28 @@ func TestTheTwoNamedAnalysisFixturesDiffer(t *testing.T) {
 	}
 	if _, ok := admin.store.GetRun("run-admin-1"); !ok {
 		t.Fatal("the admin fixture needs a source run for rematerialize")
+	}
+}
+
+func TestForEachStoreCoversInMemoryAndEveryBackend(t *testing.T) {
+	var got []string
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		got = append(got, fmt.Sprintf("%T", s))
+		if list := s.List(JobFilter{Limit: 1}); list.Total != 0 {
+			t.Fatalf("expected a fresh store, got %d jobs", list.Total)
+		}
+	})
+
+	want := 1 + len(testBackends(t))
+	if len(got) != want {
+		t.Fatalf("ran %d stores %v, want %d", len(got), got, want)
+	}
+	if got[0] != "*server.InMemoryJobStore" {
+		t.Fatalf("first store = %s, want the in-memory one", got[0])
+	}
+	for _, name := range got[1:] {
+		if name != "*server.SQLJobStore" {
+			t.Fatalf("backend store = %s, want *server.SQLJobStore", name)
+		}
 	}
 }

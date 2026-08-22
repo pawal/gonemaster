@@ -4,7 +4,6 @@ package public
 
 import (
 	"crypto/tls"
-	"io"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -14,202 +13,53 @@ import (
 	"strings"
 	"testing"
 	"testing/fstest"
+
+	"codeberg.org/pawal/gonemaster/server/internal/spatest"
 )
 
-func TestCleanRequestPath(t *testing.T) {
-	tests := []struct {
-		in   string
-		want string
-	}{
-		{in: "", want: ""},
-		{in: "/", want: ""},
-		{in: "/index.html", want: "index.html"},
-		{in: "index.html", want: "index.html"},
-		{in: "/assets/app.js", want: "assets/app.js"},
-		// Anything still containing ".." after normalization is rejected.
-		{in: "/..", want: ""},
-		{in: "..", want: ""},
-		{in: "/..foo", want: ""},
-		{in: "/foo/..bar", want: ""},
+// mustDist returns the embedded public UI files.
+func mustDist(t *testing.T) fs.FS {
+	t.Helper()
+	fsys, err := dist()
+	if err != nil {
+		t.Fatalf("dist(): %v", err)
 	}
+	return fsys
+}
 
-	for _, tt := range tests {
-		if got := cleanRequestPath(tt.in); got != tt.want {
-			t.Fatalf("cleanRequestPath(%q) = %q, want %q", tt.in, got, tt.want)
-		}
-	}
+func TestCleanRequestPath(t *testing.T) {
+	spatest.CleanPath(t, cleanRequestPath, spatest.PathCase{In: "/assets/app.js", Want: "assets/app.js"})
 }
 
 func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
-	// path.Clean collapses dot-segments and the embed.FS is sandboxed via
-	// fs.Sub(distFS, "dist"), so any traversal target that does not exist in
-	// dist/ falls through to the SPA index. This test pins that behavior.
-	h := Handler("")
-
-	rootReq := httptest.NewRequest(http.MethodGet, "/", nil)
-	rootRR := httptest.NewRecorder()
-	h.ServeHTTP(rootRR, rootReq)
-	rootBody, _ := io.ReadAll(rootRR.Result().Body)
-
-	traversals := []string{
+	spatest.PathTraversalCannotEscape(t, Handler(""),
 		"/../public.go",
 		"/../../server/public/public.go",
 		"/assets/../public.go",
 		"/../../etc/passwd",
 		"//etc/passwd",
 		"/..%2fpublic.go",
-	}
-	for _, p := range traversals {
-		req := httptest.NewRequest(http.MethodGet, p, nil)
-		rr := httptest.NewRecorder()
-		h.ServeHTTP(rr, req)
-		if rr.Code != http.StatusOK {
-			t.Errorf("%s: status = %d, want 200 (SPA fallback)", p, rr.Code)
-			continue
-		}
-		body, _ := io.ReadAll(rr.Result().Body)
-		if string(body) != string(rootBody) {
-			t.Errorf("%s: served content other than the SPA index", p)
-		}
-	}
+	)
 }
 
 func TestHandlerMethodNotAllowed(t *testing.T) {
-	h := Handler("")
-
-	req := httptest.NewRequest(http.MethodPost, "/", nil)
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusMethodNotAllowed)
-	}
+	spatest.MethodNotAllowed(t, Handler(""))
 }
 
 func TestHandlerServesIndexForRootAndUnknownPaths(t *testing.T) {
-	h := Handler("")
-
-	rootReq := httptest.NewRequest(http.MethodGet, "/", nil)
-	rootRR := httptest.NewRecorder()
-	h.ServeHTTP(rootRR, rootReq)
-	if rootRR.Code != http.StatusOK {
-		t.Fatalf("root status = %d, want %d", rootRR.Code, http.StatusOK)
-	}
-	rootBody, err := io.ReadAll(rootRR.Result().Body)
-	if err != nil {
-		t.Fatalf("read root body: %v", err)
-	}
-	if len(rootBody) == 0 {
-		t.Fatal("root response body is empty")
-	}
-
-	unknownReq := httptest.NewRequest(http.MethodGet, "/not/a/real/path", nil)
-	unknownRR := httptest.NewRecorder()
-	h.ServeHTTP(unknownRR, unknownReq)
-	if unknownRR.Code != http.StatusOK {
-		t.Fatalf("unknown path status = %d, want %d", unknownRR.Code, http.StatusOK)
-	}
-	unknownBody, err := io.ReadAll(unknownRR.Result().Body)
-	if err != nil {
-		t.Fatalf("read unknown path body: %v", err)
-	}
-	if string(unknownBody) != string(rootBody) {
-		t.Fatal("unknown path did not serve the SPA index content")
-	}
+	spatest.IndexForRootAndUnknownPaths(t, Handler(""), "/not/a/real/path")
 }
 
 func TestHandlerServesAssetsWithCacheControl(t *testing.T) {
-	fsys, err := dist()
-	if err != nil {
-		t.Fatalf("dist(): %v", err)
-	}
-	assetName, ok := firstAssetName(t, fsys)
-	if !ok {
-		t.Skip("no embedded asset files found under dist/assets")
-	}
-
-	h := Handler("")
-	req := httptest.NewRequest(http.MethodGet, "/assets/"+assetName, nil)
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("asset status = %d, want %d", rr.Code, http.StatusOK)
-	}
-	const wantCacheControl = "public, max-age=31536000, immutable"
-	if got := rr.Header().Get("Cache-Control"); got != wantCacheControl {
-		t.Fatalf("Cache-Control = %q, want %q", got, wantCacheControl)
-	}
+	spatest.AssetsHaveImmutableCacheControl(t, Handler(""), mustDist(t))
 }
 
 func TestHandlerServesFaviconFilesAndManifest(t *testing.T) {
-	fsys, err := dist()
-	if err != nil {
-		t.Fatalf("dist(): %v", err)
-	}
-	if _, err := fs.Stat(fsys, "site.webmanifest"); err != nil {
-		t.Skip("favicon assets are not embedded; run make ui-build")
-	}
-
-	requiredFiles := []string{
-		"favicon.svg",
-		"favicon-16x16.png",
-		"favicon-32x32.png",
-		"apple-touch-icon.png",
-		"android-chrome-192x192.png",
-		"android-chrome-512x512.png",
-		"site.webmanifest",
-	}
-
-	h := Handler("")
-	for _, name := range requiredFiles {
-		if _, err := fs.Stat(fsys, name); err != nil {
-			t.Fatalf("expected embedded file %q: %v", name, err)
-		}
-
-		req := httptest.NewRequest(http.MethodGet, "/"+name, nil)
-		rr := httptest.NewRecorder()
-		h.ServeHTTP(rr, req)
-
-		if rr.Code != http.StatusOK {
-			t.Fatalf("GET /%s status = %d, want %d", name, rr.Code, http.StatusOK)
-		}
-		if rr.Body.Len() == 0 {
-			t.Fatalf("GET /%s returned an empty body", name)
-		}
-	}
+	spatest.FaviconFilesAndManifest(t, Handler(""), mustDist(t))
 }
 
 func TestHandlerIndexIncludesFaviconLinks(t *testing.T) {
-	fsys, err := dist()
-	if err != nil {
-		t.Fatalf("dist(): %v", err)
-	}
-	if _, err := fs.Stat(fsys, "site.webmanifest"); err != nil {
-		t.Skip("favicon assets are not embedded; run make ui-build")
-	}
-
-	h := Handler("")
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	rr := httptest.NewRecorder()
-	h.ServeHTTP(rr, req)
-
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
-	}
-
-	body := rr.Body.String()
-	for _, snippet := range []string{
-		`href="/public/favicon.svg"`,
-		`href="/public/favicon-32x32.png"`,
-		`href="/public/favicon-16x16.png"`,
-		`href="/public/apple-touch-icon.png"`,
-		`href="/public/site.webmanifest"`,
-	} {
-		if !strings.Contains(body, snippet) {
-			t.Fatalf("index.html missing %q", snippet)
-		}
-	}
+	spatest.IndexLinksFavicons(t, Handler(""), mustDist(t), "/public/")
 }
 
 func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
@@ -402,18 +252,4 @@ func TestServeIndexInjectsPlaceholders(t *testing.T) {
 			}
 		})
 	}
-}
-
-func firstAssetName(t *testing.T, fsys fs.FS) (string, bool) {
-	t.Helper()
-	entries, err := fs.ReadDir(fsys, "assets")
-	if err != nil {
-		return "", false
-	}
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			return entry.Name(), true
-		}
-	}
-	return "", false
 }

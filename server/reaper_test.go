@@ -11,11 +11,10 @@ import (
 // backed by the in-memory store the sweep will read and write.
 func newReaperServer(t *testing.T, minutes int) *Server {
 	t.Helper()
-	cfg := DefaultConfig()
-	cfg.StuckJobTimeoutMinutes = minutes
-	srv := New(cfg)
-	srv.store = NewInMemoryJobStore()
-	return srv
+	// A store of its own, untouched by the scoring and analysis config New applies.
+	return newTestServer(t,
+		withConfig(func(cfg *Config) { cfg.StuckJobTimeoutMinutes = minutes }),
+		withStore(NewInMemoryJobStore()))
 }
 
 // seedRunningJob stores a job already at "running", started age ago.

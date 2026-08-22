@@ -3,11 +3,14 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 // reqOpt customizes a request before it is served.
@@ -130,4 +133,127 @@ func wantErrorCode(t testing.TB, resp *httptest.ResponseRecorder, status int, co
 		t.Errorf("error code = %q, want %q", body.Error.Code, code)
 	}
 	return body
+}
+
+// srvOpt customizes newTestServer.
+type srvOpt func(*testServerSetup)
+
+// testServerSetup collects what newTestServer applies, in order: config
+// mutations, then construction, then the post-construction field swaps.
+type testServerSetup struct {
+	cfg   []func(*Config)
+	db    JobStore
+	queue Queue
+	post  []func(*Server)
+}
+
+// withConfig mutates the config before construction. The named options below
+// cover the recurring cases; this is the escape hatch for one-off fields.
+func withConfig(fn func(*Config)) srvOpt {
+	return func(s *testServerSetup) { s.cfg = append(s.cfg, fn) }
+}
+
+// withDB constructs the server around store instead of a fresh in-memory one,
+// so the scoring and analysis config land in the store the test reads.
+func withDB(store JobStore) srvOpt {
+	return func(s *testServerSetup) { s.db = store }
+}
+
+// withQueue constructs the server around queue.
+func withQueue(q Queue) srvOpt {
+	return func(s *testServerSetup) { s.queue = q }
+}
+
+// withStore replaces the store after construction, which is what the tests
+// that inject a spy or an error-returning store want.
+func withStore(store JobStore) srvOpt {
+	return func(s *testServerSetup) {
+		s.post = append(s.post, func(srv *Server) { srv.store = store })
+	}
+}
+
+// withPublicAPI mutates the public API config.
+func withPublicAPI(fn func(*PublicAPIConfig)) srvOpt {
+	return withConfig(func(cfg *Config) { fn(&cfg.PublicAPI) })
+}
+
+// withWorkers sets the worker count and the concurrent-job cap.
+func withWorkers(count int, maxConcurrent int) srvOpt {
+	return withConfig(func(cfg *Config) {
+		cfg.WorkerCount = count
+		cfg.MaxConcurrentJobs = maxConcurrent
+	})
+}
+
+// withAuth switches the admin API from open mode to token mode.
+func withAuth(tokens ...string) srvOpt {
+	return withConfig(func(cfg *Config) {
+		cfg.Auth.AdminTokens = nil
+		for i, tok := range tokens {
+			cfg.Auth.AdminTokens = append(cfg.Auth.AdminTokens,
+				AdminToken{Label: fmt.Sprintf("t%d", i), Hash: hashToken(tok)})
+		}
+	})
+}
+
+// withEngineRunner replaces the engine call, so a test decides what a run
+// reports without touching the network.
+func withEngineRunner(fn func(engine.RunRequest) ([]engine.LogEntry, error)) srvOpt {
+	return func(s *testServerSetup) {
+		s.post = append(s.post, func(srv *Server) { srv.engineRunner = fn })
+	}
+}
+
+// withLogTo sends the server log to w as JSON, for the tests that assert on
+// log lines.
+func withLogTo(w io.Writer, level string) srvOpt {
+	return func(s *testServerSetup) {
+		s.post = append(s.post, func(srv *Server) { srv.logger = newLogger("json", level, w) })
+	}
+}
+
+// withAnalysisController installs an analysis controller.
+func withAnalysisController(ctrl AnalysisController) srvOpt {
+	return func(s *testServerSetup) {
+		s.post = append(s.post, func(srv *Server) { srv.SetAnalysisController(ctrl) })
+	}
+}
+
+// withConfigSources declares where each setting came from.
+func withConfigSources(sources map[string]SettingSource) srvOpt {
+	return func(s *testServerSetup) {
+		s.post = append(s.post, func(srv *Server) { srv.SetConfigSources(sources) })
+	}
+}
+
+// newTestServer builds a server from DefaultConfig plus the options. With no
+// options it is New(DefaultConfig()).
+func newTestServer(t testing.TB, opts ...srvOpt) *Server {
+	t.Helper()
+	setup := &testServerSetup{}
+	for _, opt := range opts {
+		opt(setup)
+	}
+	cfg := DefaultConfig()
+	for _, mutate := range setup.cfg {
+		mutate(&cfg)
+	}
+	var srv *Server
+	if setup.db != nil || setup.queue != nil {
+		queue := setup.queue
+		if queue == nil {
+			queue = NewInMemoryQueue()
+		}
+		store := setup.db
+		if store == nil {
+			store = NewInMemoryJobStore()
+		}
+		srv = newServer(cfg, store, queue)
+	} else {
+		srv = New(cfg)
+	}
+	for _, apply := range setup.post {
+		apply(srv)
+	}
+	return srv
 }

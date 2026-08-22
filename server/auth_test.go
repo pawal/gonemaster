@@ -39,10 +39,9 @@ func cookieNamed(rec *httptest.ResponseRecorder, name string) *http.Cookie {
 	return nil
 }
 
-func tokenServer(tok string) *Server {
-	cfg := DefaultConfig()
-	cfg.Auth.AdminTokens = []AdminToken{{Label: "t", Hash: hashToken(tok)}}
-	return New(cfg)
+func tokenServer(t *testing.T, tok string) *Server {
+	t.Helper()
+	return newTestServer(t, withAuth(tok))
 }
 
 func TestTokenSetMatch(t *testing.T) {
@@ -117,7 +116,7 @@ func TestAuthMiddlewareOpenModeAllows(t *testing.T) {
 
 func TestAuthMiddlewareTokenMode(t *testing.T) {
 	tok := "gm_mwtest"
-	s := tokenServer(tok)
+	s := tokenServer(t, tok)
 
 	if rec := authGet(s, "/api/v1/locales", nil); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("missing token: want 401, got %d", rec.Code)
@@ -155,7 +154,7 @@ func TestWhoamiOpenMode(t *testing.T) {
 
 func TestWhoamiTokenMode(t *testing.T) {
 	tok := "gm_whoami"
-	s := tokenServer(tok)
+	s := tokenServer(t, tok)
 	rec := authGet(s, "/api/v1/whoami", nil)
 	if !strings.Contains(rec.Body.String(), `"mode":"token"`) || !strings.Contains(rec.Body.String(), `"authenticated":false`) {
 		t.Fatalf("unauthed whoami: %s", rec.Body.String())
@@ -168,7 +167,7 @@ func TestWhoamiTokenMode(t *testing.T) {
 
 func TestSessionLoginAndUseCookie(t *testing.T) {
 	tok := "gm_session"
-	s := tokenServer(tok)
+	s := tokenServer(t, tok)
 	rec := authDo(s, http.MethodPost, "/api/v1/session", `{"token":"`+tok+`"}`, nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("login want 200, got %d: %s", rec.Code, rec.Body.String())
@@ -187,7 +186,7 @@ func TestSessionLoginAndUseCookie(t *testing.T) {
 }
 
 func TestSessionLoginRejectsBadToken(t *testing.T) {
-	s := tokenServer("gm_real")
+	s := tokenServer(t, "gm_real")
 	rec := authDo(s, http.MethodPost, "/api/v1/session", `{"token":"wrong"}`, nil)
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("want 401, got %d", rec.Code)
@@ -198,7 +197,7 @@ func TestSessionLoginRejectsBadToken(t *testing.T) {
 }
 
 func TestSessionLogoutClearsCookie(t *testing.T) {
-	s := tokenServer("gm_logout")
+	s := tokenServer(t, "gm_logout")
 	rec := authDo(s, http.MethodDelete, "/api/v1/session", "", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("logout want 200, got %d", rec.Code)
@@ -213,7 +212,7 @@ func TestSessionLogoutClearsCookie(t *testing.T) {
 // with a real HTTP client and cookie jar, mirroring the operator curl smoke.
 func TestAuthEndToEndOverHTTP(t *testing.T) {
 	tok := "gm_e2e"
-	ts := httptest.NewServer(tokenServer(tok).Handler())
+	ts := httptest.NewServer(tokenServer(t, tok).Handler())
 	defer ts.Close()
 
 	jar, _ := cookiejar.New(nil)

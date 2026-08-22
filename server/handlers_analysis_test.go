@@ -92,10 +92,8 @@ func (c *recordingAnalysisController) snapshot() recordingAnalysisController {
 
 func newAnalysisAdminTestServer(t *testing.T) (*Server, *recordingAnalysisController) {
 	t.Helper()
-	srv := New(DefaultConfig())
 	spy := &recordingAnalysisController{}
-	srv.SetAnalysisController(spy)
-	return srv, spy
+	return newTestServer(t, withAnalysisController(spy)), spy
 }
 
 func decodeCohort(t *testing.T, body *bytes.Buffer) AnalysisCohort {

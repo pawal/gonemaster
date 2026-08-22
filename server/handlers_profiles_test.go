@@ -1,11 +1,9 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"slices"
 	"testing"
@@ -16,22 +14,13 @@ import (
 
 func createProfile(t *testing.T, srv *Server, body string) Profile {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("createProfile: expected 201, got %d: %s", resp.Code, resp.Body)
-	}
-	var profile Profile
-	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
-		t.Fatalf("createProfile decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/profiles", body)
+	profile := mustJSON[Profile](t, resp, http.StatusCreated)
 	return profile
 }
 
 func TestCreateProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{
 		"name":"strict-dnssec",
 		"description":"Strict DNSSEC validation",
@@ -70,39 +59,18 @@ func TestCreateProfile(t *testing.T) {
 }
 
 func TestCreateProfileRejectsInvalidConfig(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles",
-		bytes.NewBufferString(`{"name":"broken","config":{"net":1}}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "invalid_profile" {
-		t.Fatalf("expected invalid_profile, got %q", out.Error.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/profiles", `{"name":"broken","config":{"net":1}}`)
+	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_profile")
 }
 
 func TestListProfiles(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createProfile(t, srv, `{"name":"alpha","config":{"net":{"ipv4":true}}}`)
 	createProfile(t, srv, `{"name":"beta","config":{"net":{"ipv6":false}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var profiles []Profile
-	if err := json.NewDecoder(resp.Body).Decode(&profiles); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles", nil)
+	profiles := mustJSON[[]Profile](t, resp, http.StatusOK)
 	if len(profiles) != 2 {
 		t.Fatalf("expected 2 profiles, got %d", len(profiles))
 	}
@@ -112,18 +80,10 @@ func TestListProfiles(t *testing.T) {
 }
 
 func TestGetDefaultProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/default", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var profile Profile
-	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/default", nil)
+	profile := mustJSON[Profile](t, resp, http.StatusOK)
 	if profile.ID != 0 {
 		t.Fatalf("ID: got %d, want 0", profile.ID)
 	}
@@ -154,16 +114,8 @@ func TestGetDefaultProfileAppliesConfigFileOverride(t *testing.T) {
 	cfg.ProfilePath = f.Name()
 	srv := New(cfg)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/default", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var profile Profile
-	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/default", nil)
+	profile := mustJSON[Profile](t, resp, http.StatusOK)
 	netCfg, ok := profile.Config["net"].(map[string]any)
 	if !ok {
 		t.Fatalf("expected net config, got %#v", profile.Config)
@@ -174,19 +126,11 @@ func TestGetDefaultProfileAppliesConfigFileOverride(t *testing.T) {
 }
 
 func TestGetProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"default","config":{"net":{"ipv4":true}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/profiles/%d", profile.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var got Profile
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/profiles/%d", profile.ID), nil)
+	got := mustJSON[Profile](t, resp, http.StatusOK)
 	if got.ID != profile.ID {
 		t.Fatalf("ID: got %d, want %d", got.ID, profile.ID)
 	}
@@ -196,26 +140,16 @@ func TestGetProfile(t *testing.T) {
 }
 
 func TestUpdateProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"default","config":{"net":{"ipv4":true}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, fmt.Sprintf("/api/v1/profiles/%d", profile.ID),
-		bytes.NewBufferString(`{
+	resp := doJSON(t, srv, http.MethodPut, fmt.Sprintf("/api/v1/profiles/%d", profile.ID), `{
 			"name":"strict",
 			"description":"Updated profile",
 			"config":{"resolver":{"defaults":{"retry":3}}},
 			"public":true
-		}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var updated Profile
-	if err := json.NewDecoder(resp.Body).Decode(&updated); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+		}`)
+	updated := mustJSON[Profile](t, resp, http.StatusOK)
 	if updated.Name != "strict" {
 		t.Fatalf("Name: got %q", updated.Name)
 	}
@@ -239,33 +173,23 @@ func TestUpdateProfile(t *testing.T) {
 }
 
 func TestDeleteProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"default","config":{"net":{"ipv4":true}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/v1/profiles/%d", profile.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodDelete, fmt.Sprintf("/api/v1/profiles/%d", profile.ID), nil)
+	wantStatus(t, resp, http.StatusNoContent)
 	if _, ok := srv.store.GetProfile(profile.ID); ok {
 		t.Fatal("expected profile to be deleted")
 	}
 }
 
 func TestSetTagProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "ops", "")
 	profile := createProfile(t, srv, `{"name":"default","config":{"net":{"ipv4":true}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/tags/ops/profile",
-		bytes.NewBufferString(fmt.Sprintf(`{"profile_id":%d}`, profile.ID)))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/tags/ops/profile", fmt.Sprintf(`{"profile_id":%d}`, profile.ID))
+	wantStatus(t, resp, http.StatusNoContent)
 
 	tag, ok := srv.store.GetTag("ops")
 	if !ok {
@@ -277,19 +201,15 @@ func TestSetTagProfile(t *testing.T) {
 }
 
 func TestDeleteTagProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "ops", "")
 	profile := createProfile(t, srv, `{"name":"default","config":{"net":{"ipv4":true}}}`)
 	if err := srv.store.SetTagDefaultProfile("ops", &profile.ID); err != nil {
 		t.Fatalf("SetTagDefaultProfile: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/tags/ops/profile", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/tags/ops/profile", nil)
+	wantStatus(t, resp, http.StatusNoContent)
 
 	tag, ok := srv.store.GetTag("ops")
 	if !ok {
@@ -303,7 +223,7 @@ func TestDeleteTagProfile(t *testing.T) {
 // ── schema_version ────────────────────────────────────────────────────────────
 
 func TestCreateProfileSetsSchemaVersion(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"sv-test","config":{"net":{"ipv4":true}}}`)
 	if profile.SchemaVersion == "" {
 		t.Fatal("expected non-empty SchemaVersion on created profile")
@@ -318,21 +238,11 @@ func TestCreateProfileSetsSchemaVersion(t *testing.T) {
 }
 
 func TestUpdateProfileSetsSchemaVersion(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"sv-update","config":{"net":{"ipv4":true}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/profiles/"+itoa(profile.ID),
-		bytes.NewBufferString(`{"name":"sv-update","description":"updated","config":{"net":{"ipv4":true}}}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var updated Profile
-	if err := json.NewDecoder(resp.Body).Decode(&updated); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/profiles/"+itoa(profile.ID), `{"name":"sv-update","description":"updated","config":{"net":{"ipv4":true}}}`)
+	updated := mustJSON[Profile](t, resp, http.StatusOK)
 	if updated.SchemaVersion == "" {
 		t.Fatal("expected non-empty SchemaVersion after update")
 	}
@@ -341,17 +251,9 @@ func TestUpdateProfileSetsSchemaVersion(t *testing.T) {
 // ── GET /profiles/defaults ────────────────────────────────────────────────────
 
 func TestGetProfileDefaults(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var defaults ProfileDefaults
-	if err := json.NewDecoder(resp.Body).Decode(&defaults); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/defaults", nil)
+	defaults := mustJSON[ProfileDefaults](t, resp, http.StatusOK)
 	if len(defaults.TestCases) == 0 {
 		t.Fatal("expected non-empty TestCases in defaults")
 	}
@@ -368,38 +270,22 @@ func TestGetProfileDefaults(t *testing.T) {
 // ── GET /profiles/compatibility ───────────────────────────────────────────────
 
 func TestProfilesCompatibilityEmpty(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var summaries []CompatibilitySummary
-	if err := json.NewDecoder(resp.Body).Decode(&summaries); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/compatibility", nil)
+	summaries := mustJSON[[]CompatibilitySummary](t, resp, http.StatusOK)
 	if len(summaries) != 0 {
 		t.Fatalf("expected 0 summaries for empty store, got %d", len(summaries))
 	}
 }
 
 func TestProfilesCompatibilityCompatibleProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	// A profile that only sets resolver options has no test_cases or test_levels
 	// overrides, so it is always compatible.
 	createProfile(t, srv, `{"name":"compat","config":{"resolver":{"defaults":{"timeout":5}}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var summaries []CompatibilitySummary
-	if err := json.NewDecoder(resp.Body).Decode(&summaries); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/compatibility", nil)
+	summaries := mustJSON[[]CompatibilitySummary](t, resp, http.StatusOK)
 	if len(summaries) != 1 {
 		t.Fatalf("expected 1 summary, got %d", len(summaries))
 	}
@@ -411,29 +297,17 @@ func TestProfilesCompatibilityCompatibleProfile(t *testing.T) {
 // ── GET /profiles/{id}/compatibility ─────────────────────────────────────────
 
 func TestProfileCompatibilityNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/999/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/999/compatibility", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestProfileCompatibilityNoOverrides(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"simple","config":{"resolver":{"defaults":{"timeout":10}}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var result CompatibilityResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
+	result := mustJSON[CompatibilityResult](t, resp, http.StatusOK)
 	if !result.Compatible {
 		t.Fatalf("expected compatible=true, got false: %+v", result.Issues)
 	}
@@ -446,22 +320,14 @@ func TestProfileCompatibilityNoOverrides(t *testing.T) {
 }
 
 func TestProfileCompatibilityMissingTestCase(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	// Profile explicitly sets test_cases with only "address01" - all other default
 	// test cases are missing.
 	profile := createProfile(t, srv, `{"name":"narrow","config":{"test_cases":["address01"]}}`)
 	markProfileStale(t, srv, profile.ID)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var result CompatibilityResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
+	result := mustJSON[CompatibilityResult](t, resp, http.StatusOK)
 	if result.Compatible {
 		t.Fatal("expected compatible=false for profile missing test cases")
 	}
@@ -485,35 +351,19 @@ func TestProfileCompatibilityMissingTestCase(t *testing.T) {
 
 func TestProfileCompatibilityAllDefaultTestCases(t *testing.T) {
 	// A profile that includes ALL default test cases should have no missing_test_case issue.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Fetch the defaults to get the full test_cases list.
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var defaults ProfileDefaults
-	if err := json.NewDecoder(resp.Body).Decode(&defaults); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/defaults", nil)
+	defaults := mustJSON[ProfileDefaults](t, resp, http.StatusOK)
 
 	// Build a profile that explicitly sets all default test cases.
 	casesJSON, _ := json.Marshal(defaults.TestCases)
 	configJSON := `{"test_cases":` + string(casesJSON) + `}`
 	profile := createProfile(t, srv, `{"name":"full-cases","config":`+configJSON+`}`)
 
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var result CompatibilityResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
+	result := mustJSON[CompatibilityResult](t, resp, http.StatusOK)
 	for _, issue := range result.Issues {
 		if issue.Type == "missing_test_case" {
 			t.Fatalf("unexpected missing_test_case issue: %s", issue.Detail)
@@ -522,19 +372,11 @@ func TestProfileCompatibilityAllDefaultTestCases(t *testing.T) {
 }
 
 func TestProfileCompatibilityMissingTestLevels(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Fetch defaults to get a real module with tags.
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var defaults ProfileDefaults
-	if err := json.NewDecoder(resp.Body).Decode(&defaults); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/defaults", nil)
+	defaults := mustJSON[ProfileDefaults](t, resp, http.StatusOK)
 
 	// Find a module that has at least 2 tags, then use only one of them.
 	var chosenModule string
@@ -566,16 +408,8 @@ func TestProfileCompatibilityMissingTestLevels(t *testing.T) {
 	profile := createProfile(t, srv, `{"name":"partial-levels","config":{"test_levels":`+string(levelsJSON)+`}}`)
 	markProfileStale(t, srv, profile.ID)
 
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var result CompatibilityResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
+	result := mustJSON[CompatibilityResult](t, resp, http.StatusOK)
 	if result.Compatible {
 		t.Fatalf("expected compatible=false for profile missing test_levels tag %q", missingTag)
 	}
@@ -596,18 +430,10 @@ func TestProfileCompatibilityMissingTestLevels(t *testing.T) {
 
 func TestProfileCompatibilityFullTestLevelsCoverage(t *testing.T) {
 	// A profile that covers all default tags for a module should have no issue for it.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var defaults ProfileDefaults
-	if err := json.NewDecoder(resp.Body).Decode(&defaults); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/defaults", nil)
+	defaults := mustJSON[ProfileDefaults](t, resp, http.StatusOK)
 
 	// Use the full ADDRESS module test_levels.
 	addressTags, ok := defaults.TestLevels["ADDRESS"]
@@ -618,16 +444,8 @@ func TestProfileCompatibilityFullTestLevelsCoverage(t *testing.T) {
 	levelsJSON, _ := json.Marshal(levelsPayload)
 	profile := createProfile(t, srv, `{"name":"full-levels","config":{"test_levels":`+string(levelsJSON)+`}}`)
 
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var result CompatibilityResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/profiles/"+itoa(profile.ID)+"/compatibility", nil)
+	result := mustJSON[CompatibilityResult](t, resp, http.StatusOK)
 	for _, issue := range result.Issues {
 		if issue.Type == "missing_test_levels" && issue.Module == "ADDRESS" {
 			t.Fatalf("unexpected missing_test_levels issue for ADDRESS: %s", issue.Detail)
@@ -716,17 +534,8 @@ func TestCheckProfileCompatibilityEmptyConfig(t *testing.T) {
 
 func patchProfile(t *testing.T, srv *Server, id int64, body string) Profile {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/profiles/"+itoa(id), bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("patchProfile: expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var profile Profile
-	if err := json.NewDecoder(resp.Body).Decode(&profile); err != nil {
-		t.Fatalf("patchProfile decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPatch, "/api/v1/profiles/"+itoa(id), body)
+	profile := mustJSON[Profile](t, resp, http.StatusOK)
 	return profile
 }
 
@@ -746,21 +555,13 @@ func markProfileStale(t *testing.T, srv *Server, id int64) {
 
 func fetchCompatibility(t *testing.T, srv *Server, id int64) CompatibilityResult {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/profiles/"+itoa(id)+"/compatibility", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("fetchCompatibility: expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var result CompatibilityResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("fetchCompatibility decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/"+itoa(id)+"/compatibility", nil)
+	result := mustJSON[CompatibilityResult](t, resp, http.StatusOK)
 	return result
 }
 
 func TestPatchProfileMarkReviewed(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"mark-rev","config":{"net":{"ipv4":true}}}`)
 
 	// Manually clear schema_version to simulate an outdated profile.
@@ -781,7 +582,7 @@ func TestPatchProfileMarkReviewed(t *testing.T) {
 }
 
 func TestPatchProfileMarkReviewedClearsCompatibility(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	// Profile pins a narrow test_cases list - many defaults are intentionally absent.
 	profile := createProfile(t, srv, `{"name":"rev-clears","config":{"test_cases":["address01"]}}`)
 	markProfileStale(t, srv, profile.ID)
@@ -802,7 +603,7 @@ func TestPatchProfileMarkReviewedClearsCompatibility(t *testing.T) {
 }
 
 func TestPatchProfileResetTestCases(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"reset-tc","config":{"test_cases":["address01","address02"]}}`)
 
 	updated := patchProfile(t, srv, profile.ID, `{"op":"reset_test_cases"}`)
@@ -813,17 +614,13 @@ func TestPatchProfileResetTestCases(t *testing.T) {
 }
 
 func TestPatchProfileAddMissingTestCases(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	// Profile with only one explicit test case - many are missing.
 	profile := createProfile(t, srv, `{"name":"add-tc","config":{"test_cases":["address01"]}}`)
 
 	// Fetch defaults to know what's expected.
-	respD := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(respD, httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil))
-	var defaults ProfileDefaults
-	if err := json.NewDecoder(respD.Body).Decode(&defaults); err != nil {
-		t.Fatalf("decode defaults: %v", err)
-	}
+	respD := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/defaults", nil)
+	defaults := mustJSON[ProfileDefaults](t, respD, http.StatusOK)
 
 	updated := patchProfile(t, srv, profile.ID, `{"op":"add_missing_test_cases"}`)
 	resultCases, ok := updated.Config["test_cases"].([]any)
@@ -847,7 +644,7 @@ func TestPatchProfileAddMissingTestCases(t *testing.T) {
 
 func TestPatchProfileAddMissingTestCasesNoop(t *testing.T) {
 	// Profile that does not override test_cases - add_missing_test_cases is a noop.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"no-tc","config":{"resolver":{"defaults":{"timeout":5}}}}`)
 
 	updated := patchProfile(t, srv, profile.ID, `{"op":"add_missing_test_cases"}`)
@@ -858,15 +655,11 @@ func TestPatchProfileAddMissingTestCasesNoop(t *testing.T) {
 }
 
 func TestPatchProfileResetTestLevels(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Build a profile with ADDRESS test_levels override.
-	respD := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(respD, httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil))
-	var defaults ProfileDefaults
-	if err := json.NewDecoder(respD.Body).Decode(&defaults); err != nil {
-		t.Fatalf("decode defaults: %v", err)
-	}
+	respD := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/defaults", nil)
+	defaults := mustJSON[ProfileDefaults](t, respD, http.StatusOK)
 	addressTags, ok := defaults.TestLevels["ADDRESS"]
 	if !ok {
 		t.Skip("ADDRESS module not in defaults")
@@ -887,12 +680,8 @@ func TestPatchProfileResetTestLevels(t *testing.T) {
 }
 
 func TestPatchProfileResetTestLevelsMissingModule(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/profiles/1",
-		bytes.NewBufferString(`{"op":"reset_test_levels"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPatch, "/api/v1/profiles/1", `{"op":"reset_test_levels"}`)
 	// Profile doesn't exist, but missing module should return 400 before 404.
 	// Actually server checks module before profile lookup... let's just check 4xx.
 	if resp.Code != http.StatusBadRequest && resp.Code != http.StatusNotFound {
@@ -901,15 +690,11 @@ func TestPatchProfileResetTestLevelsMissingModule(t *testing.T) {
 }
 
 func TestPatchProfileAddMissingTestLevels(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Get defaults to find a module with multiple tags.
-	respD := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(respD, httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil))
-	var defaults ProfileDefaults
-	if err := json.NewDecoder(respD.Body).Decode(&defaults); err != nil {
-		t.Fatalf("decode defaults: %v", err)
-	}
+	respD := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/defaults", nil)
+	defaults := mustJSON[ProfileDefaults](t, respD, http.StatusOK)
 
 	var module string
 	var partialTags map[string]string
@@ -954,14 +739,10 @@ func TestPatchProfileAddMissingTestLevels(t *testing.T) {
 // admin UI then drops the remaining fix buttons and the profile looks clean
 // while still missing tags.
 func TestPatchProfileFixDoesNotHideRemainingIssues(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	respD := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(respD, httptest.NewRequest(http.MethodGet, "/api/v1/profiles/defaults", nil))
-	var defaults ProfileDefaults
-	if err := json.NewDecoder(respD.Body).Decode(&defaults); err != nil {
-		t.Fatalf("decode defaults: %v", err)
-	}
+	respD := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/defaults", nil)
+	defaults := mustJSON[ProfileDefaults](t, respD, http.StatusOK)
 
 	// One module overridden with a single tag, plus a pinned test_cases list.
 	// That is two independent issues: missing test levels and missing test
@@ -1030,29 +811,17 @@ func hasIssueType(issues []CompatibilityIssue, want string) bool {
 }
 
 func TestPatchProfileInvalidOp(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"inv-op","config":{}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/profiles/"+itoa(profile.ID),
-		bytes.NewBufferString(`{"op":"unknown_operation"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400 for unknown op, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPatch, "/api/v1/profiles/"+itoa(profile.ID), `{"op":"unknown_operation"}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestPatchProfileNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/profiles/999",
-		bytes.NewBufferString(`{"op":"mark_reviewed"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPatch, "/api/v1/profiles/999", `{"op":"mark_reviewed"}`)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 // ── apply* unit tests ─────────────────────────────────────────────────────────
@@ -1137,7 +906,7 @@ func itoa(id int64) string {
 // ── POST /profiles/mark-all-reviewed ─────────────────────────────────────────
 
 func TestMarkAllProfilesReviewed(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	p1 := createProfile(t, srv, `{"name":"p1","config":{}}`)
 	p2 := createProfile(t, srv, `{"name":"p2","config":{}}`)
 
@@ -1149,13 +918,8 @@ func TestMarkAllProfilesReviewed(t *testing.T) {
 	stored2.SchemaVersion = "v0.9.0"
 	_ = srv.store.UpdateProfile(stored2)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/mark-all-reviewed", bytes.NewBufferString("{}"))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/profiles/mark-all-reviewed", "{}")
+	wantStatus(t, resp, http.StatusOK)
 
 	var result MarkAllReviewedResult
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
@@ -1177,18 +941,13 @@ func TestMarkAllProfilesReviewed(t *testing.T) {
 }
 
 func TestMarkAllProfilesReviewedAlreadyCurrent(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	// Create two profiles - both will have schema_version set to engine.VersionFull() by default.
 	createProfile(t, srv, `{"name":"p1","config":{}}`)
 	createProfile(t, srv, `{"name":"p2","config":{}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/mark-all-reviewed", bytes.NewBufferString("{}"))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/profiles/mark-all-reviewed", "{}")
+	wantStatus(t, resp, http.StatusOK)
 
 	var result MarkAllReviewedResult
 	json.NewDecoder(resp.Body).Decode(&result)
@@ -1198,15 +957,10 @@ func TestMarkAllProfilesReviewedAlreadyCurrent(t *testing.T) {
 }
 
 func TestMarkAllProfilesReviewedEmptyStore(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/profiles/mark-all-reviewed", bytes.NewBufferString("{}"))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/profiles/mark-all-reviewed", "{}")
+	wantStatus(t, resp, http.StatusOK)
 
 	var result MarkAllReviewedResult
 	json.NewDecoder(resp.Body).Decode(&result)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -75,85 +76,79 @@ func refusedPacket(answerFrom string) packet.Packet {
 // RETURN response (answer), and goroutine 2 blocks. After processing #1 the
 // recursor cancels the batch; #2 must observe context.Cause == ErrRaceLost.
 func TestRecurseOrderedRaceLossSetsCause(t *testing.T) {
-	prof := testhelpers.DefaultProfile(t)
-	prof.Resolver.Defaults.Parallel = 3
-	prof.Resolver.Defaults.Unordered = false
-	ctx := profile.WithContext(context.Background(), prof)
+	synctest.Test(t, func(t *testing.T) {
+		prof := testhelpers.DefaultProfile(t)
+		prof.Resolver.Defaults.Parallel = 3
+		prof.Resolver.Defaults.Unordered = false
+		ctx := profile.WithContext(context.Background(), prof)
 
-	loser := &observingQueryer{}
-	winner := fakeQueryer{resp: answerPacket("www.example", "203.0.113.50")}
-	noise := fakeQueryer{resp: refusedPacket("203.0.113.51")}
+		loser := &observingQueryer{}
+		winner := fakeQueryer{resp: answerPacket("www.example", "203.0.113.50")}
+		noise := fakeQueryer{resp: refusedPacket("203.0.113.51")}
 
-	// state.ns is consumed from the END, so the order in the slice is
-	// reverse of the batch order. Batch = [noise, winner, loser].
-	state := &recurseState{ns: []queryer{loser, winner, noise}}
+		// state.ns is consumed from the END, so the order in the slice is
+		// reverse of the batch order. Batch = [noise, winner, loser].
+		state := &recurseState{ns: []queryer{loser, winner, noise}}
 
-	r := &Recursor{}
-	respDone := make(chan error, 1)
-	go func() {
-		_, _, e := r.recurse(ctx, "www.example", "A", "IN", state)
-		respDone <- e
-	}()
+		r := &Recursor{}
+		respDone := make(chan error, 1)
+		go func() {
+			_, _, e := r.recurse(ctx, "www.example", "A", "IN", state)
+			respDone <- e
+		}()
 
-	select {
-	case e := <-respDone:
-		if e != nil {
+		if e := <-respDone; e != nil {
 			t.Fatalf("recurse returned error: %v", e)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("recurse did not return within timeout (loser may have hung)")
-	}
 
-	if !loser.wasCalled() {
-		t.Fatalf("loser goroutine was never invoked")
-	}
-	cause := loser.observedCause()
-	if cause == nil {
-		t.Fatalf("loser observed no cancellation cause")
-	}
-	if !errors.Is(cause, ErrRaceLost) {
-		t.Fatalf("loser observed cause = %v, want ErrRaceLost", cause)
-	}
+		if !loser.wasCalled() {
+			t.Fatalf("loser goroutine was never invoked")
+		}
+		cause := loser.observedCause()
+		if cause == nil {
+			t.Fatalf("loser observed no cancellation cause")
+		}
+		if !errors.Is(cause, ErrRaceLost) {
+			t.Fatalf("loser observed cause = %v, want ErrRaceLost", cause)
+		}
+	})
 }
 
 // TestRecurseUnorderedRaceLossSetsCause exercises the unordered fan-out.
 func TestRecurseUnorderedRaceLossSetsCause(t *testing.T) {
-	prof := testhelpers.DefaultProfile(t)
-	prof.Resolver.Defaults.Parallel = 2
-	prof.Resolver.Defaults.Unordered = true
-	ctx := profile.WithContext(context.Background(), prof)
+	synctest.Test(t, func(t *testing.T) {
+		prof := testhelpers.DefaultProfile(t)
+		prof.Resolver.Defaults.Parallel = 2
+		prof.Resolver.Defaults.Unordered = true
+		ctx := profile.WithContext(context.Background(), prof)
 
-	loser := &observingQueryer{}
-	winner := fakeQueryer{resp: answerPacket("www.example", "203.0.113.60")}
+		loser := &observingQueryer{}
+		winner := fakeQueryer{resp: answerPacket("www.example", "203.0.113.60")}
 
-	state := &recurseState{ns: []queryer{loser, winner}}
+		state := &recurseState{ns: []queryer{loser, winner}}
 
-	r := &Recursor{}
-	respDone := make(chan error, 1)
-	go func() {
-		_, _, e := r.recurse(ctx, "www.example", "A", "IN", state)
-		respDone <- e
-	}()
+		r := &Recursor{}
+		respDone := make(chan error, 1)
+		go func() {
+			_, _, e := r.recurse(ctx, "www.example", "A", "IN", state)
+			respDone <- e
+		}()
 
-	select {
-	case e := <-respDone:
-		if e != nil {
+		if e := <-respDone; e != nil {
 			t.Fatalf("recurse returned error: %v", e)
 		}
-	case <-time.After(2 * time.Second):
-		t.Fatalf("recurse did not return within timeout")
-	}
 
-	if !loser.wasCalled() {
-		t.Fatalf("loser goroutine was never invoked")
-	}
-	cause := loser.observedCause()
-	if cause == nil {
-		t.Fatalf("loser observed no cancellation cause")
-	}
-	if !errors.Is(cause, ErrRaceLost) {
-		t.Fatalf("loser observed cause = %v, want ErrRaceLost", cause)
-	}
+		if !loser.wasCalled() {
+			t.Fatalf("loser goroutine was never invoked")
+		}
+		cause := loser.observedCause()
+		if cause == nil {
+			t.Fatalf("loser observed no cancellation cause")
+		}
+		if !errors.Is(cause, ErrRaceLost) {
+			t.Fatalf("loser observed cause = %v, want ErrRaceLost", cause)
+		}
+	})
 }
 
 func TestRecurseSkipsUpwardReferral(t *testing.T) {

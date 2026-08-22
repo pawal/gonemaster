@@ -26,6 +26,12 @@ func withOrigin(origin string) reqOpt {
 	return withHeader("Origin", origin)
 }
 
+// sameOrigin sets Origin from the request's own Host, so a test asserts the
+// CSRF check passes rather than pinning httptest's default host.
+func sameOrigin() reqOpt {
+	return func(req *http.Request) { req.Header.Set("Origin", "http://"+req.Host) }
+}
+
 // withHost sets the request Host, which is a field rather than a header.
 func withHost(host string) reqOpt {
 	return func(req *http.Request) { req.Host = host }

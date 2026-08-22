@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -14,21 +13,11 @@ import (
 )
 
 func TestPublicCreateJobReturnsPublicIDNotUUID(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var view map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	view := mustJSON[map[string]any](t, resp, http.StatusCreated)
 	if view["public_id"] == "" || view["public_id"] == nil {
 		t.Fatal("expected public_id in response")
 	}
@@ -38,13 +27,9 @@ func TestPublicCreateJobReturnsPublicIDNotUUID(t *testing.T) {
 }
 
 func TestPublicCreateJobReturnsDomainStatusProgress(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
 
 	var view PublicJobView
 	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
@@ -62,36 +47,20 @@ func TestPublicCreateJobReturnsDomainStatusProgress(t *testing.T) {
 }
 
 func TestPublicCreateJobMissingDomainReturns400(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{}`)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestPublicCreateJobWithPublicProfileID(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"public-profile","config":{"net":{"ipv4":true}},"public":true}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID)))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID))
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var created PublicJobView
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := mustJSON[PublicJobView](t, resp, http.StatusCreated)
 	job, ok := srv.store.GetByPublicID(created.PublicID)
 	if !ok {
 		t.Fatal("expected stored public job")
@@ -105,100 +74,45 @@ func TestPublicCreateJobWithPublicProfileID(t *testing.T) {
 }
 
 func TestPublicCreateJobRejectsPrivateProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"private-profile","config":{"net":{"ipv4":true}},"public":false}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID)))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID))
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "profile_not_public" {
-		t.Fatalf("expected profile_not_public, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "profile_not_public")
 }
 
 func TestPublicCreateJobRejectsProfileOverrides(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com","profile_overrides":{"net":{"ipv6":false}}}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com","profile_overrides":{"net":{"ipv6":false}}}`)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "profile_overrides_not_allowed" {
-		t.Fatalf("expected profile_overrides_not_allowed, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "profile_overrides_not_allowed")
 }
 
 func TestPublicCreateJobCSRFRejectsCrossOrigin(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", "http://evil.example")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withOrigin("http://evil.example"))
 
-	if resp.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "csrf_origin_mismatch" {
-		t.Fatalf("expected csrf_origin_mismatch, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusForbidden, "csrf_origin_mismatch")
 }
 
 func TestPublicCreateJobCSRFAcceptsSameOrigin(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", "http://"+req.Host)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, sameOrigin())
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusCreated)
 }
 
 func TestPublicCreateJobLogsDomain(t *testing.T) {
 	var buf bytes.Buffer
-	srv := New(DefaultConfig())
-	srv.logger = newLogger("json", "info", &buf)
+	srv := newTestServer(t, withLogTo(&buf, "info"))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"Example.COM"}`))
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", "http://"+req.Host)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"Example.COM"}`, sameOrigin())
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusCreated)
 	line := findLogLine(t, &buf, "job created")
 	// The logged domain is the normalized form, not the raw request input.
 	if line["domain"] != "example.com" {
@@ -224,43 +138,23 @@ func TestPublicCreateJobCSRFAcceptsHTTPSOriginViaTrustedProxy(t *testing.T) {
 	cfg.TrustedProxyCIDRs = []string{"127.0.0.1/32"}
 	srv := New(cfg)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Host = "gonemaster.evilbit.de"
-	req.RemoteAddr = "127.0.0.1:54321"
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", "https://gonemaster.evilbit.de")
-	req.Header.Set("X-Forwarded-Proto", "https")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withHost("gonemaster.evilbit.de"), withRemoteAddr("127.0.0.1:54321"), withOrigin("https://gonemaster.evilbit.de"), withHeader("X-Forwarded-Proto", "https"))
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusCreated)
 }
 
 func TestPublicCreateJobCSRFRejectsForgedXForwardedProtoFromUntrustedRemote(t *testing.T) {
 	// No trusted proxies: X-Forwarded-Proto is ignored. The forged header
 	// must not let an attacker make port 443 match.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Host = "gonemaster.evilbit.de"
-	req.RemoteAddr = "203.0.113.99:54321"
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Origin", "https://gonemaster.evilbit.de")
-	req.Header.Set("X-Forwarded-Proto", "https")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withHost("gonemaster.evilbit.de"), withRemoteAddr("203.0.113.99:54321"), withOrigin("https://gonemaster.evilbit.de"), withHeader("X-Forwarded-Proto", "https"))
 
-	if resp.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusForbidden)
 }
 
 func TestPublicCreateJobRejectsOversizedNameservers(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	var nss []string
 	for i := 0; i <= MaxUndelegatedNameservers; i++ {
@@ -268,25 +162,13 @@ func TestPublicCreateJobRejectsOversizedNameservers(t *testing.T) {
 	}
 	body := fmt.Sprintf(`{"domain":"example.com","nameservers":[%s]}`, strings.Join(nss, ","))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "invalid_undelegated" {
-		t.Fatalf("expected invalid_undelegated, got %q (msg=%q)", out.Error.Code, out.Error.Message)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_undelegated")
 }
 
 func TestPublicCreateJobRejectsOversizedDSInfo(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	var ds []string
 	for i := 0; i <= MaxUndelegatedDSRecords; i++ {
@@ -294,25 +176,13 @@ func TestPublicCreateJobRejectsOversizedDSInfo(t *testing.T) {
 	}
 	body := fmt.Sprintf(`{"domain":"example.com","ds_info":[%s]}`, strings.Join(ds, ","))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "invalid_undelegated" {
-		t.Fatalf("expected invalid_undelegated, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_undelegated")
 }
 
 func TestPublicCreateJobRejectsOversizedTestsList(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	var tests []string
 	for i := 0; i <= MaxPublicTests; i++ {
@@ -320,21 +190,9 @@ func TestPublicCreateJobRejectsOversizedTestsList(t *testing.T) {
 	}
 	body := fmt.Sprintf(`{"domain":"example.com","tests":[%s]}`, strings.Join(tests, ","))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "too_many_tests" {
-		t.Fatalf("expected too_many_tests, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "too_many_tests")
 }
 
 // createErrStore wraps InMemoryJobStore but forces Create to return a
@@ -347,22 +205,16 @@ type createErrStore struct {
 func (s *createErrStore) Create(_ Job) (Job, error) { return Job{}, s.err }
 
 func TestPublicCreateJobStoreErrorDoesNotLeakDBDetails(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	canary := "ERROR: duplicate key value violates unique constraint \"jobs_pkey\""
 	srv.store = &createErrStore{
 		InMemoryJobStore: srv.store.(*InMemoryJobStore),
 		err:              fmt.Errorf("%s", canary),
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
 
-	if resp.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusInternalServerError)
 	body := resp.Body.String()
 	if strings.Contains(body, canary) || strings.Contains(body, "jobs_pkey") {
 		t.Fatalf("response leaked raw store error: %s", body)
@@ -382,35 +234,21 @@ func TestPublicCreateJobStoreErrorDoesNotLeakDBDetails(t *testing.T) {
 func TestPublicCreateJobCSRFAllowsMissingOrigin(t *testing.T) {
 	// Non-browser clients (e.g. gonemaster-client) omit Origin; the helper
 	// short-circuits in that case so CLI usage keeps working.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201 with no Origin header, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusCreated)
 }
 
 func TestPublicProfilesReturnsOnlyPublicProfilesWithoutConfig(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createProfile(t, srv, `{"name":"public-profile","description":"Shown","config":{"net":{"ipv4":true}},"public":true}`)
 	createProfile(t, srv, `{"name":"private-profile","description":"Hidden","config":{"net":{"ipv6":false}},"public":false}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/profiles", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/profiles", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var views []map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&views); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	views := mustJSON[[]map[string]any](t, resp, http.StatusOK)
 	if len(views) != 1 {
 		t.Fatalf("expected 1 public profile, got %d", len(views))
 	}
@@ -423,31 +261,19 @@ func TestPublicProfilesReturnsOnlyPublicProfilesWithoutConfig(t *testing.T) {
 }
 
 func TestPublicGetJobReturnsPublicIDNotUUID(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Create via public API.
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
 	var created PublicJobView
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
 		t.Fatalf("decode create: %v", err)
 	}
 
 	// Get via public ID.
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID, nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp = doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID, nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var got map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode get: %v", err)
-	}
+	got := mustJSON[map[string]any](t, resp, http.StatusOK)
 	if got["public_id"] != created.PublicID {
 		t.Fatalf("public_id: got %v, want %q", got["public_id"], created.PublicID)
 	}
@@ -457,19 +283,15 @@ func TestPublicGetJobReturnsPublicIDNotUUID(t *testing.T) {
 }
 
 func TestPublicGetJobUnknownPublicIDReturns404(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/notexist1", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/notexist1", nil)
 
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestPublicGetResultReturnsResultByPublicID(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Create a job and manually store a result for it.
 	job := Job{
@@ -499,17 +321,9 @@ func TestPublicGetResultReturnsResultByPublicID(t *testing.T) {
 		t.Fatalf("GraduateJob: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if result.Status != JobSucceeded {
 		t.Fatalf("status: got %q, want %q", result.Status, JobSucceeded)
 	}
@@ -519,22 +333,18 @@ func TestPublicGetResultReturnsResultByPublicID(t *testing.T) {
 }
 
 func TestPublicGetResultUnknownPublicIDReturns404(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/notexist1/result", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/notexist1/result", nil)
 
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusNotFound)
 	if cc := resp.Header().Get("Cache-Control"); cc != "" {
 		t.Fatalf("Cache-Control should not be set on 404, got %q", cc)
 	}
 }
 
 func TestPublicGetResultSetsCacheControlOnSuccess(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	job := Job{
 		ID:        newID("job"),
@@ -551,55 +361,39 @@ func TestPublicGetResultSetsCacheControlOnSuccess(t *testing.T) {
 		t.Fatalf("GraduateJob: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if got := resp.Header().Get("Cache-Control"); got != "public, max-age=300" {
 		t.Fatalf("Cache-Control: got %q, want %q", got, "public, max-age=300")
 	}
 }
 
 func TestPublicLocalesEndpointAccessible(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/locales", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/locales", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200 from /pub/api/v1/locales, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusOK)
 }
 
 func TestPublicGetResultNoResultYetReturns404(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Create a job but do not store a result for it.
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
 	var created PublicJobView
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
 
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp = doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
 
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 when result not yet available, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestPublicGetResultRespectsLocaleParam(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	job := Job{
 		ID:        newID("job"),
@@ -615,17 +409,9 @@ func TestPublicGetResultRespectsLocaleParam(t *testing.T) {
 		t.Fatalf("GraduateJob: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result?locale=sv", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result?locale=sv", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if result.Raw == nil || result.Raw.Locale != "sv" {
 		t.Fatalf("expected locale=sv in result, got %v", result.Raw)
 	}
@@ -635,7 +421,7 @@ func TestPublicGetResultUnknownLocaleForcedToEnglish(t *testing.T) {
 	// Unknown / malicious locale must be silently forced to "en" so the
 	// metrics layer never sees an attacker-controlled bucket key and the
 	// response never echoes the unknown value as result.locale.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	job := Job{
 		ID:        newID("job"),
@@ -651,18 +437,9 @@ func TestPublicGetResultUnknownLocaleForcedToEnglish(t *testing.T) {
 		t.Fatalf("GraduateJob: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet,
-		"/pub/api/v1/jobs/"+created.PublicID+"/result?locale=../../etc/passwd", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result?locale=../../etc/passwd", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if result.Raw == nil || result.Raw.Locale != "en" {
 		t.Fatalf("expected forced locale=en, got %v", result.Raw)
 	}
@@ -689,44 +466,26 @@ func TestResolveResultLocale(t *testing.T) {
 }
 
 func TestPublicAPIJobCreatedViaInternalAPIFetchableByPublicID(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Create via internal API.
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("internal create: expected 201, got %d", resp.Code)
-	}
-	var internalJob Job
-	if err := json.NewDecoder(resp.Body).Decode(&internalJob); err != nil {
-		t.Fatalf("decode internal job: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
+	internalJob := mustJSON[Job](t, resp, http.StatusCreated)
 	if internalJob.PublicID == "" {
 		t.Fatal("internal API response must include public_id")
 	}
 
 	// Fetch via public API using the public_id from the internal response.
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+internalJob.PublicID, nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp = doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+internalJob.PublicID, nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("public get: expected 200, got %d", resp.Code)
-	}
-	var view PublicJobView
-	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
-		t.Fatalf("decode public view: %v", err)
-	}
+	view := mustJSON[PublicJobView](t, resp, http.StatusOK)
 	if view.PublicID != internalJob.PublicID {
 		t.Fatalf("public_id mismatch: got %q, want %q", view.PublicID, internalJob.PublicID)
 	}
 }
 
 func TestPublicAPIEndpointsUnreachableViaInternalPrefix(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Admin-only endpoints must not be reachable via /pub/
 	for _, path := range []string{
@@ -734,9 +493,7 @@ func TestPublicAPIEndpointsUnreachableViaInternalPrefix(t *testing.T) {
 		"/pub/api/v1/queue/pause",
 		"/pub/api/v1/batches",
 	} {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		srv.Handler().ServeHTTP(resp, req)
+		resp := doJSON(t, srv, http.MethodGet, path, nil)
 		if resp.Code == http.StatusOK {
 			t.Errorf("path %q should not return 200 via public prefix", path)
 		}
@@ -767,16 +524,8 @@ func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
 		t.Fatalf("GraduateJob: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if result.Score != nil {
 		t.Fatal("expected Score to be nil when ShowScorePublic=false")
 	}
@@ -786,21 +535,11 @@ func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
 }
 
 func TestPublicCreateJobAcceptsIPv6Disabled(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com","ipv6_disabled":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com","ipv6_disabled":true}`)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var view PublicJobView
-	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	view := mustJSON[PublicJobView](t, resp, http.StatusCreated)
 	job, ok := srv.store.GetByPublicID(view.PublicID)
 	if !ok {
 		t.Fatal("expected stored public job")
@@ -814,21 +553,11 @@ func TestPublicCreateJobAcceptsIPv6Disabled(t *testing.T) {
 }
 
 func TestPublicCreateJobAcceptsIPv4Disabled(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/pub/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com","ipv4_disabled":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com","ipv4_disabled":true}`)
 
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body.String())
-	}
-	var view PublicJobView
-	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	view := mustJSON[PublicJobView](t, resp, http.StatusCreated)
 	job, ok := srv.store.GetByPublicID(view.PublicID)
 	if !ok {
 		t.Fatal("expected stored public job")

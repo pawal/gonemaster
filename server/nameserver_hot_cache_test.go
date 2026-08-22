@@ -5,6 +5,7 @@ import (
 	"net/netip"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -115,36 +116,39 @@ func TestNameserverHotCacheLeaseEvictsOldestOnCapacity(t *testing.T) {
 }
 
 func TestNameserverHotCacheMergeEvictsStaleAddresses(t *testing.T) {
-	// Use a short TTL so we can simulate addresses going stale.
-	cache := newNameserverHotCache(8, 2*time.Second)
+	// The sleep only has to outlast the TTL, so a bubble makes it free.
+	synctest.Test(t, func(t *testing.T) {
+		// Use a short TTL so we can simulate addresses going stale.
+		cache := newNameserverHotCache(8, 2*time.Second)
 
-	// Run 1: touch two nameserver addresses.
-	run1, release1 := cache.Lease("alpha")
-	if _, err := nameserver.NewWithCache(run1, "ns-root.example", "192.0.2.1", nil); err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	if _, err := nameserver.NewWithCache(run1, "ns-old.example", "192.0.2.99", nil); err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	release1()
+		// Run 1: touch two nameserver addresses.
+		run1, release1 := cache.Lease("alpha")
+		if _, err := nameserver.NewWithCache(run1, "ns-root.example", "192.0.2.1", nil); err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		if _, err := nameserver.NewWithCache(run1, "ns-old.example", "192.0.2.99", nil); err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		release1()
 
-	// Wait for the stale address TTL to expire.
-	time.Sleep(3 * time.Second)
+		// Wait for the stale address TTL to expire.
+		time.Sleep(3 * time.Second)
 
-	// Run 2: only touch the root address again.
-	run2, release2 := cache.Lease("alpha")
-	if _, err := nameserver.NewWithCache(run2, "ns-root.example", "192.0.2.1", nil); err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	release2()
+		// Run 2: only touch the root address again.
+		run2, release2 := cache.Lease("alpha")
+		if _, err := nameserver.NewWithCache(run2, "ns-root.example", "192.0.2.1", nil); err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+		release2()
 
-	// Run 3: the stale address (192.0.2.99) should have been evicted during
-	// run 2's merge, so the base should only have the root address left.
-	run3, release3 := cache.Lease("alpha")
-	defer release3()
-	if got := run3.AddressCacheCount(); got != 1 {
-		t.Fatalf("expected 1 warmed address (stale evicted), got %d", got)
-	}
+		// Run 3: the stale address (192.0.2.99) should have been evicted during
+		// run 2's merge, so the base should only have the root address left.
+		run3, release3 := cache.Lease("alpha")
+		defer release3()
+		if got := run3.AddressCacheCount(); got != 1 {
+			t.Fatalf("expected 1 warmed address (stale evicted), got %d", got)
+		}
+	})
 }
 
 func TestNameserverHotCacheKeyUsesEffectiveProfileInputs(t *testing.T) {

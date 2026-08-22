@@ -152,3 +152,142 @@ func TestWrapStoreKeepsWhatTheServerSeeded(t *testing.T) {
 		t.Fatal("expected the seeded run to survive wrapping")
 	}
 }
+
+func TestSeedGraduatedRunDefaults(t *testing.T) {
+	store := NewInMemoryJobStore()
+	before := time.Now().UTC()
+
+	job := seedGraduatedRun(t, store, runSpec{})
+
+	if job.ID == "" || job.Domain != "example.com" {
+		t.Fatalf("expected a generated id for example.com, got %+v", job)
+	}
+	if job.Status != JobSucceeded {
+		t.Fatalf("Status = %q, want %q", job.Status, JobSucceeded)
+	}
+	if job.FinishedAt.Before(before) {
+		t.Fatalf("FinishedAt = %v, want now or later", job.FinishedAt)
+	}
+	// Create assigns the public id, so the caller can look the run up by it.
+	if job.PublicID == "" {
+		t.Fatal("expected Create to have assigned a public id")
+	}
+	run, ok := store.GetRun(job.ID)
+	if !ok {
+		t.Fatal("expected the run to be graduated")
+	}
+	if run.Domain != "example.com" {
+		t.Fatalf("run domain = %q", run.Domain)
+	}
+}
+
+func TestSeedGraduatedRunSpecFields(t *testing.T) {
+	store := NewInMemoryJobStore()
+	at := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+
+	job := seedGraduatedRun(t, store, runSpec{
+		ID:            "job-1",
+		Domain:        "a.example",
+		BatchID:       "batch-1",
+		At:            at,
+		Duration:      time.Minute,
+		Entries:       systemStartEntry(),
+		Timings:       []NameserverTiming{{Nameserver: "ns1.a.example"}},
+		Progress:      100,
+		Origin:        JobOriginPublic,
+		ResolveDomain: true,
+	})
+
+	if job.ID != "job-1" || job.BatchID != "batch-1" {
+		t.Fatalf("id/batch = %q/%q", job.ID, job.BatchID)
+	}
+	if !job.FinishedAt.Equal(at) {
+		t.Fatalf("FinishedAt = %v, want %v", job.FinishedAt, at)
+	}
+	if want := at.Add(-time.Minute); !job.StartedAt.Equal(want) {
+		t.Fatalf("StartedAt = %v, want %v", job.StartedAt, want)
+	}
+	// ResolveDomain must set DomainID before graduation, which the batch and
+	// analysis handlers rely on.
+	if job.DomainID == 0 {
+		t.Fatal("expected ResolveDomain to set DomainID")
+	}
+	if job.Origin != JobOriginPublic || job.Progress != 100 {
+		t.Fatalf("origin/progress = %q/%d", job.Origin, job.Progress)
+	}
+	run, ok := store.GetRun("job-1")
+	if !ok {
+		t.Fatal("expected the run graduated")
+	}
+	if len(run.NameserverTimings) != 1 {
+		t.Fatalf("expected the timings carried through, got %+v", run.NameserverTimings)
+	}
+}
+
+func TestSeedGraduatedRunStoresTheChain(t *testing.T) {
+	store := NewInMemoryJobStore()
+	const chain = `{"links":[]}`
+
+	job := seedGraduatedRun(t, store, runSpec{ChainJSON: chain})
+
+	// The chain can only be set after Create, which is what assigns the
+	// public id it is looked up by.
+	got, ok, err := store.GetRunDNSSECChain(job.ID)
+	if err != nil || !ok {
+		t.Fatalf("GetRunDNSSECChain: ok=%v err=%v", ok, err)
+	}
+	if got != chain {
+		t.Fatalf("chain = %q, want %q", got, chain)
+	}
+}
+
+func TestGraduateFillsInStatusAndFinishTime(t *testing.T) {
+	store := NewInMemoryJobStore()
+	created := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+	job, err := store.Create(Job{ID: "job-1", Domain: "a.example", Status: JobQueued, CreatedAt: created})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	graduate(t, store, job, nil)
+
+	run, ok := store.GetRun("job-1")
+	if !ok {
+		t.Fatal("expected the run graduated")
+	}
+	// A queued job graduates as succeeded, and the finish time follows the
+	// creation time rather than wall clock.
+	if run.Status != JobSucceeded {
+		t.Fatalf("Status = %q, want %q", run.Status, JobSucceeded)
+	}
+	if want := created.Add(time.Second); !run.FinishedAt.Equal(want) {
+		t.Fatalf("FinishedAt = %v, want %v", run.FinishedAt, want)
+	}
+}
+
+func TestCreateAndGraduateKeepsCallerFields(t *testing.T) {
+	store := NewInMemoryJobStore()
+	now := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
+
+	got := createAndGraduate(t, store, Job{
+		ID:         "job-1",
+		Domain:     "a.example",
+		Status:     JobSucceeded,
+		CreatedAt:  now,
+		FinishedAt: now,
+		Priority:   PriorityBatch,
+	}, nil)
+
+	// Fields runSpec does not model must survive, which is the whole reason
+	// this rung exists.
+	if got.Priority != PriorityBatch {
+		t.Fatalf("Priority = %v, want %v", got.Priority, PriorityBatch)
+	}
+	run, ok := store.GetRun("job-1")
+	if !ok {
+		t.Fatal("expected the run graduated")
+	}
+	if run.Domain != "a.example" {
+		t.Fatalf("run domain = %q", run.Domain)
+	}
+}

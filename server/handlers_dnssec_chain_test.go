@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"testing"
-	"time"
 )
 
 const handlerChainJSON = `{"version":1,"zone":"example.com","status":"secure"}`
@@ -14,23 +13,11 @@ const handlerChainJSON = `{"version":1,"zone":"example.com","status":"secure"}`
 // carries a chain blob, returning its public ID.
 func graduatePublicJobWithChain(t *testing.T, srv *Server, chain string) string {
 	t.Helper()
-	job := Job{
-		ID:        newID("job"),
-		Domain:    "example.com",
-		Status:    JobSucceeded,
-		CreatedAt: time.Now().UTC(),
+	return seedGraduatedRun(t, srv.store, runSpec{
 		Progress:  100,
 		Origin:    JobOriginPublic,
-	}
-	created, err := srv.store.Create(job)
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	created.DNSSECChainJSON = chain
-	if err := srv.store.GraduateJob(created, nil); err != nil {
-		t.Fatalf("GraduateJob: %v", err)
-	}
-	return created.PublicID
+		ChainJSON: chain,
+	}).PublicID
 }
 
 func TestPublicDNSSECChainReturnsBlobWithCacheHeader(t *testing.T) {

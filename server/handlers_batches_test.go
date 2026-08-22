@@ -7,8 +7,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"codeberg.org/pawal/gonemaster/engine"
 )
 
 // seedGraduatedBatch inserts a batch + one graduated succeeded run so
@@ -23,28 +21,13 @@ func seedGraduatedBatch(t *testing.T, srv *Server, batchID, tag string) {
 	}); err != nil {
 		t.Fatalf("CreateBatch: %v", err)
 	}
-	domain, err := srv.store.GetOrCreateDomain("example.com")
-	if err != nil {
-		t.Fatalf("GetOrCreateDomain: %v", err)
-	}
-	job := Job{
-		ID:         "job_" + batchID,
-		BatchID:    batchID,
-		Domain:     "example.com",
-		DomainID:   domain.ID,
-		Status:     JobSucceeded,
-		CreatedAt:  now,
-		StartedAt:  now,
-		FinishedAt: now,
-	}
-	if _, err := srv.store.Create(job); err != nil {
-		t.Fatalf("Create job: %v", err)
-	}
-	if err := srv.store.GraduateJob(job, []engine.LogEntry{
-		{Timestamp: 1.0, Module: "System", Tag: "MODULE_START", Level: "INFO"},
-	}); err != nil {
-		t.Fatalf("GraduateJob: %v", err)
-	}
+	seedGraduatedRun(t, srv.store, runSpec{
+		ID:            "job_" + batchID,
+		BatchID:       batchID,
+		At:            now,
+		Entries:       systemStartEntry(),
+		ResolveDomain: true,
+	})
 }
 
 func TestHandleBatchDeletePreviewReturnsCounts(t *testing.T) {

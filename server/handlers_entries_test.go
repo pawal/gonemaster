@@ -14,21 +14,7 @@ import (
 // Returns the domain created by graduation.
 func makeGraduatedJobWithEntries(t *testing.T, srv *Server, domain string, entries []engine.LogEntry) Domain {
 	t.Helper()
-	now := time.Now().UTC()
-	job := Job{
-		ID:        newID("job"),
-		Domain:    domain,
-		Status:    JobSucceeded,
-		CreatedAt: now,
-		StartedAt: now,
-	}
-	if _, err := srv.store.Create(job); err != nil {
-		t.Fatalf("create job: %v", err)
-	}
-	job.FinishedAt = now
-	if err := srv.store.GraduateJob(job, entries); err != nil {
-		t.Fatalf("graduate job: %v", err)
-	}
+	seedGraduatedRun(t, srv.store, runSpec{Domain: domain, Entries: entries})
 	d, ok := srv.store.GetDomainByName(domain)
 	if !ok {
 		t.Fatalf("expected domain %q after graduation", domain)

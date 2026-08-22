@@ -6,28 +6,20 @@ import (
 	"net/http"
 	"testing"
 	"time"
-
-	"codeberg.org/pawal/gonemaster/engine"
 )
 
 // graduateRunInBatch creates and graduates one succeeded run for a batch at the
 // given finish time, so the batch accrues a completed run.
 func graduateRunInBatch(t *testing.T, srv *Server, batchID, domain string, finishedAt time.Time) {
 	t.Helper()
-	d, err := srv.store.GetOrCreateDomain(domain)
-	if err != nil {
-		t.Fatalf("GetOrCreateDomain: %v", err)
-	}
-	job := Job{
-		ID: fmt.Sprintf("job_%s_%s", batchID, domain), BatchID: batchID, Domain: domain, DomainID: d.ID,
-		Status: JobSucceeded, CreatedAt: finishedAt, StartedAt: finishedAt, FinishedAt: finishedAt,
-	}
-	if _, err := srv.store.Create(job); err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	if err := srv.store.GraduateJob(job, []engine.LogEntry{{Timestamp: 1.0, Module: "System", Tag: "MODULE_START", Level: "INFO"}}); err != nil {
-		t.Fatalf("GraduateJob: %v", err)
-	}
+	seedGraduatedRun(t, srv.store, runSpec{
+		ID:            fmt.Sprintf("job_%s_%s", batchID, domain),
+		Domain:        domain,
+		BatchID:       batchID,
+		At:            finishedAt,
+		Entries:       systemStartEntry(),
+		ResolveDomain: true,
+	})
 }
 
 // queueJobInBatch creates a still-queued job for a batch, leaving it in-flight.

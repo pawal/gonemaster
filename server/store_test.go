@@ -11,15 +11,7 @@ import (
 // graduateTestJob is a test helper that graduates a job with optional entries.
 func graduateTestJob(t *testing.T, store *InMemoryJobStore, job Job, entries []engine.LogEntry) {
 	t.Helper()
-	if job.Status == JobQueued || job.Status == "" {
-		job.Status = JobSucceeded
-	}
-	if job.FinishedAt.IsZero() {
-		job.FinishedAt = job.CreatedAt.Add(time.Second)
-	}
-	if err := store.GraduateJob(job, entries); err != nil {
-		t.Fatalf("graduateTestJob %s: %v", job.ID, err)
-	}
+	graduate(t, store, job, entries)
 }
 
 func TestInMemoryJobStoreCRUD(t *testing.T) {
@@ -726,12 +718,7 @@ func TestInMemoryJobStoreListRunsByDomain(t *testing.T) {
 			CreatedAt:  base.Add(time.Duration(i) * time.Second),
 			FinishedAt: base.Add(time.Duration(i)*time.Second + time.Minute),
 		}
-		if _, err := store.Create(job); err != nil {
-			t.Fatalf("create %s: %v", id, err)
-		}
-		if err := store.GraduateJob(job, nil); err != nil {
-			t.Fatalf("graduate %s: %v", id, err)
-		}
+		createAndGraduate(t, store, job, nil)
 	}
 
 	graduateJob("r1", "alpha.example", 0)
@@ -1117,12 +1104,7 @@ func TestInMemoryJobStoreGetTagSummary(t *testing.T) {
 			CreatedAt:  time.Now().UTC(),
 			FinishedAt: time.Now().UTC(),
 		}
-		if _, err := store.Create(job); err != nil {
-			t.Fatalf("Create %s: %v", tc.id, err)
-		}
-		if err := store.GraduateJob(job, nil); err != nil {
-			t.Fatalf("GraduateJob %s: %v", tc.id, err)
-		}
+		createAndGraduate(t, store, job, nil)
 		d, _ := store.GetDomainByName(tc.domain)
 		_ = store.UpdateDomainLatest(d.ID, tc.id, time.Now().UTC(), "succeeded", tc.level)
 	}
@@ -1387,12 +1369,7 @@ func TestInMemoryJobStoreQueryEntries(t *testing.T) {
 			Status:    JobSucceeded,
 			CreatedAt: base,
 		}
-		if _, err := store.Create(job); err != nil {
-			t.Fatalf("create: %v", err)
-		}
-		if err := store.GraduateJob(job, entries); err != nil {
-			t.Fatalf("graduate: %v", err)
-		}
+		createAndGraduate(t, store, job, entries)
 	}
 
 	grad("run1", "alpha.example", "batch1", []engine.LogEntry{
@@ -1520,12 +1497,7 @@ func TestInMemoryStorePriorityPersistedOnRun(t *testing.T) {
 		ID: "pj2", Domain: "example.com", Status: JobSucceeded,
 		CreatedAt: now, FinishedAt: now, Priority: PriorityBatch,
 	}
-	if _, err := s.Create(job); err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	if err := s.GraduateJob(job, nil); err != nil {
-		t.Fatalf("GraduateJob: %v", err)
-	}
+	createAndGraduate(t, s, job, nil)
 	run, ok := s.GetRun(job.ID)
 	if !ok {
 		t.Fatal("GetRun: not found")
@@ -1699,12 +1671,7 @@ func TestInMemoryJobStoreProfileReferencesPersist(t *testing.T) {
 		ProfileName:      profile.Name,
 		EffectiveProfile: `{"resolver.defaults.timeout":15}`,
 	}
-	if _, err := store.Create(runJob); err != nil {
-		t.Fatalf("Create run job: %v", err)
-	}
-	if err := store.GraduateJob(runJob, nil); err != nil {
-		t.Fatalf("GraduateJob: %v", err)
-	}
+	createAndGraduate(t, store, runJob, nil)
 	run, ok := store.GetRun(runJob.ID)
 	if !ok {
 		t.Fatal("GetRun: not found")

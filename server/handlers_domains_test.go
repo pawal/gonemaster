@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
-	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 )
@@ -14,21 +13,7 @@ import (
 // Returns the domain that was created by graduation.
 func makeGraduatedJob(t *testing.T, srv *Server, domain string, status JobStatus) Domain {
 	t.Helper()
-	now := time.Now().UTC()
-	job := Job{
-		ID:         newID("job"),
-		Domain:     domain,
-		Status:     status,
-		CreatedAt:  now,
-		StartedAt:  now,
-		FinishedAt: now,
-	}
-	if _, err := srv.store.Create(job); err != nil {
-		t.Fatalf("create job: %v", err)
-	}
-	if err := srv.store.GraduateJob(job, nil); err != nil {
-		t.Fatalf("graduate job: %v", err)
-	}
+	seedGraduatedRun(t, srv.store, runSpec{Domain: domain, Status: status})
 	d, ok := srv.store.GetDomainByName(domain)
 	if !ok {
 		t.Fatalf("expected domain %q to exist after graduation", domain)

@@ -12,6 +12,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 )
@@ -361,4 +362,115 @@ func (s *fakeJobStore) Progresses() []int {
 // UpdateCount returns how many times Update was called.
 func (s *fakeJobStore) UpdateCount() int64 {
 	return s.updates.Load()
+}
+
+// runSpec describes one graduated run for seedGraduatedRun. Every field is
+// optional: the zero value is a succeeded run for example.com, timestamped now,
+// under a generated job id.
+type runSpec struct {
+	ID      string
+	Domain  string
+	BatchID string
+	Status  JobStatus
+	// At is the finish time; zero means now. Duration backdates the created
+	// and started times relative to it, for the tests that read elapsed time.
+	At       time.Time
+	Duration time.Duration
+	Entries  []engine.LogEntry
+	Timings  []NameserverTiming
+	Origin   string
+	Progress int
+	// ChainJSON is stored on the run, which only graduation can do because
+	// Create assigns the public id the chain is looked up by.
+	ChainJSON string
+	// ResolveDomain creates the domain up front and sets DomainID, which the
+	// batch and analysis handlers expect on a run.
+	ResolveDomain bool
+}
+
+// graduate graduates a job the caller built, filling in the status and finish
+// time it left unset. It returns the job as stored, so the caller does not hold
+// a copy that disagrees with the store.
+func graduate(t testing.TB, store JobStore, job Job, entries []engine.LogEntry) Job {
+	t.Helper()
+	if job.Status == "" || job.Status == JobQueued {
+		job.Status = JobSucceeded
+	}
+	if job.FinishedAt.IsZero() {
+		if job.CreatedAt.IsZero() {
+			job.FinishedAt = time.Now().UTC()
+		} else {
+			job.FinishedAt = job.CreatedAt.Add(time.Second)
+		}
+	}
+	if err := store.GraduateJob(job, entries); err != nil {
+		t.Fatalf("graduate job %q: %v", job.ID, err)
+	}
+	return job
+}
+
+// createAndGraduate creates and graduates a job the caller built, for the store
+// tests that set fields runSpec deliberately does not model (priority, profile
+// snapshot, an explicit domain id).
+func createAndGraduate(t testing.TB, store JobStore, job Job, entries []engine.LogEntry) Job {
+	t.Helper()
+	created, err := store.Create(job)
+	if err != nil {
+		t.Fatalf("create job %q: %v", job.ID, err)
+	}
+	return graduate(t, store, created, entries)
+}
+
+// seedGraduatedRun creates and graduates one run, returning the stored job so
+// callers can read the public id and domain id Create assigned.
+func seedGraduatedRun(t testing.TB, store JobStore, spec runSpec) Job {
+	t.Helper()
+	at := spec.At
+	if at.IsZero() {
+		at = time.Now().UTC()
+	}
+	domain := spec.Domain
+	if domain == "" {
+		domain = "example.com"
+	}
+	id := spec.ID
+	if id == "" {
+		id = newID("job")
+	}
+	job := Job{
+		ID:                id,
+		Domain:            domain,
+		BatchID:           spec.BatchID,
+		Status:            spec.Status,
+		CreatedAt:         at.Add(-spec.Duration),
+		StartedAt:         at.Add(-spec.Duration),
+		FinishedAt:        at,
+		Progress:          spec.Progress,
+		Origin:            spec.Origin,
+		NameserverTimings: spec.Timings,
+	}
+	if spec.ResolveDomain {
+		d, err := store.GetOrCreateDomain(domain)
+		if err != nil {
+			t.Fatalf("get or create domain %q: %v", domain, err)
+		}
+		job.DomainID = d.ID
+	}
+	if spec.ChainJSON != "" {
+		// The chain is set between Create and graduation, because Create is
+		// what assigns the public id the chain is looked up by.
+		created, err := store.Create(job)
+		if err != nil {
+			t.Fatalf("create job %q: %v", job.ID, err)
+		}
+		created.DNSSECChainJSON = spec.ChainJSON
+		return graduate(t, store, created, spec.Entries)
+	}
+	return createAndGraduate(t, store, job, spec.Entries)
+}
+
+// systemStartEntry is the one log entry the fixtures graduate a run with when
+// the test does not care about findings.
+func systemStartEntry() []engine.LogEntry {
+	return []engine.LogEntry{{Timestamp: 1.0, Module: "System", Tag: "MODULE_START", Level: "INFO"}}
 }

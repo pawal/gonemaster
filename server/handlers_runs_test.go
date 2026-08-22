@@ -160,12 +160,7 @@ func TestGetRunResult(t *testing.T) {
 			},
 		},
 	}
-	if _, err := srv.store.Create(job); err != nil {
-		t.Fatalf("create job: %v", err)
-	}
-	if err := srv.store.GraduateJob(job, nil); err != nil {
-		t.Fatalf("graduate job: %v", err)
-	}
+	createAndGraduate(t, srv.store, job, nil)
 	d, ok := srv.store.GetDomainByName("example.com")
 	if !ok {
 		t.Fatal("expected domain")
@@ -303,12 +298,7 @@ func TestRunResultOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
 			{Nameserver: "ns1.example.com", Address: "192.0.2.10", AvgMS: 24, MinMS: 20, MaxMS: 30, Count: 3},
 		},
 	}
-	if _, err := srv.store.Create(job); err != nil {
-		t.Fatalf("create job: %v", err)
-	}
-	if err := srv.store.GraduateJob(job, nil); err != nil {
-		t.Fatalf("graduate job: %v", err)
-	}
+	createAndGraduate(t, srv.store, job, nil)
 	d, ok := srv.store.GetDomainByName("example.com")
 	if !ok {
 		t.Fatal("expected domain")

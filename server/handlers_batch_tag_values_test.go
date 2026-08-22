@@ -29,35 +29,23 @@ func seedBatchRuns(t *testing.T, srv *Server, batchID string, runs []seedRun) {
 		t.Fatalf("CreateBatch: %v", err)
 	}
 	for i, sr := range runs {
-		domain, err := srv.store.GetOrCreateDomain(sr.domain)
-		if err != nil {
-			t.Fatalf("GetOrCreateDomain: %v", err)
-		}
 		timings := make([]NameserverTiming, 0, len(sr.nsHosts))
 		for _, host := range sr.nsHosts {
 			timings = append(timings, NameserverTiming{Nameserver: host})
 		}
-		job := Job{
-			ID:                fmt.Sprintf("job_%s_%d", batchID, i),
-			BatchID:           batchID,
-			Domain:            sr.domain,
-			DomainID:          domain.ID,
-			Status:            JobSucceeded,
-			CreatedAt:         now,
-			StartedAt:         now,
-			FinishedAt:        now,
-			NameserverTimings: timings,
-		}
-		if _, err := srv.store.Create(job); err != nil {
-			t.Fatalf("Create job: %v", err)
-		}
 		entries := sr.entries
 		if len(entries) == 0 {
-			entries = []engine.LogEntry{{Timestamp: 1.0, Module: "System", Tag: "MODULE_START", Level: "INFO"}}
+			entries = systemStartEntry()
 		}
-		if err := srv.store.GraduateJob(job, entries); err != nil {
-			t.Fatalf("GraduateJob: %v", err)
-		}
+		seedGraduatedRun(t, srv.store, runSpec{
+			ID:            fmt.Sprintf("job_%s_%d", batchID, i),
+			Domain:        sr.domain,
+			BatchID:       batchID,
+			At:            now,
+			Entries:       entries,
+			Timings:       timings,
+			ResolveDomain: true,
+		})
 	}
 }
 

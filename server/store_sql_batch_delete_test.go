@@ -3,8 +3,6 @@ package server
 import (
 	"testing"
 	"time"
-
-	"codeberg.org/pawal/gonemaster/engine"
 )
 
 // seedBatchForDeleteTest creates a batch row with one graduated run and a
@@ -21,28 +19,14 @@ func seedBatchForDeleteTest(t *testing.T, s *SQLJobStore, batchID, tag string) (
 	}); err != nil {
 		t.Fatalf("CreateBatch: %v", err)
 	}
-	domain, err := s.GetOrCreateDomain("example.com")
-	if err != nil {
-		t.Fatalf("GetOrCreateDomain: %v", err)
-	}
-	job := Job{
-		ID:         "job-" + batchID,
-		BatchID:    batchID,
-		Domain:     "example.com",
-		DomainID:   domain.ID,
-		Status:     JobSucceeded,
-		CreatedAt:  now,
-		StartedAt:  now,
-		FinishedAt: now,
-	}
-	if _, err := s.Create(job); err != nil {
-		t.Fatalf("Create job: %v", err)
-	}
-	entries := []engine.LogEntry{{Timestamp: 1.0, Module: "System", Testcase: "", Tag: "MODULE_START", Level: "INFO"}}
-	if err := s.GraduateJob(job, entries); err != nil {
-		t.Fatalf("GraduateJob: %v", err)
-	}
-	return job.ID, domain.ID
+	job := seedGraduatedRun(t, s, runSpec{
+		ID:            "job-" + batchID,
+		BatchID:       batchID,
+		At:            now,
+		Entries:       systemStartEntry(),
+		ResolveDomain: true,
+	})
+	return job.ID, job.DomainID
 }
 
 func countRows(t *testing.T, s *SQLJobStore, query string, args ...any) int {

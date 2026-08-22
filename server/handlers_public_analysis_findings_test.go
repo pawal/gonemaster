@@ -22,23 +22,15 @@ func (f *analysisAPITestFixture) seedGraduatedRun(domainName string, finishedAt 
 func (f *analysisAPITestFixture) seedGraduatedRunInBatch(batchID, domainName string, finishedAt time.Time, entries []engine.LogEntry, timings ...NameserverTiming) Run {
 	f.t.Helper()
 	runID := "run-" + domainName + "-" + finishedAt.Format("20060102150405")
-	now := finishedAt
-	job := Job{
-		ID:                runID,
-		Domain:            domainName,
-		BatchID:           batchID,
-		Status:            JobSucceeded,
-		CreatedAt:         now.Add(-time.Minute),
-		StartedAt:         now.Add(-time.Minute),
-		FinishedAt:        now,
-		NameserverTimings: timings,
-	}
-	if _, err := f.store.Create(job); err != nil {
-		f.t.Fatalf("create job: %v", err)
-	}
-	if err := f.store.GraduateJob(job, entries); err != nil {
-		f.t.Fatalf("graduate job: %v", err)
-	}
+	seedGraduatedRun(f.t, f.store, runSpec{
+		ID:       runID,
+		Domain:   domainName,
+		BatchID:  batchID,
+		At:       finishedAt,
+		Duration: time.Minute,
+		Entries:  entries,
+		Timings:  timings,
+	})
 	run, _ := f.store.GetRun(runID)
 	domain, _ := f.store.GetDomainByName(domainName)
 	score := 85

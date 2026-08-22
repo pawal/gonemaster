@@ -56,12 +56,7 @@ func TestComputeSnapshotOverviewSeverityAndGrade(t *testing.T) {
 			StartedAt:  now,
 			FinishedAt: now.Add(time.Duration(i) * time.Minute),
 		}
-		if _, err := s.Create(job); err != nil {
-			t.Fatalf("create job: %v", err)
-		}
-		if err := s.GraduateJob(job, nil); err != nil {
-			t.Fatalf("graduate job: %v", err)
-		}
+		createAndGraduate(t, s, job, nil)
 		gradeCopy := rec.grade
 		if err := s.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
 			CohortID:   cohort.ID,
@@ -145,12 +140,7 @@ func TestComputeSnapshotOverviewTopTagsExcludesInfoAndNotice(t *testing.T) {
 			BatchID: "batch-tags", Status: JobSucceeded,
 			CreatedAt: now, StartedAt: now, FinishedAt: now.Add(time.Duration(i) * time.Minute),
 		}
-		if _, err := s.Create(job); err != nil {
-			t.Fatalf("create job %d: %v", i, err)
-		}
-		if err := s.GraduateJob(job, nil); err != nil {
-			t.Fatalf("graduate %d: %v", i, err)
-		}
+		createAndGraduate(t, s, job, nil)
 		if err := s.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
 			CohortID: cohort.ID, RunID: rec.runID, DomainID: rec.domainID,
 		}); err != nil {
@@ -276,12 +266,7 @@ func TestCountUnprojectedSnapshotRuns(t *testing.T) {
 			StartedAt:  now,
 			FinishedAt: now.Add(time.Duration(i) * time.Minute),
 		}
-		if _, err := s.Create(job); err != nil {
-			t.Fatalf("create job %d: %v", i, err)
-		}
-		if err := s.GraduateJob(job, nil); err != nil {
-			t.Fatalf("graduate job %d: %v", i, err)
-		}
+		createAndGraduate(t, s, job, nil)
 		if rec.ready {
 			if err := s.SetAnalysisProjectionState(AnalysisProjectionState{
 				CohortID:         cohort.ID,

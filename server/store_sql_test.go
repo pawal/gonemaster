@@ -160,12 +160,7 @@ func ids(jobs []Job) []string {
 // graduateSQLJob is a test helper that graduates a job with the given entries.
 func graduateSQLJob(t *testing.T, s *SQLJobStore, job Job, entries []engine.LogEntry) {
 	t.Helper()
-	if job.FinishedAt.IsZero() {
-		job.FinishedAt = time.Now().UTC()
-	}
-	if err := s.GraduateJob(job, entries); err != nil {
-		t.Fatalf("GraduateJob(%q): %v", job.ID, err)
-	}
+	graduate(t, s, job, entries)
 }
 
 // ---- testBackends gating ---------------------------------------------------
@@ -3026,12 +3021,7 @@ func TestSQLJobStorePriorityPersistedOnRun(t *testing.T) {
 				ID: "pj2", Domain: "example.com", Status: JobSucceeded,
 				CreatedAt: now, FinishedAt: now, Priority: PriorityBatch,
 			}
-			if _, err := s.Create(job); err != nil {
-				t.Fatalf("Create: %v", err)
-			}
-			if err := s.GraduateJob(job, nil); err != nil {
-				t.Fatalf("GraduateJob: %v", err)
-			}
+			createAndGraduate(t, s, job, nil)
 			run, ok := s.GetRun(job.ID)
 			if !ok {
 				t.Fatal("GetRun: not found")

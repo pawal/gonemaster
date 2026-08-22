@@ -108,12 +108,7 @@ func snapshotViewFixture(t *testing.T, s *SQLJobStore) (cohortID, snapshotID int
 			BatchID: rec.batchID, Status: JobSucceeded,
 			CreatedAt: now, StartedAt: now, FinishedAt: now.Add(time.Duration(i) * time.Minute),
 		}
-		if _, err := s.Create(job); err != nil {
-			t.Fatalf("create job %s: %v", rec.runID, err)
-		}
-		if err := s.GraduateJob(job, nil); err != nil {
-			t.Fatalf("graduate %s: %v", rec.runID, err)
-		}
+		createAndGraduate(t, s, job, nil)
 		if err := s.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
 			CohortID: cohort.ID, RunID: rec.runID, DomainID: rec.domainID, WorstLevel: "OK",
 		}); err != nil {

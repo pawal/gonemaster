@@ -23,6 +23,17 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
+// fakeRootRecursor returns a recursor whose only known root server is name at
+// addr. Package recursor cannot use internal/nstest, which imports it.
+func fakeRootRecursor(t *testing.T, name string, addr string) *Recursor {
+	t.Helper()
+	r := &Recursor{client: &transport.Client{}}
+	if err := r.AddFakeAddresses(".", map[string][]string{name: {addr}}); err != nil {
+		t.Fatalf("add fake root: %v", err)
+	}
+	return r
+}
+
 func TestAddFakeAddressesDedupAndRemove(t *testing.T) {
 	r := &Recursor{}
 	if err := r.AddFakeAddresses("Example.COM", map[string][]string{
@@ -149,17 +160,7 @@ func TestCacheStoreBoundsCacheSize(t *testing.T) {
 func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &Recursor{
-		fakeAddresses: map[string]map[string][]netip.Addr{},
-		client:        &transport.Client{},
-		recurseCache:  map[string]map[string]map[string]*recurseCacheEntry{},
-		inflight:      map[string]*inflightLookup{},
-	}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root.test": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake root: %v", err)
-	}
+	r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
 	var rootCalls int32
 	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
@@ -225,17 +226,7 @@ func TestRecurseInflightLookupCoalescing(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, _, _ := testhelpers.Context(t)
 
-		r := &Recursor{
-			fakeAddresses: map[string]map[string][]netip.Addr{},
-			client:        &transport.Client{},
-			recurseCache:  map[string]map[string]map[string]*recurseCacheEntry{},
-			inflight:      map[string]*inflightLookup{},
-		}
-		if err := r.AddFakeAddresses(".", map[string][]string{
-			"a.root.test": {"192.0.2.1"},
-		}); err != nil {
-			t.Fatalf("add fake root: %v", err)
-		}
+		r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
 		rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
 		if err != nil {
@@ -310,17 +301,7 @@ func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, _, _ := testhelpers.Context(t)
 
-		r := &Recursor{
-			fakeAddresses: map[string]map[string][]netip.Addr{},
-			client:        &transport.Client{},
-			recurseCache:  map[string]map[string]map[string]*recurseCacheEntry{},
-			inflight:      map[string]*inflightLookup{},
-		}
-		if err := r.AddFakeAddresses(".", map[string][]string{
-			"a.root.test": {"192.0.2.1"},
-		}); err != nil {
-			t.Fatalf("add fake root: %v", err)
-		}
+		r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
 		rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
 		if err != nil {
@@ -374,15 +355,7 @@ func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
 func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &Recursor{
-		fakeAddresses: map[string]map[string][]netip.Addr{},
-		client:        &transport.Client{},
-	}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root.test": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake root: %v", err)
-	}
+	r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
 	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
 	if err != nil {
@@ -450,15 +423,7 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &Recursor{
-		fakeAddresses: map[string]map[string][]netip.Addr{},
-		client:        &transport.Client{},
-	}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"a.root.test": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake root: %v", err)
-	}
+	r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
 	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
 	if err != nil {
@@ -594,12 +559,7 @@ func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
 		t.Fatalf("set unordered: %v", err)
 	}
 
-	r := &Recursor{client: &transport.Client{}}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"root.test": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake root: %v", err)
-	}
+	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
 	aaaaStarted := make(chan struct{})
 	rootNS, err := nameserver.NewWithContext(baseCtx, "root.test", "192.0.2.53", r.client)
@@ -653,12 +613,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 			t.Fatalf("set unordered: %v", err)
 		}
 
-		r := &Recursor{client: &transport.Client{}}
-		if err := r.AddFakeAddresses(".", map[string][]string{
-			"root.test": {"192.0.2.53"},
-		}); err != nil {
-			t.Fatalf("add fake root: %v", err)
-		}
+		r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
 		rootNS, err := nameserver.NewWithContext(baseCtx, "root.test", "192.0.2.53", r.client)
 		if err != nil {
@@ -754,12 +709,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &Recursor{client: &transport.Client{}}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"root.test": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake root: %v", err)
-	}
+	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
 	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
 	if err != nil {
@@ -831,12 +781,7 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &Recursor{client: &transport.Client{}}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"root.test": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake root: %v", err)
-	}
+	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
 	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
 	if err != nil {

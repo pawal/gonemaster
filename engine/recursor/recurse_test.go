@@ -21,7 +21,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
-	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
 type fakeQueryer struct {
@@ -230,17 +229,7 @@ func TestRecurseIgnoresRootReferral(t *testing.T) {
 
 func TestRecurseFollowsOutOfBailiwickCNAME(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
-	r := &Recursor{
-		client:       &transport.Client{},
-		recurseCache: map[string]map[string]map[string]*recurseCacheEntry{},
-	}
-
-	err := r.AddFakeAddresses(".", map[string][]string{
-		"root.test": {"192.0.2.53"},
-	})
-	if err != nil {
-		t.Fatalf("add fake root: %v", err)
-	}
+	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
 	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
 	if err != nil {
@@ -479,15 +468,7 @@ func TestResolveCNAMELoopReturnsUnresolved(t *testing.T) {
 func TestResolveCNAMEDoesNotShareInProgress(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	r := &Recursor{
-		client:       &transport.Client{},
-		recurseCache: map[string]map[string]map[string]*recurseCacheEntry{},
-	}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"root.test": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake root: %v", err)
-	}
+	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
 	// authNS is the nameserver for the delegation zone. It is
 	// out-of-bailiwick so the recursor must resolve its address via

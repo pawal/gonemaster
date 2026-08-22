@@ -1,13 +1,13 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
-	"strconv"
+	"net/url"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
 // TestAddrStatsAccumulatesAcrossRuns pins the central claim of the tool: one
@@ -106,45 +106,32 @@ func TestRatioUsesAttemptsNotAnswers(t *testing.T) {
 // the same farm address serves many customer domains, so its rows arrive from
 // unrelated runs and must land in one bucket keyed by (nameserver, address).
 func TestAggregateBatchMergesAddressAcrossDomains(t *testing.T) {
-	results := map[string]runResult{
-		"run-1": {NameserverTimings: []nameserverTiming{
+	results := map[string]apitest.Result{
+		"run-1": {NameserverTimings: []apitest.NSTiming{
 			{Nameserver: "ns01.farm.example", Address: "192.0.2.1", Count: 40, MedianMS: 12, Status: "ok"},
 			{Nameserver: "ns02.farm.example", Address: "192.0.2.2", Count: 40, MedianMS: 14, Status: "ok"},
 		}},
-		"run-2": {NameserverTimings: []nameserverTiming{
+		"run-2": {NameserverTimings: []apitest.NSTiming{
 			{Nameserver: "ns01.farm.example", Address: "192.0.2.1", Count: 35, MedianMS: 18, Status: "ok", TimeoutCount: 4, RefusedCount: 2},
 		}},
 	}
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.URL.Path == "/api/v1/runs":
-			if got := r.URL.Query().Get("batch"); got != "batch-x" {
-				t.Errorf("batch filter = %q, want batch-x", got)
-			}
-			_ = json.NewEncoder(w).Encode(runList{
-				Items: []runListItem{
-					{ID: "run-1", Domain: "a.example", Status: "completed"},
-					{ID: "run-2", Domain: "b.example", Status: "completed"},
-				},
-				Total: 2,
-			})
-		default:
-			id := r.URL.Path[len("/api/v1/runs/") : len(r.URL.Path)-len("/result")]
-			res, ok := results[id]
-			if !ok {
-				w.WriteHeader(http.StatusNotFound)
-				return
-			}
-			_ = json.NewEncoder(w).Encode(res)
-		}
-	}))
-	defer srv.Close()
+	var runsQuery url.Values
+	srv := apitest.New(t, apitest.Opts{
+		Runs: []apitest.Run{
+			{ID: "run-1", Domain: "a.example", Status: "completed"},
+			{ID: "run-2", Domain: "b.example", Status: "completed"},
+		},
+		RunsQuery:   &runsQuery,
+		ResultsByID: results,
+	})
 
 	stats, err := aggregateBatch(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "batch-x", 1000, 0)
 	if err != nil {
 		t.Fatalf("aggregate: %v", err)
+	}
+	if got := runsQuery.Get("batch"); got != "batch-x" {
+		t.Errorf("batch filter = %q, want batch-x", got)
 	}
 	if len(stats) != 2 {
 		t.Fatalf("addresses = %d, want 2 (%+v)", len(stats), stats)
@@ -169,24 +156,12 @@ func TestAggregateBatchMergesAddressAcrossDomains(t *testing.T) {
 // batch from dying on one purged or still-running run: the address totals are
 // worth more than strictness, and the skip is reported on stderr.
 func TestAggregateBatchSurvivesAMissingRunResult(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		if r.URL.Path == "/api/v1/runs" {
-			_ = json.NewEncoder(w).Encode(runList{
-				Items: []runListItem{{ID: "gone", Domain: "a.example"}, {ID: "ok", Domain: "b.example"}},
-				Total: 2,
-			})
-			return
-		}
-		if r.URL.Path == "/api/v1/runs/gone/result" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
-		_ = json.NewEncoder(w).Encode(runResult{NameserverTimings: []nameserverTiming{
+	srv := apitest.New(t, apitest.Opts{
+		Runs: []apitest.Run{{ID: "gone", Domain: "a.example"}, {ID: "ok", Domain: "b.example"}},
+		ResultsByID: map[string]apitest.Result{"ok": {NameserverTimings: []apitest.NSTiming{
 			{Nameserver: "ns.example", Address: "192.0.2.9", Count: 10, MedianMS: 5, Status: "ok"},
-		}})
-	}))
-	defer srv.Close()
+		}}},
+	})
 
 	stats, err := aggregateBatch(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "batch-y", 1000, 0)
 	if err != nil {
@@ -205,22 +180,11 @@ func TestAggregateBatchSurvivesAMissingRunResult(t *testing.T) {
 func TestListBatchRunsPagesPastTheServerCap(t *testing.T) {
 	const total = 1200
 	var requests []string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-		offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-		if limit > 500 {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		requests = append(requests, r.URL.RawQuery)
-		items := []runListItem{}
-		for i := offset; i < offset+limit && i < total; i++ {
-			items = append(items, runListItem{ID: fmt.Sprintf("run-%d", i)})
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(runList{Items: items, Total: total})
-	}))
-	defer srv.Close()
+	runs := make([]apitest.Run, total)
+	for i := range runs {
+		runs[i] = apitest.Run{ID: fmt.Sprintf("run-%d", i)}
+	}
+	srv := apitest.New(t, apitest.Opts{Runs: runs, RunsRequests: &requests})
 
 	items, err := listBatchRuns(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "batch-big", 100000)
 	if err != nil {
@@ -241,11 +205,7 @@ func TestListBatchRunsPagesPastTheServerCap(t *testing.T) {
 // error instead of a silently empty CSV, which in a measurement pipeline
 // reads as "no rate limiting found".
 func TestAggregateBatchRejectsEmptyBatch(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(runList{Items: nil, Total: 0})
-	}))
-	defer srv.Close()
+	srv := apitest.New(t, apitest.Opts{})
 
 	if _, err := aggregateBatch(&http.Client{Timeout: 5 * time.Second}, srv.URL+"/api/v1", "typo", 1000, 0); err == nil {
 		t.Fatal("expected an error for a batch with no runs")

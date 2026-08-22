@@ -4,9 +4,9 @@ import (
 	"encoding/json"
 	"net/http"
 	"testing"
-	"time"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
+	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
 // stubJSON points newHTTPClient at a transport answering every request with
@@ -17,13 +17,9 @@ func stubJSON(t *testing.T, body any) {
 	if err != nil {
 		t.Fatalf("marshal stub body: %v", err)
 	}
-	old := newHTTPClient
-	t.Cleanup(func() { newHTTPClient = old })
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(_ *http.Request) (*http.Response, error) {
-			return jsonResponse(http.StatusOK, string(data)), nil
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return apitest.JSONResponse(http.StatusOK, string(data)), nil
+	}))
 }
 
 func TestListCommandsPrettyOutput(t *testing.T) {

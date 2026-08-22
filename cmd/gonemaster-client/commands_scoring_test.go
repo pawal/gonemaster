@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
+	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
 // jobResultWithEntries returns a JSON body for a job result that includes raw
@@ -37,16 +37,16 @@ func jobResultWithoutEntries(jobID string) string {
 	return string(body)
 }
 
-func mockJobAndResult(jobID, domain, resultBody string) roundTripFunc {
+func mockJobAndResult(jobID, domain, resultBody string) apitest.RoundTripFunc {
 	return func(r *http.Request) (*http.Response, error) {
 		switch r.URL.Path {
 		case "/api/v1/jobs/" + jobID:
 			body := `{"id":"` + jobID + `","domain":"` + domain + `","status":"succeeded","created_at":"2026-01-01T00:00:00Z","progress":100}`
-			return jsonResponse(http.StatusOK, body), nil
+			return apitest.JSONResponse(http.StatusOK, body), nil
 		case "/api/v1/jobs/" + jobID + "/result":
-			return jsonResponse(http.StatusOK, resultBody), nil
+			return apitest.JSONResponse(http.StatusOK, resultBody), nil
 		default:
-			return jsonResponse(http.StatusNotFound, `{"error":{"code":"not_found","message":"not found"}}`), nil
+			return apitest.JSONResponse(http.StatusNotFound, `{"error":{"code":"not_found","message":"not found"}}`), nil
 		}
 	}
 }
@@ -54,11 +54,7 @@ func mockJobAndResult(jobID, domain, resultBody string) roundTripFunc {
 // ── --score flag ──────────────────────────────────────────────────────────────
 
 func TestJobsResultsNoScoreByDefault(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
-	}
+	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
 	res := clitest.Run(t, run, "jobs", "results", "job_1")
 	res.RequireCode(t, 0)
 	if strings.Contains(res.Out, "Score:") {
@@ -67,22 +63,14 @@ func TestJobsResultsNoScoreByDefault(t *testing.T) {
 }
 
 func TestJobsResultsWithScore(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
-	}
+	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
 	res := clitest.Run(t, run, "jobs", "results", "--score", "job_1")
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "Score:")
 }
 
 func TestJobsResultsNoScoreSuppresses(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
-	}
+	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
 	// --no-score should suppress even if both flags are given.
 	res := clitest.Run(t, run, "jobs", "results", "--score", "--no-score", "job_1")
 	res.RequireCode(t, 0)
@@ -92,11 +80,7 @@ func TestJobsResultsNoScoreSuppresses(t *testing.T) {
 }
 
 func TestJobsResultsScoreShowsCategories(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
-	}
+	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
 	res := clitest.Run(t, run, "jobs", "results", "--score", "job_1")
 	res.RequireCode(t, 0)
 	output := res.Out
@@ -108,11 +92,7 @@ func TestJobsResultsScoreShowsCategories(t *testing.T) {
 }
 
 func TestJobsResultsScoreNotAvailableWithoutEntries(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithoutEntries("job_1"))}
-	}
+	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithoutEntries("job_1")))
 	res := clitest.Run(t, run, "jobs", "results", "--score", "job_1")
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "N/A")
@@ -124,11 +104,7 @@ func TestJobsResultsScoringConfigImpliesScore(t *testing.T) {
 	// Write a minimal valid scoring config to a temp file.
 	cfgPath := clitest.WriteScoringConfig(t)
 
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
-	}
+	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
 	res := clitest.Run(t, run, "jobs", "results", "--scoring-config", cfgPath, "job_1")
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "Score:")
@@ -144,11 +120,7 @@ func TestJobsResultsScoringConfigInvalidPath(t *testing.T) {
 func TestScoringConfigNoScoreWins(t *testing.T) {
 	cfgPath := clitest.WriteScoringConfig(t)
 
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
-	}
+	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
 	// --no-score should override --scoring-config.
 	res := clitest.Run(t, run, "jobs", "results", "--scoring-config", cfgPath, "--no-score", "job_1")
 	res.RequireCode(t, 0)
@@ -160,11 +132,7 @@ func TestScoringConfigNoScoreWins(t *testing.T) {
 // ── JSON output ───────────────────────────────────────────────────────────────
 
 func TestJobsResultsScoreInJSONOutput(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
-	}
+	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
 	res := clitest.Run(t, run, "--format", "json", "jobs", "results", "--score", "job_1")
 	res.RequireCode(t, 0)
 	var result jobResult
@@ -180,11 +148,7 @@ func TestJobsResultsScoreInJSONOutput(t *testing.T) {
 }
 
 func TestJobsResultsNoScoreInJSONOutputByDefault(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
-	}
+	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
 	res := clitest.Run(t, run, "--format", "json", "jobs", "results", "job_1")
 	res.RequireCode(t, 0)
 	var result jobResult

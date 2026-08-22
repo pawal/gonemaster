@@ -7,30 +7,26 @@ import (
 	"net/http"
 	"strings"
 	"testing"
-	"time"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
+	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
 // ── jobs create --tag ──────────────────────────────────────────────────────────
 
 func TestJobsCreateWithTag(t *testing.T) {
 	var gotReq jobCreateRequest
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
-				t.Fatalf("decode request: %v", err)
-			}
-			body := `{"id":"job_1","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}`
-			return &http.Response{
-				StatusCode: http.StatusCreated,
-				Body:       io.NopCloser(bytes.NewBufferString(body)),
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-			}, nil
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		body := `{"id":"job_1","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}`
+		return &http.Response{
+			StatusCode: http.StatusCreated,
+			Body:       io.NopCloser(bytes.NewBufferString(body)),
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+		}, nil
+	}))
 	res := clitest.Run(t, run, "jobs", "create", "--domain", "example.com", "--tag", "tld", "--tag", "test")
 	res.RequireCode(t, 0)
 	if len(gotReq.Tags) != 2 || gotReq.Tags[0] != "tld" || gotReq.Tags[1] != "test" {
@@ -40,21 +36,17 @@ func TestJobsCreateWithTag(t *testing.T) {
 
 func TestJobsCreateNoTagOmitsField(t *testing.T) {
 	var gotReq jobCreateRequest
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
-				t.Fatalf("decode request: %v", err)
-			}
-			body := `{"id":"job_1","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}`
-			return &http.Response{
-				StatusCode: http.StatusCreated,
-				Body:       io.NopCloser(bytes.NewBufferString(body)),
-				Header:     http.Header{"Content-Type": []string{"application/json"}},
-			}, nil
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		body := `{"id":"job_1","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}`
+		return &http.Response{
+			StatusCode: http.StatusCreated,
+			Body:       io.NopCloser(bytes.NewBufferString(body)),
+			Header:     http.Header{"Content-Type": []string{"application/json"}},
+		}, nil
+	}))
 	res := clitest.Run(t, run, "jobs", "create", "--domain", "example.com")
 	res.RequireCode(t, 0)
 	if len(gotReq.Tags) != 0 {
@@ -66,17 +58,13 @@ func TestJobsCreateNoTagOmitsField(t *testing.T) {
 
 func TestJobsBatchWithTag(t *testing.T) {
 	var gotReq jobBatchRequest
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
-				t.Fatalf("decode request: %v", err)
-			}
-			body := `{"batch_id":"batch_1","job_ids":["job_1","job_2"]}`
-			return jsonResponse(http.StatusAccepted, body), nil
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		body := `{"batch_id":"batch_1","job_ids":["job_1","job_2"]}`
+		return apitest.JSONResponse(http.StatusAccepted, body), nil
+	}))
 	res := clitest.Run(t, run, "jobs", "batch", "--domain", "example.com", "--domain", "example.net", "--tag", "tld")
 	res.RequireCode(t, 0)
 	if len(gotReq.Tags) != 1 || gotReq.Tags[0] != "tld" {
@@ -89,17 +77,13 @@ func TestJobsBatchWithTag(t *testing.T) {
 
 func TestJobsBatchWithFromTag(t *testing.T) {
 	var gotReq jobBatchRequest
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
-				t.Fatalf("decode request: %v", err)
-			}
-			body := `{"batch_id":"batch_1","job_ids":["job_1","job_2"]}`
-			return jsonResponse(http.StatusAccepted, body), nil
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if err := json.NewDecoder(r.Body).Decode(&gotReq); err != nil {
+			t.Fatalf("decode request: %v", err)
+		}
+		body := `{"batch_id":"batch_1","job_ids":["job_1","job_2"]}`
+		return apitest.JSONResponse(http.StatusAccepted, body), nil
+	}))
 	res := clitest.Run(t, run, "jobs", "batch", "--from-tag", "tld")
 	res.RequireCode(t, 0)
 	if gotReq.FromTag != "tld" {
@@ -111,13 +95,9 @@ func TestJobsBatchWithFromTag(t *testing.T) {
 }
 
 func TestJobsBatchFromTagAndDomainMutuallyExclusive(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(_ *http.Request) (*http.Response, error) {
-			return jsonResponse(200, `{}`), nil
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return apitest.JSONResponse(200, `{}`), nil
+	}))
 	res := clitest.Run(t, run, "jobs", "batch", "--from-tag", "tld", "--domain", "example.com")
 	if res.Code == 0 {
 		t.Fatal("expected non-zero exit when --from-tag and --domain are both provided")
@@ -126,13 +106,9 @@ func TestJobsBatchFromTagAndDomainMutuallyExclusive(t *testing.T) {
 }
 
 func TestJobsBatchNoDomainAndNoFromTag(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(_ *http.Request) (*http.Response, error) {
-			return jsonResponse(200, `{}`), nil
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
+		return apitest.JSONResponse(200, `{}`), nil
+	}))
 	res := clitest.Run(t, run, "jobs", "batch")
 	if res.Code == 0 {
 		t.Fatal("expected non-zero exit when no domains provided")
@@ -156,26 +132,22 @@ func TestJobsListHelpContainsInFlightNote(t *testing.T) {
 // ── jobs get: fallback to run ──────────────────────────────────────────────────
 
 func TestJobsGetFallsBackToRun(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			if r.URL.Path == "/api/v1/jobs/run_1" {
-				return jsonResponse(http.StatusNotFound,
-					`{"error":{"code":"not_found","message":"not found"}}`), nil
-			}
-			if r.URL.Path == "/api/v1/runs/run_1" {
-				body, _ := json.Marshal(runRecord{
-					ID:     "run_1",
-					Domain: "example.com",
-					Status: "succeeded",
-				})
-				return jsonResponse(http.StatusOK, string(body)), nil
-			}
-			t.Fatalf("unexpected path: %s", r.URL.Path)
-			return nil, nil
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		if r.URL.Path == "/api/v1/jobs/run_1" {
+			return apitest.JSONResponse(http.StatusNotFound,
+				`{"error":{"code":"not_found","message":"not found"}}`), nil
+		}
+		if r.URL.Path == "/api/v1/runs/run_1" {
+			body, _ := json.Marshal(runRecord{
+				ID:     "run_1",
+				Domain: "example.com",
+				Status: "succeeded",
+			})
+			return apitest.JSONResponse(http.StatusOK, string(body)), nil
+		}
+		t.Fatalf("unexpected path: %s", r.URL.Path)
+		return nil, nil
+	}))
 	res := clitest.Run(t, run, "--format", "json", "jobs", "get", "run_1")
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "example.com")
@@ -184,34 +156,30 @@ func TestJobsGetFallsBackToRun(t *testing.T) {
 // ── jobs results: fallback to run result ──────────────────────────────────────
 
 func TestJobsResultsFallsBackToRunResult(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			switch r.URL.Path {
-			case "/api/v1/jobs/run_1":
-				// Return 404 for job lookup; fetchJobInfo falls back to runs.
-				return jsonResponse(http.StatusNotFound,
-					`{"error":{"code":"not_found","message":"not found"}}`), nil
-			case "/api/v1/runs/run_1":
-				body, _ := json.Marshal(runRecord{
-					ID:     "run_1",
-					Domain: "example.com",
-					Status: "succeeded",
-				})
-				return jsonResponse(http.StatusOK, string(body)), nil
-			case "/api/v1/jobs/run_1/result":
-				return jsonResponse(http.StatusNotFound,
-					`{"error":{"code":"not_found","message":"not found"}}`), nil
-			case "/api/v1/runs/run_1/result":
-				body := `{"job_id":"run_1","entries":[]}`
-				return jsonResponse(http.StatusOK, body), nil
-			default:
-				t.Fatalf("unexpected path: %s", r.URL.Path)
-				return nil, nil
-			}
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		switch r.URL.Path {
+		case "/api/v1/jobs/run_1":
+			// Return 404 for job lookup; fetchJobInfo falls back to runs.
+			return apitest.JSONResponse(http.StatusNotFound,
+				`{"error":{"code":"not_found","message":"not found"}}`), nil
+		case "/api/v1/runs/run_1":
+			body, _ := json.Marshal(runRecord{
+				ID:     "run_1",
+				Domain: "example.com",
+				Status: "succeeded",
+			})
+			return apitest.JSONResponse(http.StatusOK, string(body)), nil
+		case "/api/v1/jobs/run_1/result":
+			return apitest.JSONResponse(http.StatusNotFound,
+				`{"error":{"code":"not_found","message":"not found"}}`), nil
+		case "/api/v1/runs/run_1/result":
+			body := `{"job_id":"run_1","entries":[]}`
+			return apitest.JSONResponse(http.StatusOK, body), nil
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+			return nil, nil
+		}
+	}))
 	res := clitest.Run(t, run, "--format", "json", "jobs", "results", "run_1")
 	res.RequireCode(t, 0)
 }

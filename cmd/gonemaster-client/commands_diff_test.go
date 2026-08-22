@@ -9,40 +9,36 @@ import (
 	"strconv"
 	"strings"
 	"testing"
-	"time"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
+	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
 // diffFixture serves two runs whose entry sets the caller supplies. The
 // server exposes each run twice: /runs/<id> for the metadata (domain name)
 // and /runs/<id>/result for the entries, which is exactly the pair the diff
 // command fetches per run.
-func diffFixture(t *testing.T, entriesByRun map[string][]jobResultEntry) func() {
+func diffFixture(t *testing.T, entriesByRun map[string][]jobResultEntry) {
 	t.Helper()
-	old := newHTTPClient
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			path := strings.TrimPrefix(r.URL.Path, "/api/v1")
-			id := strings.TrimPrefix(path, "/runs/")
-			id = strings.TrimSuffix(id, "/result")
-			entries, ok := entriesByRun[id]
-			if !ok {
-				return jsonResponse(404, `{"error":"not found"}`), nil
-			}
-			if strings.HasSuffix(path, "/result") {
-				body, _ := json.Marshal(jobResult{
-					JobID:  id,
-					Status: "completed",
-					Raw:    &jobResultRaw{Entries: entries},
-				})
-				return jsonResponse(200, string(body)), nil
-			}
-			body, _ := json.Marshal(runRecord{ID: id, Domain: "example.com", Status: "completed"})
-			return jsonResponse(200, string(body)), nil
-		})}
-	}
-	return func() { newHTTPClient = old }
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/v1")
+		id := strings.TrimPrefix(path, "/runs/")
+		id = strings.TrimSuffix(id, "/result")
+		entries, ok := entriesByRun[id]
+		if !ok {
+			return apitest.JSONResponse(404, `{"error":"not found"}`), nil
+		}
+		if strings.HasSuffix(path, "/result") {
+			body, _ := json.Marshal(jobResult{
+				JobID:  id,
+				Status: "completed",
+				Raw:    &jobResultRaw{Entries: entries},
+			})
+			return apitest.JSONResponse(200, string(body)), nil
+		}
+		body, _ := json.Marshal(runRecord{ID: id, Domain: "example.com", Status: "completed"})
+		return apitest.JSONResponse(200, string(body)), nil
+	}))
 }
 
 // TestRunsDiffIdenticalRunsExitZero is the shape the zero-delta gates use:
@@ -54,7 +50,7 @@ func TestRunsDiffIdenticalRunsExitZero(t *testing.T) {
 		{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"},
 		{Module: "NAMESERVER", Tag: "N01_NO_RESPONSE", Level: "WARNING"},
 	}
-	defer diffFixture(t, map[string][]jobResultEntry{"a": entries, "b": entries})()
+	diffFixture(t, map[string][]jobResultEntry{"a": entries, "b": entries})
 
 	res := clitest.Run(t, run, "runs", "diff", "a", "b")
 	res.RequireCode(t, 0)
@@ -76,7 +72,7 @@ func TestRunsDiffReportsAddedRemovedChanged(t *testing.T) {
 		{Module: "CONSISTENCY", Tag: "ONE_SOA_SERIAL", Level: "NOTICE"},
 		{Module: "CONSISTENCY", Tag: "MULTIPLE_SOA_SERIALS", Level: "ERROR"},
 	}
-	defer diffFixture(t, map[string][]jobResultEntry{"a": before, "b": after})()
+	diffFixture(t, map[string][]jobResultEntry{"a": before, "b": after})
 
 	res := clitest.Run(t, run, "--format", "json", "runs", "diff", "a", "b")
 	res.RequireCode(t, 1)
@@ -104,7 +100,7 @@ func TestRunsDiffReportsAddedRemovedChanged(t *testing.T) {
 func TestRunsDiffQuietSuppressesOutput(t *testing.T) {
 	before := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
 	after := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "ERROR"}}
-	defer diffFixture(t, map[string][]jobResultEntry{"a": before, "b": after})()
+	diffFixture(t, map[string][]jobResultEntry{"a": before, "b": after})
 
 	res := clitest.Run(t, run, "runs", "diff", "--quiet", "a", "b")
 	res.RequireCode(t, 1)
@@ -145,7 +141,7 @@ func TestWorstLevelByTagEmptyResult(t *testing.T) {
 // batchDiffFixture serves two batches whose runs are keyed by domain. It
 // answers the runs listing per batch and each run's result, which is the
 // pair of calls the cohort diff makes per domain.
-func batchDiffFixture(t *testing.T, batches map[string]map[string][]jobResultEntry) func() {
+func batchDiffFixture(t *testing.T, batches map[string]map[string][]jobResultEntry) {
 	t.Helper()
 	runs := map[string][]jobResultEntry{}
 	for batch, byDomain := range batches {
@@ -153,45 +149,41 @@ func batchDiffFixture(t *testing.T, batches map[string]map[string][]jobResultEnt
 			runs[batch+":"+domain] = entries
 		}
 	}
-	old := newHTTPClient
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			path := strings.TrimPrefix(r.URL.Path, "/api/v1")
-			if path == "/runs" {
-				batch := r.URL.Query().Get("batch")
-				byDomain, ok := batches[batch]
-				if !ok {
-					return jsonResponse(200, `{"items":[],"total":0}`), nil
-				}
-				items := []runRecord{}
-				domains := make([]string, 0, len(byDomain))
-				for domain := range byDomain {
-					domains = append(domains, domain)
-				}
-				sort.Strings(domains)
-				for _, domain := range domains {
-					items = append(items, runRecord{ID: batch + ":" + domain, Domain: domain, Status: "completed"})
-				}
-				body, _ := json.Marshal(runList{Items: items, Total: len(items)})
-				return jsonResponse(200, string(body)), nil
-			}
-			id := strings.TrimPrefix(path, "/runs/")
-			id = strings.TrimSuffix(id, "/result")
-			id, _ = url.PathUnescape(id)
-			entries, ok := runs[id]
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/v1")
+		if path == "/runs" {
+			batch := r.URL.Query().Get("batch")
+			byDomain, ok := batches[batch]
 			if !ok {
-				return jsonResponse(404, `{"error":"not found"}`), nil
+				return apitest.JSONResponse(200, `{"items":[],"total":0}`), nil
 			}
-			if strings.HasSuffix(path, "/result") {
-				body, _ := json.Marshal(jobResult{JobID: id, Status: "completed", Raw: &jobResultRaw{Entries: entries}})
-				return jsonResponse(200, string(body)), nil
+			items := []runRecord{}
+			domains := make([]string, 0, len(byDomain))
+			for domain := range byDomain {
+				domains = append(domains, domain)
 			}
-			domain := id[strings.Index(id, ":")+1:]
-			body, _ := json.Marshal(runRecord{ID: id, Domain: domain, Status: "completed"})
-			return jsonResponse(200, string(body)), nil
-		})}
-	}
-	return func() { newHTTPClient = old }
+			sort.Strings(domains)
+			for _, domain := range domains {
+				items = append(items, runRecord{ID: batch + ":" + domain, Domain: domain, Status: "completed"})
+			}
+			body, _ := json.Marshal(runList{Items: items, Total: len(items)})
+			return apitest.JSONResponse(200, string(body)), nil
+		}
+		id := strings.TrimPrefix(path, "/runs/")
+		id = strings.TrimSuffix(id, "/result")
+		id, _ = url.PathUnescape(id)
+		entries, ok := runs[id]
+		if !ok {
+			return apitest.JSONResponse(404, `{"error":"not found"}`), nil
+		}
+		if strings.HasSuffix(path, "/result") {
+			body, _ := json.Marshal(jobResult{JobID: id, Status: "completed", Raw: &jobResultRaw{Entries: entries}})
+			return apitest.JSONResponse(200, string(body)), nil
+		}
+		domain := id[strings.Index(id, ":")+1:]
+		body, _ := json.Marshal(runRecord{ID: id, Domain: domain, Status: "completed"})
+		return apitest.JSONResponse(200, string(body)), nil
+	}))
 }
 
 // TestBatchesDiffRollsUpTagsAcrossDomains is the instrument the farm
@@ -205,10 +197,10 @@ func TestBatchesDiffRollsUpTagsAcrossDomains(t *testing.T) {
 		{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"},
 		{Module: "NAMESERVER", Tag: "N11_NO_RESPONSE", Level: "WARNING"},
 	}
-	defer batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+	batchDiffFixture(t, map[string]map[string][]jobResultEntry{
 		"serial": {"a.example": clean, "b.example": clean, "c.example": clean},
 		"w16":    {"a.example": broke, "b.example": broke, "c.example": clean},
-	})()
+	})
 
 	res := clitest.Run(t, run, "--format", "json", "batches", "diff", "serial", "w16")
 	res.RequireCode(t, 1)
@@ -238,10 +230,10 @@ func TestBatchesDiffRollsUpTagsAcrossDomains(t *testing.T) {
 // as "no findings changed".
 func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
 	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
-	defer batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+	batchDiffFixture(t, map[string]map[string][]jobResultEntry{
 		"serial": {"a.example": clean, "gone.example": clean},
 		"w16":    {"a.example": clean, "new.example": clean},
-	})()
+	})
 
 	res := clitest.Run(t, run, "--format", "json", "batches", "diff", "serial", "w16")
 	res.RequireCode(t, 1)
@@ -266,10 +258,10 @@ func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
 // pass a comparison in which nothing actually ran.
 func TestBatchesDiffTreatsEmptyRunsAsUnusable(t *testing.T) {
 	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
-	defer batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+	batchDiffFixture(t, map[string]map[string][]jobResultEntry{
 		"serial": {"a.example": clean, "broken.example": {}},
 		"w16":    {"a.example": clean, "broken.example": {}},
-	})()
+	})
 
 	res := clitest.Run(t, run, "--format", "json", "batches", "diff", "serial", "w16")
 	res.RequireCode(t, 1)
@@ -289,19 +281,15 @@ func TestBatchesDiffTreatsEmptyRunsAsUnusable(t *testing.T) {
 // the first --limit runs of a larger batch would report agreement over a
 // subset while looking like a complete answer.
 func TestBatchesDiffRefusesToTruncate(t *testing.T) {
-	old := newHTTPClient
-	defer func() { newHTTPClient = old }()
-	newHTTPClient = func(_ time.Duration) *http.Client {
-		return &http.Client{Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-			items := make([]runRecord, 0, limit)
-			for i := 0; i < limit; i++ {
-				items = append(items, runRecord{ID: fmt.Sprintf("r%d", i), Domain: fmt.Sprintf("d%d.example", i)})
-			}
-			body, _ := json.Marshal(runList{Items: items, Total: 900})
-			return jsonResponse(200, string(body)), nil
-		})}
-	}
+	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
+		limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+		items := make([]runRecord, 0, limit)
+		for i := 0; i < limit; i++ {
+			items = append(items, runRecord{ID: fmt.Sprintf("r%d", i), Domain: fmt.Sprintf("d%d.example", i)})
+		}
+		body, _ := json.Marshal(runList{Items: items, Total: 900})
+		return apitest.JSONResponse(200, string(body)), nil
+	}))
 	res := clitest.Run(t, run, "batches", "diff", "--limit", "500", "a", "b")
 	res.RequireCode(t, 2)
 	res.RequireErrContains(t, "above the --limit")
@@ -341,10 +329,10 @@ func TestWorstLevelByTagRanksDebugLevels(t *testing.T) {
 func TestBatchesDiffOmitsPerDomainListByDefault(t *testing.T) {
 	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
 	broke := []jobResultEntry{{Module: "NAMESERVER", Tag: "N11_NO_RESPONSE", Level: "WARNING"}}
-	defer batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+	batchDiffFixture(t, map[string]map[string][]jobResultEntry{
 		"serial": {"a.example": clean},
 		"w16":    {"a.example": broke},
-	})()
+	})
 
 	res := clitest.Run(t, run, "--format", "json", "batches", "diff", "serial", "w16")
 	res.RequireCode(t, 1)
@@ -370,7 +358,7 @@ func TestBatchesDiffOmitsPerDomainListByDefault(t *testing.T) {
 // "runs differ" exit, so a scripted gate cannot mistake a typo for a real
 // finding delta.
 func TestRunsDiffRequiresTwoRunIDs(t *testing.T) {
-	defer diffFixture(t, map[string][]jobResultEntry{})()
+	diffFixture(t, map[string][]jobResultEntry{})
 	res := clitest.Run(t, run, "runs", "diff", "only-one")
 	res.RequireCode(t, 2)
 	res.RequireErrContains(t, "two run IDs are required")

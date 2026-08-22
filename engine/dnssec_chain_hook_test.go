@@ -10,10 +10,10 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
+	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -28,15 +28,9 @@ func dnskeyAnswer(owner string, key *dns.DNSKEY) packet.Packet {
 func undelegatedZone(t *testing.T, ctx context.Context) *zone.Zone {
 	t.Helper()
 
-	r, err := recursor.New()
-	if err != nil {
-		t.Fatalf("new recursor: %v", err)
-	}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.55"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
+	r := nstest.HintedRecursor(t, map[string]map[string][]string{
+		"example": {"ns1.example": {"192.0.2.55"}},
+	})
 
 	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {

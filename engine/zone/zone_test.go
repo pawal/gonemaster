@@ -140,16 +140,9 @@ func TestZoneQueryAllParallel(t *testing.T) {
 }
 
 func TestZoneGlueUsesFakeAddresses(t *testing.T) {
-	r, err := recursor.New()
-	if err != nil {
-		t.Fatalf("new recursor: %v", err)
-	}
-	err = r.AddFakeAddresses("example", map[string][]string{
-		"ns1.example": {"192.0.2.55"},
+	r := nstest.HintedRecursor(t, map[string]map[string][]string{
+		"example": {"ns1.example": {"192.0.2.55"}},
 	})
-	if err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 
 	z := Zone{
 		Name:         dnsname.New("example"),
@@ -451,16 +444,12 @@ func TestZoneApexNSNamesUnionsAcrossServers(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r, err := recursor.New()
-	if err != nil {
-		t.Fatalf("new recursor: %v", err)
-	}
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-		"ns2.example.com": {"192.0.2.12"},
-	}); err != nil {
-		t.Fatalf("add fake: %v", err)
-	}
+	r := nstest.HintedRecursor(t, map[string]map[string][]string{
+		"example.com": {
+			"ns1.example.com": {"192.0.2.11"},
+			"ns2.example.com": {"192.0.2.12"},
+		},
+	})
 
 	// Both apex servers reply with overlapping but distinct NS sets.
 	mkHook := func(names ...string) func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {

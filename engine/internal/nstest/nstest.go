@@ -17,10 +17,25 @@ import (
 type Hook func(ctx context.Context, name string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error)
 
 // Recursor returns a recursor resolving the given fake addresses, keyed by zone
-// and then by nameserver name.
+// and then by nameserver name. It knows no root hints.
 func Recursor(t testing.TB, fakes map[string]map[string][]string) *recursor.Recursor {
 	t.Helper()
-	r := &recursor.Recursor{}
+	return addFakes(t, &recursor.Recursor{}, fakes)
+}
+
+// HintedRecursor is Recursor for tests that need the real root hints seeded
+// underneath their fake addresses.
+func HintedRecursor(t testing.TB, fakes map[string]map[string][]string) *recursor.Recursor {
+	t.Helper()
+	r, err := recursor.New()
+	if err != nil {
+		t.Fatalf("new recursor: %v", err)
+	}
+	return addFakes(t, r, fakes)
+}
+
+func addFakes(t testing.TB, r *recursor.Recursor, fakes map[string]map[string][]string) *recursor.Recursor {
+	t.Helper()
 	for zoneName, data := range fakes {
 		if err := r.AddFakeAddresses(zoneName, data); err != nil {
 			t.Fatalf("add fake addresses for %s: %v", zoneName, err)

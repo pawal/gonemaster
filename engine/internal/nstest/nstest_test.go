@@ -41,6 +41,34 @@ func TestRootRecursorSeedsTheRootOnly(t *testing.T) {
 	}
 }
 
+func TestHintedRecursorSeedsTheRootHints(t *testing.T) {
+	fakes := map[string]map[string][]string{"example.test": {"ns1.example.test": {"192.0.2.11"}}}
+
+	// The root hints are the whole difference between the two constructors.
+	if r := Recursor(t, fakes); r.HasFakeAddresses(".") {
+		t.Fatal("expected Recursor to leave the root empty")
+	}
+	r := HintedRecursor(t, fakes)
+	if !r.HasFakeAddresses(".") {
+		t.Fatal("expected HintedRecursor to seed the root hints")
+	}
+	if !r.HasFakeAddresses("example.test") {
+		t.Fatal("expected HintedRecursor to add the given fake addresses")
+	}
+}
+
+func TestHintedRecursorFailsOnABadAddress(t *testing.T) {
+	tb := &fakeTB{}
+	func() {
+		defer func() {
+			if recover() != errFatal {
+				t.Fatal("expected HintedRecursor to fail on an unparseable address")
+			}
+		}()
+		HintedRecursor(tb, map[string]map[string][]string{"example.test": {"ns1.example.test": {"nope"}}})
+	}()
+}
+
 func TestHookedNSAnswersThroughTheHook(t *testing.T) {
 	ctx := nameserver.WithCache(context.Background(), nameserver.NewCacheStore())
 	r := RootRecursor(t, map[string][]string{"a.root": {"192.0.2.1"}})

@@ -13,7 +13,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
-	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -346,21 +345,16 @@ func TestApplyUndelegatedDelegationEmitsFakeDelegationToSelf(t *testing.T) {
 
 	ctx, _, log := testhelpers.Context(t)
 
-	r := recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"ns1.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake root addresses: %v", err)
-	}
+	r := nstest.RootRecursor(t, map[string][]string{"ns1.root": {"192.0.2.1"}})
 
-	z, err := zone.NewWithRecursor("example", &r)
+	z, err := zone.NewWithRecursor("example", r)
 	if err != nil {
 		t.Fatalf("new zone: %v", err)
 	}
 
 	err = applyUndelegatedDelegation(
 		ctx,
-		&r,
+		r,
 		&z,
 		[]UndelegatedNameserver{
 			{Name: "ns1.root", IP: "192.0.2.1"},

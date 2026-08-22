@@ -55,16 +55,13 @@ func TestZoneGlueNamesReturnsGlueFromZone(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": {"a.root": {"192.0.2.1"}, "b.root": {"192.0.2.2"}},
+		"example.com": {
+			"ns1.example.com": {"192.0.2.11"},
+			"ns2.example.com": {"192.0.2.12"},
+		},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-		"ns2.example.com": {"192.0.2.12"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 
 	z, err := NewWithRecursor("example.com", r)
 	if err != nil {
@@ -299,17 +296,14 @@ func TestZoneApexNSNamesUndelegatedUsesApexRecords(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": {"a.root": {"192.0.2.1"}, "b.root": {"192.0.2.2"}},
+		"example.com": {
+			"ns1.example.com": {"192.0.2.11"},
+			"ns2.example.com": {"192.0.2.12"},
+			"ns3.example.com": {"192.0.2.13"},
+		},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-		"ns2.example.com": {"192.0.2.12"},
-		"ns3.example.com": {"192.0.2.13"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 
 	apexSetNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns4.example.com")
 	apexSetNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns5.example.com")
@@ -359,12 +353,10 @@ func runZoneApexNSNamesProperty(t *testing.T, names []string) []string {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-	}); err != nil {
-		t.Fatalf("add zone: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".":           {"a.root": {"192.0.2.1"}},
+		"example.com": {"ns1.example.com": {"192.0.2.11"}},
+	})
 	apexSetNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", names...)
 
 	z, err := NewWithRecursor("example.com", r)

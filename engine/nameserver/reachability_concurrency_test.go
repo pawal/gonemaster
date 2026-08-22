@@ -7,6 +7,7 @@ import (
 	"sync"
 	"syscall"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -117,51 +118,51 @@ func TestReachabilityCacheConcurrentMixedResults(t *testing.T) {
 // atomic metrics reset defends: a whole-struct store would race with the
 // counter reads happening on the query path.
 func TestReachabilityCacheClearDuringQueries(t *testing.T) {
-	store := NewCacheStore()
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.NegativeCacheTTL = 60
+	synctest.Test(t, func(t *testing.T) {
+		store := NewCacheStore()
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.NegativeCacheTTL = 60
 
-	backoff := store.reachabilityBackoff()
-	stop := make(chan struct{})
+		backoff := store.reachabilityBackoff()
+		stop := make(chan struct{})
 
-	var wg sync.WaitGroup
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for {
-			select {
-			case <-stop:
-				return
-			default:
-				backoff.clear()
-				_ = backoff.metrics()
-				time.Sleep(time.Millisecond)
-			}
-		}
-	}()
-
-	for g := range 4 {
-		wg.Add(1)
+		var clearing sync.WaitGroup
+		clearing.Add(1)
 		go func() {
-			defer wg.Done()
-			ns, err := NewWithCache(store, fmt.Sprintf("ns%d.example", g), "192.0.2.92", nil)
-			if err != nil {
-				t.Errorf("new nameserver: %v", err)
-				return
-			}
-			ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-				return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
-			})
-			for q := range 20 {
-				_, _ = ns.QueryWithOptions(ctx, fmt.Sprintf("c%d-%d.example", g, q), "A", nil)
+			defer clearing.Done()
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					backoff.clear()
+					_ = backoff.metrics()
+					time.Sleep(time.Millisecond)
+				}
 			}
 		}()
-	}
 
-	// Let the query goroutines finish, then stop the clearing loop.
-	go func() {
-		time.Sleep(50 * time.Millisecond)
+		var queries sync.WaitGroup
+		for g := range 4 {
+			queries.Add(1)
+			go func() {
+				defer queries.Done()
+				ns, err := NewWithCache(store, fmt.Sprintf("ns%d.example", g), "192.0.2.92", nil)
+				if err != nil {
+					t.Errorf("new nameserver: %v", err)
+					return
+				}
+				ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+					return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
+				})
+				for q := range 20 {
+					_, _ = ns.QueryWithOptions(ctx, fmt.Sprintf("c%d-%d.example", g, q), "A", nil)
+				}
+			}()
+		}
+
+		queries.Wait()
 		close(stop)
-	}()
-	wg.Wait()
+		clearing.Wait()
+	})
 }

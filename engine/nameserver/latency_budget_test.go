@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
@@ -49,52 +50,52 @@ func TestLatencyTrackerDisabledWhenBudgetZero(t *testing.T) {
 	}
 }
 
-// TestQuerySkipsAddressOverLatencyBudget is the step-10 verification end to end:
-// once the cumulative time spent on one nameserver address crosses the budget,
-// further queries to it are skipped for the rest of the run, with a single
+// TestQuerySkipsAddressOverLatencyBudget is the end-to-end check: once the
+// cumulative time spent on one nameserver address crosses the budget, further
+// queries to it are skipped for the rest of the run, with a single
 // DecisionLatencyBudgetBlocked and a DecisionSkippedLatencyBudget on the
 // suppressed query. Fast-fail and the error cache are disabled so only the
 // latency budget can fire - and the hook returns errors, so this also proves the
 // budget catches a server that never produces a usable answer.
 func TestQuerySkipsAddressOverLatencyBudget(t *testing.T) {
-	ctx, prof := testContext(t)
-	// 100ms budget against 60ms sleeps leaves 40ms of headroom on the first
-	// query. The earlier 30ms/20ms pairing left only 10ms, which is not enough
-	// under the race detector on a loaded CI runner: one slow first query would
-	// cross the budget on its own and suppress the second.
-	prof.Resolver.Defaults.NameserverMaxTotalMS = 100
-	prof.Resolver.Defaults.FastFailTimeoutCount = 0
-	prof.Resolver.Defaults.ErrorCacheTTL = 0
-	opts := &QueryOptions{BlacklistingDisabled: true}
+	// The bubble's fake clock makes each hook call cost exactly 60ms, so the
+	// budget crossing is deterministic instead of load-dependent.
+	synctest.Test(t, func(t *testing.T) {
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.NameserverMaxTotalMS = 100
+		prof.Resolver.Defaults.FastFailTimeoutCount = 0
+		prof.Resolver.Defaults.ErrorCacheTTL = 0
+		opts := &QueryOptions{BlacklistingDisabled: true}
 
-	rec := &dnstest.RecordingTrace{}
-	ctx = querytrace.WithContext(ctx, rec)
+		rec := &dnstest.RecordingTrace{}
+		ctx = querytrace.WithContext(ctx, rec)
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.250", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.250", nil)
+		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
 
-	var calls int
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		calls++
-		time.Sleep(60 * time.Millisecond) // ~60ms each; two queries (~120ms) cross the 100ms budget
-		return packet.Packet{}, fmt.Errorf("read timeout")
+		var calls int
+		ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+			calls++
+			time.Sleep(60 * time.Millisecond) // two queries (120ms) cross the 100ms budget
+			return packet.Packet{}, fmt.Errorf("read timeout")
+		})
+
+		// Distinct qnames so the per-query cache does not short-circuit. The first
+		// two queries run; their 120ms total crosses 100ms, so the third is skipped.
+		for _, qname := range []string{"a.example", "b.example", "c.example"} {
+			_, _ = ns.QueryWithOptions(ctx, qname, "A", opts)
+		}
+
+		if calls != 2 {
+			t.Fatalf("expected the latency budget to suppress the 3rd network call, got %d hook calls", calls)
+		}
+		if got := rec.DecisionsOfKind(querytrace.DecisionLatencyBudgetBlocked); len(got) != 1 {
+			t.Fatalf("expected exactly 1 latency-budget block decision, got %d: %+v", len(got), got)
+		}
+		if got := rec.DecisionsOfKind(querytrace.DecisionSkippedLatencyBudget); len(got) == 0 {
+			t.Fatalf("expected a skipped-latency-budget decision on the suppressed query, got none")
+		}
 	})
-
-	// Distinct qnames so the per-query cache does not short-circuit. The first
-	// two queries run; their ~120ms total crosses 100ms, so the third is skipped.
-	for _, qname := range []string{"a.example", "b.example", "c.example"} {
-		_, _ = ns.QueryWithOptions(ctx, qname, "A", opts)
-	}
-
-	if calls != 2 {
-		t.Fatalf("expected the latency budget to suppress the 3rd network call, got %d hook calls", calls)
-	}
-	if got := rec.DecisionsOfKind(querytrace.DecisionLatencyBudgetBlocked); len(got) != 1 {
-		t.Fatalf("expected exactly 1 latency-budget block decision, got %d: %+v", len(got), got)
-	}
-	if got := rec.DecisionsOfKind(querytrace.DecisionSkippedLatencyBudget); len(got) == 0 {
-		t.Fatalf("expected a skipped-latency-budget decision on the suppressed query, got none")
-	}
 }

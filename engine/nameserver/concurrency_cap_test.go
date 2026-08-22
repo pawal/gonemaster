@@ -6,7 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
-	"time"
+	"testing/synctest"
 
 	dns "codeberg.org/miekg/dns"
 
@@ -46,194 +46,171 @@ func okPacket() packet.Packet {
 }
 
 func TestNameserverConcurrencyCapDisabledAllowsParallelQueries(t *testing.T) {
-	t.Parallel()
-
-	cache := NewCacheStore()
-	nsA, err := NewWithCache(cache, "ns-a.example", "192.0.2.90", nil)
-	if err != nil {
-		t.Fatalf("new nameserver A: %v", err)
-	}
-	nsB, err := NewWithCache(cache, "ns-b.example", "192.0.2.90", nil)
-	if err != nil {
-		t.Fatalf("new nameserver B: %v", err)
-	}
-
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.NameserverConcurrency = 0
-
-	var probe concurrencyProbe
-	release := make(chan struct{})
-	started := make(chan struct{}, 2)
-	hook := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		done := probe.enter()
-		started <- struct{}{}
-		<-release
-		done()
-		return okPacket(), nil
-	}
-	nsA.SetQueryHook(hook)
-	nsB.SetQueryHook(hook)
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		_, _ = nsA.QueryWithOptions(ctx, "parallel-a.example", "A", nil)
-	}()
-	go func() {
-		defer wg.Done()
-		_, _ = nsB.QueryWithOptions(ctx, "parallel-b.example", "A", nil)
-	}()
-
-	for range 2 {
-		select {
-		case <-started:
-		case <-time.After(300 * time.Millisecond):
-			t.Fatalf("expected both queries to enter network hook without cap")
+	synctest.Test(t, func(t *testing.T) {
+		cache := NewCacheStore()
+		nsA, err := NewWithCache(cache, "ns-a.example", "192.0.2.90", nil)
+		if err != nil {
+			t.Fatalf("new nameserver A: %v", err)
 		}
-	}
+		nsB, err := NewWithCache(cache, "ns-b.example", "192.0.2.90", nil)
+		if err != nil {
+			t.Fatalf("new nameserver B: %v", err)
+		}
 
-	if got := probe.maxActive(); got < 2 {
-		t.Fatalf("max active queries = %d, want at least 2", got)
-	}
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.NameserverConcurrency = 0
 
-	close(release)
-	wg.Wait()
+		var probe concurrencyProbe
+		release := make(chan struct{})
+		hook := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+			done := probe.enter()
+			<-release
+			done()
+			return okPacket(), nil
+		}
+		nsA.SetQueryHook(hook)
+		nsB.SetQueryHook(hook)
 
-	if got := probe.callCount(); got != 2 {
-		t.Fatalf("network calls = %d, want 2", got)
-	}
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			_, _ = nsA.QueryWithOptions(ctx, "parallel-a.example", "A", nil)
+		}()
+		go func() {
+			defer wg.Done()
+			_, _ = nsB.QueryWithOptions(ctx, "parallel-b.example", "A", nil)
+		}()
+
+		// Both queries reach the hook and block there: no cap holds either back.
+		synctest.Wait()
+		if got := probe.maxActive(); got < 2 {
+			t.Fatalf("max active queries = %d, want at least 2", got)
+		}
+
+		close(release)
+		wg.Wait()
+
+		if got := probe.callCount(); got != 2 {
+			t.Fatalf("network calls = %d, want 2", got)
+		}
+	})
 }
 
 func TestNameserverConcurrencyCapSerializesAcrossSnapshots(t *testing.T) {
-	t.Parallel()
+	synctest.Test(t, func(t *testing.T) {
+		root := NewCacheStore()
+		runA := root.SnapshotForRun()
+		runB := root.SnapshotForRun()
 
-	root := NewCacheStore()
-	runA := root.SnapshotForRun()
-	runB := root.SnapshotForRun()
+		nsA, err := NewWithCache(runA, "ns-a.example", "192.0.2.91", nil)
+		if err != nil {
+			t.Fatalf("new nameserver A: %v", err)
+		}
+		nsB, err := NewWithCache(runB, "ns-b.example", "192.0.2.91", nil)
+		if err != nil {
+			t.Fatalf("new nameserver B: %v", err)
+		}
 
-	nsA, err := NewWithCache(runA, "ns-a.example", "192.0.2.91", nil)
-	if err != nil {
-		t.Fatalf("new nameserver A: %v", err)
-	}
-	nsB, err := NewWithCache(runB, "ns-b.example", "192.0.2.91", nil)
-	if err != nil {
-		t.Fatalf("new nameserver B: %v", err)
-	}
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.NameserverConcurrency = 1
 
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.NameserverConcurrency = 1
+		var probe concurrencyProbe
+		release := make(chan struct{})
+		hook := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+			done := probe.enter()
+			<-release
+			done()
+			return okPacket(), nil
+		}
+		nsA.SetQueryHook(hook)
+		nsB.SetQueryHook(hook)
 
-	var probe concurrencyProbe
-	started := make(chan string, 2)
-	release := make(chan struct{})
-	hook := func(_ context.Context, qname string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		done := probe.enter()
-		started <- qname
-		<-release
-		done()
-		return okPacket(), nil
-	}
-	nsA.SetQueryHook(hook)
-	nsB.SetQueryHook(hook)
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			_, _ = nsA.QueryWithOptions(ctx, "serial-a.example", "A", nil)
+		}()
+		synctest.Wait()
+		if got := probe.callCount(); got != 1 {
+			t.Fatalf("expected first query to start, calls = %d", got)
+		}
 
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		_, _ = nsA.QueryWithOptions(ctx, "serial-a.example", "A", nil)
-	}()
-	select {
-	case <-started:
-	case <-time.After(300 * time.Millisecond):
-		t.Fatalf("expected first query to start")
-	}
+		go func() {
+			defer wg.Done()
+			_, _ = nsB.QueryWithOptions(ctx, "serial-b.example", "A", nil)
+		}()
+		// The second query is parked on the cap, not in the hook.
+		synctest.Wait()
+		if got := probe.callCount(); got != 1 {
+			t.Fatalf("second query started before cap was released, calls = %d", got)
+		}
 
-	go func() {
-		defer wg.Done()
-		_, _ = nsB.QueryWithOptions(ctx, "serial-b.example", "A", nil)
-	}()
+		close(release)
+		wg.Wait()
 
-	select {
-	case q := <-started:
-		t.Fatalf("second query started before cap was released: %s", q)
-	case <-time.After(120 * time.Millisecond):
-	}
-
-	close(release)
-	wg.Wait()
-
-	if got := probe.maxActive(); got != 1 {
-		t.Fatalf("max active queries = %d, want 1", got)
-	}
-	if got := probe.callCount(); got != 2 {
-		t.Fatalf("network calls = %d, want 2", got)
-	}
+		if got := probe.maxActive(); got != 1 {
+			t.Fatalf("max active queries = %d, want 1", got)
+		}
+		if got := probe.callCount(); got != 2 {
+			t.Fatalf("network calls = %d, want 2", got)
+		}
+	})
 }
 
 func TestNameserverConcurrencyCapWaitCancellationReleasesInflight(t *testing.T) {
-	t.Parallel()
-
-	cache := NewCacheStore()
-	ns, err := NewWithCache(cache, "ns.example", "192.0.2.92", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.NameserverConcurrency = 1
-
-	release := make(chan struct{})
-	started := make(chan struct{}, 2)
-	var probe concurrencyProbe
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		done := probe.enter()
-		defer done()
-		started <- struct{}{}
-		<-release
-		return okPacket(), nil
-	})
-
-	firstDone := make(chan error, 1)
-	go func() {
-		_, err := ns.QueryWithOptions(ctx, "first.example", "A", nil)
-		firstDone <- err
-	}()
-
-	select {
-	case <-started:
-	case <-time.After(300 * time.Millisecond):
-		t.Fatalf("expected first query to reach network hook")
-	}
-
-	waitCtx, cancel := context.WithTimeout(ctx, 40*time.Millisecond)
-	defer cancel()
-	_, err = ns.QueryWithOptions(waitCtx, "second.example", "A", nil)
-	if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
-		t.Fatalf("expected context cancellation while waiting for cap, got %v", err)
-	}
-
-	if got := probe.callCount(); got != 1 {
-		t.Fatalf("expected waiting query not to hit network, got %d calls", got)
-	}
-
-	close(release)
-	select {
-	case err := <-firstDone:
+	synctest.Test(t, func(t *testing.T) {
+		cache := NewCacheStore()
+		ns, err := NewWithCache(cache, "ns.example", "192.0.2.92", nil)
 		if err != nil {
+			t.Fatalf("new nameserver: %v", err)
+		}
+
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.NameserverConcurrency = 1
+
+		release := make(chan struct{})
+		var probe concurrencyProbe
+		ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+			done := probe.enter()
+			defer done()
+			<-release
+			return okPacket(), nil
+		})
+
+		firstDone := make(chan error, 1)
+		go func() {
+			_, err := ns.QueryWithOptions(ctx, "first.example", "A", nil)
+			firstDone <- err
+		}()
+		synctest.Wait()
+
+		waitCtx, cancel := context.WithCancel(ctx)
+		cancel()
+		_, err = ns.QueryWithOptions(waitCtx, "second.example", "A", nil)
+		if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
+			t.Fatalf("expected context cancellation while waiting for cap, got %v", err)
+		}
+
+		if got := probe.callCount(); got != 1 {
+			t.Fatalf("expected waiting query not to hit network, got %d calls", got)
+		}
+
+		close(release)
+		if err := <-firstDone; err != nil {
 			t.Fatalf("first query failed: %v", err)
 		}
-	case <-time.After(300 * time.Millisecond):
-		t.Fatalf("first query did not complete after release")
-	}
 
-	_, err = ns.QueryWithOptions(ctx, "second.example", "A", nil)
-	if err != nil {
-		t.Fatalf("retry after canceled wait failed: %v", err)
-	}
-	if got := probe.callCount(); got != 2 {
-		t.Fatalf("network calls = %d, want 2", got)
-	}
+		// The canceled waiter must not have leaked the cap slot.
+		_, err = ns.QueryWithOptions(ctx, "second.example", "A", nil)
+		if err != nil {
+			t.Fatalf("retry after canceled wait failed: %v", err)
+		}
+		if got := probe.callCount(); got != 2 {
+			t.Fatalf("network calls = %d, want 2", got)
+		}
+	})
 }
 
 func TestResolveNameserverConcurrencyLimit(t *testing.T) {

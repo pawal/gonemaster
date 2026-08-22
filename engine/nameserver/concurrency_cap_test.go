@@ -14,6 +14,37 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
+// concurrencyProbe records how many hook calls overlap and how many ran.
+type concurrencyProbe struct {
+	active atomic.Int32
+	max    atomic.Int32
+	calls  atomic.Int32
+}
+
+// enter marks one call in flight and returns the function that ends it.
+func (p *concurrencyProbe) enter() func() {
+	p.calls.Add(1)
+	cur := p.active.Add(1)
+	for {
+		prev := p.max.Load()
+		if cur <= prev || p.max.CompareAndSwap(prev, cur) {
+			break
+		}
+	}
+	return func() { p.active.Add(-1) }
+}
+
+func (p *concurrencyProbe) maxActive() int32 { return p.max.Load() }
+
+func (p *concurrencyProbe) callCount() int32 { return p.calls.Load() }
+
+// okPacket is the minimal NOERROR answer the cap hooks hand back.
+func okPacket() packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeSuccess
+	return packet.Packet{Msg: msg}
+}
+
 func TestNameserverConcurrencyCapDisabledAllowsParallelQueries(t *testing.T) {
 	t.Parallel()
 
@@ -30,26 +61,15 @@ func TestNameserverConcurrencyCapDisabledAllowsParallelQueries(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.NameserverConcurrency = 0
 
-	var active int32
-	var maxActive int32
-	var calls int32
+	var probe concurrencyProbe
 	release := make(chan struct{})
 	started := make(chan struct{}, 2)
 	hook := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		cur := atomic.AddInt32(&active, 1)
-		for {
-			prev := atomic.LoadInt32(&maxActive)
-			if cur <= prev || atomic.CompareAndSwapInt32(&maxActive, prev, cur) {
-				break
-			}
-		}
-		atomic.AddInt32(&calls, 1)
+		done := probe.enter()
 		started <- struct{}{}
 		<-release
-		atomic.AddInt32(&active, -1)
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		return packet.Packet{Msg: msg}, nil
+		done()
+		return okPacket(), nil
 	}
 	nsA.SetQueryHook(hook)
 	nsB.SetQueryHook(hook)
@@ -73,14 +93,14 @@ func TestNameserverConcurrencyCapDisabledAllowsParallelQueries(t *testing.T) {
 		}
 	}
 
-	if got := atomic.LoadInt32(&maxActive); got < 2 {
+	if got := probe.maxActive(); got < 2 {
 		t.Fatalf("max active queries = %d, want at least 2", got)
 	}
 
 	close(release)
 	wg.Wait()
 
-	if got := atomic.LoadInt32(&calls); got != 2 {
+	if got := probe.callCount(); got != 2 {
 		t.Fatalf("network calls = %d, want 2", got)
 	}
 }
@@ -104,26 +124,15 @@ func TestNameserverConcurrencyCapSerializesAcrossSnapshots(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.NameserverConcurrency = 1
 
-	var active int32
-	var maxActive int32
-	var calls int32
+	var probe concurrencyProbe
 	started := make(chan string, 2)
 	release := make(chan struct{})
 	hook := func(_ context.Context, qname string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		cur := atomic.AddInt32(&active, 1)
-		for {
-			prev := atomic.LoadInt32(&maxActive)
-			if cur <= prev || atomic.CompareAndSwapInt32(&maxActive, prev, cur) {
-				break
-			}
-		}
-		atomic.AddInt32(&calls, 1)
+		done := probe.enter()
 		started <- qname
 		<-release
-		atomic.AddInt32(&active, -1)
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		return packet.Packet{Msg: msg}, nil
+		done()
+		return okPacket(), nil
 	}
 	nsA.SetQueryHook(hook)
 	nsB.SetQueryHook(hook)
@@ -154,10 +163,10 @@ func TestNameserverConcurrencyCapSerializesAcrossSnapshots(t *testing.T) {
 	close(release)
 	wg.Wait()
 
-	if got := atomic.LoadInt32(&maxActive); got != 1 {
+	if got := probe.maxActive(); got != 1 {
 		t.Fatalf("max active queries = %d, want 1", got)
 	}
-	if got := atomic.LoadInt32(&calls); got != 2 {
+	if got := probe.callCount(); got != 2 {
 		t.Fatalf("network calls = %d, want 2", got)
 	}
 }
@@ -176,14 +185,13 @@ func TestNameserverConcurrencyCapWaitCancellationReleasesInflight(t *testing.T) 
 
 	release := make(chan struct{})
 	started := make(chan struct{}, 2)
-	var calls int32
+	var probe concurrencyProbe
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		atomic.AddInt32(&calls, 1)
+		done := probe.enter()
+		defer done()
 		started <- struct{}{}
 		<-release
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		return packet.Packet{Msg: msg}, nil
+		return okPacket(), nil
 	})
 
 	firstDone := make(chan error, 1)
@@ -205,7 +213,7 @@ func TestNameserverConcurrencyCapWaitCancellationReleasesInflight(t *testing.T) 
 		t.Fatalf("expected context cancellation while waiting for cap, got %v", err)
 	}
 
-	if got := atomic.LoadInt32(&calls); got != 1 {
+	if got := probe.callCount(); got != 1 {
 		t.Fatalf("expected waiting query not to hit network, got %d calls", got)
 	}
 
@@ -223,7 +231,7 @@ func TestNameserverConcurrencyCapWaitCancellationReleasesInflight(t *testing.T) 
 	if err != nil {
 		t.Fatalf("retry after canceled wait failed: %v", err)
 	}
-	if got := atomic.LoadInt32(&calls); got != 2 {
+	if got := probe.callCount(); got != 2 {
 		t.Fatalf("network calls = %d, want 2", got)
 	}
 }

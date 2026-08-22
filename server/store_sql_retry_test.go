@@ -251,15 +251,16 @@ func TestGraduateJobConcurrentSameDomain(t *testing.T) {
 }
 
 func TestGraduateJobMissingJobIsNotRetried(t *testing.T) {
-	// "job not found" is permanent, so it must return on the first attempt
-	// rather than burning the retry budget and its backoff on it.
-	slept := swapRetrySleep(t)
-	store := testStoreForBackend(t, testBackends(t)[0])
+	forEachBackend(t, func(t *testing.T, store *SQLJobStore) {
+		// "job not found" is permanent, so it must return on the first attempt
+		// rather than burning the retry budget and its backoff on it.
+		slept := swapRetrySleep(t)
 
-	if err := store.GraduateJob(Job{ID: "nope", Domain: "missing.example"}, nil); err == nil {
-		t.Fatal("expected an error for a job that does not exist")
-	}
-	if len(*slept) != 0 {
-		t.Fatalf("a missing job must not back off, slept %d times", len(*slept))
-	}
+		if err := store.GraduateJob(Job{ID: "nope", Domain: "missing.example"}, nil); err == nil {
+			t.Fatal("expected an error for a job that does not exist")
+		}
+		if len(*slept) != 0 {
+			t.Fatalf("a missing job must not back off, slept %d times", len(*slept))
+		}
+	})
 }

@@ -108,8 +108,9 @@ func TestSQLJobStoreUpsertAnalysisCohort(t *testing.T) {
 }
 
 func TestSQLJobStoreUpsertAnalysisCohortValidatesSource(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	if _, err := s.UpsertAnalysisCohort(AnalysisCohort{}); err == nil {
-		t.Fatal("expected validation error for empty source_type/source_tag")
-	}
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		if _, err := s.UpsertAnalysisCohort(AnalysisCohort{}); err == nil {
+			t.Fatal("expected validation error for empty source_type/source_tag")
+		}
+	})
 }

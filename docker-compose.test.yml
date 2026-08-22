@@ -7,7 +7,7 @@
 #   docker compose -f docker-compose.test.yml up -d --wait
 #   TEST_POSTGRES_DSN="postgres://gonemaster:gonemaster@localhost:5432/gonemaster_test?sslmode=disable" \
 #   TEST_MARIADB_DSN="gonemaster:gonemaster@tcp(localhost:3306)/gonemaster_test" \
-#   go test ./server/... -count=1 -timeout 120s
+#   go test ./server/... -count=1 -timeout 600s
 #   docker compose -f docker-compose.test.yml down
 #
 # Or use: make test-integration

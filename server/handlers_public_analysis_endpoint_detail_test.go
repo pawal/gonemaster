@@ -141,27 +141,28 @@ func TestEndpointDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 }
 
 func TestComputeSnapshotEntityViewsPopulatesEndpointDomains(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, _ := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, _ := snapshotViewFixture(t, s)
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
-	if err != nil {
-		t.Fatalf("ComputeSnapshotEntityViews: %v", err)
-	}
-	byKey := map[string]AnalysisSnapshotEndpointView{}
-	for _, ep := range views.Endpoints {
-		byKey[ep.NameserverName+"|"+ep.Address] = ep
-	}
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("ComputeSnapshotEntityViews: %v", err)
+		}
+		byKey := map[string]AnalysisSnapshotEndpointView{}
+		for _, ep := range views.Endpoints {
+			byKey[ep.NameserverName+"|"+ep.Address] = ep
+		}
 
-	// ns1.example | 192.0.2.1 is shared by example.test and other.test.
-	ns1v4 := byKey["ns1.example|192.0.2.1"]
-	if len(ns1v4.Domains) != 2 || ns1v4.Domains[0] != "example.test" || ns1v4.Domains[1] != "other.test" {
-		t.Errorf("ns1+v4 domains = %v, want [example.test other.test]", ns1v4.Domains)
-	}
+		// ns1.example | 192.0.2.1 is shared by example.test and other.test.
+		ns1v4 := byKey["ns1.example|192.0.2.1"]
+		if len(ns1v4.Domains) != 2 || ns1v4.Domains[0] != "example.test" || ns1v4.Domains[1] != "other.test" {
+			t.Errorf("ns1+v4 domains = %v, want [example.test other.test]", ns1v4.Domains)
+		}
 
-	// ns1.example | 2001:db8::1 only serves example.test in this batch.
-	ns1v6 := byKey["ns1.example|2001:db8::1"]
-	if len(ns1v6.Domains) != 1 || ns1v6.Domains[0] != "example.test" {
-		t.Errorf("ns1+v6 domains = %v, want [example.test]", ns1v6.Domains)
-	}
+		// ns1.example | 2001:db8::1 only serves example.test in this batch.
+		ns1v6 := byKey["ns1.example|2001:db8::1"]
+		if len(ns1v6.Domains) != 1 || ns1v6.Domains[0] != "example.test" {
+			t.Errorf("ns1+v6 domains = %v, want [example.test]", ns1v6.Domains)
+		}
+	})
 }

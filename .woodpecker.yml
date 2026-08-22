@@ -6,8 +6,11 @@ services:
       POSTGRES_PASSWORD: gonemaster
       POSTGRES_DB: gonemaster_test
 
+  # Pinned to the same 11.8 LTS series as docker-compose.test.yml, so CI and a
+  # local run agree on innodb_snapshot_isolation (the default from 11.6.2 on,
+  # which turns concurrent writes to one row into ER_CHECKREAD).
   mariadb:
-    image: mariadb:11
+    image: mariadb:11.8
     environment:
       MARIADB_USER: gonemaster
       MARIADB_PASSWORD: gonemaster

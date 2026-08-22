@@ -95,28 +95,29 @@ func TestPublicAnalysisCacheHeadersExplicitSnapshot(t *testing.T) {
 }
 
 func TestComputeSnapshotOverviewProducesTotals(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, _ := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, _ := snapshotViewFixture(t, s)
 
-	got, err := s.ComputeSnapshotOverview(cohortID, "batch-x")
-	if err != nil {
-		t.Fatalf("ComputeSnapshotOverview: %v", err)
-	}
-	if got.Totals.DomainCount != 2 {
-		t.Errorf("totals.domain_count = %d, want 2", got.Totals.DomainCount)
-	}
-	if got.Totals.NameserverCount != 2 {
-		t.Errorf("totals.nameserver_count = %d, want 2", got.Totals.NameserverCount)
-	}
-	if got.Totals.EndpointCount != 3 {
-		t.Errorf("totals.endpoint_count = %d, want 3", got.Totals.EndpointCount)
-	}
-	if got.Totals.ASNCount != 2 {
-		t.Errorf("totals.asn_count = %d, want 2 (out-of-batch ASN must not surface)", got.Totals.ASNCount)
-	}
-	if got.Totals.PrefixCount != 2 {
-		t.Errorf("totals.prefix_count = %d, want 2", got.Totals.PrefixCount)
-	}
+		got, err := s.ComputeSnapshotOverview(cohortID, "batch-x")
+		if err != nil {
+			t.Fatalf("ComputeSnapshotOverview: %v", err)
+		}
+		if got.Totals.DomainCount != 2 {
+			t.Errorf("totals.domain_count = %d, want 2", got.Totals.DomainCount)
+		}
+		if got.Totals.NameserverCount != 2 {
+			t.Errorf("totals.nameserver_count = %d, want 2", got.Totals.NameserverCount)
+		}
+		if got.Totals.EndpointCount != 3 {
+			t.Errorf("totals.endpoint_count = %d, want 3", got.Totals.EndpointCount)
+		}
+		if got.Totals.ASNCount != 2 {
+			t.Errorf("totals.asn_count = %d, want 2 (out-of-batch ASN must not surface)", got.Totals.ASNCount)
+		}
+		if got.Totals.PrefixCount != 2 {
+			t.Errorf("totals.prefix_count = %d, want 2", got.Totals.PrefixCount)
+		}
+	})
 }
 
 func TestPublicAnalysisNameserversReadsFromViewTable(t *testing.T) {

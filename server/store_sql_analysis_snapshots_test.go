@@ -182,16 +182,17 @@ func TestSQLJobStoreAnalysisCohortSnapshotEngineVersionRoundTrip(t *testing.T) {
 }
 
 func TestSQLJobStoreUpsertAnalysisCohortSnapshotValidates(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{}); err == nil {
-		t.Fatal("expected validation error for empty snapshot")
-	}
-	if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{CohortID: 1}); err == nil {
-		t.Fatal("expected validation error for missing batch_id")
-	}
-	if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{CohortID: 1, BatchID: "b"}); err == nil {
-		t.Fatal("expected validation error for missing slug")
-	}
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{}); err == nil {
+			t.Fatal("expected validation error for empty snapshot")
+		}
+		if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{CohortID: 1}); err == nil {
+			t.Fatal("expected validation error for missing batch_id")
+		}
+		if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{CohortID: 1, BatchID: "b"}); err == nil {
+			t.Fatal("expected validation error for missing slug")
+		}
+	})
 }
 
 // TestSQLJobStoreSetAnalysisSnapshotMaterialization exercises the rematerialize
@@ -269,27 +270,28 @@ func TestSQLJobStoreSetAnalysisSnapshotMaterialization(t *testing.T) {
 }
 
 func TestSQLJobStoreAnalysisCohortSnapshotSlugUnique(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID := seedCohortForSnapshotTest(t, s, "tld")
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID := seedCohortForSnapshotTest(t, s, "tld")
 
-	if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
-		CohortID: cohortID,
-		BatchID:  "batch-1",
-		Slug:     "2026-04-20",
-		Status:   AnalysisSnapshotStatusCaptured,
-		IsPublic: true,
-	}); err != nil {
-		t.Fatalf("first snapshot: %v", err)
-	}
-	if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
-		CohortID: cohortID,
-		BatchID:  "batch-2",
-		Slug:     "2026-04-20",
-		Status:   AnalysisSnapshotStatusCaptured,
-		IsPublic: true,
-	}); err == nil {
-		t.Fatal("expected duplicate-slug error; got nil")
-	}
+		if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+			CohortID: cohortID,
+			BatchID:  "batch-1",
+			Slug:     "2026-04-20",
+			Status:   AnalysisSnapshotStatusCaptured,
+			IsPublic: true,
+		}); err != nil {
+			t.Fatalf("first snapshot: %v", err)
+		}
+		if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+			CohortID: cohortID,
+			BatchID:  "batch-2",
+			Slug:     "2026-04-20",
+			Status:   AnalysisSnapshotStatusCaptured,
+			IsPublic: true,
+		}); err == nil {
+			t.Fatal("expected duplicate-slug error; got nil")
+		}
+	})
 }
 
 func TestSQLJobStoreListAnalysisCohortSnapshots(t *testing.T) {

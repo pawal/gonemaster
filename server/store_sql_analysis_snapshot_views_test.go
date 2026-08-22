@@ -324,84 +324,87 @@ func TestReplaceSnapshotEntityViewsRoundTrip(t *testing.T) {
 }
 
 func TestReplaceSnapshotEntityViewsIdempotent(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, snapID := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, snapID := snapshotViewFixture(t, s)
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
-	if err != nil {
-		t.Fatalf("compute first: %v", err)
-	}
-	if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
-		t.Fatalf("replace first: %v", err)
-	}
-	first := s.ListSnapshotNameserverViews(snapID)
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("compute first: %v", err)
+		}
+		if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
+			t.Fatalf("replace first: %v", err)
+		}
+		first := s.ListSnapshotNameserverViews(snapID)
 
-	// Run again. Should DELETE+INSERT, leaving the same row count.
-	if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
-		t.Fatalf("replace second: %v", err)
-	}
-	second := s.ListSnapshotNameserverViews(snapID)
-	if len(second) != len(first) {
-		t.Fatalf("row count after rerun = %d, want %d (idempotence broken)", len(second), len(first))
-	}
+		// Run again. Should DELETE+INSERT, leaving the same row count.
+		if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
+			t.Fatalf("replace second: %v", err)
+		}
+		second := s.ListSnapshotNameserverViews(snapID)
+		if len(second) != len(first) {
+			t.Fatalf("row count after rerun = %d, want %d (idempotence broken)", len(second), len(first))
+		}
 
-	// Replace with empty: rows must be cleared.
-	if err := s.ReplaceSnapshotEntityViews(snapID, SnapshotEntityViews{}); err != nil {
-		t.Fatalf("replace empty: %v", err)
-	}
-	if rows := s.ListSnapshotNameserverViews(snapID); len(rows) != 0 {
-		t.Fatalf("after empty replace: ns rows = %d, want 0", len(rows))
-	}
-	if rows := s.ListSnapshotEndpointViews(snapID); len(rows) != 0 {
-		t.Fatalf("after empty replace: endpoint rows = %d, want 0", len(rows))
-	}
-	if rows := s.ListSnapshotASNViews(snapID); len(rows) != 0 {
-		t.Fatalf("after empty replace: asn rows = %d, want 0", len(rows))
-	}
+		// Replace with empty: rows must be cleared.
+		if err := s.ReplaceSnapshotEntityViews(snapID, SnapshotEntityViews{}); err != nil {
+			t.Fatalf("replace empty: %v", err)
+		}
+		if rows := s.ListSnapshotNameserverViews(snapID); len(rows) != 0 {
+			t.Fatalf("after empty replace: ns rows = %d, want 0", len(rows))
+		}
+		if rows := s.ListSnapshotEndpointViews(snapID); len(rows) != 0 {
+			t.Fatalf("after empty replace: endpoint rows = %d, want 0", len(rows))
+		}
+		if rows := s.ListSnapshotASNViews(snapID); len(rows) != 0 {
+			t.Fatalf("after empty replace: asn rows = %d, want 0", len(rows))
+		}
+	})
 }
 
 func TestReplaceSnapshotEntityViewsScopedBySnapshotID(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, snapID := snapshotViewFixture(t, s)
-	now := time.Now().UTC()
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, snapID := snapshotViewFixture(t, s)
+		now := time.Now().UTC()
 
-	other, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
-		CohortID: cohortID, BatchID: "batch-other", Slug: "other-slug",
-		Status: AnalysisSnapshotStatusCaptured, IsPublic: true,
-		CapturedAt: now, CreatedAt: now, UpdatedAt: now,
+		other, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+			CohortID: cohortID, BatchID: "batch-other", Slug: "other-slug",
+			Status: AnalysisSnapshotStatusCaptured, IsPublic: true,
+			CapturedAt: now, CreatedAt: now, UpdatedAt: now,
+		})
+		if err != nil {
+			t.Fatalf("upsert other snapshot: %v", err)
+		}
+
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("compute: %v", err)
+		}
+		if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
+			t.Fatalf("replace primary: %v", err)
+		}
+
+		otherViews, err := s.ComputeSnapshotEntityViews(cohortID, "batch-other", "")
+		if err != nil {
+			t.Fatalf("compute other: %v", err)
+		}
+		if err := s.ReplaceSnapshotEntityViews(other.ID, otherViews); err != nil {
+			t.Fatalf("replace other: %v", err)
+		}
+
+		// Re-replacing the other snapshot must not affect the primary's rows.
+		if err := s.ReplaceSnapshotEntityViews(other.ID, SnapshotEntityViews{}); err != nil {
+			t.Fatalf("clear other: %v", err)
+		}
+		if rows := s.ListSnapshotNameserverViews(snapID); len(rows) == 0 {
+			t.Fatal("primary snapshot's view rows were wiped when clearing the other snapshot")
+		}
 	})
-	if err != nil {
-		t.Fatalf("upsert other snapshot: %v", err)
-	}
-
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
-	if err != nil {
-		t.Fatalf("compute: %v", err)
-	}
-	if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
-		t.Fatalf("replace primary: %v", err)
-	}
-
-	otherViews, err := s.ComputeSnapshotEntityViews(cohortID, "batch-other", "")
-	if err != nil {
-		t.Fatalf("compute other: %v", err)
-	}
-	if err := s.ReplaceSnapshotEntityViews(other.ID, otherViews); err != nil {
-		t.Fatalf("replace other: %v", err)
-	}
-
-	// Re-replacing the other snapshot must not affect the primary's rows.
-	if err := s.ReplaceSnapshotEntityViews(other.ID, SnapshotEntityViews{}); err != nil {
-		t.Fatalf("clear other: %v", err)
-	}
-	if rows := s.ListSnapshotNameserverViews(snapID); len(rows) == 0 {
-		t.Fatal("primary snapshot's view rows were wiped when clearing the other snapshot")
-	}
 }
 
 func TestComputeSnapshotEntityViewsRequiresBatchID(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	if _, err := s.ComputeSnapshotEntityViews(1, "", ""); err == nil {
-		t.Fatal("expected error when batchID is empty")
-	}
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		if _, err := s.ComputeSnapshotEntityViews(1, "", ""); err == nil {
+			t.Fatal("expected error when batchID is empty")
+		}
+	})
 }

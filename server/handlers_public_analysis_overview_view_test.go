@@ -154,48 +154,50 @@ func TestTrendsReadsFromOverviewView(t *testing.T) {
 // TestComputeSnapshotOverviewIsBatchScoped pins out-of-batch facts
 // must not bleed into the captured overview row.
 func TestComputeSnapshotOverviewIsBatchScoped(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, snapID := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, snapID := snapshotViewFixture(t, s)
 
-	overview, err := s.ComputeSnapshotOverview(cohortID, "batch-x")
-	if err != nil {
-		t.Fatalf("compute: %v", err)
-	}
-	if err := s.ReplaceSnapshotOverview(snapID, overview); err != nil {
-		t.Fatalf("replace: %v", err)
-	}
-	got, ok := s.GetSnapshotOverview(snapID)
-	if !ok {
-		t.Fatal("expected overview row after replace")
-	}
-	if got.Totals.DomainCount != 2 {
-		t.Errorf("DomainCount = %d, want 2 (batch-other run must not surface)", got.Totals.DomainCount)
-	}
-	if got.Totals.ASNCount != 2 {
-		t.Errorf("ASNCount = %d, want 2 (out-of-batch ASN 65000 must not surface)", got.Totals.ASNCount)
-	}
+		overview, err := s.ComputeSnapshotOverview(cohortID, "batch-x")
+		if err != nil {
+			t.Fatalf("compute: %v", err)
+		}
+		if err := s.ReplaceSnapshotOverview(snapID, overview); err != nil {
+			t.Fatalf("replace: %v", err)
+		}
+		got, ok := s.GetSnapshotOverview(snapID)
+		if !ok {
+			t.Fatal("expected overview row after replace")
+		}
+		if got.Totals.DomainCount != 2 {
+			t.Errorf("DomainCount = %d, want 2 (batch-other run must not surface)", got.Totals.DomainCount)
+		}
+		if got.Totals.ASNCount != 2 {
+			t.Errorf("ASNCount = %d, want 2 (out-of-batch ASN 65000 must not surface)", got.Totals.ASNCount)
+		}
+	})
 }
 
 // TestListSnapshotOverviewsByIDsBulkReads confirms the trends bulk
 // reader returns one row per requested snapshot id.
 func TestListSnapshotOverviewsByIDsBulkReads(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, snapID := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, snapID := snapshotViewFixture(t, s)
 
-	overview, err := s.ComputeSnapshotOverview(cohortID, "batch-x")
-	if err != nil {
-		t.Fatalf("compute: %v", err)
-	}
-	if err := s.ReplaceSnapshotOverview(snapID, overview); err != nil {
-		t.Fatalf("replace: %v", err)
-	}
-	got := s.ListSnapshotOverviewsByIDs([]int64{snapID, snapID + 999})
-	if _, ok := got[snapID]; !ok {
-		t.Fatalf("expected primary snapshot in result, got %+v", got)
-	}
-	if _, ok := got[snapID+999]; ok {
-		t.Errorf("unknown snapshot id leaked: %+v", got)
-	}
+		overview, err := s.ComputeSnapshotOverview(cohortID, "batch-x")
+		if err != nil {
+			t.Fatalf("compute: %v", err)
+		}
+		if err := s.ReplaceSnapshotOverview(snapID, overview); err != nil {
+			t.Fatalf("replace: %v", err)
+		}
+		got := s.ListSnapshotOverviewsByIDs([]int64{snapID, snapID + 999})
+		if _, ok := got[snapID]; !ok {
+			t.Fatalf("expected primary snapshot in result, got %+v", got)
+		}
+		if _, ok := got[snapID+999]; ok {
+			t.Errorf("unknown snapshot id leaked: %+v", got)
+		}
+	})
 }
 
 // TestAggregatesTableDropped asserts the legacy

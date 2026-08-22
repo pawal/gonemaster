@@ -189,32 +189,33 @@ func TestTagDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 }
 
 func TestComputeSnapshotEntityViewsBuildsTagViews(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, _ := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, _ := snapshotViewFixture(t, s)
 
-	// Add a tag summary directly so the fixture has tag data - the
-	// existing fixture only exercises endpoints/asns.
-	if err := s.ReplaceAnalysisRunTagSummaries(cohortID, "run-a", []AnalysisRunTagSummary{
-		{CohortID: cohortID, RunID: "run-a", DomainID: 1, Tag: "DS07_NOT_SIGNED",
-			Module: "DNSSEC", Testcase: "dnssec07", Level: "ERROR", OccurrenceCount: 1},
-		{CohortID: cohortID, RunID: "run-a", DomainID: 1, Tag: "MODULE_OK",
-			Module: "BASIC", Testcase: "basic01", Level: "INFO", OccurrenceCount: 1},
-	}); err != nil {
-		t.Fatalf("seed tag summaries: %v", err)
-	}
+		// Add a tag summary directly so the fixture has tag data - the
+		// existing fixture only exercises endpoints/asns.
+		if err := s.ReplaceAnalysisRunTagSummaries(cohortID, "run-a", []AnalysisRunTagSummary{
+			{CohortID: cohortID, RunID: "run-a", DomainID: 1, Tag: "DS07_NOT_SIGNED",
+				Module: "DNSSEC", Testcase: "dnssec07", Level: "ERROR", OccurrenceCount: 1},
+			{CohortID: cohortID, RunID: "run-a", DomainID: 1, Tag: "MODULE_OK",
+				Module: "BASIC", Testcase: "basic01", Level: "INFO", OccurrenceCount: 1},
+		}); err != nil {
+			t.Fatalf("seed tag summaries: %v", err)
+		}
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
-	if err != nil {
-		t.Fatalf("compute: %v", err)
-	}
-	byTag := map[string]AnalysisSnapshotTagView{}
-	for _, v := range views.Tags {
-		byTag[v.Tag] = v
-	}
-	if _, ok := byTag["DS07_NOT_SIGNED"]; !ok {
-		t.Errorf("ERROR tag missing from view: %+v", views.Tags)
-	}
-	if _, ok := byTag["MODULE_OK"]; ok {
-		t.Errorf("INFO tag MODULE_OK should be filtered out by the default floor; got %+v", views.Tags)
-	}
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("compute: %v", err)
+		}
+		byTag := map[string]AnalysisSnapshotTagView{}
+		for _, v := range views.Tags {
+			byTag[v.Tag] = v
+		}
+		if _, ok := byTag["DS07_NOT_SIGNED"]; !ok {
+			t.Errorf("ERROR tag missing from view: %+v", views.Tags)
+		}
+		if _, ok := byTag["MODULE_OK"]; ok {
+			t.Errorf("INFO tag MODULE_OK should be filtered out by the default floor; got %+v", views.Tags)
+		}
+	})
 }

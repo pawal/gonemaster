@@ -113,56 +113,58 @@ func TestNameserverDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 }
 
 func TestComputeSnapshotEntityViewsPopulatesNameserverRosters(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, _ := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, _ := snapshotViewFixture(t, s)
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
-	if err != nil {
-		t.Fatalf("ComputeSnapshotEntityViews: %v", err)
-	}
-	byNS := map[string]AnalysisSnapshotNameserverView{}
-	for _, ns := range views.Nameservers {
-		byNS[ns.NameserverName] = ns
-	}
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("ComputeSnapshotEntityViews: %v", err)
+		}
+		byNS := map[string]AnalysisSnapshotNameserverView{}
+		for _, ns := range views.Nameservers {
+			byNS[ns.NameserverName] = ns
+		}
 
-	ns1 := byNS["ns1.example"]
-	if len(ns1.Addresses) != 2 || ns1.Addresses[0] != "192.0.2.1" || ns1.Addresses[1] != "2001:db8::1" {
-		t.Errorf("ns1 addresses = %v, want [192.0.2.1 2001:db8::1]", ns1.Addresses)
-	}
-	if len(ns1.ASNs) != 2 {
-		t.Errorf("ns1 asns = %v, want 2 entries", ns1.ASNs)
-	}
-	if len(ns1.Domains) != 2 || ns1.Domains[0] != "example.test" || ns1.Domains[1] != "other.test" {
-		t.Errorf("ns1 domains = %v, want [example.test other.test]", ns1.Domains)
-	}
+		ns1 := byNS["ns1.example"]
+		if len(ns1.Addresses) != 2 || ns1.Addresses[0] != "192.0.2.1" || ns1.Addresses[1] != "2001:db8::1" {
+			t.Errorf("ns1 addresses = %v, want [192.0.2.1 2001:db8::1]", ns1.Addresses)
+		}
+		if len(ns1.ASNs) != 2 {
+			t.Errorf("ns1 asns = %v, want 2 entries", ns1.ASNs)
+		}
+		if len(ns1.Domains) != 2 || ns1.Domains[0] != "example.test" || ns1.Domains[1] != "other.test" {
+			t.Errorf("ns1 domains = %v, want [example.test other.test]", ns1.Domains)
+		}
 
-	ns2 := byNS["ns2.example"]
-	if len(ns2.Domains) != 1 || ns2.Domains[0] != "other.test" {
-		t.Errorf("ns2 domains = %v, want [other.test] (out-of-batch leak.test must not show)", ns2.Domains)
-	}
+		ns2 := byNS["ns2.example"]
+		if len(ns2.Domains) != 1 || ns2.Domains[0] != "other.test" {
+			t.Errorf("ns2 domains = %v, want [other.test] (out-of-batch leak.test must not show)", ns2.Domains)
+		}
+	})
 }
 
 func TestNameserverViewRoundTripPreservesRosters(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, snapID := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, snapID := snapshotViewFixture(t, s)
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
-	if err != nil {
-		t.Fatalf("compute: %v", err)
-	}
-	if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
-		t.Fatalf("replace: %v", err)
-	}
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("compute: %v", err)
+		}
+		if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
+			t.Fatalf("replace: %v", err)
+		}
 
-	got := s.ListSnapshotNameserverViews(snapID)
-	for _, row := range got {
-		if row.Addresses == nil && row.EndpointCount > 0 {
-			t.Errorf("ns %q: addresses round-trip lost (endpoint_count=%d but addresses nil)", row.NameserverName, row.EndpointCount)
+		got := s.ListSnapshotNameserverViews(snapID)
+		for _, row := range got {
+			if row.Addresses == nil && row.EndpointCount > 0 {
+				t.Errorf("ns %q: addresses round-trip lost (endpoint_count=%d but addresses nil)", row.NameserverName, row.EndpointCount)
+			}
+			if row.Domains == nil && row.DomainCount > 0 {
+				t.Errorf("ns %q: domains round-trip lost (domain_count=%d but domains nil)", row.NameserverName, row.DomainCount)
+			}
 		}
-		if row.Domains == nil && row.DomainCount > 0 {
-			t.Errorf("ns %q: domains round-trip lost (domain_count=%d but domains nil)", row.NameserverName, row.DomainCount)
-		}
-	}
+	})
 }
 
 // TestNameserverDetailPerFamilyLatency proves the detail handler splits a

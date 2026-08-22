@@ -347,62 +347,64 @@ func TestDiffReadsFromDomainViews(t *testing.T) {
 // capture-time builder writes a per-snapshot prefix row per CIDR seen
 // in the batch's authoritative-address fact set.
 func TestComputeSnapshotEntityViewsPopulatesPrefixView(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, snapID := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, snapID := snapshotViewFixture(t, s)
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
-	if err != nil {
-		t.Fatalf("compute: %v", err)
-	}
-	if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
-		t.Fatalf("replace: %v", err)
-	}
-	rows := s.ListSnapshotPrefixViews(snapID)
-	if len(rows) == 0 {
-		t.Fatal("expected prefix view rows, got none")
-	}
-	byPrefix := map[string]AnalysisSnapshotPrefixView{}
-	for _, row := range rows {
-		byPrefix[row.Prefix] = row
-	}
-	v4 := byPrefix["192.0.2.0/24"]
-	if v4.Family != "ipv4" {
-		t.Errorf("v4 family = %q, want ipv4", v4.Family)
-	}
-	if v4.AddressCount == 0 {
-		t.Errorf("v4 address_count = 0, want >0")
-	}
-	if len(v4.Domains) == 0 {
-		t.Errorf("v4 domains roster is empty")
-	}
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("compute: %v", err)
+		}
+		if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
+			t.Fatalf("replace: %v", err)
+		}
+		rows := s.ListSnapshotPrefixViews(snapID)
+		if len(rows) == 0 {
+			t.Fatal("expected prefix view rows, got none")
+		}
+		byPrefix := map[string]AnalysisSnapshotPrefixView{}
+		for _, row := range rows {
+			byPrefix[row.Prefix] = row
+		}
+		v4 := byPrefix["192.0.2.0/24"]
+		if v4.Family != "ipv4" {
+			t.Errorf("v4 family = %q, want ipv4", v4.Family)
+		}
+		if v4.AddressCount == 0 {
+			t.Errorf("v4 address_count = 0, want >0")
+		}
+		if len(v4.Domains) == 0 {
+			t.Errorf("v4 domains roster is empty")
+		}
+	})
 }
 
 // TestASNViewRoundTripPreservesRosters round-trips ASN view rows
 // through ReplaceSnapshotEntityViews → List, asserting the new
 // domains/nameservers/prefixes JSON columns rehydrate correctly.
 func TestASNViewRoundTripPreservesRosters(t *testing.T) {
-	s := testStoreForBackend(t, testBackends(t)[0])
-	cohortID, snapID := snapshotViewFixture(t, s)
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, snapID := snapshotViewFixture(t, s)
 
-	views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
-	if err != nil {
-		t.Fatalf("compute: %v", err)
-	}
-	if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
-		t.Fatalf("replace: %v", err)
-	}
-	rows := s.ListSnapshotASNViews(snapID)
-	for _, row := range rows {
-		if row.DomainCount > 0 && row.Domains == nil {
-			t.Errorf("asn %d: Domains lost (domain_count=%d)", row.ASN, row.DomainCount)
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("compute: %v", err)
 		}
-		if row.NameserverCount > 0 && row.Nameservers == nil {
-			t.Errorf("asn %d: Nameservers lost", row.ASN)
+		if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
+			t.Fatalf("replace: %v", err)
 		}
-		if row.PrefixCount > 0 && row.Prefixes == nil {
-			t.Errorf("asn %d: Prefixes lost", row.ASN)
+		rows := s.ListSnapshotASNViews(snapID)
+		for _, row := range rows {
+			if row.DomainCount > 0 && row.Domains == nil {
+				t.Errorf("asn %d: Domains lost (domain_count=%d)", row.ASN, row.DomainCount)
+			}
+			if row.NameserverCount > 0 && row.Nameservers == nil {
+				t.Errorf("asn %d: Nameservers lost", row.ASN)
+			}
+			if row.PrefixCount > 0 && row.Prefixes == nil {
+				t.Errorf("asn %d: Prefixes lost", row.ASN)
+			}
 		}
-	}
+	})
 }
 
 // TestLegacyMaterializationCacheGone is a compile-time guard: if the

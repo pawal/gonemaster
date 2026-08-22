@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/internal/apitest"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
@@ -40,9 +42,8 @@ func toolNames(t *testing.T, api *apiClient, allowWrite bool) map[string]bool {
 var writeToolNames = []string{"batch_enqueue", "batch_cancel", "cancel_job"}
 
 func TestWriteToolsHiddenByDefault(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{})
-	defer ts.Close()
-	names := toolNames(t, clientFor(t, ts.URL, ""), false)
+	api := fakeAPI(t, apitest.Opts{})
+	names := toolNames(t, api, false)
 
 	if !names["test_domain"] || !names["ping"] {
 		t.Errorf("read tools should always be present: %v", names)
@@ -55,9 +56,8 @@ func TestWriteToolsHiddenByDefault(t *testing.T) {
 }
 
 func TestWriteToolsRegisterWhenAllowed(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{})
-	defer ts.Close()
-	names := toolNames(t, clientFor(t, ts.URL, ""), true)
+	api := fakeAPI(t, apitest.Opts{})
+	names := toolNames(t, api, true)
 	for _, n := range writeToolNames {
 		if !names[n] {
 			t.Errorf("write tool %q should register with the write gate on", n)
@@ -66,12 +66,11 @@ func TestWriteToolsRegisterWhenAllowed(t *testing.T) {
 }
 
 func TestBatchEnqueue(t *testing.T) {
-	var captured batchCreateRequest
-	ts := newFakeServer(t, fakeOpts{batchReq: &captured})
-	defer ts.Close()
+	var captured apitest.BatchCreateRequest
+	api := fakeAPI(t, apitest.Opts{BatchReq: &captured})
 
 	var out batchEnqueueOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "batch_enqueue", map[string]any{
+	res := callTool(t, api, "batch_enqueue", map[string]any{
 		"domains": []any{"a.example", "b.example"},
 		"profile": "thorough",
 		"tags":    []any{"se"},
@@ -88,19 +87,17 @@ func TestBatchEnqueue(t *testing.T) {
 }
 
 func TestBatchEnqueueRequiresDomainsOrTag(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{})
-	defer ts.Close()
-	res := callTool(t, clientFor(t, ts.URL, ""), "batch_enqueue", map[string]any{}, nil)
+	api := fakeAPI(t, apitest.Opts{})
+	res := callTool(t, api, "batch_enqueue", map[string]any{}, nil)
 	if !res.IsError {
 		t.Fatalf("expected error with no domains or from_tag")
 	}
 }
 
 func TestCancelJob(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{})
-	defer ts.Close()
+	api := fakeAPI(t, apitest.Opts{})
 	var out cancelJobOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "cancel_job", map[string]any{"job_id": "job_7"}, &out)
+	res := callTool(t, api, "cancel_job", map[string]any{"job_id": "job_7"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -110,10 +107,9 @@ func TestCancelJob(t *testing.T) {
 }
 
 func TestBatchCancel(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{})
-	defer ts.Close()
+	api := fakeAPI(t, apitest.Opts{})
 	var out batchCancelOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "batch_cancel", map[string]any{"batch_id": "b1"}, &out)
+	res := callTool(t, api, "batch_cancel", map[string]any{"batch_id": "b1"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}

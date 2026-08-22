@@ -4,22 +4,23 @@ import (
 	"net/url"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
 func TestRunSearchForwardsFiltersAndMaps(t *testing.T) {
 	grade := "B"
 	score := 80
 	var captured url.Values
-	ts := newFakeServer(t, fakeOpts{
-		runsQuery: &captured,
-		runs: []runView{
+	api := fakeAPI(t, apitest.Opts{
+		RunsQuery: &captured,
+		Runs: []apitest.Run{
 			{ID: "run_2", Domain: "x.example", Status: "succeeded", Grade: &grade, Score: &score, WorstLevel: "WARNING", DurationMs: 500, FinishedAt: time.Unix(2000, 0)},
 		},
 	})
-	defer ts.Close()
 
 	var out runSearchOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "run_search", map[string]any{
+	res := callTool(t, api, "run_search", map[string]any{
 		"domain": "x.example",
 		"tag":    "SOATIME",
 		"level":  "WARNING",
@@ -46,11 +47,10 @@ func TestRunSearchForwardsFiltersAndMaps(t *testing.T) {
 
 func TestRunSearchDefaultLimit(t *testing.T) {
 	var captured url.Values
-	ts := newFakeServer(t, fakeOpts{runsQuery: &captured})
-	defer ts.Close()
+	api := fakeAPI(t, apitest.Opts{RunsQuery: &captured})
 
 	var out runSearchOutput
-	callTool(t, clientFor(t, ts.URL, ""), "run_search", map[string]any{"domain": "d"}, &out)
+	callTool(t, api, "run_search", map[string]any{"domain": "d"}, &out)
 	if captured.Get("limit") != "20" {
 		t.Errorf("default limit = %q, want 20", captured.Get("limit"))
 	}
@@ -59,28 +59,27 @@ func TestRunSearchDefaultLimit(t *testing.T) {
 func TestRunDiff(t *testing.T) {
 	// run_a: NS01 (INFO), SOATIME (NOTICE), GONE (WARNING)
 	// run_b: NS01 (INFO), SOATIME (WARNING), NEW (ERROR)
-	ts := newFakeServer(t, fakeOpts{resultsByID: map[string]resultView{
+	api := fakeAPI(t, apitest.Opts{ResultsByID: map[string]apitest.Result{
 		"a": {
-			JobID: "a", Status: "succeeded", Score: &resultScore{Score: 90, Grade: "A"},
-			Raw: &resultRawView{Entries: []entryView{
+			JobID: "a", Status: "succeeded", Score: &apitest.Score{Score: 90, Grade: "A"},
+			Raw: &apitest.ResultRaw{Entries: []apitest.Entry{
 				{Module: "nameserver", Tag: "NS01", Level: "INFO"},
 				{Module: "consistency", Tag: "SOATIME", Level: "NOTICE"},
 				{Module: "zone", Tag: "GONE", Level: "WARNING"},
 			}},
 		},
 		"b": {
-			JobID: "b", Status: "succeeded", Score: &resultScore{Score: 70, Grade: "C"},
-			Raw: &resultRawView{Entries: []entryView{
+			JobID: "b", Status: "succeeded", Score: &apitest.Score{Score: 70, Grade: "C"},
+			Raw: &apitest.ResultRaw{Entries: []apitest.Entry{
 				{Module: "nameserver", Tag: "NS01", Level: "INFO"},
 				{Module: "consistency", Tag: "SOATIME", Level: "WARNING"},
 				{Module: "zone", Tag: "NEW", Level: "ERROR"},
 			}},
 		},
 	}})
-	defer ts.Close()
 
 	var out runDiffOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "run_diff", map[string]any{"run_a": "a", "run_b": "b"}, &out)
+	res := callTool(t, api, "run_diff", map[string]any{"run_a": "a", "run_b": "b"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -99,9 +98,8 @@ func TestRunDiff(t *testing.T) {
 }
 
 func TestRunDiffRequiresBothIDs(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{})
-	defer ts.Close()
-	res := callTool(t, clientFor(t, ts.URL, ""), "run_diff", map[string]any{"run_a": "a"}, nil)
+	api := fakeAPI(t, apitest.Opts{})
+	res := callTool(t, api, "run_diff", map[string]any{"run_a": "a"}, nil)
 	if !res.IsError {
 		t.Fatalf("expected error when run_b missing")
 	}

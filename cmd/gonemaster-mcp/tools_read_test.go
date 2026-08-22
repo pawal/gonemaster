@@ -3,224 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
-	"net/url"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/internal/apitest"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
-
-// fakeOpts configures the stand-in gonemaster-server.
-type fakeOpts struct {
-	pollsUntilDone int                     // GET /jobs/{id} returns "running" for this many polls, then finalStatus
-	finalStatus    string                  // terminal status (default "succeeded")
-	jobError       string                  // job.Error at the terminal poll
-	result         *resultView             // body for GET /jobs/{id}/result; nil yields 404
-	resultsByID    map[string]resultView   // per-id bodies for GET /jobs/{id}/result (checked first)
-	run            *runView                // body for GET /runs/{id}; nil yields 404
-	runs           []runView               // items for GET /runs
-	runsQuery      *url.Values             // when set, captures the GET /runs query
-	batch          *batchSummaryView       // body for GET /batches/{id}; nil yields 404
-	batchList      *batchListView          // body for GET /batches
-	batchListQuery *url.Values             // when set, captures the GET /batches query
-	tagValues      *batchTagValuesView     // body for GET /batches/{id}/tag-values
-	tagValuesQuery *url.Values             // when set, captures the tag-values query
-	entries        []entryRecord           // items for GET /entries (filtered by the level query)
-	batchReq       *batchCreateRequest     // when set, captures the POST /jobs/batch body
-	specList       *specTestcaseListView   // body for GET /spec/testcases
-	specDetail     *specTestcaseDetailView // body for GET /spec/testcases/{id}; nil yields 404
-	requireToken   string                  // when set, endpoints return 401 unless the Bearer token matches
-}
-
-func newFakeServer(t *testing.T, opts fakeOpts) *httptest.Server {
-	t.Helper()
-	if opts.finalStatus == "" {
-		opts.finalStatus = "succeeded"
-	}
-	var mu sync.Mutex
-	polls := 0
-
-	writeJSON := func(w http.ResponseWriter, code int, v any) {
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(code)
-		_ = json.NewEncoder(w).Encode(v)
-	}
-	errBody := func(msg string) any {
-		return map[string]any{"error": map[string]string{"code": "x", "message": msg}}
-	}
-	guard := func(w http.ResponseWriter, r *http.Request) bool {
-		if opts.requireToken != "" && r.Header.Get("Authorization") != "Bearer "+opts.requireToken {
-			writeJSON(w, http.StatusUnauthorized, errBody("unauthorized"))
-			return false
-		}
-		return true
-	}
-
-	mux := http.NewServeMux()
-	mux.HandleFunc("POST /api/v1/jobs", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		writeJSON(w, http.StatusCreated, jobView{ID: "job_1", Domain: "example.com", Status: "queued"})
-	})
-	mux.HandleFunc("GET /api/v1/jobs/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		mu.Lock()
-		polls++
-		p := polls
-		mu.Unlock()
-		status := "running"
-		if p > opts.pollsUntilDone {
-			status = opts.finalStatus
-		}
-		j := jobView{ID: r.PathValue("id"), Domain: "example.com", Status: status}
-		if terminalStatuses[status] {
-			j.StartedAt = time.Unix(1000, 0)
-			j.FinishedAt = time.Unix(1008, 0) // 8000 ms
-			j.Error = opts.jobError
-		}
-		writeJSON(w, http.StatusOK, j)
-	})
-	mux.HandleFunc("GET /api/v1/jobs/{id}/result", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		if res, ok := opts.resultsByID[r.PathValue("id")]; ok {
-			writeJSON(w, http.StatusOK, res)
-			return
-		}
-		if opts.result == nil {
-			writeJSON(w, http.StatusNotFound, errBody("no result"))
-			return
-		}
-		writeJSON(w, http.StatusOK, opts.result)
-	})
-	mux.HandleFunc("GET /api/v1/runs/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		if opts.run == nil {
-			writeJSON(w, http.StatusNotFound, errBody("no run"))
-			return
-		}
-		writeJSON(w, http.StatusOK, *opts.run)
-	})
-	mux.HandleFunc("GET /api/v1/runs", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		if opts.runsQuery != nil {
-			*opts.runsQuery = r.URL.Query()
-		}
-		writeJSON(w, http.StatusOK, runListView{Items: opts.runs, Total: len(opts.runs)})
-	})
-	mux.HandleFunc("GET /api/v1/batches/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		if opts.batch == nil {
-			writeJSON(w, http.StatusNotFound, errBody("no batch"))
-			return
-		}
-		writeJSON(w, http.StatusOK, *opts.batch)
-	})
-	mux.HandleFunc("GET /api/v1/batches", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		if opts.batchListQuery != nil {
-			*opts.batchListQuery = r.URL.Query()
-		}
-		if opts.batchList == nil {
-			writeJSON(w, http.StatusOK, batchListView{})
-			return
-		}
-		writeJSON(w, http.StatusOK, *opts.batchList)
-	})
-	mux.HandleFunc("GET /api/v1/batches/{id}/tag-values", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		if opts.tagValuesQuery != nil {
-			*opts.tagValuesQuery = r.URL.Query()
-		}
-		if opts.tagValues == nil {
-			writeJSON(w, http.StatusNotFound, errBody("no batch"))
-			return
-		}
-		writeJSON(w, http.StatusOK, *opts.tagValues)
-	})
-	mux.HandleFunc("GET /api/v1/entries", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		level := r.URL.Query().Get("level")
-		items := []entryRecord{}
-		for _, e := range opts.entries {
-			if level == "" || e.Level == level {
-				items = append(items, e)
-			}
-		}
-		writeJSON(w, http.StatusOK, entryListView{Items: items, Total: len(items)})
-	})
-	mux.HandleFunc("POST /api/v1/jobs/batch", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		var req batchCreateRequest
-		_ = json.NewDecoder(r.Body).Decode(&req)
-		if opts.batchReq != nil {
-			*opts.batchReq = req
-		}
-		ids := []string{}
-		for range req.Domains {
-			ids = append(ids, "job_x")
-		}
-		if len(ids) == 0 && req.FromTag != "" {
-			ids = []string{"job_x"}
-		}
-		writeJSON(w, http.StatusCreated, batchCreateResponse{BatchID: "batch_new", JobIDs: ids})
-	})
-	mux.HandleFunc("POST /api/v1/jobs/{id}/cancel", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		writeJSON(w, http.StatusOK, jobView{ID: r.PathValue("id"), Status: "canceled"})
-	})
-	mux.HandleFunc("DELETE /api/v1/batches/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		w.WriteHeader(http.StatusNoContent)
-	})
-	mux.HandleFunc("GET /api/v1/spec/testcases", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		if opts.specList == nil {
-			writeJSON(w, http.StatusOK, specTestcaseListView{})
-			return
-		}
-		writeJSON(w, http.StatusOK, *opts.specList)
-	})
-	mux.HandleFunc("GET /api/v1/spec/testcases/{id}", func(w http.ResponseWriter, r *http.Request) {
-		if !guard(w, r) {
-			return
-		}
-		if opts.specDetail == nil {
-			writeJSON(w, http.StatusNotFound, errBody("no testcase"))
-			return
-		}
-		writeJSON(w, http.StatusOK, *opts.specDetail)
-	})
-	return httptest.NewServer(mux)
-}
 
 // callTool runs one tools/call over an in-memory MCP session. On a successful
 // (non-error) result it decodes the structured output into out.
@@ -267,25 +57,24 @@ func errorText(res *mcp.CallToolResult) string {
 }
 
 func TestTestDomainSucceeds(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{
-		pollsUntilDone: 1,
-		result: &resultView{
+	api := fakeAPI(t, apitest.Opts{
+		PollsUntilDone: 1,
+		Result: &apitest.Result{
 			JobID:  "job_1",
 			Status: "succeeded",
-			Score:  &resultScore{Score: 72, Grade: "C"},
-			Raw: &resultRawView{Entries: []entryView{
+			Score:  &apitest.Score{Score: 72, Grade: "C"},
+			Raw: &apitest.ResultRaw{Entries: []apitest.Entry{
 				{Module: "consistency", Testcase: "Consistency01", Tag: "SOATIME", Level: "WARNING", Message: "SOA times differ"},
 			}},
 		},
 	})
-	defer ts.Close()
 
 	orig := pollInterval
 	pollInterval = 5 * time.Millisecond
 	defer func() { pollInterval = orig }()
 
 	var out testResult
-	res := callTool(t, clientFor(t, ts.URL, ""), "test_domain", map[string]any{"domain": "example.com"}, &out)
+	res := callTool(t, api, "test_domain", map[string]any{"domain": "example.com"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -304,15 +93,14 @@ func TestTestDomainSucceeds(t *testing.T) {
 }
 
 func TestTestDomainTimeout(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{pollsUntilDone: 1 << 30}) // never terminal
-	defer ts.Close()
+	api := fakeAPI(t, apitest.Opts{PollsUntilDone: 1 << 30}) // never terminal
 
 	origP, origT := pollInterval, defaultTestTimeout
 	pollInterval = 5 * time.Millisecond
 	defaultTestTimeout = 40 * time.Millisecond
 	defer func() { pollInterval = origP; defaultTestTimeout = origT }()
 
-	res := callTool(t, clientFor(t, ts.URL, ""), "test_domain", map[string]any{"domain": "example.com"}, nil)
+	res := callTool(t, api, "test_domain", map[string]any{"domain": "example.com"}, nil)
 	if !res.IsError {
 		t.Fatalf("expected a timeout tool error")
 	}
@@ -323,19 +111,18 @@ func TestTestDomainTimeout(t *testing.T) {
 
 func TestRunGet(t *testing.T) {
 	grade := "A"
-	ts := newFakeServer(t, fakeOpts{
-		run: &runView{ID: "run_9", Domain: "good.example", Status: "succeeded", DurationMs: 1234, Grade: &grade},
-		result: &resultView{
+	api := fakeAPI(t, apitest.Opts{
+		Run: &apitest.Run{ID: "run_9", Domain: "good.example", Status: "succeeded", DurationMs: 1234, Grade: &grade},
+		Result: &apitest.Result{
 			JobID:  "run_9",
 			Status: "succeeded",
-			Score:  &resultScore{Score: 95, Grade: "A"},
-			Raw:    &resultRawView{Entries: []entryView{{Module: "nameserver", Tag: "NS01", Level: "INFO"}}},
+			Score:  &apitest.Score{Score: 95, Grade: "A"},
+			Raw:    &apitest.ResultRaw{Entries: []apitest.Entry{{Module: "nameserver", Tag: "NS01", Level: "INFO"}}},
 		},
 	})
-	defer ts.Close()
 
 	var out testResult
-	res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "run_9"}, &out)
+	res := callTool(t, api, "run_get", map[string]any{"id": "run_9"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -354,21 +141,20 @@ func TestRunGet(t *testing.T) {
 }
 
 func TestRunGetIncludesNameserverTimings(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{
-		run: &runView{ID: "run_5", Domain: "timed.example", Status: "succeeded"},
-		result: &resultView{
+	api := fakeAPI(t, apitest.Opts{
+		Run: &apitest.Run{ID: "run_5", Domain: "timed.example", Status: "succeeded"},
+		Result: &apitest.Result{
 			JobID:  "run_5",
 			Status: "succeeded",
-			NameserverTimings: []nsTimingView{
+			NameserverTimings: []apitest.NSTiming{
 				{Nameserver: "ns1.example", Address: "192.0.2.1", AvgMS: 13, MedianMS: 12.5, MinMS: 9, MaxMS: 22, Count: 5, Status: "ok"},
 				{Nameserver: "ns2.example", Address: "192.0.2.2", Status: "unreachable"},
 			},
 		},
 	})
-	defer ts.Close()
 
 	var out testResult
-	res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "run_5"}, &out)
+	res := callTool(t, api, "run_get", map[string]any{"id": "run_5"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -386,14 +172,13 @@ func TestRunGetIncludesNameserverTimings(t *testing.T) {
 func TestLatestFor(t *testing.T) {
 	g1, g2 := "B", "C"
 	s1, s2 := 80, 70
-	ts := newFakeServer(t, fakeOpts{runs: []runView{
+	api := fakeAPI(t, apitest.Opts{Runs: []apitest.Run{
 		{ID: "run_2", Domain: "x.example", Status: "succeeded", Grade: &g1, Score: &s1, WorstLevel: "WARNING", DurationMs: 500, FinishedAt: time.Unix(2000, 0)},
 		{ID: "run_1", Domain: "x.example", Status: "succeeded", Grade: &g2, Score: &s2, WorstLevel: "ERROR", DurationMs: 600, FinishedAt: time.Unix(1000, 0)},
 	}})
-	defer ts.Close()
 
 	var out latestForOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "latest_for", map[string]any{"domain": "x.example"}, &out)
+	res := callTool(t, api, "latest_for", map[string]any{"domain": "x.example"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -411,16 +196,15 @@ func TestLatestFor(t *testing.T) {
 func TestRunOutputsExposeBatchID(t *testing.T) {
 	// run_get and the run-summary tools must surface the batch a run belongs
 	// to so an agent can pivot from a run to its cohort.
-	ts := newFakeServer(t, fakeOpts{
-		run: &runView{ID: "run_b", Domain: "x.example", BatchID: "batch_42", Status: "succeeded"},
-		runs: []runView{
+	api := fakeAPI(t, apitest.Opts{
+		Run: &apitest.Run{ID: "run_b", Domain: "x.example", BatchID: "batch_42", Status: "succeeded"},
+		Runs: []apitest.Run{
 			{ID: "run_b", Domain: "x.example", BatchID: "batch_42", Status: "succeeded", FinishedAt: time.Unix(2000, 0)},
 		},
 	})
-	defer ts.Close()
 
 	var got testResult
-	if res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "run_b"}, &got); res.IsError {
+	if res := callTool(t, api, "run_get", map[string]any{"id": "run_b"}, &got); res.IsError {
 		t.Fatalf("run_get error: %s", errorText(res))
 	}
 	if got.BatchID != "batch_42" {
@@ -428,7 +212,7 @@ func TestRunOutputsExposeBatchID(t *testing.T) {
 	}
 
 	var latest latestForOutput
-	if res := callTool(t, clientFor(t, ts.URL, ""), "latest_for", map[string]any{"domain": "x.example"}, &latest); res.IsError {
+	if res := callTool(t, api, "latest_for", map[string]any{"domain": "x.example"}, &latest); res.IsError {
 		t.Fatalf("latest_for error: %s", errorText(res))
 	}
 	if len(latest.Runs) != 1 || latest.Runs[0].BatchID != "batch_42" {
@@ -439,16 +223,15 @@ func TestRunOutputsExposeBatchID(t *testing.T) {
 func TestRunOutputsExposePublicID(t *testing.T) {
 	// run_get and latest_for must surface public_id so an agent can build a
 	// shareable report link.
-	ts := newFakeServer(t, fakeOpts{
-		run: &runView{ID: "run_p", Domain: "x.example", PublicID: "Ab3xZ9k0", Status: "succeeded"},
-		runs: []runView{
+	api := fakeAPI(t, apitest.Opts{
+		Run: &apitest.Run{ID: "run_p", Domain: "x.example", PublicID: "Ab3xZ9k0", Status: "succeeded"},
+		Runs: []apitest.Run{
 			{ID: "run_p", Domain: "x.example", PublicID: "Ab3xZ9k0", Status: "succeeded", FinishedAt: time.Unix(2000, 0)},
 		},
 	})
-	defer ts.Close()
 
 	var got testResult
-	if res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "run_p"}, &got); res.IsError {
+	if res := callTool(t, api, "run_get", map[string]any{"id": "run_p"}, &got); res.IsError {
 		t.Fatalf("run_get error: %s", errorText(res))
 	}
 	if got.PublicID != "Ab3xZ9k0" {
@@ -456,7 +239,7 @@ func TestRunOutputsExposePublicID(t *testing.T) {
 	}
 
 	var latest latestForOutput
-	if res := callTool(t, clientFor(t, ts.URL, ""), "latest_for", map[string]any{"domain": "x.example"}, &latest); res.IsError {
+	if res := callTool(t, api, "latest_for", map[string]any{"domain": "x.example"}, &latest); res.IsError {
 		t.Fatalf("latest_for error: %s", errorText(res))
 	}
 	if len(latest.Runs) != 1 || latest.Runs[0].PublicID != "Ab3xZ9k0" {
@@ -466,10 +249,9 @@ func TestRunOutputsExposePublicID(t *testing.T) {
 
 func TestRunOutputsOmitPublicIDWhenAbsent(t *testing.T) {
 	// A run without a public_id must not invent one.
-	ts := newFakeServer(t, fakeOpts{run: &runView{ID: "run_np", Domain: "x.example", Status: "succeeded"}})
-	defer ts.Close()
+	api := fakeAPI(t, apitest.Opts{Run: &apitest.Run{ID: "run_np", Domain: "x.example", Status: "succeeded"}})
 	var got testResult
-	if res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "run_np"}, &got); res.IsError {
+	if res := callTool(t, api, "run_get", map[string]any{"id": "run_np"}, &got); res.IsError {
 		t.Fatalf("run_get error: %s", errorText(res))
 	}
 	if got.PublicID != "" {
@@ -478,11 +260,10 @@ func TestRunOutputsOmitPublicIDWhenAbsent(t *testing.T) {
 }
 
 func TestRunGetUnauthorizedGivesTokenHint(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{requireToken: "gm_secret", run: &runView{ID: "r", Domain: "d", Status: "succeeded"}})
-	defer ts.Close()
+	api := fakeAPI(t, apitest.Opts{RequireToken: "gm_secret", Run: &apitest.Run{ID: "r", Domain: "d", Status: "succeeded"}})
 
 	// No token configured: the server returns 401.
-	res := callTool(t, clientFor(t, ts.URL, ""), "run_get", map[string]any{"id": "r"}, nil)
+	res := callTool(t, api, "run_get", map[string]any{"id": "r"}, nil)
 	if !res.IsError {
 		t.Fatalf("expected an unauthorized tool error")
 	}
@@ -493,15 +274,14 @@ func TestRunGetUnauthorizedGivesTokenHint(t *testing.T) {
 }
 
 func TestRunGetForwardsToken(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{
-		requireToken: "gm_secret",
-		run:          &runView{ID: "r", Domain: "d", Status: "succeeded"},
-		result:       &resultView{JobID: "r", Status: "succeeded", Score: &resultScore{Score: 100, Grade: "A+"}},
+	api := fakeAPI(t, apitest.Opts{
+		RequireToken: "gm_secret",
+		Run:          &apitest.Run{ID: "r", Domain: "d", Status: "succeeded"},
+		Result:       &apitest.Result{JobID: "r", Status: "succeeded", Score: &apitest.Score{Score: 100, Grade: "A+"}},
 	})
-	defer ts.Close()
 
 	var out testResult
-	res := callTool(t, clientFor(t, ts.URL, "gm_secret"), "run_get", map[string]any{"id": "r"}, &out)
+	res := callTool(t, clientFor(t, api.baseURL, "gm_secret"), "run_get", map[string]any{"id": "r"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error with valid token: %s", errorText(res))
 	}

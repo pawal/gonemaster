@@ -4,11 +4,13 @@ import (
 	"net/url"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
 func TestBatchGet(t *testing.T) {
 	fin := time.Unix(5000, 0)
-	ts := newFakeServer(t, fakeOpts{batch: &batchSummaryView{
+	api := fakeAPI(t, apitest.Opts{Batch: &apitest.BatchSummary{
 		BatchID:      "b1",
 		Tag:          "se-weekly",
 		Total:        3,
@@ -17,10 +19,9 @@ func TestBatchGet(t *testing.T) {
 		CreatedAt:    time.Unix(1000, 0),
 		FinishedAt:   &fin,
 	}})
-	defer ts.Close()
 
 	var out batchGetOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "batch_get", map[string]any{"batch_id": "b1"}, &out)
+	res := callTool(t, api, "batch_get", map[string]any{"batch_id": "b1"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -36,14 +37,13 @@ func TestBatchGet(t *testing.T) {
 }
 
 func TestBatchGetNotDoneWhenRunning(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{batch: &batchSummaryView{
+	api := fakeAPI(t, apitest.Opts{Batch: &apitest.BatchSummary{
 		BatchID:      "b2",
 		Total:        2,
 		StatusCounts: map[string]int{"running": 1, "succeeded": 1},
 	}})
-	defer ts.Close()
 	var out batchGetOutput
-	callTool(t, clientFor(t, ts.URL, ""), "batch_get", map[string]any{"batch_id": "b2"}, &out)
+	callTool(t, api, "batch_get", map[string]any{"batch_id": "b2"}, &out)
 	if out.Done {
 		t.Errorf("expected done=false while a job is running")
 	}
@@ -52,20 +52,19 @@ func TestBatchGetNotDoneWhenRunning(t *testing.T) {
 func TestBatchList(t *testing.T) {
 	fin := time.Unix(5000, 0)
 	var captured url.Values
-	ts := newFakeServer(t, fakeOpts{
-		batchListQuery: &captured,
-		batchList: &batchListView{
+	api := fakeAPI(t, apitest.Opts{
+		BatchListQuery: &captured,
+		BatchList: &apitest.BatchList{
 			Total: 2,
-			Items: []batchListItemView{
+			Items: []apitest.BatchListItem{
 				{BatchID: "b2", Tag: "tld-weekly", Status: "done", Total: 1437, Completed: 1437, Completion: 100, CreatedAt: time.Unix(4000, 0), FinishedAt: &fin},
 				{BatchID: "b1", Tag: "se", Status: "running", Total: 10, Completed: 4, Completion: 40, CreatedAt: time.Unix(1000, 0)},
 			},
 		},
 	})
-	defer ts.Close()
 
 	var out batchListOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "batch_list", map[string]any{"label": "tld", "limit": float64(5)}, &out)
+	res := callTool(t, api, "batch_list", map[string]any{"label": "tld", "limit": float64(5)}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -87,28 +86,26 @@ func TestBatchList(t *testing.T) {
 
 func TestBatchListDefaultLimit(t *testing.T) {
 	var captured url.Values
-	ts := newFakeServer(t, fakeOpts{batchListQuery: &captured})
-	defer ts.Close()
+	api := fakeAPI(t, apitest.Opts{BatchListQuery: &captured})
 	var out batchListOutput
-	callTool(t, clientFor(t, ts.URL, ""), "batch_list", map[string]any{}, &out)
+	callTool(t, api, "batch_list", map[string]any{}, &out)
 	if captured.Get("limit") != "20" {
 		t.Errorf("default limit = %q, want 20", captured.Get("limit"))
 	}
 }
 
 func TestCohortStats(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{
-		batch: &batchSummaryView{BatchID: "b1", Total: 3, Grades: map[string]int{"A": 2, "C": 1}},
-		runs: []runView{
+	api := fakeAPI(t, apitest.Opts{
+		Batch: &apitest.BatchSummary{BatchID: "b1", Total: 3, Grades: map[string]int{"A": 2, "C": 1}},
+		Runs: []apitest.Run{
 			{ID: "r1", WorstLevel: "INFO"},
 			{ID: "r2", WorstLevel: "WARNING"},
 			{ID: "r3", WorstLevel: "WARNING"},
 		},
 	})
-	defer ts.Close()
 
 	var out cohortStatsOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "cohort_stats", map[string]any{"batch_id": "b1"}, &out)
+	res := callTool(t, api, "cohort_stats", map[string]any{"batch_id": "b1"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -126,19 +123,18 @@ func TestCohortStats(t *testing.T) {
 func TestCohortTagValues(t *testing.T) {
 	avg := 92.5
 	var captured url.Values
-	ts := newFakeServer(t, fakeOpts{
-		tagValuesQuery: &captured,
-		tagValues: &batchTagValuesView{
+	api := fakeAPI(t, apitest.Opts{
+		TagValuesQuery: &captured,
+		TagValues: &apitest.TagValues{
 			BatchID: "b1", Tag: "IPV4_ONE_ASN", Arg: "asn", MinCount: 1, WeightByScore: true,
-			Values: []tagValueRollupView{
+			Values: []apitest.TagValue{
 				{Value: "13335", Count: 12, AvgScore: &avg, SampleDomains: []string{"a", "b"}},
 			},
 		},
 	})
-	defer ts.Close()
 
 	var out cohortTagValuesOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "cohort_tag_values", map[string]any{
+	res := callTool(t, api, "cohort_tag_values", map[string]any{
 		"batch_id": "b1", "tag": "IPV4_ONE_ASN", "arg": "asn", "weight_by_score": true,
 	}, &out)
 	if res.IsError {
@@ -158,27 +154,25 @@ func TestCohortTagValues(t *testing.T) {
 }
 
 func TestCohortTagValuesRequiresTagAndArg(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{})
-	defer ts.Close()
+	api := fakeAPI(t, apitest.Opts{})
 	var out cohortTagValuesOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "cohort_tag_values", map[string]any{"batch_id": "b1", "arg": "asn"}, &out)
+	res := callTool(t, api, "cohort_tag_values", map[string]any{"batch_id": "b1", "arg": "asn"}, &out)
 	if !res.IsError {
 		t.Errorf("expected an error when tag is missing")
 	}
 }
 
 func TestFailuresByTag(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{entries: []entryRecord{
+	api := fakeAPI(t, apitest.Opts{Entries: []apitest.EntryRecord{
 		{Domain: "a.example", Module: "consistency", Tag: "SOATIME", Level: "WARNING"},
 		{Domain: "b.example", Module: "consistency", Tag: "SOATIME", Level: "WARNING"},
 		{Domain: "c.example", Module: "dnssec", Tag: "DNSSEC09", Level: "ERROR"},
 		// Below the default WARNING floor; must be excluded.
 		{Domain: "d.example", Module: "nameserver", Tag: "NS01", Level: "INFO"},
 	}})
-	defer ts.Close()
 
 	var out failuresByTagOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "failures_by_tag", map[string]any{"batch_id": "b1"}, &out)
+	res := callTool(t, api, "failures_by_tag", map[string]any{"batch_id": "b1"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -203,14 +197,13 @@ func TestFailuresByTag(t *testing.T) {
 }
 
 func TestFailuresByTagSeverityFloor(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{entries: []entryRecord{
+	api := fakeAPI(t, apitest.Opts{Entries: []apitest.EntryRecord{
 		{Domain: "a.example", Tag: "DNSSEC09", Level: "ERROR"},
 		{Domain: "b.example", Tag: "SOATIME", Level: "WARNING"},
 	}})
-	defer ts.Close()
 
 	var out failuresByTagOutput
-	callTool(t, clientFor(t, ts.URL, ""), "failures_by_tag", map[string]any{"batch_id": "b1", "severity_min": "ERROR"}, &out)
+	callTool(t, api, "failures_by_tag", map[string]any{"batch_id": "b1", "severity_min": "ERROR"}, &out)
 	if len(out.Tags) != 1 || out.Tags[0].Tag != "DNSSEC09" {
 		t.Errorf("ERROR floor should keep only DNSSEC09, got %+v", out.Tags)
 	}

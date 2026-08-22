@@ -3,11 +3,11 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/internal/apitest"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -80,29 +80,6 @@ func TestNormalizeBaseURL(t *testing.T) {
 	}
 }
 
-// fakeWhoami stands in for gonemaster-server. With an empty expectToken it
-// behaves as an open-mode server; otherwise it is in token mode and reports
-// authenticated only when the request carries the matching Bearer token.
-func fakeWhoami(t *testing.T, expectToken string) *httptest.Server {
-	t.Helper()
-	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path != "/api/v1/whoami" {
-			http.NotFound(w, r)
-			return
-		}
-		resp := whoamiResponse{}
-		if expectToken == "" {
-			resp.Mode = "open"
-			resp.Authenticated = true
-		} else {
-			resp.Mode = "token"
-			resp.Authenticated = r.Header.Get("Authorization") == "Bearer "+expectToken
-		}
-		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(resp)
-	}))
-}
-
 // callPing wires the MCP server to an in-memory client and invokes the ping
 // tool, exercising the full tools/call round-trip plus the HTTP client.
 func callPing(t *testing.T, api *apiClient) pingOutput {
@@ -151,11 +128,21 @@ func clientFor(t *testing.T, serverURL, token string) *apiClient {
 	return api
 }
 
-func TestPingOpenMode(t *testing.T) {
-	ts := fakeWhoami(t, "")
-	defer ts.Close()
+// fakeAPI starts a fake gonemaster-server for the test and returns a client
+// pointed at it, with no bearer token.
+func fakeAPI(t *testing.T, opts apitest.Opts) *apiClient {
+	t.Helper()
+	return clientFor(t, apitest.New(t, opts).URL, "")
+}
 
-	out := callPing(t, clientFor(t, ts.URL, ""))
+// tokenMode is the fake in token mode: it answers whoami as such and rejects
+// every other route without the matching Bearer token.
+func tokenMode(token string) apitest.Opts {
+	return apitest.Opts{WhoamiMode: "token", RequireToken: token}
+}
+
+func TestPingOpenMode(t *testing.T) {
+	out := callPing(t, fakeAPI(t, apitest.Opts{}))
 	if !out.Reachable {
 		t.Fatalf("expected reachable, got %+v", out)
 	}
@@ -168,10 +155,9 @@ func TestPingOpenMode(t *testing.T) {
 }
 
 func TestPingTokenModeAuthenticated(t *testing.T) {
-	ts := fakeWhoami(t, "gm_secret")
-	defer ts.Close()
+	srv := apitest.New(t, tokenMode("gm_secret"))
 
-	out := callPing(t, clientFor(t, ts.URL, "gm_secret"))
+	out := callPing(t, clientFor(t, srv.URL, "gm_secret"))
 	if !out.Reachable || out.AuthMode != "token" || !out.Authenticated {
 		t.Fatalf("expected reachable token+authenticated, got %+v", out)
 	}
@@ -181,12 +167,9 @@ func TestPingTokenModeAuthenticated(t *testing.T) {
 }
 
 func TestPingTokenModeMissingToken(t *testing.T) {
-	ts := fakeWhoami(t, "gm_secret")
-	defer ts.Close()
-
 	// No token configured on the bridge: the server is in token mode, so it
 	// reports authenticated=false and ping should explain the missing token.
-	out := callPing(t, clientFor(t, ts.URL, ""))
+	out := callPing(t, fakeAPI(t, tokenMode("gm_secret")))
 	if !out.Reachable || out.AuthMode != "token" {
 		t.Fatalf("expected reachable token mode, got %+v", out)
 	}
@@ -201,9 +184,9 @@ func TestPingTokenModeMissingToken(t *testing.T) {
 func TestPingUnreachable(t *testing.T) {
 	// Start a server, capture its URL, then close it so the address refuses
 	// connections deterministically.
-	ts := fakeWhoami(t, "")
-	url := ts.URL
-	ts.Close()
+	srv := apitest.New(t, apitest.Opts{})
+	url := srv.URL
+	srv.Close()
 
 	out := callPing(t, clientFor(t, url, ""))
 	if out.Reachable {

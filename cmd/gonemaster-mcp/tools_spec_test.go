@@ -2,20 +2,21 @@ package main
 
 import (
 	"testing"
+
+	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
 func TestSpecListTool(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{specList: &specTestcaseListView{
-		Items: []specTestcaseView{
+	api := fakeAPI(t, apitest.Opts{SpecList: &apitest.SpecTestcaseList{
+		Items: []apitest.SpecTestcase{
 			{ID: "dnssec09", Module: "dnssec", Description: "RRSIG validity"},
 			{ID: "dnssec10", Module: "dnssec", Description: "Zone signed"},
 		},
 		Total: 2,
 	}})
-	defer ts.Close()
 
 	var out specListOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "spec_list_testcases", map[string]any{"category": "dnssec"}, &out)
+	res := callTool(t, api, "spec_list_testcases", map[string]any{"category": "dnssec"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -28,20 +29,19 @@ func TestSpecListTool(t *testing.T) {
 }
 
 func TestSpecGetTool(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{specDetail: &specTestcaseDetailView{
+	api := fakeAPI(t, apitest.Opts{SpecDetail: &apitest.SpecTestcaseDetail{
 		ID:          "consistency03",
 		Module:      "consistency",
 		Description: "SOA timers consistency",
 		Locale:      "en",
-		Tags: []specTagView{
+		Tags: []apitest.SpecTag{
 			{Tag: "SOATIME", Message: "SOA timers are consistent"},
 			{Tag: "MULTIPLE_SOA_TIME", Message: "SOA timers differ"},
 		},
 	}})
-	defer ts.Close()
 
 	var out specGetOutput
-	res := callTool(t, clientFor(t, ts.URL, ""), "spec_get_testcase", map[string]any{"testcase": "consistency03"}, &out)
+	res := callTool(t, api, "spec_get_testcase", map[string]any{"testcase": "consistency03"}, &out)
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
@@ -57,10 +57,9 @@ func TestSpecGetTool(t *testing.T) {
 }
 
 func TestSpecGetToolNotFound(t *testing.T) {
-	ts := newFakeServer(t, fakeOpts{specDetail: nil}) // 404
-	defer ts.Close()
+	api := fakeAPI(t, apitest.Opts{SpecDetail: nil}) // 404
 
-	res := callTool(t, clientFor(t, ts.URL, ""), "spec_get_testcase", map[string]any{"testcase": "nope99"}, nil)
+	res := callTool(t, api, "spec_get_testcase", map[string]any{"testcase": "nope99"}, nil)
 	if !res.IsError {
 		t.Fatalf("expected a not-found tool error")
 	}

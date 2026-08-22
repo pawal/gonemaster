@@ -1,7 +1,6 @@
 package server
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -9,8 +8,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	_ "modernc.org/sqlite"
 )
 
 // analysisFixture bundles a server backed by a real SQL store plus
@@ -34,11 +31,18 @@ const testAnalysisFixtureBatchID = "batch-fixture"
 type analysisFixtureOpt func(*analysisFixtureSetup)
 
 type analysisFixtureSetup struct {
+	backend      testBackend
 	batchID      string
 	isDefault    bool
 	runWindow    bool
 	seededRun    string
 	skipSnapshot bool
+}
+
+// onBackend picks the database the fixture runs against. Without it the
+// fixture uses SQLite, which is what a single-backend test wants.
+func onBackend(b testBackend) analysisFixtureOpt {
+	return func(s *analysisFixtureSetup) { s.backend = b }
 }
 
 // withFixtureBatch names the fixture's batch.
@@ -73,24 +77,16 @@ func withoutSnapshot() analysisFixtureOpt {
 // unless withoutSnapshot is given, one captured public snapshot over one batch.
 func newAnalysisFixture(t *testing.T, opts ...analysisFixtureOpt) *analysisFixture {
 	t.Helper()
-	setup := &analysisFixtureSetup{batchID: testAnalysisFixtureBatchID}
+	setup := &analysisFixtureSetup{
+		batchID: testAnalysisFixtureBatchID,
+		backend: testBackends(t)[0], // SQLite, always present
+	}
 	for _, opt := range opts {
 		opt(setup)
 	}
 
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	configurePool(db, "sqlite")
-	t.Cleanup(func() { _ = db.Close() })
-
-	dialect := sqliteDialect{}
-	if err := runMigrations(db, dialect); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-	store := NewSQLJobStore(db, dialect)
-	srv := newServer(DefaultConfig(), store, NewInMemoryQueue())
+	store := testStoreForBackend(t, setup.backend)
+	srv := newSQLTestServer(t, store)
 	cohort, err := store.UpsertAnalysisCohort(AnalysisCohort{
 		SourceType:      "tag",
 		SourceTag:       "tld",
@@ -147,6 +143,33 @@ func newAnalysisFixture(t *testing.T, opts ...analysisFixtureOpt) *analysisFixtu
 	}
 	fixture.snapshot = stored
 	return fixture
+}
+
+// forEachAnalysisFixture runs fn as a subtest against every configured backend,
+// each with its own fixture. This is what takes the public analysis read path
+// onto PostgreSQL and MariaDB when TEST_*_DSN are set; without them it is one
+// SQLite subtest, so the default test run pays nothing.
+func forEachAnalysisFixture(t *testing.T, fn func(t *testing.T, f *analysisFixture), opts ...analysisFixtureOpt) {
+	t.Helper()
+	for _, b := range testBackends(t) {
+		t.Run(b.name, func(t *testing.T) {
+			fn(t, newAnalysisFixture(t, append([]analysisFixtureOpt{onBackend(b)}, opts...)...))
+		})
+	}
+}
+
+// forEachAnalysisAPIFixture is forEachAnalysisFixture with the public API
+// fixture's options, matching newAnalysisAPITestFixture.
+func forEachAnalysisAPIFixture(t *testing.T, fn func(t *testing.T, f *analysisFixture)) {
+	t.Helper()
+	forEachAnalysisFixture(t, fn, asDefaultCohort(), withSnapshotRunWindow())
+}
+
+// forEachAdminSnapshotFixture is forEachAnalysisFixture with the admin
+// fixture's options, matching newAdminSnapshotFixture.
+func forEachAdminSnapshotFixture(t *testing.T, fn func(t *testing.T, f *analysisFixture)) {
+	t.Helper()
+	forEachAnalysisFixture(t, fn, withFixtureBatch("batch-admin"), withSeededRun("example.test"))
 }
 
 func newAnalysisAPITestFixture(t *testing.T) *analysisFixture {
@@ -296,196 +319,204 @@ func decodeDomainList(t *testing.T, body *httptest.ResponseRecorder) PublicAnaly
 }
 
 func TestPublicAnalysisDomainsEmpty(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	resp := getPublic(t, f.srv, f.publicURL("domains"))
-	wantStatus(t, resp, http.StatusOK)
-	got := decodeDomainList(t, resp)
-	if got.Total != 0 || len(got.Items) != 0 {
-		t.Fatalf("expected empty list, got %+v", got)
-	}
-	if got.Limit != defaultAnalysisListLimit {
-		t.Fatalf("expected default limit, got %d", got.Limit)
-	}
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		resp := getPublic(t, f.srv, f.publicURL("domains"))
+		wantStatus(t, resp, http.StatusOK)
+		got := decodeDomainList(t, resp)
+		if got.Total != 0 || len(got.Items) != 0 {
+			t.Fatalf("expected empty list, got %+v", got)
+		}
+		if got.Limit != defaultAnalysisListLimit {
+			t.Fatalf("expected default limit, got %d", got.Limit)
+		}
+	})
 }
 
 func TestPublicAnalysisDomainsReturnsLatestPerDomain(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	t1 := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
-	t2 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	f.seedDomainSummary("alpha.example", "run-alpha-1", t1, 60, "C", "ERROR")
-	f.seedDomainSummary("alpha.example", "run-alpha-2", t2, 95, "A", "NOTICE")
-	f.seedDomainSummary("beta.example", "run-beta-1", t1, 80, "B", "WARNING")
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		t1 := time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC)
+		t2 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		f.seedDomainSummary("alpha.example", "run-alpha-1", t1, 60, "C", "ERROR")
+		f.seedDomainSummary("alpha.example", "run-alpha-2", t2, 95, "A", "NOTICE")
+		f.seedDomainSummary("beta.example", "run-beta-1", t1, 80, "B", "WARNING")
 
-	resp := getPublic(t, f.srv, f.publicURL("domains"))
-	wantStatus(t, resp, http.StatusOK)
-	got := decodeDomainList(t, resp)
-	if got.Total != 2 || len(got.Items) != 2 {
-		t.Fatalf("expected 2 items (latest per domain), got total=%d len=%d", got.Total, len(got.Items))
-	}
-	byDomain := map[string]PublicAnalysisDomainView{}
-	for _, v := range got.Items {
-		byDomain[v.Domain] = v
-	}
-	if alpha := byDomain["alpha.example"]; alpha.Score == nil || *alpha.Score != 95 || alpha.Grade == nil || *alpha.Grade != "A" {
-		t.Fatalf("expected latest alpha score=95 grade=A, got %+v", alpha)
-	}
-	if beta := byDomain["beta.example"]; beta.WorstLevel != "WARNING" {
-		t.Fatalf("expected beta worst_level=WARNING, got %+v", beta)
-	}
+		resp := getPublic(t, f.srv, f.publicURL("domains"))
+		wantStatus(t, resp, http.StatusOK)
+		got := decodeDomainList(t, resp)
+		if got.Total != 2 || len(got.Items) != 2 {
+			t.Fatalf("expected 2 items (latest per domain), got total=%d len=%d", got.Total, len(got.Items))
+		}
+		byDomain := map[string]PublicAnalysisDomainView{}
+		for _, v := range got.Items {
+			byDomain[v.Domain] = v
+		}
+		if alpha := byDomain["alpha.example"]; alpha.Score == nil || *alpha.Score != 95 || alpha.Grade == nil || *alpha.Grade != "A" {
+			t.Fatalf("expected latest alpha score=95 grade=A, got %+v", alpha)
+		}
+		if beta := byDomain["beta.example"]; beta.WorstLevel != "WARNING" {
+			t.Fatalf("expected beta worst_level=WARNING, got %+v", beta)
+		}
+	})
 }
 
 func TestPublicAnalysisDomainsFilterByWorstLevel(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	// Two ERROR domains, one WARNING, one NOTICE, one with an empty
-	// worst_level (collapses into the OK bucket).
-	f.seedDomainSummary("err1.example", "run-err1", ts, 10, "F", "ERROR")
-	f.seedDomainSummary("err2.example", "run-err2", ts, 20, "E", "ERROR")
-	f.seedDomainSummary("warn.example", "run-warn", ts, 60, "C", "WARNING")
-	f.seedDomainSummary("notice.example", "run-notice", ts, 80, "B", "NOTICE")
-	f.seedDomainSummary("ok.example", "run-ok", ts, 95, "A", "")
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		// Two ERROR domains, one WARNING, one NOTICE, one with an empty
+		// worst_level (collapses into the OK bucket).
+		f.seedDomainSummary("err1.example", "run-err1", ts, 10, "F", "ERROR")
+		f.seedDomainSummary("err2.example", "run-err2", ts, 20, "E", "ERROR")
+		f.seedDomainSummary("warn.example", "run-warn", ts, 60, "C", "WARNING")
+		f.seedDomainSummary("notice.example", "run-notice", ts, 80, "B", "NOTICE")
+		f.seedDomainSummary("ok.example", "run-ok", ts, 95, "A", "")
 
-	cases := []struct {
-		bucket  string
-		domains []string
-	}{
-		{"ERROR", []string{"err1.example", "err2.example"}},
-		{"WARNING", []string{"warn.example"}},
-		{"NOTICE", []string{"notice.example"}},
-		{"OK", []string{"ok.example"}},
-		{"CRITICAL", nil},
-	}
-	for _, c := range cases {
-		t.Run(c.bucket, func(t *testing.T) {
-			resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=")+c.bucket)
-			wantStatus(t, resp, http.StatusOK)
-			got := decodeDomainList(t, resp)
-			if got.Total != len(c.domains) {
-				t.Fatalf("bucket %q: expected %d, got %d (items=%+v)",
-					c.bucket, len(c.domains), got.Total, got.Items)
-			}
-			seen := map[string]struct{}{}
-			for _, v := range got.Items {
-				seen[v.Domain] = struct{}{}
-			}
-			for _, want := range c.domains {
-				if _, ok := seen[want]; !ok {
-					t.Fatalf("bucket %q: expected %q in result, got %+v", c.bucket, want, got.Items)
+		cases := []struct {
+			bucket  string
+			domains []string
+		}{
+			{"ERROR", []string{"err1.example", "err2.example"}},
+			{"WARNING", []string{"warn.example"}},
+			{"NOTICE", []string{"notice.example"}},
+			{"OK", []string{"ok.example"}},
+			{"CRITICAL", nil},
+		}
+		for _, c := range cases {
+			t.Run(c.bucket, func(t *testing.T) {
+				resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=")+c.bucket)
+				wantStatus(t, resp, http.StatusOK)
+				got := decodeDomainList(t, resp)
+				if got.Total != len(c.domains) {
+					t.Fatalf("bucket %q: expected %d, got %d (items=%+v)",
+						c.bucket, len(c.domains), got.Total, got.Items)
 				}
-			}
-		})
-	}
+				seen := map[string]struct{}{}
+				for _, v := range got.Items {
+					seen[v.Domain] = struct{}{}
+				}
+				for _, want := range c.domains {
+					if _, ok := seen[want]; !ok {
+						t.Fatalf("bucket %q: expected %q in result, got %+v", c.bucket, want, got.Items)
+					}
+				}
+			})
+		}
 
-	// Lowercase input is accepted and normalized to the same bucket.
-	resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=error"))
-	wantStatus(t, resp, http.StatusOK)
-	if got := decodeDomainList(t, resp); got.Total != 2 {
-		t.Fatalf("expected lowercase filter to match 2 ERROR domains, got %d", got.Total)
-	}
+		// Lowercase input is accepted and normalized to the same bucket.
+		resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=error"))
+		wantStatus(t, resp, http.StatusOK)
+		if got := decodeDomainList(t, resp); got.Total != 2 {
+			t.Fatalf("expected lowercase filter to match 2 ERROR domains, got %d", got.Total)
+		}
+	})
 }
 
 func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	f.seedDomainSummary("a1.example", "run-a1", ts, 95, "A", "NOTICE")
-	f.seedDomainSummary("a2.example", "run-a2", ts, 93, "A", "NOTICE")
-	f.seedDomainSummary("b1.example", "run-b1", ts, 80, "B", "NOTICE")
-	f.seedDomainSummary("f1.example", "run-f1", ts, 10, "F", "CRITICAL")
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		f.seedDomainSummary("a1.example", "run-a1", ts, 95, "A", "NOTICE")
+		f.seedDomainSummary("a2.example", "run-a2", ts, 93, "A", "NOTICE")
+		f.seedDomainSummary("b1.example", "run-b1", ts, 80, "B", "NOTICE")
+		f.seedDomainSummary("f1.example", "run-f1", ts, 10, "F", "CRITICAL")
 
-	resp := getPublic(t, f.srv, f.publicURL("domains?grade=A"))
-	wantStatus(t, resp, http.StatusOK)
-	got := decodeDomainList(t, resp)
-	if got.Total != 2 {
-		t.Fatalf("expected 2 A-grade domains, got %d (items=%+v)", got.Total, got.Items)
-	}
-	for _, v := range got.Items {
-		if v.Grade == nil || *v.Grade != "A" {
-			t.Fatalf("grade filter leaked non-A: %+v", v)
+		resp := getPublic(t, f.srv, f.publicURL("domains?grade=A"))
+		wantStatus(t, resp, http.StatusOK)
+		got := decodeDomainList(t, resp)
+		if got.Total != 2 {
+			t.Fatalf("expected 2 A-grade domains, got %d (items=%+v)", got.Total, got.Items)
 		}
-	}
+		for _, v := range got.Items {
+			if v.Grade == nil || *v.Grade != "A" {
+				t.Fatalf("grade filter leaked non-A: %+v", v)
+			}
+		}
 
-	// Case-sensitive exact match - grades are stored canonical. "a" must
-	// not match "A" because custom scoring profiles may legitimately use
-	// distinct labels differing only in case.
-	resp = getPublic(t, f.srv, f.publicURL("domains?grade=a"))
-	wantStatus(t, resp, http.StatusOK)
-	if got := decodeDomainList(t, resp); got.Total != 0 {
-		t.Fatalf("lowercase filter should not match uppercase grades, got %d", got.Total)
-	}
+		// Case-sensitive exact match - grades are stored canonical. "a" must
+		// not match "A" because custom scoring profiles may legitimately use
+		// distinct labels differing only in case.
+		resp = getPublic(t, f.srv, f.publicURL("domains?grade=a"))
+		wantStatus(t, resp, http.StatusOK)
+		if got := decodeDomainList(t, resp); got.Total != 0 {
+			t.Fatalf("lowercase filter should not match uppercase grades, got %d", got.Total)
+		}
 
-	// Unknown grade returns empty without 400 - the filter is
-	// pluggable-config-friendly, not enum-validated.
-	resp = getPublic(t, f.srv, f.publicURL("domains?grade=Z"))
-	wantStatus(t, resp, http.StatusOK)
-	if got := decodeDomainList(t, resp); got.Total != 0 {
-		t.Fatalf("unknown grade should match zero domains, got %d", got.Total)
-	}
+		// Unknown grade returns empty without 400 - the filter is
+		// pluggable-config-friendly, not enum-validated.
+		resp = getPublic(t, f.srv, f.publicURL("domains?grade=Z"))
+		wantStatus(t, resp, http.StatusOK)
+		if got := decodeDomainList(t, resp); got.Total != 0 {
+			t.Fatalf("unknown grade should match zero domains, got %d", got.Total)
+		}
+	})
 }
 
 func TestPublicAnalysisDomainsRejectsInvalidWorstLevel(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=bogus"))
-	wantStatus(t, resp, http.StatusBadRequest)
-	if !strings.Contains(resp.Body.String(), "invalid_worst_level") {
-		t.Fatalf("expected invalid_worst_level error code, got %s", resp.Body)
-	}
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=bogus"))
+		wantStatus(t, resp, http.StatusBadRequest)
+		if !strings.Contains(resp.Body.String(), "invalid_worst_level") {
+			t.Fatalf("expected invalid_worst_level error code, got %s", resp.Body)
+		}
+	})
 }
 
 func TestPublicAnalysisDomainsSearchAndPagination(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	for i := range 5 {
-		f.seedDomainSummary(fmt.Sprintf("alpha-%d.example", i),
-			fmt.Sprintf("run-a-%d", i), finishedAt, 90-i, "A", "NOTICE")
-		f.seedDomainSummary(fmt.Sprintf("beta-%d.example", i),
-			fmt.Sprintf("run-b-%d", i), finishedAt, 50+i, "C", "ERROR")
-	}
-
-	resp := getPublic(t, f.srv, f.publicURL("domains?search=alpha"))
-	got := decodeDomainList(t, resp)
-	if got.Total != 5 {
-		t.Fatalf("expected 5 alpha matches, got %d", got.Total)
-	}
-	for _, v := range got.Items {
-		if !strings.Contains(v.Domain, "alpha") {
-			t.Fatalf("search leaked non-matching domain: %+v", v)
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		for i := range 5 {
+			f.seedDomainSummary(fmt.Sprintf("alpha-%d.example", i),
+				fmt.Sprintf("run-a-%d", i), finishedAt, 90-i, "A", "NOTICE")
+			f.seedDomainSummary(fmt.Sprintf("beta-%d.example", i),
+				fmt.Sprintf("run-b-%d", i), finishedAt, 50+i, "C", "ERROR")
 		}
-	}
 
-	resp = getPublic(t, f.srv, f.publicURL("domains?limit=3&offset=2"))
-	got = decodeDomainList(t, resp)
-	if got.Total != 10 {
-		t.Fatalf("expected total=10, got %d", got.Total)
-	}
-	if len(got.Items) != 3 {
-		t.Fatalf("expected 3 items on page, got %d", len(got.Items))
-	}
-	if got.Offset != 2 || got.Limit != 3 {
-		t.Fatalf("unexpected pagination: %+v", got)
-	}
+		resp := getPublic(t, f.srv, f.publicURL("domains?search=alpha"))
+		got := decodeDomainList(t, resp)
+		if got.Total != 5 {
+			t.Fatalf("expected 5 alpha matches, got %d", got.Total)
+		}
+		for _, v := range got.Items {
+			if !strings.Contains(v.Domain, "alpha") {
+				t.Fatalf("search leaked non-matching domain: %+v", v)
+			}
+		}
+
+		resp = getPublic(t, f.srv, f.publicURL("domains?limit=3&offset=2"))
+		got = decodeDomainList(t, resp)
+		if got.Total != 10 {
+			t.Fatalf("expected total=10, got %d", got.Total)
+		}
+		if len(got.Items) != 3 {
+			t.Fatalf("expected 3 items on page, got %d", len(got.Items))
+		}
+		if got.Offset != 2 || got.Limit != 3 {
+			t.Fatalf("unexpected pagination: %+v", got)
+		}
+	})
 }
 
 func TestPublicAnalysisDomainsRejectsInvalidLimit(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	resp := getPublic(t, f.srv, f.publicURL("domains?limit=99999"))
-	wantStatus(t, resp, http.StatusBadRequest)
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		resp := getPublic(t, f.srv, f.publicURL("domains?limit=99999"))
+		wantStatus(t, resp, http.StatusBadRequest)
+	})
 }
 
 func TestPublicAnalysisDomainsSortScoreDesc(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	f.seedDomainSummary("low.example", "run-low", finishedAt, 30, "E", "CRITICAL")
-	f.seedDomainSummary("high.example", "run-high", finishedAt, 95, "A", "NOTICE")
-	f.seedDomainSummary("mid.example", "run-mid", finishedAt, 70, "B", "WARNING")
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		f.seedDomainSummary("low.example", "run-low", finishedAt, 30, "E", "CRITICAL")
+		f.seedDomainSummary("high.example", "run-high", finishedAt, 95, "A", "NOTICE")
+		f.seedDomainSummary("mid.example", "run-mid", finishedAt, 70, "B", "WARNING")
 
-	resp := getPublic(t, f.srv, f.publicURL("domains?sort=score_desc"))
-	got := decodeDomainList(t, resp)
-	if len(got.Items) != 3 {
-		t.Fatalf("expected 3 items, got %d", len(got.Items))
-	}
-	if got.Items[0].Domain != "high.example" || got.Items[2].Domain != "low.example" {
-		t.Fatalf("unexpected score_desc order: %+v", got.Items)
-	}
+		resp := getPublic(t, f.srv, f.publicURL("domains?sort=score_desc"))
+		got := decodeDomainList(t, resp)
+		if len(got.Items) != 3 {
+			t.Fatalf("expected 3 items, got %d", len(got.Items))
+		}
+		if got.Items[0].Domain != "high.example" || got.Items[2].Domain != "low.example" {
+			t.Fatalf("unexpected score_desc order: %+v", got.Items)
+		}
+	})
 }
 
 func TestSortAnalysisDomainViewsByCountColumns(t *testing.T) {
@@ -530,17 +561,18 @@ func TestSortAnalysisDomainViewsByCountColumns(t *testing.T) {
 }
 
 func TestPublicAnalysisDomainsRedactsInternalIDs(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	f.seedDomainSummary("alpha.example", "run-alpha", finishedAt, 95, "A", "NOTICE")
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		f.seedDomainSummary("alpha.example", "run-alpha", finishedAt, 95, "A", "NOTICE")
 
-	resp := getPublic(t, f.srv, f.publicURL("domains"))
-	raw := resp.Body.String()
-	for _, needle := range []string{
-		`"domain_id"`, `"run_id"`, `"cohort_id"`, `"public_id"`,
-	} {
-		if strings.Contains(raw, needle) {
-			t.Fatalf("domain list should not contain %s: %s", needle, raw)
+		resp := getPublic(t, f.srv, f.publicURL("domains"))
+		raw := resp.Body.String()
+		for _, needle := range []string{
+			`"domain_id"`, `"run_id"`, `"cohort_id"`, `"public_id"`,
+		} {
+			if strings.Contains(raw, needle) {
+				t.Fatalf("domain list should not contain %s: %s", needle, raw)
+			}
 		}
-	}
+	})
 }

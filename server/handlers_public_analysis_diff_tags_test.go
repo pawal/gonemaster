@@ -104,84 +104,86 @@ func TestDiffTagViewsEmpty(t *testing.T) {
 // SOA_SERIAL to ERROR (level-changed), keeps DS07 unchanged, and introduces
 // NS_FEW (appeared).
 func TestDiffGranularityTagsClassifiesTags(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	t2 := t1.Add(24 * time.Hour)
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		t2 := t1.Add(24 * time.Hour)
 
-	older := f.seedAlternateSnapshot("batch-old", "2026-04-17-old", t1.Add(-time.Hour))
-	f.seedGraduatedRunInBatch(older.BatchID, "a.example", t1, []engine.LogEntry{
-		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
-	})
-	f.seedGraduatedRunInBatch(older.BatchID, "b.example", t1, []engine.LogEntry{
-		{Module: "DNSSEC", Testcase: "dnssec08", Tag: "DS08_MISSING", Level: "WARNING"},
-	})
-	f.seedGraduatedRunInBatch(older.BatchID, "c.example", t1, []engine.LogEntry{
-		{Module: "CONSISTENCY", Testcase: "consistency01", Tag: "SOA_SERIAL", Level: "NOTICE"},
-	})
+		older := f.seedAlternateSnapshot("batch-old", "2026-04-17-old", t1.Add(-time.Hour))
+		f.seedGraduatedRunInBatch(older.BatchID, "a.example", t1, []engine.LogEntry{
+			{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
+		})
+		f.seedGraduatedRunInBatch(older.BatchID, "b.example", t1, []engine.LogEntry{
+			{Module: "DNSSEC", Testcase: "dnssec08", Tag: "DS08_MISSING", Level: "WARNING"},
+		})
+		f.seedGraduatedRunInBatch(older.BatchID, "c.example", t1, []engine.LogEntry{
+			{Module: "CONSISTENCY", Testcase: "consistency01", Tag: "SOA_SERIAL", Level: "NOTICE"},
+		})
 
-	f.seedGraduatedRunInBatch(f.batchID, "a.example", t2, []engine.LogEntry{
-		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
-	})
-	f.seedGraduatedRunInBatch(f.batchID, "c.example", t2, []engine.LogEntry{
-		{Module: "CONSISTENCY", Testcase: "consistency01", Tag: "SOA_SERIAL", Level: "ERROR"},
-	})
-	f.seedGraduatedRunInBatch(f.batchID, "d.example", t2, []engine.LogEntry{
-		{Module: "DELEGATION", Testcase: "delegation01", Tag: "NS_FEW", Level: "WARNING"},
-	})
-	f.refreshSnapshotViews(older.BatchID)
-	f.refreshSnapshotViews(f.batchID)
+		f.seedGraduatedRunInBatch(f.batchID, "a.example", t2, []engine.LogEntry{
+			{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
+		})
+		f.seedGraduatedRunInBatch(f.batchID, "c.example", t2, []engine.LogEntry{
+			{Module: "CONSISTENCY", Testcase: "consistency01", Tag: "SOA_SERIAL", Level: "ERROR"},
+		})
+		f.seedGraduatedRunInBatch(f.batchID, "d.example", t2, []engine.LogEntry{
+			{Module: "DELEGATION", Testcase: "delegation01", Tag: "NS_FEW", Level: "WARNING"},
+		})
+		f.refreshSnapshotViews(older.BatchID)
+		f.refreshSnapshotViews(f.batchID)
 
-	url := "/pub/api/v1/analysis/cohorts/tld/diff?granularity=tags&from=" + older.Slug + "&to=" + f.snapshot.Slug
-	resp := getPublic(t, f.srv, url)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-	}
-	var got PublicAnalysisTagDiffResponse
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if got.Granularity != "tags" {
-		t.Errorf("Granularity = %q, want tags", got.Granularity)
-	}
-	if !hasTag(got.Appeared, "NS_FEW") {
-		t.Errorf("Appeared should include NS_FEW, got %+v", got.Appeared)
-	}
-	if hasTag(got.Appeared, "DS07_NOT_SIGNED") || hasTag(got.Appeared, "SOA_SERIAL") {
-		t.Errorf("Appeared must not include unchanged/level-changed tags, got %+v", got.Appeared)
-	}
-	if !hasTag(got.Cleared, "DS08_MISSING") {
-		t.Errorf("Cleared should include DS08_MISSING, got %+v", got.Cleared)
-	}
-	soa, ok := findTag(got.LevelChanged, "SOA_SERIAL")
-	if !ok {
-		t.Fatalf("LevelChanged should include SOA_SERIAL, got %+v", got.LevelChanged)
-	}
-	if soa.FromLevel != "NOTICE" || soa.ToLevel != "ERROR" {
-		t.Errorf("SOA_SERIAL levels = %s -> %s, want NOTICE -> ERROR", soa.FromLevel, soa.ToLevel)
-	}
-	// DS07 is present in both snapshots at the same level: it must not leak
-	// into any of the three change buckets.
-	if hasTag(got.Cleared, "DS07_NOT_SIGNED") || hasTag(got.LevelChanged, "DS07_NOT_SIGNED") {
-		t.Errorf("unchanged DS07_NOT_SIGNED leaked into a change bucket")
-	}
+		url := "/pub/api/v1/analysis/cohorts/tld/diff?granularity=tags&from=" + older.Slug + "&to=" + f.snapshot.Slug
+		resp := getPublic(t, f.srv, url)
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
+		}
+		var got PublicAnalysisTagDiffResponse
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if got.Granularity != "tags" {
+			t.Errorf("Granularity = %q, want tags", got.Granularity)
+		}
+		if !hasTag(got.Appeared, "NS_FEW") {
+			t.Errorf("Appeared should include NS_FEW, got %+v", got.Appeared)
+		}
+		if hasTag(got.Appeared, "DS07_NOT_SIGNED") || hasTag(got.Appeared, "SOA_SERIAL") {
+			t.Errorf("Appeared must not include unchanged/level-changed tags, got %+v", got.Appeared)
+		}
+		if !hasTag(got.Cleared, "DS08_MISSING") {
+			t.Errorf("Cleared should include DS08_MISSING, got %+v", got.Cleared)
+		}
+		soa, ok := findTag(got.LevelChanged, "SOA_SERIAL")
+		if !ok {
+			t.Fatalf("LevelChanged should include SOA_SERIAL, got %+v", got.LevelChanged)
+		}
+		if soa.FromLevel != "NOTICE" || soa.ToLevel != "ERROR" {
+			t.Errorf("SOA_SERIAL levels = %s -> %s, want NOTICE -> ERROR", soa.FromLevel, soa.ToLevel)
+		}
+		// DS07 is present in both snapshots at the same level: it must not leak
+		// into any of the three change buckets.
+		if hasTag(got.Cleared, "DS07_NOT_SIGNED") || hasTag(got.LevelChanged, "DS07_NOT_SIGNED") {
+			t.Errorf("unchanged DS07_NOT_SIGNED leaked into a change bucket")
+		}
+	})
 }
 
 // TestDiffGranularityInvalidReturns400 rejects an unknown granularity so the
 // UI can rely on either a documented shape or a clear error.
 func TestDiffGranularityInvalidReturns400(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	older := f.seedAlternateSnapshot("batch-old", "2026-04-17-old", t1.Add(-time.Hour))
-	f.seedGraduatedRunInBatch(older.BatchID, "a.example", t1, nil)
-	f.seedGraduatedRunInBatch(f.batchID, "a.example", t1.Add(time.Hour), nil)
-	f.refreshSnapshotViews(older.BatchID)
-	f.refreshSnapshotViews(f.batchID)
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		older := f.seedAlternateSnapshot("batch-old", "2026-04-17-old", t1.Add(-time.Hour))
+		f.seedGraduatedRunInBatch(older.BatchID, "a.example", t1, nil)
+		f.seedGraduatedRunInBatch(f.batchID, "a.example", t1.Add(time.Hour), nil)
+		f.refreshSnapshotViews(older.BatchID)
+		f.refreshSnapshotViews(f.batchID)
 
-	url := "/pub/api/v1/analysis/cohorts/tld/diff?granularity=bogus&from=" + older.Slug + "&to=" + f.snapshot.Slug
-	resp := getPublic(t, f.srv, url)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want 400; body = %s", resp.Code, resp.Body)
-	}
+		url := "/pub/api/v1/analysis/cohorts/tld/diff?granularity=bogus&from=" + older.Slug + "&to=" + f.snapshot.Slug
+		resp := getPublic(t, f.srv, url)
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("status = %d, want 400; body = %s", resp.Code, resp.Body)
+		}
+	})
 }
 
 func hasTag(entries []PublicAnalysisTagDiffEntry, tag string) bool {

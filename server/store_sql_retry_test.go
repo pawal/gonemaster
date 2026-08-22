@@ -180,77 +180,74 @@ func TestGraduateJobConcurrentSameDomain(t *testing.T) {
 	// since 11.6.2) the loser aborts with ER_CHECKREAD, and without the
 	// retry its job stays at "running" forever. Both must graduate, and
 	// the domain's run_count must land on exactly the number of runs.
-	for _, backend := range testBackends(t) {
-		t.Run(backend.name, func(t *testing.T) {
-			store := testStoreForBackend(t, backend)
-			const domain = "concurrent.example"
-			const jobCount = 4
+	forEachBackend(t, func(t *testing.T, store *SQLJobStore) {
+		const domain = "concurrent.example"
+		const jobCount = 4
 
-			jobs := make([]Job, jobCount)
-			for i := range jobs {
-				jobs[i] = Job{
-					ID:         fmt.Sprintf("job-concurrent-%d", i),
-					Domain:     domain,
-					Status:     JobSucceeded,
-					CreatedAt:  time.Now().UTC().Add(-time.Minute),
-					StartedAt:  time.Now().UTC().Add(-30 * time.Second),
-					FinishedAt: time.Now().UTC(),
-				}
-				if _, err := store.Create(jobs[i]); err != nil {
-					t.Fatalf("Create %s: %v", jobs[i].ID, err)
-				}
+		jobs := make([]Job, jobCount)
+		for i := range jobs {
+			jobs[i] = Job{
+				ID:         fmt.Sprintf("job-concurrent-%d", i),
+				Domain:     domain,
+				Status:     JobSucceeded,
+				CreatedAt:  time.Now().UTC().Add(-time.Minute),
+				StartedAt:  time.Now().UTC().Add(-30 * time.Second),
+				FinishedAt: time.Now().UTC(),
 			}
+			if _, err := store.Create(jobs[i]); err != nil {
+				t.Fatalf("Create %s: %v", jobs[i].ID, err)
+			}
+		}
 
-			// Release all graduations at once to maximise the overlap.
-			start := make(chan struct{})
-			errs := make(chan error, jobCount)
-			var wg sync.WaitGroup
-			for _, job := range jobs {
-				wg.Add(1)
-				go func(job Job) {
-					defer wg.Done()
-					<-start
-					errs <- store.GraduateJob(job, nil)
-				}(job)
+		// Release all graduations at once to maximise the overlap.
+		start := make(chan struct{})
+		errs := make(chan error, jobCount)
+		var wg sync.WaitGroup
+		for _, job := range jobs {
+			wg.Add(1)
+			go func(job Job) {
+				defer wg.Done()
+				<-start
+				errs <- store.GraduateJob(job, nil)
+			}(job)
+		}
+		close(start)
+		wg.Wait()
+		close(errs)
+		for err := range errs {
+			if err != nil {
+				t.Fatalf("concurrent GraduateJob: %v", err)
 			}
-			close(start)
-			wg.Wait()
-			close(errs)
-			for err := range errs {
-				if err != nil {
-					t.Fatalf("concurrent GraduateJob: %v", err)
-				}
-			}
+		}
 
-			var runs int
-			if err := store.db.QueryRow(
-				fmt.Sprintf(`SELECT COUNT(*) FROM runs WHERE domain = %s`, store.ph(1)), domain,
-			).Scan(&runs); err != nil {
-				t.Fatalf("count runs: %v", err)
-			}
-			if runs != jobCount {
-				t.Fatalf("runs = %d, want %d", runs, jobCount)
-			}
+		var runs int
+		if err := store.db.QueryRow(
+			fmt.Sprintf(`SELECT COUNT(*) FROM runs WHERE domain = %s`, store.ph(1)), domain,
+		).Scan(&runs); err != nil {
+			t.Fatalf("count runs: %v", err)
+		}
+		if runs != jobCount {
+			t.Fatalf("runs = %d, want %d", runs, jobCount)
+		}
 
-			var remaining int
-			if err := store.db.QueryRow(`SELECT COUNT(*) FROM jobs`).Scan(&remaining); err != nil {
-				t.Fatalf("count jobs: %v", err)
-			}
-			if remaining != 0 {
-				t.Fatalf("%d job rows left behind, every graduation must delete its own", remaining)
-			}
+		var remaining int
+		if err := store.db.QueryRow(`SELECT COUNT(*) FROM jobs`).Scan(&remaining); err != nil {
+			t.Fatalf("count jobs: %v", err)
+		}
+		if remaining != 0 {
+			t.Fatalf("%d job rows left behind, every graduation must delete its own", remaining)
+		}
 
-			var runCount int
-			if err := store.db.QueryRow(
-				fmt.Sprintf(`SELECT run_count FROM domains WHERE name = %s`, store.ph(1)), domain,
-			).Scan(&runCount); err != nil {
-				t.Fatalf("read run_count: %v", err)
-			}
-			if runCount != jobCount {
-				t.Fatalf("run_count = %d, want %d", runCount, jobCount)
-			}
-		})
-	}
+		var runCount int
+		if err := store.db.QueryRow(
+			fmt.Sprintf(`SELECT run_count FROM domains WHERE name = %s`, store.ph(1)), domain,
+		).Scan(&runCount); err != nil {
+			t.Fatalf("read run_count: %v", err)
+		}
+		if runCount != jobCount {
+			t.Fatalf("run_count = %d, want %d", runCount, jobCount)
+		}
+	})
 }
 
 func TestGraduateJobMissingJobIsNotRetried(t *testing.T) {

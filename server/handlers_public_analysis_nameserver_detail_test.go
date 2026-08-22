@@ -9,103 +9,107 @@ import (
 )
 
 func TestNameserverDetailReadsFromViewTable(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
-	f.seedEndpoint("run-a", "a.example", "ns1.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32")
-	f.seedEndpoint("run-b", "b.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+		f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+		f.seedEndpoint("run-a", "a.example", "ns1.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32")
+		f.seedEndpoint("run-b", "b.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	// Wipe the legacy fact rows; the view-backed detail handler must
-	// still serve from the captured roster.
-	for _, runID := range []string{"run-a", "run-b"} {
-		if err := f.store.ReplaceAnalysisRunNSEndpoints(f.cohort.ID, runID, nil); err != nil {
-			t.Fatalf("clear endpoints %s: %v", runID, err)
+		// Wipe the legacy fact rows; the view-backed detail handler must
+		// still serve from the captured roster.
+		for _, runID := range []string{"run-a", "run-b"} {
+			if err := f.store.ReplaceAnalysisRunNSEndpoints(f.cohort.ID, runID, nil); err != nil {
+				t.Fatalf("clear endpoints %s: %v", runID, err)
+			}
+			if err := f.store.ReplaceAnalysisRunAddressASNs(f.cohort.ID, runID, nil); err != nil {
+				t.Fatalf("clear address asns %s: %v", runID, err)
+			}
 		}
-		if err := f.store.ReplaceAnalysisRunAddressASNs(f.cohort.ID, runID, nil); err != nil {
-			t.Fatalf("clear address asns %s: %v", runID, err)
-		}
-	}
 
-	resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var got PublicAnalysisNameserverDetail
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if got.Nameserver != "ns1.example" {
-		t.Errorf("Nameserver = %q, want ns1.example", got.Nameserver)
-	}
-	if got.DomainCount != 2 {
-		t.Errorf("DomainCount = %d, want 2 (data must come from the view, not live facts)", got.DomainCount)
-	}
-	if got.EndpointCount != 2 {
-		t.Errorf("EndpointCount = %d, want 2 (one v4 + one v6 address)", got.EndpointCount)
-	}
-	if got.IPv4Count != 1 || got.IPv6Count != 1 {
-		t.Errorf("family counts = (v4=%d, v6=%d), want (1, 1)", got.IPv4Count, got.IPv6Count)
-	}
-	if len(got.Addresses) != 2 || got.Addresses[0] != "192.0.2.1" || got.Addresses[1] != "2001:db8::1" {
-		t.Errorf("Addresses = %v, want sorted [192.0.2.1 2001:db8::1]", got.Addresses)
-	}
-	if len(got.Domains) != 2 || got.Domains[0] != "a.example" || got.Domains[1] != "b.example" {
-		t.Errorf("Domains = %v, want sorted [a.example b.example]", got.Domains)
-	}
-	if len(got.ASNs) != 1 || got.ASNs[0] != 64500 {
-		t.Errorf("ASNs = %v, want [64500]", got.ASNs)
-	}
+		resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
+		}
+		var got PublicAnalysisNameserverDetail
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if got.Nameserver != "ns1.example" {
+			t.Errorf("Nameserver = %q, want ns1.example", got.Nameserver)
+		}
+		if got.DomainCount != 2 {
+			t.Errorf("DomainCount = %d, want 2 (data must come from the view, not live facts)", got.DomainCount)
+		}
+		if got.EndpointCount != 2 {
+			t.Errorf("EndpointCount = %d, want 2 (one v4 + one v6 address)", got.EndpointCount)
+		}
+		if got.IPv4Count != 1 || got.IPv6Count != 1 {
+			t.Errorf("family counts = (v4=%d, v6=%d), want (1, 1)", got.IPv4Count, got.IPv6Count)
+		}
+		if len(got.Addresses) != 2 || got.Addresses[0] != "192.0.2.1" || got.Addresses[1] != "2001:db8::1" {
+			t.Errorf("Addresses = %v, want sorted [192.0.2.1 2001:db8::1]", got.Addresses)
+		}
+		if len(got.Domains) != 2 || got.Domains[0] != "a.example" || got.Domains[1] != "b.example" {
+			t.Errorf("Domains = %v, want sorted [a.example b.example]", got.Domains)
+		}
+		if len(got.ASNs) != 1 || got.ASNs[0] != 64500 {
+			t.Errorf("ASNs = %v, want [64500]", got.ASNs)
+		}
+	})
 }
 
 func TestNameserverDetailCaseInsensitiveLookup(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedEndpoint("run-a", "a.example", "NS1.MIXED.Example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+		f.seedEndpoint("run-a", "a.example", "NS1.MIXED.Example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.mixed.example"))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("lower-case lookup: status = %d, body = %s", resp.Code, resp.Body)
-	}
-	var got PublicAnalysisNameserverDetail
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if got.Nameserver != "NS1.MIXED.Example" {
-		t.Errorf("Nameserver = %q, want %q (response should preserve the captured casing)", got.Nameserver, "NS1.MIXED.Example")
-	}
+		resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.mixed.example"))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("lower-case lookup: status = %d, body = %s", resp.Code, resp.Body)
+		}
+		var got PublicAnalysisNameserverDetail
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if got.Nameserver != "NS1.MIXED.Example" {
+			t.Errorf("Nameserver = %q, want %q (response should preserve the captured casing)", got.Nameserver, "NS1.MIXED.Example")
+		}
+	})
 }
 
 func TestNameserverDetailNotFoundOnUnknownName(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+		f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, f.publicURL("nameservers/does-not-exist.example"))
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404", resp.Code)
-	}
+		resp := getPublic(t, f.srv, f.publicURL("nameservers/does-not-exist.example"))
+		if resp.Code != http.StatusNotFound {
+			t.Fatalf("status = %d, want 404", resp.Code)
+		}
+	})
 }
 
 func TestNameserverDetailCacheHeadersExplicitSnapshot(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+		f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-	resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
-	if resp.Code != http.StatusOK {
-		t.Fatalf("status = %d", resp.Code)
-	}
-	// Snapshots can be rebuilt under the same slug, so the response must not be
-	// immutable; it revalidates via the ETag, which changes on rebuild.
-	if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {
-		t.Errorf("explicit-snapshot Cache-Control = %q, must not be immutable", cc)
-	}
-	if resp.Header().Get("ETag") == "" {
-		t.Error("explicit-snapshot response missing ETag for revalidation")
-	}
-	if etag := resp.Header().Get("ETag"); etag == "" {
-		t.Error("explicit-snapshot must set ETag")
-	}
+		resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
+		if resp.Code != http.StatusOK {
+			t.Fatalf("status = %d", resp.Code)
+		}
+		// Snapshots can be rebuilt under the same slug, so the response must not be
+		// immutable; it revalidates via the ETag, which changes on rebuild.
+		if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {
+			t.Errorf("explicit-snapshot Cache-Control = %q, must not be immutable", cc)
+		}
+		if resp.Header().Get("ETag") == "" {
+			t.Error("explicit-snapshot response missing ETag for revalidation")
+		}
+		if etag := resp.Header().Get("ETag"); etag == "" {
+			t.Error("explicit-snapshot must set ETag")
+		}
+	})
 }
 
 func TestComputeSnapshotEntityViewsPopulatesNameserverRosters(t *testing.T) {
@@ -165,32 +169,34 @@ func TestNameserverViewRoundTripPreservesRosters(t *testing.T) {
 // dual-stack nameserver's latency into IPv4 and IPv6 from its per-address
 // endpoints (v4 endpoint at 10ms, v6 at 50ms).
 func TestNameserverDetailPerFamilyLatency(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedEndpoint("run-a", "a.example", "ns.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24", 10)
-	f.seedEndpoint("run-b", "b.example", "ns.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32", 50)
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+		f.seedEndpoint("run-a", "a.example", "ns.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24", 10)
+		f.seedEndpoint("run-b", "b.example", "ns.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32", 50)
 
-	got := mustJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns.example")), http.StatusOK)
-	if got.LatencyIPv4 == nil || got.LatencyIPv4.LatencyP50MS == nil || *got.LatencyIPv4.LatencyP50MS != 10 {
-		t.Fatalf("IPv4 latency = %+v, want p50 10", got.LatencyIPv4)
-	}
-	if got.LatencyIPv6 == nil || got.LatencyIPv6.LatencyP50MS == nil || *got.LatencyIPv6.LatencyP50MS != 50 {
-		t.Fatalf("IPv6 latency = %+v, want p50 50", got.LatencyIPv6)
-	}
+		got := mustJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns.example")), http.StatusOK)
+		if got.LatencyIPv4 == nil || got.LatencyIPv4.LatencyP50MS == nil || *got.LatencyIPv4.LatencyP50MS != 10 {
+			t.Fatalf("IPv4 latency = %+v, want p50 10", got.LatencyIPv4)
+		}
+		if got.LatencyIPv6 == nil || got.LatencyIPv6.LatencyP50MS == nil || *got.LatencyIPv6.LatencyP50MS != 50 {
+			t.Fatalf("IPv6 latency = %+v, want p50 50", got.LatencyIPv6)
+		}
+	})
 }
 
 // TestNameserverDetailPerFamilyLatencySingleStack leaves the missing family nil
 // so the UI renders no comparison for a v4-only nameserver.
 func TestNameserverDetailPerFamilyLatencySingleStack(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
-	f.seedEndpoint("run-a", "a.example", "ns4.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24", 10)
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+		f.seedEndpoint("run-a", "a.example", "ns4.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24", 10)
 
-	got := mustJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns4.example")), http.StatusOK)
-	if got.LatencyIPv4 == nil || got.LatencyIPv4.LatencyP50MS == nil || *got.LatencyIPv4.LatencyP50MS != 10 {
-		t.Fatalf("IPv4 latency = %+v, want p50 10", got.LatencyIPv4)
-	}
-	if got.LatencyIPv6 != nil {
-		t.Fatalf("IPv6 latency should be nil for a v4-only nameserver, got %+v", got.LatencyIPv6)
-	}
+		got := mustJSON[PublicAnalysisNameserverDetail](t, getPublic(t, f.srv, f.publicURL("nameservers/ns4.example")), http.StatusOK)
+		if got.LatencyIPv4 == nil || got.LatencyIPv4.LatencyP50MS == nil || *got.LatencyIPv4.LatencyP50MS != 10 {
+			t.Fatalf("IPv4 latency = %+v, want p50 10", got.LatencyIPv4)
+		}
+		if got.LatencyIPv6 != nil {
+			t.Fatalf("IPv6 latency should be nil for a v4-only nameserver, got %+v", got.LatencyIPv6)
+		}
+	})
 }

@@ -205,11 +205,13 @@ test-go:
 # test-integration starts PostgreSQL and MariaDB via docker-compose.test.yml,
 # runs all server tests against all three backends, then tears the containers
 # down. Requires Docker with Compose v2 support.
+# The timeout is generous because every backend subtest re-runs resetSchema and
+# the migrations: the run takes ~115s once the analysis fixtures are included.
 test-integration:
 	docker compose -f docker-compose.test.yml up -d --wait
 	TEST_POSTGRES_DSN="postgres://gonemaster:gonemaster@localhost:5432/gonemaster_test?sslmode=disable" \
 	TEST_MARIADB_DSN="gonemaster:gonemaster@tcp(localhost:3306)/gonemaster_test" \
-	$(GO) test ./server/... -count=1 -timeout 120s; \
+	$(GO) test ./server/... -count=1 -timeout 600s; \
 	STATUS=$$?; \
 	docker compose -f docker-compose.test.yml down; \
 	exit $$STATUS

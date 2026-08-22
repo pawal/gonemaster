@@ -138,47 +138,49 @@ func joinComma(parts []string) string {
 // min_latency_samples drops thinly-sampled ASNs from the ranking. AS64500 has
 // two samples (10,30 -> p50 20), AS64600 one (100), AS64700 two (200,220 -> 210).
 func TestPublicAnalysisASNsSortByLatency(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-	f.seedEndpoint("r1", "a.example", "ns1.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24", 10)
-	f.seedEndpoint("r2", "b.example", "ns1.example", "192.0.2.11", "ipv4", ts, 64500, "192.0.2.0/24", 30)
-	f.seedEndpoint("r3", "c.example", "ns2.example", "198.51.100.10", "ipv4", ts, 64600, "198.51.100.0/24", 100)
-	f.seedEndpoint("r4", "d.example", "ns3.example", "203.0.113.10", "ipv4", ts, 64700, "203.0.113.0/24", 200)
-	f.seedEndpoint("r5", "e.example", "ns3.example", "203.0.113.11", "ipv4", ts, 64700, "203.0.113.0/24", 220)
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		f.seedEndpoint("r1", "a.example", "ns1.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24", 10)
+		f.seedEndpoint("r2", "b.example", "ns1.example", "192.0.2.11", "ipv4", ts, 64500, "192.0.2.0/24", 30)
+		f.seedEndpoint("r3", "c.example", "ns2.example", "198.51.100.10", "ipv4", ts, 64600, "198.51.100.0/24", 100)
+		f.seedEndpoint("r4", "d.example", "ns3.example", "203.0.113.10", "ipv4", ts, 64700, "203.0.113.0/24", 200)
+		f.seedEndpoint("r5", "e.example", "ns3.example", "203.0.113.11", "ipv4", ts, 64700, "203.0.113.0/24", 220)
 
-	asc := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
-		t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_asc")), http.StatusOK)
-	if len(asc.Items) != 3 || asc.Items[0].ASN != 64500 || asc.Items[2].ASN != 64700 {
-		t.Fatalf("asc order wrong: %+v", asc.Items)
-	}
-	if asc.Items[0].LatencyP50MS == nil || *asc.Items[0].LatencyP50MS != 20 {
-		t.Fatalf("AS64500 p50 = %v, want 20", asc.Items[0].LatencyP50MS)
-	}
-
-	desc := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
-		t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_desc")), http.StatusOK)
-	if len(desc.Items) != 3 || desc.Items[0].ASN != 64700 || desc.Items[2].ASN != 64500 {
-		t.Fatalf("desc order wrong: %+v", desc.Items)
-	}
-
-	// min_latency_samples=2 drops the single-sample AS64600.
-	filtered := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
-		t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_desc&min_latency_samples=2")), http.StatusOK)
-	if filtered.Total != 2 {
-		t.Fatalf("min_latency_samples=2 total = %d, want 2 (%+v)", filtered.Total, filtered.Items)
-	}
-	for _, it := range filtered.Items {
-		if it.ASN == 64600 {
-			t.Fatalf("AS64600 (1 sample) should be filtered out: %+v", filtered.Items)
+		asc := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
+			t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_asc")), http.StatusOK)
+		if len(asc.Items) != 3 || asc.Items[0].ASN != 64500 || asc.Items[2].ASN != 64700 {
+			t.Fatalf("asc order wrong: %+v", asc.Items)
 		}
-	}
+		if asc.Items[0].LatencyP50MS == nil || *asc.Items[0].LatencyP50MS != 20 {
+			t.Fatalf("AS64500 p50 = %v, want 20", asc.Items[0].LatencyP50MS)
+		}
+
+		desc := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
+			t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_desc")), http.StatusOK)
+		if len(desc.Items) != 3 || desc.Items[0].ASN != 64700 || desc.Items[2].ASN != 64500 {
+			t.Fatalf("desc order wrong: %+v", desc.Items)
+		}
+
+		// min_latency_samples=2 drops the single-sample AS64600.
+		filtered := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](
+			t, getPublic(t, f.srv, f.publicURL("asns?sort=latency_p50_desc&min_latency_samples=2")), http.StatusOK)
+		if filtered.Total != 2 {
+			t.Fatalf("min_latency_samples=2 total = %d, want 2 (%+v)", filtered.Total, filtered.Items)
+		}
+		for _, it := range filtered.Items {
+			if it.ASN == 64600 {
+				t.Fatalf("AS64600 (1 sample) should be filtered out: %+v", filtered.Items)
+			}
+		}
+	})
 }
 
 // TestParseAnalysisListFilterMinLatencySamples rejects a negative floor.
 func TestParseAnalysisListFilterMinLatencySamples(t *testing.T) {
-	f := newAnalysisAPITestFixture(t)
-	resp := getPublic(t, f.srv, f.publicURL("nameservers?min_latency_samples=-1"))
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("negative min_latency_samples = %d, want 400", resp.Code)
-	}
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		resp := getPublic(t, f.srv, f.publicURL("nameservers?min_latency_samples=-1"))
+		if resp.Code != http.StatusBadRequest {
+			t.Fatalf("negative min_latency_samples = %d, want 400", resp.Code)
+		}
+	})
 }

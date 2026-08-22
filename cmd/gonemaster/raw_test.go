@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
@@ -91,11 +92,6 @@ func TestFormatRawEntrySanitizesAttackerControlChars(t *testing.T) {
 		t.Fatalf("NewEntry: %v", err)
 	}
 	line := formatRawEntry(entry)
-	for i, b := range []byte(line) {
-		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
-			t.Fatalf("formatRawEntry leaked control byte %#x at offset %d: %q", b, i, line)
-		}
-	}
 	for _, want := range []string{
 		`\x1b[34mblue\x1b[0m`,
 		`\x0d`, // CR
@@ -124,11 +120,6 @@ func TestFormatRawEntrySanitizesNestedMap(t *testing.T) {
 		t.Fatalf("NewEntry: %v", err)
 	}
 	line := formatRawEntry(entry)
-	for _, b := range []byte(line) {
-		if b == 0x1b {
-			t.Fatalf("formatRawEntry leaked ESC byte in nested-map output: %q", line)
-		}
-	}
 	if !strings.Contains(line, `x\x1by`) {
 		t.Fatalf("expected escaped ESC inside nested map, got %q", line)
 	}
@@ -179,14 +170,7 @@ func TestRawReporterCallbackSanitizesOutput(t *testing.T) {
 		t.Fatalf("Callback: %v", err)
 	}
 
-	for _, b := range out.Bytes() {
-		if b == '\n' {
-			continue
-		}
-		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
-			t.Fatalf("raw reporter leaked control byte %#x: %q", b, out.String())
-		}
-	}
+	clitest.RequireNoControlBytes(t, out.Bytes(), '\n')
 	if !strings.Contains(out.String(), `\x1b]0;hijack\x07`) {
 		t.Fatalf("expected escaped OSC + BEL sequence, got %q", out.String())
 	}

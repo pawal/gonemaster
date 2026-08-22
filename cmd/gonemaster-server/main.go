@@ -44,7 +44,7 @@ func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
 
-func run(args []string, out *os.File, errOut *os.File) int {
+func run(args []string, out io.Writer, errOut io.Writer) int {
 	if len(args) > 0 && args[0] == "auth" {
 		return runAuthCommand(args[1:], out, errOut)
 	}

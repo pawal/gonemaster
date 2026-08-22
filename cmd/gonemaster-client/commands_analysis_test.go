@@ -1,13 +1,14 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 )
 
 // ── domains list ──────────────────────────────────────────────────────────────
@@ -27,17 +28,10 @@ func TestDomainsListPretty(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"domains", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "example.com") {
-		t.Fatalf("expected example.com in output: %s", out.String())
-	}
-	if !strings.Contains(out.String(), "Domains: 1") {
-		t.Fatalf("expected count in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "domains", "list")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "example.com")
+	res.RequireOutContains(t, "Domains: 1")
 }
 
 func TestDomainsListJSON(t *testing.T) {
@@ -49,13 +43,10 @@ func TestDomainsListJSON(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "domains", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "domains", "list")
+	res.RequireCode(t, 0)
 	var got domainList
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
+	if err := json.Unmarshal([]byte(res.Out), &got); err != nil {
 		t.Fatalf("expected JSON output: %v", err)
 	}
 }
@@ -82,17 +73,10 @@ func TestDomainsGet(t *testing.T) {
 			return nil, nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"domains", "get", "example.com"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "example.com") {
-		t.Fatalf("expected domain name in output: %s", out.String())
-	}
-	if !strings.Contains(out.String(), "tld") {
-		t.Fatalf("expected tag in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "domains", "get", "example.com")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "example.com")
+	res.RequireOutContains(t, "tld")
 }
 
 func TestDomainsGetNotFound(t *testing.T) {
@@ -104,9 +88,8 @@ func TestDomainsGetNotFound(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"domains", "get", "ghost.example"}, &out, &errOut)
-	if code == 0 {
+	res := clitest.Run(t, run, "domains", "get", "ghost.example")
+	if res.Code == 0 {
 		t.Fatal("expected non-zero exit for not found")
 	}
 }
@@ -123,17 +106,12 @@ func TestDomainsTag(t *testing.T) {
 			return jsonResponse(204, ""), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"domains", "tag", "example.com", "tld"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "domains", "tag", "example.com", "tld")
+	res.RequireCode(t, 0)
 	if gotPath != "/api/v1/tags/tld/domains" {
 		t.Fatalf("expected POST to /api/v1/tags/tld/domains, got %s", gotPath)
 	}
-	if !strings.Contains(out.String(), "Tagged") {
-		t.Fatalf("expected confirmation in output: %s", out.String())
-	}
+	res.RequireOutContains(t, "Tagged")
 }
 
 func TestDomainsUntag(t *testing.T) {
@@ -146,11 +124,8 @@ func TestDomainsUntag(t *testing.T) {
 			return jsonResponse(204, ""), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"domains", "untag", "example.com", "tld"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "domains", "untag", "example.com", "tld")
+	res.RequireCode(t, 0)
 	if gotMethod != http.MethodDelete {
 		t.Fatalf("expected DELETE, got %s", gotMethod)
 	}
@@ -170,14 +145,9 @@ func TestTagsList(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"tags", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "tld") {
-		t.Fatalf("expected tld in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "tags", "list")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "tld")
 }
 
 // ── tags create ───────────────────────────────────────────────────────────────
@@ -194,14 +164,9 @@ func TestTagsCreate(t *testing.T) {
 			return jsonResponse(201, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"tags", "create", "municipalities", "--description", "Swedish municipalities"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "municipalities") {
-		t.Fatalf("expected tag name in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "tags", "create", "municipalities", "--description", "Swedish municipalities")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "municipalities")
 }
 
 // ── tags delete ───────────────────────────────────────────────────────────────
@@ -216,11 +181,8 @@ func TestTagsDelete(t *testing.T) {
 			return jsonResponse(204, ""), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"tags", "delete", "tld"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "tags", "delete", "tld")
+	res.RequireCode(t, 0)
 	if gotMethod != http.MethodDelete || gotPath != "/api/v1/tags/tld" {
 		t.Fatalf("expected DELETE /api/v1/tags/tld, got %s %s", gotMethod, gotPath)
 	}
@@ -240,17 +202,10 @@ func TestTagsSummary(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"tags", "summary", "tld"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "tld") {
-		t.Fatalf("expected tag name in output: %s", out.String())
-	}
-	if !strings.Contains(out.String(), "10") {
-		t.Fatalf("expected domain count in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "tags", "summary", "tld")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "tld")
+	res.RequireOutContains(t, "10")
 }
 
 // ── tags add-domains ──────────────────────────────────────────────────────────
@@ -269,11 +224,8 @@ func TestTagsAddDomains(t *testing.T) {
 			return jsonResponse(204, ""), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"tags", "add-domains", "tld", "example.com", "example.net"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "tags", "add-domains", "tld", "example.com", "example.net")
+	res.RequireCode(t, 0)
 	if gotPath != "/api/v1/tags/tld/domains" {
 		t.Fatalf("expected /api/v1/tags/tld/domains, got %s", gotPath)
 	}
@@ -299,14 +251,9 @@ func TestRunsList(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"runs", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "example.com") {
-		t.Fatalf("expected domain in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "runs", "list")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "example.com")
 }
 
 func TestRunsListPassesFilters(t *testing.T) {
@@ -320,8 +267,7 @@ func TestRunsListPassesFilters(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	run([]string{"runs", "list", "--tag", "tld", "--level", "WARNING"}, &out, &errOut)
+	clitest.Run(t, run, "runs", "list", "--tag", "tld", "--level", "WARNING")
 	if !strings.Contains(gotQuery, "tag=tld") {
 		t.Fatalf("expected tag filter in query: %s", gotQuery)
 	}
@@ -344,17 +290,10 @@ func TestRunsGet(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"runs", "get", "abc123"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "abc123") {
-		t.Fatalf("expected run ID in output: %s", out.String())
-	}
-	if !strings.Contains(out.String(), "42") {
-		t.Fatalf("expected entry count in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "runs", "get", "abc123")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "abc123")
+	res.RequireOutContains(t, "42")
 }
 
 // ── entries query ─────────────────────────────────────────────────────────────
@@ -374,14 +313,9 @@ func TestEntriesQuery(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"entries", "query", "--level", "WARNING"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "DNSSEC") {
-		t.Fatalf("expected module in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "entries", "query", "--level", "WARNING")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "DNSSEC")
 }
 
 func TestEntriesQueryCSV(t *testing.T) {
@@ -399,12 +333,7 @@ func TestEntriesQueryCSV(t *testing.T) {
 			}, nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "csv", "entries", "query"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "DNSSEC") {
-		t.Fatalf("expected CSV data in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "--format", "csv", "entries", "query")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "DNSSEC")
 }

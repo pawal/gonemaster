@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"os"
+	"io"
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/server"
@@ -54,7 +54,7 @@ func resolveAuthConfig(configPath, envHashes, flagHashes string) (server.AuthCon
 }
 
 // runAuthCommand handles the "auth" subcommand group (currently add-token).
-func runAuthCommand(args []string, out, errOut *os.File) int {
+func runAuthCommand(args []string, out, errOut io.Writer) int {
 	if len(args) == 0 || args[0] != "add-token" {
 		fmt.Fprintln(errOut, "usage: gonemaster-server auth add-token [--label NAME]")
 		return 2

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 )
 
 // ── jobs create --tag ──────────────────────────────────────────────────────────
@@ -29,11 +31,8 @@ func TestJobsCreateWithTag(t *testing.T) {
 			}, nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "create", "--domain", "example.com", "--tag", "tld", "--tag", "test"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "jobs", "create", "--domain", "example.com", "--tag", "tld", "--tag", "test")
+	res.RequireCode(t, 0)
 	if len(gotReq.Tags) != 2 || gotReq.Tags[0] != "tld" || gotReq.Tags[1] != "test" {
 		t.Fatalf("expected tags [tld test], got %v", gotReq.Tags)
 	}
@@ -56,11 +55,8 @@ func TestJobsCreateNoTagOmitsField(t *testing.T) {
 			}, nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "create", "--domain", "example.com"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "jobs", "create", "--domain", "example.com")
+	res.RequireCode(t, 0)
 	if len(gotReq.Tags) != 0 {
 		t.Fatalf("expected no tags, got %v", gotReq.Tags)
 	}
@@ -81,12 +77,8 @@ func TestJobsBatchWithTag(t *testing.T) {
 			return jsonResponse(http.StatusAccepted, body), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "batch", "--domain", "example.com", "--domain", "example.net",
-		"--tag", "tld"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "jobs", "batch", "--domain", "example.com", "--domain", "example.net", "--tag", "tld")
+	res.RequireCode(t, 0)
 	if len(gotReq.Tags) != 1 || gotReq.Tags[0] != "tld" {
 		t.Fatalf("expected tags [tld], got %v", gotReq.Tags)
 	}
@@ -108,11 +100,8 @@ func TestJobsBatchWithFromTag(t *testing.T) {
 			return jsonResponse(http.StatusAccepted, body), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "batch", "--from-tag", "tld"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "jobs", "batch", "--from-tag", "tld")
+	res.RequireCode(t, 0)
 	if gotReq.FromTag != "tld" {
 		t.Fatalf("expected from_tag=tld, got %q", gotReq.FromTag)
 	}
@@ -129,14 +118,11 @@ func TestJobsBatchFromTagAndDomainMutuallyExclusive(t *testing.T) {
 			return jsonResponse(200, `{}`), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "batch", "--from-tag", "tld", "--domain", "example.com"}, &out, &errOut)
-	if code == 0 {
+	res := clitest.Run(t, run, "jobs", "batch", "--from-tag", "tld", "--domain", "example.com")
+	if res.Code == 0 {
 		t.Fatal("expected non-zero exit when --from-tag and --domain are both provided")
 	}
-	if !strings.Contains(errOut.String(), "mutually exclusive") {
-		t.Fatalf("expected 'mutually exclusive' in error: %s", errOut.String())
-	}
+	res.RequireErrContains(t, "mutually exclusive")
 }
 
 func TestJobsBatchNoDomainAndNoFromTag(t *testing.T) {
@@ -147,9 +133,8 @@ func TestJobsBatchNoDomainAndNoFromTag(t *testing.T) {
 			return jsonResponse(200, `{}`), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "batch"}, &out, &errOut)
-	if code == 0 {
+	res := clitest.Run(t, run, "jobs", "batch")
+	if res.Code == 0 {
 		t.Fatal("expected non-zero exit when no domains provided")
 	}
 }
@@ -157,10 +142,9 @@ func TestJobsBatchNoDomainAndNoFromTag(t *testing.T) {
 // ── jobs list: in-flight note ──────────────────────────────────────────────────
 
 func TestJobsListHelpContainsInFlightNote(t *testing.T) {
-	var out, errOut bytes.Buffer
 	// Trigger usage via --help.
-	run([]string{"jobs", "list", "--help"}, &out, &errOut)
-	combined := out.String() + errOut.String()
+	res := clitest.Run(t, run, "jobs", "list", "--help")
+	combined := res.Out + res.Err
 	if !strings.Contains(combined, "in-flight") {
 		t.Fatalf("expected 'in-flight' in jobs list help, got:\n%s", combined)
 	}
@@ -192,14 +176,9 @@ func TestJobsGetFallsBackToRun(t *testing.T) {
 			return nil, nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "jobs", "get", "run_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "example.com") {
-		t.Fatalf("expected domain in output: %s", out.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "jobs", "get", "run_1")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "example.com")
 }
 
 // ── jobs results: fallback to run result ──────────────────────────────────────
@@ -233,9 +212,6 @@ func TestJobsResultsFallsBackToRunResult(t *testing.T) {
 			}
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "jobs", "results", "run_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "jobs", "results", "run_1")
+	res.RequireCode(t, 0)
 }

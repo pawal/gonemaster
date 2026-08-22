@@ -1,12 +1,11 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
-	"os"
 	"strings"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/scoring"
 )
@@ -34,48 +33,34 @@ func stubRunEngineWithEntries(t *testing.T, entries []engine.LogEntry) {
 
 func TestScoreNotShownByDefault(t *testing.T) {
 	stubRunEngineWithEntries(t, sampleEntries())
-	var out, errOut bytes.Buffer
-	code := run([]string{"example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if strings.Contains(out.String(), "Score:") || strings.Contains(errOut.String(), "Score:") {
-		t.Fatalf("expected no score by default, got stdout=%q stderr=%q", out.String(), errOut.String())
+	res := clitest.Run(t, run, "example.se")
+	res.RequireCode(t, 0)
+	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
+		t.Fatalf("expected no score by default, got stdout=%q stderr=%q", res.Out, res.Err)
 	}
 }
 
 func TestScoreShownWithFlag(t *testing.T) {
 	stubRunEngineWithEntries(t, sampleEntries())
-	var out, errOut bytes.Buffer
-	code := run([]string{"--score", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "Score:") {
-		t.Fatalf("expected Score: in output, got: %s", out.String())
-	}
+	res := clitest.Run(t, run, "--score", "example.se")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Score:")
 }
 
 func TestNoScoreSuppressesScore(t *testing.T) {
 	stubRunEngineWithEntries(t, sampleEntries())
-	var out, errOut bytes.Buffer
-	code := run([]string{"--score", "--no-score", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if strings.Contains(out.String(), "Score:") || strings.Contains(errOut.String(), "Score:") {
-		t.Fatalf("expected --no-score to suppress score, got: %s", out.String())
+	res := clitest.Run(t, run, "--score", "--no-score", "example.se")
+	res.RequireCode(t, 0)
+	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
+		t.Fatalf("expected --no-score to suppress score, got: %s", res.Out)
 	}
 }
 
 func TestScoreShowsCategories(t *testing.T) {
 	stubRunEngineWithEntries(t, sampleEntries())
-	var out, errOut bytes.Buffer
-	code := run([]string{"--score", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	output := out.String()
+	res := clitest.Run(t, run, "--score", "example.se")
+	res.RequireCode(t, 0)
+	output := res.Out
 	for _, cat := range []string{"dnssec:", "nameserver_health:"} {
 		if !strings.Contains(output, cat) {
 			t.Errorf("expected category %q in output, got:\n%s", cat, output)
@@ -87,12 +72,9 @@ func TestScoreNoEntriesShowsHundred(t *testing.T) {
 	// An empty (but non-nil) slice means the engine ran and found nothing wrong.
 	// Expect a perfect score, not N/A.
 	stubRunEngineWithEntries(t, []engine.LogEntry{})
-	var out, errOut bytes.Buffer
-	code := run([]string{"--score", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	output := out.String()
+	res := clitest.Run(t, run, "--score", "example.se")
+	res.RequireCode(t, 0)
+	output := res.Out
 	if !strings.Contains(output, "Score:") {
 		t.Fatalf("expected Score: line, got: %s", output)
 	}
@@ -105,33 +87,25 @@ func TestScoreNoEntriesShowsHundred(t *testing.T) {
 
 func TestScoreInJSONModeGoesToStderr(t *testing.T) {
 	stubRunEngineWithEntries(t, sampleEntries())
-	var out, errOut bytes.Buffer
-	code := run([]string{"--json", "--score", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--json", "--score", "example.se")
+	res.RequireCode(t, 0)
 	// stdout must be valid JSON
 	var entries []engine.LogEntry
-	if err := json.Unmarshal(out.Bytes(), &entries); err != nil {
-		t.Fatalf("stdout must be valid JSON: %v - got: %s", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &entries); err != nil {
+		t.Fatalf("stdout must be valid JSON: %v - got: %s", err, res.Out)
 	}
 	// score must appear on stderr, not stdout
-	if strings.Contains(out.String(), "Score:") {
-		t.Fatalf("score must not appear in JSON stdout, got: %s", out.String())
+	if strings.Contains(res.Out, "Score:") {
+		t.Fatalf("score must not appear in JSON stdout, got: %s", res.Out)
 	}
-	if !strings.Contains(errOut.String(), "Score:") {
-		t.Fatalf("expected Score: on stderr for --json mode, got: %s", errOut.String())
-	}
+	res.RequireErrContains(t, "Score:")
 }
 
 func TestNoScoreNotShownInJSONModeByDefault(t *testing.T) {
 	stubRunEngineWithEntries(t, sampleEntries())
-	var out, errOut bytes.Buffer
-	code := run([]string{"--json", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if strings.Contains(out.String(), "Score:") || strings.Contains(errOut.String(), "Score:") {
+	res := clitest.Run(t, run, "--json", "example.se")
+	res.RequireCode(t, 0)
+	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
 		t.Fatalf("score must not appear by default in --json mode")
 	}
 }
@@ -140,14 +114,9 @@ func TestNoScoreNotShownInJSONModeByDefault(t *testing.T) {
 
 func TestScoreInRawMode(t *testing.T) {
 	stubRunEngineWithEntries(t, sampleEntries())
-	var out, errOut bytes.Buffer
-	code := run([]string{"--raw", "--score", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "Score:") {
-		t.Fatalf("expected Score: in stdout for --raw mode, got: %s", out.String())
-	}
+	res := clitest.Run(t, run, "--raw", "--score", "example.se")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Score:")
 }
 
 // ── --scoring-config flag ─────────────────────────────────────────────────────
@@ -155,55 +124,28 @@ func TestScoreInRawMode(t *testing.T) {
 func TestScoringConfigImpliesScore(t *testing.T) {
 	stubRunEngineWithEntries(t, sampleEntries())
 
-	cfg := scoring.DefaultConfig()
-	data, _ := json.Marshal(cfg)
-	f, err := os.CreateTemp(t.TempDir(), "scoring-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.Write(data); err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
+	cfgPath := clitest.WriteScoringConfig(t)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--scoring-config", f.Name(), "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "Score:") {
-		t.Fatalf("expected --scoring-config to imply --score, got: %s", out.String())
-	}
+	res := clitest.Run(t, run, "--scoring-config", cfgPath, "example.se")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Score:")
 }
 
 func TestScoringConfigNoScoreWins(t *testing.T) {
 	stubRunEngineWithEntries(t, sampleEntries())
 
-	cfg := scoring.DefaultConfig()
-	data, _ := json.Marshal(cfg)
-	f, err := os.CreateTemp(t.TempDir(), "scoring-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.Write(data); err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
+	cfgPath := clitest.WriteScoringConfig(t)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--scoring-config", f.Name(), "--no-score", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if strings.Contains(out.String(), "Score:") || strings.Contains(errOut.String(), "Score:") {
-		t.Fatalf("expected --no-score to suppress scoring-config, got stdout=%q stderr=%q", out.String(), errOut.String())
+	res := clitest.Run(t, run, "--scoring-config", cfgPath, "--no-score", "example.se")
+	res.RequireCode(t, 0)
+	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
+		t.Fatalf("expected --no-score to suppress scoring-config, got stdout=%q stderr=%q", res.Out, res.Err)
 	}
 }
 
 func TestScoringConfigInvalidPath(t *testing.T) {
-	var out, errOut bytes.Buffer
-	code := run([]string{"--scoring-config", "/nonexistent/path.json", "example.se"}, &out, &errOut)
-	if code == 0 {
+	res := clitest.Run(t, run, "--scoring-config", "/nonexistent/path.json", "example.se")
+	if res.Code == 0 {
 		t.Fatal("expected non-zero exit for invalid --scoring-config path")
 	}
 }
@@ -250,13 +192,10 @@ func TestScoreDoesNotLeakInfoIntoHumanOutput(t *testing.T) {
 		{Module: "DNSSEC", Tag: "DS07_SIGNED", Level: "INFO"},
 		{Module: "Zone", Tag: "REFRESH_MINIMUM_VALUE_LOWER", Level: "NOTICE"},
 	})
-	var out, errOut bytes.Buffer
 	// Force non-streaming path by NOT using a terminal (no spinner).
-	code := run([]string{"--score", "--no-progress", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	output := out.String()
+	res := clitest.Run(t, run, "--score", "--no-progress", "example.se")
+	res.RequireCode(t, 0)
+	output := res.Out
 	if strings.Contains(output, "DS07_SIGNED") {
 		t.Fatalf("INFO-level tag DS07_SIGNED leaked into NOTICE output: %s", output)
 	}
@@ -270,14 +209,11 @@ func TestScoreDoesNotLeakInfoIntoJSONOutput(t *testing.T) {
 		{Module: "DNSSEC", Tag: "DS07_SIGNED", Level: "INFO"},
 		{Module: "Zone", Tag: "REFRESH_MINIMUM_VALUE_LOWER", Level: "NOTICE"},
 	})
-	var out, errOut bytes.Buffer
-	code := run([]string{"--json", "--score", "example.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--json", "--score", "example.se")
+	res.RequireCode(t, 0)
 	var entries []engine.LogEntry
-	if err := json.Unmarshal(out.Bytes(), &entries); err != nil {
-		t.Fatalf("invalid JSON: %v - got: %s", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &entries); err != nil {
+		t.Fatalf("invalid JSON: %v - got: %s", err, res.Out)
 	}
 	for _, e := range entries {
 		if strings.EqualFold(e.Level, "INFO") {

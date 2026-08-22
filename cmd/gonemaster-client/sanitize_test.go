@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"strings"
 	"testing"
+
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 )
 
 // TestEntryTextSanitizesMessage ensures that an interpolated server-side
@@ -15,11 +17,6 @@ func TestEntryTextSanitizesMessage(t *testing.T) {
 		Message: "ns1.evil responded \x1b[34m'; DROP TABLE x; --\x1b[0m",
 	}
 	got := entryText(entry)
-	for _, b := range []byte(got) {
-		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
-			t.Fatalf("entryText leaked control byte %#x: %q", b, got)
-		}
-	}
 	if !strings.Contains(got, `\x1b[34m'; DROP TABLE x; --\x1b[0m`) {
 		t.Fatalf("expected escaped ANSI around SQL payload, got %q", got)
 	}
@@ -33,11 +30,6 @@ func TestEntryTextSanitizesRawFallback(t *testing.T) {
 		Raw:   "MOD:TC:TAG version_string=x\rfake",
 	}
 	got := entryText(entry)
-	for _, b := range []byte(got) {
-		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
-			t.Fatalf("entryText leaked control byte %#x in Raw fallback: %q", b, got)
-		}
-	}
 	if !strings.Contains(got, `\x0d`) {
 		t.Fatalf("expected escaped CR in Raw fallback, got %q", got)
 	}
@@ -103,14 +95,7 @@ func TestPrintModulesPrettySanitizesEntry(t *testing.T) {
 	var out bytes.Buffer
 	printModulesPretty(&out, view)
 
-	for i, b := range out.Bytes() {
-		if b == '\n' {
-			continue
-		}
-		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
-			t.Fatalf("printModulesPretty leaked control byte %#x at offset %d: %q", b, i, out.String())
-		}
-	}
+	clitest.RequireNoControlBytes(t, out.Bytes(), '\n')
 	if !strings.Contains(out.String(), `\x1b[31mxss\x1b[0m`) {
 		t.Fatalf("expected escaped ANSI in pretty output, got %q", out.String())
 	}
@@ -133,14 +118,7 @@ func TestPrintRawPrettySanitizesEntry(t *testing.T) {
 	var out bytes.Buffer
 	printRawPretty(&out, view)
 
-	for _, b := range out.Bytes() {
-		if b == '\n' {
-			continue
-		}
-		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
-			t.Fatalf("printRawPretty leaked control byte %#x: %q", b, out.String())
-		}
-	}
+	clitest.RequireNoControlBytes(t, out.Bytes(), '\n')
 	if !strings.Contains(out.String(), `\x1b[34mvuln\x1b[0m`) {
 		t.Fatalf("expected escaped ANSI in raw pretty output, got %q", out.String())
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,6 +10,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 )
 
 // diffFixture serves two runs whose entry sets the caller supplies. The
@@ -55,14 +56,9 @@ func TestRunsDiffIdenticalRunsExitZero(t *testing.T) {
 	}
 	defer diffFixture(t, map[string][]jobResultEntry{"a": entries, "b": entries})()
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"runs", "diff", "a", "b"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("identical runs must exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "No tag or severity changes") {
-		t.Fatalf("expected a no-change line, got: %s", out.String())
-	}
+	res := clitest.Run(t, run, "runs", "diff", "a", "b")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "No tag or severity changes")
 }
 
 // TestRunsDiffReportsAddedRemovedChanged covers the three delta kinds and
@@ -82,14 +78,11 @@ func TestRunsDiffReportsAddedRemovedChanged(t *testing.T) {
 	}
 	defer diffFixture(t, map[string][]jobResultEntry{"a": before, "b": after})()
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "runs", "diff", "a", "b"}, &out, &errOut)
-	if code != 1 {
-		t.Fatalf("differing runs must exit 1, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "runs", "diff", "a", "b")
+	res.RequireCode(t, 1)
 	var diff runDiffOutput
-	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
-		t.Fatalf("expected JSON output: %v (%s)", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &diff); err != nil {
+		t.Fatalf("expected JSON output: %v (%s)", err, res.Out)
 	}
 	if len(diff.Added) != 1 || diff.Added[0].Tag != "MULTIPLE_SOA_SERIALS" {
 		t.Fatalf("added = %+v, want just MULTIPLE_SOA_SERIALS", diff.Added)
@@ -113,13 +106,10 @@ func TestRunsDiffQuietSuppressesOutput(t *testing.T) {
 	after := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "ERROR"}}
 	defer diffFixture(t, map[string][]jobResultEntry{"a": before, "b": after})()
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"runs", "diff", "--quiet", "a", "b"}, &out, &errOut)
-	if code != 1 {
-		t.Fatalf("expected exit 1, got %d: %s", code, errOut.String())
-	}
-	if out.Len() != 0 {
-		t.Fatalf("quiet mode must print nothing, got: %s", out.String())
+	res := clitest.Run(t, run, "runs", "diff", "--quiet", "a", "b")
+	res.RequireCode(t, 1)
+	if len(res.Out) != 0 {
+		t.Fatalf("quiet mode must print nothing, got: %s", res.Out)
 	}
 }
 
@@ -220,14 +210,11 @@ func TestBatchesDiffRollsUpTagsAcrossDomains(t *testing.T) {
 		"w16":    {"a.example": broke, "b.example": broke, "c.example": clean},
 	})()
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "batches", "diff", "serial", "w16"}, &out, &errOut)
-	if code != 1 {
-		t.Fatalf("differing batches must exit 1, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "batches", "diff", "serial", "w16")
+	res.RequireCode(t, 1)
 	var diff batchDiffOutput
-	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
-		t.Fatalf("expected JSON output: %v (%s)", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &diff); err != nil {
+		t.Fatalf("expected JSON output: %v (%s)", err, res.Out)
 	}
 	if diff.Compared != 3 || diff.Identical != 1 || diff.Differing != 2 {
 		t.Fatalf("compared/identical/differing = %d/%d/%d, want 3/1/2", diff.Compared, diff.Identical, diff.Differing)
@@ -256,13 +243,10 @@ func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
 		"w16":    {"a.example": clean, "new.example": clean},
 	})()
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "batches", "diff", "serial", "w16"}, &out, &errOut)
-	if code != 1 {
-		t.Fatalf("unmatched domains must fail the gate, got exit %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "batches", "diff", "serial", "w16")
+	res.RequireCode(t, 1)
 	var diff batchDiffOutput
-	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
+	if err := json.Unmarshal([]byte(res.Out), &diff); err != nil {
 		t.Fatalf("expected JSON output: %v", err)
 	}
 	if diff.Compared != 1 || diff.Differing != 0 {
@@ -287,13 +271,10 @@ func TestBatchesDiffTreatsEmptyRunsAsUnusable(t *testing.T) {
 		"w16":    {"a.example": clean, "broken.example": {}},
 	})()
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "batches", "diff", "serial", "w16"}, &out, &errOut)
-	if code != 1 {
-		t.Fatalf("an entry-less run must fail the gate, got exit %d", code)
-	}
+	res := clitest.Run(t, run, "--format", "json", "batches", "diff", "serial", "w16")
+	res.RequireCode(t, 1)
 	var diff batchDiffOutput
-	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
+	if err := json.Unmarshal([]byte(res.Out), &diff); err != nil {
 		t.Fatalf("expected JSON output: %v", err)
 	}
 	if diff.Compared != 1 || diff.Identical != 1 {
@@ -321,13 +302,9 @@ func TestBatchesDiffRefusesToTruncate(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	if code := run([]string{"batches", "diff", "--limit", "500", "a", "b"}, &out, &errOut); code != 2 {
-		t.Fatalf("expected an error exit 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "above the --limit") {
-		t.Fatalf("expected a truncation error, got: %s", errOut.String())
-	}
+	res := clitest.Run(t, run, "batches", "diff", "--limit", "500", "a", "b")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "above the --limit")
 }
 
 // TestWorstLevelByTagRanksDebugLevels pins the severity ordering against the
@@ -369,24 +346,19 @@ func TestBatchesDiffOmitsPerDomainListByDefault(t *testing.T) {
 		"w16":    {"a.example": broke},
 	})()
 
-	var out, errOut bytes.Buffer
-	if code := run([]string{"--format", "json", "batches", "diff", "serial", "w16"}, &out, &errOut); code != 1 {
-		t.Fatalf("expected exit 1, got %d", code)
-	}
+	res := clitest.Run(t, run, "--format", "json", "batches", "diff", "serial", "w16")
+	res.RequireCode(t, 1)
 	var diff batchDiffOutput
-	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
+	if err := json.Unmarshal([]byte(res.Out), &diff); err != nil {
 		t.Fatalf("expected JSON output: %v", err)
 	}
 	if len(diff.DomainDeltas) != 0 {
 		t.Fatalf("per-domain list must be opt-in, got %+v", diff.DomainDeltas)
 	}
 
-	out.Reset()
-	errOut.Reset()
-	if code := run([]string{"--format", "json", "batches", "diff", "--per-domain", "serial", "w16"}, &out, &errOut); code != 1 {
-		t.Fatalf("expected exit 1, got %d", code)
-	}
-	if err := json.Unmarshal(out.Bytes(), &diff); err != nil {
+	res = clitest.Run(t, run, "--format", "json", "batches", "diff", "--per-domain", "serial", "w16")
+	res.RequireCode(t, 1)
+	if err := json.Unmarshal([]byte(res.Out), &diff); err != nil {
 		t.Fatalf("expected JSON output: %v", err)
 	}
 	if len(diff.DomainDeltas) != 1 || diff.DomainDeltas[0].Domain != "a.example" {
@@ -399,11 +371,7 @@ func TestBatchesDiffOmitsPerDomainListByDefault(t *testing.T) {
 // finding delta.
 func TestRunsDiffRequiresTwoRunIDs(t *testing.T) {
 	defer diffFixture(t, map[string][]jobResultEntry{})()
-	var out, errOut bytes.Buffer
-	if code := run([]string{"runs", "diff", "only-one"}, &out, &errOut); code != 2 {
-		t.Fatalf("expected usage exit 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "two run IDs are required") {
-		t.Fatalf("expected an argument error, got: %s", errOut.String())
-	}
+	res := clitest.Run(t, run, "runs", "diff", "only-one")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "two run IDs are required")
 }

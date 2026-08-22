@@ -7,30 +7,21 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 )
 
 func TestCLIMDDocumentsPurge(t *testing.T) {
-	data, err := os.ReadFile("../../docs/client/jobs.md")
-	if err != nil {
-		t.Fatalf("read docs/client/jobs.md: %v", err)
-	}
-	src := string(data)
-	for _, want := range []string{
+	clitest.FileContains(t, "../../docs/client/jobs.md",
 		"jobs purge",
 		"--older-than",
 		"purged_jobs",
 		"retention_days",
-	} {
-		if !strings.Contains(src, want) {
-			t.Errorf("docs/cli.md missing %q", want)
-		}
-	}
+	)
 }
 
 func TestNormalizeBaseURL(t *testing.T) {
@@ -66,21 +57,12 @@ func TestParseOverrideValue(t *testing.T) {
 }
 
 func TestRunVersion(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--version"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-	if !strings.Contains(out.String(), "Gonemaster version") {
-		t.Fatalf("expected gonemaster version output, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), "Miekg DNS version") {
-		t.Fatalf("expected miekg version output, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	res := clitest.Run(t, run, "--version")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Gonemaster version")
+	res.RequireOutContains(t, "Miekg DNS version")
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
@@ -113,12 +95,8 @@ func TestJobsCreateSendsNormalizedDomain(t *testing.T) {
 		}
 	}
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--server", "http://example.test", "--format", "json", "jobs", "create", "--domain", "räksmörgås.se"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "jobs", "create", "--domain", "räksmörgås.se")
+	res.RequireCode(t, 0)
 	errs, normalized := normalization.NormalizeName("räksmörgås.se")
 	if len(errs) != 0 {
 		t.Fatalf("normalization errors: %v", errs)
@@ -166,12 +144,8 @@ func TestBatchesCancelCallsCancelForQueuedAndRunning(t *testing.T) {
 		}
 	}
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--server", "http://example.test", "--format", "json", "batches", "cancel", "batch_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "batches", "cancel", "batch_1")
+	res.RequireCode(t, 0)
 	if len(canceled) != 2 {
 		t.Fatalf("expected 2 canceled jobs, got %d", len(canceled))
 	}
@@ -223,12 +197,8 @@ func TestBatchesRemoveCallsQueueRemoveForQueued(t *testing.T) {
 		}
 	}
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--server", "http://example.test", "--format", "json", "batches", "remove", "batch_2"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "batches", "remove", "batch_2")
+	res.RequireCode(t, 0)
 	if len(removed) != 1 || removed[0] != "job_q" {
 		t.Fatalf("expected queue remove for job_q, got %v", removed)
 	}
@@ -278,12 +248,8 @@ func TestBatchesRemoveCancelRunning(t *testing.T) {
 		}
 	}
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--server", "http://example.test", "--format", "json", "batches", "remove", "--cancel-running", "batch_3"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "batches", "remove", "--cancel-running", "batch_3")
+	res.RequireCode(t, 0)
 	if len(removed) != 1 || removed[0] != "job_q" {
 		t.Fatalf("expected queue remove for job_q, got %v", removed)
 	}
@@ -415,12 +381,8 @@ func TestBatchesCancelIncludesPaginatedBatchItems(t *testing.T) {
 		}
 	}
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--server", "http://example.test", "--format", "json", "batches", "cancel", "batch_4"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "batches", "cancel", "batch_4")
+	res.RequireCode(t, 0)
 	if len(canceled) != 3 {
 		t.Fatalf("expected 3 canceled jobs from paginated batch, got %d (%v)", len(canceled), canceled)
 	}
@@ -490,12 +452,8 @@ func TestJobsResultsFlagsAfterID(t *testing.T) {
 		}
 	}
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--server", "http://example.test", "--format", "json", "jobs", "results", "job_1", "--view", "translated"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "jobs", "results", "job_1", "--view", "translated")
+	res.RequireCode(t, 0)
 }
 
 func TestJobsPurgeSendsPostAndPrintsPretty(t *testing.T) {
@@ -514,12 +472,8 @@ func TestJobsPurgeSendsPostAndPrintsPretty(t *testing.T) {
 		}
 	}
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--server", "http://example.test", "jobs", "purge", "--older-than", "90"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--server", "http://example.test", "jobs", "purge", "--older-than", "90")
+	res.RequireCode(t, 0)
 	if gotMethod != http.MethodPost {
 		t.Fatalf("expected POST, got %s", gotMethod)
 	}
@@ -529,9 +483,7 @@ func TestJobsPurgeSendsPostAndPrintsPretty(t *testing.T) {
 	if gotBody["older_than_days"] != 90 {
 		t.Fatalf("expected older_than_days=90, got %v", gotBody)
 	}
-	if !strings.Contains(out.String(), "42") {
-		t.Fatalf("expected 42 in output, got %q", out.String())
-	}
+	res.RequireOutContains(t, "42")
 }
 
 func TestJobsPurgeJSONOutput(t *testing.T) {
@@ -545,14 +497,10 @@ func TestJobsPurgeJSONOutput(t *testing.T) {
 		}
 	}
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--server", "http://example.test", "--format", "json", "jobs", "purge", "--older-than", "30"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "jobs", "purge", "--older-than", "30")
+	res.RequireCode(t, 0)
 	var resp map[string]int64
-	if err := json.NewDecoder(&out).Decode(&resp); err != nil {
+	if err := json.Unmarshal([]byte(res.Out), &resp); err != nil {
 		t.Fatalf("decode output: %v", err)
 	}
 	if resp["purged_jobs"] != 7 {
@@ -573,20 +521,16 @@ func TestJobsPurgeZeroOlderThanSendsZero(t *testing.T) {
 		}
 	}
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--server", "http://example.test", "jobs", "purge"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("run returned %d, stderr=%s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--server", "http://example.test", "jobs", "purge")
+	res.RequireCode(t, 0)
 	if gotBody["older_than_days"] != 0 {
 		t.Fatalf("expected older_than_days=0, got %v", gotBody)
 	}
 }
 
 func TestJobsPurgeInUsage(t *testing.T) {
-	var out, errOut bytes.Buffer
-	run([]string{"help"}, &out, &errOut)
-	combined := out.String() + errOut.String()
+	res := clitest.Run(t, run, "help")
+	combined := res.Out + res.Err
 	if !strings.Contains(combined, "purge") {
 		t.Fatalf("expected 'purge' in usage output, got:\n%s", combined)
 	}

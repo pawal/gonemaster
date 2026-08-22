@@ -1,15 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
-	"os"
 	"strings"
 	"testing"
 	"time"
 
-	"codeberg.org/pawal/gonemaster/scoring"
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 )
 
 // jobResultWithEntries returns a JSON body for a job result that includes raw
@@ -61,13 +59,10 @@ func TestJobsResultsNoScoreByDefault(t *testing.T) {
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "results", "job_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if strings.Contains(out.String(), "Score:") {
-		t.Fatalf("expected no score by default, got: %s", out.String())
+	res := clitest.Run(t, run, "jobs", "results", "job_1")
+	res.RequireCode(t, 0)
+	if strings.Contains(res.Out, "Score:") {
+		t.Fatalf("expected no score by default, got: %s", res.Out)
 	}
 }
 
@@ -77,14 +72,9 @@ func TestJobsResultsWithScore(t *testing.T) {
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "results", "--score", "job_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "Score:") {
-		t.Fatalf("expected score in output, got: %s", out.String())
-	}
+	res := clitest.Run(t, run, "jobs", "results", "--score", "job_1")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Score:")
 }
 
 func TestJobsResultsNoScoreSuppresses(t *testing.T) {
@@ -93,14 +83,11 @@ func TestJobsResultsNoScoreSuppresses(t *testing.T) {
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
 	}
-	var out, errOut bytes.Buffer
 	// --no-score should suppress even if both flags are given.
-	code := run([]string{"jobs", "results", "--score", "--no-score", "job_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if strings.Contains(out.String(), "Score:") {
-		t.Fatalf("expected no score with --no-score, got: %s", out.String())
+	res := clitest.Run(t, run, "jobs", "results", "--score", "--no-score", "job_1")
+	res.RequireCode(t, 0)
+	if strings.Contains(res.Out, "Score:") {
+		t.Fatalf("expected no score with --no-score, got: %s", res.Out)
 	}
 }
 
@@ -110,12 +97,9 @@ func TestJobsResultsScoreShowsCategories(t *testing.T) {
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "results", "--score", "job_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	output := out.String()
+	res := clitest.Run(t, run, "jobs", "results", "--score", "job_1")
+	res.RequireCode(t, 0)
+	output := res.Out
 	for _, cat := range []string{"dnssec:", "nameserver_health:", "connectivity:", "zone_consistency:"} {
 		if !strings.Contains(output, cat) {
 			t.Errorf("expected category %q in output, got:\n%s", cat, output)
@@ -129,79 +113,47 @@ func TestJobsResultsScoreNotAvailableWithoutEntries(t *testing.T) {
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithoutEntries("job_1"))}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "results", "--score", "job_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "N/A") {
-		t.Fatalf("expected N/A when no entries, got: %s", out.String())
-	}
+	res := clitest.Run(t, run, "jobs", "results", "--score", "job_1")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "N/A")
 }
 
 // ── --scoring-config flag ─────────────────────────────────────────────────────
 
 func TestJobsResultsScoringConfigImpliesScore(t *testing.T) {
 	// Write a minimal valid scoring config to a temp file.
-	cfg := scoring.DefaultConfig()
-	data, _ := json.Marshal(cfg)
-	f, err := os.CreateTemp(t.TempDir(), "scoring-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.Write(data); err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
+	cfgPath := clitest.WriteScoringConfig(t)
 
 	old := newHTTPClient
 	defer func() { newHTTPClient = old }()
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "results", "--scoring-config", f.Name(), "job_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "Score:") {
-		t.Fatalf("expected --scoring-config to imply --score, got: %s", out.String())
-	}
+	res := clitest.Run(t, run, "jobs", "results", "--scoring-config", cfgPath, "job_1")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Score:")
 }
 
 func TestJobsResultsScoringConfigInvalidPath(t *testing.T) {
-	var out, errOut bytes.Buffer
-	code := run([]string{"jobs", "results", "--scoring-config", "/nonexistent/path.json", "job_1"}, &out, &errOut)
-	if code == 0 {
+	res := clitest.Run(t, run, "jobs", "results", "--scoring-config", "/nonexistent/path.json", "job_1")
+	if res.Code == 0 {
 		t.Fatal("expected non-zero exit for invalid --scoring-config path")
 	}
 }
 
 func TestScoringConfigNoScoreWins(t *testing.T) {
-	cfg := scoring.DefaultConfig()
-	data, _ := json.Marshal(cfg)
-	f, err := os.CreateTemp(t.TempDir(), "scoring-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.Write(data); err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
+	cfgPath := clitest.WriteScoringConfig(t)
 
 	old := newHTTPClient
 	defer func() { newHTTPClient = old }()
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
 	}
-	var out, errOut bytes.Buffer
 	// --no-score should override --scoring-config.
-	code := run([]string{"jobs", "results", "--scoring-config", f.Name(), "--no-score", "job_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	if strings.Contains(out.String(), "Score:") {
-		t.Fatalf("expected --no-score to suppress scoring config, got: %s", out.String())
+	res := clitest.Run(t, run, "jobs", "results", "--scoring-config", cfgPath, "--no-score", "job_1")
+	res.RequireCode(t, 0)
+	if strings.Contains(res.Out, "Score:") {
+		t.Fatalf("expected --no-score to suppress scoring config, got: %s", res.Out)
 	}
 }
 
@@ -213,17 +165,14 @@ func TestJobsResultsScoreInJSONOutput(t *testing.T) {
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "jobs", "results", "--score", "job_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "jobs", "results", "--score", "job_1")
+	res.RequireCode(t, 0)
 	var result jobResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatalf("invalid JSON output: %v - got: %s", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &result); err != nil {
+		t.Fatalf("invalid JSON output: %v - got: %s", err, res.Out)
 	}
 	if result.Score == nil {
-		t.Fatalf("expected score field in JSON output, got: %s", out.String())
+		t.Fatalf("expected score field in JSON output, got: %s", res.Out)
 	}
 	if result.Score.Grade == "" {
 		t.Fatalf("expected non-empty grade in JSON score")
@@ -236,13 +185,10 @@ func TestJobsResultsNoScoreInJSONOutputByDefault(t *testing.T) {
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{Transport: mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1"))}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "jobs", "results", "job_1"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "jobs", "results", "job_1")
+	res.RequireCode(t, 0)
 	var result jobResult
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
+	if err := json.Unmarshal([]byte(res.Out), &result); err != nil {
 		t.Fatalf("invalid JSON: %v", err)
 	}
 	if result.Score != nil {
@@ -283,18 +229,9 @@ func TestParseScoringOptionsNoScoreWins(t *testing.T) {
 }
 
 func TestParseScoringOptionsConfigImpliesEnabled(t *testing.T) {
-	cfg := scoring.DefaultConfig()
-	data, _ := json.Marshal(cfg)
-	f, err := os.CreateTemp(t.TempDir(), "scoring-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.Write(data); err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
+	cfgPath := clitest.WriteScoringConfig(t)
 
-	opts, err := parseScoringOptions(false, false, f.Name())
+	opts, err := parseScoringOptions(false, false, cfgPath)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -304,18 +241,9 @@ func TestParseScoringOptionsConfigImpliesEnabled(t *testing.T) {
 }
 
 func TestParseScoringOptionsConfigNoScoreWins(t *testing.T) {
-	cfg := scoring.DefaultConfig()
-	data, _ := json.Marshal(cfg)
-	f, err := os.CreateTemp(t.TempDir(), "scoring-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := f.Write(data); err != nil {
-		t.Fatal(err)
-	}
-	f.Close()
+	cfgPath := clitest.WriteScoringConfig(t)
 
-	opts, err := parseScoringOptions(false, true, f.Name())
+	opts, err := parseScoringOptions(false, true, cfgPath)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,12 +1,13 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 )
 
 // ── domains pretty-printer ────────────────────────────────────────────────────
@@ -32,12 +33,9 @@ func TestDomainsListPrettyWithRunAt(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"domains", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	output := out.String()
+	res := clitest.Run(t, run, "domains", "list")
+	res.RequireCode(t, 0)
+	output := res.Out
 	if !strings.Contains(output, "example.com") {
 		t.Fatalf("expected domain name in output: %s", output)
 	}
@@ -64,15 +62,10 @@ func TestDomainsListPrettyNoRunAt(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"domains", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "domains", "list")
+	res.RequireCode(t, 0)
 	// Should show "-" for missing last date.
-	if !strings.Contains(out.String(), "-") {
-		t.Fatalf("expected '-' placeholder for missing run_at: %s", out.String())
-	}
+	res.RequireOutContains(t, "-")
 }
 
 // ── runs pretty-printer ───────────────────────────────────────────────────────
@@ -98,12 +91,9 @@ func TestRunsListPrettyWithFinishedAt(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"runs", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	output := out.String()
+	res := clitest.Run(t, run, "runs", "list")
+	res.RequireCode(t, 0)
+	output := res.Out
 	if !strings.Contains(output, "run-abc-123") {
 		t.Fatalf("expected run ID in output: %s", output)
 	}
@@ -127,15 +117,10 @@ func TestRunsListPrettyNoFinishedAt(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"runs", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "runs", "list")
+	res.RequireCode(t, 0)
 	// Should show "-" for missing finished_at.
-	if !strings.Contains(out.String(), "-") {
-		t.Fatalf("expected '-' placeholder: %s", out.String())
-	}
+	res.RequireOutContains(t, "-")
 }
 
 // ── entries pretty-printer ────────────────────────────────────────────────────
@@ -163,12 +148,9 @@ func TestEntriesQueryPrettyWithDomain(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"entries", "query"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
-	output := out.String()
+	res := clitest.Run(t, run, "entries", "query")
+	res.RequireCode(t, 0)
+	output := res.Out
 	if !strings.Contains(output, "example.com") {
 		t.Fatalf("expected domain name in output: %s", output)
 	}
@@ -194,15 +176,10 @@ func TestEntriesQueryPrettyNoDomainFallsBackToID(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"entries", "query"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "entries", "query")
+	res.RequireCode(t, 0)
 	// Should show "id:42" when domain name is absent.
-	if !strings.Contains(out.String(), "id:42") {
-		t.Fatalf("expected 'id:42' fallback in output: %s", out.String())
-	}
+	res.RequireOutContains(t, "id:42")
 }
 
 // ── JSON/JSONL output for new commands ────────────────────────────────────────
@@ -216,14 +193,11 @@ func TestDomainsListJSONOutput(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "domains", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "domains", "list")
+	res.RequireCode(t, 0)
 	var got domainList
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("expected valid JSON output: %v - got: %s", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &got); err != nil {
+		t.Fatalf("expected valid JSON output: %v - got: %s", err, res.Out)
 	}
 }
 
@@ -236,14 +210,11 @@ func TestRunsListJSON(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "runs", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "runs", "list")
+	res.RequireCode(t, 0)
 	var got runList
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("expected valid JSON output: %v - got: %s", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &got); err != nil {
+		t.Fatalf("expected valid JSON output: %v - got: %s", err, res.Out)
 	}
 }
 
@@ -256,14 +227,11 @@ func TestTagsListJSON(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "tags", "list"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "tags", "list")
+	res.RequireCode(t, 0)
 	var got []tag
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("expected valid JSON output: %v - got: %s", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &got); err != nil {
+		t.Fatalf("expected valid JSON output: %v - got: %s", err, res.Out)
 	}
 }
 
@@ -279,13 +247,10 @@ func TestEntriesQueryJSON(t *testing.T) {
 			return jsonResponse(200, string(body)), nil
 		})}
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--format", "json", "entries", "query"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--format", "json", "entries", "query")
+	res.RequireCode(t, 0)
 	var got entryList
-	if err := json.Unmarshal(out.Bytes(), &got); err != nil {
-		t.Fatalf("expected valid JSON output: %v - got: %s", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &got); err != nil {
+		t.Fatalf("expected valid JSON output: %v - got: %s", err, res.Out)
 	}
 }

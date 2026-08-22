@@ -14,6 +14,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/cachefile"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -62,27 +63,15 @@ func samplePacketCacheFile(t *testing.T) cachefile.File {
 }
 
 func TestRunRequiresDomain(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--domain is required") {
-		t.Fatalf("expected missing domain message, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run)
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--domain is required")
 }
 
 func TestRunHelpShowsGroupedFlags(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"-h"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	help := errOut.String()
+	res := clitest.Run(t, run, "-h")
+	res.RequireCode(t, 2)
+	help := res.Err
 	expected := []string{
 		"Usage: gonemaster [flags] [DOMAIN]",
 		"Flags:",
@@ -107,8 +96,8 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 			t.Fatalf("expected %q in help output, got %q", fragment, help)
 		}
 	}
-	if out.Len() != 0 {
-		t.Fatalf("expected no stdout output, got %q", out.String())
+	if len(res.Out) != 0 {
+		t.Fatalf("expected no stdout output, got %q", res.Out)
 	}
 }
 
@@ -116,13 +105,8 @@ func TestRunAcceptsPositionalDomain(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"example.com"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "example.com")
+	res.RequireCode(t, 0)
 	if captured.Domain != "example.com" {
 		t.Fatalf("expected positional domain example.com, got %q", captured.Domain)
 	}
@@ -132,13 +116,8 @@ func TestRunAcceptsPositionalDomainWithFlags(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--min-level", "INFO", "--json", "example.com"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--min-level", "INFO", "--json", "example.com")
+	res.RequireCode(t, 0)
 	if captured.Domain != "example.com" {
 		t.Fatalf("expected positional domain example.com, got %q", captured.Domain)
 	}
@@ -150,46 +129,25 @@ func TestRunAcceptsPositionalDomainWithFlags(t *testing.T) {
 func TestRunRejectsMultiplePositionalDomains(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"example.com", "example.net"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "only one positional DOMAIN argument is allowed") {
-		t.Fatalf("expected positional-argument validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "example.com", "example.net")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "only one positional DOMAIN argument is allowed")
 }
 
 func TestRunRejectsDomainProvidedTwice(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", "example.com", "example.net"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "domain provided twice; use either --domain DOMAIN or positional DOMAIN") {
-		t.Fatalf("expected duplicate-domain validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "example.net")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "domain provided twice; use either --domain DOMAIN or positional DOMAIN")
 }
 
 func TestRunRejectsInvalidStopLevel(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", "example.com", "--stop-level", "BANANA"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--stop-level must be one of") {
-		t.Fatalf("expected stop-level validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--stop-level", "BANANA")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--stop-level must be one of")
 }
 
 func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
@@ -233,23 +191,14 @@ func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
 		runEngine = previous
 	})
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--min-level", "INFO",
-		"--stop-level", "WARNING",
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--min-level", "INFO", "--stop-level", "WARNING")
+	res.RequireCode(t, 0)
 	var payload []map[string]any
-	if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
-		t.Fatalf("expected JSON output, got %q (err=%v)", out.String(), err)
+	if err := json.Unmarshal([]byte(res.Out), &payload); err != nil {
+		t.Fatalf("expected JSON output, got %q (err=%v)", res.Out, err)
 	}
 	if len(payload) != 2 {
-		t.Fatalf("expected 2 captured entries, got %d (%q)", len(payload), out.String())
+		t.Fatalf("expected 2 captured entries, got %d (%q)", len(payload), res.Out)
 	}
 	if payload[0]["tag"] != "STOP_INFO" {
 		t.Fatalf("unexpected first tag: %v", payload[0]["tag"])
@@ -257,96 +206,56 @@ func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
 	if payload[1]["tag"] != "STOP_WARN" {
 		t.Fatalf("unexpected second tag: %v", payload[1]["tag"])
 	}
-	if strings.TrimSpace(errOut.String()) != "" {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	if strings.TrimSpace(res.Err) != "" {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunRejectsSaveAndVersion(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--version", "--save", "cache.json"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--save/--restore cannot be combined with --version") {
-		t.Fatalf("expected cache/version conflict message, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--version", "--save", "cache.json")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--save/--restore cannot be combined with --version")
 }
 
 func TestRunRejectsRestoreAndListTests(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--list-tests", "--restore", "cache.json"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--save/--restore cannot be combined with --list-tests") {
-		t.Fatalf("expected cache/list-tests conflict message, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--list-tests", "--restore", "cache.json")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--save/--restore cannot be combined with --list-tests")
 }
 
 func TestRunRejectsSaveAndDumpProfile(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--save", "cache.json", "--dump-profile"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--dump-profile cannot be combined with --save") {
-		t.Fatalf("expected cache/dump-profile conflict message, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--save", "cache.json", "--dump-profile")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--dump-profile cannot be combined with --save")
 }
 
 func TestRunRejectsRestoreAndDumpProfile(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--restore", "cache.json", "--dump-profile"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--dump-profile cannot be combined with --restore") {
-		t.Fatalf("expected cache/dump-profile conflict message, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--restore", "cache.json", "--dump-profile")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--dump-profile cannot be combined with --restore")
 }
 
 func TestRunDumpProfileWithoutDomain(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--dump-profile"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
+	res := clitest.Run(t, run, "--dump-profile")
+	res.RequireCode(t, 0)
 	var payload map[string]any
-	if err := json.Unmarshal(out.Bytes(), &payload); err != nil {
-		t.Fatalf("expected JSON output, got %q (err=%v)", out.String(), err)
+	if err := json.Unmarshal([]byte(res.Out), &payload); err != nil {
+		t.Fatalf("expected JSON output, got %q (err=%v)", res.Out, err)
 	}
 	if _, ok := payload["net"]; !ok {
-		t.Fatalf("expected net in profile output, got %q", out.String())
+		t.Fatalf("expected net in profile output, got %q", res.Out)
 	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunWritesJSONAndError(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--json"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-	if !strings.Contains(out.String(), "B01_ROOT_HAS_NO_PARENT") {
-		t.Fatalf("expected basic01 output, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--json")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "B01_ROOT_HAS_NO_PARENT")
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
@@ -383,14 +292,10 @@ func TestRunRestorePacketCacheLoadsRequestCache(t *testing.T) {
 		runEngine = previous
 	})
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--json", "--restore", restorePath}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--restore", restorePath)
+	res.RequireCode(t, 0)
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
@@ -413,12 +318,8 @@ func TestRunSavePacketCacheWritesFile(t *testing.T) {
 		runEngine = previous
 	})
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--json", "--save", savePath}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath)
+	res.RequireCode(t, 0)
 
 	payloadBytes, err := os.ReadFile(savePath)
 	if err != nil {
@@ -455,12 +356,8 @@ func TestRunSaveCompressWritesGzip(t *testing.T) {
 		runEngine = previous
 	})
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--json", "--save", savePath, "--save-compress"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath, "--save-compress")
+	res.RequireCode(t, 0)
 
 	data, err := os.ReadFile(savePath)
 	if err != nil {
@@ -487,26 +384,15 @@ func TestRunSaveCompressWritesGzip(t *testing.T) {
 	}
 	t.Cleanup(func() { runEngine = restorePrev })
 
-	out.Reset()
-	errOut.Reset()
-	code = run([]string{"--domain", "example.com", "--json", "--restore", savePath}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("restore: expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	clitest.Run(t, run, "--domain", "example.com", "--json", "--restore", savePath).RequireCode(t, 0)
 }
 
 func TestRunSaveCompressRejectsWithoutSave(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--save-compress"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--save-compress requires --save") {
-		t.Fatalf("expected save-compress validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--save-compress")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--save-compress requires --save")
 }
 
 func TestRunSaveMaxEntriesUnderLimitSucceeds(t *testing.T) {
@@ -523,12 +409,8 @@ func TestRunSaveMaxEntriesUnderLimitSucceeds(t *testing.T) {
 	}
 	t.Cleanup(func() { runEngine = previous })
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "10"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "10")
+	res.RequireCode(t, 0)
 	if _, err := os.Stat(savePath); err != nil {
 		t.Fatalf("expected save file to exist when under limit: %v", err)
 	}
@@ -548,12 +430,8 @@ func TestRunSaveMaxEntriesZeroMeansUnlimited(t *testing.T) {
 	}
 	t.Cleanup(func() { runEngine = original })
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "0"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("--save-max-entries 0 should mean unlimited, got exit %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "0")
+	res.RequireCode(t, 0)
 }
 
 func TestRunSaveMaxEntriesOverLimitFails(t *testing.T) {
@@ -574,15 +452,11 @@ func TestRunSaveMaxEntriesOverLimitFails(t *testing.T) {
 	}
 	t.Cleanup(func() { runEngine = original })
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "1"}, &out, &errOut)
-	if code == 0 {
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "1")
+	if res.Code == 0 {
 		t.Fatalf("expected non-zero exit when entry count exceeds --save-max-entries")
 	}
-	if !strings.Contains(errOut.String(), "max-entries=1") {
-		t.Fatalf("expected max-entries error message, got %q", errOut.String())
-	}
+	res.RequireErrContains(t, "max-entries=1")
 	if _, err := os.Stat(savePath); err == nil {
 		t.Fatalf("expected save file NOT to be written when over limit")
 	}
@@ -591,29 +465,17 @@ func TestRunSaveMaxEntriesOverLimitFails(t *testing.T) {
 func TestRunSaveMaxEntriesRejectsWithoutSave(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--save-max-entries", "5"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--save-max-entries requires --save") {
-		t.Fatalf("expected save-max-entries validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--save-max-entries", "5")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--save-max-entries requires --save")
 }
 
 func TestRunSaveMaxEntriesRejectsNegative(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--save", "out.json", "--save-max-entries", "-1"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--save-max-entries must be >= 0") {
-		t.Fatalf("expected negative-rejection error, got %q", errOut.String())
-	}
+	clitest.Run(t, run, "--domain", "example.com", "--save", "out.json", "--save-max-entries", "-1").
+		RequireCode(t, 2).
+		RequireErrContains(t, "--save-max-entries must be >= 0")
 }
 
 // writeSavedCache writes a real cache file (with checksum) holding 3
@@ -649,12 +511,9 @@ func TestRunCacheStatsPrintsReport(t *testing.T) {
 	stubRunEngine(t, nil)
 	path := writeSavedCache(t, t.TempDir(), "cache.json", false)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--cache-stats", path}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
-	}
-	got := out.String()
+	res := clitest.Run(t, run, "--cache-stats", path)
+	res.RequireCode(t, 0)
+	got := res.Out
 	for _, want := range []string{"entries:  3 total", "nameserver  3", "by address (nameserver):", "192.0.2.1", "192.0.2.2", "plain"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected %q in output, got %q", want, got)
@@ -666,14 +525,9 @@ func TestRunCacheStatsGzipReportsCompression(t *testing.T) {
 	stubRunEngine(t, nil)
 	path := writeSavedCache(t, t.TempDir(), "cache.json.gz", true)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--cache-stats", path}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "gzip") {
-		t.Fatalf("expected gzip label in output, got %q", out.String())
-	}
+	res := clitest.Run(t, run, "--cache-stats", path)
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "gzip")
 }
 
 func TestRunCacheStatsStrictRejectsUnknownField(t *testing.T) {
@@ -684,14 +538,9 @@ func TestRunCacheStatsStrictRejectsUnknownField(t *testing.T) {
 	if err := os.WriteFile(path, blob, 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--cache-stats", path, "--cache-strict"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "unknown field") {
-		t.Fatalf("expected unknown-field error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--cache-stats", path, "--cache-strict")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "unknown field")
 }
 
 func TestRunRestoreStrictRejectsUnknownField(t *testing.T) {
@@ -702,102 +551,59 @@ func TestRunRestoreStrictRejectsUnknownField(t *testing.T) {
 	if err := os.WriteFile(path, blob, 0o644); err != nil {
 		t.Fatalf("write: %v", err)
 	}
-	var out, errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--json", "--restore", path, "--cache-strict"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "unknown field") {
-		t.Fatalf("expected unknown-field error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--restore", path, "--cache-strict")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "unknown field")
 }
 
 func TestRunCacheStrictRequiresRestoreOrStats(t *testing.T) {
 	stubRunEngine(t, nil)
-	var out, errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--cache-strict"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--cache-strict requires --restore or --cache-stats") {
-		t.Fatalf("expected cache-strict validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--cache-strict")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--cache-strict requires --restore or --cache-stats")
 }
 
 func TestRunCacheStatsRejectsWithSave(t *testing.T) {
 	stubRunEngine(t, nil)
-	var out, errOut bytes.Buffer
-	code := run([]string{"--cache-stats", "a.json", "--save", "b.json"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--cache-stats cannot be combined with --save/--restore") {
-		t.Fatalf("expected cache-stats conflict error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--cache-stats", "a.json", "--save", "b.json")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--cache-stats cannot be combined with --save/--restore")
 }
 
 func TestRunRestorePrintsCacheSummary(t *testing.T) {
 	stubRunEngine(t, nil)
 	path := writeSavedCache(t, t.TempDir(), "cache.json", false)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--restore", path}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "packet cache: 0 hits, 0 misses") {
-		t.Fatalf("expected packet-cache summary, got %q", out.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--restore", path)
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "packet cache: 0 hits, 0 misses")
 }
 
 func TestRunWritesOutputFile(t *testing.T) {
 	dir := t.TempDir()
 	target := filepath.Join(dir, "out.json")
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--json", "--output", target}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-	data, err := os.ReadFile(target)
-	if err != nil {
-		t.Fatalf("read output: %v", err)
-	}
-	if !strings.Contains(string(data), "B01_ROOT_HAS_NO_PARENT") {
-		t.Fatalf("unexpected file output: %q", string(data))
-	}
+	clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--json", "--output", target).
+		RequireCode(t, 0)
+	clitest.FileContains(t, target, "B01_ROOT_HAS_NO_PARENT")
 }
 
 func TestRunRawStreamsOutput(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--raw"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--raw")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "B01_ROOT_HAS_NO_PARENT")
+	if strings.Contains(res.Out, "\"timestamp\"") {
+		t.Fatalf("expected raw output, got %q", res.Out)
 	}
-	if !strings.Contains(out.String(), "B01_ROOT_HAS_NO_PARENT") {
-		t.Fatalf("expected raw output, got %q", out.String())
-	}
-	if strings.Contains(out.String(), "\"timestamp\"") {
-		t.Fatalf("expected raw output, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunJSONStreamOutputs(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--json-stream"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-	lines := strings.Split(out.String(), "\n")
+	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--json-stream")
+	res.RequireCode(t, 0)
+	lines := strings.Split(res.Out, "\n")
 	var first string
 	for _, line := range lines {
 		if strings.TrimSpace(line) == "" {
@@ -807,7 +613,7 @@ func TestRunJSONStreamOutputs(t *testing.T) {
 		break
 	}
 	if first == "" {
-		t.Fatalf("expected json-stream output, got %q", out.String())
+		t.Fatalf("expected json-stream output, got %q", res.Out)
 	}
 	var payload map[string]any
 	if err := json.Unmarshal([]byte(first), &payload); err != nil {
@@ -816,120 +622,71 @@ func TestRunJSONStreamOutputs(t *testing.T) {
 	if tag, ok := payload["Tag"].(string); !ok || !strings.Contains(tag, "B01_") {
 		t.Fatalf("expected Tag in JSON output, got %v", payload["Tag"])
 	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunRejectsRawAndJSON(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--json", "--raw"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--json cannot be combined with --raw") {
-		t.Fatalf("expected error message, got %q", errOut.String())
-	}
-	if out.Len() != 0 {
-		t.Fatalf("expected no stdout output, got %q", out.String())
+	res := clitest.Run(t, run, "--domain", ".", "--json", "--raw")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--json cannot be combined with --raw")
+	if len(res.Out) != 0 {
+		t.Fatalf("expected no stdout output, got %q", res.Out)
 	}
 }
 
 func TestRunRejectsJSONStreamAndRaw(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--json-stream", "--raw"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--json-stream cannot be combined with --raw") {
-		t.Fatalf("expected error message, got %q", errOut.String())
-	}
-	if out.Len() != 0 {
-		t.Fatalf("expected no stdout output, got %q", out.String())
+	res := clitest.Run(t, run, "--domain", ".", "--json-stream", "--raw")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--json-stream cannot be combined with --raw")
+	if len(res.Out) != 0 {
+		t.Fatalf("expected no stdout output, got %q", res.Out)
 	}
 }
 
 func TestRunRejectsJSONStreamAndJSON(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--json-stream", "--json"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--json-stream cannot be combined with --json") {
-		t.Fatalf("expected error message, got %q", errOut.String())
-	}
-	if out.Len() != 0 {
-		t.Fatalf("expected no stdout output, got %q", out.String())
+	res := clitest.Run(t, run, "--domain", ".", "--json-stream", "--json")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--json-stream cannot be combined with --json")
+	if len(res.Out) != 0 {
+		t.Fatalf("expected no stdout output, got %q", res.Out)
 	}
 }
 
 func TestRunRejectsCountAndRaw(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--count", "--raw"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--count cannot be combined with --raw") {
-		t.Fatalf("expected error message, got %q", errOut.String())
-	}
-	if out.Len() != 0 {
-		t.Fatalf("expected no stdout output, got %q", out.String())
+	res := clitest.Run(t, run, "--domain", ".", "--count", "--raw")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--count cannot be combined with --raw")
+	if len(res.Out) != 0 {
+		t.Fatalf("expected no stdout output, got %q", res.Out)
 	}
 }
 
 func TestRunRejectsCountAndJSON(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--count", "--json"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--count cannot be combined with --json") {
-		t.Fatalf("expected error message, got %q", errOut.String())
-	}
-	if out.Len() != 0 {
-		t.Fatalf("expected no stdout output, got %q", out.String())
+	res := clitest.Run(t, run, "--domain", ".", "--count", "--json")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--count cannot be combined with --json")
+	if len(res.Out) != 0 {
+		t.Fatalf("expected no stdout output, got %q", res.Out)
 	}
 }
 
 func TestRunRejectsCountAndJSONStream(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--count", "--json-stream"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--count cannot be combined with --json-stream") {
-		t.Fatalf("expected error message, got %q", errOut.String())
-	}
-	if out.Len() != 0 {
-		t.Fatalf("expected no stdout output, got %q", out.String())
+	res := clitest.Run(t, run, "--domain", ".", "--count", "--json-stream")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--count cannot be combined with --json-stream")
+	if len(res.Out) != 0 {
+		t.Fatalf("expected no stdout output, got %q", res.Out)
 	}
 }
 
 func TestRunRejectsCountAndDumpProfile(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--count", "--dump-profile"}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--dump-profile cannot be combined with --count") {
-		t.Fatalf("expected error message, got %q", errOut.String())
-	}
-	if out.Len() != 0 {
-		t.Fatalf("expected no stdout output, got %q", out.String())
+	res := clitest.Run(t, run, "--count", "--dump-profile")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--dump-profile cannot be combined with --count")
+	if len(res.Out) != 0 {
+		t.Fatalf("expected no stdout output, got %q", res.Out)
 	}
 }
 
@@ -937,18 +694,8 @@ func TestRunParsesUndelegatedNameserverFlags(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--ns", "NS1.Example.com/192.0.2.1",
-		"--ns", "ns2.example.net",
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ns", "NS1.Example.com/192.0.2.1", "--ns", "ns2.example.net")
+	res.RequireCode(t, 0)
 	if len(captured.UndelegatedNameservers) != 2 {
 		t.Fatalf("expected 2 nameserver rows, got %d", len(captured.UndelegatedNameservers))
 	}
@@ -966,18 +713,8 @@ func TestRunParsesUndelegatedNameserverSameNameMultipleIPs(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--ns", "NS1.Example.com/192.0.2.1",
-		"--ns", "ns1.example.com/2001:db8::1",
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ns", "NS1.Example.com/192.0.2.1", "--ns", "ns1.example.com/2001:db8::1")
+	res.RequireCode(t, 0)
 	if len(captured.UndelegatedNameservers) != 2 {
 		t.Fatalf("expected 2 nameserver rows, got %d", len(captured.UndelegatedNameservers))
 	}
@@ -995,18 +732,8 @@ func TestRunParsesUndelegatedDSFlags(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--ds", "12345,13,2," + strings.Repeat("a", 64),
-		"--ds", "23456,8,2," + strings.Repeat("B", 64),
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ds", "12345,13,2,"+strings.Repeat("a", 64), "--ds", "23456,8,2,"+strings.Repeat("B", 64))
+	res.RequireCode(t, 0)
 	if len(captured.UndelegatedDSInfo) != 2 {
 		t.Fatalf("expected 2 DS rows, got %d", len(captured.UndelegatedDSInfo))
 	}
@@ -1023,57 +750,25 @@ func TestRunParsesUndelegatedDSFlags(t *testing.T) {
 func TestRunRejectsMalformedUndelegatedNameserverFlag(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--ns", "bad!name.example/192.0.2.1",
-	}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "undelegated nameserver") {
-		t.Fatalf("expected undelegated nameserver parse error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ns", "bad!name.example/192.0.2.1")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "undelegated nameserver")
 }
 
 func TestRunRejectsMalformedUndelegatedDSFlag(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--ds", "12345,13,2,NOT-HEX",
-	}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "undelegated DS") {
-		t.Fatalf("expected undelegated DS parse error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ds", "12345,13,2,NOT-HEX")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "undelegated DS")
 }
 
 func TestRunCarriesUndelegatedInputsInRunRequest(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--ns", "ns1.example.com/192.0.2.10",
-		"--ds", "12345,13,2," + strings.Repeat("a", 64),
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ns", "ns1.example.com/192.0.2.10", "--ds", "12345,13,2,"+strings.Repeat("a", 64))
+	res.RequireCode(t, 0)
 	if len(captured.UndelegatedNameservers) != 1 {
 		t.Fatalf("expected one undelegated nameserver row, got %d", len(captured.UndelegatedNameservers))
 	}
@@ -1092,18 +787,8 @@ func TestRunParsesSourceAddrOverrides(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--sourceaddr4", "192.0.2.44",
-		"--sourceaddr6", "2001:db8::44",
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--sourceaddr4", "192.0.2.44", "--sourceaddr6", "2001:db8::44")
+	res.RequireCode(t, 0)
 	if captured.SourceAddr4 == nil || *captured.SourceAddr4 != "192.0.2.44" {
 		t.Fatalf("unexpected SourceAddr4 override: %#v", captured.SourceAddr4)
 	}
@@ -1115,83 +800,49 @@ func TestRunParsesSourceAddrOverrides(t *testing.T) {
 func TestRunRejectsInvalidSourceAddr4(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--sourceaddr4", "not-an-ip",
-	}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--sourceaddr4 must be a valid IPv4 address") {
-		t.Fatalf("expected sourceaddr4 parse error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--sourceaddr4", "not-an-ip")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--sourceaddr4 must be a valid IPv4 address")
 }
 
 func TestRunRejectsInvalidSourceAddr6(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{
-		"--domain", "example.com",
-		"--json",
-		"--sourceaddr6", "192.0.2.10",
-	}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--sourceaddr6 must be a valid IPv6 address") {
-		t.Fatalf("expected sourceaddr6 parse error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--sourceaddr6", "192.0.2.10")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "--sourceaddr6 must be a valid IPv6 address")
 }
 
 func TestRunOutputsTranslatedByDefault(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--locale", "en"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "INFO", "--locale", "en")
+	res.RequireCode(t, 0)
+	if !strings.HasPrefix(res.Out, "Seconds Level    Message") {
+		t.Fatalf("expected translated header, got %q", res.Out)
 	}
-	if !strings.HasPrefix(out.String(), "Seconds Level    Message") {
-		t.Fatalf("expected translated header, got %q", out.String())
+	if strings.Contains(res.Out, "\"timestamp\"") {
+		t.Fatalf("expected translated output, got %q", res.Out)
 	}
-	if strings.Contains(out.String(), "\"timestamp\"") {
-		t.Fatalf("expected translated output, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), "test of the root zone") {
-		t.Fatalf("expected translated output, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	res.RequireOutContains(t, "test of the root zone")
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunOutputsLocalizedHeaderByLocale(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
+	res := clitest.Run(t, run, "--domain", "example.com", "--min-level", "CRITICAL", "--locale", "sv")
+	res.RequireCode(t, 0)
 
-	code := run([]string{"--domain", "example.com", "--min-level", "CRITICAL", "--locale", "sv"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-
-	firstLine := strings.SplitN(out.String(), "\n", 2)[0]
+	firstLine := strings.SplitN(res.Out, "\n", 2)[0]
 	if !strings.Contains(firstLine, "Sekunder") || !strings.Contains(firstLine, "Nivå") || !strings.Contains(firstLine, "Meddelande") {
 		t.Fatalf("expected localized header for sv locale, got %q", firstLine)
 	}
 	if strings.Contains(firstLine, "Seconds") {
 		t.Fatalf("expected non-English header for sv locale, got %q", firstLine)
 	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
@@ -1217,114 +868,72 @@ func TestWriteHumanHeaderAlignsDisplayWidthForJapanese(t *testing.T) {
 }
 
 func TestRunOutputsLooksOKWhenNoEntriesAtLevel(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--locale", "en"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--locale", "en")
+	res.RequireCode(t, 0)
+	if !strings.HasPrefix(res.Out, "Seconds Level    Message") {
+		t.Fatalf("expected translated header, got %q", res.Out)
 	}
-	if !strings.HasPrefix(out.String(), "Seconds Level    Message") {
-		t.Fatalf("expected translated header, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), "Looks OK.") {
-		t.Fatalf("expected Looks OK when no entries match level, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	res.RequireOutContains(t, "Looks OK.")
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunCountPrintsSummariesFromAllLevels(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--count", "--locale", "en", "--no-progress"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--count", "--locale", "en", "--no-progress")
+	res.RequireCode(t, 0)
+	if !strings.HasPrefix(res.Out, "Seconds Level    Message") {
+		t.Fatalf("expected translated header, got %q", res.Out)
 	}
-	if !strings.HasPrefix(out.String(), "Seconds Level    Message") {
-		t.Fatalf("expected translated header, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), "Looks OK.") {
-		t.Fatalf("expected Looks OK marker when min-level hides entries, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), "Number of log entries") {
-		t.Fatalf("expected level count summary, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), "Message tag") {
-		t.Fatalf("expected tag count summary, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), "INFO") {
-		t.Fatalf("expected INFO counts from entries below default min-level, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), "B01_ROOT_HAS_NO_PARENT") {
-		t.Fatalf("expected B01 tag count in summary, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	res.RequireOutContains(t, "Looks OK.")
+	res.RequireOutContains(t, "Number of log entries")
+	res.RequireOutContains(t, "Message tag")
+	res.RequireOutContains(t, "INFO")
+	res.RequireOutContains(t, "B01_ROOT_HAS_NO_PARENT")
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunJSONNoEntriesRemainsJSONArray(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--json"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--json")
+	res.RequireCode(t, 0)
+	if strings.Contains(res.Out, "Looks OK.") {
+		t.Fatalf("expected JSON output without Looks OK marker, got %q", res.Out)
 	}
-	if strings.Contains(out.String(), "Looks OK.") {
-		t.Fatalf("expected JSON output without Looks OK marker, got %q", out.String())
+	if strings.TrimSpace(res.Out) != "[]" {
+		t.Fatalf("expected empty JSON array, got %q", res.Out)
 	}
-	if strings.TrimSpace(out.String()) != "[]" {
-		t.Fatalf("expected empty JSON array, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunRawNoEntriesRemainsEmpty(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--raw"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--raw")
+	res.RequireCode(t, 0)
+	if strings.TrimSpace(res.Out) != "" {
+		t.Fatalf("expected empty raw stream, got %q", res.Out)
 	}
-	if strings.TrimSpace(out.String()) != "" {
-		t.Fatalf("expected empty raw stream, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunJSONStreamNoEntriesRemainsEmpty(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--json-stream"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	res := clitest.Run(t, run, "--domain", ".", "--testcase", "basic01", "--min-level", "CRITICAL", "--json-stream")
+	res.RequireCode(t, 0)
+	if strings.TrimSpace(res.Out) != "" {
+		t.Fatalf("expected empty json-stream output, got %q", res.Out)
 	}
-	if strings.TrimSpace(out.String()) != "" {
-		t.Fatalf("expected empty json-stream output, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunListTests(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--list-tests"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
+	res := clitest.Run(t, run, "--list-tests")
+	res.RequireCode(t, 0)
 	expected := []string{
 		"Basic:Basic01",
 		"Syntax:Syntax01",
@@ -1336,35 +945,22 @@ func TestRunListTests(t *testing.T) {
 		"Nameserver:Nameserver01",
 		"Zone:Zone01",
 	}
-	for _, want := range expected {
-		if !strings.Contains(out.String(), want) {
-			t.Fatalf("expected %q in list-tests output, got %q", want, out.String())
-		}
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	res.RequireOutContains(t, expected...)
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
 func TestRunVersion(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--version"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
+	res := clitest.Run(t, run, "--version")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Gonemaster version")
+	if !strings.Contains(res.Out, engine.VersionString()) {
+		t.Fatalf("expected version output, got %q", res.Out)
 	}
-	if !strings.Contains(out.String(), "Gonemaster version") {
-		t.Fatalf("expected version output, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), engine.VersionString()) {
-		t.Fatalf("expected version output, got %q", out.String())
-	}
-	if !strings.Contains(out.String(), "Miekg DNS version") {
-		t.Fatalf("expected dependency version output, got %q", out.String())
-	}
-	if errOut.Len() != 0 {
-		t.Fatalf("expected no stderr output, got %q", errOut.String())
+	res.RequireOutContains(t, "Miekg DNS version")
+	if len(res.Err) != 0 {
+		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
 }
 
@@ -1372,12 +968,8 @@ func TestRunNSTimesCreatesCache(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--nstimes"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d; stderr: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--nstimes")
+	res.RequireCode(t, 0)
 	if captured.NameserverCache == nil {
 		t.Fatal("expected NameserverCache to be created when --nstimes is used")
 	}
@@ -1395,13 +987,9 @@ func TestRunNSTimesOutputsTable(t *testing.T) {
 	}
 	t.Cleanup(func() { runEngine = previous })
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--domain", "example.com", "--nstimes"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d; stderr: %s", code, errOut.String())
-	}
-	output := out.String()
+	res := clitest.Run(t, run, "--domain", "example.com", "--nstimes")
+	res.RequireCode(t, 0)
+	output := res.Out
 	if !strings.Contains(output, "Name servers") {
 		t.Fatalf("expected nstimes header in output, got %q", output)
 	}
@@ -1418,20 +1006,14 @@ func TestRunAllowNonGlobalFlag(t *testing.T) {
 	// the profile/server default governs.
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
-	var out, errOut bytes.Buffer
-	if code := run([]string{"--allow-non-global", "example.com"}, &out, &errOut); code != 0 {
-		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--allow-non-global", "example.com")
+	res.RequireCode(t, 0)
 	if captured.AllowNonGlobalTargets == nil || !*captured.AllowNonGlobalTargets {
 		t.Fatalf("expected AllowNonGlobalTargets override true, got %#v", captured.AllowNonGlobalTargets)
 	}
 
 	captured = engine.RunRequest{}
-	out.Reset()
-	errOut.Reset()
-	if code := run([]string{"example.com"}, &out, &errOut); code != 0 {
-		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	clitest.Run(t, run, "example.com").RequireCode(t, 0)
 	if captured.AllowNonGlobalTargets != nil {
 		t.Fatalf("expected AllowNonGlobalTargets unset by default, got %#v", captured.AllowNonGlobalTargets)
 	}
@@ -1451,11 +1033,8 @@ func TestRunPassesCaptureMinLevelMatchingTheEngineLevel(t *testing.T) {
 		runEngine = previous
 	})
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	if code := run([]string{"--domain", "example.com", "--json"}, &out, &errOut); code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--json")
+	res.RequireCode(t, 0)
 
 	if captured.MinLevel == "" {
 		t.Fatal("expected the run to request a min level")
@@ -1478,11 +1057,8 @@ func TestRunCountCapturesEverything(t *testing.T) {
 		runEngine = previous
 	})
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	if code := run([]string{"--domain", "example.com", "--count"}, &out, &errOut); code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--count")
+	res.RequireCode(t, 0)
 
 	if captured.CaptureMinLevel != "" {
 		t.Fatalf("capture level %q, want empty so --count sees every entry", captured.CaptureMinLevel)
@@ -1512,11 +1088,8 @@ func TestRunSavePacketCacheUnaffectedByCaptureLevel(t *testing.T) {
 		runEngine = previous
 	})
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	if code := run([]string{"--domain", "example.com", "--save", savePath}, &out, &errOut); code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--save", savePath)
+	res.RequireCode(t, 0)
 
 	if captured.CaptureMinLevel == "" {
 		t.Fatal("expected the save run to be gated, otherwise this test proves nothing")

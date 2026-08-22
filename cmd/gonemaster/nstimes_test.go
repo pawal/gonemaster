@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 )
@@ -264,19 +265,15 @@ func TestRunJSONWithNSTimes(t *testing.T) {
 	}
 	t.Cleanup(func() { runEngine = previous })
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--json", "--nstimes", "--domain", "example.com"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--json", "--nstimes", "--domain", "example.com")
+	res.RequireCode(t, 0)
 
 	var result struct {
 		Entries           []any                         `json:"entries"`
 		NameserverTimings []nameserver.NameserverTiming `json:"nameserver_timings"`
 	}
-	if err := json.Unmarshal(out.Bytes(), &result); err != nil {
-		t.Fatalf("failed to decode JSON: %v\noutput: %s", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &result); err != nil {
+		t.Fatalf("failed to decode JSON: %v\noutput: %s", err, res.Out)
 	}
 	if len(result.NameserverTimings) != 1 {
 		t.Fatalf("expected 1 nameserver timing, got %d", len(result.NameserverTimings))
@@ -304,16 +301,12 @@ func TestRunJSONWithoutNSTimesIsArray(t *testing.T) {
 	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) { return nil, nil }
 	t.Cleanup(func() { runEngine = previous })
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"--json", "--domain", "example.com"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d: %s", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--json", "--domain", "example.com")
+	res.RequireCode(t, 0)
 
 	// Without --nstimes the output must still be a bare JSON array.
 	var arr []any
-	if err := json.Unmarshal(out.Bytes(), &arr); err != nil {
-		t.Fatalf("output should be a JSON array without --nstimes: %v\noutput: %s", err, out.String())
+	if err := json.Unmarshal([]byte(res.Out), &arr); err != nil {
+		t.Fatalf("output should be a JSON array without --nstimes: %v\noutput: %s", err, res.Out)
 	}
 }

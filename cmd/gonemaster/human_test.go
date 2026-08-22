@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
@@ -41,14 +42,6 @@ func TestWriteHumanSanitizesControlCharsInArgs(t *testing.T) {
 	if n := bytes.Count(body, []byte{'\n'}); n != 3 {
 		t.Fatalf("expected 3 newlines (header+divider+entry), got %d in %q", n, body)
 	}
-	for i, b := range body {
-		if b == '\n' || b == ' ' || b == '=' {
-			continue
-		}
-		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
-			t.Fatalf("human output leaked control byte %#x at offset %d: %q", b, i, body)
-		}
-	}
 	for _, want := range []string{
 		`\x1b[34mblue\x1b[0m`,
 		`\x0d`, // CR escape
@@ -84,14 +77,7 @@ func TestHumanReporterCallbackSanitizesOutput(t *testing.T) {
 	}
 
 	body := out.Bytes()
-	for _, b := range body {
-		if b == '\n' || b == ' ' || b == '=' {
-			continue
-		}
-		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
-			t.Fatalf("human reporter leaked control byte %#x: %q", b, body)
-		}
-	}
+	clitest.RequireNoControlBytes(t, body, '\n')
 	if !strings.Contains(string(body), `evil\x1b[31mxss\x1b[0m`) {
 		t.Fatalf("expected escaped ANSI in streaming output, got %q", body)
 	}

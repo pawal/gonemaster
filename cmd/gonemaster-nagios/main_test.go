@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 	"codeberg.org/pawal/gonemaster/engine"
 )
 
@@ -32,15 +33,10 @@ func stubRunEngine(t *testing.T, captured *engine.RunRequest) {
 }
 
 func TestRunHelp(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
+	res := clitest.Run(t, run, "--help")
+	res.RequireCode(t, 0)
 
-	code := run([]string{"--help"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-
-	help := errOut.String()
+	help := res.Err
 	for _, fragment := range []string{
 		"Usage:",
 		"-H, --hostname",
@@ -58,32 +54,16 @@ func TestRunHelp(t *testing.T) {
 }
 
 func TestRunVersion(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--version"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-	if !strings.Contains(out.String(), "Gonemaster version") {
-		t.Fatalf("expected version output")
-	}
-	if !strings.Contains(out.String(), "Miekg DNS version") {
-		t.Fatalf("expected miekg version output")
-	}
+	res := clitest.Run(t, run, "--version")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Gonemaster version")
+	res.RequireOutContains(t, "Miekg DNS version")
 }
 
 func TestRunMissingDomain(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "Usage:") {
-		t.Fatalf("expected usage output")
-	}
+	res := clitest.Run(t, run)
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "Usage:")
 }
 
 func TestExpandVerboseArgs(t *testing.T) {
@@ -129,27 +109,16 @@ func TestRunVerboseSanitizesAttackerControlChars(t *testing.T) {
 		}}, nil
 	})
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"-H", "example.com", "-v"}, &out, &errOut)
-	if code != 1 {
-		t.Fatalf("expected exit code 1 (WARNING), got %d (stderr=%s)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "-v")
+	res.RequireCode(t, 1)
 
-	body := out.Bytes()
+	body := []byte(res.Out)
 	if !bytes.HasPrefix(body, []byte("ZONE WARNING")) {
 		t.Fatalf("expected ZONE WARNING status line, got %q", body)
 	}
 
-	// First line is the Nagios status; the rest are verbose entries.
-	// We allow newlines between lines but no other control bytes.
-	for i, b := range body {
-		if b == '\n' {
-			continue
-		}
-		if b < 0x20 || b == 0x7f || (b >= 0x80 && b <= 0x9f) {
-			t.Fatalf("nagios output leaked control byte %#x at offset %d: %q", b, i, body)
-		}
-	}
+	// Newlines separate the status line from the verbose entries.
+	clitest.RequireNoControlBytes(t, body, '\n')
 	for _, want := range []string{
 		`\x1b[34mblue\x1b[0m`,
 		`\x0d`, // CR
@@ -183,15 +152,11 @@ func TestRunVerbosePreservesSafeMessages(t *testing.T) {
 		}}, nil
 	})
 
-	var out, errOut bytes.Buffer
-	if code := run([]string{"-H", "example.com", "-v"}, &out, &errOut); code != 1 {
-		t.Fatalf("expected exit code 1, got %d (stderr=%s)", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "café résumé") {
-		t.Fatalf("safe UTF-8 was altered: %q", out.String())
-	}
-	if strings.Contains(out.String(), `\x`) {
-		t.Fatalf("benign verbose output produced escapes: %q", out.String())
+	res := clitest.Run(t, run, "-H", "example.com", "-v")
+	res.RequireCode(t, 1)
+	res.RequireOutContains(t, "café résumé")
+	if strings.Contains(res.Out, `\x`) {
+		t.Fatalf("benign verbose output produced escapes: %q", res.Out)
 	}
 }
 
@@ -211,17 +176,8 @@ func TestRunParsesPreferredAliases(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--source-addr4", "192.0.2.50",
-		"--source-addr6", "2001:db8::50",
-		"--force-ipv6",
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--source-addr4", "192.0.2.50", "--source-addr6", "2001:db8::50", "--force-ipv6")
+	res.RequireCode(t, 0)
 	if captured.Domain != "example.com" {
 		t.Fatalf("unexpected domain: %q", captured.Domain)
 	}
@@ -240,16 +196,8 @@ func TestRunParsesLegacySourceAddrAliases(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{
-		"--domain", "example.com",
-		"--sourceaddr4", "192.0.2.50",
-		"--sourceaddr6", "2001:db8::50",
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--sourceaddr4", "192.0.2.50", "--sourceaddr6", "2001:db8::50")
+	res.RequireCode(t, 0)
 	if captured.SourceAddr4 == nil || *captured.SourceAddr4 != "192.0.2.50" {
 		t.Fatalf("unexpected SourceAddr4 override: %#v", captured.SourceAddr4)
 	}
@@ -261,74 +209,35 @@ func TestRunParsesLegacySourceAddrAliases(t *testing.T) {
 func TestRunRejectsInvalidSourceAddr4(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{
-		"--domain", "example.com",
-		"--source-addr4", "not-an-ip",
-	}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--source-addr4 must be a valid IPv4 address") {
-		t.Fatalf("expected source-addr4 validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--source-addr4", "not-an-ip")
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "--source-addr4 must be a valid IPv4 address")
 }
 
 func TestRunRejectsInvalidSourceAddr6(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{
-		"--domain", "example.com",
-		"--source-addr6", "192.0.2.5",
-	}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--source-addr6 must be a valid IPv6 address") {
-		t.Fatalf("expected source-addr6 validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--source-addr6", "192.0.2.5")
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "--source-addr6 must be a valid IPv6 address")
 }
 
 func TestRunRejectsInvalidWarningLevel(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", "example.com", "--warning", "bogus"}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--warning must be one of") {
-		t.Fatalf("expected warning validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--warning", "bogus")
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "--warning must be one of")
 }
 
 func TestRunRejectsInvalidThresholdOrdering(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", "example.com", "--warning", "ERROR", "--critical", "WARNING"}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--warning must be lower severity than --critical") {
-		t.Fatalf("expected threshold ordering error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--warning", "ERROR", "--critical", "WARNING")
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "--warning must be lower severity than --critical")
 }
 
 func TestRunRejectsInvalidTimeout(t *testing.T) {
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-
-	code := run([]string{"--domain", "example.com", "--timeout", "0"}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--timeout must be >= 1") {
-		t.Fatalf("expected timeout validation error, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--timeout", "0")
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "--timeout must be >= 1")
 }
 
 func TestRunAppliesCustomThresholds(t *testing.T) {
@@ -336,19 +245,9 @@ func TestRunAppliesCustomThresholds(t *testing.T) {
 		return []engine.LogEntry{{Level: "ERROR"}}, nil
 	})
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{
-		"--domain", "example.com",
-		"--warning", "WARNING",
-		"--critical", "CRITICAL",
-	}, &out, &errOut)
-	if code != 1 {
-		t.Fatalf("expected exit code 1, got %d (stderr=%q)", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "ZONE WARNING") {
-		t.Fatalf("expected warning output, got %q", out.String())
-	}
+	res := clitest.Run(t, run, "--domain", "example.com", "--warning", "WARNING", "--critical", "CRITICAL")
+	res.RequireCode(t, 1)
+	res.RequireOutContains(t, "ZONE WARNING")
 }
 
 func TestRunTimeoutReturnsUnknown(t *testing.T) {
@@ -363,30 +262,17 @@ func TestRunTimeoutReturnsUnknown(t *testing.T) {
 		return nil, context.DeadlineExceeded
 	})
 
-	var out bytes.Buffer
-	var errOut bytes.Buffer
-	code := run([]string{"-H", "example.com", "-t", "1"}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d (stderr=%q)", code, errOut.String())
-	}
-	if !strings.Contains(out.String(), "ZONE UNKNOWN - plugin timed out after 1s") {
-		t.Fatalf("expected timeout output, got %q", out.String())
-	}
+	clitest.Run(t, run, "-H", "example.com", "-t", "1").
+		RequireCode(t, 3).
+		RequireOutContains(t, "ZONE UNKNOWN - plugin timed out after 1s")
 }
 
 func TestUndelegatedNSPassedToEngine(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--ns", "ns1.example.com/192.0.2.1",
-		"--ns", "ns2.example.com",
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--ns", "ns1.example.com/192.0.2.1", "--ns", "ns2.example.com")
+	res.RequireCode(t, 0)
 	if len(captured.UndelegatedNameservers) != 2 {
 		t.Fatalf("expected 2 undelegated nameservers, got %d", len(captured.UndelegatedNameservers))
 	}
@@ -408,15 +294,8 @@ func TestUndelegatedDSPassedToEngine(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--ns", "ns1.example.com/192.0.2.1",
-		"--ds", "12345,13,2,ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789",
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--ns", "ns1.example.com/192.0.2.1", "--ds", "12345,13,2,ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789")
+	res.RequireCode(t, 0)
 	if len(captured.UndelegatedDSInfo) != 1 {
 		t.Fatalf("expected 1 DS record, got %d", len(captured.UndelegatedDSInfo))
 	}
@@ -429,46 +308,29 @@ func TestUndelegatedDSPassedToEngine(t *testing.T) {
 func TestUndelegatedDSWithoutNSIsError(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--ds", "12345,13,2,ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789",
-	}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--ds requires --ns") {
-		t.Fatalf("expected error about --ds requiring --ns, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--ds", "12345,13,2,ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789")
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "--ds requires --ns")
 }
 
 func TestUndelegatedInvalidNS(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"-H", "example.com", "--ns", "ns1/bad/extra"}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--ns", "ns1/bad/extra")
+	res.RequireCode(t, 3)
 }
 
 func TestUndelegatedInvalidDS(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"-H", "example.com", "--ns", "ns1.example.com", "--ds", "notvalid"}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--ns", "ns1.example.com", "--ds", "notvalid")
+	res.RequireCode(t, 3)
 }
 
 func TestHelpIncludesNSAndDS(t *testing.T) {
-	var out, errOut bytes.Buffer
-	code := run([]string{"--help"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-	help := errOut.String()
+	res := clitest.Run(t, run, "--help")
+	res.RequireCode(t, 0)
+	help := res.Err
 	for _, fragment := range []string{"--ns", "--ds"} {
 		if !strings.Contains(help, fragment) {
 			t.Fatalf("expected %q in usage output", fragment)
@@ -486,11 +348,8 @@ func TestRRSIGWarnDaysSetsProfileOnRequest(t *testing.T) {
 		return nil, nil
 	})
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"-H", "example.com", "--testcase", "dnssec04", "--rrsig-warn-days", "14"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--testcase", "dnssec04", "--rrsig-warn-days", "14")
+	res.RequireCode(t, 0)
 	if len(profileContent) == 0 {
 		t.Fatal("expected profile content to be captured inside engine stub")
 	}
@@ -510,11 +369,8 @@ func TestRRSIGWarnDaysZeroLeavesProfileUnchanged(t *testing.T) {
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"-H", "example.com"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
+	res := clitest.Run(t, run, "-H", "example.com")
+	res.RequireCode(t, 0)
 	if captured.Profile != "" {
 		t.Fatalf("expected Profile to be empty, got %q", captured.Profile)
 	}
@@ -523,14 +379,9 @@ func TestRRSIGWarnDaysZeroLeavesProfileUnchanged(t *testing.T) {
 func TestRRSIGWarnDaysNegativeIsError(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{"-H", "example.com", "--rrsig-warn-days", "-1"}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--rrsig-warn-days") {
-		t.Fatalf("expected error mentioning --rrsig-warn-days, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--rrsig-warn-days", "-1")
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "--rrsig-warn-days")
 }
 
 func TestBuildMergedProfileNoOverride(t *testing.T) {
@@ -576,14 +427,9 @@ func TestBuildMergedProfileWritesTempFile(t *testing.T) {
 }
 
 func TestHelpIncludesRRSIGWarnDays(t *testing.T) {
-	var out, errOut bytes.Buffer
-	code := run([]string{"--help"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--rrsig-warn-days") {
-		t.Fatal("expected --rrsig-warn-days in usage output")
-	}
+	res := clitest.Run(t, run, "--help")
+	res.RequireCode(t, 0)
+	res.RequireErrContains(t, "--rrsig-warn-days")
 }
 
 // --- Grade-based threshold tests -------------------------------------------
@@ -740,18 +586,9 @@ func TestGradeModeExitCodeOK(t *testing.T) {
 		return []engine.LogEntry{}, nil
 	})
 
-	var out, errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--grade-warning", "C",
-		"--grade-critical", "F",
-	}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d (stderr=%q stdout=%q)", code, errOut.String(), out.String())
-	}
-	if !strings.Contains(out.String(), "ZONE OK") {
-		t.Fatalf("expected ZONE OK, got %q", out.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--grade-warning", "C", "--grade-critical", "F")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "ZONE OK")
 }
 
 func TestGradeModeExitCodeCritical(t *testing.T) {
@@ -762,18 +599,9 @@ func TestGradeModeExitCodeCritical(t *testing.T) {
 		}, nil
 	})
 
-	var out, errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--grade-warning", "C",
-		"--grade-critical", "F",
-	}, &out, &errOut)
-	if code != 2 {
-		t.Fatalf("expected exit code 2, got %d (stdout=%q)", code, out.String())
-	}
-	if !strings.Contains(out.String(), "ZONE CRITICAL") {
-		t.Fatalf("expected ZONE CRITICAL, got %q", out.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--grade-warning", "C", "--grade-critical", "F")
+	res.RequireCode(t, 2)
+	res.RequireOutContains(t, "ZONE CRITICAL")
 }
 
 func TestGradeModeOutputIncludesGradeAndScore(t *testing.T) {
@@ -781,14 +609,9 @@ func TestGradeModeOutputIncludesGradeAndScore(t *testing.T) {
 		return []engine.LogEntry{}, nil
 	})
 
-	var out, errOut bytes.Buffer
-	run([]string{
-		"-H", "example.com",
-		"--grade-warning", "C",
-		"--grade-critical", "F",
-	}, &out, &errOut)
+	res := clitest.Run(t, run, "-H", "example.com", "--grade-warning", "C", "--grade-critical", "F")
 
-	output := out.String()
+	output := res.Out
 	if !strings.Contains(output, "grade") {
 		t.Fatalf("expected 'grade' in output, got %q", output)
 	}
@@ -800,47 +623,24 @@ func TestGradeModeOutputIncludesGradeAndScore(t *testing.T) {
 func TestGradeModeInvalidWarningFlagReturnsUnknown(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--grade-warning", "Z",
-	}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--grade-warning") {
-		t.Fatalf("expected error mentioning --grade-warning, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--grade-warning", "Z")
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "--grade-warning")
 }
 
 func TestGradeModeInvalidCriticalFlagReturnsUnknown(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--grade-critical", "X",
-	}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
-	if !strings.Contains(errOut.String(), "--grade-critical") {
-		t.Fatalf("expected error mentioning --grade-critical, got %q", errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--grade-critical", "X")
+	res.RequireCode(t, 3)
+	res.RequireErrContains(t, "--grade-critical")
 }
 
 func TestGradeModeInvalidOrderingReturnsUnknown(t *testing.T) {
 	stubRunEngine(t, nil)
 
-	var out, errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--grade-warning", "F",
-		"--grade-critical", "C",
-	}, &out, &errOut)
-	if code != 3 {
-		t.Fatalf("expected exit code 3, got %d", code)
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--grade-warning", "F", "--grade-critical", "C")
+	res.RequireCode(t, 3)
 }
 
 func TestGradeModeWorstOfSeverityAndGrade(t *testing.T) {
@@ -853,26 +653,14 @@ func TestGradeModeWorstOfSeverityAndGrade(t *testing.T) {
 		}, nil
 	})
 
-	var out, errOut bytes.Buffer
-	code := run([]string{
-		"-H", "example.com",
-		"--warning", "WARNING",
-		"--critical", "CRITICAL",
-		"--grade-warning", "C",
-		"--grade-critical", "F",
-	}, &out, &errOut)
-	if code != 1 {
-		t.Fatalf("expected exit code 1 (severity WARNING), got %d (stdout=%q)", code, out.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--warning", "WARNING", "--critical", "CRITICAL", "--grade-warning", "C", "--grade-critical", "F")
+	res.RequireCode(t, 1)
 }
 
 func TestHelpIncludesGradeFlags(t *testing.T) {
-	var out, errOut bytes.Buffer
-	code := run([]string{"--help"}, &out, &errOut)
-	if code != 0 {
-		t.Fatalf("expected exit code 0, got %d", code)
-	}
-	help := errOut.String()
+	res := clitest.Run(t, run, "--help")
+	res.RequireCode(t, 0)
+	help := res.Err
 	for _, fragment := range []string{"--grade-warning", "--grade-critical"} {
 		if !strings.Contains(help, fragment) {
 			t.Fatalf("expected %q in usage output", fragment)
@@ -884,10 +672,8 @@ func TestRunAllowNonGlobalFlag(t *testing.T) {
 	// --allow-non-global sets the RunRequest override that disables the guard.
 	var captured engine.RunRequest
 	stubRunEngine(t, &captured)
-	var out, errOut bytes.Buffer
-	if code := run([]string{"-H", "example.com", "--allow-non-global"}, &out, &errOut); code != 0 {
-		t.Fatalf("expected exit 0, got %d (stderr=%q)", code, errOut.String())
-	}
+	res := clitest.Run(t, run, "-H", "example.com", "--allow-non-global")
+	res.RequireCode(t, 0)
 	if captured.AllowNonGlobalTargets == nil || !*captured.AllowNonGlobalTargets {
 		t.Fatalf("expected AllowNonGlobalTargets true, got %#v", captured.AllowNonGlobalTargets)
 	}

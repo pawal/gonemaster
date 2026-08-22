@@ -1,21 +1,15 @@
 package main
 
 import (
-	"os"
-	"strings"
 	"testing"
+
+	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 )
 
 // TestServerDatabaseMDSection verifies that docs/server/database.md documents
 // all three database backends with their DSN formats and connection pool defaults.
 func TestServerDatabaseMDSection(t *testing.T) {
-	data, err := os.ReadFile("../../docs/server/database.md")
-	if err != nil {
-		t.Fatalf("read docs/server/database.md: %v", err)
-	}
-	src := string(data)
-
-	for _, want := range []string{
+	clitest.FileContains(t, "../../docs/server/database.md",
 		// All three backends listed
 		"`sqlite`",
 		"`postgres`",
@@ -31,35 +25,19 @@ func TestServerDatabaseMDSection(t *testing.T) {
 		"Connection lifetime",
 		// Environment variable recommendation
 		"GONEMASTER_DB_DSN",
-	} {
-		if !strings.Contains(src, want) {
-			t.Errorf("docs/server/database.md missing %q", want)
-		}
-	}
+	)
 }
 
 // TestServerDatabaseMDLinksToSetupGuide verifies that docs/server/database.md
 // references the database setup guide so readers can find detailed instructions.
 func TestServerDatabaseMDLinksToSetupGuide(t *testing.T) {
-	data, err := os.ReadFile("../../docs/server/database.md")
-	if err != nil {
-		t.Fatalf("read docs/server/database.md: %v", err)
-	}
-	if !strings.Contains(string(data), "database-setup.md") {
-		t.Error("docs/server/database.md does not link to database-setup.md")
-	}
+	clitest.FileContains(t, "../../docs/server/database.md", "database-setup.md")
 }
 
 // TestDatabaseSetupMDExists verifies the database setup guide exists and
 // covers PostgreSQL, MariaDB, DSN requirements, and key tuning parameters.
 func TestDatabaseSetupMDExists(t *testing.T) {
-	data, err := os.ReadFile("../../docs/server/database-setup.md")
-	if err != nil {
-		t.Fatalf("read docs/database-setup.md: %v", err)
-	}
-	src := string(data)
-
-	for _, want := range []string{
+	clitest.FileContains(t, "../../docs/server/database-setup.md",
 		// Both backends covered
 		"## PostgreSQL",
 		"## MariaDB",
@@ -79,31 +57,18 @@ func TestDatabaseSetupMDExists(t *testing.T) {
 		// Cross-references
 		"docker-compose.test.yml",
 		"test-integration",
-	} {
-		if !strings.Contains(src, want) {
-			t.Errorf("docs/database-setup.md missing %q", want)
-		}
-	}
+	)
 }
 
 // TestServerDatabaseMDRetentionDays verifies that docs/server/database.md
 // documents the retention_days and purge-interval configuration fields, env
 // vars, and CLI flags.
 func TestServerDatabaseMDRetentionDays(t *testing.T) {
-	data, err := os.ReadFile("../../docs/server/database.md")
-	if err != nil {
-		t.Fatalf("read docs/server/database.md: %v", err)
-	}
-	src := string(data)
-	for _, want := range []string{
+	clitest.FileContains(t, "../../docs/server/database.md",
 		"retention_days",
 		"--db-retention-days",
 		"every hour",
 		"--db-purge-interval",
 		"purge_interval_seconds",
-	} {
-		if !strings.Contains(src, want) {
-			t.Errorf("docs/server/database.md missing %q", want)
-		}
-	}
+	)
 }

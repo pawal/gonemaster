@@ -2,26 +2,36 @@ package validation
 
 import "testing"
 
+// ipCases exercise both validators against the same inputs, so each family
+// check also covers rejecting the other family.
+var ipCases = []struct {
+	name   string
+	input  string
+	wantV4 bool
+	wantV6 bool
+}{
+	{name: "IPv4 address", input: "192.0.2.1", wantV4: true},
+	{name: "IPv4 octet out of range", input: "999.0.0.1"},
+	{name: "IPv6 address", input: "2001:db8::1", wantV6: true},
+	{name: "IPv6 with non-hex digits", input: "2001:db8::zz"},
+}
+
 func TestValidateIPv4(t *testing.T) {
-	if !ValidateIPv4("192.0.2.1") {
-		t.Fatalf("expected valid IPv4")
-	}
-	if ValidateIPv4("999.0.0.1") {
-		t.Fatalf("expected invalid IPv4")
-	}
-	if ValidateIPv4("2001:db8::1") {
-		t.Fatalf("expected IPv6 to be invalid for IPv4 check")
+	for _, tc := range ipCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ValidateIPv4(tc.input); got != tc.wantV4 {
+				t.Fatalf("ValidateIPv4(%q) = %v, want %v", tc.input, got, tc.wantV4)
+			}
+		})
 	}
 }
 
 func TestValidateIPv6(t *testing.T) {
-	if !ValidateIPv6("2001:db8::1") {
-		t.Fatalf("expected valid IPv6")
-	}
-	if ValidateIPv6("2001:db8::zz") {
-		t.Fatalf("expected invalid IPv6")
-	}
-	if ValidateIPv6("192.0.2.1") {
-		t.Fatalf("expected IPv4 to be invalid for IPv6 check")
+	for _, tc := range ipCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ValidateIPv6(tc.input); got != tc.wantV6 {
+				t.Fatalf("ValidateIPv6(%q) = %v, want %v", tc.input, got, tc.wantV6)
+			}
+		})
 	}
 }

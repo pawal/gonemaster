@@ -8,7 +8,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
-	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
 // Concurrent runs over one shared cache lineage must produce identical
@@ -35,24 +34,22 @@ func TestRunConcurrentIdenticalFindings(t *testing.T) {
 	}
 	results := make([]result, runs)
 
+	// Built on the test goroutine so the helpers may fail the test; the
+	// goroutines below only run them. Offline profiles keep traffic inside the
+	// test and make every query fail the same deterministic way in every run.
+	runners := make([]*Runner, runs)
+	for i := range runs {
+		prof := dnstest.DefaultProfile(t)
+		prof.NoNetwork = true
+		runners[i] = newTestRunner(t, withProfile(prof), withRunLimits(4), withCache(base.SnapshotForRun()))
+	}
+
 	var wg sync.WaitGroup
 	wg.Add(runs)
 	for i := range runs {
 		go func() {
 			defer wg.Done()
-			// Raw profile.Default, not dnstest.DefaultProfile: this runs in a
-			// goroutine, where the error is an assertion input rather than a
-			// reason to fail the test from off the test goroutine.
-			p, err := profile.Default()
-			if err != nil {
-				results[i] = result{index: i, err: err}
-				return
-			}
-			// Offline: no traffic leaves the test, and every query fails the
-			// same deterministic way in every run.
-			p.NoNetwork = true
-
-			runner := newTestRunner(t, withProfile(p), withRunLimits(4), withCache(base.SnapshotForRun()))
+			runner := runners[i]
 			log := runner.Logger
 			req := RunRequest{Domain: "example.com", Testcases: []string{"syntax01", "basic01"}}
 			if _, err := RunWithRunner(req, runner); err != nil {

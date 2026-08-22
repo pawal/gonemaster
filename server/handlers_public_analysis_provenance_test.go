@@ -9,7 +9,7 @@ import (
 
 // stampEngineVersion sets provenance on an already-seeded snapshot and
 // returns the reloaded row.
-func stampEngineVersion(t *testing.T, f *analysisAPITestFixture, snap AnalysisCohortSnapshot, version string, mixed bool) AnalysisCohortSnapshot {
+func stampEngineVersion(t *testing.T, f *analysisFixture, snap AnalysisCohortSnapshot, version string, mixed bool) AnalysisCohortSnapshot {
 	t.Helper()
 	snap.EngineVersion = version
 	snap.MixedEngineVersion = mixed
@@ -110,7 +110,7 @@ func TestPublicAnalysisTrendPointsCarryEngineVersion(t *testing.T) {
 
 // seedDiffPair returns (older, newer) snapshots stamped with the given
 // versions, both carrying the domain views a diff needs.
-func seedDiffPair(t *testing.T, f *analysisAPITestFixture, fromVersion, toVersion string) (AnalysisCohortSnapshot, AnalysisCohortSnapshot) {
+func seedDiffPair(t *testing.T, f *analysisFixture, fromVersion, toVersion string) (AnalysisCohortSnapshot, AnalysisCohortSnapshot) {
 	t.Helper()
 	older := f.seedAlternateSnapshot("batch-prev", "2026-07-31-prev",
 		time.Date(2026, 7, 31, 12, 0, 0, 0, time.UTC))

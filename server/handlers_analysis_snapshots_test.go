@@ -1,7 +1,6 @@
 package server
 
 import (
-	"database/sql"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -12,78 +11,12 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// adminSnapshotFixture bundles a SQL-backed server with a seeded cohort
-// and one captured public snapshot. Admin snapshot tests operate against
-// this fixture so CSRF semantics and route resolution run end-to-end.
-type adminSnapshotFixture struct {
-	t        *testing.T
-	srv      *Server
-	store    *SQLJobStore
-	cohort   AnalysisCohort
-	snapshot AnalysisCohortSnapshot
-}
-
-func newAdminSnapshotFixture(t *testing.T) *adminSnapshotFixture {
+func newAdminSnapshotFixture(t *testing.T) *analysisFixture {
 	t.Helper()
-	db, err := sql.Open("sqlite", ":memory:")
-	if err != nil {
-		t.Fatalf("open sqlite: %v", err)
-	}
-	configurePool(db, "sqlite")
-	t.Cleanup(func() { _ = db.Close() })
-	dialect := sqliteDialect{}
-	if err := runMigrations(db, dialect); err != nil {
-		t.Fatalf("runMigrations: %v", err)
-	}
-	store := NewSQLJobStore(db, dialect)
-	srv := newServer(DefaultConfig(), store, NewInMemoryQueue())
-	cohort, err := store.UpsertAnalysisCohort(AnalysisCohort{
-		SourceType:      "tag",
-		SourceTag:       "tld",
-		Label:           "TLD",
-		AnalysisEnabled: true,
-		PublicEnabled:   true,
-	})
-	if err != nil {
-		t.Fatalf("upsert cohort: %v", err)
-	}
-	now := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
-	if err := store.CreateBatch(Batch{
-		ID:             "batch-admin",
-		Tag:            "tld",
-		CreatedAt:      now,
-		SnapshotIntent: true,
-	}); err != nil {
-		t.Fatalf("create batch: %v", err)
-	}
-	insertTestRun(t, store, Run{
-		ID:         "run-admin-1",
-		DomainID:   1,
-		Domain:     "example.test",
-		BatchID:    "batch-admin",
-		Status:     JobSucceeded,
-		CreatedAt:  now,
-		StartedAt:  now,
-		FinishedAt: now,
-	})
-	snap, err := store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
-		CohortID:   cohort.ID,
-		BatchID:    "batch-admin",
-		Slug:       "2026-04-20-fixture",
-		Label:      "Fixture",
-		CapturedAt: now,
-		Status:     AnalysisSnapshotStatusCaptured,
-		IsPublic:   true,
-	})
-	if err != nil {
-		t.Fatalf("upsert snapshot: %v", err)
-	}
-	return &adminSnapshotFixture{t: t, srv: srv, store: store, cohort: cohort, snapshot: snap}
+	return newAnalysisFixture(t, withFixtureBatch("batch-admin"), withSeededRun("example.test"))
 }
 
-// call sends body as an empty-but-present body when it is "", which the
-// handlers tell apart from no body at all.
-func (f *adminSnapshotFixture) call(method, path, body string, opts ...reqOpt) *httptest.ResponseRecorder {
+func (f *analysisFixture) call(method, path, body string, opts ...reqOpt) *httptest.ResponseRecorder {
 	f.t.Helper()
 	if body == "" {
 		opts = append(opts, noContentType())
@@ -91,12 +24,7 @@ func (f *adminSnapshotFixture) call(method, path, body string, opts ...reqOpt) *
 	return doJSON(f.t, f.srv, method, path, body, opts...)
 }
 
-func (f *adminSnapshotFixture) callWithOrigin(method, path, origin, body string) *httptest.ResponseRecorder {
-	f.t.Helper()
-	return f.call(method, path, body, withHost("example.com"), withOrigin(origin))
-}
-
-func (f *adminSnapshotFixture) snapshotByID(id int64) (AnalysisCohortSnapshot, bool) {
+func (f *analysisFixture) snapshotByID(id int64) (AnalysisCohortSnapshot, bool) {
 	// Walk the cohort's snapshots to avoid depending on a test-only
 	// lookup-by-id helper; there are only a handful per test.
 	for _, snap := range f.store.ListAnalysisCohortSnapshots(f.cohort.ID) {
@@ -247,7 +175,7 @@ func TestAdminSnapshotRetireUnpinsCohort(t *testing.T) {
 // status reaches want, returning the final row. The rematerialize endpoint
 // dispatches the rebuild in a goroutine, so tests must wait for completion
 // rather than reading the row immediately after the 202.
-func (f *adminSnapshotFixture) waitForMaterialization(id int64, want string) (AnalysisCohortSnapshot, bool) {
+func (f *analysisFixture) waitForMaterialization(id int64, want string) (AnalysisCohortSnapshot, bool) {
 	f.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for {
@@ -354,13 +282,15 @@ func TestAdminSnapshotListExposesSourceRunsAvailable(t *testing.T) {
 func TestAdminSnapshotCSRFRejectsMismatchedOrigin(t *testing.T) {
 	f := newAdminSnapshotFixture(t)
 	path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
-	resp := f.callWithOrigin(http.MethodPost, path, "https://evil.example", `{"label":"injected"}`)
+	resp := f.call(http.MethodPost, path, `{"label":"injected"}`,
+		withHost("example.com"), withOrigin("https://evil.example"))
 	wantStatus(t, resp, http.StatusForbidden)
 	if !strings.Contains(resp.Body.String(), "csrf_origin_mismatch") {
 		t.Fatalf("expected csrf_origin_mismatch error, got %s", resp.Body)
 	}
 	// Same origin still works.
-	resp = f.callWithOrigin(http.MethodPost, path, "http://example.com", `{"label":"ok"}`)
+	resp = f.call(http.MethodPost, path, `{"label":"ok"}`,
+		withHost("example.com"), withOrigin("http://example.com"))
 	wantStatus(t, resp, http.StatusOK)
 }
 

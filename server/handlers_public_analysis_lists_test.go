@@ -13,9 +13,9 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-// analysisAPITestFixture bundles a server backed by a real SQL store plus
+// analysisFixture bundles a server backed by a real SQL store plus
 // helpers for seeding analysis data.
-type analysisAPITestFixture struct {
+type analysisFixture struct {
 	t        *testing.T
 	srv      *Server
 	store    *SQLJobStore
@@ -30,8 +30,54 @@ type analysisAPITestFixture struct {
 // under the default auto-latest snapshot.
 const testAnalysisFixtureBatchID = "batch-fixture"
 
-func newAnalysisAPITestFixture(t *testing.T) *analysisAPITestFixture {
+// analysisFixtureOpt customizes newAnalysisFixture.
+type analysisFixtureOpt func(*analysisFixtureSetup)
+
+type analysisFixtureSetup struct {
+	batchID      string
+	isDefault    bool
+	runWindow    bool
+	seededRun    string
+	skipSnapshot bool
+}
+
+// withFixtureBatch names the fixture's batch.
+func withFixtureBatch(id string) analysisFixtureOpt {
+	return func(s *analysisFixtureSetup) { s.batchID = id }
+}
+
+// asDefaultCohort marks the cohort default, which the public read path needs
+// when the URL names no cohort.
+func asDefaultCohort() analysisFixtureOpt {
+	return func(s *analysisFixtureSetup) { s.isDefault = true }
+}
+
+// withSnapshotRunWindow stamps the snapshot's first and last run times.
+func withSnapshotRunWindow() analysisFixtureOpt {
+	return func(s *analysisFixtureSetup) { s.runWindow = true }
+}
+
+// withSeededRun inserts one run under the fixture batch, which rematerialize
+// needs a source row for.
+func withSeededRun(domain string) analysisFixtureOpt {
+	return func(s *analysisFixtureSetup) { s.seededRun = domain }
+}
+
+// withoutSnapshot leaves the cohort with no batch and no snapshot, for the
+// tests that exercise the no_snapshot branch.
+func withoutSnapshot() analysisFixtureOpt {
+	return func(s *analysisFixtureSetup) { s.skipSnapshot = true }
+}
+
+// newAnalysisFixture builds a SQLite-backed server with one analysis cohort and,
+// unless withoutSnapshot is given, one captured public snapshot over one batch.
+func newAnalysisFixture(t *testing.T, opts ...analysisFixtureOpt) *analysisFixture {
 	t.Helper()
+	setup := &analysisFixtureSetup{batchID: testAnalysisFixtureBatchID}
+	for _, opt := range opts {
+		opt(setup)
+	}
+
 	db, err := sql.Open("sqlite", ":memory:")
 	if err != nil {
 		t.Fatalf("open sqlite: %v", err)
@@ -51,52 +97,72 @@ func newAnalysisAPITestFixture(t *testing.T) *analysisAPITestFixture {
 		Label:           "TLD",
 		AnalysisEnabled: true,
 		PublicEnabled:   true,
-		IsDefault:       true,
+		IsDefault:       setup.isDefault,
 	})
 	if err != nil {
 		t.Fatalf("upsert cohort: %v", err)
 	}
+	fixture := &analysisFixture{t: t, srv: srv, store: store, cohort: cohort, batchID: setup.batchID}
+	if setup.skipSnapshot {
+		return fixture
+	}
+
 	now := time.Date(2026, 4, 20, 12, 0, 0, 0, time.UTC)
 	if err := store.CreateBatch(Batch{
-		ID:             testAnalysisFixtureBatchID,
+		ID:             setup.batchID,
 		Tag:            "tld",
 		CreatedAt:      now,
 		SnapshotIntent: true,
 	}); err != nil {
 		t.Fatalf("create fixture batch: %v", err)
 	}
-	snap, err := store.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
-		CohortID:    cohort.ID,
-		BatchID:     testAnalysisFixtureBatchID,
-		Slug:        "2026-04-20-fixture",
-		Label:       "Fixture",
-		CapturedAt:  now,
-		FirstRunAt:  now,
-		LastRunAt:   now,
-		Status:      AnalysisSnapshotStatusCaptured,
-		IsPublic:    true,
-		RunCount:    0,
-		DomainCount: 0,
-	})
+	if setup.seededRun != "" {
+		insertTestRun(t, store, Run{
+			ID:         "run-admin-1",
+			DomainID:   1,
+			Domain:     setup.seededRun,
+			BatchID:    setup.batchID,
+			Status:     JobSucceeded,
+			CreatedAt:  now,
+			StartedAt:  now,
+			FinishedAt: now,
+		})
+	}
+	snap := AnalysisCohortSnapshot{
+		CohortID:   cohort.ID,
+		BatchID:    setup.batchID,
+		Slug:       "2026-04-20-fixture",
+		Label:      "Fixture",
+		CapturedAt: now,
+		Status:     AnalysisSnapshotStatusCaptured,
+		IsPublic:   true,
+	}
+	if setup.runWindow {
+		snap.FirstRunAt = now
+		snap.LastRunAt = now
+	}
+	stored, err := store.UpsertAnalysisCohortSnapshot(snap)
 	if err != nil {
 		t.Fatalf("upsert fixture snapshot: %v", err)
 	}
-	return &analysisAPITestFixture{
-		t: t, srv: srv, store: store, cohort: cohort,
-		batchID:  testAnalysisFixtureBatchID,
-		snapshot: snap,
-	}
+	fixture.snapshot = stored
+	return fixture
+}
+
+func newAnalysisAPITestFixture(t *testing.T) *analysisFixture {
+	t.Helper()
+	return newAnalysisFixture(t, asDefaultCohort(), withSnapshotRunWindow())
 }
 
 // publicURL builds a path-segmented public read URL anchored to the
 // fixture's auto-latest snapshot. sub is the analysis sub-path (e.g.
 // "domains", "nameservers/ns1.example", or "prefix?prefix=...").
-func (f *analysisAPITestFixture) publicURL(sub string) string {
+func (f *analysisFixture) publicURL(sub string) string {
 	return f.publicURLForSnapshot(f.snapshot.Slug, sub)
 }
 
 // publicURLForSnapshot is publicURL with an explicit snapshot slug.
-func (f *analysisAPITestFixture) publicURLForSnapshot(slug, sub string) string {
+func (f *analysisFixture) publicURLForSnapshot(slug, sub string) string {
 	return "/pub/api/v1/analysis/cohorts/" + f.cohort.SourceTag +
 		"/snapshots/" + slug + "/" + sub
 }
@@ -106,7 +172,7 @@ func (f *analysisAPITestFixture) publicURLForSnapshot(slug, sub string) string {
 // default, so the fixture snapshot stays auto-latest. Tests use it to
 // scope old vs. new runs into separate snapshots and verify that
 // ?snapshot= and auto-latest both pin to a specific materialization.
-func (f *analysisAPITestFixture) seedAlternateSnapshot(batchID, slug string, capturedAt time.Time) AnalysisCohortSnapshot {
+func (f *analysisFixture) seedAlternateSnapshot(batchID, slug string, capturedAt time.Time) AnalysisCohortSnapshot {
 	f.t.Helper()
 	if err := f.store.CreateBatch(Batch{
 		ID:             batchID,
@@ -137,7 +203,7 @@ func (f *analysisAPITestFixture) seedAlternateSnapshot(batchID, slug string, cap
 // computes and writes both the aggregate blobs and the per-snapshot
 // entity views from the seeded fact rows. Seed helpers call this after
 // each insert so the view-backed handlers see consistent data.
-func (f *analysisAPITestFixture) refreshSnapshotViews(batchID string) {
+func (f *analysisFixture) refreshSnapshotViews(batchID string) {
 	f.t.Helper()
 	snap, ok := f.store.GetAnalysisCohortSnapshotByBatch(f.cohort.ID, batchID)
 	if !ok {
@@ -161,7 +227,7 @@ func (f *analysisAPITestFixture) refreshSnapshotViews(batchID string) {
 
 // seedDomainSummary writes one analysis_run_domain_summary row and ensures
 // the backing domain and run rows exist.
-func (f *analysisAPITestFixture) seedDomainSummary(domainName, runID string, finishedAt time.Time, score int, grade, worstLevel string) {
+func (f *analysisFixture) seedDomainSummary(domainName, runID string, finishedAt time.Time, score int, grade, worstLevel string) {
 	f.t.Helper()
 	domain, err := f.store.GetOrCreateDomain(domainName)
 	if err != nil {

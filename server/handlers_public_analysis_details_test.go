@@ -12,7 +12,7 @@ import (
 
 // seedDetailFixture populates two cohort domains with endpoints, addresses,
 // ASNs, prefixes, and entries so every detail endpoint has real data.
-func seedDetailFixture(t *testing.T) *analysisAPITestFixture {
+func seedDetailFixture(t *testing.T) *analysisFixture {
 	t.Helper()
 	f := newAnalysisAPITestFixture(t)
 	ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)

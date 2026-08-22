@@ -9,7 +9,7 @@ import (
 
 // seedEndpoint inserts one (run, domain, nameserver, address) endpoint row
 // plus the normalized entity rows. Runs and domains are upserted as needed.
-func (f *analysisAPITestFixture) seedEndpoint(runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string, avgMS ...float64) {
+func (f *analysisFixture) seedEndpoint(runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string, avgMS ...float64) {
 	f.seedEndpointInBatch(f.batchID, runID, domainName, nameserverName, address, family, finishedAt, asn, prefix, avgMS...)
 }
 
@@ -17,7 +17,7 @@ func (f *analysisAPITestFixture) seedEndpoint(runID, domainName, nameserverName,
 // tests that need to scope runs into different snapshots. An optional avgMS
 // sets the endpoint's average response time so the capture-time aggregation
 // produces latency; omitting it leaves the endpoint latency-free.
-func (f *analysisAPITestFixture) seedEndpointInBatch(batchID, runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string, avgMS ...float64) {
+func (f *analysisFixture) seedEndpointInBatch(batchID, runID, domainName, nameserverName, address, family string, finishedAt time.Time, asn int64, prefix string, avgMS ...float64) {
 	f.t.Helper()
 	domain, err := f.store.GetOrCreateDomain(domainName)
 	if err != nil {

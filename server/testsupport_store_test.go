@@ -291,3 +291,82 @@ func TestCreateAndGraduateKeepsCallerFields(t *testing.T) {
 		t.Fatalf("run domain = %q", run.Domain)
 	}
 }
+
+func TestNewAnalysisFixtureDefaults(t *testing.T) {
+	f := newAnalysisFixture(t)
+
+	if f.cohort.ID == 0 || f.cohort.SourceTag != "tld" {
+		t.Fatalf("cohort = %+v", f.cohort)
+	}
+	if f.batchID != testAnalysisFixtureBatchID {
+		t.Fatalf("batchID = %q, want %q", f.batchID, testAnalysisFixtureBatchID)
+	}
+	if f.snapshot.ID == 0 || f.snapshot.Status != AnalysisSnapshotStatusCaptured {
+		t.Fatalf("snapshot = %+v", f.snapshot)
+	}
+	// Neither delta is on by default; the two named constructors opt in.
+	if f.cohort.IsDefault {
+		t.Fatal("expected IsDefault off without asDefaultCohort")
+	}
+	if !f.snapshot.FirstRunAt.IsZero() {
+		t.Fatalf("expected no run window without withSnapshotRunWindow, got %v", f.snapshot.FirstRunAt)
+	}
+}
+
+func TestNewAnalysisFixtureOptions(t *testing.T) {
+	f := newAnalysisFixture(t,
+		asDefaultCohort(),
+		withSnapshotRunWindow(),
+		withFixtureBatch("batch-opt"),
+		withSeededRun("opt.example"))
+
+	if !f.cohort.IsDefault {
+		t.Fatal("expected asDefaultCohort to mark the cohort default")
+	}
+	if f.snapshot.FirstRunAt.IsZero() || f.snapshot.LastRunAt.IsZero() {
+		t.Fatalf("expected a run window, got %+v", f.snapshot)
+	}
+	if f.batchID != "batch-opt" || f.snapshot.BatchID != "batch-opt" {
+		t.Fatalf("batch = %q / %q", f.batchID, f.snapshot.BatchID)
+	}
+	run, ok := f.store.GetRun("run-admin-1")
+	if !ok {
+		t.Fatal("expected withSeededRun to insert a run")
+	}
+	if run.Domain != "opt.example" || run.BatchID != "batch-opt" {
+		t.Fatalf("seeded run = %+v", run)
+	}
+}
+
+func TestNewAnalysisFixtureWithoutSnapshot(t *testing.T) {
+	f := newAnalysisFixture(t, asDefaultCohort(), withoutSnapshot())
+
+	if f.snapshot.ID != 0 {
+		t.Fatalf("expected no snapshot, got %+v", f.snapshot)
+	}
+	// The batch must be absent too, or the cohort would not read as empty.
+	if _, ok := f.store.GetBatch(f.batchID); ok {
+		t.Fatal("expected no fixture batch")
+	}
+	if f.cohort.ID == 0 {
+		t.Fatal("expected the cohort still seeded")
+	}
+}
+
+func TestTheTwoNamedAnalysisFixturesDiffer(t *testing.T) {
+	api := newAnalysisAPITestFixture(t)
+	admin := newAdminSnapshotFixture(t)
+
+	if !api.cohort.IsDefault || admin.cohort.IsDefault {
+		t.Fatalf("IsDefault: api=%v admin=%v", api.cohort.IsDefault, admin.cohort.IsDefault)
+	}
+	if api.batchID != testAnalysisFixtureBatchID || admin.batchID != "batch-admin" {
+		t.Fatalf("batches: api=%q admin=%q", api.batchID, admin.batchID)
+	}
+	if _, ok := api.store.GetRun("run-admin-1"); ok {
+		t.Fatal("the API fixture seeds its own runs; it must start with none")
+	}
+	if _, ok := admin.store.GetRun("run-admin-1"); !ok {
+		t.Fatal("the admin fixture needs a source run for rematerialize")
+	}
+}

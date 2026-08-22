@@ -12,7 +12,7 @@ import (
 //   - current (fixture default): ns1.example serves a.example AND b.example
 //
 // so a nameserver/ASN history has two points with a rising domain count.
-func seedHistoryFixture(t *testing.T) *analysisAPITestFixture {
+func seedHistoryFixture(t *testing.T) *analysisFixture {
 	t.Helper()
 	f := newAnalysisAPITestFixture(t)
 	t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
@@ -30,7 +30,7 @@ func seedHistoryFixture(t *testing.T) *analysisAPITestFixture {
 }
 
 // historyURL builds the cohort-level (non-snapshot-scoped) history URL.
-func (f *analysisAPITestFixture) historyURL(query string) string {
+func (f *analysisFixture) historyURL(query string) string {
 	return "/pub/api/v1/analysis/cohorts/" + f.cohort.SourceTag + "/history?" + query
 }
 

@@ -11,9 +11,8 @@ import (
 // cohort case: a cohort with no captured public snapshot returns
 // status = "no_snapshot" so the UI can render a helpful panel.
 func TestPublicAnalysisCohortDetailNoSnapshotState(t *testing.T) {
-	db, store, srv := newIsolatedAnalysisTestServer(t)
-	_ = db
-	if _, err := store.UpsertAnalysisCohort(AnalysisCohort{
+	f := newAnalysisFixture(t, asDefaultCohort(), withoutSnapshot())
+	if _, err := f.store.UpsertAnalysisCohort(AnalysisCohort{
 		SourceType:      "tag",
 		SourceTag:       "tld",
 		Label:           "TLD",
@@ -24,7 +23,7 @@ func TestPublicAnalysisCohortDetailNoSnapshotState(t *testing.T) {
 		t.Fatalf("upsert cohort: %v", err)
 	}
 
-	resp := getPublic(t, srv, "/pub/api/v1/analysis/cohorts/tld")
+	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
 	if resp.Code != http.StatusOK {
 		t.Fatalf("cohort detail: got %d, want 200: %s", resp.Code, resp.Body)
 	}
@@ -317,21 +316,4 @@ func TestPublicAnalysisOverviewSlugInPath(t *testing.T) {
 	if payload.Snapshot == nil || payload.Snapshot.Slug != older.Slug {
 		t.Fatalf("older slug: got %+v, want %q", payload.Snapshot, older.Slug)
 	}
-}
-
-// newIsolatedAnalysisTestServer is newAnalysisAPITestFixture without the
-// auto-seeded batch + snapshot. Used by tests that need a cohort with
-// zero snapshots so the no_snapshot branch is exercised.
-func newIsolatedAnalysisTestServer(t *testing.T) (any, *SQLJobStore, *Server) {
-	t.Helper()
-	f := newAnalysisAPITestFixture(t)
-	// Strip the fixture snapshot so the cohort looks empty on the read
-	// path. Cleanest: delete the snapshot + batch rows manually.
-	if _, err := f.store.db.Exec(`DELETE FROM analysis_cohort_snapshots WHERE cohort_id = ?`, f.cohort.ID); err != nil {
-		t.Fatalf("strip fixture snapshot: %v", err)
-	}
-	if _, err := f.store.db.Exec(`DELETE FROM batches WHERE id = ?`, f.batchID); err != nil {
-		t.Fatalf("strip fixture batch: %v", err)
-	}
-	return nil, f.store, f.srv
 }

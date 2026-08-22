@@ -71,14 +71,12 @@ func BenchmarkInMemoryQueueBlockedWakeup(b *testing.B) {
 			}
 
 			b.ReportAllocs()
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				if err := q.Enqueue("job", PriorityNormal); err != nil {
 					b.Fatalf("enqueue: %v", err)
 				}
 				<-results
 			}
-			b.StopTimer()
 
 			cancel()
 			wg.Wait()

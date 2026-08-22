@@ -29,8 +29,7 @@ func BenchmarkHotCacheLease(b *testing.B) {
 		b.Run(fmt.Sprintf("addrs%04d", n), func(b *testing.B) {
 			hc := newNameserverHotCache(0, 0)
 			warmHotCacheEntry(b, hc, "bench-key", n)
-			b.ResetTimer()
-			for i := 0; i < b.N; i++ {
+			for b.Loop() {
 				_, release := hc.Lease("bench-key")
 				release()
 			}

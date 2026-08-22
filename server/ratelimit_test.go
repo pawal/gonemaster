@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -41,18 +42,21 @@ func TestRateLimiterDifferentIPsAreIndependent(t *testing.T) {
 }
 
 func TestRateLimiterWindowExpiryResetsCounter(t *testing.T) {
-	rl := NewRateLimiter(1, 50*time.Millisecond)
-	rl.Allow("1.2.3.4")
+	synctest.Test(t, func(t *testing.T) {
+		const window = 50 * time.Millisecond
+		rl := NewRateLimiter(1, window)
+		rl.Allow("1.2.3.4")
 
-	if ok, _ := rl.Allow("1.2.3.4"); ok {
-		t.Fatal("should be blocked before window expires")
-	}
+		if ok, _ := rl.Allow("1.2.3.4"); ok {
+			t.Fatal("should be blocked before window expires")
+		}
 
-	time.Sleep(60 * time.Millisecond)
+		time.Sleep(window + time.Millisecond)
 
-	if ok, _ := rl.Allow("1.2.3.4"); !ok {
-		t.Fatal("should be allowed after window expires")
-	}
+		if ok, _ := rl.Allow("1.2.3.4"); !ok {
+			t.Fatal("should be allowed after window expires")
+		}
+	})
 }
 
 func TestRateLimiterRetryAfterIsPositive(t *testing.T) {
@@ -65,20 +69,23 @@ func TestRateLimiterRetryAfterIsPositive(t *testing.T) {
 }
 
 func TestRateLimiterCleanupEvictsExpiredEntries(t *testing.T) {
-	rl := NewRateLimiter(5, 50*time.Millisecond)
-	rl.Allow("1.2.3.4")
-	rl.Allow("5.6.7.8")
+	synctest.Test(t, func(t *testing.T) {
+		const window = 50 * time.Millisecond
+		rl := NewRateLimiter(5, window)
+		rl.Allow("1.2.3.4")
+		rl.Allow("5.6.7.8")
 
-	time.Sleep(60 * time.Millisecond)
-	rl.Cleanup()
+		time.Sleep(window + time.Millisecond)
+		rl.Cleanup()
 
-	rl.mu.Lock()
-	n := len(rl.entries)
-	rl.mu.Unlock()
+		rl.mu.Lock()
+		n := len(rl.entries)
+		rl.mu.Unlock()
 
-	if n != 0 {
-		t.Fatalf("expected 0 entries after cleanup, got %d", n)
-	}
+		if n != 0 {
+			t.Fatalf("expected 0 entries after cleanup, got %d", n)
+		}
+	})
 }
 
 func TestRateLimiterCleanupKeepsActiveEntries(t *testing.T) {

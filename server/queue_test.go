@@ -7,6 +7,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -116,6 +117,12 @@ func TestInMemoryQueueClose(t *testing.T) {
 func TestInMemoryQueueManyBlockedDequeuers(t *testing.T) {
 	t.Parallel()
 
+	synctest.Test(t, func(t *testing.T) {
+		testManyBlockedDequeuers(t)
+	})
+}
+
+func testManyBlockedDequeuers(t *testing.T) {
 	const (
 		workers = 32
 		jobs    = 128
@@ -152,8 +159,8 @@ func TestInMemoryQueueManyBlockedDequeuers(t *testing.T) {
 		})
 	}
 
-	// Give workers a short moment to block in Dequeue.
-	time.Sleep(50 * time.Millisecond)
+	// Returns once every worker is blocked in Dequeue.
+	synctest.Wait()
 
 	expected := make(map[string]bool, jobs)
 	for i := range jobs {
@@ -189,6 +196,12 @@ func TestInMemoryQueueManyBlockedDequeuers(t *testing.T) {
 func TestInMemoryQueueBurstEnqueueDequeueConcurrent(t *testing.T) {
 	t.Parallel()
 
+	synctest.Test(t, func(t *testing.T) {
+		testBurstEnqueueDequeue(t)
+	})
+}
+
+func testBurstEnqueueDequeue(t *testing.T) {
 	const (
 		producers       = 8
 		perProducerJobs = 150
@@ -258,15 +271,16 @@ func TestInMemoryQueueBurstEnqueueDequeueConcurrent(t *testing.T) {
 
 	producerWG.Wait()
 
-	for int(consumed.Load()) < totalJobs {
-		select {
-		case err := <-errs:
-			t.Fatalf("concurrent queue error: %v", err)
-		case <-ctx.Done():
-			t.Fatalf("timed out waiting for jobs to drain: got=%d want=%d", consumed.Load(), totalJobs)
-		default:
-			time.Sleep(10 * time.Millisecond)
-		}
+	// Every consumer back in Dequeue means the queue has drained.
+	synctest.Wait()
+
+	select {
+	case err := <-errs:
+		t.Fatalf("concurrent queue error: %v", err)
+	default:
+	}
+	if int(consumed.Load()) != totalJobs {
+		t.Fatalf("consumed=%d want=%d", consumed.Load(), totalJobs)
 	}
 
 	cancel()
@@ -282,6 +296,12 @@ func TestInMemoryQueueBurstEnqueueDequeueConcurrent(t *testing.T) {
 func TestInMemoryQueuePauseResumeUnderLoad(t *testing.T) {
 	t.Parallel()
 
+	synctest.Test(t, func(t *testing.T) {
+		testPauseResumeUnderLoad(t)
+	})
+}
+
+func testPauseResumeUnderLoad(t *testing.T) {
 	const (
 		workers = 24
 		jobs    = 240
@@ -331,13 +351,14 @@ func TestInMemoryQueuePauseResumeUnderLoad(t *testing.T) {
 		}
 	}
 
-	// While paused, no worker should receive jobs.
+	// Every worker back to blocking with the queue full means the pause held.
+	synctest.Wait()
 	select {
 	case jobID := <-results:
 		t.Fatalf("received job %q while queue paused", jobID)
 	case err := <-errs:
 		t.Fatalf("worker error while paused: %v", err)
-	case <-time.After(200 * time.Millisecond):
+	default:
 	}
 
 	if err := q.Resume(); err != nil {

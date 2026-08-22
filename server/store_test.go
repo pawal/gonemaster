@@ -702,6 +702,8 @@ func TestInMemoryJobStoreConcurrentBasic(t *testing.T) {
 		}()
 	}
 
+	// Real clock on purpose: the goroutines spin rather than block, so a
+	// synctest bubble would never advance its clock past this sleep.
 	time.Sleep(200 * time.Millisecond)
 	close(done)
 

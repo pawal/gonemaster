@@ -132,22 +132,10 @@ func TestAdminDNSSECChainTwin(t *testing.T) {
 	}
 }
 
-// errChainStore wraps a real store but fails every chain lookup, standing in
-// for a transient database error. Everything else delegates to the embedded
-// store, so the handler still resolves the job before the failing lookup.
-type errChainStore struct {
-	JobStore
-	err error
-}
-
-func (e errChainStore) GetRunDNSSECChain(string) (string, bool, error) {
-	return "", false, e.err
-}
-
 func TestPublicDNSSECChainLookupErrorReturns500(t *testing.T) {
 	srv := newTestServer(t)
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
-	srv.store = errChainStore{JobStore: srv.store, err: errors.New("db down")}
+	wrapStore(t, srv).chainErr = errors.New("db down")
 
 	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
 
@@ -166,7 +154,7 @@ func TestAdminDNSSECChainLookupErrorReturns500(t *testing.T) {
 	if !ok {
 		t.Fatal("expected job")
 	}
-	srv.store = errChainStore{JobStore: srv.store, err: errors.New("db down")}
+	wrapStore(t, srv).chainErr = errors.New("db down")
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs/"+job.ID+"/dnssec-chain", nil)
 

@@ -10,7 +10,7 @@ import (
 
 func TestProgressUpdatesForFullSuite(t *testing.T) {
 	srv := newTestServer(t)
-	spy := newSpyJobStore()
+	spy := newProgressSpy()
 	srv.store = spy
 
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {

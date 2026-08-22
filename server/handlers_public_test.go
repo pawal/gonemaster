@@ -3,6 +3,7 @@ package server
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -195,22 +196,10 @@ func TestPublicCreateJobRejectsOversizedTestsList(t *testing.T) {
 	wantErrorCode(t, resp, http.StatusBadRequest, "too_many_tests")
 }
 
-// createErrStore wraps InMemoryJobStore but forces Create to return a
-// canned error so we can probe the store_error path.
-type createErrStore struct {
-	*InMemoryJobStore
-	err error
-}
-
-func (s *createErrStore) Create(_ Job) (Job, error) { return Job{}, s.err }
-
 func TestPublicCreateJobStoreErrorDoesNotLeakDBDetails(t *testing.T) {
 	srv := newTestServer(t)
 	canary := "ERROR: duplicate key value violates unique constraint \"jobs_pkey\""
-	srv.store = &createErrStore{
-		InMemoryJobStore: srv.store.(*InMemoryJobStore),
-		err:              fmt.Errorf("%s", canary),
-	}
+	wrapStore(t, srv).createErr = errors.New(canary)
 
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
 

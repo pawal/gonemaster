@@ -7,7 +7,10 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine"
@@ -262,4 +265,100 @@ func newTestServer(t testing.TB, opts ...srvOpt) *Server {
 		apply(srv)
 	}
 	return srv
+}
+
+// fakeJobStore wraps a store so a test can observe or fail individual calls.
+// The embedded JobStore supplies the 50-odd methods no test cares about.
+type fakeJobStore struct {
+	JobStore
+	// updates counts Update calls without locking, so the contention
+	// benchmark measures the server rather than this wrapper.
+	updates atomic.Int64
+
+	mu             sync.Mutex
+	recordProgress bool
+	progresses     []int
+
+	// The hooks below make one call fail, standing in for a store that will
+	// not commit. Set them before the call under test runs.
+	updateHook  func(job Job) error
+	createErr   error
+	graduateErr error
+	chainErr    error
+}
+
+// newFakeJobStore wraps a fresh in-memory store.
+func newFakeJobStore() *fakeJobStore {
+	return &fakeJobStore{JobStore: NewInMemoryJobStore()}
+}
+
+// newProgressSpy is newFakeJobStore with Update recording every progress value
+// it is handed, for the tests that assert which writes reached the store.
+func newProgressSpy() *fakeJobStore {
+	s := newFakeJobStore()
+	s.recordProgress = true
+	return s
+}
+
+// wrapStore replaces srv's store with a fake around it, keeping whatever the
+// server already seeded, and returns the fake.
+func wrapStore(t testing.TB, srv *Server) *fakeJobStore {
+	t.Helper()
+	fake := &fakeJobStore{JobStore: srv.store}
+	srv.store = fake
+	return fake
+}
+
+func (s *fakeJobStore) Create(job Job) (Job, error) {
+	if s.createErr != nil {
+		return Job{}, s.createErr
+	}
+	return s.JobStore.Create(job)
+}
+
+func (s *fakeJobStore) Update(job Job) error {
+	s.updates.Add(1)
+	// The progress is recorded before the hook runs, so a test can see the
+	// write that was attempted even when it fails.
+	s.mu.Lock()
+	if s.recordProgress {
+		s.progresses = append(s.progresses, job.Progress)
+	}
+	hook := s.updateHook
+	s.mu.Unlock()
+	if hook != nil {
+		if err := hook(job); err != nil {
+			return err
+		}
+	}
+	return s.JobStore.Update(job)
+}
+
+func (s *fakeJobStore) GraduateJob(job Job, entries []engine.LogEntry) error {
+	s.mu.Lock()
+	failure := s.graduateErr
+	s.mu.Unlock()
+	if failure != nil {
+		return failure
+	}
+	return s.JobStore.GraduateJob(job, entries)
+}
+
+func (s *fakeJobStore) GetRunDNSSECChain(runID string) (string, bool, error) {
+	if s.chainErr != nil {
+		return "", false, s.chainErr
+	}
+	return s.JobStore.GetRunDNSSECChain(runID)
+}
+
+// Progresses returns the progress values Update was handed, in order.
+func (s *fakeJobStore) Progresses() []int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return slices.Clone(s.progresses)
+}
+
+// UpdateCount returns how many times Update was called.
+func (s *fakeJobStore) UpdateCount() int64 {
+	return s.updates.Load()
 }

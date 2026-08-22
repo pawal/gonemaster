@@ -3,7 +3,6 @@ package server
 import (
 	"context"
 	"net/netip"
-	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -19,254 +18,9 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
 
-type spyJobStore struct {
-	mu         sync.Mutex
-	inner      *InMemoryJobStore
-	progresses []int
-	// graduateErr, when set, makes GraduateJob fail without graduating,
-	// standing in for a database that will not commit the transaction.
-	graduateErr error
-	// updateHook, when set, runs before each Update and can fail it.
-	updateHook func(job Job) error
-}
-
-func newSpyJobStore() *spyJobStore {
-	return &spyJobStore{inner: NewInMemoryJobStore()}
-}
-
-func (s *spyJobStore) Create(job Job) (Job, error) {
-	return s.inner.Create(job)
-}
-
-func (s *spyJobStore) Get(id string) (Job, bool) {
-	return s.inner.Get(id)
-}
-
-func (s *spyJobStore) GetByPublicID(publicID string) (Job, bool) {
-	return s.inner.GetByPublicID(publicID)
-}
-
-func (s *spyJobStore) Update(job Job) error {
-	s.mu.Lock()
-	s.progresses = append(s.progresses, job.Progress)
-	hook := s.updateHook
-	s.mu.Unlock()
-	if hook != nil {
-		if err := hook(job); err != nil {
-			return err
-		}
-	}
-	return s.inner.Update(job)
-}
-
-func (s *spyJobStore) List(filter JobFilter) JobList {
-	return s.inner.List(filter)
-}
-
-func (s *spyJobStore) GraduateJob(job Job, entries []engine.LogEntry) error {
-	s.mu.Lock()
-	failure := s.graduateErr
-	s.mu.Unlock()
-	if failure != nil {
-		return failure
-	}
-	return s.inner.GraduateJob(job, entries)
-}
-
-func (s *spyJobStore) GetResult(jobID string) (JobResult, bool) {
-	return s.inner.GetResult(jobID)
-}
-
-func (s *spyJobStore) GetRunDNSSECChain(runID string) (string, bool, error) {
-	return s.inner.GetRunDNSSECChain(runID)
-}
-
-func (s *spyJobStore) GetOrCreateDomain(name string) (Domain, error) {
-	return s.inner.GetOrCreateDomain(name)
-}
-
-func (s *spyJobStore) GetDomain(id int64) (Domain, bool) {
-	return s.inner.GetDomain(id)
-}
-
-func (s *spyJobStore) GetDomainByName(name string) (Domain, bool) {
-	return s.inner.GetDomainByName(name)
-}
-
-func (s *spyJobStore) GetDomainNamesByIDs(ids []int64) map[int64]string {
-	return s.inner.GetDomainNamesByIDs(ids)
-}
-
-func (s *spyJobStore) ListDomains(filter DomainFilter) DomainList {
-	return s.inner.ListDomains(filter)
-}
-
-func (s *spyJobStore) UpdateDomainLatest(domainID int64, runID string, finishedAt time.Time, status, level string) error {
-	return s.inner.UpdateDomainLatest(domainID, runID, finishedAt, status, level)
-}
-
-func (s *spyJobStore) CreateTag(name, description string) error {
-	return s.inner.CreateTag(name, description)
-}
-
-func (s *spyJobStore) GetTag(name string) (Tag, bool) {
-	return s.inner.GetTag(name)
-}
-
-func (s *spyJobStore) UpdateTag(name, description string) error {
-	return s.inner.UpdateTag(name, description)
-}
-
-func (s *spyJobStore) SetTagDefaultProfile(name string, profileID *int64) error {
-	return s.inner.SetTagDefaultProfile(name, profileID)
-}
-
-func (s *spyJobStore) DeleteTag(name string) error {
-	return s.inner.DeleteTag(name)
-}
-
-func (s *spyJobStore) ListTags(limit, offset int) []Tag {
-	return s.inner.ListTags(limit, offset)
-}
-
-func (s *spyJobStore) TagDomains(tag string, domainIDs []int64) error {
-	return s.inner.TagDomains(tag, domainIDs)
-}
-
-func (s *spyJobStore) UntagDomains(tag string, domainIDs []int64) error {
-	return s.inner.UntagDomains(tag, domainIDs)
-}
-
-func (s *spyJobStore) GetDomainTags(domainID int64) []string {
-	return s.inner.GetDomainTags(domainID)
-}
-
-func (s *spyJobStore) ListDomainsByTag(tag string, filter DomainFilter) DomainList {
-	return s.inner.ListDomainsByTag(tag, filter)
-}
-
-func (s *spyJobStore) GetTagSummary(tag string) (TagSummary, bool) {
-	return s.inner.GetTagSummary(tag)
-}
-
-func (s *spyJobStore) GetRun(id string) (Run, bool) {
-	return s.inner.GetRun(id)
-}
-
-func (s *spyJobStore) GetRunByPublicID(publicID string) (Run, bool) {
-	return s.inner.GetRunByPublicID(publicID)
-}
-
-func (s *spyJobStore) ListRuns(filter RunFilter) RunList {
-	return s.inner.ListRuns(filter)
-}
-
-func (s *spyJobStore) ListRunsByDomain(domainID int64, limit, offset int) RunList {
-	return s.inner.ListRunsByDomain(domainID, limit, offset)
-}
-
-func (s *spyJobStore) QueryEntries(filter EntryFilter) EntryList {
-	return s.inner.QueryEntries(filter)
-}
-
-func (s *spyJobStore) CreateBatch(batch Batch) error {
-	return s.inner.CreateBatch(batch)
-}
-
-func (s *spyJobStore) GetBatch(id string) (Batch, bool) {
-	return s.inner.GetBatch(id)
-}
-
-func (s *spyJobStore) SetBatchSnapshotIntent(batchID string, intent bool) error {
-	return s.inner.SetBatchSnapshotIntent(batchID, intent)
-}
-
-func (s *spyJobStore) ListBatchesByTag(tag string, limit, offset int) BatchList {
-	return s.inner.ListBatchesByTag(tag, limit, offset)
-}
-
-func (s *spyJobStore) ListBatches(tagLike string, limit, offset int) BatchList {
-	return s.inner.ListBatches(tagLike, limit, offset)
-}
-
-func (s *spyJobStore) BatchDeletePreviewStats(batchID string) (BatchDeletePreview, error) {
-	return s.inner.BatchDeletePreviewStats(batchID)
-}
-
-func (s *spyJobStore) DeleteBatch(batchID string) ([]int64, error) {
-	return s.inner.DeleteBatch(batchID)
-}
-
-func (s *spyJobStore) BatchHasRuns(batchID string) bool {
-	return s.inner.BatchHasRuns(batchID)
-}
-
-func (s *spyJobStore) CreateProfile(p StoredProfile) (StoredProfile, error) {
-	return s.inner.CreateProfile(p)
-}
-func (s *spyJobStore) GetProfile(id int64) (StoredProfile, bool) {
-	return s.inner.GetProfile(id)
-}
-func (s *spyJobStore) GetProfileByName(name string) (StoredProfile, bool) {
-	return s.inner.GetProfileByName(name)
-}
-func (s *spyJobStore) UpdateProfile(p StoredProfile) error {
-	return s.inner.UpdateProfile(p)
-}
-func (s *spyJobStore) DeleteProfile(id int64) error {
-	return s.inner.DeleteProfile(id)
-}
-func (s *spyJobStore) ListProfiles() []StoredProfile {
-	return s.inner.ListProfiles()
-}
-
-func (s *spyJobStore) GetSetting(key string) (string, bool) {
-	return s.inner.GetSetting(key)
-}
-func (s *spyJobStore) SetSetting(key, value string) error {
-	return s.inner.SetSetting(key, value)
-}
-func (s *spyJobStore) DeleteSetting(key string) error {
-	return s.inner.DeleteSetting(key)
-}
-func (s *spyJobStore) ListSettings() map[string]string {
-	return s.inner.ListSettings()
-}
-
-func (s *spyJobStore) PurgeOlderThan(cutoff time.Time) (int64, error) {
-	return s.inner.PurgeOlderThan(cutoff)
-}
-func (s *spyJobStore) PurgeByTag(tag string) (int64, error) {
-	return s.inner.PurgeByTag(tag)
-}
-
-func (s *spyJobStore) ListAnalysisCohorts() []AnalysisCohort {
-	return s.inner.ListAnalysisCohorts()
-}
-func (s *spyJobStore) GetAnalysisCohort(id int64) (AnalysisCohort, bool) {
-	return s.inner.GetAnalysisCohort(id)
-}
-func (s *spyJobStore) GetAnalysisCohortBySource(sourceType, sourceTag string) (AnalysisCohort, bool) {
-	return s.inner.GetAnalysisCohortBySource(sourceType, sourceTag)
-}
-func (s *spyJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohort, error) {
-	return s.inner.UpsertAnalysisCohort(cohort)
-}
-func (s *spyJobStore) DeleteAnalysisCohort(id int64) error {
-	return s.inner.DeleteAnalysisCohort(id)
-}
-
-func (s *spyJobStore) Progresses() []int {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	out := make([]int, len(s.progresses))
-	copy(out, s.progresses)
-	return out
-}
-
 func TestProgressUpdatesForMultipleTests(t *testing.T) {
 	srv := newTestServer(t)
-	spy := newSpyJobStore()
+	spy := newProgressSpy()
 	srv.store = spy
 
 	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
@@ -301,7 +55,7 @@ func TestProgressUpdatesForMultipleTests(t *testing.T) {
 
 func TestUpdateJobProgressCoalescesSmallIncrements(t *testing.T) {
 	srv := newTestServer(t)
-	spy := newSpyJobStore()
+	spy := newProgressSpy()
 	srv.store = spy
 	srv.progressWriteMinStep = 10
 	srv.progressWriteMinInterval = time.Hour
@@ -335,7 +89,7 @@ func TestUpdateJobProgressCoalescesSmallIncrements(t *testing.T) {
 
 func TestUpdateJobProgressAlwaysPersistsTerminal100(t *testing.T) {
 	srv := newTestServer(t)
-	spy := newSpyJobStore()
+	spy := newProgressSpy()
 	srv.store = spy
 	srv.progressWriteMinStep = 200
 	srv.progressWriteMinInterval = time.Hour
@@ -696,8 +450,6 @@ func TestRunEngineForJobHotCacheReportsWarmQueryMetrics(t *testing.T) {
 
 func TestRunJobSnapshotsEffectiveProfile(t *testing.T) {
 	srv := newTestServer(t)
-	spy := newSpyJobStore()
-	srv.store = spy
 
 	stored, err := srv.store.CreateProfile(StoredProfile{
 		Name:   "strict",
@@ -761,8 +513,6 @@ func TestRunJobSnapshotsEffectiveProfile(t *testing.T) {
 
 func TestRunJobPersistsNameserverTimingsForDelegatedNameserversOnly(t *testing.T) {
 	srv := newTestServer(t)
-	spy := newSpyJobStore()
-	srv.store = spy
 	srv.delegationLookup = func(_ context.Context, domain string) DelegationInfo {
 		if domain != "example.com" {
 			t.Fatalf("unexpected domain %q", domain)

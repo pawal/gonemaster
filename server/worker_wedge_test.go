@@ -12,12 +12,10 @@ import (
 // runJobWithFailingGraduation drives one job through runJob with a store
 // whose GraduateJob always fails, which is what a MariaDB contention abort
 // looks like from the worker's side.
-func runJobWithFailingGraduation(t *testing.T, cause error) (*Server, *spyJobStore, Job) {
+func runJobWithFailingGraduation(t *testing.T, cause error) (*Server, Job) {
 	t.Helper()
 	srv := newTestServer(t)
-	spy := newSpyJobStore()
-	spy.graduateErr = cause
-	srv.store = spy
+	wrapStore(t, srv).graduateErr = cause
 	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return nil, nil
 	}
@@ -34,7 +32,7 @@ func runJobWithFailingGraduation(t *testing.T, cause error) (*Server, *spyJobSto
 	if err := srv.runJob(job.ID); err == nil {
 		t.Fatal("runJob should surface the graduation failure")
 	}
-	return srv, spy, job
+	return srv, job
 }
 
 func TestRunJobFailedGraduationLeavesTerminalStatus(t *testing.T) {
@@ -42,7 +40,7 @@ func TestRunJobFailedGraduationLeavesTerminalStatus(t *testing.T) {
 	// job at "running" forever, so callers polled until their own timeout
 	// and batch snapshot capture never completed.
 	cause := errors.New("Error 1020: Record has changed since last read in table 'domains'")
-	srv, _, job := runJobWithFailingGraduation(t, cause)
+	srv, job := runJobWithFailingGraduation(t, cause)
 
 	stored, ok := srv.store.Get(job.ID)
 	if !ok {
@@ -66,7 +64,7 @@ func TestRunJobFailedGraduationDrainsInFlightGauge(t *testing.T) {
 	// The queued-to-running transition raises the in-flight gauge. Without
 	// a matching terminal transition it climbs forever, which is what made
 	// the reporter's dashboard show workers that were never actually busy.
-	srv, _, _ := runJobWithFailingGraduation(t, errors.New("commit refused"))
+	srv, _ := runJobWithFailingGraduation(t, errors.New("commit refused"))
 
 	snapshot := srv.metrics.Snapshot()
 	if snapshot.Health.InFlightJobs != 0 {
@@ -82,8 +80,7 @@ func TestRunJobReEnqueuesWhenStartUpdateFails(t *testing.T) {
 	// happens. If that write fails the job is still "queued" in the store,
 	// so it has to go back on the queue or nothing will ever pick it up.
 	srv := newTestServer(t)
-	spy := newSpyJobStore()
-	srv.store = spy
+	fake := wrapStore(t, srv)
 
 	job := Job{
 		ID:        "job-start-fails",
@@ -96,7 +93,7 @@ func TestRunJobReEnqueuesWhenStartUpdateFails(t *testing.T) {
 	}
 
 	// Fail only the transition into "running".
-	spy.updateHook = func(update Job) error {
+	fake.updateHook = func(update Job) error {
 		if update.Status == JobRunning {
 			return errors.New("store unavailable")
 		}

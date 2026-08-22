@@ -630,75 +630,91 @@ func TestCachefileASNStrictRejectsMalformed(t *testing.T) {
 	}
 }
 
-func TestCachefileSaveCompressedRoundTrip(t *testing.T) {
-	path := savedCache(t, "cache.json", withRecursor(), savingWith(WithCompression()))
-
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read file: %v", err)
-	}
-	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
-		t.Fatalf("expected gzip magic bytes in saved file, got %x", data[:min(len(data), 8)])
-	}
-
-	restoredNS := nameserver.NewCacheStore()
-	restoredRec := &recursor.Recursor{}
-	if err := Restore(path, restoredNS, restoredRec, nil, WithStrict()); err != nil {
-		t.Fatalf("strict restore of compressed file: %v", err)
-	}
-	if entries, _ := restoredNS.ExportEntries(); len(entries) != 2 {
-		t.Fatalf("expected 2 restored ns entries, got %d", len(entries))
-	}
-	if entries, _ := restoredRec.ExportCacheEntries(); len(entries) != 2 {
-		t.Fatalf("expected 2 restored recursor entries, got %d", len(entries))
-	}
+// hasGzipMagic reports whether data starts with the gzip signature.
+func hasGzipMagic(data []byte) bool {
+	return len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b
 }
 
-func TestCachefileSaveGzSuffixImpliesCompression(t *testing.T) {
-	path := savedCache(t, "cache.json.gz")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read file: %v", err)
+func TestCachefileGzipSaveRestore(t *testing.T) {
+	tests := []struct {
+		name           string
+		file           string
+		saveOpts       []savedOpt
+		wantGzip       bool
+		strict         bool
+		wantNSEntries  int
+		wantRecEntries int
+	}{
+		{
+			name:           "explicit compression round trips",
+			file:           "cache.json",
+			saveOpts:       []savedOpt{withRecursor(), savingWith(WithCompression())},
+			wantGzip:       true,
+			strict:         true,
+			wantNSEntries:  2,
+			wantRecEntries: 2,
+		},
+		{
+			name:     "gz suffix implies compression",
+			file:     "cache.json.gz",
+			wantGzip: true,
+		},
+		{
+			name:     "gz suffix is case insensitive",
+			file:     "cache.JSON.GZ",
+			wantGzip: true,
+		},
+		{
+			name:     "restore sniffs gzip regardless of name",
+			file:     "cache.bin",
+			saveOpts: []savedOpt{savingWith(WithCompression())},
+			wantGzip: true,
+			strict:   true,
+		},
+		{
+			name:     "plain save restores",
+			file:     "cache.json",
+			wantGzip: false,
+			strict:   true,
+		},
 	}
-	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
-		t.Fatalf("expected gzip magic bytes for .gz path even without WithCompression(), got %x", data[:min(len(data), 8)])
-	}
-	if err := Restore(path, nameserver.NewCacheStore(), nil, nil); err != nil {
-		t.Fatalf("restore: %v", err)
-	}
-}
 
-func TestCachefileSaveGzSuffixCaseInsensitive(t *testing.T) {
-	path := savedCache(t, "cache.JSON.GZ")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read file: %v", err)
-	}
-	if len(data) < 2 || data[0] != 0x1f || data[1] != 0x8b {
-		t.Fatalf("expected gzip magic bytes for upper-case .GZ path, got %x", data[:min(len(data), 8)])
-	}
-}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			path := savedCache(t, tc.file, tc.saveOpts...)
 
-func TestCachefileRestoreSniffsGzipRegardlessOfName(t *testing.T) {
-	// Written with explicit compression but a non-.gz name.
-	path := savedCache(t, "cache.bin", savingWith(WithCompression()))
+			data, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatalf("read %s: %v", tc.file, err)
+			}
+			if got := hasGzipMagic(data); got != tc.wantGzip {
+				t.Fatalf("gzip magic in %s: got %v want %v (head %x)", tc.file, got, tc.wantGzip, data[:min(len(data), 8)])
+			}
 
-	if err := Restore(path, nameserver.NewCacheStore(), nil, nil, WithStrict()); err != nil {
-		t.Fatalf("restore should sniff gzip magic regardless of file name: %v", err)
-	}
-}
+			var restoreOpts []Option
+			if tc.strict {
+				restoreOpts = append(restoreOpts, WithStrict())
+			}
+			restoredNS := nameserver.NewCacheStore()
+			var restoredRec *recursor.Recursor
+			if tc.wantRecEntries > 0 {
+				restoredRec = &recursor.Recursor{}
+			}
+			if err := Restore(path, restoredNS, restoredRec, nil, restoreOpts...); err != nil {
+				t.Fatalf("restore %s: %v", tc.file, err)
+			}
 
-func TestCachefileRestorePlainStillWorks(t *testing.T) {
-	path := savedCache(t, "cache.json")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		t.Fatalf("read: %v", err)
-	}
-	if len(data) >= 2 && data[0] == 0x1f && data[1] == 0x8b {
-		t.Fatalf("expected plain JSON without gzip magic, got %x", data[:8])
-	}
-	if err := Restore(path, nameserver.NewCacheStore(), nil, nil, WithStrict()); err != nil {
-		t.Fatalf("restore plain: %v", err)
+			if tc.wantNSEntries > 0 {
+				if entries, _ := restoredNS.ExportEntries(); len(entries) != tc.wantNSEntries {
+					t.Fatalf("restored ns entries: got %d want %d", len(entries), tc.wantNSEntries)
+				}
+			}
+			if tc.wantRecEntries > 0 {
+				if entries, _ := restoredRec.ExportCacheEntries(); len(entries) != tc.wantRecEntries {
+					t.Fatalf("restored recursor entries: got %d want %d", len(entries), tc.wantRecEntries)
+				}
+			}
+		})
 	}
 }
 
@@ -725,52 +741,63 @@ func TestCachefileRestoreCorruptedGzip(t *testing.T) {
 	}
 }
 
-func TestCachefileSaveMaxEntriesUnderLimitPasses(t *testing.T) {
-	path := savedCache(t, "cache.json", savingWith(WithMaxEntries(5))) // 2 entries, limit 5
-	if _, err := os.Stat(path); err != nil {
-		t.Fatalf("expected file to exist when under limit: %v", err)
+func TestCachefileSaveMaxEntries(t *testing.T) {
+	tests := []struct {
+		name            string
+		recursor        bool
+		asn             bool
+		max             int
+		wantErrContains string
+	}{
+		{name: "under limit passes", max: 5},   // 2 entries, limit 5
+		{name: "zero means unlimited", max: 0}, // 2 entries, no limit
+		{name: "over limit fails", max: 1, wantErrContains: "max-entries=1"},
+		{
+			name:            "counts all kinds",
+			recursor:        true,
+			asn:             true,
+			max:             5, // 2 entries per kind = 6 total
+			wantErrContains: "6 entries",
+		},
 	}
-}
 
-func TestCachefileSaveMaxEntriesOverLimitFails(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	seedNameserverCache(t, ns) // 2 entries
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ns := nameserver.NewCacheStore()
+			seedNameserverCache(t, ns)
+			var rec *recursor.Recursor
+			if tc.recursor {
+				rec = &recursor.Recursor{}
+				seedRecursorCache(t, rec)
+			}
+			var asn *asnlookup.Cache
+			if tc.asn {
+				asn = asnlookup.NewCache()
+				seedASNCache(t, asn)
+			}
 
-	path := filepath.Join(t.TempDir(), "cache.json")
-	err := Save(path, ns, nil, nil, WithMaxEntries(1))
-	if err == nil {
-		t.Fatalf("expected error when entry count exceeds max")
-	}
-	if !strings.Contains(err.Error(), "max-entries=1") {
-		t.Fatalf("expected max-entries error, got %v", err)
-	}
-	if _, statErr := os.Stat(path); statErr == nil {
-		t.Fatalf("expected file NOT to be written when over limit")
-	}
-}
+			path := filepath.Join(t.TempDir(), "cache.json")
+			err := Save(path, ns, rec, asn, WithMaxEntries(tc.max))
 
-func TestCachefileSaveMaxEntriesZeroMeansUnlimited(t *testing.T) {
-	// savedCache fails the test if Save errors, so writing at all is the
-	// assertion: a zero limit must not reject.
-	savedCache(t, "cache.json", savingWith(WithMaxEntries(0)))
-}
-
-func TestCachefileSaveMaxEntriesCountsAllKinds(t *testing.T) {
-	ns := nameserver.NewCacheStore()
-	rec := &recursor.Recursor{}
-	asn := asnlookup.NewCache()
-	seedNameserverCache(t, ns) // 2
-	seedRecursorCache(t, rec)  // 2
-	seedASNCache(t, asn)       // 2
-	// Total = 6 entries. Limit at 5 should reject.
-
-	path := filepath.Join(t.TempDir(), "cache.json")
-	err := Save(path, ns, rec, asn, WithMaxEntries(5))
-	if err == nil {
-		t.Fatalf("expected error when combined entry count of all kinds exceeds max")
-	}
-	if !strings.Contains(err.Error(), "6 entries") {
-		t.Fatalf("expected message to mention total of 6 entries, got %v", err)
+			if tc.wantErrContains == "" {
+				if err != nil {
+					t.Fatalf("save with max-entries=%d: %v", tc.max, err)
+				}
+				if _, statErr := os.Stat(path); statErr != nil {
+					t.Fatalf("expected file to exist when under limit: %v", statErr)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatalf("expected error when entry count exceeds max-entries=%d", tc.max)
+			}
+			if !strings.Contains(err.Error(), tc.wantErrContains) {
+				t.Fatalf("error %v does not mention %q", err, tc.wantErrContains)
+			}
+			if _, statErr := os.Stat(path); statErr == nil {
+				t.Fatalf("expected file NOT to be written when over limit")
+			}
+		})
 	}
 }
 

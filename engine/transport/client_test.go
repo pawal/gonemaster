@@ -216,74 +216,56 @@ func TestPrepareMessageEncodesOPT(t *testing.T) {
 	}
 }
 
+// extractSingleOptZFromWire reads the OPT record's Z bits straight off the
+// wire. dns.Msg has no field for an arbitrary Z value, so the packed TTL is the
+// only place the encoded bits can be checked.
 func extractSingleOptZFromWire(t *testing.T, wire []byte) uint16 {
 	t.Helper()
 
 	if len(wire) < 12 {
 		t.Fatalf("wire message too short: %d", len(wire))
 	}
-	qd := binary.BigEndian.Uint16(wire[4:6])
-	an := binary.BigEndian.Uint16(wire[6:8])
-	ns := binary.BigEndian.Uint16(wire[8:10])
-	ar := binary.BigEndian.Uint16(wire[10:12])
-	if qd != 1 || an != 0 || ns != 0 || ar != 1 {
-		t.Fatalf("unexpected DNS section counts: qd=%d an=%d ns=%d ar=%d", qd, an, ns, ar)
+	var counts [4]uint16
+	for i := range counts {
+		counts[i] = binary.BigEndian.Uint16(wire[4+2*i:])
+	}
+	if counts != [4]uint16{1, 0, 0, 1} {
+		t.Fatalf("unexpected DNS section counts: qd=%d an=%d ns=%d ar=%d", counts[0], counts[1], counts[2], counts[3])
 	}
 
 	offset, ok := skipName(wire, 12)
 	if !ok || offset+4 > len(wire) {
 		t.Fatalf("failed to parse question section")
 	}
-	offset += 4 // qtype + qclass
-
-	offset, ok = skipName(wire, offset)
+	offset, ok = skipName(wire, offset+4) // past qtype and qclass
 	if !ok || offset+10 > len(wire) {
 		t.Fatalf("failed to parse OPT owner name/header")
 	}
-	typ := binary.BigEndian.Uint16(wire[offset : offset+2])
-	offset += 2
-	_ = binary.BigEndian.Uint16(wire[offset : offset+2]) // class
-	offset += 2
-	ttl := binary.BigEndian.Uint32(wire[offset : offset+4])
-	offset += 4
-	rdlen := int(binary.BigEndian.Uint16(wire[offset : offset+2]))
-	offset += 2
-
-	if typ != dns.TypeOPT {
+	if typ := binary.BigEndian.Uint16(wire[offset:]); typ != dns.TypeOPT {
 		t.Fatalf("expected additional record type OPT, got %d", typ)
 	}
-	if offset+rdlen > len(wire) {
+	ttl := binary.BigEndian.Uint32(wire[offset+4:])
+	if rdlen := int(binary.BigEndian.Uint16(wire[offset+8:])); offset+10+rdlen != len(wire) {
 		t.Fatalf("invalid OPT rdata length: rdlen=%d offset=%d total=%d", rdlen, offset, len(wire))
 	}
-
 	return uint16(ttl & 0x1FFF)
 }
 
+// skipName advances past an uncompressed wire-format domain name. These queries
+// are built locally, so a compression pointer means the parse went wrong.
 func skipName(wire []byte, offset int) (int, bool) {
-	for {
-		if offset >= len(wire) {
+	for offset < len(wire) {
+		length := int(wire[offset])
+		if length&0xC0 != 0 {
 			return 0, false
 		}
-		length := wire[offset]
 		offset++
-		switch length & 0xC0 {
-		case 0x00:
-			if length == 0 {
-				return offset, true
-			}
-			offset += int(length)
-			if offset > len(wire) {
-				return 0, false
-			}
-		case 0xC0:
-			if offset >= len(wire) {
-				return 0, false
-			}
-			return offset + 1, true
-		default:
-			return 0, false
+		if length == 0 {
+			return offset, true
 		}
+		offset += length
 	}
+	return 0, false
 }
 
 func TestExchangeNilMessage(t *testing.T) {

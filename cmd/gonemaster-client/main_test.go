@@ -106,8 +106,100 @@ func TestJobsCreateSendsNormalizedDomain(t *testing.T) {
 	}
 }
 
+const fixtureTime = "2026-02-03T00:00:00Z"
+
+// batchItem is one job row of a fake batch-summary response.
+type batchItem struct {
+	id       string
+	domain   string
+	status   string
+	progress int
+}
+
+// batchPage is the slice of a batch one response carries. A zero page is the
+// whole batch, with no pagination fields.
+type batchPage struct {
+	items      []batchItem
+	limit      int
+	offset     int
+	nextCursor string
+}
+
+// batchFixture renders one batch-summary response with the field names the
+// server sends; total and status_counts always describe the whole batch.
+func batchFixture(id string, all []batchItem, page batchPage) string {
+	counts := map[string]int{}
+	for _, it := range all {
+		counts[it.status]++
+	}
+	countsJSON, err := json.Marshal(counts)
+	if err != nil {
+		panic(err)
+	}
+
+	items := page.items
+	if items == nil {
+		items = all
+	}
+	rows := make([]string, len(items))
+	for i, it := range items {
+		rows[i] = fmt.Sprintf(`{"id":%q,"domain":%q,"status":%q,"created_at":%q,"progress":%d}`,
+			it.id, it.domain, it.status, fixtureTime, it.progress)
+	}
+
+	body := fmt.Sprintf(`{"batch_id":%q,"total":%d,"status_counts":%s,"items":[%s],"created_at":%q`,
+		id, len(all), countsJSON, strings.Join(rows, ","), fixtureTime)
+	if page.limit > 0 {
+		body += fmt.Sprintf(`,"limit":%d,"offset":%d`, page.limit, page.offset)
+	}
+	if page.nextCursor != "" {
+		body += fmt.Sprintf(`,"next_cursor":%q`, page.nextCursor)
+	}
+	return body + "}"
+}
+
+// cancelArm answers POST /api/v1/jobs/{id}/cancel and records the job id.
+func cancelArm(t *testing.T, r *http.Request, canceled *[]string) *http.Response {
+	t.Helper()
+	parts := strings.Split(r.URL.Path, "/")
+	if len(parts) < 5 {
+		t.Fatalf("unexpected cancel path %s", r.URL.Path)
+	}
+	jobID := parts[len(parts)-2]
+	*canceled = append(*canceled, jobID)
+	return jsonResponse(http.StatusOK, fmt.Sprintf(
+		`{"id":%q,"domain":"example.com","status":"canceled","created_at":%q,"progress":100}`, jobID, fixtureTime))
+}
+
+// queueRemoveArm answers POST /api/v1/queue/remove and records the job ids.
+func queueRemoveArm(t *testing.T, r *http.Request, removed *[]string) *http.Response {
+	t.Helper()
+	var req queueRemoveRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		t.Fatalf("decode queue remove: %v", err)
+	}
+	*removed = append(*removed, req.JobIDs...)
+	return jsonResponse(http.StatusOK, `{"removed":["job_q"]}`)
+}
+
+var (
+	jobQueued    = batchItem{id: "job_q", domain: "example.com", status: "queued"}
+	jobRunning   = batchItem{id: "job_r", domain: "example.net", status: "running", progress: 50}
+	jobSucceeded = batchItem{id: "job_s", domain: "example.org", status: "succeeded", progress: 100}
+
+	// The paginated batches answer the first page with two of three items.
+	pagedItems = []batchItem{
+		{id: "job_q1", domain: "example.com", status: "queued"},
+		{id: "job_r1", domain: "example.net", status: "running", progress: 50},
+		{id: "job_q2", domain: "example.org", status: "queued"},
+	}
+	pagedFirst  = batchPage{items: pagedItems[:2], limit: 2, nextCursor: "2"}
+	pagedSecond = batchPage{items: pagedItems[2:], limit: 500, offset: 2}
+)
+
 func TestBatchesCancelCallsCancelForQueuedAndRunning(t *testing.T) {
 	var canceled []string
+	all := []batchItem{jobQueued, jobRunning, jobSucceeded}
 	oldFactory := newHTTPClient
 	defer func() { newHTTPClient = oldFactory }()
 	newHTTPClient = func(_ time.Duration) *http.Client {
@@ -115,27 +207,9 @@ func TestBatchesCancelCallsCancelForQueuedAndRunning(t *testing.T) {
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				switch {
 				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_1":
-					body := `{
-  "batch_id":"batch_1",
-  "total":3,
-  "status_counts":{"queued":1,"running":1,"succeeded":1},
-  "items":[
-    {"id":"job_q","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0},
-    {"id":"job_r","domain":"example.net","status":"running","created_at":"2026-02-03T00:00:00Z","progress":50},
-    {"id":"job_s","domain":"example.org","status":"succeeded","created_at":"2026-02-03T00:00:00Z","progress":100}
-  ],
-  "created_at":"2026-02-03T00:00:00Z"
-}`
-					return jsonResponse(http.StatusOK, body), nil
+					return jsonResponse(http.StatusOK, batchFixture("batch_1", all, batchPage{})), nil
 				case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/cancel"):
-					parts := strings.Split(r.URL.Path, "/")
-					if len(parts) < 5 {
-						t.Fatalf("unexpected cancel path %s", r.URL.Path)
-					}
-					jobID := parts[len(parts)-2]
-					canceled = append(canceled, jobID)
-					body := fmt.Sprintf(`{"id":"%s","domain":"example.com","status":"canceled","created_at":"2026-02-03T00:00:00Z","progress":100}`, jobID)
-					return jsonResponse(http.StatusOK, body), nil
+					return cancelArm(t, r, &canceled), nil
 				default:
 					t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 				}
@@ -163,6 +237,7 @@ func TestBatchesCancelCallsCancelForQueuedAndRunning(t *testing.T) {
 
 func TestBatchesRemoveCallsQueueRemoveForQueued(t *testing.T) {
 	var removed []string
+	all := []batchItem{jobQueued, jobRunning}
 	oldFactory := newHTTPClient
 	defer func() { newHTTPClient = oldFactory }()
 	newHTTPClient = func(_ time.Duration) *http.Client {
@@ -170,25 +245,9 @@ func TestBatchesRemoveCallsQueueRemoveForQueued(t *testing.T) {
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				switch {
 				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_2":
-					body := `{
-  "batch_id":"batch_2",
-  "total":2,
-  "status_counts":{"queued":1,"running":1},
-  "items":[
-    {"id":"job_q","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0},
-    {"id":"job_r","domain":"example.net","status":"running","created_at":"2026-02-03T00:00:00Z","progress":50}
-  ],
-  "created_at":"2026-02-03T00:00:00Z"
-}`
-					return jsonResponse(http.StatusOK, body), nil
+					return jsonResponse(http.StatusOK, batchFixture("batch_2", all, batchPage{})), nil
 				case r.Method == http.MethodPost && r.URL.Path == "/api/v1/queue/remove":
-					var req queueRemoveRequest
-					if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-						t.Fatalf("decode queue remove: %v", err)
-					}
-					removed = append(removed, req.JobIDs...)
-					body := `{"removed":["job_q"]}`
-					return jsonResponse(http.StatusOK, body), nil
+					return queueRemoveArm(t, r, &removed), nil
 				default:
 					t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 				}
@@ -205,8 +264,8 @@ func TestBatchesRemoveCallsQueueRemoveForQueued(t *testing.T) {
 }
 
 func TestBatchesRemoveCancelRunning(t *testing.T) {
-	var removed []string
-	var canceled []string
+	var removed, canceled []string
+	all := []batchItem{jobQueued, jobRunning, jobSucceeded}
 	oldFactory := newHTTPClient
 	defer func() { newHTTPClient = oldFactory }()
 	newHTTPClient = func(_ time.Duration) *http.Client {
@@ -214,32 +273,11 @@ func TestBatchesRemoveCancelRunning(t *testing.T) {
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
 				switch {
 				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_3":
-					body := `{
-  "batch_id":"batch_3",
-  "total":3,
-  "status_counts":{"queued":1,"running":1,"succeeded":1},
-  "items":[
-    {"id":"job_q","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0},
-    {"id":"job_r","domain":"example.net","status":"running","created_at":"2026-02-03T00:00:00Z","progress":50},
-    {"id":"job_s","domain":"example.org","status":"succeeded","created_at":"2026-02-03T00:00:00Z","progress":100}
-  ],
-  "created_at":"2026-02-03T00:00:00Z"
-}`
-					return jsonResponse(http.StatusOK, body), nil
+					return jsonResponse(http.StatusOK, batchFixture("batch_3", all, batchPage{})), nil
 				case r.Method == http.MethodPost && r.URL.Path == "/api/v1/queue/remove":
-					var req queueRemoveRequest
-					if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-						t.Fatalf("decode queue remove: %v", err)
-					}
-					removed = append(removed, req.JobIDs...)
-					body := `{"removed":["job_q"]}`
-					return jsonResponse(http.StatusOK, body), nil
+					return queueRemoveArm(t, r, &removed), nil
 				case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/cancel"):
-					parts := strings.Split(r.URL.Path, "/")
-					jobID := parts[len(parts)-2]
-					canceled = append(canceled, jobID)
-					body := fmt.Sprintf(`{"id":"%s","domain":"example.com","status":"canceled","created_at":"2026-02-03T00:00:00Z","progress":100}`, jobID)
-					return jsonResponse(http.StatusOK, body), nil
+					return cancelArm(t, r, &canceled), nil
 				default:
 					t.Fatalf("unexpected request %s %s", r.Method, r.URL.Path)
 				}
@@ -258,6 +296,23 @@ func TestBatchesRemoveCancelRunning(t *testing.T) {
 	}
 }
 
+// pagedBatchArm answers the two GET pages of a paginated batch, counting the
+// follow-up requests.
+func pagedBatchArm(t *testing.T, r *http.Request, id string, pageCalls *int) (*http.Response, bool) {
+	t.Helper()
+	if r.Method != http.MethodGet || r.URL.Path != "/api/v1/batches/"+id {
+		return nil, false
+	}
+	if r.URL.RawQuery == "" {
+		return jsonResponse(http.StatusOK, batchFixture(id, pagedItems, pagedFirst)), true
+	}
+	if got := r.URL.Query().Get("offset"); got != "2" {
+		t.Fatalf("expected second request offset=2, got %q", got)
+	}
+	*pageCalls++
+	return jsonResponse(http.StatusOK, batchFixture(id, pagedItems, pagedSecond)), true
+}
+
 func TestFetchBatchSummaryPaginatesItems(t *testing.T) {
 	var pageCalls int
 	oldFactory := newHTTPClient
@@ -265,43 +320,11 @@ func TestFetchBatchSummaryPaginatesItems(t *testing.T) {
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-				switch {
-				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_paginated" && r.URL.RawQuery == "":
-					body := `{
-  "batch_id":"batch_paginated",
-  "total":3,
-  "status_counts":{"queued":2,"running":1},
-  "items":[
-    {"id":"job_q1","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0},
-    {"id":"job_r1","domain":"example.net","status":"running","created_at":"2026-02-03T00:00:00Z","progress":50}
-  ],
-  "created_at":"2026-02-03T00:00:00Z",
-  "limit":2,
-  "offset":0,
-  "next_cursor":"2"
-}`
-					return jsonResponse(http.StatusOK, body), nil
-				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_paginated":
-					if r.URL.Query().Get("offset") != "2" {
-						t.Fatalf("expected second request offset=2, got %q", r.URL.Query().Get("offset"))
-					}
-					pageCalls++
-					body := `{
-  "batch_id":"batch_paginated",
-  "total":3,
-  "status_counts":{"queued":2,"running":1},
-  "items":[
-    {"id":"job_q2","domain":"example.org","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}
-  ],
-  "created_at":"2026-02-03T00:00:00Z",
-  "limit":500,
-  "offset":2
-}`
-					return jsonResponse(http.StatusOK, body), nil
-				default:
+				resp, ok := pagedBatchArm(t, r, "batch_paginated", &pageCalls)
+				if !ok {
 					t.Fatalf("unexpected request %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
 				}
-				return nil, nil
+				return resp, nil
 			}),
 		}
 	}
@@ -330,52 +353,19 @@ func TestFetchBatchSummaryPaginatesItems(t *testing.T) {
 
 func TestBatchesCancelIncludesPaginatedBatchItems(t *testing.T) {
 	var canceled []string
+	var pageCalls int
 	oldFactory := newHTTPClient
 	defer func() { newHTTPClient = oldFactory }()
 	newHTTPClient = func(_ time.Duration) *http.Client {
 		return &http.Client{
 			Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-				switch {
-				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_4" && r.URL.RawQuery == "":
-					body := `{
-  "batch_id":"batch_4",
-  "total":3,
-  "status_counts":{"queued":2,"running":1},
-  "items":[
-    {"id":"job_q1","domain":"example.com","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0},
-    {"id":"job_r1","domain":"example.net","status":"running","created_at":"2026-02-03T00:00:00Z","progress":50}
-  ],
-  "created_at":"2026-02-03T00:00:00Z",
-  "limit":2,
-  "offset":0,
-  "next_cursor":"2"
-}`
-					return jsonResponse(http.StatusOK, body), nil
-				case r.Method == http.MethodGet && r.URL.Path == "/api/v1/batches/batch_4":
-					if r.URL.Query().Get("offset") != "2" {
-						t.Fatalf("expected second request offset=2, got %q", r.URL.Query().Get("offset"))
-					}
-					body := `{
-  "batch_id":"batch_4",
-  "total":3,
-  "status_counts":{"queued":2,"running":1},
-  "items":[
-    {"id":"job_q2","domain":"example.org","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}
-  ],
-  "created_at":"2026-02-03T00:00:00Z",
-  "limit":500,
-  "offset":2
-}`
-					return jsonResponse(http.StatusOK, body), nil
-				case r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/cancel"):
-					parts := strings.Split(r.URL.Path, "/")
-					jobID := parts[len(parts)-2]
-					canceled = append(canceled, jobID)
-					body := fmt.Sprintf(`{"id":"%s","domain":"example.com","status":"canceled","created_at":"2026-02-03T00:00:00Z","progress":100}`, jobID)
-					return jsonResponse(http.StatusOK, body), nil
-				default:
-					t.Fatalf("unexpected request %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
+				if resp, ok := pagedBatchArm(t, r, "batch_4", &pageCalls); ok {
+					return resp, nil
 				}
+				if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/cancel") {
+					return cancelArm(t, r, &canceled), nil
+				}
+				t.Fatalf("unexpected request %s %s?%s", r.Method, r.URL.Path, r.URL.RawQuery)
 				return nil, nil
 			}),
 		}

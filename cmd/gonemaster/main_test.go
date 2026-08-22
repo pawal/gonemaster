@@ -88,6 +88,68 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 	}
 }
 
+// rejectCase is one CLI invocation the flag validation must reject.
+type rejectCase struct {
+	name string
+	args []string
+	want string
+}
+
+// runRejectCases asserts each invocation exits 2 with want on stderr and
+// nothing on stdout. The engine seam is stubbed so a validation regression
+// cannot reach the network.
+func runRejectCases(t *testing.T, cases []rejectCase) {
+	t.Helper()
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			enginetest.Capture(t, &runEngine, nil)
+
+			clitest.Run(t, run, tc.args...).
+				RequireCode(t, 2).
+				RequireErrContains(t, tc.want).
+				RequireOutEmpty(t)
+		})
+	}
+}
+
+func TestRunRejectsConflictingOutputFlags(t *testing.T) {
+	runRejectCases(t, []rejectCase{
+		{"json and raw", []string{"--domain", ".", "--json", "--raw"}, "--json cannot be combined with --raw"},
+		{"json-stream and raw", []string{"--domain", ".", "--json-stream", "--raw"}, "--json-stream cannot be combined with --raw"},
+		{"json-stream and json", []string{"--domain", ".", "--json-stream", "--json"}, "--json-stream cannot be combined with --json"},
+		{"count and raw", []string{"--domain", ".", "--count", "--raw"}, "--count cannot be combined with --raw"},
+		{"count and json", []string{"--domain", ".", "--count", "--json"}, "--count cannot be combined with --json"},
+		{"count and json-stream", []string{"--domain", ".", "--count", "--json-stream"}, "--count cannot be combined with --json-stream"},
+		{"count and dump-profile", []string{"--count", "--dump-profile"}, "--dump-profile cannot be combined with --count"},
+	})
+}
+
+func TestRunRejectsConflictingCacheFlags(t *testing.T) {
+	runRejectCases(t, []rejectCase{
+		{"save and version", []string{"--version", "--save", "cache.json"}, "--save/--restore cannot be combined with --version"},
+		{"restore and list-tests", []string{"--list-tests", "--restore", "cache.json"}, "--save/--restore cannot be combined with --list-tests"},
+		{"save and dump-profile", []string{"--save", "cache.json", "--dump-profile"}, "--dump-profile cannot be combined with --save"},
+		{"restore and dump-profile", []string{"--restore", "cache.json", "--dump-profile"}, "--dump-profile cannot be combined with --restore"},
+		{"save-compress without save", []string{"--domain", "example.com", "--save-compress"}, "--save-compress requires --save"},
+		{"save-max-entries without save", []string{"--domain", "example.com", "--save-max-entries", "5"}, "--save-max-entries requires --save"},
+		{"negative save-max-entries", []string{"--domain", "example.com", "--save", "out.json", "--save-max-entries", "-1"}, "--save-max-entries must be >= 0"},
+		{"cache-strict without restore or stats", []string{"--domain", "example.com", "--cache-strict"}, "--cache-strict requires --restore or --cache-stats"},
+		{"cache-stats with save", []string{"--cache-stats", "a.json", "--save", "b.json"}, "--cache-stats cannot be combined with --save/--restore"},
+	})
+}
+
+func TestRunRejectsMalformedArguments(t *testing.T) {
+	runRejectCases(t, []rejectCase{
+		{"two positional domains", []string{"example.com", "example.net"}, "only one positional DOMAIN argument is allowed"},
+		{"domain twice", []string{"--domain", "example.com", "example.net"}, "domain provided twice; use either --domain DOMAIN or positional DOMAIN"},
+		{"unknown stop-level", []string{"--domain", "example.com", "--stop-level", "BANANA"}, "--stop-level must be one of"},
+		{"malformed undelegated nameserver", []string{"--domain", "example.com", "--json", "--ns", "bad!name.example/192.0.2.1"}, "undelegated nameserver"},
+		{"malformed undelegated DS", []string{"--domain", "example.com", "--json", "--ds", "12345,13,2,NOT-HEX"}, "undelegated DS"},
+		{"invalid sourceaddr4", []string{"--domain", "example.com", "--json", "--sourceaddr4", "not-an-ip"}, "--sourceaddr4 must be a valid IPv4 address"},
+		{"invalid sourceaddr6", []string{"--domain", "example.com", "--json", "--sourceaddr6", "192.0.2.10"}, "--sourceaddr6 must be a valid IPv6 address"},
+	})
+}
+
 func TestRunAcceptsPositionalDomain(t *testing.T) {
 	var captured engine.RunRequest
 	enginetest.Capture(t, &runEngine, &captured)
@@ -111,30 +173,6 @@ func TestRunAcceptsPositionalDomainWithFlags(t *testing.T) {
 	if captured.MinLevel != "INFO" {
 		t.Fatalf("expected min-level INFO, got %q", captured.MinLevel)
 	}
-}
-
-func TestRunRejectsMultiplePositionalDomains(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "example.com", "example.net")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "only one positional DOMAIN argument is allowed")
-}
-
-func TestRunRejectsDomainProvidedTwice(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "--domain", "example.com", "example.net")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "domain provided twice; use either --domain DOMAIN or positional DOMAIN")
-}
-
-func TestRunRejectsInvalidStopLevel(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "--domain", "example.com", "--stop-level", "BANANA")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--stop-level must be one of")
 }
 
 func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
@@ -192,30 +230,6 @@ func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
 	if strings.TrimSpace(res.Err) != "" {
 		t.Fatalf("expected no stderr output, got %q", res.Err)
 	}
-}
-
-func TestRunRejectsSaveAndVersion(t *testing.T) {
-	res := clitest.Run(t, run, "--version", "--save", "cache.json")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--save/--restore cannot be combined with --version")
-}
-
-func TestRunRejectsRestoreAndListTests(t *testing.T) {
-	res := clitest.Run(t, run, "--list-tests", "--restore", "cache.json")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--save/--restore cannot be combined with --list-tests")
-}
-
-func TestRunRejectsSaveAndDumpProfile(t *testing.T) {
-	res := clitest.Run(t, run, "--save", "cache.json", "--dump-profile")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--dump-profile cannot be combined with --save")
-}
-
-func TestRunRejectsRestoreAndDumpProfile(t *testing.T) {
-	res := clitest.Run(t, run, "--restore", "cache.json", "--dump-profile")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--dump-profile cannot be combined with --restore")
 }
 
 func TestRunDumpProfileWithoutDomain(t *testing.T) {
@@ -356,14 +370,6 @@ func TestRunSaveCompressWritesGzip(t *testing.T) {
 	clitest.Run(t, run, "--domain", "example.com", "--json", "--restore", savePath).RequireCode(t, 0)
 }
 
-func TestRunSaveCompressRejectsWithoutSave(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "--domain", "example.com", "--save-compress")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--save-compress requires --save")
-}
-
 func TestRunSaveMaxEntriesUnderLimitSucceeds(t *testing.T) {
 	dir := t.TempDir()
 	savePath := filepath.Join(dir, "saved-cache.json")
@@ -423,22 +429,6 @@ func TestRunSaveMaxEntriesOverLimitFails(t *testing.T) {
 	if _, err := os.Stat(savePath); err == nil {
 		t.Fatalf("expected save file NOT to be written when over limit")
 	}
-}
-
-func TestRunSaveMaxEntriesRejectsWithoutSave(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "--domain", "example.com", "--save-max-entries", "5")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--save-max-entries requires --save")
-}
-
-func TestRunSaveMaxEntriesRejectsNegative(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	clitest.Run(t, run, "--domain", "example.com", "--save", "out.json", "--save-max-entries", "-1").
-		RequireCode(t, 2).
-		RequireErrContains(t, "--save-max-entries must be >= 0")
 }
 
 // writeSavedCache writes a real cache file (with checksum) holding 3
@@ -519,20 +509,6 @@ func TestRunRestoreStrictRejectsUnknownField(t *testing.T) {
 	res.RequireErrContains(t, "unknown field")
 }
 
-func TestRunCacheStrictRequiresRestoreOrStats(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-	res := clitest.Run(t, run, "--domain", "example.com", "--cache-strict")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--cache-strict requires --restore or --cache-stats")
-}
-
-func TestRunCacheStatsRejectsWithSave(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-	res := clitest.Run(t, run, "--cache-stats", "a.json", "--save", "b.json")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--cache-stats cannot be combined with --save/--restore")
-}
-
 func TestRunRestorePrintsCacheSummary(t *testing.T) {
 	enginetest.Capture(t, &runEngine, nil)
 	path := writeSavedCache(t, t.TempDir(), "cache.json", false)
@@ -587,69 +563,6 @@ func TestRunJSONStreamOutputs(t *testing.T) {
 	}
 	if len(res.Err) != 0 {
 		t.Fatalf("expected no stderr output, got %q", res.Err)
-	}
-}
-
-func TestRunRejectsRawAndJSON(t *testing.T) {
-	res := clitest.Run(t, run, "--domain", ".", "--json", "--raw")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--json cannot be combined with --raw")
-	if len(res.Out) != 0 {
-		t.Fatalf("expected no stdout output, got %q", res.Out)
-	}
-}
-
-func TestRunRejectsJSONStreamAndRaw(t *testing.T) {
-	res := clitest.Run(t, run, "--domain", ".", "--json-stream", "--raw")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--json-stream cannot be combined with --raw")
-	if len(res.Out) != 0 {
-		t.Fatalf("expected no stdout output, got %q", res.Out)
-	}
-}
-
-func TestRunRejectsJSONStreamAndJSON(t *testing.T) {
-	res := clitest.Run(t, run, "--domain", ".", "--json-stream", "--json")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--json-stream cannot be combined with --json")
-	if len(res.Out) != 0 {
-		t.Fatalf("expected no stdout output, got %q", res.Out)
-	}
-}
-
-func TestRunRejectsCountAndRaw(t *testing.T) {
-	res := clitest.Run(t, run, "--domain", ".", "--count", "--raw")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--count cannot be combined with --raw")
-	if len(res.Out) != 0 {
-		t.Fatalf("expected no stdout output, got %q", res.Out)
-	}
-}
-
-func TestRunRejectsCountAndJSON(t *testing.T) {
-	res := clitest.Run(t, run, "--domain", ".", "--count", "--json")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--count cannot be combined with --json")
-	if len(res.Out) != 0 {
-		t.Fatalf("expected no stdout output, got %q", res.Out)
-	}
-}
-
-func TestRunRejectsCountAndJSONStream(t *testing.T) {
-	res := clitest.Run(t, run, "--domain", ".", "--count", "--json-stream")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--count cannot be combined with --json-stream")
-	if len(res.Out) != 0 {
-		t.Fatalf("expected no stdout output, got %q", res.Out)
-	}
-}
-
-func TestRunRejectsCountAndDumpProfile(t *testing.T) {
-	res := clitest.Run(t, run, "--count", "--dump-profile")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--dump-profile cannot be combined with --count")
-	if len(res.Out) != 0 {
-		t.Fatalf("expected no stdout output, got %q", res.Out)
 	}
 }
 
@@ -710,22 +623,6 @@ func TestRunParsesUndelegatedDSFlags(t *testing.T) {
 	}
 }
 
-func TestRunRejectsMalformedUndelegatedNameserverFlag(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ns", "bad!name.example/192.0.2.1")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "undelegated nameserver")
-}
-
-func TestRunRejectsMalformedUndelegatedDSFlag(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ds", "12345,13,2,NOT-HEX")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "undelegated DS")
-}
-
 func TestRunCarriesUndelegatedInputsInRunRequest(t *testing.T) {
 	var captured engine.RunRequest
 	enginetest.Capture(t, &runEngine, &captured)
@@ -758,22 +655,6 @@ func TestRunParsesSourceAddrOverrides(t *testing.T) {
 	if captured.SourceAddr6 == nil || *captured.SourceAddr6 != "2001:db8::44" {
 		t.Fatalf("unexpected SourceAddr6 override: %#v", captured.SourceAddr6)
 	}
-}
-
-func TestRunRejectsInvalidSourceAddr4(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--sourceaddr4", "not-an-ip")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--sourceaddr4 must be a valid IPv4 address")
-}
-
-func TestRunRejectsInvalidSourceAddr6(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--sourceaddr6", "192.0.2.10")
-	res.RequireCode(t, 2)
-	res.RequireErrContains(t, "--sourceaddr6 must be a valid IPv6 address")
 }
 
 func TestRunOutputsTranslatedByDefault(t *testing.T) {

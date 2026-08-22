@@ -33,7 +33,7 @@ func chainJob(id, origin string) Job {
 }
 
 func TestRunEngineForJobCollectsChainForPublicOrigin(t *testing.T) {
-	srv := New(DefaultConfig()) // ShowDNSSECChainPublic defaults true
+	srv := newTestServer(t) // ShowDNSSECChainPublic defaults true
 	srv.engineRunner = chainStubEngine
 
 	art, err := srv.runEngineForJob(chainJob("job-pub", JobOriginPublic), context.Background())
@@ -49,7 +49,7 @@ func TestRunEngineForJobCollectsChainForPublicOrigin(t *testing.T) {
 }
 
 func TestRunEngineForJobSkipsChainForNonPublicOrigins(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.engineRunner = chainStubEngine
 
 	for _, origin := range []string{JobOriginAdmin, JobOriginBatch, ""} {
@@ -79,7 +79,7 @@ func TestRunEngineForJobSkipsChainWhenFlagOff(t *testing.T) {
 }
 
 func TestMarshalDNSSECChain(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	if got := srv.marshalDNSSECChain(nil); got != "" {
 		t.Errorf("nil summary: got %q, want empty", got)
@@ -107,7 +107,7 @@ func TestRunEngineForJobKeepsChainWithMostEvidence(t *testing.T) {
 	// A multi-testcase job invokes the sink once per engine run. A later run
 	// without parent evidence (its testcase never resolved the parent zone)
 	// must not overwrite an earlier summary that has it.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	rich := &dnssecchain.Summary{
 		Version: dnssecchain.Version,
 		Zone:    "example.com",

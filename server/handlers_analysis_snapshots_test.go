@@ -1,7 +1,6 @@
 package server
 
 import (
-	"bytes"
 	"database/sql"
 	"fmt"
 	"net/http"
@@ -82,40 +81,19 @@ func newAdminSnapshotFixture(t *testing.T) *adminSnapshotFixture {
 	return &adminSnapshotFixture{t: t, srv: srv, store: store, cohort: cohort, snapshot: snap}
 }
 
-func (f *adminSnapshotFixture) call(method, path, body string) *httptest.ResponseRecorder {
+// call sends body as an empty-but-present body when it is "", which the
+// handlers tell apart from no body at all.
+func (f *adminSnapshotFixture) call(method, path, body string, opts ...reqOpt) *httptest.ResponseRecorder {
 	f.t.Helper()
-	var buf *bytes.Buffer
 	if body == "" {
-		buf = bytes.NewBuffer(nil)
-	} else {
-		buf = bytes.NewBufferString(body)
+		opts = append(opts, noContentType())
 	}
-	req := httptest.NewRequest(method, path, buf)
-	if body != "" {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	resp := httptest.NewRecorder()
-	f.srv.Handler().ServeHTTP(resp, req)
-	return resp
+	return doJSON(f.t, f.srv, method, path, body, opts...)
 }
 
 func (f *adminSnapshotFixture) callWithOrigin(method, path, origin, body string) *httptest.ResponseRecorder {
 	f.t.Helper()
-	var buf *bytes.Buffer
-	if body == "" {
-		buf = bytes.NewBuffer(nil)
-	} else {
-		buf = bytes.NewBufferString(body)
-	}
-	req := httptest.NewRequest(method, path, buf)
-	req.Host = "example.com"
-	req.Header.Set("Origin", origin)
-	if body != "" {
-		req.Header.Set("Content-Type", "application/json")
-	}
-	resp := httptest.NewRecorder()
-	f.srv.Handler().ServeHTTP(resp, req)
-	return resp
+	return f.call(method, path, body, withHost("example.com"), withOrigin(origin))
 }
 
 func (f *adminSnapshotFixture) snapshotByID(id int64) (AnalysisCohortSnapshot, bool) {

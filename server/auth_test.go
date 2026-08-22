@@ -9,25 +9,22 @@ import (
 	"testing"
 )
 
-func authGet(s *Server, path string, mutate func(*http.Request)) *httptest.ResponseRecorder {
-	return authDo(s, http.MethodGet, path, "", mutate)
+func authGet(t *testing.T, s *Server, path string, mutate func(*http.Request)) *httptest.ResponseRecorder {
+	t.Helper()
+	return authDo(t, s, http.MethodGet, path, "", mutate)
 }
 
-func authDo(s *Server, method, path, body string, mutate func(*http.Request)) *httptest.ResponseRecorder {
-	var r io.Reader
+func authDo(t *testing.T, s *Server, method, path, body string, mutate func(*http.Request)) *httptest.ResponseRecorder {
+	t.Helper()
+	var reqBody any
 	if body != "" {
-		r = strings.NewReader(body)
+		reqBody = body
 	}
-	req := httptest.NewRequest(method, path, r)
-	if body != "" {
-		req.Header.Set("Content-Type", "application/json")
-	}
+	var opts []reqOpt
 	if mutate != nil {
-		mutate(req)
+		opts = append(opts, withRequest(mutate))
 	}
-	rec := httptest.NewRecorder()
-	s.Handler().ServeHTTP(rec, req)
-	return rec
+	return doJSON(t, s, method, path, reqBody, opts...)
 }
 
 func cookieNamed(rec *httptest.ResponseRecorder, name string) *http.Cookie {
@@ -109,7 +106,7 @@ func TestServerReloadAuth(t *testing.T) {
 
 func TestAuthMiddlewareOpenModeAllows(t *testing.T) {
 	s := newTestServer(t)
-	if rec := authGet(s, "/api/v1/locales", nil); rec.Code == http.StatusUnauthorized {
+	if rec := authGet(t, s, "/api/v1/locales", nil); rec.Code == http.StatusUnauthorized {
 		t.Fatalf("open mode should not require auth, got %d", rec.Code)
 	}
 }
@@ -118,32 +115,32 @@ func TestAuthMiddlewareTokenMode(t *testing.T) {
 	tok := "gm_mwtest"
 	s := tokenServer(t, tok)
 
-	if rec := authGet(s, "/api/v1/locales", nil); rec.Code != http.StatusUnauthorized {
+	if rec := authGet(t, s, "/api/v1/locales", nil); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("missing token: want 401, got %d", rec.Code)
 	}
 	bearer := func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+tok) }
-	if rec := authGet(s, "/api/v1/locales", bearer); rec.Code == http.StatusUnauthorized {
+	if rec := authGet(t, s, "/api/v1/locales", bearer); rec.Code == http.StatusUnauthorized {
 		t.Fatal("valid bearer should not be rejected")
 	}
 	cookie := func(r *http.Request) { r.AddCookie(&http.Cookie{Name: adminCookieName, Value: tok}) }
-	if rec := authGet(s, "/api/v1/locales", cookie); rec.Code == http.StatusUnauthorized {
+	if rec := authGet(t, s, "/api/v1/locales", cookie); rec.Code == http.StatusUnauthorized {
 		t.Fatal("valid cookie should not be rejected")
 	}
 	wrong := func(r *http.Request) { r.Header.Set("Authorization", "Bearer nope") }
-	if rec := authGet(s, "/api/v1/locales", wrong); rec.Code != http.StatusUnauthorized {
+	if rec := authGet(t, s, "/api/v1/locales", wrong); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("wrong token: want 401, got %d", rec.Code)
 	}
-	if rec := authGet(s, "/api/v1/healthz", nil); rec.Code != http.StatusOK {
+	if rec := authGet(t, s, "/api/v1/healthz", nil); rec.Code != http.StatusOK {
 		t.Fatalf("healthz must stay exempt: want 200, got %d", rec.Code)
 	}
-	if rec := authGet(s, "/api/v1/metrics", nil); rec.Code != http.StatusUnauthorized {
+	if rec := authGet(t, s, "/api/v1/metrics", nil); rec.Code != http.StatusUnauthorized {
 		t.Fatalf("metrics must be gated: want 401, got %d", rec.Code)
 	}
 }
 
 func TestWhoamiOpenMode(t *testing.T) {
 	s := newTestServer(t)
-	rec := authGet(s, "/api/v1/whoami", nil)
+	rec := authGet(t, s, "/api/v1/whoami", nil)
 	wantStatus(t, rec, http.StatusOK)
 	if !strings.Contains(rec.Body.String(), `"mode":"open"`) || !strings.Contains(rec.Body.String(), `"authenticated":true`) {
 		t.Fatalf("unexpected whoami body: %s", rec.Body.String())
@@ -153,11 +150,11 @@ func TestWhoamiOpenMode(t *testing.T) {
 func TestWhoamiTokenMode(t *testing.T) {
 	tok := "gm_whoami"
 	s := tokenServer(t, tok)
-	rec := authGet(s, "/api/v1/whoami", nil)
+	rec := authGet(t, s, "/api/v1/whoami", nil)
 	if !strings.Contains(rec.Body.String(), `"mode":"token"`) || !strings.Contains(rec.Body.String(), `"authenticated":false`) {
 		t.Fatalf("unauthed whoami: %s", rec.Body.String())
 	}
-	rec = authGet(s, "/api/v1/whoami", func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+tok) })
+	rec = authGet(t, s, "/api/v1/whoami", func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+tok) })
 	if !strings.Contains(rec.Body.String(), `"authenticated":true`) {
 		t.Fatalf("authed whoami: %s", rec.Body.String())
 	}
@@ -166,7 +163,7 @@ func TestWhoamiTokenMode(t *testing.T) {
 func TestSessionLoginAndUseCookie(t *testing.T) {
 	tok := "gm_session"
 	s := tokenServer(t, tok)
-	rec := authDo(s, http.MethodPost, "/api/v1/session", `{"token":"`+tok+`"}`, nil)
+	rec := authDo(t, s, http.MethodPost, "/api/v1/session", `{"token":"`+tok+`"}`, nil)
 	wantStatus(t, rec, http.StatusOK)
 	cookie := cookieNamed(rec, adminCookieName)
 	if cookie == nil {
@@ -175,7 +172,7 @@ func TestSessionLoginAndUseCookie(t *testing.T) {
 	if !cookie.HttpOnly || cookie.SameSite != http.SameSiteStrictMode {
 		t.Fatalf("cookie flags: HttpOnly=%v SameSite=%v", cookie.HttpOnly, cookie.SameSite)
 	}
-	rec = authGet(s, "/api/v1/locales", func(r *http.Request) { r.AddCookie(cookie) })
+	rec = authGet(t, s, "/api/v1/locales", func(r *http.Request) { r.AddCookie(cookie) })
 	if rec.Code == http.StatusUnauthorized {
 		t.Fatal("cookie from login should authenticate gated requests")
 	}
@@ -183,7 +180,7 @@ func TestSessionLoginAndUseCookie(t *testing.T) {
 
 func TestSessionLoginRejectsBadToken(t *testing.T) {
 	s := tokenServer(t, "gm_real")
-	rec := authDo(s, http.MethodPost, "/api/v1/session", `{"token":"wrong"}`, nil)
+	rec := authDo(t, s, http.MethodPost, "/api/v1/session", `{"token":"wrong"}`, nil)
 	wantStatus(t, rec, http.StatusUnauthorized)
 	if cookieNamed(rec, adminCookieName) != nil {
 		t.Fatal("no cookie should be set on a failed login")
@@ -192,7 +189,7 @@ func TestSessionLoginRejectsBadToken(t *testing.T) {
 
 func TestSessionLogoutClearsCookie(t *testing.T) {
 	s := tokenServer(t, "gm_logout")
-	rec := authDo(s, http.MethodDelete, "/api/v1/session", "", nil)
+	rec := authDo(t, s, http.MethodDelete, "/api/v1/session", "", nil)
 	wantStatus(t, rec, http.StatusOK)
 	c := cookieNamed(rec, adminCookieName)
 	if c == nil || c.MaxAge >= 0 {

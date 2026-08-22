@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 )
@@ -258,14 +257,12 @@ func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 
 func TestAccessLogMiddlewareOmitsBodyByDefault(t *testing.T) {
 	var buf bytes.Buffer
-	srv := newTestServer(t)
-	srv.logger = newLogger("json", "info", &buf) // info: no body capture
+	srv := newTestServer(t, withLogTo(&buf, "info")) // info: no body capture
 
 	handler := srv.accessLogMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("secret-response-body"))
 	}))
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/api/v1/jobs", nil))
+	doHandler(t, handler, http.MethodGet, "/api/v1/jobs", nil)
 
 	if strings.Contains(buf.String(), "secret-response-body") {
 		t.Fatalf("body must not be logged at info level: %s", buf.String())
@@ -274,14 +271,12 @@ func TestAccessLogMiddlewareOmitsBodyByDefault(t *testing.T) {
 
 func TestAccessLogMiddlewareCapturesBodyAtDebug(t *testing.T) {
 	var buf bytes.Buffer
-	srv := newTestServer(t)
-	srv.logger = newLogger("json", "debug", &buf) // debug: body captured
+	srv := newTestServer(t, withLogTo(&buf, "debug")) // debug: body captured
 
 	handler := srv.accessLogMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("visible-at-debug"))
 	}))
-	resp := httptest.NewRecorder()
-	handler.ServeHTTP(resp, httptest.NewRequest(http.MethodGet, "/api/v1/jobs", nil))
+	doHandler(t, handler, http.MethodGet, "/api/v1/jobs", nil)
 
 	lines := decodeLogLines(t, &buf)
 	if len(lines) != 1 {

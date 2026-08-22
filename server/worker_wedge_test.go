@@ -14,7 +14,7 @@ import (
 // looks like from the worker's side.
 func runJobWithFailingGraduation(t *testing.T, cause error) (*Server, *spyJobStore, Job) {
 	t.Helper()
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyJobStore()
 	spy.graduateErr = cause
 	srv.store = spy
@@ -81,7 +81,7 @@ func TestRunJobReEnqueuesWhenStartUpdateFails(t *testing.T) {
 	// The job has already been dequeued when the queued-to-running write
 	// happens. If that write fails the job is still "queued" in the store,
 	// so it has to go back on the queue or nothing will ever pick it up.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	spy := newSpyJobStore()
 	srv.store = spy
 

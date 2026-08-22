@@ -2,7 +2,6 @@ package server
 
 import (
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"regexp"
 	"strings"
@@ -99,14 +98,13 @@ func TestOpenAPIPathCoverage(t *testing.T) {
 		concretePath := substitutePathParams(specPath)
 		for _, method := range methods {
 			t.Run(method+" "+specPath, func(t *testing.T) {
-				req := httptest.NewRequest(method, openAPITestRequestPath(concretePath), nil)
 				// POST/PUT/PATCH need a content-type header so we don't get a
 				// parse error before the route is even matched.
+				var opts []reqOpt
 				if method == http.MethodPost || method == http.MethodPut || method == http.MethodPatch {
-					req.Header.Set("Content-Type", "application/json")
+					opts = append(opts, withHeader("Content-Type", "application/json"))
 				}
-				resp := httptest.NewRecorder()
-				srv.Handler().ServeHTTP(resp, req)
+				resp := doJSON(t, srv, method, openAPITestRequestPath(concretePath), nil, opts...)
 
 				ct := resp.Header().Get("Content-Type")
 				if !strings.HasPrefix(ct, "application/json") {

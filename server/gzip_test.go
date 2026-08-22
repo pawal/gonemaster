@@ -16,13 +16,11 @@ func gzipTestServer(handler http.HandlerFunc) http.Handler {
 
 func runGzip(t *testing.T, h http.Handler, acceptEncoding string) *httptest.ResponseRecorder {
 	t.Helper()
-	w := httptest.NewRecorder()
-	r := httptest.NewRequest(http.MethodGet, "/x", nil)
+	var opts []reqOpt
 	if acceptEncoding != "" {
-		r.Header.Set("Accept-Encoding", acceptEncoding)
+		opts = append(opts, withHeader("Accept-Encoding", acceptEncoding))
 	}
-	h.ServeHTTP(w, r)
-	return w
+	return doHandler(t, h, http.MethodGet, "/x", nil, opts...)
 }
 
 func TestGzipCompressesLargeJSON(t *testing.T) {

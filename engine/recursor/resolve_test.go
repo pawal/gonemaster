@@ -991,8 +991,8 @@ func TestRecurseOrderedUsesLIFO(t *testing.T) {
 	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.11"))
 	fastResp.AnswerFrom = "fast"
 
-	slow := testQueryer{id: "slow", resp: slowResp}
-	fast := testQueryer{id: "fast", resp: fastResp}
+	slow := answerQueryer{resp: slowResp}
+	fast := answerQueryer{resp: fastResp}
 
 	state := &recurseState{ns: []queryer{fast, slow}}
 	resp, _, err := r.recurse(ctx, "example", "A", "IN", state)
@@ -1018,10 +1018,10 @@ func TestRecurseOrderedParallelStartsNextQuery(t *testing.T) {
 	fastStarted := make(chan struct{})
 	releaseSlow := make(chan struct{})
 
-	slow := testQueryer{id: "slow", startCh: slowStarted, waitCh: releaseSlow}
+	slow := gatedQueryer{startCh: slowStarted, waitCh: releaseSlow}
 	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.71"))
 	fastResp.AnswerFrom = "fast"
-	fast := testQueryer{id: "fast", startCh: fastStarted, resp: fastResp}
+	fast := gatedQueryer{startCh: fastStarted, resp: fastResp}
 
 	state := &recurseState{ns: []queryer{fast, slow}}
 	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
@@ -1080,14 +1080,14 @@ func TestRecurseOrderedParallelPreservesRedirectPriority(t *testing.T) {
 
 	state := &recurseState{
 		ns: []queryer{
-			testQueryer{id: "speculative", resp: speculativeResp},
-			testQueryer{id: "redirect", resp: redirectResp},
+			answerQueryer{resp: speculativeResp},
+			answerQueryer{resp: redirectResp},
 		},
 		nsFrom: func(_ context.Context, resp packet.Packet, _ *recurseState) ([]queryer, error) {
 			if resp.AnswerFrom != "redirect" {
 				t.Fatalf("expected redirect source, got %q", resp.AnswerFrom)
 			}
-			return []queryer{testQueryer{id: "child", resp: childResp}}, nil
+			return []queryer{answerQueryer{resp: childResp}}, nil
 		},
 	}
 
@@ -1126,9 +1126,9 @@ func TestRecurseOrderedParallelCandidateSelection(t *testing.T) {
 
 	state := &recurseState{
 		ns: []queryer{
-			testQueryer{id: "final-miss", resp: packet.Packet{}},
-			testQueryer{id: "refused", resp: packet.Packet{Msg: refused, AnswerFrom: "refused"}},
-			testQueryer{id: "servfail", resp: packet.Packet{Msg: servfail, AnswerFrom: "servfail"}},
+			answerQueryer{}, // final miss: no answer, no rcode
+			answerQueryer{resp: packet.Packet{Msg: refused, AnswerFrom: "refused"}},
+			answerQueryer{resp: packet.Packet{Msg: servfail, AnswerFrom: "servfail"}},
 		},
 	}
 
@@ -1223,8 +1223,8 @@ func TestRecurseUnorderedReturnsFastest(t *testing.T) {
 	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.21"))
 	fastResp.AnswerFrom = "fast"
 
-	slow := testQueryer{id: "slow", resp: slowResp, delay: 80 * time.Millisecond}
-	fast := testQueryer{id: "fast", resp: fastResp}
+	slow := answerQueryer{resp: slowResp, delay: 80 * time.Millisecond}
+	fast := answerQueryer{resp: fastResp}
 
 	state := &recurseState{ns: []queryer{fast, slow}}
 	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
@@ -1252,11 +1252,11 @@ func TestRecurseUnorderedCancelsSlowQuery(t *testing.T) {
 
 	slowStarted := make(chan struct{})
 	slowCanceled := make(chan struct{})
-	slow := testQueryer{id: "slow", waitForCancel: true, cancelCh: slowCanceled, startCh: slowStarted}
+	slow := cancelQueryer{startCh: slowStarted, canceledCh: slowCanceled}
 
 	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.22"))
 	fastResp.AnswerFrom = "fast"
-	fast := testQueryer{id: "fast", resp: fastResp, waitCh: slowStarted}
+	fast := gatedQueryer{resp: fastResp, waitCh: slowStarted}
 
 	state := &recurseState{ns: []queryer{fast, slow}}
 	ctx, cancel := context.WithTimeout(baseCtx, time.Second)
@@ -1295,22 +1295,20 @@ func TestRecurseUnorderedWaitsForRedirectBatchCleanup(t *testing.T) {
 		time.Sleep(50 * time.Millisecond)
 		close(cancelGate)
 	}()
-	slow := testQueryer{
-		id:            "slow",
-		waitForCancel: true,
-		cancelCh:      slowCanceled,
-		cancelWaitCh:  cancelGate,
-		startCh:       slowStarted,
+	slow := cancelQueryer{
+		startCh:    slowStarted,
+		canceledCh: slowCanceled,
+		releaseCh:  cancelGate,
 	}
 
 	referral := packetWithReferral("example", "ns1.example")
 	referral.AnswerFrom = "redirect"
-	redirect := testQueryer{id: "redirect", resp: referral, waitCh: slowStarted}
+	redirect := gatedQueryer{resp: referral, waitCh: slowStarted}
 
 	failCh := make(chan string, 1)
 	nextResp := packetWithA("example", netip.MustParseAddr("192.0.2.23"))
 	nextResp.AnswerFrom = "next"
-	next := testQueryer{id: "next", resp: nextResp, requireClosed: slowCanceled, failCh: failCh}
+	next := gatedQueryer{id: "next", resp: nextResp, requireClosed: slowCanceled, failCh: failCh}
 
 	state := &recurseState{
 		ns: []queryer{redirect, slow},
@@ -1455,8 +1453,8 @@ func TestRecurseUnorderedDepthLimitsWorkers(t *testing.T) {
 	fastResp := packetWithA("example", netip.MustParseAddr("192.0.2.61"))
 	fastResp.AnswerFrom = "fast"
 
-	slow := testQueryer{id: "slow", resp: slowResp, startCh: slowStarted, waitCh: blockSlow}
-	fast := testQueryer{id: "fast", resp: fastResp, startCh: fastStarted}
+	slow := gatedQueryer{resp: slowResp, startCh: slowStarted, waitCh: blockSlow}
+	fast := gatedQueryer{resp: fastResp, startCh: fastStarted}
 
 	state := &recurseState{ns: []queryer{slow, fast}}
 	ctx := withUnorderedDepth(withUnorderedContext(baseCtx), 1)
@@ -1563,65 +1561,85 @@ func packetWithA(name string, addr netip.Addr) packet.Packet {
 		dnstest.Answers(dnstest.TTL(0, dnstest.ARR(name, addr.String()))...))
 }
 
-type testQueryer struct {
+// answerQueryer answers immediately, or after a delay the context can cut short.
+type answerQueryer struct {
+	resp  packet.Packet
+	delay time.Duration
+}
+
+func (q answerQueryer) QueryWithClass(ctx context.Context, _ string, _ string, _ string) (packet.Packet, error) {
+	if q.delay > 0 {
+		select {
+		case <-time.After(q.delay):
+		case <-ctx.Done():
+			return packet.Packet{}, ctx.Err()
+		}
+	}
+	return q.resp, nil
+}
+
+// gatedQueryer announces that it started, then answers once waitCh releases it.
+// With requireClosed set it reports on failCh if it runs before that channel closed.
+type gatedQueryer struct {
 	id            string
-	delay         time.Duration
 	resp          packet.Packet
-	called        chan string
-	waitForCancel bool
-	cancelCh      chan struct{}
-	cancelWaitCh  <-chan struct{}
 	startCh       chan struct{}
 	waitCh        <-chan struct{}
 	requireClosed <-chan struct{}
 	failCh        chan<- string
 }
 
-func (t testQueryer) QueryWithClass(ctx context.Context, _ string, _ string, _ string) (packet.Packet, error) {
-	if t.called != nil {
-		t.called <- t.id
-	}
-	if t.startCh != nil {
+func (q gatedQueryer) QueryWithClass(ctx context.Context, _ string, _ string, _ string) (packet.Packet, error) {
+	if q.startCh != nil {
 		select {
-		case <-t.startCh:
+		case <-q.startCh:
 		default:
-			close(t.startCh)
+			close(q.startCh)
 		}
 	}
-	if t.requireClosed != nil {
+	if q.requireClosed != nil {
 		select {
-		case <-t.requireClosed:
+		case <-q.requireClosed:
 		default:
-			if t.failCh != nil {
-				t.failCh <- t.id
+			if q.failCh != nil {
+				q.failCh <- q.id
 			}
 		}
 	}
-	if t.waitCh != nil {
+	if q.waitCh != nil {
 		select {
-		case <-t.waitCh:
+		case <-q.waitCh:
 		case <-ctx.Done():
 			return packet.Packet{}, ctx.Err()
 		}
 	}
-	if t.waitForCancel {
-		<-ctx.Done()
-		if t.cancelWaitCh != nil {
-			<-t.cancelWaitCh
-		}
-		if t.cancelCh != nil {
-			close(t.cancelCh)
-		}
-		return packet.Packet{}, ctx.Err()
-	}
-	if t.delay > 0 {
+	return q.resp, nil
+}
+
+// cancelQueryer blocks until its context is canceled, then closes canceledCh.
+// releaseCh, when set, holds the report back until the test opens it.
+type cancelQueryer struct {
+	startCh    chan struct{}
+	canceledCh chan struct{}
+	releaseCh  <-chan struct{}
+}
+
+func (q cancelQueryer) QueryWithClass(ctx context.Context, _ string, _ string, _ string) (packet.Packet, error) {
+	if q.startCh != nil {
 		select {
-		case <-time.After(t.delay):
-		case <-ctx.Done():
-			return packet.Packet{}, ctx.Err()
+		case <-q.startCh:
+		default:
+			close(q.startCh)
 		}
 	}
-	return t.resp, nil
+	<-ctx.Done()
+	if q.releaseCh != nil {
+		<-q.releaseCh
+	}
+	if q.canceledCh != nil {
+		close(q.canceledCh)
+	}
+	return packet.Packet{}, ctx.Err()
 }
 
 type loggingQueryer struct {

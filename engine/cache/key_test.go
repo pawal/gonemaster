@@ -7,18 +7,45 @@ import (
 	dns "codeberg.org/miekg/dns"
 )
 
+// mustBuildKey builds a cache key and fails the test if BuildKey errors.
+func mustBuildKey(t *testing.T, parts KeyParts) string {
+	t.Helper()
+	key, err := BuildKey(parts)
+	if err != nil {
+		t.Fatalf("BuildKey(%+v): %v", parts, err)
+	}
+	return key
+}
+
+// requireKeyParts fails unless every part appears in the key.
+func requireKeyParts(t *testing.T, key string, parts ...string) {
+	t.Helper()
+	for _, part := range parts {
+		if !strings.Contains(key, part) {
+			t.Fatalf("expected key to include %q, got %q", part, key)
+		}
+	}
+}
+
+// requireNoKeyParts fails if any part appears in the key.
+func requireNoKeyParts(t *testing.T, key string, parts ...string) {
+	t.Helper()
+	for _, part := range parts {
+		if strings.Contains(key, part) {
+			t.Fatalf("unexpected %q in key: %q", part, key)
+		}
+	}
+}
+
 func TestBuildKeyBasic(t *testing.T) {
-	key, err := BuildKey(KeyParts{
+	key := mustBuildKey(t, KeyParts{
 		ServerAddr: "192.0.2.10:53",
 		Name:       "Example.COM.",
 		Qtype:      "a",
 		Qclass:     "in",
 	})
-	if err != nil {
-		t.Fatalf("BuildKey: %v", err)
-	}
 
-	wantParts := []string{
+	requireKeyParts(t, key,
 		"SERVER=192.0.2.10:53",
 		"TRANSPORT=udp",
 		"NAME=Example.COM",
@@ -27,49 +54,35 @@ func TestBuildKeyBasic(t *testing.T) {
 		"DNSSEC=false",
 		"RECURSE=false",
 		"EDNS_SIZE=0",
-	}
-	for _, part := range wantParts {
-		if !strings.Contains(key, part) {
-			t.Fatalf("expected key to include %q, got %q", part, key)
-		}
-	}
-	if strings.Contains(key, "EDNS_VERSION=") || strings.Contains(key, "EDNS_DATA=") {
-		t.Fatalf("unexpected EDNS detail in key: %q", key)
-	}
+	)
+	requireNoKeyParts(t, key, "EDNS_VERSION=", "EDNS_DATA=")
 }
 
 func TestBuildKeyPreservesQNameCase(t *testing.T) {
-	mixedKey, err := BuildKey(KeyParts{
+	mixedKey := mustBuildKey(t, KeyParts{
 		ServerAddr: "192.0.2.10",
 		Name:       "ExAmPlE.CoM.",
 		Qtype:      "A",
 		Qclass:     "IN",
 	})
-	if err != nil {
-		t.Fatalf("BuildKey mixed: %v", err)
-	}
-	lowerKey, err := BuildKey(KeyParts{
+	lowerKey := mustBuildKey(t, KeyParts{
 		ServerAddr: "192.0.2.10",
 		Name:       "example.com.",
 		Qtype:      "A",
 		Qclass:     "IN",
 	})
-	if err != nil {
-		t.Fatalf("BuildKey lower: %v", err)
-	}
+
 	if mixedKey == lowerKey {
 		t.Fatalf("cache key must preserve QNAME case:\n mixed: %s\n lower: %s", mixedKey, lowerKey)
 	}
-	if !strings.Contains(mixedKey, "NAME=ExAmPlE.CoM") {
-		t.Fatalf("mixed-case key lost QNAME case: %q", mixedKey)
-	}
+	requireKeyParts(t, mixedKey, "NAME=ExAmPlE.CoM")
 }
 
 func TestBuildKeyWithEDNS(t *testing.T) {
 	version := uint8(0)
 	z := uint16(0x8000)
 	rcode := uint8(0)
-	key, err := BuildKey(KeyParts{
+	key := mustBuildKey(t, KeyParts{
 		ServerAddr:  "2001:db8::1",
 		Name:        "example.net",
 		Qtype:       "AAAA",
@@ -83,11 +96,8 @@ func TestBuildKeyWithEDNS(t *testing.T) {
 		EDNSRcode:   &rcode,
 		EDNSData:    []dns.EDNS0{&dns.NSID{Nsid: "aa"}},
 	})
-	if err != nil {
-		t.Fatalf("BuildKey: %v", err)
-	}
 
-	wantParts := []string{
+	requireKeyParts(t, key,
 		"SERVER=2001:db8::1",
 		"TRANSPORT=tcp",
 		"NAME=example.net",
@@ -100,12 +110,7 @@ func TestBuildKeyWithEDNS(t *testing.T) {
 		"EDNS_RCODE=0",
 		"EDNS_DATA=",
 		"EDNS_SIZE=1232",
-	}
-	for _, part := range wantParts {
-		if !strings.Contains(key, part) {
-			t.Fatalf("expected key to include %q, got %q", part, key)
-		}
-	}
+	)
 }
 
 func TestBuildKeyRejectsEDNSSize(t *testing.T) {

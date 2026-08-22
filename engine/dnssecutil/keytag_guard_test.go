@@ -10,14 +10,12 @@ import (
 	"testing"
 )
 
-// dns.DNSKEY.KeyTag() memoizes the computed tag into the record it is called
-// on. DNSKEYs handed to a testcase point into a cached packet that the server
-// shares with concurrent runs, so that write is a data race between jobs.
-// Engine code goes through dnssecutil.KeyTag instead, which computes on a copy.
-//
-// The distinction is by argument count: k.KeyTag() is the library method and is
-// rejected, dnssecutil.KeyTag(k) and the keyTag(k) alias take the key as an
-// argument and are fine.
+// dns.DNSKEY.KeyTag() memoizes the tag into the record it is called on, and a
+// testcase's DNSKEYs point into a cached packet shared with concurrent runs, so
+// that write is a data race between jobs. Engine code goes through
+// dnssecutil.KeyTag, which computes on a copy. The scan tells them apart by
+// argument count: k.KeyTag() is rejected, dnssecutil.KeyTag(k) and the
+// keyTag(k) alias are fine.
 func TestNoDirectKeyTagMethodCalls(t *testing.T) {
 	offenders, err := keyTagMethodCalls("..")
 	if err != nil {

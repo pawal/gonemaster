@@ -12,13 +12,12 @@ import (
 // Equivalence tests document where AllNameservers (zone-view union of glue
 // and apex NS) and ZoneNameservers (parent-queried delegation view) agree
 // and where they differ.
-//
-// Note: in undelegated mode both functions ultimately read from the
-// recursor's fake-address map so they agree on the nameserver set. Tests
-// asserting the divergent cases (lame delegation, out-of-bailiwick recursion)
-// require a delegated zone scaffold with distinct parent and child NS
-// responses; see TestParentNameserversSkipsOnIntermediateNoResponse for the
-// pattern such a setup requires.
+
+// TODO: in undelegated mode both functions read the recursor's fake-address
+// map, so they always agree. Covering the divergent cases (lame delegation,
+// out-of-bailiwick recursion) needs a delegated zone scaffold with distinct
+// parent and child NS responses; see
+// TestParentNameserversSkipsOnIntermediateNoResponse for that pattern.
 
 // TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated verifies that
 // for an undelegated zone with clean glue, AllNameservers and ZoneNameservers

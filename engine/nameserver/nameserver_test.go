@@ -857,12 +857,9 @@ func TestContextCanceledDoesNotBlacklist(t *testing.T) {
 // Within one run, a blackout learned through one nameserver object suppresses
 // queries through every other object on the same address.
 //
-// The three nameservers need distinct names: NewWithCache returns the cached
-// instance for a repeated name and address, and they would then share one
-// query hook. The queries need distinct qnames because the error cache and the
-// query cache are both keyed by address on the store, not per nameserver
-// object, and a hard error populates the error cache for that exact key - a
-// reused qname would trip ERROR_CACHE_SKIP instead and measure the wrong
+// Names and qnames must all differ: NewWithCache returns the cached instance
+// for a repeated name and address, and the error and query caches are keyed by
+// address, so a reused qname trips ERROR_CACHE_SKIP and measures the wrong
 // mechanism.
 func TestReachabilityCacheSkipsWithinStore(t *testing.T) {
 	store := NewCacheStore()
@@ -947,14 +944,10 @@ func TestReachabilityCacheSkipsWithinStore(t *testing.T) {
 // The blackout TTL is bounded by the retry budget, so it expires and the live
 // path runs again.
 //
-// The pre-sleep assertion is what keeps this test honest: the final call count
-// on its own is satisfied both by "the blackout expired" and by "the blackout
-// never engaged", so without proving suppression first the test would pass
-// while asserting nothing. The budget is 100ms rather than the tightest value
-// that works, because that same value is both the debounce window (the two
-// hard errors must land inside it) and the blackout length (the suppressed
-// query must land inside it) - two deadlines that need headroom under the race
-// detector on a loaded machine.
+// The pre-sleep assertion keeps this test honest: the final call count alone is
+// satisfied both by "the blackout expired" and by "it never engaged". The 100ms
+// budget is both the debounce window and the blackout length, so it needs
+// headroom under the race detector.
 func TestReachabilityCacheExpiresByBudget(t *testing.T) {
 	store := NewCacheStore()
 
@@ -1009,16 +1002,13 @@ func TestReachabilityCacheExpiresByBudget(t *testing.T) {
 	}
 }
 
-// TestReachabilityCacheDebouncesSingleHardError pins the contract that a
-// single transient EHOSTUNREACH (e.g. one IPv6 routing flap, one stray
-// ICMP destination-unreachable) must not blackout the address. Without
-// this debounce, a single bad packet under batch load blackholes the NS
-// for negative_cache_ttl seconds and cascades into spurious
-// B02_NO_WORKING_NS verdicts on otherwise-healthy zones.
+// A single transient EHOSTUNREACH (one IPv6 routing flap, one stray ICMP
+// destination-unreachable) must not blackout the address: without the debounce
+// one bad packet under batch load blackholes the NS for negative_cache_ttl
+// seconds and cascades into spurious B02_NO_WORKING_NS verdicts.
 //
-// Each query uses a distinct nameserver name and qname on one store, so the
-// address-keyed error and query caches cannot short-circuit a query before it
-// reaches the reachability rung.
+// Distinct nameserver names and qnames on one store keep the address-keyed
+// error and query caches from short-circuiting before the reachability rung.
 func TestReachabilityCacheDebouncesSingleHardError(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.NegativeCacheTTL = 60

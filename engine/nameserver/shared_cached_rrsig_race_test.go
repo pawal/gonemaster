@@ -91,18 +91,13 @@ func warmSharedCache(ctx context.Context, t *testing.T, qname string, addr strin
 }
 
 // Two concurrent jobs verifying signatures out of one warmed cache entry must
-// not step on each other. SnapshotForRun deliberately shares warmed query data
-// with concurrent runs, and a cache hit hands back a shallow copy of the
-// packet, so both runs hold the same *dns.Msg and the same RR pointers. The DNS
-// library's verification path writes through those pointers: it rewrites the
-// RRSIG owner name, blanks and restores the signature, forces every covered RR
-// to the RRSIG's original TTL, canonicalizes owner names, and sorts the RRset
-// slice in place.
+// not step on each other: SnapshotForRun shares warmed query data across runs,
+// a cache hit hands back a shallow copy, and the library's verification path
+// writes through the shared RR pointers.
 //
-// The assertions here are deliberately weak - both verifications must succeed -
-// because the real detector for this is `go test -race`. A failure of either
-// kind (a reported race, or a signature that suddenly does not verify) is the
-// same underlying bug: shared cached records mutated from two runs at once.
+// The assertions are deliberately weak - both verifications must succeed -
+// because the real detector is `go test -race`. A reported race and a signature
+// that suddenly fails to verify are the same underlying bug.
 func TestConcurrentVerifyOfSharedCachedRRSIG(t *testing.T) {
 	const qname = "shared-rrsig.example"
 	const addr = "192.0.2.53"

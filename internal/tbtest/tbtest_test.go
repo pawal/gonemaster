@@ -39,6 +39,23 @@ func TestCleanupsRunInReverseOrder(t *testing.T) {
 	}
 }
 
+func TestErrorfRecordsWithoutAborting(t *testing.T) {
+	tb := &TB{}
+	tb.Errorf("code = %q, want %q", "other", "not_found")
+	tb.Errorf("second")
+
+	if len(tb.Errs) != 2 {
+		t.Fatalf("expected two recorded errors, got %v", tb.Errs)
+	}
+	if tb.Errs[0] != `code = "other", want "not_found"` {
+		t.Fatalf("expected the formatted message, got %q", tb.Errs[0])
+	}
+	// Errorf must not look like a Fatalf.
+	if tb.Msg != "" {
+		t.Fatalf("expected Msg untouched, got %q", tb.Msg)
+	}
+}
+
 func TestContextIsUsable(t *testing.T) {
 	if (&TB{}).Context() == nil {
 		t.Fatal("expected a non-nil context")

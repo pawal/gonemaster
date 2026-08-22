@@ -20,6 +20,7 @@ var ErrFatal = errors.New("tbtest: fatal")
 type TB struct {
 	testing.TB
 	Msg      string
+	Errs     []string
 	cleanups []func()
 }
 
@@ -44,6 +45,12 @@ func (f *TB) RunCleanups() {
 func (f *TB) Fatalf(format string, args ...any) {
 	f.Msg = fmt.Sprintf(format, args...)
 	panic(ErrFatal)
+}
+
+// Errorf records the message without aborting, so a helper that reports with
+// Errorf rather than Fatalf can be told apart.
+func (f *TB) Errorf(format string, args ...any) {
+	f.Errs = append(f.Errs, fmt.Sprintf(format, args...))
 }
 
 // MustFail runs fn with a fresh TB and checks it failed with a message

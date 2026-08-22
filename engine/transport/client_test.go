@@ -330,6 +330,9 @@ func (l *acceptCountingListener) Accept() (net.Conn, error) {
 	return conn, err
 }
 
+// The exchange tests below drive real sockets. Goroutines blocked in socket
+// I/O never become durably blocked, so these stay on the real clock rather
+// than inside a synctest bubble.
 func startUDPDNSServer(t *testing.T, handler dns.HandlerFunc) (string, func()) {
 	t.Helper()
 

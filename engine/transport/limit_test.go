@@ -3,55 +3,57 @@ package transport
 import (
 	"context"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
 func TestLimiterBlocksUntilRelease(t *testing.T) {
-	limiter := NewLimiter(1)
-	ctx := WithLimiter(context.Background(), limiter)
+	synctest.Test(t, func(t *testing.T) {
+		limiter := NewLimiter(1)
+		ctx := WithLimiter(context.Background(), limiter)
 
-	if err := acquireQuerySlot(ctx); err != nil {
-		t.Fatalf("acquire: %v", err)
-	}
-
-	done := make(chan struct{})
-	go func() {
-		if err := acquireQuerySlot(ctx); err == nil {
-			releaseQuerySlot(ctx)
+		if err := acquireQuerySlot(ctx); err != nil {
+			t.Fatalf("acquire: %v", err)
 		}
-		close(done)
-	}()
 
-	select {
-	case <-done:
-		t.Fatalf("expected acquire to block before release")
-	case <-time.After(50 * time.Millisecond):
-	}
+		done := make(chan struct{})
+		go func() {
+			if err := acquireQuerySlot(ctx); err == nil {
+				releaseQuerySlot(ctx)
+			}
+			close(done)
+		}()
 
-	releaseQuerySlot(ctx)
+		// The second acquire is parked on the single token, not merely slow.
+		synctest.Wait()
+		select {
+		case <-done:
+			t.Fatalf("expected acquire to block before release")
+		default:
+		}
 
-	select {
-	case <-done:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("expected acquire to succeed after release")
-	}
+		releaseQuerySlot(ctx)
+		<-done
+	})
 }
 
 func TestLimiterHonorsContext(t *testing.T) {
-	limiter := NewLimiter(1)
-	ctx := WithLimiter(context.Background(), limiter)
+	synctest.Test(t, func(t *testing.T) {
+		limiter := NewLimiter(1)
+		ctx := WithLimiter(context.Background(), limiter)
 
-	if err := acquireQuerySlot(ctx); err != nil {
-		t.Fatalf("acquire: %v", err)
-	}
-	defer releaseQuerySlot(ctx)
+		if err := acquireQuerySlot(ctx); err != nil {
+			t.Fatalf("acquire: %v", err)
+		}
+		defer releaseQuerySlot(ctx)
 
-	ctx, cancel := context.WithTimeout(ctx, 20*time.Millisecond)
-	defer cancel()
+		ctx, cancel := context.WithTimeout(ctx, 20*time.Millisecond)
+		defer cancel()
 
-	if err := acquireQuerySlot(ctx); err == nil {
-		t.Fatalf("expected context deadline error")
-	}
+		if err := acquireQuerySlot(ctx); err == nil {
+			t.Fatalf("expected context deadline error")
+		}
+	})
 }
 
 func TestLimiterIndependentLimits(t *testing.T) {

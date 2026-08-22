@@ -14,8 +14,19 @@ func TestAvailableLocalesIncludesJapanese(t *testing.T) {
 	}
 }
 
-func TestParsePOExtractsMessages(t *testing.T) {
-	data := `
+func TestParsePO(t *testing.T) {
+	tests := []struct {
+		name       string
+		data       string
+		wantIDs    map[string]string
+		wantMsgs   map[string]string
+		absentKeys []string
+	}{
+		{
+			// Continuation lines are concatenated, and one entry can carry
+			// several dot-comment keys.
+			name: "multi-line entry with two dot-comment keys",
+			data: `
 #. ZONE:TEST_TAG
 #. BASIC:TEST_TAG
 msgid ""
@@ -24,21 +35,99 @@ msgid ""
 msgstr ""
 "Hej "
 "{name}"
-`
-	msgs, ids := parsePO(data)
-	key := "ZONE:TEST_TAG"
-	key2 := "BASIC:TEST_TAG"
-	if ids[key] != "Hello {name}" {
-		t.Fatalf("unexpected msgid: %q", ids[key])
+`,
+			wantIDs: map[string]string{
+				"ZONE:TEST_TAG":  "Hello {name}",
+				"BASIC:TEST_TAG": "Hello {name}",
+			},
+			wantMsgs: map[string]string{
+				"ZONE:TEST_TAG":  "Hej {name}",
+				"BASIC:TEST_TAG": "Hej {name}",
+			},
+		},
+		{
+			// msgctxt wins over a preceding #. comment, so a typo in the
+			// comment cannot silently break the lookup.
+			name: "msgctxt overrides dot comment",
+			data: `
+#. NAMESERVER:TYPO_IN_COMMENT
+msgctxt "NAMESERVER:N11_NO_EDNS"
+msgid "No EDNS from {ns_ip_list}."
+msgstr "Ingen EDNS från {ns_ip_list}."
+`,
+			wantIDs:    map[string]string{"NAMESERVER:N11_NO_EDNS": "No EDNS from {ns_ip_list}."},
+			wantMsgs:   map[string]string{"NAMESERVER:N11_NO_EDNS": "Ingen EDNS från {ns_ip_list}."},
+			absentKeys: []string{"NAMESERVER:TYPO_IN_COMMENT"},
+		},
+		{
+			name: "msgctxt without a dot comment",
+			data: `
+msgctxt "ZONE:Z01_MNAME_NOT_RESOLVE"
+msgid "SOA MNAME is not a master for the zone."
+msgstr "SOA MNAME är inte en master för zonen."
+`,
+			wantIDs:  map[string]string{"ZONE:Z01_MNAME_NOT_RESOLVE": "SOA MNAME is not a master for the zone."},
+			wantMsgs: map[string]string{"ZONE:Z01_MNAME_NOT_RESOLVE": "SOA MNAME är inte en master för zonen."},
+		},
+		{
+			// The dot-comment fallback is the intended path for shared
+			// messages like TEST_CASE_END.
+			name: "dot comment fallback for a multi-key entry",
+			data: `
+#. ADDRESS:TEST_CASE_END
+#. BASIC:TEST_CASE_END
+#. ZONE:TEST_CASE_END
+msgid "TEST_CASE_END {testcase}."
+msgstr "Testfall {testcase} avslutat."
+`,
+			wantIDs: map[string]string{
+				"ADDRESS:TEST_CASE_END": "TEST_CASE_END {testcase}.",
+				"BASIC:TEST_CASE_END":   "TEST_CASE_END {testcase}.",
+				"ZONE:TEST_CASE_END":    "TEST_CASE_END {testcase}.",
+			},
+			wantMsgs: map[string]string{
+				"ADDRESS:TEST_CASE_END": "Testfall {testcase} avslutat.",
+				"BASIC:TEST_CASE_END":   "Testfall {testcase} avslutat.",
+				"ZONE:TEST_CASE_END":    "Testfall {testcase} avslutat.",
+			},
+		},
+		{
+			// A msgctxt that is not MODULE:TAG format must not clobber the
+			// #. key, which has to survive.
+			name: "malformed msgctxt keeps the dot-comment key",
+			data: `
+#. ZONE:Z02_NO_NS
+msgctxt "not-a-valid-key"
+msgid "No NS records."
+msgstr "Inga NS-poster."
+`,
+			wantMsgs: map[string]string{"ZONE:Z02_NO_NS": "Inga NS-poster."},
+		},
 	}
-	if ids[key2] != "Hello {name}" {
-		t.Fatalf("unexpected msgid: %q", ids[key2])
-	}
-	if msgs[key] != "Hej {name}" {
-		t.Fatalf("unexpected msgstr: %q", msgs[key])
-	}
-	if msgs[key2] != "Hej {name}" {
-		t.Fatalf("unexpected msgstr: %q", msgs[key2])
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			msgs, ids := parsePO(tc.data)
+
+			for key, want := range tc.wantIDs {
+				if ids[key] != want {
+					t.Errorf("ids[%q] = %q, want %q", key, ids[key], want)
+				}
+			}
+			for key, want := range tc.wantMsgs {
+				if msgs[key] != want {
+					t.Errorf("msgs[%q] = %q, want %q", key, msgs[key], want)
+				}
+			}
+			for _, key := range tc.absentKeys {
+				if _, ok := ids[key]; ok {
+					t.Errorf("ids must not contain %q, got %v", key, ids)
+				}
+				if _, ok := msgs[key]; ok {
+					t.Errorf("msgs must not contain %q, got %v", key, msgs)
+				}
+			}
+		})
 	}
 }
 
@@ -145,67 +234,6 @@ func TestTranslateWithStatusMissing(t *testing.T) {
 	}
 }
 
-func TestParsePOMsgctxtOverridesDotComment(t *testing.T) {
-	// When msgctxt is present it must win over any preceding #. comment,
-	// so a typo in the comment cannot silently break the lookup.
-	data := `
-#. NAMESERVER:TYPO_IN_COMMENT
-msgctxt "NAMESERVER:N11_NO_EDNS"
-msgid "No EDNS from {ns_ip_list}."
-msgstr "Ingen EDNS från {ns_ip_list}."
-`
-	msgs, ids := parsePO(data)
-
-	if ids["NAMESERVER:N11_NO_EDNS"] != "No EDNS from {ns_ip_list}." {
-		t.Fatalf("expected msgctxt key to be used, got ids=%v", ids)
-	}
-	if msgs["NAMESERVER:N11_NO_EDNS"] != "Ingen EDNS från {ns_ip_list}." {
-		t.Fatalf("expected msgctxt key to be used, got msgs=%v", msgs)
-	}
-	if _, ok := ids["NAMESERVER:TYPO_IN_COMMENT"]; ok {
-		t.Fatal("dot-comment key must not appear when msgctxt is present")
-	}
-}
-
-func TestParsePOMsgctxtOnly(t *testing.T) {
-	// msgctxt with no preceding #. comment works on its own.
-	data := `
-msgctxt "ZONE:Z01_MNAME_NOT_RESOLVE"
-msgid "SOA MNAME is not a master for the zone."
-msgstr "SOA MNAME är inte en master för zonen."
-`
-	msgs, ids := parsePO(data)
-
-	if ids["ZONE:Z01_MNAME_NOT_RESOLVE"] != "SOA MNAME is not a master for the zone." {
-		t.Fatalf("unexpected msgid: %v", ids)
-	}
-	if msgs["ZONE:Z01_MNAME_NOT_RESOLVE"] != "SOA MNAME är inte en master för zonen." {
-		t.Fatalf("unexpected msgstr: %v", msgs)
-	}
-}
-
-func TestParsePODotCommentFallbackForMultiKey(t *testing.T) {
-	// Multi-key entries (no msgctxt) still work via #. comment fallback,
-	// which is the intended path for shared messages like TEST_CASE_END.
-	data := `
-#. ADDRESS:TEST_CASE_END
-#. BASIC:TEST_CASE_END
-#. ZONE:TEST_CASE_END
-msgid "TEST_CASE_END {testcase}."
-msgstr "Testfall {testcase} avslutat."
-`
-	msgs, ids := parsePO(data)
-
-	for _, key := range []string{"ADDRESS:TEST_CASE_END", "BASIC:TEST_CASE_END", "ZONE:TEST_CASE_END"} {
-		if ids[key] != "TEST_CASE_END {testcase}." {
-			t.Fatalf("expected %q in ids, got %v", key, ids)
-		}
-		if msgs[key] != "Testfall {testcase} avslutat." {
-			t.Fatalf("expected %q in msgs, got %v", key, msgs)
-		}
-	}
-}
-
 // TestDS01AlgoDeprecatedAllLocalesExpandArgs verifies that the
 // DNSSEC:DS01_DS_ALGO_DEPRECATED translation resolves every placeholder in all
 // supported locales. This guards against stale PO files that still use the old
@@ -233,21 +261,5 @@ func TestDS01AlgoDeprecatedAllLocalesExpandArgs(t *testing.T) {
 			strings.Contains(out, "{ds_algo_descr}") || strings.Contains(out, "{servers}") {
 			t.Errorf("locale %s: unresolved placeholder in translation: %q", locale, out)
 		}
-	}
-}
-
-func TestParsePOMsgctxtMalformedIsIgnored(t *testing.T) {
-	// A msgctxt that is not MODULE:TAG format must not clobber #. keys.
-	data := `
-#. ZONE:Z02_NO_NS
-msgctxt "not-a-valid-key"
-msgid "No NS records."
-msgstr "Inga NS-poster."
-`
-	msgs, _ := parsePO(data)
-
-	// The dot-comment key should survive because msgctxt had no valid colon-pair.
-	if msgs["ZONE:Z02_NO_NS"] != "Inga NS-poster." {
-		t.Fatalf("expected dot-comment fallback when msgctxt is malformed, got msgs=%v", msgs)
 	}
 }

@@ -3,6 +3,8 @@ package server
 import (
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"slices"
 	"testing"
 )
 
@@ -173,4 +175,29 @@ func (r *sliceReader) Read(p []byte) (int, error) {
 	n := copy(p, r.data[r.off:])
 	r.off += n
 	return n, nil
+}
+
+func TestCSRFOriginMatrixSendsAbsentSameAndCrossOrigin(t *testing.T) {
+	var seen []string
+	// Stands in for a CSRF-checked endpoint: an Origin naming another host is
+	// refused the way writeError would report it.
+	handler := http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		origin := req.Header.Get("Origin")
+		seen = append(seen, origin)
+		if origin != "" && origin != "http://"+req.Host {
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte(`{"error":{"code":"csrf_origin_mismatch"}}`))
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+	})
+
+	csrfOriginMatrix(t, http.StatusCreated, func(t *testing.T, opts ...reqOpt) *httptest.ResponseRecorder {
+		return doHandler(t, handler, http.MethodPost, "/api/v1/jobs", `{}`, opts...)
+	})
+
+	want := []string{"", "http://example.com", "https://evil.example"}
+	if !slices.Equal(seen, want) {
+		t.Fatalf("origins sent = %v, want %v", seen, want)
+	}
 }

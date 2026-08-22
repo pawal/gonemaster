@@ -107,93 +107,46 @@ func TestApplyFileConfigSourceAddrs(t *testing.T) {
 	}
 }
 
-func TestDefaultConfigShowScoreAdmin(t *testing.T) {
-	cfg := DefaultConfig()
-	if !cfg.ShowScoreAdmin {
-		t.Fatal("expected ShowScoreAdmin to default to true")
-	}
-}
+func TestShowFlagsDefaultTrueAndFollowFileConfig(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		get  func(Config) bool
+		set  func(*FileConfig, *bool)
+	}{
+		{"show_score_admin",
+			func(c Config) bool { return c.ShowScoreAdmin },
+			func(f *FileConfig, v *bool) { f.ShowScoreAdmin = v }},
+		{"show_score_public",
+			func(c Config) bool { return c.ShowScorePublic },
+			func(f *FileConfig, v *bool) { f.ShowScorePublic = v }},
+		{"show_nameserver_timings_admin",
+			func(c Config) bool { return c.ShowNameserverTimingsAdmin },
+			func(f *FileConfig, v *bool) { f.ShowNameserverTimingsAdmin = v }},
+		{"show_nameserver_timings_public",
+			func(c Config) bool { return c.ShowNameserverTimingsPublic },
+			func(f *FileConfig, v *bool) { f.ShowNameserverTimingsPublic = v }},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := DefaultConfig()
+			if !tc.get(cfg) {
+				t.Fatal("expected the flag to default to true")
+			}
 
-func TestApplyFileConfigShowScoreAdmin(t *testing.T) {
-	cfg := DefaultConfig()
-	f := false
-	cfg.ApplyFileConfig(FileConfig{ShowScoreAdmin: &f})
-	if cfg.ShowScoreAdmin {
-		t.Fatal("expected ShowScoreAdmin to be false after applying file config")
-	}
+			off := false
+			file := FileConfig{}
+			tc.set(&file, &off)
+			cfg.ApplyFileConfig(file)
+			if tc.get(cfg) {
+				t.Fatal("expected false after applying the file config")
+			}
 
-	// Nil means "not set" - should not change the value.
-	cfg2 := DefaultConfig()
-	cfg2.ApplyFileConfig(FileConfig{ShowScoreAdmin: nil})
-	if !cfg2.ShowScoreAdmin {
-		t.Fatal("expected ShowScoreAdmin to stay true when file config has nil")
-	}
-}
-
-func TestDefaultConfigShowScorePublic(t *testing.T) {
-	cfg := DefaultConfig()
-	if !cfg.ShowScorePublic {
-		t.Fatal("expected ShowScorePublic to default to true")
-	}
-}
-
-func TestDefaultConfigShowNameserverTimingsAdmin(t *testing.T) {
-	cfg := DefaultConfig()
-	if !cfg.ShowNameserverTimingsAdmin {
-		t.Fatal("expected ShowNameserverTimingsAdmin to default to true")
-	}
-}
-
-func TestApplyFileConfigShowNameserverTimingsAdmin(t *testing.T) {
-	cfg := DefaultConfig()
-	f := false
-	cfg.ApplyFileConfig(FileConfig{ShowNameserverTimingsAdmin: &f})
-	if cfg.ShowNameserverTimingsAdmin {
-		t.Fatal("expected ShowNameserverTimingsAdmin to be false after applying file config")
-	}
-
-	cfg2 := DefaultConfig()
-	cfg2.ApplyFileConfig(FileConfig{ShowNameserverTimingsAdmin: nil})
-	if !cfg2.ShowNameserverTimingsAdmin {
-		t.Fatal("expected ShowNameserverTimingsAdmin to stay true when file config has nil")
-	}
-}
-
-func TestDefaultConfigShowNameserverTimingsPublic(t *testing.T) {
-	cfg := DefaultConfig()
-	if !cfg.ShowNameserverTimingsPublic {
-		t.Fatal("expected ShowNameserverTimingsPublic to default to true")
-	}
-}
-
-func TestApplyFileConfigShowNameserverTimingsPublic(t *testing.T) {
-	cfg := DefaultConfig()
-	f := false
-	cfg.ApplyFileConfig(FileConfig{ShowNameserverTimingsPublic: &f})
-	if cfg.ShowNameserverTimingsPublic {
-		t.Fatal("expected ShowNameserverTimingsPublic to be false after applying file config")
-	}
-
-	cfg2 := DefaultConfig()
-	cfg2.ApplyFileConfig(FileConfig{ShowNameserverTimingsPublic: nil})
-	if !cfg2.ShowNameserverTimingsPublic {
-		t.Fatal("expected ShowNameserverTimingsPublic to stay true when file config has nil")
-	}
-}
-
-func TestApplyFileConfigShowScorePublic(t *testing.T) {
-	cfg := DefaultConfig()
-	f := false
-	cfg.ApplyFileConfig(FileConfig{ShowScorePublic: &f})
-	if cfg.ShowScorePublic {
-		t.Fatal("expected ShowScorePublic to be false after applying file config")
-	}
-
-	// Nil means "not set" - should not change the value.
-	cfg2 := DefaultConfig()
-	cfg2.ApplyFileConfig(FileConfig{ShowScorePublic: nil})
-	if !cfg2.ShowScorePublic {
-		t.Fatal("expected ShowScorePublic to stay true when file config has nil")
+			// Nil means "not set" and must leave the default alone.
+			unset := DefaultConfig()
+			unset.ApplyFileConfig(FileConfig{})
+			if !tc.get(unset) {
+				t.Fatal("expected the default to survive a nil file config")
+			}
+		})
 	}
 }
 

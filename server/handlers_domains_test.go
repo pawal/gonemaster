@@ -1,16 +1,15 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine"
 )
 
-// makeGraduatedJob is a helper that creates a job and immediately graduates it.
-// Returns the domain that was created by graduation.
+// makeGraduatedJob graduates one run and returns the domain it created.
 func makeGraduatedJob(t *testing.T, srv *Server, domain string, status JobStatus) Domain {
 	t.Helper()
 	seedGraduatedRun(t, srv.store, runSpec{Domain: domain, Status: status})
@@ -21,7 +20,6 @@ func makeGraduatedJob(t *testing.T, srv *Server, domain string, status JobStatus
 	return d
 }
 
-// TestListDomainsEmpty verifies an empty store returns an empty list.
 func TestListDomainsEmpty(t *testing.T) {
 	srv := newTestServer(t)
 
@@ -36,86 +34,55 @@ func TestListDomainsEmpty(t *testing.T) {
 	}
 }
 
-// TestListDomainsReturnsDomains verifies graduated jobs appear in the domain list.
-func TestListDomainsReturnsDomains(t *testing.T) {
+func TestListDomainsFilters(t *testing.T) {
 	srv := newTestServer(t)
-	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
-	makeGraduatedJob(t, srv, "example.net", JobSucceeded)
-
-	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains", nil)
-
-	list := mustJSON[DomainList](t, resp, http.StatusOK)
-	if list.Total != 2 {
-		t.Fatalf("expected total=2, got %d", list.Total)
-	}
-}
-
-// TestListDomainsFilterByName verifies the ?name= substring filter.
-func TestListDomainsFilterByName(t *testing.T) {
-	srv := newTestServer(t)
-	makeGraduatedJob(t, srv, "alpha.example.com", JobSucceeded)
-	makeGraduatedJob(t, srv, "beta.other.net", JobSucceeded)
-
-	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?name=example", nil)
-
-	list := mustJSON[DomainList](t, resp, http.StatusOK)
-	if list.Total != 1 {
-		t.Fatalf("expected total=1, got %d", list.Total)
-	}
-	if list.Items[0].Name != "alpha.example.com" {
-		t.Fatalf("expected alpha.example.com, got %q", list.Items[0].Name)
-	}
-}
-
-// TestListDomainsFilterByTag verifies the ?tag= filter.
-func TestListDomainsFilterByTag(t *testing.T) {
-	srv := newTestServer(t)
-	d1 := makeGraduatedJob(t, srv, "tagged.example.com", JobSucceeded)
-	makeGraduatedJob(t, srv, "untagged.example.com", JobSucceeded)
-
+	tagged := makeGraduatedJobWithEntries(t, srv, "alpha.example.com", []engine.LogEntry{
+		{Module: "Basic", Level: "INFO"},
+	})
+	makeGraduatedJobWithEntries(t, srv, "beta.other.net", []engine.LogEntry{
+		{Module: "DNSSEC", Level: "WARNING"},
+	})
+	makeGraduatedJobWithEntries(t, srv, "gamma.example.com", []engine.LogEntry{
+		{Module: "DNSSEC", Level: "ERROR"},
+	})
 	if err := srv.store.CreateTag("mytag", ""); err != nil {
 		t.Fatalf("create tag: %v", err)
 	}
-	if err := srv.store.TagDomains("mytag", []int64{d1.ID}); err != nil {
+	if err := srv.store.TagDomains("mytag", []int64{tagged.ID}); err != nil {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?tag=mytag", nil)
+	for _, tc := range []struct {
+		name  string
+		query string
+		want  []string
+	}{
+		{name: "unfiltered", want: []string{"alpha.example.com", "beta.other.net", "gamma.example.com"}},
+		{name: "name substring", query: "?name=example", want: []string{"alpha.example.com", "gamma.example.com"}},
+		{name: "tag", query: "?tag=mytag", want: []string{"alpha.example.com"}},
+		{name: "no tag", query: "?tag=__none__", want: []string{"beta.other.net", "gamma.example.com"}},
+		{name: "min level warning", query: "?min_level=WARNING", want: []string{"beta.other.net", "gamma.example.com"}},
+		{name: "min level error", query: "?min_level=ERROR", want: []string{"gamma.example.com"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains"+tc.query, nil)
 
-	list := mustJSON[DomainList](t, resp, http.StatusOK)
-	if list.Total != 1 {
-		t.Fatalf("expected total=1, got %d", list.Total)
-	}
-	if list.Items[0].Name != "tagged.example.com" {
-		t.Fatalf("expected tagged.example.com, got %q", list.Items[0].Name)
-	}
-}
-
-// TestListDomainsFilterByNoTag verifies the ?tag=__none__ filter returns only untagged domains.
-func TestListDomainsFilterByNoTag(t *testing.T) {
-	srv := newTestServer(t)
-	d1 := makeGraduatedJob(t, srv, "tagged.example.com", JobSucceeded)
-	makeGraduatedJob(t, srv, "untagged.example.com", JobSucceeded)
-
-	if err := srv.store.CreateTag("mytag", ""); err != nil {
-		t.Fatalf("create tag: %v", err)
-	}
-	if err := srv.store.TagDomains("mytag", []int64{d1.ID}); err != nil {
-		t.Fatalf("tag domain: %v", err)
-	}
-
-	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?tag=__none__", nil)
-
-	list := mustJSON[DomainList](t, resp, http.StatusOK)
-	if list.Total != 1 {
-		t.Fatalf("expected total=1, got %d", list.Total)
-	}
-	if list.Items[0].Name != "untagged.example.com" {
-		t.Fatalf("expected untagged.example.com, got %q", list.Items[0].Name)
+			list := mustJSON[DomainList](t, resp, http.StatusOK)
+			if list.Total != len(tc.want) {
+				t.Fatalf("total = %d, want %d", list.Total, len(tc.want))
+			}
+			names := make([]string, 0, len(list.Items))
+			for _, item := range list.Items {
+				names = append(names, item.Name)
+			}
+			slices.Sort(names)
+			if !slices.Equal(names, tc.want) {
+				t.Fatalf("domains = %v, want %v", names, tc.want)
+			}
+		})
 	}
 }
 
-// TestListDomainsInvalidLimit verifies that an out-of-range limit returns 400.
 func TestListDomainsInvalidLimit(t *testing.T) {
 	srv := newTestServer(t)
 
@@ -124,7 +91,6 @@ func TestListDomainsInvalidLimit(t *testing.T) {
 	wantStatus(t, resp, http.StatusBadRequest)
 }
 
-// TestGetDomainByID verifies a domain can be fetched by its numeric ID.
 func TestGetDomainByID(t *testing.T) {
 	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
@@ -140,7 +106,6 @@ func TestGetDomainByID(t *testing.T) {
 	}
 }
 
-// TestGetDomainByIDIncludesTags verifies that tags are populated in the response.
 func TestGetDomainByIDIncludesTags(t *testing.T) {
 	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
@@ -160,7 +125,6 @@ func TestGetDomainByIDIncludesTags(t *testing.T) {
 	}
 }
 
-// TestGetDomainByIDNotFound verifies a 404 for a missing domain.
 func TestGetDomainByIDNotFound(t *testing.T) {
 	srv := newTestServer(t)
 
@@ -169,7 +133,6 @@ func TestGetDomainByIDNotFound(t *testing.T) {
 	wantStatus(t, resp, http.StatusNotFound)
 }
 
-// TestGetDomainByIDInvalidID verifies a 404 for a non-numeric or zero ID.
 func TestGetDomainByIDInvalidID(t *testing.T) {
 	srv := newTestServer(t)
 
@@ -179,7 +142,6 @@ func TestGetDomainByIDInvalidID(t *testing.T) {
 	}
 }
 
-// TestGetDomainRunsReturnsRuns verifies run history is returned for a domain.
 func TestGetDomainRunsReturnsRuns(t *testing.T) {
 	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
@@ -198,7 +160,6 @@ func TestGetDomainRunsReturnsRuns(t *testing.T) {
 	}
 }
 
-// TestGetDomainRunsDomainNotFound verifies a 404 for an unknown domain ID.
 func TestGetDomainRunsDomainNotFound(t *testing.T) {
 	srv := newTestServer(t)
 
@@ -207,7 +168,6 @@ func TestGetDomainRunsDomainNotFound(t *testing.T) {
 	wantStatus(t, resp, http.StatusNotFound)
 }
 
-// TestGetDomainRunsPagination verifies limit and offset are respected.
 func TestGetDomainRunsPagination(t *testing.T) {
 	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
@@ -223,40 +183,4 @@ func TestGetDomainRunsPagination(t *testing.T) {
 	if len(list.Items) != 2 {
 		t.Fatalf("expected 2 items on first page, got %d", len(list.Items))
 	}
-}
-
-// TestListDomainsFilterByMinLevel verifies the ?min_level= threshold filter.
-func TestListDomainsFilterByMinLevel(t *testing.T) {
-	srv := newTestServer(t)
-	makeGraduatedJobWithEntries(t, srv, "info.example.com", []engine.LogEntry{
-		{Module: "Basic", Level: "INFO"},
-	})
-	makeGraduatedJobWithEntries(t, srv, "warning.example.com", []engine.LogEntry{
-		{Module: "DNSSEC", Level: "WARNING"},
-	})
-	makeGraduatedJobWithEntries(t, srv, "error.example.com", []engine.LogEntry{
-		{Module: "DNSSEC", Level: "ERROR"},
-	})
-
-	t.Run("warning_plus", func(t *testing.T) {
-		resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?min_level=WARNING", nil)
-		wantStatus(t, resp, http.StatusOK)
-		var list DomainList
-		_ = json.NewDecoder(resp.Body).Decode(&list)
-		if list.Total != 2 {
-			t.Fatalf("expected total=2 for warning+, got %d", list.Total)
-		}
-	})
-
-	t.Run("error_plus", func(t *testing.T) {
-		resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?min_level=ERROR", nil)
-		var list DomainList
-		_ = json.NewDecoder(resp.Body).Decode(&list)
-		if list.Total != 1 {
-			t.Fatalf("expected total=1 for error+, got %d", list.Total)
-		}
-		if list.Items[0].Name != "error.example.com" {
-			t.Fatalf("expected error.example.com, got %q", list.Items[0].Name)
-		}
-	})
 }

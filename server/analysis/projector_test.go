@@ -1043,15 +1043,15 @@ func TestProjectorExtractNameserverEndpoints(t *testing.T) {
 	}
 }
 
-// TestProjectorExtractNameserverEndpointsFallbackWithoutTimings verifies the
-// legacy behavior: when NameserverTimings is empty, entry-derived endpoints
-// still inherit the role tied to their source key. Without
-// nameserver_timings we can't trust the generic `servers` list or a
-// singleton {ns, address} entry as authoritative - zonemaster uses those
-// same shapes for parent-side delegation traversal, and trusting them
-// leaks root-server entries into TLD cohort analyses. Only the explicit
-// child-side keys (child_servers / zone_servers / ns_set_servers) name
-// the zone's own NSes; everything else defaults to parent.
+// The NS classification contract the next four tests share: nameserver_timings
+// is the authoritative NS set when present, Delegation01 tags supplement it,
+// and without timings only the explicit child-side keys (child_servers /
+// zone_servers / ns_set_servers) name the zone's own NSes. The generic
+// `servers` list and singleton {ns, address} entries also carry parent-side
+// delegation traversal, so trusting them leaks root servers into a cohort.
+//
+// Here: no timings, so entry-derived endpoints inherit their source key's role
+// and everything outside the child-side keys defaults to parent.
 func TestProjectorExtractNameserverEndpointsFallbackWithoutTimings(t *testing.T) {
 	input := RunInput{
 		Entries: []serverpkg.Entry{
@@ -1165,12 +1165,9 @@ func TestDelegationNSSetEmptyWhenTagsMissing(t *testing.T) {
 	}
 }
 
-// TestExtractNameserverEndpointsTimingsDrivesClassify covers the
-// primary pipeline: the worker emits one NameserverTiming per delegated
-// target (including unreachable / unresolved ones), and the projector
-// uses that list as the authoritative NS set. Unreachable NSes (address
-// present, no samples) are still authoritative even though generic
-// `servers` entries would otherwise fall into the parent-side bucket.
+// Primary path of the contract above: the worker emits one timing per
+// delegated target, and unreachable NSes (address, no samples) stay
+// authoritative where a generic `servers` entry would read as parent-side.
 func TestExtractNameserverEndpointsTimingsDrivesClassify(t *testing.T) {
 	input := RunInput{
 		NameserverTimings: []serverpkg.NameserverTiming{
@@ -1214,14 +1211,10 @@ func TestExtractNameserverEndpointsTimingsDrivesClassify(t *testing.T) {
 	}
 }
 
-// TestExtractNameserverEndpointsSuppressesStaleGlueForUnresolvedNS
-// pins the .ck "downstage" mismatch: Nameserver06 says the NS can't be
-// resolved, but CN04 still lists a stale (ns, addr) pair for it.
-// Trusting the CN04 address would make the analysis UI show a bogus IP
-// with "No response" while the public UI (which uses live lookupNS)
-// correctly says "Does not resolve". The projector trusts Nameserver06
-// and drops the stale pair; the synthetic delegation-only endpoint
-// represents the NS without an address.
+// The .ck "downstage" mismatch: Nameserver06 says unresolved while CN04 still
+// lists a stale (ns, addr) pair. Trusting CN04 would show a bogus IP with "No
+// response" where the public UI says "Does not resolve", so the pair is
+// dropped and a synthetic address-less endpoint stands for the NS.
 func TestExtractNameserverEndpointsSuppressesStaleGlueForUnresolvedNS(t *testing.T) {
 	input := RunInput{
 		Entries: []serverpkg.Entry{
@@ -1273,12 +1266,9 @@ func TestExtractNameserverEndpointsSuppressesStaleGlueForUnresolvedNS(t *testing
 	}
 }
 
-// TestExtractNameserverEndpointsMergesDelegationTagsIntoTimings covers
-// the legacy-data rollout: a run whose nameserver_timings_json predates
-// the worker's per-target emission (so timings lists only the NSes the
-// engine successfully probed). The Delegation01 tag parser supplements
-// the timings-derived set so a pure cohort rebuild - no re-running of
-// the DNS tests - still surfaces unreachable and unresolved NSes.
+// Legacy data: timings predating per-target emission list only the NSes the
+// engine probed, so the Delegation01 tags supplement them and a cohort rebuild
+// still surfaces the unreachable and unresolved ones without re-running tests.
 func TestExtractNameserverEndpointsMergesDelegationTagsIntoTimings(t *testing.T) {
 	input := RunInput{
 		NameserverTimings: []serverpkg.NameserverTiming{

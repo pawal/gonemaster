@@ -286,19 +286,13 @@ func TestAdminSnapshotListExposesSourceRunsAvailable(t *testing.T) {
 // verbs enforce CSRF when a browser Origin is present. The POST patch
 // path is a representative sample; every mutating endpoint goes
 // through the same enforceCSRF gate.
-func TestAdminSnapshotCSRFRejectsMismatchedOrigin(t *testing.T) {
+func TestAdminSnapshotCSRFOriginMatrix(t *testing.T) {
 	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
 		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
-		resp := f.call(http.MethodPost, path, `{"label":"injected"}`,
-			withHost("example.com"), withOrigin("https://evil.example"))
-		wantStatus(t, resp, http.StatusForbidden)
-		if !strings.Contains(resp.Body.String(), "csrf_origin_mismatch") {
-			t.Fatalf("expected csrf_origin_mismatch error, got %s", resp.Body)
-		}
-		// Same origin still works.
-		resp = f.call(http.MethodPost, path, `{"label":"ok"}`,
-			withHost("example.com"), withOrigin("http://example.com"))
-		wantStatus(t, resp, http.StatusOK)
+		csrfOriginMatrix(t, http.StatusOK, func(t *testing.T, opts ...reqOpt) *httptest.ResponseRecorder {
+			return f.call(http.MethodPost, path, `{"label":"relabel"}`,
+				append([]reqOpt{withHost("example.com")}, opts...)...)
+		})
 	})
 }
 

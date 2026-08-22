@@ -112,23 +112,10 @@ func TestGetJobResultOmitsNameserverTimingsWhenAdminDisplayDisabled(t *testing.T
 	}
 }
 
-func TestCreateJobCSRFRejectsMismatchedOrigin(t *testing.T) {
-	srv := newTestServer(t)
-
-	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`, withOrigin("http://evil.example"))
-
-	out := mustJSON[ErrorResponse](t, resp, http.StatusForbidden)
-	if out.Error.Code != "csrf_origin_mismatch" {
-		t.Fatalf("expected csrf_origin_mismatch, got %q", out.Error.Code)
-	}
-}
-
-func TestCreateJobCSRFAcceptsMatchingOrigin(t *testing.T) {
-	srv := newTestServer(t)
-
-	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`, withOrigin("http://example.com"))
-
-	wantStatus(t, resp, http.StatusCreated)
+func TestCreateJobCSRFOriginMatrix(t *testing.T) {
+	csrfOriginMatrix(t, http.StatusCreated, func(t *testing.T, opts ...reqOpt) *httptest.ResponseRecorder {
+		return doJSON(t, newTestServer(t), http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`, opts...)
+	})
 }
 
 func TestCreateJobMinLevel(t *testing.T) {
@@ -322,16 +309,6 @@ func TestListJobsPaginationAndSort(t *testing.T) {
 	}
 }
 
-func TestListJobsRejectsInvalidCursor(t *testing.T) {
-	srv := newTestServer(t)
-
-	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?cursor=not-a-number", nil)
-	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
-	if out.Error.Code != "invalid_cursor" {
-		t.Fatalf("expected invalid_cursor, got %q", out.Error.Code)
-	}
-}
-
 func TestListJobsFiltersByDomainAndTimeRange(t *testing.T) {
 	srv := newTestServer(t)
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
@@ -396,42 +373,23 @@ func TestListJobsSortBySeverityAcceptsParam(t *testing.T) {
 	}
 }
 
-func TestListJobsRejectsInvalidSort(t *testing.T) {
+func TestListJobsRejectsInvalidQuery(t *testing.T) {
 	srv := newTestServer(t)
 
-	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?sort=bad_sort", nil)
-	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
-	if out.Error.Code != "invalid_sort" {
-		t.Fatalf("expected invalid_sort, got %q", out.Error.Code)
-	}
-}
-
-func TestListJobsRejectsInvalidSeverity(t *testing.T) {
-	srv := newTestServer(t)
-
-	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?severity=bad_filter", nil)
-	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
-	if out.Error.Code != "invalid_severity" {
-		t.Fatalf("expected invalid_severity, got %q", out.Error.Code)
-	}
-}
-
-func TestListJobsRejectsInvalidCreatedBeforeAndRange(t *testing.T) {
-	srv := newTestServer(t)
-
-	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?created_before=not-a-date", nil)
-	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
-	if out.Error.Code != "invalid_created_before" {
-		t.Fatalf("expected invalid_created_before, got %q", out.Error.Code)
-	}
-
-	resp = doJSON(t, srv, http.MethodGet, "/api/v1/jobs?created_after=2026-02-03T00:00:02Z&created_before=2026-02-03T00:00:01Z", nil)
-	wantStatus(t, resp, http.StatusBadRequest)
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "invalid_time_range" {
-		t.Fatalf("expected invalid_time_range, got %q", out.Error.Code)
+	for _, tc := range []struct {
+		query string
+		code  string
+	}{
+		{query: "cursor=not-a-number", code: "invalid_cursor"},
+		{query: "sort=bad_sort", code: "invalid_sort"},
+		{query: "severity=bad_filter", code: "invalid_severity"},
+		{query: "created_before=not-a-date", code: "invalid_created_before"},
+		{query: "created_after=2026-02-03T00:00:02Z&created_before=2026-02-03T00:00:01Z", code: "invalid_time_range"},
+	} {
+		t.Run(tc.code, func(t *testing.T) {
+			resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?"+tc.query, nil)
+			wantErrorCode(t, resp, http.StatusBadRequest, tc.code)
+		})
 	}
 }
 

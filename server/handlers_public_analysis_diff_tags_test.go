@@ -9,19 +9,10 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 )
 
-// TestDiffTagViews is the core unit test for the granularity=tags
-// classifier. It feeds two hand-built sets of per-snapshot tag views and
-// asserts every tag lands in exactly the right bucket:
-//   - a tag present only in "to" is APPEARED (from_* zero, delta positive),
-//   - a tag present only in "from" is CLEARED (to_* zero, delta negative),
-//   - a tag in both with a different worst level is LEVEL-CHANGED,
-//   - a tag in both with the same level (even if its domain count changed,
-//     and even if the level strings differ only by case) is in NONE of the
-//     three buckets - it did not "move" in the sense this view reports.
-//
-// It also pins the sort contract: each bucket is ordered by the larger of
-// its two domain counts descending, then tag ascending, so the API output
-// is deterministic regardless of Go's random map iteration order.
+// A tag only in "to" appeared, only in "from" cleared, in both with a
+// different worst level changed level, and in both with the same level (case
+// insensitive) is in no bucket. Buckets sort by the larger domain count
+// descending, then tag, so map iteration order cannot leak into the API.
 func TestDiffTagViews(t *testing.T) {
 	from := []AnalysisSnapshotTagView{
 		{Tag: "DS07_NOT_SIGNED", Module: "DNSSEC", Testcase: "dnssec07", Level: "ERROR", DomainCount: 5},

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -90,20 +91,11 @@ func TestPublicCreateJobRejectsProfileOverrides(t *testing.T) {
 	wantErrorCode(t, resp, http.StatusBadRequest, "profile_overrides_not_allowed")
 }
 
-func TestPublicCreateJobCSRFRejectsCrossOrigin(t *testing.T) {
-	srv := newTestServer(t)
-
-	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withOrigin("http://evil.example"))
-
-	wantErrorCode(t, resp, http.StatusForbidden, "csrf_origin_mismatch")
-}
-
-func TestPublicCreateJobCSRFAcceptsSameOrigin(t *testing.T) {
-	srv := newTestServer(t)
-
-	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, sameOrigin())
-
-	wantStatus(t, resp, http.StatusCreated)
+func TestPublicCreateJobCSRFOriginMatrix(t *testing.T) {
+	// A missing Origin passes so non-browser clients (gonemaster-client) work.
+	csrfOriginMatrix(t, http.StatusCreated, func(t *testing.T, opts ...reqOpt) *httptest.ResponseRecorder {
+		return doJSON(t, newTestServer(t), http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, opts...)
+	})
 }
 
 func TestPublicCreateJobCSRFAcceptsHTTPSOriginViaTrustedProxy(t *testing.T) {
@@ -129,46 +121,49 @@ func TestPublicCreateJobCSRFRejectsForgedXForwardedProtoFromUntrustedRemote(t *t
 	wantStatus(t, resp, http.StatusForbidden)
 }
 
-func TestPublicCreateJobRejectsOversizedNameservers(t *testing.T) {
-	srv := newTestServer(t)
-
-	var nss []string
-	for i := 0; i <= MaxUndelegatedNameservers; i++ {
-		nss = append(nss, fmt.Sprintf(`{"ns":"ns%d.example.","ip":"198.51.100.%d"}`, i, i+1))
+func TestPublicCreateJobRejectsOversizedInput(t *testing.T) {
+	// One element past each cap, so the limit itself is what rejects.
+	list := func(n int, item func(i int) string) string {
+		items := make([]string, 0, n)
+		for i := range n {
+			items = append(items, item(i))
+		}
+		return strings.Join(items, ",")
 	}
-	body := fmt.Sprintf(`{"domain":"example.com","nameservers":[%s]}`, strings.Join(nss, ","))
 
-	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
-
-	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_undelegated")
-}
-
-func TestPublicCreateJobRejectsOversizedDSInfo(t *testing.T) {
-	srv := newTestServer(t)
-
-	var ds []string
-	for i := 0; i <= MaxUndelegatedDSRecords; i++ {
-		ds = append(ds, `{"keytag":1,"algorithm":8,"digtype":2,"digest":"`+strings.Repeat("a", 64)+`"}`)
+	for _, tc := range []struct {
+		field string
+		body  string
+		code  string
+	}{
+		{
+			field: "nameservers",
+			body: fmt.Sprintf(`{"domain":"example.com","nameservers":[%s]}`,
+				list(MaxUndelegatedNameservers+1, func(i int) string {
+					return fmt.Sprintf(`{"ns":"ns%d.example.","ip":"198.51.100.%d"}`, i, i+1)
+				})),
+			code: "invalid_undelegated",
+		},
+		{
+			field: "ds_info",
+			body: fmt.Sprintf(`{"domain":"example.com","ds_info":[%s]}`,
+				list(MaxUndelegatedDSRecords+1, func(int) string {
+					return `{"keytag":1,"algorithm":8,"digtype":2,"digest":"` + strings.Repeat("a", 64) + `"}`
+				})),
+			code: "invalid_undelegated",
+		},
+		{
+			field: "tests",
+			body: fmt.Sprintf(`{"domain":"example.com","tests":[%s]}`,
+				list(MaxPublicTests+1, func(int) string { return `"x"` })),
+			code: "too_many_tests",
+		},
+	} {
+		t.Run(tc.field, func(t *testing.T) {
+			resp := doJSON(t, newTestServer(t), http.MethodPost, "/pub/api/v1/jobs", tc.body)
+			wantErrorCode(t, resp, http.StatusBadRequest, tc.code)
+		})
 	}
-	body := fmt.Sprintf(`{"domain":"example.com","ds_info":[%s]}`, strings.Join(ds, ","))
-
-	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
-
-	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_undelegated")
-}
-
-func TestPublicCreateJobRejectsOversizedTestsList(t *testing.T) {
-	srv := newTestServer(t)
-
-	var tests []string
-	for i := 0; i <= MaxPublicTests; i++ {
-		tests = append(tests, `"x"`)
-	}
-	body := fmt.Sprintf(`{"domain":"example.com","tests":[%s]}`, strings.Join(tests, ","))
-
-	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
-
-	wantErrorCode(t, resp, http.StatusBadRequest, "too_many_tests")
 }
 
 func TestPublicCreateJobStoreErrorDoesNotLeakDBDetails(t *testing.T) {
@@ -193,16 +188,6 @@ func TestPublicCreateJobStoreErrorDoesNotLeakDBDetails(t *testing.T) {
 	if out.Error.Message == "" || strings.Contains(out.Error.Message, "duplicate") {
 		t.Fatalf("expected sanitized message, got %q", out.Error.Message)
 	}
-}
-
-func TestPublicCreateJobCSRFAllowsMissingOrigin(t *testing.T) {
-	// Non-browser clients (e.g. gonemaster-client) omit Origin; the helper
-	// short-circuits in that case so CLI usage keeps working.
-	srv := newTestServer(t)
-
-	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
-
-	wantStatus(t, resp, http.StatusCreated)
 }
 
 func TestPublicProfilesReturnsOnlyPublicProfilesWithoutConfig(t *testing.T) {

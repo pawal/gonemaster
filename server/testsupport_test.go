@@ -145,6 +145,32 @@ func wantErrorCode(t testing.TB, resp *httptest.ResponseRecorder, status int, co
 	return body
 }
 
+// csrfOriginMatrix runs the three Origin cases every state-changing endpoint
+// must satisfy: an absent Origin passes (CLI clients send none), the server's
+// own origin passes, and a cross origin is refused. call issues one request
+// with the opts applied on top of whatever the endpoint itself needs.
+func csrfOriginMatrix(t *testing.T, okStatus int, call func(t *testing.T, opts ...reqOpt) *httptest.ResponseRecorder) {
+	t.Helper()
+	for _, tc := range []struct {
+		name string
+		opts []reqOpt
+		want int
+	}{
+		{name: "no origin", want: okStatus},
+		{name: "same origin", opts: []reqOpt{sameOrigin()}, want: okStatus},
+		{name: "cross origin", opts: []reqOpt{withOrigin("https://evil.example")}, want: http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			resp := call(t, tc.opts...)
+			if tc.want == http.StatusForbidden {
+				wantErrorCode(t, resp, http.StatusForbidden, "csrf_origin_mismatch")
+				return
+			}
+			wantStatus(t, resp, tc.want)
+		})
+	}
+}
+
 // srvOpt customizes newTestServer.
 type srvOpt func(*testServerSetup)
 

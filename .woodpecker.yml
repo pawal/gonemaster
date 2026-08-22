@@ -71,7 +71,10 @@ steps:
     commands:
       - bash -c 'i=0; until echo > /dev/tcp/postgres/5432 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done'
       - bash -c 'i=0; until echo > /dev/tcp/mariadb/3306 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done'
-      - go test ./server/... -count=1 -timeout 120s
+      # Keep the timeout in step with the test-integration target in the
+      # Makefile: this runs the same tests, against services CI already
+      # provides rather than ones the target starts itself.
+      - go test ./server/... -count=1 -timeout 600s
 
   build_server_with_ui:
     image: golang:1.27

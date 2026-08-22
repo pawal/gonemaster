@@ -27,14 +27,14 @@ func runAllNSNamesProperty(t *testing.T, glueNames []string, apexNames []string)
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 	glue := map[string][]string{}
 	for i, name := range glueNames {
 		glue[strings.ToLower(name)] = []string{fmt.Sprintf("192.0.2.%d", 20+i)}
 	}
-	if err := r.AddFakeAddresses("example.com", glue); err != nil {
-		t.Fatalf("add zone: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".":           {"a.root": {"192.0.2.1"}},
+		"example.com": glue,
+	})
 	for i, name := range glueNames {
 		setNSHook(ctx, t, r, strings.ToLower(name), fmt.Sprintf("192.0.2.%d", 20+i), "example.com", apexNames...)
 	}
@@ -89,14 +89,14 @@ func TestAllNameserversPropertyAlwaysSortedAndDedupedByString(t *testing.T) {
 		prof.Net.IPv4 = true
 		prof.Net.IPv6 = true
 
-		r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 		fakes := map[string][]string{}
 		for i, name := range glue {
 			fakes[strings.ToLower(name)] = []string{fmt.Sprintf("192.0.2.%d", 30+i)}
 		}
-		if err := r.AddFakeAddresses("example.com", fakes); err != nil {
-			t.Fatalf("add zone: %v", err)
-		}
+		r := nstest.Recursor(t, map[string]map[string][]string{
+			".":           {"a.root": {"192.0.2.1"}},
+			"example.com": fakes,
+		})
 		for i, name := range glue {
 			setNSHook(ctx, t, r, strings.ToLower(name), fmt.Sprintf("192.0.2.%d", 30+i), "example.com", glue...)
 		}
@@ -142,7 +142,6 @@ func TestDelegationNameserversNoNilNamesInOutput(t *testing.T) {
 		prof.Net.IPv4 = true
 		prof.Net.IPv6 = true
 
-		r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 		glue := map[string][]string{}
 		for i := 0; i < size; i++ {
 			labelLen := 1 + rng.Intn(4)
@@ -153,9 +152,10 @@ func TestDelegationNameserversNoNilNamesInOutput(t *testing.T) {
 			name := string(label) + ".example.com"
 			glue[name] = []string{fmt.Sprintf("192.0.2.%d", 50+i)}
 		}
-		if err := r.AddFakeAddresses("example.com", glue); err != nil {
-			t.Fatalf("trial %d: add zone: %v", trial, err)
-		}
+		r := nstest.Recursor(t, map[string]map[string][]string{
+			".":           {"a.root": {"192.0.2.1"}},
+			"example.com": glue,
+		})
 
 		z, err := zone.NewWithRecursor("example.com", r)
 		if err != nil {

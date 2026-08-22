@@ -140,10 +140,10 @@ func TestZoneNameserversReturnsEmptyWhenDelegationEmpty(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithCache(ctx, NewCache())
 
-	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
-		t.Fatalf("add zone: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".":           {"a.root": {"192.0.2.1"}},
+		"example.com": {},
+	})
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {

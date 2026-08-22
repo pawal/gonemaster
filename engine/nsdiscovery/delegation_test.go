@@ -14,7 +14,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
@@ -323,12 +322,7 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = false
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"ns.root": {"192.0.2.9"},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	r := nstest.RootRecursor(t, map[string][]string{"ns.root": {"192.0.2.9"}})
 
 	rootNS, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.9", r.Client())
 	if err != nil {
@@ -426,12 +420,7 @@ func TestGetIBAddrInZoneBreaksEarlyOnSuccess(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = false
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"ns.root": {"192.0.2.9"},
-	}); err != nil {
-		t.Fatal(err)
-	}
+	r := nstest.RootRecursor(t, map[string][]string{"ns.root": {"192.0.2.9"}})
 
 	rootNS, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.9", r.Client())
 	if err != nil {

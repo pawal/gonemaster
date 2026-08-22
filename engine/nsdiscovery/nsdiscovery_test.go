@@ -32,16 +32,13 @@ func TestGlueNameserversReturnsGlueFromZone(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": {"a.root": {"192.0.2.1"}, "b.root": {"192.0.2.2"}},
+		"example.com": {
+			"ns1.example.com": {"192.0.2.11"},
+			"ns2.example.com": {"192.0.2.12"},
+		},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-		"ns2.example.com": {"192.0.2.12"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {
@@ -90,16 +87,13 @@ func TestApexNameserversReturnsApexNameservers(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
-		"b.root": {"192.0.2.2"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": {"a.root": {"192.0.2.1"}, "b.root": {"192.0.2.2"}},
+		"example.com": {
+			"ns1.example.com": {"192.0.2.11"},
+			"ns2.example.com": {"192.0.2.12"},
+		},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-		"ns2.example.com": {"192.0.2.12"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns2.example.com")
 	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns2.example.com")
 
@@ -175,12 +169,10 @@ func TestAllNSNamesEmptyInputs(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".":           {"a.root": {"192.0.2.1"}},
+		"example.com": {},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {
@@ -204,15 +196,13 @@ func TestAllNSNamesOnlyGlueWhenApexReturnsNoNS(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": {"a.root": {"192.0.2.1"}},
+		"example.com": {
+			"ns1.example.com": {"192.0.2.11"},
+			"ns2.example.com": {"192.0.2.12"},
+		},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-		"ns2.example.com": {"192.0.2.12"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 	noNS := packet.Packet{Msg: new(dns.Msg)}
 	setHookWithPacket(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", noNS)
 	setHookWithPacket(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", noNS)
@@ -246,14 +236,10 @@ func TestAllNSNamesOverlapDedupedCaseInsensitively(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".":           {"a.root": {"192.0.2.1"}},
+		"example.com": {"ns1.example.com": {"192.0.2.11"}},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "NS1.Example.com.")
 
 	z, err := zone.NewWithRecursor("example.com", r)
@@ -326,12 +312,10 @@ func TestAllNameserversEmptyInputs(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".":           {"a.root": {"192.0.2.1"}},
+		"example.com": {},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {
@@ -356,14 +340,10 @@ func TestAllNameserversOnlyGlueWhenApexHasNoServers(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".":           {"a.root": {"192.0.2.1"}},
+		"example.com": {"ns1.example.com": {"192.0.2.11"}},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com")
 
 	z, err := zone.NewWithRecursor("example.com", r)
@@ -388,15 +368,13 @@ func TestAllNameserversDedupesByNameserverString(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.RootRecursor(t, map[string][]string{
-		"a.root": {"192.0.2.1"},
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": {"a.root": {"192.0.2.1"}},
+		"example.com": {
+			"ns1.example.com": {"192.0.2.11"},
+			"ns2.example.com": {"192.0.2.12"},
+		},
 	})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{
-		"ns1.example.com": {"192.0.2.11"},
-		"ns2.example.com": {"192.0.2.12"},
-	}); err != nil {
-		t.Fatalf("add fake addresses: %v", err)
-	}
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns2.example.com")
 	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns2.example.com")
 

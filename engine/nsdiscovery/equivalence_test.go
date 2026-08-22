@@ -144,10 +144,10 @@ func TestAllNameserversVsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
 	prof.Net.IPv4 = true
 	prof.Net.IPv6 = true
 
-	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
-	if err := r.AddFakeAddresses("example.com", map[string][]string{}); err != nil {
-		t.Fatalf("add empty: %v", err)
-	}
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".":           {"a.root": {"192.0.2.1"}},
+		"example.com": {},
+	})
 
 	z, err := zone.NewWithRecursor("example.com", r)
 	if err != nil {

@@ -73,211 +73,146 @@ func TestEnsurePort(t *testing.T) {
 	}
 }
 
-func TestPrepareMessageWithEDNSDetails(t *testing.T) {
+// singleOPT returns the one OPT record prepareMessage put in the additional section.
+func singleOPT(t *testing.T, msg *dns.Msg) *dns.OPT {
+	t.Helper()
+
+	var opt *dns.OPT
+	for _, rr := range msg.Extra {
+		typed, ok := rr.(*dns.OPT)
+		if !ok {
+			continue
+		}
+		if opt != nil {
+			t.Fatalf("expected a single OPT record in additional section, got more than one")
+		}
+		opt = typed
+	}
+	if opt == nil {
+		t.Fatalf("expected explicit OPT record in additional section")
+	}
+	return opt
+}
+
+func TestPrepareMessageEncodesOPT(t *testing.T) {
 	do := true
-	version := uint8(1)
-	rcode := uint8(16)
-
-	client := &Client{
-		RecursionDesired: true,
-		EDNSSize:         1232,
-		EDNSDetails: &EDNSDetails{
-			Do:      &do,
-			Version: &version,
-			Rcode:   &rcode,
-			Data: []dns.EDNS0{
-				&dns.NSID{},
-			},
-		},
-	}
-
-	msg := BuildQuery("example.com", dns.TypeA)
-	prepared := client.prepareMessage(msg)
-
-	if !prepared.RecursionDesired {
-		t.Fatalf("expected recursion desired to be true")
-	}
-	if len(prepared.Pseudo) != 0 {
-		t.Fatalf("expected pseudo section to be empty when explicit OPT is used, got %d entries", len(prepared.Pseudo))
-	}
-	if prepared.UDPSize != 0 {
-		t.Fatalf("expected UDPSize to be moved into OPT record, got %d", prepared.UDPSize)
-	}
-	var opt *dns.OPT
-	for _, rr := range prepared.Extra {
-		if typed, ok := rr.(*dns.OPT); ok {
-			opt = typed
-			break
-		}
-	}
-	if opt == nil {
-		t.Fatalf("expected explicit OPT record in additional section")
-	}
-	if got := opt.UDPSize(); got != 1232 {
-		t.Fatalf("unexpected OPT UDP size: got %d want 1232", got)
-	}
-	if !opt.Security() {
-		t.Fatalf("expected OPT DO bit set")
-	}
-	if got := opt.Version(); got != 1 {
-		t.Fatalf("unexpected OPT version: got %d want 1", got)
-	}
-	if got := opt.Rcode(); got != 16 {
-		t.Fatalf("unexpected OPT extended rcode: got %d want 16", got)
-	}
-	if len(opt.Options) != 1 {
-		t.Fatalf("expected one EDNS option in OPT, got %d", len(opt.Options))
-	}
-
-	if err := prepared.Pack(); err != nil {
-		t.Fatalf("pack prepared query: %v", err)
-	}
-	var unpacked dns.Msg
-	unpacked.Data = append([]byte(nil), prepared.Data...)
-	if err := unpacked.Unpack(); err != nil {
-		t.Fatalf("unpack prepared query: %v", err)
-	}
-	if unpacked.UDPSize != 1232 || unpacked.Version != 1 || unpacked.Rcode != 16 {
-		t.Fatalf("unexpected unpacked EDNS fields: udp=%d version=%d rcode=%d", unpacked.UDPSize, unpacked.Version, unpacked.Rcode)
-	}
-}
-
-func TestPrepareMessageWithEDNSVersionAndDefaultSizeEncodesOPT(t *testing.T) {
-	version := uint8(1)
-	client := &Client{
-		EDNSDetails: &EDNSDetails{
-			Version: &version,
-		},
-	}
-
-	prepared := client.prepareMessage(BuildQuery("example.com", dns.TypeA))
-
-	var opt *dns.OPT
-	for _, rr := range prepared.Extra {
-		if typed, ok := rr.(*dns.OPT); ok {
-			opt = typed
-			break
-		}
-	}
-	if opt == nil {
-		t.Fatalf("expected explicit OPT record in additional section")
-	}
-	if got := opt.UDPSize(); got != dns.MinMsgSize {
-		t.Fatalf("unexpected OPT UDP size: got %d want %d", got, dns.MinMsgSize)
-	}
-	if got := opt.Version(); got != 1 {
-		t.Fatalf("unexpected OPT version: got %d want 1", got)
-	}
-
-	if err := prepared.Pack(); err != nil {
-		t.Fatalf("pack prepared query: %v", err)
-	}
-	var unpacked dns.Msg
-	unpacked.Data = append([]byte(nil), prepared.Data...)
-	if err := unpacked.Unpack(); err != nil {
-		t.Fatalf("unpack prepared query: %v", err)
-	}
-	if unpacked.UDPSize != dns.MinMsgSize || unpacked.Version != 1 {
-		t.Fatalf("unexpected unpacked EDNS fields: udp=%d version=%d", unpacked.UDPSize, unpacked.Version)
-	}
-}
-
-func TestPrepareMessageWithEDNSSize512EncodesOPT(t *testing.T) {
-	client := &Client{EDNSSize: dns.MinMsgSize}
-
-	prepared := client.prepareMessage(BuildQuery("example.com", dns.TypeA))
-
-	var opt *dns.OPT
-	for _, rr := range prepared.Extra {
-		if typed, ok := rr.(*dns.OPT); ok {
-			opt = typed
-			break
-		}
-	}
-	if opt == nil {
-		t.Fatalf("expected explicit OPT record in additional section")
-	}
-	if got := opt.UDPSize(); got != dns.MinMsgSize {
-		t.Fatalf("unexpected OPT UDP size: got %d want %d", got, dns.MinMsgSize)
-	}
-
-	if err := prepared.Pack(); err != nil {
-		t.Fatalf("pack prepared query: %v", err)
-	}
-	var unpacked dns.Msg
-	unpacked.Data = append([]byte(nil), prepared.Data...)
-	if err := unpacked.Unpack(); err != nil {
-		t.Fatalf("unpack prepared query: %v", err)
-	}
-	if unpacked.UDPSize != dns.MinMsgSize {
-		t.Fatalf("unexpected unpacked UDP size: got %d want %d", unpacked.UDPSize, dns.MinMsgSize)
-	}
-}
-
-func TestPrepareMessageWithEDNSZEncodesSingleOPT(t *testing.T) {
-	do := true
-	size := uint16(1232)
-	version := uint8(1)
+	size1232 := uint16(1232)
+	version1 := uint8(1)
 	z := uint16(0x1234)
-	rcode := uint8(16)
+	rcode16 := uint8(16)
 
-	client := &Client{
-		EDNSDetails: &EDNSDetails{
-			Do:      &do,
-			Size:    &size,
-			Version: &version,
-			Z:       &z,
-			Rcode:   &rcode,
-			Data: []dns.EDNS0{
-				&dns.NSID{},
+	tests := []struct {
+		name          string
+		client        *Client
+		wantRecursion bool
+		wantUDPSize   uint16
+		wantVersion   uint8
+		wantRcode     uint8
+		wantDO        bool
+		wantZ         uint16
+		wantOptions   int
+	}{
+		{
+			name: "EDNS details with client size",
+			client: &Client{
+				RecursionDesired: true,
+				EDNSSize:         1232,
+				EDNSDetails: &EDNSDetails{
+					Do:      &do,
+					Version: &version1,
+					Rcode:   &rcode16,
+					Data:    []dns.EDNS0{&dns.NSID{}},
+				},
 			},
+			wantRecursion: true,
+			wantUDPSize:   1232,
+			wantVersion:   1,
+			wantRcode:     16,
+			wantDO:        true,
+			wantOptions:   1,
+		},
+		{
+			name:        "EDNS version with default size",
+			client:      &Client{EDNSDetails: &EDNSDetails{Version: &version1}},
+			wantUDPSize: dns.MinMsgSize,
+			wantVersion: 1,
+		},
+		{
+			name:        "EDNS size 512",
+			client:      &Client{EDNSSize: dns.MinMsgSize},
+			wantUDPSize: dns.MinMsgSize,
+		},
+		{
+			name: "EDNS Z bits",
+			client: &Client{
+				EDNSDetails: &EDNSDetails{
+					Do:      &do,
+					Size:    &size1232,
+					Version: &version1,
+					Z:       &z,
+					Rcode:   &rcode16,
+					Data:    []dns.EDNS0{&dns.NSID{}},
+				},
+			},
+			wantUDPSize: 1232,
+			wantVersion: 1,
+			wantRcode:   16,
+			wantDO:      true,
+			wantZ:       z & 0x1FFF,
+			wantOptions: 1,
 		},
 	}
 
-	prepared := client.prepareMessage(BuildQuery("example.com", dns.TypeA))
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			prepared := tc.client.prepareMessage(BuildQuery("example.com", dns.TypeA))
 
-	if len(prepared.Pseudo) != 0 {
-		t.Fatalf("expected pseudo section to be empty when explicit OPT is used, got %d entries", len(prepared.Pseudo))
-	}
-	if prepared.UDPSize != 0 {
-		t.Fatalf("expected UDPSize to be moved into OPT record, got %d", prepared.UDPSize)
-	}
+			if prepared.RecursionDesired != tc.wantRecursion {
+				t.Fatalf("recursion desired: got %v want %v", prepared.RecursionDesired, tc.wantRecursion)
+			}
+			if len(prepared.Pseudo) != 0 {
+				t.Fatalf("expected pseudo section to be empty when explicit OPT is used, got %d entries", len(prepared.Pseudo))
+			}
+			if prepared.UDPSize != 0 {
+				t.Fatalf("expected UDPSize to be moved into OPT record, got %d", prepared.UDPSize)
+			}
 
-	var opt *dns.OPT
-	for _, rr := range prepared.Extra {
-		if typed, ok := rr.(*dns.OPT); ok {
-			opt = typed
-			break
-		}
-	}
-	if opt == nil {
-		t.Fatalf("expected explicit OPT record in additional section")
-	}
-	if got := opt.Z(); got != (z & 0x1FFF) {
-		t.Fatalf("unexpected OPT Z value: got %d want %d", got, z&0x1FFF)
-	}
-	if got := opt.UDPSize(); got != size {
-		t.Fatalf("unexpected OPT UDP size: got %d want %d", got, size)
-	}
-	if got := opt.Version(); got != version {
-		t.Fatalf("unexpected OPT version: got %d want %d", got, version)
-	}
-	if !opt.Security() {
-		t.Fatalf("expected OPT DO bit set")
-	}
-	if got := opt.Rcode(); got != 16 {
-		t.Fatalf("unexpected OPT extended rcode: got %d want 16", got)
-	}
-	if len(opt.Options) != 1 {
-		t.Fatalf("expected one EDNS option in OPT, got %d", len(opt.Options))
-	}
+			opt := singleOPT(t, prepared)
+			if got := opt.UDPSize(); got != tc.wantUDPSize {
+				t.Fatalf("OPT UDP size: got %d want %d", got, tc.wantUDPSize)
+			}
+			if got := opt.Version(); got != tc.wantVersion {
+				t.Fatalf("OPT version: got %d want %d", got, tc.wantVersion)
+			}
+			if got := opt.Rcode(); got != uint16(tc.wantRcode) {
+				t.Fatalf("OPT extended rcode: got %d want %d", got, tc.wantRcode)
+			}
+			if opt.Security() != tc.wantDO {
+				t.Fatalf("OPT DO bit: got %v want %v", opt.Security(), tc.wantDO)
+			}
+			if got := opt.Z(); got != tc.wantZ {
+				t.Fatalf("OPT Z value: got %d want %d", got, tc.wantZ)
+			}
+			if len(opt.Options) != tc.wantOptions {
+				t.Fatalf("EDNS options in OPT: got %d want %d", len(opt.Options), tc.wantOptions)
+			}
 
-	if err := prepared.Pack(); err != nil {
-		t.Fatalf("pack prepared query: %v", err)
-	}
-	wireZ := extractSingleOptZFromWire(t, prepared.Data)
-	if wireZ != (z & 0x1FFF) {
-		t.Fatalf("wire OPT Z mismatch: got %d want %d", wireZ, z&0x1FFF)
+			if err := prepared.Pack(); err != nil {
+				t.Fatalf("pack prepared query: %v", err)
+			}
+			var unpacked dns.Msg
+			unpacked.Data = append([]byte(nil), prepared.Data...)
+			if err := unpacked.Unpack(); err != nil {
+				t.Fatalf("unpack prepared query: %v", err)
+			}
+			if unpacked.UDPSize != tc.wantUDPSize || unpacked.Version != tc.wantVersion || unpacked.Rcode != uint16(tc.wantRcode) {
+				t.Fatalf("unpacked EDNS fields: udp=%d version=%d rcode=%d want udp=%d version=%d rcode=%d",
+					unpacked.UDPSize, unpacked.Version, unpacked.Rcode, tc.wantUDPSize, tc.wantVersion, tc.wantRcode)
+			}
+			if wireZ := extractSingleOptZFromWire(t, prepared.Data); wireZ != tc.wantZ {
+				t.Fatalf("wire OPT Z mismatch: got %d want %d", wireZ, tc.wantZ)
+			}
+		})
 	}
 }
 
@@ -538,67 +473,86 @@ func writeSimpleAResponse(w dns.ResponseWriter, req *dns.Msg) {
 	_, _ = resp.WriteTo(w)
 }
 
-func TestEffectiveAttemptTimeoutUsesConfiguredTimeout(t *testing.T) {
-	client := &Client{
-		Timeout: 250 * time.Millisecond,
-		Retrans: 40 * time.Millisecond,
+func TestEffectiveAttemptTimeout(t *testing.T) {
+	tests := []struct {
+		name        string
+		timeout     time.Duration
+		retrans     time.Duration
+		setFallback bool
+		useTCP      bool
+		fromUDPFB   bool
+		ctxTimeout  time.Duration
+		want        time.Duration
+	}{
+		{
+			name:    "uses configured timeout",
+			timeout: 250 * time.Millisecond,
+			retrans: 40 * time.Millisecond,
+			useTCP:  true,
+			want:    250 * time.Millisecond,
+		},
+		{
+			name:    "uses retrans budget for UDP",
+			timeout: 250 * time.Millisecond,
+			retrans: 40 * time.Millisecond,
+			want:    40 * time.Millisecond,
+		},
+		{
+			name:        "does not cap UDP for fallback",
+			timeout:     5 * time.Second,
+			retrans:     3 * time.Second,
+			setFallback: true,
+			want:        3 * time.Second,
+		},
+		{
+			name:      "uses retrans budget for TCP fallback",
+			timeout:   250 * time.Millisecond,
+			retrans:   40 * time.Millisecond,
+			useTCP:    true,
+			fromUDPFB: true,
+			want:      40 * time.Millisecond,
+		},
+		{
+			name:    "falls back to retrans when timeout unset",
+			retrans: 80 * time.Millisecond,
+			want:    80 * time.Millisecond,
+		},
+		{
+			name:       "respects context deadline",
+			timeout:    300 * time.Millisecond,
+			retrans:    200 * time.Millisecond,
+			useTCP:     true,
+			ctxTimeout: 120 * time.Millisecond,
+			want:       120 * time.Millisecond,
+		},
 	}
 
-	got := client.effectiveAttemptTimeout(context.Background(), true, false)
-	if got != 250*time.Millisecond {
-		t.Fatalf("expected configured timeout 250ms, got %v", got)
-	}
-}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &Client{Timeout: tc.timeout, Retrans: tc.retrans}
+			if tc.setFallback {
+				client.SetFallback(true)
+			}
 
-func TestEffectiveAttemptTimeoutUsesRetransBudgetForUDP(t *testing.T) {
-	client := &Client{
-		Timeout: 250 * time.Millisecond,
-		Retrans: 40 * time.Millisecond,
-	}
+			ctx := context.Background()
+			if tc.ctxTimeout > 0 {
+				var cancel context.CancelFunc
+				ctx, cancel = context.WithTimeout(ctx, tc.ctxTimeout)
+				defer cancel()
+			}
 
-	got := client.effectiveAttemptTimeout(context.Background(), false, false)
-	if got != 40*time.Millisecond {
-		t.Fatalf("expected UDP retrans budget 40ms, got %v", got)
-	}
-}
-
-func TestEffectiveAttemptTimeoutDoesNotCapUDPForFallback(t *testing.T) {
-	client := &Client{
-		Timeout: 5 * time.Second,
-		Retrans: 3 * time.Second,
-	}
-	client.SetFallback(true)
-
-	got := client.effectiveAttemptTimeout(context.Background(), false, false)
-	if got != 3*time.Second {
-		t.Fatalf("expected UDP timeout budget to stay at retrans 3s, got %v", got)
-	}
-}
-
-func TestEffectiveAttemptTimeoutUsesRetransBudgetForTCPFallback(t *testing.T) {
-	client := &Client{
-		Timeout: 250 * time.Millisecond,
-		Retrans: 40 * time.Millisecond,
-	}
-
-	got := client.effectiveAttemptTimeout(context.Background(), true, true)
-	if got != 40*time.Millisecond {
-		t.Fatalf("expected fallback TCP retrans budget 40ms, got %v", got)
-	}
-}
-
-func TestEffectiveAttemptTimeoutRespectsContextDeadline(t *testing.T) {
-	client := &Client{
-		Timeout: 300 * time.Millisecond,
-		Retrans: 200 * time.Millisecond,
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Millisecond)
-	defer cancel()
-
-	got := client.effectiveAttemptTimeout(ctx, true, false)
-	if got <= 0 || got > 120*time.Millisecond {
-		t.Fatalf("expected timeout within context deadline, got %v", got)
+			got := client.effectiveAttemptTimeout(ctx, tc.useTCP, tc.fromUDPFB)
+			if tc.ctxTimeout > 0 {
+				// Deadline clamps the budget; the remainder shrinks with wall clock.
+				if got <= 0 || got > tc.want {
+					t.Fatalf("attempt timeout %v outside (0, %v]", got, tc.want)
+				}
+				return
+			}
+			if got != tc.want {
+				t.Fatalf("attempt timeout: got %v want %v", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -838,18 +792,6 @@ func TestExchangeDoesNotFallbackTCPOnUDPFailure(t *testing.T) {
 	}
 	if elapsed < 20*time.Millisecond || elapsed > 300*time.Millisecond {
 		t.Fatalf("expected exchange to fail within UDP timeout budget, took %v", elapsed)
-	}
-}
-
-func TestEffectiveAttemptTimeoutFallsBackToRetransWhenTimeoutUnset(t *testing.T) {
-	client := &Client{
-		Timeout: 0,
-		Retrans: 80 * time.Millisecond,
-	}
-
-	got := client.effectiveAttemptTimeout(context.Background(), false, false)
-	if got != 80*time.Millisecond {
-		t.Fatalf("expected retrans fallback 80ms, got %v", got)
 	}
 }
 

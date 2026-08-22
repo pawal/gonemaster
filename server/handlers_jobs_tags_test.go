@@ -5,24 +5,17 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
 // --- POST /api/v1/jobs with tags ---------------------------------------------
 
 func TestCreateJobWithTags(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com","tags":["tld"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tags":["tld"]}`)
+	wantStatus(t, resp, http.StatusCreated)
 
 	// Domain should be tagged.
 	d, ok := srv.store.GetDomainByName("example.com")
@@ -37,17 +30,11 @@ func TestCreateJobWithTags(t *testing.T) {
 
 func TestCreateJobLogsDomain(t *testing.T) {
 	var buf bytes.Buffer
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.logger = newLogger("json", "info", &buf)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
+	wantStatus(t, resp, http.StatusCreated)
 
 	line := findLogLine(t, &buf, "job created")
 	if line["domain"] != "example.com" {
@@ -59,44 +46,26 @@ func TestCreateJobLogsDomain(t *testing.T) {
 }
 
 func TestCreateJobWithUnknownTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com","tags":["ghost"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tags":["ghost"]}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestCreateJobNoTagsUnchanged(t *testing.T) {
 	// Submitting a job without tags should still work as before.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
+	wantStatus(t, resp, http.StatusCreated)
 }
 
 func TestCreateJobWithProfileID(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"strict","config":{"net":{"ipv4":true}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID)))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID))
+	wantStatus(t, resp, http.StatusCreated)
 
 	var created Job
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
@@ -122,21 +91,15 @@ func TestCreateJobWithProfileID(t *testing.T) {
 }
 
 func TestCreateJobUsesTagDefaultProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	profile := createProfile(t, srv, `{"name":"strict","config":{"net":{"ipv4":true}}}`)
 	if err := srv.store.SetTagDefaultProfile("tld", &profile.ID); err != nil {
 		t.Fatalf("SetTagDefaultProfile: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com","tags":["tld"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tags":["tld"]}`)
+	wantStatus(t, resp, http.StatusCreated)
 
 	var created Job
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
@@ -151,21 +114,15 @@ func TestCreateJobUsesTagDefaultProfile(t *testing.T) {
 }
 
 func TestCreateJobDoesNotUseTagDefaultWhenOverridesProvided(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	profile := createProfile(t, srv, `{"name":"strict","config":{"net":{"ipv4":true}}}`)
 	if err := srv.store.SetTagDefaultProfile("tld", &profile.ID); err != nil {
 		t.Fatalf("SetTagDefaultProfile: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com","tags":["tld"],"profile_overrides":{"net":{"ipv6":false}}}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("expected 201, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tags":["tld"],"profile_overrides":{"net":{"ipv6":false}}}`)
+	wantStatus(t, resp, http.StatusCreated)
 
 	var created Job
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
@@ -180,7 +137,7 @@ func TestCreateJobDoesNotUseTagDefaultWhenOverridesProvided(t *testing.T) {
 }
 
 func TestCreateJobRejectsConflictingTagDefaultProfiles(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "alpha", "")
 	createTag(t, srv, "beta", "")
 	profile1 := createProfile(t, srv, `{"name":"one","config":{"net":{"ipv4":true}}}`)
@@ -192,14 +149,8 @@ func TestCreateJobRejectsConflictingTagDefaultProfiles(t *testing.T) {
 		t.Fatalf("SetTagDefaultProfile beta: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs",
-		bytes.NewBufferString(`{"domain":"example.com","tags":["alpha","beta"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tags":["alpha","beta"]}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 
 	var out ErrorResponse
 	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
@@ -213,17 +164,11 @@ func TestCreateJobRejectsConflictingTagDefaultProfiles(t *testing.T) {
 // --- POST /api/v1/jobs/batch with tags ---------------------------------------
 
 func TestBatchJobWithTags(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(`{"domains":["example.com","example.net"],"tags":["tld"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"domains":["example.com","example.net"],"tags":["tld"]}`)
+	wantStatus(t, resp, http.StatusAccepted)
 
 	// Both domains should be tagged.
 	tag, ok := srv.store.GetTag("tld")
@@ -240,20 +185,10 @@ func TestBatchJobWithTags(t *testing.T) {
 // payload, and the server stores it on the batch record so the projector
 // can gate snapshot accumulation on it.
 func TestBatchJobAcceptsSnapshotIntent(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(`{"domains":["example.com"],"snapshot_intent":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
-	}
-	var batchResp JobBatchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"domains":["example.com"],"snapshot_intent":true}`)
+	batchResp := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 	batch, ok := srv.store.GetBatch(batchResp.BatchID)
 	if !ok {
 		t.Fatalf("batch not found: %s", batchResp.BatchID)
@@ -264,14 +199,8 @@ func TestBatchJobAcceptsSnapshotIntent(t *testing.T) {
 
 	// Default (flag omitted) must stay false so ad-hoc batches never
 	// become snapshot-intent by accident.
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(`{"domains":["example.net"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
-	}
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"domains":["example.net"]}`)
+	wantStatus(t, resp, http.StatusAccepted)
 	batchResp = JobBatchResponse{}
 	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
 		t.Fatalf("decode default: %v", err)
@@ -283,22 +212,16 @@ func TestBatchJobAcceptsSnapshotIntent(t *testing.T) {
 }
 
 func TestBatchJobWithUnknownTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(`{"domains":["example.com"],"tags":["ghost"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"domains":["example.com"],"tags":["ghost"]}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 // --- POST /api/v1/jobs/batch with from_tag -----------------------------------
 
 func TestBatchJobFromTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	d1 := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	d2 := makeGraduatedJob(t, srv, "example.net", JobSucceeded)
@@ -307,14 +230,8 @@ func TestBatchJobFromTag(t *testing.T) {
 		t.Fatalf("tag domains: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(`{"from_tag":"tld"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"from_tag":"tld"}`)
+	wantStatus(t, resp, http.StatusAccepted)
 
 	var batchResp JobBatchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
@@ -326,7 +243,7 @@ func TestBatchJobFromTag(t *testing.T) {
 }
 
 func TestBatchJobFromTagUsesDefaultProfile(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	profile := createProfile(t, srv, `{"name":"strict","config":{"net":{"ipv4":true}}}`)
 	if err := srv.store.SetTagDefaultProfile("tld", &profile.ID); err != nil {
@@ -338,14 +255,8 @@ func TestBatchJobFromTagUsesDefaultProfile(t *testing.T) {
 		t.Fatalf("tag domains: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(`{"from_tag":"tld"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"from_tag":"tld"}`)
+	wantStatus(t, resp, http.StatusAccepted)
 
 	var batchResp JobBatchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
@@ -366,17 +277,11 @@ func TestBatchJobFromTagUsesDefaultProfile(t *testing.T) {
 }
 
 func TestBatchJobWithExplicitProfileID(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	profile := createProfile(t, srv, `{"name":"strict","config":{"net":{"ipv4":true}}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(fmt.Sprintf(`{"domains":["example.com","example.net"],"profile_id":%d}`, profile.ID)))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", fmt.Sprintf(`{"domains":["example.com","example.net"],"profile_id":%d}`, profile.ID))
+	wantStatus(t, resp, http.StatusAccepted)
 
 	var batchResp JobBatchResponse
 	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
@@ -397,28 +302,16 @@ func TestBatchJobWithExplicitProfileID(t *testing.T) {
 }
 
 func TestBatchJobFromTagNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(`{"from_tag":"ghost"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"from_tag":"ghost"}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestBatchJobFromTagAndDomainsMutuallyExclusive(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/jobs/batch",
-		bytes.NewBufferString(`{"from_tag":"tld","domains":["example.com"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"from_tag":"tld","domains":["example.com"]}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -14,50 +13,32 @@ import (
 // --- GET /api/v1/runs --------------------------------------------------------
 
 func TestListRunsEmpty(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list RunList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs", nil)
+	list := mustJSON[RunList](t, resp, http.StatusOK)
 	if list.Total != 0 {
 		t.Fatalf("expected total=0, got %d", list.Total)
 	}
 }
 
 func TestListRunsReturnsRuns(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJob(t, srv, "alpha.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "beta.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list RunList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs", nil)
+	list := mustJSON[RunList](t, resp, http.StatusOK)
 	if list.Total != 2 {
 		t.Fatalf("expected total=2, got %d", list.Total)
 	}
 }
 
 func TestListRunsFilterByDomain(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJob(t, srv, "alpha.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "beta.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs?domain=alpha", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs?domain=alpha", nil)
 	var list RunList
 	_ = json.NewDecoder(resp.Body).Decode(&list)
 	if list.Total != 1 {
@@ -69,7 +50,7 @@ func TestListRunsFilterByDomain(t *testing.T) {
 }
 
 func TestListRunsFilterByTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "other.org", JobSucceeded)
@@ -77,9 +58,7 @@ func TestListRunsFilterByTag(t *testing.T) {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs?tag=tld", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs?tag=tld", nil)
 	var list RunList
 	_ = json.NewDecoder(resp.Body).Decode(&list)
 	if list.Total != 1 {
@@ -90,7 +69,7 @@ func TestListRunsFilterByTag(t *testing.T) {
 func TestListRunsFilterByEventTag(t *testing.T) {
 	// event_tag filters runs by the presence of a log-event tag in their
 	// entries. This is distinct from the domain-tag tag= filter above.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedBatchRuns(t, srv, "batch_evt", []seedRun{
 		{domain: "signed.example", entries: []engine.LogEntry{
 			{Timestamp: 1.0, Module: "DNSSEC", Testcase: "DNSSEC07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
@@ -101,9 +80,7 @@ func TestListRunsFilterByEventTag(t *testing.T) {
 	})
 
 	get := func(query string) RunList {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/runs"+query, nil)
-		srv.Handler().ServeHTTP(resp, req)
+		resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs"+query, nil)
 		var list RunList
 		_ = json.NewDecoder(resp.Body).Decode(&list)
 		return list
@@ -128,61 +105,40 @@ func TestListRunsFilterByEventTag(t *testing.T) {
 }
 
 func TestListRunsInvalidLimit(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs?limit=bad", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs?limit=bad", nil)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestListRunsInvalidTimeRange(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet,
-		"/api/v1/runs?finished_after=2026-01-02T00:00:00Z&finished_before=2026-01-01T00:00:00Z", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs?finished_after=2026-01-02T00:00:00Z&finished_before=2026-01-01T00:00:00Z", nil)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 // --- GET /api/v1/runs/{id} ---------------------------------------------------
 
 func TestGetRun(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/"+d.LatestRunID, nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var run Run
-	if err := json.NewDecoder(resp.Body).Decode(&run); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs/"+d.LatestRunID, nil)
+	run := mustJSON[Run](t, resp, http.StatusOK)
 	if run.Domain != "example.com" {
 		t.Fatalf("expected domain=example.com, got %q", run.Domain)
 	}
 }
 
 func TestGetRunNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/no-such-run", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs/no-such-run", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 // --- GET /api/v1/runs/{id}/result --------------------------------------------
 
 func TestGetRunResult(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	now := time.Now().UTC()
 	job := Job{
 		ID:         newID("job"),
@@ -215,16 +171,8 @@ func TestGetRunResult(t *testing.T) {
 		t.Fatal("expected domain")
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if result.Status != JobSucceeded {
 		t.Fatalf("expected status=succeeded, got %q", result.Status)
 	}
@@ -234,31 +182,19 @@ func TestGetRunResult(t *testing.T) {
 }
 
 func TestGetRunResultNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/no-such-run/result", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs/no-such-run/result", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 // --- Scoring fields in run responses ----------------------------------------
 
 func TestListRunsIncludeScore(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list RunList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs", nil)
+	list := mustJSON[RunList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1, got %d", list.Total)
 	}
@@ -272,19 +208,11 @@ func TestListRunsIncludeScore(t *testing.T) {
 }
 
 func TestGetRunIncludesScore(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs/"+d.LatestRunID, nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var run Run
-	if err := json.NewDecoder(resp.Body).Decode(&run); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs/"+d.LatestRunID, nil)
+	run := mustJSON[Run](t, resp, http.StatusOK)
 	if run.Score == nil {
 		t.Fatal("run.Score is nil in GET /runs/{id} response")
 	}
@@ -294,19 +222,11 @@ func TestGetRunIncludesScore(t *testing.T) {
 }
 
 func TestGetRunResultIncludesScore(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if result.Score == nil {
 		t.Fatal("result.Score is nil in run result response")
 	}
@@ -315,7 +235,7 @@ func TestGetRunResultIncludesScore(t *testing.T) {
 // --- ?grade= filter ----------------------------------------------------------
 
 func TestListRunsFilterByGrade(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// No-entry job → score 100, grade A (no bonus criteria met → not A+).
 	domA := makeGraduatedJobWithEntries(t, srv, "clean.example", nil)
@@ -344,16 +264,8 @@ func TestListRunsFilterByGrade(t *testing.T) {
 	}
 
 	// Filter by gradeA - should return exactly the clean run.
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs?grade="+gradeA, nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var listA RunList
-	if err := json.NewDecoder(resp.Body).Decode(&listA); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs?grade="+gradeA, nil)
+	listA := mustJSON[RunList](t, resp, http.StatusOK)
 	if listA.Total != 1 {
 		t.Fatalf("grade=%s filter: expected total=1, got %d", gradeA, listA.Total)
 	}
@@ -362,16 +274,8 @@ func TestListRunsFilterByGrade(t *testing.T) {
 	}
 
 	// Filter by gradeF - should return exactly the broken run.
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/runs?grade="+gradeF, nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var listF RunList
-	if err := json.NewDecoder(resp.Body).Decode(&listF); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp = doJSON(t, srv, http.MethodGet, "/api/v1/runs?grade="+gradeF, nil)
+	listF := mustJSON[RunList](t, resp, http.StatusOK)
 	if listF.Total != 1 {
 		t.Fatalf("grade=%s filter: expected total=1, got %d", gradeF, listF.Total)
 	}
@@ -410,16 +314,8 @@ func TestRunResultOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
 		t.Fatal("expected domain")
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/runs/%s/result", d.LatestRunID), nil)
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if result.Score != nil {
 		t.Fatal("expected Score to be nil when ShowScoreAdmin=false")
 	}
@@ -434,16 +330,8 @@ func TestListRunsOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
 	srv := New(cfg)
 	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/runs", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list RunList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs", nil)
+	list := mustJSON[RunList](t, resp, http.StatusOK)
 	if len(list.Items) == 0 {
 		t.Fatal("expected at least one run")
 	}
@@ -458,16 +346,8 @@ func TestGetRunOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
 	srv := New(cfg)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/runs/%s", d.LatestRunID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var run Run
-	if err := json.NewDecoder(resp.Body).Decode(&run); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/runs/%s", d.LatestRunID), nil)
+	run := mustJSON[Run](t, resp, http.StatusOK)
 	if run.Score != nil || run.Grade != nil {
 		t.Fatal("expected Score/Grade to be nil when ShowScoreAdmin=false")
 	}

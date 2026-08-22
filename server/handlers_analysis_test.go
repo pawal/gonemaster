@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"sync"
 	"testing"
@@ -107,13 +106,8 @@ func decodeCohort(t *testing.T, body *bytes.Buffer) AnalysisCohort {
 
 func createAnalysisCohort(t *testing.T, srv *Server, body string) AnalysisCohort {
 	t.Helper()
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/analysis/cohorts", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("create cohort: expected 202, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/analysis/cohorts", body)
+	wantStatus(t, resp, http.StatusAccepted)
 	return decodeCohort(t, resp.Body)
 }
 
@@ -141,38 +135,20 @@ func TestCreateAnalysisCohortTagDefaults(t *testing.T) {
 
 func TestCreateAnalysisCohortRejectsMissingSourceTag(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/analysis/cohorts",
-		bytes.NewBufferString(`{"label":"no source"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/analysis/cohorts", `{"label":"no source"}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestCreateAnalysisCohortRejectsPublicWithoutAnalysis(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/analysis/cohorts",
-		bytes.NewBufferString(`{"source_tag":"x","public_enabled":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/analysis/cohorts", `{"source_tag":"x","public_enabled":true}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestCreateAnalysisCohortRejectsDefaultWithoutPublic(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/analysis/cohorts",
-		bytes.NewBufferString(`{"source_tag":"x","analysis_enabled":true,"is_default":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/analysis/cohorts", `{"source_tag":"x","analysis_enabled":true,"is_default":true}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestCreateAnalysisCohortAutoCreatesMissingTag(t *testing.T) {
@@ -190,12 +166,8 @@ func TestAnalysisCohortJSONOmitsZeroLastMaterializedAt(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
 	createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/analysis/cohorts", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/analysis/cohorts", nil)
+	wantStatus(t, resp, http.StatusOK)
 	body := resp.Body.String()
 	if strings.Contains(body, "last_materialized_at") {
 		t.Fatalf("expected last_materialized_at to be omitted when zero, got body: %s", body)
@@ -220,14 +192,8 @@ func TestCreateAnalysisCohortReusesExistingTag(t *testing.T) {
 func TestCreateAnalysisCohortRejectsDuplicateSource(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
 	createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/analysis/cohorts",
-		bytes.NewBufferString(`{"source_tag":"tld"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/analysis/cohorts", `{"source_tag":"tld"}`)
+	wantStatus(t, resp, http.StatusConflict)
 }
 
 func TestListAnalysisCohortsSortedBySortOrder(t *testing.T) {
@@ -235,16 +201,8 @@ func TestListAnalysisCohortsSortedBySortOrder(t *testing.T) {
 	createAnalysisCohort(t, srv, `{"source_tag":"gov","sort_order":20}`)
 	createAnalysisCohort(t, srv, `{"source_tag":"tld","sort_order":10}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/analysis/cohorts", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var cohorts []AnalysisCohort
-	if err := json.NewDecoder(resp.Body).Decode(&cohorts); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/analysis/cohorts", nil)
+	cohorts := mustJSON[[]AnalysisCohort](t, resp, http.StatusOK)
 	if len(cohorts) != 2 || cohorts[0].SourceTag != "tld" || cohorts[1].SourceTag != "gov" {
 		t.Fatalf("unexpected ordering: %+v", cohorts)
 	}
@@ -254,12 +212,8 @@ func TestGetAnalysisCohortByIDReturnsRow(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
 	cohort := createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID), nil)
+	wantStatus(t, resp, http.StatusOK)
 	got := decodeCohort(t, resp.Body)
 	if got.ID != cohort.ID || got.SourceTag != "tld" {
 		t.Fatalf("unexpected cohort: %+v", got)
@@ -268,12 +222,8 @@ func TestGetAnalysisCohortByIDReturnsRow(t *testing.T) {
 
 func TestGetAnalysisCohortByIDNotFound(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/analysis/cohorts/999", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/analysis/cohorts/999", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestPatchAnalysisCohortTogglesAnalysisEnabledAndReconciles(t *testing.T) {
@@ -285,15 +235,8 @@ func TestPatchAnalysisCohortTogglesAnalysisEnabledAndReconciles(t *testing.T) {
 	spy.rebuildCohorts = nil
 	spy.mu.Unlock()
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPatch,
-		fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID),
-		bytes.NewBufferString(`{"analysis_enabled":true,"label":"TLD Analysis"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPatch, fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID), `{"analysis_enabled":true,"label":"TLD Analysis"}`)
+	wantStatus(t, resp, http.StatusOK)
 	got := decodeCohort(t, resp.Body)
 	if !got.AnalysisEnabled {
 		t.Fatalf("expected analysis_enabled=true, got %+v", got)
@@ -316,15 +259,8 @@ func TestPatchAnalysisCohortSetDefaultClearsOthers(t *testing.T) {
 	a := createAnalysisCohort(t, srv, `{"source_tag":"a","analysis_enabled":true,"public_enabled":true,"is_default":true}`)
 	b := createAnalysisCohort(t, srv, `{"source_tag":"b","analysis_enabled":true,"public_enabled":true}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPatch,
-		fmt.Sprintf("/api/v1/analysis/cohorts/%d", b.ID),
-		bytes.NewBufferString(`{"is_default":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPatch, fmt.Sprintf("/api/v1/analysis/cohorts/%d", b.ID), `{"is_default":true}`)
+	wantStatus(t, resp, http.StatusOK)
 
 	reloadedA, _ := srv.store.GetAnalysisCohort(a.ID)
 	reloadedB, _ := srv.store.GetAnalysisCohort(b.ID)
@@ -340,15 +276,8 @@ func TestPatchAnalysisCohortRejectsPublicWithoutAnalysis(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
 	cohort := createAnalysisCohort(t, srv, `{"source_tag":"tld","analysis_enabled":true}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPatch,
-		fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID),
-		bytes.NewBufferString(`{"analysis_enabled":false,"public_enabled":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPatch, fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID), `{"analysis_enabled":false,"public_enabled":true}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestAnalysisCohortRebuildInvokesController(t *testing.T) {
@@ -358,13 +287,8 @@ func TestAnalysisCohortRebuildInvokesController(t *testing.T) {
 	spy.rebuildCohorts = nil
 	spy.mu.Unlock()
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost,
-		fmt.Sprintf("/api/v1/analysis/cohorts/%d/rebuild", cohort.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, fmt.Sprintf("/api/v1/analysis/cohorts/%d/rebuild", cohort.ID), nil)
+	wantStatus(t, resp, http.StatusAccepted)
 	// Rebuild is dispatched in a goroutine, so poll until the spy
 	// observes the call instead of asserting synchronously.
 	waitForCond(t, func() bool {
@@ -377,13 +301,8 @@ func TestAnalysisCohortClearInvokesController(t *testing.T) {
 	srv, spy := newAnalysisAdminTestServer(t)
 	cohort := createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost,
-		fmt.Sprintf("/api/v1/analysis/cohorts/%d/clear", cohort.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, fmt.Sprintf("/api/v1/analysis/cohorts/%d/clear", cohort.ID), nil)
+	wantStatus(t, resp, http.StatusOK)
 	snap := spy.snapshot()
 	if len(snap.clearCohorts) != 1 || snap.clearCohorts[0] != cohort.ID {
 		t.Fatalf("expected one clear call for cohort %d, got %+v", cohort.ID, snap.clearCohorts)
@@ -391,32 +310,22 @@ func TestAnalysisCohortClearInvokesController(t *testing.T) {
 }
 
 func TestAnalysisCohortRebuildFailsWhenControllerMissing(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	created, err := srv.store.UpsertAnalysisCohort(AnalysisCohort{SourceType: "tag", SourceTag: "tld"})
 	if err != nil {
 		t.Fatalf("upsert cohort: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost,
-		fmt.Sprintf("/api/v1/analysis/cohorts/%d/rebuild", created.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusServiceUnavailable {
-		t.Fatalf("expected 503, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, fmt.Sprintf("/api/v1/analysis/cohorts/%d/rebuild", created.ID), nil)
+	wantStatus(t, resp, http.StatusServiceUnavailable)
 }
 
 func TestDeleteAnalysisCohortRemovesCatalogAndClears(t *testing.T) {
 	srv, spy := newAnalysisAdminTestServer(t)
 	cohort := createAnalysisCohort(t, srv, `{"source_tag":"tld"}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete,
-		fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodDelete, fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID), nil)
+	wantStatus(t, resp, http.StatusNoContent)
 	if _, found := srv.store.GetAnalysisCohort(cohort.ID); found {
 		t.Fatal("expected cohort row to be removed from catalog")
 	}
@@ -428,22 +337,14 @@ func TestDeleteAnalysisCohortRemovesCatalogAndClears(t *testing.T) {
 
 func TestDeleteAnalysisCohortNotFound(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/analysis/cohorts/999", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/analysis/cohorts/999", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestAnalysisCohortRebuildNotFound(t *testing.T) {
 	srv, _ := newAnalysisAdminTestServer(t)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/analysis/cohorts/42/rebuild", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/analysis/cohorts/42/rebuild", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestCreateAnalysisCohortKeepsCatalogWhenAsyncRebuildFails(t *testing.T) {
@@ -455,14 +356,8 @@ func TestCreateAnalysisCohortKeepsCatalogWhenAsyncRebuildFails(t *testing.T) {
 	srv, spy := newAnalysisAdminTestServer(t)
 	spy.rebuildErr = errors.New("boom")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/analysis/cohorts",
-		bytes.NewBufferString(`{"source_tag":"tld","analysis_enabled":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusAccepted {
-		t.Fatalf("expected 202, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/analysis/cohorts", `{"source_tag":"tld","analysis_enabled":true}`)
+	wantStatus(t, resp, http.StatusAccepted)
 	waitForCond(t, func() bool {
 		snap := spy.snapshot()
 		return len(snap.rebuildCohorts) == 1
@@ -477,15 +372,8 @@ func TestPatchAnalysisCohortRollsBackWhenReconcileFails(t *testing.T) {
 	cohort := createAnalysisCohort(t, srv, `{"source_tag":"tld","label":"Before","analysis_enabled":true}`)
 	spy.reconcileErr = errors.New("boom")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPatch,
-		fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID),
-		bytes.NewBufferString(`{"label":"After","public_enabled":true}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusInternalServerError {
-		t.Fatalf("expected 500, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPatch, fmt.Sprintf("/api/v1/analysis/cohorts/%d", cohort.ID), `{"label":"After","public_enabled":true}`)
+	wantStatus(t, resp, http.StatusInternalServerError)
 	reloaded, ok := srv.store.GetAnalysisCohort(cohort.ID)
 	if !ok {
 		t.Fatalf("expected cohort to remain after rollback")

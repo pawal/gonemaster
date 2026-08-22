@@ -1,23 +1,17 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
 func TestGetSettings(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	var settings map[string]settingEntry
 	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
@@ -48,15 +42,13 @@ func TestGetSettings(t *testing.T) {
 }
 
 func TestGetSettingsWithConfigSources(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.SetConfigSources(map[string]SettingSource{
 		"worker_count": SourceCLIFlag,
 		"min_level":    SourceConfigFile,
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 
 	var settings map[string]settingEntry
 	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
@@ -72,14 +64,12 @@ func TestGetSettingsWithConfigSources(t *testing.T) {
 }
 
 func TestGetSettingsDatabaseOverride(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	if err := srv.store.SetSetting("worker_count", "16"); err != nil {
 		t.Fatalf("SetSetting: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 
 	var settings map[string]settingEntry
 	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
@@ -92,7 +82,7 @@ func TestGetSettingsDatabaseOverride(t *testing.T) {
 }
 
 func TestPutSettings(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	body := `{
 		"worker_count": 16,
@@ -100,14 +90,9 @@ func TestPutSettings(t *testing.T) {
 		"show_nameserver_timings_admin": false,
 		"show_nameserver_timings_public": false
 	}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", body)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	// Verify settings were stored.
 	v, ok := srv.store.GetSetting("worker_count")
@@ -151,17 +136,12 @@ func TestPutSettings(t *testing.T) {
 }
 
 func TestPutSettingsReadonlyRejected(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	body := `{"listen_addr": "0.0.0.0:9090"}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", body)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 
 	var errResp ErrorResponse
 	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
@@ -173,32 +153,23 @@ func TestPutSettingsReadonlyRejected(t *testing.T) {
 }
 
 func TestPutSettingsInvalidBody(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString("not json"))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", "not json")
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestSettingsMethodNotAllowed(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/settings", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/settings", nil)
 
-	if resp.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusMethodNotAllowed)
 }
 
 func TestApplyDatabaseSettingsOnStartup(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Simulate DB settings that were persisted from a previous session.
 	_ = srv.store.SetSetting("worker_count", "16")
@@ -223,7 +194,7 @@ func TestApplyDatabaseSettingsOnStartup(t *testing.T) {
 }
 
 func TestApplyDatabaseSettingsRespectsCliFlags(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.SetConfigSources(map[string]SettingSource{
 		"worker_count": SourceCLIFlag,
 	})
@@ -244,7 +215,7 @@ func TestApplyDatabaseSettingsRespectsCliFlags(t *testing.T) {
 }
 
 func TestPutSettingsHotReloadsRuntime(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Default: rate limiting disabled, worker_count=16.
 	if srv.rateLimiter != nil {
@@ -256,14 +227,9 @@ func TestPutSettingsHotReloadsRuntime(t *testing.T) {
 
 	// PUT to change settings.
 	body := `{"worker_count": 8, "min_level": "ERROR", "rate_limit_enabled": true, "rate_limit_max": 5}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", body)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	// Verify runtime config was updated.
 	if srv.cfg.WorkerCount != 8 {
@@ -280,11 +246,8 @@ func TestPutSettingsHotReloadsRuntime(t *testing.T) {
 	}
 
 	// Disable rate limiting.
-	body2 := `{"rate_limit_enabled": false}`
-	resp2 := httptest.NewRecorder()
-	req2 := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body2))
-	req2.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp2, req2)
+	resp2 := doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"rate_limit_enabled": false}`)
+	wantStatus(t, resp2, http.StatusOK)
 
 	if srv.rateLimiter != nil {
 		t.Fatal("expected rateLimiter=nil after disabling rate limiting")
@@ -292,7 +255,7 @@ func TestPutSettingsHotReloadsRuntime(t *testing.T) {
 }
 
 func TestApplyDatabaseSettingsRetentionDays(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	_ = srv.store.SetSetting("retention_days", "30")
 	srv.ApplyDatabaseSettings()
 
@@ -302,7 +265,7 @@ func TestApplyDatabaseSettingsRetentionDays(t *testing.T) {
 }
 
 func TestApplyDatabaseSettingsPublicURL(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	_ = srv.store.SetSetting("public_url", "https://dns.example.com")
 	srv.ApplyDatabaseSettings()
 
@@ -312,7 +275,7 @@ func TestApplyDatabaseSettingsPublicURL(t *testing.T) {
 }
 
 func TestApplyDatabaseSettingsRateLimitWindow(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	_ = srv.store.SetSetting("rate_limit_window", "5m")
 	srv.ApplyDatabaseSettings()
 
@@ -322,7 +285,7 @@ func TestApplyDatabaseSettingsRateLimitWindow(t *testing.T) {
 }
 
 func TestApplyDatabaseSettingsIgnoresInvalidValues(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	_ = srv.store.SetSetting("worker_count", "not-a-number")
 	_ = srv.store.SetSetting("rate_limit_window", "invalid")
 	srv.ApplyDatabaseSettings()
@@ -350,13 +313,8 @@ func TestPutSettingsResizesWorkerPool(t *testing.T) {
 
 	// Scale up to 5 via the settings API.
 	body := `{"worker_count": 5}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("PUT settings: expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", body)
+	wantStatus(t, resp, http.StatusOK)
 
 	srv.workers.mu.Lock()
 	after := len(srv.workers.cancels)
@@ -367,13 +325,8 @@ func TestPutSettingsResizesWorkerPool(t *testing.T) {
 
 	// Scale down to 3.
 	body = `{"worker_count": 3}`
-	resp = httptest.NewRecorder()
-	req = httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("PUT settings: expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp = doJSON(t, srv, http.MethodPut, "/api/v1/settings", body)
+	wantStatus(t, resp, http.StatusOK)
 
 	srv.workers.mu.Lock()
 	after = len(srv.workers.cancels)
@@ -384,7 +337,7 @@ func TestPutSettingsResizesWorkerPool(t *testing.T) {
 }
 
 func TestApplyDatabaseSettingsHotCacheTTL(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	_ = srv.store.SetSetting("cross_job_hot_cache_ttl_seconds", "120")
 	srv.ApplyDatabaseSettings()
 
@@ -394,7 +347,7 @@ func TestApplyDatabaseSettingsHotCacheTTL(t *testing.T) {
 }
 
 func TestApplyDatabaseSettingsHotCacheTTLIgnoresInvalid(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	_ = srv.store.SetSetting("cross_job_hot_cache_ttl_seconds", "not-a-number")
 	srv.ApplyDatabaseSettings()
 
@@ -404,17 +357,12 @@ func TestApplyDatabaseSettingsHotCacheTTLIgnoresInvalid(t *testing.T) {
 }
 
 func TestPutSettingsUpdatesHotCacheTTL(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	body := `{"cross_job_hot_cache_ttl_seconds": 300}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", body)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	if srv.cfg.CrossJobHotCacheTTLSeconds != 300 {
 		t.Fatalf("CrossJobHotCacheTTLSeconds after PUT: got %d, want 300", srv.cfg.CrossJobHotCacheTTLSeconds)
@@ -422,11 +370,9 @@ func TestPutSettingsUpdatesHotCacheTTL(t *testing.T) {
 }
 
 func TestGetSettingsIncludesHotCacheTTL(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 
 	var settings map[string]settingEntry
 	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
@@ -451,17 +397,12 @@ func TestGetSettingsIncludesHotCacheTTL(t *testing.T) {
 }
 
 func TestPutSettingsUpdatesPurgeInterval(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	body := `{"purge_interval_seconds": 1800}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", body)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 	if srv.cfg.Database.PurgeIntervalSeconds != 1800 {
 		t.Fatalf("PurgeIntervalSeconds after PUT: got %d, want 1800", srv.cfg.Database.PurgeIntervalSeconds)
 	}
@@ -473,11 +414,9 @@ func TestPutSettingsUpdatesPurgeInterval(t *testing.T) {
 }
 
 func TestGetSettingsIncludesPurgeInterval(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 
 	var settings map[string]settingEntry
 	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
@@ -503,15 +442,11 @@ func TestGetSettingsIncludesPurgeInterval(t *testing.T) {
 }
 
 func TestPublicInfoEndpointDefault(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/info", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/info", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	var info publicInfoResponse
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
@@ -531,13 +466,9 @@ func TestPublicInfoEndpointReflectsConfig(t *testing.T) {
 	cfg.ShowNameserverTimingsPublic = false
 	srv := New(cfg)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/pub/api/v1/info", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/info", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	var info publicInfoResponse
 	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
@@ -552,15 +483,11 @@ func TestPublicInfoEndpointReflectsConfig(t *testing.T) {
 }
 
 func TestFeaturesEndpointDefault(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/features", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/features", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	var feat featuresResponse
 	if err := json.NewDecoder(resp.Body).Decode(&feat); err != nil {
@@ -580,13 +507,9 @@ func TestFeaturesEndpointReflectsConfig(t *testing.T) {
 	cfg.ShowNameserverTimingsAdmin = false
 	srv := New(cfg)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/features", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/features", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	var feat featuresResponse
 	if err := json.NewDecoder(resp.Body).Decode(&feat); err != nil {
@@ -603,26 +526,19 @@ func TestFeaturesEndpointReflectsConfig(t *testing.T) {
 func TestPutSettingsAllowNonGlobalTargets(t *testing.T) {
 	// The query-guard server policy is a settable admin setting that hot-reloads
 	// into the running config and is reported by GET /settings.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	if srv.cfg.PublicAPI.AllowNonGlobalTargets {
 		t.Fatal("expected AllowNonGlobalTargets default false")
 	}
 
 	body := `{"allow_non_global_targets": true}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/settings", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", body)
+	wantStatus(t, resp, http.StatusOK)
 	if !srv.cfg.PublicAPI.AllowNonGlobalTargets {
 		t.Fatal("expected AllowNonGlobalTargets true after PUT")
 	}
 
-	getResp := httptest.NewRecorder()
-	getReq := httptest.NewRequest(http.MethodGet, "/api/v1/settings", nil)
-	srv.Handler().ServeHTTP(getResp, getReq)
+	getResp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 	var settings map[string]settingEntry
 	if err := json.NewDecoder(getResp.Body).Decode(&settings); err != nil {
 		t.Fatalf("decode: %v", err)

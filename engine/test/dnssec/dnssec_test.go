@@ -25,7 +25,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
-	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/util"
 	"codeberg.org/pawal/gonemaster/engine/zone"
@@ -83,17 +82,10 @@ func TestDNSSEC01DigestMatrix(t *testing.T) {
 func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"ns1.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake root addresses: %v", err)
-	}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns-child.example": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake child addresses: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".":       {"ns1.root": {"192.0.2.1"}},
+		"example": {"ns-child.example": {"192.0.2.53"}},
+	})
 
 	parent, err := zone.NewWithRecursor(".", r)
 	if err != nil {
@@ -294,17 +286,10 @@ func TestDNSSEC01KeyAlgoOK(t *testing.T) {
 func TestDNSSEC01KeyAlgoUndelegated(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	r := &recursor.Recursor{}
-	if err := r.AddFakeAddresses(".", map[string][]string{
-		"ns1.root": {"192.0.2.1"},
-	}); err != nil {
-		t.Fatalf("add fake root addresses: %v", err)
-	}
-	if err := r.AddFakeAddresses("example", map[string][]string{
-		"ns-child.example": {"192.0.2.53"},
-	}); err != nil {
-		t.Fatalf("add fake child addresses: %v", err)
-	}
+	r := tctest.Recursor(t, map[string]map[string][]string{
+		".":       {"ns1.root": {"192.0.2.1"}},
+		"example": {"ns-child.example": {"192.0.2.53"}},
+	})
 
 	parent, err := zone.NewWithRecursor(".", r)
 	if err != nil {

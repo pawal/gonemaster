@@ -39,12 +39,7 @@ func TestNewWithOptionsRetentionDaysZeroNoPurge(t *testing.T) {
 
 	old := time.Now().UTC().Add(-365 * 24 * time.Hour)
 	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
-	if _, err := srv.store.Create(job); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if err := srv.store.GraduateJob(job, nil); err != nil {
-		t.Fatalf("graduate: %v", err)
-	}
+	createAndGraduate(t, srv.store, job, nil)
 
 	srv.Start()
 	time.Sleep(30 * time.Millisecond)
@@ -62,12 +57,7 @@ func TestStartPurgeLoopPurgesOldJobs(t *testing.T) {
 	old := time.Now().UTC().Add(-time.Duration(cutoffAge+1) * 24 * time.Hour)
 
 	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
-	if _, err := store.Create(job); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if err := store.GraduateJob(job, nil); err != nil {
-		t.Fatalf("graduate: %v", err)
-	}
+	createAndGraduate(t, store, job, nil)
 
 	logger, recCh := newChanLogger(10)
 
@@ -169,12 +159,7 @@ func TestStartPurgeLoopPreservesNewJobs(t *testing.T) {
 
 	recent := time.Now().UTC()
 	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: recent, FinishedAt: recent}
-	if _, err := store.Create(job); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if err := store.GraduateJob(job, nil); err != nil {
-		t.Fatalf("graduate: %v", err)
-	}
+	createAndGraduate(t, store, job, nil)
 
 	logger, _ := newChanLogger(10)
 	ctx := t.Context()
@@ -204,12 +189,7 @@ func TestPurgeLoopRetentionDaysDynamic(t *testing.T) {
 	// Create a very old job.
 	old := time.Now().UTC().Add(-180 * 24 * time.Hour)
 	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
-	if _, err := store.Create(job); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if err := store.GraduateJob(job, nil); err != nil {
-		t.Fatalf("graduate: %v", err)
-	}
+	createAndGraduate(t, store, job, nil)
 
 	// With retention disabled the run should be preserved.
 	time.Sleep(40 * time.Millisecond)
@@ -241,12 +221,7 @@ func TestRunPurgeLoopRecordsPurgeMetric(t *testing.T) {
 	store := NewInMemoryJobStore()
 	old := time.Now().UTC().Add(-91 * 24 * time.Hour)
 	job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
-	if _, err := store.Create(job); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if err := store.GraduateJob(job, nil); err != nil {
-		t.Fatalf("graduate: %v", err)
-	}
+	createAndGraduate(t, store, job, nil)
 
 	metrics := NewMetricsCollector(DefaultConfig())
 	logger, recCh := newChanLogger(4)
@@ -284,12 +259,7 @@ func TestRunPurgeLoopAppliesIntervalChange(t *testing.T) {
 	addOldJob := func(id string) {
 		old := time.Now().UTC().Add(-91 * 24 * time.Hour)
 		job := Job{ID: id, Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
-		if _, err := store.Create(job); err != nil {
-			t.Fatalf("create %s: %v", id, err)
-		}
-		if err := store.GraduateJob(job, nil); err != nil {
-			t.Fatalf("graduate %s: %v", id, err)
-		}
+		createAndGraduate(t, store, job, nil)
 	}
 	waitForPurge := func(label string) {
 		select {

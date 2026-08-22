@@ -252,12 +252,7 @@ func TestListJobsFiltersBySeverity(t *testing.T) {
 	// Three graduated runs: clean (NOTICE only), a WARNING, and an ERROR.
 	graduate := func(id, domain, level string) {
 		job := Job{ID: id, Domain: domain, Status: JobSucceeded, CreatedAt: now, StartedAt: now, FinishedAt: now}
-		if _, err := srv.store.Create(job); err != nil {
-			t.Fatalf("create %s: %v", id, err)
-		}
-		if err := srv.store.GraduateJob(job, []engine.LogEntry{{Level: level}}); err != nil {
-			t.Fatalf("graduate %s: %v", id, err)
-		}
+		createAndGraduate(t, srv.store, job, []engine.LogEntry{{Level: level}})
 	}
 	graduate("job_clean", "clean.example", "NOTICE")
 	graduate("job_warn", "warn.example", "WARNING")
@@ -1292,12 +1287,7 @@ func TestHandleJobsPurge(t *testing.T) {
 		srv := newTestServer(t)
 		old := time.Now().UTC().Add(-48 * time.Hour)
 		job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
-		if _, err := srv.store.Create(job); err != nil {
-			t.Fatalf("create: %v", err)
-		}
-		if err := srv.store.GraduateJob(job, nil); err != nil {
-			t.Fatalf("graduate: %v", err)
-		}
+		createAndGraduate(t, srv.store, job, nil)
 
 		resp := postPurge(srv, `{"older_than_days":1}`)
 		wantStatus(t, resp, http.StatusOK)
@@ -1314,12 +1304,7 @@ func TestHandleJobsPurge(t *testing.T) {
 		srv := New(cfg)
 		old := time.Now().UTC().Add(-48 * time.Hour)
 		job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
-		if _, err := srv.store.Create(job); err != nil {
-			t.Fatalf("create: %v", err)
-		}
-		if err := srv.store.GraduateJob(job, nil); err != nil {
-			t.Fatalf("graduate: %v", err)
-		}
+		createAndGraduate(t, srv.store, job, nil)
 
 		resp := postPurge(srv, "")
 		wantStatus(t, resp, http.StatusOK)

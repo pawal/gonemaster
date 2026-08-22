@@ -131,13 +131,11 @@ func TestListEntriesLatestOnly(t *testing.T) {
 	now := time.Now().UTC()
 	job1 := Job{ID: newID("job"), Domain: "example.com", Status: JobSucceeded,
 		CreatedAt: now, StartedAt: now, FinishedAt: now}
-	_, _ = srv.store.Create(job1)
-	_ = srv.store.GraduateJob(job1, []engine.LogEntry{{Module: "Old", Level: "INFO"}})
+	createAndGraduate(t, srv.store, job1, []engine.LogEntry{{Module: "Old", Level: "INFO"}})
 
 	job2 := Job{ID: newID("job"), Domain: "example.com", Status: JobSucceeded,
 		CreatedAt: now.Add(time.Second), StartedAt: now.Add(time.Second), FinishedAt: now.Add(time.Second)}
-	_, _ = srv.store.Create(job2)
-	_ = srv.store.GraduateJob(job2, []engine.LogEntry{{Module: "New", Level: "WARNING"}})
+	createAndGraduate(t, srv.store, job2, []engine.LogEntry{{Module: "New", Level: "WARNING"}})
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?latest=true", nil)
 	var list EntryList

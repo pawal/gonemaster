@@ -367,14 +367,9 @@ func TestInMemoryJobStorePurgeOlderThanDeletesTerminalRuns(t *testing.T) {
 		{"c1", JobCanceled},
 		{"e1", JobExpired},
 	} {
-		job := Job{ID: tc.id, Domain: "example.com", Status: tc.status, CreatedAt: old, FinishedAt: old}
-		if _, err := store.Create(job); err != nil {
-			t.Fatalf("create %s: %v", tc.id, err)
-		}
-		job.FinishedAt = old
-		if err := store.GraduateJob(job, nil); err != nil {
-			t.Fatalf("graduate %s: %v", tc.id, err)
-		}
+		createAndGraduate(t, store, Job{
+			ID: tc.id, Domain: "example.com", Status: tc.status, CreatedAt: old, FinishedAt: old,
+		}, nil)
 	}
 
 	n, err := store.PurgeOlderThan(cutoff)
@@ -454,16 +449,9 @@ func TestInMemoryJobStorePurgeDeletesEntries(t *testing.T) {
 	cutoff := time.Now().UTC()
 	old := cutoff.Add(-24 * time.Hour)
 
-	job := Job{ID: "s1", Domain: "example.com", Status: JobSucceeded,
-		CreatedAt: old, FinishedAt: old}
-	if _, err := store.Create(job); err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	if err := store.GraduateJob(job, []engine.LogEntry{
-		{Module: "DNS", Tag: "TAG", Level: "NOTICE", Timestamp: 1.0},
-	}); err != nil {
-		t.Fatalf("graduate: %v", err)
-	}
+	createAndGraduate(t, store, Job{
+		ID: "s1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old,
+	}, []engine.LogEntry{{Module: "DNS", Tag: "TAG", Level: "NOTICE", Timestamp: 1.0}})
 
 	if _, err := store.PurgeOlderThan(cutoff); err != nil {
 		t.Fatalf("purge: %v", err)
@@ -491,15 +479,9 @@ func TestInMemoryJobStorePurgeByTagDeletesTaggedRuns(t *testing.T) {
 	// Two domains tagged "tld", one untagged domain.
 	for _, name := range []string{"se", "dk", "other.example"} {
 		id := name
-		job := Job{ID: id, Domain: name, Status: JobSucceeded, CreatedAt: now, FinishedAt: now}
-		if _, err := store.Create(job); err != nil {
-			t.Fatalf("create %s: %v", id, err)
-		}
-		if err := store.GraduateJob(job, []engine.LogEntry{
-			{Module: "DNS", Tag: "TAG", Level: "NOTICE", Timestamp: 1.0},
-		}); err != nil {
-			t.Fatalf("graduate %s: %v", id, err)
-		}
+		createAndGraduate(t, store, Job{
+			ID: id, Domain: name, Status: JobSucceeded, CreatedAt: now, FinishedAt: now,
+		}, []engine.LogEntry{{Module: "DNS", Tag: "TAG", Level: "NOTICE", Timestamp: 1.0}})
 	}
 	if err := store.CreateTag("tld", ""); err != nil {
 		t.Fatalf("CreateTag: %v", err)

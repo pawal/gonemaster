@@ -1,11 +1,8 @@
 package server
 
 import (
-	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 )
 
@@ -14,24 +11,14 @@ import (
 func createTag(t *testing.T, srv *Server, name, description string) Tag {
 	t.Helper()
 	body := fmt.Sprintf(`{"name":%q,"description":%q}`, name, description)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusCreated {
-		t.Fatalf("createTag %q: expected 201, got %d: %s", name, resp.Code, resp.Body)
-	}
-	var tag Tag
-	if err := json.NewDecoder(resp.Body).Decode(&tag); err != nil {
-		t.Fatalf("createTag decode: %v", err)
-	}
-	return tag
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags", body)
+	return mustJSON[Tag](t, resp, http.StatusCreated)
 }
 
 // --- POST /api/v1/tags -------------------------------------------------------
 
 func TestCreateTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	tag := createTag(t, srv, "tld", "top-level domains")
 
 	if tag.Name != "tld" {
@@ -43,81 +30,52 @@ func TestCreateTag(t *testing.T) {
 }
 
 func TestCreateTagMissingName(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags", bytes.NewBufferString(`{"name":""}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags", `{"name":""}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestCreateTagDuplicate(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags", bytes.NewBufferString(`{"name":"tld"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags", `{"name":"tld"}`)
+	wantStatus(t, resp, http.StatusConflict)
 }
 
 // --- GET /api/v1/tags --------------------------------------------------------
 
 func TestListTagsEmpty(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var tags []Tag
-	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags", nil)
+	tags := mustJSON[[]Tag](t, resp, http.StatusOK)
 	if len(tags) != 0 {
 		t.Fatalf("expected 0 tags, got %d", len(tags))
 	}
 }
 
 func TestListTagsReturnsTags(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "alpha", "")
 	createTag(t, srv, "beta", "")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var tags []Tag
-	if err := json.NewDecoder(resp.Body).Decode(&tags); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags", nil)
+	tags := mustJSON[[]Tag](t, resp, http.StatusOK)
 	if len(tags) != 2 {
 		t.Fatalf("expected 2 tags, got %d", len(tags))
 	}
 }
 
 func TestListTagsDomainCount(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	if err := srv.store.TagDomains("tld", []int64{d.ID}); err != nil {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	var tags []Tag
-	_ = json.NewDecoder(resp.Body).Decode(&tags)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags", nil)
+	tags := mustJSON[[]Tag](t, resp, http.StatusOK)
 	if tags[0].DomainCount != 1 {
 		t.Fatalf("expected domain_count=1, got %d", tags[0].DomainCount)
 	}
@@ -126,48 +84,30 @@ func TestListTagsDomainCount(t *testing.T) {
 // --- PUT /api/v1/tags/{name} -------------------------------------------------
 
 func TestUpdateTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "old description")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/tags/tld", bytes.NewBufferString(`{"description":"new description"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var tag Tag
-	if err := json.NewDecoder(resp.Body).Decode(&tag); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/tags/tld", `{"description":"new description"}`)
+	tag := mustJSON[Tag](t, resp, http.StatusOK)
 	if tag.Description != "new description" {
 		t.Fatalf("expected updated description, got %q", tag.Description)
 	}
 }
 
 func TestUpdateTagNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/tags/ghost", bytes.NewBufferString(`{"description":"x"}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/tags/ghost", `{"description":"x"}`)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 // --- DELETE /api/v1/tags/{name} ----------------------------------------------
 
 func TestDeleteTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/tags/tld", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/tags/tld", nil)
+	wantStatus(t, resp, http.StatusNoContent)
 
 	// Tag should be gone.
 	_, ok := srv.store.GetTag("tld")
@@ -177,17 +117,13 @@ func TestDeleteTag(t *testing.T) {
 }
 
 func TestDeleteTagNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/tags/ghost", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/tags/ghost", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestDeleteTagBlockedByCohort(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	if _, err := srv.store.UpsertAnalysisCohort(AnalysisCohort{
 		SourceType: "tag", SourceTag: "tld", Label: "TLDs",
@@ -195,12 +131,8 @@ func TestDeleteTagBlockedByCohort(t *testing.T) {
 		t.Fatalf("UpsertAnalysisCohort: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/tags/tld", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusConflict {
-		t.Fatalf("expected 409, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/tags/tld", nil)
+	wantStatus(t, resp, http.StatusConflict)
 	// Tag must still exist.
 	if _, ok := srv.store.GetTag("tld"); !ok {
 		t.Fatal("expected tag to survive a blocked delete")
@@ -210,25 +142,17 @@ func TestDeleteTagBlockedByCohort(t *testing.T) {
 // --- POST /api/v1/tags/{name}/purge ------------------------------------------
 
 func TestTagPurge(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	d := makeGraduatedJob(t, srv, "se", JobSucceeded)
 	if err := srv.store.TagDomains("tld", []int64{d.ID}); err != nil {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags/tld/purge", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var out struct {
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags/tld/purge", nil)
+	out := mustJSON[struct {
 		PurgedRuns int64 `json:"purged_runs"`
-	}
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	}](t, resp, http.StatusOK)
 	if out.PurgedRuns != 1 {
 		t.Fatalf("expected purged_runs=1, got %d", out.PurgedRuns)
 	}
@@ -238,30 +162,20 @@ func TestTagPurge(t *testing.T) {
 }
 
 func TestTagPurgeNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags/ghost/purge", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags/ghost/purge", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 // --- POST /api/v1/tags/{name}/domains ----------------------------------------
 
 func TestAddTagDomains(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags/tld/domains",
-		bytes.NewBufferString(`{"domains":["example.com"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags/tld/domains", `{"domains":["example.com"]}`)
+	wantStatus(t, resp, http.StatusNoContent)
 
 	tag, _ := srv.store.GetTag("tld")
 	if tag.DomainCount != 1 {
@@ -271,17 +185,11 @@ func TestAddTagDomains(t *testing.T) {
 
 func TestAddTagDomainsCreatesUnknownDomain(t *testing.T) {
 	// Domains that don't exist yet should be created via GetOrCreateDomain.
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags/tld/domains",
-		bytes.NewBufferString(`{"domains":["new.example.com"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags/tld/domains", `{"domains":["new.example.com"]}`)
+	wantStatus(t, resp, http.StatusNoContent)
 
 	_, ok := srv.store.GetDomainByName("new.example.com")
 	if !ok {
@@ -290,49 +198,31 @@ func TestAddTagDomainsCreatesUnknownDomain(t *testing.T) {
 }
 
 func TestAddTagDomainsTagNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags/ghost/domains",
-		bytes.NewBufferString(`{"domains":["example.com"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags/ghost/domains", `{"domains":["example.com"]}`)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestAddTagDomainsMissingBody(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/tags/tld/domains",
-		bytes.NewBufferString(`{"domains":[]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/tags/tld/domains", `{"domains":[]}`)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 // --- DELETE /api/v1/tags/{name}/domains --------------------------------------
 
 func TestRemoveTagDomains(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	if err := srv.store.TagDomains("tld", []int64{d.ID}); err != nil {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/tags/tld/domains",
-		bytes.NewBufferString(`{"domains":["example.com"]}`))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/tags/tld/domains", `{"domains":["example.com"]}`)
+	wantStatus(t, resp, http.StatusNoContent)
 
 	tag, _ := srv.store.GetTag("tld")
 	if tag.DomainCount != 0 {
@@ -343,7 +233,7 @@ func TestRemoveTagDomains(t *testing.T) {
 // --- GET /api/v1/tags/{name}/domains -----------------------------------------
 
 func TestListTagDomains(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	d1 := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	d2 := makeGraduatedJob(t, srv, "example.net", JobSucceeded)
@@ -352,51 +242,31 @@ func TestListTagDomains(t *testing.T) {
 		t.Fatalf("tag domains: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags/tld/domains", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var list DomainList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags/tld/domains", nil)
+	list := mustJSON[DomainList](t, resp, http.StatusOK)
 	if list.Total != 2 {
 		t.Fatalf("expected total=2, got %d", list.Total)
 	}
 }
 
 func TestListTagDomainsNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags/ghost/domains", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags/ghost/domains", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 // --- GET /api/v1/tags/{name}/summary -----------------------------------------
 
 func TestTagSummary(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	if err := srv.store.TagDomains("tld", []int64{d.ID}); err != nil {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags/tld/summary", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var summary TagSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags/tld/summary", nil)
+	summary := mustJSON[TagSummary](t, resp, http.StatusOK)
 	if summary.Tag != "tld" {
 		t.Fatalf("expected tag=tld, got %q", summary.Tag)
 	}
@@ -406,17 +276,13 @@ func TestTagSummary(t *testing.T) {
 }
 
 func TestTagSummaryNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags/ghost/summary", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags/ghost/summary", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestTagSummaryIncludesGrades(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "prod", "")
 
 	// Graduate one clean domain (gets a grade).
@@ -425,16 +291,8 @@ func TestTagSummaryIncludesGrades(t *testing.T) {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags/prod/summary", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var summary TagSummary
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags/prod/summary", nil)
+	summary := mustJSON[TagSummary](t, resp, http.StatusOK)
 	if len(summary.Grades) == 0 {
 		t.Fatal("expected non-empty grades map in tag summary")
 	}

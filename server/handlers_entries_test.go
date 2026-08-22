@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -40,46 +39,30 @@ func makeGraduatedJobWithEntries(t *testing.T, srv *Server, domain string, entri
 // --- GET /api/v1/entries -----------------------------------------------------
 
 func TestListEntriesEmpty(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list EntryList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries", nil)
+	list := mustJSON[EntryList](t, resp, http.StatusOK)
 	if list.Total != 0 {
 		t.Fatalf("expected total=0, got %d", list.Total)
 	}
 }
 
 func TestListEntriesReturnsEntries(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
 		{Module: "Basic", Testcase: "Basic01", Tag: "BASIC_WORKING_GLUE", Level: "INFO"},
 		{Module: "DNSSEC", Testcase: "DNSSEC02", Tag: "NO_KEYS", Level: "WARNING"},
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list EntryList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries", nil)
+	list := mustJSON[EntryList](t, resp, http.StatusOK)
 	if list.Total != 2 {
 		t.Fatalf("expected total=2, got %d", list.Total)
 	}
 }
 
 func TestListEntriesFilterByRun(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d1 := makeGraduatedJobWithEntries(t, srv, "alpha.com", []engine.LogEntry{
 		{Module: "Basic", Level: "INFO"},
 	})
@@ -87,9 +70,7 @@ func TestListEntriesFilterByRun(t *testing.T) {
 		{Module: "DNSSEC", Level: "WARNING"},
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?run="+d1.LatestRunID, nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?run="+d1.LatestRunID, nil)
 	var list EntryList
 	_ = json.NewDecoder(resp.Body).Decode(&list)
 	if list.Total != 1 {
@@ -101,16 +82,14 @@ func TestListEntriesFilterByRun(t *testing.T) {
 }
 
 func TestListEntriesFilterByLevel(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
 		{Module: "Basic", Level: "INFO"},
 		{Module: "DNSSEC", Level: "WARNING"},
 		{Module: "Nameserver", Level: "WARNING"},
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?level=WARNING", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?level=WARNING", nil)
 	var list EntryList
 	_ = json.NewDecoder(resp.Body).Decode(&list)
 	if list.Total != 2 {
@@ -119,15 +98,13 @@ func TestListEntriesFilterByLevel(t *testing.T) {
 }
 
 func TestListEntriesFilterByModule(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
 		{Module: "Basic", Level: "INFO"},
 		{Module: "DNSSEC", Level: "WARNING"},
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?module=DNSSEC", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?module=DNSSEC", nil)
 	var list EntryList
 	_ = json.NewDecoder(resp.Body).Decode(&list)
 	if list.Total != 1 {
@@ -136,7 +113,7 @@ func TestListEntriesFilterByModule(t *testing.T) {
 }
 
 func TestListEntriesFilterByTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	createTag(t, srv, "tld", "")
 	d := makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
 		{Module: "Basic", Level: "INFO"},
@@ -148,9 +125,7 @@ func TestListEntriesFilterByTag(t *testing.T) {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?tag=tld", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?tag=tld", nil)
 	var list EntryList
 	_ = json.NewDecoder(resp.Body).Decode(&list)
 	if list.Total != 1 {
@@ -159,17 +134,13 @@ func TestListEntriesFilterByTag(t *testing.T) {
 }
 
 func TestListEntriesUnknownTagReturns404(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?tag=doesnotexist", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404 for unknown tag, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?tag=doesnotexist", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestListEntriesLatestOnly(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	// Graduate the same domain twice; latest_only should return only entries from the second run.
 	now := time.Now().UTC()
 	job1 := Job{ID: newID("job"), Domain: "example.com", Status: JobSucceeded,
@@ -182,9 +153,7 @@ func TestListEntriesLatestOnly(t *testing.T) {
 	_, _ = srv.store.Create(job2)
 	_ = srv.store.GraduateJob(job2, []engine.LogEntry{{Module: "New", Level: "WARNING"}})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?latest=true", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?latest=true", nil)
 	var list EntryList
 	_ = json.NewDecoder(resp.Body).Decode(&list)
 	if list.Total != 1 {
@@ -196,17 +165,13 @@ func TestListEntriesLatestOnly(t *testing.T) {
 }
 
 func TestListEntriesCSV(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
 		{Module: "Basic", Testcase: "Basic01", Tag: "BASIC_WORKING_GLUE", Level: "INFO"},
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?format=csv", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?format=csv", nil)
+	wantStatus(t, resp, http.StatusOK)
 	ct := resp.Header().Get("Content-Type")
 	if !strings.HasPrefix(ct, "text/csv") {
 		t.Fatalf("expected text/csv content-type, got %q", ct)
@@ -221,21 +186,13 @@ func TestListEntriesCSV(t *testing.T) {
 }
 
 func TestListEntriesIncludesDomainName(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
 		{Module: "Basic", Testcase: "Basic01", Tag: "BASIC_WORKING_GLUE", Level: "INFO"},
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list EntryList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries", nil)
+	list := mustJSON[EntryList](t, resp, http.StatusOK)
 	if len(list.Items) == 0 {
 		t.Fatal("expected at least one entry")
 	}
@@ -245,17 +202,13 @@ func TestListEntriesIncludesDomainName(t *testing.T) {
 }
 
 func TestListEntriesCSVIncludesDomainColumn(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
 		{Module: "Basic", Testcase: "Basic01", Tag: "BASIC_WORKING_GLUE", Level: "INFO"},
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?format=csv", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?format=csv", nil)
+	wantStatus(t, resp, http.StatusOK)
 	body := resp.Body.String()
 	if !strings.Contains(body, "domain") {
 		t.Fatalf("expected 'domain' column in CSV header: %s", body)
@@ -266,38 +219,26 @@ func TestListEntriesCSVIncludesDomainColumn(t *testing.T) {
 }
 
 func TestListEntriesInvalidLimit(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?limit=0", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?limit=0", nil)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestListEntriesInvalidDomain(t *testing.T) {
-	srv := New(DefaultConfig())
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?domain=abc", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?domain=abc", nil)
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestListEntriesCSVIncludesScoreAndGrade(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	// Graduate a job with a WARNING entry - scoring will produce a non-trivial grade.
 	makeGraduatedJobWithEntries(t, srv, "example.com", []engine.LogEntry{
 		{Module: "DNSSEC", Testcase: "DS07", Tag: "DS07_NOT_SIGNED", Level: "WARNING"},
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/entries?format=csv", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?format=csv", nil)
+	wantStatus(t, resp, http.StatusOK)
 	body := resp.Body.String()
 	// Header row must contain score and grade columns.
 	if !strings.Contains(body, "score") {

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
@@ -39,19 +38,11 @@ func makeGraduatedJob(t *testing.T, srv *Server, domain string, status JobStatus
 
 // TestListDomainsEmpty verifies an empty store returns an empty list.
 func TestListDomainsEmpty(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/domains", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list DomainList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list := mustJSON[DomainList](t, resp, http.StatusOK)
 	if list.Total != 0 {
 		t.Fatalf("expected total=0, got %d", list.Total)
 	}
@@ -62,21 +53,13 @@ func TestListDomainsEmpty(t *testing.T) {
 
 // TestListDomainsReturnsDomains verifies graduated jobs appear in the domain list.
 func TestListDomainsReturnsDomains(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "example.net", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/domains", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list DomainList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list := mustJSON[DomainList](t, resp, http.StatusOK)
 	if list.Total != 2 {
 		t.Fatalf("expected total=2, got %d", list.Total)
 	}
@@ -84,21 +67,13 @@ func TestListDomainsReturnsDomains(t *testing.T) {
 
 // TestListDomainsFilterByName verifies the ?name= substring filter.
 func TestListDomainsFilterByName(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJob(t, srv, "alpha.example.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "beta.other.net", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/domains?name=example", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?name=example", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list DomainList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list := mustJSON[DomainList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1, got %d", list.Total)
 	}
@@ -109,7 +84,7 @@ func TestListDomainsFilterByName(t *testing.T) {
 
 // TestListDomainsFilterByTag verifies the ?tag= filter.
 func TestListDomainsFilterByTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d1 := makeGraduatedJob(t, srv, "tagged.example.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "untagged.example.com", JobSucceeded)
 
@@ -120,17 +95,9 @@ func TestListDomainsFilterByTag(t *testing.T) {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/domains?tag=mytag", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?tag=mytag", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list DomainList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list := mustJSON[DomainList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1, got %d", list.Total)
 	}
@@ -141,7 +108,7 @@ func TestListDomainsFilterByTag(t *testing.T) {
 
 // TestListDomainsFilterByNoTag verifies the ?tag=__none__ filter returns only untagged domains.
 func TestListDomainsFilterByNoTag(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d1 := makeGraduatedJob(t, srv, "tagged.example.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "untagged.example.com", JobSucceeded)
 
@@ -152,17 +119,9 @@ func TestListDomainsFilterByNoTag(t *testing.T) {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/domains?tag=__none__", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?tag=__none__", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list DomainList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list := mustJSON[DomainList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1, got %d", list.Total)
 	}
@@ -173,33 +132,21 @@ func TestListDomainsFilterByNoTag(t *testing.T) {
 
 // TestListDomainsInvalidLimit verifies that an out-of-range limit returns 400.
 func TestListDomainsInvalidLimit(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/domains?limit=9999", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?limit=9999", nil)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 // TestGetDomainByID verifies a domain can be fetched by its numeric ID.
 func TestGetDomainByID(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/domains/%d", d.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/domains/%d", d.ID), nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var got Domain
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	got := mustJSON[Domain](t, resp, http.StatusOK)
 	if got.ID != d.ID {
 		t.Fatalf("expected id=%d, got %d", d.ID, got.ID)
 	}
@@ -210,7 +157,7 @@ func TestGetDomainByID(t *testing.T) {
 
 // TestGetDomainByIDIncludesTags verifies that tags are populated in the response.
 func TestGetDomainByIDIncludesTags(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
 	if err := srv.store.CreateTag("tld", ""); err != nil {
@@ -220,17 +167,9 @@ func TestGetDomainByIDIncludesTags(t *testing.T) {
 		t.Fatalf("tag domain: %v", err)
 	}
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/domains/%d", d.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/domains/%d", d.ID), nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var got Domain
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	got := mustJSON[Domain](t, resp, http.StatusOK)
 	if len(got.Tags) != 1 || got.Tags[0] != "tld" {
 		t.Fatalf("expected tags=[tld], got %v", got.Tags)
 	}
@@ -238,48 +177,32 @@ func TestGetDomainByIDIncludesTags(t *testing.T) {
 
 // TestGetDomainByIDNotFound verifies a 404 for a missing domain.
 func TestGetDomainByIDNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/domains/99999", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains/99999", nil)
 
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 // TestGetDomainByIDInvalidID verifies a 404 for a non-numeric or zero ID.
 func TestGetDomainByIDInvalidID(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	for _, path := range []string{"/api/v1/domains/abc", "/api/v1/domains/0", "/api/v1/domains/-1"} {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, path, nil)
-		srv.Handler().ServeHTTP(resp, req)
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("path %s: expected 404, got %d", path, resp.Code)
-		}
+		resp := doJSON(t, srv, http.MethodGet, path, nil)
+		wantStatus(t, resp, http.StatusNotFound)
 	}
 }
 
 // TestGetDomainRunsReturnsRuns verifies run history is returned for a domain.
 func TestGetDomainRunsReturnsRuns(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "example.com", JobSucceeded) // second run
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/domains/%d/runs", d.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/domains/%d/runs", d.ID), nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var list RunList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list := mustJSON[RunList](t, resp, http.StatusOK)
 	if list.Total != 2 {
 		t.Fatalf("expected total=2, got %d", list.Total)
 	}
@@ -292,35 +215,23 @@ func TestGetDomainRunsReturnsRuns(t *testing.T) {
 
 // TestGetDomainRunsDomainNotFound verifies a 404 for an unknown domain ID.
 func TestGetDomainRunsDomainNotFound(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/domains/99999/runs", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains/99999/runs", nil)
 
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 // TestGetDomainRunsPagination verifies limit and offset are respected.
 func TestGetDomainRunsPagination(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/v1/domains/%d/runs?limit=2&offset=0", d.ID), nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/domains/%d/runs?limit=2&offset=0", d.ID), nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d", resp.Code)
-	}
-	var list RunList
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list := mustJSON[RunList](t, resp, http.StatusOK)
 	if list.Total != 3 {
 		t.Fatalf("expected total=3, got %d", list.Total)
 	}
@@ -331,7 +242,7 @@ func TestGetDomainRunsPagination(t *testing.T) {
 
 // TestListDomainsFilterByMinLevel verifies the ?min_level= threshold filter.
 func TestListDomainsFilterByMinLevel(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	makeGraduatedJobWithEntries(t, srv, "info.example.com", []engine.LogEntry{
 		{Module: "Basic", Level: "INFO"},
 	})
@@ -343,12 +254,8 @@ func TestListDomainsFilterByMinLevel(t *testing.T) {
 	})
 
 	t.Run("warning_plus", func(t *testing.T) {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/domains?min_level=WARNING", nil)
-		srv.Handler().ServeHTTP(resp, req)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d", resp.Code)
-		}
+		resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?min_level=WARNING", nil)
+		wantStatus(t, resp, http.StatusOK)
 		var list DomainList
 		_ = json.NewDecoder(resp.Body).Decode(&list)
 		if list.Total != 2 {
@@ -357,9 +264,7 @@ func TestListDomainsFilterByMinLevel(t *testing.T) {
 	})
 
 	t.Run("error_plus", func(t *testing.T) {
-		resp := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/api/v1/domains?min_level=ERROR", nil)
-		srv.Handler().ServeHTTP(resp, req)
+		resp := doJSON(t, srv, http.MethodGet, "/api/v1/domains?min_level=ERROR", nil)
 		var list DomainList
 		_ = json.NewDecoder(resp.Body).Decode(&list)
 		if list.Total != 1 {

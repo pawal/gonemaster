@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -49,15 +48,11 @@ func seedGraduatedBatch(t *testing.T, srv *Server, batchID, tag string) {
 }
 
 func TestHandleBatchDeletePreviewReturnsCounts(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedGraduatedBatch(t, srv, "batch_xyz", "tld")
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches/batch_xyz/delete-preview", nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches/batch_xyz/delete-preview", nil)
+	wantStatus(t, resp, http.StatusOK)
 	var preview BatchDeletePreview
 	if err := json.Unmarshal(resp.Body.Bytes(), &preview); err != nil {
 		t.Fatalf("unmarshal: %v", err)
@@ -71,25 +66,17 @@ func TestHandleBatchDeletePreviewReturnsCounts(t *testing.T) {
 }
 
 func TestHandleBatchDeletePreviewMissingReturns404(t *testing.T) {
-	srv := New(DefaultConfig())
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/batches/missing/delete-preview", nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches/missing/delete-preview", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestHandleDeleteBatchReturns204AndPurges(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedGraduatedBatch(t, srv, "batch_del", "tld")
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/batch_del", nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/batches/batch_del", nil)
+	wantStatus(t, resp, http.StatusNoContent)
 	if _, ok := srv.store.GetBatch("batch_del"); ok {
 		t.Fatal("batch should be gone")
 	}
@@ -99,7 +86,7 @@ func TestHandleDeleteBatchReturns204AndPurges(t *testing.T) {
 }
 
 func TestHandleDeleteBatchIgnoresTerminalJobRows(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	now := time.Now().UTC()
 	if err := srv.store.CreateBatch(Batch{
 		ID:        "batch_terminal_jobs",
@@ -120,12 +107,8 @@ func TestHandleDeleteBatchIgnoresTerminalJobRows(t *testing.T) {
 		t.Fatalf("Create failed job: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/batch_terminal_jobs", nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/batches/batch_terminal_jobs", nil)
+	wantStatus(t, resp, http.StatusNoContent)
 	if _, ok := srv.store.GetBatch("batch_terminal_jobs"); ok {
 		t.Fatal("batch should be gone")
 	}
@@ -135,7 +118,7 @@ func TestHandleDeleteBatchIgnoresTerminalJobRows(t *testing.T) {
 }
 
 func TestHandleDeleteBatchCancelsStaleRunningJobRows(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	now := time.Now().UTC()
 	if err := srv.store.CreateBatch(Batch{
 		ID:        "batch_stale_running",
@@ -155,12 +138,8 @@ func TestHandleDeleteBatchCancelsStaleRunningJobRows(t *testing.T) {
 		t.Fatalf("Create running job: %v", err)
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/batch_stale_running", nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("expected 204, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/batches/batch_stale_running", nil)
+	wantStatus(t, resp, http.StatusNoContent)
 	if _, ok := srv.store.GetBatch("batch_stale_running"); ok {
 		t.Fatal("batch should be gone")
 	}
@@ -181,12 +160,8 @@ func TestHandleDeleteBatchUnpinsCohortDefault(t *testing.T) {
 		t.Fatalf("pin: got %d: %s", resp.Code, resp.Body)
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/"+f.snapshot.BatchID, nil)
-	resp := httptest.NewRecorder()
-	f.srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNoContent {
-		t.Fatalf("delete batch: got %d, want 204: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, f.srv, http.MethodDelete, "/api/v1/batches/"+f.snapshot.BatchID, nil)
+	wantStatus(t, resp, http.StatusNoContent)
 
 	cohort, _ := f.store.GetAnalysisCohort(f.cohort.ID)
 	if cohort.DefaultSnapshotPolicy != DefaultSnapshotPolicyAutoLatest {
@@ -198,87 +173,61 @@ func TestHandleDeleteBatchUnpinsCohortDefault(t *testing.T) {
 }
 
 func TestHandlePatchBatchTogglesSnapshotIntent(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedGraduatedBatch(t, srv, "batch_snap", "tld")
 	if b, _ := srv.store.GetBatch("batch_snap"); b.SnapshotIntent {
 		t.Fatalf("seed batch should default to snapshot_intent=false")
 	}
 
 	body := strings.NewReader(`{"snapshot_intent":true}`)
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/batches/batch_snap", body)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodPatch, "/api/v1/batches/batch_snap", body, noContentType())
+	wantStatus(t, resp, http.StatusOK)
 	if b, _ := srv.store.GetBatch("batch_snap"); !b.SnapshotIntent {
 		t.Fatalf("snapshot_intent should be true after PATCH")
 	}
 
 	body = strings.NewReader(`{"snapshot_intent":false}`)
-	req = httptest.NewRequest(http.MethodPatch, "/api/v1/batches/batch_snap", body)
-	resp = httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp = doJSON(t, srv, http.MethodPatch, "/api/v1/batches/batch_snap", body, noContentType())
+	wantStatus(t, resp, http.StatusOK)
 	if b, _ := srv.store.GetBatch("batch_snap"); b.SnapshotIntent {
 		t.Fatalf("snapshot_intent should be false after second PATCH")
 	}
 }
 
 func TestHandlePatchBatchMissingReturns404(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	body := strings.NewReader(`{"snapshot_intent":true}`)
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/batches/missing", body)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodPatch, "/api/v1/batches/missing", body, noContentType())
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestHandlePatchBatchRequiresField(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedGraduatedBatch(t, srv, "batch_req", "tld")
 	body := strings.NewReader(`{}`)
-	req := httptest.NewRequest(http.MethodPatch, "/api/v1/batches/batch_req", body)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodPatch, "/api/v1/batches/batch_req", body, noContentType())
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestHandleDeleteBatchMissingReturns404(t *testing.T) {
-	srv := New(DefaultConfig())
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/missing", nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/batches/missing", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }
 
 func TestHandleDeleteBatchRejectsMismatchedOrigin(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	seedGraduatedBatch(t, srv, "batch_csrf", "tld")
 
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/batches/batch_csrf", nil)
-	req.Host = "example.com"
-	req.Header.Set("Origin", "https://attacker.example")
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusForbidden {
-		t.Fatalf("expected 403, got %d", resp.Code)
-	}
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/batches/batch_csrf", nil, withHost("example.com"), withOrigin("https://attacker.example"))
+	wantStatus(t, resp, http.StatusForbidden)
 	if _, ok := srv.store.GetBatch("batch_csrf"); !ok {
 		t.Fatal("batch should still exist after CSRF rejection")
 	}
 }
 
 func TestHandleTagBatchesReturnsRecent(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	if err := srv.store.CreateTag("tld", "tld tag"); err != nil {
 		t.Fatalf("CreateTag: %v", err)
 	}
@@ -286,12 +235,8 @@ func TestHandleTagBatchesReturnsRecent(t *testing.T) {
 	seedGraduatedBatch(t, srv, "batch_b", "tld")
 	seedGraduatedBatch(t, srv, "batch_other", "muni")
 
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags/tld/batches", nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body.String())
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags/tld/batches", nil)
+	wantStatus(t, resp, http.StatusOK)
 	var list BatchList
 	if err := json.Unmarshal(resp.Body.Bytes(), &list); err != nil {
 		t.Fatalf("unmarshal: %v", err)
@@ -307,11 +252,7 @@ func TestHandleTagBatchesReturnsRecent(t *testing.T) {
 }
 
 func TestHandleTagBatchesUnknownTagReturns404(t *testing.T) {
-	srv := New(DefaultConfig())
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/tags/does-not-exist/batches", nil)
-	resp := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("expected 404, got %d", resp.Code)
-	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags/does-not-exist/batches", nil)
+	wantStatus(t, resp, http.StatusNotFound)
 }

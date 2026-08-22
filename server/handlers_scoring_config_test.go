@@ -1,10 +1,8 @@
 package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"net/http"
-	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -14,19 +12,11 @@ import (
 )
 
 func TestGetScoringConfigDefault(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/scoring-config", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/scoring-config", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var got scoringConfigResponse
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	got := mustJSON[scoringConfigResponse](t, resp, http.StatusOK)
 	if got.Source != SourceDefault {
 		t.Fatalf("source: got %q, want %q", got.Source, SourceDefault)
 	}
@@ -40,7 +30,7 @@ func TestGetScoringConfigDefault(t *testing.T) {
 }
 
 func TestGetScoringConfigFromDatabase(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Store a custom config in DB.
 	cfg := scoring.DefaultConfig()
@@ -48,17 +38,9 @@ func TestGetScoringConfigFromDatabase(t *testing.T) {
 	raw, _ := json.Marshal(cfg)
 	_ = srv.store.SetSetting("scoring_config", string(raw))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/scoring-config", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/scoring-config", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var got scoringConfigResponse
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	got := mustJSON[scoringConfigResponse](t, resp, http.StatusOK)
 	if got.Source != SourceDatabase {
 		t.Fatalf("source: got %q, want %q", got.Source, SourceDatabase)
 	}
@@ -68,51 +50,27 @@ func TestGetScoringConfigFromDatabase(t *testing.T) {
 }
 
 func TestGetScoringConfigCLIFlag(t *testing.T) {
-	srv := New(DefaultConfig())
-	srv.SetConfigSources(map[string]SettingSource{
+	srv := newTestServer(t, withConfigSources(map[string]SettingSource{
 		"scoring_config": SourceCLIFlag,
-	})
-	// CLI flag requires a real path; simulate by setting path to empty and
-	// injecting a DB value that should be ignored.
-	srv.cfg.ScoringConfigPath = ""
-	_ = srv.store.SetSetting("scoring_config", `{"severity_penalties":{"WARNING":99}}`)
+	}))
+	// A stored value must not win over the CLI flag.
+	_ = srv.store.SetSetting("scoring_config", `{"severity_penalties":{"WARNING":77}}`)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/scoring-config", nil)
-	srv.Handler().ServeHTTP(resp, req)
-
-	// CLI flag with empty path will fail LoadConfig, so this tests source logic.
-	// We only assert the source/readonly, not the body on error.
-	// Instead, set a non-CLI-flag source to verify the source field works.
-	// Reset to just verify source resolution without a real file:
-	srv2 := New(DefaultConfig())
-	srv2.SetConfigSources(map[string]SettingSource{
-		"scoring_config": SourceCLIFlag,
-	})
-	// Override effectiveScoringConfig path indirectly: put a DB value that should NOT win.
-	_ = srv2.store.SetSetting("scoring_config", `{"severity_penalties":{"WARNING":77}}`)
-
-	src := srv2.scoringConfigSource()
-	if src != SourceCLIFlag {
+	if src := srv.scoringConfigSource(); src != SourceCLIFlag {
 		t.Fatalf("source: got %q, want %q", src, SourceCLIFlag)
 	}
 }
 
 func TestPutScoringConfig(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	cfg := scoring.DefaultConfig()
 	cfg.SeverityPenalties["ERROR"] = 50
 	body, _ := json.Marshal(cfg)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/scoring-config", body)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	// Verify stored in DB.
 	raw, ok := srv.store.GetSetting("scoring_config")
@@ -134,44 +92,27 @@ func TestPutScoringConfig(t *testing.T) {
 }
 
 func TestPutScoringConfigReadonlyRejected(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.SetConfigSources(map[string]SettingSource{
 		"scoring_config": SourceCLIFlag,
 	})
 
 	body := `{"severity_penalties":{"WARNING":99}}`
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewBufferString(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/scoring-config", body)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d: %s", resp.Code, resp.Body)
-	}
-	var errResp ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if errResp.Error.Code != "readonly_scoring_config" {
-		t.Fatalf("error code: got %q, want readonly_scoring_config", errResp.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "readonly_scoring_config")
 }
 
 func TestPutScoringConfigInvalidJSON(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewBufferString("not json"))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/scoring-config", "not json")
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestDeleteScoringConfig(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Plant a DB override.
 	cfg := scoring.DefaultConfig()
@@ -179,14 +120,9 @@ func TestDeleteScoringConfig(t *testing.T) {
 	raw, _ := json.Marshal(cfg)
 	_ = srv.store.SetSetting("scoring_config", string(raw))
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/scoring-config", nil)
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/scoring-config", nil, withHeader("Content-Type", "application/json"))
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	wantStatus(t, resp, http.StatusOK)
 
 	// DB setting should be gone.
 	if _, ok := srv.store.GetSetting("scoring_config"); ok {
@@ -200,34 +136,22 @@ func TestDeleteScoringConfig(t *testing.T) {
 }
 
 func TestDeleteScoringConfigReadonlyRejected(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 	srv.SetConfigSources(map[string]SettingSource{
 		"scoring_config": SourceCLIFlag,
 	})
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodDelete, "/api/v1/scoring-config", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/scoring-config", nil)
 
-	if resp.Code != http.StatusBadRequest {
-		t.Fatalf("expected 400, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusBadRequest)
 }
 
 func TestGetScoringConfigDefaults(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/scoring-config/defaults", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/scoring-config/defaults", nil)
 
-	if resp.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var got scoring.Config
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	got := mustJSON[scoring.Config](t, resp, http.StatusOK)
 	defaults := scoring.DefaultConfig()
 	if got.SeverityPenalties["WARNING"] != defaults.SeverityPenalties["WARNING"] {
 		t.Fatalf("defaults WARNING penalty mismatch: got %d", got.SeverityPenalties["WARNING"])
@@ -235,19 +159,15 @@ func TestGetScoringConfigDefaults(t *testing.T) {
 }
 
 func TestScoringConfigMethodNotAllowed(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/scoring-config", nil)
-	srv.Handler().ServeHTTP(resp, req)
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/scoring-config", nil)
 
-	if resp.Code != http.StatusMethodNotAllowed {
-		t.Fatalf("expected 405, got %d", resp.Code)
-	}
+	wantStatus(t, resp, http.StatusMethodNotAllowed)
 }
 
 func TestApplyDatabaseSettingsScoringConfig(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	cfg := scoring.DefaultConfig()
 	cfg.SeverityPenalties["WARNING"] = 42
@@ -299,7 +219,7 @@ func TestApplyDatabaseSettingsScoringConfig(t *testing.T) {
 // current scoring config dynamically - changing the config after graduation
 // changes the score returned by the next GetResult call.
 func TestGetResultRecomputesWithUpdatedConfig(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// Graduate a job under the default config.
 	job := Job{
@@ -331,13 +251,8 @@ func TestGetResultRecomputesWithUpdatedConfig(t *testing.T) {
 	newCfg := scoring.DefaultConfig()
 	newCfg.SeverityPenalties["WARNING"] = 80
 	body, _ := json.Marshal(newCfg)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("PUT: expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/scoring-config", body)
+	wantStatus(t, resp, http.StatusOK)
 
 	// GetResult should recompute using the new config.
 	r2, ok := srv.store.GetResult(created.ID)
@@ -362,13 +277,8 @@ func TestScoringConfigPersistsAcrossServerRestart(t *testing.T) {
 	cfg := scoring.DefaultConfig()
 	cfg.SeverityPenalties["WARNING"] = 88
 	body, _ := json.Marshal(cfg)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv1.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("PUT: expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv1, http.MethodPut, "/api/v1/scoring-config", body)
+	wantStatus(t, resp, http.StatusOK)
 
 	// Simulate a restart: new server instance with the same store.
 	srv2 := newServer(DefaultConfig(), store, NewInMemoryQueue())
@@ -431,16 +341,8 @@ func TestCLIFlagOverrideScoringConfig(t *testing.T) {
 	srv.SetConfigSources(map[string]SettingSource{"scoring_config": SourceCLIFlag})
 
 	// GET must return source=cli_flag, readonly=true, and values from the file.
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/api/v1/scoring-config", nil)
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("GET: expected 200, got %d: %s", resp.Code, resp.Body)
-	}
-	var got scoringConfigResponse
-	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/scoring-config", nil)
+	got := mustJSON[scoringConfigResponse](t, resp, http.StatusOK)
 	if got.Source != SourceCLIFlag {
 		t.Fatalf("source: got %q, want %q", got.Source, SourceCLIFlag)
 	}
@@ -453,29 +355,19 @@ func TestCLIFlagOverrideScoringConfig(t *testing.T) {
 
 	// PUT must be rejected.
 	putBody, _ := json.Marshal(scoring.DefaultConfig())
-	putResp := httptest.NewRecorder()
-	putReq := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewReader(putBody))
-	putReq.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(putResp, putReq)
-	if putResp.Code != http.StatusBadRequest {
-		t.Fatalf("PUT: expected 400, got %d", putResp.Code)
-	}
+	putResp := doJSON(t, srv, http.MethodPut, "/api/v1/scoring-config", putBody)
+	wantStatus(t, putResp, http.StatusBadRequest)
 }
 
 func TestScoringConfigRuntimeUpdateAffectsGraduation(t *testing.T) {
-	srv := New(DefaultConfig())
+	srv := newTestServer(t)
 
 	// PUT a config with a very high WARNING penalty.
 	cfg := scoring.DefaultConfig()
 	cfg.SeverityPenalties["WARNING"] = 80
 	body, _ := json.Marshal(cfg)
-	resp := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodPut, "/api/v1/scoring-config", bytes.NewReader(body))
-	req.Header.Set("Content-Type", "application/json")
-	srv.Handler().ServeHTTP(resp, req)
-	if resp.Code != http.StatusOK {
-		t.Fatalf("PUT scoring-config: expected 200, got %d: %s", resp.Code, resp.Body)
-	}
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/scoring-config", body)
+	wantStatus(t, resp, http.StatusOK)
 
 	// Graduate a job with one WARNING entry.
 	job := Job{

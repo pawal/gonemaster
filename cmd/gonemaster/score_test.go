@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
+	"codeberg.org/pawal/gonemaster/cmd/internal/enginetest"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/scoring"
 )
@@ -20,19 +21,10 @@ func sampleEntries() []engine.LogEntry {
 	}
 }
 
-func stubRunEngineWithEntries(t *testing.T, entries []engine.LogEntry) {
-	t.Helper()
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		return entries, nil
-	}
-	t.Cleanup(func() { runEngine = previous })
-}
-
 // ── --score / --no-score ──────────────────────────────────────────────────────
 
 func TestScoreNotShownByDefault(t *testing.T) {
-	stubRunEngineWithEntries(t, sampleEntries())
+	enginetest.Entries(t, &runEngine, sampleEntries()...)
 	res := clitest.Run(t, run, "example.se")
 	res.RequireCode(t, 0)
 	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
@@ -41,14 +33,14 @@ func TestScoreNotShownByDefault(t *testing.T) {
 }
 
 func TestScoreShownWithFlag(t *testing.T) {
-	stubRunEngineWithEntries(t, sampleEntries())
+	enginetest.Entries(t, &runEngine, sampleEntries()...)
 	res := clitest.Run(t, run, "--score", "example.se")
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "Score:")
 }
 
 func TestNoScoreSuppressesScore(t *testing.T) {
-	stubRunEngineWithEntries(t, sampleEntries())
+	enginetest.Entries(t, &runEngine, sampleEntries()...)
 	res := clitest.Run(t, run, "--score", "--no-score", "example.se")
 	res.RequireCode(t, 0)
 	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
@@ -57,7 +49,7 @@ func TestNoScoreSuppressesScore(t *testing.T) {
 }
 
 func TestScoreShowsCategories(t *testing.T) {
-	stubRunEngineWithEntries(t, sampleEntries())
+	enginetest.Entries(t, &runEngine, sampleEntries()...)
 	res := clitest.Run(t, run, "--score", "example.se")
 	res.RequireCode(t, 0)
 	output := res.Out
@@ -71,7 +63,7 @@ func TestScoreShowsCategories(t *testing.T) {
 func TestScoreNoEntriesShowsHundred(t *testing.T) {
 	// An empty (but non-nil) slice means the engine ran and found nothing wrong.
 	// Expect a perfect score, not N/A.
-	stubRunEngineWithEntries(t, []engine.LogEntry{})
+	enginetest.Entries(t, &runEngine, []engine.LogEntry{}...)
 	res := clitest.Run(t, run, "--score", "example.se")
 	res.RequireCode(t, 0)
 	output := res.Out
@@ -86,7 +78,7 @@ func TestScoreNoEntriesShowsHundred(t *testing.T) {
 // ── --json mode: score goes to stderr ─────────────────────────────────────────
 
 func TestScoreInJSONModeGoesToStderr(t *testing.T) {
-	stubRunEngineWithEntries(t, sampleEntries())
+	enginetest.Entries(t, &runEngine, sampleEntries()...)
 	res := clitest.Run(t, run, "--json", "--score", "example.se")
 	res.RequireCode(t, 0)
 	// stdout must be valid JSON
@@ -102,7 +94,7 @@ func TestScoreInJSONModeGoesToStderr(t *testing.T) {
 }
 
 func TestNoScoreNotShownInJSONModeByDefault(t *testing.T) {
-	stubRunEngineWithEntries(t, sampleEntries())
+	enginetest.Entries(t, &runEngine, sampleEntries()...)
 	res := clitest.Run(t, run, "--json", "example.se")
 	res.RequireCode(t, 0)
 	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
@@ -113,7 +105,7 @@ func TestNoScoreNotShownInJSONModeByDefault(t *testing.T) {
 // ── --raw mode ────────────────────────────────────────────────────────────────
 
 func TestScoreInRawMode(t *testing.T) {
-	stubRunEngineWithEntries(t, sampleEntries())
+	enginetest.Entries(t, &runEngine, sampleEntries()...)
 	res := clitest.Run(t, run, "--raw", "--score", "example.se")
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "Score:")
@@ -122,7 +114,7 @@ func TestScoreInRawMode(t *testing.T) {
 // ── --scoring-config flag ─────────────────────────────────────────────────────
 
 func TestScoringConfigImpliesScore(t *testing.T) {
-	stubRunEngineWithEntries(t, sampleEntries())
+	enginetest.Entries(t, &runEngine, sampleEntries()...)
 
 	cfgPath := clitest.WriteScoringConfig(t)
 
@@ -132,7 +124,7 @@ func TestScoringConfigImpliesScore(t *testing.T) {
 }
 
 func TestScoringConfigNoScoreWins(t *testing.T) {
-	stubRunEngineWithEntries(t, sampleEntries())
+	enginetest.Entries(t, &runEngine, sampleEntries()...)
 
 	cfgPath := clitest.WriteScoringConfig(t)
 
@@ -188,10 +180,10 @@ func TestFilterEntriesByLevel(t *testing.T) {
 func TestScoreDoesNotLeakInfoIntoHumanOutput(t *testing.T) {
 	// Engine returns an INFO entry and a NOTICE entry.
 	// With --score and default min-level (NOTICE), INFO must not appear in output.
-	stubRunEngineWithEntries(t, []engine.LogEntry{
-		{Module: "DNSSEC", Tag: "DS07_SIGNED", Level: "INFO"},
-		{Module: "Zone", Tag: "REFRESH_MINIMUM_VALUE_LOWER", Level: "NOTICE"},
-	})
+	enginetest.Entries(t, &runEngine,
+		engine.LogEntry{Module: "DNSSEC", Tag: "DS07_SIGNED", Level: "INFO"},
+		engine.LogEntry{Module: "Zone", Tag: "REFRESH_MINIMUM_VALUE_LOWER", Level: "NOTICE"},
+	)
 	// Force non-streaming path by NOT using a terminal (no spinner).
 	res := clitest.Run(t, run, "--score", "--no-progress", "example.se")
 	res.RequireCode(t, 0)
@@ -205,10 +197,10 @@ func TestScoreDoesNotLeakInfoIntoHumanOutput(t *testing.T) {
 }
 
 func TestScoreDoesNotLeakInfoIntoJSONOutput(t *testing.T) {
-	stubRunEngineWithEntries(t, []engine.LogEntry{
-		{Module: "DNSSEC", Tag: "DS07_SIGNED", Level: "INFO"},
-		{Module: "Zone", Tag: "REFRESH_MINIMUM_VALUE_LOWER", Level: "NOTICE"},
-	})
+	enginetest.Entries(t, &runEngine,
+		engine.LogEntry{Module: "DNSSEC", Tag: "DS07_SIGNED", Level: "INFO"},
+		engine.LogEntry{Module: "Zone", Tag: "REFRESH_MINIMUM_VALUE_LOWER", Level: "NOTICE"},
+	)
 	res := clitest.Run(t, run, "--json", "--score", "example.se")
 	res.RequireCode(t, 0)
 	var entries []engine.LogEntry

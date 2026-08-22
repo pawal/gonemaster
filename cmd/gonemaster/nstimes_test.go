@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
+	"codeberg.org/pawal/gonemaster/cmd/internal/enginetest"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 )
@@ -255,15 +256,13 @@ func TestWriteNSTimesSortedByName(t *testing.T) {
 }
 
 func TestRunJSONWithNSTimes(t *testing.T) {
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if req.NameserverCache != nil {
 			req.NameserverCache.RecordQueryTime("ns1.example.com/192.0.2.1", 10*time.Millisecond)
 			req.NameserverCache.RecordQueryTime("ns1.example.com/192.0.2.1", 20*time.Millisecond)
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() { runEngine = previous })
+	})
 
 	res := clitest.Run(t, run, "--json", "--nstimes", "--domain", "example.com")
 	res.RequireCode(t, 0)
@@ -297,9 +296,7 @@ func TestRunJSONWithNSTimes(t *testing.T) {
 }
 
 func TestRunJSONWithoutNSTimesIsArray(t *testing.T) {
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) { return nil, nil }
-	t.Cleanup(func() { runEngine = previous })
+	enginetest.Entries(t, &runEngine)
 
 	res := clitest.Run(t, run, "--json", "--domain", "example.com")
 	res.RequireCode(t, 0)

@@ -15,26 +15,13 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
+	"codeberg.org/pawal/gonemaster/cmd/internal/enginetest"
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/cachefile"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 )
-
-func stubRunEngine(t *testing.T, captured *engine.RunRequest) {
-	t.Helper()
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		if captured != nil {
-			*captured = req
-		}
-		return nil, nil
-	}
-	t.Cleanup(func() {
-		runEngine = previous
-	})
-}
 
 func samplePacketCacheFile(t *testing.T) cachefile.File {
 	t.Helper()
@@ -103,7 +90,7 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 
 func TestRunAcceptsPositionalDomain(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "example.com")
 	res.RequireCode(t, 0)
@@ -114,7 +101,7 @@ func TestRunAcceptsPositionalDomain(t *testing.T) {
 
 func TestRunAcceptsPositionalDomainWithFlags(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "--min-level", "INFO", "--json", "example.com")
 	res.RequireCode(t, 0)
@@ -127,7 +114,7 @@ func TestRunAcceptsPositionalDomainWithFlags(t *testing.T) {
 }
 
 func TestRunRejectsMultiplePositionalDomains(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "example.com", "example.net")
 	res.RequireCode(t, 2)
@@ -135,7 +122,7 @@ func TestRunRejectsMultiplePositionalDomains(t *testing.T) {
 }
 
 func TestRunRejectsDomainProvidedTwice(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "example.net")
 	res.RequireCode(t, 2)
@@ -143,7 +130,7 @@ func TestRunRejectsDomainProvidedTwice(t *testing.T) {
 }
 
 func TestRunRejectsInvalidStopLevel(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--stop-level", "BANANA")
 	res.RequireCode(t, 2)
@@ -151,8 +138,7 @@ func TestRunRejectsInvalidStopLevel(t *testing.T) {
 }
 
 func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if req.LogCallback == nil {
 			t.Fatalf("expected log callback")
 		}
@@ -186,9 +172,6 @@ func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
 			t.Fatalf("callback stop warn: %v", cbErr)
 		}
 		return nil, context.Canceled
-	}
-	t.Cleanup(func() {
-		runEngine = previous
 	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--min-level", "INFO", "--stop-level", "WARNING")
@@ -271,8 +254,7 @@ func TestRunRestorePacketCacheLoadsRequestCache(t *testing.T) {
 		t.Fatalf("write fixture: %v", err)
 	}
 
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if req.NameserverCache == nil {
 			t.Fatalf("expected nameserver cache in request")
 		}
@@ -287,9 +269,6 @@ func TestRunRestorePacketCacheLoadsRequestCache(t *testing.T) {
 			t.Fatalf("unexpected restored entry: %+v", exported[0])
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() {
-		runEngine = previous
 	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--restore", restorePath)
@@ -304,8 +283,7 @@ func TestRunSavePacketCacheWritesFile(t *testing.T) {
 	savePath := filepath.Join(dir, "saved-cache.json")
 	fixture := samplePacketCacheFile(t)
 
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if req.NameserverCache == nil {
 			t.Fatalf("expected nameserver cache in request")
 		}
@@ -313,9 +291,6 @@ func TestRunSavePacketCacheWritesFile(t *testing.T) {
 			t.Fatalf("import fixture into run cache: %v", importErr)
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() {
-		runEngine = previous
 	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath)
@@ -345,15 +320,11 @@ func TestRunSaveCompressWritesGzip(t *testing.T) {
 	savePath := filepath.Join(dir, "saved-cache.json")
 	fixture := samplePacketCacheFile(t)
 
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor, req.ASNCache); importErr != nil {
 			t.Fatalf("import fixture: %v", importErr)
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() {
-		runEngine = previous
 	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath, "--save-compress")
@@ -368,8 +339,7 @@ func TestRunSaveCompressWritesGzip(t *testing.T) {
 	}
 
 	// And restoring through the CLI must work on the same file.
-	restorePrev := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if req.NameserverCache == nil {
 			t.Fatalf("expected nameserver cache in request")
 		}
@@ -381,14 +351,13 @@ func TestRunSaveCompressWritesGzip(t *testing.T) {
 			t.Fatalf("expected 1 restored entry with key fixture.key, got %+v", entries)
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() { runEngine = restorePrev })
+	})
 
 	clitest.Run(t, run, "--domain", "example.com", "--json", "--restore", savePath).RequireCode(t, 0)
 }
 
 func TestRunSaveCompressRejectsWithoutSave(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--save-compress")
 	res.RequireCode(t, 2)
@@ -400,14 +369,12 @@ func TestRunSaveMaxEntriesUnderLimitSucceeds(t *testing.T) {
 	savePath := filepath.Join(dir, "saved-cache.json")
 	fixture := samplePacketCacheFile(t)
 
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor, req.ASNCache); importErr != nil {
 			t.Fatalf("import fixture: %v", importErr)
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() { runEngine = previous })
+	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "10")
 	res.RequireCode(t, 0)
@@ -421,14 +388,12 @@ func TestRunSaveMaxEntriesZeroMeansUnlimited(t *testing.T) {
 	savePath := filepath.Join(dir, "saved-cache.json")
 	fixture := samplePacketCacheFile(t)
 
-	original := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if importErr := cachefile.Import(fixture, req.NameserverCache, req.Recursor, req.ASNCache); importErr != nil {
 			t.Fatalf("import fixture: %v", importErr)
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() { runEngine = original })
+	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "0")
 	res.RequireCode(t, 0)
@@ -439,8 +404,7 @@ func TestRunSaveMaxEntriesOverLimitFails(t *testing.T) {
 	savePath := filepath.Join(dir, "saved-cache.json")
 	fixture := samplePacketCacheFile(t)
 
-	original := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		twoEntryFixture := fixture
 		extra := fixture.Entries[0]
 		extra.Key = "fixture.key.2"
@@ -449,8 +413,7 @@ func TestRunSaveMaxEntriesOverLimitFails(t *testing.T) {
 			t.Fatalf("import fixture: %v", importErr)
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() { runEngine = original })
+	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--save", savePath, "--save-max-entries", "1")
 	if res.Code == 0 {
@@ -463,7 +426,7 @@ func TestRunSaveMaxEntriesOverLimitFails(t *testing.T) {
 }
 
 func TestRunSaveMaxEntriesRejectsWithoutSave(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--save-max-entries", "5")
 	res.RequireCode(t, 2)
@@ -471,7 +434,7 @@ func TestRunSaveMaxEntriesRejectsWithoutSave(t *testing.T) {
 }
 
 func TestRunSaveMaxEntriesRejectsNegative(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	clitest.Run(t, run, "--domain", "example.com", "--save", "out.json", "--save-max-entries", "-1").
 		RequireCode(t, 2).
@@ -508,7 +471,7 @@ func writeSavedCache(t *testing.T, dir, name string, compress bool) string {
 }
 
 func TestRunCacheStatsPrintsReport(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 	path := writeSavedCache(t, t.TempDir(), "cache.json", false)
 
 	res := clitest.Run(t, run, "--cache-stats", path)
@@ -522,7 +485,7 @@ func TestRunCacheStatsPrintsReport(t *testing.T) {
 }
 
 func TestRunCacheStatsGzipReportsCompression(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 	path := writeSavedCache(t, t.TempDir(), "cache.json.gz", true)
 
 	res := clitest.Run(t, run, "--cache-stats", path)
@@ -531,7 +494,7 @@ func TestRunCacheStatsGzipReportsCompression(t *testing.T) {
 }
 
 func TestRunCacheStatsStrictRejectsUnknownField(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cache.json")
 	blob := []byte(`{"format":"gonemaster.packet-cache","version":2,"mystery":1,"entries":[]}`)
@@ -544,7 +507,7 @@ func TestRunCacheStatsStrictRejectsUnknownField(t *testing.T) {
 }
 
 func TestRunRestoreStrictRejectsUnknownField(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 	dir := t.TempDir()
 	path := filepath.Join(dir, "cache.json")
 	blob := []byte(`{"format":"gonemaster.packet-cache","version":2,"mystery":1,"entries":[]}`)
@@ -557,21 +520,21 @@ func TestRunRestoreStrictRejectsUnknownField(t *testing.T) {
 }
 
 func TestRunCacheStrictRequiresRestoreOrStats(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 	res := clitest.Run(t, run, "--domain", "example.com", "--cache-strict")
 	res.RequireCode(t, 2)
 	res.RequireErrContains(t, "--cache-strict requires --restore or --cache-stats")
 }
 
 func TestRunCacheStatsRejectsWithSave(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 	res := clitest.Run(t, run, "--cache-stats", "a.json", "--save", "b.json")
 	res.RequireCode(t, 2)
 	res.RequireErrContains(t, "--cache-stats cannot be combined with --save/--restore")
 }
 
 func TestRunRestorePrintsCacheSummary(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 	path := writeSavedCache(t, t.TempDir(), "cache.json", false)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--restore", path)
@@ -692,7 +655,7 @@ func TestRunRejectsCountAndDumpProfile(t *testing.T) {
 
 func TestRunParsesUndelegatedNameserverFlags(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ns", "NS1.Example.com/192.0.2.1", "--ns", "ns2.example.net")
 	res.RequireCode(t, 0)
@@ -711,7 +674,7 @@ func TestRunParsesUndelegatedNameserverFlags(t *testing.T) {
 
 func TestRunParsesUndelegatedNameserverSameNameMultipleIPs(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ns", "NS1.Example.com/192.0.2.1", "--ns", "ns1.example.com/2001:db8::1")
 	res.RequireCode(t, 0)
@@ -730,7 +693,7 @@ func TestRunParsesUndelegatedNameserverSameNameMultipleIPs(t *testing.T) {
 
 func TestRunParsesUndelegatedDSFlags(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ds", "12345,13,2,"+strings.Repeat("a", 64), "--ds", "23456,8,2,"+strings.Repeat("B", 64))
 	res.RequireCode(t, 0)
@@ -748,7 +711,7 @@ func TestRunParsesUndelegatedDSFlags(t *testing.T) {
 }
 
 func TestRunRejectsMalformedUndelegatedNameserverFlag(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ns", "bad!name.example/192.0.2.1")
 	res.RequireCode(t, 2)
@@ -756,7 +719,7 @@ func TestRunRejectsMalformedUndelegatedNameserverFlag(t *testing.T) {
 }
 
 func TestRunRejectsMalformedUndelegatedDSFlag(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ds", "12345,13,2,NOT-HEX")
 	res.RequireCode(t, 2)
@@ -765,7 +728,7 @@ func TestRunRejectsMalformedUndelegatedDSFlag(t *testing.T) {
 
 func TestRunCarriesUndelegatedInputsInRunRequest(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--ns", "ns1.example.com/192.0.2.10", "--ds", "12345,13,2,"+strings.Repeat("a", 64))
 	res.RequireCode(t, 0)
@@ -785,7 +748,7 @@ func TestRunCarriesUndelegatedInputsInRunRequest(t *testing.T) {
 
 func TestRunParsesSourceAddrOverrides(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--sourceaddr4", "192.0.2.44", "--sourceaddr6", "2001:db8::44")
 	res.RequireCode(t, 0)
@@ -798,7 +761,7 @@ func TestRunParsesSourceAddrOverrides(t *testing.T) {
 }
 
 func TestRunRejectsInvalidSourceAddr4(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--sourceaddr4", "not-an-ip")
 	res.RequireCode(t, 2)
@@ -806,7 +769,7 @@ func TestRunRejectsInvalidSourceAddr4(t *testing.T) {
 }
 
 func TestRunRejectsInvalidSourceAddr6(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json", "--sourceaddr6", "192.0.2.10")
 	res.RequireCode(t, 2)
@@ -829,7 +792,7 @@ func TestRunOutputsTranslatedByDefault(t *testing.T) {
 }
 
 func TestRunOutputsLocalizedHeaderByLocale(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--min-level", "CRITICAL", "--locale", "sv")
 	res.RequireCode(t, 0)
@@ -966,7 +929,7 @@ func TestRunVersion(t *testing.T) {
 
 func TestRunNSTimesCreatesCache(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--nstimes")
 	res.RequireCode(t, 0)
@@ -976,16 +939,14 @@ func TestRunNSTimesCreatesCache(t *testing.T) {
 }
 
 func TestRunNSTimesOutputsTable(t *testing.T) {
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		// Simulate query timing data in the cache the CLI created.
 		if req.NameserverCache != nil {
 			req.NameserverCache.RecordQueryTime("ns1.example.com/192.0.2.1", 10*time.Millisecond)
 			req.NameserverCache.RecordQueryTime("ns1.example.com/192.0.2.1", 20*time.Millisecond)
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() { runEngine = previous })
+	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--nstimes")
 	res.RequireCode(t, 0)
@@ -1005,7 +966,7 @@ func TestRunAllowNonGlobalFlag(t *testing.T) {
 	// --allow-non-global sets the RunRequest override; absent, it stays nil so
 	// the profile/server default governs.
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 	res := clitest.Run(t, run, "--allow-non-global", "example.com")
 	res.RequireCode(t, 0)
 	if captured.AllowNonGlobalTargets == nil || !*captured.AllowNonGlobalTargets {
@@ -1024,13 +985,9 @@ func TestRunAllowNonGlobalFlag(t *testing.T) {
 // asked the engine for rather than the user's display level.
 func TestRunPassesCaptureMinLevelMatchingTheEngineLevel(t *testing.T) {
 	var captured engine.RunRequest
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		captured = req
 		return nil, nil
-	}
-	t.Cleanup(func() {
-		runEngine = previous
 	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--json")
@@ -1048,13 +1005,9 @@ func TestRunPassesCaptureMinLevelMatchingTheEngineLevel(t *testing.T) {
 // display floor, so that run must capture everything.
 func TestRunCountCapturesEverything(t *testing.T) {
 	var captured engine.RunRequest
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		captured = req
 		return nil, nil
-	}
-	t.Cleanup(func() {
-		runEngine = previous
 	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--count")
@@ -1073,8 +1026,7 @@ func TestRunSavePacketCacheUnaffectedByCaptureLevel(t *testing.T) {
 	fixture := samplePacketCacheFile(t)
 
 	var captured engine.RunRequest
-	previous := runEngine
-	runEngine = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		captured = req
 		if req.NameserverCache == nil {
 			t.Fatalf("expected nameserver cache in request")
@@ -1083,9 +1035,6 @@ func TestRunSavePacketCacheUnaffectedByCaptureLevel(t *testing.T) {
 			t.Fatalf("import fixture into run cache: %v", importErr)
 		}
 		return nil, nil
-	}
-	t.Cleanup(func() {
-		runEngine = previous
 	})
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--save", savePath)

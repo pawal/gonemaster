@@ -10,27 +10,9 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
+	"codeberg.org/pawal/gonemaster/cmd/internal/enginetest"
 	"codeberg.org/pawal/gonemaster/engine"
 )
-
-func stubRunEngineFunc(t *testing.T, fn func(engine.RunRequest) ([]engine.LogEntry, error)) {
-	t.Helper()
-	previous := runEngine
-	runEngine = fn
-	t.Cleanup(func() {
-		runEngine = previous
-	})
-}
-
-func stubRunEngine(t *testing.T, captured *engine.RunRequest) {
-	t.Helper()
-	stubRunEngineFunc(t, func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		if captured != nil {
-			*captured = req
-		}
-		return nil, nil
-	})
-}
 
 func TestRunHelp(t *testing.T) {
 	res := clitest.Run(t, run, "--help")
@@ -94,7 +76,7 @@ func TestMaxLevel(t *testing.T) {
 //     interactive runs;
 //   - a raw pipe character would corrupt Nagios perfdata parsing.
 func TestRunVerboseSanitizesAttackerControlChars(t *testing.T) {
-	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return []engine.LogEntry{{
 			Module:    "NAMESERVER",
 			Testcase:  "NS01",
@@ -141,7 +123,7 @@ func TestRunVerboseSanitizesAttackerControlChars(t *testing.T) {
 // TestRunVerbosePreservesSafeMessages is the negative case: benign
 // Unicode in a verbose entry must reach stdout unchanged.
 func TestRunVerbosePreservesSafeMessages(t *testing.T) {
-	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return []engine.LogEntry{{
 			Module:    "NAMESERVER",
 			Testcase:  "NS01",
@@ -174,7 +156,7 @@ func TestStatusForLevelHonorsCustomThresholds(t *testing.T) {
 
 func TestRunParsesPreferredAliases(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--source-addr4", "192.0.2.50", "--source-addr6", "2001:db8::50", "--force-ipv6")
 	res.RequireCode(t, 0)
@@ -194,7 +176,7 @@ func TestRunParsesPreferredAliases(t *testing.T) {
 
 func TestRunParsesLegacySourceAddrAliases(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--sourceaddr4", "192.0.2.50", "--sourceaddr6", "2001:db8::50")
 	res.RequireCode(t, 0)
@@ -207,7 +189,7 @@ func TestRunParsesLegacySourceAddrAliases(t *testing.T) {
 }
 
 func TestRunRejectsInvalidSourceAddr4(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--source-addr4", "not-an-ip")
 	res.RequireCode(t, 3)
@@ -215,7 +197,7 @@ func TestRunRejectsInvalidSourceAddr4(t *testing.T) {
 }
 
 func TestRunRejectsInvalidSourceAddr6(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "--domain", "example.com", "--source-addr6", "192.0.2.5")
 	res.RequireCode(t, 3)
@@ -241,7 +223,7 @@ func TestRunRejectsInvalidTimeout(t *testing.T) {
 }
 
 func TestRunAppliesCustomThresholds(t *testing.T) {
-	stubRunEngineFunc(t, func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		return []engine.LogEntry{{Level: "ERROR"}}, nil
 	})
 
@@ -251,7 +233,7 @@ func TestRunAppliesCustomThresholds(t *testing.T) {
 }
 
 func TestRunTimeoutReturnsUnknown(t *testing.T) {
-	stubRunEngineFunc(t, func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		deadline, ok := req.Context.Deadline()
 		if !ok {
 			t.Fatalf("expected timeout context deadline")
@@ -269,7 +251,7 @@ func TestRunTimeoutReturnsUnknown(t *testing.T) {
 
 func TestUndelegatedNSPassedToEngine(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--ns", "ns1.example.com/192.0.2.1", "--ns", "ns2.example.com")
 	res.RequireCode(t, 0)
@@ -292,7 +274,7 @@ func TestUndelegatedNSPassedToEngine(t *testing.T) {
 
 func TestUndelegatedDSPassedToEngine(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--ns", "ns1.example.com/192.0.2.1", "--ds", "12345,13,2,ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789")
 	res.RequireCode(t, 0)
@@ -306,7 +288,7 @@ func TestUndelegatedDSPassedToEngine(t *testing.T) {
 }
 
 func TestUndelegatedDSWithoutNSIsError(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--ds", "12345,13,2,ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789ABCDEF0123456789")
 	res.RequireCode(t, 3)
@@ -314,14 +296,14 @@ func TestUndelegatedDSWithoutNSIsError(t *testing.T) {
 }
 
 func TestUndelegatedInvalidNS(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--ns", "ns1/bad/extra")
 	res.RequireCode(t, 3)
 }
 
 func TestUndelegatedInvalidDS(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--ns", "ns1.example.com", "--ds", "notvalid")
 	res.RequireCode(t, 3)
@@ -340,7 +322,7 @@ func TestHelpIncludesNSAndDS(t *testing.T) {
 
 func TestRRSIGWarnDaysSetsProfileOnRequest(t *testing.T) {
 	var profileContent []byte
-	stubRunEngineFunc(t, func(req engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(req engine.RunRequest) ([]engine.LogEntry, error) {
 		if req.Profile != "" {
 			// Read profile while temp file still exists (before run() defers cleanup).
 			profileContent, _ = os.ReadFile(req.Profile)
@@ -367,7 +349,7 @@ func TestRRSIGWarnDaysSetsProfileOnRequest(t *testing.T) {
 
 func TestRRSIGWarnDaysZeroLeavesProfileUnchanged(t *testing.T) {
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 
 	res := clitest.Run(t, run, "-H", "example.com")
 	res.RequireCode(t, 0)
@@ -377,7 +359,7 @@ func TestRRSIGWarnDaysZeroLeavesProfileUnchanged(t *testing.T) {
 }
 
 func TestRRSIGWarnDaysNegativeIsError(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--rrsig-warn-days", "-1")
 	res.RequireCode(t, 3)
@@ -582,7 +564,7 @@ func TestWorstStatus(t *testing.T) {
 
 func TestGradeModeExitCodeOK(t *testing.T) {
 	// Empty entries → score 100, grade A → OK with --grade-warning C --grade-critical F
-	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return []engine.LogEntry{}, nil
 	})
 
@@ -593,7 +575,7 @@ func TestGradeModeExitCodeOK(t *testing.T) {
 
 func TestGradeModeExitCodeCritical(t *testing.T) {
 	// CRITICAL entry → score forced to 10, grade F → CRITICAL with --grade-critical F
-	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return []engine.LogEntry{
 			{Module: "BASIC", Tag: "NO_NS", Level: "CRITICAL"},
 		}, nil
@@ -605,7 +587,7 @@ func TestGradeModeExitCodeCritical(t *testing.T) {
 }
 
 func TestGradeModeOutputIncludesGradeAndScore(t *testing.T) {
-	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return []engine.LogEntry{}, nil
 	})
 
@@ -621,7 +603,7 @@ func TestGradeModeOutputIncludesGradeAndScore(t *testing.T) {
 }
 
 func TestGradeModeInvalidWarningFlagReturnsUnknown(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--grade-warning", "Z")
 	res.RequireCode(t, 3)
@@ -629,7 +611,7 @@ func TestGradeModeInvalidWarningFlagReturnsUnknown(t *testing.T) {
 }
 
 func TestGradeModeInvalidCriticalFlagReturnsUnknown(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--grade-critical", "X")
 	res.RequireCode(t, 3)
@@ -637,7 +619,7 @@ func TestGradeModeInvalidCriticalFlagReturnsUnknown(t *testing.T) {
 }
 
 func TestGradeModeInvalidOrderingReturnsUnknown(t *testing.T) {
-	stubRunEngine(t, nil)
+	enginetest.Capture(t, &runEngine, nil)
 
 	res := clitest.Run(t, run, "-H", "example.com", "--grade-warning", "F", "--grade-critical", "C")
 	res.RequireCode(t, 3)
@@ -647,7 +629,7 @@ func TestGradeModeWorstOfSeverityAndGrade(t *testing.T) {
 	// Severity check: ERROR → WARNING (--warning ERROR --critical CRITICAL)
 	// Grade check: grade A → OK (--grade-warning C --grade-critical F)
 	// Result should be WARNING (severity wins)
-	stubRunEngineFunc(t, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
+	enginetest.Stub(t, &runEngine, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return []engine.LogEntry{
 			{Module: "NAMESERVER", Tag: "NS_NO_RESPONSE", Level: "ERROR"},
 		}, nil
@@ -671,7 +653,7 @@ func TestHelpIncludesGradeFlags(t *testing.T) {
 func TestRunAllowNonGlobalFlag(t *testing.T) {
 	// --allow-non-global sets the RunRequest override that disables the guard.
 	var captured engine.RunRequest
-	stubRunEngine(t, &captured)
+	enginetest.Capture(t, &runEngine, &captured)
 	res := clitest.Run(t, run, "-H", "example.com", "--allow-non-global")
 	res.RequireCode(t, 0)
 	if captured.AllowNonGlobalTargets == nil || !*captured.AllowNonGlobalTargets {

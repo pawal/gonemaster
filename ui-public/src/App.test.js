@@ -191,7 +191,9 @@ describe("App", () => {
 
   it("hides locale selector when only one locale is available", async () => {
     render(App);
-    await new Promise((r) => setTimeout(r, 50));
+    // The locales fetch has to land, then Svelte needs a tick to re-render.
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    await new Promise((r) => setTimeout(r, 0));
     expect(screen.queryByRole("combobox", { name: /language/i })).toBeNull();
   });
 

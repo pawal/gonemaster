@@ -38,6 +38,13 @@ describe("Results", () => {
     global.fetch = vi.fn();
   });
 
+  // renderResults answers every fetch with resp and renders with the default
+  // public id, which every case but the rerender and failure ones want.
+  const renderResults = (resp, props = {}) => {
+    global.fetch.mockResolvedValue(resp);
+    return render(Results, { props: { publicID: "abc12345", ...props } });
+  };
+
   it("shows loading indicator before fetch resolves", async () => {
     let resolve;
     global.fetch.mockReturnValue(new Promise((r) => { resolve = r; }));
@@ -47,14 +54,12 @@ describe("Results", () => {
   });
 
   it("shows result banner after successful fetch", async () => {
-    global.fetch.mockResolvedValue(resultResp([]));
-    render(Results, { props: { publicID: "abc12345" } });
+    renderResults(resultResp([]));
     await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
   });
 
   it("banner has ok class when no entries", async () => {
-    global.fetch.mockResolvedValue(resultResp([]));
-    render(Results, { props: { publicID: "abc12345" } });
+    renderResults(resultResp([]));
     await waitFor(() => {
       const banner = screen.getByTestId("result-banner");
       expect(banner.classList.contains("ok")).toBe(true);
@@ -62,11 +67,10 @@ describe("Results", () => {
   });
 
   it("banner has error class when worst level is ERROR", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       entry("Module::A", "INFO"),
       entry("Module::A", "ERROR"),
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => {
       const banner = screen.getByTestId("result-banner");
       expect(banner.classList.contains("error")).toBe(true);
@@ -74,19 +78,18 @@ describe("Results", () => {
   });
 
   it("groups entries by module", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       entry("Module::Alpha", "INFO"),
       entry("Module::Beta", "WARNING"),
       entry("Module::Alpha", "NOTICE"),
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() =>
       expect(screen.getAllByTestId("module-group")).toHaveLength(2)
     );
   });
 
   it("renders the explanation header for a blocked non-global query", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       {
         timestamp: 0,
         module: "System",
@@ -96,18 +99,16 @@ describe("Results", () => {
         message: "Query to ns1.example/192.168.0.1 skipped",
       },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() =>
       expect(screen.getByText("Query skipped for a non-public address")).toBeInTheDocument()
     );
   });
 
   it("shows per-level count badges in module summary", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       entry("Module::Alpha", "WARNING", "w msg"),
       entry("Module::Alpha", "INFO", "i msg"),
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => {
       const badges = screen.getAllByTestId("module-badge");
       const texts = badges.map((b) => b.textContent.trim());
@@ -117,23 +118,21 @@ describe("Results", () => {
   });
 
   it("shows result rows inside module group", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       entry("Module::Alpha", "INFO", "first"),
       entry("Module::Alpha", "WARNING", "second"),
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() =>
       expect(screen.getAllByTestId("result-row")).toHaveLength(2)
     );
   });
 
   it("groups entries by testcase within module", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       entry("ADDRESS", "INFO", "msg1", "Address01"),
       entry("ADDRESS", "WARNING", "msg2", "Address02"),
       entry("ADDRESS", "INFO", "msg3", "Address01"),
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() =>
       expect(screen.getAllByTestId("testcase-group")).toHaveLength(2)
     );
@@ -145,11 +144,10 @@ describe("Results", () => {
   });
 
   it("testcase groups default closed for INFO/NOTICE, open for WARNING+", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       entry("ADDRESS", "INFO", "ok msg", "Address01"),
       entry("ADDRESS", "WARNING", "warn msg", "Address02"),
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() =>
       expect(screen.getAllByTestId("testcase-group")).toHaveLength(2)
     );
@@ -162,16 +160,14 @@ describe("Results", () => {
   });
 
   it("shows share button when domain prop is set", async () => {
-    global.fetch.mockResolvedValue(resultResp([]));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com" } });
+    renderResults(resultResp([]), { domain: "example.com" });
     await waitFor(() =>
       expect(screen.getByTestId("share-button")).toBeTruthy()
     );
   });
 
   it("shows formatted finished date when finishedAt prop is set", async () => {
-    global.fetch.mockResolvedValue(resultResp([]));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com", finishedAt: "2024-06-15T14:30:00Z" } });
+    renderResults(resultResp([]), { domain: "example.com", finishedAt: "2024-06-15T14:30:00Z" });
     await waitFor(() => {
       // The formatted date should contain at least the year
       expect(screen.getByText(/2024/)).toBeTruthy();
@@ -179,14 +175,13 @@ describe("Results", () => {
   });
 
   it("does not show date when finishedAt is null", async () => {
-    global.fetch.mockResolvedValue(resultResp([]));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com", finishedAt: null } });
+    renderResults(resultResp([]), { domain: "example.com", finishedAt: null });
     await waitFor(() => screen.getByTestId("result-banner"));
     expect(document.querySelector(".result-date")).toBeNull();
   });
 
   it("renders nameserver timing table when data is present", async () => {
-    global.fetch.mockResolvedValue(resultResp([], {}, [
+    renderResults(resultResp([], {}, [
       {
         nameserver: "ns1.example.com",
         address: "192.0.2.10",
@@ -203,8 +198,7 @@ describe("Results", () => {
         max_ms: 14,
         count: 2,
       },
-    ]));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com" } });
+    ]), { domain: "example.com" });
     await waitFor(() => expect(screen.getByTestId("nameserver-timings")).toBeTruthy());
     const timings = screen.getByTestId("nameserver-timings");
     expect(timings.open).toBe(false);
@@ -219,7 +213,7 @@ describe("Results", () => {
   });
 
   it("renders unreachable and unresolved nameserver rows with status badges", async () => {
-    global.fetch.mockResolvedValue(resultResp([], {}, [
+    renderResults(resultResp([], {}, [
       // ok row: has samples.
       {
         nameserver: "ns1.example.com",
@@ -250,8 +244,7 @@ describe("Results", () => {
         count: 0,
         status: "unresolved",
       },
-    ]));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com" } });
+    ]), { domain: "example.com" });
     await waitFor(() => expect(screen.getByTestId("nameserver-timings")).toBeTruthy());
     const timings = screen.getByTestId("nameserver-timings");
     timings.open = true;
@@ -270,14 +263,13 @@ describe("Results", () => {
   });
 
   it("hides nameserver timing table when no data is present", async () => {
-    global.fetch.mockResolvedValue(resultResp([]));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com" } });
+    renderResults(resultResp([]), { domain: "example.com" });
     await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
     expect(screen.queryByTestId("nameserver-timings")).toBeNull();
   });
 
   it("hides nameserver timing table when display is disabled", async () => {
-    global.fetch.mockResolvedValue(resultResp([], {}, [
+    renderResults(resultResp([], {}, [
       {
         nameserver: "ns1.example.com",
         address: "192.0.2.10",
@@ -286,15 +278,13 @@ describe("Results", () => {
         max_ms: 30,
         count: 3,
       },
-    ]));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com", nameserverTimingsEnabled: false } });
+    ]), { domain: "example.com", nameserverTimingsEnabled: false });
     await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
     expect(screen.queryByTestId("nameserver-timings")).toBeNull();
   });
 
   it("shows error on 404", async () => {
-    global.fetch.mockResolvedValue(errResp(404));
-    render(Results, { props: { publicID: "abc12345" } });
+    renderResults(errResp(404));
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
   });
 
@@ -325,10 +315,9 @@ describe("Results", () => {
   });
 
   it("renders tag header inline when pub.tag.<module>.<TAG>.header exists", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "Delegation does not list enough (1) nameservers." },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
     const header = screen.getByTestId("result-tag-header");
     expect(header.textContent.trim()).toBe("Not enough nameservers");
@@ -338,10 +327,9 @@ describe("Results", () => {
   });
 
   it("does not render a tag header when the i18n key is missing", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NO_SUCH_TAG_XYZ", level: "WARNING", message: "some message" },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
     expect(screen.queryByTestId("result-tag-header")).toBeNull();
     // The engine message still renders.
@@ -349,10 +337,9 @@ describe("Results", () => {
   });
 
   it("renders the About-this-finding disclosure with both the testcase description and the tag description when both keys exist", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
     const disclosure = screen.getByTestId("result-explanation");
     expect(disclosure).toBeTruthy();
@@ -366,10 +353,9 @@ describe("Results", () => {
   });
 
   it("shows only the testcase paragraph in the disclosure when the tag description is missing", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NO_SUCH_TAG_XYZ", level: "WARNING", message: "x" },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
     expect(screen.getByTestId("result-explanation")).toBeTruthy();
     expect(screen.getByTestId("result-explanation-test")).toBeTruthy();
@@ -377,10 +363,9 @@ describe("Results", () => {
   });
 
   it("shows only the tag paragraph in the disclosure when the testcase description is missing", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "UnknownTC", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
     expect(screen.getByTestId("result-explanation")).toBeTruthy();
     expect(screen.queryByTestId("result-explanation-test")).toBeNull();
@@ -388,29 +373,26 @@ describe("Results", () => {
   });
 
   it("does not render the About disclosure when neither description key exists", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "UnknownTC", tag: "NO_SUCH_TAG_XYZ", level: "WARNING", message: "x" },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-row")).toBeTruthy());
     expect(screen.queryByTestId("result-explanation")).toBeNull();
   });
 
   it("renders a per-row testcase-title caption above each finding", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-row-caption")).toBeTruthy());
     expect(screen.getByTestId("result-row-caption").textContent.trim())
       .toBe("Minimum number of name servers");
   });
 
   it("links a glossary term inside the finding explanation", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-explanation-tag")).toBeTruthy());
     // The tag description mentions "delegation", a glossary term.
     const term = screen.getAllByTestId("glossary-term").find((el) => el.textContent === "delegation");
@@ -418,10 +400,9 @@ describe("Results", () => {
   });
 
   it("shows a glossary definition tooltip on hover", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-explanation-tag")).toBeTruthy());
     const term = screen.getAllByTestId("glossary-term").find((el) => el.textContent === "delegation");
     // Tooltip is absent until the term is hovered.
@@ -431,10 +412,9 @@ describe("Results", () => {
   });
 
   it("keeps the full explanation text intact when terms are linked", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       { timestamp: 0, module: "DELEGATION", testcase: "delegation01", tag: "NOT_ENOUGH_NS_DEL", level: "WARNING", message: "x" },
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("result-explanation-tag")).toBeTruthy());
     // The linkified paragraph reads exactly as authored (no injected tooltip text).
     expect(screen.getByTestId("result-explanation-tag").textContent)
@@ -458,11 +438,10 @@ describe("Results", () => {
 
   it("shows the callout and calls ontestparent with the found parent zone", async () => {
     const ontestparent = vi.fn();
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       taggedEntry("B01_NO_CHILD", { domain_child: "resources.eosc.ch", domain_super: "eosc.ch" }, "ERROR"),
       taggedEntry("B01_PARENT_FOUND", { domain: "eosc.ch" }),
-    ]));
-    render(Results, { props: { publicID: "abc12345", domain: "resources.eosc.ch", ontestparent } });
+    ]), { domain: "resources.eosc.ch", ontestparent });
     await waitFor(() => expect(screen.getByTestId("no-zone-callout")).toBeTruthy());
     // Body names the tested domain.
     expect(screen.getByTestId("no-zone-callout").textContent).toContain("resources.eosc.ch");
@@ -475,39 +454,35 @@ describe("Results", () => {
   // A bare unknown label or a bad TLD both report the root as the found
   // parent (verified against the live engine), so the root must be filtered.
   it("shows the callout without a parent button when the found parent is the root", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       taggedEntry("B01_NO_CHILD", { domain_child: "skjsfsdkf", domain_super: "." }, "ERROR"),
       taggedEntry("B01_PARENT_FOUND", { domain: "." }),
-    ]));
-    render(Results, { props: { publicID: "abc12345", domain: "skjsfsdkf" } });
+    ]), { domain: "skjsfsdkf" });
     await waitFor(() => expect(screen.getByTestId("no-zone-callout")).toBeTruthy());
     expect(screen.queryByTestId("no-zone-test-parent")).toBeNull();
   });
 
   it("shows the callout without a parent button when no parent zone was found at all", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       taggedEntry("B01_NO_CHILD", { domain_child: "example.skjsfsdkf", domain_super: "skjsfsdkf" }, "ERROR"),
       taggedEntry("B01_PARENT_NOT_FOUND", {}),
-    ]));
-    render(Results, { props: { publicID: "abc12345", domain: "example.skjsfsdkf" } });
+    ]), { domain: "example.skjsfsdkf" });
     await waitFor(() => expect(screen.getByTestId("no-zone-callout")).toBeTruthy());
     expect(screen.queryByTestId("no-zone-test-parent")).toBeNull();
   });
 
   it("shows the callout without a parent button when the parent is ambiguous", async () => {
-    global.fetch.mockResolvedValue(resultResp([
+    renderResults(resultResp([
       taggedEntry("B01_NO_CHILD", { domain_child: "x.example", domain_super: "example" }, "ERROR"),
       taggedEntry("B01_PARENT_FOUND", { domain: "a.example" }),
       taggedEntry("B01_PARENT_FOUND", { domain: "b.example" }),
     ]));
-    render(Results, { props: { publicID: "abc12345" } });
     await waitFor(() => expect(screen.getByTestId("no-zone-callout")).toBeTruthy());
     expect(screen.queryByTestId("no-zone-test-parent")).toBeNull();
   });
 
   it("does not show the callout when there is no B01_NO_CHILD finding", async () => {
-    global.fetch.mockResolvedValue(resultResp([entry("Module::A", "INFO")]));
-    render(Results, { props: { publicID: "abc12345" } });
+    renderResults(resultResp([entry("Module::A", "INFO")]));
     await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
     expect(screen.queryByTestId("no-zone-callout")).toBeNull();
   });
@@ -524,21 +499,18 @@ describe("Results", () => {
     });
 
   it("renders the DNSSEC chain section when enabled and the marker is set", async () => {
-    global.fetch.mockResolvedValue(markerResp(true));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com", dnssecChainEnabled: true } });
+    renderResults(markerResp(true), { domain: "example.com", dnssecChainEnabled: true });
     await waitFor(() => expect(screen.getByTestId("dnssec-chain")).toBeTruthy());
   });
 
   it("hides the DNSSEC chain section when the marker is absent", async () => {
-    global.fetch.mockResolvedValue(markerResp(false));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com", dnssecChainEnabled: true } });
+    renderResults(markerResp(false), { domain: "example.com", dnssecChainEnabled: true });
     await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
     expect(screen.queryByTestId("dnssec-chain")).toBeNull();
   });
 
   it("hides the DNSSEC chain section when the feature flag is off", async () => {
-    global.fetch.mockResolvedValue(markerResp(true));
-    render(Results, { props: { publicID: "abc12345", domain: "example.com", dnssecChainEnabled: false } });
+    renderResults(markerResp(true), { domain: "example.com", dnssecChainEnabled: false });
     await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
     expect(screen.queryByTestId("dnssec-chain")).toBeNull();
   });

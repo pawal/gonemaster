@@ -1,6 +1,7 @@
 import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsPanel from "./SettingsPanel.svelte";
+import { jsonResponse } from "../test/helpers.js";
 
 const settingsSubTabs = [
   { id: "system", labelKey: "settings_subtab_system" },
@@ -10,12 +11,7 @@ const settingsSubTabs = [
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      headers: { get: () => "application/json" },
-      json: async () => ({}),
-      text: async () => "{}",
-    });
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({}));
   });
 
   it("renders the three sub-tab buttons", () => {

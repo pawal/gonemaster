@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AnalysisCohorts from "./AnalysisCohorts.svelte";
-import { cohortFixture, jsonResponse, requestUrl } from "../test/helpers.js";
+import { cohortFixture, jsonResponse, noContentResponse, requestUrl } from "../test/helpers.js";
 
 describe("AnalysisCohorts", () => {
   beforeEach(() => {
@@ -72,7 +72,7 @@ describe("AnalysisCohorts", () => {
       if (deleteMatch && method === "DELETE") {
         const id = Number(deleteMatch[1]);
         cohorts = cohorts.filter((c) => c.id !== id);
-        return { ok: true, statusText: "No Content", headers: { get: () => "" }, json: async () => ({}), text: async () => "" };
+        return noContentResponse();
       }
       const actionMatch = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/(rebuild|clear)$/);
       if (actionMatch && method === "POST") {
@@ -330,10 +330,7 @@ describe("AnalysisCohorts", () => {
         const purge = value.includes("purge=true");
         snapshotDeletes.push({ id, slug, purge });
         snapshotsByCohort[id] = (snapshotsByCohort[id] || []).filter((s) => s.slug !== slug);
-        return {
-          ok: true, statusText: "No Content", headers: { get: () => "" },
-          json: async () => ({}), text: async () => ""
-        };
+        return noContentResponse();
       }
       if (value === "/api/v1/jobs/batch" && method === "POST") {
         submittedBatches.push(JSON.parse(requestOptions.body));
@@ -654,6 +651,19 @@ describe("AnalysisCohorts", () => {
     (args) => args[0] === "/api/v1/analysis/cohorts" && (args[1]?.method || "GET") === "GET",
   ).length;
 
+  // Fake timers must be installed before render so a poll interval the
+  // component arms lands on the fake clock; installed afterwards it would
+  // never fire and the "does not poll" assertions would hold whatever the
+  // component did. testing-library's waitFor cannot see vitest's fake timers
+  // (it looks for a jest global), so setup waits drive the clock themselves.
+  const advanceUntil = async (predicate, budgetMs = 5000, stepMs = 50) => {
+    for (let waited = 0; waited <= budgetMs; waited += stepMs) {
+      if (predicate()) return;
+      await vi.advanceTimersByTimeAsync(stepMs);
+    }
+    throw new Error("condition not met within the fake-clock budget");
+  };
+
   const pendingCohort = (extra) => ([{
     ...sampleCohorts()[0],
     materialization_status: "pending",
@@ -668,13 +678,18 @@ describe("AnalysisCohorts", () => {
     // cleared. Nothing is running in that state, so an open page must not keep
     // requesting the cohort list.
     installSnapshotFetch({ initialCohorts: pendingCohort() });
-    render(AnalysisCohorts);
-    await screen.findByText("tld");
+    vi.useFakeTimers();
+    try {
+      render(AnalysisCohorts);
+      await advanceUntil(() => screen.queryByText("tld"));
 
-    const before = countCohortListGets();
-    await new Promise((resolve) => setTimeout(resolve, 700));
+      const before = countCohortListGets();
+      await vi.advanceTimersByTimeAsync(700);
 
-    expect(countCohortListGets()).toBe(before);
+      expect(countCohortListGets()).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("polls while a cohort rebuild reports a work total", async () => {
@@ -710,14 +725,19 @@ describe("AnalysisCohorts", () => {
       backendSupported: false,
       initialCohorts: pendingCohort({ materialization_done: 1, materialization_total: 4 }),
     });
-    render(AnalysisCohorts);
-    // The banner confirms the status response landed before we start counting.
-    await screen.findByText("Analysis backend not configured");
+    vi.useFakeTimers();
+    try {
+      render(AnalysisCohorts);
+      // The banner confirms the status response landed before we start counting.
+      await advanceUntil(() => screen.queryByText("Analysis backend not configured"));
 
-    const before = countCohortListGets();
-    await new Promise((resolve) => setTimeout(resolve, 700));
+      const before = countCohortListGets();
+      await vi.advanceTimersByTimeAsync(700);
 
-    expect(countCohortListGets()).toBe(before);
+      expect(countCohortListGets()).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("stops polling when the rebuild it started finishes, despite another idle pending cohort", async () => {
@@ -736,21 +756,27 @@ describe("AnalysisCohorts", () => {
       },
     ];
     installSnapshotFetch({ initialCohorts: rows });
-    render(AnalysisCohorts);
+    vi.useFakeTimers();
+    try {
+      render(AnalysisCohorts);
 
-    const tldRow = (await screen.findByText("tld")).closest("tr");
-    await fireEvent.click(within(tldRow).getByRole("button", { name: /Rebuild/i }));
-    await screen.findByText(/Rebuild triggered for cohort tld/i);
+      await advanceUntil(() => screen.queryByText("tld"));
+      const tldRow = screen.getByText("tld").closest("tr");
+      await fireEvent.click(within(tldRow).getByRole("button", { name: /Rebuild/i }));
+      await advanceUntil(() => screen.queryByText(/Rebuild triggered for cohort tld/i));
 
-    // The server finishes that rebuild; the other cohort stays pending.
-    rows[0].materialization_status = "ready";
-    rows[0].last_materialized_at = "2026-04-17T12:00:00Z";
-    await within((await screen.findByText("tld")).closest("tr")).findByText("ready");
+      // The server finishes that rebuild; the other cohort stays pending.
+      rows[0].materialization_status = "ready";
+      rows[0].last_materialized_at = "2026-04-17T12:00:00Z";
+      await advanceUntil(() => within(screen.getByText("tld").closest("tr")).queryByText("ready"));
 
-    const before = countCohortListGets();
-    await new Promise((resolve) => setTimeout(resolve, 700));
+      const before = countCohortListGets();
+      await vi.advanceTimersByTimeAsync(700);
 
-    expect(countCohortListGets()).toBe(before);
+      expect(countCohortListGets()).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it("sorts the snapshot table when a column header is clicked", async () => {

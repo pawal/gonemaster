@@ -2,7 +2,7 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/sve
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
 import { setCatalog, locale } from "./i18n.js";
-import { installFetchRoutes, jsonResponse, profileFixture, requestUrl } from "./test/helpers.js";
+import { installFetchRoutes, jsonResponse, noContentResponse, profileFixture, requestUrl } from "./test/helpers.js";
 
 const sampleProfiles = () => [
   profileFixture({ id: 11, name: "baseline", description: "Default baseline", config: { net: { ipv4: true, ipv6: true } } }),
@@ -1024,7 +1024,7 @@ describe("App", () => {
         if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: domains, total: domains.length });
         if (value.match(/\/tags\/[^/]+\/batches/)) return jsonResponse({ items: [], total: 0 });
         if (value.includes("/api/v1/tags") && opts?.method === "POST") return jsonResponse({ name: "new-tag", description: "", domain_count: 0 }, true);
-        if (value.includes("/api/v1/tags") && opts?.method === "DELETE") return { ok: true, status: 204, headers: { get: () => null }, json: async () => ({}), text: async () => "" };
+        if (value.includes("/api/v1/tags") && opts?.method === "DELETE") return noContentResponse();
         if (value.includes("/api/v1/tags")) return jsonResponse(tags);
         return jsonResponse({ items: [], total: 0 });
       });

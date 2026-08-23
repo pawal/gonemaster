@@ -1,18 +1,12 @@
 import { render, screen, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Progress from "./Progress.svelte";
+import { errorResponse, jsonResponse } from "../test/helpers.js";
 
-const jobResp = (status, progress = 0, domain = "example.com") => ({
-  ok: true,
-  status: 200,
-  json: async () => ({ public_id: "abc12345", domain, status, progress }),
-});
+const jobResp = (status, progress = 0, domain = "example.com") =>
+  jsonResponse({ public_id: "abc12345", domain, status, progress });
 
-const errResp = (status) => ({
-  ok: false,
-  status,
-  json: async () => ({}),
-});
+const errResp = (status) => errorResponse(status);
 
 describe("Progress", () => {
   beforeEach(() => {

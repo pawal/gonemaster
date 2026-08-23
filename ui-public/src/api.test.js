@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { API_BASE, createJob, getJob, getResult, getLocales, getDnssecChain } from "./api.js";
+import { jsonResponse } from "./test/helpers.js";
 
 describe("API_BASE", () => {
   it("points to /pub/api/v1", () => {
@@ -9,7 +10,7 @@ describe("API_BASE", () => {
 
 describe("createJob", () => {
   beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({}));
   });
 
   it("POSTs to /pub/api/v1/jobs", async () => {
@@ -41,7 +42,7 @@ describe("createJob", () => {
 
 describe("getJob", () => {
   beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({}));
   });
 
   it("GETs /pub/api/v1/jobs/:publicID", async () => {
@@ -57,7 +58,7 @@ describe("getJob", () => {
 
 describe("getResult", () => {
   beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({}));
   });
 
   it("GETs /pub/api/v1/jobs/:publicID/result with locale", async () => {
@@ -77,7 +78,7 @@ describe("getResult", () => {
 
 describe("getLocales", () => {
   beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({}));
   });
 
   it("GETs /pub/api/v1/locales", async () => {
@@ -88,7 +89,7 @@ describe("getLocales", () => {
 
 describe("getDnssecChain", () => {
   beforeEach(() => {
-    global.fetch = vi.fn().mockResolvedValue({ ok: true });
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({}));
   });
 
   it("GETs /pub/api/v1/jobs/:publicID/dnssec-chain", async () => {

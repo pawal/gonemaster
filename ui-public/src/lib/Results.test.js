@@ -1,24 +1,18 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Results from "./Results.svelte";
+import { errorResponse, jsonResponse } from "../test/helpers.js";
 
-const resultResp = (entries = [], testcase_descriptions = {}, nameserver_timings = []) => ({
-  ok: true,
-  status: 200,
-  json: async () => ({
+const resultResp = (entries = [], testcase_descriptions = {}, nameserver_timings = []) =>
+  jsonResponse({
     job_id: "test-id",
     status: "succeeded",
     raw: { locale: "en", entries },
     nameserver_timings,
     testcase_descriptions,
-  }),
-});
+  });
 
-const errResp = (status) => ({
-  ok: false,
-  status,
-  json: async () => ({}),
-});
+const errResp = (status) => errorResponse(status);
 
 const entry = (module, level, message = "msg", testcase = "tc") => ({
   timestamp: 0,
@@ -311,10 +305,8 @@ describe("Results", () => {
   });
 
   it("keeps module open after locale re-fetch", async () => {
-    const mkResp = (msg) => ({
-      ok: true, status: 200,
-      json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [entry("Module::Alpha", "INFO", msg)] } }),
-    });
+    const mkResp = (msg) =>
+      jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [entry("Module::Alpha", "INFO", msg)] } });
     global.fetch.mockResolvedValueOnce(mkResp("first")).mockResolvedValueOnce(mkResp("second"));
     const { rerender } = render(Results, { props: { publicID: "abc12345", locale: "en" } });
     await waitFor(() => screen.getByTestId("module-group"));
@@ -450,14 +442,8 @@ describe("Results", () => {
   });
 
   it("re-fetches with new locale when locale prop changes", async () => {
-    const enResp = {
-      ok: true, status: 200,
-      json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [entry("M", "INFO", "english msg")] } }),
-    };
-    const svResp = {
-      ok: true, status: 200,
-      json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "sv", entries: [entry("M", "INFO", "swedish msg")] } }),
-    };
+    const enResp = jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [entry("M", "INFO", "english msg")] } });
+    const svResp = jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "sv", entries: [entry("M", "INFO", "swedish msg")] } });
     global.fetch.mockResolvedValueOnce(enResp).mockResolvedValueOnce(svResp);
     const { rerender } = render(Results, { props: { publicID: "abc12345", locale: "en" } });
     await waitFor(() => expect(screen.getByText("english msg")).toBeTruthy());
@@ -527,18 +513,15 @@ describe("Results", () => {
   });
 
   // markerResp adds the has_dnssec_chain field to a plain result payload.
-  const markerResp = (hasChain) => ({
-    ok: true,
-    status: 200,
-    json: async () => ({
+  const markerResp = (hasChain) =>
+    jsonResponse({
       job_id: "test-id",
       status: "succeeded",
       raw: { locale: "en", entries: [] },
       nameserver_timings: [],
       testcase_descriptions: {},
       has_dnssec_chain: hasChain,
-    }),
-  });
+    });
 
   it("renders the DNSSEC chain section when enabled and the marker is set", async () => {
     global.fetch.mockResolvedValue(markerResp(true));

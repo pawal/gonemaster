@@ -1,37 +1,7 @@
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DnssecChain from "./DnssecChain.svelte";
-
-// secureChain is a complete "secure" summary: one DS matching a KSK, a ZSK, and
-// a valid DNSKEY signature.
-function secureChain() {
-  return {
-    version: 1,
-    zone: "example.com",
-    parent_zone: "com",
-    delegation: "normal",
-    status: "secure",
-    parent: {
-      ds_source: "parent",
-      ds: [{ key_tag: 1000, algorithm: 13, digest_type: 2, digest: "ab", servers: ["192.0.2.1"] }],
-      servers_disagreeing: [],
-    },
-    child: {
-      dnskeys: [
-        { key_tag: 1000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] },
-        { key_tag: 2000, algorithm: 13, flags: 256, sep: false, servers: ["203.0.113.1"] },
-      ],
-      dnskey_rrsig: [{ key_tag: 1000, algorithm: 13, state: "valid", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] }],
-      signed: [],
-      servers_disagreeing: [],
-    },
-    links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] }],
-  };
-}
-
-function jsonResponse(body, status = 200) {
-  return { ok: status >= 200 && status < 300, status, json: async () => body };
-}
+import { jsonResponse, secureChain } from "../test/helpers.js";
 
 // openChain flips the <details> open and dispatches toggle, which jsdom does
 // not fire on its own.

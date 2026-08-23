@@ -1,31 +1,16 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
+import { errorResponse, fetchRouter, jsonResponse } from "./test/helpers.js";
 
-/** A fetch mock that dispatches different responses by URL pattern. */
-const fetchRouter = (routes) => {
-  global.fetch = vi.fn().mockImplementation(async (url) => {
-    for (const [pat, resp] of routes) {
-      if (url.includes(pat)) return resp;
-    }
-    return { ok: true, json: async () => [] };
-  });
-};
+const localesResp = jsonResponse({ locales: ["en"] });
+const multiLocalesResp = jsonResponse({ locales: ["en", "sv", "da"] });
 
-const localesResp = { ok: true, json: async () => ({ locales: ["en"] }) };
-const multiLocalesResp = { ok: true, json: async () => ({ locales: ["en", "sv", "da"] }) };
+const jobResp = (status, domain = "example.com", progress = 0, finished_at = null) =>
+  jsonResponse({ public_id: "abc12345", domain, status, progress, finished_at });
 
-const jobResp = (status, domain = "example.com", progress = 0, finished_at = null) => ({
-  ok: true,
-  status: 200,
-  json: async () => ({ public_id: "abc12345", domain, status, progress, finished_at }),
-});
-
-const resultResp = (entries = []) => ({
-  ok: true,
-  status: 200,
-  json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries } }),
-});
+const resultResp = (entries = []) =>
+  jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "en", entries } });
 
 describe("App", () => {
   beforeEach(() => {
@@ -85,7 +70,7 @@ describe("App", () => {
     window.location.hash = "#/result/abc12345";
     fetchRouter([
       ["/locales", localesResp],
-      ["/jobs/", { ok: false, status: 404, json: async () => ({}) }],
+      ["/jobs/", errorResponse(404)],
     ]);
     render(App);
     await waitFor(() =>
@@ -129,19 +114,15 @@ describe("App", () => {
     window.location.hash = "#/result/abc12345";
     fetchRouter([
       ["/locales", localesResp],
-      ["/info", { ok: true, json: async () => ({ show_score_public: false, show_nameserver_timings_public: false }) }],
-      ["jobs/abc12345/result", {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          job_id: "x",
-          status: "succeeded",
-          nameserver_timings: [
-            { nameserver: "ns1.example.com", address: "192.0.2.10", avg_ms: 24, min_ms: 20, max_ms: 30, count: 3 },
-          ],
-          raw: { locale: "en", entries: [] },
-        }),
-      }],
+      ["/info", jsonResponse({ show_score_public: false, show_nameserver_timings_public: false })],
+      ["jobs/abc12345/result", jsonResponse({
+        job_id: "x",
+        status: "succeeded",
+        nameserver_timings: [
+          { nameserver: "ns1.example.com", address: "192.0.2.10", avg_ms: 24, min_ms: 20, max_ms: 30, count: 3 },
+        ],
+        raw: { locale: "en", entries: [] },
+      })],
       ["/jobs/", jobResp("succeeded", "example.com", 100)],
     ]);
     render(App);
@@ -153,12 +134,8 @@ describe("App", () => {
     window.location.hash = "#/result/abc12345";
     fetchRouter([
       ["/locales", localesResp],
-      ["/info", { ok: true, json: async () => ({ show_dnssec_chain_public: true }) }],
-      ["jobs/abc12345/result", {
-        ok: true,
-        status: 200,
-        json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [] }, has_dnssec_chain: true }),
-      }],
+      ["/info", jsonResponse({ show_dnssec_chain_public: true })],
+      ["jobs/abc12345/result", jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [] }, has_dnssec_chain: true })],
       ["/jobs/", jobResp("succeeded", "example.com", 100)],
     ]);
     render(App);
@@ -169,11 +146,7 @@ describe("App", () => {
     window.location.hash = "#/result/abc12345";
     fetchRouter([
       ["/locales", localesResp],
-      ["jobs/abc12345/result", {
-        ok: true,
-        status: 200,
-        json: async () => ({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [] }, has_dnssec_chain: true }),
-      }],
+      ["jobs/abc12345/result", jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [] }, has_dnssec_chain: true })],
       ["/jobs/", jobResp("succeeded", "example.com", 100)],
     ]);
     render(App);
@@ -185,7 +158,7 @@ describe("App", () => {
     window.location.hash = "#/result/abc12345";
     fetchRouter([
       ["/locales", localesResp],
-      ["/jobs/", { ok: false, status: 404, json: async () => ({}) }],
+      ["/jobs/", errorResponse(404)],
     ]);
     render(App);
     await waitFor(() => screen.getByTestId("expired-view"));
@@ -404,7 +377,7 @@ describe("App", () => {
         ["/locales", localesResp],
         ["jobs/abc12345/result", resultResp()],
         ["/jobs/abc12345", jobResp("succeeded", "example.com", 100, "2026-08-07T09:30:00Z")],
-        ["/jobs", { ok: true, status: 200, json: async () => ({ public_id: "abc12345" }) }],
+        ["/jobs", jsonResponse({ public_id: "abc12345" })],
       ]);
       render(App);
       await startTest("example.com");
@@ -418,7 +391,7 @@ describe("App", () => {
       fetchRouter([
         ["/locales", localesResp],
         ["/jobs/abc12345", jobResp("failed", "example.com", 100)],
-        ["/jobs", { ok: true, status: 200, json: async () => ({ public_id: "abc12345" }) }],
+        ["/jobs", jsonResponse({ public_id: "abc12345" })],
       ]);
       render(App);
       await startTest("example.com");
@@ -439,7 +412,7 @@ describe("App", () => {
           jobCalls += 1;
           return jobResp(jobCalls === 1 ? "running" : "succeeded", "example.com", 100, "2026-08-07T09:30:00Z");
         }
-        return { ok: true, json: async () => [] };
+        return jsonResponse([]);
       });
       render(App);
       await waitFor(() => screen.getByTestId("results-view"));
@@ -454,7 +427,7 @@ describe("App", () => {
       window.location.hash = "#/result/abc12345";
       fetchRouter([
         ["/locales", localesResp],
-        ["/jobs/", { ok: false, status: 404, json: async () => ({}) }],
+        ["/jobs/", errorResponse(404)],
       ]);
       render(App);
       await waitFor(() => screen.getByTestId("expired-view"));
@@ -506,7 +479,7 @@ describe("App", () => {
         ["/locales", localesResp],
         ["jobs/abc12345/result", resultResp()],
         ["/jobs/abc12345", jobResp("succeeded", "example.com", 100, "2026-08-07T09:30:00Z")],
-        ["/jobs", { ok: true, status: 200, json: async () => ({ public_id: "abc12345" }) }],
+        ["/jobs", jsonResponse({ public_id: "abc12345" })],
       ]);
       render(App);
       await startTest("example.com");
@@ -522,16 +495,12 @@ describe("App", () => {
       window.location.hash = "#/result/abc12345";
       fetchRouter([
         ["/locales", localesResp],
-        ["jobs/abc12345/result", {
-          ok: true,
-          status: 200,
-          json: async () => ({
-            job_id: "x",
-            status: "succeeded",
-            raw: { locale: "en", entries: [] },
-            score: { grade: "B" },
-          }),
-        }],
+        ["jobs/abc12345/result", jsonResponse({
+          job_id: "x",
+          status: "succeeded",
+          raw: { locale: "en", entries: [] },
+          score: { grade: "B" },
+        })],
         ["/jobs/", jobResp("succeeded", "example.com", 100)],
       ]);
       render(App);

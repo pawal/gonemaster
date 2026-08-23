@@ -1,20 +1,11 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import TestForm from "./TestForm.svelte";
+import { errorResponse, jsonResponse } from "../test/helpers.js";
 
-const okResponse = (data, status = 201) => ({
-  ok: status >= 200 && status < 300,
-  status,
-  headers: { get: () => null },
-  json: async () => data,
-});
+const okResponse = (data, status = 201) => jsonResponse(data, status);
 
-const errResponse = (status, body = {}) => ({
-  ok: false,
-  status,
-  headers: { get: (h) => (h === "Retry-After" ? "30" : null) },
-  json: async () => body,
-});
+const errResponse = (status, body = {}) => errorResponse(status, body, { "Retry-After": "30" });
 
 describe("TestForm", () => {
   beforeEach(() => {
@@ -177,18 +168,15 @@ describe("TestForm", () => {
   // ── Fetch from parent ─────────────────────────────────────────────────────
 
   it("fetch from parent populates NS and DS rows", async () => {
-    global.fetch.mockResolvedValue({
-      ok: true,
-      json: async () => ({
-        nameservers: [
-          { ns: "ns1.example.com", ip: "192.0.2.1" },
-          { ns: "ns2.example.com", ip: "198.51.100.1" },
-        ],
-        ds_records: [
-          { keytag: 12345, algorithm: 13, digtype: 2, digest: "abcdef" },
-        ],
-      }),
-    });
+    global.fetch.mockResolvedValue(jsonResponse({
+      nameservers: [
+        { ns: "ns1.example.com", ip: "192.0.2.1" },
+        { ns: "ns2.example.com", ip: "198.51.100.1" },
+      ],
+      ds_records: [
+        { keytag: 12345, algorithm: 13, digtype: 2, digest: "abcdef" },
+      ],
+    }));
     render(TestForm);
     await fireEvent.input(screen.getByLabelText("Domain"), {
       target: { value: "example.com" },

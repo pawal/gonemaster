@@ -133,8 +133,8 @@ func TestDNSSEC01UndelegatedDSOnlyUsesFakeDS(t *testing.T) {
 		if entry == nil || entry.Tag != "DS01_DS_ALGO_OK" {
 			continue
 		}
-		servers, ok := entry.Args["servers"].([]map[string]any)
-		if !ok || len(servers) != 1 {
+		servers := tctest.Servers(t, entry.Args["servers"])
+		if len(servers) != 1 {
 			continue
 		}
 		if _, ok := entry.Args["ns_list"]; ok {
@@ -243,8 +243,8 @@ func TestDNSSEC01KeyAlgoPrivate(t *testing.T) {
 	if entry.Args["keytag"] != uint16(12345) {
 		t.Fatalf("expected keytag 12345, got %#v", entry.Args["keytag"])
 	}
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) == 0 {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) == 0 {
 		t.Fatalf("expected emitting servers list, got %#v", entry.Args["servers"])
 	}
 }
@@ -330,8 +330,8 @@ func TestDNSSEC01KeyAlgoUndelegated(t *testing.T) {
 		t.Fatalf("dnssec01: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "DS01_KEY_ALGO_PRIVATE")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one server for undelegated fake DS, got %#v", entry.Args["servers"])
 	}
 	if servers[0]["ns"] != "-" {
@@ -397,9 +397,7 @@ func TestDNSSEC01ParallelParentQueries(t *testing.T) {
 			if entry == nil || entry.Tag != "DS01_DS_ALGO_OK" {
 				continue
 			}
-			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-				gotServers = servers
-			}
+			gotServers = tctest.Servers(t, entry.Args["servers"])
 			if _, ok := entry.Args["ns_list"]; ok {
 				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 			}
@@ -504,28 +502,18 @@ func signedDNSKEYPair(t *testing.T, owner string) (*dns.DNSKEY, *dns.RRSIG) {
 	return key, tctest.Sign(t, key, signer, dns.TypeDNSKEY, []dns.RR{key})
 }
 
-func dnssec02Wire(t *testing.T, parentNS nameserver.Nameserver, childNS nameserver.Nameserver) func() {
+func dnssec02Wire(t *testing.T, parentNS nameserver.Nameserver, childNS nameserver.Nameserver) {
 	t.Helper()
 
-	origGetParent := parentNameservers
-	origGlue := glueNameservers
-	origApex := apexNameservers
-
-	parentNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parentNS}, nil
-	}
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{childNS}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
-	}
-
-	return func() {
-		parentNameservers = origGetParent
-		glueNameservers = origGlue
-		apexNameservers = origApex
-	}
+	})
 }
 
 func TestDNSSEC02DSAlgorithmMismatch(t *testing.T) {
@@ -557,7 +545,7 @@ func TestDNSSEC02DSAlgorithmMismatch(t *testing.T) {
 		sigCopy := *sig
 		return answerPacket(q.Name, dns.TypeDNSKEY, &keyCopy, &sigCopy)
 	})
-	t.Cleanup(dnssec02Wire(t, parentNS, childNS))
+	dnssec02Wire(t, parentNS, childNS)
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := DNSSEC02(ctx, &z)
@@ -618,7 +606,7 @@ func TestDNSSEC02DSAlgorithmMismatchAlongsideValidDS(t *testing.T) {
 		sigCopy := *sig
 		return answerPacket(q.Name, dns.TypeDNSKEY, &keyCopy, &sigCopy)
 	})
-	t.Cleanup(dnssec02Wire(t, parentNS, childNS))
+	dnssec02Wire(t, parentNS, childNS)
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := DNSSEC02(ctx, &z)
@@ -660,7 +648,7 @@ func TestDNSSEC02DSAlgorithmMismatchUnsupportedDigest(t *testing.T) {
 		sigCopy := *sig
 		return answerPacket(q.Name, dns.TypeDNSKEY, &keyCopy, &sigCopy)
 	})
-	t.Cleanup(dnssec02Wire(t, parentNS, childNS))
+	dnssec02Wire(t, parentNS, childNS)
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := DNSSEC02(ctx, &z)
@@ -698,7 +686,7 @@ func TestDNSSEC02MatchWithoutAlgorithmMismatch(t *testing.T) {
 		sigCopy := *sig
 		return answerPacket(q.Name, dns.TypeDNSKEY, &keyCopy, &sigCopy)
 	})
-	t.Cleanup(dnssec02Wire(t, parentNS, childNS))
+	dnssec02Wire(t, parentNS, childNS)
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := DNSSEC02(ctx, &z)
@@ -824,8 +812,8 @@ func TestDNSSEC03NoNSEC3(t *testing.T) {
 		t.Fatalf("dnssec03: %v", err)
 	}
 	noNSEC3 := tctest.RequireTag(t, entries, "DS03_NO_NSEC3")
-	noNSEC3Servers, ok := noNSEC3.Args["servers"].([]map[string]any)
-	if !ok || len(noNSEC3Servers) != 1 {
+	noNSEC3Servers := tctest.Servers(t, noNSEC3.Args["servers"])
+	if len(noNSEC3Servers) != 1 {
 		t.Fatalf("expected one typed server for DS03_NO_NSEC3, got %#v", noNSEC3.Args["servers"])
 	}
 	if noNSEC3Servers[0]["ns"] != "ns1.example" {
@@ -869,8 +857,8 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 		t.Fatalf("dnssec03: %v", err)
 	}
 	illegal := tctest.RequireTag(t, entries, "DS03_ILLEGAL_HASH_ALGO")
-	illegalServers, ok := illegal.Args["servers"].([]map[string]any)
-	if !ok || len(illegalServers) != 1 {
+	illegalServers := tctest.Servers(t, illegal.Args["servers"])
+	if len(illegalServers) != 1 {
 		t.Fatalf("expected one typed server for DS03_ILLEGAL_HASH_ALGO, got %#v", illegal.Args["servers"])
 	}
 	if illegalServers[0]["ns"] != "ns1.example" {
@@ -941,9 +929,7 @@ func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 			if entry == nil || entry.Tag != "DS03_NO_NSEC3" {
 				continue
 			}
-			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-				gotServers = servers
-			}
+			gotServers = tctest.Servers(t, entry.Args["servers"])
 			if _, ok := entry.Args["ns_list"]; ok {
 				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 			}
@@ -1232,9 +1218,7 @@ func TestDNSSEC05ParallelDNSKEYQueries(t *testing.T) {
 			if entry == nil || entry.Tag != "DS05_ALGO_OK" {
 				continue
 			}
-			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-				gotServers = servers
-			}
+			gotServers = tctest.Servers(t, entry.Args["servers"])
 			if _, ok := entry.Args["ns_list"]; ok {
 				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 			}
@@ -1416,8 +1400,8 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 		t.Fatalf("dnssec07: %v", err)
 	}
 	signedOnServer := tctest.RequireTag(t, entries, "DS07_SIGNED_ON_SERVER")
-	signedServers, ok := signedOnServer.Args["servers"].([]map[string]any)
-	if !ok || len(signedServers) != 1 {
+	signedServers := tctest.Servers(t, signedOnServer.Args["servers"])
+	if len(signedServers) != 1 {
 		t.Fatalf("expected typed servers for DS07_SIGNED_ON_SERVER, got %#v", signedOnServer.Args["servers"])
 	}
 	if signedServers[0]["ns"] != "ns1.example" {
@@ -1428,8 +1412,8 @@ func TestDNSSEC07SignedZone(t *testing.T) {
 	}
 	tctest.RequireTags(t, entries, "DS07_SIGNED", "DS07_DS_ON_PARENT_SERVER")
 	dsOnParent := tctest.RequireTag(t, entries, "DS07_DS_ON_PARENT_SERVER")
-	parentServers, ok := dsOnParent.Args["servers"].([]map[string]any)
-	if !ok || len(parentServers) != 1 {
+	parentServers := tctest.Servers(t, dsOnParent.Args["servers"])
+	if len(parentServers) != 1 {
 		t.Fatalf("expected typed servers for DS07_DS_ON_PARENT_SERVER, got %#v", dsOnParent.Args["servers"])
 	}
 	if parentServers[0]["ns"] != "ns-parent.example" {
@@ -1511,9 +1495,7 @@ func TestDNSSEC07ParallelChildQueries(t *testing.T) {
 			if entry == nil || entry.Tag != "DS07_NOT_SIGNED_ON_SERVER" {
 				continue
 			}
-			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-				gotServers = servers
-			}
+			gotServers = tctest.Servers(t, entry.Args["servers"])
 			if _, ok := entry.Args["ns_list"]; ok {
 				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 			}
@@ -1611,9 +1593,7 @@ func TestDNSSEC07ParallelParentQueries(t *testing.T) {
 			if entry == nil || entry.Tag != "DS07_DS_ON_PARENT_SERVER" {
 				continue
 			}
-			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-				gotServers = servers
-			}
+			gotServers = tctest.Servers(t, entry.Args["servers"])
 			if _, ok := entry.Args["ns_list"]; ok {
 				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 			}
@@ -1670,8 +1650,8 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 		t.Fatalf("dnssec07: %v", err)
 	}
 	notSignedOnServer := tctest.RequireTag(t, entries, "DS07_NOT_SIGNED_ON_SERVER")
-	notSignedServers, ok := notSignedOnServer.Args["servers"].([]map[string]any)
-	if !ok || len(notSignedServers) != 1 {
+	notSignedServers := tctest.Servers(t, notSignedOnServer.Args["servers"])
+	if len(notSignedServers) != 1 {
 		t.Fatalf("expected typed servers for DS07_NOT_SIGNED_ON_SERVER, got %#v", notSignedOnServer.Args["servers"])
 	}
 	if notSignedServers[0]["ns"] != "ns2.example" {
@@ -1764,8 +1744,8 @@ func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 	}
 	expectOneServer := func(entry *logger.Entry, ns string) {
 		t.Helper()
-		servers, ok := entry.Args["servers"].([]map[string]any)
-		if !ok || len(servers) != 1 {
+		servers := tctest.Servers(t, entry.Args["servers"])
+		if len(servers) != 1 {
 			t.Fatalf("expected one typed server for %s, got %#v", entry.Tag, entry.Args["servers"])
 		}
 		if servers[0]["ns"] != ns {
@@ -1837,8 +1817,8 @@ func TestDNSSEC07NoDSOnParentServerTypedServers(t *testing.T) {
 		t.Fatalf("dnssec07: %v", err)
 	}
 	noDS := tctest.RequireTag(t, entries, "DS07_NO_DS_ON_PARENT_SERVER")
-	servers, ok := noDS.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers := tctest.Servers(t, noDS.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected typed servers for DS07_NO_DS_ON_PARENT_SERVER, got %#v", noDS.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns-parent-no-ds.example" {
@@ -2682,9 +2662,7 @@ func TestDNSSEC10ParallelQueries(t *testing.T) {
 			if entry == nil || entry.Tag != "DS10_NSEC_QUERY_RESPONSE_ERR" {
 				continue
 			}
-			if servers, ok := entry.Args["servers"].([]map[string]any); ok {
-				gotServers = servers
-			}
+			gotServers = tctest.Servers(t, entry.Args["servers"])
 			if _, ok := entry.Args["ns_list"]; ok {
 				t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 			}

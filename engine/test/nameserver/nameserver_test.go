@@ -291,10 +291,7 @@ func TestNameserver01ParallelQueries(t *testing.T) {
 		if found == nil {
 			t.Fatalf("expected IS_A_RECURSOR entry, got none")
 		}
-		servers, ok := found.Args["servers"].([]map[string]any)
-		if !ok {
-			t.Fatalf("expected servers array in IS_A_RECURSOR args, got %#v", found.Args)
-		}
+		servers := tctest.Servers(t, found.Args["servers"])
 		if len(servers) != 2 {
 			t.Fatalf("expected 2 servers in consolidated entry, got %d", len(servers))
 		}
@@ -551,8 +548,8 @@ func TestNameserver06NotResolved(t *testing.T) {
 		t.Fatalf("nameserver06: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "CAN_NOT_BE_RESOLVED")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns2.example" {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 || servers[0]["ns"] != "ns2.example" {
 		t.Fatalf("expected typed unresolved nameserver list, got %#v", entry.Args["servers"])
 	}
 	if _, ok := entry.Args["nsname_list"]; ok {
@@ -578,8 +575,8 @@ func TestNameserver07NoUpwardReferral(t *testing.T) {
 		t.Fatalf("nameserver07: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "NO_UPWARD_REFERRAL")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed nameserver list for NO_UPWARD_REFERRAL, got %#v", entry.Args["servers"])
 	}
 	if _, ok := entry.Args["nsname_list"]; ok {
@@ -858,8 +855,8 @@ func TestNameserver15SoftwareVersionAndWrongClass(t *testing.T) {
 	if _, ok := software.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", software.Args)
 	}
-	servers, ok := software.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers := tctest.Servers(t, software.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one typed server for N15_SOFTWARE_VERSION, got %#v", software.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns1.example" {
@@ -949,8 +946,8 @@ func TestNameserver16HasNSID(t *testing.T) {
 	if _, ok := hasNSID.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", hasNSID.Args)
 	}
-	servers, ok := hasNSID.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers := tctest.Servers(t, hasNSID.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one typed server for N16_HAS_NSID, got %#v", hasNSID.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns1.example" {
@@ -992,8 +989,8 @@ func TestNameserver16NoNSID(t *testing.T) {
 	if _, ok := noNSID.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", noNSID.Args)
 	}
-	servers, ok := noNSID.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers := tctest.Servers(t, noNSID.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one typed server for N16_NO_NSID_REVEALED, got %#v", noNSID.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns1.example" {
@@ -1149,8 +1146,8 @@ func TestNameserver17Supported(t *testing.T) {
 	}
 	tctest.RequireTags(t, entries, "N17_COOKIE_SUPPORTED", "N17_COOKIE_ROUNDTRIP_OK")
 	entry := tctest.RequireTag(t, entries, "N17_COOKIE_SUPPORTED")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for N17_COOKIE_SUPPORTED, got %#v", entry.Args["servers"])
 	}
 }
@@ -1375,8 +1372,8 @@ func TestNameserver17RequireServerCookie(t *testing.T) {
 	tctest.RequireTags(t, entries, "N17_COOKIE_ENFORCED", "N17_COOKIE_ROUNDTRIP_OK")
 	tctest.RequireNoTag(t, entries, "N17_COOKIE_SUPPORTED")
 	entry := tctest.RequireTag(t, entries, "N17_COOKIE_ENFORCED")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for N17_COOKIE_ENFORCED, got %#v", entry.Args["servers"])
 	}
 }
@@ -1667,8 +1664,8 @@ func TestNameserver18ServerError(t *testing.T) {
 	if e.Args["extra_text"] != "lame" {
 		t.Fatalf("extra_text = %v, want \"lame\"", e.Args["extra_text"])
 	}
-	servers, ok := e.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.1" {
+	servers := tctest.Servers(t, e.Args["servers"])
+	if len(servers) != 1 || servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.1" {
 		t.Fatalf("servers = %#v", e.Args["servers"])
 	}
 }
@@ -1724,8 +1721,8 @@ func TestNameserver18MultipleServersSameCode(t *testing.T) {
 	entries := runNameserver18(t, ctx, s1, s2)
 	tctest.RequireCount(t, entries, "N18_SERVER_ERROR_REPORTED", 1)
 	e := tctest.RequireTag(t, entries, "N18_SERVER_ERROR_REPORTED")
-	servers, ok := e.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
+	servers := tctest.Servers(t, e.Args["servers"])
+	if len(servers) != 2 {
 		t.Fatalf("expected both servers listed, got %#v", e.Args["servers"])
 	}
 }

@@ -46,24 +46,24 @@ func TestDelegation01Counts(t *testing.T) {
 		t.Fatalf("delegation01: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "ENOUGH_NS_DEL")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 2 {
 		t.Fatalf("expected typed server list for ENOUGH_NS_DEL, got %#v", entry.Args["servers"])
 	}
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
 	entry = tctest.RequireTag(t, entries, "NOT_ENOUGH_NS_CHILD")
-	servers, ok = entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+	servers = tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for NOT_ENOUGH_NS_CHILD, got %#v", entry.Args["servers"])
 	}
 	if _, ok := entry.Args["nsname_list"]; ok {
 		t.Fatalf("legacy key nsname_list should not be present: %#v", entry.Args)
 	}
 	entry = tctest.RequireTag(t, entries, "NOT_ENOUGH_IPV4_NS_DEL")
-	servers, ok = entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers = tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_DEL, got %#v", entry.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.1" {
@@ -77,8 +77,8 @@ func TestDelegation01Counts(t *testing.T) {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
 	entry = tctest.RequireTag(t, entries, "NOT_ENOUGH_IPV6_NS_DEL")
-	servers, ok = entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers = tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV6_NS_DEL, got %#v", entry.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns2.example" || servers[0]["address"] != "2001:db8::1" {
@@ -92,8 +92,8 @@ func TestDelegation01Counts(t *testing.T) {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
 	entry = tctest.RequireTag(t, entries, "NOT_ENOUGH_IPV4_NS_CHILD")
-	servers, ok = entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers = tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one typed server for NOT_ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.2" {
@@ -144,8 +144,8 @@ func TestDelegation01EnoughIPv4ChildTypedArgsOrder(t *testing.T) {
 		t.Fatalf("delegation01: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "ENOUGH_IPV4_NS_CHILD")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 2 {
 		t.Fatalf("expected two typed servers for ENOUGH_IPV4_NS_CHILD, got %#v", entry.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns1.example" || servers[0]["address"] != "192.0.2.11" {
@@ -280,8 +280,8 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 		t.Fatalf("delegation02: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "DEL_NS_SAME_IP")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 2 {
 		t.Fatalf("expected typed server list for DEL_NS_SAME_IP, got %#v", entry.Args["servers"])
 	}
 	if address, _ := entry.Args["address"].(string); address != "192.0.2.1" {
@@ -295,8 +295,8 @@ func TestDelegation02DuplicateIPs(t *testing.T) {
 	}
 	tctest.RequireTags(t, entries, "CHILD_DISTINCT_NS_IP", "SAME_IP_ADDRESS")
 	entry = tctest.First(entries, "SAME_IP_ADDRESS")
-	servers, ok = entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
+	servers = tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 2 {
 		t.Fatalf("expected typed server list for SAME_IP_ADDRESS, got %#v", entry.Args["servers"])
 	}
 	if address, _ := entry.Args["address"].(string); address != "192.0.2.1" {
@@ -426,8 +426,8 @@ func TestDelegation04Authoritative(t *testing.T) {
 		t.Fatalf("delegation04: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "ARE_AUTHORITATIVE")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for ARE_AUTHORITATIVE, got %#v", entry.Args["servers"])
 	}
 	if _, ok := entry.Args["nsname_list"]; ok {
@@ -744,8 +744,8 @@ func TestDelegation07NamesMatch(t *testing.T) {
 		t.Fatalf("delegation07: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "NAMES_MATCH")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
 		t.Fatalf("expected typed server list for NAMES_MATCH, got %#v", entry.Args["servers"])
 	}
 	if _, ok := entry.Args["names"]; ok {

@@ -58,8 +58,8 @@ func TestConsistency01MultipleSerials(t *testing.T) {
 	if _, ok := entry.Args["ns_list"]; ok {
 		t.Fatalf("legacy key ns_list should not be present: %#v", entry.Args)
 	}
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.1" {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 || servers[0]["address"] != "192.0.2.1" {
 		t.Fatalf("expected endpoint-preserving typed server for SOA_SERIAL, got %#v", entry.Args["servers"])
 	}
 }
@@ -266,8 +266,8 @@ func TestConsistency04MultipleNSSets(t *testing.T) {
 	if !ok || len(nsSet) == 0 {
 		t.Fatalf("expected typed ns_set_servers for NS_SET, got %#v", entry.Args["ns_set_servers"])
 	}
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.1" {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 || servers[0]["address"] != "192.0.2.1" {
 		t.Fatalf("expected endpoint-preserving typed servers for NS_SET, got %#v", entry.Args["servers"])
 	}
 }
@@ -301,8 +301,8 @@ func TestConsistency04OneNSSetTypedServers(t *testing.T) {
 		t.Fatalf("consistency04: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "ONE_NS_SET")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 2 {
 		t.Fatalf("expected typed server list for ONE_NS_SET, got %#v", entry.Args["servers"])
 	}
 	if servers[0]["ns"] != "ns1.example" || servers[1]["ns"] != "ns2.example" {
@@ -905,8 +905,8 @@ func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
 			t.Fatalf("delegation set element must carry no address, got %#v", element)
 		}
 	}
-	servers, ok := sets[0].Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.101" {
+	servers := tctest.Servers(t, sets[0].Args["servers"])
+	if len(servers) != 1 || servers[0]["address"] != "192.0.2.101" {
 		t.Fatalf("expected first set served by 192.0.2.101, got %#v", sets[0].Args["servers"])
 	}
 
@@ -915,8 +915,8 @@ func TestConsistency05DelegationNSSetInconsistentParents(t *testing.T) {
 	if !ok || len(second) != 1 {
 		t.Fatalf("expected 1 typed ns_set_servers element, got %#v", sets[1].Args["ns_set_servers"])
 	}
-	servers, ok = sets[1].Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 || servers[0]["address"] != "192.0.2.102" {
+	servers = tctest.Servers(t, sets[1].Args["servers"])
+	if len(servers) != 1 || servers[0]["address"] != "192.0.2.102" {
 		t.Fatalf("expected second set served by 192.0.2.102, got %#v", sets[1].Args["servers"])
 	}
 }

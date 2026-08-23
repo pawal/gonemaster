@@ -102,8 +102,8 @@ func TestBasic01ParentFoundTypedArgs(t *testing.T) {
 		t.Fatalf("basic01: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "B01_PARENT_FOUND")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 2 {
 		t.Fatalf("expected two typed servers for B01_PARENT_FOUND, got %#v", entry.Args["servers"])
 	}
 	if servers[0]["ns"] != "a.root" || servers[0]["address"] != "192.0.2.1" {
@@ -248,8 +248,8 @@ func TestBasic02AuthResponseSOA(t *testing.T) {
 		t.Fatalf("basic02: %v", err)
 	}
 	entry := tctest.RequireTag(t, entries, "B02_AUTH_RESPONSE_SOA")
-	servers, ok := entry.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers := tctest.Servers(t, entry.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one typed server for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["servers"])
 	}
 	if servers[0]["ns"] != "a.root" || servers[0]["address"] != "192.0.2.1" {
@@ -345,8 +345,8 @@ func TestBasic02ParallelQueries(t *testing.T) {
 			t.Fatalf("expected deterministic address order, got %v", enabledAddresses)
 		}
 		entry := tctest.RequireTag(t, entries, "B02_AUTH_RESPONSE_SOA")
-		servers, ok := entry.Args["servers"].([]map[string]any)
-		if !ok || len(servers) != 2 {
+		servers := tctest.Servers(t, entry.Args["servers"])
+		if len(servers) != 2 {
 			t.Fatalf("expected two typed servers for B02_AUTH_RESPONSE_SOA, got %#v", entry.Args["servers"])
 		}
 		if servers[0]["ns"] != "a.root" || servers[0]["address"] != "192.0.2.1" {
@@ -813,8 +813,8 @@ func TestBasic01InconsistentDelegation(t *testing.T) {
 	if inconsistent.Args["domain_parent"] != "." {
 		t.Fatalf("expected domain_parent=., got %#v", inconsistent.Args["domain_parent"])
 	}
-	servers, ok := inconsistent.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers := tctest.Servers(t, inconsistent.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one typed server for B01_INCONSISTENT_DELEGATION, got %#v", inconsistent.Args["servers"])
 	}
 	if servers[0]["ns"] != "b.root" || servers[0]["address"] != "192.0.2.2" {

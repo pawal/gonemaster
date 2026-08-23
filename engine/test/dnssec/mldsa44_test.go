@@ -35,13 +35,6 @@ func mldsa44Sig(t *testing.T, owner string, typeCovered uint16, key *dns.DNSKEY,
 func TestDNSSEC08MLDSA44Valid(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
-
 	now := time.Unix(1700000000, 0).UTC()
 	key, signer := mldsa44Key(t, "example")
 	sig := mldsa44Sig(t, "example", dns.TypeDNSKEY, key, signer, []dns.RR{key}, now)
@@ -55,12 +48,12 @@ func TestDNSSEC08MLDSA44Valid(t *testing.T) {
 		return pkt
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := DNSSEC08(ctx, &z)
@@ -78,13 +71,6 @@ func TestDNSSEC08MLDSA44Valid(t *testing.T) {
 // The same change on the SOA RRSIG path.
 func TestDNSSEC09MLDSA44Valid(t *testing.T) {
 	ctx := tctest.Context(t)
-
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	t.Cleanup(func() {
-		glueNameservers = origM4
-		apexNameservers = origM5
-	})
 
 	now := time.Unix(1700000000, 0).UTC()
 	key, signer := mldsa44Key(t, "example")
@@ -106,12 +92,12 @@ func TestDNSSEC09MLDSA44Valid(t *testing.T) {
 		}
 	})
 
-	glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{ns}, nil
-	}
-	apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return nil, nil
-	}
+	})
 
 	z := zone.Zone{Name: dnsname.New("example")}
 	entries, err := DNSSEC09(ctx, &z)

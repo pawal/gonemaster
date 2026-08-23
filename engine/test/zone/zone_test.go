@@ -419,8 +419,8 @@ func TestZone09MXDataUsesTypedMailTargets(t *testing.T) {
 	if _, ok := mxData.Args["addresses"]; ok {
 		t.Fatalf("Z09_MX_DATA should not emit addresses anymore: %#v", mxData.Args)
 	}
-	servers, ok := mxData.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers := tctest.Servers(t, mxData.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one typed server, got %#v", mxData.Args["servers"])
 	}
 	if addr, _ := servers[0]["address"].(string); addr != "192.0.2.1" {
@@ -546,8 +546,8 @@ func TestZone09MXConsistentDespiteTTLDifference(t *testing.T) {
 	if mxData == nil {
 		t.Fatalf("expected a single consistent Z09_MX_DATA")
 	}
-	servers, ok := mxData.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
+	servers := tctest.Servers(t, mxData.Args["servers"])
+	if len(servers) != 2 {
 		t.Fatalf("expected both name servers in Z09_MX_DATA, got %#v", mxData.Args["servers"])
 	}
 }
@@ -601,8 +601,8 @@ func TestZone09MXInconsistentDataPerVariant(t *testing.T) {
 		if !ok || len(targets) != 1 {
 			t.Fatalf("expected one mail target per variant, got %#v", entry.Args["mail_targets"])
 		}
-		servers, ok := entry.Args["servers"].([]map[string]any)
-		if !ok || len(servers) != 1 {
+		servers := tctest.Servers(t, entry.Args["servers"])
+		if len(servers) != 1 {
 			t.Fatalf("expected one server per variant, got %#v", entry.Args["servers"])
 		}
 		if ns, _ := servers[0]["ns"].(string); ns == "" {
@@ -1915,8 +1915,8 @@ func TestZone15ConsolidatedFound(t *testing.T) {
 	if len(found) != 1 {
 		t.Fatalf("expected one consolidated Z15_CAA_FOUND, got %d", len(found))
 	}
-	servers, ok := found[0].Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 2 {
+	servers := tctest.Servers(t, found[0].Args["servers"])
+	if len(servers) != 2 {
 		t.Fatalf("expected both name servers in servers, got %#v", found[0].Args["servers"])
 	}
 	tctest.RequireNoTag(t, entries, "Z15_INCONSISTENT_CAA", "Z15_MIXED_PRESENCE")
@@ -1933,8 +1933,8 @@ func TestZone15NoCAA(t *testing.T) {
 	entries := runZone15(t, ctx, "example.com")
 
 	noCAA := tctest.RequireTag(t, entries, "Z15_NO_CAA")
-	servers, ok := noCAA.Args["servers"].([]map[string]any)
-	if !ok || len(servers) != 1 {
+	servers := tctest.Servers(t, noCAA.Args["servers"])
+	if len(servers) != 1 {
 		t.Fatalf("expected one server in Z15_NO_CAA, got %#v", noCAA.Args["servers"])
 	}
 	// A normal delegated domain must not get the TLD wording.

@@ -15,19 +15,11 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func BenchmarkDNSSEC18Parallel(b *testing.B) {
-	origParentNS := parentApexNameservers
-	origM4 := glueNameservers
-	origM5 := apexNameservers
-	defer func() {
-		parentApexNameservers = origParentNS
-		glueNameservers = origM4
-		apexNameservers = origM5
-	}()
-
 	delay := 200 * time.Microsecond
 
 	benchCase := func(b *testing.B, parallel int) {
@@ -99,15 +91,15 @@ func BenchmarkDNSSEC18Parallel(b *testing.B) {
 		}
 		child2.SetQueryHook(childHook)
 
-		parentApexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		tctest.Stub(b, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return []nameserver.Nameserver{parentNS}, nil
-		}
-		glueNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		})
+		tctest.Stub(b, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return []nameserver.Nameserver{child1, child2}, nil
-		}
-		apexNameservers = func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		})
+		tctest.Stub(b, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 			return nil, nil
-		}
+		})
 
 		p := dnstest.DefaultProfile(b)
 		if err := p.Set("resolver.defaults.parallel", parallel); err != nil {

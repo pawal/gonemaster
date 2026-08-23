@@ -1,38 +1,12 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ServerSettings from "./ServerSettings.svelte";
-
-const jsonResponse = (data, ok = true) => ({
-  ok,
-  statusText: ok ? "OK" : "Bad Request",
-  headers: { get: () => "application/json" },
-  json: async () => data,
-  text: async () => JSON.stringify(data),
-});
-
-const sampleSettings = () => ({
-  listen_addr: { value: "127.0.0.1:8080", source: "default", readonly: true },
-  db_driver: { value: "", source: "default", readonly: true },
-  db_dsn: { value: "", source: "default", readonly: true },
-  profile_path: { value: "", source: "default", readonly: true },
-  worker_count: { value: 4, source: "default" },
-  max_concurrent_jobs: { value: 0, source: "default" },
-  min_level: { value: "INFO", source: "config_file" },
-  retention_days: { value: 0, source: "default" },
-  public_url: { value: "", source: "default" },
-  rate_limit_enabled: { value: false, source: "default" },
-  rate_limit_max: { value: 10, source: "default" },
-  rate_limit_window: { value: "10m0s", source: "default" },
-  show_score_admin: { value: true, source: "default" },
-  show_score_public: { value: true, source: "default" },
-  show_nameserver_timings_admin: { value: true, source: "default" },
-  show_nameserver_timings_public: { value: true, source: "default" },
-});
+import { jsonResponse, requestUrl, serverSettingsFixture } from "../test/helpers.js";
 
 const settingsMock = (url, options = {}) => {
-  const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+  const value = requestUrl(url);
   if (value.includes("/api/v1/settings") && (!options.method || options.method === "GET")) {
-    return jsonResponse(sampleSettings());
+    return jsonResponse(serverSettingsFixture());
   }
   if (value.includes("/api/v1/settings") && options.method === "PUT") {
     return jsonResponse({ status: "ok" });
@@ -110,7 +84,7 @@ describe("ServerSettings", () => {
   it("sends PUT request with changed values on save", async () => {
     const calls = [];
     global.fetch.mockImplementation((url, options = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      const value = requestUrl(url);
       if (options.method === "PUT") calls.push({ url: value, body: JSON.parse(options.body) });
       return settingsMock(url, options);
     });
@@ -149,7 +123,7 @@ describe("ServerSettings", () => {
 
   it("shows error when settings fail to load", async () => {
     global.fetch.mockImplementation((url, options = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      const value = requestUrl(url);
       if (value.includes("/api/v1/settings")) {
         return jsonResponse({ error: { message: "db connection lost" } }, false);
       }

@@ -1,14 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ScoringSettings from "./ScoringSettings.svelte";
-
-const jsonResponse = (data, ok = true) => ({
-  ok,
-  statusText: ok ? "OK" : "Bad Request",
-  headers: { get: () => "application/json" },
-  json: async () => data,
-  text: async () => JSON.stringify(data),
-});
+import { jsonResponse, requestUrl } from "../test/helpers.js";
 
 const defaultConfig = () => ({
   severity_penalties: { NOTICE: 1, WARNING: 5, ERROR: 20, CRITICAL: 0 },
@@ -130,7 +123,7 @@ describe("ScoringSettings", () => {
   it("save calls PUT /api/v1/scoring-config and reloads", async () => {
     let putCalled = false;
     global.fetch.mockImplementation((url, opts) => {
-      const path = typeof url === "string" ? url : String(url?.url || url);
+      const path = requestUrl(url);
       if (opts?.method === "PUT" && path.includes("/scoring-config")) {
         putCalled = true;
         return Promise.resolve(jsonResponse({ status: "ok" }));
@@ -225,7 +218,7 @@ describe("ScoringSettings", () => {
     modifiedConfig.severity_penalties.WARNING = 99;
 
     global.fetch.mockImplementation((url) => {
-      const path = typeof url === "string" ? url : String(url?.url || url);
+      const path = requestUrl(url);
       if (path.includes("/scoring-config/defaults")) {
         defaultsFetched = true;
         return Promise.resolve(jsonResponse(defaultConfig()));
@@ -326,7 +319,7 @@ describe("ScoringSettings", () => {
 
   const reconcileMock = (stored, defaults, configOverrides = {}) =>
     (url) => {
-      const path = typeof url === "string" ? url : String(url?.url || url);
+      const path = requestUrl(url);
       if (path.includes("/scoring-config/defaults")) {
         return Promise.resolve(jsonResponse(defaults));
       }

@@ -1,30 +1,16 @@
 import { render, screen, fireEvent } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import ThemeToggle from "./ThemeToggle.svelte";
-import { themeStore, _resetForTests } from "../lib/theme.svelte.js";
-
-const stubMatchMedia = (matchesDark) => {
-  const mock = vi.fn().mockImplementation((q) => ({
-    matches: q === "(prefers-color-scheme: dark)" ? matchesDark : false,
-    media: q,
-    addEventListener: () => {},
-    removeEventListener: () => {},
-  }));
-  vi.stubGlobal("matchMedia", mock);
-  window.matchMedia = mock;
-};
+import { themeStore } from "../lib/theme.svelte.js";
+import { resetTheme, stubMatchMedia } from "../test/helpers.js";
 
 describe("ThemeToggle", () => {
   beforeEach(() => {
-    localStorage.clear();
-    document.documentElement.removeAttribute("data-theme");
-    _resetForTests();
+    resetTheme();
   });
 
   afterEach(() => {
-    localStorage.clear();
-    document.documentElement.removeAttribute("data-theme");
-    _resetForTests();
+    resetTheme();
   });
 
   it("shows the sun icon when the OS is light and value is 'system'", () => {

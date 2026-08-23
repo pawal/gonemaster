@@ -1,24 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import BatchDeleteModal from "./BatchDeleteModal.svelte";
-
-const jsonResponse = (data, ok = true, status = ok ? 200 : 500) => ({
-  ok,
-  status,
-  statusText: ok ? "OK" : "Error",
-  headers: { get: () => "application/json" },
-  json: async () => data,
-  text: async () => JSON.stringify(data),
-});
-
-const noContentResponse = () => ({
-  ok: true,
-  status: 204,
-  statusText: "No Content",
-  headers: { get: () => "" },
-  json: async () => ({}),
-  text: async () => "",
-});
+import { jsonResponse, noContentResponse, requestUrl } from "../test/helpers.js";
 
 const samplePreview = (overrides = {}) => ({
   batch_id: "batch_xyz",
@@ -43,7 +26,7 @@ describe("BatchDeleteModal", () => {
   const installFetch = (scenario = {}) => {
     const deleteCalls = [];
     global.fetch.mockImplementation((url, options = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url);
+      const value = requestUrl(url);
       const method = options.method || "GET";
       if (method === "GET" && value.endsWith("/delete-preview")) {
         if (scenario.previewError) {

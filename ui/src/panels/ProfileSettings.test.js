@@ -1,26 +1,7 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProfileSettings from "./ProfileSettings.svelte";
-
-const jsonResponse = (data, ok = true) => ({
-  ok,
-  statusText: ok ? "OK" : "Bad Request",
-  headers: {
-    get: () => "application/json"
-  },
-  json: async () => data,
-  text: async () => JSON.stringify(data)
-});
-
-const emptyResponse = () => ({
-  ok: true,
-  statusText: "No Content",
-  headers: {
-    get: () => ""
-  },
-  json: async () => ({}),
-  text: async () => ""
-});
+import { emptyResponse, jsonResponse, profileFixture, requestUrl } from "../test/helpers.js";
 
 describe("ProfileSettings", () => {
   beforeEach(() => {
@@ -46,26 +27,17 @@ describe("ProfileSettings", () => {
     updated_at: "0001-01-01T00:00:00Z"
   });
 
-  const sampleProfiles = () => ([
-    {
-      id: 1,
-      name: "alpha",
-      description: "Public baseline",
-      config: { net: { ipv4: true } },
-      public: true,
-      created_at: "2026-04-01T10:00:00Z",
-      updated_at: "2026-04-02T10:00:00Z"
-    },
-    {
+  const sampleProfiles = () => [
+    profileFixture({ id: 1, name: "alpha", description: "Public baseline", config: { net: { ipv4: true } }, public: true }),
+    profileFixture({
       id: 2,
       name: "beta",
       description: "Strict resolver profile",
       config: { resolver: { defaults: { timeout: 5 } } },
-      public: false,
       created_at: "2026-04-01T11:00:00Z",
       updated_at: "2026-04-03T09:30:00Z"
-    }
-  ]);
+    })
+  ];
 
   const sampleTags = () => ([
     { name: "ops", default_profile_id: 2 },
@@ -164,7 +136,7 @@ describe("ProfileSettings", () => {
     const clearedIds = new Set();
 
     global.fetch.mockImplementation((url, requestOptions = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      const value = requestUrl(url);
       const method = requestOptions.method || "GET";
 
       if (value === "/api/v1/profiles/default") return jsonResponse(sampleDefaultProfile());

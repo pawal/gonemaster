@@ -2,38 +2,11 @@ import { render, screen, fireEvent, waitFor, within } from "@testing-library/sve
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
 import { setCatalog, locale } from "./i18n.js";
+import { installFetchRoutes, jsonResponse, profileFixture, requestUrl } from "./test/helpers.js";
 
-const jsonResponse = (data, ok = true) => ({
-  ok,
-  statusText: ok ? "OK" : "Bad Request",
-  headers: {
-    get: () => "application/json"
-  },
-  json: async () => data,
-  text: async () => JSON.stringify(data)
-});
-
-const emptyResponse = () => ({
-  ok: true,
-  statusText: "No Content",
-  headers: {
-    get: () => ""
-  },
-  json: async () => ({}),
-  text: async () => ""
-});
-
-const sampleProfiles = () => ([
-  {
-    id: 11,
-    name: "baseline",
-    description: "Default baseline",
-    config: { net: { ipv4: true, ipv6: true } },
-    public: false,
-    created_at: "2026-04-01T10:00:00Z",
-    updated_at: "2026-04-02T10:00:00Z"
-  },
-  {
+const sampleProfiles = () => [
+  profileFixture({ id: 11, name: "baseline", description: "Default baseline", config: { net: { ipv4: true, ipv6: true } } }),
+  profileFixture({
     id: 12,
     name: "strict",
     description: "Strict DNS profile",
@@ -41,8 +14,8 @@ const sampleProfiles = () => ([
     public: true,
     created_at: "2026-04-01T11:00:00Z",
     updated_at: "2026-04-03T09:30:00Z"
-  }
-]);
+  })
+];
 
 describe("App", () => {
   beforeEach(() => {
@@ -104,14 +77,8 @@ describe("App", () => {
   });
 
   it("refreshes recent tests list when clicking the recent tests tab", async () => {
-    const calls = [];
-    global.fetch.mockImplementation((url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      calls.push(value);
-      if (value.includes("/api/v1/jobs?")) {
-        return jsonResponse({ items: [], total: 0 });
-      }
-      return jsonResponse({});
+    const calls = installFetchRoutes({
+      "/api/v1/jobs?": { items: [], total: 0 }
     });
 
     render(App);
@@ -138,18 +105,10 @@ describe("App", () => {
       created_at: "2026-02-03T00:00:00Z"
     };
 
-    global.fetch.mockImplementation((url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      if (value.includes("/api/v1/batches?")) {
-        return jsonResponse({ items: [{ batch_id: "batch_refresh", tag: "", status: "running", total: 1, completed: 0, completion: 0, created_at: "2026-02-03T00:00:00Z" }], total: 1 });
-      }
-      if (value.includes("/api/v1/batches/batch_refresh")) {
-        return jsonResponse(batch);
-      }
-      if (value.includes("/api/v1/jobs?")) {
-        return jsonResponse({ items: [], total: 0 });
-      }
-      return jsonResponse({});
+    installFetchRoutes({
+      "/api/v1/batches?": { items: [{ batch_id: "batch_refresh", tag: "", status: "running", total: 1, completed: 0, completion: 0, created_at: "2026-02-03T00:00:00Z" }], total: 1 },
+      "/api/v1/batches/batch_refresh": batch,
+      "/api/v1/jobs?": { items: [], total: 0 }
     });
 
     render(App);
@@ -245,7 +204,7 @@ describe("App", () => {
     const doneJob = { ...queuedJob, status: "succeeded", progress: 100 };
 
     global.fetch.mockImplementation((url, options = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      const value = requestUrl(url);
       if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
       if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) {
         jobCallCount++;
@@ -294,7 +253,7 @@ describe("App", () => {
     let tags = [{ name: "ops", description: "Operations", domain_count: 1, default_profile_id: null }];
 
     global.fetch.mockImplementation((url, options = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      const value = requestUrl(url);
       if (typeof value === "string" && value.startsWith("/api/v1/jobs?")) {
         return jsonResponse({ items: [], total: 0 });
       }
@@ -366,24 +325,16 @@ describe("App", () => {
   });
 
   it("persists view filters and sorts in URL query params", async () => {
-    global.fetch.mockImplementation((url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      if (value.includes("/api/v1/jobs?")) {
-        return jsonResponse({ items: [], total: 0 });
+    installFetchRoutes({
+      "/api/v1/jobs?": { items: [], total: 0 },
+      "/api/v1/batches?": { items: [{ batch_id: "batch_1", tag: "", status: "done", total: 0, completed: 0, completion: 0, created_at: "2026-02-03T00:00:00Z" }], total: 1 },
+      "/api/v1/batches/": {
+        batch_id: "batch_1",
+        total: 0,
+        status_counts: {},
+        items: [],
+        created_at: "2026-02-03T00:00:00Z"
       }
-      if (value.includes("/api/v1/batches?")) {
-        return jsonResponse({ items: [{ batch_id: "batch_1", tag: "", status: "done", total: 0, completed: 0, completion: 0, created_at: "2026-02-03T00:00:00Z" }], total: 1 });
-      }
-      if (value.includes("/api/v1/batches/")) {
-        return jsonResponse({
-          batch_id: "batch_1",
-          total: 0,
-          status_counts: {},
-          items: [],
-          created_at: "2026-02-03T00:00:00Z"
-        });
-      }
-      return jsonResponse({});
     });
 
     render(App);
@@ -435,23 +386,15 @@ describe("App", () => {
       "/?r_sort=domain_desc&r_sev=errors_only&r_batch=batch_url&r_limit=50&r_cursor=2&b_id=batch_url_1&b_sort=created_at_asc&b_limit=50&b_cursor=2&b_status=failed&b_domain=beta#/batches"
     );
 
-    const calls = [];
-    global.fetch.mockImplementation((url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      calls.push(value);
-      if (value.includes("/api/v1/jobs?")) {
-        return jsonResponse({ items: [], total: 0 });
+    const calls = installFetchRoutes({
+      "/api/v1/jobs?": { items: [], total: 0 },
+      "/api/v1/batches/batch_url_1": {
+        batch_id: "batch_url_1",
+        total: 0,
+        status_counts: {},
+        items: [],
+        created_at: "2026-02-03T00:00:00Z"
       }
-      if (value.includes("/api/v1/batches/batch_url_1")) {
-        return jsonResponse({
-          batch_id: "batch_url_1",
-          total: 0,
-          status_counts: {},
-          items: [],
-          created_at: "2026-02-03T00:00:00Z"
-        });
-      }
-      return jsonResponse({});
     });
 
     render(App);
@@ -498,15 +441,8 @@ describe("App", () => {
         recentCursor: 2
       })
     );
-    const calls = [];
-
-    global.fetch.mockImplementation((url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      calls.push(value);
-      if (value.includes("/api/v1/jobs?")) {
-        return jsonResponse({ items: [], total: 0 });
-      }
-      return jsonResponse({});
+    const calls = installFetchRoutes({
+      "/api/v1/jobs?": { items: [], total: 0 }
     });
 
     render(App);
@@ -537,7 +473,7 @@ describe("App", () => {
     };
 
     global.fetch.mockImplementation((url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      const value = requestUrl(url);
       calls.push(value);
       if (value.includes("/api/v1/jobs?")) {
         return jsonResponse({ items: [job], total: 1 });
@@ -576,23 +512,15 @@ describe("App", () => {
       "/?r_sort=bad_sort&r_sev=bad_filter&r_batch=batch_from_url&r_limit=13&r_cursor=-4&b_id=batch_invalid&b_sort=bad_batch_sort&b_limit=13&b_cursor=-4&b_status=wat&b_domain=edge#/batches"
     );
 
-    const calls = [];
-    global.fetch.mockImplementation((url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-      calls.push(value);
-      if (value.includes("/api/v1/jobs?")) {
-        return jsonResponse({ items: [], total: 0 });
+    const calls = installFetchRoutes({
+      "/api/v1/jobs?": { items: [], total: 0 },
+      "/api/v1/batches/batch_invalid": {
+        batch_id: "batch_invalid",
+        total: 0,
+        status_counts: {},
+        items: [],
+        created_at: "2026-02-03T00:00:00Z"
       }
-      if (value.includes("/api/v1/batches/batch_invalid")) {
-        return jsonResponse({
-          batch_id: "batch_invalid",
-          total: 0,
-          status_counts: {},
-          items: [],
-          created_at: "2026-02-03T00:00:00Z"
-        });
-      }
-      return jsonResponse({});
     });
 
     render(App);
@@ -635,15 +563,9 @@ describe("App", () => {
 
   describe("locale selector", () => {
     const mockFetchWithLocales = (locales) => {
-      global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-        if (value.includes("/api/v1/locales")) {
-          return jsonResponse({ locales });
-        }
-        if (value.includes("/api/v1/jobs?")) {
-          return jsonResponse({ items: [], total: 0 });
-        }
-        return jsonResponse({});
+      installFetchRoutes({
+        "/api/v1/locales": { locales },
+        "/api/v1/jobs?": { items: [], total: 0 }
       });
     };
 
@@ -715,15 +637,9 @@ describe("App", () => {
       // Inject a minimal Swedish catalog so we can observe a chrome string change.
       setCatalog("sv", { run_single_job: "Kör enkeljobb" });
 
-      global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-        if (value.includes("/api/v1/locales")) {
-          return jsonResponse({ locales: ["en", "sv"] });
-        }
-        if (value.includes("/api/v1/jobs?")) {
-          return jsonResponse({ items: [], total: 0 });
-        }
-        return jsonResponse({});
+      installFetchRoutes({
+        "/api/v1/locales": { locales: ["en", "sv"] },
+        "/api/v1/jobs?": { items: [], total: 0 }
       });
 
       render(App);
@@ -786,7 +702,7 @@ describe("App", () => {
       const doneJob = { ...queuedJob, status: "succeeded", progress: 100 };
 
       global.fetch.mockImplementation((url, options = {}) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
         if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) {
           jobCallCount++;
@@ -824,7 +740,7 @@ describe("App", () => {
       };
 
       global.fetch.mockImplementation((url, options = {}) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
         if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) return jsonResponse(queuedJob);
         if (value.includes("/api/v1/jobs?")) return jsonResponse({ items: [], total: 0 });
@@ -861,7 +777,7 @@ describe("App", () => {
       const doneJob = { ...queuedJob, status: "succeeded", progress: 100 };
 
       global.fetch.mockImplementation((url, options = {}) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         if (url === "/api/v1/jobs" && options?.method === "POST") return jsonResponse(queuedJob);
         if (value.includes(`/api/v1/jobs/${queuedJob.id}`)) {
           jobCallCount++;
@@ -920,7 +836,7 @@ describe("App", () => {
       };
 
       global.fetch.mockImplementation((url, options = {}) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         if (url === "/api/v1/jobs/batch" && options?.method === "POST") {
           return jsonResponse({ batch_id: "batch_notify", job_ids: ["job_bn"] });
         }
@@ -976,21 +892,13 @@ describe("App", () => {
     });
 
     it("shows domain list when tab opened", async () => {
-      const calls = [];
-      global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-        calls.push(value);
-        if (value.includes("/api/v1/domains")) {
-          return jsonResponse({
-            items: [{ id: 1, name: "example.com", tags: ["tld"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 3 }],
-            total: 1
-          });
-        }
-        if (value.includes("/api/v1/tags")) {
-          return jsonResponse([{ name: "tld", description: "TLD", domain_count: 1 }]);
-        }
-        return jsonResponse({ items: [], total: 0 });
-      });
+      const calls = installFetchRoutes({
+        "/api/v1/domains": {
+          items: [{ id: 1, name: "example.com", tags: ["tld"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 3 }],
+          total: 1
+        },
+        "/api/v1/tags": [{ name: "tld", description: "TLD", domain_count: 1 }]
+      }, { items: [], total: 0 });
 
       render(App);
       await openDomainsTab();
@@ -1003,20 +911,14 @@ describe("App", () => {
     });
 
     it("clicking a domain row shows detail view and loads runs", async () => {
-      const calls = [];
-      global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-        calls.push(value);
-        if (value.includes("/runs")) return jsonResponse({ items: [], total: 0 });
-        if (value.includes("/api/v1/domains")) {
-          return jsonResponse({
-            items: [{ id: 7, name: "example.com", tags: ["tld"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
-            total: 1
-          });
-        }
-        if (value.includes("/api/v1/tags")) return jsonResponse([]);
-        return jsonResponse({ items: [], total: 0 });
-      });
+      const calls = installFetchRoutes({
+        "/runs": { items: [], total: 0 },
+        "/api/v1/domains": {
+          items: [{ id: 7, name: "example.com", tags: ["tld"], latest_level: "WARNING", latest_run_at: "2026-03-15T10:00:00Z", run_count: 1 }],
+          total: 1
+        },
+        "/api/v1/tags": []
+      }, { items: [], total: 0 });
 
       render(App);
       await openDomainsTab();
@@ -1031,17 +933,13 @@ describe("App", () => {
     });
 
     it("back button returns to domain list", async () => {
-      global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-        if (value.includes("/api/v1/domains")) {
-          return jsonResponse({
-            items: [{ id: 1, name: "example.com", tags: [], latest_level: "OK", latest_run_at: null, run_count: 0 }],
-            total: 1
-          });
-        }
-        if (value.includes("/api/v1/tags")) return jsonResponse([]);
-        return jsonResponse({ items: [], total: 0 });
-      });
+      installFetchRoutes({
+        "/api/v1/domains": {
+          items: [{ id: 1, name: "example.com", tags: [], latest_level: "OK", latest_run_at: null, run_count: 0 }],
+          total: 1
+        },
+        "/api/v1/tags": []
+      }, { items: [], total: 0 });
 
       render(App);
       await openDomainsTab();
@@ -1057,24 +955,18 @@ describe("App", () => {
     });
 
     it("clicking a run row loads the result inline and stays in domain view", async () => {
-      global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-        if (value.includes("/runs")) {
-          return jsonResponse({
-            items: [
-              { id: "run-xyz", finished_at: "2026-03-15T10:00:00Z", worst_level: "ERROR", duration_ms: 800, entry_count: 3 },
-              { id: "run-old", finished_at: "2026-03-14T09:00:00Z", worst_level: "WARNING", duration_ms: 600, entry_count: 2 }
-            ],
-            total: 2
-          });
-        }
-        if (value.includes("/api/v1/domains")) {
-          return jsonResponse({ items: [{ id: 2, name: "test.com", tags: [], latest_level: "ERROR", run_count: 2 }], total: 1 });
-        }
-        if (value.includes("/api/v1/jobs/run-")) return jsonResponse({ id: "run-old", status: "succeeded", domain: "test.com" });
-        if (value.includes("/api/v1/tags")) return jsonResponse([]);
-        return jsonResponse({ items: [], total: 0 });
-      });
+      installFetchRoutes({
+        "/runs": {
+          items: [
+            { id: "run-xyz", finished_at: "2026-03-15T10:00:00Z", worst_level: "ERROR", duration_ms: 800, entry_count: 3 },
+            { id: "run-old", finished_at: "2026-03-14T09:00:00Z", worst_level: "WARNING", duration_ms: 600, entry_count: 2 }
+          ],
+          total: 2
+        },
+        "/api/v1/domains": { items: [{ id: 2, name: "test.com", tags: [], latest_level: "ERROR", run_count: 2 }], total: 1 },
+        "/api/v1/jobs/run-": { id: "run-old", status: "succeeded", domain: "test.com" },
+        "/api/v1/tags": []
+      }, { items: [], total: 0 });
 
       render(App);
       await openDomainsTab();
@@ -1092,7 +984,7 @@ describe("App", () => {
     it("re-test button creates a new job and navigates to inspector", async () => {
       const calls = [];
       global.fetch.mockImplementation((url, opts) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         calls.push({ url: value, method: opts?.method });
         if (value.includes("/runs")) return jsonResponse({ items: [], total: 0 });
         if (value.includes("/api/v1/domains")) {
@@ -1128,7 +1020,7 @@ describe("App", () => {
 
     const mockTagFetch = (tags = [], summary = null, domains = []) => {
       global.fetch.mockImplementation((url, opts) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         if (value.includes("/summary")) return jsonResponse(summary ?? { tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
         if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: domains, total: domains.length });
         if (value.match(/\/tags\/[^/]+\/batches/)) return jsonResponse({ items: [], total: 0 });
@@ -1156,7 +1048,7 @@ describe("App", () => {
     it("Run all button POSTs batch with from_tag", async () => {
       const calls = [];
       global.fetch.mockImplementation((url, opts) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         calls.push({ url: value, method: opts?.method, body: opts?.body });
         if (value.includes("/summary")) return jsonResponse({ tag: "t", domain_count: 0, ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
         if (value.includes("/domains") && value.includes("/tags/")) return jsonResponse({ items: [], total: 0 });
@@ -1183,7 +1075,7 @@ describe("App", () => {
       const mockTagBatchesFetch = (batches = [], extra = {}) => {
         const calls = [];
         global.fetch.mockImplementation((url, opts) => {
-          const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+          const value = requestUrl(url);
           const method = opts?.method || "GET";
           calls.push({ url: value, method });
           if (value.includes("/summary")) {
@@ -1248,7 +1140,7 @@ describe("App", () => {
 
   describe("Settings sub-tabs", () => {
     const subtabMock = (url, options = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      const value = requestUrl(url);
       if (value.includes("/api/v1/settings")) return jsonResponse({});
       if (value.includes("/api/v1/scoring-config/defaults")) return jsonResponse({});
       if (value.includes("/api/v1/scoring-config")) return jsonResponse({
@@ -1348,7 +1240,7 @@ describe("App", () => {
     const setupTagsFetchTracking = () => {
       const calls = [];
       global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         calls.push(value);
         if (value === "/api/v1/analysis/cohorts") {
           return jsonResponse([{ id: 1, source_tag: "tld", label: "TLD", analysis_enabled: true, public_enabled: true }]);
@@ -1402,7 +1294,7 @@ describe("App", () => {
   // the drill-down instead of silently re-entering it.
   describe("hash routing and back-button navigation", () => {
     const domainsMock = (url) => {
-      const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+      const value = requestUrl(url);
       if (value.includes("/runs")) return jsonResponse({ items: [], total: 0 });
       if (value.includes("/api/v1/domains")) {
         return jsonResponse({
@@ -1455,7 +1347,7 @@ describe("App", () => {
 
     it("clicking a tag row pushes a hash route and Back returns to the list", async () => {
       global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         if (value.includes("/summary")) return jsonResponse({ ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
         if (value.match(/\/tags\/[^/]+\/domains/)) return jsonResponse({ items: [], total: 0 });
         if (value.match(/\/tags\/[^/]+\/batches/)) return jsonResponse({ items: [], total: 0 });
@@ -1486,7 +1378,7 @@ describe("App", () => {
       window.history.replaceState(null, "", "/#/domains/example.com");
       const calls = [];
       global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         calls.push(value);
         return domainsMock(url);
       });
@@ -1503,7 +1395,7 @@ describe("App", () => {
       window.history.replaceState(null, "", "/#/domains/example.com/runs/run_seven");
       const calls = [];
       global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         calls.push(value);
         if (value.includes("/runs")) {
           return jsonResponse({ items: [{ id: "run_seven", finished_at: "2026-03-15T10:00:00Z", worst_level: "WARNING", duration_ms: 500, entry_count: 2 }], total: 1 });
@@ -1525,7 +1417,7 @@ describe("App", () => {
       window.history.replaceState(null, "", "/#/tags/tld");
       const calls = [];
       global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         calls.push(value);
         if (value.includes("/summary")) return jsonResponse({ ok: 0, notice: 0, warning: 0, error: 0, critical: 0 });
         if (value.match(/\/tags\/[^/]+\/domains/)) return jsonResponse({ items: [], total: 0 });
@@ -1563,7 +1455,7 @@ describe("App", () => {
     it("writes the hash and loads the job when a job id is entered manually", async () => {
       const calls = [];
       global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
+        const value = requestUrl(url);
         calls.push(value);
         if (value === "/api/v1/jobs/job_typed") return jsonResponse({ id: "job_typed", domain: "typed.example", status: "running", created_at: "2026-02-03T00:00:00Z", progress: 5 });
         return jsonResponse({ items: [] });
@@ -1581,16 +1473,10 @@ describe("App", () => {
     });
 
     it("clicking a batch row pushes a hash route and Back returns to the list", async () => {
-      global.fetch.mockImplementation((url) => {
-        const value = typeof url === "string" ? url : String(url?.url || url?.href || url || "");
-        if (value.includes("/api/v1/batches?")) {
-          return jsonResponse({ items: [{ batch_id: "batch_z", tag: "", status: "done", total: 2, completed: 2, completion: 100, created_at: "2026-05-01T00:00:00Z" }], total: 1 });
-        }
-        if (value.includes("/api/v1/batches/batch_z")) {
-          return jsonResponse({ batch_id: "batch_z", total: 2, status_counts: { succeeded: 2 }, items: [], created_at: "2026-05-01T00:00:00Z" });
-        }
-        return jsonResponse({ items: [], total: 0 });
-      });
+      installFetchRoutes({
+        "/api/v1/batches?": { items: [{ batch_id: "batch_z", tag: "", status: "done", total: 2, completed: 2, completion: 100, created_at: "2026-05-01T00:00:00Z" }], total: 1 },
+        "/api/v1/batches/batch_z": { batch_id: "batch_z", total: 2, status_counts: { succeeded: 2 }, items: [], created_at: "2026-05-01T00:00:00Z" }
+      }, { items: [], total: 0 });
       render(App);
 
       await openBatchTab();

@@ -1,30 +1,15 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { themeStore, osDark, toggleTheme, initThemeFromStorage, _resetForTests } from "./theme.svelte.js";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { themeStore, osDark, toggleTheme, initThemeFromStorage } from "./theme.svelte.js";
+import { resetTheme, stubMatchMedia } from "../test/helpers.js";
 
 describe("theme store", () => {
   beforeEach(() => {
-    localStorage.clear();
-    document.documentElement.removeAttribute("data-theme");
-    _resetForTests();
+    resetTheme();
   });
 
   afterEach(() => {
-    localStorage.clear();
-    document.documentElement.removeAttribute("data-theme");
-    _resetForTests();
+    resetTheme();
   });
-
-  const stubMatchMedia = (matchesDark) => {
-    const mock = vi.fn().mockImplementation((q) => ({
-      matches: q === "(prefers-color-scheme: dark)" ? matchesDark : false,
-      media: q,
-      addEventListener: () => {},
-      removeEventListener: () => {},
-    }));
-    vi.stubGlobal("matchMedia", mock);
-    window.matchMedia = mock;
-    return mock;
-  };
 
   it("starts in 'system' mode with no data-theme attribute", () => {
     expect(themeStore.value).toBe("system");

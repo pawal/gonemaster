@@ -1,50 +1,30 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AnalysisCohorts from "./AnalysisCohorts.svelte";
-
-const jsonResponse = (data, ok = true) => ({
-  ok,
-  statusText: ok ? "OK" : "Bad Request",
-  headers: { get: () => "application/json" },
-  json: async () => data,
-  text: async () => JSON.stringify(data),
-});
+import { cohortFixture, jsonResponse, requestUrl } from "../test/helpers.js";
 
 describe("AnalysisCohorts", () => {
   beforeEach(() => {
     global.fetch = vi.fn();
   });
 
-  const sampleCohorts = () => ([
-    {
-      id: 1,
-      source_type: "tag",
-      source_tag: "tld",
-      label: "TLD",
-      description: "Top-level domains",
-      analysis_enabled: true,
-      public_enabled: true,
-      is_default: true,
-      sort_order: 10,
-      materialization_status: "ready",
-      last_materialized_at: "2026-04-17T12:00:00Z",
-      last_materialization_error: "",
-    },
-    {
+  const tldCohort = (overrides = {}) =>
+    cohortFixture({ description: "Top-level domains", is_default: true, ...overrides });
+  const govCohort = (overrides = {}) =>
+    cohortFixture({
       id: 2,
-      source_type: "tag",
       source_tag: "gov",
       label: "Government",
-      description: "",
       analysis_enabled: false,
       public_enabled: false,
-      is_default: false,
       sort_order: 20,
       materialization_status: "failed",
       last_materialized_at: "",
       last_materialization_error: "boom happened",
-    },
-  ]);
+      ...overrides,
+    });
+
+  const sampleCohorts = () => [tldCohort(), govCohort()];
 
   const installFetch = (scenario = {}) => {
     let cohorts = scenario.initialCohorts || sampleCohorts();
@@ -53,7 +33,7 @@ describe("AnalysisCohorts", () => {
     const created = [];
     const actions = [];
     global.fetch.mockImplementation((url, requestOptions = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url);
+      const value = requestUrl(url);
       const method = requestOptions.method || "GET";
 
       if (value === "/api/v1/tags?limit=500" && method === "GET") {
@@ -165,11 +145,10 @@ describe("AnalysisCohorts", () => {
   });
 
   it("sends is_default:true when marking a non-default cohort as default after enabling analysis and public", async () => {
-    const govWithPublic = sampleCohorts().map((c) =>
-      c.source_tag === "gov"
-        ? { ...c, analysis_enabled: true, public_enabled: true, materialization_status: "ready" }
-        : c
-    );
+    const govWithPublic = [
+      tldCohort(),
+      govCohort({ analysis_enabled: true, public_enabled: true, materialization_status: "ready" }),
+    ];
     const handles = installFetch({ initialCohorts: govWithPublic });
     render(AnalysisCohorts);
 
@@ -323,7 +302,7 @@ describe("AnalysisCohorts", () => {
     const snapshotPatches = [];
     const snapshotDeletes = [];
     global.fetch.mockImplementation((url, requestOptions = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url);
+      const value = requestUrl(url);
       const method = requestOptions.method || "GET";
       if (value === "/api/v1/tags?limit=500" && method === "GET") return jsonResponse([]);
       if (value === "/api/v1/analysis/cohorts" && method === "GET") return jsonResponse(cohorts);
@@ -631,7 +610,7 @@ describe("AnalysisCohorts", () => {
     let rematerializeCalls = 0;
 
     global.fetch.mockImplementation((url, requestOptions = {}) => {
-      const value = typeof url === "string" ? url : String(url?.url || url);
+      const value = requestUrl(url);
       const method = requestOptions.method || "GET";
       if (value === "/api/v1/tags?limit=500" && method === "GET") return jsonResponse([]);
       if (value === "/api/v1/analysis/cohorts" && method === "GET") return jsonResponse(sampleCohorts());

@@ -86,30 +86,21 @@ describe("resolveShortcut guards", () => {
 });
 
 describe("resolveShortcut single keys", () => {
-  it("toggles the help overlay on '?'", () => {
-    expect(resolveShortcut(ev("?"))).toEqual({ type: "help-toggle" });
-  });
-
-  it("arms the g-prefix on 'g'", () => {
-    expect(resolveShortcut(ev("g"))).toEqual({ type: "set-g" });
-  });
-
-  it("focuses the filter on '/'", () => {
-    expect(resolveShortcut(ev("/"))).toEqual({ type: "focus-filter" });
-  });
-
-  it("closes on Escape", () => {
-    expect(resolveShortcut(ev("Escape"))).toEqual({ type: "close" });
-  });
-
-  it("returns none for unmapped keys, including admin-only shortcuts", () => {
-    // No new-scan or row navigation in the read-only analysis UI.
-    expect(resolveShortcut(ev("n"))).toEqual({ type: "none" });
-    expect(resolveShortcut(ev("j"))).toEqual({ type: "none" });
-    expect(resolveShortcut(ev("k"))).toEqual({ type: "none" });
-    expect(resolveShortcut(ev("ArrowDown"))).toEqual({ type: "none" });
-    expect(resolveShortcut(ev("x"))).toEqual({ type: "none" });
-    expect(resolveShortcut(ev("1"))).toEqual({ type: "none" });
+  // n, j, k and ArrowDown are admin-only: no new-scan or row navigation in the
+  // read-only analysis UI.
+  it.each([
+    ["?", "help-toggle"],
+    ["g", "set-g"],
+    ["/", "focus-filter"],
+    ["Escape", "close"],
+    ["n", "none"],
+    ["j", "none"],
+    ["k", "none"],
+    ["ArrowDown", "none"],
+    ["x", "none"],
+    ["1", "none"]
+  ])("resolves %s to %s", (key, type) => {
+    expect(resolveShortcut(ev(key))).toEqual({ type });
   });
 });
 

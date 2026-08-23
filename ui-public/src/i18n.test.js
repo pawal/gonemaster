@@ -7,10 +7,6 @@ describe("i18n store", () => {
     locale.set("en");
   });
 
-  // ---------------------------------------------------------------------------
-  // English baseline
-  // ---------------------------------------------------------------------------
-
   describe("English baseline", () => {
     it("returns the English string for a known key", () => {
       expect(get(t)("pub.app_title")).toBe("Gonemaster");
@@ -40,10 +36,6 @@ describe("i18n store", () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // Variable interpolation
-  // ---------------------------------------------------------------------------
-
   describe("interpolation", () => {
     it("replaces a {domain} placeholder", () => {
       expect(get(t)("pub.progress_testing", { domain: "example.com" }))
@@ -68,10 +60,6 @@ describe("i18n store", () => {
       expect(get(t)("pub.progress_testing", {})).toBe("Testing {domain}…");
     });
   });
-
-  // ---------------------------------------------------------------------------
-  // setCatalog + locale switching
-  // ---------------------------------------------------------------------------
 
   describe("setCatalog and locale switching", () => {
     it("returns translated string after injecting a catalog", () => {
@@ -116,10 +104,6 @@ describe("i18n store", () => {
       expect(second).toBe("Gonemaster UU");
     });
   });
-
-  // ---------------------------------------------------------------------------
-  // loadCatalog
-  // ---------------------------------------------------------------------------
 
   describe("loadCatalog", () => {
     it("is a no-op for 'en' (always bundled)", async () => {

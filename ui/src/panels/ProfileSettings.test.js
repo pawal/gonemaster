@@ -14,6 +14,14 @@ describe("ProfileSettings", () => {
     return rows.find((row) => within(row).queryByText(name));
   };
 
+  // Renders the panel and opens the named profile in the editor.
+  const openProfile = async (name) => {
+    render(ProfileSettings);
+    const row = await findLibraryRow(name);
+    await fireEvent.click(within(row).getByRole("button", { name: new RegExp(name, "i") }));
+    return row;
+  };
+
   const sampleDefaultProfile = () => ({
     id: 0,
     name: "default",
@@ -270,10 +278,7 @@ describe("ProfileSettings", () => {
   it("updates an existing profile from the editor", async () => {
     const state = installProfileFetch();
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     await fireEvent.input(screen.getByLabelText("Description"), {
       target: { value: "Updated strict resolver profile" }
@@ -347,10 +352,7 @@ describe("ProfileSettings", () => {
   it("disables save button until draft is dirty and valid", async () => {
     installProfileFetch();
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     // Save should be disabled with no changes.
     const saveButton = screen.getByRole("button", { name: "Save" });
@@ -367,10 +369,7 @@ describe("ProfileSettings", () => {
     installProfileFetch();
     global.confirm.mockReturnValue(false);
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     // Make a change to create dirty state.
     await fireEvent.input(screen.getByLabelText("Description"), {
@@ -408,10 +407,7 @@ describe("ProfileSettings", () => {
   it("resets changes for an existing profile", async () => {
     installProfileFetch();
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     // Save should be disabled (no changes yet).
     expect(screen.getByRole("button", { name: "Save" }).disabled).toBe(true);
@@ -612,15 +608,12 @@ describe("ProfileSettings", () => {
     expect(await screen.findByRole("heading", { name: "Edit profile" })).toBeInTheDocument();
   });
 
-  // ── compatibility banner ───────────────────────────────────────────────────
+  // compatibility banner
 
   it("shows no compatibility banner for a compatible profile", async () => {
     installProfileFetch(); // all profiles return compatible by default
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     // Banner should not be present.
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -630,10 +623,7 @@ describe("ProfileSettings", () => {
     // beta (id=2) is incompatible
     installProfileFetch({ incompatibleProfileId: 2 });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     expect(await screen.findByRole("alert")).toBeInTheDocument();
     expect(screen.getByText(/1 compatibility issue/i)).toBeInTheDocument();
@@ -643,10 +633,7 @@ describe("ProfileSettings", () => {
   it("banner shows action buttons for missing_test_case issues", async () => {
     installProfileFetch({ incompatibleProfileId: 2 });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     await screen.findByRole("alert");
     expect(screen.getByRole("button", { name: "Add missing test cases" })).toBeInTheDocument();
@@ -657,10 +644,7 @@ describe("ProfileSettings", () => {
   it("compatibility banner disappears after switching to default profile", async () => {
     installProfileFetch({ incompatibleProfileId: 2 });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
     await screen.findByRole("alert");
 
     // Switch to default profile - banner should disappear.
@@ -675,10 +659,7 @@ describe("ProfileSettings", () => {
   it("action buttons are disabled when draft has unsaved changes", async () => {
     installProfileFetch({ incompatibleProfileId: 2 });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     await screen.findByRole("alert");
 
@@ -692,10 +673,7 @@ describe("ProfileSettings", () => {
   it("clicking 'Mark as reviewed' sends PATCH mark_reviewed op", async () => {
     const state = installProfileFetch({ incompatibleProfileId: 2 });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     await screen.findByRole("alert");
     await fireEvent.click(screen.getByRole("button", { name: "Mark as reviewed" }));
@@ -709,10 +687,7 @@ describe("ProfileSettings", () => {
   it("clicking 'Add missing test cases' sends PATCH add_missing_test_cases op", async () => {
     const state = installProfileFetch({ incompatibleProfileId: 2 });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     await screen.findByRole("alert");
     await fireEvent.click(screen.getByRole("button", { name: "Add missing test cases" }));
@@ -726,10 +701,7 @@ describe("ProfileSettings", () => {
   it("shows error notice when PATCH fix fails", async () => {
     installProfileFetch({ incompatibleProfileId: 2, patchError: "server unavailable" });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     await screen.findByRole("alert");
     await fireEvent.click(screen.getByRole("button", { name: "Mark as reviewed" }));
@@ -737,7 +709,7 @@ describe("ProfileSettings", () => {
     expect(await screen.findByText(/Failed to apply fix: server unavailable/i)).toBeInTheDocument();
   });
 
-  // ── profile list: compat badges and summary ────────────────────────────────
+  // profile list: compat badges and summary
 
   it("shows no 'needs review' warning when all profiles are compatible", async () => {
     installProfileFetch(); // no incompatibleProfileId - all compatible
@@ -852,15 +824,12 @@ describe("ProfileSettings", () => {
     expect(within(betaRow).queryByText(/waived/)).not.toBeInTheDocument();
   });
 
-  // ── review state ───────────────────────────────────────────────────────────
+  // review state
 
   it("shows the reviewed line with the waived issues for a reviewed profile", async () => {
     installProfileFetch({ reviewedProfileId: 2 });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     expect(await screen.findByText("Reviewed against v1.0.0")).toBeInTheDocument();
     expect(screen.getByText("1 issue(s) waived by this review")).toBeInTheDocument();
@@ -874,10 +843,7 @@ describe("ProfileSettings", () => {
   it("re-checking a reviewed profile clears the stamp and brings the banner back", async () => {
     const state = installProfileFetch({ reviewedProfileId: 2 });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
     await screen.findByText("Reviewed against v1.0.0");
 
     await fireEvent.click(screen.getByRole("button", { name: "Check again" }));
@@ -896,24 +862,18 @@ describe("ProfileSettings", () => {
   it("shows no reviewed line for an unreviewed profile", async () => {
     installProfileFetch({ incompatibleProfileId: 2 });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     await screen.findByRole("alert");
     expect(screen.queryByRole("button", { name: "Check again" })).not.toBeInTheDocument();
   });
 
-  // ── diff panel ─────────────────────────────────────────────────────────────
+  // diff panel
 
   it("shows the diff summary for the selected profile", async () => {
     installProfileFetch();
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     expect(await screen.findByText("Differences from engine defaults")).toBeInTheDocument();
     expect(screen.getByText(
@@ -924,10 +884,7 @@ describe("ProfileSettings", () => {
   it("sends the unsaved draft config to the diff endpoint", async () => {
     const state = installProfileFetch();
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
     await screen.findByText("Differences from engine defaults");
 
     await fireEvent.input(screen.getByLabelText("Config JSON"), {
@@ -942,10 +899,7 @@ describe("ProfileSettings", () => {
   it("expands the diff into a table of per-property rows", async () => {
     installProfileFetch();
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
     await screen.findByText("Differences from engine defaults");
 
     await fireEvent.click(screen.getByRole("button", { name: "Show details" }));
@@ -976,10 +930,7 @@ describe("ProfileSettings", () => {
   it("strips only the wholly redundant properties from the draft", async () => {
     installProfileFetch();
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
     await screen.findByText("Differences from engine defaults");
 
     await fireEvent.input(screen.getByLabelText("Config JSON"), {
@@ -1017,10 +968,7 @@ describe("ProfileSettings", () => {
       }
     });
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    const betaRow = await openProfile("beta");
 
     const strip = await screen.findByRole("button", { name: "No redundant overrides" });
     expect(strip.disabled).toBe(true);
@@ -1042,10 +990,7 @@ describe("ProfileSettings", () => {
   it("hides the diff panel while the draft config is not valid JSON", async () => {
     installProfileFetch();
 
-    render(ProfileSettings);
-
-    const betaRow = await findLibraryRow("beta");
-    await fireEvent.click(within(betaRow).getByRole("button", { name: /beta/i }));
+    await openProfile("beta");
     await screen.findByText("Differences from engine defaults");
 
     await fireEvent.input(screen.getByLabelText("Config JSON"), {

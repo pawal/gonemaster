@@ -12,6 +12,13 @@ function openChain(container) {
   return details;
 }
 
+// Renders the section already opened, which is when it fetches.
+function renderOpened() {
+  const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+  openChain(container);
+  return container;
+}
+
 describe("DnssecChain", () => {
   beforeEach(() => {
     global.fetch = vi.fn();
@@ -39,15 +46,13 @@ describe("DnssecChain", () => {
 
   it("shows a loading note while the request is pending", async () => {
     fetch.mockReturnValue(new Promise(() => {})); // never resolves
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
     await waitFor(() => expect(screen.getByTestId("chain-loading")).toBeTruthy());
   });
 
   it("renders an SVG with the expected nodes on success", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     const svg = screen.getByTestId("chain-svg");
@@ -72,8 +77,7 @@ describe("DnssecChain", () => {
       { type: "CDNSKEY", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000] },
     ];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     expect(container.querySelectorAll("path.edge-ref").length).toBe(2);
@@ -81,8 +85,7 @@ describe("DnssecChain", () => {
 
   it("shows a custom tooltip immediately on hover, localized from tip data", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     const ksk = container.querySelector("g.node-ksk");
@@ -100,8 +103,7 @@ describe("DnssecChain", () => {
     chain.parent.dnskeys = [{ key_tag: 5000, algorithm: 13, flags: 256, key_size: 2048, servers: ["192.0.2.1"] }];
     chain.parent.ds_rrsig = [{ key_tag: 5000, algorithm: 13, state: "valid", inception: 100, expiration: 200, servers: ["192.0.2.1"] }];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     const pk = container.querySelector("g.node-parent-key");
@@ -114,8 +116,7 @@ describe("DnssecChain", () => {
     chain.parent.ds[0].ttl = 86400;
     chain.child.dnskeys[0].ttl = 3600;
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     expect(container.querySelector("g.node-ds").getAttribute("data-tip")).toContain("TTL: 86400");
@@ -128,8 +129,7 @@ describe("DnssecChain", () => {
       { key_tag: 1000, algorithm: 13, state: "valid", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] },
     ];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     // The ZSK does not sign the DNSKEY RRset, but its box tip still shows the
@@ -146,8 +146,7 @@ describe("DnssecChain", () => {
       { key_tag: 1000, algorithm: 13, state: "expired", inception: 1700000000, expiration: 1750000000, servers: ["203.0.113.1"] },
     ];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     const self = container.querySelector("path.chain-edge");
@@ -167,8 +166,7 @@ describe("DnssecChain", () => {
       { key_tag: 1000, algorithm: 8, state: "unsupported_key", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] },
     ];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
 
@@ -201,8 +199,7 @@ describe("DnssecChain", () => {
       { key_tag: 57780, algorithm: 8, state: "valid", inception: 1784052000, expiration: 1785178800, servers: ["198.41.0.4"] },
     ];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     // Both DS RRSIG facts lines render rather than collapsing or crashing.
@@ -211,8 +208,7 @@ describe("DnssecChain", () => {
 
   it("shows the unavailable note on a 404 and never an SVG", async () => {
     fetch.mockResolvedValue(jsonResponse({}, 404));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-empty")).toBeTruthy());
     expect(screen.queryByTestId("chain-svg")).toBeNull();
@@ -220,8 +216,7 @@ describe("DnssecChain", () => {
 
   it("shows an error and refetches when retry is clicked", async () => {
     fetch.mockRejectedValueOnce(new Error("network"));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-error")).toBeTruthy());
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -234,8 +229,7 @@ describe("DnssecChain", () => {
 
   it("renders the unsigned callout without an SVG", async () => {
     fetch.mockResolvedValue(jsonResponse({ version: 1, zone: "example.com", status: "unsigned", parent: {}, child: {}, links: [] }));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-unsigned")).toBeTruthy());
     expect(screen.queryByTestId("chain-svg")).toBeNull();
@@ -245,8 +239,7 @@ describe("DnssecChain", () => {
     const chain = secureChain();
     chain.parent.servers_disagreeing = ["192.0.2.2"];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-disagree")).toBeTruthy());
   });
@@ -257,8 +250,7 @@ describe("DnssecChain", () => {
     chain.parent.servers_without_ds = ["192.0.2.3"];
     chain.child.servers_without_dnskey = ["203.0.113.9"];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-disagree-servers")).toBeTruthy());
     expect(screen.getByTestId("chain-disagree-servers").textContent).toContain("192.0.2.2");
@@ -268,8 +260,7 @@ describe("DnssecChain", () => {
 
   it("omits the per-server facts lines when every server agrees", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-facts")).toBeTruthy());
     expect(screen.queryByTestId("chain-disagree-servers")).toBeNull();
@@ -283,8 +274,7 @@ describe("DnssecChain", () => {
     chain.parent.ds_source = "input";
     chain.parent.ds[0].servers = ["-"];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-provided-ds")).toBeTruthy());
   });
@@ -298,8 +288,7 @@ describe("DnssecChain", () => {
     cold.child.dnskey_rrsig = [];
     cold.child.servers_without_dnskey = [];
     fetch.mockResolvedValue(jsonResponse(cold));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-indeterminate")).toBeTruthy());
     expect(screen.queryByTestId("chain-no-dnskey")).toBeNull();
@@ -322,8 +311,7 @@ describe("DnssecChain", () => {
     const chain = secureChain();
     chain.child.dnskeys[0].key_size = 2048;
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-facts")).toBeTruthy());
     expect(screen.getByTestId("chain-facts").textContent).toContain("2048 bit");
@@ -331,8 +319,7 @@ describe("DnssecChain", () => {
 
   it("lists the DNSKEY signature validity window in the facts", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-facts")).toBeTruthy());
     const facts = screen.getByTestId("chain-facts").textContent;
@@ -361,8 +348,7 @@ describe("DnssecChain", () => {
     const broken = secureChain();
     broken.status = "broken";
     fetch.mockResolvedValue(jsonResponse(broken));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
     const badge = screen.getByTestId("chain-status-badge");
@@ -372,8 +358,7 @@ describe("DnssecChain", () => {
 
   it("tones the badge neutral for an unsigned zone", async () => {
     fetch.mockResolvedValue(jsonResponse({ version: 1, zone: "example.com", status: "unsigned", parent: {}, child: {}, links: [] }));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
     const badge = screen.getByTestId("chain-status-badge");
@@ -387,8 +372,7 @@ describe("DnssecChain", () => {
       { key_tag: 5000, state: "expired", inception: 1700000000, expiration: 1750000000 },
     ];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     expect(container.querySelector("g.node-ds.node-sig-bad")).toBeTruthy();
@@ -410,8 +394,7 @@ describe("DnssecChain", () => {
       { ds_key_tag: 5000, ds_digest_type: 2, status: "no_dnskey", servers: ["192.0.2.1"] },
     ];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     const phantom = container.querySelector("g.node-key-phantom");
@@ -434,8 +417,7 @@ describe("DnssecChain", () => {
     ];
     chain.child.signed = [];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-rollover")).toBeTruthy());
     expect(screen.getByTestId("chain-rollover").textContent).toContain("3000");
@@ -448,8 +430,7 @@ describe("DnssecChain", () => {
     const chain = secureChain();
     chain.child.dnskeys[0].anchored = true;
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     expect(screen.queryByTestId("chain-rollover")).toBeNull();
@@ -464,8 +445,7 @@ describe("DnssecChain", () => {
       { type: "CDNSKEY", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000, 3000], ds_match: "rollover", new_keys: [3000] },
     ];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-rollover")).toBeTruthy());
     // The incoming key tag is named in the callout.
@@ -481,8 +461,7 @@ describe("DnssecChain", () => {
       { type: "CDS", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000], ds_match: "match" },
     ];
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     expect(screen.queryByTestId("chain-rollover")).toBeNull();
@@ -493,16 +472,14 @@ describe("DnssecChain", () => {
     const chain = secureChain();
     chain.truncated = true;
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-truncated")).toBeTruthy());
   });
 
   it("omits the truncation callout when nothing was capped", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     expect(screen.queryByTestId("chain-truncated")).toBeNull();
@@ -512,8 +489,7 @@ describe("DnssecChain", () => {
     const chain = secureChain();
     chain.child.dnskeys[0].revoked = true;
     fetch.mockResolvedValue(jsonResponse(chain));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     expect(container.querySelector("g.node-revoked")).toBeTruthy();
@@ -523,8 +499,7 @@ describe("DnssecChain", () => {
 
   it("omits the revoked legend item when no key is revoked", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
-    openChain(container);
+    const container = renderOpened();
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     expect(container.querySelector("g.node-revoked")).toBeNull();

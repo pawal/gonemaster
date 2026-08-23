@@ -26,7 +26,7 @@ describe("App", () => {
     window.localStorage.clear();
   });
 
-  // ── Layout ──────────────────────────────────────────────────────────────────
+  // Layout
 
   it("always renders the test form", () => {
     render(App);
@@ -39,7 +39,7 @@ describe("App", () => {
     expect(document.querySelector("[data-testid='results-view']")).toBeNull();
   });
 
-  // ── Shared-link init ────────────────────────────────────────────────────────
+  // Shared-link init
 
   it("shows Progress when hash is a running job on load", async () => {
     window.location.hash = "#/result/abc12345";
@@ -78,7 +78,7 @@ describe("App", () => {
     );
   });
 
-  // ── Form disabled state ─────────────────────────────────────────────────────
+  // Form disabled state
 
   it("form is enabled while idle", () => {
     render(App);
@@ -97,7 +97,7 @@ describe("App", () => {
     );
   });
 
-  // ── Post-job flow ───────────────────────────────────────────────────────────
+  // Post-job flow
 
   it("shows Results after job succeeds", async () => {
     window.location.hash = "#/result/abc12345";
@@ -164,7 +164,7 @@ describe("App", () => {
     await waitFor(() => screen.getByTestId("expired-view"));
   });
 
-  // ── Header ──────────────────────────────────────────────────────────────────
+  // Header
 
   it("renders the app logo", () => {
     render(App);
@@ -195,7 +195,7 @@ describe("App", () => {
     expect(screen.queryByRole("combobox", { name: /language/i })).toBeNull();
   });
 
-  // ── Locale init / persistence ──────────────────────────────────────────────
+  // Locale init / persistence
 
   describe("locale", () => {
     const LOCALE_KEY = "gonemaster.public.locale.v1";
@@ -274,7 +274,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /theme/i })).toBeTruthy();
   });
 
-  // ── Theme init / persistence ───────────────────────────────────────────────
+  // Theme init / persistence
 
   describe("theme", () => {
     const THEME_KEY = "gonemaster.public.theme.v1";
@@ -304,7 +304,7 @@ describe("App", () => {
     });
   });
 
-  // ── Document title ─────────────────────────────────────────────────────────
+  // Document title
 
   it("sets title to percentage while running", async () => {
     window.location.hash = "#/result/abc12345";
@@ -335,7 +335,7 @@ describe("App", () => {
     expect(document.title).toBe("Gonemaster");
   });
 
-  // ── Theme toggle ───────────────────────────────────────────────────────────
+  // Theme toggle
   // jsdom has no matchMedia, so isDark initialises to false → data-theme="light"
 
   it("starts with data-theme=light in test env (no system dark preference)", () => {
@@ -357,7 +357,7 @@ describe("App", () => {
     expect(document.documentElement.getAttribute("data-theme")).toBe("light");
   });
 
-  // ── Recent tests history ────────────────────────────────────────────────────
+  // Recent tests history
 
   describe("recent tests history", () => {
     const HISTORY_KEY = "gonemaster.public.history.v1";

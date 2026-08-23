@@ -12,7 +12,14 @@ describe("TestForm", () => {
     global.fetch = vi.fn();
   });
 
-  // ── Rendering ──────────────────────────────────────────────────────────────
+  // Renders the form, types a domain and submits it.
+  const submitDomain = async (domain) => {
+    render(TestForm);
+    await fireEvent.input(screen.getByLabelText("Domain"), { target: { value: domain } });
+    await fireEvent.click(screen.getByRole("button", { name: "Test" }));
+  };
+
+  // Rendering
 
   it("renders domain input", () => {
     render(TestForm);
@@ -34,7 +41,7 @@ describe("TestForm", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  // ── Validation ─────────────────────────────────────────────────────────────
+  // Validation
 
   it("shows required error when submitting with empty domain", async () => {
     render(TestForm);
@@ -57,15 +64,11 @@ describe("TestForm", () => {
     await waitFor(() => expect(screen.queryByRole("alert")).toBeNull());
   });
 
-  // ── Successful submission ──────────────────────────────────────────────────
+  // Successful submission
 
   it("calls createJob with the trimmed domain", async () => {
     global.fetch.mockResolvedValue(okResponse({ public_id: "abc12345" }));
-    render(TestForm);
-    await fireEvent.input(screen.getByLabelText("Domain"), {
-      target: { value: "  example.com  " },
-    });
-    await fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    await submitDomain("  example.com  ");
     await waitFor(() => expect(fetch).toHaveBeenCalled());
     const body = JSON.parse(fetch.mock.calls[0][1].body);
     expect(body.domain).toBe("example.com");
@@ -83,15 +86,11 @@ describe("TestForm", () => {
     expect(handler.mock.calls[0][0].publicID).toBe("abc12345");
   });
 
-  // ── Error responses ────────────────────────────────────────────────────────
+  // Error responses
 
   it("shows rate limit error on 429", async () => {
     global.fetch.mockResolvedValue(errResponse(429));
-    render(TestForm);
-    await fireEvent.input(screen.getByLabelText("Domain"), {
-      target: { value: "example.com" },
-    });
-    await fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    await submitDomain("example.com");
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
     expect(screen.getByRole("alert").textContent).toMatch(/30/);
   });
@@ -100,35 +99,23 @@ describe("TestForm", () => {
     global.fetch.mockResolvedValue(
       errResponse(400, { error: { code: "invalid_domain", message: "bad" } })
     );
-    render(TestForm);
-    await fireEvent.input(screen.getByLabelText("Domain"), {
-      target: { value: "notvalid" },
-    });
-    await fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    await submitDomain("notvalid");
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
   });
 
   it("shows generic error on other non-ok response", async () => {
     global.fetch.mockResolvedValue(errResponse(500, {}));
-    render(TestForm);
-    await fireEvent.input(screen.getByLabelText("Domain"), {
-      target: { value: "example.com" },
-    });
-    await fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    await submitDomain("example.com");
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
   });
 
   it("shows network error when fetch throws", async () => {
     global.fetch.mockRejectedValue(new Error("network down"));
-    render(TestForm);
-    await fireEvent.input(screen.getByLabelText("Domain"), {
-      target: { value: "example.com" },
-    });
-    await fireEvent.click(screen.getByRole("button", { name: "Test" }));
+    await submitDomain("example.com");
     await waitFor(() => expect(screen.getByRole("alert")).toBeTruthy());
   });
 
-  // ── NS rows ────────────────────────────────────────────────────────────────
+  // NS rows
 
   it("adds an NS row when Add nameserver is clicked", async () => {
     render(TestForm);
@@ -146,7 +133,7 @@ describe("TestForm", () => {
     expect(screen.getAllByTestId("ns-row")).toHaveLength(1);
   });
 
-  // ── DS rows ────────────────────────────────────────────────────────────────
+  // DS rows
 
   it("adds a DS row when Add DS record is clicked", async () => {
     render(TestForm);
@@ -165,7 +152,7 @@ describe("TestForm", () => {
     expect(screen.getAllByTestId("ds-row")).toHaveLength(1);
   });
 
-  // ── Fetch from parent ─────────────────────────────────────────────────────
+  // Fetch from parent
 
   it("fetch from parent populates NS and DS rows", async () => {
     global.fetch.mockResolvedValue(jsonResponse({
@@ -193,7 +180,7 @@ describe("TestForm", () => {
     expect(screen.getByTestId("fetch-ns").disabled).toBe(true);
   });
 
-  // ── Reset form ───────────────────────────────────────────────────────────
+  // Reset form
 
   it("reset clears domain, NS rows, DS rows, and errors", async () => {
     render(TestForm);
@@ -215,7 +202,7 @@ describe("TestForm", () => {
     expect(screen.queryAllByTestId("ds-row")).toHaveLength(0);
   });
 
-  // ── Button state during submission ────────────────────────────────────────
+  // Button state during submission
 
   it("shows Testing… while submitting", async () => {
     let resolve;
@@ -231,7 +218,7 @@ describe("TestForm", () => {
     resolve(okResponse({ public_id: "x" }));
   });
 
-  // ── Prefill from results callout ────────────────────────────────────────────
+  // Prefill from results callout
 
   it("prefills, flashes, and submits the test in one go when prefillSignal is bumped", async () => {
     global.fetch.mockResolvedValue(okResponse({ public_id: "abc12345" }));

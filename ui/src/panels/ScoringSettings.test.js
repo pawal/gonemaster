@@ -32,15 +32,19 @@ describe("ScoringSettings", () => {
     global.fetch = vi.fn();
   });
 
-  // ── load ────────────────────────────────────────────────────────────────────
+  // Renders and waits for the config fetch to paint the first section.
+  const renderLoaded = async (heading = "Severity Penalties") => {
+    render(ScoringSettings);
+    await waitFor(() => {
+      expect(screen.getByText(heading)).toBeInTheDocument();
+    });
+  };
+
+  // load
 
   it("loads and displays the scoring config", async () => {
     global.fetch.mockResolvedValue(jsonResponse(configResponse()));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     // Severity table rows
     expect(screen.getByText("NOTICE")).toBeInTheDocument();
@@ -85,11 +89,7 @@ describe("ScoringSettings", () => {
 
   it("disables inputs when readonly", async () => {
     global.fetch.mockResolvedValue(jsonResponse(configResponse({ source: "cli_flag", readonly: true })));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     const numberInputs = screen.getAllByRole("spinbutton");
     for (const input of numberInputs) {
@@ -97,15 +97,11 @@ describe("ScoringSettings", () => {
     }
   });
 
-  // ── edit ────────────────────────────────────────────────────────────────────
+  // edit
 
   it("save button appears after editing a severity penalty", async () => {
     global.fetch.mockResolvedValue(jsonResponse(configResponse()));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     // Save should start disabled (no changes).
     const saveBtn = screen.getByRole("button", { name: "Save" });
@@ -132,11 +128,7 @@ describe("ScoringSettings", () => {
       return Promise.resolve(jsonResponse(configResponse()));
     });
 
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     // Make a change.
     const warningInput = screen.getByLabelText(/Penalty WARNING/i);
@@ -160,11 +152,7 @@ describe("ScoringSettings", () => {
 
   it("discard resets to loaded config", async () => {
     global.fetch.mockResolvedValue(jsonResponse(configResponse()));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     const warningInput = screen.getByLabelText(/Penalty WARNING/i);
     await fireEvent.input(warningInput, { target: { value: "77" } });
@@ -180,15 +168,11 @@ describe("ScoringSettings", () => {
     });
   });
 
-  // ── tag overrides ────────────────────────────────────────────────────────────
+  // tag overrides
 
   it("can add and remove tag penalty override rows", async () => {
     global.fetch.mockResolvedValue(jsonResponse(configResponse()));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Tag Penalty Overrides")).toBeInTheDocument();
-    });
+    await renderLoaded("Tag Penalty Overrides");
 
     // Add a new row.
     await fireEvent.click(screen.getByRole("button", { name: "Add override" }));
@@ -210,7 +194,7 @@ describe("ScoringSettings", () => {
     });
   });
 
-  // ── reset to defaults ───────────────────────────────────────────────────────
+  // reset to defaults
 
   it("reset to defaults fetches defaults endpoint and populates form", async () => {
     let defaultsFetched = false;
@@ -226,11 +210,7 @@ describe("ScoringSettings", () => {
       return Promise.resolve(jsonResponse(configResponse({ config: modifiedConfig })));
     });
 
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     await fireEvent.click(screen.getByRole("button", { name: "Reset to defaults" }));
 
@@ -244,15 +224,11 @@ describe("ScoringSettings", () => {
     });
   });
 
-  // ── module mapping toggle ───────────────────────────────────────────────────
+  // module mapping toggle
 
   it("module mapping is collapsed by default and expands on click", async () => {
     global.fetch.mockResolvedValue(jsonResponse(configResponse()));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     // Module mapping initially hidden.
     expect(screen.queryByText("DNSSEC")).toBeNull();
@@ -270,15 +246,11 @@ describe("ScoringSettings", () => {
     });
   });
 
-  // ── import JSON ─────────────────────────────────────────────────────────────
+  // import JSON
 
   it("import JSON panel applies valid JSON to the form", async () => {
     global.fetch.mockResolvedValue(jsonResponse(configResponse()));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     await fireEvent.click(screen.getByRole("button", { name: "Import JSON" }));
 
@@ -298,11 +270,7 @@ describe("ScoringSettings", () => {
 
   it("import JSON shows error on invalid JSON", async () => {
     global.fetch.mockResolvedValue(jsonResponse(configResponse()));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     await fireEvent.click(screen.getByRole("button", { name: "Import JSON" }));
 
@@ -315,7 +283,7 @@ describe("ScoringSettings", () => {
     });
   });
 
-  // ── default reconciliation ────────────────────────────────────────────────────
+  // default reconciliation
 
   const reconcileMock = (stored, defaults, configOverrides = {}) =>
     (url) => {
@@ -368,11 +336,7 @@ describe("ScoringSettings", () => {
   it("shows no banner when the saved config already has every default entry", async () => {
     const cfg = defaultConfig();
     global.fetch.mockImplementation(reconcileMock(cfg, defaultConfig(), { source: "database" }));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
     expect(screen.queryByText(/new default scoring entries/)).toBeNull();
     expect(screen.queryByRole("button", { name: "Add missing defaults" })).toBeNull();
   });
@@ -383,11 +347,7 @@ describe("ScoringSettings", () => {
     defaults.tag_penalties = { ...defaults.tag_penalties, N18_NO_RESPONSE: 0 };
 
     global.fetch.mockImplementation(reconcileMock(stored, defaults, { source: "cli_flag", readonly: true }));
-    render(ScoringSettings);
-
-    await waitFor(() => {
-      expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
-    });
+    await renderLoaded();
     expect(screen.queryByRole("button", { name: "Add missing defaults" })).toBeNull();
   });
 });

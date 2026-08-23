@@ -16,10 +16,6 @@ describe("i18n store", () => {
     locale.set("en");
   });
 
-  // ---------------------------------------------------------------------------
-  // English baseline lookups
-  // ---------------------------------------------------------------------------
-
   describe("English baseline", () => {
     it("returns the English string for a known key", () => {
       expect(get(t)("app_title")).toBe("Gonemaster");
@@ -33,10 +29,6 @@ describe("i18n store", () => {
       expect(get(t)("job_created")).toBe("Job {id} created.");
     });
   });
-
-  // ---------------------------------------------------------------------------
-  // Variable interpolation
-  // ---------------------------------------------------------------------------
 
   describe("interpolation", () => {
     it("replaces a single {var} placeholder", () => {
@@ -60,10 +52,6 @@ describe("i18n store", () => {
       expect(get(t)("job_created", {})).toBe("Job {id} created.");
     });
   });
-
-  // ---------------------------------------------------------------------------
-  // setCatalog + locale switching
-  // ---------------------------------------------------------------------------
 
   describe("setCatalog and locale switching", () => {
     it("returns translated string after injecting a catalog", () => {
@@ -109,10 +97,6 @@ describe("i18n store", () => {
     });
   });
 
-  // ---------------------------------------------------------------------------
-  // loadCatalog
-  // ---------------------------------------------------------------------------
-
   describe("loadCatalog", () => {
     it("is a no-op for 'en' (always bundled)", async () => {
       // Should resolve without error and leave the English catalog intact.
@@ -136,10 +120,6 @@ describe("i18n store", () => {
       expect(get(t)("app_title")).toBe("Gonemaster"); // English fallback
     });
   });
-
-  // ---------------------------------------------------------------------------
-  // Translation completeness
-  // ---------------------------------------------------------------------------
 
   describe("translation completeness", () => {
     // app_title is intentionally absent from non-English catalogs (brand name).

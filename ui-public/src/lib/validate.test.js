@@ -2,61 +2,41 @@ import { describe, it, expect } from "vitest";
 import { validateDomain, buildJobOpts, emptyNsRow, emptyDsRow } from "./validate.js";
 
 describe("validateDomain", () => {
-  it("returns null for a valid domain", () => {
-    expect(validateDomain("example.com")).toBeNull();
-    expect(validateDomain("sub.example.co.uk")).toBeNull();
-    expect(validateDomain("xn--rksmrgs-5wao1o.se")).toBeNull();
-  });
-
-  it("returns error key for empty string", () => {
-    expect(validateDomain("")).toBe("pub.error_domain_required");
-    expect(validateDomain("   ")).toBe("pub.error_domain_required");
-  });
-
-  it("returns error key for null/undefined", () => {
-    expect(validateDomain(null)).toBe("pub.error_domain_required");
-    expect(validateDomain(undefined)).toBe("pub.error_domain_required");
-  });
-
-  it("returns error key for domain with whitespace", () => {
-    expect(validateDomain("ex ample.com")).toBe("pub.error_domain_invalid");
-  });
-
-  it("returns error key for domain over 253 chars", () => {
-    expect(validateDomain("a".repeat(254))).toBe("pub.error_domain_invalid");
-  });
-
-  it("returns error key for dots/hyphens only", () => {
-    expect(validateDomain("...")).toBe("pub.error_domain_invalid");
-    expect(validateDomain("---")).toBe("pub.error_domain_invalid");
+  it.each([
+    ["accepts a plain domain", "example.com", null],
+    ["accepts a multi-label domain", "sub.example.co.uk", null],
+    ["accepts a punycode domain", "xn--rksmrgs-5wao1o.se", null],
+    ["requires a non-empty string", "", "pub.error_domain_required"],
+    ["requires more than blanks", "   ", "pub.error_domain_required"],
+    ["requires a value, not null", null, "pub.error_domain_required"],
+    ["requires a value, not undefined", undefined, "pub.error_domain_required"],
+    ["rejects embedded whitespace", "ex ample.com", "pub.error_domain_invalid"],
+    ["rejects a domain over 253 chars", "a".repeat(254), "pub.error_domain_invalid"],
+    ["rejects dots only", "...", "pub.error_domain_invalid"],
+    ["rejects hyphens only", "---", "pub.error_domain_invalid"],
+  ])("%s", (_name, input, want) => {
+    expect(validateDomain(input)).toBe(want);
   });
 });
 
 describe("buildJobOpts", () => {
-  it("returns empty object for defaults with no NS/DS rows", () => {
-    expect(buildJobOpts("default", [], [])).toEqual({});
+  it.each([
+    ["default", {}],
+    ["disable_ipv4", { ipv4_disabled: true }],
+    ["disable_ipv6", { ipv6_disabled: true }],
+  ])("maps the %s IP mode with no NS/DS rows", (mode, want) => {
+    expect(buildJobOpts(mode, [], [])).toEqual(want);
   });
 
-  it("sets ipv4_disabled for disable_ipv4 mode", () => {
-    expect(buildJobOpts("disable_ipv4", [], [])).toEqual({ ipv4_disabled: true });
-  });
-
-  it("sets ipv6_disabled for disable_ipv6 mode", () => {
-    expect(buildJobOpts("disable_ipv6", [], [])).toEqual({ ipv6_disabled: true });
-  });
-
-  it("includes nameservers with NS only when IP is blank", () => {
-    const ns = [{ ns: "ns1.example.com", ip: "" }];
-    expect(buildJobOpts("default", ns, [])).toEqual({
-      nameservers: [{ ns: "ns1.example.com" }],
-    });
-  });
-
-  it("includes nameservers with IP when provided", () => {
-    const ns = [{ ns: "ns1.example.com", ip: "192.0.2.1" }];
-    expect(buildJobOpts("default", ns, [])).toEqual({
-      nameservers: [{ ns: "ns1.example.com", ip: "192.0.2.1" }],
-    });
+  it.each([
+    ["NS only when IP is blank", { ns: "ns1.example.com", ip: "" }, { ns: "ns1.example.com" }],
+    [
+      "the IP when provided",
+      { ns: "ns1.example.com", ip: "192.0.2.1" },
+      { ns: "ns1.example.com", ip: "192.0.2.1" },
+    ],
+  ])("includes nameservers with %s", (_name, row, want) => {
+    expect(buildJobOpts("default", [row], [])).toEqual({ nameservers: [want] });
   });
 
   it("skips NS rows where ns is blank", () => {

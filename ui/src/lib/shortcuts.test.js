@@ -74,39 +74,20 @@ describe("resolveShortcut guards", () => {
 });
 
 describe("resolveShortcut single keys", () => {
-  it("toggles the help overlay on '?'", () => {
-    expect(resolveShortcut(ev("?"))).toEqual({ type: "help-toggle" });
-  });
-
-  it("arms the g-prefix on 'g'", () => {
-    expect(resolveShortcut(ev("g"))).toEqual({ type: "set-g" });
-  });
-
-  it("starts a new scan on 'n'", () => {
-    expect(resolveShortcut(ev("n"))).toEqual({ type: "new-scan" });
-  });
-
-  it("focuses the filter on '/'", () => {
-    expect(resolveShortcut(ev("/"))).toEqual({ type: "focus-filter" });
-  });
-
-  it("moves to the next row on 'j' and ArrowDown", () => {
-    expect(resolveShortcut(ev("j"))).toEqual({ type: "row-next" });
-    expect(resolveShortcut(ev("ArrowDown"))).toEqual({ type: "row-next" });
-  });
-
-  it("moves to the previous row on 'k' and ArrowUp", () => {
-    expect(resolveShortcut(ev("k"))).toEqual({ type: "row-prev" });
-    expect(resolveShortcut(ev("ArrowUp"))).toEqual({ type: "row-prev" });
-  });
-
-  it("closes on Escape", () => {
-    expect(resolveShortcut(ev("Escape"))).toEqual({ type: "close" });
-  });
-
-  it("returns none for unmapped keys", () => {
-    expect(resolveShortcut(ev("x"))).toEqual({ type: "none" });
-    expect(resolveShortcut(ev("1"))).toEqual({ type: "none" });
+  it.each([
+    ["?", "help-toggle"],
+    ["g", "set-g"],
+    ["n", "new-scan"],
+    ["/", "focus-filter"],
+    ["j", "row-next"],
+    ["ArrowDown", "row-next"],
+    ["k", "row-prev"],
+    ["ArrowUp", "row-prev"],
+    ["Escape", "close"],
+    ["x", "none"],
+    ["1", "none"]
+  ])("resolves %s to %s", (key, type) => {
+    expect(resolveShortcut(ev(key))).toEqual({ type });
   });
 });
 

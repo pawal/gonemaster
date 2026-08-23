@@ -454,7 +454,7 @@ describe("Results", () => {
     expect(fetch.mock.calls[1][0]).toContain("locale=sv");
   });
 
-  // ── Not-a-DNS-zone callout ──────────────────────────────────────────────────
+  // Not-a-DNS-zone callout
 
   it("shows the callout and calls ontestparent with the found parent zone", async () => {
     const ontestparent = vi.fn();

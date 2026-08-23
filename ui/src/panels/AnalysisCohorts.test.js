@@ -293,7 +293,7 @@ describe("AnalysisCohorts", () => {
     expect(screen.getByText(/source_tag is required/i)).toBeInTheDocument();
   });
 
-  // ── Snapshot sub-panel (Phase 6) ─────────────────────────────────────────
+  // Snapshot sub-panel
 
   const installSnapshotFetch = (scenario = {}) => {
     let cohorts = scenario.initialCohorts || sampleCohorts();
@@ -593,13 +593,8 @@ describe("AnalysisCohorts", () => {
   });
 
   it("shows a determinate progress bar driven by materialization status and clears it when ready", async () => {
-    // Tier-2 flow: the rematerialize POST returns 202 and flips the snapshot to
-    // materialization_status "pending"; the admin UI then polls the snapshots
-    // list and renders a determinate bar from materialization_done/total. We
-    // model the async server with a single mutable snapshot object so the poll
-    // loop can observe pending (0/4 -> 2/4) and finally ready, at which point
-    // the bar must disappear. The label span is queried directly so the numeric
-    // "done/total" text can be asserted independent of node splitting.
+    // One mutable snapshot object models the async server, so the poll loop
+    // sees pending 0/4 -> 2/4 -> ready.
     const snap = {
       id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
       profile_name: "strict", run_count: 3, domain_count: 3,
@@ -795,7 +790,7 @@ describe("AnalysisCohorts", () => {
     await waitFor(() => expect(firstSlug()).toBe("2026-04-10-earlier"));
   });
 
-  // ── Delete-batch action ──────────────────────────────────────────────────
+  // Delete-batch action
 
   it("renders a Delete source batch button per snapshot row when onDeleteBatch is provided", async () => {
     const snapshotsByCohort = {

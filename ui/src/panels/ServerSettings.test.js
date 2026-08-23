@@ -19,6 +19,14 @@ describe("ServerSettings", () => {
     global.fetch = vi.fn();
   });
 
+  // Renders and waits for the settings fetch to paint the named field.
+  const renderLoaded = async (label = /Worker count/) => {
+    render(ServerSettings);
+    await waitFor(() => {
+      expect(screen.getByLabelText(label)).toBeInTheDocument();
+    });
+  };
+
   it("renders server settings with labels and values after loading", async () => {
     global.fetch.mockImplementation(settingsMock);
     render(ServerSettings);
@@ -44,11 +52,7 @@ describe("ServerSettings", () => {
 
   it("shows source labels for settings", async () => {
     global.fetch.mockImplementation(settingsMock);
-    render(ServerSettings);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     expect(screen.getAllByText("(default)", { exact: false }).length).toBeGreaterThan(0);
     expect(screen.getAllByText("(config file)", { exact: false }).length).toBeGreaterThan(0);
@@ -56,11 +60,7 @@ describe("ServerSettings", () => {
 
   it("disables save button when no changes are made", async () => {
     global.fetch.mockImplementation(settingsMock);
-    render(ServerSettings);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     const saveButton = screen.getByRole("button", { name: "Save changes" });
     expect(saveButton.disabled).toBe(true);
@@ -68,11 +68,7 @@ describe("ServerSettings", () => {
 
   it("enables save button after editing a mutable setting", async () => {
     global.fetch.mockImplementation(settingsMock);
-    render(ServerSettings);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     const workerInput = screen.getByLabelText(/Worker count/);
     await fireEvent.input(workerInput, { target: { value: "8" } });
@@ -89,11 +85,7 @@ describe("ServerSettings", () => {
       return settingsMock(url, options);
     });
 
-    render(ServerSettings);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     const workerInput = screen.getByLabelText(/Worker count/);
     await fireEvent.input(workerInput, { target: { value: "8" } });
@@ -107,11 +99,7 @@ describe("ServerSettings", () => {
 
   it("shows success toast after saving settings", async () => {
     global.fetch.mockImplementation(settingsMock);
-    render(ServerSettings);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Worker count/)).toBeInTheDocument();
-    });
+    await renderLoaded();
 
     await fireEvent.input(screen.getByLabelText(/Worker count/), { target: { value: "8" } });
     await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
@@ -139,11 +127,7 @@ describe("ServerSettings", () => {
 
   it("renders readonly settings as disabled inputs", async () => {
     global.fetch.mockImplementation(settingsMock);
-    render(ServerSettings);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Database driver/)).toBeInTheDocument();
-    });
+    await renderLoaded(/Database driver/);
 
     expect(screen.getByLabelText(/Database driver/).disabled).toBe(true);
     expect(screen.getByLabelText(/Database DSN/).disabled).toBe(true);
@@ -152,11 +136,7 @@ describe("ServerSettings", () => {
 
   it("renders toggle inputs for boolean settings", async () => {
     global.fetch.mockImplementation(settingsMock);
-    render(ServerSettings);
-
-    await waitFor(() => {
-      expect(screen.getByLabelText(/Rate limiting/)).toBeInTheDocument();
-    });
+    await renderLoaded(/Rate limiting/);
 
     const toggle = screen.getByLabelText(/Rate limiting/);
     expect(toggle.type).toBe("checkbox");

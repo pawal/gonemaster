@@ -860,9 +860,8 @@ describe("App", () => {
         expect(screen.getByText("job_bn")).toBeInTheDocument();
       });
 
-      // Fire all registered pollers (the App-level batch watch plus panel
-      // refreshes) a few times so the completion check runs against the done
-      // batch, flushing microtasks between rounds.
+      // Fire every registered poller a few times, flushing microtasks between
+      // rounds, so the completion check runs against the done batch.
       expect(intervalCallbacks.length).toBeGreaterThan(0);
       for (let round = 0; round < 3; round++) {
         for (const cb of intervalCallbacks) {
@@ -1232,10 +1231,8 @@ describe("App", () => {
     });
   });
 
-  // Regression tests: both entry points into per-tab data loading
-  // (setTab on click, initializeApp on mount) must go through the shared
-  // loadDataForTab helper so they can't drift. We previously had a bug
-  // where /analysis/cohorts loaded on tab-click but not on page reload.
+  // Both entry points into per-tab loading (setTab on click, initializeApp on
+  // mount) must go through loadDataForTab, or they drift apart.
   describe("per-tab data loading parity", () => {
     const setupTagsFetchTracking = () => {
       const calls = [];
@@ -1289,9 +1286,8 @@ describe("App", () => {
     });
   });
 
-  // Routing: in-panel drill-downs now push a hash route, so the browser Back
-  // button returns from a detail view to its list, and switching tabs resets
-  // the drill-down instead of silently re-entering it.
+  // Drill-downs push a hash route, so Back returns to the list and switching
+  // tabs resets the drill-down.
   describe("hash routing and back-button navigation", () => {
     const domainsMock = (url) => {
       const value = requestUrl(url);
@@ -1508,8 +1504,7 @@ describe("App", () => {
     });
   });
 
-  // Keyboard shortcuts: the global keydown handler is wired in App; here we
-  // verify the end-to-end effects (overlay, focus, navigation) and that a
+  // End-to-end effects of App's global keydown handler, including that a
   // keystroke inside an input never triggers a shortcut.
   describe("keyboard shortcuts", () => {
     const benignFetch = () => global.fetch.mockImplementation(() => jsonResponse({ items: [] }));

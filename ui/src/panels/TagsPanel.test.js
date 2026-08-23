@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import TagsPanel from "./TagsPanel.svelte";
 
 const sampleTags = () => [
@@ -33,8 +33,6 @@ describe("TagsPanel", () => {
       return Promise.resolve({});
     });
   });
-
-  afterEach(() => cleanup());
 
   it("loads and renders the tag list on mount", async () => {
     render(TagsPanel, { props: { apiFetch } });

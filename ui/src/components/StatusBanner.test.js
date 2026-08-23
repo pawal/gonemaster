@@ -1,4 +1,4 @@
-import { render, screen, cleanup, fireEvent } from "@testing-library/svelte";
+import { render, screen, fireEvent } from "@testing-library/svelte";
 import { afterEach, describe, expect, it } from "vitest";
 import StatusBanner from "./StatusBanner.svelte";
 import { setStatus, clearStatus, status } from "../lib/status.svelte.js";
@@ -6,7 +6,6 @@ import { setStatus, clearStatus, status } from "../lib/status.svelte.js";
 describe("StatusBanner", () => {
   afterEach(() => {
     clearStatus();
-    cleanup();
   });
 
   it("renders nothing when there is no message", () => {

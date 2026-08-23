@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import RunResultBody from "./RunResultBody.svelte";
 
 const sampleResult = {
@@ -13,8 +13,6 @@ const sampleResult = {
 };
 
 describe("RunResultBody", () => {
-  afterEach(() => cleanup());
-
   it("renders nothing when result is null", () => {
     const { container } = render(RunResultBody, { props: { result: null } });
     expect(container.querySelector(".status-banner")).toBeNull();

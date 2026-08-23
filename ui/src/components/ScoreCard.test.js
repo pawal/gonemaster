@@ -1,5 +1,5 @@
-import { render, screen, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/svelte";
+import { describe, expect, it } from "vitest";
 import ScoreCard from "./ScoreCard.svelte";
 import { setCatalog } from "../i18n.js";
 
@@ -27,8 +27,6 @@ const sampleScore = () => ({
 });
 
 describe("ScoreCard", () => {
-  afterEach(() => cleanup());
-
   it("renders nothing when no score is given", () => {
     const { container } = render(ScoreCard, { props: { score: null } });
     expect(container.querySelector(".score-card")).toBeNull();

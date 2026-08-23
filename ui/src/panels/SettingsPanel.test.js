@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import SettingsPanel from "./SettingsPanel.svelte";
 
 const settingsSubTabs = [
@@ -17,8 +17,6 @@ describe("SettingsPanel", () => {
       text: async () => "{}",
     });
   });
-
-  afterEach(() => cleanup());
 
   it("renders the three sub-tab buttons", () => {
     render(SettingsPanel, { props: { settingsSubTab: "system", settingsSubTabs } });

@@ -1,5 +1,5 @@
-import { render, screen, waitFor, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import Progress from "./Progress.svelte";
 
 const jobResp = (status, progress = 0, domain = "example.com") => ({
@@ -16,11 +16,8 @@ const errResp = (status) => ({
 
 describe("Progress", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     global.fetch = vi.fn();
   });
-
-  afterEach(() => cleanup());
 
   it("shows progressbar on mount", async () => {
     global.fetch.mockResolvedValue(jobResp("queued", 0));

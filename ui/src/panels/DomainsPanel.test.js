@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import DomainsPanel from "./DomainsPanel.svelte";
 
 const sampleDomains = () => ({
@@ -35,8 +35,6 @@ describe("DomainsPanel", () => {
       return Promise.resolve({});
     });
   });
-
-  afterEach(() => cleanup());
 
   it("loads the domains list on mount when no domain is selected", async () => {
     render(DomainsPanel, { props: { apiFetch } });

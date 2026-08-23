@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import ScoringSettings from "./ScoringSettings.svelte";
 
 const jsonResponse = (data, ok = true) => ({
@@ -36,12 +36,7 @@ const configResponse = (overrides = {}) =>
 
 describe("ScoringSettings", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     global.fetch = vi.fn();
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   // ── load ────────────────────────────────────────────────────────────────────

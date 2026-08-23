@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import BatchesPanel from "./BatchesPanel.svelte";
 
 const baseProps = (overrides = {}) => ({
@@ -42,8 +42,6 @@ describe("BatchesPanel", () => {
       return Promise.resolve({});
     });
   });
-
-  afterEach(() => cleanup());
 
   it("loads recent and active batches from the batches endpoint on mount", async () => {
     render(BatchesPanel, { props: baseProps({ apiFetch }) });

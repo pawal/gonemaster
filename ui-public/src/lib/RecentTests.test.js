@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
 import RecentTests from "./RecentTests.svelte";
 
 // Entries are given newest first, the way the history module stores them.
@@ -7,8 +7,6 @@ const ENTRIES = [
   { id: "id2", domain: "example.org", finishedAt: "2026-08-07T10:12:00Z", grade: "F" },
   { id: "id1", domain: "example.com", finishedAt: "2026-08-03T22:40:00Z" },
 ];
-
-afterEach(() => cleanup());
 
 describe("RecentTests", () => {
   it("renders one row per entry, in the given order, with result links", () => {

@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import MetricsPanel from "./MetricsPanel.svelte";
 
 const sampleSnapshot = () => ({
@@ -54,8 +54,6 @@ describe("MetricsPanel", () => {
   beforeEach(() => {
     apiFetch = vi.fn().mockResolvedValue(sampleSnapshot());
   });
-
-  afterEach(() => cleanup());
 
   it("loads metrics on mount and renders the queue, DNS, and severity groups", async () => {
     render(MetricsPanel, { props: { apiFetch } });

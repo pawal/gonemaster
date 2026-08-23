@@ -1,10 +1,8 @@
-import { render, screen, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it } from "vitest";
+import { render } from "@testing-library/svelte";
+import { describe, expect, it } from "vitest";
 import GradeChip from "./GradeChip.svelte";
 
 describe("GradeChip", () => {
-  afterEach(() => cleanup());
-
   it("renders the grade letter with its data-grade attribute and the bare score", () => {
     const { container } = render(GradeChip, { props: { grade: "A", score: 92 } });
     const letter = container.querySelector(".grade-chip-letter");

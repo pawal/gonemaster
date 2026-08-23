@@ -1,10 +1,8 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
 import SingleTestPanel from "./SingleTestPanel.svelte";
 
 describe("SingleTestPanel", () => {
-  afterEach(() => cleanup());
-
   it("renders the form with a Run Single Job button", () => {
     render(SingleTestPanel, { props: { apiFetch: vi.fn() } });
     expect(screen.getByPlaceholderText("example.com")).toBeInTheDocument();

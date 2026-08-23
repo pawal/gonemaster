@@ -1,12 +1,10 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/svelte";
+import { describe, expect, it } from "vitest";
 import GlossaryTerm from "./GlossaryTerm.svelte";
 
 // These render against the real bundled en.json, so the definitions come
 // from the synced pub.glossary.* keys.
 describe("GlossaryTerm", () => {
-  afterEach(() => cleanup());
-
   it("renders the term text and carries the definition in aria-label", () => {
     render(GlossaryTerm, { props: { term: "delegation", slug: "delegation" } });
     const trigger = screen.getByTestId("glossary-term");

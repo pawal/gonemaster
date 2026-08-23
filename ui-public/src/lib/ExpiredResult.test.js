@@ -1,11 +1,8 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
 import ExpiredResult from "./ExpiredResult.svelte";
 
 describe("ExpiredResult", () => {
-  beforeEach(() => vi.restoreAllMocks());
-  afterEach(() => cleanup());
-
   it("shows expired heading", () => {
     render(ExpiredResult);
     expect(screen.getByText(/no longer available/i)).toBeTruthy();

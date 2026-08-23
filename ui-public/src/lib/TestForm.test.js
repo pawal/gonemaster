@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import TestForm from "./TestForm.svelte";
 
 const okResponse = (data, status = 201) => ({
@@ -18,11 +18,8 @@ const errResponse = (status, body = {}) => ({
 
 describe("TestForm", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     global.fetch = vi.fn();
   });
-
-  afterEach(() => cleanup());
 
   // ── Rendering ──────────────────────────────────────────────────────────────
 

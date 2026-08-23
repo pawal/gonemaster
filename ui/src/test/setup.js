@@ -1,4 +1,6 @@
 import "@testing-library/jest-dom/vitest";
+// Registers testing-library cleanup after every test; globals are off here.
+import "@testing-library/svelte/vitest";
 
 const storage = () => {
   const store = new Map();

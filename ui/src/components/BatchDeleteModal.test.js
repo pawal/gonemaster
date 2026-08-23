@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import BatchDeleteModal from "./BatchDeleteModal.svelte";
 
 const jsonResponse = (data, ok = true, status = ok ? 200 : 500) => ({
@@ -37,12 +37,7 @@ const samplePreview = (overrides = {}) => ({
 
 describe("BatchDeleteModal", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     global.fetch = vi.fn();
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   const installFetch = (scenario = {}) => {

@@ -1,13 +1,11 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
 import ConfirmDialog from "./ConfirmDialog.svelte";
 import { setCatalog } from "../i18n.js";
 
 setCatalog("en", { cancel: "Cancel", submitting: "Working..." });
 
 describe("ConfirmDialog", () => {
-  afterEach(() => cleanup());
-
   it("renders nothing when closed", () => {
     const { container } = render(ConfirmDialog, { props: { open: false, title: "Delete?" } });
     expect(container.querySelector(".modal-card")).toBeNull();

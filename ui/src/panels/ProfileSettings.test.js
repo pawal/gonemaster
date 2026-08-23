@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import ProfileSettings from "./ProfileSettings.svelte";
 
 const jsonResponse = (data, ok = true) => ({
@@ -24,13 +24,8 @@ const emptyResponse = () => ({
 
 describe("ProfileSettings", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     global.fetch = vi.fn();
     global.confirm = vi.fn(() => true);
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   const findLibraryRow = async (name) => {

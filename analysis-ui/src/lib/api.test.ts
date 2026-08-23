@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ApiError,
   NoSnapshotError,
@@ -42,14 +42,6 @@ function recorder(responseBody: unknown = { ok: true }, ok = true) {
 }
 
 describe("analysis API client", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    vi.restoreAllMocks();
-  });
-
   it("buildQuery drops empty values and serializes the rest", () => {
     expect(buildQuery({})).toBe("");
     expect(buildQuery({ dataset_tag: "", search: "", limit: undefined })).toBe("");

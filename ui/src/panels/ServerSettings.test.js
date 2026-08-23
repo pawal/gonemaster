@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import ServerSettings from "./ServerSettings.svelte";
 
 const jsonResponse = (data, ok = true) => ({
@@ -42,12 +42,7 @@ const settingsMock = (url, options = {}) => {
 
 describe("ServerSettings", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     global.fetch = vi.fn();
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   it("renders server settings with labels and values after loading", async () => {

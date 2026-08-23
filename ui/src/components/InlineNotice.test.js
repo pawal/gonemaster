@@ -1,10 +1,8 @@
-import { render, screen, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it } from "vitest";
+import { render, screen } from "@testing-library/svelte";
+import { describe, expect, it } from "vitest";
 import InlineNotice from "./InlineNotice.svelte";
 
 describe("InlineNotice", () => {
-  afterEach(() => cleanup());
-
   it("renders nothing when there is no message", () => {
     const { container } = render(InlineNotice, { props: { message: "" } });
     expect(container.querySelector(".inline-notice")).toBeNull();

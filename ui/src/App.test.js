@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
 import { setCatalog, locale } from "./i18n.js";
 
@@ -52,10 +52,6 @@ describe("App", () => {
     global.fetch = vi.fn();
   });
 
-  afterEach(() => {
-    cleanup();
-  });
-
   const openRecentTab = async () => {
     await fireEvent.click(screen.getByRole("tab", { name: "Recent Tests" }));
   };
@@ -84,7 +80,7 @@ describe("App", () => {
   it("renders the main sections", async () => {
     global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 
-    const { container, unmount } = render(App);
+    const { container } = render(App);
 
     expect(screen.getByAltText("gonemaster")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Single Job" })).toBeInTheDocument();
@@ -105,8 +101,6 @@ describe("App", () => {
 
     await openSettingsTab("Profiles");
     expect(screen.getByText("Profile Library")).toBeInTheDocument();
-
-    unmount();
   });
 
   it("refreshes recent tests list when clicking the recent tests tab", async () => {
@@ -120,13 +114,11 @@ describe("App", () => {
       return jsonResponse({});
     });
 
-    const { unmount } = render(App);
+    render(App);
     await openRecentTab();
     await waitFor(() => {
       expect(calls.some((value) => value.includes("/api/v1/jobs?"))).toBe(true);
     });
-
-    unmount();
   });
 
   it("opens a batch detail from the batches list and deep-links it", async () => {
@@ -160,7 +152,7 @@ describe("App", () => {
       return jsonResponse({});
     });
 
-    const { unmount } = render(App);
+    render(App);
 
     await openBatchTab();
     const row = (await screen.findByText("batch_refresh")).closest("tr");
@@ -170,13 +162,12 @@ describe("App", () => {
     await waitFor(() => {
       expect(window.location.hash).toBe("#/batches/batch_refresh");
     });
-    unmount();
   });
 
   it("clears status notice when switching tabs", async () => {
     global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
 
-    const { unmount } = render(App);
+    render(App);
 
     const button = await screen.findByText("Run Single Job");
     await fireEvent.click(button);
@@ -186,8 +177,6 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.queryByText("Domain is required.")).toBeNull();
     });
-
-    unmount();
   });
 
   it("submits a single job and displays the created id", async () => {
@@ -214,7 +203,7 @@ describe("App", () => {
       return jsonResponse({ items: [] });
     });
 
-    const { unmount } = render(App);
+    render(App);
 
     const input = await screen.findByPlaceholderText("example.com");
     await fireEvent.input(input, { target: { value: "example.com" } });
@@ -235,8 +224,6 @@ describe("App", () => {
         body: JSON.stringify({ domain: "example.com" })
       })
     );
-
-    unmount();
   });
 
   it("stops auto-refresh once a watched single job completes", async () => {
@@ -268,7 +255,7 @@ describe("App", () => {
       return jsonResponse({});
     });
 
-    const { unmount } = render(App);
+    render(App);
 
     const input = await screen.findByPlaceholderText("example.com");
     await fireEvent.input(input, { target: { value: "autostop.example" } });
@@ -290,8 +277,6 @@ describe("App", () => {
     await waitFor(() => {
       expect(screen.getByText("Auto refresh: off")).toBeInTheDocument();
     });
-
-    unmount();
   });
 
   it("refreshes admin profile selectors after creating a non-public profile in settings", async () => {
@@ -350,7 +335,7 @@ describe("App", () => {
       return jsonResponse({});
     });
 
-    const { unmount } = render(App);
+    render(App);
 
     await openSettingsTab("Profiles");
     await fireEvent.click(await screen.findByRole("button", { name: "New profile" }));
@@ -378,8 +363,6 @@ describe("App", () => {
     await waitFor(() => {
       expect(within(tagSelect).getByRole("option", { name: "internal-only" })).toBeInTheDocument();
     });
-
-    unmount();
   });
 
   it("persists view filters and sorts in URL query params", async () => {
@@ -403,7 +386,7 @@ describe("App", () => {
       return jsonResponse({});
     });
 
-    const { unmount } = render(App);
+    render(App);
 
     await openRecentTab();
     await fireEvent.change(screen.getByLabelText("Sort"), { target: { value: "domain_desc" } });
@@ -427,8 +410,6 @@ describe("App", () => {
       expect(params.get("b_id")).toBeNull();
       expect(window.location.hash).toBe("#/batches/batch_1");
     });
-
-    unmount();
   });
 
   it("restores view state from URL params with precedence over localStorage", async () => {
@@ -473,7 +454,7 @@ describe("App", () => {
       return jsonResponse({});
     });
 
-    const { unmount } = render(App);
+    render(App);
 
     await waitFor(() => {
       expect(
@@ -504,8 +485,6 @@ describe("App", () => {
     expect(screen.getByLabelText("Sort")).toHaveValue("domain_desc");
     expect(screen.getByLabelText("Page size")).toHaveValue("50");
     expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_url");
-
-    unmount();
   });
 
   it("uses localStorage view state when URL has no persisted params", async () => {
@@ -530,7 +509,7 @@ describe("App", () => {
       return jsonResponse({});
     });
 
-    const { unmount } = render(App);
+    render(App);
     await openRecentTab();
 
     await waitFor(() => {
@@ -544,8 +523,6 @@ describe("App", () => {
         )
       ).toBe(true);
     });
-
-    unmount();
   });
 
   it("opens single job inspector when inspecting from recent tests", async () => {
@@ -571,7 +548,7 @@ describe("App", () => {
       return jsonResponse({});
     });
 
-    const { unmount } = render(App);
+    render(App);
 
     await openRecentTab();
     const refresh = await screen.findByRole("button", { name: /refresh list/i });
@@ -590,8 +567,6 @@ describe("App", () => {
       expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
       expect(screen.getByLabelText("Job ID")).toHaveValue(job.id);
     });
-
-    unmount();
   });
 
   it("normalizes invalid persisted URL filters and pagination values", async () => {
@@ -620,7 +595,7 @@ describe("App", () => {
       return jsonResponse({});
     });
 
-    const { unmount } = render(App);
+    render(App);
 
     await waitFor(() => {
       expect(
@@ -656,8 +631,6 @@ describe("App", () => {
     expect(screen.getByLabelText("Sort")).toHaveValue("started_at_desc");
     expect(screen.getByLabelText("Page size")).toHaveValue("20");
     expect(screen.getByLabelText("Batch ID filter")).toHaveValue("batch_from_url");
-
-    unmount();
   });
 
   describe("locale selector", () => {
@@ -677,7 +650,7 @@ describe("App", () => {
     it("shows language selector when server returns multiple locales", async () => {
       mockFetchWithLocales(["da", "en", "fr", "sv"]);
 
-      const { unmount } = render(App);
+      render(App);
 
       await waitFor(() => {
         expect(screen.getByRole("combobox", { name: "Result language" })).toBeInTheDocument();
@@ -687,14 +660,12 @@ describe("App", () => {
       expect(within(select).getByRole("option", { name: "Dansk" })).toBeInTheDocument();
       expect(within(select).getByRole("option", { name: "Français" })).toBeInTheDocument();
       expect(within(select).getByRole("option", { name: "Svenska" })).toBeInTheDocument();
-
-      unmount();
     });
 
     it("hides language selector when server returns only one locale", async () => {
       mockFetchWithLocales(["en"]);
 
-      const { unmount } = render(App);
+      render(App);
 
       // Give the locales fetch time to resolve.
       await waitFor(() => {
@@ -704,48 +675,40 @@ describe("App", () => {
       await new Promise((r) => setTimeout(r, 0));
 
       expect(screen.queryByRole("combobox", { name: "Result language" })).toBeNull();
-
-      unmount();
     });
 
     it("persists chosen locale to localStorage when changed", async () => {
       mockFetchWithLocales(["en", "sv", "da"]);
 
-      const { unmount } = render(App);
+      render(App);
 
       const select = await screen.findByRole("combobox", { name: "Result language" });
       await fireEvent.change(select, { target: { value: "sv" } });
 
       expect(localStorage.getItem("gonemaster.ui.locale.v1")).toBe("sv");
-
-      unmount();
     });
 
     it("restores locale from localStorage on load", async () => {
       localStorage.setItem("gonemaster.ui.locale.v1", "fr");
       mockFetchWithLocales(["en", "fr", "sv"]);
 
-      const { unmount } = render(App);
+      render(App);
 
       const select = await screen.findByRole("combobox", { name: "Result language" });
       expect(select.value).toBe("fr");
-
-      unmount();
     });
 
     it("falls back to English when stored locale is not in server list", async () => {
       localStorage.setItem("gonemaster.ui.locale.v1", "ja");
       mockFetchWithLocales(["en", "da", "sv"]);
 
-      const { unmount } = render(App);
+      render(App);
 
       const select = await screen.findByRole("combobox", { name: "Result language" });
       await waitFor(() => {
         expect(select.value).toBe("en");
       });
       expect(localStorage.getItem("gonemaster.ui.locale.v1")).toBe("en");
-
-      unmount();
     });
 
     it("switching locale selector updates UI chrome strings reactively", async () => {
@@ -763,7 +726,7 @@ describe("App", () => {
         return jsonResponse({});
       });
 
-      const { unmount } = render(App);
+      render(App);
 
       // Wait for the locale selector to appear (loadLocales must resolve first).
       const select = await screen.findByRole("combobox", { name: "Result language" });
@@ -779,7 +742,6 @@ describe("App", () => {
         expect(screen.getByRole("button", { name: "Kör enkeljobb" })).toBeInTheDocument();
       });
 
-      unmount();
       // Reset locale store so subsequent tests start in English.
       locale.set("en");
     });
@@ -834,7 +796,7 @@ describe("App", () => {
         return jsonResponse({});
       });
 
-      const { unmount } = render(App);
+      render(App);
       await submitAndWaitForQueued("notify.example");
 
       expect(intervalCallbacks.length).toBeGreaterThan(0);
@@ -847,8 +809,6 @@ describe("App", () => {
           expect.objectContaining({ body: expect.stringContaining("notify.example") })
         );
       });
-
-      unmount();
     });
 
     it("requests notification permission when submitting a single job", async () => {
@@ -871,14 +831,12 @@ describe("App", () => {
         return jsonResponse({});
       });
 
-      const { unmount } = render(App);
+      render(App);
       await submitAndWaitForQueued("perm.example");
 
       await waitFor(() => {
         expect(NotificationMock.requestPermission).toHaveBeenCalled();
       });
-
-      unmount();
     });
 
     it("does not send a notification when Notification permission is denied", async () => {
@@ -913,7 +871,7 @@ describe("App", () => {
         return jsonResponse({});
       });
 
-      const { unmount } = render(App);
+      render(App);
       await submitAndWaitForQueued("denied.example");
 
       expect(intervalCallbacks.length).toBeGreaterThan(0);
@@ -926,8 +884,6 @@ describe("App", () => {
 
       // Notification constructor must not have been called.
       expect(NotificationMock).not.toHaveBeenCalled();
-
-      unmount();
     });
 
     it("sends a browser notification when a batch finishes", async () => {
@@ -976,7 +932,7 @@ describe("App", () => {
         return jsonResponse({});
       });
 
-      const { unmount } = render(App);
+      render(App);
 
       await fireEvent.click(screen.getByRole("tab", { name: "Batch Jobs" }));
       await fireEvent.input(await screen.findByLabelText("Domains (one per line)"), {
@@ -1005,8 +961,6 @@ describe("App", () => {
           expect.objectContaining({ body: expect.stringContaining("batch_notify") })
         );
       });
-
-      unmount();
     });
   });
 
@@ -1017,9 +971,8 @@ describe("App", () => {
 
     it("renders Domains tab button", async () => {
       global.fetch.mockImplementation(() => jsonResponse({ items: [], total: 0 }));
-      const { unmount } = render(App);
+      render(App);
       expect(screen.getByRole("tab", { name: "Domains" })).toBeInTheDocument();
-      unmount();
     });
 
     it("shows domain list when tab opened", async () => {
@@ -1039,7 +992,7 @@ describe("App", () => {
         return jsonResponse({ items: [], total: 0 });
       });
 
-      const { unmount } = render(App);
+      render(App);
       await openDomainsTab();
 
       await waitFor(() => {
@@ -1047,8 +1000,6 @@ describe("App", () => {
       });
       expect(await screen.findByText("example.com")).toBeInTheDocument();
       expect(screen.getByText("WARNING")).toBeInTheDocument();
-
-      unmount();
     });
 
     it("clicking a domain row shows detail view and loads runs", async () => {
@@ -1067,7 +1018,7 @@ describe("App", () => {
         return jsonResponse({ items: [], total: 0 });
       });
 
-      const { unmount } = render(App);
+      render(App);
       await openDomainsTab();
 
       const row = await screen.findByText("example.com");
@@ -1077,7 +1028,6 @@ describe("App", () => {
         expect(screen.getByText("← Back to domains")).toBeInTheDocument();
         expect(calls.some((v) => v.includes("/api/v1/domains/7/runs"))).toBe(true);
       });
-      unmount();
     });
 
     it("back button returns to domain list", async () => {
@@ -1093,7 +1043,7 @@ describe("App", () => {
         return jsonResponse({ items: [], total: 0 });
       });
 
-      const { unmount } = render(App);
+      render(App);
       await openDomainsTab();
 
       await fireEvent.click(await screen.findByText("example.com"));
@@ -1104,7 +1054,6 @@ describe("App", () => {
         expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
       });
-      unmount();
     });
 
     it("clicking a run row loads the result inline and stays in domain view", async () => {
@@ -1127,7 +1076,7 @@ describe("App", () => {
         return jsonResponse({ items: [], total: 0 });
       });
 
-      const { unmount } = render(App);
+      render(App);
       await openDomainsTab();
       await fireEvent.click(await screen.findByText("test.com"));
       const olderRow = await screen.findByText("run-old");
@@ -1138,7 +1087,6 @@ describe("App", () => {
         expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "false");
         expect(olderRow.closest("tr")).toHaveClass("run-row-selected");
       });
-      unmount();
     });
 
     it("re-test button creates a new job and navigates to inspector", async () => {
@@ -1160,7 +1108,7 @@ describe("App", () => {
         return jsonResponse({ items: [], total: 0 });
       });
 
-      const { unmount } = render(App);
+      render(App);
       await openDomainsTab();
       await fireEvent.click(await screen.findByText("retest.com"));
       await waitFor(() => screen.getByText("Re-test"));
@@ -1170,7 +1118,6 @@ describe("App", () => {
         expect(calls.some((c) => c.url.includes("/api/v1/jobs") && c.method === "POST")).toBe(true);
         expect(screen.getByRole("tab", { name: "Single Job" })).toHaveAttribute("aria-selected", "true");
       });
-      unmount();
     });
   });
 
@@ -1194,18 +1141,16 @@ describe("App", () => {
 
     it("renders Tags tab button", async () => {
       mockTagFetch();
-      const { unmount } = render(App);
+      render(App);
       expect(screen.getByRole("tab", { name: "Tags" })).toBeInTheDocument();
-      unmount();
     });
 
     it("shows tag list when tab opened", async () => {
       mockTagFetch([{ name: "tld", description: "Top-level", domain_count: 5 }]);
-      const { unmount } = render(App);
+      render(App);
       await openTagsTab();
       expect(await screen.findByText("tld")).toBeInTheDocument();
       expect(screen.getByText("Top-level")).toBeInTheDocument();
-      unmount();
     });
 
     it("Run all button POSTs batch with from_tag", async () => {
@@ -1221,7 +1166,7 @@ describe("App", () => {
         return jsonResponse({ items: [], total: 0 });
       });
 
-      const { unmount } = render(App);
+      render(App);
       await openTagsTab();
       await fireEvent.click(await screen.findByText("tld"));
       await waitFor(() => screen.getByText("Run all domains"));
@@ -1232,7 +1177,6 @@ describe("App", () => {
         expect(batchCall).toBeTruthy();
         expect(batchCall.body).toContain("from_tag");
       });
-      unmount();
     });
 
     describe("Earlier batches panel", () => {
@@ -1286,7 +1230,7 @@ describe("App", () => {
           { id: "batch_a", tag: "tld", created_at: "2026-04-10T12:00:00Z", domain_count: 3, snapshot_intent: false },
         ]);
 
-        const { unmount } = render(App);
+        render(App);
         await openTagsTab();
         await fireEvent.click(await screen.findByText("tld"));
 
@@ -1298,11 +1242,9 @@ describe("App", () => {
         });
         expect(await screen.findByRole("heading", { name: "batch_a" })).toBeInTheDocument();
         expect(window.location.hash).toBe("#/batches/batch_a");
-        unmount();
       });
     });
   });
-
 
   describe("Settings sub-tabs", () => {
     const subtabMock = (url, options = {}) => {
@@ -1335,7 +1277,7 @@ describe("App", () => {
 
     it("defaults to System sub-tab and renders ServerSettings", async () => {
       global.fetch.mockImplementation(subtabMock);
-      const { unmount } = render(App);
+      render(App);
       await openSettingsTab();
 
       const systemTab = screen.getByRole("tab", { name: "System" });
@@ -1345,24 +1287,22 @@ describe("App", () => {
       });
       expect(screen.queryByRole("heading", { name: "Profile Library" })).toBeNull();
       expect(screen.queryByRole("heading", { name: "Analysis Cohorts" })).toBeNull();
-      unmount();
     });
 
     it("switches to Profiles sub-tab and renders ProfileSettings", async () => {
       global.fetch.mockImplementation(subtabMock);
-      const { unmount } = render(App);
+      render(App);
       await openSettingsTab("Profiles");
 
       await waitFor(() => {
         expect(screen.getByText("Profile Library")).toBeInTheDocument();
       });
       expect(screen.queryByRole("heading", { name: "Server Settings" })).toBeNull();
-      unmount();
     });
 
     it("switches to Scoring sub-tab and renders ScoringSettings", async () => {
       global.fetch.mockImplementation(subtabMock);
-      const { unmount } = render(App);
+      render(App);
       await openSettingsTab("Scoring");
 
       await waitFor(() => {
@@ -1371,12 +1311,11 @@ describe("App", () => {
       await waitFor(() => {
         expect(screen.getByText("Severity Penalties")).toBeInTheDocument();
       });
-      unmount();
     });
 
     it("pushes sub-tab changes to history and restores them on popstate", async () => {
       global.fetch.mockImplementation(subtabMock);
-      const { unmount } = render(App);
+      render(App);
 
       await openSettingsTab();
       expect(window.location.hash).toBe("#/settings");
@@ -1398,8 +1337,6 @@ describe("App", () => {
         expect(screen.getByRole("tab", { name: "System" }).getAttribute("aria-selected")).toBe("true");
       });
       expect(window.location.hash).toBe("#/settings");
-
-      unmount();
     });
   });
 
@@ -1428,30 +1365,28 @@ describe("App", () => {
       window.history.replaceState(null, "", "/#/tags");
       const calls = setupTagsFetchTracking();
 
-      const { unmount } = render(App);
+      render(App);
 
       await waitFor(() => {
         expect(calls).toContain("/api/v1/analysis/cohorts");
       });
-      unmount();
     });
 
     it("fetches /analysis/cohorts when clicking the Tags tab", async () => {
       const calls = setupTagsFetchTracking();
 
-      const { unmount } = render(App);
+      render(App);
       await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
 
       await waitFor(() => {
         expect(calls).toContain("/api/v1/analysis/cohorts");
       });
-      unmount();
     });
 
     it("shows the cohort label in the tags list for tags used as cohort source", async () => {
       setupTagsFetchTracking();
 
-      const { container, unmount } = render(App);
+      const { container } = render(App);
       await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
 
       await waitFor(() => {
@@ -1459,7 +1394,6 @@ describe("App", () => {
         expect(chip).not.toBeNull();
         expect(chip.textContent.trim()).toBe("TLD");
       });
-      unmount();
     });
   });
 
@@ -1482,7 +1416,7 @@ describe("App", () => {
 
     it("clicking a domain row pushes a hash route and Back returns to the list", async () => {
       global.fetch.mockImplementation(domainsMock);
-      const { unmount } = render(App);
+      render(App);
 
       await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
       await fireEvent.click(await screen.findByText("example.com"));
@@ -1499,12 +1433,11 @@ describe("App", () => {
         expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
       });
-      unmount();
     });
 
     it("switching to another tab clears an open domain detail", async () => {
       global.fetch.mockImplementation(domainsMock);
-      const { unmount } = render(App);
+      render(App);
 
       await fireEvent.click(screen.getByRole("tab", { name: "Domains" }));
       await fireEvent.click(await screen.findByText("example.com"));
@@ -1518,7 +1451,6 @@ describe("App", () => {
         expect(screen.queryByText("← Back to domains")).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Domains" })).toBeInTheDocument();
       });
-      unmount();
     });
 
     it("clicking a tag row pushes a hash route and Back returns to the list", async () => {
@@ -1531,7 +1463,7 @@ describe("App", () => {
         if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "TLD", domain_count: 2, default_profile_id: null }]);
         return jsonResponse({ items: [], total: 0 });
       });
-      const { unmount } = render(App);
+      render(App);
 
       await fireEvent.click(screen.getByRole("tab", { name: "Tags" }));
       await fireEvent.click(await screen.findByText("tld"));
@@ -1548,7 +1480,6 @@ describe("App", () => {
         expect(screen.queryByText("← Back to tags")).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Tags" })).toBeInTheDocument();
       });
-      unmount();
     });
 
     it("restores a domain detail deep link on reload", async () => {
@@ -1559,14 +1490,13 @@ describe("App", () => {
         calls.push(value);
         return domainsMock(url);
       });
-      const { unmount } = render(App);
+      render(App);
 
       await waitFor(() => {
         expect(screen.getByRole("heading", { name: "example.com" })).toBeInTheDocument();
         expect(calls.some((v) => v.includes("/api/v1/domains/7/runs"))).toBe(true);
       });
       expect(window.location.hash).toBe("#/domains/example.com");
-      unmount();
     });
 
     it("restores a specific run deep link on reload", async () => {
@@ -1583,13 +1513,12 @@ describe("App", () => {
         }
         return domainsMock(url);
       });
-      const { unmount } = render(App);
+      render(App);
 
       await waitFor(() => {
         expect(calls.some((v) => v.includes("/api/v1/jobs/run_seven/result"))).toBe(true);
       });
       expect(window.location.hash).toBe("#/domains/example.com/runs/run_seven");
-      unmount();
     });
 
     it("restores a tag detail deep link on reload", async () => {
@@ -1605,14 +1534,13 @@ describe("App", () => {
         if (value.includes("/api/v1/tags")) return jsonResponse([{ name: "tld", description: "TLD", domain_count: 2, default_profile_id: null }]);
         return jsonResponse({ items: [], total: 0 });
       });
-      const { unmount } = render(App);
+      render(App);
 
       await waitFor(() => {
         expect(screen.getByRole("heading", { level: 2, name: /tld/ })).toBeInTheDocument();
         expect(calls.some((v) => v.includes("/api/v1/tags/tld/summary"))).toBe(true);
       });
       expect(window.location.hash).toBe("#/tags/tld");
-      unmount();
     });
 
     it("writes a single-job deep link when a job is created", async () => {
@@ -1622,7 +1550,7 @@ describe("App", () => {
         if (url === `/api/v1/jobs/${job.id}`) return jsonResponse(job);
         return jsonResponse({ items: [] });
       });
-      const { unmount } = render(App);
+      render(App);
 
       await fireEvent.input(await screen.findByPlaceholderText("example.com"), { target: { value: "example.com" } });
       await fireEvent.click(screen.getByText("Run Single Job"));
@@ -1630,7 +1558,6 @@ describe("App", () => {
       await waitFor(() => {
         expect(window.location.hash).toBe("#/single/job_created_1");
       });
-      unmount();
     });
 
     it("writes the hash and loads the job when a job id is entered manually", async () => {
@@ -1641,7 +1568,7 @@ describe("App", () => {
         if (value === "/api/v1/jobs/job_typed") return jsonResponse({ id: "job_typed", domain: "typed.example", status: "running", created_at: "2026-02-03T00:00:00Z", progress: 5 });
         return jsonResponse({ items: [] });
       });
-      const { unmount } = render(App);
+      render(App);
 
       const input = await screen.findByLabelText("Job ID");
       await fireEvent.input(input, { target: { value: "job_typed" } });
@@ -1651,7 +1578,6 @@ describe("App", () => {
         expect(window.location.hash).toBe("#/single/job_typed");
         expect(calls.some((v) => v === "/api/v1/jobs/job_typed")).toBe(true);
       });
-      unmount();
     });
 
     it("clicking a batch row pushes a hash route and Back returns to the list", async () => {
@@ -1665,7 +1591,7 @@ describe("App", () => {
         }
         return jsonResponse({ items: [], total: 0 });
       });
-      const { unmount } = render(App);
+      render(App);
 
       await openBatchTab();
       await fireEvent.click((await screen.findByText("batch_z")).closest("tr"));
@@ -1682,19 +1608,17 @@ describe("App", () => {
         expect(screen.queryByText("← Back to batches")).not.toBeInTheDocument();
         expect(screen.getByRole("heading", { name: "Batches" })).toBeInTheDocument();
       });
-      unmount();
     });
 
     it("redirects the legacy #/settings/analysis bookmark to the Cohorts tab", async () => {
       window.history.replaceState(null, "", "/#/settings/analysis");
       global.fetch.mockImplementation(() => jsonResponse({ items: [] }));
-      const { unmount } = render(App);
+      render(App);
 
       await waitFor(() => {
         expect(screen.getByRole("tab", { name: "Cohorts" })).toHaveAttribute("aria-selected", "true");
         expect(window.location.hash).toBe("#/cohorts");
       });
-      unmount();
     });
   });
 
@@ -1707,7 +1631,7 @@ describe("App", () => {
 
     it("opens the help overlay on '?' and closes it on Escape", async () => {
       benignFetch();
-      const { unmount } = render(App);
+      render(App);
 
       expect(helpDialog()).toBeNull();
       await fireEvent.keyDown(document.body, { key: "?" });
@@ -1715,32 +1639,29 @@ describe("App", () => {
 
       await fireEvent.keyDown(document.body, { key: "Escape" });
       await waitFor(() => expect(helpDialog()).toBeNull());
-      unmount();
     });
 
     it("opens the help overlay from the header affordance", async () => {
       benignFetch();
-      const { unmount } = render(App);
+      render(App);
 
       await fireEvent.click(screen.getByRole("button", { name: "Keyboard shortcuts (?)" }));
       expect(await screen.findByRole("dialog", { name: "Keyboard shortcuts help" })).toBeInTheDocument();
-      unmount();
     });
 
     it("focuses the domain field on 'n'", async () => {
       benignFetch();
-      const { unmount } = render(App);
+      render(App);
 
       const input = await screen.findByPlaceholderText("example.com");
       input.blur();
       await fireEvent.keyDown(document.body, { key: "n" });
       await waitFor(() => expect(input).toHaveFocus());
-      unmount();
     });
 
     it("navigates tabs via the g-prefix sequence (g then r)", async () => {
       benignFetch();
-      const { unmount } = render(App);
+      render(App);
 
       await fireEvent.keyDown(document.body, { key: "g" });
       await fireEvent.keyDown(document.body, { key: "r" });
@@ -1748,19 +1669,17 @@ describe("App", () => {
         expect(screen.getByRole("tab", { name: "Recent Tests" })).toHaveAttribute("aria-selected", "true");
         expect(window.location.hash).toBe("#/recent");
       });
-      unmount();
     });
 
     it("does not trigger a shortcut while typing in an input", async () => {
       benignFetch();
-      const { unmount } = render(App);
+      render(App);
 
       const input = await screen.findByPlaceholderText("example.com");
       input.focus();
       await fireEvent.keyDown(input, { key: "?" });
       // '?' typed into a field must not open the overlay.
       expect(helpDialog()).toBeNull();
-      unmount();
     });
   });
 });

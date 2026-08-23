@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, cleanup, waitFor } from "@testing-library/svelte";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
 import ShortcutsHelp from "./ShortcutsHelp.svelte";
 import { setCatalog } from "../i18n.js";
 
@@ -28,8 +28,6 @@ setCatalog("en", {
 });
 
 describe("ShortcutsHelp", () => {
-  afterEach(() => cleanup());
-
   it("renders nothing when closed", () => {
     const { container } = render(ShortcutsHelp, { props: { open: false } });
     expect(container.querySelector(".modal-card")).toBeNull();

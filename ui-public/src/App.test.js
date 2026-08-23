@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
 
@@ -29,7 +29,6 @@ const resultResp = (entries = []) => ({
 
 describe("App", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     window.location.hash = "";
     fetchRouter([
       ["/locales", localesResp],
@@ -38,7 +37,6 @@ describe("App", () => {
   });
 
   afterEach(() => {
-    cleanup();
     document.documentElement.removeAttribute("data-theme");
     window.localStorage.clear();
   });

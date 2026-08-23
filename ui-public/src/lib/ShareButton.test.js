@@ -1,10 +1,9 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ShareButton from "./ShareButton.svelte";
 
 describe("ShareButton", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     vi.useFakeTimers();
     Object.defineProperty(window, "location", {
       value: { origin: "https://example.com", pathname: "/public/" },
@@ -15,7 +14,6 @@ describe("ShareButton", () => {
 
   afterEach(() => {
     vi.useRealTimers();
-    cleanup();
   });
 
   it("renders Share button", () => {

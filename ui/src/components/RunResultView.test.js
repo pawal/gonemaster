@@ -1,5 +1,5 @@
-import { render, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it } from "vitest";
+import { render } from "@testing-library/svelte";
+import { describe, expect, it } from "vitest";
 import RunResultView from "./RunResultView.svelte";
 import { setCatalog } from "../i18n.js";
 
@@ -13,8 +13,6 @@ const resultWithScore = () => ({
 });
 
 describe("RunResultView", () => {
-  afterEach(() => cleanup());
-
   it("renders nothing without a result", () => {
     const { container } = render(RunResultView, { props: { result: null } });
     expect(container.querySelector(".score-card")).toBeNull();

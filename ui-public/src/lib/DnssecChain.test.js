@@ -1,5 +1,5 @@
 import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import DnssecChain from "./DnssecChain.svelte";
 
 // secureChain is a complete "secure" summary: one DS matching a KSK, a ZSK, and
@@ -46,11 +46,6 @@ describe("DnssecChain", () => {
   beforeEach(() => {
     global.fetch = vi.fn();
   });
-  afterEach(() => {
-    cleanup();
-    vi.restoreAllMocks();
-  });
-
   it("does not fetch before the section is opened", () => {
     render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
     expect(fetch).not.toHaveBeenCalled();

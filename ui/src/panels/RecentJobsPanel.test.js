@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
 import RecentJobsPanel from "./RecentJobsPanel.svelte";
 
 const sampleJobs = () => ({
@@ -36,8 +36,6 @@ const baseProps = (overrides = {}) => ({
 });
 
 describe("RecentJobsPanel", () => {
-  afterEach(() => cleanup());
-
   it("loads and renders jobs on mount", async () => {
     const apiFetch = vi.fn().mockResolvedValue(sampleJobs());
     render(RecentJobsPanel, { props: baseProps({ apiFetch }) });

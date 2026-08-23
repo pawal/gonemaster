@@ -1,10 +1,8 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent } from "@testing-library/svelte";
+import { describe, expect, it, vi } from "vitest";
 import JobInspector from "./JobInspector.svelte";
 
 describe("JobInspector", () => {
-  afterEach(() => cleanup());
-
   it("renders the job inspector heading when no job is selected", () => {
     render(JobInspector, {
       props: { selectedJob: null, selectedJobResult: null, selectedRun: null },

@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import ThemeToggle from "./ThemeToggle.svelte";
 import { themeStore, _resetForTests } from "../lib/theme.svelte.js";
@@ -22,7 +22,6 @@ describe("ThemeToggle", () => {
   });
 
   afterEach(() => {
-    cleanup();
     localStorage.clear();
     document.documentElement.removeAttribute("data-theme");
     _resetForTests();

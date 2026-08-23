@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import Results from "./Results.svelte";
 
 const resultResp = (entries = [], testcase_descriptions = {}, nameserver_timings = []) => ({
@@ -41,11 +41,8 @@ const taggedEntry = (tag, args, level = "INFO") => ({
 
 describe("Results", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     global.fetch = vi.fn();
   });
-
-  afterEach(() => cleanup());
 
   it("shows loading indicator before fetch resolves", async () => {
     let resolve;

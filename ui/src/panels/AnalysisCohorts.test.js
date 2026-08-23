@@ -1,5 +1,5 @@
-import { render, screen, fireEvent, waitFor, within, cleanup } from "@testing-library/svelte";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import AnalysisCohorts from "./AnalysisCohorts.svelte";
 
 const jsonResponse = (data, ok = true) => ({
@@ -12,12 +12,7 @@ const jsonResponse = (data, ok = true) => ({
 
 describe("AnalysisCohorts", () => {
   beforeEach(() => {
-    vi.restoreAllMocks();
     global.fetch = vi.fn();
-  });
-
-  afterEach(() => {
-    cleanup();
   });
 
   const sampleCohorts = () => ([

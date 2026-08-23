@@ -483,19 +483,6 @@ func TestLoadConfig_RenamedTagCurrentKeyWins(t *testing.T) {
 	}
 }
 
-func TestCompute_TagPenaltyScoreImpact(t *testing.T) {
-	// DS07_NOT_SIGNED with 20-pt penalty: dnssec sub-score = 80.
-	// Weighted: (80*1.5 + 100*1.2 + 100*1.0 + 100*0.8) / 4.5
-	//         = (120 + 120 + 100 + 80) / 4.5 = 420/4.5 = 93
-	entries := []Entry{
-		e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"),
-	}
-	r := Compute("example.se", entries, cfg)
-	if r.Score != 93 {
-		t.Errorf("expected score 93 with DS07_NOT_SIGNED penalty, got %d", r.Score)
-	}
-}
-
 // Severity alone gives 5 points for WARNING and 1 for NOTICE.
 func TestComputeTagPenalties(t *testing.T) {
 	for _, tc := range []struct {

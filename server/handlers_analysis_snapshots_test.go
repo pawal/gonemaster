@@ -314,9 +314,9 @@ func TestAdminSnapshotNotFound(t *testing.T) {
 	})
 }
 
-// TestAdminSnapshotListReturnsAllStatuses covers the admin list endpoint
-// added in Phase 6: unlike the public list, it includes retired and
-// failed_mixed_profiles rows so the cohort panel can manage them.
+// TestAdminSnapshotListReturnsAllStatuses covers the admin list endpoint:
+// unlike the public list, it includes retired and failed_mixed_profiles rows
+// so the cohort panel can manage them.
 func TestAdminSnapshotListReturnsAllStatuses(t *testing.T) {
 	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
 		// Seed a retired snapshot in addition to the fixture's captured one.
@@ -335,9 +335,8 @@ func TestAdminSnapshotListReturnsAllStatuses(t *testing.T) {
 	})
 }
 
-// TestAdminSnapshotRestoreViaStatus covers the status=captured restore
-// path added in Phase 6 so retired snapshots can be un-retired without a
-// separate endpoint.
+// TestAdminSnapshotRestoreViaStatus covers the status=captured restore path,
+// which un-retires a snapshot without a separate endpoint.
 func TestAdminSnapshotRestoreViaStatus(t *testing.T) {
 	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
 		// Retire the fixture snapshot first.

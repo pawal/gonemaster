@@ -13,240 +13,229 @@ func fakeEnv(m map[string]string) func(string) string {
 	return func(k string) string { return m[k] }
 }
 
-func TestApplyEnvVarsListen(t *testing.T) {
+// envCase is one applyEnvVars row: the variable under test, the value it is
+// given, and how to read the field it writes back off the config.
+type envCase struct {
+	name  string
+	env   string
+	value string
+	get   func(server.Config) any
+	want  any
+	// pre seeds the config before applyEnvVars runs, standing in for a value
+	// the CLI already set.
+	pre func(*server.Config)
+	// flag names the CLI flag to mark as set, for the CLI-wins rows.
+	flag string
+	// wantWarningPrefix also asserts the "warning:" prefix on the message.
+	wantWarningPrefix bool
+}
+
+// runApplyEnvVars applies one env var to a fresh default config and returns
+// the config plus whatever warning text was written.
+func runApplyEnvVars(tc envCase) (server.Config, string) {
 	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_LISTEN": "0.0.0.0:9090",
-	}), &warn)
-	if cfg.ListenAddr != "0.0.0.0:9090" {
-		t.Fatalf("expected 0.0.0.0:9090, got %q", cfg.ListenAddr)
+	if tc.pre != nil {
+		tc.pre(&cfg)
 	}
-	if warn.String() != "" {
-		t.Fatalf("unexpected warning: %q", warn.String())
+	flags := map[string]bool{}
+	if tc.flag != "" {
+		flags[tc.flag] = true
+	}
+	var warn strings.Builder
+	applyEnvVars(&cfg, flags, fakeEnv(map[string]string{tc.env: tc.value}), &warn)
+	return cfg, warn.String()
+}
+
+func TestApplyEnvVarsSetsFields(t *testing.T) {
+	for _, tc := range []envCase{
+		{
+			name: "listen", env: "GONEMASTER_LISTEN", value: "0.0.0.0:9090",
+			get: func(c server.Config) any { return c.ListenAddr }, want: "0.0.0.0:9090",
+		},
+		{
+			name: "worker count", env: "GONEMASTER_WORKER_COUNT", value: "16",
+			get: func(c server.Config) any { return c.WorkerCount }, want: 16,
+		},
+		{
+			name: "max concurrent jobs", env: "GONEMASTER_MAX_CONCURRENT_JOBS", value: "24",
+			get: func(c server.Config) any { return c.MaxConcurrentJobs }, want: 24,
+		},
+		{
+			name: "debug true", env: "GONEMASTER_DEBUG", value: "true",
+			get: func(c server.Config) any { return c.Debug }, want: true,
+		},
+		{
+			name: "debug numeric", env: "GONEMASTER_DEBUG", value: "1",
+			get: func(c server.Config) any { return c.Debug }, want: true,
+		},
+		{
+			name: "debug false", env: "GONEMASTER_DEBUG", value: "false",
+			pre: func(c *server.Config) { c.Debug = true },
+			get: func(c server.Config) any { return c.Debug }, want: false,
+		},
+		{
+			name: "min level", env: "GONEMASTER_MIN_LEVEL", value: "WARNING",
+			get: func(c server.Config) any { return c.MinLevel }, want: "WARNING",
+		},
+		{
+			name: "log format", env: "GONEMASTER_LOG_FORMAT", value: "json",
+			get: func(c server.Config) any { return c.LogFormat }, want: "json",
+		},
+		{
+			name: "log level", env: "GONEMASTER_LOG_LEVEL", value: "debug",
+			get: func(c server.Config) any { return c.LogLevel }, want: "debug",
+		},
+		{
+			name: "profile", env: "GONEMASTER_PROFILE", value: "/etc/gonemaster/profile.yaml",
+			get: func(c server.Config) any { return c.ProfilePath }, want: "/etc/gonemaster/profile.yaml",
+		},
+		{
+			name: "db driver", env: "GONEMASTER_DB_DRIVER", value: "sqlite",
+			get: func(c server.Config) any { return c.Database.Driver }, want: "sqlite",
+		},
+		{
+			name: "db dsn", env: "GONEMASTER_DB_DSN", value: "/var/lib/gonemaster/db.sqlite",
+			get: func(c server.Config) any { return c.Database.DSN }, want: "/var/lib/gonemaster/db.sqlite",
+		},
+		{
+			name: "db retention days", env: "GONEMASTER_DB_RETENTION_DAYS", value: "90",
+			get: func(c server.Config) any { return c.Database.RetentionDays }, want: 90,
+		},
+		{
+			name: "db purge interval", env: "GONEMASTER_DB_PURGE_INTERVAL", value: "1800",
+			get: func(c server.Config) any { return c.Database.PurgeIntervalSeconds }, want: 1800,
+		},
+		{
+			name: "public api rate limit enabled", env: "GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED", value: "true",
+			get: func(c server.Config) any { return c.PublicAPI.RateLimitEnabled }, want: true,
+		},
+		{
+			name: "public api rate limit max", env: "GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX", value: "50",
+			get: func(c server.Config) any { return c.PublicAPI.RateLimitMax }, want: 50,
+		},
+		{
+			name: "public api rate limit window", env: "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", value: "2m",
+			get: func(c server.Config) any { return c.PublicAPI.RateLimitWindow.Duration }, want: 2 * time.Minute,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, warn := runApplyEnvVars(tc)
+			if got := tc.get(cfg); got != tc.want {
+				t.Fatalf("%s = %v, want %v", tc.env, got, tc.want)
+			}
+			if warn != "" {
+				t.Fatalf("unexpected warning: %q", warn)
+			}
+		})
 	}
 }
 
-func TestApplyEnvVarsListenCLIWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.ListenAddr = "127.0.0.1:8888" // set by CLI
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{"listen": true}, fakeEnv(map[string]string{
-		"GONEMASTER_LISTEN": "0.0.0.0:9090",
-	}), &warn)
-	// CLI flag was set - env var must be ignored.
-	if cfg.ListenAddr != "127.0.0.1:8888" {
-		t.Fatalf("expected CLI value 127.0.0.1:8888, got %q", cfg.ListenAddr)
+// An unparseable value leaves the default in place and reports why.
+func TestApplyEnvVarsInvalidValueWarns(t *testing.T) {
+	for _, tc := range []envCase{
+		{
+			name: "worker count", env: "GONEMASTER_WORKER_COUNT", value: "not-a-number",
+			get:               func(c server.Config) any { return c.WorkerCount },
+			wantWarningPrefix: true,
+		},
+		{
+			name: "debug", env: "GONEMASTER_DEBUG", value: "maybe",
+			get: func(c server.Config) any { return c.Debug },
+		},
+		{
+			name: "db retention days", env: "GONEMASTER_DB_RETENTION_DAYS", value: "notanumber",
+			get: func(c server.Config) any { return c.Database.RetentionDays },
+		},
+		{
+			name: "db purge interval", env: "GONEMASTER_DB_PURGE_INTERVAL", value: "notanumber",
+			get: func(c server.Config) any { return c.Database.PurgeIntervalSeconds },
+		},
+		{
+			name: "public api rate limit enabled", env: "GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED", value: "maybe",
+			get: func(c server.Config) any { return c.PublicAPI.RateLimitEnabled },
+		},
+		{
+			name: "public api rate limit max", env: "GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX", value: "notanumber",
+			get: func(c server.Config) any { return c.PublicAPI.RateLimitMax },
+		},
+		{
+			name: "public api rate limit window", env: "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", value: "notaduration",
+			get: func(c server.Config) any { return c.PublicAPI.RateLimitWindow },
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, warn := runApplyEnvVars(tc)
+			want := tc.get(server.DefaultConfig())
+			if got := tc.get(cfg); got != want {
+				t.Fatalf("%s = %v, want the default %v to survive", tc.env, got, want)
+			}
+			if !strings.Contains(warn, tc.env) {
+				t.Fatalf("warning = %q, want it to name %s", warn, tc.env)
+			}
+			if tc.wantWarningPrefix && !strings.Contains(warn, "warning:") {
+				t.Fatalf("expected warning prefix, got %q", warn)
+			}
+		})
 	}
 }
 
-func TestApplyEnvVarsWorkerCount(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_WORKER_COUNT": "16",
-	}), &warn)
-	if cfg.WorkerCount != 16 {
-		t.Fatalf("expected WorkerCount=16, got %d", cfg.WorkerCount)
-	}
-	if warn.String() != "" {
-		t.Fatalf("unexpected warning: %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsWorkerCountInvalidIsWarning(t *testing.T) {
-	cfg := server.DefaultConfig()
-	original := cfg.WorkerCount
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_WORKER_COUNT": "not-a-number",
-	}), &warn)
-	// Value must be unchanged.
-	if cfg.WorkerCount != original {
-		t.Fatalf("expected WorkerCount unchanged (%d), got %d", original, cfg.WorkerCount)
-	}
-	// A warning must have been emitted.
-	if !strings.Contains(warn.String(), "GONEMASTER_WORKER_COUNT") {
-		t.Fatalf("expected warning mentioning GONEMASTER_WORKER_COUNT, got %q", warn.String())
-	}
-	if !strings.Contains(warn.String(), "warning:") {
-		t.Fatalf("expected warning prefix, got %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsWorkerCountCLIWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.WorkerCount = 8
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{"workers": true}, fakeEnv(map[string]string{
-		"GONEMASTER_WORKER_COUNT": "32",
-	}), &warn)
-	if cfg.WorkerCount != 8 {
-		t.Fatalf("expected CLI value 8, got %d", cfg.WorkerCount)
-	}
-}
-
-func TestApplyEnvVarsMaxConcurrentJobs(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_MAX_CONCURRENT_JOBS": "24",
-	}), &warn)
-	if cfg.MaxConcurrentJobs != 24 {
-		t.Fatalf("expected MaxConcurrentJobs=24, got %d", cfg.MaxConcurrentJobs)
-	}
-}
-
-func TestApplyEnvVarsDebugTrue(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DEBUG": "true",
-	}), &warn)
-	if !cfg.Debug {
-		t.Fatal("expected Debug=true")
-	}
-}
-
-func TestApplyEnvVarsDebugNumeric(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DEBUG": "1",
-	}), &warn)
-	if !cfg.Debug {
-		t.Fatal("expected Debug=true from '1'")
-	}
-}
-
-func TestApplyEnvVarsDebugFalse(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.Debug = true
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DEBUG": "false",
-	}), &warn)
-	if cfg.Debug {
-		t.Fatal("expected Debug=false")
-	}
-}
-
-func TestApplyEnvVarsDebugInvalidIsWarning(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DEBUG": "maybe",
-	}), &warn)
-	if cfg.Debug {
-		t.Fatal("expected Debug unchanged (false)")
-	}
-	if !strings.Contains(warn.String(), "GONEMASTER_DEBUG") {
-		t.Fatalf("expected warning mentioning GONEMASTER_DEBUG, got %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsDebugCLIWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.Debug = true // set by CLI
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{"debug": true}, fakeEnv(map[string]string{
-		"GONEMASTER_DEBUG": "false",
-	}), &warn)
-	if !cfg.Debug {
-		t.Fatal("expected CLI value true to win over env false")
-	}
-}
-
-func TestApplyEnvVarsMinLevel(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_MIN_LEVEL": "WARNING",
-	}), &warn)
-	if cfg.MinLevel != "WARNING" {
-		t.Fatalf("expected MinLevel=WARNING, got %q", cfg.MinLevel)
-	}
-}
-
-func TestApplyEnvVarsLogFormat(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_LOG_FORMAT": "json",
-	}), &warn)
-	if cfg.LogFormat != "json" {
-		t.Fatalf("expected LogFormat=json, got %q", cfg.LogFormat)
-	}
-	if warn.String() != "" {
-		t.Fatalf("unexpected warning: %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsLogLevel(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_LOG_LEVEL": "debug",
-	}), &warn)
-	if cfg.LogLevel != "debug" {
-		t.Fatalf("expected LogLevel=debug, got %q", cfg.LogLevel)
-	}
-}
-
-func TestApplyEnvVarsLogFormatCLIWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.LogFormat = "text" // set by CLI
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{"log-format": true}, fakeEnv(map[string]string{
-		"GONEMASTER_LOG_FORMAT": "json",
-	}), &warn)
-	if cfg.LogFormat != "text" {
-		t.Fatalf("expected CLI value text to win, got %q", cfg.LogFormat)
-	}
-}
-
-func TestApplyEnvVarsProfile(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_PROFILE": "/etc/gonemaster/profile.yaml",
-	}), &warn)
-	if cfg.ProfilePath != "/etc/gonemaster/profile.yaml" {
-		t.Fatalf("expected ProfilePath set, got %q", cfg.ProfilePath)
-	}
-}
-
-func TestApplyEnvVarsDBDriver(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DB_DRIVER": "sqlite",
-	}), &warn)
-	if cfg.Database.Driver != "sqlite" {
-		t.Fatalf("expected Database.Driver=sqlite, got %q", cfg.Database.Driver)
-	}
-}
-
-func TestApplyEnvVarsDBDSN(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DB_DSN": "/var/lib/gonemaster/db.sqlite",
-	}), &warn)
-	if cfg.Database.DSN != "/var/lib/gonemaster/db.sqlite" {
-		t.Fatalf("expected Database.DSN set, got %q", cfg.Database.DSN)
-	}
-}
-
-func TestApplyEnvVarsDBDriverCLIWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.Database.Driver = "sqlite" // set by CLI
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{"db-driver": true}, fakeEnv(map[string]string{
-		"GONEMASTER_DB_DRIVER": "postgres",
-	}), &warn)
-	if cfg.Database.Driver != "sqlite" {
-		t.Fatalf("expected CLI value sqlite to win, got %q", cfg.Database.Driver)
+// A flag the CLI set outranks the environment.
+func TestApplyEnvVarsCLIFlagWins(t *testing.T) {
+	for _, tc := range []envCase{
+		{
+			name: "listen", env: "GONEMASTER_LISTEN", value: "0.0.0.0:9090", flag: "listen",
+			pre: func(c *server.Config) { c.ListenAddr = "127.0.0.1:8888" },
+			get: func(c server.Config) any { return c.ListenAddr }, want: "127.0.0.1:8888",
+		},
+		{
+			name: "worker count", env: "GONEMASTER_WORKER_COUNT", value: "32", flag: "workers",
+			pre: func(c *server.Config) { c.WorkerCount = 8 },
+			get: func(c server.Config) any { return c.WorkerCount }, want: 8,
+		},
+		{
+			name: "debug", env: "GONEMASTER_DEBUG", value: "false", flag: "debug",
+			pre: func(c *server.Config) { c.Debug = true },
+			get: func(c server.Config) any { return c.Debug }, want: true,
+		},
+		{
+			name: "log format", env: "GONEMASTER_LOG_FORMAT", value: "json", flag: "log-format",
+			pre: func(c *server.Config) { c.LogFormat = "text" },
+			get: func(c server.Config) any { return c.LogFormat }, want: "text",
+		},
+		{
+			name: "db driver", env: "GONEMASTER_DB_DRIVER", value: "postgres", flag: "db-driver",
+			pre: func(c *server.Config) { c.Database.Driver = "sqlite" },
+			get: func(c server.Config) any { return c.Database.Driver }, want: "sqlite",
+		},
+		{
+			name: "db retention days", env: "GONEMASTER_DB_RETENTION_DAYS", value: "90", flag: "db-retention-days",
+			pre: func(c *server.Config) { c.Database.RetentionDays = 30 },
+			get: func(c server.Config) any { return c.Database.RetentionDays }, want: 30,
+		},
+		{
+			name: "db purge interval", env: "GONEMASTER_DB_PURGE_INTERVAL", value: "1800", flag: "db-purge-interval",
+			pre: func(c *server.Config) { c.Database.PurgeIntervalSeconds = 900 },
+			get: func(c server.Config) any { return c.Database.PurgeIntervalSeconds }, want: 900,
+		},
+		{
+			name: "public api rate limit enabled", env: "GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED", value: "false",
+			flag: "public-api-rate-limit-enabled",
+			pre:  func(c *server.Config) { c.PublicAPI.RateLimitEnabled = true },
+			get:  func(c server.Config) any { return c.PublicAPI.RateLimitEnabled }, want: true,
+		},
+		{
+			// No pre: the flag alone must protect the 10m default.
+			name: "public api rate limit window", env: "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", value: "30s",
+			flag: "public-api-rate-limit-window",
+			get:  func(c server.Config) any { return c.PublicAPI.RateLimitWindow.Duration }, want: 10 * time.Minute,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg, _ := runApplyEnvVars(tc)
+			if got := tc.get(cfg); got != tc.want {
+				t.Fatalf("%s = %v, want the CLI value %v", tc.env, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -254,7 +243,6 @@ func TestApplyEnvVarsEmptyEnvIsNoop(t *testing.T) {
 	cfg := server.DefaultConfig()
 	original := cfg.ListenAddr
 	var warn strings.Builder
-	// Empty env map - nothing should change.
 	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{}), &warn)
 	if cfg.ListenAddr != original {
 		t.Fatalf("expected ListenAddr unchanged, got %q", cfg.ListenAddr)
@@ -291,192 +279,5 @@ func TestApplyEnvVarsMultipleFieldsTogether(t *testing.T) {
 	}
 	if warn.String() != "" {
 		t.Fatalf("unexpected warning: %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsDBRetentionDays(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DB_RETENTION_DAYS": "90",
-	}), &warn)
-	if cfg.Database.RetentionDays != 90 {
-		t.Fatalf("expected RetentionDays=90, got %d", cfg.Database.RetentionDays)
-	}
-	if warn.String() != "" {
-		t.Fatalf("unexpected warning: %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsDBRetentionDaysInvalidIsWarned(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DB_RETENTION_DAYS": "notanumber",
-	}), &warn)
-	if cfg.Database.RetentionDays != 0 {
-		t.Fatalf("expected RetentionDays unchanged at 0, got %d", cfg.Database.RetentionDays)
-	}
-	if warn.String() == "" {
-		t.Fatal("expected warning for invalid retention_days, got none")
-	}
-}
-
-func TestApplyEnvVarsDBRetentionDaysCLIWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.Database.RetentionDays = 30
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{"db-retention-days": true}, fakeEnv(map[string]string{
-		"GONEMASTER_DB_RETENTION_DAYS": "90",
-	}), &warn)
-	if cfg.Database.RetentionDays != 30 {
-		t.Fatalf("expected CLI value 30 to win, got %d", cfg.Database.RetentionDays)
-	}
-}
-
-func TestApplyEnvVarsDBPurgeInterval(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DB_PURGE_INTERVAL": "1800",
-	}), &warn)
-	if cfg.Database.PurgeIntervalSeconds != 1800 {
-		t.Fatalf("expected PurgeIntervalSeconds=1800, got %d", cfg.Database.PurgeIntervalSeconds)
-	}
-	if warn.String() != "" {
-		t.Fatalf("unexpected warning: %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsDBPurgeIntervalInvalidIsWarned(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_DB_PURGE_INTERVAL": "notanumber",
-	}), &warn)
-	if cfg.Database.PurgeIntervalSeconds != 0 {
-		t.Fatalf("expected PurgeIntervalSeconds unchanged at 0, got %d", cfg.Database.PurgeIntervalSeconds)
-	}
-	if warn.String() == "" {
-		t.Fatal("expected warning for invalid purge interval, got none")
-	}
-}
-
-func TestApplyEnvVarsDBPurgeIntervalCLIWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.Database.PurgeIntervalSeconds = 900
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{"db-purge-interval": true}, fakeEnv(map[string]string{
-		"GONEMASTER_DB_PURGE_INTERVAL": "1800",
-	}), &warn)
-	if cfg.Database.PurgeIntervalSeconds != 900 {
-		t.Fatalf("expected CLI value 900 to win, got %d", cfg.Database.PurgeIntervalSeconds)
-	}
-}
-
-func TestApplyEnvVarsPublicAPIRateLimitEnabled(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED": "true",
-	}), &warn)
-	if !cfg.PublicAPI.RateLimitEnabled {
-		t.Fatal("expected RateLimitEnabled=true")
-	}
-	if warn.String() != "" {
-		t.Fatalf("unexpected warning: %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsPublicAPIRateLimitEnabledInvalidIsWarning(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED": "maybe",
-	}), &warn)
-	if cfg.PublicAPI.RateLimitEnabled {
-		t.Fatal("expected RateLimitEnabled unchanged (false)")
-	}
-	if !strings.Contains(warn.String(), "GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED") {
-		t.Fatalf("expected warning mentioning env var, got %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsPublicAPIRateLimitEnabledCLIWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.PublicAPI.RateLimitEnabled = true
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{"public-api-rate-limit-enabled": true}, fakeEnv(map[string]string{
-		"GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED": "false",
-	}), &warn)
-	if !cfg.PublicAPI.RateLimitEnabled {
-		t.Fatal("expected CLI value true to win")
-	}
-}
-
-func TestApplyEnvVarsPublicAPIRateLimitMax(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX": "50",
-	}), &warn)
-	if cfg.PublicAPI.RateLimitMax != 50 {
-		t.Fatalf("expected RateLimitMax=50, got %d", cfg.PublicAPI.RateLimitMax)
-	}
-}
-
-func TestApplyEnvVarsPublicAPIRateLimitMaxInvalidIsWarning(t *testing.T) {
-	cfg := server.DefaultConfig()
-	original := cfg.PublicAPI.RateLimitMax
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX": "notanumber",
-	}), &warn)
-	if cfg.PublicAPI.RateLimitMax != original {
-		t.Fatalf("expected RateLimitMax unchanged (%d), got %d", original, cfg.PublicAPI.RateLimitMax)
-	}
-	if !strings.Contains(warn.String(), "GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX") {
-		t.Fatalf("expected warning mentioning env var, got %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsPublicAPIRateLimitWindow(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW": "2m",
-	}), &warn)
-	if cfg.PublicAPI.RateLimitWindow.Duration != 2*time.Minute {
-		t.Fatalf("expected RateLimitWindow=2m, got %v", cfg.PublicAPI.RateLimitWindow)
-	}
-	if warn.String() != "" {
-		t.Fatalf("unexpected warning: %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsPublicAPIRateLimitWindowInvalidIsWarning(t *testing.T) {
-	cfg := server.DefaultConfig()
-	original := cfg.PublicAPI.RateLimitWindow
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{
-		"GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW": "notaduration",
-	}), &warn)
-	if cfg.PublicAPI.RateLimitWindow != original {
-		t.Fatalf("expected RateLimitWindow unchanged, got %v", cfg.PublicAPI.RateLimitWindow)
-	}
-	if !strings.Contains(warn.String(), "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW") {
-		t.Fatalf("expected warning mentioning env var, got %q", warn.String())
-	}
-}
-
-func TestApplyEnvVarsPublicAPIRateLimitWindowCLIWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	var warn strings.Builder
-	applyEnvVars(&cfg, map[string]bool{"public-api-rate-limit-window": true}, fakeEnv(map[string]string{
-		"GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW": "30s",
-	}), &warn)
-	// Default is 10m - env must be ignored.
-	if cfg.PublicAPI.RateLimitWindow.Duration != 10*time.Minute {
-		t.Fatalf("expected default 10m to be preserved, got %v", cfg.PublicAPI.RateLimitWindow)
 	}
 }

@@ -25,7 +25,7 @@ type fakeStore struct {
 	tags    map[int64][]string
 	cohorts []serverpkg.AnalysisCohort
 
-	// Queue + batch catalog used by the Phase 2 snapshot lifecycle tests.
+	// Queue + batch catalog used by the snapshot lifecycle tests.
 	// These are intentionally simple maps - the unit tests exercise
 	// controller logic, not storage semantics.
 	queuedJobs map[string][]string // batchID → []jobID (only in-flight jobs)

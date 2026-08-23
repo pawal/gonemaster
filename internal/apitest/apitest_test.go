@@ -300,3 +300,68 @@ func TestDiffResultsCarryTheGrades(t *testing.T) {
 		t.Fatal("results must carry the DiffPair entries")
 	}
 }
+
+func TestCaptureJSONDecodesAndAnswers(t *testing.T) {
+	var got struct {
+		Domain string `json:"domain"`
+	}
+	rec := apitest.CaptureJSON(t, &got, http.StatusCreated, `{"id":"job_1"}`)
+	client := &http.Client{Transport: rec}
+
+	resp, err := client.Post("http://example.test/api/v1/jobs", "application/json",
+		strings.NewReader(`{"domain":"example.com"}`))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+
+	if got.Domain != "example.com" {
+		t.Fatalf("decoded domain = %q, want example.com", got.Domain)
+	}
+	if rec.Method() != http.MethodPost {
+		t.Fatalf("Method = %q, want POST", rec.Method())
+	}
+	if rec.Path() != "/api/v1/jobs" {
+		t.Fatalf("Path = %q, want /api/v1/jobs", rec.Path())
+	}
+	if resp.StatusCode != http.StatusCreated {
+		t.Fatalf("status = %d, want 201", resp.StatusCode)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	if string(body) != `{"id":"job_1"}` {
+		t.Fatalf("body = %q", body)
+	}
+}
+
+func TestCaptureJSONSkipsTheDecodeWithoutATarget(t *testing.T) {
+	rec := apitest.CaptureJSON(t, nil, http.StatusOK, `{}`)
+	client := &http.Client{Transport: rec}
+
+	// A GET carries no body, which is what a nil target is for.
+	resp, err := client.Get("http://example.test/api/v1/whoami")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	defer resp.Body.Close()
+	if rec.Path() != "/api/v1/whoami" {
+		t.Fatalf("Path = %q", rec.Path())
+	}
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("status = %d", resp.StatusCode)
+	}
+}
+
+func TestCaptureJSONRecordsTheLastRequest(t *testing.T) {
+	rec := apitest.CaptureJSON(t, nil, http.StatusOK, `{}`)
+	client := &http.Client{Transport: rec}
+	for _, path := range []string{"/api/v1/first", "/api/v1/second"} {
+		resp, err := client.Get("http://example.test" + path)
+		if err != nil {
+			t.Fatalf("get %s: %v", path, err)
+		}
+		resp.Body.Close()
+	}
+	if rec.Path() != "/api/v1/second" {
+		t.Fatalf("Path = %q, want the last request", rec.Path())
+	}
+}

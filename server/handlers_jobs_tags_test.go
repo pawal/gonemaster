@@ -183,10 +183,10 @@ func TestBatchJobWithTags(t *testing.T) {
 	}
 }
 
-// TestBatchJobAcceptsSnapshotIntent pins the Phase 6 admin-UI flow: the
-// "Capture as cohort snapshot" checkbox is a flag on the POST /jobs/batch
-// payload, and the server stores it on the batch record so the projector
-// can gate snapshot accumulation on it.
+// TestBatchJobAcceptsSnapshotIntent pins the admin-UI flow: the "Capture as
+// cohort snapshot" checkbox is a flag on the POST /jobs/batch payload, and
+// the server stores it on the batch record so the projector can gate
+// snapshot accumulation on it.
 func TestBatchJobAcceptsSnapshotIntent(t *testing.T) {
 	srv := newTestServer(t)
 

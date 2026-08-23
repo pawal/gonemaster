@@ -418,10 +418,10 @@ func TestControllerRepairAllAndDisableChangeClearMaterializedRows(t *testing.T) 
 }
 
 // testAnalysisRunBatchID is the batch id every existing
-// testAnalysisRun-seeded run is scoped under. Phase 2's pollution gates
-// refuse to project a run with no batch_id or whose batch is not
-// snapshot-intent, so the default test helper pins a single intent-true
-// batch and buildBatches below wires it into the fakeStore.
+// testAnalysisRun-seeded run is scoped under. The pollution gates refuse to
+// project a run with no batch_id or whose batch is not snapshot-intent, so
+// the default test helper pins a single intent-true batch and buildBatches
+// below wires it into the fakeStore.
 const testAnalysisRunBatchID = "batch-test"
 
 func testAnalysisRun(id string, domainID int64, domain string, finishedAt time.Time, ipv4Address, ipv6Address string) serverpkg.Run {

@@ -17,9 +17,7 @@ func stubJSON(t *testing.T, body any) {
 	if err != nil {
 		t.Fatalf("marshal stub body: %v", err)
 	}
-	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
-		return apitest.JSONResponse(http.StatusOK, string(data)), nil
-	}))
+	apitest.StubClient(t, &newHTTPClient, apitest.CaptureJSON(t, nil, http.StatusOK, string(data)))
 }
 
 func TestListCommandsPrettyOutput(t *testing.T) {

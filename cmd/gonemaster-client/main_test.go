@@ -1,11 +1,9 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"strings"
 	"testing"
@@ -89,12 +87,7 @@ func TestJobsCreateSendsNormalizedDomain(t *testing.T) {
 		}
 		gotDomain = req.Domain
 		body := fmt.Sprintf(`{"id":"job_1","domain":"%s","status":"queued","created_at":"2026-02-03T00:00:00Z","progress":0}`, req.Domain)
-		resp := &http.Response{
-			StatusCode: http.StatusCreated,
-			Body:       io.NopCloser(bytes.NewBufferString(body)),
-			Header:     http.Header{"Content-Type": []string{"application/json"}},
-		}
-		return resp, nil
+		return apitest.JSONResponse(http.StatusCreated, body), nil
 	}))
 
 	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "jobs", "create", "--domain", "räksmörgås.se")
@@ -407,22 +400,17 @@ func TestJobsResultsFlagsAfterID(t *testing.T) {
 }
 
 func TestJobsPurgeSendsPostAndPrintsPretty(t *testing.T) {
-	var gotMethod, gotPath string
 	var gotBody map[string]int
-	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		gotMethod = r.Method
-		gotPath = r.URL.Path
-		_ = json.NewDecoder(r.Body).Decode(&gotBody)
-		return apitest.JSONResponse(http.StatusOK, `{"purged_jobs":42}`), nil
-	}))
+	rec := apitest.CaptureJSON(t, &gotBody, http.StatusOK, `{"purged_jobs":42}`)
+	apitest.StubClient(t, &newHTTPClient, rec)
 
 	res := clitest.Run(t, run, "--server", "http://example.test", "jobs", "purge", "--older-than", "90")
 	res.RequireCode(t, 0)
-	if gotMethod != http.MethodPost {
-		t.Fatalf("expected POST, got %s", gotMethod)
+	if rec.Method() != http.MethodPost {
+		t.Fatalf("expected POST, got %s", rec.Method())
 	}
-	if gotPath != "/api/v1/jobs/purge" {
-		t.Fatalf("expected /api/v1/jobs/purge, got %s", gotPath)
+	if rec.Path() != "/api/v1/jobs/purge" {
+		t.Fatalf("expected /api/v1/jobs/purge, got %s", rec.Path())
 	}
 	if gotBody["older_than_days"] != 90 {
 		t.Fatalf("expected older_than_days=90, got %v", gotBody)
@@ -431,9 +419,7 @@ func TestJobsPurgeSendsPostAndPrintsPretty(t *testing.T) {
 }
 
 func TestJobsPurgeJSONOutput(t *testing.T) {
-	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(_ *http.Request) (*http.Response, error) {
-		return apitest.JSONResponse(http.StatusOK, `{"purged_jobs":7}`), nil
-	}))
+	apitest.StubClient(t, &newHTTPClient, apitest.CaptureJSON(t, nil, http.StatusOK, `{"purged_jobs":7}`))
 
 	res := clitest.Run(t, run, "--server", "http://example.test", "--format", "json", "jobs", "purge", "--older-than", "30")
 	res.RequireCode(t, 0)
@@ -448,10 +434,7 @@ func TestJobsPurgeJSONOutput(t *testing.T) {
 
 func TestJobsPurgeZeroOlderThanSendsZero(t *testing.T) {
 	var gotBody map[string]int
-	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		_ = json.NewDecoder(r.Body).Decode(&gotBody)
-		return apitest.JSONResponse(http.StatusOK, `{"purged_jobs":0}`), nil
-	}))
+	apitest.StubClient(t, &newHTTPClient, apitest.CaptureJSON(t, &gotBody, http.StatusOK, `{"purged_jobs":0}`))
 
 	res := clitest.Run(t, run, "--server", "http://example.test", "jobs", "purge")
 	res.RequireCode(t, 0)

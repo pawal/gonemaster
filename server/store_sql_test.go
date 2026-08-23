@@ -2181,7 +2181,7 @@ func TestGetRunLazyScoreComputation(t *testing.T) {
 			t.Fatalf("GraduateJob: %v", err)
 		}
 
-		// NULL out score/grade to simulate pre-Phase-3 rows.
+		// NULL out score/grade to simulate rows stored before scoring existed.
 		ph := s.ph(1)
 		_, err := s.db.Exec("UPDATE runs SET score = NULL, grade = NULL WHERE id = "+ph, job.ID)
 		if err != nil {

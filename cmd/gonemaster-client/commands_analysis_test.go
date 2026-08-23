@@ -171,22 +171,16 @@ func TestTagsSummary(t *testing.T) {
 // ── tags add-domains ──────────────────────────────────────────────────────────
 
 func TestTagsAddDomains(t *testing.T) {
-	var gotPath string
-	var gotDomains []string
-	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
-		gotPath = r.URL.Path
-		var body map[string][]string
-		_ = json.NewDecoder(r.Body).Decode(&body)
-		gotDomains = body["domains"]
-		return apitest.JSONResponse(204, ""), nil
-	}))
+	var gotBody map[string][]string
+	rec := apitest.CaptureJSON(t, &gotBody, http.StatusNoContent, "")
+	apitest.StubClient(t, &newHTTPClient, rec)
 	res := clitest.Run(t, run, "tags", "add-domains", "tld", "example.com", "example.net")
 	res.RequireCode(t, 0)
-	if gotPath != "/api/v1/tags/tld/domains" {
-		t.Fatalf("expected /api/v1/tags/tld/domains, got %s", gotPath)
+	if rec.Path() != "/api/v1/tags/tld/domains" {
+		t.Fatalf("expected /api/v1/tags/tld/domains, got %s", rec.Path())
 	}
-	if len(gotDomains) != 2 {
-		t.Fatalf("expected 2 domains, got %v", gotDomains)
+	if len(gotBody["domains"]) != 2 {
+		t.Fatalf("expected 2 domains, got %v", gotBody["domains"])
 	}
 }
 

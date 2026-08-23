@@ -338,3 +338,50 @@ func StubFake(t testing.TB, seam *ClientFunc, opts Opts) {
 	t.Helper()
 	StubClient(t, seam, Transport(t, opts))
 }
+
+// Capture is a RoundTripper that decodes each request body into a caller
+// struct and answers with a canned JSON response, recording the method and
+// path of the last request it served.
+type Capture struct {
+	t      testing.TB
+	into   any
+	status int
+	body   string
+
+	mu     sync.Mutex
+	method string
+	path   string
+}
+
+// CaptureJSON returns a Capture that decodes each request body into into (a
+// pointer; nil skips the decode) and replies with status and body.
+func CaptureJSON(t testing.TB, into any, status int, body string) *Capture {
+	t.Helper()
+	return &Capture{t: t, into: into, status: status, body: body}
+}
+
+func (c *Capture) RoundTrip(r *http.Request) (*http.Response, error) {
+	c.mu.Lock()
+	c.method, c.path = r.Method, r.URL.Path
+	c.mu.Unlock()
+	if c.into != nil && r.Body != nil && r.Body != http.NoBody {
+		if err := json.NewDecoder(r.Body).Decode(c.into); err != nil {
+			c.t.Errorf("decode %s %s request: %v", r.Method, r.URL.Path, err)
+		}
+	}
+	return JSONResponse(c.status, c.body), nil
+}
+
+// Method returns the method of the last request served.
+func (c *Capture) Method() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.method
+}
+
+// Path returns the path of the last request served.
+func (c *Capture) Path() string {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.path
+}

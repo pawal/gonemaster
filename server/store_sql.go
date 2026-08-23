@@ -1405,8 +1405,8 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 }
 
 // lazyComputeScore loads entries for runID, computes the score, writes it back
-// to the DB, and sets Score/Grade on run. Used for pre-existing rows that have
-// a NULL score because they predate Phase 3.
+// to the DB, and sets Score/Grade on run. Used for rows stored before scoring
+// existed, which carry a NULL score.
 func (s *SQLJobStore) lazyComputeScore(run *Run) {
 	entries, err := s.loadEntries(run.ID)
 	if err != nil {

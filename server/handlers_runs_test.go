@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -39,8 +38,7 @@ func TestListRunsFilterByDomain(t *testing.T) {
 	makeGraduatedJob(t, srv, "beta.com", JobSucceeded)
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs?domain=alpha", nil)
-	var list RunList
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list := mustJSON[RunList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1, got %d", list.Total)
 	}
@@ -59,8 +57,7 @@ func TestListRunsFilterByTag(t *testing.T) {
 	}
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs?tag=tld", nil)
-	var list RunList
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list := mustJSON[RunList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1, got %d", list.Total)
 	}
@@ -81,8 +78,7 @@ func TestListRunsFilterByEventTag(t *testing.T) {
 
 	get := func(query string) RunList {
 		resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs"+query, nil)
-		var list RunList
-		_ = json.NewDecoder(resp.Body).Decode(&list)
+		list := mustJSON[RunList](t, resp, http.StatusOK)
 		return list
 	}
 
@@ -282,10 +278,11 @@ func TestListRunsFilterByGrade(t *testing.T) {
 // --- Score omission when ShowScoreAdmin=false --------------------------------
 
 func TestRunResultOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowScoreAdmin = false
-	cfg.ShowNameserverTimingsAdmin = false
-	srv := New(cfg)
+	srv := newTestServer(t,
+		withConfig(func(c *Config) {
+			c.ShowScoreAdmin = false
+			c.ShowNameserverTimingsAdmin = false
+		}))
 	now := time.Now().UTC()
 	job := Job{
 		ID:         newID("job"),
@@ -315,9 +312,7 @@ func TestRunResultOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
 }
 
 func TestListRunsOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowScoreAdmin = false
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.ShowScoreAdmin = false }))
 	makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs", nil)
@@ -331,9 +326,7 @@ func TestListRunsOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
 }
 
 func TestGetRunOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowScoreAdmin = false
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.ShowScoreAdmin = false }))
 	d := makeGraduatedJob(t, srv, "example.com", JobSucceeded)
 
 	resp := doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/runs/%s", d.LatestRunID), nil)

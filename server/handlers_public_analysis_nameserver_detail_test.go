@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -27,13 +26,7 @@ func TestNameserverDetailReadsFromViewTable(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisNameserverDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisNameserverDetail](t, resp, http.StatusOK)
 		if got.Nameserver != "ns1.example" {
 			t.Errorf("Nameserver = %q, want ns1.example", got.Nameserver)
 		}
@@ -64,13 +57,7 @@ func TestNameserverDetailCaseInsensitiveLookup(t *testing.T) {
 		f.seedEndpoint("run-a", "a.example", "NS1.MIXED.Example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.mixed.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("lower-case lookup: status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisNameserverDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisNameserverDetail](t, resp, http.StatusOK)
 		if got.Nameserver != "NS1.MIXED.Example" {
 			t.Errorf("Nameserver = %q, want %q (response should preserve the captured casing)", got.Nameserver, "NS1.MIXED.Example")
 		}
@@ -83,9 +70,7 @@ func TestNameserverDetailNotFoundOnUnknownName(t *testing.T) {
 		f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("nameservers/does-not-exist.example"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -95,9 +80,7 @@ func TestNameserverDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 		f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		// Snapshots can be rebuilt under the same slug, so the response must not be
 		// immutable; it revalidates via the ETag, which changes on rebuild.
 		if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {

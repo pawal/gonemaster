@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -21,13 +20,7 @@ func TestOverviewReadsFromViewTable(t *testing.T) {
 			"alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("overview"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisOverviewResponse
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisOverviewResponse](t, resp, http.StatusOK)
 		if got.Overview == nil {
 			t.Fatal("expected Overview payload")
 		}
@@ -61,13 +54,7 @@ func TestOverviewSurvivesFactWipe(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("overview"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisOverviewResponse
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisOverviewResponse](t, resp, http.StatusOK)
 		if got.Overview == nil || got.Overview.Totals.NameserverCount != 1 {
 			t.Errorf("Overview = %+v, want NameserverCount=1 sourced from view", got.Overview)
 		}
@@ -86,13 +73,7 @@ func TestSnapshotDetailExposesAggregateMap(t *testing.T) {
 
 		url := "/pub/api/v1/analysis/cohorts/tld/snapshots/" + f.snapshot.Slug
 		resp := getPublic(t, f.srv, url)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisSnapshotDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisSnapshotDetail](t, resp, http.StatusOK)
 		if _, ok := got.Aggregates[SnapshotAggregateOverviewV2]; !ok {
 			t.Errorf("Aggregates missing overview_v2 key: %+v", got.Aggregates)
 		}
@@ -130,13 +111,7 @@ func TestTrendsReadsFromOverviewView(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category="+FactCategorySeverity)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisTrendResponse
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisTrendResponse](t, resp, http.StatusOK)
 		if len(got.Points) != 2 {
 			t.Fatalf("expected 2 points (one per snapshot), got %d: %+v", len(got.Points), got.Points)
 		}

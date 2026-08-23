@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"os"
 	"testing"
 	"time"
 )
@@ -223,17 +222,7 @@ func TestLoadFileConfigDatabase(t *testing.T) {
 			"dsn": "/var/lib/gonemaster/db.sqlite"
 		}
 	}`
-	f, err := os.CreateTemp("", "gm-config-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	if _, err := f.WriteString(raw); err != nil {
-		t.Fatal(err)
-	}
-	_ = f.Close()
-
-	fileCfg, err := LoadFileConfig(f.Name())
+	fileCfg, err := LoadFileConfig(writeTempJSON(t, raw))
 	if err != nil {
 		t.Fatalf("LoadFileConfig: %v", err)
 	}
@@ -472,17 +461,7 @@ func TestLoadFileConfigPublicAPI(t *testing.T) {
 			"rate_limit_window": "2m"
 		}
 	}`
-	f, err := os.CreateTemp("", "gm-config-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	if _, err := f.WriteString(raw); err != nil {
-		t.Fatal(err)
-	}
-	_ = f.Close()
-
-	fileCfg, err := LoadFileConfig(f.Name())
+	fileCfg, err := LoadFileConfig(writeTempJSON(t, raw))
 	if err != nil {
 		t.Fatalf("LoadFileConfig: %v", err)
 	}
@@ -520,17 +499,7 @@ func TestLoadFileConfigRetentionDays(t *testing.T) {
 			"retention_days": 90
 		}
 	}`
-	f, err := os.CreateTemp("", "gm-config-*.json")
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer os.Remove(f.Name())
-	if _, err := f.WriteString(raw); err != nil {
-		t.Fatal(err)
-	}
-	_ = f.Close()
-
-	fileCfg, err := LoadFileConfig(f.Name())
+	fileCfg, err := LoadFileConfig(writeTempJSON(t, raw))
 	if err != nil {
 		t.Fatalf("LoadFileConfig: %v", err)
 	}

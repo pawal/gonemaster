@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -17,10 +16,7 @@ func postProfileDiff(t *testing.T, srv *Server, body string) (int, *httptest.Res
 
 func decodeDiff(t *testing.T, resp *httptest.ResponseRecorder) engineprofile.DiffResult {
 	t.Helper()
-	var result engineprofile.DiffResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode diff: %v", err)
-	}
+	result := mustJSON[engineprofile.DiffResult](t, resp, http.StatusOK)
 	return result
 }
 

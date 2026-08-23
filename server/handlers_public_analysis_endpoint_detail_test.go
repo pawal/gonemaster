@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -25,13 +24,7 @@ func TestEndpointDetailReadsFromViewTable(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.1"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisEndpointDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisEndpointDetail](t, resp, http.StatusOK)
 		if got.Nameserver != "ns1.example" {
 			t.Errorf("Nameserver = %q, want ns1.example", got.Nameserver)
 		}
@@ -61,9 +54,7 @@ func TestEndpointDetailAmbiguousWithoutNameserverFilter(t *testing.T) {
 		f.seedEndpoint("run-b", "b.example", "ns2.shared.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.1"))
-		if resp.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want 400 (ambiguous endpoint)", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusBadRequest)
 		if !strings.Contains(resp.Body.String(), "ambiguous_endpoint") {
 			t.Errorf("body = %q, want ambiguous_endpoint marker", resp.Body.String())
 		}
@@ -77,13 +68,7 @@ func TestEndpointDetailWithNameserverDisambiguator(t *testing.T) {
 		f.seedEndpoint("run-b", "b.example", "ns2.shared.example", "192.0.2.1", "ipv4", now, 64501, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.1?nameserver=ns2.shared.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisEndpointDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisEndpointDetail](t, resp, http.StatusOK)
 		if got.Nameserver != "ns2.shared.example" {
 			t.Errorf("Nameserver = %q, want ns2.shared.example", got.Nameserver)
 		}
@@ -99,9 +84,7 @@ func TestEndpointDetailNotFound(t *testing.T) {
 		f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("endpoints/198.51.100.99"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -111,9 +94,7 @@ func TestEndpointDetailCaseInsensitiveAddressLookup(t *testing.T) {
 		f.seedEndpoint("run-a", "a.example", "ns1.example", "2001:DB8::1", "ipv6", now, 64500, "2001:db8::/32")
 
 		resp := getPublic(t, f.srv, f.publicURL("endpoints/2001:db8::1"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusOK)
 	})
 }
 
@@ -123,9 +104,7 @@ func TestEndpointDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 		f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.1"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		// Snapshots can be rebuilt under the same slug, so the response must not be
 		// immutable; it revalidates via the ETag, which changes on rebuild.
 		if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {

@@ -174,9 +174,7 @@ func TestRequestIDMiddlewareGeneratesForUntrusted(t *testing.T) {
 }
 
 func TestRequestIDMiddlewareEchoesFromTrustedProxy(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.TrustedProxyCIDRs = []string{"127.0.0.1/32"}
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.TrustedProxyCIDRs = []string{"127.0.0.1/32"} }))
 	handler := srv.requestIDMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))

@@ -2,7 +2,6 @@ package server
 
 import (
 	"bytes"
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -86,10 +85,7 @@ func TestCreateJobWithProfileID(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID))
 	wantStatus(t, resp, http.StatusCreated)
 
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 	if created.ProfileID == nil || *created.ProfileID != profile.ID {
 		t.Fatalf("ProfileID: got %v, want %d", created.ProfileID, profile.ID)
 	}
@@ -120,10 +116,7 @@ func TestCreateJobUsesTagDefaultProfile(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tags":["tld"]}`)
 	wantStatus(t, resp, http.StatusCreated)
 
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 	if created.ProfileID == nil || *created.ProfileID != profile.ID {
 		t.Fatalf("ProfileID: got %v, want %d", created.ProfileID, profile.ID)
 	}
@@ -143,10 +136,7 @@ func TestCreateJobDoesNotUseTagDefaultWhenOverridesProvided(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tags":["tld"],"profile_overrides":{"net":{"ipv6":false}}}`)
 	wantStatus(t, resp, http.StatusCreated)
 
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 	if created.ProfileID != nil {
 		t.Fatalf("expected no ProfileID when overrides are provided, got %v", *created.ProfileID)
 	}
@@ -171,13 +161,7 @@ func TestCreateJobRejectsConflictingTagDefaultProfiles(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tags":["alpha","beta"]}`)
 	wantStatus(t, resp, http.StatusBadRequest)
 
-	var out ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&out); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if out.Error.Code != "ambiguous_profile" {
-		t.Fatalf("expected ambiguous_profile, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "ambiguous_profile")
 }
 
 // --- POST /api/v1/jobs/batch with tags ---------------------------------------
@@ -219,11 +203,7 @@ func TestBatchJobAcceptsSnapshotIntent(t *testing.T) {
 	// Default (flag omitted) must stay false so ad-hoc batches never
 	// become snapshot-intent by accident.
 	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"domains":["example.net"]}`)
-	wantStatus(t, resp, http.StatusAccepted)
-	batchResp = JobBatchResponse{}
-	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
-		t.Fatalf("decode default: %v", err)
-	}
+	batchResp = mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 	batch, _ = srv.store.GetBatch(batchResp.BatchID)
 	if batch.SnapshotIntent {
 		t.Fatal("SnapshotIntent defaulted to true without the request flag")
@@ -252,10 +232,7 @@ func TestBatchJobFromTag(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"from_tag":"tld"}`)
 	wantStatus(t, resp, http.StatusAccepted)
 
-	var batchResp JobBatchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	batchResp := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 	if len(batchResp.JobIDs) != 2 {
 		t.Fatalf("expected 2 jobs from tag, got %d", len(batchResp.JobIDs))
 	}
@@ -277,10 +254,7 @@ func TestBatchJobFromTagUsesDefaultProfile(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"from_tag":"tld"}`)
 	wantStatus(t, resp, http.StatusAccepted)
 
-	var batchResp JobBatchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	batchResp := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 	for _, jobID := range batchResp.JobIDs {
 		job, ok := srv.store.Get(jobID)
 		if !ok {
@@ -302,10 +276,7 @@ func TestBatchJobWithExplicitProfileID(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", fmt.Sprintf(`{"domains":["example.com","example.net"],"profile_id":%d}`, profile.ID))
 	wantStatus(t, resp, http.StatusAccepted)
 
-	var batchResp JobBatchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	batchResp := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 	for _, jobID := range batchResp.JobIDs {
 		job, ok := srv.store.Get(jobID)
 		if !ok {

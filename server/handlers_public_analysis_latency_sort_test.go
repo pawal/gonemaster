@@ -179,8 +179,6 @@ func TestPublicAnalysisASNsSortByLatency(t *testing.T) {
 func TestParseAnalysisListFilterMinLatencySamples(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		resp := getPublic(t, f.srv, f.publicURL("nameservers?min_latency_samples=-1"))
-		if resp.Code != http.StatusBadRequest {
-			t.Fatalf("negative min_latency_samples = %d, want 400", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusBadRequest)
 	})
 }

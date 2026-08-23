@@ -75,9 +75,7 @@ func (s *spyAnalysisController) CaptureCompletedSnapshots(_ context.Context) err
 }
 
 func TestServerStartTriggersAnalysisRepair(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.WorkerCount = 1
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.WorkerCount = 1 }))
 	spy := newSpyAnalysisController()
 	srv.SetAnalysisController(spy)
 

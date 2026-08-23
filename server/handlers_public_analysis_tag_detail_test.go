@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -28,13 +27,7 @@ func TestTagDetailReadsFromViewTable(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("tags/DS07_NOT_SIGNED"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisTagDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisTagDetail](t, resp, http.StatusOK)
 		if got.Tag != "DS07_NOT_SIGNED" {
 			t.Errorf("Tag = %q, want DS07_NOT_SIGNED", got.Tag)
 		}
@@ -58,9 +51,7 @@ func TestTagDetail404OnUnknownTag(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("tags/UNKNOWN_TAG"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -73,9 +64,7 @@ func TestTagDetailFloorExcludesInfoTags(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("tags/MODULE_OK"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404 (INFO tags must not get a detail page)", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -91,13 +80,9 @@ func TestTagDetailFloorHonorsConfigOverride(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("tags/B01_OK"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("NOTICE tag with floor=WARNING: status = %d, want 404", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 		resp = getPublic(t, f.srv, f.publicURL("tags/DS07_NOT_SIGNED"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("ERROR tag with floor=WARNING: status = %d, want 200", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusOK)
 	})
 }
 
@@ -111,13 +96,7 @@ func TestTagListingReadsFromViewTable(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("tags"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisListResponse[PublicAnalysisTagView]
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisTagView]](t, resp, http.StatusOK)
 		tags := map[string]PublicAnalysisTagView{}
 		for _, v := range got.Items {
 			tags[v.Tag] = v
@@ -143,13 +122,7 @@ func TestTagListingMinLevelTightens(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("tags?min_level=WARNING"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d", resp.Code)
-		}
-		var got PublicAnalysisListResponse[PublicAnalysisTagView]
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisTagView]](t, resp, http.StatusOK)
 		tags := map[string]PublicAnalysisTagView{}
 		for _, v := range got.Items {
 			tags[v.Tag] = v
@@ -171,9 +144,7 @@ func TestTagDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("tags/DS07_NOT_SIGNED"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		// Snapshots can be rebuilt under the same slug, so the response must not be
 		// immutable; it revalidates via the ETag, which changes on rebuild.
 		if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {

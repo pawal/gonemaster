@@ -32,10 +32,7 @@ func TestPublicCreateJobReturnsDomainStatusProgress(t *testing.T) {
 
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
 
-	var view PublicJobView
-	if err := json.NewDecoder(resp.Body).Decode(&view); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	view := mustJSON[PublicJobView](t, resp, http.StatusCreated)
 	if view.Domain != "example.com" {
 		t.Fatalf("domain: got %q, want %q", view.Domain, "example.com")
 	}
@@ -102,9 +99,7 @@ func TestPublicCreateJobCSRFAcceptsHTTPSOriginViaTrustedProxy(t *testing.T) {
 	// Caddy/nginx terminate TLS upstream; gonemaster sees plain HTTP.
 	// Without honoring X-Forwarded-Proto, port 443 (Origin) won't match
 	// port 80 (assumed scheme=http) and the CSRF check would 403.
-	cfg := DefaultConfig()
-	cfg.TrustedProxyCIDRs = []string{"127.0.0.1/32"}
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.TrustedProxyCIDRs = []string{"127.0.0.1/32"} }))
 
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withHost("gonemaster.evilbit.de"), withRemoteAddr("127.0.0.1:54321"), withOrigin("https://gonemaster.evilbit.de"), withHeader("X-Forwarded-Proto", "https"))
 
@@ -214,10 +209,7 @@ func TestPublicGetJobReturnsPublicIDNotUUID(t *testing.T) {
 
 	// Create via public API.
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
-	var created PublicJobView
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode create: %v", err)
-	}
+	created := mustJSON[PublicJobView](t, resp, http.StatusCreated)
 
 	// Get via public ID.
 	resp = doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID, nil)
@@ -331,10 +323,7 @@ func TestPublicGetResultNoResultYetReturns404(t *testing.T) {
 
 	// Create a job but do not store a result for it.
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
-	var created PublicJobView
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	created := mustJSON[PublicJobView](t, resp, http.StatusCreated)
 
 	resp = doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
 
@@ -450,10 +439,11 @@ func TestPublicAPIEndpointsUnreachableViaInternalPrefix(t *testing.T) {
 }
 
 func TestPublicResultOmitsScoreWhenPublicScoringDisabled(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowScorePublic = false
-	cfg.ShowNameserverTimingsPublic = false
-	srv := New(cfg)
+	srv := newTestServer(t,
+		withConfig(func(c *Config) {
+			c.ShowScorePublic = false
+			c.ShowNameserverTimingsPublic = false
+		}))
 
 	job := Job{
 		ID:        newID("job"),

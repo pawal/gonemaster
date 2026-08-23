@@ -3,6 +3,7 @@ package server
 import (
 	"net/http"
 	"net/http/httptest"
+	"net/netip"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -106,79 +107,83 @@ func TestRateLimiterCleanupKeepsActiveEntries(t *testing.T) {
 
 // --- clientIP tests ---
 
-func TestClientIPFromRemoteAddr(t *testing.T) {
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.RemoteAddr = "192.0.2.1:1234"
-	if got := clientIP(r, nil); got != "192.0.2.1" {
-		t.Fatalf("expected 192.0.2.1, got %q", got)
-	}
-}
-
-func TestClientIPIgnoresXForwardedForFromUntrustedRemote(t *testing.T) {
-	// No trusted proxies configured: XFF must be ignored, even if set.
-	// Spoofing XFF should not change the attribution.
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.RemoteAddr = "203.0.113.1:1234"
-	r.Header.Set("X-Forwarded-For", "1.2.3.4")
-	if got := clientIP(r, nil); got != "203.0.113.1" {
-		t.Fatalf("expected RemoteAddr 203.0.113.1, got %q", got)
-	}
-}
-
-func TestClientIPHonorsXForwardedForFromTrustedRemote(t *testing.T) {
-	trusted := parseTrustedProxies([]string{"10.0.0.0/8"})
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.RemoteAddr = "10.0.0.1:1234"
-	r.Header.Set("X-Forwarded-For", "203.0.113.5")
-	if got := clientIP(r, trusted); got != "203.0.113.5" {
-		t.Fatalf("expected 203.0.113.5, got %q", got)
-	}
-}
-
-func TestClientIPWalksRightToLeftSkippingTrustedHops(t *testing.T) {
-	trusted := parseTrustedProxies([]string{"10.0.0.0/8", "192.168.0.0/16"})
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.RemoteAddr = "192.168.1.1:1234"
-	// client → proxy1(10.0.0.5) → proxy2(192.168.1.1).
-	// Right-to-left: skip 10.0.0.5 (trusted), return 203.0.113.7 (untrusted).
-	r.Header.Set("X-Forwarded-For", "203.0.113.7, 10.0.0.5")
-	if got := clientIP(r, trusted); got != "203.0.113.7" {
-		t.Fatalf("expected 203.0.113.7, got %q", got)
-	}
-}
-
-func TestClientIPRejectsSpoofedXForwardedForViaTrustedRemote(t *testing.T) {
-	// Even when remote is trusted, an entirely-untrusted XFF chain is taken
-	// at face value: the right-most untrusted hop wins. This documents the
-	// "spoof from outside the trust boundary" expectation.
-	trusted := parseTrustedProxies([]string{"10.0.0.0/8"})
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.RemoteAddr = "10.0.0.1:1234"
-	// Attacker behind a trusted proxy sets XFF; rightmost untrusted hop is
-	// the value just before the trusted proxy in the real chain - here all
-	// hops are untrusted so the rightmost wins.
-	r.Header.Set("X-Forwarded-For", "198.51.100.10, 203.0.113.20")
-	if got := clientIP(r, trusted); got != "203.0.113.20" {
-		t.Fatalf("expected rightmost untrusted hop 203.0.113.20, got %q", got)
-	}
-}
-
-func TestClientIPRemoteAddrTrustedButNoXFFFallsBackToRemote(t *testing.T) {
-	trusted := parseTrustedProxies([]string{"10.0.0.0/8"})
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.RemoteAddr = "10.0.0.1:1234"
-	if got := clientIP(r, trusted); got != "10.0.0.1" {
-		t.Fatalf("expected 10.0.0.1, got %q", got)
-	}
-}
-
-func TestClientIPHandlesV4MappedV6InTrustedCIDR(t *testing.T) {
-	trusted := parseTrustedProxies([]string{"10.0.0.0/8"})
-	r := httptest.NewRequest(http.MethodGet, "/", nil)
-	r.RemoteAddr = "[::ffff:10.0.0.1]:1234"
-	r.Header.Set("X-Forwarded-For", "203.0.113.9")
-	if got := clientIP(r, trusted); got != "203.0.113.9" {
-		t.Fatalf("expected 203.0.113.9, got %q", got)
+func TestClientIP(t *testing.T) {
+	for _, tc := range []struct {
+		name       string
+		trusted    []string
+		remoteAddr string
+		xff        string
+		want       string
+	}{
+		{
+			name:       "remote addr only",
+			remoteAddr: "192.0.2.1:1234",
+			want:       "192.0.2.1",
+		},
+		{
+			// No trusted proxies configured: XFF must be ignored, even if
+			// set. Spoofing XFF should not change the attribution.
+			name:       "untrusted remote ignores xff",
+			remoteAddr: "203.0.113.1:1234",
+			xff:        "1.2.3.4",
+			want:       "203.0.113.1",
+		},
+		{
+			name:       "trusted remote honors xff",
+			trusted:    []string{"10.0.0.0/8"},
+			remoteAddr: "10.0.0.1:1234",
+			xff:        "203.0.113.5",
+			want:       "203.0.113.5",
+		},
+		{
+			// client -> proxy1(10.0.0.5) -> proxy2(192.168.1.1).
+			// Right-to-left: skip 10.0.0.5 (trusted), return 203.0.113.7.
+			name:       "walks right to left skipping trusted hops",
+			trusted:    []string{"10.0.0.0/8", "192.168.0.0/16"},
+			remoteAddr: "192.168.1.1:1234",
+			xff:        "203.0.113.7, 10.0.0.5",
+			want:       "203.0.113.7",
+		},
+		{
+			// Even when remote is trusted, an entirely-untrusted XFF chain is
+			// taken at face value: the right-most untrusted hop wins. This
+			// documents the "spoof from outside the trust boundary"
+			// expectation - an attacker behind a trusted proxy sets XFF, and
+			// with every hop untrusted the rightmost one wins.
+			name:       "all-untrusted xff chain takes the rightmost hop",
+			trusted:    []string{"10.0.0.0/8"},
+			remoteAddr: "10.0.0.1:1234",
+			xff:        "198.51.100.10, 203.0.113.20",
+			want:       "203.0.113.20",
+		},
+		{
+			name:       "trusted remote without xff falls back to remote",
+			trusted:    []string{"10.0.0.0/8"},
+			remoteAddr: "10.0.0.1:1234",
+			want:       "10.0.0.1",
+		},
+		{
+			name:       "v4-mapped v6 remote matches a v4 trusted cidr",
+			trusted:    []string{"10.0.0.0/8"},
+			remoteAddr: "[::ffff:10.0.0.1]:1234",
+			xff:        "203.0.113.9",
+			want:       "203.0.113.9",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var trusted []netip.Prefix
+			if tc.trusted != nil {
+				trusted = parseTrustedProxies(tc.trusted)
+			}
+			r := httptest.NewRequest(http.MethodGet, "/", nil)
+			r.RemoteAddr = tc.remoteAddr
+			if tc.xff != "" {
+				r.Header.Set("X-Forwarded-For", tc.xff)
+			}
+			if got := clientIP(r, trusted); got != tc.want {
+				t.Fatalf("clientIP = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -276,9 +281,8 @@ func TestRateLimitMiddlewareIgnoresSpoofedXForwardedFor(t *testing.T) {
 // --- End-to-end through the server ---
 
 func TestServerRateLimitDisabledByDefault(t *testing.T) {
-	cfg := DefaultConfig()
 	// Rate limiting is off by default - repeated POSTs must all pass.
-	srv := New(cfg)
+	srv := newTestServer(t)
 	for range 5 {
 		resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withRemoteAddr("1.2.3.4:1234"))
 		wantStatus(t, resp, http.StatusCreated)
@@ -286,11 +290,12 @@ func TestServerRateLimitDisabledByDefault(t *testing.T) {
 }
 
 func TestServerRateLimitEnabledBlocks429(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.PublicAPI.RateLimitEnabled = true
-	cfg.PublicAPI.RateLimitMax = 2
-	cfg.PublicAPI.RateLimitWindow = Duration{time.Minute}
-	srv := New(cfg)
+	srv := newTestServer(t,
+		withPublicAPI(func(c *PublicAPIConfig) {
+			c.RateLimitEnabled = true
+			c.RateLimitMax = 2
+			c.RateLimitWindow = Duration{time.Minute}
+		}))
 
 	makePost := func() int {
 		resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withRemoteAddr("1.2.3.4:1234"))
@@ -309,11 +314,12 @@ func TestServerRateLimitEnabledBlocks429(t *testing.T) {
 }
 
 func TestServerRateLimitDoesNotApplyToGET(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.PublicAPI.RateLimitEnabled = true
-	cfg.PublicAPI.RateLimitMax = 0 // blocks all POSTs immediately
-	cfg.PublicAPI.RateLimitWindow = Duration{time.Minute}
-	srv := New(cfg)
+	srv := newTestServer(t,
+		withPublicAPI(func(c *PublicAPIConfig) {
+			c.RateLimitEnabled = true
+			c.RateLimitMax = 0 // blocks all POSTs immediately
+			c.RateLimitWindow = Duration{time.Minute}
+		}))
 
 	// Seed a job directly so there's a public ID to look up.
 	job, err := srv.store.Create(Job{ID: newID("job"), Domain: "example.com", Status: JobQueued})

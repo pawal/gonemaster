@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 )
@@ -13,10 +12,7 @@ func TestGetSettings(t *testing.T) {
 
 	wantStatus(t, resp, http.StatusOK)
 
-	var settings map[string]settingEntry
-	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	settings := mustJSON[map[string]settingEntry](t, resp, http.StatusOK)
 
 	// Check a few known settings exist.
 	for _, key := range []string{"worker_count", "min_level", "listen_addr", "show_nameserver_timings_admin", "show_nameserver_timings_public"} {
@@ -50,10 +46,7 @@ func TestGetSettingsWithConfigSources(t *testing.T) {
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 
-	var settings map[string]settingEntry
-	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	settings := mustJSON[map[string]settingEntry](t, resp, http.StatusOK)
 
 	if settings["worker_count"].Source != SourceCLIFlag {
 		t.Fatalf("worker_count source: got %q, want %q", settings["worker_count"].Source, SourceCLIFlag)
@@ -71,10 +64,7 @@ func TestGetSettingsDatabaseOverride(t *testing.T) {
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 
-	var settings map[string]settingEntry
-	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	settings := mustJSON[map[string]settingEntry](t, resp, http.StatusOK)
 
 	if settings["worker_count"].Source != SourceDatabase {
 		t.Fatalf("source: got %q, want %q", settings["worker_count"].Source, SourceDatabase)
@@ -143,13 +133,7 @@ func TestPutSettingsReadonlyRejected(t *testing.T) {
 
 	wantStatus(t, resp, http.StatusBadRequest)
 
-	var errResp ErrorResponse
-	if err := json.NewDecoder(resp.Body).Decode(&errResp); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if errResp.Error.Code != "readonly_setting" {
-		t.Fatalf("error code: got %q", errResp.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "readonly_setting")
 }
 
 func TestPutSettingsInvalidBody(t *testing.T) {
@@ -297,9 +281,7 @@ func TestApplyDatabaseSettingsIgnoresInvalidValues(t *testing.T) {
 }
 
 func TestPutSettingsResizesWorkerPool(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.WorkerCount = 2
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.WorkerCount = 2 }))
 	srv.Start()
 	defer srv.Stop(t.Context())
 
@@ -374,10 +356,7 @@ func TestGetSettingsIncludesHotCacheTTL(t *testing.T) {
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 
-	var settings map[string]settingEntry
-	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	settings := mustJSON[map[string]settingEntry](t, resp, http.StatusOK)
 
 	entry, ok := settings["cross_job_hot_cache_ttl_seconds"]
 	if !ok {
@@ -418,10 +397,7 @@ func TestGetSettingsIncludesPurgeInterval(t *testing.T) {
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
 
-	var settings map[string]settingEntry
-	if err := json.NewDecoder(resp.Body).Decode(&settings); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	settings := mustJSON[map[string]settingEntry](t, resp, http.StatusOK)
 
 	entry, ok := settings["purge_interval_seconds"]
 	if !ok {
@@ -448,10 +424,7 @@ func TestPublicInfoEndpointDefault(t *testing.T) {
 
 	wantStatus(t, resp, http.StatusOK)
 
-	var info publicInfoResponse
-	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	info := mustJSON[publicInfoResponse](t, resp, http.StatusOK)
 	if !info.ShowScorePublic {
 		t.Fatal("expected show_score_public=true by default")
 	}
@@ -461,19 +434,17 @@ func TestPublicInfoEndpointDefault(t *testing.T) {
 }
 
 func TestPublicInfoEndpointReflectsConfig(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowScorePublic = false
-	cfg.ShowNameserverTimingsPublic = false
-	srv := New(cfg)
+	srv := newTestServer(t,
+		withConfig(func(c *Config) {
+			c.ShowScorePublic = false
+			c.ShowNameserverTimingsPublic = false
+		}))
 
 	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/info", nil)
 
 	wantStatus(t, resp, http.StatusOK)
 
-	var info publicInfoResponse
-	if err := json.NewDecoder(resp.Body).Decode(&info); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	info := mustJSON[publicInfoResponse](t, resp, http.StatusOK)
 	if info.ShowScorePublic {
 		t.Fatal("expected show_score_public=false when disabled in config")
 	}
@@ -489,10 +460,7 @@ func TestFeaturesEndpointDefault(t *testing.T) {
 
 	wantStatus(t, resp, http.StatusOK)
 
-	var feat featuresResponse
-	if err := json.NewDecoder(resp.Body).Decode(&feat); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	feat := mustJSON[featuresResponse](t, resp, http.StatusOK)
 	if !feat.ShowScoreAdmin {
 		t.Fatal("expected show_score_admin=true by default")
 	}
@@ -502,19 +470,17 @@ func TestFeaturesEndpointDefault(t *testing.T) {
 }
 
 func TestFeaturesEndpointReflectsConfig(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowScoreAdmin = false
-	cfg.ShowNameserverTimingsAdmin = false
-	srv := New(cfg)
+	srv := newTestServer(t,
+		withConfig(func(c *Config) {
+			c.ShowScoreAdmin = false
+			c.ShowNameserverTimingsAdmin = false
+		}))
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/features", nil)
 
 	wantStatus(t, resp, http.StatusOK)
 
-	var feat featuresResponse
-	if err := json.NewDecoder(resp.Body).Decode(&feat); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	feat := mustJSON[featuresResponse](t, resp, http.StatusOK)
 	if feat.ShowScoreAdmin {
 		t.Fatal("expected show_score_admin=false when disabled in config")
 	}
@@ -539,10 +505,7 @@ func TestPutSettingsAllowNonGlobalTargets(t *testing.T) {
 	}
 
 	getResp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
-	var settings map[string]settingEntry
-	if err := json.NewDecoder(getResp.Body).Decode(&settings); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	settings := mustJSON[map[string]settingEntry](t, getResp, http.StatusOK)
 	if _, ok := settings["allow_non_global_targets"]; !ok {
 		t.Fatal("missing setting allow_non_global_targets")
 	}

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -168,13 +167,7 @@ func TestPublicNameserverListSurfacesLatency(t *testing.T) {
 		f.refreshSnapshotViews(f.batchID)
 
 		resp := getPublic(t, f.srv, f.publicURL("nameservers"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisListResponse[PublicAnalysisNameserverView]
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisNameserverView]](t, resp, http.StatusOK)
 		var ns1 *PublicAnalysisNameserverView
 		for i := range got.Items {
 			if got.Items[i].Nameserver == "ns1.example" {
@@ -210,13 +203,7 @@ func TestPublicNameserverDetailSurfacesLatency(t *testing.T) {
 		f.refreshSnapshotViews(f.batchID)
 
 		resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisNameserverDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisNameserverDetail](t, resp, http.StatusOK)
 		if got.LatencyP50MS == nil || *got.LatencyP50MS != 22 {
 			t.Errorf("detail latency_p50_ms = %v, want 22", got.LatencyP50MS)
 		}

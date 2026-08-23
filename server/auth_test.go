@@ -115,9 +115,7 @@ func TestAuthMiddlewareTokenMode(t *testing.T) {
 	tok := "gm_mwtest"
 	s := tokenServer(t, tok)
 
-	if rec := authGet(t, s, "/api/v1/locales", nil); rec.Code != http.StatusUnauthorized {
-		t.Fatalf("missing token: want 401, got %d", rec.Code)
-	}
+	wantStatus(t, authGet(t, s, "/api/v1/locales", nil), http.StatusUnauthorized)
 	bearer := func(r *http.Request) { r.Header.Set("Authorization", "Bearer "+tok) }
 	if rec := authGet(t, s, "/api/v1/locales", bearer); rec.Code == http.StatusUnauthorized {
 		t.Fatal("valid bearer should not be rejected")
@@ -127,15 +125,10 @@ func TestAuthMiddlewareTokenMode(t *testing.T) {
 		t.Fatal("valid cookie should not be rejected")
 	}
 	wrong := func(r *http.Request) { r.Header.Set("Authorization", "Bearer nope") }
-	if rec := authGet(t, s, "/api/v1/locales", wrong); rec.Code != http.StatusUnauthorized {
-		t.Fatalf("wrong token: want 401, got %d", rec.Code)
-	}
-	if rec := authGet(t, s, "/api/v1/healthz", nil); rec.Code != http.StatusOK {
-		t.Fatalf("healthz must stay exempt: want 200, got %d", rec.Code)
-	}
-	if rec := authGet(t, s, "/api/v1/metrics", nil); rec.Code != http.StatusUnauthorized {
-		t.Fatalf("metrics must be gated: want 401, got %d", rec.Code)
-	}
+	wantStatus(t, authGet(t, s, "/api/v1/locales", wrong), http.StatusUnauthorized)
+	// healthz stays exempt, metrics stays gated.
+	wantStatus(t, authGet(t, s, "/api/v1/healthz", nil), http.StatusOK)
+	wantStatus(t, authGet(t, s, "/api/v1/metrics", nil), http.StatusUnauthorized)
 }
 
 func TestWhoamiOpenMode(t *testing.T) {

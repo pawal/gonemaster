@@ -53,9 +53,7 @@ func TestPublicCreateJobRejectsPrivateUndelegatedIP(t *testing.T) {
 }
 
 func TestPublicCreateJobAllowsPrivateUndelegatedIPWhenEnabled(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.PublicAPI.AllowPrivateUndelegatedIP = true
-	srv := New(cfg)
+	srv := newTestServer(t, withPublicAPI(func(c *PublicAPIConfig) { c.AllowPrivateUndelegatedIP = true }))
 
 	body := `{"domain":"example.com","nameservers":[{"ns":"ns1.internal.example","ip":"10.0.0.1"}]}`
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)

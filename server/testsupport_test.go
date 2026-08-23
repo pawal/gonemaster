@@ -7,6 +7,8 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
@@ -513,4 +515,15 @@ func seedGraduatedRun(t testing.TB, store JobStore, spec runSpec) Job {
 // the test does not care about findings.
 func systemStartEntry() []engine.LogEntry {
 	return []engine.LogEntry{{Timestamp: 1.0, Module: "System", Tag: "MODULE_START", Level: "INFO"}}
+}
+
+// writeTempJSON writes raw to a temp file and returns its path, for the tests
+// that load a config from disk.
+func writeTempJSON(t testing.TB, raw string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
+		t.Fatalf("write temp json: %v", err)
+	}
+	return path
 }

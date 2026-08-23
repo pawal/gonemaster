@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -17,13 +16,7 @@ func TestPublicAnalysisOverviewIncludesOverviewV2(t *testing.T) {
 		f.seedEndpoint("run-b", "b.example", "ns2.example", "192.0.2.2", "ipv4", now.Add(time.Minute), 64501, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("overview"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisOverviewResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisOverviewResponse](t, resp, http.StatusOK)
 		if payload.Overview == nil {
 			t.Fatal("expected Overview payload, got nil")
 		}
@@ -59,13 +52,7 @@ func TestPublicAnalysisOverviewIncludesOverviewV2(t *testing.T) {
 func TestPublicAnalysisOverviewWithoutSnapshotHasNoOverview(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		resp := getPublic(t, f.srv, f.publicURL("overview"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisOverviewResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisOverviewResponse](t, resp, http.StatusOK)
 		if payload.Overview != nil {
 			t.Fatalf("Overview should be nil when no aggregate row exists, got %+v", payload.Overview)
 		}
@@ -79,9 +66,7 @@ func TestPublicAnalysisCacheHeadersExplicitSnapshot(t *testing.T) {
 		f.seedEndpoint("run-a", "a.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("nameservers"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		// Snapshots can be rebuilt under the same slug, so the response must not be
 		// immutable; it revalidates via the ETag, which changes on rebuild.
 		cc := resp.Header().Get("Cache-Control")
@@ -136,13 +121,7 @@ func TestPublicAnalysisNameserversReadsFromViewTable(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("nameservers"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisListResponse[PublicAnalysisNameserverView]
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisNameserverView]](t, resp, http.StatusOK)
 		if got.Total != 1 {
 			t.Fatalf("total = %d, want 1 (data must come from view table, not facts)", got.Total)
 		}

@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -57,8 +56,7 @@ func TestListEntriesFilterByRun(t *testing.T) {
 	})
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?run="+d1.LatestRunID, nil)
-	var list EntryList
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list := mustJSON[EntryList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1, got %d", list.Total)
 	}
@@ -76,8 +74,7 @@ func TestListEntriesFilterByLevel(t *testing.T) {
 	})
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?level=WARNING", nil)
-	var list EntryList
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list := mustJSON[EntryList](t, resp, http.StatusOK)
 	if list.Total != 2 {
 		t.Fatalf("expected total=2, got %d", list.Total)
 	}
@@ -91,8 +88,7 @@ func TestListEntriesFilterByModule(t *testing.T) {
 	})
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?module=DNSSEC", nil)
-	var list EntryList
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list := mustJSON[EntryList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1, got %d", list.Total)
 	}
@@ -112,8 +108,7 @@ func TestListEntriesFilterByTag(t *testing.T) {
 	}
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?tag=tld", nil)
-	var list EntryList
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list := mustJSON[EntryList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1, got %d", list.Total)
 	}
@@ -138,8 +133,7 @@ func TestListEntriesLatestOnly(t *testing.T) {
 	createAndGraduate(t, srv.store, job2, []engine.LogEntry{{Module: "New", Level: "WARNING"}})
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?latest=true", nil)
-	var list EntryList
-	_ = json.NewDecoder(resp.Body).Decode(&list)
+	list := mustJSON[EntryList](t, resp, http.StatusOK)
 	if list.Total != 1 {
 		t.Fatalf("expected total=1 with latest=true, got %d", list.Total)
 	}

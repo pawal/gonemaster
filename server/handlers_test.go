@@ -82,9 +82,7 @@ func TestCreateAndGetJob(t *testing.T) {
 }
 
 func TestGetJobResultOmitsNameserverTimingsWhenAdminDisplayDisabled(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowNameserverTimingsAdmin = false
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.ShowNameserverTimingsAdmin = false }))
 
 	now := time.Now().UTC()
 	job := Job{
@@ -103,10 +101,7 @@ func TestGetJobResultOmitsNameserverTimingsWhenAdminDisplayDisabled(t *testing.T
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs/"+job.ID+"/result", nil)
 	wantStatus(t, resp, http.StatusOK)
 
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if result.NameserverTimings != nil {
 		t.Fatal("expected NameserverTimings to be nil when ShowNameserverTimingsAdmin=false")
 	}
@@ -193,10 +188,7 @@ func TestCreateJobRejectsMalformedUndelegatedInput(t *testing.T) {
 		"nameservers":[{"ns":"ns1.example.com","ip":"not-an-ip"}]
 	}`
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", payload)
-	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
-	if out.Error.Code != "invalid_undelegated" {
-		t.Fatalf("expected invalid_undelegated, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_undelegated")
 }
 
 func TestCreateJobRejectsMalformedUndelegatedDSInput(t *testing.T) {
@@ -207,10 +199,7 @@ func TestCreateJobRejectsMalformedUndelegatedDSInput(t *testing.T) {
 		"ds_info":[{"keytag":12345,"algorithm":13,"digtype":2,"digest":"not-hex"}]
 	}`
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", payload)
-	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
-	if out.Error.Code != "invalid_undelegated" {
-		t.Fatalf("expected invalid_undelegated, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_undelegated")
 }
 
 func TestListJobs(t *testing.T) {
@@ -342,10 +331,7 @@ func TestListJobsFiltersByBatchIDAndSupportsBatchSort(t *testing.T) {
 	}
 
 	resp = doJSON(t, srv, http.MethodGet, "/api/v1/jobs?batch_id=batch_b&sort=batch_id_desc", nil)
-	wantStatus(t, resp, http.StatusOK)
-	if err := json.NewDecoder(resp.Body).Decode(&list); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	list = mustJSON[JobList](t, resp, http.StatusOK)
 	if list.Total != 2 || len(list.Items) != 2 {
 		t.Fatalf("expected two jobs in batch_b, got %+v", list.Items)
 	}
@@ -447,10 +433,7 @@ func TestBatchSubmitRejectsUndelegatedFields(t *testing.T) {
 	payload := `{"domains":["example.com"],"nameservers":[{"ns":"ns1.example.com","ip":"192.0.2.1"}]}`
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", payload)
 
-	out := mustJSON[ErrorResponse](t, resp, http.StatusBadRequest)
-	if out.Error.Code != "undelegated_not_supported_for_batch" {
-		t.Fatalf("expected undelegated_not_supported_for_batch, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusBadRequest, "undelegated_not_supported_for_batch")
 }
 
 func TestBatchSummary(t *testing.T) {
@@ -574,10 +557,7 @@ func TestBatchSummarySupportsFiltersAndEmptyMatches(t *testing.T) {
 	}
 
 	resp = doJSON(t, srv, http.MethodGet, "/api/v1/batches/"+batchID+"?status=running", nil)
-	wantStatus(t, resp, http.StatusOK)
-	if err := json.NewDecoder(resp.Body).Decode(&summary); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	summary = mustJSON[BatchSummary](t, resp, http.StatusOK)
 	if summary.Total != 0 || len(summary.Items) != 0 {
 		t.Fatalf("expected no matching items, got %+v", summary.Items)
 	}
@@ -622,14 +602,10 @@ func TestCancelJob(t *testing.T) {
 	srv := newTestServer(t)
 
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
-	wantStatus(t, resp, http.StatusCreated)
-	var created Job
-	_ = json.NewDecoder(resp.Body).Decode(&created)
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 
 	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil)
-	wantStatus(t, resp, http.StatusOK)
-	var canceled Job
-	_ = json.NewDecoder(resp.Body).Decode(&canceled)
+	canceled := mustJSON[Job](t, resp, http.StatusOK)
 	if canceled.Status != JobCanceled {
 		t.Fatalf("expected status canceled, got %s", canceled.Status)
 	}
@@ -639,15 +615,10 @@ func TestCancelJobCSRFRejectsMismatchedOrigin(t *testing.T) {
 	srv := newTestServer(t)
 
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`)
-	wantStatus(t, resp, http.StatusCreated)
-	var created Job
-	_ = json.NewDecoder(resp.Body).Decode(&created)
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 
 	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/"+created.ID+"/cancel", nil, withOrigin("https://attacker.example"))
-	out := mustJSON[ErrorResponse](t, resp, http.StatusForbidden)
-	if out.Error.Code != "csrf_origin_mismatch" {
-		t.Fatalf("expected csrf_origin_mismatch, got %q", out.Error.Code)
-	}
+	wantErrorCode(t, resp, http.StatusForbidden, "csrf_origin_mismatch")
 
 	stored, ok := srv.store.Get(created.ID)
 	if !ok {
@@ -985,10 +956,7 @@ func TestMetricsEndpointSupportsIncludeWindowAndLimits(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/metrics?include=health,insights,trends&window=1h&limit_domains=1&limit_batches=1", nil)
 	wantStatus(t, resp, http.StatusOK)
 
-	var payload map[string]any
-	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-		t.Fatalf("decode metrics payload: %v", err)
-	}
+	payload := mustJSON[map[string]any](t, resp, http.StatusOK)
 	if _, ok := payload["schema_version"]; !ok {
 		t.Fatal("missing schema_version")
 	}
@@ -1170,10 +1138,7 @@ func TestHealthAndMetrics(t *testing.T) {
 	if got := resp.Header().Get("Content-Type"); got != "application/json" {
 		t.Fatalf("expected application/json content-type, got %q", got)
 	}
-	var metrics MetricsSnapshot
-	if err := json.NewDecoder(resp.Body).Decode(&metrics); err != nil {
-		t.Fatalf("decode metrics: %v", err)
-	}
+	metrics := mustJSON[MetricsSnapshot](t, resp, http.StatusOK)
 	if metrics.SchemaVersion == "" {
 		t.Fatal("expected schema_version in metrics response")
 	}
@@ -1233,9 +1198,7 @@ func TestHandleJobsPurge(t *testing.T) {
 	t.Run("400 when no retention configured and no body", func(t *testing.T) {
 		srv := newTestServer(t)
 		resp := postPurge(srv, "")
-		wantStatus(t, resp, http.StatusBadRequest)
-		var body map[string]any
-		_ = json.NewDecoder(resp.Body).Decode(&body)
+		body := mustJSON[map[string]any](t, resp, http.StatusBadRequest)
 		if errObj, _ := body["error"].(map[string]any); errObj["code"] != "retention_not_configured" {
 			t.Fatalf("expected retention_not_configured, got %v", errObj)
 		}
@@ -1248,26 +1211,20 @@ func TestHandleJobsPurge(t *testing.T) {
 		createAndGraduate(t, srv.store, job, nil)
 
 		resp := postPurge(srv, `{"older_than_days":1}`)
-		wantStatus(t, resp, http.StatusOK)
-		var body map[string]int64
-		_ = json.NewDecoder(resp.Body).Decode(&body)
+		body := mustJSON[map[string]int64](t, resp, http.StatusOK)
 		if body["purged_jobs"] != 1 {
 			t.Fatalf("expected purged_jobs=1, got %d", body["purged_jobs"])
 		}
 	})
 
 	t.Run("200 using server retention_days when body omits older_than_days", func(t *testing.T) {
-		cfg := DefaultConfig()
-		cfg.Database.RetentionDays = 1
-		srv := New(cfg)
+		srv := newTestServer(t, withConfig(func(c *Config) { c.Database.RetentionDays = 1 }))
 		old := time.Now().UTC().Add(-48 * time.Hour)
 		job := Job{ID: "j1", Domain: "example.com", Status: JobSucceeded, CreatedAt: old, FinishedAt: old}
 		createAndGraduate(t, srv.store, job, nil)
 
 		resp := postPurge(srv, "")
-		wantStatus(t, resp, http.StatusOK)
-		var body map[string]int64
-		_ = json.NewDecoder(resp.Body).Decode(&body)
+		body := mustJSON[map[string]int64](t, resp, http.StatusOK)
 		if body["purged_jobs"] != 1 {
 			t.Fatalf("expected purged_jobs=1, got %d", body["purged_jobs"])
 		}
@@ -1276,9 +1233,7 @@ func TestHandleJobsPurge(t *testing.T) {
 	t.Run("200 with zero purged when no old jobs", func(t *testing.T) {
 		srv := newTestServer(t)
 		resp := postPurge(srv, `{"older_than_days":90}`)
-		wantStatus(t, resp, http.StatusOK)
-		var body map[string]int64
-		_ = json.NewDecoder(resp.Body).Decode(&body)
+		body := mustJSON[map[string]int64](t, resp, http.StatusOK)
 		if body["purged_jobs"] != 0 {
 			t.Fatalf("expected purged_jobs=0, got %d", body["purged_jobs"])
 		}

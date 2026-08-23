@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"errors"
 	"net/http"
 	"testing"
@@ -41,10 +40,7 @@ func TestPublicDNSSECChainMarkerInResult(t *testing.T) {
 
 	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/result", nil)
 
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if !result.HasDNSSECChain {
 		t.Error("expected has_dnssec_chain marker true")
 	}
@@ -75,9 +71,7 @@ func TestPublicDNSSECChainRunWithoutBlobReturnsNoChainData(t *testing.T) {
 }
 
 func TestPublicDNSSECChainFlagOffReturnsNotFound(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowDNSSECChainPublic = false
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.ShowDNSSECChainPublic = false }))
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
 
 	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/dnssec-chain", nil)
@@ -87,17 +81,12 @@ func TestPublicDNSSECChainFlagOffReturnsNotFound(t *testing.T) {
 }
 
 func TestPublicDNSSECChainMarkerMaskedWhenFlagOff(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowDNSSECChainPublic = false
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.ShowDNSSECChainPublic = false }))
 	publicID := graduatePublicJobWithChain(t, srv, handlerChainJSON)
 
 	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+publicID+"/result", nil)
 
-	var result JobResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	result := mustJSON[JobResult](t, resp, http.StatusOK)
 	if result.HasDNSSECChain {
 		t.Error("expected marker masked to false when flag off")
 	}

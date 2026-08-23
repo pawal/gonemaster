@@ -25,13 +25,7 @@ func TestPublicAnalysisSnapshotListCarriesEngineVersion(t *testing.T) {
 		f.snapshot = stampEngineVersion(t, f, f.snapshot, "v1.6.6", false)
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/snapshots")
-		if resp.Code != http.StatusOK {
-			t.Fatalf("snapshots: got %d, want 200: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisSnapshotListResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode snapshots: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisSnapshotListResponse](t, resp, http.StatusOK)
 		if len(payload.Snapshots) != 1 {
 			t.Fatalf("expected 1 snapshot, got %d", len(payload.Snapshots))
 		}
@@ -49,10 +43,7 @@ func TestPublicAnalysisSnapshotListReportsMixedEngineVersion(t *testing.T) {
 		f.snapshot = stampEngineVersion(t, f, f.snapshot, "v1.6.3", true)
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/snapshots")
-		var payload PublicAnalysisSnapshotListResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode snapshots: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisSnapshotListResponse](t, resp, http.StatusOK)
 		if !payload.Snapshots[0].MixedEngineVersion {
 			t.Fatal("expected mixed_engine_version to survive to the public response")
 		}
@@ -96,13 +87,7 @@ func TestPublicAnalysisTrendPointsCarryEngineVersion(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category="+FactCategorySeverity)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("trends: got %d, want 200: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisTrendResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode trends: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisTrendResponse](t, resp, http.StatusOK)
 		if len(payload.Points) != 1 {
 			t.Fatalf("expected 1 trend point, got %d", len(payload.Points))
 		}
@@ -131,13 +116,7 @@ func TestPublicAnalysisDiffFlagsCrossedEngineVersions(t *testing.T) {
 		older, newer := seedDiffPair(t, f, "v1.6.3", "v1.6.6")
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/diff?from="+older.Slug+"&to="+newer.Slug)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("diff: got %d, want 200: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisDiffResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode diff: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisDiffResponse](t, resp, http.StatusOK)
 		if !payload.Engine.Crossed {
 			t.Fatal("expected crossed_engine_versions=true across an upgrade")
 		}
@@ -157,10 +136,7 @@ func TestPublicAnalysisDiffReportsSameEngineVersion(t *testing.T) {
 		older, newer := seedDiffPair(t, f, "v1.6.3", "v1.6.3")
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/diff?from="+older.Slug+"&to="+newer.Slug)
-		var payload PublicAnalysisDiffResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode diff: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisDiffResponse](t, resp, http.StatusOK)
 		if payload.Engine.Crossed {
 			t.Fatal("same engine version on both sides must not be flagged as crossed")
 		}
@@ -179,10 +155,7 @@ func TestPublicAnalysisDiffReportsUnknownEngineVersion(t *testing.T) {
 		newer := stampEngineVersion(t, f, f.snapshot, "v1.6.6", false)
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/diff?from="+older.Slug+"&to="+newer.Slug)
-		var payload PublicAnalysisDiffResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode diff: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisDiffResponse](t, resp, http.StatusOK)
 		if !payload.Engine.Unknown {
 			t.Fatal("expected engine_version_unknown=true when one side is unstamped")
 		}
@@ -198,13 +171,7 @@ func TestPublicAnalysisTagDiffCarriesEngineDelta(t *testing.T) {
 
 		url := "/pub/api/v1/analysis/cohorts/tld/diff?granularity=tags&from=" + older.Slug + "&to=" + newer.Slug
 		resp := getPublic(t, f.srv, url)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("tag diff: got %d, want 200: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisTagDiffResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode tag diff: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisTagDiffResponse](t, resp, http.StatusOK)
 		if !payload.Engine.Crossed {
 			t.Fatal("the tag diff is where engine capability shows up; it must carry the delta")
 		}

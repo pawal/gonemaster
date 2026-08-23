@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -124,13 +123,7 @@ func TestDiffGranularityTagsClassifiesTags(t *testing.T) {
 
 		url := "/pub/api/v1/analysis/cohorts/tld/diff?granularity=tags&from=" + older.Slug + "&to=" + f.snapshot.Slug
 		resp := getPublic(t, f.srv, url)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisTagDiffResponse
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisTagDiffResponse](t, resp, http.StatusOK)
 		if got.Granularity != "tags" {
 			t.Errorf("Granularity = %q, want tags", got.Granularity)
 		}
@@ -171,9 +164,7 @@ func TestDiffGranularityInvalidReturns400(t *testing.T) {
 
 		url := "/pub/api/v1/analysis/cohorts/tld/diff?granularity=bogus&from=" + older.Slug + "&to=" + f.snapshot.Slug
 		resp := getPublic(t, f.srv, url)
-		if resp.Code != http.StatusBadRequest {
-			t.Fatalf("status = %d, want 400; body = %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusBadRequest)
 	})
 }
 

@@ -3,8 +3,10 @@ package server
 import (
 	"context"
 	"net/netip"
+	"sync"
 	"sync/atomic"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -126,96 +128,80 @@ func TestUpdateJobProgressAlwaysPersistsTerminal100(t *testing.T) {
 	}
 }
 
-func TestRunEngineForJobParallel(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.MaxConcurrentJobs = 0
-	srv := New(cfg)
+// twoRuns starts two concurrent runEngineForJob calls against a server capped
+// at maxConcurrent, with the engine stub parked until release is called. Both
+// TestRunEngineForJobParallel and TestRunEngineForJobLimiter run it inside a
+// synctest bubble, so synctest.Wait settles the runs instead of a timeout.
+type twoRuns struct {
+	started chan struct{}
+	errs    chan error
+	release func()
+}
 
-	started := make(chan struct{}, 2)
+func startTwoRuns(t *testing.T, maxConcurrent int) *twoRuns {
+	t.Helper()
+	srv := newTestServer(t, withConfig(func(c *Config) { c.MaxConcurrentJobs = maxConcurrent }))
+
 	release := make(chan struct{})
+	r := &twoRuns{
+		started: make(chan struct{}, 2),
+		errs:    make(chan error, 2),
+		release: sync.OnceFunc(func() { close(release) }),
+	}
 	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
-		started <- struct{}{}
+		r.started <- struct{}{}
 		<-release
 		return nil, nil
 	}
-
-	job1 := Job{ID: "job-par-1", Domain: "example.com", Tests: []string{"basic01"}}
-	job2 := Job{ID: "job-par-2", Domain: "example.net", Tests: []string{"basic01"}}
-
-	errs := make(chan error, 2)
-	go func() {
-		_, err := srv.runEngineForJob(job1, context.Background())
-		errs <- err
-	}()
-	go func() {
-		_, err := srv.runEngineForJob(job2, context.Background())
-		errs <- err
-	}()
-
-	for i := range 2 {
-		select {
-		case <-started:
-		case <-time.After(250 * time.Millisecond):
-			t.Fatalf("expected both runs to start in parallel, got %d", i)
-		}
+	for _, job := range []Job{
+		{ID: "job-run-1", Domain: "example.com", Tests: []string{"basic01"}},
+		{ID: "job-run-2", Domain: "example.net", Tests: []string{"basic01"}},
+	} {
+		go func() {
+			_, err := srv.runEngineForJob(job, context.Background())
+			r.errs <- err
+		}()
 	}
+	return r
+}
 
-	close(release)
+// finish unparks both runs and asserts neither returned an error.
+func (r *twoRuns) finish(t *testing.T) {
+	t.Helper()
+	r.release()
 	for i := range 2 {
-		if err := <-errs; err != nil {
+		if err := <-r.errs; err != nil {
 			t.Fatalf("run %d: %v", i, err)
 		}
 	}
+}
+
+func TestRunEngineForJobParallel(t *testing.T) {
+	synctest.Test(t, func(t *testing.T) {
+		r := startTwoRuns(t, 0)
+		synctest.Wait()
+		if got := len(r.started); got != 2 {
+			t.Fatalf("started = %d, want both runs to start in parallel", got)
+		}
+		r.finish(t)
+	})
 }
 
 func TestRunEngineForJobLimiter(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.MaxConcurrentJobs = 1
-	srv := New(cfg)
-
-	started := make(chan struct{}, 2)
-	release := make(chan struct{})
-	srv.engineRunner = func(_ engine.RunRequest) ([]engine.LogEntry, error) {
-		started <- struct{}{}
-		<-release
-		return nil, nil
-	}
-
-	job1 := Job{ID: "job-cap-1", Domain: "example.com", Tests: []string{"basic01"}}
-	job2 := Job{ID: "job-cap-2", Domain: "example.net", Tests: []string{"basic01"}}
-
-	errs := make(chan error, 2)
-	go func() {
-		_, err := srv.runEngineForJob(job1, context.Background())
-		errs <- err
-	}()
-	go func() {
-		_, err := srv.runEngineForJob(job2, context.Background())
-		errs <- err
-	}()
-
-	select {
-	case <-started:
-	case <-time.After(250 * time.Millisecond):
-		t.Fatalf("expected first run to start")
-	}
-	select {
-	case <-started:
-		t.Fatalf("expected second run to be blocked by limiter")
-	case <-time.After(200 * time.Millisecond):
-	}
-
-	close(release)
-	for i := range 2 {
-		if err := <-errs; err != nil {
-			t.Fatalf("run %d: %v", i, err)
+	synctest.Test(t, func(t *testing.T) {
+		r := startTwoRuns(t, 1)
+		// Once everything is durably blocked, exactly one run has entered the
+		// engine; the other is still waiting on the limiter token.
+		synctest.Wait()
+		if got := len(r.started); got != 1 {
+			t.Fatalf("started = %d, want 1: the limiter must block the second run", got)
 		}
-	}
+		r.finish(t)
+	})
 }
 
 func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
-	cfg := DefaultConfig()
-	srv := New(cfg)
+	srv := newTestServer(t)
 
 	var captured engine.RunRequest
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -259,12 +245,12 @@ func TestRunEngineForJobPassesUndelegatedInputs(t *testing.T) {
 }
 
 func TestRunEngineForJobPassesSourceAddrOverrides(t *testing.T) {
-	cfg := DefaultConfig()
 	source4 := "192.0.2.70"
 	source6 := "2001:db8::70"
-	cfg.SourceAddr4 = &source4
-	cfg.SourceAddr6 = &source6
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) {
+		c.SourceAddr4 = &source4
+		c.SourceAddr6 = &source6
+	}))
 
 	var captured engine.RunRequest
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -362,8 +348,7 @@ func TestDNSQueryCounterCallback(t *testing.T) {
 }
 
 func TestRunEngineForJobPassesCacheStore(t *testing.T) {
-	cfg := DefaultConfig()
-	srv := New(cfg)
+	srv := newTestServer(t)
 
 	var captured engine.RunRequest
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -394,9 +379,7 @@ func TestRunEngineForJobPassesCacheStore(t *testing.T) {
 }
 
 func TestRunEngineForJobHotCacheReportsWarmQueryMetrics(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.CrossJobHotCache = true
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.CrossJobHotCache = true }))
 
 	var networkCalls atomic.Int32
 	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
@@ -597,9 +580,7 @@ func TestRunEngineForJobClampsNonGlobalGuard(t *testing.T) {
 	}
 
 	// Instance permits non-global targets: no clamp, the override is honored.
-	cfgAllow := DefaultConfig()
-	cfgAllow.PublicAPI.AllowNonGlobalTargets = true
-	srvAllow := New(cfgAllow)
+	srvAllow := newTestServer(t, withPublicAPI(func(c *PublicAPIConfig) { c.AllowNonGlobalTargets = true }))
 	var capturedAllow engine.RunRequest
 	srvAllow.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) { capturedAllow = req; return nil, nil }
 	artAllow, err := srvAllow.runEngineForJob(makeJob(), context.Background())

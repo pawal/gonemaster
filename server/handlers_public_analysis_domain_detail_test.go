@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -36,13 +35,7 @@ func TestDomainDetailReadsFromViewTable(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisDomainDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisDomainDetail](t, resp, http.StatusOK)
 		if got.Domain != "alpha.example" {
 			t.Errorf("Domain = %q, want alpha.example", got.Domain)
 		}
@@ -80,13 +73,7 @@ func TestDomainDetailCaseInsensitiveLookup(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("lower-case lookup status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisDomainDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisDomainDetail](t, resp, http.StatusOK)
 		if got.Domain == "" {
 			t.Errorf("Domain empty; expected captured casing preserved")
 		}
@@ -104,13 +91,9 @@ func TestDomainDetailIgnoresLocaleQueryParam(t *testing.T) {
 		})
 
 		plain := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
-		if plain.Code != http.StatusOK {
-			t.Fatalf("plain status = %d, body = %s", plain.Code, plain.Body)
-		}
+		wantStatus(t, plain, http.StatusOK)
 		withLocale := getPublic(t, f.srv, f.publicURL("domains/alpha.example")+"?locale=../../etc/passwd")
-		if withLocale.Code != http.StatusOK {
-			t.Fatalf("locale-param status = %d, body = %s", withLocale.Code, withLocale.Body)
-		}
+		wantStatus(t, withLocale, http.StatusOK)
 		if plain.Body.String() != withLocale.Body.String() {
 			t.Fatalf("response differs when ?locale= is set; expected the parameter to be ignored")
 		}
@@ -125,9 +108,7 @@ func TestDomainDetailNotFoundOnUnknownName(t *testing.T) {
 		f.seedGraduatedRun("alpha.example", now, nil)
 
 		resp := getPublic(t, f.srv, f.publicURL("domains/does-not-exist.example"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404 (body %s)", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -144,13 +125,7 @@ func TestDomainDetailTagFloorFiltersBelowFloor(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisDomainDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisDomainDetail](t, resp, http.StatusOK)
 		tags := map[string]string{}
 		for _, ti := range got.Tags {
 			tags[ti.Tag] = ti.Level
@@ -181,13 +156,7 @@ func TestDomainDetailTagFloorHonorsWarningOverride(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisDomainDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisDomainDetail](t, resp, http.StatusOK)
 		tags := map[string]string{}
 		for _, ti := range got.Tags {
 			tags[ti.Tag] = ti.Level
@@ -214,9 +183,7 @@ func TestDomainDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 		f.seedGraduatedRun("alpha.example", now, nil)
 
 		resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {
 			t.Errorf("explicit-snapshot Cache-Control = %q, must not be immutable", cc)
 		}

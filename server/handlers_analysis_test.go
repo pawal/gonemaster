@@ -15,7 +15,8 @@ import (
 
 // waitForCond polls until cond returns true or one second elapses. Used
 // by handler tests to observe side effects of cohort rebuilds that now
-// run in a goroutine instead of synchronously inside the request.
+// run in a goroutine instead of synchronously inside the request. It stays
+// on the real clock: the rebuild does its own I/O outside any bubble.
 func waitForCond(t *testing.T, cond func() bool) {
 	t.Helper()
 	deadline := time.Now().Add(time.Second)

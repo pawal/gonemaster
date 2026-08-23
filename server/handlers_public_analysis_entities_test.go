@@ -273,9 +273,7 @@ func TestPublicAnalysisASNsSortByNameserverAndPrefixCounts(t *testing.T) {
 		for _, c := range cases {
 			t.Run(c.name, func(t *testing.T) {
 				resp := getPublic(t, f.srv, f.publicURL("asns?sort=")+c.sort)
-				if resp.Code != http.StatusOK {
-					t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-				}
+				wantStatus(t, resp, http.StatusOK)
 				got := mustJSON[PublicAnalysisListResponse[PublicAnalysisASNView]](t, resp, http.StatusOK)
 				if len(got.Items) != 2 {
 					t.Fatalf("expected 2 ASN rows, got %+v", got.Items)

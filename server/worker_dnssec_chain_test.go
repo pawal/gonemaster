@@ -64,9 +64,7 @@ func TestRunEngineForJobSkipsChainForNonPublicOrigins(t *testing.T) {
 }
 
 func TestRunEngineForJobSkipsChainWhenFlagOff(t *testing.T) {
-	cfg := DefaultConfig()
-	cfg.ShowDNSSECChainPublic = false
-	srv := New(cfg)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.ShowDNSSECChainPublic = false }))
 	srv.engineRunner = chainStubEngine
 
 	art, err := srv.runEngineForJob(chainJob("job-flagoff", JobOriginPublic), context.Background())

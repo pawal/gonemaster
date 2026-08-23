@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -34,13 +33,7 @@ func TestASNDetailReadsFromViewTable(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("asns/64500"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisASNDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisASNDetail](t, resp, http.StatusOK)
 		if got.ASN != 64500 {
 			t.Errorf("ASN = %d, want 64500", got.ASN)
 		}
@@ -67,9 +60,7 @@ func TestASNDetailNotFoundOnUnknownASN(t *testing.T) {
 			"alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("asns/9999"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -81,9 +72,7 @@ func TestASNDetailCacheHeadersExplicitSnapshot(t *testing.T) {
 			"alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("asns/64500"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusOK)
 		// Snapshots can be rebuilt under the same slug, so the response must not be
 		// immutable; it revalidates via the ETag, which changes on rebuild.
 		if cc := resp.Header().Get("Cache-Control"); strings.Contains(cc, "immutable") {
@@ -117,13 +106,7 @@ func TestPrefixDetailReadsFromViewTable(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("prefix?prefix=192.0.2.0/24"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisPrefixDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisPrefixDetail](t, resp, http.StatusOK)
 		if got.Prefix != "192.0.2.0/24" || got.Family != "ipv4" {
 			t.Errorf("prefix detail = %+v", got)
 		}
@@ -144,9 +127,7 @@ func TestPrefixDetailNotFoundOnUnknownPrefix(t *testing.T) {
 			"alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
 		resp := getPublic(t, f.srv, f.publicURL("prefix?prefix=10.0.0.0/8"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -163,13 +144,7 @@ func TestPrefixListingReadsFromViewTable(t *testing.T) {
 			"beta.example", "ns1.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32")
 
 		resp := getPublic(t, f.srv, f.publicURL("prefixes"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisListResponse[PublicAnalysisPrefixView]
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisPrefixView]](t, resp, http.StatusOK)
 		if got.Total != 2 {
 			t.Errorf("total = %d, want 2", got.Total)
 		}
@@ -210,13 +185,7 @@ func TestDomainsListingReadsFromViewTable(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("domains"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisListResponse[PublicAnalysisDomainView]
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if got.Total != 2 {
 			t.Errorf("total = %d, want 2", got.Total)
 		}
@@ -250,13 +219,7 @@ func TestTestcaseDetailReadsFromTagView(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("testcase?module=DNSSEC&testcase=dnssec07"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisTestcaseDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisTestcaseDetail](t, resp, http.StatusOK)
 		if got.Testcase != "dnssec07" || got.Module != "DNSSEC" {
 			t.Errorf("got module/testcase = %s/%s", got.Module, got.Testcase)
 		}
@@ -309,13 +272,7 @@ func TestDiffReadsFromDomainViews(t *testing.T) {
 
 		url := "/pub/api/v1/analysis/cohorts/tld/diff?from=" + older.Slug + "&to=" + f.snapshot.Slug
 		resp := getPublic(t, f.srv, url)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisDiffResponse
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisDiffResponse](t, resp, http.StatusOK)
 		if len(got.Added) != 1 || got.Added[0].Domain != "added.example" {
 			t.Errorf("Added = %+v, want [added.example]", got.Added)
 		}

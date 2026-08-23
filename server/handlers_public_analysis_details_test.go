@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -40,13 +39,7 @@ func TestPublicAnalysisCohortDetail(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisCohortDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisCohortDetail](t, resp, http.StatusOK)
 		if got.DatasetTag != "tld" || !got.IsDefault {
 			t.Fatalf("unexpected cohort: %+v", got)
 		}
@@ -79,13 +72,7 @@ func TestPublicAnalysisCohortDetailSeverityDistribution(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisCohortDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisCohortDetail](t, resp, http.StatusOK)
 		if got.DomainCount != 3 {
 			t.Fatalf("expected 3 domains, got %d", got.DomainCount)
 		}
@@ -160,13 +147,7 @@ func TestPublicAnalysisCohortDetailFactDistributions(t *testing.T) {
 		f.refreshSnapshotViews(f.batchID)
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisCohortDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisCohortDetail](t, resp, http.StatusOK)
 		posture, ok := got.FactDistributions[FactCategoryDNSSECPosture]
 		if !ok {
 			t.Fatalf("expected %q distribution, got %+v", FactCategoryDNSSECPosture, got.FactDistributions)
@@ -223,13 +204,7 @@ func TestPublicAnalysisCohortDetailFactDistributionsRedactInternalIDs(t *testing
 		f.refreshSnapshotViews(f.batchID)
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisCohortDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisCohortDetail](t, resp, http.StatusOK)
 		if len(got.FactDistributions) == 0 {
 			t.Fatalf("fixture did not populate fact_distributions; redaction check would be vacuous")
 		}
@@ -293,13 +268,7 @@ func TestPublicAnalysisDomainDetailSurfacesNameserverStatus(t *testing.T) {
 		f.refreshSnapshotViews(f.batchID)
 
 		resp := getPublic(t, f.srv, f.publicURL("domains/ck.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisDomainDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisDomainDetail](t, resp, http.StatusOK)
 		byName := map[string]PublicAnalysisDomainNameserver{}
 		for _, ns := range got.Nameservers {
 			byName[ns.Nameserver] = ns
@@ -335,9 +304,7 @@ func TestPublicAnalysisCohortDetailNotFound(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/unknown")
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("expected 404, got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -345,13 +312,7 @@ func TestPublicAnalysisDomainDetail(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisDomainDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisDomainDetail](t, resp, http.StatusOK)
 		if got.Domain != "alpha.example" {
 			t.Fatalf("expected domain=alpha.example, got %q", got.Domain)
 		}
@@ -385,9 +346,7 @@ func TestPublicAnalysisDomainDetailNotInCohort(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("domains/missing.example"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("expected 404, got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -395,13 +354,7 @@ func TestPublicAnalysisNameserverDetail(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("nameservers/ns1.shared.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisNameserverDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisNameserverDetail](t, resp, http.StatusOK)
 		if got.DomainCount != 2 {
 			t.Fatalf("expected 2 domains served, got %d", got.DomainCount)
 		}
@@ -418,9 +371,7 @@ func TestPublicAnalysisNameserverDetailNotFound(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("nameservers/missing.example"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("expected 404, got %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -428,13 +379,7 @@ func TestPublicAnalysisEndpointDetail(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.10"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisEndpointDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisEndpointDetail](t, resp, http.StatusOK)
 		if got.DomainCount != 2 {
 			t.Fatalf("expected endpoint shared across 2 domains, got %d", got.DomainCount)
 		}
@@ -448,13 +393,7 @@ func TestPublicAnalysisASNDetail(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("asns/64500"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisASNDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisASNDetail](t, resp, http.StatusOK)
 		if got.DomainCount != 2 {
 			t.Fatalf("expected 2 domains on AS64500, got %d", got.DomainCount)
 		}
@@ -471,9 +410,7 @@ func TestPublicAnalysisASNDetailNotFound(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("asns/99999"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("expected 404, got %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -481,13 +418,7 @@ func TestPublicAnalysisPrefixDetail(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("prefix?prefix=192.0.2.0/24"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisPrefixDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisPrefixDetail](t, resp, http.StatusOK)
 		if got.Prefix != "192.0.2.0/24" || got.Family != "ipv4" {
 			t.Fatalf("unexpected prefix detail: %+v", got)
 		}
@@ -540,13 +471,7 @@ func TestPublicAnalysisPrefixDetailHidesNonAuthoritativeAddresses(t *testing.T) 
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("prefix?prefix=192.0.2.0/24"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisPrefixDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisPrefixDetail](t, resp, http.StatusOK)
 		if len(got.Addresses) != 1 || got.Addresses[0] != "192.0.2.10" {
 			t.Fatalf("prefix detail should list only authoritative address, got %+v", got.Addresses)
 		}
@@ -558,9 +483,7 @@ func TestPublicAnalysisPrefixDetailHidesNonAuthoritativeAddresses(t *testing.T) 
 		// 404s (nothing to resolve), but that's fine because the UI no longer
 		// generates a link to it.
 		resp = getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.99"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("expected 404 for non-authoritative address, got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -568,9 +491,7 @@ func TestPublicAnalysisPrefixDetailMissingParam(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("prefix"))
-		if resp.Code != http.StatusBadRequest {
-			t.Fatalf("expected 400, got %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusBadRequest)
 	})
 }
 
@@ -578,13 +499,7 @@ func TestPublicAnalysisTagDetail(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("tags/DS07_NOT_SIGNED"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisTagDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisTagDetail](t, resp, http.StatusOK)
 		if got.DomainCount != 2 {
 			t.Fatalf("expected DS07 to cover 2 domains, got %d", got.DomainCount)
 		}
@@ -598,9 +513,7 @@ func TestPublicAnalysisTagDetailNotFound(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("tags/UNKNOWN_TAG"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("expected 404, got %d", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -608,13 +521,7 @@ func TestPublicAnalysisTestcaseDetail(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		seedDetailFixture(t, f)
 		resp := getPublic(t, f.srv, f.publicURL("testcase?module=DNSSEC&testcase=dnssec07"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisTestcaseDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisTestcaseDetail](t, resp, http.StatusOK)
 		if got.DomainCount != 2 {
 			t.Fatalf("expected 2 domains on dnssec07, got %d", got.DomainCount)
 		}
@@ -677,10 +584,7 @@ func TestPublicAnalysisCohortAndDetailsScopedToSnapshot(t *testing.T) {
 			"alpha.example", "ns-new.example", "198.51.100.20", "ipv4", t2, 64501, "198.51.100.0/24")
 
 		cohortResp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
-		var cohort PublicAnalysisCohortDetail
-		if err := json.NewDecoder(cohortResp.Body).Decode(&cohort); err != nil {
-			t.Fatalf("decode cohort detail: %v", err)
-		}
+		cohort := mustJSON[PublicAnalysisCohortDetail](t, cohortResp, http.StatusOK)
 		if cohort.NameserverCount != 1 || cohort.EndpointCount != 1 || cohort.ASNCount != 1 || cohort.PrefixCount != 1 {
 			t.Fatalf("expected auto-latest snapshot counts, got %+v", cohort)
 		}
@@ -689,10 +593,7 @@ func TestPublicAnalysisCohortAndDetailsScopedToSnapshot(t *testing.T) {
 		}
 
 		domainResp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
-		var detail PublicAnalysisDomainDetail
-		if err := json.NewDecoder(domainResp.Body).Decode(&detail); err != nil {
-			t.Fatalf("decode domain detail: %v", err)
-		}
+		detail := mustJSON[PublicAnalysisDomainDetail](t, domainResp, http.StatusOK)
 		if len(detail.Nameservers) != 1 || detail.Nameservers[0].Nameserver != "ns-new.example" {
 			t.Fatalf("expected only new snapshot's nameserver, got %+v", detail.Nameservers)
 		}
@@ -705,26 +606,19 @@ func TestPublicAnalysisCohortAndDetailsScopedToSnapshot(t *testing.T) {
 			}
 		}
 
+		// Older-snapshot entities are hidden under auto-latest.
 		oldNS := getPublic(t, f.srv, f.publicURL("nameservers/ns-old.example"))
-		if oldNS.Code != http.StatusNotFound {
-			t.Fatalf("expected older nameserver to be hidden under auto-latest, got %d: %s", oldNS.Code, oldNS.Body)
-		}
+		wantStatus(t, oldNS, http.StatusNotFound)
 
 		oldASN := getPublic(t, f.srv, f.publicURL("asns/64500"))
-		if oldASN.Code != http.StatusNotFound {
-			t.Fatalf("expected older ASN to be hidden under auto-latest, got %d: %s", oldASN.Code, oldASN.Body)
-		}
+		wantStatus(t, oldASN, http.StatusNotFound)
 
 		oldPrefix := getPublic(t, f.srv, f.publicURL("prefix?prefix=192.0.2.0/24"))
-		if oldPrefix.Code != http.StatusNotFound {
-			t.Fatalf("expected older prefix to be hidden under auto-latest, got %d: %s", oldPrefix.Code, oldPrefix.Body)
-		}
+		wantStatus(t, oldPrefix, http.StatusNotFound)
 
 		// Pinning the older slug in the path makes that nameserver visible again.
 		oldNSExplicit := getPublic(t, f.srv, f.publicURLForSnapshot("2026-04-17-old", "nameservers/ns-old.example"))
-		if oldNSExplicit.Code != http.StatusOK {
-			t.Fatalf("expected older nameserver visible with explicit slug, got %d: %s", oldNSExplicit.Code, oldNSExplicit.Body)
-		}
+		wantStatus(t, oldNSExplicit, http.StatusOK)
 	})
 }
 
@@ -740,18 +634,10 @@ func TestPublicAnalysisEndpointDetailRequiresNameserverWhenAddressIsShared(t *te
 			"beta.example", "ns2.shared.example", "192.0.2.10", "ipv4", ts, 64500, "192.0.2.0/24")
 
 		ambiguous := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.10"))
-		if ambiguous.Code != http.StatusBadRequest {
-			t.Fatalf("expected 400 for ambiguous endpoint, got %d: %s", ambiguous.Code, ambiguous.Body)
-		}
+		wantStatus(t, ambiguous, http.StatusBadRequest)
 
 		selected := getPublic(t, f.srv, f.publicURL("endpoints/192.0.2.10?nameserver=ns2.shared.example"))
-		if selected.Code != http.StatusOK {
-			t.Fatalf("expected 200 for disambiguated endpoint, got %d: %s", selected.Code, selected.Body)
-		}
-		var detail PublicAnalysisEndpointDetail
-		if err := json.NewDecoder(selected.Body).Decode(&detail); err != nil {
-			t.Fatalf("decode endpoint detail: %v", err)
-		}
+		detail := mustJSON[PublicAnalysisEndpointDetail](t, selected, http.StatusOK)
 		if detail.Nameserver != "ns2.shared.example" || detail.DomainCount != 1 || len(detail.Domains) != 1 || detail.Domains[0] != "beta.example" {
 			t.Fatalf("unexpected endpoint detail: %+v", detail)
 		}
@@ -773,13 +659,7 @@ func TestPublicAnalysisDetailHandlersLoadAllEntriesForRun(t *testing.T) {
 		f.seedGraduatedRun("alpha.example", ts, entries)
 
 		domainResp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
-		if domainResp.Code != http.StatusOK {
-			t.Fatalf("expected 200 domain detail, got %d: %s", domainResp.Code, domainResp.Body)
-		}
-		var domainDetail PublicAnalysisDomainDetail
-		if err := json.NewDecoder(domainResp.Body).Decode(&domainDetail); err != nil {
-			t.Fatalf("decode domain detail: %v", err)
-		}
+		domainDetail := mustJSON[PublicAnalysisDomainDetail](t, domainResp, http.StatusOK)
 		foundLateTag := false
 		for _, t2 := range domainDetail.Tags {
 			if t2.Tag == "LATE_TAG" {
@@ -792,25 +672,13 @@ func TestPublicAnalysisDetailHandlersLoadAllEntriesForRun(t *testing.T) {
 		}
 
 		tagResp := getPublic(t, f.srv, f.publicURL("tags/LATE_TAG"))
-		if tagResp.Code != http.StatusOK {
-			t.Fatalf("expected 200 tag detail, got %d: %s", tagResp.Code, tagResp.Body)
-		}
-		var tagDetail PublicAnalysisTagDetail
-		if err := json.NewDecoder(tagResp.Body).Decode(&tagDetail); err != nil {
-			t.Fatalf("decode tag detail: %v", err)
-		}
+		tagDetail := mustJSON[PublicAnalysisTagDetail](t, tagResp, http.StatusOK)
 		if tagDetail.OccurrenceCount != 1 {
 			t.Fatalf("expected one LATE_TAG occurrence, got %+v", tagDetail)
 		}
 
 		testcaseResp := getPublic(t, f.srv, f.publicURL("testcase?module=DNSSEC&testcase=bulk01"))
-		if testcaseResp.Code != http.StatusOK {
-			t.Fatalf("expected 200 testcase detail, got %d: %s", testcaseResp.Code, testcaseResp.Body)
-		}
-		var testcaseDetail PublicAnalysisTestcaseDetail
-		if err := json.NewDecoder(testcaseResp.Body).Decode(&testcaseDetail); err != nil {
-			t.Fatalf("decode testcase detail: %v", err)
-		}
+		testcaseDetail := mustJSON[PublicAnalysisTestcaseDetail](t, testcaseResp, http.StatusOK)
 		if testcaseDetail.EntryCount != 10050 {
 			t.Fatalf("expected 10050 testcase entries, got %+v", testcaseDetail)
 		}

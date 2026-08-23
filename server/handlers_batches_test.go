@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
@@ -35,11 +34,7 @@ func TestHandleBatchDeletePreviewReturnsCounts(t *testing.T) {
 	seedGraduatedBatch(t, srv, "batch_xyz", "tld")
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches/batch_xyz/delete-preview", nil)
-	wantStatus(t, resp, http.StatusOK)
-	var preview BatchDeletePreview
-	if err := json.Unmarshal(resp.Body.Bytes(), &preview); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
+	preview := mustJSON[BatchDeletePreview](t, resp, http.StatusOK)
 	if !preview.Exists || preview.BatchID != "batch_xyz" {
 		t.Fatalf("unexpected preview: %+v", preview)
 	}
@@ -139,9 +134,7 @@ func TestHandleDeleteBatchCancelsStaleRunningJobRows(t *testing.T) {
 func TestHandleDeleteBatchUnpinsCohortDefault(t *testing.T) {
 	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
 		pinPath := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
-		if resp := f.call(http.MethodPost, pinPath, `{"is_default":true}`); resp.Code != http.StatusOK {
-			t.Fatalf("pin: got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, f.call(http.MethodPost, pinPath, `{"is_default":true}`), http.StatusOK)
 
 		resp := doJSON(t, f.srv, http.MethodDelete, "/api/v1/batches/"+f.snapshot.BatchID, nil)
 		wantStatus(t, resp, http.StatusNoContent)
@@ -220,11 +213,7 @@ func TestHandleTagBatchesReturnsRecent(t *testing.T) {
 	seedGraduatedBatch(t, srv, "batch_other", "muni")
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags/tld/batches", nil)
-	wantStatus(t, resp, http.StatusOK)
-	var list BatchList
-	if err := json.Unmarshal(resp.Body.Bytes(), &list); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
+	list := mustJSON[BatchList](t, resp, http.StatusOK)
 	if list.Total != 2 {
 		t.Fatalf("Total = %d, want 2", list.Total)
 	}

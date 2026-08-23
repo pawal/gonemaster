@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -23,13 +22,7 @@ func TestSnapshotPathOverviewServesContent(t *testing.T) {
 
 		url := "/pub/api/v1/analysis/cohorts/tld/snapshots/" + f.snapshot.Slug + "/overview"
 		resp := getPublicNoRedirect(t, f.srv, url)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisOverviewResponse
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisOverviewResponse](t, resp, http.StatusOK)
 		if got.Overview == nil {
 			t.Fatal("expected Overview payload")
 		}
@@ -58,13 +51,7 @@ func TestSnapshotPathDomainDetailServesContent(t *testing.T) {
 
 		url := "/pub/api/v1/analysis/cohorts/tld/snapshots/" + f.snapshot.Slug + "/domains/alpha.example"
 		resp := getPublicNoRedirect(t, f.srv, url)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisDomainDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisDomainDetail](t, resp, http.StatusOK)
 		if got.Domain != "alpha.example" {
 			t.Errorf("Domain = %q", got.Domain)
 		}
@@ -90,13 +77,7 @@ func TestSnapshotPathPrefixDetailPreservesQuery(t *testing.T) {
 		url := "/pub/api/v1/analysis/cohorts/tld/snapshots/" + f.snapshot.Slug +
 			"/prefix?prefix=192.0.2.0%2F24"
 		resp := getPublicNoRedirect(t, f.srv, url)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisPrefixDetail
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisPrefixDetail](t, resp, http.StatusOK)
 		if got.Prefix != "192.0.2.0/24" {
 			t.Errorf("Prefix = %q", got.Prefix)
 		}
@@ -112,9 +93,7 @@ func TestSnapshotPathUnknownSlug404s(t *testing.T) {
 
 		url := "/pub/api/v1/analysis/cohorts/tld/snapshots/does-not-exist/overview"
 		resp := getPublicNoRedirect(t, f.srv, url)
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -127,9 +106,7 @@ func TestSnapshotPathUnknownCohort404s(t *testing.T) {
 
 		url := "/pub/api/v1/analysis/cohorts/nope/snapshots/" + f.snapshot.Slug + "/overview"
 		resp := getPublicNoRedirect(t, f.srv, url)
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("status = %d, want 404", resp.Code)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 

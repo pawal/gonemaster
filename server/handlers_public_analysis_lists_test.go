@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -311,10 +310,7 @@ func insertTestRun(t *testing.T, store *SQLJobStore, run Run) {
 
 func decodeDomainList(t *testing.T, body *httptest.ResponseRecorder) PublicAnalysisListResponse[PublicAnalysisDomainView] {
 	t.Helper()
-	var got PublicAnalysisListResponse[PublicAnalysisDomainView]
-	if err := json.NewDecoder(body.Body).Decode(&got); err != nil {
-		t.Fatalf("decode domains list: %v", err)
-	}
+	got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, body, http.StatusOK)
 	return got
 }
 

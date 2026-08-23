@@ -158,13 +158,9 @@ func TestAdminSnapshotRetireUnpinsCohort(t *testing.T) {
 	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
 		// Pin the fixture snapshot first.
 		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
-		if resp := f.call(http.MethodPost, path, `{"is_default":true}`); resp.Code != http.StatusOK {
-			t.Fatalf("pin: got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, f.call(http.MethodPost, path, `{"is_default":true}`), http.StatusOK)
 		// Retire it.
-		if resp := f.call(http.MethodDelete, path, ""); resp.Code != http.StatusNoContent {
-			t.Fatalf("retire: got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, f.call(http.MethodDelete, path, ""), http.StatusNoContent)
 		cohort, _ := f.store.GetAnalysisCohort(f.cohort.ID)
 		if cohort.DefaultSnapshotPolicy != DefaultSnapshotPolicyAutoLatest {
 			t.Fatalf("policy = %q, want auto_latest after retiring pinned snapshot", cohort.DefaultSnapshotPolicy)
@@ -178,7 +174,8 @@ func TestAdminSnapshotRetireUnpinsCohort(t *testing.T) {
 // waitForMaterialization polls the snapshot row until its materialization
 // status reaches want, returning the final row. The rematerialize endpoint
 // dispatches the rebuild in a goroutine, so tests must wait for completion
-// rather than reading the row immediately after the 202.
+// rather than reading the row immediately after the 202. It stays on the
+// real clock: the rebuild talks to the database outside any bubble.
 func (f *analysisFixture) waitForMaterialization(id int64, want string) (AnalysisCohortSnapshot, bool) {
 	f.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -345,9 +342,7 @@ func TestAdminSnapshotRestoreViaStatus(t *testing.T) {
 	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
 		// Retire the fixture snapshot first.
 		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
-		if resp := f.call(http.MethodDelete, path, ""); resp.Code != http.StatusNoContent {
-			t.Fatalf("retire: got %d: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, f.call(http.MethodDelete, path, ""), http.StatusNoContent)
 		// Restore via status=captured.
 		resp := f.call(http.MethodPost, path, `{"status":"captured","is_public":true}`)
 		wantStatus(t, resp, http.StatusOK)

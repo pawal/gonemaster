@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"testing"
@@ -40,11 +39,7 @@ func queueJobInBatch(t *testing.T, srv *Server, batchID, domain string) {
 func listBatches(t *testing.T, srv *Server, query string) BatchListResponse {
 	t.Helper()
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches"+query, nil)
-	wantStatus(t, resp, http.StatusOK)
-	var body BatchListResponse
-	if err := json.Unmarshal(resp.Body.Bytes(), &body); err != nil {
-		t.Fatalf("unmarshal: %v", err)
-	}
+	body := mustJSON[BatchListResponse](t, resp, http.StatusOK)
 	return body
 }
 

@@ -50,10 +50,7 @@ func TestProfileIntegrationBatchFromTagSnapshotsStoredProfile(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"from_tag":"ops"}`)
 	wantStatus(t, resp, http.StatusAccepted)
 
-	var batchResp JobBatchResponse
-	if err := json.NewDecoder(resp.Body).Decode(&batchResp); err != nil {
-		t.Fatalf("decode batch response: %v", err)
-	}
+	batchResp := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
 	if len(batchResp.JobIDs) != 1 {
 		t.Fatalf("expected 1 batch job, got %d", len(batchResp.JobIDs))
 	}
@@ -104,10 +101,7 @@ func TestProfileIntegrationJobOverridesAppearInRunSnapshot(t *testing.T) {
 		}`, storedProfile.ID))
 	wantStatus(t, resp, http.StatusCreated)
 
-	var created Job
-	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		t.Fatalf("decode job: %v", err)
-	}
+	created := mustJSON[Job](t, resp, http.StatusCreated)
 	if created.ProfileID == nil || *created.ProfileID != storedProfile.ID {
 		t.Fatalf("ProfileID: got %v, want %d", created.ProfileID, storedProfile.ID)
 	}

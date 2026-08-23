@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"os"
 	"slices"
 	"testing"
 
@@ -100,19 +99,8 @@ func TestGetDefaultProfile(t *testing.T) {
 }
 
 func TestGetDefaultProfileAppliesConfigFileOverride(t *testing.T) {
-	cfg := DefaultConfig()
-	f, err := os.CreateTemp(t.TempDir(), "profile-override-*.json")
-	if err != nil {
-		t.Fatalf("CreateTemp: %v", err)
-	}
-	if _, err := f.WriteString(`{"net":{"ipv6":false}}`); err != nil {
-		t.Fatalf("WriteString: %v", err)
-	}
-	if err := f.Close(); err != nil {
-		t.Fatalf("Close: %v", err)
-	}
-	cfg.ProfilePath = f.Name()
-	srv := New(cfg)
+	path := writeTempJSON(t, `{"net":{"ipv6":false}}`)
+	srv := newTestServer(t, withConfig(func(c *Config) { c.ProfilePath = path }))
 
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/profiles/default", nil)
 	profile := mustJSON[Profile](t, resp, http.StatusOK)
@@ -921,10 +909,7 @@ func TestMarkAllProfilesReviewed(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/profiles/mark-all-reviewed", "{}")
 	wantStatus(t, resp, http.StatusOK)
 
-	var result MarkAllReviewedResult
-	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
+	result := mustJSON[MarkAllReviewedResult](t, resp, http.StatusOK)
 	if result.Updated != 2 {
 		t.Fatalf("expected updated=2, got %d", result.Updated)
 	}
@@ -947,10 +932,7 @@ func TestMarkAllProfilesReviewedAlreadyCurrent(t *testing.T) {
 	createProfile(t, srv, `{"name":"p2","config":{}}`)
 
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/profiles/mark-all-reviewed", "{}")
-	wantStatus(t, resp, http.StatusOK)
-
-	var result MarkAllReviewedResult
-	json.NewDecoder(resp.Body).Decode(&result)
+	result := mustJSON[MarkAllReviewedResult](t, resp, http.StatusOK)
 	if result.Updated != 0 {
 		t.Fatalf("expected updated=0 (already current), got %d", result.Updated)
 	}
@@ -960,10 +942,7 @@ func TestMarkAllProfilesReviewedEmptyStore(t *testing.T) {
 	srv := newTestServer(t)
 
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/profiles/mark-all-reviewed", "{}")
-	wantStatus(t, resp, http.StatusOK)
-
-	var result MarkAllReviewedResult
-	json.NewDecoder(resp.Body).Decode(&result)
+	result := mustJSON[MarkAllReviewedResult](t, resp, http.StatusOK)
 	if result.Updated != 0 {
 		t.Fatalf("expected updated=0 for empty store, got %d", result.Updated)
 	}

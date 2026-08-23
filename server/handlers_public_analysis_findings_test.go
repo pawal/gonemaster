@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"strings"
 	"testing"
@@ -112,13 +111,7 @@ func TestPublicAnalysisTagsAggregates(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("tags"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisListResponse[PublicAnalysisTagView]
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisTagView]](t, resp, http.StatusOK)
 		if got.Total != 3 {
 			t.Fatalf("expected 3 unique tags, got %d", got.Total)
 		}
@@ -147,8 +140,7 @@ func TestPublicAnalysisTagsSearch(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("tags?search=dnssec"))
-		var got PublicAnalysisListResponse[PublicAnalysisTagView]
-		_ = json.NewDecoder(resp.Body).Decode(&got)
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisTagView]](t, resp, http.StatusOK)
 		if got.Total != 1 || got.Items[0].Tag != "DS07_NOT_SIGNED" {
 			t.Fatalf("expected dnssec module filter to return one row, got %+v", got)
 		}
@@ -166,13 +158,7 @@ func TestPublicAnalysisTagsMinLevel(t *testing.T) {
 
 		// min_level=WARNING drops NOTICE-only tags and keeps WARNING and ERROR.
 		resp := getPublic(t, f.srv, f.publicURL("tags?min_level=WARNING"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisListResponse[PublicAnalysisTagView]
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisTagView]](t, resp, http.StatusOK)
 		tags := map[string]PublicAnalysisTagView{}
 		for _, v := range got.Items {
 			tags[v.Tag] = v
@@ -189,9 +175,7 @@ func TestPublicAnalysisTagsMinLevel(t *testing.T) {
 
 		// Invalid level is a 400.
 		bad := getPublic(t, f.srv, f.publicURL("tags?min_level=nonsense"))
-		if bad.Code != http.StatusBadRequest {
-			t.Fatalf("expected 400 for invalid min_level, got %d: %s", bad.Code, bad.Body)
-		}
+		wantStatus(t, bad, http.StatusBadRequest)
 	})
 }
 
@@ -208,13 +192,7 @@ func TestPublicAnalysisTestcasesAggregates(t *testing.T) {
 		})
 
 		resp := getPublic(t, f.srv, f.publicURL("testcases"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("expected 200, got %d: %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisListResponse[PublicAnalysisTestcaseView]
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisTestcaseView]](t, resp, http.StatusOK)
 		if got.Total != 2 {
 			t.Fatalf("expected 2 testcases, got %d", got.Total)
 		}
@@ -271,25 +249,13 @@ func TestPublicAnalysisFindingListsLoadAllEntriesForRun(t *testing.T) {
 		f.seedGraduatedRun("alpha.example", ts, entries)
 
 		tagsResp := getPublic(t, f.srv, f.publicURL("tags"))
-		if tagsResp.Code != http.StatusOK {
-			t.Fatalf("expected 200 tags, got %d: %s", tagsResp.Code, tagsResp.Body)
-		}
-		var tags PublicAnalysisListResponse[PublicAnalysisTagView]
-		if err := json.NewDecoder(tagsResp.Body).Decode(&tags); err != nil {
-			t.Fatalf("decode tags: %v", err)
-		}
+		tags := mustJSON[PublicAnalysisListResponse[PublicAnalysisTagView]](t, tagsResp, http.StatusOK)
 		if len(tags.Items) != 1 || tags.Items[0].OccurrenceCount != 10050 {
 			t.Fatalf("expected full BULK_TAG count, got %+v", tags)
 		}
 
 		testcasesResp := getPublic(t, f.srv, f.publicURL("testcases"))
-		if testcasesResp.Code != http.StatusOK {
-			t.Fatalf("expected 200 testcases, got %d: %s", testcasesResp.Code, testcasesResp.Body)
-		}
-		var testcases PublicAnalysisListResponse[PublicAnalysisTestcaseView]
-		if err := json.NewDecoder(testcasesResp.Body).Decode(&testcases); err != nil {
-			t.Fatalf("decode testcases: %v", err)
-		}
+		testcases := mustJSON[PublicAnalysisListResponse[PublicAnalysisTestcaseView]](t, testcasesResp, http.StatusOK)
 		if len(testcases.Items) != 1 || testcases.Items[0].EntryCount != 10050 {
 			t.Fatalf("expected full testcase count, got %+v", testcases)
 		}

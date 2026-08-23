@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -11,32 +10,27 @@ import (
 // cohort case: a cohort with no captured public snapshot returns
 // status = "no_snapshot" so the UI can render a helpful panel.
 func TestPublicAnalysisCohortDetailNoSnapshotState(t *testing.T) {
-	f := newAnalysisFixture(t, asDefaultCohort(), withoutSnapshot())
-	if _, err := f.store.UpsertAnalysisCohort(AnalysisCohort{
-		SourceType:      "tag",
-		SourceTag:       "tld",
-		Label:           "TLD",
-		AnalysisEnabled: true,
-		PublicEnabled:   true,
-		IsDefault:       true,
-	}); err != nil {
-		t.Fatalf("upsert cohort: %v", err)
-	}
+	forEachAnalysisFixture(t, func(t *testing.T, f *analysisFixture) {
+		if _, err := f.store.UpsertAnalysisCohort(AnalysisCohort{
+			SourceType:      "tag",
+			SourceTag:       "tld",
+			Label:           "TLD",
+			AnalysisEnabled: true,
+			PublicEnabled:   true,
+			IsDefault:       true,
+		}); err != nil {
+			t.Fatalf("upsert cohort: %v", err)
+		}
 
-	resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
-	if resp.Code != http.StatusOK {
-		t.Fatalf("cohort detail: got %d, want 200: %s", resp.Code, resp.Body)
-	}
-	var detail PublicAnalysisCohortDetail
-	if err := json.NewDecoder(resp.Body).Decode(&detail); err != nil {
-		t.Fatalf("decode cohort detail: %v", err)
-	}
-	if detail.Status != PublicAnalysisStatusNoSnapshot {
-		t.Fatalf("Status = %q, want no_snapshot", detail.Status)
-	}
-	if detail.Snapshot != nil {
-		t.Fatalf("expected Snapshot nil on no_snapshot response, got %+v", detail.Snapshot)
-	}
+		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld")
+		detail := mustJSON[PublicAnalysisCohortDetail](t, resp, http.StatusOK)
+		if detail.Status != PublicAnalysisStatusNoSnapshot {
+			t.Fatalf("Status = %q, want no_snapshot", detail.Status)
+		}
+		if detail.Snapshot != nil {
+			t.Fatalf("expected Snapshot nil on no_snapshot response, got %+v", detail.Snapshot)
+		}
+	}, asDefaultCohort(), withoutSnapshot())
 }
 
 // TestPublicAnalysisCatalogCarriesDefaultSnapshot checks that the catalog
@@ -44,13 +38,7 @@ func TestPublicAnalysisCohortDetailNoSnapshotState(t *testing.T) {
 func TestPublicAnalysisCatalogCarriesDefaultSnapshot(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/catalog")
-		if resp.Code != http.StatusOK {
-			t.Fatalf("catalog: got %d, want 200: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisCatalogResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode catalog: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisCatalogResponse](t, resp, http.StatusOK)
 		if len(payload.Cohorts) != 1 {
 			t.Fatalf("expected 1 cohort, got %d", len(payload.Cohorts))
 		}
@@ -115,13 +103,7 @@ func TestPublicAnalysisSnapshotsListReturnsCapturedOnly(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/snapshots")
-		if resp.Code != http.StatusOK {
-			t.Fatalf("snapshots: got %d, want 200: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisSnapshotListResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode snapshots: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisSnapshotListResponse](t, resp, http.StatusOK)
 		if len(payload.Snapshots) != 1 {
 			t.Fatalf("expected 1 public snapshot, got %d: %+v", len(payload.Snapshots), payload.Snapshots)
 		}
@@ -172,13 +154,7 @@ func TestPublicAnalysisTrendsUseSourceRunOrderAndMetadata(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category="+FactCategorySeverity)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("trends: got %d, want 200: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisTrendResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode trends: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisTrendResponse](t, resp, http.StatusOK)
 		if len(payload.Points) != 2 {
 			t.Fatalf("expected 2 trend points, got %d: %+v", len(payload.Points), payload.Points)
 		}
@@ -215,13 +191,7 @@ func TestPublicAnalysisTrendsCarryKeyMeta(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/trends?category="+FactCategoryDNSKEYAlgorithm)
-		if resp.Code != http.StatusOK {
-			t.Fatalf("trends: got %d, want 200: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisTrendResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode trends: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisTrendResponse](t, resp, http.StatusOK)
 		got8, ok := payload.KeyMeta["8"]
 		if !ok {
 			t.Fatalf("key_meta missing key %q: %+v", "8", payload.KeyMeta)
@@ -263,14 +233,10 @@ func TestPublicAnalysisSnapshotDetailHiddenForRetired(t *testing.T) {
 			t.Fatalf("seed retired: %v", err)
 		}
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/snapshots/2026-03-01-retired")
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("retired slug: got %d, want 404: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 
 		resp = getPublic(t, f.srv, f.publicURLForSnapshot("2026-03-01-retired", "overview"))
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("retired path-segmented: got %d, want 404: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -288,9 +254,7 @@ func TestPublicAnalysisSnapshotDetailHiddenForMixedProfile(t *testing.T) {
 			t.Fatalf("seed mixed: %v", err)
 		}
 		resp := getPublic(t, f.srv, "/pub/api/v1/analysis/cohorts/tld/snapshots/2026-03-15-mixed")
-		if resp.Code != http.StatusNotFound {
-			t.Fatalf("mixed slug: got %d, want 404: %s", resp.Code, resp.Body)
-		}
+		wantStatus(t, resp, http.StatusNotFound)
 	})
 }
 
@@ -301,24 +265,13 @@ func TestPublicAnalysisOverviewSlugInPath(t *testing.T) {
 		older := f.seedAlternateSnapshot("batch-old", "2026-04-01-older", time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC))
 
 		resp := getPublic(t, f.srv, f.publicURL("overview"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("overview: got %d: %s", resp.Code, resp.Body)
-		}
-		var payload PublicAnalysisOverviewResponse
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		payload := mustJSON[PublicAnalysisOverviewResponse](t, resp, http.StatusOK)
 		if payload.Snapshot == nil || payload.Snapshot.Slug != f.snapshot.Slug {
 			t.Fatalf("fixture slug: got %+v, want fixture", payload.Snapshot)
 		}
 
 		resp = getPublic(t, f.srv, f.publicURLForSnapshot("2026-04-01-older", "overview"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("older overview: got %d: %s", resp.Code, resp.Body)
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
-			t.Fatalf("decode older: %v", err)
-		}
+		payload = mustJSON[PublicAnalysisOverviewResponse](t, resp, http.StatusOK)
 		if payload.Snapshot == nil || payload.Snapshot.Slug != older.Slug {
 			t.Fatalf("older slug: got %+v, want %q", payload.Snapshot, older.Slug)
 		}

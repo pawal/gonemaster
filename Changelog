@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - ui-public: the DNSSEC chain of trust names ML-DSA-44 instead of showing "alg 18"
+- server: in `nogui` builds the analysis dashboard path returns 404 for asset requests instead of serving the info page with 200
 
 ## [v1.7.1] - 2026-08-20
 

@@ -20,81 +20,85 @@ import (
 // unique nameserver addresses. Memory should stabilise once stale addresses
 // are evicted, not grow linearly with job count.
 func TestHotCacheMemoryBounded(t *testing.T) {
-	ttl := 500 * time.Millisecond
-	hc := newNameserverHotCache(8, ttl)
+	// The TTL sleep below only has to outlast the hot-cache TTL and the GC is
+	// forced rather than waited for, so a bubble costs the test nothing.
+	synctest.Test(t, func(t *testing.T) {
+		ttl := 500 * time.Millisecond
+		hc := newNameserverHotCache(8, ttl)
 
-	dummyPacket := func(addr string) packet.Packet {
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		msg.Answer = []dns.RR{
-			&dns.A{
-				Hdr: dns.Header{Name: "x.example.", Class: dns.ClassINET, TTL: 60},
-				A:   rdata.A{Addr: netip.MustParseAddr(addr)},
-			},
+		dummyPacket := func(addr string) packet.Packet {
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeSuccess
+			msg.Answer = []dns.RR{
+				&dns.A{
+					Hdr: dns.Header{Name: "x.example.", Class: dns.ClassINET, TTL: 60},
+					A:   rdata.A{Addr: netip.MustParseAddr(addr)},
+				},
+			}
+			return packet.Packet{Msg: msg}
 		}
-		return packet.Packet{Msg: msg}
-	}
 
-	// Simulate 200 jobs, each touching one shared root address + one unique address.
-	for i := range 200 {
+		// Simulate 200 jobs, each touching one shared root address + one unique address.
+		for i := range 200 {
+			runCache, release := hc.Lease("batch")
+
+			// Shared root nameserver (always warm).
+			rootNS, err := nameserver.NewWithCache(runCache, "root.example", "198.41.0.4", nil)
+			if err != nil {
+				t.Fatalf("job %d root: %v", i, err)
+			}
+			rootNS.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+				return dummyPacket("198.41.0.4"), nil
+			})
+			rootNS.QueryWithOptions(context.Background(), "example.", "A", nil)
+
+			// Unique per-domain nameserver.
+			uniqueAddr := fmt.Sprintf("10.%d.%d.%d", (i/65536)%256, (i/256)%256, i%256+1)
+			uniqueNS, err := nameserver.NewWithCache(runCache, fmt.Sprintf("ns%d.example", i), uniqueAddr, nil)
+			if err != nil {
+				t.Fatalf("job %d unique: %v", i, err)
+			}
+			uniqueNS.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+				return dummyPacket(uniqueAddr), nil
+			})
+			uniqueNS.QueryWithOptions(context.Background(), fmt.Sprintf("ns%d.example.", i), "A", nil)
+
+			release()
+		}
+
+		// Force GC and measure.
+		runtime.GC()
+		var before runtime.MemStats
+		runtime.ReadMemStats(&before)
+
+		// Wait for TTL to expire, then run one more job to trigger eviction.
+		time.Sleep(ttl + 100*time.Millisecond)
 		runCache, release := hc.Lease("batch")
-
-		// Shared root nameserver (always warm).
-		rootNS, err := nameserver.NewWithCache(runCache, "root.example", "198.41.0.4", nil)
-		if err != nil {
-			t.Fatalf("job %d root: %v", i, err)
-		}
+		rootNS, _ := nameserver.NewWithCache(runCache, "root.example", "198.41.0.4", nil)
 		rootNS.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 			return dummyPacket("198.41.0.4"), nil
 		})
 		rootNS.QueryWithOptions(context.Background(), "example.", "A", nil)
-
-		// Unique per-domain nameserver.
-		uniqueAddr := fmt.Sprintf("10.%d.%d.%d", (i/65536)%256, (i/256)%256, i%256+1)
-		uniqueNS, err := nameserver.NewWithCache(runCache, fmt.Sprintf("ns%d.example", i), uniqueAddr, nil)
-		if err != nil {
-			t.Fatalf("job %d unique: %v", i, err)
-		}
-		uniqueNS.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-			return dummyPacket(uniqueAddr), nil
-		})
-		uniqueNS.QueryWithOptions(context.Background(), fmt.Sprintf("ns%d.example.", i), "A", nil)
-
 		release()
-	}
 
-	// Force GC and measure.
-	runtime.GC()
-	var before runtime.MemStats
-	runtime.ReadMemStats(&before)
+		runtime.GC()
+		var after runtime.MemStats
+		runtime.ReadMemStats(&after)
 
-	// Wait for TTL to expire, then run one more job to trigger eviction.
-	time.Sleep(ttl + 100*time.Millisecond)
-	runCache, release := hc.Lease("batch")
-	rootNS, _ := nameserver.NewWithCache(runCache, "root.example", "198.41.0.4", nil)
-	rootNS.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
-		return dummyPacket("198.41.0.4"), nil
+		// Check: the base cache should only have the root address's data, not all 200.
+		finalRun, finalRelease := hc.Lease("batch")
+		defer finalRelease()
+		addrCount := finalRun.AddressCacheCount()
+
+		t.Logf("heap before eviction: %d KB, after: %d KB, base addresses: %d",
+			before.HeapInuse/1024, after.HeapInuse/1024, addrCount)
+
+		// We expect a small number of warmed addresses (root + maybe a few recent),
+		// not all 200+ unique addresses.
+		if addrCount > 20 {
+			t.Fatalf("expected most stale addresses evicted, but base still has %d", addrCount)
+		}
 	})
-	rootNS.QueryWithOptions(context.Background(), "example.", "A", nil)
-	release()
-
-	runtime.GC()
-	var after runtime.MemStats
-	runtime.ReadMemStats(&after)
-
-	// Check: the base cache should only have the root address's data, not all 200.
-	finalRun, finalRelease := hc.Lease("batch")
-	defer finalRelease()
-	addrCount := finalRun.AddressCacheCount()
-
-	t.Logf("heap before eviction: %d KB, after: %d KB, base addresses: %d",
-		before.HeapInuse/1024, after.HeapInuse/1024, addrCount)
-
-	// We expect a small number of warmed addresses (root + maybe a few recent),
-	// not all 200+ unique addresses.
-	if addrCount > 20 {
-		t.Fatalf("expected most stale addresses evicted, but base still has %d", addrCount)
-	}
 }
 
 // TestHotCacheHeapGrowthWithForcedGC mirrors a memprobe pattern: run

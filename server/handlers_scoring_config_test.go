@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -268,53 +267,52 @@ func TestGetResultRecomputesWithUpdatedConfig(t *testing.T) {
 // saved to the database is applied when a new server instance reuses the same
 // store (simulating a server restart).
 func TestScoringConfigPersistsAcrossServerRestart(t *testing.T) {
-	b := testBackends(t)[0] // SQLite, always present
-	store := testStoreForBackend(t, b)
+	forEachBackend(t, func(t *testing.T, store *SQLJobStore) {
+		srv1 := newServer(DefaultConfig(), store, NewInMemoryQueue())
 
-	srv1 := newServer(DefaultConfig(), store, NewInMemoryQueue())
+		// PUT a custom config on the first server.
+		cfg := scoring.DefaultConfig()
+		cfg.SeverityPenalties["WARNING"] = 88
+		body, _ := json.Marshal(cfg)
+		resp := doJSON(t, srv1, http.MethodPut, "/api/v1/scoring-config", body)
+		wantStatus(t, resp, http.StatusOK)
 
-	// PUT a custom config on the first server.
-	cfg := scoring.DefaultConfig()
-	cfg.SeverityPenalties["WARNING"] = 88
-	body, _ := json.Marshal(cfg)
-	resp := doJSON(t, srv1, http.MethodPut, "/api/v1/scoring-config", body)
-	wantStatus(t, resp, http.StatusOK)
+		// Simulate a restart: new server instance with the same store.
+		srv2 := newServer(DefaultConfig(), store, NewInMemoryQueue())
+		srv2.ApplyDatabaseSettings()
 
-	// Simulate a restart: new server instance with the same store.
-	srv2 := newServer(DefaultConfig(), store, NewInMemoryQueue())
-	srv2.ApplyDatabaseSettings()
+		// Graduate a job on the restarted server and check the score.
+		job := Job{
+			ID:         "job-persist",
+			Domain:     "persist.example.com",
+			Status:     JobSucceeded,
+			PublicID:   GeneratePublicID(),
+			CreatedAt:  time.Now().UTC(),
+			StartedAt:  time.Now().UTC(),
+			FinishedAt: time.Now().UTC(),
+		}
+		created, err := store.Create(job)
+		if err != nil {
+			t.Fatalf("create: %v", err)
+		}
+		entries := []engine.LogEntry{
+			{Module: "DNSSEC", Tag: "DS01_DIGEST_NOT_SUPPORTED_BY_NS", Level: "WARNING"},
+		}
+		if err := store.GraduateJob(created, entries); err != nil {
+			t.Fatalf("graduate: %v", err)
+		}
+		result, ok := store.GetResult(created.ID)
+		if !ok || result.Score == nil {
+			t.Fatal("result or score missing")
+		}
 
-	// Graduate a job on the restarted server and check the score.
-	job := Job{
-		ID:         "job-persist",
-		Domain:     "persist.example.com",
-		Status:     JobSucceeded,
-		PublicID:   GeneratePublicID(),
-		CreatedAt:  time.Now().UTC(),
-		StartedAt:  time.Now().UTC(),
-		FinishedAt: time.Now().UTC(),
-	}
-	created, err := store.Create(job)
-	if err != nil {
-		t.Fatalf("create: %v", err)
-	}
-	entries := []engine.LogEntry{
-		{Module: "DNSSEC", Tag: "DS01_DIGEST_NOT_SUPPORTED_BY_NS", Level: "WARNING"},
-	}
-	if err := store.GraduateJob(created, entries); err != nil {
-		t.Fatalf("graduate: %v", err)
-	}
-	result, ok := store.GetResult(created.ID)
-	if !ok || result.Score == nil {
-		t.Fatal("result or score missing")
-	}
-
-	// Score should be lower than default (penalty 5) because persisted config has penalty 88.
-	scoringEntries := []scoring.Entry{{Module: "DNSSEC", Tag: "DS01_DIGEST_NOT_SUPPORTED_BY_NS", Level: "WARNING"}}
-	defaultScore := scoring.Compute("persist.example.com", scoringEntries, scoring.DefaultConfig())
-	if result.Score.Score >= defaultScore.Score {
-		t.Fatalf("persisted config not applied: got %d, default is %d", result.Score.Score, defaultScore.Score)
-	}
+		// Score should be lower than default (penalty 5) because persisted config has penalty 88.
+		scoringEntries := []scoring.Entry{{Module: "DNSSEC", Tag: "DS01_DIGEST_NOT_SUPPORTED_BY_NS", Level: "WARNING"}}
+		defaultScore := scoring.Compute("persist.example.com", scoringEntries, scoring.DefaultConfig())
+		if result.Score.Score >= defaultScore.Score {
+			t.Fatalf("persisted config not applied: got %d, default is %d", result.Score.Score, defaultScore.Score)
+		}
+	})
 }
 
 // TestCLIFlagOverrideScoringConfig verifies that when scoring_config is marked
@@ -325,20 +323,11 @@ func TestCLIFlagOverrideScoringConfig(t *testing.T) {
 	customCfg := scoring.DefaultConfig()
 	customCfg.SeverityPenalties["ERROR"] = 99
 	raw, _ := json.Marshal(customCfg)
-	f, err := os.CreateTemp("", "scoring-*.json")
-	if err != nil {
-		t.Fatalf("create temp file: %v", err)
-	}
-	defer os.Remove(f.Name())
-	if _, err := f.Write(raw); err != nil {
-		t.Fatalf("write config: %v", err)
-	}
-	_ = f.Close()
+	path := writeTempJSON(t, string(raw))
 
-	cfg := DefaultConfig()
-	cfg.ScoringConfigPath = f.Name()
-	srv := New(cfg)
-	srv.SetConfigSources(map[string]SettingSource{"scoring_config": SourceCLIFlag})
+	srv := newTestServer(t,
+		withConfig(func(c *Config) { c.ScoringConfigPath = path }),
+		withConfigSources(map[string]SettingSource{"scoring_config": SourceCLIFlag}))
 
 	// GET must return source=cli_flag, readonly=true, and values from the file.
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/scoring-config", nil)

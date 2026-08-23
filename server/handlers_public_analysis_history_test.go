@@ -1,7 +1,6 @@
 package server
 
 import (
-	"encoding/json"
 	"net/http"
 	"testing"
 	"time"
@@ -41,13 +40,7 @@ func TestPublicEntityHistoryNameserver(t *testing.T) {
 		seedHistoryFixture(t, f)
 
 		resp := getPublic(t, f.srv, f.historyURL("entity=nameserver&key=ns1.example"))
-		if resp.Code != http.StatusOK {
-			t.Fatalf("status = %d, body = %s", resp.Code, resp.Body)
-		}
-		var got PublicAnalysisEntityHistoryResponse
-		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
-			t.Fatalf("decode: %v", err)
-		}
+		got := mustJSON[PublicAnalysisEntityHistoryResponse](t, resp, http.StatusOK)
 		if got.Entity != "nameserver" || got.Key != "ns1.example" {
 			t.Errorf("echo = %s/%s, want nameserver/ns1.example", got.Entity, got.Key)
 		}

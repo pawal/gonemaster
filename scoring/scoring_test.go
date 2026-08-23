@@ -268,8 +268,7 @@ func TestCompute_ZeroEntries(t *testing.T) {
 
 func TestCompute_CustomConfigZeroWeight(t *testing.T) {
 	// Zeroing DNSSEC weight excludes it from the aggregate entirely.
-	custom := DefaultConfig()
-	custom.CategoryWeights["dnssec"] = 0
+	custom := cfgWith(func(c *Config) { c.CategoryWeights["dnssec"] = 0 })
 	entries := []Entry{
 		e("DNSSEC", "SOME_ERROR", "ERROR"),
 		e("DNSSEC", "SOME_ERROR", "ERROR"),
@@ -284,72 +283,106 @@ func TestCompute_CustomConfigZeroWeight(t *testing.T) {
 
 // ---- Bonus criteria tests ---------------------------------------------------
 
-func TestBonus_APlus_AllCriteriaMet(t *testing.T) {
+// aPlusEntries meets every A+ criterion; cdsTags is the zone's CDS evidence.
+func aPlusEntries(cdsTags ...string) []Entry {
 	entries := []Entry{
-		// DNSSEC signed
 		e("DNSSEC", "DS07_SIGNED", "INFO"),
-		// Strong algorithm
 		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
-		// NSEC3 opt-out disabled
 		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
-		// CDS/CDNSKEY present
-		e("DNSSEC", "DS15_HAS_CDS_AND_CDNSKEY", "INFO"),
-		// IPv6 ASN found (implies IPv6 reachable)
 		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
-		// AS diversity
 		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
 	}
-	r := Compute("example.se", entries, cfg)
-	if r.Score != 100 {
-		t.Fatalf("expected perfect score for A+ check, got %d", r.Score)
+	for _, tag := range cdsTags {
+		entries = append(entries, e("DNSSEC", tag, "INFO"))
 	}
-	if !r.Bonus.Eligible {
-		t.Error("expected A+ eligible")
-	}
-	if r.Grade != "A+" {
-		t.Errorf("expected grade A+, got %s", r.Grade)
+	return entries
+}
+
+func cfgWith(mutate func(*Config)) Config {
+	c := DefaultConfig()
+	mutate(&c)
+	return c
+}
+
+const rolloverEvidence = "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE"
+
+func TestBonusCDSCriterion(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		domain   string
+		cdsTags  []string
+		want     *bool
+		grade    string
+		eligible bool
+	}{
+		{"published", "example.se", []string{"DS15_HAS_CDS_AND_CDNSKEY"}, boolPtr(true), "A+", true},
+		{"absent blocks A+", "example.se", []string{"DS15_NO_CDS_CDNSKEY"}, boolPtr(false), "A", false},
+		{"not applicable to a TLD", "se", nil, nil, "A+", true},
+		// On-demand publication (Knot DNS) must not read as false, or A+ is
+		// unreachable.
+		{"rollover evidence stands in", "example.se", []string{rolloverEvidence}, nil, "A+", true},
+		// They should not coexist; the precedence keeps the criterion defined.
+		{"DS15_HAS wins over rollover evidence", "example.se", []string{"DS15_HAS_CDS_AND_CDNSKEY", rolloverEvidence}, boolPtr(true), "A+", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := Compute(tc.domain, aPlusEntries(tc.cdsTags...), cfg)
+			if r.Score != 100 {
+				t.Fatalf("score = %d, want a perfect 100", r.Score)
+			}
+			got := r.Bonus.Criteria["cds_cdnskey_published"]
+			switch {
+			case tc.want == nil && got != nil:
+				t.Errorf("cds_cdnskey_published = %v, want nil", *got)
+			case tc.want != nil && got == nil:
+				t.Errorf("cds_cdnskey_published = nil, want %v", *tc.want)
+			case tc.want != nil && *got != *tc.want:
+				t.Errorf("cds_cdnskey_published = %v, want %v", *got, *tc.want)
+			}
+			if r.Bonus.Eligible != tc.eligible {
+				t.Errorf("eligible = %v, want %v", r.Bonus.Eligible, tc.eligible)
+			}
+			if r.Grade != tc.grade {
+				t.Errorf("grade = %s, want %s", r.Grade, tc.grade)
+			}
+		})
 	}
 }
 
-func TestBonus_AGradeWhenMissingCriteria(t *testing.T) {
-	// Perfect score but CDS/CDNSKEY missing.
-	entries := []Entry{
-		e("DNSSEC", "DS07_SIGNED", "INFO"),
-		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
-		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
-		e("DNSSEC", "DS15_NO_CDS_CDNSKEY", "INFO"), // missing
-		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
-		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
-	}
-	r := Compute("example.se", entries, cfg)
-	if r.Score != 100 {
-		t.Fatalf("expected perfect score, got %d", r.Score)
-	}
-	if r.Bonus.Eligible {
-		t.Error("should not be A+ eligible when CDS/CDNSKEY missing")
-	}
-	if r.Grade != "A" {
-		t.Errorf("expected grade A, got %s", r.Grade)
-	}
-	v := r.Bonus.Criteria["cds_cdnskey_published"]
-	if v == nil || *v {
-		t.Error("expected cds_cdnskey_published = false")
-	}
-}
-
-func TestBonus_CDSNotApplicableForTLD(t *testing.T) {
-	// TLD zones: CDS/CDNSKEY criterion must be nil (not applicable).
-	entries := []Entry{
-		e("DNSSEC", "DS07_SIGNED", "INFO"),
-		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
-		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
-		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
-		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
-	}
-	r := Compute("se", entries, cfg) // TLD
-	v := r.Bonus.Criteria["cds_cdnskey_published"]
-	if v != nil {
-		t.Errorf("expected cds_cdnskey_published nil for TLD, got %v", *v)
+// An empty tag set means the module never ran: not-met, not not-applicable.
+func TestBonusCriterionHelpers(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		fn   func(map[string]bool) *bool
+		tags []string
+		want *bool
+	}{
+		// A TLD using opt-out is acceptable, so the criterion does not apply.
+		{"nsec3 opt-out on a TLD", nsec3NonOptout, []string{"DS03_NSEC3_OPT_OUT_ENABLED_TLD"}, nil},
+		{"nsec3 opt-out below a TLD", nsec3NonOptout, []string{"DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD"}, boolPtr(false)},
+		{"zone not signed", dnssecEnabled, []string{"DS07_NOT_SIGNED"}, boolPtr(false)},
+		{"dnssec not run", dnssecEnabled, nil, boolPtr(false)},
+		{"deprecated algorithm", strongAlgorithm, []string{"DS05_ALGO_DEPRECATED"}, boolPtr(false)},
+		{"ipv6 disabled", ipv6AllNameservers, []string{"IPV6_DISABLED"}, boolPtr(false)},
+		{"ipv6 disabled by CN01", ipv6AllNameservers, []string{"CN01_IPV6_DISABLED"}, boolPtr(false)},
+		{"ipv4 addresses in different ASNs", asDiversity, []string{"IPV4_DIFFERENT_ASN"}, boolPtr(true)},
+		{"ipv4 addresses in one ASN", asDiversity, []string{"IPV4_ONE_ASN"}, boolPtr(false)},
+		{"AS lookup not run", asDiversity, nil, boolPtr(false)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			tags := map[string]bool{}
+			for _, tag := range tc.tags {
+				tags[tag] = true
+			}
+			got := tc.fn(tags)
+			switch {
+			case tc.want == nil && got != nil:
+				t.Fatalf("got %v, want nil", *got)
+			case tc.want != nil && got == nil:
+				t.Fatalf("got nil, want %v", *tc.want)
+			case tc.want != nil && *got != *tc.want:
+				t.Fatalf("got %v, want %v", *got, *tc.want)
+			}
+		})
 	}
 }
 
@@ -360,90 +393,6 @@ func TestBonus_TLDWithTrailingDot(t *testing.T) {
 	}
 	if isTLDZone("example.se.") {
 		t.Error("expected isTLDZone(\"example.se.\") = false")
-	}
-}
-
-func TestBonus_NSEC3OptOutTLDIsNil(t *testing.T) {
-	// DS03_NSEC3_OPT_OUT_ENABLED_TLD means TLD using opt-out, which is
-	// acceptable: criterion should be nil (not applicable), not false.
-	tags := map[string]bool{"DS03_NSEC3_OPT_OUT_ENABLED_TLD": true}
-	v := nsec3NonOptout(tags)
-	if v != nil {
-		t.Errorf("expected nil for TLD opt-out tag, got %v", *v)
-	}
-}
-
-func TestBonus_NSEC3OptOutNonTLDIsFalse(t *testing.T) {
-	tags := map[string]bool{"DS03_NSEC3_OPT_OUT_ENABLED_NON_TLD": true}
-	v := nsec3NonOptout(tags)
-	if v == nil || *v {
-		t.Error("expected false for non-TLD opt-out")
-	}
-}
-
-func TestBonus_DNSSECNotSigned(t *testing.T) {
-	tags := map[string]bool{"DS07_NOT_SIGNED": true}
-	v := dnssecEnabled(tags)
-	if v == nil || *v {
-		t.Error("expected false when DS07_NOT_SIGNED present")
-	}
-}
-
-func TestBonus_DNSSECNotRun(t *testing.T) {
-	// Neither SIGNED nor NOT_SIGNED: test not run → treated as not met (false).
-	tags := map[string]bool{}
-	v := dnssecEnabled(tags)
-	if v == nil || *v {
-		t.Error("expected false when DNSSEC test not run")
-	}
-}
-
-func TestBonus_StrongAlgorithmDeprecated(t *testing.T) {
-	tags := map[string]bool{"DS05_ALGO_DEPRECATED": true}
-	v := strongAlgorithm(tags)
-	if v == nil || *v {
-		t.Error("expected false for deprecated algorithm")
-	}
-}
-
-func TestBonus_IPv6DisabledIsFalse(t *testing.T) {
-	tags := map[string]bool{"IPV6_DISABLED": true}
-	v := ipv6AllNameservers(tags)
-	if v == nil || *v {
-		t.Error("expected false when IPV6_DISABLED present")
-	}
-}
-
-func TestBonus_IPv6CN01DisabledIsFalse(t *testing.T) {
-	tags := map[string]bool{"CN01_IPV6_DISABLED": true}
-	v := ipv6AllNameservers(tags)
-	if v == nil || *v {
-		t.Error("expected false when CN01_IPV6_DISABLED present")
-	}
-}
-
-func TestBonus_ASDiversityTrue(t *testing.T) {
-	tags := map[string]bool{"IPV4_DIFFERENT_ASN": true}
-	v := asDiversity(tags)
-	if v == nil || !*v {
-		t.Error("expected true for IPV4_DIFFERENT_ASN")
-	}
-}
-
-func TestBonus_ASDiversityFalse(t *testing.T) {
-	tags := map[string]bool{"IPV4_ONE_ASN": true}
-	v := asDiversity(tags)
-	if v == nil || *v {
-		t.Error("expected false for IPV4_ONE_ASN with no IPv6 diversity")
-	}
-}
-
-func TestBonus_ASDiversityNotRun(t *testing.T) {
-	// AS lookup not run → treated as not met (false).
-	tags := map[string]bool{}
-	v := asDiversity(tags)
-	if v == nil || *v {
-		t.Error("expected false when AS lookup not run")
 	}
 }
 
@@ -534,30 +483,6 @@ func TestLoadConfig_RenamedTagCurrentKeyWins(t *testing.T) {
 	}
 }
 
-func TestCompute_TagPenaltyOverridesSeverity(t *testing.T) {
-	// DS07_NOT_SIGNED is WARNING (5 pts by severity) but gets 20 pts via TagPenalties.
-	entries := []Entry{
-		e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"),
-	}
-	r := Compute("example.se", entries, cfg)
-	cat := r.Categories["dnssec"]
-	if cat.Penalties != 20 {
-		t.Errorf("expected dnssec penalties 20 (tag override), got %d", cat.Penalties)
-	}
-}
-
-func TestCompute_NoDSForSignedZonePenalty(t *testing.T) {
-	// DS07_NO_DS_FOR_SIGNED_ZONE is WARNING but gets 20 pts via TagPenalties.
-	entries := []Entry{
-		e("DNSSEC", "DS07_NO_DS_FOR_SIGNED_ZONE", "WARNING"),
-	}
-	r := Compute("example.se", entries, cfg)
-	cat := r.Categories["dnssec"]
-	if cat.Penalties != 20 {
-		t.Errorf("expected dnssec penalties 20 (tag override), got %d", cat.Penalties)
-	}
-}
-
 func TestCompute_TagPenaltyScoreImpact(t *testing.T) {
 	// DS07_NOT_SIGNED with 20-pt penalty: dnssec sub-score = 80.
 	// Weighted: (80*1.5 + 100*1.2 + 100*1.0 + 100*0.8) / 4.5
@@ -571,137 +496,86 @@ func TestCompute_TagPenaltyScoreImpact(t *testing.T) {
 	}
 }
 
-func TestCompute_TagPenaltyCanBeDisabledByZero(t *testing.T) {
-	// Setting a tag penalty to 0 means no penalty even if severity would give one.
-	custom := DefaultConfig()
-	custom.TagPenalties["DS07_NOT_SIGNED"] = 0
-	entries := []Entry{
-		e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"),
-	}
-	r := Compute("example.se", entries, custom)
-	cat := r.Categories["dnssec"]
-	if cat.Penalties != 0 {
-		t.Errorf("expected 0 penalty when tag penalty set to 0, got %d", cat.Penalties)
-	}
-}
-
-func TestCompute_NoIPv6NSChildPenalty(t *testing.T) {
-	// NO_IPV6_NS_CHILD is NOTICE (1 pt) but must get 20 pts via TagPenalties.
-	entries := []Entry{
-		e("DELEGATION", "NO_IPV6_NS_CHILD", "NOTICE"),
-	}
-	r := Compute("example.se", entries, cfg)
-	cat := r.Categories["nameserver_health"]
-	if cat.Penalties != 20 {
-		t.Errorf("expected nameserver_health penalties 20, got %d", cat.Penalties)
-	}
-}
-
-func TestCompute_NoIPv6NSDelPenalty(t *testing.T) {
-	entries := []Entry{
-		e("DELEGATION", "NO_IPV6_NS_DEL", "NOTICE"),
-	}
-	r := Compute("example.se", entries, cfg)
-	cat := r.Categories["nameserver_health"]
-	if cat.Penalties != 20 {
-		t.Errorf("expected nameserver_health penalties 20, got %d", cat.Penalties)
+// Severity alone gives 5 points for WARNING and 1 for NOTICE.
+func TestComputeTagPenalties(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		entry    Entry
+		config   Config
+		category string
+		want     int
+	}{
+		{"not signed overrides its severity", e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"), cfg, "dnssec", 20},
+		{"no DS for a signed zone", e("DNSSEC", "DS07_NO_DS_FOR_SIGNED_ZONE", "WARNING"), cfg, "dnssec", 20},
+		{"no IPv6 NS at the child", e("DELEGATION", "NO_IPV6_NS_CHILD", "NOTICE"), cfg, "nameserver_health", 20},
+		{"no IPv6 NS in the delegation", e("DELEGATION", "NO_IPV6_NS_DEL", "NOTICE"), cfg, "nameserver_health", 20},
+		{"not enough IPv6 NS keeps its severity", e("DELEGATION", "NOT_ENOUGH_IPV6_NS_CHILD", "ERROR"), cfg, "nameserver_health", 20},
+		{"an unlisted tag keeps its severity", e("DNSSEC", "DS04_RRSIG_EXPIRY_SOON", "WARNING"), cfg, "dnssec", 5},
+		{
+			name:     "a zero override cancels the severity penalty",
+			entry:    e("DNSSEC", "DS07_NOT_SIGNED", "WARNING"),
+			config:   cfgWith(func(c *Config) { c.TagPenalties["DS07_NOT_SIGNED"] = 0 }),
+			category: "dnssec",
+			want:     0,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			r := Compute("example.se", []Entry{tc.entry}, tc.config)
+			if got := r.Categories[tc.category].Penalties; got != tc.want {
+				t.Errorf("%s penalties = %d, want %d", tc.category, got, tc.want)
+			}
+		})
 	}
 }
 
-func TestCompute_NotEnoughIPv6UsesErrorSeverity(t *testing.T) {
-	// NOT_ENOUGH_IPV6_NS_CHILD is already ERROR (20 pts by severity); no override needed.
-	entries := []Entry{
-		e("DELEGATION", "NOT_ENOUGH_IPV6_NS_CHILD", "ERROR"),
-	}
-	r := Compute("example.se", entries, cfg)
-	cat := r.Categories["nameserver_health"]
-	if cat.Penalties != 20 {
-		t.Errorf("expected nameserver_health penalties 20, got %d", cat.Penalties)
+func TestComputeTagPenaltyScoreImpact(t *testing.T) {
+	// DS07_NOT_SIGNED costs 20, so dnssec scores 80. Weighted:
+	// (80*1.5 + 100*1.2 + 100*1.0 + 100*0.8) / 4.5 = 420/4.5 = 93.
+	r := Compute("example.se", []Entry{e("DNSSEC", "DS07_NOT_SIGNED", "WARNING")}, cfg)
+	if r.Score != 93 {
+		t.Errorf("expected score 93 with DS07_NOT_SIGNED penalty, got %d", r.Score)
 	}
 }
 
-func TestCompute_N15SoftwareVersionNopenalty(t *testing.T) {
-	// N15_SOFTWARE_VERSION is NOTICE but must carry zero penalty - it is a
-	// cosmetic privacy notice, not a zone health issue.
-	entries := []Entry{
-		e("NAMESERVER", "N15_SOFTWARE_VERSION", "NOTICE"),
-		e("NAMESERVER", "N15_SOFTWARE_VERSION", "NOTICE"),
-	}
-	r := Compute("example.se", entries, cfg)
-	if r.Score != 100 {
-		t.Errorf("expected score 100 with N15_SOFTWARE_VERSION entries, got %d", r.Score)
-	}
-}
-
-func TestCompute_N16HasNSIDNopenalty(t *testing.T) {
-	// N16_HAS_NSID is NOTICE but should be informational only when a server
-	// returns NSID in response to an explicit NSID query.
-	entries := []Entry{
-		e("NAMESERVER", "N16_HAS_NSID", "NOTICE"),
-		e("NAMESERVER", "N16_HAS_NSID", "NOTICE"),
-	}
-	r := Compute("example.se", entries, cfg)
-	if r.Score != 100 {
-		t.Errorf("expected score 100 with N16_HAS_NSID entries, got %d", r.Score)
-	}
-	cat := r.Categories["nameserver_health"]
-	if cat.Penalties != 0 {
-		t.Errorf("expected nameserver_health penalties 0 for N16_HAS_NSID, got %d", cat.Penalties)
-	}
-}
-
-func TestCompute_RSAExponentUnsupportedNopenalty(t *testing.T) {
-	// DS0x_RSA_EXPONENT_UNSUPPORTED is a NOTICE flagging that the RRSIG could not
-	// be verified locally because of a large RSA public exponent. The zone can be
-	// perfectly valid, so this local limitation must carry zero penalty - unlike a
-	// bare NOTICE, which would otherwise deduct one point each.
-	entries := []Entry{
-		e("DNSSEC", "DS02_RSA_EXPONENT_UNSUPPORTED", "NOTICE"),
-		e("DNSSEC", "DS08_RSA_EXPONENT_UNSUPPORTED", "NOTICE"),
-		e("DNSSEC", "DS09_RSA_EXPONENT_UNSUPPORTED", "NOTICE"),
-	}
-	r := Compute("example.se", entries, cfg)
-	if r.Score != 100 {
-		t.Errorf("expected score 100 with RSA_EXPONENT_UNSUPPORTED entries, got %d", r.Score)
-	}
-	if cat := r.Categories["dnssec"]; cat.Penalties != 0 {
-		t.Errorf("expected dnssec penalties 0 for RSA_EXPONENT_UNSUPPORTED, got %d", cat.Penalties)
-	}
-}
-
-func TestCompute_Z13SpfMacroTargetNopenalty(t *testing.T) {
-	// Z13_SPF_MACRO_TARGET is NOTICE but should carry no penalty - the SPF
-	// construct is valid, only the sub-lookup count is unauditable.
-	entries := []Entry{
-		e("ZONE", "Z13_SPF_MACRO_TARGET", "NOTICE"),
-		e("ZONE", "Z13_SPF_MACRO_TARGET", "NOTICE"),
-	}
-	r := Compute("example.com", entries, cfg)
-	if r.Score != 100 {
-		t.Errorf("expected score 100 with Z13_SPF_MACRO_TARGET entries, got %d", r.Score)
-	}
-	cat := r.Categories["zone_consistency"]
-	if cat.Penalties != 0 {
-		t.Errorf("expected zone_consistency penalties 0 for Z13_SPF_MACRO_TARGET, got %d", cat.Penalties)
-	}
-}
-
-func TestCompute_TagPenaltyNotAffectingOtherTags(t *testing.T) {
-	// A regular WARNING tag should still use the severity penalty (5 pts).
-	entries := []Entry{
-		e("DNSSEC", "DS04_RRSIG_EXPIRY_SOON", "WARNING"),
-	}
-	r := Compute("example.se", entries, cfg)
-	cat := r.Categories["dnssec"]
-	if cat.Penalties != 5 {
-		t.Errorf("expected severity-based penalty 5 for unlisted tag, got %d", cat.Penalties)
+// These tags report a fact, not a fault; a bare NOTICE would cost a point each.
+func TestComputeScoreNeutralTags(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		domain   string
+		module   string
+		category string
+		tags     []string
+	}{
+		{"software version", "example.se", "NAMESERVER", "nameserver_health", []string{"N15_SOFTWARE_VERSION", "N15_SOFTWARE_VERSION"}},
+		{"NSID present", "example.se", "NAMESERVER", "nameserver_health", []string{"N16_HAS_NSID", "N16_HAS_NSID"}},
+		{
+			name: "unsupported RSA exponent", domain: "example.se",
+			module: "DNSSEC", category: "dnssec",
+			tags: []string{"DS02_RSA_EXPONENT_UNSUPPORTED", "DS08_RSA_EXPONENT_UNSUPPORTED", "DS09_RSA_EXPONENT_UNSUPPORTED"},
+		},
+		{"SPF macro target", "example.com", "ZONE", "zone_consistency", []string{"Z13_SPF_MACRO_TARGET", "Z13_SPF_MACRO_TARGET"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			entries := make([]Entry, len(tc.tags))
+			for i, tag := range tc.tags {
+				entries[i] = e(tc.module, tag, "NOTICE")
+			}
+			r := Compute(tc.domain, entries, cfg)
+			if r.Score != 100 {
+				t.Errorf("score = %d, want 100", r.Score)
+			}
+			if got := r.Categories[tc.category].Penalties; got != 0 {
+				t.Errorf("%s penalties = %d, want 0", tc.category, got)
+			}
+		})
 	}
 }
 
 func TestBonus_DisabledCriteriaNotInResult(t *testing.T) {
-	custom := DefaultConfig()
-	custom.BonusCriteria.CDSCDNSKEYPublished = false
-	custom.BonusCriteria.IPv6AllNameservers = false
+	custom := cfgWith(func(c *Config) {
+		c.BonusCriteria.CDSCDNSKEYPublished = false
+		c.BonusCriteria.IPv6AllNameservers = false
+	})
 
 	r := Compute("example.se", nil, custom)
 	if _, ok := r.Bonus.Criteria["cds_cdnskey_published"]; ok {
@@ -712,98 +586,8 @@ func TestBonus_DisabledCriteriaNotInResult(t *testing.T) {
 	}
 }
 
-// TestBonus_CDSRolloverEvidenceIsNil checks that DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE
-// causes the cds_cdnskey_published criterion to be nil (not-applicable, not false),
-// so that on-demand CDS/CDNSKEY publication (e.g. Knot DNS) does not block A+.
-func TestBonus_CDSRolloverEvidenceIsNil(t *testing.T) {
-	entries := []Entry{
-		e("DNSSEC", "DS07_SIGNED", "INFO"),
-		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
-		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
-		// No DS15_HAS_* tag; rollover evidence seen instead.
-		e("DNSSEC", "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE", "INFO"),
-		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
-		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
-	}
-	r := Compute("example.se", entries, cfg)
-	v := r.Bonus.Criteria["cds_cdnskey_published"]
-	if v != nil {
-		t.Errorf("expected cds_cdnskey_published nil for rollover-evidence zone, got %v", *v)
-	}
-}
-
-// TestBonus_APlusWithRolloverEvidence verifies a zone with rollover evidence but
-// no CDS/CDNSKEY and a perfect score receives grade A+.
-func TestBonus_APlusWithRolloverEvidence(t *testing.T) {
-	entries := []Entry{
-		e("DNSSEC", "DS07_SIGNED", "INFO"),
-		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
-		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
-		e("DNSSEC", "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE", "INFO"),
-		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
-		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
-	}
-	r := Compute("example.se", entries, cfg)
-	if r.Score != 100 {
-		t.Fatalf("expected perfect score, got %d", r.Score)
-	}
-	if !r.Bonus.Eligible {
-		t.Error("expected A+ eligible when rollover evidence substitutes CDS/CDNSKEY")
-	}
-	if r.Grade != "A+" {
-		t.Errorf("expected grade A+, got %s", r.Grade)
-	}
-}
-
-// TestBonus_NoCDSWithoutRolloverEvidence verifies that absence of both
-// DS15_HAS_* and DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE still blocks A+.
-func TestBonus_NoCDSWithoutRolloverEvidence(t *testing.T) {
-	entries := []Entry{
-		e("DNSSEC", "DS07_SIGNED", "INFO"),
-		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
-		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
-		e("DNSSEC", "DS15_NO_CDS_CDNSKEY", "INFO"),
-		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
-		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
-	}
-	r := Compute("example.se", entries, cfg)
-	if r.Score != 100 {
-		t.Fatalf("expected perfect score, got %d", r.Score)
-	}
-	if r.Bonus.Eligible {
-		t.Error("should not be A+ eligible when no CDS/CDNSKEY and no rollover evidence")
-	}
-	v := r.Bonus.Criteria["cds_cdnskey_published"]
-	if v == nil || *v {
-		t.Error("expected cds_cdnskey_published = false")
-	}
-}
-
-// TestBonus_DS15HasCDSWinsOverDS18RolloverEvidence locks the precedence: when a
-// DS15_HAS_* tag is present, cds_cdnskey_published is true regardless of any
-// DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE marker (which would otherwise yield
-// nil). The two should never coexist in practice, but the precedence keeps the
-// criterion well-defined if they do.
-func TestBonus_DS15HasCDSWinsOverDS18RolloverEvidence(t *testing.T) {
-	entries := []Entry{
-		e("DNSSEC", "DS07_SIGNED", "INFO"),
-		e("DNSSEC", "DS05_ALGO_OK", "INFO"),
-		e("DNSSEC", "DS03_NSEC3_OPT_OUT_DISABLED", "INFO"),
-		e("DNSSEC", "DS15_HAS_CDS_AND_CDNSKEY", "INFO"),
-		e("DNSSEC", "DS18_NO_CDS_CDNSKEY_BUT_ROLLOVER_EVIDENCE", "INFO"),
-		e("CONNECTIVITY", "IPV6_DIFFERENT_ASN", "INFO"),
-		e("CONNECTIVITY", "IPV4_DIFFERENT_ASN", "INFO"),
-	}
-	r := Compute("example.se", entries, cfg)
-	v := r.Bonus.Criteria["cds_cdnskey_published"]
-	if v == nil || !*v {
-		t.Errorf("expected cds_cdnskey_published = true (DS15_HAS_* wins), got %v", v)
-	}
-}
-
 func TestSystemTagsAreScoreNeutral(t *testing.T) {
-	// SYSTEM-module entries (such as the non-global query guard skip) are not
-	// mapped to any scoring category, so they must never change score or grade.
+	// SYSTEM entries map to no scoring category.
 	base := []Entry{{Module: "BASIC", Tag: "B01_OK", Level: "NOTICE"}}
 	withGuard := append(append([]Entry{}, base...),
 		Entry{Module: "System", Tag: "NON_GLOBAL_QUERY_BLOCKED", Level: "NOTICE"})

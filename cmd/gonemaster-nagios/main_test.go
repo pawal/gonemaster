@@ -69,12 +69,8 @@ func TestMaxLevel(t *testing.T) {
 	}
 }
 
-// TestRunVerboseSanitizesAttackerControlChars feeds the nagios verbose
-// output a log entry whose args carry ANSI escapes, NUL, CR and the
-// Nagios pipe separator. None of these may reach stdout verbatim:
-//   - ANSI / NUL / CR would allow terminal hijack in nagios web UIs and
-//     interactive runs;
-//   - a raw pipe character would corrupt Nagios perfdata parsing.
+// ANSI, NUL and CR would allow terminal hijack in nagios web UIs, and a raw
+// pipe would corrupt Nagios perfdata parsing.
 func TestRunVerboseSanitizesAttackerControlChars(t *testing.T) {
 	enginetest.Stub(t, &runEngine, func(_ engine.RunRequest) ([]engine.LogEntry, error) {
 		return []engine.LogEntry{{
@@ -111,10 +107,8 @@ func TestRunVerboseSanitizesAttackerControlChars(t *testing.T) {
 		}
 	}
 
-	// The raw \n inside trailing="ok\r\nfake|perf=999" must have been
-	// escaped, so the literal pipe-separator attack cannot start a new
-	// physical line. Count newlines: 1 for ZONE status + 1 for the one
-	// verbose entry = 2 total.
+	// With the injected \n escaped, the pipe-separator attack cannot start a
+	// new line: 1 newline for the status, 1 for the single verbose entry.
 	if n := bytes.Count(body, []byte{'\n'}); n != 2 {
 		t.Fatalf("expected 2 newlines (status + 1 entry), got %d in %q", n, body)
 	}

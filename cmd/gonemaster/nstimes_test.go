@@ -81,13 +81,8 @@ func TestWriteNSTimesFormat(t *testing.T) {
 	}
 }
 
-// TestWriteNSTimesReportsTimeoutAndRefusedColumns pins the two counter
-// columns and their grand totals. The interesting row is the mixed one: an
-// address that answers most queries and still drops or refuses some looks
-// perfectly healthy in every other column, which is precisely why the
-// counters were added. The two columns are adjacent and hold small
-// integers, so a swap between them would go unnoticed without an assertion
-// that distinguishes their values.
+// The two counters are adjacent and hold small integers, so the rows use
+// different values to catch a swap between them.
 func TestWriteNSTimesReportsTimeoutAndRefusedColumns(t *testing.T) {
 	timings := map[string][]time.Duration{
 		"ns1.example.com/192.0.2.1": {10 * time.Millisecond, 20 * time.Millisecond},

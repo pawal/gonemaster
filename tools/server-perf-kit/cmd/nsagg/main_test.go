@@ -10,10 +10,8 @@ import (
 	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
-// TestAddrStatsAccumulatesAcrossRuns pins the central claim of the tool: one
-// address is seen once per run, and the interesting quantities are sums over
-// the whole batch. A rate limiter that drops one query in ten is invisible in
-// any single run's row and obvious in the sum over 500 of them.
+// A rate limiter dropping one query in ten is invisible in any single run's
+// row and obvious in the sum over 500 of them, so the sums are the point.
 func TestAddrStatsAccumulatesAcrossRuns(t *testing.T) {
 	s := &addrStats{nameserver: "ns01.example", address: "192.0.2.1"}
 	s.add(nameserverTiming{Count: 40, MedianMS: 10, MaxMS: 30, Status: "ok"}, 0)
@@ -49,18 +47,8 @@ func TestAddrStatsAccumulatesAcrossRuns(t *testing.T) {
 	}
 }
 
-// TestEngagementReplayIsPerRunAndRequiresAPriorAnswer pins the replay used
-// to estimate how often a backoff trigger would fire on a corpus that is
-// not being rate limited. Two conditions have to hold together, and each
-// has a distinct failure mode if dropped:
-//
-//   - Per run, never summed. An address seen in fifty runs with one timeout
-//     each sums to fifty and engages in none of them; summing first would
-//     report a spurious-engagement rate near 100% on any large corpus.
-//   - The address must have answered. "Timed out after answering" is the
-//     whole thing separating a rate limiter (drops excess, answers the
-//     rest) from a dead server, which fast-fail and blacklisting already
-//     handle.
+// Summing across runs would report near-100% spurious engagement on any large
+// corpus, and an address that never answered is dead rather than limited.
 func TestEngagementReplayIsPerRunAndRequiresAPriorAnswer(t *testing.T) {
 	s := &addrStats{}
 	// Below threshold in each run, and three runs' worth in total: a sum
@@ -89,10 +77,8 @@ func TestEngagementReplayIsPerRunAndRequiresAPriorAnswer(t *testing.T) {
 	}
 }
 
-// TestRatioUsesAttemptsNotAnswers documents the denominator choice. A timeout
-// produces no answer and therefore no entry in Count, so dividing by Count
-// alone would understate the drop rate; the denominator has to be answers
-// plus timeouts, i.e. what we actually asked the address for.
+// A timeout leaves no entry in Count, so the denominator has to be answers
+// plus timeouts or the drop rate reads low.
 func TestRatioUsesAttemptsNotAnswers(t *testing.T) {
 	if got := ratio(10, 100); got != "0.100000" {
 		t.Fatalf("ratio(10, 100) = %q, want 0.100000", got)
@@ -172,11 +158,8 @@ func TestAggregateBatchSurvivesAMissingRunResult(t *testing.T) {
 	}
 }
 
-// TestListBatchRunsPagesPastTheServerCap covers the trap that a 500-domain
-// farm corpus walks straight into: the runs endpoint refuses any limit above
-// 500, and a single unpaged request would have silently dropped every run
-// past the cap - producing a smaller, cleaner-looking aggregate rather than
-// an error.
+// The runs endpoint refuses a limit above 500, so an unpaged request drops
+// every run past the cap - a cleaner-looking aggregate rather than an error.
 func TestListBatchRunsPagesPastTheServerCap(t *testing.T) {
 	const total = 1200
 	var requests []string

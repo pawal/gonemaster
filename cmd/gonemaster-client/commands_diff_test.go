@@ -41,10 +41,8 @@ func diffFixture(t *testing.T, entriesByRun map[string][]apitest.Entry) {
 	}))
 }
 
-// TestRunsDiffIdenticalRunsExitZero is the shape the zero-delta gates use:
-// two runs of the same domain under different knob settings must produce
-// byte-identical tag/severity sets, and the command has to say so with an
-// exit code a shell loop can test.
+// The zero-delta gate: two runs of one domain under different knob settings
+// must compare identical, with an exit code a shell loop can test.
 func TestRunsDiffIdenticalRunsExitZero(t *testing.T) {
 	entries := []apitest.Entry{
 		{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"},
@@ -57,10 +55,8 @@ func TestRunsDiffIdenticalRunsExitZero(t *testing.T) {
 	res.RequireOutContains(t, "No tag or severity changes")
 }
 
-// TestRunsDiffReportsAddedRemovedChanged covers the three delta kinds and
-// the non-zero exit that makes the command usable as a gate. The severity
-// change is the subtle one: the tag is present in both runs, so a naive
-// set difference would call the runs identical.
+// The severity change is the subtle delta: the tag is in both runs, so a
+// naive set difference would call them identical.
 func TestRunsDiffReportsAddedRemovedChanged(t *testing.T) {
 	before, after := apitest.DiffPair()
 	diffFixture(t, map[string][]apitest.Entry{"a": before, "b": after})
@@ -85,9 +81,8 @@ func TestRunsDiffReportsAddedRemovedChanged(t *testing.T) {
 	}
 }
 
-// TestRunsDiffQuietSuppressesOutput keeps the gate usable inside a matrix
-// script, where only the exit status matters and per-domain output would
-// bury the summary.
+// Inside a matrix script only the exit status matters, and per-domain output
+// would bury the summary.
 func TestRunsDiffQuietSuppressesOutput(t *testing.T) {
 	before := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
 	after := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "ERROR"}}
@@ -100,11 +95,8 @@ func TestRunsDiffQuietSuppressesOutput(t *testing.T) {
 	}
 }
 
-// TestWorstLevelByTagKeepsHighestSeverity pins the collapse rule shared with
-// the MCP run_diff tool. A tag emitted several times in one run (once per
-// nameserver, typically) must be represented by its worst level, or a run
-// where one address degraded would look unchanged as long as another
-// address still emitted the tag at the old level.
+// A tag emitted once per nameserver must collapse to its worst level, or one
+// degraded address hides behind the others still emitting the old level.
 func TestWorstLevelByTagKeepsHighestSeverity(t *testing.T) {
 	result := jobResult{Raw: &jobResultRaw{Entries: []jobResultEntry{
 		{Module: "NAMESERVER", Tag: "N11_NO_RESPONSE", Level: "INFO"},
@@ -177,11 +169,8 @@ func batchDiffFixture(t *testing.T, batches map[string]map[string][]apitest.Entr
 	}))
 }
 
-// TestBatchesDiffRollsUpTagsAcrossDomains is the instrument the farm
-// characterization reads: two runs of the same corpus under different load,
-// answering "how many domains gained a finding, and which finding". A
-// per-domain view alone cannot answer that, and a batch-level grade
-// histogram cannot say which tag moved.
+// "How many domains gained a finding, and which finding" - a per-domain view
+// cannot answer that, and a grade histogram cannot say which tag moved.
 func TestBatchesDiffRollsUpTagsAcrossDomains(t *testing.T) {
 	clean := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
 	broke := []apitest.Entry{
@@ -212,13 +201,8 @@ func TestBatchesDiffRollsUpTagsAcrossDomains(t *testing.T) {
 	}
 }
 
-// TestBatchesDiffReportsUncomparableDomains keeps a batch that lost domains
-// from quietly shrinking the denominator: a domain tested in only one arm
-// cannot contribute a delta, and silently dropping it would make a run that
-// failed to complete look cleaner than one that did. An unmatched domain is
-// therefore not agreement, and the exit status has to say so - a gate that
-// returned 0 here would read a batch that tested one domain of five hundred
-// as "no findings changed".
+// A domain tested in one arm has no delta; dropping it silently would read a
+// batch that tested one domain of five hundred as "no findings changed".
 func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
 	clean := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
 	batchDiffFixture(t, map[string]map[string][]apitest.Entry{
@@ -243,10 +227,8 @@ func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
 	}
 }
 
-// TestBatchesDiffTreatsEmptyRunsAsUnusable covers the case where both arms
-// broke the same way. Two runs with no entries produce two empty tag maps,
-// which compare as identical; counting that as agreement would let a gate
-// pass a comparison in which nothing actually ran.
+// Two runs with no entries compare as identical; counting that as agreement
+// would pass a comparison in which nothing actually ran.
 func TestBatchesDiffTreatsEmptyRunsAsUnusable(t *testing.T) {
 	clean := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
 	batchDiffFixture(t, map[string]map[string][]apitest.Entry{
@@ -286,10 +268,8 @@ func TestBatchesDiffRefusesToTruncate(t *testing.T) {
 	res.RequireErrContains(t, "above the --limit")
 }
 
-// TestWorstLevelByTagRanksDebugLevels pins the severity ordering against the
-// engine's own. An unranked level ties with every other unranked one, so the
-// collapse keeps whichever entry happened to arrive first and two identical
-// runs can report a severity change.
+// An unranked level ties with every other unranked one, so the collapse keeps
+// whichever entry arrived first and two identical runs report a change.
 func TestWorstLevelByTagRanksDebugLevels(t *testing.T) {
 	forward := worstLevelByTag(jobResult{Raw: &jobResultRaw{Entries: []jobResultEntry{
 		{Module: "SYSTEM", Tag: "X", Level: "DEBUG2"},

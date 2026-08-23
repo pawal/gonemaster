@@ -17,15 +17,8 @@ func TestEmbeddedAssetsPresent(t *testing.T) {
 	}
 }
 
-// gonemaster and Zonemaster are distinct projects, and the message catalogs
-// were inherited from an upstream reference that named itself in its own
-// result text. A leftover reference reaches real users: a DNSSEC notice once
-// told them their key was unsupported "by this installation of Zonemaster",
-// naming a product that is not the one they ran.
-//
-// The catalogs are data, so no compiler catches this. Guard every embedded
-// locale at once rather than one string at a time, since the failure mode is a
-// new or re-synced translation quietly reintroducing the name.
+// A notice once told users their key was unsupported "by this installation of
+// Zonemaster". The catalogs are data, so nothing else catches a re-synced one.
 func TestNoForeignProductNameInCatalogs(t *testing.T) {
 	entries, err := POFiles.ReadDir("lang")
 	if err != nil {

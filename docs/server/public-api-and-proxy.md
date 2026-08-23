@@ -173,6 +173,14 @@ flag (default `true`) gates it: when off or the id is unknown it returns `404`
 `not_found`; a run without chain data returns `404` `no_chain_data` (uncached).
 The result payload's `has_dnssec_chain` marker tells the UI when to fetch it.
 
+The document carries its own `version`. Version 2 adds `servers_stale` on both
+`parent` and `child` (the servers that answered with a signature outside its
+validity window) and captures NSEC and NSEC3 signatures alongside SOA, CDS and
+CDNSKEY. The roll-up `status` is `partial` when the validated path holds but
+some servers serve expired or not-yet-valid signatures, so resolvers reaching
+those servers may still fail. Documents stored before this change stay at
+version 1 and have neither field.
+
 ## Reverse Proxy
 
 Configure the proxy so public paths are reachable and admin paths are blocked

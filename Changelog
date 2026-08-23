@@ -7,9 +7,12 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - tests: the Go and frontend test suites are refactored onto shared test-support packages, with repetitive groups converted to tables; no behaviour change
+- engine: DNSSEC chain summaries move to schema version 2 (adds `servers_stale` and NSEC/NSEC3 signatures)
 
 ### Fixed
 
+- engine: the DNSSEC chain reports `partial`, not `secure`, when only some nameservers serve expired signatures
+- ui-public: an expired chain signature is no longer hidden behind a fresh one, and stale nameservers are listed
 - ui-public: the DNSSEC chain of trust names ML-DSA-44 instead of showing "alg 18"
 - server: in `nogui` builds the analysis dashboard path returns 404 for asset requests instead of serving the info page with 200
 

@@ -2812,7 +2812,10 @@ components:
       properties:
         version:
           type: integer
-          description: Schema version of the chain document.
+          description: >
+            Schema version of the chain document. Version 2 added
+            `servers_stale` on `parent` and `child` plus NSEC/NSEC3 signatures.
+          example: 2
         zone:
           type: string
         parent_zone:
@@ -2822,6 +2825,10 @@ components:
           enum: [normal, undelegated]
         status:
           type: string
+          description: >
+            Roll-up verdict. `partial` means the validated path holds but some
+            servers serve signatures outside their validity window, or a
+            DS-anchored signature cannot be verified locally.
           enum: [secure, broken, partial, island, unsigned, indeterminate]
         truncated:
           type: boolean

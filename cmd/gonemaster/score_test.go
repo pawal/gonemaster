@@ -21,57 +21,59 @@ func sampleEntries() []engine.LogEntry {
 	}
 }
 
-// ── --score / --no-score ──────────────────────────────────────────────────────
-
-func TestScoreNotShownByDefault(t *testing.T) {
-	enginetest.Entries(t, &runEngine, sampleEntries()...)
-	res := clitest.Run(t, run, "example.se")
-	res.RequireCode(t, 0)
-	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
-		t.Fatalf("expected no score by default, got stdout=%q stderr=%q", res.Out, res.Err)
-	}
+// scoreCase is one CLI invocation and what the score line does in it: want
+// is required on stdout, absent must appear on neither stream.
+type scoreCase struct {
+	name    string
+	entries []engine.LogEntry
+	args    []string
+	want    []string
+	absent  []string
 }
 
-func TestScoreShownWithFlag(t *testing.T) {
-	enginetest.Entries(t, &runEngine, sampleEntries()...)
-	res := clitest.Run(t, run, "--score", "example.se")
-	res.RequireCode(t, 0)
-	res.RequireOutContains(t, "Score:")
-}
+func TestScoreFlagCombinations(t *testing.T) {
+	cfgPath := clitest.WriteScoringConfig(t)
 
-func TestNoScoreSuppressesScore(t *testing.T) {
-	enginetest.Entries(t, &runEngine, sampleEntries()...)
-	res := clitest.Run(t, run, "--score", "--no-score", "example.se")
-	res.RequireCode(t, 0)
-	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
-		t.Fatalf("expected --no-score to suppress score, got: %s", res.Out)
-	}
-}
+	for _, tc := range []scoreCase{
+		{name: "off by default", args: []string{"example.se"}, absent: []string{"Score:"}},
+		{
+			name: "score flag prints the score and its categories",
+			args: []string{"--score", "example.se"},
+			want: []string{"Score:", "dnssec:", "nameserver_health:"},
+		},
+		{name: "no-score beats score", args: []string{"--score", "--no-score", "example.se"}, absent: []string{"Score:"}},
+		{
+			// An empty (but non-nil) slice means the engine ran and found
+			// nothing wrong: a real score, not N/A.
+			name:    "clean run scores instead of N/A",
+			entries: []engine.LogEntry{},
+			args:    []string{"--score", "example.se"},
+			want:    []string{"Score:"},
+			absent:  []string{"N/A"},
+		},
+		{name: "raw mode", args: []string{"--raw", "--score", "example.se"}, want: []string{"Score:"}},
+		{name: "json mode stays quiet by default", args: []string{"--json", "example.se"}, absent: []string{"Score:"}},
+		{name: "scoring-config implies score", args: []string{"--scoring-config", cfgPath, "example.se"}, want: []string{"Score:"}},
+		{
+			name:   "no-score beats scoring-config",
+			args:   []string{"--scoring-config", cfgPath, "--no-score", "example.se"},
+			absent: []string{"Score:"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			entries := tc.entries
+			if entries == nil {
+				entries = sampleEntries()
+			}
+			enginetest.Entries(t, &runEngine, entries...)
 
-func TestScoreShowsCategories(t *testing.T) {
-	enginetest.Entries(t, &runEngine, sampleEntries()...)
-	res := clitest.Run(t, run, "--score", "example.se")
-	res.RequireCode(t, 0)
-	output := res.Out
-	for _, cat := range []string{"dnssec:", "nameserver_health:"} {
-		if !strings.Contains(output, cat) {
-			t.Errorf("expected category %q in output, got:\n%s", cat, output)
-		}
-	}
-}
-
-func TestScoreNoEntriesShowsHundred(t *testing.T) {
-	// An empty (but non-nil) slice means the engine ran and found nothing wrong.
-	// Expect a perfect score, not N/A.
-	enginetest.Entries(t, &runEngine, []engine.LogEntry{}...)
-	res := clitest.Run(t, run, "--score", "example.se")
-	res.RequireCode(t, 0)
-	output := res.Out
-	if !strings.Contains(output, "Score:") {
-		t.Fatalf("expected Score: line, got: %s", output)
-	}
-	if strings.Contains(output, "N/A") {
-		t.Fatalf("expected a real score for clean run, got N/A: %s", output)
+			res := clitest.Run(t, run, tc.args...).RequireCode(t, 0).RequireOutContains(t, tc.want...)
+			for _, a := range tc.absent {
+				if strings.Contains(res.Out, a) || strings.Contains(res.Err, a) {
+					t.Fatalf("%q must not appear: stdout=%q stderr=%q", a, res.Out, res.Err)
+				}
+			}
+		})
 	}
 }
 
@@ -93,47 +95,7 @@ func TestScoreInJSONModeGoesToStderr(t *testing.T) {
 	res.RequireErrContains(t, "Score:")
 }
 
-func TestNoScoreNotShownInJSONModeByDefault(t *testing.T) {
-	enginetest.Entries(t, &runEngine, sampleEntries()...)
-	res := clitest.Run(t, run, "--json", "example.se")
-	res.RequireCode(t, 0)
-	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
-		t.Fatalf("score must not appear by default in --json mode")
-	}
-}
-
-// ── --raw mode ────────────────────────────────────────────────────────────────
-
-func TestScoreInRawMode(t *testing.T) {
-	enginetest.Entries(t, &runEngine, sampleEntries()...)
-	res := clitest.Run(t, run, "--raw", "--score", "example.se")
-	res.RequireCode(t, 0)
-	res.RequireOutContains(t, "Score:")
-}
-
 // ── --scoring-config flag ─────────────────────────────────────────────────────
-
-func TestScoringConfigImpliesScore(t *testing.T) {
-	enginetest.Entries(t, &runEngine, sampleEntries()...)
-
-	cfgPath := clitest.WriteScoringConfig(t)
-
-	res := clitest.Run(t, run, "--scoring-config", cfgPath, "example.se")
-	res.RequireCode(t, 0)
-	res.RequireOutContains(t, "Score:")
-}
-
-func TestScoringConfigNoScoreWins(t *testing.T) {
-	enginetest.Entries(t, &runEngine, sampleEntries()...)
-
-	cfgPath := clitest.WriteScoringConfig(t)
-
-	res := clitest.Run(t, run, "--scoring-config", cfgPath, "--no-score", "example.se")
-	res.RequireCode(t, 0)
-	if strings.Contains(res.Out, "Score:") || strings.Contains(res.Err, "Score:") {
-		t.Fatalf("expected --no-score to suppress scoring-config, got stdout=%q stderr=%q", res.Out, res.Err)
-	}
-}
 
 func TestScoringConfigInvalidPath(t *testing.T) {
 	res := clitest.Run(t, run, "--scoring-config", "/nonexistent/path.json", "example.se")

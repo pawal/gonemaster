@@ -203,3 +203,48 @@ type Whoami struct {
 	Mode          string `json:"mode"`
 	Authenticated bool   `json:"authenticated"`
 }
+
+// The tags of the run pair DiffPair returns, so a test can name what it
+// expects rather than repeat a literal.
+const (
+	DiffTagUnchanged = "B01_CHILD_FOUND"
+	DiffTagRemoved   = "N11_NO_RESPONSE"
+	DiffTagAdded     = "MULTIPLE_SOA_SERIALS"
+	DiffTagChanged   = "ONE_SOA_SERIAL"
+)
+
+// DiffPair is the before/after run the run-diff tests on both CLIs share: one
+// tag unchanged, one gone, one new, and one whose severity rises. Every delta
+// kind a diff reports appears exactly once, so a diff that misses a kind
+// cannot pass.
+func DiffPair() (before, after []Entry) {
+	before = []Entry{
+		{Module: "BASIC", Tag: DiffTagUnchanged, Level: "INFO"},
+		{Module: "NAMESERVER", Tag: DiffTagRemoved, Level: "WARNING"},
+		{Module: "CONSISTENCY", Tag: DiffTagChanged, Level: "INFO"},
+	}
+	after = []Entry{
+		{Module: "BASIC", Tag: DiffTagUnchanged, Level: "INFO"},
+		{Module: "CONSISTENCY", Tag: DiffTagChanged, Level: "NOTICE"},
+		{Module: "CONSISTENCY", Tag: DiffTagAdded, Level: "ERROR"},
+	}
+	return before, after
+}
+
+// DiffResults is DiffPair as two scored results keyed by run id, for the
+// endpoints that serve a whole result rather than raw entries.
+func DiffResults(idBefore, idAfter string) map[string]Result {
+	before, after := DiffPair()
+	return map[string]Result{
+		idBefore: {
+			JobID: idBefore, Status: "succeeded",
+			Score: &Score{Score: 90, Grade: "A"},
+			Raw:   &ResultRaw{Entries: before},
+		},
+		idAfter: {
+			JobID: idAfter, Status: "succeeded",
+			Score: &Score{Score: 70, Grade: "C"},
+			Raw:   &ResultRaw{Entries: after},
+		},
+	}
+}

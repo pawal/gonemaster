@@ -18,7 +18,7 @@ import (
 // server exposes each run twice: /runs/<id> for the metadata (domain name)
 // and /runs/<id>/result for the entries, which is exactly the pair the diff
 // command fetches per run.
-func diffFixture(t *testing.T, entriesByRun map[string][]jobResultEntry) {
+func diffFixture(t *testing.T, entriesByRun map[string][]apitest.Entry) {
 	t.Helper()
 	apitest.StubClient(t, &newHTTPClient, apitest.RoundTripFunc(func(r *http.Request) (*http.Response, error) {
 		path := strings.TrimPrefix(r.URL.Path, "/api/v1")
@@ -29,14 +29,14 @@ func diffFixture(t *testing.T, entriesByRun map[string][]jobResultEntry) {
 			return apitest.JSONResponse(404, `{"error":"not found"}`), nil
 		}
 		if strings.HasSuffix(path, "/result") {
-			body, _ := json.Marshal(jobResult{
+			body, _ := json.Marshal(apitest.Result{
 				JobID:  id,
 				Status: "completed",
-				Raw:    &jobResultRaw{Entries: entries},
+				Raw:    &apitest.ResultRaw{Entries: entries},
 			})
 			return apitest.JSONResponse(200, string(body)), nil
 		}
-		body, _ := json.Marshal(runRecord{ID: id, Domain: "example.com", Status: "completed"})
+		body, _ := json.Marshal(apitest.Run{ID: id, Domain: "example.com", Status: "completed"})
 		return apitest.JSONResponse(200, string(body)), nil
 	}))
 }
@@ -46,11 +46,11 @@ func diffFixture(t *testing.T, entriesByRun map[string][]jobResultEntry) {
 // byte-identical tag/severity sets, and the command has to say so with an
 // exit code a shell loop can test.
 func TestRunsDiffIdenticalRunsExitZero(t *testing.T) {
-	entries := []jobResultEntry{
+	entries := []apitest.Entry{
 		{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"},
 		{Module: "NAMESERVER", Tag: "N01_NO_RESPONSE", Level: "WARNING"},
 	}
-	diffFixture(t, map[string][]jobResultEntry{"a": entries, "b": entries})
+	diffFixture(t, map[string][]apitest.Entry{"a": entries, "b": entries})
 
 	res := clitest.Run(t, run, "runs", "diff", "a", "b")
 	res.RequireCode(t, 0)
@@ -62,17 +62,8 @@ func TestRunsDiffIdenticalRunsExitZero(t *testing.T) {
 // change is the subtle one: the tag is present in both runs, so a naive
 // set difference would call the runs identical.
 func TestRunsDiffReportsAddedRemovedChanged(t *testing.T) {
-	before := []jobResultEntry{
-		{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"},
-		{Module: "NAMESERVER", Tag: "N11_NO_RESPONSE", Level: "WARNING"},
-		{Module: "CONSISTENCY", Tag: "ONE_SOA_SERIAL", Level: "INFO"},
-	}
-	after := []jobResultEntry{
-		{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"},
-		{Module: "CONSISTENCY", Tag: "ONE_SOA_SERIAL", Level: "NOTICE"},
-		{Module: "CONSISTENCY", Tag: "MULTIPLE_SOA_SERIALS", Level: "ERROR"},
-	}
-	diffFixture(t, map[string][]jobResultEntry{"a": before, "b": after})
+	before, after := apitest.DiffPair()
+	diffFixture(t, map[string][]apitest.Entry{"a": before, "b": after})
 
 	res := clitest.Run(t, run, "--format", "json", "runs", "diff", "a", "b")
 	res.RequireCode(t, 1)
@@ -80,14 +71,14 @@ func TestRunsDiffReportsAddedRemovedChanged(t *testing.T) {
 	if err := json.Unmarshal([]byte(res.Out), &diff); err != nil {
 		t.Fatalf("expected JSON output: %v (%s)", err, res.Out)
 	}
-	if len(diff.Added) != 1 || diff.Added[0].Tag != "MULTIPLE_SOA_SERIALS" {
-		t.Fatalf("added = %+v, want just MULTIPLE_SOA_SERIALS", diff.Added)
+	if len(diff.Added) != 1 || diff.Added[0].Tag != apitest.DiffTagAdded {
+		t.Fatalf("added = %+v, want just %s", diff.Added, apitest.DiffTagAdded)
 	}
-	if len(diff.Removed) != 1 || diff.Removed[0].Tag != "N11_NO_RESPONSE" {
-		t.Fatalf("removed = %+v, want just N11_NO_RESPONSE", diff.Removed)
+	if len(diff.Removed) != 1 || diff.Removed[0].Tag != apitest.DiffTagRemoved {
+		t.Fatalf("removed = %+v, want just %s", diff.Removed, apitest.DiffTagRemoved)
 	}
-	if len(diff.Changed) != 1 || diff.Changed[0].Tag != "ONE_SOA_SERIAL" {
-		t.Fatalf("changed = %+v, want just ONE_SOA_SERIAL", diff.Changed)
+	if len(diff.Changed) != 1 || diff.Changed[0].Tag != apitest.DiffTagChanged {
+		t.Fatalf("changed = %+v, want just %s", diff.Changed, apitest.DiffTagChanged)
 	}
 	if diff.Changed[0].FromLevel != "INFO" || diff.Changed[0].ToLevel != "NOTICE" {
 		t.Fatalf("changed levels = %+v, want INFO -> NOTICE", diff.Changed[0])
@@ -98,9 +89,9 @@ func TestRunsDiffReportsAddedRemovedChanged(t *testing.T) {
 // script, where only the exit status matters and per-domain output would
 // bury the summary.
 func TestRunsDiffQuietSuppressesOutput(t *testing.T) {
-	before := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
-	after := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "ERROR"}}
-	diffFixture(t, map[string][]jobResultEntry{"a": before, "b": after})
+	before := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
+	after := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "ERROR"}}
+	diffFixture(t, map[string][]apitest.Entry{"a": before, "b": after})
 
 	res := clitest.Run(t, run, "runs", "diff", "--quiet", "a", "b")
 	res.RequireCode(t, 1)
@@ -141,9 +132,9 @@ func TestWorstLevelByTagEmptyResult(t *testing.T) {
 // batchDiffFixture serves two batches whose runs are keyed by domain. It
 // answers the runs listing per batch and each run's result, which is the
 // pair of calls the cohort diff makes per domain.
-func batchDiffFixture(t *testing.T, batches map[string]map[string][]jobResultEntry) {
+func batchDiffFixture(t *testing.T, batches map[string]map[string][]apitest.Entry) {
 	t.Helper()
-	runs := map[string][]jobResultEntry{}
+	runs := map[string][]apitest.Entry{}
 	for batch, byDomain := range batches {
 		for domain, entries := range byDomain {
 			runs[batch+":"+domain] = entries
@@ -157,16 +148,16 @@ func batchDiffFixture(t *testing.T, batches map[string]map[string][]jobResultEnt
 			if !ok {
 				return apitest.JSONResponse(200, `{"items":[],"total":0}`), nil
 			}
-			items := []runRecord{}
+			items := []apitest.Run{}
 			domains := make([]string, 0, len(byDomain))
 			for domain := range byDomain {
 				domains = append(domains, domain)
 			}
 			sort.Strings(domains)
 			for _, domain := range domains {
-				items = append(items, runRecord{ID: batch + ":" + domain, Domain: domain, Status: "completed"})
+				items = append(items, apitest.Run{ID: batch + ":" + domain, Domain: domain, Status: "completed"})
 			}
-			body, _ := json.Marshal(runList{Items: items, Total: len(items)})
+			body, _ := json.Marshal(apitest.RunList{Items: items, Total: len(items)})
 			return apitest.JSONResponse(200, string(body)), nil
 		}
 		id := strings.TrimPrefix(path, "/runs/")
@@ -177,11 +168,11 @@ func batchDiffFixture(t *testing.T, batches map[string]map[string][]jobResultEnt
 			return apitest.JSONResponse(404, `{"error":"not found"}`), nil
 		}
 		if strings.HasSuffix(path, "/result") {
-			body, _ := json.Marshal(jobResult{JobID: id, Status: "completed", Raw: &jobResultRaw{Entries: entries}})
+			body, _ := json.Marshal(apitest.Result{JobID: id, Status: "completed", Raw: &apitest.ResultRaw{Entries: entries}})
 			return apitest.JSONResponse(200, string(body)), nil
 		}
 		domain := id[strings.Index(id, ":")+1:]
-		body, _ := json.Marshal(runRecord{ID: id, Domain: domain, Status: "completed"})
+		body, _ := json.Marshal(apitest.Run{ID: id, Domain: domain, Status: "completed"})
 		return apitest.JSONResponse(200, string(body)), nil
 	}))
 }
@@ -192,12 +183,12 @@ func batchDiffFixture(t *testing.T, batches map[string]map[string][]jobResultEnt
 // per-domain view alone cannot answer that, and a batch-level grade
 // histogram cannot say which tag moved.
 func TestBatchesDiffRollsUpTagsAcrossDomains(t *testing.T) {
-	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
-	broke := []jobResultEntry{
+	clean := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
+	broke := []apitest.Entry{
 		{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"},
 		{Module: "NAMESERVER", Tag: "N11_NO_RESPONSE", Level: "WARNING"},
 	}
-	batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+	batchDiffFixture(t, map[string]map[string][]apitest.Entry{
 		"serial": {"a.example": clean, "b.example": clean, "c.example": clean},
 		"w16":    {"a.example": broke, "b.example": broke, "c.example": clean},
 	})
@@ -229,8 +220,8 @@ func TestBatchesDiffRollsUpTagsAcrossDomains(t *testing.T) {
 // returned 0 here would read a batch that tested one domain of five hundred
 // as "no findings changed".
 func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
-	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
-	batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+	clean := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
+	batchDiffFixture(t, map[string]map[string][]apitest.Entry{
 		"serial": {"a.example": clean, "gone.example": clean},
 		"w16":    {"a.example": clean, "new.example": clean},
 	})
@@ -257,8 +248,8 @@ func TestBatchesDiffReportsUncomparableDomains(t *testing.T) {
 // which compare as identical; counting that as agreement would let a gate
 // pass a comparison in which nothing actually ran.
 func TestBatchesDiffTreatsEmptyRunsAsUnusable(t *testing.T) {
-	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
-	batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+	clean := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
+	batchDiffFixture(t, map[string]map[string][]apitest.Entry{
 		"serial": {"a.example": clean, "broken.example": {}},
 		"w16":    {"a.example": clean, "broken.example": {}},
 	})
@@ -327,9 +318,9 @@ func TestWorstLevelByTagRanksDebugLevels(t *testing.T) {
 // TestBatchesDiffOmitsPerDomainListByDefault keeps a 500-domain comparison
 // readable: the rollup is the answer, the per-domain list is the follow-up.
 func TestBatchesDiffOmitsPerDomainListByDefault(t *testing.T) {
-	clean := []jobResultEntry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
-	broke := []jobResultEntry{{Module: "NAMESERVER", Tag: "N11_NO_RESPONSE", Level: "WARNING"}}
-	batchDiffFixture(t, map[string]map[string][]jobResultEntry{
+	clean := []apitest.Entry{{Module: "BASIC", Tag: "B01_CHILD_FOUND", Level: "INFO"}}
+	broke := []apitest.Entry{{Module: "NAMESERVER", Tag: "N11_NO_RESPONSE", Level: "WARNING"}}
+	batchDiffFixture(t, map[string]map[string][]apitest.Entry{
 		"serial": {"a.example": clean},
 		"w16":    {"a.example": broke},
 	})
@@ -358,7 +349,7 @@ func TestBatchesDiffOmitsPerDomainListByDefault(t *testing.T) {
 // "runs differ" exit, so a scripted gate cannot mistake a typo for a real
 // finding delta.
 func TestRunsDiffRequiresTwoRunIDs(t *testing.T) {
-	diffFixture(t, map[string][]jobResultEntry{})
+	diffFixture(t, map[string][]apitest.Entry{})
 	res := clitest.Run(t, run, "runs", "diff", "only-one")
 	res.RequireCode(t, 2)
 	res.RequireErrContains(t, "two run IDs are required")

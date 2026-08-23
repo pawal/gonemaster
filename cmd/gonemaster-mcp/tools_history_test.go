@@ -57,26 +57,7 @@ func TestRunSearchDefaultLimit(t *testing.T) {
 }
 
 func TestRunDiff(t *testing.T) {
-	// run_a: NS01 (INFO), SOATIME (NOTICE), GONE (WARNING)
-	// run_b: NS01 (INFO), SOATIME (WARNING), NEW (ERROR)
-	api := fakeAPI(t, apitest.Opts{ResultsByID: map[string]apitest.Result{
-		"a": {
-			JobID: "a", Status: "succeeded", Score: &apitest.Score{Score: 90, Grade: "A"},
-			Raw: &apitest.ResultRaw{Entries: []apitest.Entry{
-				{Module: "nameserver", Tag: "NS01", Level: "INFO"},
-				{Module: "consistency", Tag: "SOATIME", Level: "NOTICE"},
-				{Module: "zone", Tag: "GONE", Level: "WARNING"},
-			}},
-		},
-		"b": {
-			JobID: "b", Status: "succeeded", Score: &apitest.Score{Score: 70, Grade: "C"},
-			Raw: &apitest.ResultRaw{Entries: []apitest.Entry{
-				{Module: "nameserver", Tag: "NS01", Level: "INFO"},
-				{Module: "consistency", Tag: "SOATIME", Level: "WARNING"},
-				{Module: "zone", Tag: "NEW", Level: "ERROR"},
-			}},
-		},
-	}})
+	api := fakeAPI(t, apitest.Opts{ResultsByID: apitest.DiffResults("a", "b")})
 
 	var out runDiffOutput
 	res := callTool(t, api, "run_diff", map[string]any{"run_a": "a", "run_b": "b"}, &out)
@@ -86,13 +67,14 @@ func TestRunDiff(t *testing.T) {
 	if out.GradeA != "A" || out.GradeB != "C" {
 		t.Errorf("grades wrong: %s -> %s", out.GradeA, out.GradeB)
 	}
-	if len(out.Added) != 1 || out.Added[0].Tag != "NEW" || out.Added[0].Level != "ERROR" {
+	if len(out.Added) != 1 || out.Added[0].Tag != apitest.DiffTagAdded || out.Added[0].Level != "ERROR" {
 		t.Errorf("added wrong: %+v", out.Added)
 	}
-	if len(out.Removed) != 1 || out.Removed[0].Tag != "GONE" {
+	if len(out.Removed) != 1 || out.Removed[0].Tag != apitest.DiffTagRemoved {
 		t.Errorf("removed wrong: %+v", out.Removed)
 	}
-	if len(out.Changed) != 1 || out.Changed[0].Tag != "SOATIME" || out.Changed[0].FromLevel != "NOTICE" || out.Changed[0].ToLevel != "WARNING" {
+	if len(out.Changed) != 1 || out.Changed[0].Tag != apitest.DiffTagChanged ||
+		out.Changed[0].FromLevel != "INFO" || out.Changed[0].ToLevel != "NOTICE" {
 		t.Errorf("changed wrong: %+v", out.Changed)
 	}
 }

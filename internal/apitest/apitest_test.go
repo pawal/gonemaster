@@ -246,3 +246,57 @@ func TestJSONResponseCarriesItsBody(t *testing.T) {
 		t.Fatalf("content type = %q", got)
 	}
 }
+
+// TestDiffPairCoversEveryDeltaKind guards the shared fixture itself: both
+// CLIs' run-diff tests assert one added, one removed and one changed tag, so
+// a fixture that lost a kind would turn those into silent passes.
+func TestDiffPairCoversEveryDeltaKind(t *testing.T) {
+	before, after := apitest.DiffPair()
+
+	level := func(entries []apitest.Entry, tag string) (string, bool) {
+		for _, e := range entries {
+			if e.Tag == tag {
+				return e.Level, true
+			}
+		}
+		return "", false
+	}
+
+	if l, ok := level(before, apitest.DiffTagUnchanged); !ok || l != "INFO" {
+		t.Errorf("unchanged tag before = %q (present=%v), want INFO", l, ok)
+	}
+	if l, ok := level(after, apitest.DiffTagUnchanged); !ok || l != "INFO" {
+		t.Errorf("unchanged tag after = %q (present=%v), want INFO", l, ok)
+	}
+	if _, ok := level(before, apitest.DiffTagRemoved); !ok {
+		t.Error("removed tag must be in before")
+	}
+	if _, ok := level(after, apitest.DiffTagRemoved); ok {
+		t.Error("removed tag must not be in after")
+	}
+	if _, ok := level(before, apitest.DiffTagAdded); ok {
+		t.Error("added tag must not be in before")
+	}
+	if _, ok := level(after, apitest.DiffTagAdded); !ok {
+		t.Error("added tag must be in after")
+	}
+	from, okFrom := level(before, apitest.DiffTagChanged)
+	to, okTo := level(after, apitest.DiffTagChanged)
+	if !okFrom || !okTo || from == to {
+		t.Errorf("changed tag = %q -> %q (present=%v/%v), want two different levels", from, to, okFrom, okTo)
+	}
+}
+
+func TestDiffResultsCarryTheGrades(t *testing.T) {
+	results := apitest.DiffResults("a", "b")
+	if len(results) != 2 {
+		t.Fatalf("results = %d, want 2", len(results))
+	}
+	if results["a"].Score.Grade != "A" || results["b"].Score.Grade != "C" {
+		t.Fatalf("grades = %q -> %q, want A -> C", results["a"].Score.Grade, results["b"].Score.Grade)
+	}
+	before, after := apitest.DiffPair()
+	if len(results["a"].Raw.Entries) != len(before) || len(results["b"].Raw.Entries) != len(after) {
+		t.Fatal("results must carry the DiffPair entries")
+	}
+}

@@ -51,81 +51,72 @@ func mockJobAndResult(jobID, domain, resultBody string) apitest.RoundTripFunc {
 	}
 }
 
-// ── --score flag ──────────────────────────────────────────────────────────────
+// scoreCase is one `jobs results` invocation and what the score line does in
+// it: want is required on stdout, absent must appear on neither stream.
+type scoreCase struct {
+	name   string
+	result func(string) string
+	args   []string
+	want   []string
+	absent []string
+}
 
-func TestJobsResultsNoScoreByDefault(t *testing.T) {
-	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
-	res := clitest.Run(t, run, "jobs", "results", "job_1")
-	res.RequireCode(t, 0)
-	if strings.Contains(res.Out, "Score:") {
-		t.Fatalf("expected no score by default, got: %s", res.Out)
+func TestJobsResultsScoreFlagCombinations(t *testing.T) {
+	cfgPath := clitest.WriteScoringConfig(t)
+
+	for _, tc := range []scoreCase{
+		{name: "off by default", args: []string{"jobs", "results", "job_1"}, absent: []string{"Score:"}},
+		{
+			name: "score flag prints the score and its categories",
+			args: []string{"jobs", "results", "--score", "job_1"},
+			want: []string{"Score:", "dnssec:", "nameserver_health:", "connectivity:", "zone_consistency:"},
+		},
+		{
+			name:   "no-score beats score",
+			args:   []string{"jobs", "results", "--score", "--no-score", "job_1"},
+			absent: []string{"Score:"},
+		},
+		{
+			// A summary-only result carries no entries to score.
+			name:   "summary-only result scores N/A",
+			result: jobResultWithoutEntries,
+			args:   []string{"jobs", "results", "--score", "job_1"},
+			want:   []string{"N/A"},
+		},
+		{
+			name: "scoring-config implies score",
+			args: []string{"jobs", "results", "--scoring-config", cfgPath, "job_1"},
+			want: []string{"Score:"},
+		},
+		{
+			name:   "no-score beats scoring-config",
+			args:   []string{"jobs", "results", "--scoring-config", cfgPath, "--no-score", "job_1"},
+			absent: []string{"Score:"},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := tc.result
+			if result == nil {
+				result = jobResultWithEntries
+			}
+			apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", result("job_1")))
+
+			res := clitest.Run(t, run, tc.args...).RequireCode(t, 0).RequireOutContains(t, tc.want...)
+			for _, a := range tc.absent {
+				if strings.Contains(res.Out, a) || strings.Contains(res.Err, a) {
+					t.Fatalf("%q must not appear: stdout=%q stderr=%q", a, res.Out, res.Err)
+				}
+			}
+		})
 	}
-}
-
-func TestJobsResultsWithScore(t *testing.T) {
-	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
-	res := clitest.Run(t, run, "jobs", "results", "--score", "job_1")
-	res.RequireCode(t, 0)
-	res.RequireOutContains(t, "Score:")
-}
-
-func TestJobsResultsNoScoreSuppresses(t *testing.T) {
-	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
-	// --no-score should suppress even if both flags are given.
-	res := clitest.Run(t, run, "jobs", "results", "--score", "--no-score", "job_1")
-	res.RequireCode(t, 0)
-	if strings.Contains(res.Out, "Score:") {
-		t.Fatalf("expected no score with --no-score, got: %s", res.Out)
-	}
-}
-
-func TestJobsResultsScoreShowsCategories(t *testing.T) {
-	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
-	res := clitest.Run(t, run, "jobs", "results", "--score", "job_1")
-	res.RequireCode(t, 0)
-	output := res.Out
-	for _, cat := range []string{"dnssec:", "nameserver_health:", "connectivity:", "zone_consistency:"} {
-		if !strings.Contains(output, cat) {
-			t.Errorf("expected category %q in output, got:\n%s", cat, output)
-		}
-	}
-}
-
-func TestJobsResultsScoreNotAvailableWithoutEntries(t *testing.T) {
-	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithoutEntries("job_1")))
-	res := clitest.Run(t, run, "jobs", "results", "--score", "job_1")
-	res.RequireCode(t, 0)
-	res.RequireOutContains(t, "N/A")
 }
 
 // ── --scoring-config flag ─────────────────────────────────────────────────────
-
-func TestJobsResultsScoringConfigImpliesScore(t *testing.T) {
-	// Write a minimal valid scoring config to a temp file.
-	cfgPath := clitest.WriteScoringConfig(t)
-
-	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
-	res := clitest.Run(t, run, "jobs", "results", "--scoring-config", cfgPath, "job_1")
-	res.RequireCode(t, 0)
-	res.RequireOutContains(t, "Score:")
-}
 
 func TestJobsResultsScoringConfigInvalidPath(t *testing.T) {
 	res := clitest.Run(t, run, "jobs", "results", "--scoring-config", "/nonexistent/path.json", "job_1")
 	if res.Code == 0 {
 		t.Fatal("expected non-zero exit for invalid --scoring-config path")
-	}
-}
-
-func TestScoringConfigNoScoreWins(t *testing.T) {
-	cfgPath := clitest.WriteScoringConfig(t)
-
-	apitest.StubClient(t, &newHTTPClient, mockJobAndResult("job_1", "example.se", jobResultWithEntries("job_1")))
-	// --no-score should override --scoring-config.
-	res := clitest.Run(t, run, "jobs", "results", "--scoring-config", cfgPath, "--no-score", "job_1")
-	res.RequireCode(t, 0)
-	if strings.Contains(res.Out, "Score:") {
-		t.Fatalf("expected --no-score to suppress scoring config, got: %s", res.Out)
 	}
 }
 

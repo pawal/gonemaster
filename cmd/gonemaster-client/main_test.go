@@ -26,13 +26,20 @@ func TestCLIMDDocumentsPurge(t *testing.T) {
 }
 
 func TestNormalizeBaseURL(t *testing.T) {
+	// The same eight cases the MCP bridge's normalizeBaseURL is pinned on;
+	// the two implementations have to agree.
 	tests := []struct {
 		input string
 		want  string
 	}{
+		{"", defaultServer},
 		{"http://localhost:8080", "http://localhost:8080/api/v1"},
+		{"http://localhost:8080/", "http://localhost:8080/api/v1"},
 		{"http://localhost:8080/api/v1", "http://localhost:8080/api/v1"},
-		{"localhost:8080", "http://localhost:8080/api/v1"},
+		{"http://localhost:8080/api/v1/", "http://localhost:8080/api/v1"},
+		{"localhost:9000", "http://localhost:9000/api/v1"},
+		{"https://gm.example.com/api/v1/", "https://gm.example.com/api/v1"},
+		{"http://host/prefix", "http://host/prefix/api/v1"},
 	}
 	for _, tt := range tests {
 		got, err := normalizeBaseURL(tt.input)

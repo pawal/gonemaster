@@ -89,6 +89,41 @@ export function worstSigTone(sigs) {
   return tone;
 }
 
+// SIG_SEVERITY ranks signature states so a set of signatures over one RRset can
+// collapse to its worst member: a fresh signature must never mask an expired
+// one drawn along the same path.
+const SIG_SEVERITY = {
+  expired: 3, bogus: 3, no_key: 3,
+  not_yet_valid: 2, unsupported_algorithm: 2, unsupported_key: 2,
+  unverified: 1,
+  valid: 0,
+};
+
+// worstSigState returns the most severe state in sigs.
+export function worstSigState(sigs) {
+  let state = "valid";
+  let rank = -1;
+  for (const s of Array.isArray(sigs) ? sigs : []) {
+    const r = SIG_SEVERITY[s.state] ?? 1;
+    if (r > rank) {
+      rank = r;
+      state = s.state;
+    }
+  }
+  return state;
+}
+
+// groupByKeyTag groups signatures by the key that made them, preserving order.
+function groupByKeyTag(sigs) {
+  const out = new Map();
+  for (const s of Array.isArray(sigs) ? sigs : []) {
+    const group = out.get(s.key_tag);
+    if (group) group.push(s);
+    else out.set(s.key_tag, [s]);
+  }
+  return out;
+}
+
 // sigDetail carries a signature's state and window for the component to
 // localize; the component turns it into "state, from to to".
 function sigDetail(sig) {
@@ -100,18 +135,19 @@ function sigLine(k, sig, extra = {}) {
   return { k, p: extra, sig: sigDetail(sig) };
 }
 
-// sigTitle builds the tip lines for one RRSIG edge.
-function sigTitle(headline, sig) {
-  const lines = [
-    headline,
-    { k: "pub.dnssec_chain_tip_signing_key", p: { tag: sig.key_tag } },
-    { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(sig.algorithm) } },
-  ];
-  if (sig.inception && sig.expiration) {
-    lines.push({ k: "pub.dnssec_chain_tip_valid", p: { from: fmtDate(sig.inception), to: fmtDate(sig.expiration) } });
+// sigTitle builds the tip lines for a signature edge. Several signatures share
+// one edge when they cover the same RRset, so every window is listed.
+function sigTitle(headline, sigs) {
+  const lines = [headline];
+  for (const sig of Array.isArray(sigs) ? sigs : [sigs]) {
+    lines.push({ k: "pub.dnssec_chain_tip_signing_key", p: { tag: sig.key_tag } });
+    lines.push({ k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(sig.algorithm) } });
+    if (sig.inception && sig.expiration) {
+      lines.push({ k: "pub.dnssec_chain_tip_valid", p: { from: fmtDate(sig.inception), to: fmtDate(sig.expiration) } });
+    }
+    lines.push({ k: "pub.dnssec_chain_tip_status", statusState: sig.state });
+    lines.push(serversTip(sig.servers));
   }
-  lines.push({ k: "pub.dnssec_chain_tip_status", statusState: sig.state });
-  lines.push(serversTip(sig.servers));
   return lines.filter(Boolean);
 }
 
@@ -338,17 +374,17 @@ export function layoutChain(chain) {
   const edges = [];
 
   // Parent key(s) sign the DS RRset: an edge from the parent key to each DS.
-  for (const sig of dsRRSIG) {
-    const signer = byId.get(`pkey-${sig.key_tag}`);
+  for (const [tag, group] of groupByKeyTag(dsRRSIG)) {
+    const signer = byId.get(`pkey-${tag}`);
     if (!signer) continue;
     for (const ds of dsNodes) {
       if (ds.kind !== "ds" && ds.kind !== "ds-input") continue;
       edges.push({
-        id: `dssig-${sig.key_tag}-${sig.inception ?? 0}-${ds.id}`,
+        id: `dssig-${tag}-${ds.id}`,
         kind: "keysig",
-        status: sig.state,
-        keyTag: sig.key_tag,
-        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_ds" }, sig),
+        status: worstSigState(group),
+        keyTag: tag,
+        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_ds" }, group),
         from: edgePoint(signer, "bottom"),
         to: edgePoint(ds, "top"),
       });
@@ -401,21 +437,24 @@ export function layoutChain(chain) {
 
   // Keys that sign the DNSKEY RRset self-loop, vouch for lower-row keys, and
   // vouch for same-row KSKs that do not sign themselves (one signature covers
-  // the whole RRset). Edge ids carry the inception: one key can serve
-  // overlapping signatures.
-  const signingTags = new Set(dnskeySigs.map((s) => s.key_tag));
-  for (const sig of dnskeySigs) {
-    const signer = byId.get(`key-${sig.key_tag}`);
+  // the whole RRset). One key can serve several signatures over that RRset -
+  // re-signing, or a lagging secondary - and they share one path, so they
+  // collapse into a single edge carrying the worst state and every window.
+  const dnskeySigsByTag = groupByKeyTag(dnskeySigs);
+  const signingTags = new Set(dnskeySigsByTag.keys());
+  for (const [tag, group] of dnskeySigsByTag) {
+    const signer = byId.get(`key-${tag}`);
     if (!signer) continue;
+    const status = worstSigState(group);
     // An unanchored KSK's signatures are valid but off the chain of trust.
     const incoming = !!signer.incoming;
     edges.push({
-      id: `self-${sig.key_tag}-${sig.inception ?? 0}`,
+      id: `self-${tag}`,
       kind: "selfsig",
-      status: sig.state,
-      keyTag: sig.key_tag,
+      status,
+      keyTag: tag,
       incoming,
-      tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey" }, sig),
+      tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey" }, group),
       d: selfLoopPath(signer),
     });
     for (const target of nodes) {
@@ -425,13 +464,13 @@ export function layoutChain(chain) {
       const sibling = target.rowIndex === signer.rowIndex && target.kind === "ksk" && !signingTags.has(target.keyTag);
       if (!downward && !sibling) continue;
       const edge = {
-        id: `keysig-${sig.key_tag}-${sig.inception ?? 0}-${target.keyTag}`,
+        id: `keysig-${tag}-${target.keyTag}`,
         kind: "keysig",
-        status: sig.state,
-        keyTag: sig.key_tag,
+        status,
+        keyTag: tag,
         targetTag: target.keyTag,
         incoming,
-        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey_covers", p: { tag: target.keyTag } }, sig),
+        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_dnskey_covers", p: { tag: target.keyTag } }, group),
       };
       if (downward) {
         edge.from = edgePoint(signer, "bottom");
@@ -447,15 +486,15 @@ export function layoutChain(chain) {
   for (const entry of signed) {
     const to = byId.get(`rrset-${entry.type}`);
     if (!to) continue;
-    for (const sig of entry.rrsig ?? []) {
-      const from = byId.get(`key-${sig.key_tag}`);
+    for (const [tag, group] of groupByKeyTag(entry.rrsig)) {
+      const from = byId.get(`key-${tag}`);
       if (!from) continue;
       edges.push({
-        id: `sig-${entry.type}-${sig.key_tag}-${sig.inception ?? 0}`,
+        id: `sig-${entry.type}-${tag}`,
         kind: "sig",
-        status: sig.state,
-        keyTag: sig.key_tag,
-        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_over", p: { type: entry.type } }, sig),
+        status: worstSigState(group),
+        keyTag: tag,
+        tip: sigTitle({ k: "pub.dnssec_chain_tip_rrsig_over", p: { type: entry.type } }, group),
         from: edgePoint(from, "bottom"),
         to: edgePoint(to, "top"),
       });

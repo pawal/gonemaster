@@ -505,4 +505,68 @@ describe("DnssecChain", () => {
     expect(container.querySelector("g.node-revoked")).toBeNull();
     expect(screen.queryByTestId("chain-legend-revoked")).toBeNull();
   });
+
+  // A lagging secondary: the validated path holds through the fresh servers,
+  // so the roll-up is partial and the stale servers are named.
+  it("warns about stale secondaries and tones the partial badge amber", async () => {
+    const chain = secureChain();
+    chain.status = "partial";
+    chain.child.servers_stale = ["203.0.113.9", "203.0.113.10"];
+    chain.child.dnskey_rrsig.push({
+      key_tag: 1000, algorithm: 13, state: "expired",
+      inception: 1600000000, expiration: 1650000000, servers: ["203.0.113.9"],
+    });
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const container = renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const badge = screen.getByTestId("chain-status-badge");
+    expect(badge.textContent).toBe("Partial");
+    expect(badge.classList.contains("badge-warn")).toBe(true);
+    expect(screen.getByTestId("chain-stale")).toBeTruthy();
+    const staleFact = screen.getByTestId("chain-stale-servers").textContent;
+    expect(staleFact).toContain("203.0.113.9");
+    expect(staleFact).toContain("203.0.113.10");
+    // The expired signature colors the self-loop even though a fresh
+    // signature by the same key covers the same RRset.
+    expect(container.querySelector("path.chain-edge.edge-bad")).toBeTruthy();
+  });
+
+  it("merges parent and child stale servers into one callout", async () => {
+    const chain = secureChain();
+    chain.status = "partial";
+    chain.parent.servers_stale = ["192.0.2.1"];
+    chain.child.servers_stale = ["203.0.113.9"];
+    fetch.mockResolvedValue(jsonResponse(chain));
+    renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-stale")).toBeTruthy());
+    const staleFact = screen.getByTestId("chain-stale-servers").textContent;
+    expect(staleFact).toContain("192.0.2.1");
+    expect(staleFact).toContain("203.0.113.9");
+  });
+
+  it("omits the stale callout when no server serves an expired signature", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.queryByTestId("chain-stale")).toBeNull();
+    expect(screen.queryByTestId("chain-stale-servers")).toBeNull();
+  });
+
+  // A newer blob may carry a status this build has no name for; the graph must
+  // still render and the badge must not leak the raw token.
+  it("renders neutrally for an unknown future status", async () => {
+    const chain = secureChain();
+    chain.version = 3;
+    chain.status = "quantum_broken";
+    fetch.mockResolvedValue(jsonResponse(chain));
+    renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.queryByTestId("chain-status-badge")).toBeNull();
+    expect(screen.queryByTestId("chain-status-fact")).toBeNull();
+    expect(screen.getByTestId("chain-facts").textContent).not.toContain("quantum_broken");
+  });
 });

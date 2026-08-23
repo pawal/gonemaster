@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Obestämd",
   "pub.dnssec_chain_disagree": "Namnservrar returnerade olika DNSSEC-poster - visar det vanligaste svaret.",
   "pub.dnssec_chain_disagree_servers": "Namnservrar som avviker: {servers}",
+  "pub.dnssec_chain_stale_secondary": "Vissa namnservrar levererar utgångna signaturer (en eftersläpande sekundär), så resolvrar som når dem kan inte validera zonen.",
+  "pub.dnssec_chain_stale_servers": "Namnservrar med utgångna signaturer: {servers}",
   "pub.dnssec_chain_servers_without_ds": "Namnservrar utan DS: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Namnservrar utan DNSKEY: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

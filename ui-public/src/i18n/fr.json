@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Indéterminée",
   "pub.dnssec_chain_disagree": "Les serveurs de noms ont renvoyé des enregistrements DNSSEC différents - affichage de la réponse la plus fréquente.",
   "pub.dnssec_chain_disagree_servers": "Serveurs de noms divergents : {servers}",
+  "pub.dnssec_chain_stale_secondary": "Certains serveurs de noms renvoient des signatures expirées (un secondaire obsolète), les résolveurs qui les interrogent ne peuvent donc pas valider cette zone.",
+  "pub.dnssec_chain_stale_servers": "Serveurs de noms avec des signatures expirées : {servers}",
   "pub.dnssec_chain_servers_without_ds": "Serveurs de noms sans DS : {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Serveurs de noms sans DNSKEY : {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

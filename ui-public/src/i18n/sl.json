@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Nedoločeno",
   "pub.dnssec_chain_disagree": "Imenski strežniki so vrnili različne zapise DNSSEC - prikazan je najpogostejši odgovor.",
   "pub.dnssec_chain_disagree_servers": "Neskladni imenski strežniki: {servers}",
+  "pub.dnssec_chain_stale_secondary": "Nekateri imenski strežniki vračajo potekle podpise (zastarel sekundarni strežnik), zato razreševalniki, ki jih uporabljajo, te cone ne morejo potrditi.",
+  "pub.dnssec_chain_stale_servers": "Imenski strežniki s poteklimi podpisi: {servers}",
   "pub.dnssec_chain_servers_without_ds": "Imenski strežniki brez DS: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Imenski strežniki brez DNSKEY: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

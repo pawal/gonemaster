@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Määrittämätön",
   "pub.dnssec_chain_disagree": "Nimipalvelimet palauttivat erilaisia DNSSEC-tietueita - näytetään yleisin vastaus.",
   "pub.dnssec_chain_disagree_servers": "Eroavat nimipalvelimet: {servers}",
+  "pub.dnssec_chain_stale_secondary": "Osa nimipalvelimista tarjoaa vanhentuneita allekirjoituksia (vanhentunut sekundääripalvelin), joten niitä käyttävät resolverit eivät voi validoida tätä vyöhykettä.",
+  "pub.dnssec_chain_stale_servers": "Nimipalvelimet, joilla on vanhentuneet allekirjoitukset: {servers}",
   "pub.dnssec_chain_servers_without_ds": "Nimipalvelimet ilman DS:ää: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Nimipalvelimet ilman DNSKEY:tä: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

@@ -62,6 +62,11 @@
   ]);
   let serversWithoutDS = $derived(chain?.parent?.servers_without_ds ?? []);
   let serversWithoutDNSKEY = $derived(chain?.child?.servers_without_dnskey ?? []);
+  // Servers serving a signature outside its validity window: a lagging
+  // secondary breaks validation for the resolvers that happen to reach it.
+  let staleServers = $derived([
+    ...new Set([...(chain?.parent?.servers_stale ?? []), ...(chain?.child?.servers_stale ?? [])]),
+  ]);
   let disagree = $derived(disagreeingServers.length > 0);
   let providedDS = $derived(chain?.parent?.ds_source === "input");
   let unsigned = $derived(chain?.status === "unsigned");
@@ -98,7 +103,12 @@
   );
 
   // status is the roll-up shown as a heading badge and the first facts line.
-  let status = $derived(phase === "loaded" && chain?.status ? chain.status : "");
+  // A status this build has no name for (a newer blob version) is left out
+  // rather than shown as a raw token.
+  const KNOWN_STATUS = ["secure", "partial", "broken", "island", "unsigned", "indeterminate"];
+  let status = $derived(
+    phase === "loaded" && KNOWN_STATUS.includes(chain?.status) ? chain.status : ""
+  );
   let truncated = $derived(!!chain?.truncated);
   // rolloverKeys: keys not yet anchored by a DS - unanchored KSKs plus any
   // CDS/CDNSKEY signals a new key. A rollover is only meaningful when some key
@@ -262,6 +272,9 @@
         {#if indeterminate}
           <p class="dnssec-chain-callout callout-info" data-testid="chain-indeterminate">{$t("pub.dnssec_chain_indeterminate")}</p>
         {/if}
+        {#if staleServers.length}
+          <p class="dnssec-chain-callout callout-warn" data-testid="chain-stale">{$t("pub.dnssec_chain_stale_secondary")}</p>
+        {/if}
         {#if disagree}
           <p class="dnssec-chain-callout callout-warn" data-testid="chain-disagree">{$t("pub.dnssec_chain_disagree")}</p>
         {/if}
@@ -349,6 +362,9 @@
         <li>{$t("pub.dnssec_chain_parent_label")}: {chain?.parent_zone || "-"}</li>
         <li>DS: {dsSummary}</li>
         <li>{$t("pub.dnssec_chain_keys_label")}: {keySummary}</li>
+        {#if staleServers.length}
+          <li data-testid="chain-stale-servers">{$t("pub.dnssec_chain_stale_servers", { servers: staleServers.join(", ") })}</li>
+        {/if}
         {#if disagreeingServers.length}
           <li data-testid="chain-disagree-servers">{$t("pub.dnssec_chain_disagree_servers", { servers: disagreeingServers.join(", ") })}</li>
         {/if}

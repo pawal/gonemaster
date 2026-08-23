@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Onbepaald",
   "pub.dnssec_chain_disagree": "Naamservers gaven verschillende DNSSEC-records terug - het meest voorkomende antwoord wordt getoond.",
   "pub.dnssec_chain_disagree_servers": "Afwijkende naamservers: {servers}",
+  "pub.dnssec_chain_stale_secondary": "Sommige naamservers leveren verlopen handtekeningen (een verouderde secundaire server), dus resolvers die ze bereiken kunnen deze zone niet valideren.",
+  "pub.dnssec_chain_stale_servers": "Naamservers met verlopen handtekeningen: {servers}",
   "pub.dnssec_chain_servers_without_ds": "Naamservers zonder DS: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Naamservers zonder DNSKEY: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

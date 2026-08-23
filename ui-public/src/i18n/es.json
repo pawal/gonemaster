@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Indeterminada",
   "pub.dnssec_chain_disagree": "Los servidores de nombres devolvieron registros DNSSEC diferentes - se muestra la respuesta más común.",
   "pub.dnssec_chain_disagree_servers": "Servidores de nombres discordantes: {servers}",
+  "pub.dnssec_chain_stale_secondary": "Algunos servidores de nombres entregan firmas expiradas (un secundario obsoleto), por lo que los resolvers que los consultan no pueden validar esta zona.",
+  "pub.dnssec_chain_stale_servers": "Servidores de nombres con firmas expiradas: {servers}",
   "pub.dnssec_chain_servers_without_ds": "Servidores de nombres sin DS: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Servidores de nombres sin DNSKEY: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

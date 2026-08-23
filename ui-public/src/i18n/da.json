@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Ubestemt",
   "pub.dnssec_chain_disagree": "Navneservere returnerede forskellige DNSSEC-poster - viser det mest almindelige svar.",
   "pub.dnssec_chain_disagree_servers": "Uenige navneservere: {servers}",
+  "pub.dnssec_chain_stale_secondary": "Nogle navneservere leverer udløbne signaturer (en forældet sekundær), så resolvere der bruger dem, kan ikke validere denne zone.",
+  "pub.dnssec_chain_stale_servers": "Navneservere med udløbne signaturer: {servers}",
   "pub.dnssec_chain_servers_without_ds": "Navneservere uden DS: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Navneservere uden DNSKEY: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

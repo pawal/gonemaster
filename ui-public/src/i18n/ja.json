@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "不明",
   "pub.dnssec_chain_disagree": "ネームサーバーが異なる DNSSEC レコードを返しました - 最も一般的な回答を表示しています。",
   "pub.dnssec_chain_disagree_servers": "回答が異なるネームサーバー: {servers}",
+  "pub.dnssec_chain_stale_secondary": "一部のネームサーバーが失効した署名を返しています (古いセカンダリ)。それらに到達したリゾルバーはこのゾーンを検証できません。",
+  "pub.dnssec_chain_stale_servers": "失効した署名を返すネームサーバー: {servers}",
   "pub.dnssec_chain_servers_without_ds": "DS のないネームサーバー: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "DNSKEY のないネームサーバー: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

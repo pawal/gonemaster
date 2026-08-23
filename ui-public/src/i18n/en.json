@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Indeterminate",
   "pub.dnssec_chain_disagree": "Nameservers returned different DNSSEC records - showing the most common answer.",
   "pub.dnssec_chain_disagree_servers": "Disagreeing nameservers: {servers}",
+  "pub.dnssec_chain_stale_secondary": "Some nameservers serve expired signatures (a lagging secondary), so resolvers reaching those servers cannot validate this zone.",
+  "pub.dnssec_chain_stale_servers": "Nameservers with expired signatures: {servers}",
   "pub.dnssec_chain_servers_without_ds": "Nameservers without DS: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Nameservers without DNSKEY: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

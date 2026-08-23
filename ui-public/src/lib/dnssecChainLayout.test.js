@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { secureChain } from "../test/helpers.js";
-import { layoutChain, truncateName, worstSigTone, algoMnemonic } from "./dnssecChainLayout.js";
+import { layoutChain, truncateName, worstSigTone, worstSigState, algoMnemonic } from "./dnssecChainLayout.js";
 
 // tipParams returns the params of the tip line with the given i18n key.
 function tipParams(el, k) {
@@ -274,10 +274,10 @@ describe("layoutChain", () => {
     const g = layoutChain(chain);
     expect(g.nodes.some((n) => n.id === "rrset-SOA" && n.label === "SOA")).toBe(true);
     expect(g.nodes.some((n) => n.id === "rrset-CDS" && n.label === "CDS")).toBe(true);
-    // ZSK signs SOA, KSK signs CDS. Edge ids end with the inception (0 when
-    // the fixture sets none) so overlapping signatures stay distinct.
-    expect(g.edges.some((e) => e.id === "sig-SOA-2000-0")).toBe(true);
-    expect(g.edges.some((e) => e.id === "sig-CDS-1000-0")).toBe(true);
+    // ZSK signs SOA, KSK signs CDS. One edge per signer and RRset: every
+    // signature that key made over the RRset shares the same path.
+    expect(g.edges.some((e) => e.id === "sig-SOA-2000")).toBe(true);
+    expect(g.edges.some((e) => e.id === "sig-CDS-1000")).toBe(true);
     // CDS names the KSK (key tag 1000): a grey reference edge points to it,
     // drawn as a bowed path so it clears the signature edge.
     const ref = g.edges.find((e) => e.kind === "ref" && e.id === "ref-CDS-1000");
@@ -527,9 +527,10 @@ describe("layoutChain", () => {
     expect(dsEdges[0].status).toBe("match");
   });
 
-  it("keeps overlapping signatures by the same key as distinct edges", () => {
+  it("merges overlapping signatures by the same key into one identified edge", () => {
     // During re-signing a zone serves two RRSIGs by the same key with
-    // different validity windows; their edges need unique ids.
+    // different validity windows. They share one path, so they share one edge
+    // rather than being drawn on top of each other, and ids stay unique.
     const chain = secureChain();
     chain.child.dnskey_rrsig = [
       { key_tag: 1000, algorithm: 13, state: "valid", inception: 100, expiration: 200, servers: ["203.0.113.1"] },
@@ -537,7 +538,8 @@ describe("layoutChain", () => {
     ];
     const g = layoutChain(chain);
     const selfLoops = g.edges.filter((e) => e.kind === "selfsig");
-    expect(selfLoops).toHaveLength(2);
+    expect(selfLoops).toHaveLength(1);
+    expect(selfLoops[0].status).toBe("expired");
     const edgeIds = new Set(g.edges.map((e) => e.id));
     expect(edgeIds.size).toBe(g.edges.length);
   });
@@ -615,5 +617,121 @@ describe("layoutChain", () => {
     const dsEdge = g.edges.find((e) => e.kind === "ds");
     expect(dsEdge).toBeTruthy();
     expect(dsEdge.status).toBe("match");
+  });
+});
+
+describe("worstSigState", () => {
+  it("ranks expired above valid so a fresh signature cannot mask it", () => {
+    expect(worstSigState([{ state: "valid" }, { state: "expired" }])).toBe("expired");
+    expect(worstSigState([{ state: "expired" }, { state: "valid" }])).toBe("expired");
+  });
+
+  it("prefers a window failure over an unverifiable one", () => {
+    expect(worstSigState([{ state: "unsupported_key" }, { state: "expired" }])).toBe("expired");
+    expect(worstSigState([{ state: "valid" }, { state: "not_yet_valid" }])).toBe("not_yet_valid");
+  });
+
+  it("returns valid for an all-valid or empty set", () => {
+    expect(worstSigState([{ state: "valid" }])).toBe("valid");
+    expect(worstSigState([])).toBe("valid");
+    expect(worstSigState(undefined)).toBe("valid");
+  });
+});
+
+describe("layoutChain signature overlap", () => {
+  // A lagging secondary serves an expired signature over the same RRset as the
+  // fresh servers. Both edges share a path, so the fresh one used to be drawn
+  // on top of the expired one and hide it.
+  it("collapses same-path DNSKEY signatures into one worst-state edge", () => {
+    const chain = secureChain();
+    chain.child.dnskey_rrsig = [
+      { key_tag: 1000, algorithm: 13, state: "valid", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] },
+      { key_tag: 1000, algorithm: 13, state: "expired", inception: 1600000000, expiration: 1650000000, servers: ["203.0.113.9"] },
+    ];
+    const g = layoutChain(chain);
+
+    const loops = g.edges.filter((e) => e.kind === "selfsig");
+    expect(loops).toHaveLength(1);
+    expect(loops[0].id).toBe("self-1000");
+    expect(loops[0].status).toBe("expired");
+    // Both windows stay in the tip, so hovering explains the two states.
+    const windows = loops[0].tip.filter((l) => l.k === "pub.dnssec_chain_tip_valid");
+    expect(windows).toHaveLength(2);
+    const states = loops[0].tip.filter((l) => l.statusState).map((l) => l.statusState);
+    expect(states).toEqual(["valid", "expired"]);
+
+    // The edge vouching for the ZSK collapses the same way.
+    const vouch = g.edges.filter((e) => e.kind === "keysig" && e.targetTag === 2000);
+    expect(vouch).toHaveLength(1);
+    expect(vouch[0].status).toBe("expired");
+  });
+
+  it("collapses mixed-state signatures over a signed RRset to the worst state", () => {
+    const chain = secureChain();
+    chain.child.signed = [
+      {
+        type: "SOA",
+        rrsig: [
+          { key_tag: 2000, algorithm: 13, state: "valid", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] },
+          { key_tag: 2000, algorithm: 13, state: "expired", inception: 1600000000, expiration: 1650000000, servers: ["203.0.113.9"] },
+        ],
+      },
+    ];
+    const g = layoutChain(chain);
+    const soaEdges = g.edges.filter((e) => e.kind === "sig");
+    expect(soaEdges).toHaveLength(1);
+    expect(soaEdges[0].id).toBe("sig-SOA-2000");
+    expect(soaEdges[0].status).toBe("expired");
+  });
+
+  it("keeps signatures by different keys on their own edges", () => {
+    const chain = secureChain();
+    chain.child.dnskey_rrsig = [
+      { key_tag: 1000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] },
+      { key_tag: 2000, algorithm: 13, state: "expired", servers: ["203.0.113.1"] },
+    ];
+    const g = layoutChain(chain);
+    const loops = g.edges.filter((e) => e.kind === "selfsig");
+    expect(loops.map((e) => e.id).sort()).toEqual(["self-1000", "self-2000"]);
+  });
+});
+
+describe("layoutChain authenticated denial", () => {
+  it("lays out NSEC and NSEC3 as signed rows", () => {
+    const chain = secureChain();
+    chain.child.signed = [
+      { type: "NSEC", rrsig: [{ key_tag: 2000, algorithm: 13, state: "expired", servers: ["203.0.113.9"] }] },
+      { type: "NSEC3", rrsig: [{ key_tag: 2000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }] },
+    ];
+    const g = layoutChain(chain);
+
+    const nsec = g.nodes.find((n) => n.id === "rrset-NSEC");
+    const nsec3 = g.nodes.find((n) => n.id === "rrset-NSEC3");
+    expect(nsec.label).toBe("NSEC");
+    expect(nsec3.label).toBe("NSEC3");
+    // Both sit in the same (bottom) row, inside the viewBox.
+    expect(nsec.rowIndex).toBe(nsec3.rowIndex);
+    for (const n of [nsec, nsec3]) {
+      expect(n.x + n.w).toBeLessThanOrEqual(g.width);
+      expect(n.y + n.h).toBeLessThanOrEqual(g.height);
+    }
+    // The expired denial signature colors its own edge.
+    const nsecEdge = g.edges.find((e) => e.id === "sig-NSEC-2000");
+    expect(nsecEdge.status).toBe("expired");
+  });
+});
+
+describe("stale-signature strings", () => {
+  it("are translated in every locale", async () => {
+    const locales = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
+    for (const loc of locales) {
+      const catalog = (await import(`../i18n/${loc}.json`)).default;
+      for (const key of ["pub.dnssec_chain_stale_secondary", "pub.dnssec_chain_stale_servers"]) {
+        const val = catalog[key];
+        expect(typeof val, `${loc} ${key}`).toBe("string");
+        expect(val.length > 0, `${loc} ${key}`).toBe(true);
+      }
+      expect(catalog["pub.dnssec_chain_stale_servers"].includes("{servers}"), loc).toBe(true);
+    }
   });
 });

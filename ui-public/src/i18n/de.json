@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Unbestimmt",
   "pub.dnssec_chain_disagree": "Die Nameserver lieferten unterschiedliche DNSSEC-Records - die häufigste Antwort wird angezeigt.",
   "pub.dnssec_chain_disagree_servers": "Abweichende Nameserver: {servers}",
+  "pub.dnssec_chain_stale_secondary": "Einige Nameserver liefern abgelaufene Signaturen (ein veralteter Secondary), daher können Resolver, die diese Server erreichen, die Zone nicht validieren.",
+  "pub.dnssec_chain_stale_servers": "Nameserver mit abgelaufenen Signaturen: {servers}",
   "pub.dnssec_chain_servers_without_ds": "Nameserver ohne DS: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Nameserver ohne DNSKEY: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

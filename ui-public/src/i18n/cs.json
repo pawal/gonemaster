@@ -82,6 +82,8 @@
   "pub.dnssec_chain_status_indeterminate": "Neurčeno",
   "pub.dnssec_chain_disagree": "Jmenné servery vrátily různé záznamy DNSSEC - zobrazuje se nejčastější odpověď.",
   "pub.dnssec_chain_disagree_servers": "Odlišné jmenné servery: {servers}",
+  "pub.dnssec_chain_stale_secondary": "Některé jmenné servery vracejí prošlé podpisy (zastaralý sekundární server), takže resolvery, které je používají, nemohou tuto zónu ověřit.",
+  "pub.dnssec_chain_stale_servers": "Jmenné servery s prošlými podpisy: {servers}",
   "pub.dnssec_chain_servers_without_ds": "Jmenné servery bez DS: {servers}",
   "pub.dnssec_chain_servers_without_dnskey": "Jmenné servery bez DNSKEY: {servers}",
   "pub.dnssec_chain_tip_ds": "DS · key tag {tag}",

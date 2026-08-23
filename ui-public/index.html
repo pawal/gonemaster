@@ -20,27 +20,9 @@
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
     <!-- HREFLANG_TAGS -->
-    <!--
-      Structured data: one @graph with two @id-linked nodes, a WebSite node and
-      the app node. The app node is multi-typed WebApplication +
-      SoftwareApplication so parsers that only match SoftwareApplication still
-      find it. Every @id and url uses the __PUBLIC_URL__ placeholder, which the
-      server substitutes per deployment (server/public/public.go), so nothing
-      may be hardcoded to a specific host.
-
-      Deliberately NO `offers` and NO `aggregateRating` on the app node:
-      including a price block makes Google's Rich Results treat the markup as a
-      software-listing snippet, which then requires ratings and reviews.
-      gonemaster collects no user ratings, and fabricating an aggregateRating
-      would violate Google's structured-data guidelines. The markup exists for
-      entity understanding, not the rich snippet; "free" is conveyed via
-      isAccessibleForFree. If you are tempted to add offers, read this again.
-
-      Also deliberately no FAQPage node: Google requires FAQ markup to mirror
-      FAQ content visible on the page, and the public UI has none.
-
-      src/test/structured-data.test.js enforces all of this.
-    -->
+    <!-- What this block may and may not contain (no offers, no
+         aggregateRating, no FAQPage) is documented and enforced in
+         src/test/structured-data.test.js. -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",

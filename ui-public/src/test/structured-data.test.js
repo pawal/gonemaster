@@ -1,5 +1,19 @@
-// Guards the JSON-LD structured-data block in index.html; the policy the
-// assertions enforce is documented next to the block itself.
+// Guards the JSON-LD structured-data block in index.html: one @graph with an
+// @id-linked WebSite node and an app node. The app node is multi-typed
+// WebApplication + SoftwareApplication so parsers matching only
+// SoftwareApplication still find it, and every @id and url uses the
+// __PUBLIC_URL__ placeholder the server substitutes per deployment
+// (server/public/public.go), so nothing may be hardcoded to a host.
+//
+// Deliberately no `offers` and no `aggregateRating`: a price block makes
+// Google's Rich Results treat the markup as a software listing, which then
+// requires ratings and reviews. gonemaster collects no user ratings, and
+// fabricating an aggregateRating would violate Google's guidelines. The markup
+// exists for entity understanding, not the rich snippet; "free" is conveyed via
+// isAccessibleForFree. If you are tempted to add offers, read this again.
+//
+// Also deliberately no FAQPage node: Google requires FAQ markup to mirror FAQ
+// content visible on the page, and the public UI has none.
 
 import { describe, expect, it } from "vitest";
 import { readFileSync, readdirSync } from "node:fs";

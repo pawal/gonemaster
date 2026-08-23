@@ -3,8 +3,8 @@ package main
 import (
 	"context"
 	"testing"
-	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/mcptest"
 	"codeberg.org/pawal/gonemaster/internal/apitest"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -13,29 +13,16 @@ import (
 // toolNames lists the tools a server registers for a given write gate.
 func toolNames(t *testing.T, api *apiClient, allowWrite bool) map[string]bool {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	done := make(chan struct{})
-	defer func() { cancel(); <-done }()
-
-	clientT, serverT := mcp.NewInMemoryTransports()
-	srv := newMCPServer(api, allowWrite)
-	go func() { _ = srv.Run(ctx, serverT); close(done) }()
-
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
-	session, err := client.Connect(ctx, clientT, nil)
-	if err != nil {
-		t.Fatalf("client connect: %v", err)
-	}
-	defer session.Close()
-
-	res, err := session.ListTools(ctx, nil)
-	if err != nil {
-		t.Fatalf("list tools: %v", err)
-	}
 	names := map[string]bool{}
-	for _, tl := range res.Tools {
-		names[tl.Name] = true
-	}
+	mcptest.Session(t, newMCPServer(api, allowWrite), func(ctx context.Context, session *mcp.ClientSession) {
+		res, err := session.ListTools(ctx, nil)
+		if err != nil {
+			t.Fatalf("list tools: %v", err)
+		}
+		for _, tl := range res.Tools {
+			names[tl.Name] = true
+		}
+	})
 	return names
 }
 

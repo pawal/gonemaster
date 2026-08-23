@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/mcptest"
 	"codeberg.org/pawal/gonemaster/internal/apitest"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -16,33 +17,20 @@ import (
 // (non-error) result it decodes the structured output into out.
 func callTool(t *testing.T, api *apiClient, name string, args map[string]any, out any) *mcp.CallToolResult {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	// Join the server goroutine before returning so a test that restores
-	// overridden package vars (pollInterval, defaultTestTimeout) cannot race it.
-	done := make(chan struct{})
-	defer func() { cancel(); <-done }()
-
-	clientT, serverT := mcp.NewInMemoryTransports()
-	srv := newMCPServer(api, true)
-	go func() { _ = srv.Run(ctx, serverT); close(done) }()
-
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
-	session, err := client.Connect(ctx, clientT, nil)
-	if err != nil {
-		t.Fatalf("client connect: %v", err)
-	}
-	defer session.Close()
-
-	res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})
-	if err != nil {
-		t.Fatalf("call %s: %v", name, err)
-	}
-	if out != nil && !res.IsError && res.StructuredContent != nil {
-		raw, _ := json.Marshal(res.StructuredContent)
-		if e := json.Unmarshal(raw, out); e != nil {
-			t.Fatalf("decode %s output: %v", name, e)
+	var res *mcp.CallToolResult
+	mcptest.Session(t, newMCPServer(api, true), func(ctx context.Context, session *mcp.ClientSession) {
+		var err error
+		res, err = session.CallTool(ctx, &mcp.CallToolParams{Name: name, Arguments: args})
+		if err != nil {
+			t.Fatalf("call %s: %v", name, err)
 		}
-	}
+		if out != nil && !res.IsError && res.StructuredContent != nil {
+			raw, _ := json.Marshal(res.StructuredContent)
+			if e := json.Unmarshal(raw, out); e != nil {
+				t.Fatalf("decode %s output: %v", name, e)
+			}
+		}
+	})
 	return res
 }
 

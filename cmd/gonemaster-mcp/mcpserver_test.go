@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/cmd/internal/mcptest"
 	"codeberg.org/pawal/gonemaster/internal/apitest"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
@@ -35,24 +36,13 @@ func TestServerInstructions(t *testing.T) {
 // TestServerInstructionsReachClient proves the instructions are delivered to a
 // connected client in the initialize result, not just stored server-side.
 func TestServerInstructionsReachClient(t *testing.T) {
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	clientT, serverT := mcp.NewInMemoryTransports()
 	srv := newMCPServer(clientFor(t, "http://localhost:0", ""), false)
-	go func() { _ = srv.Run(ctx, serverT) }()
-
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
-	session, err := client.Connect(ctx, clientT, nil)
-	if err != nil {
-		t.Fatalf("client connect: %v", err)
-	}
-	defer session.Close()
-
-	got := session.InitializeResult().Instructions
-	if got != serverInstructions(false) {
-		t.Errorf("client instructions = %q, want server instructions", got)
-	}
+	mcptest.Session(t, srv, func(_ context.Context, session *mcp.ClientSession) {
+		got := session.InitializeResult().Instructions
+		if got != serverInstructions(false) {
+			t.Errorf("client instructions = %q, want server instructions", got)
+		}
+	})
 }
 
 func TestNormalizeBaseURL(t *testing.T) {
@@ -84,38 +74,26 @@ func TestNormalizeBaseURL(t *testing.T) {
 // tool, exercising the full tools/call round-trip plus the HTTP client.
 func callPing(t *testing.T, api *apiClient) pingOutput {
 	t.Helper()
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	clientT, serverT := mcp.NewInMemoryTransports()
-	srv := newMCPServer(api, false)
-	go func() { _ = srv.Run(ctx, serverT) }()
-
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
-	session, err := client.Connect(ctx, clientT, nil)
-	if err != nil {
-		t.Fatalf("client connect: %v", err)
-	}
-	defer session.Close()
-
-	res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "ping"})
-	if err != nil {
-		t.Fatalf("call ping: %v", err)
-	}
-	if res.IsError {
-		t.Fatalf("ping returned a tool error: %+v", res.Content)
-	}
-	if res.StructuredContent == nil {
-		t.Fatalf("ping returned no structured content")
-	}
-	raw, err := json.Marshal(res.StructuredContent)
-	if err != nil {
-		t.Fatalf("marshal structured content: %v", err)
-	}
 	var out pingOutput
-	if err := json.Unmarshal(raw, &out); err != nil {
-		t.Fatalf("decode ping output: %v", err)
-	}
+	mcptest.Session(t, newMCPServer(api, false), func(ctx context.Context, session *mcp.ClientSession) {
+		res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "ping"})
+		if err != nil {
+			t.Fatalf("call ping: %v", err)
+		}
+		if res.IsError {
+			t.Fatalf("ping returned a tool error: %+v", res.Content)
+		}
+		if res.StructuredContent == nil {
+			t.Fatalf("ping returned no structured content")
+		}
+		raw, err := json.Marshal(res.StructuredContent)
+		if err != nil {
+			t.Fatalf("marshal structured content: %v", err)
+		}
+		if err := json.Unmarshal(raw, &out); err != nil {
+			t.Fatalf("decode ping output: %v", err)
+		}
+	})
 	return out
 }
 

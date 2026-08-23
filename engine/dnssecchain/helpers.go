@@ -3,6 +3,7 @@ package dnssecchain
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sort"
 	"strings"
 	"time"
@@ -104,12 +105,35 @@ func recordsOfType(resp packet.Packet, name dnsname.Name, rrtype uint16) []dns.R
 	return resp.GetRecordsForName(dns.TypeToString[rrtype], name, "answer")
 }
 
-// coveringRRSIG returns answer-section RRSIGs covering rrtype, filtered by
-// signer when signer is non-empty.
-func coveringRRSIG(resp packet.Packet, rrtype uint16, signer string) []*dns.RRSIG {
+// sectionRecords returns the records of rrtype in section. Answer-section
+// RRsets are the ones owned by the zone apex; authority-section NSEC3 records
+// are owned by a hashed name, so those are taken as served.
+func sectionRecords(resp packet.Packet, zone dnsname.Name, rrtype uint16, section string) []dns.RR {
+	if section == "authority" {
+		return resp.GetRecords(dns.TypeToString[rrtype], section)
+	}
+	return recordsOfType(resp, zone, rrtype)
+}
+
+// rrsetForOwner narrows rrs to the RRset a signature covers.
+func rrsetForOwner(rrs []dns.RR, owner string) []dns.RR {
+	want := canonName(owner)
+	out := make([]dns.RR, 0, len(rrs))
+	for _, rr := range rrs {
+		if canonName(rr.Header().Name) == want {
+			out = append(out, rr)
+		}
+	}
+	return out
+}
+
+// coveringRRSIG returns RRSIGs in section covering rrtype, filtered by signer
+// when signer is non-empty. Authenticated-denial signatures (NSEC, NSEC3) sit
+// in the authority section of a negative answer.
+func coveringRRSIG(resp packet.Packet, rrtype uint16, signer, section string) []*dns.RRSIG {
 	want := canonName(signer)
 	var out []*dns.RRSIG
-	for _, rr := range resp.GetRecords("RRSIG", "answer") {
+	for _, rr := range resp.GetRecords("RRSIG", section) {
 		sig, ok := rr.(*dns.RRSIG)
 		if !ok || sig.TypeCovered != rrtype {
 			continue
@@ -215,6 +239,31 @@ func keySetSignature(keys []*dns.DNSKEY) string {
 	}
 	sort.Strings(parts)
 	return strings.Join(parts, ",")
+}
+
+// sigProfile accumulates one server's signature evidence: the (type, key tag,
+// state) tuples it served and whether any of them was outside its validity
+// window. Two servers serving identical records with differently aged
+// signatures must still count as disagreeing.
+type sigProfile struct {
+	states []string
+	stale  bool
+}
+
+func (p *sigProfile) add(rrtype string, sig *dns.RRSIG, state string) {
+	if sig == nil {
+		return
+	}
+	p.states = append(p.states, fmt.Sprintf("%s|%d|%s", rrtype, sig.KeyTag, state))
+	if state == SigExpired || state == SigNotYetValid {
+		p.stale = true
+	}
+}
+
+// fingerprint folds the signature states into the record-set signature.
+func (p *sigProfile) fingerprint(recordSet string) string {
+	sort.Strings(p.states)
+	return recordSet + "#" + strings.Join(p.states, ",")
 }
 
 // disagreeing returns servers whose record-set signature differs from the most

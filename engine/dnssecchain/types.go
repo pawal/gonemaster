@@ -3,7 +3,8 @@
 package dnssecchain
 
 // Version is the schema version of the emitted Summary. Changes are additive.
-const Version = 1
+// Version 2 added the per-side servers_stale lists and NSEC/NSEC3 signatures.
+const Version = 2
 
 // Roll-up status values.
 const (
@@ -72,6 +73,7 @@ type Parent struct {
 	ServersQueried     []string `json:"servers_queried"`
 	ServersWithoutDS   []string `json:"servers_without_ds"`
 	ServersDisagreeing []string `json:"servers_disagreeing"`
+	ServersStale       []string `json:"servers_stale"` // served an expired or not-yet-valid signature
 }
 
 // Child holds the DNSKEY and signature evidence from the tested zone's servers.
@@ -82,11 +84,12 @@ type Child struct {
 	ServersQueried       []string      `json:"servers_queried"`
 	ServersWithoutDNSKEY []string      `json:"servers_without_dnskey"`
 	ServersDisagreeing   []string      `json:"servers_disagreeing"`
+	ServersStale         []string      `json:"servers_stale"` // served an expired or not-yet-valid signature
 }
 
-// SignedRRset is one apex RRset the zone publishes together with the signatures
-// covering it (for example SOA, NSEC3PARAM, CDS, CDNSKEY). Refs lists the
-// DNSKEY key tags the RRset points at (CDS/CDNSKEY name a key by tag).
+// SignedRRset is one RRset the zone publishes together with the signatures
+// covering it (for example SOA, NSEC, NSEC3, NSEC3PARAM, CDS, CDNSKEY). Refs
+// lists the DNSKEY key tags the RRset points at (CDS/CDNSKEY name a key by tag).
 // For CDS/CDNSKEY, DSMatch reports whether those key tags match the parent DS
 // and NewKeys lists the signaled key tags with no DS at the parent yet.
 type SignedRRset struct {
@@ -130,7 +133,7 @@ type DNSKEY struct {
 	Servers   []string `json:"servers"`
 }
 
-// RRSIG is one signature covering a DS, DNSKEY, or SOA RRset.
+// RRSIG is one signature covering a DS, DNSKEY, or zone-data RRset.
 type RRSIG struct {
 	KeyTag     uint16   `json:"key_tag"`
 	Algorithm  uint8    `json:"algorithm"`

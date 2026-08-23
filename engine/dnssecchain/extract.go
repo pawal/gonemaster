@@ -155,23 +155,28 @@ func (e *extractor) extractParent(ctx context.Context, in Input) {
 			sigByIP[ip] = ""
 			continue
 		}
-		sigByIP[ip] = dsSetSignature(dsRRs)
 		for _, ds := range dsRRs {
 			e.addDS(ds, ip)
 		}
 
 		// Verify DS-covering RRSIGs against this server's DS RRset using the
 		// parent-apex DNSKEYs from the same server, matching DNSSEC21.
+		var prof sigProfile
 		parentKeys := parentApexKeys(ctx, ns, in.ParentZone, parentApex)
 		dsRRset := dsRRsetToRR(dsRRs)
-		for _, sig := range coveringRRSIG(resp, dns.TypeDS, parentApex) {
+		for _, sig := range coveringRRSIG(resp, dns.TypeDS, parentApex, "answer") {
 			state := sigState(sig, dsRRset, parentKeys, e.at)
 			e.addRRSIG(&e.summary.Parent.DSRRSIG, sig, state, ip)
+			prof.add("DS", sig, state)
 			for _, pk := range parentKeys {
 				if dnssecutil.KeyTag(pk) == sig.KeyTag {
 					e.addParentDNSKEY(pk, ip)
 				}
 			}
+		}
+		sigByIP[ip] = prof.fingerprint(dsSetSignature(dsRRs))
+		if prof.stale {
+			e.summary.Parent.ServersStale = append(e.summary.Parent.ServersStale, ip)
 		}
 	}
 
@@ -200,32 +205,35 @@ func (e *extractor) extractChild(ctx context.Context, in Input) {
 			sigByIP[ip] = ""
 			continue
 		}
-		sigByIP[ip] = keySetSignature(keyRRs)
 		for _, key := range keyRRs {
 			e.addDNSKEY(key, ip)
 		}
 
+		var prof sigProfile
 		keyRRset := keysToRR(keyRRs)
-		for _, sig := range coveringRRSIG(resp, dns.TypeDNSKEY, zoneName) {
+		for _, sig := range coveringRRSIG(resp, dns.TypeDNSKEY, zoneName, "answer") {
 			state := sigState(sig, keyRRset, keyRRs, e.at)
 			e.addRRSIG(&e.summary.Child.DNSKEYRRSIG, sig, state, ip)
+			prof.add("DNSKEY", sig, state)
 		}
 
-		// Apex zone-data signatures cached with the DO bit by a testcase.
+		// Zone-data signatures cached with the DO bit by a testcase.
 		for _, zt := range zoneDataTypes {
-			zresp, ok := query(ctx, ns, zoneName, zt.name)
+			zresp, ok := query(ctx, ns, zoneName, zt.qtype)
 			if !ok || !validDNSSECAnswer(zresp) {
 				continue
 			}
-			rrset := recordsOfType(zresp, e.zone, zt.rrtype)
-			if len(rrset) > 0 {
-				if _, seen := e.signedTTL[zt.name]; !seen {
-					e.signedTTL[zt.name] = rrset[0].Header().TTL
-				}
+			rrs := sectionRecords(zresp, e.zone, zt.rrtype, zt.section)
+			if len(rrs) == 0 {
+				continue
 			}
-			for _, sig := range coveringRRSIG(zresp, zt.rrtype, zoneName) {
-				state := sigState(sig, rrset, keyRRs, e.at)
+			if _, seen := e.signedTTL[zt.name]; !seen {
+				e.signedTTL[zt.name] = rrs[0].Header().TTL
+			}
+			for _, sig := range coveringRRSIG(zresp, zt.rrtype, zoneName, zt.section) {
+				state := sigState(sig, rrsetForOwner(rrs, sig.Hdr.Name), keyRRs, e.at)
 				e.addSignedRRSIG(zt.name, sig, state, ip)
+				prof.add(zt.name, sig, state)
 			}
 			if zt.refs != nil {
 				for _, kt := range zt.refs(zresp, e.zone) {
@@ -233,22 +241,32 @@ func (e *extractor) extractChild(ctx context.Context, in Input) {
 				}
 			}
 		}
+		sigByIP[ip] = prof.fingerprint(keySetSignature(keyRRs))
+		if prof.stale {
+			e.summary.Child.ServersStale = append(e.summary.Child.ServersStale, ip)
+		}
 	}
 	e.summary.Child.ServersDisagreeing = disagreeing(sigByIP)
 	e.buildSigned()
 }
 
-// zoneDataTypes are apex RRsets, in display order, whose signatures the run
-// already cached with the DO bit.
+// zoneDataTypes are the RRsets, in display order, whose signatures the run
+// already cached with the DO bit. Authenticated denial is read from the apex
+// NSEC query DNSSEC10 and DNSSEC03 issue: an NSEC zone answers it directly,
+// an NSEC3 zone answers NODATA with the NSEC3 proof in the authority section.
 var zoneDataTypes = []struct {
-	name   string
-	rrtype uint16
-	refs   func(packet.Packet, dnsname.Name) []uint16
+	name    string
+	qtype   string
+	rrtype  uint16
+	section string
+	refs    func(packet.Packet, dnsname.Name) []uint16
 }{
-	{"SOA", dns.TypeSOA, nil},
-	{"NSEC3PARAM", dns.TypeNSEC3PARAM, nil},
-	{"CDS", dns.TypeCDS, cdsRefs},
-	{"CDNSKEY", dns.TypeCDNSKEY, cdnskeyRefs},
+	{"SOA", "SOA", dns.TypeSOA, "answer", nil},
+	{"NSEC", "NSEC", dns.TypeNSEC, "answer", nil},
+	{"NSEC3", "NSEC", dns.TypeNSEC3, "authority", nil},
+	{"NSEC3PARAM", "NSEC3PARAM", dns.TypeNSEC3PARAM, "answer", nil},
+	{"CDS", "CDS", dns.TypeCDS, "answer", cdsRefs},
+	{"CDNSKEY", "CDNSKEY", dns.TypeCDNSKEY, "answer", cdnskeyRefs},
 }
 
 func (e *extractor) addSignedRRSIG(rrtype string, sig *dns.RRSIG, state, server string) {
@@ -390,7 +408,17 @@ func (e *extractor) rollup() string {
 		if !e.hasMatchingLink() {
 			return StatusBroken
 		}
+		// Every DS signature outside its window leaves no validatable path
+		// to the zone's keys, whichever parent server a resolver asks.
+		if e.allDSSignaturesStale() {
+			return StatusBroken
+		}
 		if e.hasValidDNSKEYSignature() {
+			// Some servers serve signatures outside their window: the chain
+			// holds, but resolvers reaching those servers may still fail.
+			if e.hasStaleServer() {
+				return StatusPartial
+			}
 			return StatusSecure
 		}
 		// A DS-anchored key we cannot verify locally is unproven, not broken.
@@ -399,6 +427,26 @@ func (e *extractor) rollup() string {
 		}
 		return StatusBroken
 	}
+}
+
+// hasStaleServer reports whether any server served a signature outside its
+// validity window.
+func (e *extractor) hasStaleServer() bool {
+	return len(e.summary.Parent.ServersStale) > 0 || len(e.summary.Child.ServersStale) > 0
+}
+
+// allDSSignaturesStale reports whether DS signatures were seen and every one of
+// them is outside its validity window.
+func (e *extractor) allDSSignaturesStale() bool {
+	if len(e.summary.Parent.DSRRSIG) == 0 {
+		return false
+	}
+	for _, sig := range e.summary.Parent.DSRRSIG {
+		if sig.State != SigExpired && sig.State != SigNotYetValid {
+			return false
+		}
+	}
+	return true
 }
 
 // markAnchoredKeys flags each DNSKEY a matching DS names.
@@ -580,10 +628,12 @@ func (e *extractor) finalize() {
 	p.ServersQueried = sortUnique(p.ServersQueried)
 	p.ServersWithoutDS = sortUnique(p.ServersWithoutDS)
 	p.ServersDisagreeing = sortUnique(p.ServersDisagreeing)
+	p.ServersStale = sortUnique(p.ServersStale)
 	c := &e.summary.Child
 	c.ServersQueried = sortUnique(c.ServersQueried)
 	c.ServersWithoutDNSKEY = sortUnique(c.ServersWithoutDNSKEY)
 	c.ServersDisagreeing = sortUnique(c.ServersDisagreeing)
+	c.ServersStale = sortUnique(c.ServersStale)
 
 	sort.Slice(p.DS, func(i, j int) bool {
 		if p.DS[i].KeyTag != p.DS[j].KeyTag {
@@ -646,6 +696,7 @@ func (e *extractor) ensureNonNil() {
 	p.ServersQueried = orEmpty(p.ServersQueried)
 	p.ServersWithoutDS = orEmpty(p.ServersWithoutDS)
 	p.ServersDisagreeing = orEmpty(p.ServersDisagreeing)
+	p.ServersStale = orEmpty(p.ServersStale)
 	if c.DNSKEYs == nil {
 		c.DNSKEYs = []DNSKEY{}
 	}
@@ -658,6 +709,7 @@ func (e *extractor) ensureNonNil() {
 	c.ServersQueried = orEmpty(c.ServersQueried)
 	c.ServersWithoutDNSKEY = orEmpty(c.ServersWithoutDNSKEY)
 	c.ServersDisagreeing = orEmpty(c.ServersDisagreeing)
+	c.ServersStale = orEmpty(c.ServersStale)
 	if e.summary.Links == nil {
 		e.summary.Links = []Link{}
 	}
@@ -687,9 +739,11 @@ func (e *extractor) applyCaps() {
 	p.ServersQueried, trunc = capSlice(p.ServersQueried, maxServers, trunc)
 	p.ServersWithoutDS, trunc = capSlice(p.ServersWithoutDS, maxServers, trunc)
 	p.ServersDisagreeing, trunc = capSlice(p.ServersDisagreeing, maxServers, trunc)
+	p.ServersStale, trunc = capSlice(p.ServersStale, maxServers, trunc)
 	c.ServersQueried, trunc = capSlice(c.ServersQueried, maxServers, trunc)
 	c.ServersWithoutDNSKEY, trunc = capSlice(c.ServersWithoutDNSKEY, maxServers, trunc)
 	c.ServersDisagreeing, trunc = capSlice(c.ServersDisagreeing, maxServers, trunc)
+	c.ServersStale, trunc = capSlice(c.ServersStale, maxServers, trunc)
 	for i := range p.DS {
 		p.DS[i].Servers, trunc = capSlice(p.DS[i].Servers, maxServers, trunc)
 	}

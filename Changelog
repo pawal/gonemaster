@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Changed
+
+- tests: the Go and frontend test suites are refactored onto shared test-support packages, with repetitive groups converted to tables; no behaviour change
+
 ### Fixed
 
 - ui-public: the DNSSEC chain of trust names ML-DSA-44 instead of showing "alg 18"

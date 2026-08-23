@@ -40,10 +40,7 @@ func TestParentNameserversReturnsEmptyWhenRootEmpty(t *testing.T) {
 
 	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{}})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	out, err := ParentNameservers(ctx, &z)
 	if err != nil {
@@ -67,10 +64,7 @@ func TestDelegationNameserversReturnsEmptyWhenAllDelegationServersUnreachable(t 
 
 	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{}})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	out, err := DelegationNameservers(ctx, &z)
 	if err != nil {
@@ -100,10 +94,7 @@ func TestGetOOBIPsAttachesCNAMEErrorToAddressLessItem(t *testing.T) {
 	}
 	recursortest.SeedCNAMEError(r, seedErr, "ns.outside.test", []string{"A", "AAAA"})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	items, err := getOOBIPs(ctx, &z, []dnsname.Name{dnsname.New("ns.outside.test")})
 	if err != nil {
@@ -145,10 +136,7 @@ func TestZoneNameserversReturnsEmptyWhenDelegationEmpty(t *testing.T) {
 		"example.com": {},
 	})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	out, err := ZoneNameservers(ctx, &z)
 	if err != nil {

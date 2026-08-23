@@ -14,7 +14,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
-	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 func TestDelegationNameserversUndelegated(t *testing.T) {
@@ -26,10 +25,7 @@ func TestDelegationNameserversUndelegated(t *testing.T) {
 			"ns2.example.net": {"192.0.2.2"},
 		},
 	})
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	items, err := DelegationNameservers(ctx, &z)
 	if err != nil {
@@ -63,10 +59,7 @@ func TestZoneNSNamesUndelegatedIgnoresAuthoritativeApexSet(t *testing.T) {
 			"ns1.example.net": {"192.0.2.53"},
 		},
 	})
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	_ = newAuthoritativeNameserver(ctx, t, r, "ns1.example.net", "192.0.2.53", "example", "NS1.EXAMPLE.NET", "ns2.example.net")
 
@@ -96,10 +89,7 @@ func TestZoneNameserversOutOfBailiwick(t *testing.T) {
 			"ns2.example.net": {"192.0.2.54"},
 		},
 	})
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	_ = newAuthoritativeNameserver(ctx, t, r, "ns1.example.net", "192.0.2.53", "example", "ns1.example.net", "ns2.example.net")
 	_ = newAuthoritativeNameserver(ctx, t, r, "ns2.example.net", "192.0.2.54", "example", "ns1.example.net", "ns2.example.net")
@@ -153,10 +143,7 @@ func TestDelegationNameserversUndelegatedLookupWhenNoIP(t *testing.T) {
 		return packet.Packet{Msg: msg}, nil
 	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	items, err := DelegationNameservers(ctx, &z)
 	if err != nil {
@@ -181,10 +168,7 @@ func TestDelegationNameserversUndelegatedKeepsInBailiwickNameWithoutIP(t *testin
 			"ns1.example": {},
 		},
 	})
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	items, err := DelegationNameservers(ctx, &z)
 	if err != nil {
@@ -207,10 +191,7 @@ func TestZoneNSNamesUndelegatedUsesDelegationNames(t *testing.T) {
 			"ns1.example":     {"192.0.2.53"},
 		},
 	})
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	names, err := zoneNSNames(ctx, &z)
 	if err != nil {
@@ -232,10 +213,7 @@ func TestZoneNameserversUndelegatedInBailiwickUsesProvidedGlue(t *testing.T) {
 			"ns1.example": {"192.0.2.53"},
 		},
 	})
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	ns := nstest.NS(t, ctx, r, "ns1.example", "192.0.2.53")
 	queryCalls := 0
@@ -324,11 +302,7 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 
 	r := nstest.RootRecursor(t, map[string][]string{"ns.root": {"192.0.2.9"}})
 
-	rootNS, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.9", r.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	rootNS.SetQueryHook(ibTestRootHook("example", map[string]string{
+	nstest.HookedNS(t, ctx, r, "ns.root", "192.0.2.9", ibTestRootHook("example", map[string]string{
 		"ns1.example":  "192.0.2.11",
 		"ns2.example":  "192.0.2.12",
 		"dead.example": "192.0.2.99",
@@ -357,36 +331,21 @@ func TestGetIBAddrInZoneSkipsDeadDelegationServer(t *testing.T) {
 		return packet.Packet{}, nil
 	}
 
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.11", r.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	ns1.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "ns1.example", "192.0.2.11", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		return ibHook(name, qtype)
 	})
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.12", r.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	ns2.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "ns2.example", "192.0.2.12", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		return ibHook(name, qtype)
 	})
 
 	var deadQueryCount atomic.Int32
-	deadNS, err := nameserver.NewWithContext(ctx, "dead.example", "192.0.2.99", r.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	deadNS.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "dead.example", "192.0.2.99", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		deadQueryCount.Add(1)
 		return packet.Packet{}, fmt.Errorf("connection timed out")
 	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatal(err)
-	}
+	z := newZone(t, "example", r)
 
 	items, err := ZoneNameservers(ctx, &z)
 	if err != nil {
@@ -422,11 +381,7 @@ func TestGetIBAddrInZoneBreaksEarlyOnSuccess(t *testing.T) {
 
 	r := nstest.RootRecursor(t, map[string][]string{"ns.root": {"192.0.2.9"}})
 
-	rootNS, err := nameserver.NewWithContext(ctx, "ns.root", "192.0.2.9", r.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	rootNS.SetQueryHook(ibTestRootHook("example", map[string]string{
+	nstest.HookedNS(t, ctx, r, "ns.root", "192.0.2.9", ibTestRootHook("example", map[string]string{
 		"ns1.example": "192.0.2.21",
 		"ns2.example": "192.0.2.22",
 	}))
@@ -456,22 +411,11 @@ func TestGetIBAddrInZoneBreaksEarlyOnSuccess(t *testing.T) {
 	}
 
 	var ns1Count, ns2Count atomic.Int32
-	ns1, err := nameserver.NewWithContext(ctx, "ns1.example", "192.0.2.21", r.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	ns1.SetQueryHook(ibHook(&ns1Count))
+	nstest.HookedNS(t, ctx, r, "ns1.example", "192.0.2.21", ibHook(&ns1Count))
 
-	ns2, err := nameserver.NewWithContext(ctx, "ns2.example", "192.0.2.22", r.Client())
-	if err != nil {
-		t.Fatal(err)
-	}
-	ns2.SetQueryHook(ibHook(&ns2Count))
+	nstest.HookedNS(t, ctx, r, "ns2.example", "192.0.2.22", ibHook(&ns2Count))
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatal(err)
-	}
+	z := newZone(t, "example", r)
 
 	// Reset counters after zone creation (zoneNSNames queries both servers).
 	ns1Count.Store(0)

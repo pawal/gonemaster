@@ -17,10 +17,7 @@ func TestContract_IPV4BlockedArgs(t *testing.T) {
 	log := logger.FromContext(ctx)
 	prof.Net.IPv4 = false
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.81", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.81")
 	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
 		t.Fatalf("query with ipv4 disabled: %v", err)
 	}
@@ -42,10 +39,7 @@ func TestContract_ExternalQueryArgs(t *testing.T) {
 	prof.Net.AllowNonGlobalTargets = true
 	log := logger.FromContext(ctx)
 
-	ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "127.0.0.1")
 
 	timeout := 10 * time.Millisecond
 	opts := &QueryOptions{Timeout: &timeout}
@@ -68,10 +62,7 @@ func TestContract_ErrorCacheSkipArgs(t *testing.T) {
 	log := logger.FromContext(ctx)
 	prof.Resolver.Defaults.ErrorCacheTTL = 60
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.15", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.15")
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		return packet.Packet{}, fmt.Errorf("network error")
 	})
@@ -105,11 +96,8 @@ func TestContract_FakeDSReturnedArgs(t *testing.T) {
 	ctx, _ := testContext(t)
 	log := logger.FromContext(ctx)
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	err = ns.AddFakeDS("example", []DSData{{
+	ns := newNS(t, ctx, "ns.example", "192.0.2.1")
+	err := ns.AddFakeDS("example", []DSData{{
 		KeyTag:     1234,
 		Algorithm:  8,
 		DigestType: 2,

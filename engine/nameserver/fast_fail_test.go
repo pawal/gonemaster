@@ -150,10 +150,7 @@ func TestFastFailEngagesOnDialTimeouts(t *testing.T) {
 	// Use BlacklistingDisabled to isolate fast-fail from the SOA-blacklist path.
 	opts := &QueryOptions{BlacklistingDisabled: true}
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.240", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.240")
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -186,10 +183,7 @@ func TestFastFailIgnoresOuterContextCancellation(t *testing.T) {
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 	opts := &QueryOptions{BlacklistingDisabled: true}
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.241", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.241")
 
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		return packet.Packet{}, context.DeadlineExceeded
@@ -224,10 +218,7 @@ func TestQueryEmitsFastFailDecision(t *testing.T) {
 	rec := &dnstest.RecordingTrace{}
 	ctx = querytrace.WithContext(ctx, rec)
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.242", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.242")
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {

@@ -6,7 +6,6 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 // Equivalence tests document where AllNameservers (zone-view union of glue
@@ -40,10 +39,7 @@ func TestAllNameserversVsZoneNameserversAgreeOnCleanUndelegated(t *testing.T) {
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns2.example.com")
 	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns2.example.com")
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	allNS, err := AllNameservers(ctx, &z)
 	if err != nil {
@@ -103,10 +99,7 @@ func TestAllNameserversVsZoneNameserversAgreeOnOutOfBailiwickGlue(t *testing.T) 
 	setNSHook(ctx, t, r, "ns1.example.net", "192.0.2.53", "example.com", "ns1.example.net", "ns2.example.net")
 	setNSHook(ctx, t, r, "ns2.example.net", "192.0.2.54", "example.com", "ns1.example.net", "ns2.example.net")
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	allNS, err := AllNameservers(ctx, &z)
 	if err != nil {
@@ -149,10 +142,7 @@ func TestAllNameserversVsZoneNameserversAgreeOnEmptyZone(t *testing.T) {
 		"example.com": {},
 	})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	allNS, err := AllNameservers(ctx, &z)
 	if err != nil {

@@ -95,6 +95,15 @@ func NoData(owner string) packet.Packet {
 	return Response(NotAuthoritative(), Authority(SOARR(owner)))
 }
 
+// MixedApexRecords builds an apex answer mixing SOA, NS and a decoy A record.
+func MixedApexRecords(zoneName string, nsNames []string) packet.Packet {
+	soa := SOARR(zoneName, MName("ns1."+zoneName))
+	soa.Hdr.TTL = 3600
+	answer := append([]dns.RR{soa}, NSRRs(zoneName, nsNames...)...)
+	answer = append(answer, ARR("decoy."+zoneName, "192.0.2.99"))
+	return Response(NotAuthoritative(), Answers(answer...))
+}
+
 // header returns the record header every RR builder starts from.
 func header(owner string) dns.Header {
 	return dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: defaultTTL}

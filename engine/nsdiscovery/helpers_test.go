@@ -9,9 +9,20 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
+	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 // Shared test helpers for the nsdiscovery package.
+
+// newZone builds a zone served by r.
+func newZone(t *testing.T, name string, r *recursor.Recursor) zone.Zone {
+	t.Helper()
+	z, err := zone.NewWithRecursor(name, r)
+	if err != nil {
+		t.Fatalf("new zone %s: %v", name, err)
+	}
+	return z
+}
 
 // nsAnswerPacket builds an NS answer packet listing nsNames as authoritative
 // nameservers for zoneName.

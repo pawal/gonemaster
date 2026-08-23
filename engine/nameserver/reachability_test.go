@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/netip"
 	"testing"
+	"testing/synctest"
 	"time"
 )
 
@@ -53,27 +54,29 @@ func TestReachabilityCacheMarkDebounce(t *testing.T) {
 // Two hard errors farther apart than the TTL window must not promote to a
 // blackout. The first failure is forgotten; the second is treated as fresh.
 func TestReachabilityCachePendingExpires(t *testing.T) {
-	c := newReachabilityCache()
-	addr := "192.0.2.250"
+	synctest.Test(t, func(t *testing.T) {
+		c := newReachabilityCache()
+		addr := "192.0.2.250"
 
-	c.mark(addr, 10*time.Millisecond)
-	if skip, _ := c.shouldSkip(addr); skip {
-		t.Fatalf("first mark must not engage skip")
-	}
+		c.mark(addr, 10*time.Millisecond)
+		if skip, _ := c.shouldSkip(addr); skip {
+			t.Fatalf("first mark must not engage skip")
+		}
 
-	// Sleep past the window. A second mark now is "fresh first," not "second."
-	time.Sleep(20 * time.Millisecond)
+		// Sleep past the window. A second mark now is "fresh first," not "second."
+		time.Sleep(20 * time.Millisecond)
 
-	c.mark(addr, 10*time.Millisecond)
-	if skip, _ := c.shouldSkip(addr); skip {
-		t.Fatalf("second mark after window expiry must not engage skip")
-	}
+		c.mark(addr, 10*time.Millisecond)
+		if skip, _ := c.shouldSkip(addr); skip {
+			t.Fatalf("second mark after window expiry must not engage skip")
+		}
 
-	// A second mark within the window of the just-recorded pending DOES engage.
-	c.mark(addr, 10*time.Millisecond)
-	if skip, _ := c.shouldSkip(addr); !skip {
-		t.Fatalf("two consecutive marks within window must engage skip")
-	}
+		// A second mark within the window of the just-recorded pending DOES engage.
+		c.mark(addr, 10*time.Millisecond)
+		if skip, _ := c.shouldSkip(addr); !skip {
+			t.Fatalf("two consecutive marks within window must engage skip")
+		}
+	})
 }
 
 // A success observed between two failures clears the pending strike, so the
@@ -238,21 +241,23 @@ func TestEmptyKeepsReachabilityBlackout(t *testing.T) {
 // A pending strike for an address that is never marked again would otherwise
 // sit in the map for the lifetime of the cache. mark sweeps stale entries.
 func TestReachabilityCacheMarkSweepsStalePending(t *testing.T) {
-	c := newReachabilityCache()
+	synctest.Test(t, func(t *testing.T) {
+		c := newReachabilityCache()
 
-	c.mark("192.0.2.240", 10*time.Millisecond)
-	if _, pending := c.len(); pending != 1 {
-		t.Fatalf("first mark must record one pending strike; got %d", pending)
-	}
+		c.mark("192.0.2.240", 10*time.Millisecond)
+		if _, pending := c.len(); pending != 1 {
+			t.Fatalf("first mark must record one pending strike; got %d", pending)
+		}
 
-	time.Sleep(20 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
-	// Marking an unrelated address sweeps the stale pending entry.
-	c.mark("192.0.2.241", 10*time.Millisecond)
-	if _, pending := c.len(); pending != 1 {
-		t.Fatalf("stale pending strike must be swept, leaving only the new one; got %d", pending)
-	}
-	if got := c.metrics().Evictions; got != 1 {
-		t.Fatalf("sweep must count one eviction; got %d", got)
-	}
+		// Marking an unrelated address sweeps the stale pending entry.
+		c.mark("192.0.2.241", 10*time.Millisecond)
+		if _, pending := c.len(); pending != 1 {
+			t.Fatalf("stale pending strike must be swept, leaving only the new one; got %d", pending)
+		}
+		if got := c.metrics().Evictions; got != 1 {
+			t.Fatalf("sweep must count one eviction; got %d", got)
+		}
+	})
 }

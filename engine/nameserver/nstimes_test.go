@@ -7,6 +7,7 @@ import (
 	"math"
 	"strings"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -126,30 +127,28 @@ func TestCacheStoreRecordQueryTime(t *testing.T) {
 // hook returns a timeout-pattern error after a short delay to model a dead
 // server that swallows the query.
 func TestQueryNetworkRecordsTimeoutSeparately(t *testing.T) {
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.ErrorCacheTTL = 0
+	synctest.Test(t, func(t *testing.T) {
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.ErrorCacheTTL = 0
 
-	store := NewCacheStore()
-	ns, err := NewWithCache(store, "ns.example", "192.0.2.253", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		time.Sleep(3 * time.Millisecond)
-		return packet.Packet{}, fmt.Errorf("read timeout")
+		store := NewCacheStore()
+		ns := hookedNS(t, store, "ns.example", "192.0.2.253", func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+			time.Sleep(3 * time.Millisecond)
+			return packet.Packet{}, fmt.Errorf("read timeout")
+		})
+
+		if _, err := ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{BlacklistingDisabled: true}); err == nil {
+			t.Fatalf("expected timeout error")
+		}
+
+		const key = "ns.example/192.0.2.253"
+		if got := store.QueryTimings()[key]; len(got) != 0 {
+			t.Fatalf("expected no QueryTimings entry for a timed-out query, got %v", got)
+		}
+		if got := store.QueryTimeouts()[key]; got == 0 {
+			t.Fatalf("expected a timeout count for %q, got none: %+v", key, store.QueryTimeouts())
+		}
 	})
-
-	if _, err := ns.QueryWithOptions(ctx, "example", "A", &QueryOptions{BlacklistingDisabled: true}); err == nil {
-		t.Fatalf("expected timeout error")
-	}
-
-	const key = "ns.example/192.0.2.253"
-	if got := store.QueryTimings()[key]; len(got) != 0 {
-		t.Fatalf("expected no QueryTimings entry for a timed-out query, got %v", got)
-	}
-	if got := store.QueryTimeouts()[key]; got == 0 {
-		t.Fatalf("expected a timeout count for %q, got none: %+v", key, store.QueryTimeouts())
-	}
 }
 
 // TestQueryNetworkRecordsRefused verifies the other half of the load signal.
@@ -163,11 +162,7 @@ func TestQueryNetworkRecordsRefused(t *testing.T) {
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 
 	store := NewCacheStore()
-	ns, err := NewWithCache(store, "ns.example", "192.0.2.251", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, qname string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+	ns := hookedNS(t, store, "ns.example", "192.0.2.251", func(_ context.Context, qname string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		// A NOERROR answer for the second name proves the counter keys on
 		// the rcode, not merely on "a response arrived".
@@ -210,11 +205,7 @@ func TestQueryNetworkRefusedNotCountedOnCancelledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	store := NewCacheStore()
-	ns, err := NewWithCache(store, "ns.example", "192.0.2.250", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+	ns := hookedNS(t, store, "ns.example", "192.0.2.250", func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		cancel()
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeRefused

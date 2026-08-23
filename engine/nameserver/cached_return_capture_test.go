@@ -33,11 +33,7 @@ func cachedReturnFixture(t *testing.T, log *logger.Logger) (context.Context, Nam
 	a.Addr = netip.MustParseAddr("192.0.2.7")
 	answer.Answer = []dns.RR{a}
 
-	ns, err := NewWithCache(NewCacheStore(), "ns1.example", "192.0.2.53", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+	ns := hookedNS(t, NewCacheStore(), "ns1.example", "192.0.2.53", func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		return packet.Packet{Msg: answer}, nil
 	})
 	if _, err := ns.QueryWithOptions(ctx, qname, "A", nil); err != nil {

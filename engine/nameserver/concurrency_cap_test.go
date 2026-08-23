@@ -48,14 +48,8 @@ func okPacket() packet.Packet {
 func TestNameserverConcurrencyCapDisabledAllowsParallelQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		cache := NewCacheStore()
-		nsA, err := NewWithCache(cache, "ns-a.example", "192.0.2.90", nil)
-		if err != nil {
-			t.Fatalf("new nameserver A: %v", err)
-		}
-		nsB, err := NewWithCache(cache, "ns-b.example", "192.0.2.90", nil)
-		if err != nil {
-			t.Fatalf("new nameserver B: %v", err)
-		}
+		nsA := newCacheNS(t, cache, "ns-a.example", "192.0.2.90")
+		nsB := newCacheNS(t, cache, "ns-b.example", "192.0.2.90")
 
 		ctx, prof := testContext(t)
 		prof.Resolver.Defaults.NameserverConcurrency = 0
@@ -103,14 +97,8 @@ func TestNameserverConcurrencyCapSerializesAcrossSnapshots(t *testing.T) {
 		runA := root.SnapshotForRun()
 		runB := root.SnapshotForRun()
 
-		nsA, err := NewWithCache(runA, "ns-a.example", "192.0.2.91", nil)
-		if err != nil {
-			t.Fatalf("new nameserver A: %v", err)
-		}
-		nsB, err := NewWithCache(runB, "ns-b.example", "192.0.2.91", nil)
-		if err != nil {
-			t.Fatalf("new nameserver B: %v", err)
-		}
+		nsA := newCacheNS(t, runA, "ns-a.example", "192.0.2.91")
+		nsB := newCacheNS(t, runB, "ns-b.example", "192.0.2.91")
 
 		ctx, prof := testContext(t)
 		prof.Resolver.Defaults.NameserverConcurrency = 1
@@ -162,10 +150,7 @@ func TestNameserverConcurrencyCapSerializesAcrossSnapshots(t *testing.T) {
 func TestNameserverConcurrencyCapWaitCancellationReleasesInflight(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		cache := NewCacheStore()
-		ns, err := NewWithCache(cache, "ns.example", "192.0.2.92", nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
-		}
+		ns := newCacheNS(t, cache, "ns.example", "192.0.2.92")
 
 		ctx, prof := testContext(t)
 		prof.Resolver.Defaults.NameserverConcurrency = 1
@@ -188,7 +173,7 @@ func TestNameserverConcurrencyCapWaitCancellationReleasesInflight(t *testing.T) 
 
 		waitCtx, cancel := context.WithCancel(ctx)
 		cancel()
-		_, err = ns.QueryWithOptions(waitCtx, "second.example", "A", nil)
+		_, err := ns.QueryWithOptions(waitCtx, "second.example", "A", nil)
 		if !errors.Is(err, context.DeadlineExceeded) && !errors.Is(err, context.Canceled) {
 			t.Fatalf("expected context cancellation while waiting for cap, got %v", err)
 		}

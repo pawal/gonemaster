@@ -6,7 +6,6 @@ import (
 	"time"
 
 	dns "codeberg.org/miekg/dns"
-	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
@@ -47,13 +46,7 @@ func undelegatedZone(t *testing.T, ctx context.Context) *zone.Zone {
 	}
 	child := servers[0]
 
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("example"), Class: dns.ClassINET, TTL: 3600}}
-	key.Flags = dns.FlagZONE | dns.FlagSEP
-	key.Protocol = 3
-	key.Algorithm = dns.ECDSAP256SHA256
-	if _, err := key.Generate(256); err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
+	key := dnstest.GenKey(t, "example", dns.ECDSAP256SHA256, true).Key
 	child.SetQueryHook(func(_ context.Context, qname, qtype, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		if qtype == "DNSKEY" {
 			return dnskeyAnswer("example", key), nil

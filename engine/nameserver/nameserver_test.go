@@ -10,6 +10,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"testing"
+	"testing/synctest"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -24,12 +25,9 @@ import (
 )
 
 func TestFakeDSResponse(t *testing.T) {
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.1")
 
-	err = ns.AddFakeDS("example", []DSData{{
+	err := ns.AddFakeDS("example", []DSData{{
 		KeyTag:     1234,
 		Algorithm:  8,
 		DigestType: 2,
@@ -55,12 +53,9 @@ func TestFakeDSResponse(t *testing.T) {
 }
 
 func TestFakeDelegationNS(t *testing.T) {
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.1")
 
-	err = ns.AddFakeDelegation("example", map[string][]string{
+	err := ns.AddFakeDelegation("example", map[string][]string{
 		"ns1.example.": {"192.0.2.2"},
 	})
 	if err != nil {
@@ -84,10 +79,7 @@ func TestFakeDelegationNS(t *testing.T) {
 
 func TestQueryCacheHit(t *testing.T) {
 	cache := NewCacheStore()
-	ns, err := NewWithCache(cache, "ns.example", "192.0.2.10", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, cache, "ns.example", "192.0.2.10")
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -100,7 +92,7 @@ func TestQueryCacheHit(t *testing.T) {
 		return packet.Packet{Msg: msg}, nil
 	})
 
-	_, err = ns.QueryWithOptions(context.Background(), "example", "A", nil)
+	_, err := ns.QueryWithOptions(context.Background(), "example", "A", nil)
 	if err != nil {
 		t.Fatalf("query 1: %v", err)
 	}
@@ -119,74 +111,67 @@ func TestQueryCacheHit(t *testing.T) {
 }
 
 func TestInflightQueryCoalescing(t *testing.T) {
-	cache := NewCacheStore()
-	ns, err := NewWithCache(cache, "ns.example", "192.0.2.51", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		cache := NewCacheStore()
+		ns := newCacheNS(t, cache, "ns.example", "192.0.2.51")
 
-	ctx, _ := testContext(t)
+		ctx, _ := testContext(t)
 
-	started := make(chan struct{})
-	release := make(chan struct{})
-	var startOnce sync.Once
-	var calls int32
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		atomic.AddInt32(&calls, 1)
-		startOnce.Do(func() { close(started) })
-		<-release
-		msg := new(dns.Msg)
-		msg.Rcode = dns.RcodeSuccess
-		return packet.Packet{Msg: msg}, nil
+		started := make(chan struct{})
+		release := make(chan struct{})
+		var startOnce sync.Once
+		var calls int32
+		ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+			atomic.AddInt32(&calls, 1)
+			startOnce.Do(func() { close(started) })
+			<-release
+			msg := new(dns.Msg)
+			msg.Rcode = dns.RcodeSuccess
+			return packet.Packet{Msg: msg}, nil
+		})
+
+		var wg sync.WaitGroup
+		wg.Add(2)
+		var err1, err2 error
+		go func() {
+			defer wg.Done()
+			_, err1 = ns.QueryWithOptions(ctx, "example", "A", nil)
+		}()
+
+		select {
+		case <-started:
+		case <-time.After(200 * time.Millisecond):
+			t.Fatalf("expected first query to start")
+		}
+
+		go func() {
+			defer wg.Done()
+			_, err2 = ns.QueryWithOptions(ctx, "example", "A", nil)
+		}()
+
+		synctest.Wait()
+		if got := atomic.LoadInt32(&calls); got != 1 {
+			t.Fatalf("expected single inflight call, got %d", got)
+		}
+
+		close(release)
+		wg.Wait()
+
+		if err1 != nil || err2 != nil {
+			t.Fatalf("unexpected errors: %v %v", err1, err2)
+		}
+		if got := atomic.LoadInt32(&calls); got != 1 {
+			t.Fatalf("expected one query call total, got %d", got)
+		}
 	})
-
-	var wg sync.WaitGroup
-	wg.Add(2)
-	var err1, err2 error
-	go func() {
-		defer wg.Done()
-		_, err1 = ns.QueryWithOptions(ctx, "example", "A", nil)
-	}()
-
-	select {
-	case <-started:
-	case <-time.After(200 * time.Millisecond):
-		t.Fatalf("expected first query to start")
-	}
-
-	go func() {
-		defer wg.Done()
-		_, err2 = ns.QueryWithOptions(ctx, "example", "A", nil)
-	}()
-
-	time.Sleep(50 * time.Millisecond)
-	if got := atomic.LoadInt32(&calls); got != 1 {
-		t.Fatalf("expected single inflight call, got %d", got)
-	}
-
-	close(release)
-	wg.Wait()
-
-	if err1 != nil || err2 != nil {
-		t.Fatalf("unexpected errors: %v %v", err1, err2)
-	}
-	if got := atomic.LoadInt32(&calls); got != 1 {
-		t.Fatalf("expected one query call total, got %d", got)
-	}
 }
 
 func TestCacheStoreIsolation(t *testing.T) {
 	cacheA := NewCacheStore()
 	cacheB := NewCacheStore()
 
-	nsA, err := NewWithCache(cacheA, "ns.example", "192.0.2.30", nil)
-	if err != nil {
-		t.Fatalf("new nameserver A: %v", err)
-	}
-	nsB, err := NewWithCache(cacheB, "ns.example", "192.0.2.30", nil)
-	if err != nil {
-		t.Fatalf("new nameserver B: %v", err)
-	}
+	nsA := newCacheNS(t, cacheA, "ns.example", "192.0.2.30")
+	nsB := newCacheNS(t, cacheB, "ns.example", "192.0.2.30")
 
 	var callsA int
 	nsA.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -225,14 +210,8 @@ func TestTwoRunsDoNotShareCache(t *testing.T) {
 	cacheB := NewCacheStore()
 	addr := "192.0.2.32"
 
-	nsA, err := NewWithCache(cacheA, "ns.example", addr, nil)
-	if err != nil {
-		t.Fatalf("new nameserver A: %v", err)
-	}
-	nsB, err := NewWithCache(cacheB, "ns.example", addr, nil)
-	if err != nil {
-		t.Fatalf("new nameserver B: %v", err)
-	}
+	nsA := newCacheNS(t, cacheA, "ns.example", addr)
+	nsB := newCacheNS(t, cacheB, "ns.example", addr)
 	if nsA.state.errorCache == nsB.state.errorCache {
 		t.Fatalf("independent stores must not share error cache pointers")
 	}
@@ -284,14 +263,8 @@ func TestIntraRunSharesPerAddressAcrossObjects(t *testing.T) {
 	cache := NewCacheStore()
 	addr := "192.0.2.33"
 
-	ns1, err := NewWithCache(cache, "ns1.example", addr, nil)
-	if err != nil {
-		t.Fatalf("new nameserver 1: %v", err)
-	}
-	ns2, err := NewWithCache(cache, "ns2.example", addr, nil)
-	if err != nil {
-		t.Fatalf("new nameserver 2: %v", err)
-	}
+	ns1 := newCacheNS(t, cache, "ns1.example", addr)
+	ns2 := newCacheNS(t, cache, "ns2.example", addr)
 	if ns1.state.cache != ns2.state.cache {
 		t.Fatalf("expected both objects to share the per-address query cache")
 	}
@@ -360,10 +333,7 @@ func TestErrorCacheEngagesByDefault(t *testing.T) {
 	ctx, _ := testContext(t)
 	// Intentionally do not override ErrorCacheTTL: this asserts the default
 	// profile suppresses repeat live queries on the same transport.
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.16", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.16")
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -395,10 +365,7 @@ func TestErrorCacheEngagesByDefault(t *testing.T) {
 // pinned by TestErrorCacheKeyIsolatesQueries below.
 func TestErrorCacheSkipsQueries(t *testing.T) {
 	cache := NewCacheStore()
-	ns, err := NewWithCache(cache, "ns.example", "192.0.2.15", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, cache, "ns.example", "192.0.2.15")
 
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 60
@@ -409,7 +376,7 @@ func TestErrorCacheSkipsQueries(t *testing.T) {
 		return packet.Packet{}, fmt.Errorf("network error")
 	})
 
-	_, err = ns.QueryWithOptions(ctx, "example", "A", nil)
+	_, err := ns.QueryWithOptions(ctx, "example", "A", nil)
 	if err == nil {
 		t.Fatalf("expected error on first query")
 	}
@@ -433,10 +400,7 @@ func TestErrorCacheDebouncesSingleTimeout(t *testing.T) {
 	prof.Resolver.Defaults.ErrorCacheTTL = 60
 	prof.Resolver.Defaults.FastFailTimeoutCount = 5
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.17", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.17")
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -486,39 +450,38 @@ func TestErrorCacheDebouncesSingleTimeout(t *testing.T) {
 // query live. Asserted directly on errorCache because the query cache
 // otherwise shadows the same key.
 func TestErrorCacheTTLRespectsTimeoutBudget(t *testing.T) {
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.31", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	synctest.Test(t, func(t *testing.T) {
+		ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.31")
 
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.ErrorCacheTTL = 60
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.ErrorCacheTTL = 60
 
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-		return packet.Packet{}, fmt.Errorf("network error")
+		ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+			return packet.Packet{}, fmt.Errorf("network error")
+		})
+
+		timeout := 20 * time.Millisecond
+		retry := 1
+		opts := &QueryOptions{Timeout: &timeout, Retry: &retry}
+
+		if _, err := ns.QueryWithOptions(ctx, "example", "A", opts); err == nil {
+			t.Fatalf("expected error on first query")
+		}
+
+		key, _, _, err := buildCacheKey("example", "A", "IN", opts)
+		if err != nil {
+			t.Fatalf("build cache key: %v", err)
+		}
+		if skip, _ := ns.state.errorCache.shouldSkip(key); !skip {
+			t.Fatalf("expected error cache to engage on this non-timeout error")
+		}
+
+		time.Sleep(60 * time.Millisecond)
+
+		if skip, _ := ns.state.errorCache.shouldSkip(key); skip {
+			t.Fatalf("expected error cache TTL to expire after retry-budget window")
+		}
 	})
-
-	timeout := 20 * time.Millisecond
-	retry := 1
-	opts := &QueryOptions{Timeout: &timeout, Retry: &retry}
-
-	if _, err = ns.QueryWithOptions(ctx, "example", "A", opts); err == nil {
-		t.Fatalf("expected error on first query")
-	}
-
-	key, _, _, err := buildCacheKey("example", "A", "IN", opts)
-	if err != nil {
-		t.Fatalf("build cache key: %v", err)
-	}
-	if skip, _ := ns.state.errorCache.shouldSkip(key); !skip {
-		t.Fatalf("expected error cache to engage on this non-timeout error")
-	}
-
-	time.Sleep(60 * time.Millisecond)
-
-	if skip, _ := ns.state.errorCache.shouldSkip(key); skip {
-		t.Fatalf("expected error cache TTL to expire after retry-budget window")
-	}
 }
 
 // TestErrorCacheNotSharedAcrossSnapshots pins the contract that error caches
@@ -580,9 +543,7 @@ func TestQueryCacheStillMergesBackToParent(t *testing.T) {
 	addr := "192.0.2.223"
 
 	run1 := root.SnapshotForRun()
-	if _, err := NewWithCache(run1, "ns.example", addr, nil); err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	newCacheNS(t, run1, "ns.example", addr)
 	root.MergeWarmDataFrom(run1)
 
 	if got := root.AddressCacheCount(); got != 1 {
@@ -599,10 +560,7 @@ func TestErrorCacheKeyIsolatesQueries(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 60
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.230", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.230")
 
 	// Pre-populate the error cache for a CDS query (mimicking DNSSEC15).
 	cdsKey, _, _, err := buildCacheKey("kristianstad.se", "CDS", "IN", nil)
@@ -651,10 +609,7 @@ func TestErrorCacheKeyIsolatesEDNSVariants(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 60
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.231", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.231")
 
 	// Cache a failure for an EDNS-version-1 SOA probe.
 	ver1 := uint8(1)
@@ -689,47 +644,46 @@ func TestErrorCacheKeyIsolatesEDNSVariants(t *testing.T) {
 // per address, so opportunistic eviction during set keeps the map size
 // bounded by live workload.
 func TestErrorCacheSetEvictsExpiredEntries(t *testing.T) {
-	c := &errorCache{}
-	c.set("a", 10*time.Millisecond)
-	c.set("b", 10*time.Millisecond)
-	c.set("c", time.Hour)
+	synctest.Test(t, func(t *testing.T) {
+		c := &errorCache{}
+		c.set("a", 10*time.Millisecond)
+		c.set("b", 10*time.Millisecond)
+		c.set("c", time.Hour)
 
-	if got := len(c.data); got != 3 {
-		t.Fatalf("expected 3 entries before sweep; got %d", got)
-	}
+		if got := len(c.data); got != 3 {
+			t.Fatalf("expected 3 entries before sweep; got %d", got)
+		}
 
-	time.Sleep(20 * time.Millisecond)
+		time.Sleep(20 * time.Millisecond)
 
-	// Inserting a fresh entry must sweep "a" and "b" but keep "c".
-	c.set("d", time.Hour)
+		// Inserting a fresh entry must sweep "a" and "b" but keep "c".
+		c.set("d", time.Hour)
 
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if _, ok := c.data["a"]; ok {
-		t.Fatalf("expired entry a must have been evicted")
-	}
-	if _, ok := c.data["b"]; ok {
-		t.Fatalf("expired entry b must have been evicted")
-	}
-	if _, ok := c.data["c"]; !ok {
-		t.Fatalf("live entry c must remain")
-	}
-	if _, ok := c.data["d"]; !ok {
-		t.Fatalf("just-inserted entry d must be present")
-	}
-	if len(c.data) != 2 {
-		t.Fatalf("expected 2 entries after sweep + insert; got %d", len(c.data))
-	}
+		c.mu.Lock()
+		defer c.mu.Unlock()
+		if _, ok := c.data["a"]; ok {
+			t.Fatalf("expired entry a must have been evicted")
+		}
+		if _, ok := c.data["b"]; ok {
+			t.Fatalf("expired entry b must have been evicted")
+		}
+		if _, ok := c.data["c"]; !ok {
+			t.Fatalf("live entry c must remain")
+		}
+		if _, ok := c.data["d"]; !ok {
+			t.Fatalf("just-inserted entry d must be present")
+		}
+		if len(c.data) != 2 {
+			t.Fatalf("expected 2 entries after sweep + insert; got %d", len(c.data))
+		}
+	})
 }
 
 func TestQueryCacheStoresTimeoutsAsNoMessage(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.250", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.250")
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -761,10 +715,7 @@ func TestQueryCacheDoesNotStoreContextCancelErrors(t *testing.T) {
 	ctx, _ := testContext(t)
 	cctx, cancel := context.WithCancel(ctx)
 
-	ns, err := NewWithContext(cctx, "ns.example", "192.0.2.251", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, cctx, "ns.example", "192.0.2.251")
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -782,7 +733,7 @@ func TestQueryCacheDoesNotStoreContextCancelErrors(t *testing.T) {
 		calls++
 		return packet.Packet{}, fmt.Errorf("timeout")
 	})
-	_, err = ns.QueryWithOptions(cctx2, "example", "SOA", opts)
+	_, err := ns.QueryWithOptions(cctx2, "example", "SOA", opts)
 	if err == nil {
 		t.Fatalf("expected error on second query (cancellation must not have cached nil)")
 	}
@@ -801,10 +752,7 @@ func TestQueryCacheDoesNotStoreCauseCancelledQueries(t *testing.T) {
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 
 	store := NewCacheStore()
-	ns, err := NewWithCache(store, "ns.example", "192.0.2.253", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, store, "ns.example", "192.0.2.253")
 
 	// Local sentinel mirroring recursor.ErrRaceLost; importing recursor here
 	// would be a cycle. The contract under test is "ctx cancelled with any
@@ -832,10 +780,7 @@ func TestQueryCacheDoesNotStoreCauseCancelledQueries(t *testing.T) {
 }
 
 func TestContextCanceledDoesNotBlacklist(t *testing.T) {
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.200", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.200")
 
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		return packet.Packet{}, context.Canceled
@@ -864,18 +809,9 @@ func TestContextCanceledDoesNotBlacklist(t *testing.T) {
 func TestReachabilityCacheSkipsWithinStore(t *testing.T) {
 	store := NewCacheStore()
 
-	nsA, err := NewWithCache(store, "ns-a.example", "192.0.2.44", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	nsB, err := NewWithCache(store, "ns-b.example", "192.0.2.44", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	nsC, err := NewWithCache(store, "ns-c.example", "192.0.2.44", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	nsA := newCacheNS(t, store, "ns-a.example", "192.0.2.44")
+	nsB := newCacheNS(t, store, "ns-b.example", "192.0.2.44")
+	nsC := newCacheNS(t, store, "ns-c.example", "192.0.2.44")
 
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.NegativeCacheTTL = 60
@@ -899,14 +835,14 @@ func TestReachabilityCacheSkipsWithinStore(t *testing.T) {
 
 	// Two consecutive hard errors promote the store's reachability cache from
 	// pending to blocked.
-	if _, err = nsA.QueryWithOptions(ctx, "first.example", "A", nil); err == nil {
+	if _, err := nsA.QueryWithOptions(ctx, "first.example", "A", nil); err == nil {
 		t.Fatalf("expected error on first hard-error query")
 	}
-	if _, err = nsB.QueryWithOptions(ctx, "second.example", "A", nil); err == nil {
+	if _, err := nsB.QueryWithOptions(ctx, "second.example", "A", nil); err == nil {
 		t.Fatalf("expected error on second hard-error query")
 	}
 
-	_, err = nsC.QueryWithOptions(ctx, "third.example", "A", nil)
+	_, err := nsC.QueryWithOptions(ctx, "third.example", "A", nil)
 	if err != nil {
 		t.Fatalf("expected reachability cache to skip error after 2 hard errors, got %v", err)
 	}
@@ -924,10 +860,7 @@ func TestReachabilityCacheSkipsWithinStore(t *testing.T) {
 
 	// A different run must not inherit the blackout.
 	other := NewCacheStore()
-	nsOther, err := NewWithCache(other, "ns-a.example", "192.0.2.44", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	nsOther := newCacheNS(t, other, "ns-a.example", "192.0.2.44")
 	var callsOther int
 	nsOther.SetQueryHook(func(c context.Context, n string, t1 string, t2 string, o *QueryOptions) (packet.Packet, error) {
 		callsOther++
@@ -949,57 +882,56 @@ func TestReachabilityCacheSkipsWithinStore(t *testing.T) {
 // budget is both the debounce window and the blackout length, so it needs
 // headroom under the race detector.
 func TestReachabilityCacheExpiresByBudget(t *testing.T) {
-	store := NewCacheStore()
+	synctest.Test(t, func(t *testing.T) {
+		store := NewCacheStore()
 
-	names := []string{"ns-a.example", "ns-b.example", "ns-c.example", "ns-d.example"}
-	servers := make([]Nameserver, 0, len(names))
-	for _, name := range names {
-		ns, err := NewWithCache(store, name, "192.0.2.55", nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
+		names := []string{"ns-a.example", "ns-b.example", "ns-c.example", "ns-d.example"}
+		servers := make([]Nameserver, 0, len(names))
+		for _, name := range names {
+			ns := newCacheNS(t, store, name, "192.0.2.55")
+			servers = append(servers, ns)
 		}
-		servers = append(servers, ns)
-	}
 
-	ctx, prof := testContext(t)
-	prof.Resolver.Defaults.NegativeCacheTTL = 60
+		ctx, prof := testContext(t)
+		prof.Resolver.Defaults.NegativeCacheTTL = 60
 
-	timeout := 100 * time.Millisecond
-	retry := 0
-	opts := &QueryOptions{Timeout: &timeout, Retry: &retry}
+		timeout := 100 * time.Millisecond
+		retry := 0
+		opts := &QueryOptions{Timeout: &timeout, Retry: &retry}
 
-	var calls int
-	for _, ns := range servers {
-		ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
-			calls++
-			return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
-		})
-	}
+		var calls int
+		for _, ns := range servers {
+			ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+				calls++
+				return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
+			})
+		}
 
-	if _, err := servers[0].QueryWithOptions(ctx, "first.example", "A", opts); err == nil {
-		t.Fatalf("expected error on first query")
-	}
-	if _, err := servers[1].QueryWithOptions(ctx, "second.example", "A", opts); err == nil {
-		t.Fatalf("expected error on second query")
-	}
+		if _, err := servers[0].QueryWithOptions(ctx, "first.example", "A", opts); err == nil {
+			t.Fatalf("expected error on first query")
+		}
+		if _, err := servers[1].QueryWithOptions(ctx, "second.example", "A", opts); err == nil {
+			t.Fatalf("expected error on second query")
+		}
 
-	// Anti-vacuity: the blackout must be live right now.
-	if _, err := servers[2].QueryWithOptions(ctx, "third.example", "A", opts); err != nil {
-		t.Fatalf("expected the blackout to suppress the third query, got %v", err)
-	}
-	if calls != 2 {
-		t.Fatalf("expected the third query to be suppressed; got %d live calls", calls)
-	}
+		// Anti-vacuity: the blackout must be live right now.
+		if _, err := servers[2].QueryWithOptions(ctx, "third.example", "A", opts); err != nil {
+			t.Fatalf("expected the blackout to suppress the third query, got %v", err)
+		}
+		if calls != 2 {
+			t.Fatalf("expected the third query to be suppressed; got %d live calls", calls)
+		}
 
-	time.Sleep(150 * time.Millisecond)
+		time.Sleep(150 * time.Millisecond)
 
-	// Past the budget-bounded TTL the live path runs again.
-	if _, err := servers[3].QueryWithOptions(ctx, "fourth.example", "A", opts); err == nil {
-		t.Fatalf("expected error after reachability cache expiry")
-	}
-	if calls != 3 {
-		t.Fatalf("expected reachability cache to expire and re-query, got %d calls", calls)
-	}
+		// Past the budget-bounded TTL the live path runs again.
+		if _, err := servers[3].QueryWithOptions(ctx, "fourth.example", "A", opts); err == nil {
+			t.Fatalf("expected error after reachability cache expiry")
+		}
+		if calls != 3 {
+			t.Fatalf("expected reachability cache to expire and re-query, got %d calls", calls)
+		}
+	})
 }
 
 // A single transient EHOSTUNREACH (one IPv6 routing flap, one stray ICMP
@@ -1018,16 +950,7 @@ func TestReachabilityCacheDebouncesSingleHardError(t *testing.T) {
 	}
 	addr := "192.0.2.56"
 	store := NewCacheStore()
-	seq := 0
-	freshNS := func(t *testing.T) Nameserver {
-		t.Helper()
-		seq++
-		ns, err := NewWithCache(store, fmt.Sprintf("ns%d.example", seq), addr, nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
-		}
-		return ns
-	}
+	freshNS := freshNSSeq(t, store, addr)
 
 	var calls int
 	hook := func(c context.Context, n string, t1 string, t2 string, o *QueryOptions) (packet.Packet, error) {
@@ -1035,14 +958,12 @@ func TestReachabilityCacheDebouncesSingleHardError(t *testing.T) {
 		return hardErr(c, n, t1, t2, o)
 	}
 
-	ns1 := freshNS(t)
-	ns1.SetQueryHook(hook)
+	ns1 := freshNS(hook)
 	if _, err := ns1.QueryWithOptions(ctx, "first.example", "A", nil); err == nil {
 		t.Fatalf("expected error on first hard-error query")
 	}
 
-	ns2 := freshNS(t)
-	ns2.SetQueryHook(hook)
+	ns2 := freshNS(hook)
 	if _, err := ns2.QueryWithOptions(ctx, "second.example", "A", nil); err == nil {
 		t.Fatalf("expected error on second hard-error query")
 	}
@@ -1053,8 +974,7 @@ func TestReachabilityCacheDebouncesSingleHardError(t *testing.T) {
 	// After two consecutive hard errors the cache engages; a third query
 	// from yet another fresh nameserver is suppressed without invoking the
 	// hook.
-	ns3 := freshNS(t)
-	ns3.SetQueryHook(hook)
+	ns3 := freshNS(hook)
 	if _, err := ns3.QueryWithOptions(ctx, "third.example", "A", nil); err != nil {
 		t.Fatalf("expected reachability cache to suppress 3rd query, got: %v", err)
 	}
@@ -1074,16 +994,7 @@ func TestReachabilityCacheResetsOnSuccess(t *testing.T) {
 
 	addr := "192.0.2.57"
 	store := NewCacheStore()
-	seq := 0
-	freshNS := func(t *testing.T) Nameserver {
-		t.Helper()
-		seq++
-		ns, err := NewWithCache(store, fmt.Sprintf("ns%d.example", seq), addr, nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
-		}
-		return ns
-	}
+	freshNS := freshNSSeq(t, store, addr)
 
 	var phase int
 	hook := func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -1094,20 +1005,17 @@ func TestReachabilityCacheResetsOnSuccess(t *testing.T) {
 		return packet.Packet{}, &net.OpError{Op: "dial", Net: "udp", Err: syscall.EHOSTUNREACH}
 	}
 
-	ns1 := freshNS(t)
-	ns1.SetQueryHook(hook)
+	ns1 := freshNS(hook)
 	if _, err := ns1.QueryWithOptions(ctx, "a.example", "A", nil); err == nil {
 		t.Fatalf("expected error on first hard-error query")
 	}
 
-	ns2 := freshNS(t)
-	ns2.SetQueryHook(hook)
+	ns2 := freshNS(hook)
 	if pkt, err := ns2.QueryWithOptions(ctx, "b.example", "A", nil); err != nil || pkt.Msg == nil {
 		t.Fatalf("expected successful 2nd query, got pkt.Msg=%v err=%v", pkt.Msg, err)
 	}
 
-	ns3 := freshNS(t)
-	ns3.SetQueryHook(hook)
+	ns3 := freshNS(hook)
 	if _, err := ns3.QueryWithOptions(ctx, "c.example", "A", nil); err == nil {
 		t.Fatalf("expected error on third hard-error query")
 	}
@@ -1119,8 +1027,7 @@ func TestReachabilityCacheResetsOnSuccess(t *testing.T) {
 	// A 4th query from yet another fresh nameserver must still issue live:
 	// the success between phases 1 and 3 reset the consecutive count, so
 	// phase 3 is treated as a fresh first failure.
-	ns4 := freshNS(t)
-	ns4.SetQueryHook(hook)
+	ns4 := freshNS(hook)
 	if _, err := ns4.QueryWithOptions(ctx, "d.example", "A", nil); err == nil {
 		t.Fatalf("expected error on 4th query (cache must not have engaged)")
 	}
@@ -1130,10 +1037,7 @@ func TestReachabilityCacheResetsOnSuccess(t *testing.T) {
 }
 
 func TestQueryIPv4Disabled(t *testing.T) {
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.11", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.11")
 
 	ctx, prof := testContext(t)
 	prof.Net.IPv4 = false
@@ -1157,10 +1061,7 @@ func TestQueryIPv4Disabled(t *testing.T) {
 }
 
 func TestClientForOptionsDefaults(t *testing.T) {
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.12", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.12")
 
 	ctx, _ := testContext(t)
 
@@ -1193,10 +1094,7 @@ func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
 	prof.Resolver.Source4 = "192.0.2.88"
 	prof.Resolver.Source6 = "2001:db8::88"
 
-	ns4, err := NewWithCache(NewCacheStore(), "ns4.example", "192.0.2.30", nil)
-	if err != nil {
-		t.Fatalf("new ipv4 nameserver: %v", err)
-	}
+	ns4 := newCacheNS(t, NewCacheStore(), "ns4.example", "192.0.2.30")
 	client4, err := ns4.clientForOptions(ctx, nil)
 	if err != nil {
 		t.Fatalf("client4: %v", err)
@@ -1205,10 +1103,7 @@ func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
 		t.Fatalf("client4.SourceIP = %q, want 192.0.2.88", client4.SourceIP)
 	}
 
-	ns6, err := NewWithCache(NewCacheStore(), "ns6.example", "2001:db8::30", nil)
-	if err != nil {
-		t.Fatalf("new ipv6 nameserver: %v", err)
-	}
+	ns6 := newCacheNS(t, NewCacheStore(), "ns6.example", "2001:db8::30")
 	client6, err := ns6.clientForOptions(ctx, nil)
 	if err != nil {
 		t.Fatalf("client6: %v", err)
@@ -1232,10 +1127,7 @@ func TestClientForOptionsAppliesProfileSourceAddressByFamily(t *testing.T) {
 }
 
 func TestAXFRHook(t *testing.T) {
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.22", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.22")
 
 	rr1, err := dns.New("example. 60 IN SOA ns.example. hostmaster.example. 1 3600 600 86400 60")
 	if err != nil {
@@ -1272,15 +1164,12 @@ func TestAXFRHook(t *testing.T) {
 }
 
 func TestAXFRNoNetwork(t *testing.T) {
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.23", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.23")
 
 	ctx, prof := testContext(t)
 	prof.NoNetwork = true
 
-	err = ns.AXFR(ctx, "example", nil, "")
+	err := ns.AXFR(ctx, "example", nil, "")
 	if err == nil {
 		t.Fatalf("expected error when no_network is set")
 	}
@@ -1290,10 +1179,7 @@ func TestAXFRNoNetwork(t *testing.T) {
 }
 
 func TestAXFRIPv4Disabled(t *testing.T) {
-	ns, err := NewWithCache(NewCacheStore(), "ns.example", "192.0.2.24", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, NewCacheStore(), "ns.example", "192.0.2.24")
 
 	ctx, prof := testContext(t)
 	prof.Net.IPv4 = false
@@ -1304,7 +1190,7 @@ func TestAXFRIPv4Disabled(t *testing.T) {
 		return nil
 	})
 
-	err = ns.AXFR(ctx, "example", nil, "")
+	err := ns.AXFR(ctx, "example", nil, "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1315,10 +1201,7 @@ func TestAXFRIPv4Disabled(t *testing.T) {
 
 func TestCacheStoreEmpty(t *testing.T) {
 	cache := NewCacheStore()
-	ns, err := NewWithCache(cache, "ns.example", "192.0.2.25", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newCacheNS(t, cache, "ns.example", "192.0.2.25")
 	if ns.state == nil || ns.state.cache == nil {
 		t.Fatalf("expected nameserver cache state")
 	}
@@ -1351,10 +1234,7 @@ func TestQueryLogging(t *testing.T) {
 	prof.Net.AllowNonGlobalTargets = true
 	log := logger.FromContext(ctx)
 
-	ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "127.0.0.1")
 
 	// Use a very short timeout since we expect network failure
 	timeout := 10 * time.Millisecond
@@ -1363,38 +1243,24 @@ func TestQueryLogging(t *testing.T) {
 	// This query will likely fail due to no server at 127.0.0.1:53, but logging happens before exchange
 	_, _ = ns.QueryWithOptions(ctx, "example.com", "SOA", opts)
 
-	var foundQuery bool
-	for _, entry := range log.Entries() {
-		if entry == nil {
-			continue
-		}
-		if entry.Tag == "EXTERNAL_QUERY" {
-			foundQuery = true
-			loggedArgs := entry.Args
-			if name, ok := loggedArgs["query_name"]; !ok || name != "example.com" {
-				t.Errorf("expected query_name=example.com, got %v", name)
-			}
-			if qtype, ok := loggedArgs["query_type"]; !ok || qtype != "SOA" {
-				t.Errorf("expected query_type=SOA, got %v", qtype)
-			}
-			if qclass, ok := loggedArgs["query_class"]; !ok || qclass != "IN" {
-				t.Errorf("expected query_class=IN, got %v", qclass)
-			}
-			if address, ok := loggedArgs["address"]; !ok || address != "127.0.0.1" {
-				t.Errorf("expected address=127.0.0.1, got %v", address)
-			}
-			if _, ok := loggedArgs["ip"]; ok {
-				t.Errorf("legacy key ip should not be present, got %v", loggedArgs["ip"])
-			}
-			if flags, ok := loggedArgs["flags"]; !ok || flags != "{\"class\":\"IN\"}" {
-				t.Errorf("expected flags={\"class\":\"IN\"}, got %v", flags)
-			}
-			break
-		}
+	loggedArgs := dnstest.RequireEntryByTag(t, log.Entries(), "EXTERNAL_QUERY").Args
+	if name, ok := loggedArgs["query_name"]; !ok || name != "example.com" {
+		t.Errorf("expected query_name=example.com, got %v", name)
 	}
-
-	if !foundQuery {
-		t.Errorf("expected EXTERNAL_QUERY tag, got %v", log.Entries())
+	if qtype, ok := loggedArgs["query_type"]; !ok || qtype != "SOA" {
+		t.Errorf("expected query_type=SOA, got %v", qtype)
+	}
+	if qclass, ok := loggedArgs["query_class"]; !ok || qclass != "IN" {
+		t.Errorf("expected query_class=IN, got %v", qclass)
+	}
+	if address, ok := loggedArgs["address"]; !ok || address != "127.0.0.1" {
+		t.Errorf("expected address=127.0.0.1, got %v", address)
+	}
+	if _, ok := loggedArgs["ip"]; ok {
+		t.Errorf("legacy key ip should not be present, got %v", loggedArgs["ip"])
+	}
+	if flags, ok := loggedArgs["flags"]; !ok || flags != "{\"class\":\"IN\"}" {
+		t.Errorf("expected flags={\"class\":\"IN\"}, got %v", flags)
 	}
 }
 
@@ -1402,12 +1268,8 @@ func TestConstructorEmitsCreationLogs(t *testing.T) {
 	ctx, _ := testContext(t)
 	log := logger.FromContext(ctx)
 
-	if _, err := NewWithContext(ctx, "ns1.example", "192.0.2.77", nil); err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	if _, err := NewWithContext(ctx, "ns2.example", "192.0.2.77", nil); err != nil {
-		t.Fatalf("new nameserver with shared cache: %v", err)
-	}
+	newNS(t, ctx, "ns1.example", "192.0.2.77")
+	newNS(t, ctx, "ns2.example", "192.0.2.77")
 
 	var cacheCreated, cacheFetched, nsCreated int
 	seenNS := map[string]bool{}
@@ -1451,10 +1313,7 @@ func TestQueryEmitsQueryAndCachedReturn(t *testing.T) {
 	ctx, _ := testContext(t)
 	log := logger.FromContext(ctx)
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.80", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.80")
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, qclass string, _ *QueryOptions) (packet.Packet, error) {
@@ -1498,10 +1357,7 @@ func TestQueryEmitsQueryAndCachedReturn(t *testing.T) {
 func TestQueryCacheKeyPreservesQNameCase(t *testing.T) {
 	ctx, _ := testContext(t)
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.81", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.81")
 
 	var calls int
 	ns.SetQueryHook(func(_ context.Context, qname string, qtype string, _ string, _ *QueryOptions) (packet.Packet, error) {
@@ -1542,20 +1398,14 @@ func TestQueryLogsIPBlocked(t *testing.T) {
 	log := logger.FromContext(ctx)
 	prof.Net.IPv4 = false
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.81", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.81")
 	if _, err := ns.QueryWithOptions(ctx, "example", "A", nil); err != nil {
 		t.Fatalf("query with ipv4 disabled: %v", err)
 	}
 
-	for _, entry := range log.Entries() {
-		if entry != nil && entry.Tag == "IPV4_BLOCKED" {
-			return
-		}
+	if !dnstest.HasTag(log.Entries(), "IPV4_BLOCKED") {
+		t.Fatalf("expected IPV4_BLOCKED log entry")
 	}
-	t.Fatalf("expected IPV4_BLOCKED log entry")
 }
 
 // TestSkipShortCircuitPriorityOrder pins the relative priority of the five
@@ -1573,10 +1423,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		prof.Resolver.Defaults.FastFailTimeoutCount = 1
 		log := logger.FromContext(ctx)
 
-		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.180", nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
-		}
+		ns := newNS(t, ctx, "ns.example", "192.0.2.180")
 		// Trip both fast-fail and blacklisting up front.
 		ns.state.fastFail.observeResult(false, true, 1)
 		ns.state.blacklisted[false] = true
@@ -1592,10 +1439,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		prof.Resolver.Defaults.FastFailTimeoutCount = 0
 		log := logger.FromContext(ctx)
 
-		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.181", nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
-		}
+		ns := newNS(t, ctx, "ns.example", "192.0.2.181")
 		key, _, _, err := buildCacheKey("example", "A", "IN", nil)
 		if err != nil {
 			t.Fatalf("build cache key: %v", err)
@@ -1614,10 +1458,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		prof.Resolver.Defaults.ErrorCacheTTL = 60
 		log := logger.FromContext(ctx)
 
-		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.182", nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
-		}
+		ns := newNS(t, ctx, "ns.example", "192.0.2.182")
 		// Two marks promote pending to blocked, matching production semantics.
 		ns.state.reachability.mark(ns.Address.String(), 60*time.Second)
 		ns.state.reachability.mark(ns.Address.String(), 60*time.Second)
@@ -1639,10 +1480,7 @@ func TestSkipShortCircuitPriorityOrder(t *testing.T) {
 		prof.Resolver.Defaults.NameserverMaxTotalMS = 1
 		log := logger.FromContext(ctx)
 
-		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.183", nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
-		}
+		ns := newNS(t, ctx, "ns.example", "192.0.2.183")
 		// Trip both fast-fail and the latency budget up front; fast-fail is
 		// checked first, so its tag must win.
 		ns.state.fastFail.observeResult(false, true, 1)
@@ -1658,10 +1496,7 @@ func TestBlacklistingEmitsTags(t *testing.T) {
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 	log := logger.FromContext(ctx)
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.90", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.90")
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		return packet.Packet{}, fmt.Errorf("timeout")
 	})
@@ -1696,10 +1531,7 @@ func TestPacketBigEmitted(t *testing.T) {
 	ctx, _ := testContext(t)
 	log := logger.FromContext(ctx)
 
-	ns, err := NewWithContext(ctx, "ns.example", "192.0.2.91", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
+	ns := newNS(t, ctx, "ns.example", "192.0.2.91")
 	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		msg := new(dns.Msg)
 		msg.Rcode = dns.RcodeSuccess
@@ -1712,7 +1544,7 @@ func TestPacketBigEmitted(t *testing.T) {
 		return packet.Packet{Msg: msg}, nil
 	})
 
-	_, err = ns.QueryWithOptions(ctx, "example", "A", nil)
+	_, err := ns.QueryWithOptions(ctx, "example", "A", nil)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -1737,16 +1569,50 @@ func testContext(t *testing.T) (context.Context, *profile.Profile) {
 	return WithCache(ctx, NewCacheStore()), prof
 }
 
+// queryHook is the SetQueryHook signature.
+type queryHook = func(ctx context.Context, name string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error)
+
+// newNS builds a nameserver on the cache store carried by ctx.
+func newNS(t *testing.T, ctx context.Context, name string, addr string) Nameserver {
+	t.Helper()
+	ns, err := NewWithContext(ctx, name, addr, nil)
+	if err != nil {
+		t.Fatalf("new nameserver %s/%s: %v", name, addr, err)
+	}
+	return ns
+}
+
+// newCacheNS builds a nameserver on store.
+func newCacheNS(t *testing.T, store *CacheStore, name string, addr string) Nameserver {
+	t.Helper()
+	ns, err := NewWithCache(store, name, addr, nil)
+	if err != nil {
+		t.Fatalf("new nameserver %s/%s: %v", name, addr, err)
+	}
+	return ns
+}
+
+// hookedNS builds a nameserver on store answering through hook.
+func hookedNS(t *testing.T, store *CacheStore, name string, addr string, hook queryHook) Nameserver {
+	t.Helper()
+	ns := newCacheNS(t, store, name, addr)
+	ns.SetQueryHook(hook)
+	return ns
+}
+
+// freshNSSeq returns a factory handing out distinct nameserver names on one
+// store and address, so the address-keyed caches are not short-circuited.
+func freshNSSeq(t *testing.T, store *CacheStore, addr string) func(queryHook) Nameserver {
+	t.Helper()
+	seq := 0
+	return func(hook queryHook) Nameserver {
+		seq++
+		return hookedNS(t, store, fmt.Sprintf("ns%d.example", seq), addr, hook)
+	}
+}
+
 func TestNonGlobalQueryGuard(t *testing.T) {
 	const blockTag = "NON_GLOBAL_QUERY_BLOCKED"
-	hasTag := func(log *logger.Logger, tag string) bool {
-		for _, e := range log.Entries() {
-			if e != nil && e.Tag == tag {
-				return true
-			}
-		}
-		return false
-	}
 	timeout := 10 * time.Millisecond
 	opts := &QueryOptions{Timeout: &timeout}
 
@@ -1756,10 +1622,7 @@ func TestNonGlobalQueryGuard(t *testing.T) {
 	for _, addr := range []string{"192.168.0.1", "10.0.0.1", "::ffff:127.0.0.1"} {
 		ctx, _ := testContext(t)
 		log := logger.FromContext(ctx)
-		ns, err := NewWithContext(ctx, "ns.example", addr, nil)
-		if err != nil {
-			t.Fatalf("new nameserver %s: %v", addr, err)
-		}
+		ns := newNS(t, ctx, "ns.example", addr)
 		resp, err := ns.QueryWithOptions(ctx, "example.com", "SOA", opts)
 		if err != nil {
 			t.Errorf("%s: expected nil error from blocked query, got %v", addr, err)
@@ -1767,10 +1630,10 @@ func TestNonGlobalQueryGuard(t *testing.T) {
 		if resp.Msg != nil {
 			t.Errorf("%s: expected empty packet from blocked query", addr)
 		}
-		if !hasTag(log, blockTag) {
+		if !dnstest.HasTag(log.Entries(), blockTag) {
 			t.Errorf("%s: expected %s to be logged", addr, blockTag)
 		}
-		if hasTag(log, "EXTERNAL_QUERY") {
+		if dnstest.HasTag(log.Entries(), "EXTERNAL_QUERY") {
 			t.Errorf("%s: blocked query must not emit EXTERNAL_QUERY", addr)
 		}
 	}
@@ -1782,15 +1645,12 @@ func TestNonGlobalQueryGuard(t *testing.T) {
 		ctx, prof := testContext(t)
 		prof.Net.AllowNonGlobalTargets = true
 		log := logger.FromContext(ctx)
-		ns, err := NewWithContext(ctx, "ns.example", addr, nil)
-		if err != nil {
-			t.Fatalf("new nameserver %s: %v", addr, err)
-		}
+		ns := newNS(t, ctx, "ns.example", addr)
 		_, _ = ns.QueryWithOptions(ctx, "example.com", "SOA", opts)
-		if hasTag(log, blockTag) {
+		if dnstest.HasTag(log.Entries(), blockTag) {
 			t.Errorf("%s: guard disabled, did not expect %s", addr, blockTag)
 		}
-		if !hasTag(log, "EXTERNAL_QUERY") {
+		if !dnstest.HasTag(log.Entries(), "EXTERNAL_QUERY") {
 			t.Errorf("%s: guard disabled, expected the query to be attempted", addr)
 		}
 	}
@@ -1803,15 +1663,12 @@ func TestNonGlobalQueryGuard(t *testing.T) {
 			netip.MustParseAddr("127.0.0.1"): {},
 		})
 		log := logger.FromContext(ctx)
-		ns, err := NewWithContext(ctx, "ns.example", "127.0.0.1", nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
-		}
+		ns := newNS(t, ctx, "ns.example", "127.0.0.1")
 		_, _ = ns.QueryWithOptions(ctx, "example.com", "SOA", opts)
-		if hasTag(log, blockTag) {
+		if dnstest.HasTag(log.Entries(), blockTag) {
 			t.Errorf("allow-set: did not expect %s", blockTag)
 		}
-		if !hasTag(log, "EXTERNAL_QUERY") {
+		if !dnstest.HasTag(log.Entries(), "EXTERNAL_QUERY") {
 			t.Errorf("allow-set: expected the query to be attempted")
 		}
 	}

@@ -11,7 +11,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/internal/nstest"
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
-	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
 // Property-style tests: invariants that must hold across many input shapes.
@@ -39,10 +38,7 @@ func runAllNSNamesProperty(t *testing.T, glueNames []string, apexNames []string)
 		setNSHook(ctx, t, r, strings.ToLower(name), fmt.Sprintf("192.0.2.%d", 20+i), "example.com", apexNames...)
 	}
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	got, err := AllNSNames(ctx, &z)
 	if err != nil {
@@ -101,10 +97,7 @@ func TestAllNameserversPropertyAlwaysSortedAndDedupedByString(t *testing.T) {
 			setNSHook(ctx, t, r, strings.ToLower(name), fmt.Sprintf("192.0.2.%d", 30+i), "example.com", glue...)
 		}
 
-		z, err := zone.NewWithRecursor("example.com", r)
-		if err != nil {
-			t.Fatalf("new zone: %v", err)
-		}
+		z := newZone(t, "example.com", r)
 
 		out, err := AllNameservers(ctx, &z)
 		if err != nil {
@@ -157,10 +150,7 @@ func TestDelegationNameserversNoNilNamesInOutput(t *testing.T) {
 			"example.com": glue,
 		})
 
-		z, err := zone.NewWithRecursor("example.com", r)
-		if err != nil {
-			t.Fatalf("trial %d: new zone: %v", trial, err)
-		}
+		z := newZone(t, "example.com", r)
 
 		items, err := DelegationNameservers(ctx, &z)
 		if err != nil {

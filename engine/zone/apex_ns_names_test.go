@@ -38,15 +38,6 @@ func apexSetHookWithPacket(ctx context.Context, t *testing.T, r *recursor.Recurs
 	nstest.HookedNS(t, ctx, r, name, addr, nstest.AnswerHook(zoneName, "NS", p))
 }
 
-// apexMixedRecordsPacket builds an apex response mixing NS, A, and SOA RRs.
-func apexMixedRecordsPacket(zoneName string, nsNames []string) packet.Packet {
-	soa := dnstest.SOARR(zoneName, dnstest.MName("ns1."+zoneName))
-	soa.Hdr.TTL = 3600
-	answer := append([]dns.RR{soa}, dnstest.NSRRs(zoneName, nsNames...)...)
-	answer = append(answer, dnstest.ARR("decoy."+zoneName, "192.0.2.99"))
-	return dnstest.Response(dnstest.NotAuthoritative(), dnstest.Answers(answer...))
-}
-
 // TestZoneGlueNamesReturnsGlueFromZone verifies that GlueNames returns the
 // names registered via the recursor's fake glue for an undelegated zone.
 func TestZoneGlueNamesReturnsGlueFromZone(t *testing.T) {
@@ -63,10 +54,7 @@ func TestZoneGlueNamesReturnsGlueFromZone(t *testing.T) {
 		},
 	})
 
-	z, err := NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	names, err := z.GlueNames(ctx)
 	if err != nil {
@@ -97,10 +85,7 @@ func TestZoneApexNSNamesNoNSRecordsReturnsEmpty(t *testing.T) {
 	empty := packet.Packet{Msg: new(dns.Msg)}
 	apexSetHookWithPacket(ctx, t, r, "a.root", "192.0.2.1", ".", empty)
 
-	z, err := NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, ".", r)
 
 	names, err := z.ApexNSNames(ctx)
 	if err != nil {
@@ -131,12 +116,9 @@ func TestZoneApexNSNamesSkipsNonNSRecords(t *testing.T) {
 		"a.root": {"192.0.2.1"},
 	})
 	apexSetHookWithPacket(ctx, t, r, "a.root", "192.0.2.1", ".",
-		apexMixedRecordsPacket(".", []string{"a.root", "b.root"}))
+		dnstest.MixedApexRecords(".", []string{"a.root", "b.root"}))
 
-	z, err := NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, ".", r)
 
 	names, err := z.ApexNSNames(ctx)
 	if err != nil {
@@ -167,10 +149,7 @@ func TestZoneApexNSNamesSkipsNilMsgResponses(t *testing.T) {
 	apexSetHookWithPacket(ctx, t, r, "a.root", "192.0.2.1", ".", packet.Packet{Msg: nil})
 	apexSetNSHook(ctx, t, r, "b.root", "192.0.2.2", ".", "a.root", "b.root")
 
-	z, err := NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, ".", r)
 
 	names, err := z.ApexNSNames(ctx)
 	if err != nil {
@@ -202,10 +181,7 @@ func TestZoneApexNSNamesDedupesAcrossMultipleServers(t *testing.T) {
 	apexSetNSHook(ctx, t, r, "a.root", "192.0.2.1", ".", "ns1.example", "ns2.example")
 	apexSetNSHook(ctx, t, r, "b.root", "192.0.2.2", ".", "ns2.example", "ns3.example")
 
-	z, err := NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, ".", r)
 
 	names, err := z.ApexNSNames(ctx)
 	if err != nil {
@@ -236,10 +212,7 @@ func TestZoneApexNSNamesCaseFoldedDeduplication(t *testing.T) {
 	apexSetNSHook(ctx, t, r, "a.root", "192.0.2.1", ".", "NS1.Example.")
 	apexSetNSHook(ctx, t, r, "b.root", "192.0.2.2", ".", "ns1.example.")
 
-	z, err := NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, ".", r)
 
 	names, err := z.ApexNSNames(ctx)
 	if err != nil {
@@ -267,10 +240,7 @@ func TestZoneApexNSNamesDedupAndSort(t *testing.T) {
 	apexSetNSHook(ctx, t, r, "a.root", "192.0.2.1", ".", "a.root", "b.root")
 	apexSetNSHook(ctx, t, r, "b.root", "192.0.2.2", ".", "B.ROOT", "c.root")
 
-	z, err := NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, ".", r)
 
 	names, err := z.ApexNSNames(ctx)
 	if err != nil {
@@ -309,10 +279,7 @@ func TestZoneApexNSNamesUndelegatedUsesApexRecords(t *testing.T) {
 	apexSetNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns5.example.com")
 	apexSetNSHook(ctx, t, r, "ns3.example.com", "192.0.2.13", "example.com", "ns4.example.com")
 
-	z, err := NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	parentNames, err := z.GlueNames(ctx)
 	if err != nil {
@@ -359,10 +326,7 @@ func runZoneApexNSNamesProperty(t *testing.T, names []string) []string {
 	})
 	apexSetNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", names...)
 
-	z, err := NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	got, err := z.ApexNSNames(ctx)
 	if err != nil {

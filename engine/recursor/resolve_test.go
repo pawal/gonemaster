@@ -34,6 +34,27 @@ func fakeRootRecursor(t *testing.T, name string, addr string) *Recursor {
 	return r
 }
 
+// queryHook is the SetQueryHook signature.
+type queryHook = func(ctx context.Context, name string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error)
+
+// newNS builds a nameserver on r's client.
+func newNS(t *testing.T, ctx context.Context, r *Recursor, name string, addr string) nameserver.Nameserver {
+	t.Helper()
+	ns, err := nameserver.NewWithContext(ctx, name, addr, r.client)
+	if err != nil {
+		t.Fatalf("new nameserver %s/%s: %v", name, addr, err)
+	}
+	return ns
+}
+
+// hookedNS builds a nameserver on r's client, answering through hook.
+func hookedNS(t *testing.T, ctx context.Context, r *Recursor, name string, addr string, hook queryHook) nameserver.Nameserver {
+	t.Helper()
+	ns := newNS(t, ctx, r, name, addr)
+	ns.SetQueryHook(hook)
+	return ns
+}
+
 func TestAddFakeAddressesDedupAndRemove(t *testing.T) {
 	r := &Recursor{}
 	if err := r.AddFakeAddresses("Example.COM", map[string][]string{
@@ -163,11 +184,7 @@ func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
 	r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
 	var rootCalls int32
-	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "a.root.test", "192.0.2.1", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		if dnsname.New(name).String() != "example" || strings.ToUpper(qtype) != "A" {
 			return packet.Packet{}, nil
 		}
@@ -176,11 +193,7 @@ func TestRecurseWithNameserversDoesNotPoisonRootCache(t *testing.T) {
 	})
 
 	var customCalls int32
-	customNS, err := nameserver.NewWithContext(ctx, "custom.test", "192.0.2.2", r.client)
-	if err != nil {
-		t.Fatalf("new custom nameserver: %v", err)
-	}
-	customNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	customNS := hookedNS(t, ctx, r, "custom.test", "192.0.2.2", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		if dnsname.New(name).String() != "example" || strings.ToUpper(qtype) != "A" {
 			return packet.Packet{}, nil
 		}
@@ -228,10 +241,7 @@ func TestRecurseInflightLookupCoalescing(t *testing.T) {
 
 		r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
-		rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
-		if err != nil {
-			t.Fatalf("new root nameserver: %v", err)
-		}
+		rootNS := newNS(t, ctx, r, "a.root.test", "192.0.2.1")
 
 		release := make(chan struct{})
 		var calls int32
@@ -303,10 +313,7 @@ func TestRecurseInflightLookupWaiterCancellation(t *testing.T) {
 
 		r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
-		rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
-		if err != nil {
-			t.Fatalf("new root nameserver: %v", err)
-		}
+		rootNS := newNS(t, ctx, r, "a.root.test", "192.0.2.1")
 
 		release := make(chan struct{})
 		var calls int32
@@ -357,11 +364,7 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 
 	r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
-	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "a.root.test", "192.0.2.1", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		nameObj := dnsname.New(name)
 		name = nameObj.String()
 		qtype = strings.ToUpper(qtype)
@@ -385,11 +388,7 @@ func TestParentSingleLabelFallsBackToRoot(t *testing.T) {
 		}
 	})
 
-	arpaNS, err := nameserver.NewWithContext(ctx, "ns.arpa.test", "192.0.2.2", r.client)
-	if err != nil {
-		t.Fatalf("new arpa nameserver: %v", err)
-	}
-	arpaNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "ns.arpa.test", "192.0.2.2", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		nameObj := dnsname.New(name)
 		name = nameObj.String()
 		qtype = strings.ToUpper(qtype)
@@ -425,11 +424,7 @@ func TestParentSingleLabelNoTraceFallsBackToRoot(t *testing.T) {
 
 	r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
 
-	rootNS, err := nameserver.NewWithContext(ctx, "a.root.test", "192.0.2.1", r.client)
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "a.root.test", "192.0.2.1", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		nameObj := dnsname.New(name)
 		name = nameObj.String()
 		qtype = strings.ToUpper(qtype)
@@ -562,11 +557,7 @@ func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
 	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
 	aaaaStarted := make(chan struct{})
-	rootNS, err := nameserver.NewWithContext(baseCtx, "root.test", "192.0.2.53", r.client)
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	rootNS.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, baseCtx, r, "root.test", "192.0.2.53", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		switch strings.ToUpper(qtype) {
 		case "A":
 			select {
@@ -615,11 +606,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 
 		r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
-		rootNS, err := nameserver.NewWithContext(baseCtx, "root.test", "192.0.2.53", r.client)
-		if err != nil {
-			t.Fatalf("new root nameserver: %v", err)
-		}
-		rootNS.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		hookedNS(t, baseCtx, r, "root.test", "192.0.2.53", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 			switch strings.ToUpper(qtype) {
 			case "A":
 				return packetWithARecords(name, []netip.Addr{
@@ -643,11 +630,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 			}
 		}
 
-		ns1, err := nameserver.NewWithContext(baseCtx, "ns1.example", "192.0.2.10", r.client)
-		if err != nil {
-			t.Fatalf("new ns1: %v", err)
-		}
-		ns1.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		hookedNS(t, baseCtx, r, "ns1.example", "192.0.2.10", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 			select {
 			case <-allowAddr1:
 			case <-ctx.Done():
@@ -658,11 +641,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 			return resp, nil
 		})
 
-		ns2, err := nameserver.NewWithContext(baseCtx, "ns1.example", "192.0.2.20", r.client)
-		if err != nil {
-			t.Fatalf("new ns2: %v", err)
-		}
-		ns2.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		hookedNS(t, baseCtx, r, "ns1.example", "192.0.2.20", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 			select {
 			case <-addr2Started:
 			default:
@@ -696,7 +675,7 @@ func TestLazyNameserverParallelPrefersFirstAddress(t *testing.T) {
 		allowOnce()
 
 		resp := <-resultCh
-		err = <-errCh
+		err := <-errCh
 		if err != nil {
 			t.Fatalf("query failed: %v", err)
 		}
@@ -711,11 +690,7 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 
 	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
-	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	rootNS.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "root.test", "192.0.2.53", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		switch strings.ToUpper(qtype) {
 		case "A":
 			return packetWithA(name, netip.MustParseAddr("192.0.2.30")), nil
@@ -726,19 +701,11 @@ func TestLazyNameserverConcurrentQueriesShareGlue(t *testing.T) {
 		}
 	})
 
-	ns4, err := nameserver.NewWithContext(ctx, "ns.example", "192.0.2.30", r.client)
-	if err != nil {
-		t.Fatalf("new ns4: %v", err)
-	}
-	ns4.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "ns.example", "192.0.2.30", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		return packetWithA(name, netip.MustParseAddr("192.0.2.31")), nil
 	})
 
-	ns6, err := nameserver.NewWithContext(ctx, "ns.example", "2001:db8::30", r.client)
-	if err != nil {
-		t.Fatalf("new ns6: %v", err)
-	}
-	ns6.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "ns.example", "2001:db8::30", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		return packetWithA(name, netip.MustParseAddr("192.0.2.32")), nil
 	})
 
@@ -783,11 +750,7 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 
 	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
-	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	rootNS.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "root.test", "192.0.2.53", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		switch strings.ToUpper(qtype) {
 		case "A":
 			return packetWithA(name, netip.MustParseAddr("192.0.2.40")), nil
@@ -798,19 +761,11 @@ func TestGetNSFromConcurrentWithLazyNameserver(t *testing.T) {
 		}
 	})
 
-	ns4, err := nameserver.NewWithContext(ctx, "ns.example", "192.0.2.40", r.client)
-	if err != nil {
-		t.Fatalf("new ns4: %v", err)
-	}
-	ns4.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "ns.example", "192.0.2.40", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		return packetWithA(name, netip.MustParseAddr("192.0.2.41")), nil
 	})
 
-	ns6, err := nameserver.NewWithContext(ctx, "ns.example", "2001:db8::40", r.client)
-	if err != nil {
-		t.Fatalf("new ns6: %v", err)
-	}
-	ns6.SetQueryHook(func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "ns.example", "2001:db8::40", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		return packetWithA(name, netip.MustParseAddr("192.0.2.42")), nil
 	})
 
@@ -1304,10 +1259,7 @@ func TestGetAddressesForUnorderedSequential(t *testing.T) {
 			t.Fatalf("add root: %v", err)
 		}
 
-		ns, err := nameserver.NewWithContext(baseCtx, "root.test", "192.0.2.53", r.client)
-		if err != nil {
-			t.Fatalf("nameserver: %v", err)
-		}
+		ns := newNS(t, baseCtx, r, "root.test", "192.0.2.53")
 
 		started := make(chan string, 2)
 		blockA := make(chan struct{})
@@ -1427,6 +1379,8 @@ func TestRecurseUnorderedDepthLimitsWorkers(t *testing.T) {
 	})
 }
 
+// Runs on the real clock: the race detector needs genuinely parallel writers,
+// which a synctest bubble serialises away.
 func TestSnapshotStateMapsConcurrentMutation(t *testing.T) {
 	state := &recurseState{}
 	state.ensureLock()

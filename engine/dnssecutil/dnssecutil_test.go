@@ -155,18 +155,8 @@ func TestKeySizeUnaffected(t *testing.T) {
 // records, which are pointers into a packet cache shared between concurrent
 // runs. Verification must leave the caller's records untouched.
 func TestVerifyRRSIGDoesNotMutateCallerRecords(t *testing.T) {
-	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn("Example.Test"), Class: dns.ClassINET, TTL: 3600}}
-	key.Flags = dns.FlagZONE
-	key.Protocol = 3
-	key.Algorithm = dns.ECDSAP256SHA256
-	priv, err := key.Generate(256)
-	if err != nil {
-		t.Fatalf("generate key: %v", err)
-	}
-	signer, ok := priv.(crypto.Signer)
-	if !ok {
-		t.Fatalf("private key does not implement crypto.Signer")
-	}
+	kp := dnstest.GenKey(t, "Example.Test", dns.ECDSAP256SHA256, false)
+	key, signer := kp.Key, kp.Priv
 
 	// Two records with distinct TTLs and mixed-case owner names, in an order
 	// the canonical sort would change.

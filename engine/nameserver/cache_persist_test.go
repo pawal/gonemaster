@@ -66,11 +66,7 @@ func TestCacheStoreExportsTimeoutAsNoMessage(t *testing.T) {
 	prof.Resolver.Defaults.ErrorCacheTTL = 0
 
 	store := NewCacheStore()
-	ns, err := NewWithCache(store, "ns.example", "192.0.2.252", nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+	ns := hookedNS(t, store, "ns.example", "192.0.2.252", func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		return packet.Packet{}, fmt.Errorf("timeout")
 	})
 

@@ -72,11 +72,7 @@ func warmSharedCache(ctx context.Context, t *testing.T, qname string, addr strin
 	t.Helper()
 
 	base := NewCacheStore()
-	warm, err := NewWithCache(base, "ns1.example", addr, nil)
-	if err != nil {
-		t.Fatalf("new nameserver: %v", err)
-	}
-	warm.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
+	warm := hookedNS(t, base, "ns1.example", addr, func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {
 		return packet.Packet{Msg: answer}, nil
 	})
 	if _, err := warm.QueryWithOptions(ctx, qname, "DNSKEY", nil); err != nil {

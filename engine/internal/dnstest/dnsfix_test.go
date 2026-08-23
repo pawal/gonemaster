@@ -70,6 +70,31 @@ func TestReferralAndNoData(t *testing.T) {
 	}
 }
 
+func TestMixedApexRecords(t *testing.T) {
+	p := MixedApexRecords("example.test", []string{"ns1.example.test", "ns2.example.test"})
+	if p.Msg.Authoritative {
+		t.Fatal("the apex mix models a non-authoritative answer")
+	}
+	// SOA first, then one NS per name, then the decoy A.
+	if len(p.Msg.Answer) != 4 {
+		t.Fatalf("expected 4 answer records, got %#v", p.Msg.Answer)
+	}
+	soa, ok := p.Msg.Answer[0].(*dns.SOA)
+	if !ok || soa.Hdr.TTL != 3600 || soa.Ns != "ns1.example.test." {
+		t.Fatalf("unexpected SOA: %#v", p.Msg.Answer[0])
+	}
+	for i, want := range []string{"ns1.example.test.", "ns2.example.test."} {
+		ns, ok := p.Msg.Answer[1+i].(*dns.NS)
+		if !ok || ns.Ns != want {
+			t.Fatalf("expected NS %s at %d, got %#v", want, 1+i, p.Msg.Answer[1+i])
+		}
+	}
+	decoy, ok := p.Msg.Answer[3].(*dns.A)
+	if !ok || decoy.Hdr.Name != "decoy.example.test." {
+		t.Fatalf("unexpected decoy record: %#v", p.Msg.Answer[3])
+	}
+}
+
 func TestRRBuildersFqdnAndDefaults(t *testing.T) {
 	if got := ARR("example.test", "192.0.2.1"); got.Hdr.Name != "example.test." || got.Hdr.TTL != defaultTTL {
 		t.Fatalf("unexpected A header: %#v", got.Hdr)

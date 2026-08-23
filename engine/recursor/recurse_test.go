@@ -231,11 +231,7 @@ func TestRecurseFollowsOutOfBailiwickCNAME(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
-	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "root.test", "192.0.2.53", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		if name != "alias.example.net" || qtype != "A" {
 			return packet.Packet{}, nil
 		}
@@ -470,14 +466,9 @@ func TestResolveCNAMEDoesNotShareInProgress(t *testing.T) {
 
 	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
 
-	// authNS is the nameserver for the delegation zone. It is
-	// out-of-bailiwick so the recursor must resolve its address via
-	// getAddressesFor (no glue available).
-	authNS, err := nameserver.NewWithContext(ctx, "ns.auth.test", "192.0.2.10", r.client)
-	if err != nil {
-		t.Fatalf("new auth nameserver: %v", err)
-	}
-	authNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	// The delegation zone's nameserver is out-of-bailiwick, so the recursor
+	// must resolve its address via getAddressesFor (no glue available).
+	hookedNS(t, ctx, r, "ns.auth.test", "192.0.2.10", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		fqName := dnsutil.Fqdn(name)
 		// First query: return CNAME (classless delegation).
 		if strings.EqualFold(fqName, "ptr.rev.test.") && qtype == "PTR" {
@@ -490,11 +481,7 @@ func TestResolveCNAMEDoesNotShareInProgress(t *testing.T) {
 		return packet.Packet{}, nil
 	})
 
-	rootNS, err := nameserver.NewWithContext(ctx, "root.test", "192.0.2.53", r.client)
-	if err != nil {
-		t.Fatalf("new root nameserver: %v", err)
-	}
-	rootNS.SetQueryHook(func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, ctx, r, "root.test", "192.0.2.53", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		fqName := dnsutil.Fqdn(name)
 		switch {
 		// Resolve ns.auth.test address.

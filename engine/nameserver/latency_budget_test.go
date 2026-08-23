@@ -70,10 +70,7 @@ func TestQuerySkipsAddressOverLatencyBudget(t *testing.T) {
 		rec := &dnstest.RecordingTrace{}
 		ctx = querytrace.WithContext(ctx, rec)
 
-		ns, err := NewWithContext(ctx, "ns.example", "192.0.2.250", nil)
-		if err != nil {
-			t.Fatalf("new nameserver: %v", err)
-		}
+		ns := newNS(t, ctx, "ns.example", "192.0.2.250")
 
 		var calls int
 		ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *QueryOptions) (packet.Packet, error) {

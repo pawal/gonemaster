@@ -14,16 +14,6 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-// mixedRecordsPacket builds a response containing a mix of NS, A, and SOA
-// records at the zone apex.
-func mixedRecordsPacket(zoneName string, nsNames []string) packet.Packet {
-	soa := dnstest.SOARR(zoneName, dnstest.MName("ns1."+zoneName))
-	soa.Hdr.TTL = 3600
-	answer := append([]dns.RR{soa}, dnstest.NSRRs(zoneName, nsNames...)...)
-	answer = append(answer, dnstest.ARR("decoy."+zoneName, "192.0.2.99"))
-	return dnstest.Response(dnstest.NotAuthoritative(), dnstest.Answers(answer...))
-}
-
 // TestGlueNameserversReturnsGlueFromZone verifies that GlueNameservers
 // returns nameserver objects (name + IP) for the zone's glue.
 func TestGlueNameserversReturnsGlueFromZone(t *testing.T) {
@@ -40,10 +30,7 @@ func TestGlueNameserversReturnsGlueFromZone(t *testing.T) {
 		},
 	})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	out, err := GlueNameservers(ctx, &z)
 	if err != nil {
@@ -97,10 +84,7 @@ func TestApexNameserversReturnsApexNameservers(t *testing.T) {
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns2.example.com")
 	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns2.example.com")
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	out, err := ApexNameservers(ctx, &z)
 	if err != nil {
@@ -141,10 +125,7 @@ func TestAllNSNamesUnionSorted(t *testing.T) {
 	setNSHook(ctx, t, r, "a.root", "192.0.2.3", ".", "a.root", "b.root")
 	setNSHook(ctx, t, r, "b.root", "192.0.2.4", ".", "c.root")
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, ".", r)
 
 	names, err := AllNSNames(ctx, &z)
 	if err != nil {
@@ -174,10 +155,7 @@ func TestAllNSNamesEmptyInputs(t *testing.T) {
 		"example.com": {},
 	})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	names, err := AllNSNames(ctx, &z)
 	if err != nil {
@@ -207,10 +185,7 @@ func TestAllNSNamesOnlyGlueWhenApexReturnsNoNS(t *testing.T) {
 	setHookWithPacket(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", noNS)
 	setHookWithPacket(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", noNS)
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	names, err := AllNSNames(ctx, &z)
 	if err != nil {
@@ -242,10 +217,7 @@ func TestAllNSNamesOverlapDedupedCaseInsensitively(t *testing.T) {
 	})
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "NS1.Example.com.")
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	names, err := AllNSNames(ctx, &z)
 	if err != nil {
@@ -281,10 +253,7 @@ func TestAllNameserversUnionSorted(t *testing.T) {
 	setNSHook(ctx, t, r, "b.root", "192.0.2.6", ".", "a.root", "b.root")
 	setNSHook(ctx, t, r, "c.root", "192.0.2.7", ".", "a.root", "b.root")
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, ".", r)
 
 	out, err := AllNameservers(ctx, &z)
 	if err != nil {
@@ -317,10 +286,7 @@ func TestAllNameserversEmptyInputs(t *testing.T) {
 		"example.com": {},
 	})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	out, err := AllNameservers(ctx, &z)
 	if err != nil {
@@ -346,10 +312,7 @@ func TestAllNameserversOnlyGlueWhenApexHasNoServers(t *testing.T) {
 	})
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com")
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	out, err := AllNameservers(ctx, &z)
 	if err != nil {
@@ -378,10 +341,7 @@ func TestAllNameserversDedupesByNameserverString(t *testing.T) {
 	setNSHook(ctx, t, r, "ns1.example.com", "192.0.2.11", "example.com", "ns1.example.com", "ns2.example.com")
 	setNSHook(ctx, t, r, "ns2.example.com", "192.0.2.12", "example.com", "ns1.example.com", "ns2.example.com")
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	out, err := AllNameservers(ctx, &z)
 	if err != nil {
@@ -425,12 +385,9 @@ func TestApexNSNamesSkipsNonNSRecords(t *testing.T) {
 		"a.root": {"192.0.2.1"},
 	})
 	setHookWithPacket(ctx, t, r, "a.root", "192.0.2.1", ".",
-		mixedRecordsPacket(".", []string{"a.root", "b.root"}))
+		dnstest.MixedApexRecords(".", []string{"a.root", "b.root"}))
 
-	z, err := zone.NewWithRecursor(".", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, ".", r)
 
 	names, err := z.ApexNSNames(ctx)
 	if err != nil {

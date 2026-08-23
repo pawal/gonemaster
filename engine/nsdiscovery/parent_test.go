@@ -64,10 +64,7 @@ func TestParentNameserversUndelegated(t *testing.T) {
 			"ns1.example": {"192.0.2.1"},
 		},
 	})
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	parent, err := ParentNameservers(ctx, &z)
 	if err != nil {
@@ -130,10 +127,7 @@ func TestParentNameserversSkipsOnIntermediateNoResponse(t *testing.T) {
 		}
 	})
 
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	parent, err := ParentNameservers(ctx, &z)
 	if err != nil {
@@ -222,10 +216,7 @@ func TestParentNameserversAcceptsRFC8020ContradictionAtIntermediate(t *testing.T
 		return packet.Packet{}, nil
 	})
 
-	z, err := zone.NewWithRecursor("c.b.example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "c.b.example", r)
 
 	parent, err := ParentNameservers(ctx, &z)
 	if err != nil {
@@ -252,10 +243,7 @@ func TestParentNameserversUsesCacheOnSecondCall(t *testing.T) {
 		},
 	})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	key := z.Name.String()
 	seedParentCache(ctx, t, r, cache, key, "sentinel.ns.example", "203.0.113.99")
@@ -305,14 +293,8 @@ func TestParentNameserversCachesPerInstance(t *testing.T) {
 
 	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 
-	zA, err := zone.NewWithRecursor("alpha.test", r)
-	if err != nil {
-		t.Fatalf("new zone alpha: %v", err)
-	}
-	zB, err := zone.NewWithRecursor("beta.test", r)
-	if err != nil {
-		t.Fatalf("new zone beta: %v", err)
-	}
+	zA := newZone(t, "alpha.test", r)
+	zB := newZone(t, "beta.test", r)
 
 	seedParentCache(ctx, t, r, cacheA, zA.Name.String(), "ns.alpha", "203.0.113.10")
 	seedParentCache(ctx, t, r, cacheB, zB.Name.String(), "ns.beta", "203.0.113.20")
@@ -355,10 +337,7 @@ func TestParentNameserversNoCacheStillWorks(t *testing.T) {
 			"ns1.example": {"192.0.2.1"},
 		},
 	})
-	z, err := zone.NewWithRecursor("example", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example", r)
 
 	parent, err := ParentNameservers(ctx, &z)
 	if err != nil {
@@ -379,10 +358,7 @@ func TestParentNameserversConcurrentCallsSameZone(t *testing.T) {
 
 	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	seedParentCache(ctx, t, r, cache, z.Name.String(), "shared.ns", "203.0.113.42")
 
@@ -419,10 +395,7 @@ func TestParentNameserversConcurrentCallsDifferentZones(t *testing.T) {
 	expectedNS := make([]string, NZones)
 	for i := 0; i < NZones; i++ {
 		name := fmt.Sprintf("zone%d.test", i)
-		z, err := zone.NewWithRecursor(name, r)
-		if err != nil {
-			t.Fatalf("new zone %s: %v", name, err)
-		}
+		z := newZone(t, name, r)
 		zones[i] = z
 		nsName := fmt.Sprintf("ns.zone%d", i)
 		expectedNS[i] = nsName
@@ -464,10 +437,7 @@ func TestCacheClearConcurrentWithParentNameservers(t *testing.T) {
 
 	r := nstest.Recursor(t, map[string]map[string][]string{".": map[string][]string{"a.root": {"192.0.2.1"}}})
 
-	z, err := zone.NewWithRecursor("example.com", r)
-	if err != nil {
-		t.Fatalf("new zone: %v", err)
-	}
+	z := newZone(t, "example.com", r)
 
 	seedParentCache(ctx, t, r, cache, z.Name.String(), "ns.example", "203.0.113.50")
 

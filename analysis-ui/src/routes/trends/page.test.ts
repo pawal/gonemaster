@@ -1,3 +1,4 @@
+import { appNavigation, appPaths, appState, loadEvent, stubResponse } from "../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import { load, type TrendsPageData } from "./+page";
@@ -5,47 +6,18 @@ import { load, type TrendsPageData } from "./+page";
 const h = vi.hoisted(() => ({
   page: { url: new URL("http://localhost/analysis/trends"), data: { snapshots: [] } as unknown }
 }));
-vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
-vi.mock("$app/paths", () => ({ base: "/analysis" }));
-vi.mock("$app/state", () => ({
-  page: {
-    get url() {
-      return h.page.url;
-    },
-    get data() {
-      return h.page.data;
-    }
-  }
-}));
+vi.mock("$app/navigation", () => appNavigation());
+vi.mock("$app/paths", () => appPaths());
+vi.mock("$app/state", () => appState(h.page));
 
 import TrendsPage from "./+page.svelte";
 
-function stubResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    status: ok ? 200 : 500,
-    statusText: ok ? "OK" : "Server Error",
-    headers: new Headers({ "content-type": "application/json" }),
-    json: async () => body,
-    text: async () => JSON.stringify(body)
-  } as unknown as Response;
-}
-
-function evt(overrides: {
-  resolvedCohort: string | null;
-  fetchImpl: typeof fetch;
-  search?: string;
-}) {
-  return {
-    parent: async () => ({
-      catalog: null,
-      catalogError: null,
-      resolvedCohort: overrides.resolvedCohort
-    }),
-    fetch: overrides.fetchImpl,
-    url: new URL(`http://localhost/analysis/trends${overrides.search ?? ""}`)
-  } as Parameters<typeof load>[0];
-}
+const evt = (o: { resolvedCohort: string | null; fetchImpl: typeof fetch; search?: string }) =>
+  loadEvent<Parameters<typeof load>[0]>({
+    resolvedCohort: o.resolvedCohort,
+    fetch: o.fetchImpl,
+    url: `http://localhost/analysis/trends${o.search ?? ""}`
+  });
 
 describe("+trends.load", () => {
   it("falls back to severity when ?category= is unknown or missing", async () => {

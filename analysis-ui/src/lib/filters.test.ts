@@ -1,7 +1,8 @@
+import { appNavigation } from "../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { applyFilterToParams, filterFromURL, searchToString, updateURLParam } from "./filters";
 
-vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
+vi.mock("$app/navigation", () => appNavigation());
 
 describe("filters", () => {
   it("filterFromURL picks up dataset_tag and search, ignores other keys", () => {

@@ -7,38 +7,10 @@ import {
   systemPrefersDark
 } from "./theme";
 
-// SvelteKit's test shim clears the jsdom localStorage, so provide a minimal
-// in-memory implementation per test to exercise the theme helpers.
-function installLocalStorageMock() {
-  let store: Record<string, string> = {};
-  const api = {
-    get length() {
-      return Object.keys(store).length;
-    },
-    clear: () => {
-      store = {};
-    },
-    getItem: (key: string) => (key in store ? store[key] : null),
-    key: (index: number) => Object.keys(store)[index] ?? null,
-    removeItem: (key: string) => {
-      delete store[key];
-    },
-    setItem: (key: string, value: string) => {
-      store[key] = String(value);
-    }
-  };
-  Object.defineProperty(globalThis, "localStorage", {
-    configurable: true,
-    value: api
-  });
-  return api;
-}
-
 describe("theme helpers", () => {
   let originalMatchMedia: typeof window.matchMedia;
 
   beforeEach(() => {
-    installLocalStorageMock();
     originalMatchMedia = window.matchMedia;
   });
 

@@ -1,11 +1,10 @@
+import { appNavigation, appState } from "../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import Pagination from "./Pagination.svelte";
 
-vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
-vi.mock("$app/state", () => ({
-  page: { url: new URL("http://localhost/domains?dataset_tag=tld") }
-}));
+vi.mock("$app/navigation", () => appNavigation());
+vi.mock("$app/state", () => appState({ url: new URL("http://localhost/domains?dataset_tag=tld") }));
 
 describe("Pagination", () => {
   it("disables Previous and enables Next on the first page", () => {

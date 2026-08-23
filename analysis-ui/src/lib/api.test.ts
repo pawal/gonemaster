@@ -1,3 +1,4 @@
+import { stubResponse } from "../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import {
   ApiError,
@@ -29,14 +30,7 @@ function recorder(responseBody: unknown = { ok: true }, ok = true) {
   const stub: typeof fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     calls.push({ url, method: init?.method });
-    return {
-      ok,
-      status: ok ? 200 : 500,
-      statusText: ok ? "OK" : "Error",
-      headers: new Headers({ "content-type": "application/json" }),
-      json: async () => responseBody,
-      text: async () => JSON.stringify(responseBody)
-    } as unknown as Response;
+    return stubResponse(responseBody, ok);
   }) as unknown as typeof fetch;
   return { stub, calls };
 }

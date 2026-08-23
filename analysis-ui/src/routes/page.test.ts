@@ -1,3 +1,4 @@
+import { appNavigation, appPaths, appState, fetchRouter, loadEvent, stubResponse } from "../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
 import type { NameserverView } from "$lib/api";
@@ -6,69 +7,24 @@ import { load, type OverviewPageData } from "./+page";
 const h = vi.hoisted(() => ({
   page: { url: new URL("http://localhost/analysis"), data: { snapshots: [] } as unknown }
 }));
-vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
-vi.mock("$app/paths", () => ({ base: "/analysis" }));
-vi.mock("$app/state", () => ({
-  page: {
-    get url() {
-      return h.page.url;
-    },
-    get data() {
-      return h.page.data;
-    }
-  }
-}));
+vi.mock("$app/navigation", () => appNavigation());
+vi.mock("$app/paths", () => appPaths());
+vi.mock("$app/state", () => appState(h.page));
 
 import OverviewPage from "./+page.svelte";
 
-function stubResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    status: ok ? 200 : 500,
-    statusText: ok ? "OK" : "Server Error",
-    headers: new Headers({ "content-type": "application/json" }),
-    json: async () => body,
-    text: async () => JSON.stringify(body)
-  } as unknown as Response;
-}
-
-function fetchRouter(
-  routes: Array<{ match: (url: string) => boolean; body: unknown; ok?: boolean }>,
-  defaultResponse: { body: unknown; ok: boolean } = { body: { error: "unrouted" }, ok: false }
-) {
-  const calls: string[] = [];
-  const impl = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
-    const url =
-      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-    calls.push(url);
-    for (const route of routes) {
-      if (route.match(url)) {
-        return stubResponse(route.body, route.ok ?? true);
-      }
-    }
-    return stubResponse(defaultResponse.body, defaultResponse.ok);
-  }) as unknown as typeof fetch;
-  return { impl, calls };
-}
-
-function evt(overrides: {
+const evt = (o: {
   resolvedCohort: string | null;
   fetchImpl: typeof fetch;
   effectiveSnapshotSlug?: string | null;
   snapshots?: { slug: string }[];
-}) {
-  return {
-    parent: async () => ({
-      catalog: null,
-      catalogError: null,
-      resolvedCohort: overrides.resolvedCohort,
-      effectiveSnapshotSlug: overrides.effectiveSnapshotSlug ?? null,
-      snapshots: overrides.snapshots ?? []
-    }),
-    fetch: overrides.fetchImpl,
-    url: new URL("http://localhost/analysis")
-  } as Parameters<typeof load>[0];
-}
+}) =>
+  loadEvent<Parameters<typeof load>[0]>({
+    resolvedCohort: o.resolvedCohort,
+    effectiveSnapshotSlug: o.effectiveSnapshotSlug,
+    snapshots: o.snapshots,
+    fetch: o.fetchImpl
+  });
 
 const sampleOverview = {
   totals: {

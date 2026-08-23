@@ -1,34 +1,19 @@
+import { loadEvent, stubResponse } from "../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { load } from "./+page";
 
-function stubResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    status: ok ? 200 : 500,
-    statusText: ok ? "OK" : "Server Error",
-    headers: new Headers({ "content-type": "application/json" }),
-    json: async () => body,
-    text: async () => JSON.stringify(body)
-  } as unknown as Response;
-}
-
-function evt(options: {
+const evt = (o: {
   resolvedCohort: string | null;
   fetchImpl: ReturnType<typeof vi.fn>;
   search?: string;
   effectiveSnapshotSlug?: string | null;
-}) {
-  return {
-    parent: async () => ({
-      catalog: null,
-      catalogError: null,
-      resolvedCohort: options.resolvedCohort,
-      effectiveSnapshotSlug: options.effectiveSnapshotSlug ?? null
-    }),
-    fetch: options.fetchImpl as unknown as typeof fetch,
-    url: new URL(`http://localhost/domains${options.search ?? ""}`)
-  } as Parameters<typeof load>[0];
-}
+}) =>
+  loadEvent<Parameters<typeof load>[0]>({
+    resolvedCohort: o.resolvedCohort,
+    effectiveSnapshotSlug: o.effectiveSnapshotSlug,
+    fetch: o.fetchImpl as unknown as typeof fetch,
+    url: `http://localhost/domains${o.search ?? ""}`
+  });
 
 describe("/domains +page.load", () => {
   it("short-circuits when no cohort is resolved", async () => {

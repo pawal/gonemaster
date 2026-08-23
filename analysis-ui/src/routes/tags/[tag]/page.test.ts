@@ -1,17 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import type { TagDetailPageData } from "./+page";
+import { appPaths, appState } from "../../../test/helpers";
 
 const h = vi.hoisted(() => ({ url: new URL("http://localhost/tags/DS10_NSEC_QUERY_RESPONSE_ERR") }));
-vi.mock("$app/paths", () => ({ base: "/analysis" }));
-vi.mock("$app/state", () => ({
-  page: {
-    get url() {
-      return h.url;
-    },
-    data: {}
-  }
-}));
+vi.mock("$app/paths", () => appPaths());
+vi.mock("$app/state", () => appState(h));
 
 import TagDetailPage from "./+page.svelte";
 

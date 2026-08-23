@@ -1,19 +1,13 @@
+import { appNavigation, appPaths, appState } from "../../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
 import type { NameserverDetail } from "$lib/api";
 import type { NameserverDetailPageData } from "./+page";
 
 const h = vi.hoisted(() => ({ url: new URL("http://localhost/nameservers/ns1.example") }));
-vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
-vi.mock("$app/paths", () => ({ base: "/analysis" }));
-vi.mock("$app/state", () => ({
-  page: {
-    get url() {
-      return h.url;
-    },
-    data: {}
-  }
-}));
+vi.mock("$app/navigation", () => appNavigation());
+vi.mock("$app/paths", () => appPaths());
+vi.mock("$app/state", () => appState(h));
 
 import NameserverDetailPage from "./+page.svelte";
 

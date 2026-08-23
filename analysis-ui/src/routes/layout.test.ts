@@ -1,26 +1,15 @@
+import { loadEvent, stubResponse } from "../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { load } from "./+layout";
 import type { CatalogResponse } from "$lib/api";
 
 type FetchMock = ReturnType<typeof vi.fn>;
 
-function stubResponse(body: unknown, ok = true) {
-  return {
-    ok,
-    status: ok ? 200 : 500,
-    statusText: ok ? "OK" : "Server Error",
-    headers: new Headers({ "content-type": "application/json" }),
-    json: async () => body,
-    text: async () => JSON.stringify(body)
-  } as unknown as Response;
-}
-
-function event(fetch: FetchMock, search = "") {
-  return {
+const event = (fetch: FetchMock, search = "") =>
+  loadEvent<Parameters<typeof load>[0]>({
     fetch: fetch as unknown as typeof globalThis.fetch,
-    url: new URL(`http://localhost${search}`)
-  } as Parameters<typeof load>[0];
-}
+    url: `http://localhost${search}`
+  });
 
 describe("+layout.load", () => {
   it("resolves catalog and picks the default_tag when dataset_tag is not requested", async () => {

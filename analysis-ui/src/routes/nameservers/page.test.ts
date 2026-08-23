@@ -1,3 +1,4 @@
+import { appNavigation, appPaths, appState } from "../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/svelte";
 import { goto } from "$app/navigation";
@@ -6,16 +7,9 @@ import type { NameserversPageData } from "./+page";
 
 // A mutable URL holder so each render controls the active query.
 const h = vi.hoisted(() => ({ url: new URL("http://localhost/nameservers") }));
-vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
-vi.mock("$app/paths", () => ({ base: "/analysis" }));
-vi.mock("$app/state", () => ({
-  page: {
-    get url() {
-      return h.url;
-    },
-    data: {}
-  }
-}));
+vi.mock("$app/navigation", () => appNavigation());
+vi.mock("$app/paths", () => appPaths());
+vi.mock("$app/state", () => appState(h));
 
 import NameserversPage from "./+page.svelte";
 

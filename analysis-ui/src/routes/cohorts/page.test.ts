@@ -1,25 +1,17 @@
+import { appPaths, appState, loadEvent } from "../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/svelte";
 import { load, type CohortsPageData } from "./+page";
 import type { CatalogResponse } from "$lib/api";
 
 const h = vi.hoisted(() => ({ url: new URL("http://localhost/analysis/cohorts") }));
-vi.mock("$app/paths", () => ({ base: "/analysis" }));
-vi.mock("$app/state", () => ({
-  page: {
-    get url() {
-      return h.url;
-    }
-  }
-}));
+vi.mock("$app/paths", () => appPaths());
+vi.mock("$app/state", () => appState(h));
 
 import CohortsPage from "./+page.svelte";
 
-function evt(catalog: CatalogResponse | null, catalogError: string | null = null) {
-  return {
-    parent: async () => ({ catalog, catalogError })
-  } as Parameters<typeof load>[0];
-}
+const evt = (catalog: CatalogResponse | null, catalogError: string | null = null) =>
+  loadEvent<Parameters<typeof load>[0]>({ catalog, catalogError });
 
 describe("/cohorts +page.load", () => {
   it("reuses the catalog from the layout instead of refetching", async () => {

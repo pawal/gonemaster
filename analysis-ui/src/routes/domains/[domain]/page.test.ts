@@ -1,50 +1,28 @@
+import { appNavigation, appPaths, appState, loadEvent, stubResponse } from "../../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
 import type { DomainDetail } from "$lib/api";
 import { load, type DomainDetailPageData } from "./+page";
 
 const h = vi.hoisted(() => ({ url: new URL("http://localhost/domains/alpha.example") }));
-vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
-vi.mock("$app/paths", () => ({ base: "/analysis" }));
-vi.mock("$app/state", () => ({
-  page: {
-    get url() {
-      return h.url;
-    },
-    data: {}
-  }
-}));
+vi.mock("$app/navigation", () => appNavigation());
+vi.mock("$app/paths", () => appPaths());
+vi.mock("$app/state", () => appState(h));
 
 import DomainDetailPage from "./+page.svelte";
 
-function stubResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    status: ok ? 200 : 500,
-    statusText: ok ? "OK" : "Server Error",
-    headers: new Headers({ "content-type": "application/json" }),
-    json: async () => body,
-    text: async () => JSON.stringify(body)
-  } as unknown as Response;
-}
-
-function evt(options: {
+const evt = (o: {
   domain: string;
   resolvedCohort: string | null;
   fetchImpl: ReturnType<typeof vi.fn>;
   effectiveSnapshotSlug?: string | null;
-}) {
-  return {
-    parent: async () => ({
-      catalog: null,
-      catalogError: null,
-      resolvedCohort: options.resolvedCohort,
-      effectiveSnapshotSlug: options.effectiveSnapshotSlug ?? null
-    }),
-    fetch: options.fetchImpl as unknown as typeof fetch,
-    params: { domain: options.domain }
-  } as Parameters<typeof load>[0];
-}
+}) =>
+  loadEvent<Parameters<typeof load>[0]>({
+    resolvedCohort: o.resolvedCohort,
+    effectiveSnapshotSlug: o.effectiveSnapshotSlug,
+    fetch: o.fetchImpl as unknown as typeof fetch,
+    params: { domain: o.domain }
+  });
 
 describe("/domains/[domain] +page.load", () => {
   it("returns null detail when no cohort is resolved", async () => {

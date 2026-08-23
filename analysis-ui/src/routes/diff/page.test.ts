@@ -1,3 +1,4 @@
+import { appNavigation, appPaths, appState, loadEvent, stubResponse } from "../../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
 import { load, type DiffPageData } from "./+page";
@@ -8,44 +9,19 @@ import type { DiffResponse, TagDiffResponse } from "$lib/api";
 const h = vi.hoisted(() => ({
   url: new URL("http://localhost/analysis/diff?from=s1&to=s2&tab=grade_changed")
 }));
-vi.mock("$app/navigation", () => ({ goto: vi.fn() }));
-vi.mock("$app/paths", () => ({ base: "/analysis" }));
-vi.mock("$app/state", () => ({
-  page: {
-    get url() {
-      return h.url;
-    },
-    data: {}
-  }
-}));
+vi.mock("$app/navigation", () => appNavigation());
+vi.mock("$app/paths", () => appPaths());
+vi.mock("$app/state", () => appState(h));
 
 import DiffPage from "./+page.svelte";
 
-function stubResponse(body: unknown, ok = true): Response {
-  return {
-    ok,
-    status: ok ? 200 : 500,
-    statusText: ok ? "OK" : "Server Error",
-    headers: new Headers({ "content-type": "application/json" }),
-    json: async () => body,
-    text: async () => JSON.stringify(body)
-  } as unknown as Response;
-}
-
-function evt(overrides: {
-  snapshots?: { slug: string }[];
-  fetchImpl?: typeof fetch;
-  search?: string;
-}) {
-  return {
-    parent: async () => ({
-      resolvedCohort: "tld",
-      snapshots: overrides.snapshots ?? []
-    }),
-    fetch: (overrides.fetchImpl ?? (vi.fn() as unknown as typeof fetch)),
-    url: new URL(`http://localhost/analysis/diff${overrides.search ?? ""}`)
-  } as Parameters<typeof load>[0];
-}
+const evt = (o: { snapshots?: { slug: string }[]; fetchImpl?: typeof fetch; search?: string }) =>
+  loadEvent<Parameters<typeof load>[0]>({
+    resolvedCohort: "tld",
+    snapshots: o.snapshots,
+    fetch: o.fetchImpl,
+    url: `http://localhost/analysis/diff${o.search ?? ""}`
+  });
 
 const sampleDiff: DiffResponse = {
   dataset_tag: "tld",

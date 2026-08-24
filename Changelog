@@ -13,6 +13,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 - engine: the DNSSEC chain reports `partial`, not `secure`, when only some nameservers serve expired signatures
 - ui-public: an expired chain signature is no longer hidden behind a fresh one, and stale nameservers are listed
+- ui-public: the DNSSEC chain tooltip no longer overflows the window edge on the first hover over a box
 - ui-public: the DNSSEC chain of trust names ML-DSA-44 instead of showing "alg 18"
 - server: in `nogui` builds the analysis dashboard path returns 404 for asset requests instead of serving the info page with 200
 

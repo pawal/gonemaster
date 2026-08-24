@@ -98,6 +98,41 @@ describe("DnssecChain", () => {
     expect(tip.textContent).toContain("Algorithm: ECDSAP256SHA256");
   });
 
+  // The tip box is measured once per text change, not per pointer move: the
+  // per-move read forced a layout and returned the previous text's box,
+  // because the DOM updates only after the handler returns.
+  it("measures the tooltip once per text change and flips it at the viewport edge", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const tip = container.querySelector(".chain-tip");
+    const measure = vi.fn(() => ({ width: 200, height: 80, x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0 }));
+    tip.getBoundingClientRect = measure;
+
+    const ksk = container.querySelector("g.node-ksk");
+    await fireEvent.mouseMove(ksk, { clientX: 100, clientY: 100 });
+    const afterFirst = measure.mock.calls.length;
+    expect(afterFirst).toBeGreaterThan(0);
+
+    // Three more moves over the same node: same text, so no new measurement.
+    for (const x of [110, 120, 130]) {
+      await fireEvent.mouseMove(ksk, { clientX: x, clientY: 100 });
+    }
+    expect(measure.mock.calls.length).toBe(afterFirst);
+    expect(tip.style.left).toBe("144px");
+
+    // Near the right edge the box flips to the left of the pointer, using the
+    // width measured for the text now on screen.
+    await fireEvent.mouseMove(ksk, { clientX: window.innerWidth - 10, clientY: 100 });
+    expect(parseInt(tip.style.left, 10)).toBe(window.innerWidth - 10 - 200 - 14);
+
+    // A different node means different text, and one fresh measurement.
+    const zsk = container.querySelector("g.node-zsk");
+    await fireEvent.mouseMove(zsk, { clientX: 100, clientY: 100 });
+    expect(measure.mock.calls.length).toBe(afterFirst + 1);
+  });
+
   it("renders the parent-zone signing key above the DS", async () => {
     const chain = secureChain();
     chain.parent.dnskeys = [{ key_tag: 5000, algorithm: 13, flags: 256, key_size: 2048, servers: ["192.0.2.1"] }];

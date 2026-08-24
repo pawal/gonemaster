@@ -126,21 +126,37 @@
   let tipEl = $state(null);
   let tipText = $state("");
   let tipShown = $state(false);
+  // Tip box size, measured once per text change. Measuring inside the pointer
+  // handler would force a layout on every move and still read the previous
+  // text's box, since the DOM updates only after the handler returns.
+  let tipW = 0;
+  let tipH = 0;
+  let pointer = { x: 0, y: 0 };
+
+  $effect(() => {
+    tipText;
+    if (!tipEl) return;
+    const r = tipEl.getBoundingClientRect();
+    tipW = r.width;
+    tipH = r.height;
+    positionTip();
+  });
 
   function showTip(e, text) {
     if (!text) return;
+    pointer = { x: e.clientX, y: e.clientY };
     tipText = text;
     tipShown = true;
-    positionTip(e);
+    positionTip();
   }
-  function positionTip(e) {
+  // Flips the box to the other side of the pointer when it would overflow.
+  function positionTip() {
     if (!tipEl) return;
     const pad = 14;
-    const r = tipEl.getBoundingClientRect();
-    let x = e.clientX + pad;
-    let y = e.clientY + pad;
-    if (x + r.width > window.innerWidth) x = e.clientX - r.width - pad;
-    if (y + r.height > window.innerHeight) y = e.clientY - r.height - pad;
+    let x = pointer.x + pad;
+    let y = pointer.y + pad;
+    if (x + tipW > window.innerWidth) x = pointer.x - tipW - pad;
+    if (y + tipH > window.innerHeight) y = pointer.y - tipH - pad;
     tipEl.style.left = `${Math.max(4, x)}px`;
     tipEl.style.top = `${Math.max(4, y)}px`;
   }

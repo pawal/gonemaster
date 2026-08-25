@@ -23,6 +23,7 @@ describe("App", () => {
 
   afterEach(() => {
     document.documentElement.removeAttribute("data-theme");
+    document.documentElement.removeAttribute("lang");
     window.localStorage.clear();
   });
 
@@ -320,7 +321,7 @@ describe("App", () => {
     );
   });
 
-  it("resets title to Gonemaster when job finishes", async () => {
+  it("names the domain in the title of an unscored result", async () => {
     window.location.hash = "#/result/abc12345";
     fetchRouter([
       ["/locales", localesResp],
@@ -329,12 +330,61 @@ describe("App", () => {
     ]);
     render(App);
     await waitFor(() => screen.getByTestId("results-view"));
+    expect(document.title).toBe("example.com - Gonemaster");
+  });
+
+  it("adds the grade to the title once the result reports one", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["jobs/abc12345/result", jsonResponse({
+        job_id: "x",
+        status: "succeeded",
+        score: { grade: "A+", score: 100 },
+        raw: { locale: "en", entries: [] },
+      })],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() =>
+      expect(document.title).toBe("example.com - grade A+ - Gonemaster")
+    );
+  });
+
+  it("drops the result from the title when the job did not succeed", async () => {
+    window.location.hash = "#/result/abc12345";
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/jobs/", jobResp("failed", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => screen.getByTestId("expired-view"));
     expect(document.title).toBe("Gonemaster");
   });
 
   it("title is Gonemaster on initial idle state", () => {
     render(App);
     expect(document.title).toBe("Gonemaster");
+  });
+
+  // Document language
+
+  it("sets html lang to the initial locale", () => {
+    render(App);
+    expect(document.documentElement.lang).toBe("en");
+  });
+
+  it("follows the locale selector into html lang", async () => {
+    fetchRouter([
+      ["/locales", multiLocalesResp],
+      ["/jobs/", jobResp("queued", "example.com", 0)],
+    ]);
+    render(App);
+    const select = await waitFor(() =>
+      screen.getByRole("combobox", { name: /language/i })
+    );
+    await fireEvent.change(select, { target: { value: "sv" } });
+    await waitFor(() => expect(document.documentElement.lang).toBe("sv"));
   });
 
   // Theme toggle

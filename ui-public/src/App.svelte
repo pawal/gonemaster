@@ -42,17 +42,34 @@
   let historyEntries = $state(loadEntries());
   // True only for runs created in this tab; share-link visits stay unrecorded.
   let startedHere = false;
+  // Grade of the result on screen, for the document title.
+  let resultGrade = $state("");
 
   function onScore(detail) {
     historyEntries = setGrade(detail.publicID, detail.grade);
+    resultGrade = detail.grade;
   }
 
   function onClearHistory() {
     historyEntries = clearEntries();
   }
 
+  // Names the result so tabs, bookmarks, history and text browsers are readable.
   $effect(() => {
-    document.title = phase === "running" ? `${jobProgress}% Gonemaster` : "Gonemaster";
+    if (phase === "running") {
+      document.title = `${jobProgress}% Gonemaster`;
+    } else if (phase === "done" && jobStatus === "succeeded" && jobDomain) {
+      document.title = resultGrade
+        ? $t("pub.doc_title_grade", { domain: jobDomain, grade: resultGrade })
+        : $t("pub.doc_title_result", { domain: jobDomain });
+    } else {
+      document.title = "Gonemaster";
+    }
+  });
+
+  // Keeps <html lang> on the active catalog so screen readers pick the right voice.
+  $effect(() => {
+    document.documentElement.lang = $locale;
   });
 
   const TERMINAL = new Set(["succeeded", "failed", "canceled", "expired"]);
@@ -153,6 +170,7 @@
     if (view !== "result" || !id) return;
     publicID = id;
     startedHere = false;
+    resultGrade = "";
     try {
       const res = await getJob(id);
       if (!res.ok) {
@@ -190,6 +208,7 @@
     jobDomain = "";
     jobFinishedAt = null;
     jobProgress = 0;
+    resultGrade = "";
     phase = "running";
     window.location.hash = hashFor("result", publicID).slice(1);
   }
@@ -210,6 +229,7 @@
     jobStatus = "";
     jobDomain = "";
     jobFinishedAt = null;
+    resultGrade = "";
     window.location.hash = hashFor("home").slice(1);
     focusSignal += 1;
   }

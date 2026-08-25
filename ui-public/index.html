@@ -66,6 +66,39 @@
     <title>Gonemaster</title>
   </head>
   <body>
+    <!-- Without this, text browsers and curl get an empty page. English only:
+         the server cannot read the ui-public locale catalogs. -->
+    <noscript>
+      <h1>Gonemaster</h1>
+      <p>
+        Gonemaster is a free DNS health checker. It runs more than 80 testcases
+        against every authoritative nameserver for a domain - basics, address
+        records, connectivity, cross-nameserver consistency, delegation, DNSSEC,
+        nameserver behavior, name syntax, and zone data - and reports the
+        findings by severity, with a 0-100 score and an A+ to F letter grade.
+      </p>
+      <p>
+        The interactive checker needs JavaScript. Without it, the public HTTP
+        API runs the same tests from a shell:
+      </p>
+      <pre>
+curl -s -X POST __PUBLIC_URL__pub/api/v1/jobs \
+     -H 'content-type: application/json' \
+     -d '{"domain":"example.com"}'
+
+curl -s __PUBLIC_URL__pub/api/v1/jobs/PUBLIC_ID
+curl -s __PUBLIC_URL__pub/api/v1/jobs/PUBLIC_ID/result
+</pre>
+      <p>
+        The first call answers with a <code>public_id</code>. Poll the second
+        until <code>status</code> is <code>succeeded</code>, then read the third
+        for the findings.
+      </p>
+      <ul>
+        <li><a href="https://pawal.codeberg.page/gonemaster/">Documentation</a></li>
+        <li><a href="https://codeberg.org/pawal/gonemaster">Source code and command line client</a></li>
+      </ul>
+    </noscript>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>

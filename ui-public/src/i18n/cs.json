@@ -1,6 +1,8 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Otestujte konfiguraci DNS domény.",
+  "pub.doc_title_result": "{domain} - Gonemaster",
+  "pub.doc_title_grade": "{domain} - známka {grade} - Gonemaster",
   "pub.about_summary": "O aplikaci",
   "pub.about_intro": "gonemaster kontroluje konfiguraci DNS domény. Testuje delegaci, DNSSEC, chování jmenných serverů, konzistenci zóny a další a hlásí nálezy podle závažnosti.",
   "pub.about_credit": "Vytvořil {author}. Zdrojový kód na {repo}.",

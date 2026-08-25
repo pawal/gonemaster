@@ -1,6 +1,8 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Tester la configuration DNS d'un domaine.",
+  "pub.doc_title_result": "{domain} - Gonemaster",
+  "pub.doc_title_grade": "{domain} - note {grade} - Gonemaster",
   "pub.about_summary": "À propos",
   "pub.about_intro": "gonemaster vérifie la configuration DNS d'un domaine. Il teste la délégation, DNSSEC, le comportement des serveurs de noms, la cohérence de zone et plus encore, et signale les constats par niveau de gravité.",
   "pub.about_credit": "Écrit par {author}. Code source sur {repo}.",

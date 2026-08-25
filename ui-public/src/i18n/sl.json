@@ -1,6 +1,8 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Preizkusite konfiguracijo DNS domene.",
+  "pub.doc_title_result": "{domain} - Gonemaster",
+  "pub.doc_title_grade": "{domain} - ocena {grade} - Gonemaster",
   "pub.about_summary": "O aplikaciji",
   "pub.about_intro": "gonemaster preveri konfiguracijo DNS za domeno. Preizkusi delegiranje, DNSSEC, vedenje imenskih strežnikov, doslednost cone in drugo ter poroča o ugotovitvah glede na resnost.",
   "pub.about_credit": "Napisal {author}. Izvorna koda na {repo}.",

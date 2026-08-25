@@ -1,6 +1,8 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Test DNS-konfigurationen for et domæne.",
+  "pub.doc_title_result": "{domain} - Gonemaster",
+  "pub.doc_title_grade": "{domain} - karakter {grade} - Gonemaster",
   "pub.about_summary": "Om",
   "pub.about_intro": "gonemaster kontrollerer DNS-konfigurationen for et domæne. Den tester delegering, DNSSEC, navneserveradfærd, zonekonsistens og mere og rapporterer fund efter alvorsgrad.",
   "pub.about_credit": "Skrevet af {author}. Kildekode på {repo}.",

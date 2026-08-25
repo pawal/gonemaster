@@ -1,6 +1,8 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "ドメインのDNS設定をテストします。",
+  "pub.doc_title_result": "{domain} - Gonemaster",
+  "pub.doc_title_grade": "{domain} - 評価 {grade} - Gonemaster",
   "pub.about_summary": "概要",
   "pub.about_intro": "gonemaster はドメインのDNS設定をチェックします。委任、DNSSEC、ネームサーバーの動作、ゾーンの一貫性などをテストし、検出結果を重大度別に報告します。",
   "pub.about_credit": "作成者: {author}。ソースコードは {repo} で公開されています。",

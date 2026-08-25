@@ -1,6 +1,8 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Test de DNS-configuratie van een domein.",
+  "pub.doc_title_result": "{domain} - Gonemaster",
+  "pub.doc_title_grade": "{domain} - cijfer {grade} - Gonemaster",
   "pub.about_summary": "Over",
   "pub.about_intro": "gonemaster controleert de DNS-configuratie van een domein. Het test delegatie, DNSSEC, naamservergedrag, zoneconsistentie en meer, en rapporteert bevindingen op ernst.",
   "pub.about_credit": "Geschreven door {author}. Broncode op {repo}.",

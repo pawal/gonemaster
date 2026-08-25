@@ -1,6 +1,8 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Testaa verkkotunnuksen DNS-asetukset.",
+  "pub.doc_title_result": "{domain} - Gonemaster",
+  "pub.doc_title_grade": "{domain} - arvosana {grade} - Gonemaster",
   "pub.about_summary": "Tietoja",
   "pub.about_intro": "gonemaster tarkistaa verkkotunnuksen DNS-asetukset. Se testaa delegoinnin, DNSSEC:n, nimipalvelimen toiminnan, vyöhykkeen yhtenäisyyden ja muuta sekä raportoi havainnot vakavuuden mukaan.",
   "pub.about_credit": "Tekijä: {author}. Lähdekoodi: {repo}.",

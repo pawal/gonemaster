@@ -1,6 +1,8 @@
 {
   "pub.app_title": "Gonemaster",
   "pub.app_subtitle": "Test the DNS configuration of a domain.",
+  "pub.doc_title_result": "{domain} - Gonemaster",
+  "pub.doc_title_grade": "{domain} - grade {grade} - Gonemaster",
   "pub.about_summary": "About",
   "pub.about_intro": "gonemaster checks the DNS configuration of a domain. It tests delegation, DNSSEC, nameserver behaviour, zone consistency, and more, and reports findings by severity.",
   "pub.about_credit": "Written by {author}. Source code on {repo}.",

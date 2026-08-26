@@ -972,23 +972,23 @@ func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	base := baseurl.Resolve(s.cfg.PublicURL, r)
-	langs := serverpublic.ShippedLocales()
+	site := serverpublic.NewSite(base, s.cfg.PublicUIPath)
 
 	// Every listed URL must repeat the whole alternate set.
 	alternates := func(b *strings.Builder) {
-		for _, lang := range langs {
+		for _, lang := range serverpublic.ShippedLocales() {
 			fmt.Fprintf(b, "    <xhtml:link rel=\"alternate\" hreflang=\"%s\" href=\"%s\"/>\n",
-				lang, xmlEscape(serverpublic.LocaleURL(base, lang)))
+				lang, xmlEscape(site.Locale(lang)))
 		}
 		fmt.Fprintf(b, "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"%s\"/>\n",
-			xmlEscape(serverpublic.HomeURL(base)))
+			xmlEscape(site.Home()))
 	}
 
 	var b strings.Builder
 	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	b.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n")
 	b.WriteString("        xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n")
-	for _, loc := range serverpublic.PageURLs(base) {
+	for _, loc := range site.PageURLs() {
 		b.WriteString("  <url>\n")
 		fmt.Fprintf(&b, "    <loc>%s</loc>\n", xmlEscape(loc))
 		alternates(&b)

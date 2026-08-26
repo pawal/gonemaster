@@ -30,14 +30,14 @@ var (
 // Every alternate names a distinct URL that really answers in that language,
 // and each of those pages repeats this same set, which is what makes the block
 // a language signal rather than noise.
-func buildHreflang(base string) string {
+func buildHreflang(site Site) string {
 	var b strings.Builder
 	for _, lang := range hreflangLangs {
 		fmt.Fprintf(&b, "    <link rel=\"alternate\" hreflang=\"%s\" href=\"%s\" />\n",
-			lang, html.EscapeString(LocaleURL(base, lang)))
+			lang, html.EscapeString(site.Locale(lang)))
 	}
 	fmt.Fprintf(&b, "    <link rel=\"alternate\" hreflang=\"x-default\" href=\"%s\" />",
-		html.EscapeString(HomeURL(base)))
+		html.EscapeString(site.Home()))
 	return b.String()
 }
 
@@ -58,8 +58,9 @@ const noEmbeddedUIPage = `<!doctype html>
 // Handler serves the embedded public UI with a basic SPA fallback.
 // publicURL is the canonical base URL of the deployment (e.g. "https://example.com/");
 // leave empty to auto-detect from the request's Host and X-Forwarded-Proto headers.
+// uiPath is where visitors reach the UI under publicURL (see DefaultUIPath).
 // lookup renders result pages for non-scripting clients; nil disables that.
-func Handler(publicURL string, lookup LookupResult) http.Handler {
+func Handler(publicURL, uiPath string, lookup LookupResult) http.Handler {
 	fsys, err := dist()
 	if err != nil {
 		return unavailableUIHandler()
@@ -74,7 +75,7 @@ func Handler(publicURL string, lookup LookupResult) http.Handler {
 
 		cleanPath := cleanRequestPath(r.URL.Path)
 		if cleanPath == "" || cleanPath == "index.html" {
-			serveIndex(fsys, w, r, publicURL, nil)
+			serveIndex(fsys, w, r, publicURL, uiPath, nil)
 			return
 		}
 
@@ -86,7 +87,7 @@ func Handler(publicURL string, lookup LookupResult) http.Handler {
 			return
 		}
 
-		serveIndex(fsys, w, r, publicURL, lookup)
+		serveIndex(fsys, w, r, publicURL, uiPath, lookup)
 	})
 }
 
@@ -146,7 +147,7 @@ type page struct {
 	summary     string
 }
 
-func homePage(base, locale string) page {
+func homePage(site Site, locale string) page {
 	if locale == "" {
 		locale = "en"
 	}
@@ -154,18 +155,19 @@ func homePage(base, locale string) page {
 		title:       "Gonemaster",
 		description: textFor(locale).homeDescription,
 		lang:        locale,
-		url:         LocaleURL(base, locale),
-		hreflang:    buildHreflang(base),
+		url:         site.Locale(locale),
+		hreflang:    buildHreflang(site),
 	}
 }
 
-func render(data []byte, base string, p page) []byte {
+func render(data []byte, site Site, p page) []byte {
 	canonical := ""
 	if p.url != "" {
 		canonical = `<link rel="canonical" href="` + html.EscapeString(p.url) + `" />`
 	}
 	for _, sub := range [][2]string{
-		{"__PUBLIC_URL__", base},
+		{"__PUBLIC_URL__", site.base},
+		{"__UI_BASE__", html.EscapeString(site.ClientBase())},
 		{"__PAGE_TITLE__", html.EscapeString(p.title)},
 		{"__PAGE_DESCRIPTION__", html.EscapeString(p.description)},
 		{"__PAGE_LANG__", html.EscapeString(p.lang)},
@@ -205,16 +207,16 @@ func cutRegion(data []byte, start, end string) []byte {
 	return append(data[:i:i], data[i+j+len(end):]...)
 }
 
-func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request, publicURL string, lookup LookupResult) {
+func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request, publicURL, uiPath string, lookup LookupResult) {
 	data, err := fs.ReadFile(fsys, "index.html")
 	if err != nil {
 		serveUnavailableUIPage(w, r)
 		return
 	}
-	base := baseurl.Resolve(publicURL, r)
+	site := NewSite(baseurl.Resolve(publicURL, r), uiPath)
 
 	if id := resultID(cleanRequestPath(r.URL.Path)); id != "" && lookup != nil {
-		serveResult(data, w, r, base, id, lookup)
+		serveResult(data, w, r, site, id, lookup)
 		return
 	}
 
@@ -225,18 +227,18 @@ func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request, publicURL st
 	}
 	// Only ?lang, never Accept-Language: the home shell stays one cacheable
 	// response per URL, and each locale has its own URL.
-	page := homePage(base, matchLocale(r.URL.Query().Get("lang")))
-	http.ServeContent(w, r, "index.html", modTime, bytes.NewReader(render(data, base, page)))
+	page := homePage(site, matchLocale(r.URL.Query().Get("lang")))
+	http.ServeContent(w, r, "index.html", modTime, bytes.NewReader(render(data, site, page)))
 }
 
 // serveResult renders one result page. Results name domains someone chose to
 // test, so they carry noindex and never reach a search index.
-func serveResult(data []byte, w http.ResponseWriter, r *http.Request, base, id string, lookup LookupResult) {
+func serveResult(data []byte, w http.ResponseWriter, r *http.Request, site Site, id string, lookup LookupResult) {
 	locale := negotiateLocale(r.URL.Query().Get("lang"), r.Header.Get("Accept-Language"))
 	summary, status := lookup(id, locale)
 
-	p := homePage(base, locale)
-	p.url = HomeURL(base) + "result/" + id
+	p := homePage(site, locale)
+	p.url = site.Result(id)
 	p.robots = `<meta name="robots" content="noindex, nofollow" />`
 	p.hreflang = ""
 
@@ -255,7 +257,7 @@ func serveResult(data []byte, w http.ResponseWriter, r *http.Request, base, id s
 		w.Header().Set("Cache-Control", "no-cache")
 	}
 
-	body := render(data, base, p)
+	body := render(data, site, p)
 	w.Header().Set("X-Robots-Tag", "noindex")
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Content-Length", strconv.Itoa(len(body)))

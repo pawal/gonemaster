@@ -1,19 +1,30 @@
-// Routes: BASE is home, BASE + "result/:id" is a result. Hash forms are legacy.
+// Routes: base() is home, base() + "result/:id" is a result. Hash forms are legacy.
 
-// Vite's base and the server's mount point. Not import.meta.env.BASE_URL:
-// vitest reports "/" for it. Pinned by router.test.js.
-export const BASE = "/public/";
+// Fallback when the page carries no base, e.g. vite dev. Not
+// import.meta.env.BASE_URL: vitest reports "/" for it. Pinned by router.test.js.
+export const DEFAULT_BASE = "/public/";
 
-export function parsePath(pathname) {
-  const rest = String(pathname ?? "").startsWith(BASE) ? String(pathname).slice(BASE.length) : "";
+// A proxy may serve the UI somewhere else, so the server states where.
+export function base() {
+  const stated = document
+    .querySelector('meta[name="gonemaster:base"]')
+    ?.getAttribute("content");
+  if (stated && stated.startsWith("/") && stated.endsWith("/")) return stated;
+  return DEFAULT_BASE;
+}
+
+export function parsePath(pathname, prefix = base()) {
+  const rest = String(pathname ?? "").startsWith(prefix)
+    ? String(pathname).slice(prefix.length)
+    : "";
   const m = rest.match(/^result\/([A-Za-z0-9]+)\/?$/);
   if (m) return { view: "result", publicID: m[1] };
   return { view: "home", publicID: null };
 }
 
 export function pathFor(view, publicID = null) {
-  if (view === "result" && publicID) return `${BASE}result/${publicID}`;
-  return BASE;
+  if (view === "result" && publicID) return `${base()}result/${publicID}`;
+  return base();
 }
 
 // Keeps the query so ?lang survives. Callers update app state themselves.

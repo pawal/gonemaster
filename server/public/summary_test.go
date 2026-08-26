@@ -24,6 +24,7 @@ const indexFixture = `<!doctype html>
     <meta property="og:title" content="__PAGE_TITLE__" />
     <meta property="og:description" content="__PAGE_DESCRIPTION__" />
     <meta property="og:url" content="__OG_URL__" />
+    <meta name="gonemaster:base" content="__UI_BASE__" />
     <meta property="og:image" content="__PUBLIC_URL__android-chrome-512x512.png" />
     <!-- CANONICAL -->
     <!-- ROBOTS_TAG -->
@@ -71,13 +72,20 @@ func lookupOf(s ResultSummary, status LookupStatus) LookupResult {
 
 func get(t *testing.T, path string, lookup LookupResult, headers map[string]string) *httptest.ResponseRecorder {
 	t.Helper()
+	return getAt(t, path, DefaultUIPath, lookup, headers)
+}
+
+// getAt serves one request with the UI mounted at uiPath, which a proxy can
+// move to the site root.
+func getAt(t *testing.T, path, uiPath string, lookup LookupResult, headers map[string]string) *httptest.ResponseRecorder {
+	t.Helper()
 	req := httptest.NewRequest(http.MethodGet, path, nil)
 	req.Host = "example.com"
 	for k, v := range headers {
 		req.Header.Set(k, v)
 	}
 	rr := httptest.NewRecorder()
-	serveIndex(fixtureFS(), rr, req, "", lookup)
+	serveIndex(fixtureFS(), rr, req, "", uiPath, lookup)
 	return rr
 }
 
@@ -357,6 +365,64 @@ func TestHomePageRejectsHostileLangParam(t *testing.T) {
 	}
 }
 
+// A proxy can rewrite the site root onto the UI. The server still mounts at
+// /public/, but every URL it advertises has to name the root, or the canonical
+// points away from the page visitors are on.
+func TestRootMountedUIAdvertisesTheRoot(t *testing.T) {
+	body := getAt(t, "/", "", nil, nil).Body.String()
+
+	for _, want := range []string{
+		`<meta property="og:url" content="http://example.com/" />`,
+		`<link rel="canonical" href="http://example.com/" />`,
+		`<meta name="gonemaster:base" content="/" />`,
+		`hreflang="sv" href="http://example.com/?lang=sv"`,
+		`hreflang="x-default" href="http://example.com/"`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("body missing %q", want)
+		}
+	}
+	if strings.Contains(body, "/public/") {
+		t.Error("a /public/ URL leaked into a root-mounted page")
+	}
+}
+
+func TestRootMountedResultURL(t *testing.T) {
+	body := getAt(t, "/result/abc12345", "", lookupOf(sampleSummary(), LookupFound), nil).Body.String()
+
+	if !strings.Contains(body, `<link rel="canonical" href="http://example.com/result/abc12345" />`) {
+		t.Error("the result canonical does not name the root-mounted URL")
+	}
+	if !strings.Contains(body, "Results for example.com") {
+		t.Error("the summary did not render")
+	}
+}
+
+func TestSiteNormalisesUIPath(t *testing.T) {
+	tests := []struct {
+		in         string
+		wantHome   string
+		wantClient string
+	}{
+		{in: "public/", wantHome: "https://x/public/", wantClient: "/public/"},
+		{in: "/public/", wantHome: "https://x/public/", wantClient: "/public/"},
+		{in: "public", wantHome: "https://x/public/", wantClient: "/public/"},
+		{in: " /public ", wantHome: "https://x/public/", wantClient: "/public/"},
+		{in: "", wantHome: "https://x/", wantClient: "/"},
+		{in: "/", wantHome: "https://x/", wantClient: "/"},
+		{in: "dns/check", wantHome: "https://x/dns/check/", wantClient: "/dns/check/"},
+	}
+	for _, tt := range tests {
+		site := NewSite("https://x/", tt.in)
+		if got := site.Home(); got != tt.wantHome {
+			t.Errorf("NewSite(%q).Home() = %q, want %q", tt.in, got, tt.wantHome)
+		}
+		if got := site.ClientBase(); got != tt.wantClient {
+			t.Errorf("NewSite(%q).ClientBase() = %q, want %q", tt.in, got, tt.wantClient)
+		}
+	}
+}
+
 // A domain reaches this code from user input, and message args carry remote
 // data, so a rendering mistake here is stored XSS.
 func TestServeResultEscapesUserInput(t *testing.T) {
@@ -462,7 +528,7 @@ func TestServeIndexRejectsHostileHost(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/result/abc12345", nil)
 	req.Host = `evil"onload="alert(1)`
 	rr := httptest.NewRecorder()
-	serveIndex(fixtureFS(), rr, req, "", lookupOf(sampleSummary(), LookupFound))
+	serveIndex(fixtureFS(), rr, req, "", DefaultUIPath, lookupOf(sampleSummary(), LookupFound))
 
 	if strings.Contains(rr.Body.String(), `onload="alert(1)`) {
 		t.Fatal("hostile Host reached the page unescaped")
@@ -475,7 +541,7 @@ func TestEmbeddedIndexHasEveryHook(t *testing.T) {
 		t.Fatalf("read index.html: %v", err)
 	}
 	hooks := []string{
-		"__PAGE_TITLE__", "__PAGE_DESCRIPTION__", "__PAGE_LANG__", "__OG_URL__", "__PUBLIC_URL__",
+		"__PAGE_TITLE__", "__PAGE_DESCRIPTION__", "__PAGE_LANG__", "__OG_URL__", "__PUBLIC_URL__", "__UI_BASE__",
 		"<!-- CANONICAL -->", "<!-- ROBOTS_TAG -->", "<!-- HREFLANG_TAGS -->",
 		"<!-- RESULT_SUMMARY -->", "<!-- NOSCRIPT_GENERIC_START -->", "<!-- NOSCRIPT_GENERIC_END -->",
 	}
@@ -486,13 +552,14 @@ func TestEmbeddedIndexHasEveryHook(t *testing.T) {
 	}
 
 	// Both page kinds must consume every hook, or a placeholder ships to users.
-	home := string(render(data, "https://example.com/", homePage("https://example.com/", "")))
-	p := homePage("https://example.com/", "en")
+	site := NewSite("https://example.com/", DefaultUIPath)
+	home := string(render(data, site, homePage(site, "")))
+	p := homePage(site, "en")
 	p.url = "https://example.com/public/result/abc12345"
 	p.robots = `<meta name="robots" content="noindex" />`
 	p.hreflang = ""
 	p.summary = renderSummary(sampleSummary(), "en")
-	result := string(render(data, "https://example.com/", p))
+	result := string(render(data, site, p))
 	for _, page := range []struct {
 		name string
 		body string

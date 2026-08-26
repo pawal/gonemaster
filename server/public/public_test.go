@@ -31,7 +31,7 @@ func TestCleanRequestPath(t *testing.T) {
 }
 
 func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
-	spatest.PathTraversalCannotEscape(t, Handler("", nil),
+	spatest.PathTraversalCannotEscape(t, Handler("", DefaultUIPath, nil),
 		"/../public.go",
 		"/../../server/public/public.go",
 		"/assets/../public.go",
@@ -42,23 +42,23 @@ func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
 }
 
 func TestHandlerMethodNotAllowed(t *testing.T) {
-	spatest.MethodNotAllowed(t, Handler("", nil))
+	spatest.MethodNotAllowed(t, Handler("", DefaultUIPath, nil))
 }
 
 func TestHandlerServesIndexForRootAndUnknownPaths(t *testing.T) {
-	spatest.IndexForRootAndUnknownPaths(t, Handler("", nil), "/not/a/real/path")
+	spatest.IndexForRootAndUnknownPaths(t, Handler("", DefaultUIPath, nil), "/not/a/real/path")
 }
 
 func TestHandlerServesAssetsWithCacheControl(t *testing.T) {
-	spatest.AssetsHaveImmutableCacheControl(t, Handler("", nil), mustDist(t))
+	spatest.AssetsHaveImmutableCacheControl(t, Handler("", DefaultUIPath, nil), mustDist(t))
 }
 
 func TestHandlerServesFaviconFilesAndManifest(t *testing.T) {
-	spatest.FaviconFilesAndManifest(t, Handler("", nil), mustDist(t))
+	spatest.FaviconFilesAndManifest(t, Handler("", DefaultUIPath, nil), mustDist(t))
 }
 
 func TestHandlerIndexIncludesFaviconLinks(t *testing.T) {
-	spatest.IndexLinksFavicons(t, Handler("", nil), mustDist(t), "/public/")
+	spatest.IndexLinksFavicons(t, Handler("", DefaultUIPath, nil), mustDist(t), "/public/")
 }
 
 func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
@@ -68,7 +68,7 @@ func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	serveIndex(fsys, rr, req, "", nil)
+	serveIndex(fsys, rr, req, "", DefaultUIPath, nil)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
@@ -83,11 +83,12 @@ func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 // get its own URL, and none of them may be the base URL: that serves the admin
 // UI, not the public one.
 func TestBuildHreflang(t *testing.T) {
-	result := buildHreflang("https://example.com/")
+	site := NewSite("https://example.com/", DefaultUIPath)
+	result := buildHreflang(site)
 
 	for _, lang := range hreflangLangs {
 		want := `<link rel="alternate" hreflang="` + lang +
-			`" href="` + LocaleURL("https://example.com/", lang) + `" />`
+			`" href="` + site.Locale(lang) + `" />`
 		if !strings.Contains(result, want) {
 			t.Errorf("missing alternate for %q\ngot: %s", lang, result)
 		}
@@ -107,12 +108,12 @@ func TestBuildHreflang(t *testing.T) {
 // Each locale URL must carry the whole alternate set, including itself, or
 // search engines discard the block.
 func TestHreflangIsSelfReferencingAndReciprocal(t *testing.T) {
-	const base = "https://example.com/"
-	block := buildHreflang(base)
+	site := NewSite("https://example.com/", DefaultUIPath)
+	block := buildHreflang(site)
 	for _, lang := range hreflangLangs {
 		// Every locale page renders the same block, so each URL appears in it.
-		if !strings.Contains(block, `href="`+LocaleURL(base, lang)+`"`) {
-			t.Errorf("the block served at %s does not reference itself", LocaleURL(base, lang))
+		if !strings.Contains(block, `href="`+site.Locale(lang)+`"`) {
+			t.Errorf("the block served at %s does not reference itself", site.Locale(lang))
 		}
 	}
 }
@@ -187,7 +188,7 @@ func TestServeIndexInjectsPlaceholders(t *testing.T) {
 			req.Host = tt.reqHost
 			rr := httptest.NewRecorder()
 
-			serveIndex(fsys, rr, req, tt.configured, nil)
+			serveIndex(fsys, rr, req, tt.configured, DefaultUIPath, nil)
 
 			body := rr.Body.String()
 			if strings.Contains(body, "__PUBLIC_URL__") {

@@ -40,6 +40,31 @@ rewrites them on load.
 what the `hreflang` tags and `sitemap.xml` advertise. English shares the plain
 `/public/` URL. Without scripts only the page metadata is localized.
 
+### Serving the public UI at the site root
+
+`public_ui_path` is where visitors reach the UI under `public_url`. It defaults
+to `public/`; set it to `""` when a proxy maps the site root onto the UI. It
+changes the URLs advertised in `og:url`, canonical, `hreflang` and
+`sitemap.xml`, and the base the SPA builds links from. The server still mounts
+at `/public/`, so the proxy must keep passing that through for assets, along
+with `/pub/api/v1/`, `/sitemap.xml` and `/robots.txt`. A Caddy example:
+
+```
+gonemaster.example {
+    @passthrough path /pub/api/v1/* /public/* /analysis /analysis/* /sitemap.xml /robots.txt
+    handle @passthrough {
+        reverse_proxy backend:8080
+    }
+    handle {
+        rewrite * /public{uri}
+        reverse_proxy backend:8080
+    }
+}
+```
+
+Without the `/sitemap.xml` and `/robots.txt` passthrough, the rewrite sends them
+into the SPA fallback, which answers 200 with HTML.
+
 When a signed zone is tested, the result page shows a collapsed "DNSSEC chain of
 trust" section. Expanding it lazily fetches the stored chain summary and draws a
 hand-rolled SVG graph of the parent DS records, the zone's DNSKEYs, and the

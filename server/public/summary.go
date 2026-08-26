@@ -16,24 +16,45 @@ func ShippedLocales() []string {
 	return slices.Clone(hreflangLangs)
 }
 
-// HomeURL is where the public UI is served; the base is the site root.
-func HomeURL(base string) string {
-	return base + "public/"
+// DefaultUIPath is where the public UI sits under the site root unless a
+// deployment serves it somewhere else, typically the root itself.
+const DefaultUIPath = "public/"
+
+// Site builds the URLs a deployment advertises. base is the site root; uiPath
+// is where visitors reach the public UI under it.
+type Site struct {
+	base   string
+	uiPath string
 }
 
-// English shares the x-default URL rather than duplicating it under ?lang=en.
-func LocaleURL(base, locale string) string {
-	if locale == "" || locale == "en" {
-		return HomeURL(base)
+func NewSite(base, uiPath string) Site {
+	uiPath = strings.Trim(strings.TrimSpace(uiPath), "/")
+	if uiPath != "" {
+		uiPath += "/"
 	}
-	return HomeURL(base) + "?lang=" + locale
+	return Site{base: base, uiPath: uiPath}
+}
+
+func (s Site) Home() string { return s.base + s.uiPath }
+
+// ClientBase is the path prefix the browser sees, which the SPA router needs.
+func (s Site) ClientBase() string { return "/" + s.uiPath }
+
+func (s Site) Result(id string) string { return s.Home() + "result/" + id }
+
+// English shares the x-default URL rather than duplicating it under ?lang=en.
+func (s Site) Locale(locale string) string {
+	if locale == "" || locale == "en" {
+		return s.Home()
+	}
+	return s.Home() + "?lang=" + locale
 }
 
 // PageURLs is every distinct indexable public UI URL.
-func PageURLs(base string) []string {
-	urls := []string{HomeURL(base)}
+func (s Site) PageURLs() []string {
+	urls := []string{s.Home()}
 	for _, lang := range hreflangLangs {
-		if u := LocaleURL(base, lang); u != HomeURL(base) {
+		if u := s.Locale(lang); u != s.Home() {
 			urls = append(urls, u)
 		}
 	}

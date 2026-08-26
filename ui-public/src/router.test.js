@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import {
-  BASE,
+  DEFAULT_BASE,
+  base,
   parsePath,
   pathFor,
   navigate,
@@ -16,14 +17,54 @@ import {
 } from "./router.js";
 import { goTo } from "./test/helpers.js";
 
-describe("BASE", () => {
-  // Hardcoded in router.js, so pin it: a drift here 404s every link.
-  it("matches the base in vite.config.js", () => {
+describe("base", () => {
+  const setStatedBase = (value) => {
+    document.head.querySelectorAll('meta[name="gonemaster:base"]').forEach((m) => m.remove());
+    if (value === null) return;
+    const meta = document.createElement("meta");
+    meta.setAttribute("name", "gonemaster:base");
+    meta.setAttribute("content", value);
+    document.head.appendChild(meta);
+  };
+
+  afterEach(() => setStatedBase(null));
+
+  // The fallback is hardcoded, so pin it: a drift here 404s every link.
+  it("falls back to the base in vite.config.js when the page states none", () => {
     const here = dirname(fileURLToPath(import.meta.url));
     const config = readFileSync(resolve(here, "..", "vite.config.js"), "utf8");
     const match = config.match(/base:\s*"([^"]+)"/);
     expect(match).not.toBeNull();
-    expect(BASE).toBe(match[1]);
+    expect(DEFAULT_BASE).toBe(match[1]);
+    expect(base()).toBe(match[1]);
+  });
+
+  // A proxy can serve the UI at the root, and then every produced link must
+  // drop the prefix or it 404s.
+  it("honours the base the server states", () => {
+    setStatedBase("/");
+    expect(base()).toBe("/");
+    expect(pathFor("result", "abc12345")).toBe("/result/abc12345");
+    expect(parsePath("/result/abc12345")).toEqual({ view: "result", publicID: "abc12345" });
+  });
+
+  it("accepts any stated prefix", () => {
+    setStatedBase("/dns/check/");
+    expect(pathFor("home")).toBe("/dns/check/");
+    expect(parsePath("/dns/check/result/xyz")).toEqual({ view: "result", publicID: "xyz" });
+  });
+
+  it.each(["", "public/", "/public", "not-a-path"])(
+    "ignores the unusable stated base %j",
+    (value) => {
+      setStatedBase(value);
+      expect(base()).toBe(DEFAULT_BASE);
+    },
+  );
+
+  it("ignores the unsubstituted placeholder", () => {
+    setStatedBase("__UI_BASE__");
+    expect(base()).toBe(DEFAULT_BASE);
   });
 });
 

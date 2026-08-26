@@ -24,7 +24,7 @@ const noUIPage = `<!doctype html>
 `
 
 // Handler returns a minimal info page for API-only builds.
-func Handler(_ string, _ LookupResult) http.Handler {
+func Handler(_, _ string, _ LookupResult) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet && r.Method != http.MethodHead {
 			w.WriteHeader(http.StatusMethodNotAllowed)

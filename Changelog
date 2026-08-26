@@ -4,9 +4,13 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+Public result pages get shareable URLs that preview with the domain and grade.
+New `public_ui_path` for serving the public UI at the site root.
+
 ### Added
 
 - ui-public: result pages render a summary server-side for link previews and text browsers
+- server: `public_ui_path` sets where visitors reach the public UI, for proxies serving it at the site root
 
 ### Changed
 

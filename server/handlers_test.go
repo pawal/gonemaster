@@ -1375,7 +1375,8 @@ func TestSitemapXML(t *testing.T) {
 
 			// The public UI lives under public/, not at the site root, which
 			// serves the admin UI and must not be advertised.
-			home := serverpublic.HomeURL(tt.wantBase)
+			site := serverpublic.NewSite(tt.wantBase, serverpublic.DefaultUIPath)
+			home := site.Home()
 			if !strings.Contains(body, "<loc>"+home+"</loc>") {
 				t.Fatalf("sitemap.xml missing <loc>%s</loc>\ngot: %s", home, body)
 			}
@@ -1383,7 +1384,7 @@ func TestSitemapXML(t *testing.T) {
 				t.Error("sitemap.xml advertises the site root")
 			}
 			for _, lang := range serverpublic.ShippedLocales() {
-				loc := serverpublic.LocaleURL(tt.wantBase, lang)
+				loc := site.Locale(lang)
 				if !strings.Contains(body, "<loc>"+loc+"</loc>") {
 					t.Errorf("sitemap.xml has no <url> for %s", loc)
 				}
@@ -1407,7 +1408,7 @@ func TestSitemapAlternatesAreReciprocal(t *testing.T) {
 	wantStatus(t, rr, http.StatusOK)
 
 	const base = "https://example.com/"
-	wantURLs := serverpublic.PageURLs(base)
+	wantURLs := serverpublic.NewSite(base, serverpublic.DefaultUIPath).PageURLs()
 
 	blocks := strings.Split(rr.Body.String(), "<url>")[1:]
 	found := 0
@@ -1425,6 +1426,32 @@ func TestSitemapAlternatesAreReciprocal(t *testing.T) {
 	}
 	if found != len(wantURLs) {
 		t.Errorf("found %d public UI <url> entries, want %d", found, len(wantURLs))
+	}
+}
+
+// With the UI proxied to the site root, the sitemap must advertise the root
+// URLs visitors actually use, not the /public/ paths the server mounts at.
+func TestSitemapForRootMountedUI(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(cfg *Config) {
+		cfg.PublicURL = "https://gonemaster.example/"
+		cfg.PublicUIPath = ""
+	}))
+	rr := doJSON(t, srv, http.MethodGet, "/sitemap.xml", nil, withHost("ignored.example.com"))
+	wantStatus(t, rr, http.StatusOK)
+
+	body := rr.Body.String()
+	if !strings.Contains(body, "<loc>https://gonemaster.example/</loc>") {
+		t.Error("the root is not listed")
+	}
+	if !strings.Contains(body, "<loc>https://gonemaster.example/?lang=sv</loc>") {
+		t.Error("locale URLs do not hang off the root")
+	}
+	if strings.Contains(body, "/public/") {
+		t.Error("a /public/ URL leaked into the sitemap")
+	}
+	// The analysis dashboard keeps its own mount either way.
+	if !strings.Contains(body, "<loc>https://gonemaster.example/analysis/</loc>") {
+		t.Error("the analysis landing page is missing")
 	}
 }
 

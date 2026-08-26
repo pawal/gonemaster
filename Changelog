@@ -4,29 +4,32 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+## [v1.7.2] - 2026-08-26
+
 Public result pages get shareable URLs that preview with the domain and grade.
 New `public_ui_path` for serving the public UI at the site root.
 
 ### Added
 
-- ui-public: result pages render a summary server-side for link previews and text browsers
-- server: `public_ui_path` sets where visitors reach the public UI, for proxies serving it at the site root
+- ui-public: result pages render a server-side summary for link previews and text browsers
+- server: `public_ui_path` sets where visitors reach the public UI
 
 ### Changed
 
 - ui-public: result links move to `/public/result/<id>`; old hash links still resolve
-- ui-public: `?lang=xx` selects the language and gives each locale its own URL
-- server: hreflang, canonical and `sitemap.xml` name `/public/`, not the site root
-- tests: the Go and frontend test suites are refactored onto shared test-support packages, with repetitive groups converted to tables; no behaviour change
-- engine: DNSSEC chain summaries move to schema version 2 (adds `servers_stale` and NSEC/NSEC3 signatures)
+- ui-public: `?lang=xx` selects the language, one URL per locale
+- server: hreflang, canonical and `sitemap.xml` name `/public/`
+- engine: DNSSEC chain summaries move to schema 2, adding `servers_stale` and NSEC/NSEC3 signatures
+- tests: the Go and frontend suites are refactored onto shared test-support packages
+- deps: bump codeberg.org/miekg/dns to v0.6.104
 
 ### Fixed
 
 - engine: the DNSSEC chain reports `partial`, not `secure`, when only some nameservers serve expired signatures
-- ui-public: an expired chain signature is no longer hidden behind a fresh one, and stale nameservers are listed
-- ui-public: the DNSSEC chain tooltip no longer overflows the window edge on the first hover over a box
-- ui-public: the DNSSEC chain of trust names ML-DSA-44 instead of showing "alg 18"
-- server: in `nogui` builds the analysis dashboard path returns 404 for asset requests instead of serving the info page with 200
+- ui-public: expired chain signatures stay visible and stale nameservers are listed
+- ui-public: the DNSSEC chain tooltip no longer overflows the window edge on first hover
+- ui-public: the DNSSEC chain names ML-DSA-44 instead of "alg 18"
+- server: `nogui` builds return 404 for analysis dashboard asset requests
 - server: a hostile `Host` header no longer reaches the public UI page unescaped
 
 ## [v1.7.1] - 2026-08-20

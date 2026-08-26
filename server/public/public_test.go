@@ -32,7 +32,7 @@ func TestCleanRequestPath(t *testing.T) {
 }
 
 func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
-	spatest.PathTraversalCannotEscape(t, Handler(""),
+	spatest.PathTraversalCannotEscape(t, Handler("", nil),
 		"/../public.go",
 		"/../../server/public/public.go",
 		"/assets/../public.go",
@@ -43,23 +43,23 @@ func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
 }
 
 func TestHandlerMethodNotAllowed(t *testing.T) {
-	spatest.MethodNotAllowed(t, Handler(""))
+	spatest.MethodNotAllowed(t, Handler("", nil))
 }
 
 func TestHandlerServesIndexForRootAndUnknownPaths(t *testing.T) {
-	spatest.IndexForRootAndUnknownPaths(t, Handler(""), "/not/a/real/path")
+	spatest.IndexForRootAndUnknownPaths(t, Handler("", nil), "/not/a/real/path")
 }
 
 func TestHandlerServesAssetsWithCacheControl(t *testing.T) {
-	spatest.AssetsHaveImmutableCacheControl(t, Handler(""), mustDist(t))
+	spatest.AssetsHaveImmutableCacheControl(t, Handler("", nil), mustDist(t))
 }
 
 func TestHandlerServesFaviconFilesAndManifest(t *testing.T) {
-	spatest.FaviconFilesAndManifest(t, Handler(""), mustDist(t))
+	spatest.FaviconFilesAndManifest(t, Handler("", nil), mustDist(t))
 }
 
 func TestHandlerIndexIncludesFaviconLinks(t *testing.T) {
-	spatest.IndexLinksFavicons(t, Handler(""), mustDist(t), "/public/")
+	spatest.IndexLinksFavicons(t, Handler("", nil), mustDist(t), "/public/")
 }
 
 func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
@@ -69,7 +69,7 @@ func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	serveIndex(fsys, rr, req, "")
+	serveIndex(fsys, rr, req, "", nil)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
@@ -187,7 +187,7 @@ func TestHreflangLangsMatchShippedLocales(t *testing.T) {
 
 func TestServeIndexInjectsPlaceholders(t *testing.T) {
 	const indexHTML = `<head>` +
-		`<meta property="og:url" content="__PUBLIC_URL__" />` +
+		`<meta property="og:url" content="__OG_URL__" />` +
 		`<meta property="og:image" content="__PUBLIC_URL__android-chrome-512x512.png" />` +
 		`<!-- HREFLANG_TAGS -->` +
 		`</head>`
@@ -232,7 +232,7 @@ func TestServeIndexInjectsPlaceholders(t *testing.T) {
 			req.Host = tt.reqHost
 			rr := httptest.NewRecorder()
 
-			serveIndex(fsys, rr, req, tt.configured)
+			serveIndex(fsys, rr, req, tt.configured, nil)
 
 			body := rr.Body.String()
 			if strings.Contains(body, "__PUBLIC_URL__") {

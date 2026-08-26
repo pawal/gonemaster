@@ -9,6 +9,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 )
 
 // MaxPublicTests caps how many testcase IDs a single public create request
@@ -227,6 +228,66 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 	// Let a CDN absorb repeat reads; short window so show_* flips propagate.
 	w.Header().Set("Cache-Control", "public, max-age=300")
 	writeJSON(w, http.StatusOK, result)
+}
+
+// publicResultLookup feeds the server-rendered result page. It mirrors
+// handlePublicGetResult so a page cannot show what the API hides.
+func (s *Server) publicResultLookup() serverpublic.LookupResult {
+	return func(publicID, locale string) (serverpublic.ResultSummary, serverpublic.LookupStatus) {
+		job, ok := s.store.GetByPublicID(publicID)
+		if !ok {
+			return serverpublic.ResultSummary{}, serverpublic.LookupNotFound
+		}
+		switch job.Status {
+		case JobQueued, JobRunning, JobPaused:
+			return serverpublic.ResultSummary{}, serverpublic.LookupPending
+		case JobSucceeded:
+		default:
+			return serverpublic.ResultSummary{}, serverpublic.LookupNotFound
+		}
+		result, ok := s.store.GetResult(job.ID)
+		if !ok {
+			return serverpublic.ResultSummary{}, serverpublic.LookupNotFound
+		}
+		summary := serverpublic.ResultSummary{Domain: job.Domain, FinishedAt: job.FinishedAt}
+		if s.cfg.ShowScorePublic && result.Score != nil {
+			summary.Grade = result.Score.Grade
+			summary.Score = result.Score.Score
+		}
+		if result.Raw != nil {
+			summary.Findings, summary.Warnings, summary.Errors, summary.Criticals =
+				summaryFindings(result.Raw.Entries, locale)
+		}
+		return summary, serverpublic.LookupFound
+	}
+}
+
+// Counts every entry at WARNING and above but localizes only the ones rendered.
+func summaryFindings(entries []JobResultEntry, locale string) (findings []serverpublic.Finding, nWarning, nError, nCritical int) {
+	kept := make([]JobResultEntry, 0, serverpublic.MaxSummaryFindings)
+	for _, e := range entries {
+		switch severityRank(e.Level) {
+		case 2:
+			nWarning++
+		case 3:
+			nError++
+		case 4:
+			nCritical++
+		default:
+			continue
+		}
+		if len(kept) < serverpublic.MaxSummaryFindings {
+			kept = append(kept, e)
+		}
+	}
+	for _, e := range localizeResultEntries(kept, locale) {
+		findings = append(findings, serverpublic.Finding{
+			Level:    strings.ToUpper(e.Level),
+			Message:  e.Message,
+			Testcase: e.Testcase,
+		})
+	}
+	return findings, nWarning, nError, nCritical
 }
 
 // handlePublicGetDNSSECChain handles GET /pub/api/v1/jobs/{publicID}/dnssec-chain.

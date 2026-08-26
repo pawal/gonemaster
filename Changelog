@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- ui-public: result pages render a summary server-side for link previews and text browsers
+
 ### Changed
 
 - ui-public: result links move to `/public/result/<id>`; old hash links still resolve
@@ -17,6 +21,7 @@ All notable changes to all gonemaster components will be documented in this file
 - ui-public: the DNSSEC chain tooltip no longer overflows the window edge on the first hover over a box
 - ui-public: the DNSSEC chain of trust names ML-DSA-44 instead of showing "alg 18"
 - server: in `nogui` builds the analysis dashboard path returns 404 for asset requests instead of serving the info page with 200
+- server: a hostile `Host` header no longer reaches the public UI page unescaped
 
 ## [v1.7.1] - 2026-08-20
 

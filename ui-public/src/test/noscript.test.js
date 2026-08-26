@@ -67,3 +67,46 @@ describe("index.html noscript fallback", () => {
     expect(/<script/.test(noscriptBlock())).toBe(false);
   });
 });
+
+// The server substitutes these per request (server/public/public.go). Losing one
+// ships a literal placeholder, or a result page with no summary in it.
+describe("index.html server hooks", () => {
+  it.each([
+    "__PAGE_TITLE__",
+    "__PAGE_DESCRIPTION__",
+    "__OG_URL__",
+    "__PUBLIC_URL__",
+    "<!-- CANONICAL -->",
+    "<!-- ROBOTS_TAG -->",
+    "<!-- HREFLANG_TAGS -->",
+  ])("keeps the %s hook", (hook) => {
+    expect(indexHtml.includes(hook)).toBe(true);
+  });
+
+  it("titles the page through the hook rather than hardcoding it", () => {
+    expect(indexHtml).toMatch(/<title>__PAGE_TITLE__<\/title>/);
+  });
+
+  it("takes og:title, og:description and twitter equivalents from the hooks", () => {
+    const tagged = [
+      ...indexHtml.matchAll(
+        /(?:property|name)="(?:og|twitter):(title|description)" content="([^"]*)"/g
+      ),
+    ];
+    expect(tagged.length).toBe(4);
+    for (const [, kind, value] of tagged) {
+      expect(value).toBe(kind === "title" ? "__PAGE_TITLE__" : "__PAGE_DESCRIPTION__");
+    }
+  });
+
+  it("wraps the generic noscript body in the markers the server cuts on", () => {
+    const block = noscriptBlock();
+    const start = block.indexOf("<!-- NOSCRIPT_GENERIC_START -->");
+    const end = block.indexOf("<!-- NOSCRIPT_GENERIC_END -->");
+    const summary = block.indexOf("<!-- RESULT_SUMMARY -->");
+    expect(summary).toBeGreaterThan(-1);
+    expect(start).toBeGreaterThan(summary);
+    expect(end).toBeGreaterThan(start);
+    expect(block.slice(start, end)).toMatch(/needs JavaScript/);
+  });
+});

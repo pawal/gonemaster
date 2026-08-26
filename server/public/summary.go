@@ -11,6 +11,20 @@ import (
 // Must match ui-public/src/i18n (see TestHreflangLangsMatchShippedLocales).
 var hreflangLangs = []string{"cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"}
 
+// ShippedLocales is the single list the sitemap and hreflang block share.
+func ShippedLocales() []string {
+	return slices.Clone(hreflangLangs)
+}
+
+// HomeURL is where the public UI is served; the base is the site root.
+func HomeURL(base string) string {
+	return base + "public/"
+}
+
+func LocaleURL(base, locale string) string {
+	return HomeURL(base) + "?lang=" + locale
+}
+
 const MaxSummaryFindings = 25
 
 type Finding struct {
@@ -48,13 +62,14 @@ type LookupResult func(publicID, locale string) (ResultSummary, LookupStatus)
 // titleGrade, titleResult and heading are copies of the ui-public catalog keys,
 // pinned by TestSummaryStringsMatchCatalogs.
 type summaryStrings struct {
-	titleGrade  string
-	titleResult string
-	heading     string
-	gradeClause string
-	issues      string
-	tested      string
-	more        string
+	titleGrade      string
+	titleResult     string
+	heading         string
+	gradeClause     string
+	issues          string
+	tested          string
+	more            string
+	homeDescription string
 }
 
 var summaryText = map[string]summaryStrings{
@@ -62,61 +77,73 @@ var summaryText = map[string]summaryStrings{
 		titleGrade: "{domain} - grade {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Results for {domain}", gradeClause: "Grade {grade}, score {score}/100.",
 		issues: "Issues", tested: "Tested", more: "and {n} more",
+		homeDescription: "Test your DNS zone configuration with Gonemaster - a free online DNS health checker.",
 	},
 	"sv": {
 		titleGrade: "{domain} - betyg {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultat för {domain}", gradeClause: "Betyg {grade}, poäng {score}/100.",
 		issues: "Problem", tested: "Testad", more: "och {n} fler",
+		homeDescription: "Testa din DNS-zonkonfiguration med Gonemaster - en fri DNS-hälsokontroll på webben.",
 	},
 	"da": {
 		titleGrade: "{domain} - karakter {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultater for {domain}", gradeClause: "Karakter {grade}, point {score}/100.",
 		issues: "Problemer", tested: "Testet", more: "og {n} flere",
+		homeDescription: "Test din DNS-zonekonfiguration med Gonemaster - et frit DNS-helbredstjek på nettet.",
 	},
 	"nb": {
 		titleGrade: "{domain} - karakter {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultater for {domain}", gradeClause: "Karakter {grade}, poeng {score}/100.",
 		issues: "Problemer", tested: "Testet", more: "og {n} flere",
+		homeDescription: "Test DNS-sonekonfigurasjonen din med Gonemaster - en fri DNS-helsesjekk på nettet.",
 	},
 	"de": {
 		titleGrade: "{domain} - Note {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Ergebnisse für {domain}", gradeClause: "Note {grade}, Punktzahl {score}/100.",
 		issues: "Probleme", tested: "Getestet", more: "und {n} weitere",
+		homeDescription: "Prüfen Sie Ihre DNS-Zonenkonfiguration mit Gonemaster - eine freie DNS-Statusprüfung im Web.",
 	},
 	"nl": {
 		titleGrade: "{domain} - cijfer {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultaten voor {domain}", gradeClause: "Cijfer {grade}, score {score}/100.",
 		issues: "Problemen", tested: "Getest", more: "en nog {n}",
+		homeDescription: "Test je DNS-zoneconfiguratie met Gonemaster - een vrije DNS-gezondheidscontrole op het web.",
 	},
 	"fr": {
 		titleGrade: "{domain} - note {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Résultats pour {domain}", gradeClause: "Note {grade}, score {score}/100.",
 		issues: "Problèmes", tested: "Testé", more: "et {n} de plus",
+		homeDescription: "Testez la configuration de votre zone DNS avec Gonemaster - un contrôle de santé DNS libre en ligne.",
 	},
 	"es": {
 		titleGrade: "{domain} - nota {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Resultados para {domain}", gradeClause: "Nota {grade}, puntuación {score}/100.",
 		issues: "Problemas", tested: "Probado", more: "y {n} más",
+		homeDescription: "Compruebe la configuración de su zona DNS con Gonemaster - una verificación de salud DNS libre en línea.",
 	},
 	"fi": {
 		titleGrade: "{domain} - arvosana {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Tulokset verkkotunnukselle {domain}", gradeClause: "Arvosana {grade}, pisteet {score}/100.",
 		issues: "Ongelmat", tested: "Testattu", more: "ja {n} muuta",
+		homeDescription: "Testaa DNS-vyöhykkeesi asetukset Gonemasterilla - vapaa DNS-kuntotarkistus verkossa.",
 	},
 	"cs": {
 		titleGrade: "{domain} - známka {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Výsledky pro {domain}", gradeClause: "Známka {grade}, skóre {score}/100.",
 		issues: "Problémy", tested: "Otestováno", more: "a {n} dalších",
+		homeDescription: "Otestujte konfiguraci své DNS zóny pomocí Gonemasteru - volná kontrola zdraví DNS na webu.",
 	},
 	"sl": {
 		titleGrade: "{domain} - ocena {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "Rezultati za {domain}", gradeClause: "Ocena {grade}, točke {score}/100.",
 		issues: "Težave", tested: "Preizkušeno", more: "in {n} več",
+		homeDescription: "Preizkusite nastavitve svoje cone DNS z Gonemastrom - prosta preveritev zdravja DNS na spletu.",
 	},
 	"ja": {
 		titleGrade: "{domain} - 評価 {grade} - Gonemaster", titleResult: "{domain} - Gonemaster",
 		heading: "{domain} の結果", gradeClause: "評価 {grade}、スコア {score}/100。",
 		issues: "問題", tested: "テスト日時", more: "他 {n} 件",
+		homeDescription: "Gonemaster で DNS ゾーン設定をテストします。無料で使える DNS ヘルスチェックです。",
 	},
 }
 

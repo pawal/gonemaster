@@ -11,6 +11,8 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - ui-public: result links move to `/public/result/<id>`; old hash links still resolve
+- ui-public: `?lang=xx` selects the language and gives each locale its own URL
+- server: hreflang, canonical and `sitemap.xml` name `/public/`, not the site root
 - tests: the Go and frontend test suites are refactored onto shared test-support packages, with repetitive groups converted to tables; no behaviour change
 - engine: DNSSEC chain summaries move to schema version 2 (adds `servers_stale` and NSEC/NSEC3 signatures)
 

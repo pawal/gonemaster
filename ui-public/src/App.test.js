@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
-import { errorResponse, fetchRouter, jsonResponse } from "./test/helpers.js";
+import { clickLink, errorResponse, fetchRouter, goBackTo, goTo, jsonResponse } from "./test/helpers.js";
 
 const localesResp = jsonResponse({ locales: ["en"] });
 const multiLocalesResp = jsonResponse({ locales: ["en", "sv", "da"] });
@@ -12,16 +12,8 @@ const jobResp = (status, domain = "example.com", progress = 0, finished_at = nul
 const resultResp = (entries = []) =>
   jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "en", entries } });
 
-// Only replaceState can set a path in jsdom, and it persists between tests.
-const goTo = (url) => window.history.replaceState(null, "", url);
-
-const clickHome = () => fireEvent.click(screen.getByAltText("gonemaster").closest("a"));
-
-// What the browser fires on Back once the URL has already moved.
-const goBackTo = async (url) => {
-  goTo(url);
-  await fireEvent(window, new PopStateEvent("popstate"));
-};
+const brandLink = () => screen.getByAltText("gonemaster").closest("a");
+const clickHome = () => clickLink(brandLink());
 
 describe("App", () => {
   beforeEach(() => {
@@ -123,9 +115,7 @@ describe("App", () => {
 
     it("intercepts the logo click instead of reloading the page", async () => {
       render(App);
-      const event = new MouseEvent("click", { bubbles: true, cancelable: true, button: 0 });
-      await fireEvent(screen.getByAltText("gonemaster").closest("a"), event);
-      expect(event.defaultPrevented).toBe(true);
+      expect(await clickLink(brandLink())).toBe(true);
     });
 
     it("opens a recent test from its row, moving the URL with it", async () => {
@@ -303,6 +293,15 @@ describe("App", () => {
 
   describe("locale", () => {
     const LOCALE_KEY = "gonemaster.public.locale.v1";
+    // The selector's accessible name is itself localized, so a test that
+    // starts in another language cannot find it by name.
+    const localeSelect = async () =>
+      await waitFor(() => {
+        const el = document.querySelector(".locale-select");
+        if (!el) throw new Error("locale select not rendered yet");
+        return el;
+      });
+
     const setLanguages = (langs) => {
       Object.defineProperty(navigator, "languages", { value: langs, configurable: true });
       Object.defineProperty(navigator, "language", { value: langs[0] ?? "", configurable: true });
@@ -335,8 +334,7 @@ describe("App", () => {
         ["/jobs/", jobResp("queued", "example.com", 0)],
       ]);
       render(App);
-      const sel = await screen.findByRole("combobox", { name: /language/i });
-      expect(sel.value).toBe("da");
+      expect((await localeSelect()).value).toBe("da");
     });
 
     it("falls back to en when no browser language matches a shipped catalog", async () => {
@@ -359,6 +357,57 @@ describe("App", () => {
       const sel = await screen.findByRole("combobox", { name: /language/i });
       await fireEvent.change(sel, { target: { value: "sv" } });
       await waitFor(() => expect(window.localStorage.getItem(LOCALE_KEY)).toBe("sv"));
+    });
+
+    // A shared ?lang link must render the language it names, so it agrees with
+    // what the server rendered into that same URL.
+    it("lets ?lang win over a stored locale", async () => {
+      window.localStorage.setItem(LOCALE_KEY, "da");
+      goTo("/public/?lang=sv");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      expect((await localeSelect()).value).toBe("sv");
+    });
+
+    it("takes the base locale from a ?lang region tag", async () => {
+      goTo("/public/?lang=sv-SE");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      expect((await localeSelect()).value).toBe("sv");
+    });
+
+    it("ignores a ?lang we do not ship", async () => {
+      window.localStorage.setItem(LOCALE_KEY, "da");
+      goTo("/public/?lang=zz");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      expect((await localeSelect()).value).toBe("da");
+    });
+
+    // The URL stays shareable, and a ?lang link renders the same server-side.
+    it("puts the chosen locale in the URL without leaving the page", async () => {
+      goTo("/public/result/abc12345");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/", jobResp("succeeded", "example.com", 100)],
+      ]);
+      render(App);
+      const sel = await screen.findByRole("combobox", { name: /language/i });
+      await fireEvent.change(sel, { target: { value: "sv" } });
+      await waitFor(() =>
+        expect(new URLSearchParams(window.location.search).get("lang")).toBe("sv")
+      );
+      expect(window.location.pathname).toBe("/public/result/abc12345");
     });
 
     it("snaps stored locale back to en when the server does not advertise it", async () => {

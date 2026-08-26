@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/xml"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -12,6 +13,8 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/i18n"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
+	"codeberg.org/pawal/gonemaster/server/internal/baseurl"
+	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 )
 
 const maxListLimit = 500
@@ -948,8 +951,6 @@ func (s *Server) handleJobsPurge(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]int64{"purged_jobs": n})
 }
 
-var sitemapLangs = []string{"cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"}
-
 // analysisSitemapPaths are the English-only analysis dashboard landing pages.
 var analysisSitemapPaths = []string{
 	"/analysis/",
@@ -962,52 +963,59 @@ var analysisSitemapPaths = []string{
 	"/analysis/trends",
 }
 
-func resolvePublicURL(configured string, r *http.Request) string {
-	if configured != "" {
-		return configured
-	}
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" || proto == "http" {
-		scheme = proto
-	}
-	host := r.Host
-	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
-		host = fwdHost
-	}
-	return scheme + "://" + host + "/"
-}
-
 func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
-	base := strings.TrimRight(resolvePublicURL(s.cfg.PublicURL, r), "/")
+	base := strings.TrimRight(baseurl.Resolve(s.cfg.PublicURL, r), "/")
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	fmt.Fprintf(w, "User-agent: *\nSitemap: %s/sitemap.xml\n", base)
 }
 
 func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
-	publicURL := resolvePublicURL(s.cfg.PublicURL, r)
+	base := baseurl.Resolve(s.cfg.PublicURL, r)
+	langs := serverpublic.ShippedLocales()
+
+	// Every listed URL must repeat the whole alternate set.
+	alternates := func(b *strings.Builder) {
+		for _, lang := range langs {
+			fmt.Fprintf(b, "    <xhtml:link rel=\"alternate\" hreflang=\"%s\" href=\"%s\"/>\n",
+				lang, xmlEscape(serverpublic.LocaleURL(base, lang)))
+		}
+		fmt.Fprintf(b, "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"%s\"/>\n",
+			xmlEscape(serverpublic.HomeURL(base)))
+	}
+
 	var b strings.Builder
 	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	b.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n")
 	b.WriteString("        xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n")
-	b.WriteString("  <url>\n")
-	fmt.Fprintf(&b, "    <loc>%s</loc>\n", publicURL)
-	for _, lang := range sitemapLangs {
-		fmt.Fprintf(&b, "    <xhtml:link rel=\"alternate\" hreflang=\"%s\" href=\"%s\"/>\n", lang, publicURL)
+	for _, loc := range append([]string{serverpublic.HomeURL(base)}, localeURLs(base, langs)...) {
+		b.WriteString("  <url>\n")
+		fmt.Fprintf(&b, "    <loc>%s</loc>\n", xmlEscape(loc))
+		alternates(&b)
+		b.WriteString("  </url>\n")
 	}
-	fmt.Fprintf(&b, "    <xhtml:link rel=\"alternate\" hreflang=\"x-default\" href=\"%s\"/>\n", publicURL)
-	b.WriteString("  </url>\n")
-	analysisBase := strings.TrimRight(publicURL, "/")
+	analysisBase := strings.TrimRight(base, "/")
 	for _, p := range analysisSitemapPaths {
 		b.WriteString("  <url>\n")
-		fmt.Fprintf(&b, "    <loc>%s%s</loc>\n", analysisBase, p)
+		fmt.Fprintf(&b, "    <loc>%s%s</loc>\n", xmlEscape(analysisBase), p)
 		b.WriteString("  </url>\n")
 	}
 	b.WriteString("</urlset>\n")
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	fmt.Fprint(w, b.String())
+}
+
+func localeURLs(base string, langs []string) []string {
+	urls := make([]string, 0, len(langs))
+	for _, lang := range langs {
+		urls = append(urls, serverpublic.LocaleURL(base, lang))
+	}
+	return urls
+}
+
+func xmlEscape(s string) string {
+	var b strings.Builder
+	_ = xml.EscapeText(&b, []byte(s))
+	return b.String()
 }

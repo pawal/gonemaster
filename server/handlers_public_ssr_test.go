@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -12,23 +11,23 @@ import (
 	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 )
 
-// seedPublicJob stores a job in the given status, graduating it with entries when it
-// is a finished one.
+// seedPublicJob stores a job in the given status. Only a succeeded one is
+// graduated; the rest never reach a stored result, which is what the lookup
+// has to cope with.
 func seedPublicJob(t *testing.T, srv *Server, status JobStatus, entries []engine.LogEntry) Job {
 	t.Helper()
-	created, err := srv.store.Create(Job{
+	job := Job{
 		ID:        newID("job"),
 		Domain:    "example.com",
 		Status:    status,
 		CreatedAt: time.Now().UTC(),
-	})
-	if err != nil {
-		t.Fatalf("Create: %v", err)
 	}
 	if status == JobSucceeded {
-		if err := srv.store.GraduateJob(created, entries); err != nil {
-			t.Fatalf("GraduateJob: %v", err)
-		}
+		return createAndGraduate(t, srv.store, job, entries)
+	}
+	created, err := srv.store.Create(job)
+	if err != nil {
+		t.Fatalf("create job %q: %v", job.ID, err)
 	}
 	return created
 }
@@ -176,15 +175,10 @@ func TestPublicUIServesRenderedResultPage(t *testing.T) {
 		{Module: "ZONE", Testcase: "zone01", Tag: "Z_RETRY_MINIMUM_VALUE_LOWER", Level: "WARNING"},
 	})
 
-	req := httptest.NewRequest(http.MethodGet, "/public/result/"+job.PublicID, nil)
-	rr := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rr, req)
+	rr := doJSON(t, srv, http.MethodGet, "/public/result/"+job.PublicID, nil)
 
-	if rr.Code != http.StatusOK {
-		t.Fatalf("status = %d, want 200", rr.Code)
-	}
-	body := rr.Body.String()
-	if !strings.Contains(body, "example.com") {
+	wantStatus(t, rr, http.StatusOK)
+	if !strings.Contains(rr.Body.String(), "example.com") {
 		t.Error("rendered page does not name the domain")
 	}
 	if rr.Header().Get("X-Robots-Tag") != "noindex" {
@@ -195,13 +189,9 @@ func TestPublicUIServesRenderedResultPage(t *testing.T) {
 func TestPublicUIUnknownResultIs404(t *testing.T) {
 	srv := newTestServer(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/public/result/nosuchid", nil)
-	rr := httptest.NewRecorder()
-	srv.Handler().ServeHTTP(rr, req)
+	rr := doJSON(t, srv, http.MethodGet, "/public/result/nosuchid", nil)
 
-	if rr.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404", rr.Code)
-	}
+	wantStatus(t, rr, http.StatusNotFound)
 }
 
 // The public limiter meters POST only, so result pages are no more metered
@@ -217,17 +207,13 @@ func TestResultPageGetsShareTheAPIsUnmeteredPath(t *testing.T) {
 		t.Fatal("rate limiter did not come up, the rest of this test proves nothing")
 	}
 
-	do := func(method, path string) int {
-		req := httptest.NewRequest(method, path, nil)
-		req.RemoteAddr = "192.0.2.10:1234"
-		rr := httptest.NewRecorder()
-		srv.Handler().ServeHTTP(rr, req)
-		return rr.Code
+	do := func(method, path string, body any) int {
+		return doJSON(t, srv, method, path, body, withRemoteAddr("192.0.2.10:1234")).Code
 	}
 
 	for i := 0; i < 5; i++ {
 		for _, path := range []string{"/public/", "/public/result/abc12345", "/pub/api/v1/jobs/abc12345"} {
-			if code := do(http.MethodGet, path); code == http.StatusTooManyRequests {
+			if code := do(http.MethodGet, path, nil); code == http.StatusTooManyRequests {
 				t.Fatalf("GET %s was rate limited on request %d", path, i+1)
 			}
 		}
@@ -237,7 +223,7 @@ func TestResultPageGetsShareTheAPIsUnmeteredPath(t *testing.T) {
 	// passing merely because nothing is metered at all.
 	limited := false
 	for i := 0; i < 4; i++ {
-		if do(http.MethodPost, "/pub/api/v1/jobs") == http.StatusTooManyRequests {
+		if do(http.MethodPost, "/pub/api/v1/jobs", map[string]string{"domain": "example.com"}) == http.StatusTooManyRequests {
 			limited = true
 			break
 		}

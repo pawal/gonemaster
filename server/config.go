@@ -162,9 +162,10 @@ type Config struct {
 	ReadTimeout  Duration `json:"read_timeout"`
 	WriteTimeout Duration `json:"write_timeout"`
 	IdleTimeout  Duration `json:"idle_timeout"`
-	// PublicURL is the canonical base URL of the public UI (e.g. "https://example.com/").
-	// Used for og:url, hreflang, robots.txt, and sitemap.xml. When empty, the URL
-	// is auto-detected from the request's Host and X-Forwarded-Proto headers.
+	// PublicURL is the site root (e.g. "https://example.com/"), not the public
+	// UI's own URL: that is PublicURL + "public/". Used for og:url, hreflang,
+	// robots.txt, and sitemap.xml. When empty, the URL is auto-detected from
+	// the request's Host and X-Forwarded-Proto headers.
 	PublicURL string          `json:"public_url,omitempty"`
 	Database  DatabaseConfig  `json:"database"`
 	PublicAPI PublicAPIConfig `json:"public_api"`

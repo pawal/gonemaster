@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/server/internal/baseurl"
 )
 
 //go:embed dist
@@ -25,54 +27,17 @@ var (
 	distErr  error
 )
 
-// The returned URL always ends with "/" so index.html can join asset
-// paths onto it (e.g. __PUBLIC_URL__android-chrome-512x512.png).
-func resolvePublicURL(configured string, r *http.Request) string {
-	if configured != "" {
-		if !strings.HasSuffix(configured, "/") {
-			configured += "/"
-		}
-		return configured
-	}
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" || proto == "http" {
-		scheme = proto
-	}
-	host := r.Host
-	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
-		host = fwdHost
-	}
-	// Go accepts quotes in Host, which would break out of an attribute.
-	if !hostLooksValid(host) {
-		return "/"
-	}
-	return scheme + "://" + host + "/"
-}
-
-func hostLooksValid(host string) bool {
-	if host == "" {
-		return false
-	}
-	for _, c := range host {
-		switch {
-		case c >= 'a' && c <= 'z', c >= 'A' && c <= 'Z', c >= '0' && c <= '9':
-		case c == '-', c == '.', c == ':', c == '[', c == ']', c == '_':
-		default:
-			return false
-		}
-	}
-	return true
-}
-
-func buildHreflang(baseURL string) string {
+// Every alternate names a distinct URL that really answers in that language,
+// and each of those pages repeats this same set, which is what makes the block
+// a language signal rather than noise.
+func buildHreflang(base string) string {
 	var b strings.Builder
 	for _, lang := range hreflangLangs {
-		fmt.Fprintf(&b, "    <link rel=\"alternate\" hreflang=\"%s\" href=\"%s\" />\n", lang, baseURL)
+		fmt.Fprintf(&b, "    <link rel=\"alternate\" hreflang=\"%s\" href=\"%s\" />\n",
+			lang, html.EscapeString(LocaleURL(base, lang)))
 	}
-	fmt.Fprintf(&b, "    <link rel=\"alternate\" hreflang=\"x-default\" href=\"%s\" />", baseURL)
+	fmt.Fprintf(&b, "    <link rel=\"alternate\" hreflang=\"x-default\" href=\"%s\" />",
+		html.EscapeString(HomeURL(base)))
 	return b.String()
 }
 
@@ -170,23 +135,31 @@ func isFile(fsys fs.FS, name string) bool {
 	return !info.IsDir()
 }
 
-const defaultDescription = "Test your DNS zone configuration with Gonemaster - a free online DNS health checker."
-
 // page holds the per-request substitutions for index.html.
 type page struct {
 	title       string
 	description string
+	lang        string
 	url         string // og:url and canonical, which must never disagree
 	robots      string
 	hreflang    string
 	summary     string
 }
 
-func homePage(base string) page {
+// homePage describes the public UI landing page. An empty locale means the
+// x-default URL, which answers in English.
+func homePage(base, locale string) page {
+	url := HomeURL(base)
+	if locale != "" {
+		url = LocaleURL(base, locale)
+	} else {
+		locale = "en"
+	}
 	return page{
 		title:       "Gonemaster",
-		description: defaultDescription,
-		url:         base,
+		description: textFor(locale).homeDescription,
+		lang:        locale,
+		url:         url,
 		hreflang:    buildHreflang(base),
 	}
 }
@@ -200,6 +173,7 @@ func render(data []byte, base string, p page) []byte {
 		{"__PUBLIC_URL__", base},
 		{"__PAGE_TITLE__", html.EscapeString(p.title)},
 		{"__PAGE_DESCRIPTION__", html.EscapeString(p.description)},
+		{"__PAGE_LANG__", html.EscapeString(p.lang)},
 		{"__OG_URL__", html.EscapeString(p.url)},
 		{"<!-- CANONICAL -->", canonical},
 		{"<!-- ROBOTS_TAG -->", p.robots},
@@ -242,7 +216,7 @@ func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request, publicURL st
 		serveUnavailableUIPage(w, r)
 		return
 	}
-	base := resolvePublicURL(publicURL, r)
+	base := baseurl.Resolve(publicURL, r)
 
 	if id := resultID(cleanRequestPath(r.URL.Path)); id != "" && lookup != nil {
 		serveResult(data, w, r, base, id, lookup)
@@ -254,7 +228,10 @@ func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request, publicURL st
 	if info, err := fs.Stat(fsys, "index.html"); err == nil {
 		modTime = info.ModTime()
 	}
-	http.ServeContent(w, r, "index.html", modTime, bytes.NewReader(render(data, base, homePage(base))))
+	// Only ?lang, never Accept-Language: the home shell stays one cacheable
+	// response per URL, and each locale has its own URL.
+	page := homePage(base, matchLocale(r.URL.Query().Get("lang")))
+	http.ServeContent(w, r, "index.html", modTime, bytes.NewReader(render(data, base, page)))
 }
 
 // serveResult renders one result page. Results name domains someone chose to
@@ -263,8 +240,8 @@ func serveResult(data []byte, w http.ResponseWriter, r *http.Request, base, id s
 	locale := negotiateLocale(r.URL.Query().Get("lang"), r.Header.Get("Accept-Language"))
 	summary, status := lookup(id, locale)
 
-	p := homePage(base)
-	p.url = base + "public/result/" + id
+	p := homePage(base, locale)
+	p.url = HomeURL(base) + "result/" + id
 	p.robots = `<meta name="robots" content="noindex, nofollow" />`
 	p.hreflang = ""
 

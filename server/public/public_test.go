@@ -3,7 +3,6 @@
 package public
 
 import (
-	"crypto/tls"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -80,85 +79,42 @@ func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 	}
 }
 
-func TestResolvePublicURL(t *testing.T) {
-	tests := []struct {
-		name       string
-		configured string
-		host       string
-		fwdProto   string
-		fwdHost    string
-		tls        bool
-		want       string
-	}{
-		{
-			name:       "configured root",
-			configured: "https://example.com/",
-			host:       "ignored.example.com",
-			want:       "https://example.com/",
-		},
-		{
-			name:       "configured subpath",
-			configured: "https://example.com/public/",
-			host:       "ignored.example.com",
-			want:       "https://example.com/public/",
-		},
-		{
-			name: "auto-detect http",
-			host: "myhost.example.com",
-			want: "http://myhost.example.com/",
-		},
-		{
-			name: "auto-detect tls",
-			host: "myhost.example.com",
-			tls:  true,
-			want: "https://myhost.example.com/",
-		},
-		{
-			name:     "X-Forwarded-Proto https",
-			host:     "myhost.example.com",
-			fwdProto: "https",
-			want:     "https://myhost.example.com/",
-		},
-		{
-			name:    "X-Forwarded-Host overrides Host",
-			host:    "internal:8080",
-			fwdHost: "public.example.com",
-			want:    "http://public.example.com/",
-		},
+// Identical alternate targets are not a language signal, so every locale must
+// get its own URL, and none of them may be the base URL: that serves the admin
+// UI, not the public one.
+func TestBuildHreflang(t *testing.T) {
+	result := buildHreflang("https://example.com/")
+
+	seen := map[string]string{}
+	for _, lang := range hreflangLangs {
+		want := `<link rel="alternate" hreflang="` + lang +
+			`" href="https://example.com/public/?lang=` + lang + `" />`
+		if !strings.Contains(result, want) {
+			t.Errorf("missing alternate for %q\ngot: %s", lang, result)
+		}
+		seen[lang] = want
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Host = tt.host
-			if tt.fwdProto != "" {
-				req.Header.Set("X-Forwarded-Proto", tt.fwdProto)
-			}
-			if tt.fwdHost != "" {
-				req.Header.Set("X-Forwarded-Host", tt.fwdHost)
-			}
-			if tt.tls {
-				req.TLS = &tls.ConnectionState{}
-			}
-			got := resolvePublicURL(tt.configured, req)
-			if got != tt.want {
-				t.Fatalf("resolvePublicURL() = %q, want %q", got, tt.want)
-			}
-		})
+	if len(seen) != len(hreflangLangs) {
+		t.Errorf("duplicate locales in the alternate set")
+	}
+	if !strings.Contains(result, `hreflang="x-default" href="https://example.com/public/" />`) {
+		t.Errorf("x-default should name the unparameterised home page\ngot: %s", result)
+	}
+	if strings.Contains(result, `href="https://example.com/"`) {
+		t.Error("an alternate points at the site root, which serves the admin UI")
 	}
 }
 
-func TestBuildHreflang(t *testing.T) {
-	result := buildHreflang("https://example.com/")
+// Each locale URL must carry the whole alternate set, including itself, or
+// search engines discard the block.
+func TestHreflangIsSelfReferencingAndReciprocal(t *testing.T) {
+	const base = "https://example.com/"
+	block := buildHreflang(base)
 	for _, lang := range hreflangLangs {
-		if !strings.Contains(result, `hreflang="`+lang+`"`) {
-			t.Fatalf("buildHreflang missing hreflang=%q", lang)
+		// Every locale page renders the same block, so each URL appears in it.
+		if !strings.Contains(block, `href="`+LocaleURL(base, lang)+`"`) {
+			t.Errorf("the block served at %s does not reference itself", LocaleURL(base, lang))
 		}
-	}
-	if !strings.Contains(result, `hreflang="x-default"`) {
-		t.Fatal("buildHreflang missing x-default")
-	}
-	if !strings.Contains(result, `href="https://example.com/"`) {
-		t.Fatal("buildHreflang missing expected href")
 	}
 }
 
@@ -241,8 +197,9 @@ func TestServeIndexInjectsPlaceholders(t *testing.T) {
 			if strings.Contains(body, "<!-- HREFLANG_TAGS -->") {
 				t.Fatal("<!-- HREFLANG_TAGS --> placeholder was not replaced")
 			}
-			if !strings.Contains(body, `content="`+tt.wantURL+`"`) {
-				t.Fatalf("og:url not set to %q in body: %s", tt.wantURL, body)
+			// og:url names the public UI; og:image is served from the root.
+			if !strings.Contains(body, `content="`+tt.wantURL+`public/"`) {
+				t.Fatalf("og:url not set to %qpublic/ in body: %s", tt.wantURL, body)
 			}
 			if !strings.Contains(body, `content="`+tt.wantURL+`android-chrome-512x512.png"`) {
 				t.Fatalf("og:image not joined onto %q in body: %s", tt.wantURL, body)

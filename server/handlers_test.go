@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 )
 
 var metricsRequestNonce uint32
@@ -1340,25 +1341,25 @@ func TestSitemapXML(t *testing.T) {
 		name      string
 		publicURL string
 		host      string
-		wantLoc   string
+		wantBase  string
 	}{
 		{
 			name:      "configured root URL",
 			publicURL: "https://example.com/",
 			host:      "ignored.example.com",
-			wantLoc:   "<loc>https://example.com/</loc>",
+			wantBase:  "https://example.com/",
 		},
 		{
-			name:      "configured subpath URL",
-			publicURL: "https://example.com/public/",
+			name:      "configured without trailing slash gets one",
+			publicURL: "https://example.com",
 			host:      "ignored.example.com",
-			wantLoc:   "<loc>https://example.com/public/</loc>",
+			wantBase:  "https://example.com/",
 		},
 		{
 			name:      "auto-detected from host",
 			publicURL: "",
 			host:      "myhost.example.com",
-			wantLoc:   "<loc>http://myhost.example.com/</loc>",
+			wantBase:  "http://myhost.example.com/",
 		},
 	}
 	for _, tt := range tests {
@@ -1371,16 +1372,23 @@ func TestSitemapXML(t *testing.T) {
 				t.Fatalf("Content-Type = %q", ct)
 			}
 			body := rr.Body.String()
-			if !strings.Contains(body, tt.wantLoc) {
-				t.Fatalf("sitemap.xml missing %q\ngot: %s", tt.wantLoc, body)
+
+			// The public UI lives under public/, not at the site root, which
+			// serves the admin UI and must not be advertised.
+			home := serverpublic.HomeURL(tt.wantBase)
+			if !strings.Contains(body, "<loc>"+home+"</loc>") {
+				t.Fatalf("sitemap.xml missing <loc>%s</loc>\ngot: %s", home, body)
 			}
-			for _, lang := range sitemapLangs {
-				if !strings.Contains(body, `hreflang="`+lang+`"`) {
-					t.Fatalf("sitemap.xml missing hreflang=%q", lang)
+			if strings.Contains(body, "<loc>"+tt.wantBase+"</loc>") {
+				t.Error("sitemap.xml advertises the site root")
+			}
+			for _, lang := range serverpublic.ShippedLocales() {
+				loc := serverpublic.LocaleURL(tt.wantBase, lang)
+				if !strings.Contains(body, "<loc>"+loc+"</loc>") {
+					t.Errorf("sitemap.xml has no <url> for %s", loc)
 				}
 			}
-			root := strings.TrimSuffix(strings.TrimPrefix(tt.wantLoc, "<loc>"), "</loc>")
-			analysisBase := strings.TrimRight(root, "/")
+			analysisBase := strings.TrimRight(tt.wantBase, "/")
 			for _, p := range analysisSitemapPaths {
 				wantURL := "<loc>" + analysisBase + p + "</loc>"
 				if !strings.Contains(body, wantURL) {
@@ -1388,5 +1396,35 @@ func TestSitemapXML(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// Sitemap hreflang is only read when every listed URL repeats the whole
+// alternate set, itself included.
+func TestSitemapAlternatesAreReciprocal(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(cfg *Config) { cfg.PublicURL = "https://example.com/" }))
+	rr := doJSON(t, srv, http.MethodGet, "/sitemap.xml", nil, withHost("ignored.example.com"))
+	wantStatus(t, rr, http.StatusOK)
+
+	langs := serverpublic.ShippedLocales()
+	wantURLs := append([]string{serverpublic.HomeURL("https://example.com/")},
+		localeURLs("https://example.com/", langs)...)
+
+	blocks := strings.Split(rr.Body.String(), "<url>")[1:]
+	found := 0
+	for _, block := range blocks {
+		loc := block[strings.Index(block, "<loc>")+len("<loc>") : strings.Index(block, "</loc>")]
+		if !slices.Contains(wantURLs, loc) {
+			continue
+		}
+		found++
+		for _, want := range append(wantURLs[1:], serverpublic.HomeURL("https://example.com/")) {
+			if !strings.Contains(block, `href="`+want+`"`) {
+				t.Errorf("the <url> for %s does not list %s as an alternate", loc, want)
+			}
+		}
+	}
+	if found != len(wantURLs) {
+		t.Errorf("found %d public UI <url> entries, want %d", found, len(wantURLs))
 	}
 }

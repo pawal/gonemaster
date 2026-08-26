@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { t, locale, loadCatalog } from "./i18n.js";
-  import { parsePath, pathFor, navigate, upgradeLegacyHash, isPlainClick } from "./router.js";
+  import { parsePath, pathFor, navigate, upgradeLegacyHash, isPlainClick, readLang, writeLang } from "./router.js";
   import { getLocales, getJob, getVersion, getInfo } from "./api.js";
   import TestForm from "./lib/TestForm.svelte";
   import Progress from "./lib/Progress.svelte";
@@ -114,9 +114,13 @@
   };
   const localeLabel = (code) => localeDisplayNames[code] || code;
 
-  // Stored choice → first browser-preferred catalog we ship → "en".
+  // ?lang → stored choice → first browser-preferred catalog we ship → "en".
+  // ?lang comes first so a shared link renders the language it names, matching
+  // what the server rendered for it.
   function pickInitialLocale() {
     if (typeof window === "undefined") return "en";
+    const asked = readLang().split("-")[0].toLowerCase();
+    if (localeDisplayNames[asked]) return asked;
     try {
       const stored = window.localStorage.getItem(localeKey);
       if (stored && localeDisplayNames[stored]) return stored;
@@ -164,6 +168,7 @@
     await loadCatalog(code);
     locale.set(code);
     resultLocale = code;
+    writeLang(code);
     try { window.localStorage.setItem(localeKey, code); } catch (_) {}
   }
 

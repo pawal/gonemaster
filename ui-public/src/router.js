@@ -47,3 +47,16 @@ export function upgradeLegacyHash() {
 export function isPlainClick(event) {
   return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 }
+
+export function readLang() {
+  return new URLSearchParams(window.location.search).get("lang") ?? "";
+}
+
+// Keeps the chosen language in the URL so it stays shareable, and so the
+// server renders the same language for clients that do not run scripts.
+export function writeLang(code) {
+  const params = new URLSearchParams(window.location.search);
+  params.set("lang", code);
+  const query = params.toString();
+  window.history.replaceState(null, "", window.location.pathname + (query ? `?${query}` : ""));
+}

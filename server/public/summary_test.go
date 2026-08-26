@@ -18,7 +18,7 @@ import (
 // Mirrors the hooks in ui-public/index.html; TestEmbeddedIndexHasEveryHook
 // checks the real file against the same renderer.
 const indexFixture = `<!doctype html>
-<html lang="en">
+<html lang="__PAGE_LANG__">
   <head>
     <meta name="description" content="__PAGE_DESCRIPTION__" />
     <meta property="og:title" content="__PAGE_TITLE__" />
@@ -176,13 +176,13 @@ func TestServeResultOgURLMatchesCanonical(t *testing.T) {
 			name:    "home page names the base",
 			path:    "/",
 			lookup:  nil,
-			wantURL: "http://example.com/",
+			wantURL: "http://example.com/public/",
 		},
 		{
 			name:    "unknown path is home, not the requested path",
 			path:    "/garbage",
 			lookup:  lookupOf(ResultSummary{}, LookupNotFound),
-			wantURL: "http://example.com/",
+			wantURL: "http://example.com/public/",
 		},
 	}
 	for _, tt := range tests {
@@ -275,6 +275,85 @@ func TestHomePageIsIndexableAndKeepsHreflang(t *testing.T) {
 	}
 	if !strings.Contains(body, genericMarker) {
 		t.Error("home page lost the generic noscript body")
+	}
+}
+
+// Each locale URL must answer in that language, or the hreflang block promising
+// it is still a lie.
+func TestHomePageLocalizesFromLangParam(t *testing.T) {
+	tests := []struct {
+		name     string
+		path     string
+		wantLang string
+		wantURL  string
+		wantText string
+	}{
+		{
+			name: "no lang is the x-default page in English", path: "/",
+			wantLang: "en", wantURL: "http://example.com/public/",
+			wantText: "Test your DNS zone configuration",
+		},
+		{
+			name: "swedish", path: "/?lang=sv",
+			wantLang: "sv", wantURL: "http://example.com/public/?lang=sv",
+			wantText: "Testa din DNS-zonkonfiguration",
+		},
+		{
+			name: "japanese", path: "/?lang=ja",
+			wantLang: "ja", wantURL: "http://example.com/public/?lang=ja",
+			wantText: "DNS ゾーン設定をテストします",
+		},
+		{
+			name: "region tag narrows to the base locale", path: "/?lang=de-AT",
+			wantLang: "de", wantURL: "http://example.com/public/?lang=de",
+			wantText: "Prüfen Sie Ihre DNS-Zonenkonfiguration",
+		},
+		{
+			name: "unshipped lang falls back to the default page", path: "/?lang=zz",
+			wantLang: "en", wantURL: "http://example.com/public/",
+			wantText: "Test your DNS zone configuration",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := get(t, tt.path, nil, nil).Body.String()
+			if !strings.Contains(body, `<html lang="`+tt.wantLang+`">`) {
+				t.Errorf("html lang is not %q", tt.wantLang)
+			}
+			if !strings.Contains(body, tt.wantText) {
+				t.Errorf("description is not in %s", tt.wantLang)
+			}
+			if !strings.Contains(body, `<link rel="canonical" href="`+tt.wantURL+`" />`) {
+				t.Errorf("canonical is not %q", tt.wantURL)
+			}
+			if !strings.Contains(body, `<meta property="og:url" content="`+tt.wantURL+`" />`) {
+				t.Errorf("og:url is not %q", tt.wantURL)
+			}
+		})
+	}
+}
+
+// The home page is negotiated from the URL alone, so one cached response per
+// URL stays correct and it needs no Vary.
+func TestHomePageIgnoresAcceptLanguage(t *testing.T) {
+	rr := get(t, "/", nil, map[string]string{"Accept-Language": "sv"})
+	body := rr.Body.String()
+	if !strings.Contains(body, `<html lang="en">`) {
+		t.Error("the unparameterised home page should stay English")
+	}
+	if rr.Header().Get("Vary") != "" {
+		t.Errorf("home page sets Vary = %q", rr.Header().Get("Vary"))
+	}
+}
+
+// The locale reaches <html lang> and a URL, so it must never be echoed raw.
+func TestHomePageRejectsHostileLangParam(t *testing.T) {
+	body := get(t, `/?lang=%22%3E%3Cscript%3Ealert(1)%3C/script%3E`, nil, nil).Body.String()
+	if strings.Contains(body, "<script>alert(1)") {
+		t.Fatal("lang param reached the page unescaped")
+	}
+	if !strings.Contains(body, `<html lang="en">`) {
+		t.Error("an unusable lang should fall back to en")
 	}
 }
 
@@ -396,7 +475,7 @@ func TestEmbeddedIndexHasEveryHook(t *testing.T) {
 		t.Fatalf("read index.html: %v", err)
 	}
 	hooks := []string{
-		"__PAGE_TITLE__", "__PAGE_DESCRIPTION__", "__OG_URL__", "__PUBLIC_URL__",
+		"__PAGE_TITLE__", "__PAGE_DESCRIPTION__", "__PAGE_LANG__", "__OG_URL__", "__PUBLIC_URL__",
 		"<!-- CANONICAL -->", "<!-- ROBOTS_TAG -->", "<!-- HREFLANG_TAGS -->",
 		"<!-- RESULT_SUMMARY -->", "<!-- NOSCRIPT_GENERIC_START -->", "<!-- NOSCRIPT_GENERIC_END -->",
 	}
@@ -407,8 +486,8 @@ func TestEmbeddedIndexHasEveryHook(t *testing.T) {
 	}
 
 	// Both page kinds must consume every hook, or a placeholder ships to users.
-	home := string(render(data, "https://example.com/", homePage("https://example.com/")))
-	p := homePage("https://example.com/")
+	home := string(render(data, "https://example.com/", homePage("https://example.com/", "")))
+	p := homePage("https://example.com/", "en")
 	p.url = "https://example.com/public/result/abc12345"
 	p.robots = `<meta name="robots" content="noindex" />`
 	p.hreflang = ""

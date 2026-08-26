@@ -11,9 +11,10 @@ import {
   hashFor,
   upgradeLegacyHash,
   isPlainClick,
+  readLang,
+  writeLang,
 } from "./router.js";
-
-const goTo = (url) => window.history.replaceState(null, "", url);
+import { goTo } from "./test/helpers.js";
 
 describe("BASE", () => {
   // Hardcoded in router.js, so pin it: a drift here 404s every link.
@@ -201,6 +202,49 @@ describe("upgradeLegacyHash", () => {
     goTo("/public/result/pathwins#/result/hashloses");
     expect(upgradeLegacyHash()).toBe(false);
     expect(window.location.pathname).toBe("/public/result/pathwins");
+  });
+});
+
+describe("readLang and writeLang", () => {
+  beforeEach(() => {
+    goTo("/public/");
+  });
+
+  it("reads the lang query parameter", () => {
+    goTo("/public/?lang=sv");
+    expect(readLang()).toBe("sv");
+  });
+
+  it("returns an empty string when there is no lang parameter", () => {
+    expect(readLang()).toBe("");
+    goTo("/public/?other=1");
+    expect(readLang()).toBe("");
+  });
+
+  it("writes the lang parameter without touching the path", () => {
+    goTo("/public/result/abc12345");
+    writeLang("da");
+    expect(window.location.pathname).toBe("/public/result/abc12345");
+    expect(readLang()).toBe("da");
+  });
+
+  it("replaces an existing lang rather than appending a second one", () => {
+    goTo("/public/?lang=sv");
+    writeLang("de");
+    expect(window.location.search).toBe("?lang=de");
+  });
+
+  it("keeps other query parameters", () => {
+    goTo("/public/?keep=1");
+    writeLang("fi");
+    expect(new URLSearchParams(window.location.search).get("keep")).toBe("1");
+    expect(readLang()).toBe("fi");
+  });
+
+  it("replaces rather than pushes, so Back does not walk language changes", () => {
+    const before = window.history.length;
+    writeLang("nb");
+    expect(window.history.length).toBe(before);
   });
 });
 

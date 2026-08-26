@@ -32,7 +32,8 @@ gonemaster-server --dump-config
 | `cross_job_hot_cache_ttl_seconds` | TTL for cross-job hot-cache entries. |
 | `min_level` | Minimum log level stored and returned in results. |
 | `profile_path` | Default engine profile file. |
-| `public_url` | Canonical public base URL for public pages, robots, and sitemap. |
+| `public_url` | Site root the deployment answers at, e.g. `https://example.com/`. Also builds `og:image`, the API examples, `robots.txt` and `sitemap.xml`, so it is the root and not the public UI's own URL. |
+| `public_ui_path` | Path under `public_url` where visitors reach the public UI. Default `public/`; set `""` when a proxy serves it at the root. Does not move the server's own mount. |
 | `scoring_config_path` | Optional JSON scoring configuration file. |
 | `debug` | Captures request/response bodies in the access log and implies `log_level=debug`. |
 | `log_format` | Operational log encoding: `text` (default, human-readable) or `json` (one object per line, for aggregation). |
@@ -138,6 +139,8 @@ Database and public API flags are covered in [database.md](database.md) and
   "log_format": "text",
   "log_level": "info",
   "profile_path": "/etc/gonemaster/profile.json",
+  "public_url": "https://gonemaster.example/",
+  "public_ui_path": "public/",
   "database": {
     "driver": "sqlite",
     "dsn": "/var/lib/gonemaster/gonemaster.db",
@@ -156,6 +159,9 @@ Database and public API flags are covered in [database.md](database.md) and
   "idle_timeout": "60s"
 }
 ```
+
+To proxy the public UI to the site root, set `public_ui_path` to `""` and see
+[ui.md](ui.md).
 
 ## Profiles
 

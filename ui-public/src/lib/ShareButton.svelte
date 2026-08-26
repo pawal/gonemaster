@@ -1,6 +1,6 @@
 <script>
   import { t } from "../i18n.js";
-  import { hashFor } from "../router.js";
+  import { pathFor } from "../router.js";
 
   let { publicID, domain = "", score = null } = $props();
 
@@ -17,7 +17,7 @@
   let timer;
 
   async function share() {
-    const url = window.location.origin + window.location.pathname + hashFor("result", publicID);
+    const url = window.location.origin + pathFor("result", publicID);
     let text = url;
     if (score && domain) {
       const emoji = GRADE_EMOJI[score.grade] ?? "🔵";

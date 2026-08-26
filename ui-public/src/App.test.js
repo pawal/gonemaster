@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import App from "./App.svelte";
-import { errorResponse, fetchRouter, jsonResponse } from "./test/helpers.js";
+import { clickLink, errorResponse, fetchRouter, goBackTo, goTo, jsonResponse } from "./test/helpers.js";
 
 const localesResp = jsonResponse({ locales: ["en"] });
 const multiLocalesResp = jsonResponse({ locales: ["en", "sv", "da"] });
@@ -12,9 +12,12 @@ const jobResp = (status, domain = "example.com", progress = 0, finished_at = nul
 const resultResp = (entries = []) =>
   jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "en", entries } });
 
+const brandLink = () => screen.getByAltText("gonemaster").closest("a");
+const clickHome = () => clickLink(brandLink());
+
 describe("App", () => {
   beforeEach(() => {
-    window.location.hash = "";
+    goTo("/public/");
     fetchRouter([
       ["/locales", localesResp],
       ["/jobs/", jobResp("queued", "example.com", 0)],
@@ -40,10 +43,98 @@ describe("App", () => {
     expect(document.querySelector("[data-testid='results-view']")).toBeNull();
   });
 
+  // Path routing
+
+  describe("routing", () => {
+    const succeededRoutes = [
+      ["/locales", localesResp],
+      ["jobs/abc12345/result", resultResp()],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ];
+
+    // Links shared while results lived at #/result/:id must keep working.
+    it("rewrites a legacy hash link to the path form and still renders it", async () => {
+      goTo("/public/#/result/abc12345");
+      fetchRouter(succeededRoutes);
+      render(App);
+      await waitFor(() => screen.getByTestId("results-view"));
+      expect(window.location.pathname).toBe("/public/result/abc12345");
+      expect(window.location.hash).toBe("");
+    });
+
+    it("puts the result path in the URL when a test is started", async () => {
+      fetchRouter([
+        ["/locales", localesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/abc12345", jobResp("succeeded", "example.com", 100)],
+        ["/jobs", jsonResponse({ public_id: "abc12345" })],
+      ]);
+      render(App);
+      await fireEvent.input(screen.getByLabelText("Domain"), { target: { value: "example.com" } });
+      await fireEvent.click(screen.getByRole("button", { name: "Test" }));
+      await waitFor(() => expect(window.location.pathname).toBe("/public/result/abc12345"));
+    });
+
+    it("returns to the idle form on Back from a result", async () => {
+      goTo("/public/result/abc12345");
+      fetchRouter(succeededRoutes);
+      render(App);
+      await waitFor(() => screen.getByTestId("results-view"));
+      await goBackTo("/public/");
+      await waitFor(() => expect(screen.queryByTestId("results-view")).toBeNull());
+    });
+
+    // Reacting to Back by pushing home again would need a second Back press.
+    it("adds no history entry when Back lands on home", async () => {
+      goTo("/public/result/abc12345");
+      fetchRouter(succeededRoutes);
+      render(App);
+      await waitFor(() => screen.getByTestId("results-view"));
+      const before = window.history.length;
+      await goBackTo("/public/");
+      await waitFor(() => expect(screen.queryByTestId("results-view")).toBeNull());
+      expect(window.history.length).toBe(before);
+    });
+
+    it("loads the result on Forward to a result path", async () => {
+      fetchRouter(succeededRoutes);
+      render(App);
+      await goBackTo("/public/result/abc12345");
+      await waitFor(() => screen.getByTestId("results-view"));
+    });
+
+    it("moves the URL home when the logo is clicked", async () => {
+      goTo("/public/result/abc12345");
+      fetchRouter(succeededRoutes);
+      render(App);
+      await waitFor(() => screen.getByTestId("results-view"));
+      await clickHome();
+      expect(window.location.pathname).toBe("/public/");
+      await waitFor(() => expect(screen.queryByTestId("results-view")).toBeNull());
+    });
+
+    it("intercepts the logo click instead of reloading the page", async () => {
+      render(App);
+      expect(await clickLink(brandLink())).toBe(true);
+    });
+
+    it("opens a recent test from its row, moving the URL with it", async () => {
+      window.localStorage.setItem(
+        "gonemaster.public.history.v1",
+        JSON.stringify([{ id: "abc12345", domain: "example.com", finishedAt: null }]),
+      );
+      fetchRouter(succeededRoutes);
+      render(App);
+      await fireEvent.click(screen.getByText("example.com"));
+      expect(window.location.pathname).toBe("/public/result/abc12345");
+      await waitFor(() => screen.getByTestId("results-view"));
+    });
+  });
+
   // Shared-link init
 
-  it("shows Progress when hash is a running job on load", async () => {
-    window.location.hash = "#/result/abc12345";
+  it("shows Progress when the path is a running job on load", async () => {
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["/jobs/abc12345", jobResp("running", "example.com", 30)],
@@ -54,8 +145,8 @@ describe("App", () => {
     );
   });
 
-  it("shows Results when hash is a succeeded job on load", async () => {
-    window.location.hash = "#/result/abc12345";
+  it("shows Results when the path is a succeeded job on load", async () => {
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["jobs/abc12345/result", resultResp()],
@@ -67,8 +158,8 @@ describe("App", () => {
     );
   });
 
-  it("shows ExpiredResult when hash job returns 404 on load", async () => {
-    window.location.hash = "#/result/abc12345";
+  it("shows ExpiredResult when the job returns 404 on load", async () => {
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["/jobs/", errorResponse(404)],
@@ -87,7 +178,7 @@ describe("App", () => {
   });
 
   it("form is disabled while test is running", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["/jobs/abc12345", jobResp("running", "example.com", 30)],
@@ -101,7 +192,7 @@ describe("App", () => {
   // Post-job flow
 
   it("shows Results after job succeeds", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["jobs/abc12345/result", resultResp()],
@@ -112,7 +203,7 @@ describe("App", () => {
   });
 
   it("hides nameserver timings when public info disables them", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["/info", jsonResponse({ show_score_public: false, show_nameserver_timings_public: false })],
@@ -132,7 +223,7 @@ describe("App", () => {
   });
 
   it("shows the DNSSEC chain section when public info enables it and the marker is set", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["/info", jsonResponse({ show_dnssec_chain_public: true })],
@@ -144,7 +235,7 @@ describe("App", () => {
   });
 
   it("hides the DNSSEC chain section by default (fail-safe, no info)", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["jobs/abc12345/result", jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [] }, has_dnssec_chain: true })],
@@ -156,7 +247,7 @@ describe("App", () => {
   });
 
   it("shows ExpiredResult when job is expired", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["/jobs/", errorResponse(404)],
@@ -176,7 +267,7 @@ describe("App", () => {
     render(App);
     const link = screen.getByAltText("gonemaster").closest("a");
     expect(link).not.toBeNull();
-    expect(link.getAttribute("href")).toBe("#/");
+    expect(link.getAttribute("href")).toBe("/public/");
   });
 
   it("renders the locale selector when multiple locales are available", async () => {
@@ -202,6 +293,15 @@ describe("App", () => {
 
   describe("locale", () => {
     const LOCALE_KEY = "gonemaster.public.locale.v1";
+    // The selector's accessible name is itself localized, so a test that
+    // starts in another language cannot find it by name.
+    const localeSelect = async () =>
+      await waitFor(() => {
+        const el = document.querySelector(".locale-select");
+        if (!el) throw new Error("locale select not rendered yet");
+        return el;
+      });
+
     const setLanguages = (langs) => {
       Object.defineProperty(navigator, "languages", { value: langs, configurable: true });
       Object.defineProperty(navigator, "language", { value: langs[0] ?? "", configurable: true });
@@ -234,8 +334,7 @@ describe("App", () => {
         ["/jobs/", jobResp("queued", "example.com", 0)],
       ]);
       render(App);
-      const sel = await screen.findByRole("combobox", { name: /language/i });
-      expect(sel.value).toBe("da");
+      expect((await localeSelect()).value).toBe("da");
     });
 
     it("falls back to en when no browser language matches a shipped catalog", async () => {
@@ -258,6 +357,87 @@ describe("App", () => {
       const sel = await screen.findByRole("combobox", { name: /language/i });
       await fireEvent.change(sel, { target: { value: "sv" } });
       await waitFor(() => expect(window.localStorage.getItem(LOCALE_KEY)).toBe("sv"));
+    });
+
+    // A shared ?lang link must render the language it names, so it agrees with
+    // what the server rendered into that same URL.
+    it("lets ?lang win over a stored locale", async () => {
+      window.localStorage.setItem(LOCALE_KEY, "da");
+      goTo("/public/?lang=sv");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      expect((await localeSelect()).value).toBe("sv");
+    });
+
+    it("takes the base locale from a ?lang region tag", async () => {
+      goTo("/public/?lang=sv-SE");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      expect((await localeSelect()).value).toBe("sv");
+    });
+
+    it("ignores a ?lang we do not ship", async () => {
+      window.localStorage.setItem(LOCALE_KEY, "da");
+      goTo("/public/?lang=zz");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["/jobs/", jobResp("queued", "example.com", 0)],
+      ]);
+      render(App);
+      expect((await localeSelect()).value).toBe("da");
+    });
+
+    // A shared ?lang link used to lose its language at the first navigation.
+    it("keeps ?lang in the URL when a test is started", async () => {
+      goTo("/public/?lang=sv");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/abc12345", jobResp("succeeded", "example.com", 100)],
+        ["/jobs", jsonResponse({ public_id: "abc12345" })],
+      ]);
+      render(App);
+      await fireEvent.input(screen.getByLabelText("Domän"), { target: { value: "example.com" } });
+      await fireEvent.click(screen.getByRole("button", { name: "Testa" }));
+      await waitFor(() => expect(window.location.pathname).toBe("/public/result/abc12345"));
+      expect(new URLSearchParams(window.location.search).get("lang")).toBe("sv");
+    });
+
+    it("keeps ?lang when the logo sends us home", async () => {
+      goTo("/public/result/abc12345?lang=sv");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/", jobResp("succeeded", "example.com", 100)],
+      ]);
+      render(App);
+      await waitFor(() => screen.getByTestId("results-view"));
+      await clickHome();
+      expect(window.location.pathname).toBe("/public/");
+      expect(new URLSearchParams(window.location.search).get("lang")).toBe("sv");
+    });
+
+    // The URL stays shareable, and a ?lang link renders the same server-side.
+    it("puts the chosen locale in the URL without leaving the page", async () => {
+      goTo("/public/result/abc12345");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/", jobResp("succeeded", "example.com", 100)],
+      ]);
+      render(App);
+      const sel = await screen.findByRole("combobox", { name: /language/i });
+      await fireEvent.change(sel, { target: { value: "sv" } });
+      await waitFor(() =>
+        expect(new URLSearchParams(window.location.search).get("lang")).toBe("sv")
+      );
+      expect(window.location.pathname).toBe("/public/result/abc12345");
     });
 
     it("snaps stored locale back to en when the server does not advertise it", async () => {
@@ -310,7 +490,7 @@ describe("App", () => {
   // Document title
 
   it("sets title to percentage while running", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["/jobs/abc12345", jobResp("running", "example.com", 42)],
@@ -322,7 +502,7 @@ describe("App", () => {
   });
 
   it("names the domain in the title of an unscored result", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["jobs/abc12345/result", resultResp()],
@@ -334,7 +514,7 @@ describe("App", () => {
   });
 
   it("adds the grade to the title once the result reports one", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["jobs/abc12345/result", jsonResponse({
@@ -352,7 +532,7 @@ describe("App", () => {
   });
 
   it("drops the result from the title when the job did not succeed", async () => {
-    window.location.hash = "#/result/abc12345";
+    goTo("/public/result/abc12345");
     fetchRouter([
       ["/locales", localesResp],
       ["/jobs/", jobResp("failed", "example.com", 100)],
@@ -455,7 +635,7 @@ describe("App", () => {
       // The shared job is still running on arrival (applyHash sees "running"),
       // then Progress's first poll sees it finish. Despite the succeeded
       // onJobDone, nothing may be recorded: the run was not started here.
-      window.location.hash = "#/result/abc12345";
+      goTo("/public/result/abc12345");
       let jobCalls = 0;
       global.fetch = vi.fn().mockImplementation(async (url) => {
         if (url.includes("/locales")) return localesResp;
@@ -476,7 +656,7 @@ describe("App", () => {
         { id: "abc12345", domain: "example.com", finishedAt: null },
         { id: "keep1", domain: "example.org", finishedAt: null },
       ]);
-      window.location.hash = "#/result/abc12345";
+      goTo("/public/result/abc12345");
       fetchRouter([
         ["/locales", localesResp],
         ["/jobs/", errorResponse(404)],
@@ -500,7 +680,7 @@ describe("App", () => {
 
     it("hides the list while a test is running", async () => {
       seedHistory([{ id: "id1", domain: "example.com", finishedAt: null }]);
-      window.location.hash = "#/result/abc12345";
+      goTo("/public/result/abc12345");
       fetchRouter([
         ["/locales", localesResp],
         ["/jobs/abc12345", jobResp("running", "example.com", 30)],
@@ -512,7 +692,7 @@ describe("App", () => {
 
     it("hides the list on the result view", async () => {
       seedHistory([{ id: "id1", domain: "example.com", finishedAt: null }]);
-      window.location.hash = "#/result/abc12345";
+      goTo("/public/result/abc12345");
       fetchRouter([
         ["/locales", localesResp],
         ["jobs/abc12345/result", resultResp()],
@@ -523,10 +703,9 @@ describe("App", () => {
       expect(screen.queryByTestId("recent-tests")).toBeNull();
     });
 
+    // The full loop the feature exists for: run a test, land on the result
+    // view (list hidden there), click the logo home, find the run in the list.
     it("shows the list after navigating back to the home view", async () => {
-      // The full loop the feature exists for: run a test, land on the result
-      // view (list hidden there), go home the way the logo link does (hash
-      // navigation), and find the finished run in the recent tests list.
       fetchRouter([
         ["/locales", localesResp],
         ["jobs/abc12345/result", resultResp()],
@@ -537,14 +716,15 @@ describe("App", () => {
       await startTest("example.com");
       await waitFor(() => screen.getByTestId("results-view"));
       expect(screen.queryByTestId("recent-tests")).toBeNull();
-      window.location.hash = "#/";
+      await clickHome();
       await waitFor(() => screen.getByTestId("recent-tests"));
       expect(screen.getByText("example.com")).toBeTruthy();
+      expect(window.location.pathname).toBe("/public/");
     });
 
     it("updates the stored grade from a viewed result", async () => {
       seedHistory([{ id: "abc12345", domain: "example.com", finishedAt: null }]);
-      window.location.hash = "#/result/abc12345";
+      goTo("/public/result/abc12345");
       fetchRouter([
         ["/locales", localesResp],
         ["jobs/abc12345/result", jsonResponse({

@@ -1,4 +1,38 @@
+import { fireEvent } from "@testing-library/svelte";
 import { vi } from "vitest";
+
+// Only replaceState can set a path in jsdom, and it persists between tests.
+export const goTo = (url) => window.history.replaceState(null, "", url);
+
+// What the browser fires on Back or Forward once the URL has already moved.
+export const goBackTo = async (url) => {
+  goTo(url);
+  await fireEvent(window, new PopStateEvent("popstate"));
+};
+
+// Clicks a link, reports whether the component prevented the navigation, and
+// stops jsdom from trying to follow the href.
+export const clickLink = async (link, init = {}) => {
+  let prevented = null;
+  const swallow = (e) => {
+    prevented = e.defaultPrevented;
+    e.preventDefault();
+  };
+  document.addEventListener("click", swallow);
+  await fireEvent(link, new MouseEvent("click", {
+    bubbles: true, cancelable: true, button: 0, ...init,
+  }));
+  document.removeEventListener("click", swallow);
+  return prevented;
+};
+
+// The modified clicks a link must leave to the browser, so it can open a tab.
+export const MODIFIED_CLICKS = [
+  ["middle click", { button: 1 }],
+  ["ctrl-click", { ctrlKey: true }],
+  ["meta-click", { metaKey: true }],
+  ["shift-click", { shiftKey: true }],
+];
 
 // The public API client reads ok, status, headers.get and json.
 export const jsonResponse = (body, status = 200) => ({

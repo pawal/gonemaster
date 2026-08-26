@@ -1,6 +1,7 @@
 import { render, screen, fireEvent } from "@testing-library/svelte";
 import { describe, expect, it, vi } from "vitest";
 import RecentTests from "./RecentTests.svelte";
+import { clickLink, MODIFIED_CLICKS } from "../test/helpers.js";
 
 // Entries are given newest first, the way the history module stores them.
 const ENTRIES = [
@@ -14,9 +15,29 @@ describe("RecentTests", () => {
     const links = screen.getAllByRole("link");
     expect(links).toHaveLength(2);
     expect(links[0].textContent).toBe("example.org");
-    expect(links[0].getAttribute("href")).toBe("#/result/id2");
+    expect(links[0].getAttribute("href")).toBe("/public/result/id2");
     expect(links[1].textContent).toBe("example.com");
-    expect(links[1].getAttribute("href")).toBe("#/result/id1");
+    expect(links[1].getAttribute("href")).toBe("/public/result/id1");
+  });
+
+  // A real href for new-tab opening, but a plain click stays in the SPA.
+  it("fires onselect for a plain left click and suppresses the navigation", async () => {
+    const onselect = vi.fn();
+    render(RecentTests, { entries: ENTRIES, locale: "en", onselect });
+    expect(await clickLink(screen.getAllByRole("link")[0])).toBe(true);
+    expect(onselect).toHaveBeenCalledWith("id2");
+  });
+
+  it.each(MODIFIED_CLICKS)("leaves %s to the browser so it opens a new tab", async (_name, init) => {
+    const onselect = vi.fn();
+    render(RecentTests, { entries: ENTRIES, locale: "en", onselect });
+    expect(await clickLink(screen.getAllByRole("link")[0], init)).toBe(false);
+    expect(onselect).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when no onselect handler is given", async () => {
+    render(RecentTests, { entries: ENTRIES, locale: "en" });
+    expect(await clickLink(screen.getAllByRole("link")[0])).toBe(true);
   });
 
   it("renders the grade chip only for entries that have a grade", () => {

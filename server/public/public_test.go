@@ -3,7 +3,6 @@
 package public
 
 import (
-	"crypto/tls"
 	"io/fs"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +31,7 @@ func TestCleanRequestPath(t *testing.T) {
 }
 
 func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
-	spatest.PathTraversalCannotEscape(t, Handler(""),
+	spatest.PathTraversalCannotEscape(t, Handler("", DefaultUIPath, nil),
 		"/../public.go",
 		"/../../server/public/public.go",
 		"/assets/../public.go",
@@ -43,23 +42,23 @@ func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
 }
 
 func TestHandlerMethodNotAllowed(t *testing.T) {
-	spatest.MethodNotAllowed(t, Handler(""))
+	spatest.MethodNotAllowed(t, Handler("", DefaultUIPath, nil))
 }
 
 func TestHandlerServesIndexForRootAndUnknownPaths(t *testing.T) {
-	spatest.IndexForRootAndUnknownPaths(t, Handler(""), "/not/a/real/path")
+	spatest.IndexForRootAndUnknownPaths(t, Handler("", DefaultUIPath, nil), "/not/a/real/path")
 }
 
 func TestHandlerServesAssetsWithCacheControl(t *testing.T) {
-	spatest.AssetsHaveImmutableCacheControl(t, Handler(""), mustDist(t))
+	spatest.AssetsHaveImmutableCacheControl(t, Handler("", DefaultUIPath, nil), mustDist(t))
 }
 
 func TestHandlerServesFaviconFilesAndManifest(t *testing.T) {
-	spatest.FaviconFilesAndManifest(t, Handler(""), mustDist(t))
+	spatest.FaviconFilesAndManifest(t, Handler("", DefaultUIPath, nil), mustDist(t))
 }
 
 func TestHandlerIndexIncludesFaviconLinks(t *testing.T) {
-	spatest.IndexLinksFavicons(t, Handler(""), mustDist(t), "/public/")
+	spatest.IndexLinksFavicons(t, Handler("", DefaultUIPath, nil), mustDist(t), "/public/")
 }
 
 func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
@@ -69,7 +68,7 @@ func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
 
-	serveIndex(fsys, rr, req, "")
+	serveIndex(fsys, rr, req, "", DefaultUIPath, nil)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rr.Code, http.StatusOK)
@@ -80,85 +79,42 @@ func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 	}
 }
 
-func TestResolvePublicURL(t *testing.T) {
-	tests := []struct {
-		name       string
-		configured string
-		host       string
-		fwdProto   string
-		fwdHost    string
-		tls        bool
-		want       string
-	}{
-		{
-			name:       "configured root",
-			configured: "https://example.com/",
-			host:       "ignored.example.com",
-			want:       "https://example.com/",
-		},
-		{
-			name:       "configured subpath",
-			configured: "https://example.com/public/",
-			host:       "ignored.example.com",
-			want:       "https://example.com/public/",
-		},
-		{
-			name: "auto-detect http",
-			host: "myhost.example.com",
-			want: "http://myhost.example.com/",
-		},
-		{
-			name: "auto-detect tls",
-			host: "myhost.example.com",
-			tls:  true,
-			want: "https://myhost.example.com/",
-		},
-		{
-			name:     "X-Forwarded-Proto https",
-			host:     "myhost.example.com",
-			fwdProto: "https",
-			want:     "https://myhost.example.com/",
-		},
-		{
-			name:    "X-Forwarded-Host overrides Host",
-			host:    "internal:8080",
-			fwdHost: "public.example.com",
-			want:    "http://public.example.com/",
-		},
+// Identical alternate targets are not a language signal, so every locale must
+// get its own URL, and none of them may be the base URL: that serves the admin
+// UI, not the public one.
+func TestBuildHreflang(t *testing.T) {
+	site := NewSite("https://example.com/", DefaultUIPath)
+	result := buildHreflang(site)
+
+	for _, lang := range hreflangLangs {
+		want := `<link rel="alternate" hreflang="` + lang +
+			`" href="` + site.Locale(lang) + `" />`
+		if !strings.Contains(result, want) {
+			t.Errorf("missing alternate for %q\ngot: %s", lang, result)
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/", nil)
-			req.Host = tt.host
-			if tt.fwdProto != "" {
-				req.Header.Set("X-Forwarded-Proto", tt.fwdProto)
-			}
-			if tt.fwdHost != "" {
-				req.Header.Set("X-Forwarded-Host", tt.fwdHost)
-			}
-			if tt.tls {
-				req.TLS = &tls.ConnectionState{}
-			}
-			got := resolvePublicURL(tt.configured, req)
-			if got != tt.want {
-				t.Fatalf("resolvePublicURL() = %q, want %q", got, tt.want)
-			}
-		})
+	if !strings.Contains(result, `hreflang="x-default" href="https://example.com/public/" />`) {
+		t.Errorf("x-default should name the unparameterised home page\ngot: %s", result)
+	}
+	// en shares the x-default URL instead of duplicating that page.
+	if strings.Contains(result, "?lang=en") {
+		t.Error("English should not get a second URL of its own")
+	}
+	if strings.Contains(result, `href="https://example.com/"`) {
+		t.Error("an alternate points at the site root, which serves the admin UI")
 	}
 }
 
-func TestBuildHreflang(t *testing.T) {
-	result := buildHreflang("https://example.com/")
+// Each locale URL must carry the whole alternate set, including itself, or
+// search engines discard the block.
+func TestHreflangIsSelfReferencingAndReciprocal(t *testing.T) {
+	site := NewSite("https://example.com/", DefaultUIPath)
+	block := buildHreflang(site)
 	for _, lang := range hreflangLangs {
-		if !strings.Contains(result, `hreflang="`+lang+`"`) {
-			t.Fatalf("buildHreflang missing hreflang=%q", lang)
+		// Every locale page renders the same block, so each URL appears in it.
+		if !strings.Contains(block, `href="`+site.Locale(lang)+`"`) {
+			t.Errorf("the block served at %s does not reference itself", site.Locale(lang))
 		}
-	}
-	if !strings.Contains(result, `hreflang="x-default"`) {
-		t.Fatal("buildHreflang missing x-default")
-	}
-	if !strings.Contains(result, `href="https://example.com/"`) {
-		t.Fatal("buildHreflang missing expected href")
 	}
 }
 
@@ -187,7 +143,7 @@ func TestHreflangLangsMatchShippedLocales(t *testing.T) {
 
 func TestServeIndexInjectsPlaceholders(t *testing.T) {
 	const indexHTML = `<head>` +
-		`<meta property="og:url" content="__PUBLIC_URL__" />` +
+		`<meta property="og:url" content="__OG_URL__" />` +
 		`<meta property="og:image" content="__PUBLIC_URL__android-chrome-512x512.png" />` +
 		`<!-- HREFLANG_TAGS -->` +
 		`</head>`
@@ -232,7 +188,7 @@ func TestServeIndexInjectsPlaceholders(t *testing.T) {
 			req.Host = tt.reqHost
 			rr := httptest.NewRecorder()
 
-			serveIndex(fsys, rr, req, tt.configured)
+			serveIndex(fsys, rr, req, tt.configured, DefaultUIPath, nil)
 
 			body := rr.Body.String()
 			if strings.Contains(body, "__PUBLIC_URL__") {
@@ -241,8 +197,9 @@ func TestServeIndexInjectsPlaceholders(t *testing.T) {
 			if strings.Contains(body, "<!-- HREFLANG_TAGS -->") {
 				t.Fatal("<!-- HREFLANG_TAGS --> placeholder was not replaced")
 			}
-			if !strings.Contains(body, `content="`+tt.wantURL+`"`) {
-				t.Fatalf("og:url not set to %q in body: %s", tt.wantURL, body)
+			// og:url names the public UI; og:image is served from the root.
+			if !strings.Contains(body, `content="`+tt.wantURL+`public/"`) {
+				t.Fatalf("og:url not set to %qpublic/ in body: %s", tt.wantURL, body)
 			}
 			if !strings.Contains(body, `content="`+tt.wantURL+`android-chrome-512x512.png"`) {
 				t.Fatalf("og:image not joined onto %q in body: %s", tt.wantURL, body)

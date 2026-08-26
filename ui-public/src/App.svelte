@@ -1,7 +1,7 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { t, locale, loadCatalog } from "./i18n.js";
-  import { parseHash, hashFor } from "./router.js";
+  import { parsePath, pathFor, navigate, upgradeLegacyHash, isPlainClick, readLang, writeLang } from "./router.js";
   import { getLocales, getJob, getVersion, getInfo } from "./api.js";
   import TestForm from "./lib/TestForm.svelte";
   import Progress from "./lib/Progress.svelte";
@@ -12,10 +12,13 @@
 
   const logoSrc = `${import.meta.env.BASE_URL}gonemaster.svg`;
 
+  // Before any routing: old shared links are hash-form.
+  upgradeLegacyHash();
+
   // Bumped whenever the user should be sent back to the domain input: initial
   // home load and every transition back to idle ("new test"). Starts at 0 for
   // share-link visits to a result so we don't steal focus from the result.
-  const initialView = parseHash(window.location.hash).view;
+  const initialView = parsePath(window.location.pathname).view;
   let focusSignal = $state(initialView === "home" ? 1 : 0);
 
   // Bumped when a result callout asks to test the parent zone: prefills and
@@ -111,9 +114,13 @@
   };
   const localeLabel = (code) => localeDisplayNames[code] || code;
 
-  // Stored choice → first browser-preferred catalog we ship → "en".
+  // ?lang → stored choice → first browser-preferred catalog we ship → "en".
+  // ?lang comes first so a shared link renders the language it names, matching
+  // what the server rendered for it.
   function pickInitialLocale() {
     if (typeof window === "undefined") return "en";
+    const asked = readLang().split("-")[0].toLowerCase();
+    if (localeDisplayNames[asked]) return asked;
     try {
       const stored = window.localStorage.getItem(localeKey);
       if (stored && localeDisplayNames[stored]) return stored;
@@ -161,12 +168,13 @@
     await loadCatalog(code);
     locale.set(code);
     resultLocale = code;
+    writeLang(code);
     try { window.localStorage.setItem(localeKey, code); } catch (_) {}
   }
 
   // ── Shared-link init ────────────────────────────────────────────────────────
-  async function applyHash() {
-    const { view, publicID: id } = parseHash(window.location.hash);
+  async function applyPath() {
+    const { view, publicID: id } = parsePath(window.location.pathname);
     if (view !== "result" || !id) return;
     publicID = id;
     startedHere = false;
@@ -194,10 +202,22 @@
     }
   }
 
-  function onHashChange() {
-    const { view, publicID: id } = parseHash(window.location.hash);
+  function onPopState() {
+    const { view, publicID: id } = parsePath(window.location.pathname);
     if (view === "home") resetToIdle();
-    else if (view === "result" && id && id !== publicID) applyHash();
+    else if (view === "result" && id && id !== publicID) applyPath();
+  }
+
+  // Link clicks the SPA handles itself.
+  function onHomeClick(e) {
+    if (!isPlainClick(e)) return;
+    e.preventDefault();
+    goHome();
+  }
+
+  function onSelectResult(id) {
+    navigate("result", id);
+    applyPath();
   }
 
   // ── Job handlers ────────────────────────────────────────────────────────────
@@ -210,7 +230,7 @@
     jobProgress = 0;
     resultGrade = "";
     phase = "running";
-    window.location.hash = hashFor("result", publicID).slice(1);
+    navigate("result", publicID);
   }
 
   function onJobDone(detail) {
@@ -230,8 +250,14 @@
     jobDomain = "";
     jobFinishedAt = null;
     resultGrade = "";
-    window.location.hash = hashFor("home").slice(1);
     focusSignal += 1;
+  }
+
+  // Going home from a link or "new test" moves the URL too; popstate must not
+  // push a second entry, so it calls resetToIdle directly.
+  function goHome() {
+    navigate("home");
+    resetToIdle();
   }
 
   // ── Lifecycle ───────────────────────────────────────────────────────────────
@@ -265,7 +291,7 @@
   }
 
   onMount(() => {
-    window.addEventListener("hashchange", onHashChange);
+    window.addEventListener("popstate", onPopState);
     applyTheme();
     const initial = pickInitialLocale();
     resultLocale = initial;
@@ -274,11 +300,11 @@
     fetchLocales();
     fetchVersion();
     fetchInfo();
-    applyHash();
+    applyPath();
   });
 
   onDestroy(() => {
-    window.removeEventListener("hashchange", onHashChange);
+    window.removeEventListener("popstate", onPopState);
   });
 </script>
 
@@ -286,7 +312,7 @@
   <header>
     <div class="header-text">
       <h1 class="brand-mark">
-        <a class="brand-link" href="#/">
+        <a class="brand-link" href={pathFor("home")} onclick={onHomeClick}>
           <img class="brand-logo" src={logoSrc} alt="gonemaster" />
         </a>
       </h1>
@@ -317,7 +343,7 @@
   <TestForm disabled={phase === "running"} {focusSignal} {prefillDomain} {prefillSignal} onjobcreated={onJobCreated} />
 
   {#if phase === "idle" && historyEntries.length > 0}
-    <RecentTests entries={historyEntries} locale={resultLocale} onclear={onClearHistory} />
+    <RecentTests entries={historyEntries} locale={resultLocale} onclear={onClearHistory} onselect={onSelectResult} />
   {/if}
 
   {#if phase === "running"}
@@ -340,7 +366,7 @@
         onscore={onScore}
       />
     {:else}
-      <ExpiredResult onnewtest={resetToIdle} />
+      <ExpiredResult onnewtest={goHome} />
     {/if}
   {/if}
 

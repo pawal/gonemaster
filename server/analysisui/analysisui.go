@@ -14,6 +14,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/server/internal/baseurl"
 )
 
 // mountPath is where the dashboard is served under; used to build absolute
@@ -80,24 +82,6 @@ func Handler(publicURL string) http.Handler {
 	})
 }
 
-func resolvePublicURL(configured string, r *http.Request) string {
-	if configured != "" {
-		return configured
-	}
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	if proto := r.Header.Get("X-Forwarded-Proto"); proto == "https" || proto == "http" {
-		scheme = proto
-	}
-	host := r.Host
-	if fwdHost := r.Header.Get("X-Forwarded-Host"); fwdHost != "" {
-		host = fwdHost
-	}
-	return scheme + "://" + host + "/"
-}
-
 // injectMeta fills the canonical/Open Graph placeholders in index.html with
 // URLs derived from the request. Non-JS crawlers rely on these; the client
 // refines them per route once the SPA hydrates.
@@ -154,7 +138,7 @@ func serveIndex(fsys fs.FS, w http.ResponseWriter, r *http.Request, publicURL st
 	// Inject only the deployment base, not the request path: the path is
 	// attacker-controlled and would be reflected into an HTML attribute. The
 	// client refines canonical/og:url per route once the SPA hydrates.
-	base := strings.TrimRight(resolvePublicURL(publicURL, r), "/")
+	base := strings.TrimRight(baseurl.Resolve(publicURL, r), "/")
 	ogURL := html.EscapeString(base + mountPath + "/")
 	ogImage := html.EscapeString(base + mountPath + "/og-image.png")
 	data = injectMeta(data, ogURL, ogImage)

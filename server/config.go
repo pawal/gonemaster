@@ -6,6 +6,8 @@ import (
 	"os"
 	"strings"
 	"time"
+
+	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 )
 
 // DatabaseConfig controls the persistence backend.
@@ -162,14 +164,18 @@ type Config struct {
 	ReadTimeout  Duration `json:"read_timeout"`
 	WriteTimeout Duration `json:"write_timeout"`
 	IdleTimeout  Duration `json:"idle_timeout"`
-	// PublicURL is the canonical base URL of the public UI (e.g. "https://example.com/").
-	// Used for og:url, hreflang, robots.txt, and sitemap.xml. When empty, the URL
-	// is auto-detected from the request's Host and X-Forwarded-Proto headers.
-	PublicURL string          `json:"public_url,omitempty"`
-	Database  DatabaseConfig  `json:"database"`
-	PublicAPI PublicAPIConfig `json:"public_api"`
-	Analysis  AnalysisConfig  `json:"analysis"`
-	Auth      AuthConfig      `json:"auth"`
+	// PublicURL is the site root (e.g. "https://example.com/"), not the public
+	// UI's own URL: that is PublicURL + PublicUIPath. Used for og:url, hreflang,
+	// robots.txt, and sitemap.xml. When empty, the URL is auto-detected from
+	// the request's Host and X-Forwarded-Proto headers.
+	PublicURL string `json:"public_url,omitempty"`
+	// PublicUIPath is where visitors reach the UI under PublicURL. Empty means
+	// the root. Changes advertised URLs, not where the server mounts.
+	PublicUIPath string          `json:"public_ui_path"`
+	Database     DatabaseConfig  `json:"database"`
+	PublicAPI    PublicAPIConfig `json:"public_api"`
+	Analysis     AnalysisConfig  `json:"analysis"`
+	Auth         AuthConfig      `json:"auth"`
 	// ScoringConfigPath is an optional path to a JSON file that overrides the
 	// default scoring configuration (weights, penalties, tag overrides, etc.).
 	// When empty, scoring.DefaultConfig() is used.
@@ -246,6 +252,7 @@ type FileConfig struct {
 	WriteTimeout                *string              `json:"write_timeout,omitempty"`
 	IdleTimeout                 *string              `json:"idle_timeout,omitempty"`
 	PublicURL                   *string              `json:"public_url,omitempty"`
+	PublicUIPath                *string              `json:"public_ui_path,omitempty"`
 	Database                    *DatabaseFileConfig  `json:"database,omitempty"`
 	PublicAPI                   *PublicAPIFileConfig `json:"public_api,omitempty"`
 	Analysis                    *AnalysisFileConfig  `json:"analysis,omitempty"`
@@ -274,6 +281,7 @@ func DefaultConfig() Config {
 		LogLevel:                    "info",
 		ShowScoreAdmin:              true,
 		ShowScorePublic:             true,
+		PublicUIPath:                serverpublic.DefaultUIPath,
 		ShowNameserverTimingsAdmin:  true,
 		ShowNameserverTimingsPublic: true,
 		ShowDNSSECChainPublic:       true,
@@ -410,6 +418,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.PublicURL != nil {
 		c.PublicURL = *file.PublicURL
+	}
+	if file.PublicUIPath != nil {
+		c.PublicUIPath = *file.PublicUIPath
 	}
 	if file.ScoringConfigPath != nil {
 		c.ScoringConfigPath = *file.ScoringConfigPath

@@ -1,8 +1,8 @@
 <script>
   import { t } from "../i18n.js";
-  import { hashFor } from "../router.js";
+  import { pathFor, isPlainClick } from "../router.js";
 
-  let { entries = [], locale = "en", onclear } = $props();
+  let { entries = [], locale = "en", onclear, onselect } = $props();
 
   let fmt = $derived(new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }));
 
@@ -10,6 +10,12 @@
     if (!iso) return "";
     const ms = Date.parse(iso);
     return Number.isNaN(ms) ? "" : fmt.format(ms);
+  }
+
+  function onRowClick(e, id) {
+    if (!isPlainClick(e)) return;
+    e.preventDefault();
+    onselect?.(id);
   }
 </script>
 
@@ -21,7 +27,11 @@
   <ul class="recent-list">
     {#each entries as entry (entry.id)}
       <li class="recent-row">
-        <a class="recent-domain" href={hashFor("result", entry.id)}>{entry.domain}</a>
+        <a
+          class="recent-domain"
+          href={pathFor("result", entry.id)}
+          onclick={(e) => onRowClick(e, entry.id)}
+        >{entry.domain}</a>
         <span class="recent-meta">
           {#if entry.grade}
             <span class="grade-chip-letter" data-grade={entry.grade}>{entry.grade}</span>

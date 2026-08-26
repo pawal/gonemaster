@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"codeberg.org/pawal/gonemaster/server/internal/spatest"
 )
@@ -81,19 +82,20 @@ func TestServeIndexDoesNotReflectRequestPath(t *testing.T) {
 	}
 }
 
-func TestResolvePublicURL(t *testing.T) {
-	// Configured value wins verbatim.
+// The base URL itself is resolved and tested in server/internal/baseurl; this
+// pins that a hostile Host cannot reach the injected og:url.
+func TestServeIndexRejectsHostileHost(t *testing.T) {
+	fsys := fstest.MapFS{"index.html": &fstest.MapFile{
+		Data: []byte(`<meta property="og:url" content="__ANALYSIS_OG_URL__" />`),
+	}}
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	if got := resolvePublicURL("https://canonical.example/", req); got != "https://canonical.example/" {
-		t.Fatalf("configured URL = %q, want https://canonical.example/", got)
-	}
+	req.Host = `evil"onload="alert(1)`
+	rr := httptest.NewRecorder()
 
-	// Empty config falls back to request host, honouring the forwarded proto.
-	req = httptest.NewRequest(http.MethodGet, "/", nil)
-	req.Host = "myhost.example.com"
-	req.Header.Set("X-Forwarded-Proto", "https")
-	if got := resolvePublicURL("", req); got != "https://myhost.example.com/" {
-		t.Fatalf("auto-detected URL = %q, want https://myhost.example.com/", got)
+	serveIndex(fsys, rr, req, "")
+
+	if strings.Contains(rr.Body.String(), `onload="alert(1)`) {
+		t.Fatal("hostile Host reached the page")
 	}
 }
 

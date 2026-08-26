@@ -109,6 +109,17 @@ func resultID(cleanPath string) string {
 	return rest
 }
 
+// IsBuilt reports whether the public UI assets have been embedded. False when
+// only the placeholder was committed, e.g. CI without make ui-build.
+func IsBuilt() bool {
+	fsys, err := dist()
+	if err != nil {
+		return false
+	}
+	_, err = fs.Stat(fsys, "index.html")
+	return err == nil
+}
+
 func dist() (fs.FS, error) {
 	distOnce.Do(func() {
 		distSub, distErr = fs.Sub(distFS, "dist")

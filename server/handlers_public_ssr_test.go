@@ -168,8 +168,13 @@ func TestPublicResultLookupLocalizesMessages(t *testing.T) {
 	}
 }
 
-// End to end through the mux: the result path must render server-side.
+// End to end through the mux: the result path must render server-side. Only
+// exercised with the SPA embedded; the placeholder build serves a static
+// unavailable page instead.
 func TestPublicUIServesRenderedResultPage(t *testing.T) {
+	if !serverpublic.IsBuilt() {
+		t.Skip("public UI dist not built; the render path is not exercised")
+	}
 	srv := newTestServer(t)
 	job := seedPublicJob(t, srv, JobSucceeded, []engine.LogEntry{
 		{Module: "ZONE", Testcase: "zone01", Tag: "Z_RETRY_MINIMUM_VALUE_LOWER", Level: "WARNING"},
@@ -187,6 +192,9 @@ func TestPublicUIServesRenderedResultPage(t *testing.T) {
 }
 
 func TestPublicUIUnknownResultIs404(t *testing.T) {
+	if !serverpublic.IsBuilt() {
+		t.Skip("public UI dist not built; the unavailable page answers 200")
+	}
 	srv := newTestServer(t)
 
 	rr := doJSON(t, srv, http.MethodGet, "/public/result/nosuchid", nil)

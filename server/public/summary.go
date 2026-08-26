@@ -21,8 +21,23 @@ func HomeURL(base string) string {
 	return base + "public/"
 }
 
+// English shares the x-default URL rather than duplicating it under ?lang=en.
 func LocaleURL(base, locale string) string {
+	if locale == "" || locale == "en" {
+		return HomeURL(base)
+	}
 	return HomeURL(base) + "?lang=" + locale
+}
+
+// PageURLs is every distinct indexable public UI URL.
+func PageURLs(base string) []string {
+	urls := []string{HomeURL(base)}
+	for _, lang := range hreflangLangs {
+		if u := LocaleURL(base, lang); u != HomeURL(base) {
+			urls = append(urls, u)
+		}
+	}
+	return urls
 }
 
 const MaxSummaryFindings = 25

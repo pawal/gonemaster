@@ -85,20 +85,19 @@ func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {
 func TestBuildHreflang(t *testing.T) {
 	result := buildHreflang("https://example.com/")
 
-	seen := map[string]string{}
 	for _, lang := range hreflangLangs {
 		want := `<link rel="alternate" hreflang="` + lang +
-			`" href="https://example.com/public/?lang=` + lang + `" />`
+			`" href="` + LocaleURL("https://example.com/", lang) + `" />`
 		if !strings.Contains(result, want) {
 			t.Errorf("missing alternate for %q\ngot: %s", lang, result)
 		}
-		seen[lang] = want
-	}
-	if len(seen) != len(hreflangLangs) {
-		t.Errorf("duplicate locales in the alternate set")
 	}
 	if !strings.Contains(result, `hreflang="x-default" href="https://example.com/public/" />`) {
 		t.Errorf("x-default should name the unparameterised home page\ngot: %s", result)
+	}
+	// en shares the x-default URL instead of duplicating that page.
+	if strings.Contains(result, "?lang=en") {
+		t.Error("English should not get a second URL of its own")
 	}
 	if strings.Contains(result, `href="https://example.com/"`) {
 		t.Error("an alternate points at the site root, which serves the admin UI")

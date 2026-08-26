@@ -1406,9 +1406,8 @@ func TestSitemapAlternatesAreReciprocal(t *testing.T) {
 	rr := doJSON(t, srv, http.MethodGet, "/sitemap.xml", nil, withHost("ignored.example.com"))
 	wantStatus(t, rr, http.StatusOK)
 
-	langs := serverpublic.ShippedLocales()
-	wantURLs := append([]string{serverpublic.HomeURL("https://example.com/")},
-		localeURLs("https://example.com/", langs)...)
+	const base = "https://example.com/"
+	wantURLs := serverpublic.PageURLs(base)
 
 	blocks := strings.Split(rr.Body.String(), "<url>")[1:]
 	found := 0
@@ -1418,7 +1417,7 @@ func TestSitemapAlternatesAreReciprocal(t *testing.T) {
 			continue
 		}
 		found++
-		for _, want := range append(wantURLs[1:], serverpublic.HomeURL("https://example.com/")) {
+		for _, want := range wantURLs {
 			if !strings.Contains(block, `href="`+want+`"`) {
 				t.Errorf("the <url> for %s does not list %s as an alternate", loc, want)
 			}
@@ -1426,5 +1425,20 @@ func TestSitemapAlternatesAreReciprocal(t *testing.T) {
 	}
 	if found != len(wantURLs) {
 		t.Errorf("found %d public UI <url> entries, want %d", found, len(wantURLs))
+	}
+}
+
+// English shares the x-default URL, so it gets no <url> of its own.
+func TestSitemapHasNoEnglishQueryURL(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(cfg *Config) { cfg.PublicURL = "https://example.com/" }))
+	rr := doJSON(t, srv, http.MethodGet, "/sitemap.xml", nil, withHost("ignored.example.com"))
+	wantStatus(t, rr, http.StatusOK)
+
+	body := rr.Body.String()
+	if strings.Contains(body, "?lang=en") {
+		t.Error("sitemap.xml duplicates the default page under ?lang=en")
+	}
+	if got := strings.Count(body, "<loc>https://example.com/public/</loc>"); got != 1 {
+		t.Errorf("the default page is listed %d times, want 1", got)
 	}
 }

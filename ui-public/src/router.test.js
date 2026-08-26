@@ -108,6 +108,23 @@ describe("navigate", () => {
     navigate("home");
     expect(window.location.pathname).toBe("/public/");
   });
+
+  // Losing the query here dropped the chosen language on every navigation.
+  it("carries the query along", () => {
+    goTo("/public/?lang=sv");
+    navigate("result", "abc12345");
+    expect(window.location.pathname).toBe("/public/result/abc12345");
+    expect(readLang()).toBe("sv");
+
+    navigate("home");
+    expect(window.location.pathname).toBe("/public/");
+    expect(readLang()).toBe("sv");
+  });
+
+  it("adds no query when there was none", () => {
+    navigate("result", "abc12345");
+    expect(window.location.search).toBe("");
+  });
 });
 
 // Links shared before the move to path routing are hash-form and must resolve.

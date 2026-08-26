@@ -988,7 +988,7 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	b.WriteString("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
 	b.WriteString("<urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"\n")
 	b.WriteString("        xmlns:xhtml=\"http://www.w3.org/1999/xhtml\">\n")
-	for _, loc := range append([]string{serverpublic.HomeURL(base)}, localeURLs(base, langs)...) {
+	for _, loc := range serverpublic.PageURLs(base) {
 		b.WriteString("  <url>\n")
 		fmt.Fprintf(&b, "    <loc>%s</loc>\n", xmlEscape(loc))
 		alternates(&b)
@@ -1004,14 +1004,6 @@ func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/xml; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	fmt.Fprint(w, b.String())
-}
-
-func localeURLs(base string, langs []string) []string {
-	urls := make([]string, 0, len(langs))
-	for _, lang := range langs {
-		urls = append(urls, serverpublic.LocaleURL(base, lang))
-	}
-	return urls
 }
 
 func xmlEscape(s string) string {

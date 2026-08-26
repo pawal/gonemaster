@@ -146,20 +146,15 @@ type page struct {
 	summary     string
 }
 
-// homePage describes the public UI landing page. An empty locale means the
-// x-default URL, which answers in English.
 func homePage(base, locale string) page {
-	url := HomeURL(base)
-	if locale != "" {
-		url = LocaleURL(base, locale)
-	} else {
+	if locale == "" {
 		locale = "en"
 	}
 	return page{
 		title:       "Gonemaster",
 		description: textFor(locale).homeDescription,
 		lang:        locale,
-		url:         url,
+		url:         LocaleURL(base, locale),
 		hreflang:    buildHreflang(base),
 	}
 }

@@ -393,6 +393,36 @@ describe("App", () => {
       expect((await localeSelect()).value).toBe("da");
     });
 
+    // A shared ?lang link used to lose its language at the first navigation.
+    it("keeps ?lang in the URL when a test is started", async () => {
+      goTo("/public/?lang=sv");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/abc12345", jobResp("succeeded", "example.com", 100)],
+        ["/jobs", jsonResponse({ public_id: "abc12345" })],
+      ]);
+      render(App);
+      await fireEvent.input(screen.getByLabelText("Domän"), { target: { value: "example.com" } });
+      await fireEvent.click(screen.getByRole("button", { name: "Testa" }));
+      await waitFor(() => expect(window.location.pathname).toBe("/public/result/abc12345"));
+      expect(new URLSearchParams(window.location.search).get("lang")).toBe("sv");
+    });
+
+    it("keeps ?lang when the logo sends us home", async () => {
+      goTo("/public/result/abc12345?lang=sv");
+      fetchRouter([
+        ["/locales", multiLocalesResp],
+        ["jobs/abc12345/result", resultResp()],
+        ["/jobs/", jobResp("succeeded", "example.com", 100)],
+      ]);
+      render(App);
+      await waitFor(() => screen.getByTestId("results-view"));
+      await clickHome();
+      expect(window.location.pathname).toBe("/public/");
+      expect(new URLSearchParams(window.location.search).get("lang")).toBe("sv");
+    });
+
     // The URL stays shareable, and a ?lang link renders the same server-side.
     it("puts the chosen locale in the URL without leaving the page", async () => {
       goTo("/public/result/abc12345");

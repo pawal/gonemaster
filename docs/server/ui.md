@@ -28,6 +28,18 @@ Path: `/public/`
 The public test UI lets an end user submit one domain test and retrieve the
 result through the restricted public API.
 
+A result lives at `/public/result/<public_id>`. That path reaches the server, so
+a shared link previews with the domain and grade, and clients without scripts
+get a rendered summary in the `<noscript>` block. Result pages are `noindex`.
+An unknown or expired id answers 404; one still running answers 200.
+
+Links of the older `/public/#/result/<public_id>` form still resolve; the app
+rewrites them on load.
+
+`?lang=xx` selects the language and gives each locale a shareable URL, which is
+what the `hreflang` tags and `sitemap.xml` advertise. English shares the plain
+`/public/` URL. Without scripts only the page metadata is localized.
+
 When a signed zone is tested, the result page shows a collapsed "DNSSEC chain of
 trust" section. Expanding it lazily fetches the stored chain summary and draws a
 hand-rolled SVG graph of the parent DS records, the zone's DNSKEYs, and the

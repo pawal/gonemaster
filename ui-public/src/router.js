@@ -16,9 +16,9 @@ export function pathFor(view, publicID = null) {
   return BASE;
 }
 
-// Callers update app state themselves; no event is dispatched.
+// Keeps the query so ?lang survives. Callers update app state themselves.
 export function navigate(view, publicID = null) {
-  window.history.pushState(null, "", pathFor(view, publicID));
+  window.history.pushState(null, "", pathFor(view, publicID) + window.location.search);
 }
 
 export function parseHash(hash) {

@@ -1,12 +1,26 @@
-/**
- * Minimal hash router for the public UI.
- *
- * Routes:
- *   #/              → { view: "home",   publicID: null }
- *   #/result/:id    → { view: "result", publicID: id  }
- */
+// Routes: BASE is home, BASE + "result/:id" is a result. Hash forms are legacy.
 
-/** Parse a location.hash string into a route object. */
+// Vite's base and the server's mount point. Not import.meta.env.BASE_URL:
+// vitest reports "/" for it. Pinned by router.test.js.
+export const BASE = "/public/";
+
+export function parsePath(pathname) {
+  const rest = String(pathname ?? "").startsWith(BASE) ? String(pathname).slice(BASE.length) : "";
+  const m = rest.match(/^result\/([A-Za-z0-9]+)\/?$/);
+  if (m) return { view: "result", publicID: m[1] };
+  return { view: "home", publicID: null };
+}
+
+export function pathFor(view, publicID = null) {
+  if (view === "result" && publicID) return `${BASE}result/${publicID}`;
+  return BASE;
+}
+
+// Callers update app state themselves; no event is dispatched.
+export function navigate(view, publicID = null) {
+  window.history.pushState(null, "", pathFor(view, publicID));
+}
+
 export function parseHash(hash) {
   const path = hash.startsWith("#") ? hash.slice(1) : hash;
   const m = path.match(/^\/result\/([A-Za-z0-9]+)$/);
@@ -14,13 +28,22 @@ export function parseHash(hash) {
   return { view: "home", publicID: null };
 }
 
-/** Build the hash string for a given view + optional publicID. */
 export function hashFor(view, publicID = null) {
   if (view === "result" && publicID) return `#/result/${publicID}`;
   return "#/";
 }
 
-/** Navigate to a view by setting location.hash. */
-export function navigate(view, publicID = null) {
-  window.location.hash = hashFor(view, publicID).slice(1);
+// Rewrites an old #/result/:id link to the path form. A path route wins.
+export function upgradeLegacyHash() {
+  const { view, publicID } = parseHash(window.location.hash);
+  if (view !== "result") return false;
+  if (parsePath(window.location.pathname).view !== "home") return false;
+  window.history.replaceState(null, "", pathFor("result", publicID) + window.location.search);
+  return true;
+}
+
+// Middle- and modified clicks must still open a new tab, so only plain ones
+// are intercepted.
+export function isPlainClick(event) {
+  return event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
 }

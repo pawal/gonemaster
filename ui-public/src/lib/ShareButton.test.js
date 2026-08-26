@@ -27,7 +27,23 @@ describe("ShareButton", () => {
     render(ShareButton, { props: { publicID: "abc12345" } });
     await fireEvent.click(screen.getByTestId("share-button"));
     await waitFor(() => expect(write).toHaveBeenCalledWith(
-      "https://example.com/public/#/result/abc12345"
+      "https://example.com/public/result/abc12345"
+    ));
+  });
+
+  // Built from the base path, so sharing from a result page cannot nest paths.
+  it("builds the same URL when shared from a result page", async () => {
+    Object.defineProperty(window, "location", {
+      value: { origin: "https://example.com", pathname: "/public/result/other999" },
+      writable: true,
+      configurable: true,
+    });
+    const write = vi.fn().mockResolvedValue(undefined);
+    Object.assign(navigator, { clipboard: { writeText: write } });
+    render(ShareButton, { props: { publicID: "abc12345" } });
+    await fireEvent.click(screen.getByTestId("share-button"));
+    await waitFor(() => expect(write).toHaveBeenCalledWith(
+      "https://example.com/public/result/abc12345"
     ));
   });
 

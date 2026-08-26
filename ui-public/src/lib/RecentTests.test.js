@@ -14,9 +14,50 @@ describe("RecentTests", () => {
     const links = screen.getAllByRole("link");
     expect(links).toHaveLength(2);
     expect(links[0].textContent).toBe("example.org");
-    expect(links[0].getAttribute("href")).toBe("#/result/id2");
+    expect(links[0].getAttribute("href")).toBe("/public/result/id2");
     expect(links[1].textContent).toBe("example.com");
-    expect(links[1].getAttribute("href")).toBe("#/result/id1");
+    expect(links[1].getAttribute("href")).toBe("/public/result/id1");
+  });
+
+  // Clicks a row, reports whether the component prevented the navigation, and
+  // stops jsdom from trying to follow the href.
+  const clickRow = async (link, init = {}) => {
+    let prevented = null;
+    const swallow = (e) => {
+      prevented = e.defaultPrevented;
+      e.preventDefault();
+    };
+    document.addEventListener("click", swallow);
+    await fireEvent(link, new MouseEvent("click", {
+      bubbles: true, cancelable: true, button: 0, ...init,
+    }));
+    document.removeEventListener("click", swallow);
+    return prevented;
+  };
+
+  // A real href for new-tab opening, but a plain click stays in the SPA.
+  it("fires onselect for a plain left click and suppresses the navigation", async () => {
+    const onselect = vi.fn();
+    render(RecentTests, { entries: ENTRIES, locale: "en", onselect });
+    expect(await clickRow(screen.getAllByRole("link")[0])).toBe(true);
+    expect(onselect).toHaveBeenCalledWith("id2");
+  });
+
+  it.each([
+    ["middle click", { button: 1 }],
+    ["ctrl-click", { ctrlKey: true }],
+    ["meta-click", { metaKey: true }],
+    ["shift-click", { shiftKey: true }],
+  ])("leaves %s to the browser so it opens a new tab", async (_name, init) => {
+    const onselect = vi.fn();
+    render(RecentTests, { entries: ENTRIES, locale: "en", onselect });
+    expect(await clickRow(screen.getAllByRole("link")[0], init)).toBe(false);
+    expect(onselect).not.toHaveBeenCalled();
+  });
+
+  it("does not throw when no onselect handler is given", async () => {
+    render(RecentTests, { entries: ENTRIES, locale: "en" });
+    expect(await clickRow(screen.getAllByRole("link")[0])).toBe(true);
   });
 
   it("renders the grade chip only for entries that have a grade", () => {

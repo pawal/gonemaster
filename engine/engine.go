@@ -333,6 +333,14 @@ func normalizeRequest(req RunRequest) (string, []string, error) {
 		return "", nil, fmt.Errorf("unknown module %q: %w", req.Module, ErrNotImplemented)
 	}
 
+	// Checked here as well as in convertEntries so a bad level fails before
+	// the run instead of after it.
+	if minLevel := strings.ToUpper(strings.TrimSpace(req.MinLevel)); minLevel != "" {
+		if _, ok := logger.Levels()[minLevel]; !ok {
+			return "", nil, fmt.Errorf("unknown min level %q", req.MinLevel)
+		}
+	}
+
 	testcases := make([]string, 0, len(req.Testcases))
 	seen := map[string]bool{}
 	for _, raw := range req.Testcases {

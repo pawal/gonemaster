@@ -110,3 +110,61 @@ func TestCaptureMinLevelRejectsUnknownLevel(t *testing.T) {
 		t.Fatal("an unknown capture min level should fail the run")
 	}
 }
+
+func TestNormalizeRequestRejectsUnknownMinLevel(t *testing.T) {
+	tests := []struct {
+		name     string
+		minLevel string
+		wantErr  bool
+	}{
+		{name: "empty is the caller default", minLevel: ""},
+		{name: "canonical", minLevel: "WARNING"},
+		{name: "lowercase", minLevel: "warning"},
+		{name: "padded", minLevel: "  Notice  "},
+		{name: "debug3 is a real level", minLevel: "DEBUG3"},
+		{name: "unknown name", minLevel: "bogus", wantErr: true},
+		{name: "numeric", minLevel: "3", wantErr: true},
+		{name: "near miss", minLevel: "WARN", wantErr: true},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			_, _, err := normalizeRequest(RunRequest{
+				Domain:    "example.com",
+				Testcases: []string{"syntax01"},
+				MinLevel:  tc.minLevel,
+			})
+			if tc.wantErr && err == nil {
+				t.Fatalf("MinLevel %q was accepted", tc.minLevel)
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("MinLevel %q was rejected: %v", tc.minLevel, err)
+			}
+		})
+	}
+}
+
+// A bad level used to surface only in convertEntries, after the whole run had
+// already spent its queries. No testcase may execute now.
+func TestRunRejectsUnknownMinLevelBeforeRunning(t *testing.T) {
+	runner := newTestRunner(t, withRunLimits(4))
+	runner.Profile.NoNetwork = true
+
+	entries, err := RunWithRunner(RunRequest{
+		Domain:    "example.com",
+		Testcases: []string{"syntax01", "basic01"},
+		MinLevel:  "bogus",
+	}, runner)
+
+	if err == nil {
+		t.Fatal("expected an error for an unknown min level")
+	}
+	if entries != nil {
+		t.Fatalf("expected no entries, got %d", len(entries))
+	}
+	// Only the UNKNOWN_METHOD marker from the error branch may be logged.
+	for _, e := range runner.Logger.Entries() {
+		if e.Tag != "UNKNOWN_METHOD" {
+			t.Fatalf("run produced %q, so a testcase executed", e.Tag)
+		}
+	}
+}

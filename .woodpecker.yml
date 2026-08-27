@@ -1,3 +1,7 @@
+# Share the Go caches across steps via the workspace volume.
+variables:
+  - &go_cache export GOCACHE="$CI_WORKSPACE/.gocache" GOMODCACHE="$CI_WORKSPACE/.gomodcache"
+
 services:
   postgres:
     image: postgres:17
@@ -18,43 +22,35 @@ services:
       MARIADB_ROOT_PASSWORD: root
 
 steps:
+  # All three build into server/*/dist; a missing one skips its Go tests.
   ui_checks:
     image: node:22-bookworm
     commands:
       - npm --prefix ui ci
+      - npm --prefix ui-public ci
+      - npm --prefix analysis-ui ci
       - npm --prefix ui run test
+      - npm --prefix ui-public run test
+      - npm --prefix analysis-ui run test
       - npm --prefix ui run build
+      - npm --prefix ui-public run build
+      - npm --prefix analysis-ui run build
+      - make spec-check-node
 
-  spec_check:
+  static_checks:
     image: golang:1.27
     commands:
-      - go run ./tools/specifications/validate
-      - go run ./tools/specifications/generate-tag-catalog --check
-      - go run ./tools/specifications/export-log-args --check --check-coherency
-      - go run ./tools/i18n/check-placeholders
-
-  architecture_check:
-    image: golang:1.27
-    commands:
-      - go run ./tools/architecture-check
-
-  gofmt_check:
-    image: golang:1.27
-    commands:
-      - |
-        set -eu
-        unformatted=$(gofmt -l $(git ls-files '*.go'))
-        if [ -n "$unformatted" ]; then
-          echo "These files are not gofmt-clean:"
-          echo "$unformatted"
-          exit 1
-        fi
+      - *go_cache
+      - make fmt-check
+      - make architecture-check
+      - make spec-check-go
 
   go_test:
     image: golang:1.27
     depends_on:
       - ui_checks
     commands:
+      - *go_cache
       - go test ./...
 
   # -race requires cgo, so this step must stay on the Debian-based golang
@@ -62,6 +58,7 @@ steps:
   race_test:
     image: golang:1.27
     commands:
+      - *go_cache
       - make race-ci
 
   integration_test:
@@ -72,6 +69,7 @@ steps:
       TEST_POSTGRES_DSN: postgres://gonemaster:gonemaster@postgres/gonemaster_test?sslmode=disable
       TEST_MARIADB_DSN: gonemaster:gonemaster@tcp(mariadb:3306)/gonemaster_test
     commands:
+      - *go_cache
       - bash -c 'i=0; until echo > /dev/tcp/postgres/5432 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done'
       - bash -c 'i=0; until echo > /dev/tcp/mariadb/3306 2>/dev/null || [ $i -ge 30 ]; do i=$((i+1)); sleep 1; done'
       # Keep the timeout in step with the Makefile's test-integration target.
@@ -82,6 +80,7 @@ steps:
     depends_on:
       - ui_checks
     commands:
+      - *go_cache
       - go build -trimpath -o /tmp/gonemaster-server ./cmd/gonemaster-server
 
   deploy_pages:
@@ -89,7 +88,7 @@ steps:
     depends_on:
       - integration_test
       - build_server_with_ui
-      - spec_check
+      - static_checks
       - race_test
     environment:
       CODEBERG_PAGES_TOKEN:

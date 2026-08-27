@@ -47,3 +47,7 @@
 
 # Packaging build output (cross-compiled binaries + .deb/.rpm)
 /dist/
+
+# CI Go caches, shared between pipeline steps via the workspace
+/.gocache/
+/.gomodcache/

@@ -352,16 +352,25 @@ The tags compose: `-tags "nogui badkeys_embed"` is a valid build.
 
 Default pipeline (every push and pull request):
 
-1. `ui_checks` - lint, test, and build the admin UI.
-2. `spec_check` - validate testcase specs; check tag catalog, log
-   args, and i18n placeholder drift.
-3. `go_test` - `go test ./...` with `GOMAXPROCS=4`.
-4. `integration_test` - server tests against PostgreSQL 17 and
+1. `ui_checks` - test and build all three frontends, then
+   `make spec-check-node`. All three must be built: the Go embeds
+   read `server/*/dist`, and a missing one silently skips the
+   public SSR and analysis-UI CSP tests.
+2. `static_checks` - `make fmt-check`, `make architecture-check`,
+   and `make spec-check-go`.
+3. `go_test` - `go test ./...`.
+4. `race_test` - `make race-ci`, the engine tree plus the
+   concurrency-sensitive server tests under `-race`.
+5. `integration_test` - server tests against PostgreSQL 17 and
    MariaDB 11 services started in-pipeline.
-5. `build_server_with_ui` - confirm `gonemaster-server` builds with
+6. `build_server_with_ui` - confirm `gonemaster-server` builds with
    UI embedding.
-6. `deploy_pages` (main branch only) - build the Hugo docs site and
+7. `deploy_pages` (main branch only) - build the Hugo docs site and
    force-push to `codeberg.org/pawal/gonemaster:pages`.
+
+Every Go step points `GOCACHE` and `GOMODCACHE` at the shared
+workspace volume, so steps that start later reuse the compiled
+dependency graph instead of rebuilding it.
 
 A second pipeline for release artifacts is declared in
 [.woodpecker.yml](../.woodpecker.yml) but has not yet been
@@ -617,7 +626,7 @@ runs `ui-test`, `ui-public-test`, `test-go`, `spec-check`, and
 
 ### Spec coherency
 
-`make spec-check` runs four substeps; any drift is a CI failure,
+`make spec-check` runs six substeps; any drift is a CI failure,
 not a warning:
 
 1. `spec-validate` - canonical testcase specs match implementation
@@ -630,6 +639,16 @@ not a warning:
    `make spec-export-log-args`.
 4. `spec-check-i18n-placeholders` - i18n template placeholders are
    on the allowlist; no legacy placeholders sneak in.
+5. `spec-check-testcase-descriptions` - the site testcase
+   description data file matches the specs.
+6. `spec-check-ui-explanations` - `ui-public` `en.json` matches the
+   ui-explanations markdown.
+
+The first five need only Go and are grouped as `spec-check-go`; the
+last needs node and is `spec-check-node`. CI runs each half in the
+image that has the toolchain, so both stay reachable from the one
+`make spec-check` definition rather than being restated in
+[.woodpecker.yml](../.woodpecker.yml).
 
 Each substep is runnable in isolation for fix-and-recheck loops.
 
@@ -687,11 +706,11 @@ the verification path used by CI.
 
 ### Enforcement
 
-CI runs `make spec-check` on every commit
-([.woodpecker.yml](../.woodpecker.yml)). The four substeps already
-listed in [Chapter 11](#11-testing-strategy) apply: spec
-validation, tag catalog drift, log-args inventory coherency, i18n
-placeholder allowlist. Drift in any of them is a build failure.
+CI runs `make spec-check-go` and `make spec-check-node` on every
+commit ([.woodpecker.yml](../.woodpecker.yml)), which together are
+`make spec-check`. The six substeps listed in
+[Chapter 11](#11-testing-strategy) apply. Drift in any of them is a
+build failure.
 
 After any change to `appendLog*`, message tags, or testcase
 metadata, the change author runs `make spec-check` locally before

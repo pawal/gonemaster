@@ -24,6 +24,7 @@ CMD ?= all
 	spec-export-implemented spec-export-tags spec-export spec-validate spec-validate-scan spec-check \
 	spec-export-testcase-descriptions spec-check-testcase-descriptions \
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-log-args spec-check-i18n-placeholders \
+	spec-check-go spec-check-node \
 	spec-check-ui-explanations \
 	architecture-check badkeys-update badkeys-update-embed man man-gz clean-man \
 	package-binaries package-deb package-rpm packages clean-packages
@@ -69,7 +70,9 @@ help:
 	@echo "  spec-check-log-args  Check the log argument inventory is up to date, plus the coherency guardrails"
 	@echo "  spec-check-i18n-placeholders  Verify placeholder parity and reject non-allowlisted legacy placeholders"
 	@echo "  spec-check-ui-explanations  Check ui-public en.json is in sync with the ui-explanations markdown"
-	@echo "  spec-check         Run spec-validate + spec-check-tags + log-args + i18n placeholder + testcase-description + ui-explanations checks"
+	@echo "  spec-check-go      The spec checks that only need the Go toolchain"
+	@echo "  spec-check-node    The spec checks that need node"
+	@echo "  spec-check         Run spec-check-go + spec-check-node"
 	@echo "  architecture-check Verify docs/architecture.md against cmd/, build tags, drivers, and the Last reviewed date"
 	@echo "  docs             Build the documentation site (writes site/public/)"
 	@echo "  docs-serve       Serve the documentation site locally"
@@ -270,7 +273,7 @@ install-gonemaster-mcp:
 vet:
 	$(GO) vet ./...
 
-# Same check CI runs in the gofmt_check step.
+# Same check CI runs in the static_checks step.
 fmt-check:
 	@unformatted=$$(gofmt -l $$(git ls-files '*.go')); \
 	if [ -n "$$unformatted" ]; then \
@@ -331,7 +334,12 @@ spec-check-i18n-placeholders:
 spec-check-ui-explanations:
 	node tools/i18n/sync-ui-explanations.mjs --check
 
-spec-check: spec-validate spec-check-tags spec-check-log-args spec-check-i18n-placeholders spec-check-testcase-descriptions spec-check-ui-explanations
+# Split by toolchain so CI can run each half in the image that has the tools.
+spec-check-go: spec-validate spec-check-tags spec-check-log-args spec-check-i18n-placeholders spec-check-testcase-descriptions
+
+spec-check-node: spec-check-ui-explanations
+
+spec-check: spec-check-go spec-check-node
 
 architecture-check:
 	GOOS= GOARCH= $(GO) run ./tools/architecture-check

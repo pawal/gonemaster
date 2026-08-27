@@ -223,7 +223,8 @@ func (s *Server) ReloadAuth(cfg AuthConfig) error {
 // Handler returns the root HTTP handler. Request-ID and access-log middleware
 // are applied per API surface in routes(), not here.
 func (s *Server) Handler() http.Handler {
-	return securityHeadersMiddleware(gzipMiddleware(s.mux))
+	return stripUntrustedForwardedHeaders(s.trustedProxies,
+		securityHeadersMiddleware(gzipMiddleware(s.mux)))
 }
 
 // Store exposes the configured job store for optional integration layers.

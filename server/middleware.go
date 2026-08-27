@@ -18,6 +18,20 @@ import (
 
 const debugBodyLimit = 4096
 
+var forwardedHeaders = []string{"X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto"}
+
+// stripUntrustedForwardedHeaders drops forwarded headers from untrusted peers.
+func stripUntrustedForwardedHeaders(trusted []netip.Prefix, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !remoteIsTrusted(r.RemoteAddr, trusted) {
+			for _, h := range forwardedHeaders {
+				r.Header.Del(h)
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 type responseRecorder struct {
 	http.ResponseWriter
 	status    int

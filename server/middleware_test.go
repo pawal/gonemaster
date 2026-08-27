@@ -411,3 +411,75 @@ func TestRecoverMiddlewareDoesNotSwallowErrAbortHandler(t *testing.T) {
 	doHandler(t, srv.recoverMiddleware(panicker), http.MethodGet, "/whatever", nil)
 	t.Fatal("expected panic to propagate")
 }
+
+// The forwarded headers reach a consumer only from a configured proxy, so a
+// direct client cannot spoof its scheme, client IP, or the canonical host.
+func TestStripUntrustedForwardedHeaders(t *testing.T) {
+	tests := []struct {
+		name     string
+		trusted  []string
+		remote   string
+		wantKept bool
+	}{
+		{name: "untrusted peer", remote: untrustedAddr},
+		{name: "no trusted proxies configured", remote: trustedProxyAddr},
+		{
+			name:     "trusted proxy",
+			trusted:  []string{"127.0.0.1/32"},
+			remote:   trustedProxyAddr,
+			wantKept: true,
+		},
+		{
+			name:    "peer outside the trusted range",
+			trusted: []string{"127.0.0.1/32"},
+			remote:  untrustedAddr,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var seen http.Header
+			handler := stripUntrustedForwardedHeaders(parseTrustedProxies(tc.trusted),
+				http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+					seen = r.Header.Clone()
+				}))
+
+			doHandler(t, handler, http.MethodGet, "/", nil,
+				withRemoteAddr(tc.remote),
+				withHeader("X-Forwarded-For", "198.51.100.9"),
+				withHeader("X-Forwarded-Host", "evil.example"),
+				withHeader("X-Forwarded-Proto", "https"))
+
+			for _, h := range forwardedHeaders {
+				got := seen.Get(h)
+				if tc.wantKept && got == "" {
+					t.Errorf("%s was stripped, want it forwarded from a trusted proxy", h)
+				}
+				if !tc.wantKept && got != "" {
+					t.Errorf("%s = %q, want it stripped", h, got)
+				}
+			}
+		})
+	}
+}
+
+// Other headers must survive, or the middleware would be breaking requests.
+func TestStripUntrustedForwardedHeadersLeavesOtherHeaders(t *testing.T) {
+	var seen http.Header
+	handler := stripUntrustedForwardedHeaders(nil,
+		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
+			seen = r.Header.Clone()
+		}))
+
+	doHandler(t, handler, http.MethodGet, "/", nil,
+		withRemoteAddr(untrustedAddr),
+		withHeader("X-Forwarded-For", "198.51.100.9"),
+		withHeader("Origin", "https://real.example"))
+
+	if got := seen.Get("Origin"); got != "https://real.example" {
+		t.Fatalf("Origin = %q, want it untouched", got)
+	}
+	if got := seen.Get("X-Forwarded-For"); got != "" {
+		t.Fatalf("X-Forwarded-For = %q, want it stripped", got)
+	}
+}

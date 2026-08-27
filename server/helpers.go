@@ -9,9 +9,8 @@ import (
 func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	enc := json.NewEncoder(w)
-	enc.SetEscapeHTML(false)
-	_ = enc.Encode(payload)
+	// HTML escaping stays on: error bodies echo user input verbatim.
+	_ = json.NewEncoder(w).Encode(payload)
 }
 
 func readJSON(r *http.Request, maxBodySize int64, dst any) error {

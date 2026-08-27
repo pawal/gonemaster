@@ -75,6 +75,12 @@ honoured when the request's `RemoteAddr` falls inside one of the CIDRs listed
 in `trusted_proxy_cidrs`; from there the chain is walked right-to-left and
 the first untrusted hop is taken as the client.
 
+`X-Forwarded-Host` and `X-Forwarded-Proto` follow the same rule: all three
+headers are removed from requests that do not come from a trusted proxy. With
+`public_url` unset the server builds its canonical URL from those headers, and
+that URL appears in `robots.txt`, `sitemap.xml`, and the `canonical` and
+`og:url` tags of cached result pages. Set `public_url` to skip auto-detection.
+
 ### What goes in `trusted_proxy_cidrs`
 
 The IP address that **gonemaster-server sees** when the reverse proxy connects

@@ -501,10 +501,11 @@ internet exposure. Configure with `public_api.rate_limit_enabled`,
 ### Trusted proxies
 
 `trusted_proxy_cidrs` lists the CIDRs of reverse proxies allowed to
-set `X-Forwarded-For`. The default is empty: with no trusted
-proxies, the server uses `RemoteAddr` and ignores
-`X-Forwarded-For`. Set this to the proxy's IP or CIDR before
-relying on rate limiting or per-client logs in a public deployment.
+set `X-Forwarded-For`, `X-Forwarded-Host`, and `X-Forwarded-Proto`.
+The default is empty: with no trusted proxies the server removes all
+three and uses `RemoteAddr`, `Host`, and the connection scheme. Set
+this to the proxy's IP or CIDR before relying on rate limiting,
+per-client logs, or canonical URL auto-detection.
 
 ### Secrets
 

@@ -130,6 +130,9 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
+	if !validateMinLevel(w, req.MinLevel) {
+		return
+	}
 	if !s.cfg.PublicAPI.AllowPrivateUndelegatedIP {
 		for i, ns := range undelegatedNS {
 			if blocked, reason := isBlockedPublicNameserverIP(ns.IP); blocked {

@@ -505,3 +505,53 @@ func TestPublicCreateJobAcceptsIPv4Disabled(t *testing.T) {
 		t.Fatal("expected job.IPv4Disabled=true")
 	}
 }
+
+// min_level is checked at submit time on every create path.
+func TestCreateJobRejectsUnknownMinLevel(t *testing.T) {
+	paths := []struct {
+		name string
+		path string
+		body func(minLevel string) map[string]any
+		ok   int
+	}{
+		{
+			name: "public",
+			path: "/pub/api/v1/jobs",
+			body: func(l string) map[string]any {
+				return map[string]any{"domain": "example.com", "min_level": l}
+			},
+			ok: http.StatusCreated,
+		},
+		{
+			name: "admin",
+			path: "/api/v1/jobs",
+			body: func(l string) map[string]any {
+				return map[string]any{"domain": "example.com", "min_level": l}
+			},
+			ok: http.StatusCreated,
+		},
+		{
+			name: "batch",
+			path: "/api/v1/jobs/batch",
+			body: func(l string) map[string]any {
+				return map[string]any{"domains": []string{"example.com"}, "min_level": l}
+			},
+			ok: http.StatusAccepted,
+		},
+	}
+
+	for _, tc := range paths {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := newTestServer(t)
+
+			rr := doJSON(t, srv, http.MethodPost, tc.path, tc.body("bogus"))
+			wantErrorCode(t, rr, http.StatusBadRequest, "invalid_min_level")
+			if got := len(srv.store.List(JobFilter{Limit: 10}).Items); got != 0 {
+				t.Fatalf("%d job(s) created despite the rejection", got)
+			}
+
+			rr = doJSON(t, srv, http.MethodPost, tc.path, tc.body("warning"))
+			wantStatus(t, rr, tc.ok)
+		})
+	}
+}

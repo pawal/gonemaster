@@ -12,6 +12,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/i18n"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 	"codeberg.org/pawal/gonemaster/server/internal/baseurl"
 	serverpublic "codeberg.org/pawal/gonemaster/server/public"
@@ -72,6 +73,9 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !validateMinLevel(w, req.MinLevel) {
+		return
+	}
 	tagNames, ok := validateTags(w, s, req.Tags)
 	if !ok {
 		return
@@ -403,6 +407,9 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
+	if !validateMinLevel(w, req.MinLevel) {
+		return
+	}
 	tagNames, ok := validateTags(w, s, req.Tags)
 	if !ok {
 		return
@@ -484,6 +491,26 @@ func validateTags(w http.ResponseWriter, s *Server, tags []string) ([]string, bo
 		names = append(names, t)
 	}
 	return names, true
+}
+
+// validateMinLevel rejects a min_level the engine cannot use. Empty is the
+// server default.
+func validateMinLevel(w http.ResponseWriter, minLevel string) bool {
+	if strings.TrimSpace(minLevel) == "" {
+		return true
+	}
+	levels := logger.Levels()
+	if _, ok := levels[strings.ToUpper(strings.TrimSpace(minLevel))]; ok {
+		return true
+	}
+	names := make([]string, 0, len(levels))
+	for name := range levels {
+		names = append(names, name)
+	}
+	sort.Slice(names, func(i, j int) bool { return levels[names[i]] < levels[names[j]] })
+	writeError(w, http.StatusBadRequest, "invalid_min_level",
+		fmt.Sprintf("min_level %q is not one of %s", minLevel, strings.Join(names, ", ")), nil)
+	return false
 }
 
 // MaxUndelegatedNameservers / MaxUndelegatedDSRecords cap the number of

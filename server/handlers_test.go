@@ -1469,3 +1469,46 @@ func TestSitemapHasNoEnglishQueryURL(t *testing.T) {
 		t.Errorf("the default page is listed %d times, want 1", got)
 	}
 }
+
+// robots.txt and sitemap.xml are cacheable, so a spoofed X-Forwarded-Host
+// would poison a shared cache with URLs pointing at the attacker's host.
+func TestAutoDetectedBaseURLIgnoresSpoofedForwardedHost(t *testing.T) {
+	for _, path := range []string{"/robots.txt", "/sitemap.xml"} {
+		t.Run(path, func(t *testing.T) {
+			srv := newTestServer(t) // trusts nothing
+
+			rr := doJSON(t, srv, http.MethodGet, path, nil,
+				withHost("real.example"),
+				withRemoteAddr(untrustedAddr),
+				withHeader("X-Forwarded-Host", "evil.example"),
+				withHeader("X-Forwarded-Proto", "https"))
+
+			wantStatus(t, rr, http.StatusOK)
+			body := rr.Body.String()
+			if strings.Contains(body, "evil.example") {
+				t.Fatalf("%s used the spoofed host\ngot: %s", path, body)
+			}
+			if !strings.Contains(body, "http://real.example") {
+				t.Fatalf("%s did not fall back to the real Host\ngot: %s", path, body)
+			}
+		})
+	}
+}
+
+// A configured proxy is the one caller allowed to rewrite host and scheme.
+func TestAutoDetectedBaseURLHonoursTrustedForwardedHost(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(cfg *Config) {
+		cfg.TrustedProxyCIDRs = []string{"127.0.0.1/32"}
+	}))
+
+	rr := doJSON(t, srv, http.MethodGet, "/robots.txt", nil,
+		withHost("internal:8080"),
+		withRemoteAddr(trustedProxyAddr),
+		withHeader("X-Forwarded-Host", "public.example"),
+		withHeader("X-Forwarded-Proto", "https"))
+
+	wantStatus(t, rr, http.StatusOK)
+	if got := rr.Body.String(); !strings.Contains(got, "Sitemap: https://public.example/sitemap.xml") {
+		t.Fatalf("robots.txt ignored the trusted proxy headers\ngot: %s", got)
+	}
+}

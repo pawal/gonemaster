@@ -240,3 +240,23 @@ func TestResultPageGetsShareTheAPIsUnmeteredPath(t *testing.T) {
 		t.Error("POST /pub/api/v1/jobs was never limited, so the limiter is inert")
 	}
 }
+
+// The result page is cached for 300s, so its canonical and og:url must not be
+// steerable by a direct client's X-Forwarded-Host.
+func TestRenderedResultPageIgnoresSpoofedForwardedHost(t *testing.T) {
+	if !serverpublic.IsBuilt() {
+		t.Skip("public UI dist not built; the render path is not exercised")
+	}
+	srv := newTestServer(t) // trusts nothing
+	job := seedPublicJob(t, srv, JobSucceeded, nil)
+
+	rr := doJSON(t, srv, http.MethodGet, "/public/result/"+job.PublicID, nil,
+		withHost("real.example"),
+		withRemoteAddr(untrustedAddr),
+		withHeader("X-Forwarded-Host", "evil.example"))
+
+	wantStatus(t, rr, http.StatusOK)
+	if body := rr.Body.String(); strings.Contains(body, "evil.example") {
+		t.Fatal("rendered page carries the spoofed host in its URLs")
+	}
+}

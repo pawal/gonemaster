@@ -231,11 +231,15 @@ func main() {
 	var (
 		rootDir        string
 		markdownOut    string
+		jsonOut        string
 		checkCoherency bool
+		checkMode      bool
 	)
 	flag.StringVar(&rootDir, "root", "engine", "Root directory to scan for Go files")
 	flag.StringVar(&markdownOut, "markdown-out", "docs/specifications/log-args-inventory.md", "Path to write markdown report")
+	flag.StringVar(&jsonOut, "json-out", "docs/specifications/log-args-inventory.json", "Path the JSON report is compared against in --check mode")
 	flag.BoolVar(&checkCoherency, "check-coherency", false, "Validate coherency guardrails")
+	flag.BoolVar(&checkMode, "check", false, "Diff generated content against on-disk files; exit non-zero on drift")
 	flag.Parse()
 
 	files, err := collectGoFiles(rootDir)
@@ -255,27 +259,73 @@ func main() {
 	data := inv.asPayload(len(files))
 	data.Summary.PackedListOnlyKeyCount = len(data.PackedListOnlyKeys)
 
-	enc := json.NewEncoder(os.Stdout)
-	enc.SetIndent("", "  ")
-	if err := enc.Encode(data); err != nil {
+	jsonBytes, err := encodeJSON(data)
+	if err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "encode json: %v\n", err)
 		os.Exit(1)
 	}
 
-	if markdownOut != "" {
-		md := renderMarkdown(data)
-		if err := os.WriteFile(markdownOut, []byte(md), 0o644); err != nil {
-			_, _ = fmt.Fprintf(os.Stderr, "write markdown: %v\n", err)
+	failed := false
+
+	if checkMode {
+		drift := !fileMatches(jsonOut, jsonBytes)
+		if markdownOut != "" && !fileMatches(markdownOut, []byte(renderMarkdown(data))) {
+			drift = true
+		}
+		if drift {
+			_, _ = fmt.Fprintln(os.Stderr, "log-args inventory drift detected; run: make spec-export-log-args")
+			failed = true
+		} else {
+			fmt.Println("log-args inventory is up to date")
+		}
+	} else {
+		if _, err := os.Stdout.Write(jsonBytes); err != nil {
+			_, _ = fmt.Fprintf(os.Stderr, "write json: %v\n", err)
 			os.Exit(1)
+		}
+		if markdownOut != "" {
+			if err := os.WriteFile(markdownOut, []byte(renderMarkdown(data)), 0o644); err != nil {
+				_, _ = fmt.Fprintf(os.Stderr, "write markdown: %v\n", err)
+				os.Exit(1)
+			}
 		}
 	}
 
 	if checkCoherency {
 		if err := checkCoherencyGuardrails(data); err != nil {
 			_, _ = fmt.Fprintf(os.Stderr, "coherency check failed: %v\n", err)
-			os.Exit(1)
+			failed = true
 		}
 	}
+
+	if failed {
+		os.Exit(1)
+	}
+}
+
+// encodeJSON renders the payload exactly as the committed JSON report is written.
+func encodeJSON(data payload) ([]byte, error) {
+	var buf bytes.Buffer
+	enc := json.NewEncoder(&buf)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(data); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
+}
+
+// fileMatches reports whether path holds want, reporting drift on stderr.
+func fileMatches(path string, want []byte) bool {
+	existing, err := os.ReadFile(path)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "drift: cannot read %s: %v\n", path, err)
+		return false
+	}
+	if !bytes.Equal(existing, want) {
+		_, _ = fmt.Fprintf(os.Stderr, "drift: %s differs from generated output\n", path)
+		return false
+	}
+	return true
 }
 
 func collectGoFiles(root string) ([]string, error) {
@@ -444,8 +494,9 @@ func scanLoggingCalls(fset *token.FileSet, filePath string, block *ast.BlockStmt
 			return
 		}
 
-		for key, shapes := range keys {
-			for shape := range shapes {
+		// Sorted, so the sample order and the per-key sample cap are stable.
+		for _, key := range slices.Sorted(maps.Keys(keys)) {
+			for _, shape := range slices.Sorted(maps.Keys(keys[key])) {
 				inv.addKeyObservation(key, tag, shape, filepath.ToSlash(filePath), pos.Line)
 			}
 		}
@@ -963,7 +1014,10 @@ func sortSamples(in []sampleEntry) []sampleEntry {
 		if out[a].File != out[b].File {
 			return out[a].File < out[b].File
 		}
-		return out[a].Line < out[b].Line
+		if out[a].Line != out[b].Line {
+			return out[a].Line < out[b].Line
+		}
+		return out[a].Shape < out[b].Shape
 	})
 	return out
 }

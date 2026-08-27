@@ -624,8 +624,10 @@ not a warning:
    metadata (name, module, severity floors).
 2. `spec-check-tags` - per-module tag catalog markdown files match
    the current tag registry.
-3. `spec-check-coherency` - the log-args inventory regenerated
-   from `appendLog*` call sites equals the committed one.
+3. `spec-check-log-args` - the log-args inventory regenerated
+   from `appendLog*` call sites equals the committed one, and the
+   coherency guardrails hold. Refresh with
+   `make spec-export-log-args`.
 4. `spec-check-i18n-placeholders` - i18n template placeholders are
    on the allowlist; no legacy placeholders sneak in.
 

@@ -31,6 +31,7 @@ Applies to all emitted log entries consumed through:
 | ASN collection | `asns` | `array<int>` | Structured ASN list for machine use. |
 | Prefix collection | `prefixes` | `array<string>` | CIDR prefix list. |
 | MX target list | `mail_targets` | `array<string>` | MX target hostname list. |
+| MX target (single) | `mx` | `string` | One MX exchange hostname, for per-exchange verdicts. |
 | Query name/type/class | `query_name`, `query_type`, `query_class` | `string` | Canonical query identity keys in current runtime inventory. |
 
 ## Migration Status

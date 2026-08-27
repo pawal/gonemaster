@@ -2546,6 +2546,11 @@ components:
             $ref: '#/components/schemas/UndelegatedDSInput'
         min_level:
           type: string
+          description: >
+            Minimum severity of the entries returned for the run. One of
+            DEBUG3, DEBUG2, DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL
+            (case-insensitive). Omit to use the server default. An unknown
+            value is rejected with `400 invalid_min_level`.
         tags:
           type: array
           description: Tag names to apply to the created domain (creates tags/domains if needed).
@@ -2578,6 +2583,11 @@ components:
           additionalProperties: true
         min_level:
           type: string
+          description: >
+            Minimum severity of the entries returned for the run. One of
+            DEBUG3, DEBUG2, DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL
+            (case-insensitive). Omit to use the server default. An unknown
+            value is rejected with `400 invalid_min_level`.
         tags:
           type: array
           description: Tag names to apply to the batch (creates domain/tag records as needed).

@@ -3135,12 +3135,12 @@ msgstr ""
 "värde ({retry})."
 
 msgctxt "ZONE:MX_RECORD_IS_CNAME"
-msgid "MX record for the domain is pointing to a CNAME."
-msgstr "Domänens MX-post pekar på ett alias (CNAME)."
+msgid "MX record for the domain is pointing to \"{mx}\", which is a CNAME."
+msgstr "Domänens MX-post pekar på \"{mx}\", som är ett alias (CNAME)."
 
 msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
-msgid "MX record for the domain is not pointing to a CNAME."
-msgstr "MX-post för domänen pekar inte på ett CNAME."
+msgid "MX record for the domain is pointing to \"{mx}\", which is not a CNAME."
+msgstr "Domänens MX-post pekar på \"{mx}\", som inte är ett alias (CNAME)."
 
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""

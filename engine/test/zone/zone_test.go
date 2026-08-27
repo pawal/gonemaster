@@ -2,6 +2,7 @@ package zone
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -1656,6 +1657,76 @@ func TestZone14MixedPresenceAndInconsistent(t *testing.T) {
 		t.Fatalf("zone14: %v", err)
 	}
 	tctest.RequireTags(t, entries, "Z14_MIXED_PRESENCE", "Z14_INCONSISTENT_ZONEMD")
+}
+
+// runZone08 stubs the authoritative resolver: mx answers the apex MX query,
+// cnames maps a queried exchange to the target it aliases.
+func runZone08(t *testing.T, name string, mx packet.Packet, cnames map[string]string) []*logger.Entry {
+	t.Helper()
+	ctx := tctest.Context(t)
+
+	tctest.Stub(t, &queryAuth, func(_ context.Context, _ *zonepkg.Zone, qname string, qtype string) (packet.Packet, error) {
+		switch qtype {
+		case "MX":
+			return mx, nil
+		case "CNAME":
+			if target, ok := cnames[qname]; ok {
+				return tctest.Response(tctest.Question(qname, dns.TypeCNAME),
+					tctest.Answers(tctest.CNAMERR(qname, target))), nil
+			}
+			return tctest.Response(tctest.Question(qname, dns.TypeCNAME)), nil
+		default:
+			return packet.Packet{}, nil
+		}
+	})
+
+	z := zonepkg.Zone{Name: dnsname.New(name)}
+	entries, err := Zone08(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone08: %v", err)
+	}
+	return entries
+}
+
+// Two aliased MX records must not produce two indistinguishable entries.
+func TestZone08NamesEachCNAMEExchange(t *testing.T) {
+	entries := runZone08(t, "example.com",
+		mxPacket("example.com", 300, mxRR{10, "mail1.example.com."}, mxRR{20, "mail2.example.com."}),
+		map[string]string{
+			"mail1.example.com.": "host1.mail.example.net.",
+			"mail2.example.com.": "host2.mail.example.net.",
+		})
+
+	tctest.RequireCount(t, entries, "MX_RECORD_IS_CNAME", 2)
+	tctest.RequireNoTag(t, entries, "MX_RECORD_IS_NOT_CNAME")
+
+	got := tctest.ArgValues(entries, "MX_RECORD_IS_CNAME", "mx")
+	want := []string{"mail1.example.com", "mail2.example.com"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("expected mx arguments %v, got %v", want, got)
+	}
+}
+
+// A mixed zone reports each exchange under its own verdict tag.
+func TestZone08NamesTheCleanExchange(t *testing.T) {
+	entries := runZone08(t, "example.com",
+		mxPacket("example.com", 300, mxRR{10, "alias.example.com."}, mxRR{20, "real.example.com."}),
+		map[string]string{"alias.example.com.": "host.mail.example.net."})
+
+	if got, want := tctest.ArgValues(entries, "MX_RECORD_IS_CNAME", "mx"), []string{"alias.example.com"}; !slices.Equal(got, want) {
+		t.Fatalf("expected CNAME verdict for %v, got %v", want, got)
+	}
+	if got, want := tctest.ArgValues(entries, "MX_RECORD_IS_NOT_CNAME", "mx"), []string{"real.example.com"}; !slices.Equal(got, want) {
+		t.Fatalf("expected non-CNAME verdict for %v, got %v", want, got)
+	}
+}
+
+// A missing apex MX response yields no per-exchange verdict.
+func TestZone08NoMXResponse(t *testing.T) {
+	entries := runZone08(t, "example.com", packet.Packet{}, nil)
+
+	tctest.RequireTags(t, entries, "NO_RESPONSE_MX_QUERY")
+	tctest.RequireNoTag(t, entries, "MX_RECORD_IS_CNAME", "MX_RECORD_IS_NOT_CNAME")
 }
 
 // runZone09 wires a single-nameserver zone09 run for a given zone name and MX

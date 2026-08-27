@@ -8,6 +8,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 - server: `X-Forwarded-Host` and `X-Forwarded-Proto` are honoured only from `trusted_proxy_cidrs`
 - server: API responses keep JSON HTML escaping on
+- zone08: the CNAME verdicts name the MX exchange they are about
 
 ### Fixed
 

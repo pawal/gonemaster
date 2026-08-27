@@ -23,7 +23,8 @@ Status: Final
    - if CNAME query has no response, emit no tag for that exchange;
    - if CNAME answer exists, emit:
      - `MX_RECORD_IS_CNAME` when exchange has CNAME answer;
-     - `MX_RECORD_IS_NOT_CNAME` otherwise.
+     - `MX_RECORD_IS_NOT_CNAME` otherwise;
+   - both verdict tags carry the exchange hostname in `mx`.
 5. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
@@ -38,8 +39,8 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
-| `MX_RECORD_IS_CNAME` | `-` | `-` | No arguments. |
-| `MX_RECORD_IS_NOT_CNAME` | `-` | `-` | No arguments. |
+| `MX_RECORD_IS_CNAME` | `mx` | `string` | Normalized MX exchange hostname that resolves as an alias. |
+| `MX_RECORD_IS_NOT_CNAME` | `mx` | `string` | Normalized MX exchange hostname that is not an alias. |
 | `NO_RESPONSE_MX_QUERY` | `-` | `-` | No arguments. |
 | `TEST_CASE_END` | `testcase` | `string` | Testcase display name (`Zone08`). |
 | `TEST_CASE_START` | `testcase` | `string` | Testcase display name (`Zone08`). |
@@ -58,9 +59,10 @@ Status: Final
   - Upstream: describes a high-level authoritative MX/CNAME check. Gonemaster: performs explicit per-MX exchange CNAME probes and emits explicit positive/negative tags (`MX_RECORD_IS_CNAME` / `MX_RECORD_IS_NOT_CNAME`).
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
   - Upstream: does not describe explicit no-response MX tag. Gonemaster: emits `NO_RESPONSE_MX_QUERY`.
+  - Upstream: verdict messages name no exchange. Gonemaster: both verdict messages name the exchange (`mx`), so a zone with several MX records yields one distinguishable entry per exchange.
 - Potential upstream report:
   - `no`
 
 ## Edge Cases And Limitations
-- Multiple MX RRs can yield multiple CNAME verdict tags in one run.
+- Multiple MX RRs can yield multiple CNAME verdict tags in one run, one per exchange, distinguished by `mx`.
 - A missing CNAME-query response for an MX exchange yields no dedicated per-exchange tag.

@@ -1631,12 +1631,12 @@ msgid "SOA 'refresh' value ({refresh}) is higher than the SOA 'retry' value ({re
 msgstr "SOA 'refresh'-waarde ({refresh}) is hoger dan de SOA 'retry'-waarde ({retry})."
 
 msgctxt "ZONE:MX_RECORD_IS_CNAME"
-msgid "MX record for the domain is pointing to a CNAME."
-msgstr "MX-record voor het domein verwijst naar een CNAME."
+msgid "MX record for the domain is pointing to \"{mx}\", which is a CNAME."
+msgstr "MX-record voor het domein verwijst naar \"{mx}\", wat een CNAME is."
 
 msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
-msgid "MX record for the domain is not pointing to a CNAME."
-msgstr "MX-record voor het domein verwijst niet naar een CNAME."
+msgid "MX record for the domain is pointing to \"{mx}\", which is not a CNAME."
+msgstr "MX-record voor het domein verwijst naar \"{mx}\", wat geen CNAME is."
 
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid "Nameserver {ns}/{address} responds with multiple ({count}) SOA records on SOA queries."

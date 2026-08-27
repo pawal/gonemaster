@@ -2607,12 +2607,12 @@ msgstr ""
 "({retry})."
 
 msgctxt "ZONE:MX_RECORD_IS_CNAME"
-msgid "MX record for the domain is pointing to a CNAME."
-msgstr "Der MX-Record der Domain verweist auf ein CNAME."
+msgid "MX record for the domain is pointing to \"{mx}\", which is a CNAME."
+msgstr "Der MX-Record der Domain verweist auf \"{mx}\", was ein CNAME ist."
 
 msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
-msgid "MX record for the domain is not pointing to a CNAME."
-msgstr "Der MX-Record der Domain verweist nicht auf ein CNAME."
+msgid "MX record for the domain is pointing to \"{mx}\", which is not a CNAME."
+msgstr "Der MX-Record der Domain verweist auf \"{mx}\", was kein CNAME ist."
 
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""

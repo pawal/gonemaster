@@ -3103,12 +3103,12 @@ msgstr ""
 "SOA 'refresh'-værdi ({refresh}) er større end SOA 'retry'-værdi ({retry})."
 
 msgctxt "ZONE:MX_RECORD_IS_CNAME"
-msgid "MX record for the domain is pointing to a CNAME."
-msgstr "Domænets MX-record refererer til et alias (CNAME)."
+msgid "MX record for the domain is pointing to \"{mx}\", which is a CNAME."
+msgstr "Domænets MX-record peger på \"{mx}\", som er et alias (CNAME)."
 
 msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
-msgid "MX record for the domain is not pointing to a CNAME."
-msgstr "MX-record for domænenavnet peger ikke på et alias (CNAME)."
+msgid "MX record for the domain is pointing to \"{mx}\", which is not a CNAME."
+msgstr "Domænets MX-record peger på \"{mx}\", som ikke er et alias (CNAME)."
 
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""

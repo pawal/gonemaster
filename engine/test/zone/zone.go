@@ -1001,12 +1001,18 @@ func Zone08(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				return results, err
 			}
 			if p2.Msg != nil {
+				// Name the exchange so several MX records stay distinguishable.
+				exchange := dnsname.New(mx.Mx).String()
 				if p2.HasRRsOfTypeForName("CNAME", dnsname.New(mx.Mx), "answer") {
-					if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_CNAME", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_CNAME", map[string]any{
+						"mx": exchange,
+					}); err != nil {
 						return results, err
 					}
 				} else {
-					if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_NOT_CNAME", map[string]any{}); err != nil {
+					if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_NOT_CNAME", map[string]any{
+						"mx": exchange,
+					}); err != nil {
 						return results, err
 					}
 				}

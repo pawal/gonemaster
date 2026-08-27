@@ -3065,12 +3065,12 @@ msgid ""
 msgstr "SOA 'refresh' ({refresh}) je večji od SOA 'retry' ({retry})."
 
 msgctxt "ZONE:MX_RECORD_IS_CNAME"
-msgid "MX record for the domain is pointing to a CNAME."
-msgstr "MX zapis za domeno kaže na alias (CNAME)."
+msgid "MX record for the domain is pointing to \"{mx}\", which is a CNAME."
+msgstr "MX zapis za domeno kaže na \"{mx}\", kar je alias (CNAME)."
 
 msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
-msgid "MX record for the domain is not pointing to a CNAME."
-msgstr "MX zapis ne kaže na alias (CNAME)."
+msgid "MX record for the domain is pointing to \"{mx}\", which is not a CNAME."
+msgstr "MX zapis za domeno kaže na \"{mx}\", kar ni alias (CNAME)."
 
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""

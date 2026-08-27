@@ -1989,12 +1989,14 @@ msgid ""
 msgstr "SOA 'refresh' 値 ({refresh}) が SOA 'retry' 値 ({retry}) より大きいです。"
 
 msgctxt "ZONE:MX_RECORD_IS_CNAME"
-msgid "MX record for the domain is pointing to a CNAME."
-msgstr "このドメインの MX レコードは CNAME を指しています。"
+msgid "MX record for the domain is pointing to \"{mx}\", which is a CNAME."
+msgstr "このドメインの MX レコードは \"{mx}\" を指しており、これは CNAME です。"
 
 msgctxt "ZONE:MX_RECORD_IS_NOT_CNAME"
-msgid "MX record for the domain is not pointing to a CNAME."
-msgstr "このドメインの MX レコードは CNAME を指していません。"
+msgid "MX record for the domain is pointing to \"{mx}\", which is not a CNAME."
+msgstr ""
+"このドメインの MX レコードは \"{mx}\" を指しており、これは CNAME ではありませ"
+"ん。"
 
 msgctxt "ZONE:MULTIPLE_SOA"
 msgid ""

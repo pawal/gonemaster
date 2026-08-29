@@ -37,8 +37,12 @@ steps:
       - npm --prefix analysis-ui run build
       - make spec-check-node
 
+  # spec-check-go builds ./server (via export-testcase-descriptions), so this
+  # step has the same ui_checks dependency as race_test below.
   static_checks:
     image: golang:1.27
+    depends_on:
+      - ui_checks
     commands:
       - *go_cache
       - make fmt-check
@@ -54,9 +58,12 @@ steps:
       - go test ./...
 
   # -race requires cgo, so this step must stay on the Debian-based golang
-  # image and must never inherit CGO_ENABLED=0.
+  # image and must never inherit CGO_ENABLED=0. It also waits for ui_checks
+  # because the vite builds empty server/*/dist, which ./server embeds.
   race_test:
     image: golang:1.27
+    depends_on:
+      - ui_checks
     commands:
       - *go_cache
       - make race-ci

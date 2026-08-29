@@ -1,5 +1,7 @@
 codeberg.org/miekg/dns v0.6.104 h1:MAb7q9cmY5Ed9UpCeXnt1cjPPPHOBsCaUPOkennW6IA=
 codeberg.org/miekg/dns v0.6.104/go.mod h1:vbidSyLJl5JcDUL2LrXCUjRYSFa5tJweseQox0GOrTk=
+codeberg.org/miekg/dns v0.6.105 h1:Z6uaCoVPDEGdPdRKGmllBBeSsXSlE5bnWsEPQKgE5T4=
+codeberg.org/miekg/dns v0.6.105/go.mod h1:vbidSyLJl5JcDUL2LrXCUjRYSFa5tJweseQox0GOrTk=
 filippo.io/edwards25519 v1.1.0 h1:FNf4tywRC1HmFuKW5xopWpigGjJKiJSV0Cqo0cJWDaA=
 filippo.io/edwards25519 v1.1.0/go.mod h1:BxyFTGdWcka3PhytdK4V28tE5sGfRvvvRV7EaN4VDT4=
 filippo.io/edwards25519 v1.2.0 h1:crnVqOiS4jqYleHd9vaKZ+HKtHfllngJIiOpNpoJsjo=

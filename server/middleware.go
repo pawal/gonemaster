@@ -140,7 +140,8 @@ func statusLevel(status int) slog.Level {
 
 // accessLogMiddleware emits one structured line per request. The response body
 // is captured only when debug logging is on, to avoid logging bodies by default.
-func (s *Server) accessLogMiddleware(next http.Handler) http.Handler {
+// fallbackRoute labels requests the mount's router did not match.
+func (s *Server) accessLogMiddleware(fallbackRoute string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		captureBody := s.logger.Enabled(r.Context(), slog.LevelDebug)
@@ -156,9 +157,7 @@ func (s *Server) accessLogMiddleware(next http.Handler) http.Handler {
 		if status == 0 {
 			status = http.StatusOK
 		}
-		// Prefer the router's matched pattern; fall back to path parsing for
-		// non-mux handlers that never populate the holder.
-		route := apiRouteTemplate(r.URL.Path)
+		route := fallbackRoute
 		if p := holder.route.Load(); p != nil {
 			route = *p
 		}
@@ -282,10 +281,11 @@ func (s *Server) recoverMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (s *Server) apiMetricsMiddleware(next http.Handler) http.Handler {
+// apiMetricsMiddleware records one API request observation, labelled by the
+// router's matched pattern so metrics and the access log agree.
+func (s *Server) apiMetricsMiddleware(fallbackRoute string, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		startedAt := time.Now()
-		route := apiRouteTemplate(r.URL.Path)
 
 		recorder := newAPIMetricsResponseRecorder(w)
 		next.ServeHTTP(recorder, r)
@@ -293,6 +293,12 @@ func (s *Server) apiMetricsMiddleware(next http.Handler) http.Handler {
 		status := recorder.status
 		if status == 0 {
 			status = http.StatusOK
+		}
+		route := fallbackRoute
+		if holder, ok := r.Context().Value(routeHolderContextKey).(*routeHolder); ok {
+			if p := holder.route.Load(); p != nil {
+				route = *p
+			}
 		}
 		s.metrics.ObserveAPIRequest(route, r.Method, status, time.Since(startedAt), recorder.errorCode)
 	})
@@ -333,7 +339,9 @@ func captureRoute(prefix string, mux *http.ServeMux) http.Handler {
 	})
 }
 
-// routeLabel maps "GET /jobs/{id}" to a method-free "/api/v1/jobs/{id}".
+// routeLabel maps "GET /jobs/{id}" to a method-free "/api/v1/jobs/{id}". A
+// subtree pattern keeps its trailing slash, or it would share a bucket with the
+// exact route of the same name.
 func routeLabel(prefix, pattern string) string {
 	if pattern == "" {
 		return prefix + "/unknown"
@@ -341,64 +349,5 @@ func routeLabel(prefix, pattern string) string {
 	if i := strings.IndexByte(pattern, ' '); i >= 0 {
 		pattern = pattern[i+1:]
 	}
-	return prefix + strings.TrimSuffix(pattern, "/")
-}
-
-func apiRouteTemplate(path string) string {
-	const apiPrefix = "/api/v1"
-
-	if path == apiPrefix || path == apiPrefix+"/" {
-		return path
-	}
-	if !strings.HasPrefix(path, apiPrefix+"/") {
-		return "/api/v1/unknown"
-	}
-	if path == "/api/v1/jobs" {
-		return "/api/v1/jobs"
-	}
-	if path == "/api/v1/jobs/batch" {
-		return "/api/v1/jobs/batch"
-	}
-	if after, ok := strings.CutPrefix(path, "/api/v1/jobs/"); ok {
-		tail := after
-		parts := strings.Split(strings.Trim(tail, "/"), "/")
-		if len(parts) == 1 && parts[0] != "" {
-			return "/api/v1/jobs/{job_id}"
-		}
-		if len(parts) >= 2 && parts[0] != "" {
-			switch parts[1] {
-			case "result":
-				return "/api/v1/jobs/{job_id}/result"
-			case "events":
-				return "/api/v1/jobs/{job_id}/events"
-			case "cancel":
-				return "/api/v1/jobs/{job_id}/cancel"
-			}
-		}
-		return "/api/v1/jobs/unknown"
-	}
-	if after, ok := strings.CutPrefix(path, "/api/v1/batches/"); ok {
-		tail := after
-		parts := strings.Split(strings.Trim(tail, "/"), "/")
-		if len(parts) >= 2 && parts[1] == "delete-preview" {
-			return "/api/v1/batches/{batch_id}/delete-preview"
-		}
-		if strings.TrimSpace(tail) != "" {
-			return "/api/v1/batches/{batch_id}"
-		}
-		return "/api/v1/batches/unknown"
-	}
-	switch path {
-	case "/api/v1/queue/pause",
-		"/api/v1/queue/resume",
-		"/api/v1/queue/reorder",
-		"/api/v1/queue/remove",
-		"/api/v1/metrics",
-		"/api/v1/healthz",
-		"/api/v1/whoami",
-		"/api/v1/session":
-		return path
-	default:
-		return "/api/v1/unknown"
-	}
+	return prefix + pattern
 }

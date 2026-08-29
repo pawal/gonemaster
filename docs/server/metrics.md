@@ -48,6 +48,10 @@ Top-level fields:
 - `insights`
 - `trends`
 
+`api` covers both HTTP API surfaces: the admin API under `/api/v1` and the public API under
+`/pub/api/v1`. Route labels are the router's matched pattern, prefixed with the mount, so
+`api.routes[]` keeps the two surfaces apart (`/api/v1/jobs` vs `/pub/api/v1/jobs`).
+
 Commonly used fields:
 - `health.queue_depth`
 - `health.in_flight_jobs`

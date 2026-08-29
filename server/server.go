@@ -268,6 +268,13 @@ func securityHeadersMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+// apiChain wraps an API mount with request ID, access log, panic recovery, and
+// request metrics. fallbackRoute labels requests no route matched.
+func (s *Server) apiChain(fallbackRoute string, next http.Handler) http.Handler {
+	return s.requestIDMiddleware(s.accessLogMiddleware(fallbackRoute,
+		s.recoverMiddleware(s.apiMetricsMiddleware(fallbackRoute, next))))
+}
+
 func (s *Server) routes() {
 	apiMux := http.NewServeMux()
 	apiMux.HandleFunc("/jobs/batch", s.handleJobsBatch)
@@ -336,10 +343,12 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("GET /whoami", s.handleWhoami)
 	apiMux.HandleFunc("/session", s.handleSession)
 
-	s.mux.Handle("/api/v1/", s.requestIDMiddleware(s.accessLogMiddleware(s.recoverMiddleware(s.apiMetricsMiddleware(s.authMiddleware(http.StripPrefix("/api/v1", captureRoute("/api/v1", apiMux))))))))
-	s.mux.Handle("/api/v1", s.requestIDMiddleware(s.accessLogMiddleware(s.recoverMiddleware(s.apiMetricsMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	s.mux.Handle("/api/v1/", s.apiChain("/api/v1/unknown",
+		s.authMiddleware(http.StripPrefix("/api/v1", captureRoute("/api/v1", apiMux)))))
+	// One fixed path with no router to match, so it labels itself.
+	s.mux.Handle("/api/v1", s.apiChain("/api/v1", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)
-	}))))))
+	})))
 
 	pubMux := http.NewServeMux()
 	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
@@ -404,8 +413,8 @@ func (s *Server) routes() {
 	if s.rateLimiter != nil {
 		pubHandler = rateLimitMiddleware(s.rateLimiter, s.trustedProxies, pubHandler)
 	}
-	pubHandler = s.recoverMiddleware(pubHandler)
-	pubHandler = s.requestIDMiddleware(s.accessLogMiddleware(pubHandler))
+	// Outside the rate limiter, so a 429 is counted rather than invisible.
+	pubHandler = s.apiChain("/pub/api/v1/unknown", pubHandler)
 	s.mux.Handle("/pub/api/v1/", pubHandler)
 
 	s.mux.HandleFunc("GET /robots.txt", s.handleRobotsTxt)

@@ -8,38 +8,6 @@ import (
 	"testing"
 )
 
-func TestAPIRouteTemplate(t *testing.T) {
-	tests := []struct {
-		path string
-		want string
-	}{
-		{path: "/api/v1", want: "/api/v1"},
-		{path: "/api/v1/", want: "/api/v1/"},
-		{path: "/api/v1/jobs", want: "/api/v1/jobs"},
-		{path: "/api/v1/jobs/batch", want: "/api/v1/jobs/batch"},
-		{path: "/api/v1/jobs/job-1", want: "/api/v1/jobs/{job_id}"},
-		{path: "/api/v1/jobs/job-1/result", want: "/api/v1/jobs/{job_id}/result"},
-		{path: "/api/v1/jobs/job-1/events", want: "/api/v1/jobs/{job_id}/events"},
-		{path: "/api/v1/jobs/job-1/cancel", want: "/api/v1/jobs/{job_id}/cancel"},
-		{path: "/api/v1/jobs/job-1/extra", want: "/api/v1/jobs/unknown"},
-		{path: "/api/v1/batches/batch-1", want: "/api/v1/batches/{batch_id}"},
-		{path: "/api/v1/queue/pause", want: "/api/v1/queue/pause"},
-		{path: "/api/v1/queue/resume", want: "/api/v1/queue/resume"},
-		{path: "/api/v1/queue/reorder", want: "/api/v1/queue/reorder"},
-		{path: "/api/v1/queue/remove", want: "/api/v1/queue/remove"},
-		{path: "/api/v1/metrics", want: "/api/v1/metrics"},
-		{path: "/api/v1/healthz", want: "/api/v1/healthz"},
-		{path: "/api/v1/unknown/path", want: "/api/v1/unknown"},
-		{path: "/not-api", want: "/api/v1/unknown"},
-	}
-
-	for _, tc := range tests {
-		if got := apiRouteTemplate(tc.path); got != tc.want {
-			t.Fatalf("apiRouteTemplate(%q) = %q, want %q", tc.path, got, tc.want)
-		}
-	}
-}
-
 func TestRouteLabel(t *testing.T) {
 	tests := []struct {
 		prefix  string
@@ -54,8 +22,10 @@ func TestRouteLabel(t *testing.T) {
 		{"/pub/api/v1", "POST /jobs", "/pub/api/v1/jobs"},
 		// Method-less patterns pass through unchanged apart from the prefix.
 		{"/api/v1", "/healthz", "/api/v1/healthz"},
-		// Subtree patterns keep the trailing slash out of the label.
-		{"/api/v1", "/jobs/", "/api/v1/jobs"},
+		// A subtree pattern keeps its trailing slash. Trimming it would give
+		// "/jobs/" and the exact "/jobs" one shared label, so a list request
+		// and a per-job request would land in the same metrics bucket.
+		{"/api/v1", "/jobs/", "/api/v1/jobs/"},
 		// An unmatched request has no pattern and lands in the mount's bucket.
 		{"/pub/api/v1", "", "/pub/api/v1/unknown"},
 	}
@@ -69,7 +39,8 @@ func TestRouteLabel(t *testing.T) {
 // TestAccessLogRouteFromMatchedPattern drives the fully wired handler so the
 // route field is derived from the router's matched pattern. Before the fix the
 // public surface, mounted under /pub/api/v1, always logged /api/v1/unknown
-// because apiRouteTemplate only understood the admin /api/v1 prefix.
+// because the hand-maintained route template only understood the admin
+// /api/v1 prefix.
 func TestAccessLogRouteFromMatchedPattern(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -80,6 +51,14 @@ func TestAccessLogRouteFromMatchedPattern(t *testing.T) {
 		{"public info route", "/pub/api/v1/info", "/pub/api/v1/info"},
 		{"public templated route", "/pub/api/v1/jobs/does-not-exist", "/pub/api/v1/jobs/{publicID}"},
 		{"public unmatched route", "/pub/api/v1/no-such-endpoint", "/pub/api/v1/unknown"},
+		// The admin mount labels these from the same source, so routes the old
+		// template did not list no longer collapse into /api/v1/unknown.
+		{"admin settings route", "/api/v1/settings", "/api/v1/settings"},
+		{"admin domains route", "/api/v1/domains", "/api/v1/domains"},
+		{"admin templated route", "/api/v1/runs/does-not-exist", "/api/v1/runs/{id}"},
+		{"admin unmatched route", "/api/v1/no-such-endpoint", "/api/v1/unknown"},
+		// No captureRoute on the redirect mount, so its fallback label applies.
+		{"admin redirect mount", "/api/v1", "/api/v1"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -96,6 +75,103 @@ func TestAccessLogRouteFromMatchedPattern(t *testing.T) {
 				t.Fatalf("path = %v, want %q", got, tc.path)
 			}
 		})
+	}
+}
+
+// TestMetricsRouteFromMatchedPattern is the metrics half of the same fix. The
+// per-route table used to be labelled from a hand-maintained path template, so
+// every admin route it did not list was filed under /api/v1/unknown.
+func TestMetricsRouteFromMatchedPattern(t *testing.T) {
+	tests := []struct {
+		name      string
+		path      string
+		wantRoute string
+	}{
+		{"admin settings route", "/api/v1/settings", "/api/v1/settings"},
+		{"admin domains route", "/api/v1/domains", "/api/v1/domains"},
+		{"admin templated route", "/api/v1/runs/does-not-exist", "/api/v1/runs/{id}"},
+		{"admin unmatched route", "/api/v1/no-such-endpoint", "/api/v1/unknown"},
+		{"admin redirect mount", "/api/v1", "/api/v1"},
+		{"public info route", "/pub/api/v1/info", "/pub/api/v1/info"},
+		{"public templated route", "/pub/api/v1/jobs/does-not-exist", "/pub/api/v1/jobs/{publicID}"},
+		{"public unmatched route", "/pub/api/v1/no-such-endpoint", "/pub/api/v1/unknown"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := newTestServer(t)
+
+			doJSON(t, srv, http.MethodGet, tc.path, nil)
+
+			routes := srv.metrics.Snapshot().API.Routes
+			if len(routes) != 1 {
+				t.Fatalf("api.routes = %+v, want exactly one entry", routes)
+			}
+			if routes[0].Route != tc.wantRoute {
+				t.Fatalf("route = %q, want %q (path %q)", routes[0].Route, tc.wantRoute, tc.path)
+			}
+		})
+	}
+}
+
+// Both surfaces read one source, so one request cannot be attributed to two
+// different routes.
+func TestMetricsAndAccessLogAgreeOnRoute(t *testing.T) {
+	for _, path := range []string{"/api/v1/settings", "/pub/api/v1/info", "/pub/api/v1/no-such-endpoint"} {
+		t.Run(path, func(t *testing.T) {
+			var buf bytes.Buffer
+			srv := newTestServer(t, withLogTo(&buf, "info"))
+
+			doJSON(t, srv, http.MethodGet, path, nil)
+
+			routes := srv.metrics.Snapshot().API.Routes
+			if len(routes) != 1 {
+				t.Fatalf("api.routes = %+v, want exactly one entry", routes)
+			}
+			if got := findLogLine(t, &buf, "http_request")["route"]; got != routes[0].Route {
+				t.Fatalf("access log route = %v, metrics route = %q", got, routes[0].Route)
+			}
+		})
+	}
+}
+
+// A limiter firing is what an operator most needs to see, so the 429 has to
+// reach the counters instead of being short-circuited ahead of them.
+func TestPublicRateLimitedRequestsAreCounted(t *testing.T) {
+	srv := newTestServer(t, withPublicAPI(func(api *PublicAPIConfig) {
+		api.RateLimitEnabled = true
+		api.RateLimitMax = 1
+	}))
+
+	doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
+
+	wantStatus(t, resp, http.StatusTooManyRequests)
+	api := srv.metrics.Snapshot().API
+	if api.RequestsTotal != 2 {
+		t.Fatalf("api.requests_total = %d, want both public requests counted", api.RequestsTotal)
+	}
+	if api.StatusClassCounts["4xx"] != 1 {
+		t.Fatalf("4xx count = %d, want the throttled request counted", api.StatusClassCounts["4xx"])
+	}
+}
+
+// The admin bucket already carries real traffic, so a public request landing in
+// it would corrupt a counter rather than just mislabel one request.
+func TestPublicRequestsNeverLabelledAsAdmin(t *testing.T) {
+	srv := newTestServer(t)
+
+	for _, path := range []string{"/pub/api/v1/info", "/pub/api/v1/version", "/pub/api/v1/no-such-endpoint"} {
+		doJSON(t, srv, http.MethodGet, path, nil)
+	}
+
+	routes := srv.metrics.Snapshot().API.Routes
+	if len(routes) != 3 {
+		t.Fatalf("api.routes = %+v, want one entry per request", routes)
+	}
+	for _, route := range routes {
+		if !strings.HasPrefix(route.Route, "/pub/api/v1/") {
+			t.Errorf("public request labelled %q", route.Route)
+		}
 	}
 }
 
@@ -217,7 +293,7 @@ func TestAccessLogMiddlewareEmitsStructuredLine(t *testing.T) {
 		srv := newTestServer(t, withLogTo(&buf, "info"))
 
 		// requestID wraps accessLog so the line carries a request_id.
-		handler := srv.requestIDMiddleware(srv.accessLogMiddleware(
+		handler := srv.requestIDMiddleware(srv.accessLogMiddleware("/api/v1/unknown",
 			http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.WriteHeader(tc.status)
 			})))
@@ -257,7 +333,7 @@ func TestAccessLogMiddlewareOmitsBodyByDefault(t *testing.T) {
 	var buf bytes.Buffer
 	srv := newTestServer(t, withLogTo(&buf, "info")) // info: no body capture
 
-	handler := srv.accessLogMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := srv.accessLogMiddleware("/api/v1/unknown", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("secret-response-body"))
 	}))
 	doHandler(t, handler, http.MethodGet, "/api/v1/jobs", nil)
@@ -271,7 +347,7 @@ func TestAccessLogMiddlewareCapturesBodyAtDebug(t *testing.T) {
 	var buf bytes.Buffer
 	srv := newTestServer(t, withLogTo(&buf, "debug")) // debug: body captured
 
-	handler := srv.accessLogMiddleware(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	handler := srv.accessLogMiddleware("/api/v1/unknown", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		_, _ = w.Write([]byte("visible-at-debug"))
 	}))
 	doHandler(t, handler, http.MethodGet, "/api/v1/jobs", nil)

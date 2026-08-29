@@ -842,7 +842,9 @@ func TestMetricsTracksAPIRequestsByRouteMethodStatusAndErrorCode(t *testing.T) {
 		t.Fatalf("unexpected reorder route metrics: %+v", reorder)
 	}
 
-	cancel := findAPIRouteMetrics(t, snapshot, http.MethodPost, "/api/v1/jobs/{job_id}/cancel")
+	// Cancel is served by the "/jobs/" subtree handler rather than its own mux
+	// pattern, so the router's label for it is the subtree.
+	cancel := findAPIRouteMetrics(t, snapshot, http.MethodPost, "/api/v1/jobs/")
 	if cancel.RequestsTotal != 1 || cancel.StatusClassCounts["4xx"] != 1 {
 		t.Fatalf("unexpected cancel route metrics: %+v", cancel)
 	}

@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- server: request metrics and the access log cover the public API and the page mounts, with new proxy-health counters
+
 ### Changed
 
 - server: `X-Forwarded-Host` and `X-Forwarded-Proto` are honoured only from `trusted_proxy_cidrs`

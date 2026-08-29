@@ -17,6 +17,7 @@ All notable changes to all gonemaster components will be documented in this file
 - deps: bump golang.org/x/text to v0.41.0 and golang.org/x/net to v0.58.0 to fix reachable advisories
 - deps: bump go-sql-driver/mysql to v1.10.0 and lib/pq to v1.12.3
 - deps: bump codeberg.org/miekg/dns to v0.6.105
+- gonemaster-mcp: bump the MCP SDK to v1.7.0, adding the 2026-07-28 protocol revision
 
 ### Fixed
 

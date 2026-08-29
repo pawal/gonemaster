@@ -589,8 +589,9 @@ func TestStripUntrustedForwardedHeaders(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
+			srv := newTestServer(t, withConfig(func(c *Config) { c.TrustedProxyCIDRs = tc.trusted }))
 			var seen http.Header
-			handler := stripUntrustedForwardedHeaders(parseTrustedProxies(tc.trusted),
+			handler := srv.stripUntrustedForwardedHeaders(
 				http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 					seen = r.Header.Clone()
 				}))
@@ -610,14 +611,38 @@ func TestStripUntrustedForwardedHeaders(t *testing.T) {
 					t.Errorf("%s = %q, want it stripped", h, got)
 				}
 			}
+
+			// The counter is the operator's signal that the CIDR is wrong, so
+			// it must move exactly when headers were actually discarded.
+			want := int64(1)
+			if tc.wantKept {
+				want = 0
+			}
+			if got := srv.metrics.Snapshot().API.Proxy.ForwardedHeadersStrippedTotal; got != want {
+				t.Errorf("forwarded_headers_stripped_total = %d, want %d", got, want)
+			}
 		})
+	}
+}
+
+// A peer sending no forwarded headers has nothing to strip, so it must not
+// register as a proxy misconfiguration.
+func TestStripUntrustedForwardedHeadersCounterIgnoresPlainRequests(t *testing.T) {
+	srv := newTestServer(t)
+	handler := srv.stripUntrustedForwardedHeaders(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {}))
+
+	doHandler(t, handler, http.MethodGet, "/", nil, withRemoteAddr(untrustedAddr))
+
+	if got := srv.metrics.Snapshot().API.Proxy.ForwardedHeadersStrippedTotal; got != 0 {
+		t.Fatalf("forwarded_headers_stripped_total = %d, want 0", got)
 	}
 }
 
 // Other headers must survive, or the middleware would be breaking requests.
 func TestStripUntrustedForwardedHeadersLeavesOtherHeaders(t *testing.T) {
+	srv := newTestServer(t)
 	var seen http.Header
-	handler := stripUntrustedForwardedHeaders(nil,
+	handler := srv.stripUntrustedForwardedHeaders(
 		http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 			seen = r.Header.Clone()
 		}))

@@ -21,12 +21,21 @@ const debugBodyLimit = 4096
 
 var forwardedHeaders = []string{"X-Forwarded-For", "X-Forwarded-Host", "X-Forwarded-Proto"}
 
-// stripUntrustedForwardedHeaders drops forwarded headers from untrusted peers.
-func stripUntrustedForwardedHeaders(trusted []netip.Prefix, next http.Handler) http.Handler {
+// stripUntrustedForwardedHeaders drops forwarded headers from untrusted peers
+// and counts the requests it stripped. Behind a correctly configured proxy the
+// counter stays at zero.
+func (s *Server) stripUntrustedForwardedHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !remoteIsTrusted(r.RemoteAddr, trusted) {
+		if !remoteIsTrusted(r.RemoteAddr, s.trustedProxies) {
+			stripped := false
 			for _, h := range forwardedHeaders {
-				r.Header.Del(h)
+				if r.Header.Get(h) != "" {
+					r.Header.Del(h)
+					stripped = true
+				}
+			}
+			if stripped {
+				s.metrics.ObserveForwardedHeadersStripped()
 			}
 		}
 		next.ServeHTTP(w, r)

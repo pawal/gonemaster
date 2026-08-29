@@ -44,6 +44,9 @@ type metricsPromSnapshot struct {
 	APIErrorCodeCounts   map[string]int64
 	APIRoutes            []metricsPromAPIRoute
 
+	ForwardedHeadersStrippedTotal int64
+	RateLimitKeys                 int
+
 	JobDurationHistogram boundedHistogram
 	JobDurationCount     int64
 	JobDurationTotalMs   int64
@@ -65,6 +68,8 @@ func (m *MetricsCollector) prometheusSnapshot() metricsPromSnapshot {
 	if m == nil {
 		return metricsPromSnapshot{ServerVersion: engine.VersionFull()}
 	}
+
+	rateLimitKeys := m.rateLimitKeys()
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -98,6 +103,10 @@ func (m *MetricsCollector) prometheusSnapshot() metricsPromSnapshot {
 		APIStatusClassCounts: copyStatusClassCounts(m.apiStatusClassCounts),
 		APIErrorCodeCounts:   copyStringCounts(m.apiErrorCodeCounts),
 		APIRoutes:            m.copyPromAPIRouteMetricsLocked(),
+
+		ForwardedHeadersStrippedTotal: m.forwardedStrippedTotal,
+		RateLimitKeys:                 rateLimitKeys,
+
 		JobDurationHistogram: cloneBoundedHistogram(m.jobDuration),
 		JobDurationCount:     m.jobDurationCount,
 		JobDurationTotalMs:   m.jobDurationTotalMs,
@@ -213,6 +222,12 @@ func renderPrometheusMetrics(snapshot metricsPromSnapshot) []byte {
 	for _, statusClass := range metricsStatusClasses {
 		writePromSample(&buf, "gonemaster_api_requests_by_status_class_total", map[string]string{"status_class": statusClass}, snapshot.APIStatusClassCounts[statusClass])
 	}
+
+	writePromHeader(&buf, "gonemaster_forwarded_headers_stripped_total", "Lifetime requests whose X-Forwarded-* headers were dropped as untrusted.", "counter")
+	writePromSample(&buf, "gonemaster_forwarded_headers_stripped_total", nil, snapshot.ForwardedHeadersStrippedTotal)
+
+	writePromHeader(&buf, "gonemaster_rate_limit_keys", "Distinct client IPs currently tracked by the public rate limiter.", "gauge")
+	writePromSample(&buf, "gonemaster_rate_limit_keys", nil, snapshot.RateLimitKeys)
 
 	if len(snapshot.APIErrorCodeCounts) > 0 {
 		writePromHeader(&buf, "gonemaster_api_errors_total", "Lifetime structured API errors by error code.", "counter")

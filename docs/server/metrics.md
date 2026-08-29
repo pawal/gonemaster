@@ -52,6 +52,13 @@ Top-level fields:
 `/pub/api/v1`. Route labels are the router's matched pattern, prefixed with the mount, so
 `api.routes[]` keeps the two surfaces apart (`/api/v1/jobs` vs `/pub/api/v1/jobs`).
 
+`api.proxy` checks the reverse proxy in front of the server:
+
+- `api.proxy.forwarded_headers_stripped_total`: requests that arrived with `X-Forwarded-*` from a
+  peer outside `trusted_proxy_cidrs`, whose headers were therefore discarded. Should stay at `0`.
+- `api.proxy.rate_limit_keys`: distinct client IPs the public rate limiter is tracking, `0` when it
+  is disabled. Stuck at `1` while serving many visitors means they all share one bucket.
+
 Commonly used fields:
 - `health.queue_depth`
 - `health.in_flight_jobs`
@@ -125,6 +132,7 @@ Included families:
 - DNS counters for external queries by family, cache lookups by result, and cache evictions.
 - Job lifecycle counters and current-status gauges.
 - API request counters plus per-route/per-method latency histograms.
+- `gonemaster_forwarded_headers_stripped_total` and the `gonemaster_rate_limit_keys` gauge.
 - Job duration histogram, severity totals, and locale usage totals.
 
 Excluded from Prometheus output:

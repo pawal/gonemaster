@@ -132,7 +132,14 @@ type MetricsAPISnapshot struct {
 	StatusClassCounts map[string]int64         `json:"status_class_counts"`
 	ErrorCodeCounts   map[string]int64         `json:"error_code_counts"`
 	PanicsTotal       int64                    `json:"panics_total"`
+	Proxy             MetricsProxySnapshot     `json:"proxy"`
 	Routes            []MetricsAPIRouteMetrics `json:"routes"`
+}
+
+// MetricsProxySnapshot captures reverse-proxy and rate-limiter health.
+type MetricsProxySnapshot struct {
+	ForwardedHeadersStrippedTotal int64 `json:"forwarded_headers_stripped_total"`
+	RateLimitKeys                 int   `json:"rate_limit_keys"`
 }
 
 // MetricsAPIRouteMetrics captures per-route API request statistics.
@@ -230,11 +237,14 @@ type MetricsCollector struct {
 	purgedTotal    int64
 	statusCounts   map[string]int64
 
-	apiRequestsTotal     int64
-	apiStatusClassCounts map[string]int64
-	apiErrorCodeCounts   map[string]int64
-	apiPanicsTotal       int64
-	apiRoutes            map[string]*apiRouteMetrics
+	apiRequestsTotal       int64
+	apiStatusClassCounts   map[string]int64
+	apiErrorCodeCounts     map[string]int64
+	apiPanicsTotal         int64
+	apiRoutes              map[string]*apiRouteMetrics
+	forwardedStrippedTotal int64
+	// nil when the rate limiter is disabled.
+	rateLimitKeysFn func() int
 
 	jobDuration        boundedHistogram
 	jobDurationCount   int64
@@ -449,6 +459,33 @@ func (m *MetricsCollector) ObservePanic() {
 	m.mu.Unlock()
 }
 
+// ObserveForwardedHeadersStripped records one request whose forwarded headers
+// were discarded because the peer is not a trusted proxy.
+func (m *MetricsCollector) ObserveForwardedHeadersStripped() {
+	m.mu.Lock()
+	m.forwardedStrippedTotal++
+	m.mu.Unlock()
+}
+
+// SetRateLimitKeysSource registers the gauge source for distinct limiter keys.
+func (m *MetricsCollector) SetRateLimitKeysSource(fn func() int) {
+	m.mu.Lock()
+	m.rateLimitKeysFn = fn
+	m.mu.Unlock()
+}
+
+// rateLimitKeys reads the source outside m.mu, so the limiter's own lock is
+// never taken while holding it.
+func (m *MetricsCollector) rateLimitKeys() int {
+	m.mu.Lock()
+	fn := m.rateLimitKeysFn
+	m.mu.Unlock()
+	if fn == nil {
+		return 0
+	}
+	return fn()
+}
+
 // ObserveJobCompletion records completion data for a terminal job.
 func (m *MetricsCollector) ObserveJobCompletion(status JobStatus, duration time.Duration, severityTotals map[string]int64) {
 	m.ObserveJobCompletionWithContext("", "", status, duration, severityTotals)
@@ -565,6 +602,7 @@ func (m *MetricsCollector) snapshotAt(now time.Time) MetricsSnapshot {
 func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, batchLimit int) MetricsSnapshot {
 	now = now.UTC()
 	uptime := max(int64(now.Sub(m.startedAt).Seconds()), 0)
+	rateLimitKeys := m.rateLimitKeys()
 
 	m.mu.Lock()
 	statusCounts := copyStatusCounts(m.statusCounts)
@@ -588,6 +626,7 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 	apiStatusClassCounts := copyStatusClassCounts(m.apiStatusClassCounts)
 	apiErrorCodeCounts := copyStringCounts(m.apiErrorCodeCounts)
 	apiPanicsTotal := m.apiPanicsTotal
+	forwardedStrippedTotal := m.forwardedStrippedTotal
 	apiRoutes := m.copyAPIRouteMetricsLocked()
 	jobDurationCount := m.jobDurationCount
 	jobDurationTotalMs := m.jobDurationTotalMs
@@ -648,7 +687,11 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 			StatusClassCounts: apiStatusClassCounts,
 			ErrorCodeCounts:   apiErrorCodeCounts,
 			PanicsTotal:       apiPanicsTotal,
-			Routes:            apiRoutes,
+			Proxy: MetricsProxySnapshot{
+				ForwardedHeadersStrippedTotal: forwardedStrippedTotal,
+				RateLimitKeys:                 rateLimitKeys,
+			},
+			Routes: apiRoutes,
 		},
 		Quality: MetricsQualitySnapshot{
 			JobDurationMs: MetricsDurationSnapshot{

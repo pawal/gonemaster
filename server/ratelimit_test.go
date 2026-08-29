@@ -105,6 +105,64 @@ func TestRateLimiterCleanupKeepsActiveEntries(t *testing.T) {
 	}
 }
 
+func TestRateLimiterKeysCountsDistinctIPs(t *testing.T) {
+	rl := NewRateLimiter(5, time.Minute)
+	if got := rl.Keys(); got != 0 {
+		t.Fatalf("Keys on a fresh limiter = %d, want 0", got)
+	}
+
+	rl.Allow("1.2.3.4")
+	rl.Allow("1.2.3.4")
+	rl.Allow("5.6.7.8")
+
+	if got := rl.Keys(); got != 2 {
+		t.Fatalf("Keys = %d, want 2 distinct IPs", got)
+	}
+}
+
+// The gauge exists to make the bucket-collapse failure visible: with the wrong
+// trusted CIDR every visitor resolves to the proxy's own address, so many
+// clients share one bucket and the gauge sticks at 1.
+func TestRateLimitKeysGaugeShowsBucketCollapse(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		trusted []string
+		want    int
+	}{
+		{name: "proxy trusted, per-client buckets", trusted: []string{"127.0.0.1/32"}, want: 3},
+		{name: "proxy not trusted, buckets collapse", want: 1},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			srv := newTestServer(t,
+				withConfig(func(c *Config) { c.TrustedProxyCIDRs = tc.trusted }),
+				withPublicAPI(func(api *PublicAPIConfig) {
+					api.RateLimitEnabled = true
+					api.RateLimitMax = 10
+				}))
+
+			for _, client := range []string{"198.51.100.1", "198.51.100.2", "198.51.100.3"} {
+				doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`,
+					withRemoteAddr("127.0.0.1:5000"), withHeader("X-Forwarded-For", client))
+			}
+
+			if got := srv.metrics.Snapshot().API.Proxy.RateLimitKeys; got != tc.want {
+				t.Fatalf("rate_limit_keys = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// Reporting 1 with the limiter off would look like the collapse above.
+func TestRateLimitKeysGaugeIsZeroWhenDisabled(t *testing.T) {
+	srv := newTestServer(t)
+
+	doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`)
+
+	if got := srv.metrics.Snapshot().API.Proxy.RateLimitKeys; got != 0 {
+		t.Fatalf("rate_limit_keys = %d, want 0 with the limiter disabled", got)
+	}
+}
+
 // --- clientIP tests ---
 
 func TestClientIP(t *testing.T) {

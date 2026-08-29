@@ -646,3 +646,29 @@ func TestMetricsCollectorTracksJobsPurged(t *testing.T) {
 		t.Fatalf("expected prometheus counter gonemaster_jobs_purged_total 5, got:\n%s", prom)
 	}
 }
+
+func TestMetricsCollectorExportsProxyCounters(t *testing.T) {
+	collector := newMetricsCollector(DefaultConfig(), time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC))
+	collector.ObserveForwardedHeadersStripped()
+	collector.ObserveForwardedHeadersStripped()
+	collector.SetRateLimitKeysSource(func() int { return 7 })
+
+	proxy := collector.Snapshot().API.Proxy
+	if proxy.ForwardedHeadersStrippedTotal != 2 {
+		t.Fatalf("forwarded_headers_stripped_total = %d, want 2", proxy.ForwardedHeadersStrippedTotal)
+	}
+	if proxy.RateLimitKeys != 7 {
+		t.Fatalf("rate_limit_keys = %d, want 7", proxy.RateLimitKeys)
+	}
+
+	// Both are single scalars, so they carry no label and add no series.
+	prom := string(renderPrometheusMetrics(collector.prometheusSnapshot()))
+	for _, want := range []string{
+		"gonemaster_forwarded_headers_stripped_total 2",
+		"gonemaster_rate_limit_keys 7",
+	} {
+		if !strings.Contains(prom, want) {
+			t.Fatalf("expected %q in prometheus output, got:\n%s", want, prom)
+		}
+	}
+}

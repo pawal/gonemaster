@@ -61,6 +61,14 @@ func (rl *RateLimiter) Allow(ip string) (allowed bool, retryAfter int) {
 	return true, 0
 }
 
+// Keys returns the number of distinct client IPs currently tracked. A value of
+// 1 while many visitors are served means every request resolves to one IP.
+func (rl *RateLimiter) Keys() int {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	return len(rl.entries)
+}
+
 // Cleanup removes entries for IPs whose timestamps have all left the window.
 // Safe to call concurrently; typically called on a periodic ticker.
 func (rl *RateLimiter) Cleanup() {

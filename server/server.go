@@ -175,6 +175,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	}
 	if cfg.PublicAPI.RateLimitEnabled {
 		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)
+		s.metrics.SetRateLimitKeysSource(s.rateLimiter.Keys)
 	}
 	s.trustedProxies = parseTrustedProxies(cfg.TrustedProxyCIDRs)
 	if cfg.CrossJobHotCache {
@@ -223,7 +224,7 @@ func (s *Server) ReloadAuth(cfg AuthConfig) error {
 // Handler returns the root HTTP handler. Request-ID and access-log middleware
 // are applied per API surface in routes(), not here.
 func (s *Server) Handler() http.Handler {
-	return stripUntrustedForwardedHeaders(s.trustedProxies,
+	return s.stripUntrustedForwardedHeaders(
 		securityHeadersMiddleware(gzipMiddleware(s.mux)))
 }
 

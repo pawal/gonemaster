@@ -275,6 +275,20 @@ func (s *Server) apiChain(fallbackRoute string, next http.Handler) http.Handler 
 		s.recoverMiddleware(s.apiMetricsMiddleware(fallbackRoute, next))))
 }
 
+// pageChain wraps a human-facing mount with request ID, access log, and panic
+// recovery. Static assets are served without a log line.
+func (s *Server) pageChain(route string, next http.Handler) http.Handler {
+	recovered := s.recoverMiddleware(next)
+	logged := s.accessLogMiddleware(route, recovered)
+	return s.requestIDMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if isStaticAsset(r.URL.Path) {
+			recovered.ServeHTTP(w, r)
+			return
+		}
+		logged.ServeHTTP(w, r)
+	}))
+}
+
 func (s *Server) routes() {
 	apiMux := http.NewServeMux()
 	apiMux.HandleFunc("/jobs/batch", s.handleJobsBatch)
@@ -417,14 +431,15 @@ func (s *Server) routes() {
 	pubHandler = s.apiChain("/pub/api/v1/unknown", pubHandler)
 	s.mux.Handle("/pub/api/v1/", pubHandler)
 
-	s.mux.HandleFunc("GET /robots.txt", s.handleRobotsTxt)
-	s.mux.HandleFunc("GET /sitemap.xml", s.handleSitemap)
-	s.mux.Handle("/public/", http.StripPrefix("/public", serverpublic.Handler(s.cfg.PublicURL, s.cfg.PublicUIPath, s.publicResultLookup())))
-	s.mux.Handle("/analysis/", legacyTagRedirect(
+	s.mux.Handle("GET /robots.txt", s.pageChain("/robots.txt", http.HandlerFunc(s.handleRobotsTxt)))
+	s.mux.Handle("GET /sitemap.xml", s.pageChain("/sitemap.xml", http.HandlerFunc(s.handleSitemap)))
+	s.mux.Handle("/public/", s.pageChain("/public/",
+		http.StripPrefix("/public", serverpublic.Handler(s.cfg.PublicURL, s.cfg.PublicUIPath, s.publicResultLookup()))))
+	s.mux.Handle("/analysis/", s.pageChain("/analysis/", legacyTagRedirect(
 		http.StripPrefix("/analysis", serveranalysisui.Handler(s.cfg.PublicURL)),
-	))
-	s.mux.HandleFunc("/analysis", func(w http.ResponseWriter, r *http.Request) {
+	)))
+	s.mux.Handle("/analysis", s.pageChain("/analysis", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/analysis/", http.StatusMovedPermanently)
-	})
-	s.mux.Handle("/", serverui.Handler())
+	})))
+	s.mux.Handle("/", s.pageChain("/", serverui.Handler()))
 }

@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"path"
 	"runtime/debug"
 	"strings"
 	"sync/atomic"
@@ -180,6 +181,19 @@ func (s *Server) accessLogMiddleware(fallbackRoute string, next http.Handler) ht
 		}
 		s.logger.LogAttrs(r.Context(), statusLevel(status), "http_request", attrs...)
 	})
+}
+
+// staticAssetExts are the file types the embedded UIs serve as assets.
+var staticAssetExts = map[string]bool{
+	".js": true, ".mjs": true, ".css": true, ".map": true,
+	".svg": true, ".png": true, ".jpg": true, ".jpeg": true, ".webp": true, ".gif": true,
+	".ico": true, ".webmanifest": true,
+	".woff": true, ".woff2": true, ".ttf": true, ".otf": true,
+}
+
+// isStaticAsset reports whether a request path names a UI asset, not a page.
+func isStaticAsset(requestPath string) bool {
+	return staticAssetExts[strings.ToLower(path.Ext(requestPath))]
 }
 
 type metricsAwareResponseWriter interface {

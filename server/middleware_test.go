@@ -175,6 +175,81 @@ func TestPublicRequestsNeverLabelledAsAdmin(t *testing.T) {
 	}
 }
 
+// Without recovery a panic in the SSR result page reaches net/http, which
+// closes the connection and bypasses both slog and panics_total.
+func TestPageChainRecoversFromPanic(t *testing.T) {
+	srv := newTestServer(t)
+	panicker := http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
+		panic("page-panic")
+	})
+
+	resp := doHandler(t, srv.pageChain("/public/", panicker), http.MethodGet, "/public/result/abc123", nil)
+
+	wantStatus(t, resp, http.StatusInternalServerError)
+	if got := srv.metrics.Snapshot().API.PanicsTotal; got != 1 {
+		t.Fatalf("panics_total = %d, want 1", got)
+	}
+}
+
+// Driving the real server proves the mounts are wired to pageChain, which is
+// what puts the recovery above onto them too.
+func TestPageMountsEmitAccessLog(t *testing.T) {
+	for _, path := range []string{"/public/", "/analysis/", "/robots.txt", "/sitemap.xml", "/"} {
+		t.Run(path, func(t *testing.T) {
+			var buf bytes.Buffer
+			srv := newTestServer(t, withLogTo(&buf, "info"))
+
+			doJSON(t, srv, http.MethodGet, path, nil)
+
+			line := findLogLine(t, &buf, "http_request")
+			if line["path"] != path {
+				t.Fatalf("path = %v, want %q", line["path"], path)
+			}
+			if id, ok := line["request_id"].(string); !ok || id == "" {
+				t.Fatalf("missing request_id, got %v", line["request_id"])
+			}
+		})
+	}
+}
+
+// A 404 is fine here: nothing may be logged either way, so the test does not
+// depend on the UI having been built.
+func TestPageMountsSkipAccessLogForAssets(t *testing.T) {
+	for _, path := range []string{
+		"/public/assets/app-abc123.js",
+		"/assets/admin-abc123.css",
+		"/analysis/_app/immutable/entry-abc123.js",
+		"/public/favicon.svg",
+	} {
+		t.Run(path, func(t *testing.T) {
+			var buf bytes.Buffer
+			srv := newTestServer(t, withLogTo(&buf, "info"))
+
+			doJSON(t, srv, http.MethodGet, path, nil)
+
+			if lines := decodeLogLines(t, &buf); len(lines) != 0 {
+				t.Fatalf("expected no access-log line for an asset, got %v", lines)
+			}
+		})
+	}
+}
+
+func TestIsStaticAsset(t *testing.T) {
+	assets := []string{"/assets/app-abc.js", "/public/style.CSS", "/favicon.ico", "/fonts/inter.woff2"}
+	pages := []string{"/", "/public/", "/public/result/abc123", "/robots.txt", "/sitemap.xml", "/analysis/"}
+
+	for _, p := range assets {
+		if !isStaticAsset(p) {
+			t.Errorf("isStaticAsset(%q) = false, want true", p)
+		}
+	}
+	for _, p := range pages {
+		if isStaticAsset(p) {
+			t.Errorf("isStaticAsset(%q) = true, want false", p)
+		}
+	}
+}
+
 // findLogLine returns the first decoded log line whose msg matches want.
 func findLogLine(t *testing.T, buf *bytes.Buffer, want string) map[string]any {
 	t.Helper()

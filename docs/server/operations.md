@@ -133,15 +133,23 @@ chosen so operators can alert on `error` lines without parsing status codes.
 
 ### Access log
 
-Each `/api/v1` and `/pub/api/v1` request emits one `http_request` line. Its level
-follows the response status: 2xx/3xx -> `info`, 4xx -> `warn`, 5xx -> `error`.
-Fields:
+One `http_request` line per request, on the API mounts (`/api/v1`,
+`/pub/api/v1`) and on the page-serving mounts (`/`, `/public/`, `/analysis/`,
+`/robots.txt`, `/sitemap.xml`). Static assets, meaning the hashed bundles,
+fonts, and icons a page pulls in, are served without a line, so the log holds
+roughly one entry per page view rather than one per file.
+
+Page views are visitor activity and each line carries the client IP in `remote`,
+so the retention policy of whatever collects stderr also governs this data.
+
+The line's level follows the response status: 2xx/3xx -> `info`, 4xx -> `warn`,
+5xx -> `error`. Fields:
 
 | Field | Meaning |
 |---|---|
 | `method` | HTTP method. |
 | `path` | Request path. |
-| `route` | Templated route (IDs collapsed), for aggregation. |
+| `route` | The router's matched pattern, prefixed with the mount, for aggregation. |
 | `status` | HTTP status code. |
 | `duration_ms` | Handler wall time in milliseconds. |
 | `bytes` | Response body bytes written. |
@@ -152,12 +160,12 @@ Fields:
 A sample JSON access line:
 
 ```json
-{"time":"2026-07-19T10:00:00Z","level":"INFO","msg":"http_request","method":"GET","path":"/api/v1/jobs/j1","route":"/api/v1/jobs/{job_id}","status":200,"duration_ms":12,"bytes":842,"remote":"203.0.113.7","request_id":"9f1c2a3b4d5e6f70"}
+{"time":"2026-07-19T10:00:00Z","level":"INFO","msg":"http_request","method":"GET","path":"/api/v1/runs/r1","route":"/api/v1/runs/{id}","status":200,"duration_ms":12,"bytes":842,"remote":"203.0.113.7","request_id":"9f1c2a3b4d5e6f70"}
 ```
 
 ### Request IDs
 
-Every API request is tagged with a correlation ID that ties the access-log line,
+Every request is tagged with a correlation ID that ties the access-log line,
 any handler audit/error lines, and a panic line to the same request. The ID is
 returned in the `X-Request-Id` response header. An inbound `X-Request-Id` is
 trusted only from a `trusted_proxy_cidrs` peer; otherwise a fresh ID is

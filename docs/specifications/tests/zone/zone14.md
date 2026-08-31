@@ -1,6 +1,6 @@
 # Zone14
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check existence and RFC 8976 compliance of the ZONEMD RR at the zone apex.

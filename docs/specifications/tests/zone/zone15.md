@@ -1,6 +1,6 @@
 # Zone15
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check presence and syntax of CAA records (RFC 8659) at the zone apex.

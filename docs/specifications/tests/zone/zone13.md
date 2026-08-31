@@ -1,6 +1,6 @@
 # Zone13
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Validate that the SPF policy at the zone apex does not exceed the DNS lookup limit defined in RFC 7208 Section 4.6.4.

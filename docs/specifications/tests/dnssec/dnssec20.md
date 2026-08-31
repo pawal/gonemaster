@@ -1,6 +1,6 @@
 # DNSSEC20
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that the NSEC/NSEC3 apex type bitmap accurately reflects the RR types actually present in the zone.

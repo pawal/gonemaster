@@ -1,6 +1,6 @@
 # DNSSEC19
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Check DNSKEY records for known cryptographic weaknesses and membership in blocklists of compromised keys.

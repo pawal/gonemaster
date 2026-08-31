@@ -1,6 +1,6 @@
 # DNSSEC21
 
-Status: Draft
+Status: Final
 
 ## Purpose
 - Verify that the parent zone correctly signs the DS RRset that delegates the child zone.

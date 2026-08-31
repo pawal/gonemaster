@@ -127,8 +127,8 @@ the other 73, and adds ten testcases that have no upstream counterpart:
 
 **Cadence.** Upstream ships roughly two feature releases a year: v2024.1 (July
 2024), v2024.2 (December 2024), v2025.1 (June 2025), v2025.2 (December 2025),
-v2026.1 (June 2026). gonemaster releases continuously from CI: 64 tags, most
-recently v1.7.2 on 26 August 2026. A change proposed upstream waits for a
+v2026.1 (June 2026). gonemaster releases continuously from CI: 65 tags, most
+recently v1.7.3 on 31 August 2026. A change proposed upstream waits for a
 release cycle; in gonemaster it waits for the next tag.
 
 ### Side by side
@@ -137,7 +137,7 @@ release cycle; in gonemaster it waits for the next tag.
 |---|---|---|
 | Testcases | 83 implemented, 9 modules | 74 documented specifications, one of them a placeholder |
 | Specification corpus | own corpus under CC BY 4.0, derived from upstream's | upstream corpus under CC BY 4.0 |
-| Release cadence | continuous from CI, 64 tags, v1.7.2 | about two feature releases a year |
+| Release cadence | continuous from CI, 65 tags, v1.7.3 | about two feature releases a year |
 | Language and runtime | Go, one static binary | Perl |
 | Deployment shape | one binary with the web UIs embedded, on SQLite, PostgreSQL, or MariaDB | Engine, CLI, Backend, and GUI installed separately |
 | Numeric score and letter grade | 0-100 and A+ to F | not available |

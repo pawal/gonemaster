@@ -21,7 +21,7 @@ theme = "relearn"
 [[module.mounts]]
   source = "../docs"
   target = "content"
-  excludeFiles = ["README.md", "**/README.md", "specifications/templates/**", "specifications/known-behavior-divergences.md"]
+  excludeFiles = ["README.md", "**/README.md", "why.md", "specifications/templates/**", "specifications/known-behavior-divergences.md"]
 [[module.mounts]]
   source = "../docs"
   target = "assets/docs"

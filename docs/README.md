@@ -9,6 +9,7 @@ The [architecture overview](architecture.md) is a one-sitting tour of the system
 
 | I want to... | Start here |
 |---|---|
+| Understand what gonemaster is and how it compares | [why.md](why.md) |
 | Run one DNS check locally | [cli/](cli/README.md) |
 | Start and operate the HTTP server | [server/](server/README.md) |
 | Automate the server from a shell or script | [client/](client/README.md) |

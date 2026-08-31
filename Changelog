@@ -6,6 +6,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
+- docs: a "Why gonemaster" page
 - server: request metrics and the access log cover the public API and the page mounts, with new proxy-health counters
 
 ### Changed

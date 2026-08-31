@@ -14,6 +14,10 @@ and an MCP bridge for AI agents.
 Try it without installing anything: a public instance runs at
 [gonemaster.evilbit.de](https://gonemaster.evilbit.de/).
 
+New to the project?
+[Why gonemaster](https://pawal.codeberg.page/gonemaster/why/) covers what it is,
+how it compares with Zonemaster, and when to use something else.
+
 ## What gonemaster Tests
 
 A test run takes a domain through a series of testcases grouped into modules:
@@ -149,6 +153,7 @@ Full documentation: [pawal.codeberg.page/gonemaster](https://pawal.codeberg.page
 
 Start with the [architecture overview](https://pawal.codeberg.page/gonemaster/architecture/) for a one-sitting tour of the system: binaries, request lifecycles, data model, concurrency, security posture, and known limitations.
 
+- [Why gonemaster](https://pawal.codeberg.page/gonemaster/why/) - what it is, how it compares with Zonemaster
 - [CLI](https://pawal.codeberg.page/gonemaster/cli/) - local test runner
 - [Server](https://pawal.codeberg.page/gonemaster/server/) - HTTP server and queue
 - [Client](https://pawal.codeberg.page/gonemaster/client/) - automation client

@@ -83,7 +83,7 @@ Status: Final
   - Upstream: iterates nameserver IP set. Gonemaster: iterates raw [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers) output (no testcase-local deduplication).
   - Upstream: does not explicitly describe testcase boundary and transport-disabled debug emissions. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Resolved upstream issues:
-  - Upstream engine bug ([zonemaster#1468](https://github.com/zonemaster/zonemaster/issues/1468)): upstream engine queried `SOA` instead of `DNSKEY` as specified. Gonemaster now queries `DNSKEY` matching the specification. Upstream has since fixed this in their engine.
+  - Upstream engine bug ([zonemaster-engine#1503](https://github.com/zonemaster/zonemaster-engine/issues/1503)): upstream engine queried `SOA` instead of `DNSKEY` as specified. Gonemaster now queries `DNSKEY` matching the specification. Upstream has since fixed this in their engine.
   - Upstream engine bug: `NO_EDNS_SUPPORT` was emitted on any `FORMERR`; now requires `FORMERR` with no EDNS OPT record in the response (`!HasEdns()`).
   - Upstream engine bug: success branch checked `edns_rcode == 0` in addition to `NOERROR` and `EdnsVersion == 0`; the `edns_rcode` check is now removed to match the specification.
 

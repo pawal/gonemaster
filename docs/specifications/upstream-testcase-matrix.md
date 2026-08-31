@@ -69,7 +69,7 @@ Status meanings:
 | `nameserver10` | `nameserver10` | implemented | Direct testcase ID mapping. |
 | `nameserver11` | `nameserver11` | implemented | Direct testcase ID mapping. |
 | `nameserver12` | `nameserver12` | implemented | Direct testcase ID mapping. |
-| `nameserver13` | `nameserver13` | needs-review | Review tag: `DIV-NS13-SPEC-QUERYTYPE`. Reported as [zonemaster#1468](https://github.com/zonemaster/zonemaster/issues/1468). See `docs/specifications/known-behavior-divergences.md`. |
+| `nameserver13` | `nameserver13` | needs-review | Review tag: `DIV-NS13-SPEC-QUERYTYPE`. Reported as [zonemaster-engine#1503](https://github.com/zonemaster/zonemaster-engine/issues/1503). See `docs/specifications/known-behavior-divergences.md`. |
 | `nameserver15` | `nameserver15` | implemented | Direct testcase ID mapping. |
 | `syntax01` | `syntax01` | implemented | Direct testcase ID mapping. |
 | `syntax02` | `syntax02` | implemented | Direct testcase ID mapping. |

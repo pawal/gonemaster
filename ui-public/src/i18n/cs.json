@@ -6,6 +6,7 @@
   "pub.about_summary": "O aplikaci",
   "pub.about_intro": "gonemaster kontroluje konfiguraci DNS domény. Testuje delegaci, DNSSEC, chování jmenných serverů, konzistenci zóny a další a hlásí nálezy podle závažnosti.",
   "pub.about_credit": "Vytvořil {author}. Zdrojový kód na {repo}.",
+  "pub.about_why": "V {why} najdete srovnání projektu s dalšími nástroji pro testování DNS.",
   "pub.locale_select_title": "Jazyk výsledných zpráv",
   "pub.locale_select_aria": "Jazyk výsledků",
   "pub.theme_cycle_title": "Barevné téma: {theme} - kliknutím přepnete",

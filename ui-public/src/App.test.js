@@ -43,6 +43,44 @@ describe("App", () => {
     expect(document.querySelector("[data-testid='results-view']")).toBeNull();
   });
 
+  describe("about disclosure", () => {
+    // The About block is the only place in the public UI that points at the
+    // documentation site, so the href is asserted literally: a typo here is a
+    // 404 for every first-time visitor, and nothing else in the suite covers it.
+    const aboutBody = () => document.querySelector(".about-details .about-body");
+    const whyLink = () => aboutBody().querySelector("a[href*='/gonemaster/why/']");
+
+    it("links to the why page from the About body", () => {
+      render(App);
+      const link = whyLink();
+      expect(link).toBeTruthy();
+      expect(link.getAttribute("href")).toBe("https://pawal.codeberg.page/gonemaster/why/");
+      expect(link.textContent).toBe("Why gonemaster");
+    });
+
+    it("opens the why link in a new tab with noopener", () => {
+      render(App);
+      const link = whyLink();
+      expect(link.getAttribute("target")).toBe("_blank");
+      expect(link.getAttribute("rel")).toBe("noopener");
+    });
+
+    it("injects the why anchor as markup rather than escaped text", () => {
+      render(App);
+      // The line is rendered with {@html}, so a regression that escapes the
+      // anchor would leave the user reading a literal tag.
+      expect(aboutBody().textContent).not.toContain("<a href");
+      expect(aboutBody().textContent).toContain("Why gonemaster");
+    });
+
+    it("uses no inline style attributes in the About body", () => {
+      render(App);
+      // style-src is 'self' with no 'unsafe-inline' for /public/, so an inline
+      // style attribute anywhere in this block is blocked by the browser.
+      expect(aboutBody().querySelector("[style]")).toBeNull();
+    });
+  });
+
   // Path routing
 
   describe("routing", () => {

@@ -6,6 +6,7 @@
   "pub.about_summary": "Acerca de",
   "pub.about_intro": "gonemaster comprueba la configuración DNS de un dominio. Prueba la delegación, DNSSEC, el comportamiento de los servidores de nombres, la coherencia de zona y más, e informa de los hallazgos por gravedad.",
   "pub.about_credit": "Escrito por {author}. Código fuente en {repo}.",
+  "pub.about_why": "Consulta {why} para ver cómo se compara el proyecto con otras herramientas de prueba de DNS.",
   "pub.locale_select_title": "Idioma de los mensajes de resultados",
   "pub.locale_select_aria": "Idioma de resultados",
   "pub.theme_cycle_title": "Tema de color: {theme} - clic para cambiar",

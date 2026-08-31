@@ -6,6 +6,7 @@
   "pub.about_summary": "Over",
   "pub.about_intro": "gonemaster controleert de DNS-configuratie van een domein. Het test delegatie, DNSSEC, naamservergedrag, zoneconsistentie en meer, en rapporteert bevindingen op ernst.",
   "pub.about_credit": "Geschreven door {author}. Broncode op {repo}.",
+  "pub.about_why": "Zie {why} voor hoe het project zich verhoudt tot andere DNS-testtools.",
   "pub.locale_select_title": "Taal van resultaatberichten",
   "pub.locale_select_aria": "Resultaattaal",
   "pub.theme_cycle_title": "Kleurthema: {theme} - klik om te wisselen",

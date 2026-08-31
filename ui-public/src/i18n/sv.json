@@ -6,6 +6,7 @@
   "pub.about_summary": "Om",
   "pub.about_intro": "gonemaster kontrollerar DNS-konfigurationen för en domän. Den testar delegering, DNSSEC, namnserverbeteende, zonkonsekvens med mera och rapporterar fynd efter allvarlighetsgrad.",
   "pub.about_credit": "Skriven av {author}. Källkod på {repo}.",
+  "pub.about_why": "Se {why} för hur projektet står sig jämfört med andra DNS-testverktyg.",
   "pub.locale_select_title": "Språk för resultatmeddelanden",
   "pub.locale_select_aria": "Resultatspråk",
   "pub.theme_cycle_title": "Färgtema: {theme} - klicka för att byta",

@@ -142,6 +142,7 @@
   // Static links injected into the translatable about credit line.
   const authorLink = '<a href="https://codeberg.org/pawal" target="_blank" rel="noopener">Patrik Wallström</a>';
   const repoLink = '<a href="https://codeberg.org/pawal/gonemaster" target="_blank" rel="noopener">Codeberg</a>';
+  const whyLink = '<a href="https://pawal.codeberg.page/gonemaster/why/" target="_blank" rel="noopener">Why gonemaster</a>';
   // Fail-safe default: hide scoring until server confirms it is enabled.
   let scoringEnabled = $state(false);
   let nameserverTimingsEnabled = $state(false);
@@ -376,6 +377,7 @@
       <div class="about-body">
         <p>{$t("pub.about_intro")}</p>
         <p>{@html $t("pub.about_credit", { author: authorLink, repo: repoLink })}</p>
+        <p>{@html $t("pub.about_why", { why: whyLink })}</p>
       </div>
     </details>
     {#if versionGonemaster}

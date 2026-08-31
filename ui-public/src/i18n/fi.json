@@ -6,6 +6,7 @@
   "pub.about_summary": "Tietoja",
   "pub.about_intro": "gonemaster tarkistaa verkkotunnuksen DNS-asetukset. Se testaa delegoinnin, DNSSEC:n, nimipalvelimen toiminnan, vyöhykkeen yhtenäisyyden ja muuta sekä raportoi havainnot vakavuuden mukaan.",
   "pub.about_credit": "Tekijä: {author}. Lähdekoodi: {repo}.",
+  "pub.about_why": "Katso {why}, miten projekti vertautuu muihin DNS-testaustyökaluihin.",
   "pub.locale_select_title": "Tulosviestien kieli",
   "pub.locale_select_aria": "Tuloskieli",
   "pub.theme_cycle_title": "Väriasetus: {theme} - napsauta vaihtaaksesi",

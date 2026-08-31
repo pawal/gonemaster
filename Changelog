@@ -23,6 +23,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Fixed
 
+- dnssec03: the NSEC3 salt length is reported in octets, not as twice that
 - server: an unknown `min_level` is rejected with `400` instead of failing the job after the run
 
 ## [v1.7.2] - 2026-08-26

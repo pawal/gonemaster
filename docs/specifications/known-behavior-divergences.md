@@ -47,6 +47,7 @@ Status meanings:
 
 | Review tag | Scope | Status | Upstream report status | Upstream issue | Summary | Primary evidence | Testcase spec evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- |
+| `DIV-DS03-SALT-LENGTH` | `dnssec03` | open | not-reported | `-` | Upstream derives the NSEC3 salt length from the hexadecimal representation of the `Salt` field, so `DS03_ILLEGAL_SALT_LENGTH` reports twice the octet count while its message names the value as octets. Gonemaster reports the octet count defined by RFC 5155 section 3.1.5. | RFC 5155 section 3.1.5, [dnssec.go](../../engine/test/dnssec/dnssec.go), upstream engine `DNSSEC.pm` | [tests/dnssec/dnssec03.md](tests/dnssec/dnssec03.md) (`Potential upstream report`) |
 | `DIV-CONS01-SERIAL-ARITH` | `consistency01` | open | not-reported | `-` | Upstream sorts serial values as strings and subtracts the first from the last, which mis-ranks serials of differing length and serials near the 32-bit wrap boundary. Gonemaster orders serials with RFC 1982 arithmetic. | upstream engine `Consistency.pm` | [tests/consistency/consistency01.md](tests/consistency/consistency01.md) (`Potential upstream report`) |
 | `DIV-RECURSOR-CACHE-GROWTH` | cross-cutting recursor | tracking | not-reported | `-` | Global recursive cache has no built-in size/TTL controls in recursor layer. | upstream engine `Recursor.pm` | Cross-cutting; attach affected testcase spec evidence when a testcase is shown to depend on it. |
 | `DIV-RECURSOR-CACHE-UNDEF` | cross-cutting recursor | tracking | not-reported | `-` | `undef` recursion results can be cached and reused as negatives instead of retrying. | upstream engine `Recursor.pm` | Cross-cutting; attach affected testcase spec evidence when a testcase is shown to depend on it. |
@@ -59,6 +60,7 @@ Status meanings:
 - `delegation01`: `DIV-DEL01-IPV6-SEVERITY` (proposal; see table)
 - `delegation03`: `DIV-DEL03-512-BAND`
 - `dnssec02`: `DIV-DS02-PRIVATE-DS-ALGO`
+- `dnssec03`: `DIV-DS03-SALT-LENGTH`
 - `dnssec05`: `DIV-DS05-ALGO18`
 - `dnssec09`: `DIV-DS09-RRSIG-FALSE-POSITIVE` (resolved; see table)
 - `dnssec21`: `DIV-DS21-PARENT-DS-RRSIG`

@@ -872,6 +872,102 @@ func TestDNSSEC03IllegalHashAlgo(t *testing.T) {
 	}
 }
 
+// The NSEC3 Salt field carries hex text, but RFC 5155 section 3.1.5 counts the salt
+// in octets, which is what the message promises the reader ("{int} octets").
+func TestDNSSEC03SaltLengthCountsOctets(t *testing.T) {
+	// 8 hex characters, so 4 octets on the wire.
+	const saltHex = "aabbccdd"
+	const saltOctets = 4
+
+	ctx := tctest.Context(t)
+
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.13", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "DNSKEY":
+			key := tctest.DNSKEYRR(q.Name, 8, tctest.PublicKey("AwEAAc=="))
+			return dnskeyPacket(q.Name, key)
+		case "NSEC":
+			nsec3 := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
+			nsec3.Hash = 1
+			nsec3.Flags = 0
+			nsec3.Iterations = 0
+			nsec3.SaltLength = saltOctets
+			nsec3.Salt = saltHex
+			nsec3.HashLength = 0
+			nsec3.NextDomain = ""
+			return nsec3Packet(q.Name, nsec3)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	})
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC03(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec03: %v", err)
+	}
+
+	illegal := tctest.RequireTag(t, entries, "DS03_ILLEGAL_SALT_LENGTH")
+	got, ok := illegal.Args["int"].(int)
+	if !ok {
+		t.Fatalf("expected an int salt length for DS03_ILLEGAL_SALT_LENGTH, got %#v", illegal.Args["int"])
+	}
+	if got != saltOctets {
+		t.Fatalf("expected salt length %d octets, got %d (hex-string length would be %d)", saltOctets, got, len(saltHex))
+	}
+
+	servers := tctest.Servers(t, illegal.Args["servers"])
+	if len(servers) != 1 || servers[0]["ns"] != "ns1.example" {
+		t.Fatalf("unexpected typed server payload for DS03_ILLEGAL_SALT_LENGTH: %#v", illegal.Args["servers"])
+	}
+}
+
+// An absent salt is the recommended practice and stays legal at length 0.
+func TestDNSSEC03EmptySaltIsLegal(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.13", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "DNSKEY":
+			key := tctest.DNSKEYRR(q.Name, 8, tctest.PublicKey("AwEAAc=="))
+			return dnskeyPacket(q.Name, key)
+		case "NSEC":
+			nsec3 := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
+			nsec3.Hash = 1
+			nsec3.Flags = 0
+			nsec3.Iterations = 0
+			nsec3.SaltLength = 0
+			nsec3.Salt = ""
+			nsec3.HashLength = 0
+			nsec3.NextDomain = ""
+			return nsec3Packet(q.Name, nsec3)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	})
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC03(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec03: %v", err)
+	}
+
+	tctest.RequireTag(t, entries, "DS03_LEGAL_EMPTY_SALT")
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "DS03_ILLEGAL_SALT_LENGTH" {
+			t.Fatalf("an absent salt must not be reported as illegal: %#v", entry.Args)
+		}
+	}
+}
+
 func TestDNSSEC03ParallelDNSKEYQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)

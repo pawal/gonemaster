@@ -1639,11 +1639,8 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			outcome.nsec3Flags = rr.Flags
 			outcome.nsec3Iterations = rr.Iterations
 
-			saltLength := 0
-			if rr.Salt != "" {
-				saltLength = len(rr.Salt)
-			}
-			outcome.nsec3SaltLength = saltLength
+			// RFC 5155 section 3.1.5 counts the salt in octets, and Salt is hex text.
+			outcome.nsec3SaltLength = len(rr.Salt) / 2
 			outcome.hasNSEC3Details = true
 
 			outcomes[i] = outcome

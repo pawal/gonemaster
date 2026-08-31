@@ -29,7 +29,7 @@ Status: Final
      - Non-`NOERROR` or non-`AA` -> mark `Error Response NSEC Query`.
      - No NSEC3 in authority -> mark `Responds Without NSEC3`.
      - Otherwise mark `Responds With NSEC3`; if multiple NSEC3 RRs exist, also mark `Multiple NSEC3`.
-     - Use the first NSEC3 RR to extract hash algorithm, flags, iterations, and salt-length value.
+     - Use the first NSEC3 RR to extract hash algorithm, flags, iterations, and salt length in octets (RFC 5155 section 3.1.5).
 4. Emit DNSSEC-support summary tags:
    - `DS03_NO_DNSSEC_SUPPORT` if no nameserver had DNSKEY but at least one lacked DNSKEY.
    - `DS03_SERVER_NO_DNSSEC_SUPPORT` if mixed DNSKEY support exists.
@@ -165,7 +165,7 @@ emit TEST_CASE_END
 | `DS03_ILLEGAL_ITERATION_VALUE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with non-zero NSEC3 iterations. |
 | `DS03_ILLEGAL_ITERATION_VALUE` | `int` | `int` | NSEC3 iteration value. |
 | `DS03_ILLEGAL_SALT_LENGTH` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) with non-zero salt length. |
-| `DS03_ILLEGAL_SALT_LENGTH` | `int` | `int` | NSEC3 salt length value used by implementation. |
+| `DS03_ILLEGAL_SALT_LENGTH` | `int` | `int` | NSEC3 salt length in octets (RFC 5155 section 3.1.5). |
 | `DS03_INCONSISTENT_HASH_ALGO` | `-` | `-` | No arguments. |
 | `DS03_INCONSISTENT_ITERATION` | `-` | `-` | No arguments. |
 | `DS03_INCONSISTENT_NSEC3_FLAGS` | `-` | `-` | No arguments. |
@@ -225,10 +225,11 @@ emit TEST_CASE_END
 - Differences (Upstream vs Gonemaster):
   - Upstream: allows TLD-like classification based on Public Suffix List data for opt-out interpretation. Gonemaster: treats TLD context as only root (`.`) or a direct single-label TLD (no PSL-based classification in this testcase).
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+  - Upstream: derives the salt length from the hexadecimal representation of the NSEC3 `Salt` field, so `DS03_ILLEGAL_SALT_LENGTH` reports twice the octet count while the message names the value as octets. Gonemaster reports the octet count defined by RFC 5155 section 3.1.5, so a four-octet salt is reported as `4`.
 - Potential upstream report:
-  - `no`
+  - `yes` (the upstream salt length is the hex-string length, which is twice the octet count the message text promises).
 
 ## Edge Cases And Limitations
 - When multiple NSEC3 records are present, only the first NSEC3 RR is used for parameter extraction (hash, flags, iterations, salt length).
 - Nameservers whose DNSKEY response fails shape checks (`NOERROR` and `AA`) are silently skipped for DS03 finding sets.
-- Salt length is derived from the NSEC3 `Salt` string length used by the implementation, not a decoded-octet length conversion step.
+- Salt length is the octet count carried by the NSEC3 `Salt` field, so an absent salt is length `0` and yields `DS03_LEGAL_EMPTY_SALT`.

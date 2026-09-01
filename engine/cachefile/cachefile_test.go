@@ -1044,3 +1044,257 @@ func TestCachefileCompressedFileIsSmallerForRepetitiveData(t *testing.T) {
 		t.Fatalf("expected gzip to be smaller than plain (got plain=%d, gz=%d)", plainStat.Size(), gzStat.Size())
 	}
 }
+
+// A replayed run should see the same transport the recorded run saw, so the
+// field has to survive the file round trip.
+func TestCachefileProtocolRoundTrip(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	if err := ns.ImportEntries([]nameserver.Entry{{
+		Address:  "192.0.2.53",
+		Key:      "tcp/a",
+		Message:  buildPackedMsg(t, "example.com.", dns.TypeA),
+		Protocol: "tcp",
+	}, {
+		Address: "192.0.2.53",
+		Key:     "unknown/a",
+		Message: buildPackedMsg(t, "example.net.", dns.TypeA),
+	}}); err != nil {
+		t.Fatalf("seed ns cache: %v", err)
+	}
+
+	file, err := Export(ns, nil, nil)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+
+	byKey := map[string]Entry{}
+	for _, e := range file.Entries {
+		byKey[e.Key] = e
+	}
+	if got := byKey["tcp/a"].Protocol; got != "tcp" {
+		t.Errorf("exported protocol = %q, want tcp", got)
+	}
+	if got := byKey["unknown/a"].Protocol; got != "" {
+		t.Errorf("an unknown transport exported %q, want empty", got)
+	}
+
+	// An unknown transport must not render as a field at all.
+	blob, err := json.Marshal(byKey["unknown/a"])
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if strings.Contains(string(blob), "protocol") {
+		t.Errorf("empty protocol rendered a field: %s", blob)
+	}
+
+	restored := nameserver.NewCacheStore()
+	if err := Import(file, restored, nil, nil, WithStrict()); err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	entries, err := restored.ExportEntries()
+	if err != nil {
+		t.Fatalf("re-export: %v", err)
+	}
+	for _, e := range entries {
+		want := ""
+		if e.Key == "tcp/a" {
+			want = "tcp"
+		}
+		if e.Protocol != want {
+			t.Errorf("%s restored protocol %q, want %q", e.Key, e.Protocol, want)
+		}
+	}
+}
+
+// Save and Restore carry the transport through the on-disk file too.
+func TestCachefileProtocolSurvivesSaveRestore(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	if err := ns.ImportEntries([]nameserver.Entry{{
+		Address:  "192.0.2.53",
+		Key:      "udp/a",
+		Message:  buildPackedMsg(t, "example.com.", dns.TypeA),
+		Protocol: "udp",
+	}}); err != nil {
+		t.Fatalf("seed ns cache: %v", err)
+	}
+
+	path := filepath.Join(t.TempDir(), "cache.json")
+	if err := Save(path, ns, nil, nil); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	restored := nameserver.NewCacheStore()
+	if err := Restore(path, restored, nil, nil, WithStrict()); err != nil {
+		t.Fatalf("restore: %v", err)
+	}
+	entries, err := restored.ExportEntries()
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Protocol != "udp" {
+		t.Fatalf("restored entries %+v, want one udp entry", entries)
+	}
+}
+
+// version2Fixture was written by the release that predates the protocol field.
+// Its checksum was computed over the old struct, so it also pins the invariant
+// that makes multi-version reading sound: adding an omitempty field must not
+// change how an old file marshals.
+const version2Fixture = `{
+  "format": "gonemaster.packet-cache",
+  "version": 2,
+  "checksum": "f8274d7aaed52c42e4417aa660f607dee391134067e535252a2e82b8a97a0139",
+  "entries": [
+    {
+      "kind": "nameserver",
+      "address": "192.0.2.53",
+      "key": "k.response",
+      "answer_from": "192.0.2.53:53",
+      "message": "EjSBAAABAAEAAAAAB2V4YW1wbGUDY29tAAABAAHADAABAAEAAAA8AATAAAIK"
+    },
+    {
+      "kind": "nameserver",
+      "address": "192.0.2.53",
+      "key": "k.empty",
+      "no_message": true
+    }
+  ]
+}`
+
+func TestCachefileRestoresVersion2Files(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "v2.json")
+	if err := os.WriteFile(path, []byte(version2Fixture), 0o644); err != nil {
+		t.Fatalf("write: %v", err)
+	}
+
+	// Strict mode leaves no room for a checksum or unknown-field complaint.
+	ns := nameserver.NewCacheStore()
+	if err := Restore(path, ns, nil, nil, WithStrict()); err != nil {
+		t.Fatalf("restore version 2 file: %v", err)
+	}
+
+	entries, err := ns.ExportEntries()
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 restored entries, got %d", len(entries))
+	}
+	for _, e := range entries {
+		if e.Protocol != "" {
+			t.Errorf("%s restored protocol %q from a version 2 file, want empty", e.Key, e.Protocol)
+		}
+	}
+	if entries[0].AnswerFrom == "" && entries[1].AnswerFrom == "" {
+		t.Error("version 2 answer_from was lost")
+	}
+}
+
+func TestCachefileVersionRange(t *testing.T) {
+	for _, tc := range []struct {
+		version int
+		wantErr bool
+	}{
+		{minReadVersion - 1, true},
+		{2, false},
+		{3, false},
+		{Version + 1, true},
+	} {
+		file := File{Format: Format, Version: tc.version, Entries: []Entry{}}
+		sum, err := checksumFor(file)
+		if err != nil {
+			t.Fatalf("checksum: %v", err)
+		}
+		file.Checksum = sum
+
+		err = Import(file, nameserver.NewCacheStore(), nil, nil)
+		if tc.wantErr && err == nil {
+			t.Errorf("version %d was accepted, want rejected", tc.version)
+		}
+		if !tc.wantErr && err != nil {
+			t.Errorf("version %d was rejected: %v", tc.version, err)
+		}
+	}
+}
+
+func TestCachefileExportStampsCurrentVersion(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	seedNameserverCache(t, ns)
+
+	file, err := Export(ns, nil, nil)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	if file.Version != 3 {
+		t.Errorf("exported version %d, want 3", file.Version)
+	}
+	if err := Import(file, nameserver.NewCacheStore(), nil, nil, WithStrict()); err != nil {
+		t.Errorf("exported file failed its own strict import: %v", err)
+	}
+}
+
+// An unknown transport is a data error, not a reason to drop the packet.
+func TestCachefileInvalidProtocol(t *testing.T) {
+	file := File{Format: Format, Version: Version, Entries: []Entry{{
+		Kind:     KindNameserver,
+		Address:  "192.0.2.53",
+		Key:      "bad/a",
+		Message:  base64.StdEncoding.EncodeToString(buildPackedMsg(t, "example.com.", dns.TypeA)),
+		Protocol: "quic",
+	}}}
+	sum, err := checksumFor(file)
+	if err != nil {
+		t.Fatalf("checksum: %v", err)
+	}
+	file.Checksum = sum
+
+	if err := Import(file, nameserver.NewCacheStore(), nil, nil, WithStrict()); err == nil {
+		t.Error("strict mode accepted an unknown protocol")
+	} else if !strings.Contains(err.Error(), "entry 0") || !strings.Contains(err.Error(), "quic") {
+		t.Errorf("error %q should name the entry and the value", err)
+	}
+
+	var warnings []string
+	ns := nameserver.NewCacheStore()
+	if err := Import(file, ns, nil, nil, WithWarnf(func(f string, a ...any) {
+		warnings = append(warnings, fmt.Sprintf(f, a...))
+	})); err != nil {
+		t.Fatalf("lenient import: %v", err)
+	}
+	if len(warnings) != 1 || !strings.Contains(warnings[0], "quic") {
+		t.Fatalf("expected one protocol warning, got %v", warnings)
+	}
+	entries, err := ns.ExportEntries()
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	if len(entries) != 1 {
+		t.Fatalf("expected the entry to be imported, got %d", len(entries))
+	}
+	if entries[0].Protocol != "" {
+		t.Errorf("protocol = %q, want empty after an unknown value", entries[0].Protocol)
+	}
+}
+
+// A cached empty response has no packet and so no transport.
+func TestCachefileNoMessageEntryHasNoProtocol(t *testing.T) {
+	ns := nameserver.NewCacheStore()
+	if err := ns.ImportEntries([]nameserver.Entry{{
+		Address:   "192.0.2.53",
+		Key:       "empty/a",
+		NoMessage: true,
+	}}); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+
+	file, err := Export(ns, nil, nil)
+	if err != nil {
+		t.Fatalf("export: %v", err)
+	}
+	if len(file.Entries) != 1 {
+		t.Fatalf("expected 1 entry, got %d", len(file.Entries))
+	}
+	if file.Entries[0].Protocol != "" {
+		t.Errorf("no_message entry carried protocol %q", file.Entries[0].Protocol)
+	}
+}

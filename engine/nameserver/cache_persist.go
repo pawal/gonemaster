@@ -23,6 +23,8 @@ type Entry struct {
 	Message []byte
 	// AnswerFrom records the responder address captured with the packet.
 	AnswerFrom string
+	// Protocol is the transport that carried the reply, "udp" or "tcp".
+	Protocol string
 	// NoMessage marks a cached nil response entry.
 	NoMessage bool
 }
@@ -69,6 +71,7 @@ func (c *CacheStore) ExportEntries() ([]Entry, error) {
 			}
 			entry.Message = append([]byte(nil), value.Msg.Data...)
 			entry.AnswerFrom = value.AnswerFrom
+			entry.Protocol = value.Protocol
 			entries = append(entries, entry)
 		}
 		cache.mu.Unlock()
@@ -112,6 +115,7 @@ func (c *CacheStore) ImportEntries(entries []Entry) error {
 		cache.set(key, &packet.Packet{
 			Msg:        msg,
 			AnswerFrom: strings.TrimSpace(entry.AnswerFrom),
+			Protocol:   entry.Protocol,
 		})
 	}
 	return nil

@@ -23,8 +23,10 @@ import (
 const (
 	// Format identifies the on-disk cache file format.
 	Format = "gonemaster.packet-cache"
-	// Version is the current schema version.
-	Version = 2
+	// Version is the schema version written by Export.
+	Version = 3
+	// minReadVersion is the oldest schema version still readable.
+	minReadVersion = 2
 
 	// KindNameserver tags per-nameserver cache entries.
 	KindNameserver = "nameserver"
@@ -52,6 +54,9 @@ type Entry struct {
 	Address    string `json:"address,omitempty"`
 	Key        string `json:"key,omitempty"`
 	AnswerFrom string `json:"answer_from,omitempty"`
+	// Protocol is the transport that carried the reply, "udp" or "tcp".
+	// Absent in version 2 files and on no_message entries.
+	Protocol string `json:"protocol,omitempty"`
 
 	// Recursor-kind fields.
 	Name        string          `json:"name,omitempty"`
@@ -74,6 +79,17 @@ type Entry struct {
 	// Common fields.
 	Message   string `json:"message,omitempty"`
 	NoMessage bool   `json:"no_message,omitempty"`
+}
+
+// validProtocol accepts "udp", "tcp", or an empty value, and reports an
+// unknown transport as an error with the empty value.
+func validProtocol(value string) (string, error) {
+	switch value {
+	case "", "udp", "tcp":
+		return value, nil
+	default:
+		return "", fmt.Errorf("unknown protocol %q", value)
+	}
 }
 
 // NameserverRef identifies a nameserver for recursor-kind entries.
@@ -134,6 +150,7 @@ func Export(ns *nameserver.CacheStore, rec *recursor.Recursor, asn *asnlookup.Ca
 				Address:    e.Address,
 				Key:        e.Key,
 				AnswerFrom: e.AnswerFrom,
+				Protocol:   e.Protocol,
 				NoMessage:  e.NoMessage,
 			}
 			if !e.NoMessage {
@@ -220,10 +237,18 @@ func Import(file File, ns *nameserver.CacheStore, rec *recursor.Recursor, asn *a
 	for idx, entry := range file.Entries {
 		switch entry.Kind {
 		case KindNameserver:
+			protocol, perr := validProtocol(entry.Protocol)
+			if perr != nil {
+				if cfg.strict {
+					return fmt.Errorf("entry %d: %w", idx, perr)
+				}
+				cfg.warn("entry %d: %v, treating the transport as unknown", idx, perr)
+			}
 			nsEntry := nameserver.Entry{
 				Address:    entry.Address,
 				Key:        entry.Key,
 				AnswerFrom: entry.AnswerFrom,
+				Protocol:   protocol,
 				NoMessage:  entry.NoMessage,
 			}
 			if !entry.NoMessage {
@@ -454,7 +479,7 @@ func validateHeaderAndChecksum(file File, cfg *config) error {
 	if file.Format != Format {
 		return fmt.Errorf("unsupported packet cache format %q", file.Format)
 	}
-	if file.Version != Version {
+	if file.Version < minReadVersion || file.Version > Version {
 		return fmt.Errorf("unsupported packet cache version %d", file.Version)
 	}
 	if strings.TrimSpace(file.Checksum) == "" {
@@ -549,6 +574,7 @@ var knownEntryFields = map[string]bool{
 	"address":     true,
 	"key":         true,
 	"answer_from": true,
+	"protocol":    true,
 	"name":        true,
 	"qtype":       true,
 	"qclass":      true,

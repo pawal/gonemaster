@@ -22,7 +22,8 @@ type Packet struct {
 	// Timestamp is when the packet was received or synthesized.
 	Timestamp time.Time
 	// Protocol is the transport that carried the reply, "udp" or "tcp". It is
-	// empty for packets not obtained from a live exchange, including cache hits.
+	// empty when the transport is unknown: synthesized packets, and entries
+	// restored from cache files written before the field existed.
 	Protocol string
 	// Log is the logger associated with the query context.
 	Log *logger.Logger

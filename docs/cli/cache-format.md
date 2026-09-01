@@ -66,7 +66,7 @@ A single JSON object:
 ```json
 {
   "format": "gonemaster.packet-cache",
-  "version": 2,
+  "version": 3,
   "checksum": "<lowercase sha-256 hex>",
   "entries": [ ... ]
 }
@@ -75,13 +75,26 @@ A single JSON object:
 | Field      | Type   | Required | Description                                                         |
 |------------|--------|----------|---------------------------------------------------------------------|
 | `format`   | string | yes      | Always `"gonemaster.packet-cache"`. Foreign formats are rejected.   |
-| `version`  | number | yes      | Schema version. Currently `2`. Unknown versions are rejected.       |
+| `version`  | number | yes      | Schema version. Writers emit `3`; readers accept `2` and `3`.       |
 | `checksum` | string | no (\*)  | Lowercase SHA-256 hex of the file with `checksum` blanked.          |
 | `entries`  | array  | yes      | Ordered list of cache records, discriminated by `kind`.             |
 
 (\*) `checksum` is always written by `--save` and always verified when
 present. It is optional only so that hand-crafted fixtures can omit it;
 omission is a warning in lenient mode and an error in strict mode.
+
+### Version compatibility
+
+`gonemaster --save` writes version `3`. `--restore` and `--cache-stats` read
+version `2` as well, so recordings made before the `protocol` field keep
+working; their entries restore with the transport unknown.
+
+Version `3` files cannot be read by a gonemaster older than the release that
+introduced them. The failure is an `unsupported packet cache version 3`
+error, in both strict and lenient mode. This is why the field arrived with a
+version bump rather than as a plain addition: the checksum is recomputed from
+the fields a reader knows, so any field an older reader lacks would make an
+otherwise valid file fail with a checksum mismatch instead.
 
 ## Checksum contract
 
@@ -122,6 +135,7 @@ and errors in strict mode.
   "address": "192.0.2.53",
   "key": "example.com./A/IN",
   "answer_from": "192.0.2.53:53",
+  "protocol": "udp",
   "message": "<base64-encoded DNS wire packet>"
 }
 ```
@@ -144,6 +158,7 @@ A cached empty (nil) response is encoded with `"no_message": true` and no
 | `key`         | string  | yes                              | Internal cache key; kept opaque to the file format.    |
 | `message`     | string  | required unless `no_message`     | Base64 (std) of the wire-format DNS response packet.   |
 | `answer_from` | string  | no                               | Observed source address of the response.               |
+| `protocol`    | string  | no                               | Transport that carried the reply: `"udp"` or `"tcp"`.  |
 | `no_message`  | boolean | no                               | `true` for a cached empty/nil response.                |
 
 ### `kind: "recursor"`
@@ -243,8 +258,10 @@ An entry must carry either `rrs` or `no_transfer`, never both and never
 neither. Only the records streamed by the consumer are captured, so an
 available entry typically holds just the leading SOA.
 
-`axfr` is an additive kind: `version` stays `2`, and older binaries skip
-unknown-kind entries in lenient mode.
+`axfr` arrived as an additive kind under version `2`: older binaries skip
+unknown-kind entries in lenient mode. A new *field* has no such path, since
+the checksum covers only the fields a reader knows, which is why `protocol`
+came with version `3`.
 
 ## Strict vs. lenient parsing
 
@@ -263,6 +280,8 @@ processing:
 - Unknown top-level field (e.g., a future `stats` section).
 - Unknown field inside an entry.
 - Entry with an empty or unknown `kind` (the entry is skipped).
+- Nameserver entry with a `protocol` other than `"udp"` or `"tcp"` (the entry
+  is kept, with the transport treated as unknown).
 
 In **strict** mode the same conditions are hard errors.
 
@@ -275,7 +294,7 @@ is an `axfr` entry that carries both `rrs` and `no_transfer`, or neither.
 ```json
 {
   "format": "gonemaster.packet-cache",
-  "version": 2,
+  "version": 3,
   "checksum": "0000000000000000000000000000000000000000000000000000000000000000",
   "entries": [
     {
@@ -283,6 +302,7 @@ is an `axfr` entry that carries both `rrs` and `no_transfer`, or neither.
       "address": "192.0.2.53",
       "key": "example.com./A/IN",
       "answer_from": "192.0.2.53:53",
+      "protocol": "udp",
       "message": "PQ4BAAABAAEAAAAAB2V4YW1wbGUDY29tAAABAAE="
     },
     {

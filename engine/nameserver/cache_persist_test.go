@@ -108,3 +108,49 @@ func TestCacheStoreImportValidationErrors(t *testing.T) {
 		})
 	}
 }
+
+// The transport belongs to the recorded response, so it has to survive the
+// export/import pair that backs cache files.
+func TestCacheStoreExportImportPreservesProtocol(t *testing.T) {
+	cache := NewCacheStore()
+
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, "example.com.", dns.TypeA)
+	msg.Response = true
+
+	cache.cacheForAddress("192.0.2.53").set("k.tcp", &packet.Packet{Msg: msg, Protocol: "tcp"})
+	cache.cacheForAddress("192.0.2.53").set("k.unknown", &packet.Packet{Msg: msg})
+
+	entries, err := cache.ExportEntries()
+	if err != nil {
+		t.Fatalf("export entries: %v", err)
+	}
+	for _, entry := range entries {
+		want := ""
+		if entry.Key == "k.tcp" {
+			want = "tcp"
+		}
+		if entry.Protocol != want {
+			t.Errorf("%s exported protocol %q, want %q", entry.Key, entry.Protocol, want)
+		}
+	}
+
+	restored := NewCacheStore()
+	if err := restored.ImportEntries(entries); err != nil {
+		t.Fatalf("import entries: %v", err)
+	}
+	got, ok := restored.cacheForAddress("192.0.2.53").get("k.tcp")
+	if !ok || got == nil {
+		t.Fatal("expected the restored tcp entry")
+	}
+	if got.Protocol != "tcp" {
+		t.Errorf("restored protocol = %q, want tcp", got.Protocol)
+	}
+	unknown, ok := restored.cacheForAddress("192.0.2.53").get("k.unknown")
+	if !ok || unknown == nil {
+		t.Fatal("expected the restored unknown-transport entry")
+	}
+	if unknown.Protocol != "" {
+		t.Errorf("restored protocol = %q, want empty", unknown.Protocol)
+	}
+}

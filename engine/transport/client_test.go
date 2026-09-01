@@ -619,10 +619,10 @@ func TestExchangeFallbackTCPOnTruncatedUDP(t *testing.T) {
 // In particular the 4096-byte receive-buffer bump in prepareWireMessage must
 // not leak an OPT onto the wire.
 func TestExchangeDefaultQueryHasNoEDNSAndRDUnset(t *testing.T) {
-	hdrCh := make(chan dns.MsgHeader, 1)
+	queries := make(chan *dns.Msg, 1)
 	serverAddr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 		select {
-		case hdrCh <- req.MsgHeader:
+		case queries <- req:
 		default:
 		}
 		writeSimpleAResponse(w, req)
@@ -638,12 +638,7 @@ func TestExchangeDefaultQueryHasNoEDNSAndRDUnset(t *testing.T) {
 		t.Fatalf("expected successful UDP response, got %v", err)
 	}
 
-	var hdr dns.MsgHeader
-	select {
-	case hdr = <-hdrCh:
-	case <-time.After(time.Second):
-		t.Fatal("server did not receive the query")
-	}
+	hdr := receivedQuery(t, queries)
 
 	if hdr.UDPSize != 0 {
 		t.Fatalf("expected no EDNS OPT on default query, got advertised UDP size %d", hdr.UDPSize)
@@ -663,10 +658,10 @@ func TestExchangeDefaultQueryHasNoEDNSAndRDUnset(t *testing.T) {
 // truncated UDP response triggers exactly one plain-TCP requery, with no
 // EDNS upgrade and no EDNS-on-TC UDP requery (DNSQueryAndResponseDefaults).
 func TestExchangeTruncatedUDPFallsBackToPlainTCPExactlyOnce(t *testing.T) {
-	tcpHdrCh := make(chan dns.MsgHeader, 1)
+	tcpQueries := make(chan *dns.Msg, 1)
 	serverAddr, listener, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
 		select {
-		case tcpHdrCh <- req.MsgHeader:
+		case tcpQueries <- req:
 		default:
 		}
 		writeSimpleAResponse(w, req)
@@ -700,12 +695,7 @@ func TestExchangeTruncatedUDPFallsBackToPlainTCPExactlyOnce(t *testing.T) {
 		t.Fatalf("expected exactly one UDP query (no EDNS-on-TC requery), got %d", got)
 	}
 
-	var tcpHdr dns.MsgHeader
-	select {
-	case tcpHdr = <-tcpHdrCh:
-	case <-time.After(time.Second):
-		t.Fatal("TCP server did not receive the fallback query")
-	}
+	tcpHdr := receivedQuery(t, tcpQueries)
 	if tcpHdr.UDPSize != 0 || tcpHdr.Security {
 		t.Fatalf("expected plain TCP fallback query without EDNS, got UDPSize=%d security=%t", tcpHdr.UDPSize, tcpHdr.Security)
 	}

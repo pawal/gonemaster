@@ -440,3 +440,60 @@ func TestFallbackOverrideDoesNotShareCacheEntry(t *testing.T) {
 		t.Errorf("no-fallback probe did not get the truncated answer")
 	}
 }
+
+// A CD probe and a plain query differ in what the answer means at a validating
+// resolver, so they must not share an entry.
+func TestBuildCacheKeyCheckingDisabled(t *testing.T) {
+	t.Parallel()
+
+	cd := true
+	noCD := false
+
+	plain, _, _, err := buildCacheKey("example.com", "A", "IN", &QueryOptions{})
+	if err != nil {
+		t.Fatalf("buildCacheKey plain: %v", err)
+	}
+	if strings.Contains(plain, "CD") {
+		t.Errorf("a query with no CD override gained a CD field: %q", plain)
+	}
+
+	withCD, _, _, err := buildCacheKey("example.com", "A", "IN", &QueryOptions{CheckingDisabled: &cd})
+	if err != nil {
+		t.Fatalf("buildCacheKey CD: %v", err)
+	}
+	withoutCD, _, _, err := buildCacheKey("example.com", "A", "IN", &QueryOptions{CheckingDisabled: &noCD})
+	if err != nil {
+		t.Fatalf("buildCacheKey explicit no-CD: %v", err)
+	}
+
+	if withCD == plain || withoutCD == plain || withCD == withoutCD {
+		t.Errorf("CD keys collide:\n plain: %q\n cd: %q\n nocd: %q", plain, withCD, withoutCD)
+	}
+	if !strings.HasSuffix(withCD, "|CD=true|EDNS_SIZE=0") {
+		t.Errorf("unexpected CD key layout: %q", withCD)
+	}
+}
+
+// QueryOptions.CheckingDisabled must reach the transport client.
+func TestQueryOptionsCheckingDisabledReachesClient(t *testing.T) {
+	ctx, _ := testContext(t)
+
+	ns := newNS(t, ctx, "ns1.example", "192.0.2.53")
+	cd := true
+
+	client, err := ns.clientForOptions(ctx, &QueryOptions{CheckingDisabled: &cd})
+	if err != nil {
+		t.Fatalf("clientForOptions: %v", err)
+	}
+	if !client.CheckingDisabled {
+		t.Error("CheckingDisabled did not reach the client")
+	}
+
+	plain, err := ns.clientForOptions(ctx, nil)
+	if err != nil {
+		t.Fatalf("clientForOptions nil opts: %v", err)
+	}
+	if plain.CheckingDisabled {
+		t.Error("a query with no CD override produced a CD client")
+	}
+}

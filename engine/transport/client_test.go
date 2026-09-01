@@ -1154,3 +1154,53 @@ func TestExchangeRecordsProtocol(t *testing.T) {
 		}
 	})
 }
+
+// The CD bit is not derivable from any other client setting, and a query that
+// does not ask for it must not carry it.
+func TestPrepareMessageCheckingDisabled(t *testing.T) {
+	queries := make(chan *dns.Msg, 1)
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		select {
+		case queries <- req:
+		default:
+		}
+		writeSimpleAResponse(w, req)
+	})
+	defer shutdown()
+
+	for _, tc := range []struct {
+		name string
+		cd   bool
+	}{
+		{"unset", false},
+		{"set", true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := &Client{}
+			client.SetCheckingDisabled(tc.cd)
+			client.SetRetries(0)
+			client.SetTimeout(time.Second)
+
+			if _, err := client.Exchange(context.Background(), addr, BuildQuery("cd.example.", dns.TypeA)); err != nil {
+				t.Fatalf("exchange: %v", err)
+			}
+			if got := receivedQuery(t, queries).CheckingDisabled; got != tc.cd {
+				t.Errorf("CD on the wire = %v, want %v", got, tc.cd)
+			}
+		})
+	}
+}
+
+// A caller-built message keeps its own CD bit; the client only ever sets it.
+func TestPrepareMessageCheckingDisabledDoesNotClearCallerBit(t *testing.T) {
+	msg := BuildQuery("cd-preserved.example.", dns.TypeA)
+	msg.CheckingDisabled = true
+
+	prepared := (&Client{}).prepareMessage(msg)
+	if !prepared.CheckingDisabled {
+		t.Error("prepareMessage cleared the caller's CD bit")
+	}
+	if msg.CheckingDisabled != true {
+		t.Error("prepareMessage mutated the caller's message")
+	}
+}

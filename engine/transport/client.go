@@ -45,6 +45,9 @@ type Client struct {
 	EDNSDetails *EDNSDetails
 	// RecursionDesired controls the RD bit.
 	RecursionDesired bool
+	// CheckingDisabled sets the CD bit, suppressing DNSSEC validation at a
+	// validating resolver. It has no effect on authoritative answers.
+	CheckingDisabled bool
 	// SourceIP selects the local source IP address.
 	SourceIP string
 	// SourcePort selects the local source port.
@@ -132,6 +135,11 @@ func (c *Client) SetEDNSSize(value uint16) {
 // SetRecursionDesired sets the RD bit on outbound queries.
 func (c *Client) SetRecursionDesired(value bool) {
 	c.RecursionDesired = value
+}
+
+// SetCheckingDisabled sets the CD bit on outbound queries.
+func (c *Client) SetCheckingDisabled(value bool) {
+	c.CheckingDisabled = value
 }
 
 // ApplyProfileDefaults sets unset fields using the effective profile defaults.
@@ -449,6 +457,9 @@ func (c *Client) prepareMessage(msg *dns.Msg) *dns.Msg {
 	prepared := msg.Copy()
 	if c.RecursionDesired {
 		prepared.RecursionDesired = true
+	}
+	if c.CheckingDisabled {
+		prepared.CheckingDisabled = true
 	}
 
 	if c.EDNSSize > 0 || c.EDNSDetails != nil {

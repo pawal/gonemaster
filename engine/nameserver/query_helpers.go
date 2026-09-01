@@ -396,6 +396,9 @@ func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions)
 		if opts.Timeout != nil {
 			buf = appendCacheKeyInt(buf, "TIMEOUT", int64(*opts.Timeout))
 		}
+		if opts.CheckingDisabled != nil {
+			buf = appendCacheKeyBool(buf, "CD", *opts.CheckingDisabled)
+		}
 	}
 
 	if opts != nil && opts.EDNSDetails != nil {

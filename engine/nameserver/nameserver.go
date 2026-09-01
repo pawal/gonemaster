@@ -42,6 +42,8 @@ type QueryOptions struct {
 	UseVC *bool
 	// Recurse overrides the RD bit.
 	Recurse *bool
+	// CheckingDisabled overrides the CD bit.
+	CheckingDisabled *bool
 	// Fallback overrides UDP-to-TCP fallback on truncation.
 	Fallback *bool
 	// Retry overrides the retry count.
@@ -612,6 +614,9 @@ func (ns Nameserver) clientForOptions(ctx context.Context, opts *QueryOptions) (
 
 	base.SetUseTCP(resolveUseVC(opts))
 	base.SetRecursionDesired(resolveRecurse(opts))
+	if opts != nil && opts.CheckingDisabled != nil {
+		base.SetCheckingDisabled(*opts.CheckingDisabled)
+	}
 
 	if opts != nil {
 		if opts.Fallback != nil {

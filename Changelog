@@ -9,6 +9,7 @@ All notable changes to all gonemaster components will be documented in this file
 - docs: a migration guide for moving from Zonemaster
 - engine: `nsdiscovery.ParentNameserversStatus` tells an unreachable chain from a proven absent parent
 - engine: `packet.Packet.Protocol` records whether a reply arrived over UDP or TCP
+- engine: a CD-bit override on `transport.Client` and `nameserver.QueryOptions`
 
 ### Changed
 

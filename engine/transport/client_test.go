@@ -1045,6 +1045,16 @@ func TestPrepareMessageZCarriesCOAndDE(t *testing.T) {
 			if got := opt.Delegation(); got != tc.wantDelegation {
 				t.Errorf("DE = %v, want %v", got, tc.wantDelegation)
 			}
+			// The library keeps the CO and DE bit positions unexported, so the
+			// constants above are pinned against the encoded OPT: a bump that
+			// moves either flag must fail here rather than silently set the
+			// wrong bit for a caller's Z value.
+			if got := opt.Hdr.TTL&ednsZCompactAnswers != 0; got != tc.wantCompactAns {
+				t.Errorf("TTL bit %#04x = %v, want %v; the library moved CO", ednsZCompactAnswers, got, tc.wantCompactAns)
+			}
+			if got := opt.Hdr.TTL&ednsZDelegation != 0; got != tc.wantDelegation {
+				t.Errorf("TTL bit %#04x = %v, want %v; the library moved DE", ednsZDelegation, got, tc.wantDelegation)
+			}
 		})
 	}
 }

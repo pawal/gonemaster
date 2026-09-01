@@ -94,6 +94,25 @@ func singleOPT(t *testing.T, msg *dns.Msg) *dns.OPT {
 	return opt
 }
 
+// receivedQuery parses a query captured by a stub server. The handler's message
+// exposes header bits but not EDNS fields until the wire bytes are unpacked.
+func receivedQuery(t *testing.T, queries <-chan *dns.Msg) *dns.Msg {
+	t.Helper()
+
+	var req *dns.Msg
+	select {
+	case req = <-queries:
+	case <-time.After(time.Second):
+		t.Fatal("server did not receive the query")
+	}
+
+	parsed := &dns.Msg{Data: append([]byte(nil), req.Data...)}
+	if err := parsed.Unpack(); err != nil {
+		t.Fatalf("unpack received query: %v", err)
+	}
+	return parsed
+}
+
 func TestPrepareMessageEncodesOPT(t *testing.T) {
 	do := true
 	size1232 := uint16(1232)
@@ -1002,5 +1021,73 @@ func TestExchangeConcurrentOnOneClient(t *testing.T) {
 		if err := <-errs; err != nil {
 			t.Errorf("concurrent exchange: %v", err)
 		}
+	}
+}
+
+// The DNS library carries Z's top two bits as the named CO and DE flags and
+// masks them out of SetZ, but EDNSDetails.Z promises all 15 bits.
+func TestPrepareMessageZCarriesCOAndDE(t *testing.T) {
+	cases := []struct {
+		name           string
+		z              uint16
+		wantZ          uint16
+		wantCompactAns bool
+		wantDelegation bool
+	}{
+		{"reserved bits only", 0x0003, 0x0003, false, false},
+		{"CO only", 0x4000, 0x0000, true, false},
+		{"DE only", 0x2000, 0x0000, false, true},
+		{"CO, DE and reserved bits", 0x6003, 0x0003, true, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			z := tc.z
+			client := &Client{EDNSDetails: &EDNSDetails{Z: &z}}
+			prepared := client.prepareMessage(BuildQuery("z-flags.example.", dns.TypeA))
+
+			opt := singleOPT(t, prepared)
+			if got := opt.Z(); got != tc.wantZ {
+				t.Errorf("OPT Z = %#04x, want %#04x", got, tc.wantZ)
+			}
+			if got := opt.CompactAnswers(); got != tc.wantCompactAns {
+				t.Errorf("CO = %v, want %v", got, tc.wantCompactAns)
+			}
+			if got := opt.Delegation(); got != tc.wantDelegation {
+				t.Errorf("DE = %v, want %v", got, tc.wantDelegation)
+			}
+		})
+	}
+}
+
+// The flags must survive packing, not just sit on the prepared message.
+func TestPrepareMessageZReachesTheWire(t *testing.T) {
+	queries := make(chan *dns.Msg, 1)
+	serverAddr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		select {
+		case queries <- req:
+		default:
+		}
+		writeSimpleAResponse(w, req)
+	})
+	defer shutdown()
+
+	z := uint16(0x6003)
+	client := &Client{EDNSDetails: &EDNSDetails{Z: &z}}
+	client.SetRetries(0)
+	client.SetTimeout(time.Second)
+
+	if _, err := client.Exchange(context.Background(), serverAddr, BuildQuery("z-flags-wire.example.", dns.TypeA)); err != nil {
+		t.Fatalf("exchange: %v", err)
+	}
+
+	got := receivedQuery(t, queries)
+	if !got.CompactAnswers {
+		t.Error("CO bit did not reach the wire")
+	}
+	if !got.Delegation {
+		t.Error("DE bit did not reach the wire")
+	}
+	if got.UDPSize == 0 {
+		t.Error("EDNS OPT did not reach the wire")
 	}
 }

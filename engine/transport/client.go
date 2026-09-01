@@ -19,6 +19,12 @@ import (
 
 const defaultTimeout = 5 * time.Second
 
+// Top Z bits the DNS library carries as named flags rather than in SetZ.
+const (
+	ednsZCompactAnswers = 0x4000
+	ednsZDelegation     = 0x2000
+)
+
 // Client performs DNS exchanges; Exchange treats it as read-only and is safe to share.
 type Client struct {
 	// Timeout is the per-attempt timeout.
@@ -59,8 +65,8 @@ type EDNSDetails struct {
 	Size *uint16
 	// Version overrides the EDNS version when non-nil.
 	Version *uint8
-	// Z carries the EDNS Z flags (low 15 bits). When set, prepareMessage encodes
-	// EDNS using an explicit OPT RR so Z is preserved on the wire.
+	// Z carries the EDNS Z flags (low 15 bits); 0x4000 is CO and 0x2000 is DE.
+	// When set, EDNS is encoded as an explicit OPT RR so Z reaches the wire.
 	Z *uint16
 	// Rcode overrides the EDNS extended response code when non-nil.
 	Rcode *uint8
@@ -494,12 +500,18 @@ func applyExplicitEDNS(msg *dns.Msg, z *uint16) {
 		opt.Options = append(opt.Options, edns)
 	}
 
+	compactAnswers, delegation := msg.CompactAnswers, msg.Delegation
+	if z != nil {
+		compactAnswers = compactAnswers || *z&ednsZCompactAnswers != 0
+		delegation = delegation || *z&ednsZDelegation != 0
+	}
+
 	udpSize := max(msg.UDPSize, dns.MinMsgSize)
 	opt.SetUDPSize(udpSize)
 	opt.SetVersion(msg.Version)
 	opt.SetSecurity(msg.Security)
-	opt.SetCompactAnswers(msg.CompactAnswers)
-	opt.SetDelegation(msg.Delegation)
+	opt.SetCompactAnswers(compactAnswers)
+	opt.SetDelegation(delegation)
 	opt.SetRcode(msg.Rcode)
 	if z != nil {
 		opt.SetZ(*z)

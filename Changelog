@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - engine: `dnssecutil.KeySize` derives the size per algorithm
+- engine: `EDNSDetails.Z` carries the CO and DE bits
 
 ### Fixed
 

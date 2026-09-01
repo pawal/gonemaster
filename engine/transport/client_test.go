@@ -954,3 +954,53 @@ func TestExchangeWithoutTraceDoesNotPanic(t *testing.T) {
 		t.Fatalf("unexpected error with tracing disabled: %v", err)
 	}
 }
+
+// A client is shared by every query to one nameserver, so a write-through would
+// apply one caller's profile defaults to the rest, and race them.
+func TestExchangeDoesNotMutateClient(t *testing.T) {
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		writeSimpleAResponse(w, req)
+	})
+	defer shutdown()
+
+	// Every default-carrying field is unset, so a write-through would show.
+	client := &Client{}
+	before := *client
+
+	if _, err := client.Exchange(context.Background(), addr, BuildQuery("nomutate.example.", dns.TypeA)); err != nil {
+		t.Fatalf("exchange: %v", err)
+	}
+
+	if *client != before {
+		t.Errorf("Exchange mutated the client:\n got %+v\nwant %+v", *client, before)
+	}
+}
+
+// Under -race this fails if Exchange writes to the shared client.
+func TestExchangeConcurrentOnOneClient(t *testing.T) {
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+		writeSimpleAResponse(w, req)
+	})
+	defer shutdown()
+
+	client := &Client{}
+	client.SetTimeout(2 * time.Second)
+
+	const concurrency = 8
+	errs := make(chan error, concurrency)
+	start := make(chan struct{})
+	for range concurrency {
+		go func() {
+			<-start
+			_, err := client.Exchange(context.Background(), addr, BuildQuery("concurrent.example.", dns.TypeA))
+			errs <- err
+		}()
+	}
+	close(start)
+
+	for range concurrency {
+		if err := <-errs; err != nil {
+			t.Errorf("concurrent exchange: %v", err)
+		}
+	}
+}

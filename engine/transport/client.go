@@ -19,7 +19,7 @@ import (
 
 const defaultTimeout = 5 * time.Second
 
-// Client performs DNS exchanges with configurable behavior.
+// Client performs DNS exchanges; Exchange treats it as read-only and is safe to share.
 type Client struct {
 	// Timeout is the per-attempt timeout.
 	Timeout time.Duration
@@ -166,13 +166,15 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 	}
 	defer releaseQuerySlot(ctx)
 
-	c.ApplyProfileDefaults(profile.FromContext(ctx))
-	prepared := c.prepareMessage(msg)
+	// Defaults land on a copy; the caller's client is never written to.
+	eff := *c
+	eff.ApplyProfileDefaults(profile.FromContext(ctx))
+	prepared := eff.prepareMessage(msg)
 	trace := querytrace.FromContext(ctx)
 	qname, qtype := questionNameType(prepared)
 	attempts := 1
-	if c.Retries > 0 {
-		attempts = 1 + c.Retries
+	if eff.Retries > 0 {
+		attempts = 1 + eff.Retries
 	}
 
 	var lastErr error
@@ -184,7 +186,7 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 			}
 		}
 
-		response, rtt, err := c.tracedExchangeOnce(ctx, trace, server, prepared, qname, qtype, c.UseTCP, false, i+1)
+		response, rtt, err := eff.tracedExchangeOnce(ctx, trace, server, prepared, qname, qtype, eff.UseTCP, false, i+1)
 		if err != nil {
 			if ctx != nil {
 				if cerr := ctx.Err(); cerr != nil {
@@ -196,8 +198,8 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 			continue
 		}
 
-		if !c.UseTCP && response.Truncated && c.Fallback {
-			response, rtt, err = c.tracedExchangeOnce(ctx, trace, server, prepared, qname, qtype, true, true, i+1)
+		if !eff.UseTCP && response.Truncated && eff.Fallback {
+			response, rtt, err = eff.tracedExchangeOnce(ctx, trace, server, prepared, qname, qtype, true, true, i+1)
 			if err != nil {
 				if ctx != nil {
 					if cerr := ctx.Err(); cerr != nil {

@@ -5667,3 +5667,45 @@ func (f dnssec21Fixture) signedDSResponseForcedKeytag(t *testing.T, sigKey *dns.
 	return tctest.Response(tctest.Question(f.childName, dns.TypeDS), tctest.Secure(),
 		tctest.Answers(&ds, sig))
 }
+
+// The apex NSEC3 is owned by the hash of the apex name, not by the apex name
+// itself, so the match is a hash comparison against the first owner label.
+func TestNSEC3OwnerMatchesApex(t *testing.T) {
+	const apex = "example.com"
+	apexName := dnsname.New(apex)
+
+	nsec3 := func(owner string, salt string, iterations uint16) *dns.NSEC3 {
+		rr := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+		rr.Hash = 1
+		rr.Iterations = iterations
+		rr.Salt = salt
+		return rr
+	}
+
+	hashed := dnsutil.NSEC3Name(apexName.FQDN(), "", 0)
+	if hashed == "" {
+		t.Fatal("could not hash the apex name")
+	}
+
+	if !nsec3OwnerMatchesApex(nsec3(hashed+"."+apex, "", 0), apexName) {
+		t.Error("the apex hash owner did not match")
+	}
+	// The comparison is case-insensitive on the base32 label.
+	if !nsec3OwnerMatchesApex(nsec3(strings.ToUpper(hashed)+"."+apex, "", 0), apexName) {
+		t.Error("an upper-case owner label did not match")
+	}
+	if nsec3OwnerMatchesApex(nil, apexName) {
+		t.Error("a nil record matched")
+	}
+	if nsec3OwnerMatchesApex(nsec3(apex, "", 0), apexName) {
+		t.Error("an unhashed owner matched")
+	}
+	// Salt and iterations feed the hash, so a record using different parameters
+	// owns a different name.
+	if nsec3OwnerMatchesApex(nsec3(hashed+"."+apex, "AABB", 0), apexName) {
+		t.Error("a record with a different salt matched")
+	}
+	if nsec3OwnerMatchesApex(nsec3(hashed+"."+apex, "", 5), apexName) {
+		t.Error("a record with a different iteration count matched")
+	}
+}

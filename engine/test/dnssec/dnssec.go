@@ -7263,6 +7263,10 @@ func rrOwnerMatchesZone(rr dns.RR, zoneName dnsname.Name) bool {
 	return strings.EqualFold(owner.String(), zoneName.String())
 }
 
+// nsec3OwnerMatchesApex reports whether rr is the NSEC3 owned by the apex hash.
+// The owner hash is computed with SHA-1, the only NSEC3 hash algorithm IANA
+// defines; rr.Hash is not consulted, so a record declaring another algorithm is
+// compared against a SHA-1 hash and, in practice, fails to match.
 func nsec3OwnerMatchesApex(rr *dns.NSEC3, apex dnsname.Name) bool {
 	if rr == nil {
 		return false

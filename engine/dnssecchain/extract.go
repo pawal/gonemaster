@@ -548,7 +548,7 @@ func (e *extractor) addDNSKEY(key *dns.DNSKEY, server string) {
 		SEP:       key.Flags&dns.FlagSEP != 0,
 		ZoneKey:   key.Flags&dns.FlagZONE != 0,
 		Revoked:   key.Flags&revokeFlag != 0,
-		KeySize:   keySizeBits(key),
+		KeySize:   dnssecutil.KeySize(key),
 		TTL:       key.Hdr.TTL,
 		Servers:   []string{server},
 	})
@@ -573,7 +573,7 @@ func (e *extractor) addParentDNSKEY(key *dns.DNSKEY, server string) {
 		SEP:       key.Flags&dns.FlagSEP != 0,
 		ZoneKey:   key.Flags&dns.FlagZONE != 0,
 		Revoked:   key.Flags&revokeFlag != 0,
-		KeySize:   keySizeBits(key),
+		KeySize:   dnssecutil.KeySize(key),
 		TTL:       key.Hdr.TTL,
 		Servers:   []string{server},
 	})

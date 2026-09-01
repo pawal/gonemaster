@@ -8,6 +8,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 - docs: a migration guide for moving from Zonemaster
 
+### Changed
+
+- engine: `dnssecutil.KeySize` derives the size per algorithm
+
 ## [v1.7.3] - 2026-08-31
 
 Hardens the server behind a reverse proxy: forwarded headers are honoured only

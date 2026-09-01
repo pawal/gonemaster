@@ -272,9 +272,9 @@ func TestKeySizeMLDSA44(t *testing.T) {
 		t.Fatalf("fixture key: algorithm %d, want %d (MLDSA44)", key.Algorithm, dns.MLDSA44)
 	}
 
-	// A result in RSA-modulus range would mean KeySize had produced a
-	// plausible, and therefore dangerous, number.
-	if bits := KeySize(key); bits >= 512 && bits <= 4096 {
-		t.Errorf("KeySize on an ML-DSA-44 key returned %d bits, which looks like a valid RSA modulus size", bits)
+	// Any non-zero result would be an RSA modulus parse of key material that is
+	// not RSA, and a plausible number is the dangerous kind.
+	if bits := KeySize(key); bits != 0 {
+		t.Errorf("KeySize on an ML-DSA-44 key returned %d bits, want 0", bits)
 	}
 }

@@ -62,9 +62,30 @@ func parseRSAExponentLen(keybuf []byte) (explen, off int, ok bool) {
 	return explen, off, true
 }
 
-// KeySize returns the RSA modulus size in bits, or 0 when not derivable.
+// KeySize returns the key size in bits for the key's algorithm, or 0 when not derivable.
 func KeySize(key *dns.DNSKEY) int {
-	if key == nil || key.PublicKey == "" {
+	if key == nil {
+		return 0
+	}
+	switch key.Algorithm {
+	case dns.RSAMD5, dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512:
+		return rsaModulusBits(key)
+	case dns.ECDSAP256SHA256:
+		return 256
+	case dns.ECDSAP384SHA384:
+		return 384
+	case dns.ED25519:
+		return 256
+	case dns.ED448:
+		return 456
+	default:
+		return 0
+	}
+}
+
+// rsaModulusBits returns the RSA modulus size in bits, or 0 when not derivable.
+func rsaModulusBits(key *dns.DNSKEY) int {
+	if key.PublicKey == "" {
 		return 0
 	}
 	keybuf, err := base64.StdEncoding.DecodeString(key.PublicKey)

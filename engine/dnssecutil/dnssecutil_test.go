@@ -48,6 +48,70 @@ func TestKeySize(t *testing.T) {
 	}
 }
 
+// Each key carries a real 2048-bit RSA payload, so a KeySize that still parsed
+// the modulus would answer 2048 instead of the algorithm's fixed size.
+func TestKeySizeFixedSizeAlgorithms(t *testing.T) {
+	cases := []struct {
+		algo uint8
+		want int
+	}{
+		{dns.ECDSAP256SHA256, 256},
+		{dns.ECDSAP384SHA384, 384},
+		{dns.ED25519, 256},
+		{dns.ED448, 456},
+	}
+	for _, tc := range cases {
+		t.Run(dns.AlgorithmToString[tc.algo], func(t *testing.T) {
+			key := dnstest.RSADNSKEY("example.", dns.FlagZONE, dnstest.LBKSK3842)
+			key.Algorithm = tc.algo
+			if got := dnssecutil.KeySize(key); got != tc.want {
+				t.Errorf("KeySize = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// Generated keys confirm the mapped sizes match real key material.
+func TestKeySizeGeneratedCurveKeys(t *testing.T) {
+	for _, tc := range []struct {
+		algo uint8
+		want int
+	}{
+		{dns.ECDSAP256SHA256, 256},
+		{dns.ED25519, 256},
+	} {
+		t.Run(dns.AlgorithmToString[tc.algo], func(t *testing.T) {
+			key := dnstest.GenKey(t, "example.test", tc.algo, false).Key
+			if got := dnssecutil.KeySize(key); got != tc.want {
+				t.Errorf("KeySize = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+// An unknown algorithm has no derivable size, even when the payload happens to
+// parse as an RSA modulus.
+func TestKeySizeUnknownAlgorithmIsZero(t *testing.T) {
+	for _, algo := range []uint8{dns.DSA, dns.ECCGOST, dns.MLDSA44, 0, 99} {
+		key := dnstest.RSADNSKEY("example.", dns.FlagZONE|dns.FlagSEP, dnstest.LBKSK3842)
+		key.Algorithm = algo
+		if got := dnssecutil.KeySize(key); got != 0 {
+			t.Errorf("algorithm %d: KeySize = %d, want 0", algo, got)
+		}
+	}
+}
+
+// Every RSA algorithm keeps the modulus-derived size, RSAMD5 included.
+func TestKeySizeRSAAlgorithms(t *testing.T) {
+	for _, algo := range []uint8{dns.RSAMD5, dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512} {
+		key := dnstest.RSADNSKEY("example.", dns.FlagZONE|dns.FlagSEP, dnstest.LBKSK3842)
+		key.Algorithm = algo
+		if got := dnssecutil.KeySize(key); got != 2048 {
+			t.Errorf("algorithm %d: KeySize = %d, want 2048", algo, got)
+		}
+	}
+}
+
 func TestVerifyRRSIG(t *testing.T) {
 	if err := dnssecutil.VerifyRRSIG(nil, nil, nil, time.Unix(1000, 0)); err == nil {
 		t.Error("nil sig/key should error")

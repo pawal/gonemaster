@@ -1,16 +1,20 @@
 package nameserver
 
 import (
+	"context"
 	"reflect"
 	"strconv"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	dns "codeberg.org/miekg/dns"
+	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 )
 
@@ -276,4 +280,163 @@ func parseCacheKeyParts(t *testing.T, key string, expectedOrder []string) map[st
 		t.Fatalf("part order mismatch:\n got: %v\nwant: %v", gotOrder, expectedOrder)
 	}
 	return parts
+}
+
+// A no-fallback probe wants the truncated answer a fallback-allowed query never
+// returns, so every override present in the options must appear in the key.
+func TestBuildCacheKeyTransportOverrideLayout(t *testing.T) {
+	t.Parallel()
+
+	fallback := false
+	retry := 2
+	retrans := 3 * time.Second
+	timeout := 4 * time.Second
+
+	opts := &QueryOptions{
+		Fallback: &fallback,
+		Retry:    &retry,
+		Retrans:  &retrans,
+		Timeout:  &timeout,
+	}
+
+	key, _, _, err := buildCacheKey("example.com", "MX", "IN", opts)
+	if err != nil {
+		t.Fatalf("buildCacheKey: %v", err)
+	}
+
+	gotParts := strings.Split(key, "|")
+	wantParts := []string{
+		"NAME=example.com",
+		"TYPE=MX",
+		"CLASS=IN",
+		"DNSSEC=false",
+		"USEVC=false",
+		"RECURSE=false",
+		"FALLBACK=false",
+		"RETRY=2",
+		"RETRANS=" + strconv.FormatInt(int64(retrans), 10),
+		"TIMEOUT=" + strconv.FormatInt(int64(timeout), 10),
+		"EDNS_SIZE=0",
+	}
+	if !reflect.DeepEqual(gotParts, wantParts) {
+		t.Fatalf("cache key parts mismatch:\n got: %v\nwant: %v", gotParts, wantParts)
+	}
+}
+
+// Each override must separate the entry from an otherwise identical query.
+func TestBuildCacheKeyTransportOverridesAreDistinct(t *testing.T) {
+	t.Parallel()
+
+	fallbackOff, fallbackOn := false, true
+	zeroRetry, oneRetry := 0, 1
+	zeroDur, oneSec := time.Duration(0), time.Second
+
+	cases := []struct {
+		name string
+		opts *QueryOptions
+	}{
+		{"no overrides", &QueryOptions{}},
+		{"fallback off", &QueryOptions{Fallback: &fallbackOff}},
+		{"fallback on", &QueryOptions{Fallback: &fallbackOn}},
+		{"retry zero", &QueryOptions{Retry: &zeroRetry}},
+		{"retry one", &QueryOptions{Retry: &oneRetry}},
+		{"retrans zero", &QueryOptions{Retrans: &zeroDur}},
+		{"retrans one second", &QueryOptions{Retrans: &oneSec}},
+		{"timeout zero", &QueryOptions{Timeout: &zeroDur}},
+		{"timeout one second", &QueryOptions{Timeout: &oneSec}},
+	}
+
+	seen := map[string]string{}
+	for _, tc := range cases {
+		key, _, _, err := buildCacheKey("example.com", "MX", "IN", tc.opts)
+		if err != nil {
+			t.Fatalf("%s: buildCacheKey: %v", tc.name, err)
+		}
+		if other, dup := seen[key]; dup {
+			t.Errorf("%q and %q share cache key %q", tc.name, other, key)
+			continue
+		}
+		seen[key] = tc.name
+	}
+}
+
+// Saved cache files carry these keys, so a query with no override must keep the
+// existing layout.
+func TestBuildCacheKeyOmitsUnsetTransportOverrides(t *testing.T) {
+	t.Parallel()
+
+	dnssec := true
+	nilOptsKey, _, _, err := buildCacheKey("example.com", "A", "IN", nil)
+	if err != nil {
+		t.Fatalf("buildCacheKey nil opts: %v", err)
+	}
+	for _, part := range []string{"FALLBACK", "RETRY", "RETRANS", "TIMEOUT"} {
+		if strings.Contains(nilOptsKey, part) {
+			t.Errorf("default key gained a %s field: %q", part, nilOptsKey)
+		}
+	}
+
+	emptyOptsKey, _, _, err := buildCacheKey("example.com", "A", "IN", &QueryOptions{})
+	if err != nil {
+		t.Fatalf("buildCacheKey empty opts: %v", err)
+	}
+	if emptyOptsKey != nilOptsKey {
+		t.Errorf("empty options changed the key:\n got %q\nwant %q", emptyOptsKey, nilOptsKey)
+	}
+
+	dnssecKey, _, _, err := buildCacheKey("example.com", "A", "IN", &QueryOptions{DNSSEC: &dnssec})
+	if err != nil {
+		t.Fatalf("buildCacheKey dnssec opts: %v", err)
+	}
+	wantDNSSECKey := "NAME=example.com|TYPE=A|CLASS=IN|DNSSEC=true|USEVC=false|RECURSE=false|EDNS_SIZE=" +
+		strconv.Itoa(constants.EDNSUDPPayloadDNSSECDefault)
+	if dnssecKey != wantDNSSECKey {
+		t.Errorf("DNSSEC key layout changed:\n got %q\nwant %q", dnssecKey, wantDNSSECKey)
+	}
+}
+
+// zone08 asks for MX with default options while zone09 asks the same server with
+// fallback disabled. One shared entry serves whichever ran first to both.
+func TestFallbackOverrideDoesNotShareCacheEntry(t *testing.T) {
+	ctx, _ := testContext(t)
+
+	const qname = "fallback-split.example"
+	truncated := dnsutil.SetQuestion(&dns.Msg{}, dnsutil.Fqdn(qname), dns.TypeMX)
+	truncated.Response = true
+	truncated.Truncated = true
+
+	full := dnsutil.SetQuestion(&dns.Msg{}, dnsutil.Fqdn(qname), dns.TypeMX)
+	full.Response = true
+	mx := &dns.MX{Hdr: dns.Header{Name: dnsutil.Fqdn(qname), Class: dns.ClassINET, TTL: 3600}}
+	mx.Mx = dnsutil.Fqdn("mail." + qname)
+	full.Answer = []dns.RR{mx}
+
+	var calls int
+	ns := hookedNS(t, CacheFromContext(ctx), "ns1.example", "192.0.2.53", func(_ context.Context, _ string, _ string, _ string, opts *QueryOptions) (packet.Packet, error) {
+		calls++
+		if opts != nil && opts.Fallback != nil && !*opts.Fallback {
+			return packet.Packet{Msg: truncated}, nil
+		}
+		return packet.Packet{Msg: full}, nil
+	})
+
+	withFallback, err := ns.QueryWithOptions(ctx, qname, "MX", nil)
+	if err != nil {
+		t.Fatalf("default query: %v", err)
+	}
+	fallbackOff := false
+	noFallback, err := ns.QueryWithOptions(ctx, qname, "MX", &QueryOptions{Fallback: &fallbackOff})
+	if err != nil {
+		t.Fatalf("no-fallback query: %v", err)
+	}
+
+	if calls != 2 {
+		t.Fatalf("hook calls = %d, want 2: the no-fallback probe was served the cached fallback answer", calls)
+	}
+	if withFallback.Msg == nil || withFallback.Msg.Truncated {
+		t.Errorf("default query got the truncated answer")
+	}
+	if noFallback.Msg == nil || !noFallback.Msg.Truncated {
+		t.Errorf("no-fallback probe did not get the truncated answer")
+	}
 }

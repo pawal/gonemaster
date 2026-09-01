@@ -15,6 +15,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - engine: `Exchange` no longer writes profile defaults into the shared client
+- engine: the response cache keys the fallback, retry, retrans and timeout overrides
 
 ## [v1.7.3] - 2026-08-31
 

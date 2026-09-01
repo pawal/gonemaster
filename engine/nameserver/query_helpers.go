@@ -381,6 +381,23 @@ func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions)
 	buf = appendCacheKeyBool(buf, "USEVC", usevc)
 	buf = appendCacheKeyBool(buf, "RECURSE", recurse)
 
+	// Transport overrides change what an answer means. Only explicit ones are
+	// keyed, so default queries keep their existing key.
+	if opts != nil {
+		if opts.Fallback != nil {
+			buf = appendCacheKeyBool(buf, "FALLBACK", *opts.Fallback)
+		}
+		if opts.Retry != nil {
+			buf = appendCacheKeyInt(buf, "RETRY", int64(*opts.Retry))
+		}
+		if opts.Retrans != nil {
+			buf = appendCacheKeyInt(buf, "RETRANS", int64(*opts.Retrans))
+		}
+		if opts.Timeout != nil {
+			buf = appendCacheKeyInt(buf, "TIMEOUT", int64(*opts.Timeout))
+		}
+	}
+
 	if opts != nil && opts.EDNSDetails != nil {
 		buf = appendCacheKeyUint8Ptr(buf, "EDNS_VERSION", opts.EDNSDetails.Version)
 		buf = appendCacheKeyUint16Ptr(buf, "EDNS_Z", opts.EDNSDetails.Z)
@@ -424,6 +441,11 @@ func appendCacheKeyBool(buf []byte, key string, value bool) []byte {
 func appendCacheKeyUint(buf []byte, key string, value uint64) []byte {
 	buf = appendCacheKeyPrefix(buf, key)
 	return strconv.AppendUint(buf, value, 10)
+}
+
+func appendCacheKeyInt(buf []byte, key string, value int64) []byte {
+	buf = appendCacheKeyPrefix(buf, key)
+	return strconv.AppendInt(buf, value, 10)
 }
 
 func appendCacheKeyUint8Ptr(buf []byte, key string, value *uint8) []byte {

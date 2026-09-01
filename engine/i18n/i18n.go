@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path"
 	"sort"
@@ -17,15 +18,74 @@ import (
 var (
 	loadOnce sync.Once
 
+	// mu guards the catalogs against readers running concurrently with
+	// RegisterCatalogs.
+	mu        sync.RWMutex
 	catalogs  map[string]map[string]string
 	english   map[string]string
 	localeIDs []string
 )
 
-// AvailableLocales returns the list of embedded locales, plus "en".
+// RegisterCatalogs merges the .po files matching pattern in fsys into the
+// message catalogs. Locale names are taken from the file base names, and the
+// entry keys follow the embedded convention: msgctxt, else a "MODULE:TAG"
+// dot-comment. Registered entries take precedence over the embedded ones and
+// over entries registered earlier.
+//
+// The files are parsed before anything is merged, so a read error leaves the
+// catalogs unchanged. A pattern matching no file is not an error.
+func RegisterCatalogs(fsys fs.FS, pattern string) error {
+	if fsys == nil {
+		return fmt.Errorf("i18n: nil filesystem")
+	}
+	loadCatalogs()
+
+	paths, err := fs.Glob(fsys, pattern)
+	if err != nil {
+		return fmt.Errorf("i18n: glob %q: %w", pattern, err)
+	}
+
+	type parsed struct {
+		locale string
+		msgs   map[string]string
+		ids    map[string]string
+	}
+	pending := make([]parsed, 0, len(paths))
+	for _, poPath := range paths {
+		data, err := fs.ReadFile(fsys, poPath)
+		if err != nil {
+			return fmt.Errorf("i18n: read %q: %w", poPath, err)
+		}
+		locale := strings.ToLower(strings.TrimSuffix(path.Base(poPath), ".po"))
+		if locale == "" {
+			continue
+		}
+		msgs, ids := parsePO(string(data))
+		pending = append(pending, parsed{locale: locale, msgs: msgs, ids: ids})
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+	for _, item := range pending {
+		if len(item.msgs) > 0 {
+			if catalogs[item.locale] == nil {
+				catalogs[item.locale] = map[string]string{}
+				localeIDs = append(localeIDs, item.locale)
+			}
+			maps.Copy(catalogs[item.locale], item.msgs)
+		}
+		maps.Copy(english, item.ids)
+	}
+	sort.Strings(localeIDs)
+	return nil
+}
+
+// AvailableLocales returns the list of embedded and registered locales, plus "en".
 func AvailableLocales() []string {
 	loadCatalogs()
+	mu.RLock()
 	locales := append([]string{}, localeIDs...)
+	mu.RUnlock()
 	locales = append(locales, "en")
 	sort.Strings(locales)
 	return locales
@@ -65,19 +125,27 @@ func TranslateWithStatus(locale string, module string, tag string, args map[stri
 		locale = DefaultLocale()
 	}
 
+	mu.RLock()
+	msg := ""
 	for _, candidate := range localeCandidates(locale) {
-		if msg := lookupCatalog(candidate, key); msg != "" {
-			return interpolate(msg, args), true
+		if found := lookupCatalog(candidate, key); found != "" {
+			msg = found
+			break
 		}
 	}
+	if msg == "" {
+		msg = english[key]
+	}
+	mu.RUnlock()
 
-	if msg := english[key]; msg != "" {
+	if msg != "" {
 		return interpolate(msg, args), true
 	}
 
 	return interpolate(key, args), false
 }
 
+// lookupCatalog reads the catalogs; callers must hold mu.
 func lookupCatalog(locale string, key string) string {
 	if catalogs == nil {
 		return ""
@@ -116,6 +184,9 @@ func normalizeLocale(locale string) string {
 
 func loadCatalogs() {
 	loadOnce.Do(func() {
+		mu.Lock()
+		defer mu.Unlock()
+
 		catalogs = map[string]map[string]string{}
 		english = map[string]string{}
 		localeIDs = []string{}

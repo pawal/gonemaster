@@ -10,6 +10,7 @@ All notable changes to all gonemaster components will be documented in this file
 - engine: `nsdiscovery.ParentNameserversStatus` tells an unreachable chain from a proven absent parent
 - engine: `packet.Packet.Protocol` records whether a reply arrived over UDP or TCP
 - engine: a CD-bit override on `transport.Client` and `nameserver.QueryOptions`
+- engine: `i18n.RegisterCatalogs` merges caller-supplied `.po` catalogs
 
 ### Changed
 

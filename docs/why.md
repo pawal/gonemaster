@@ -228,7 +228,9 @@ from upstream's, credited as such in the license, and have since diverged.
 
 For command-line testing, API testing, and batch runs, yes. If your workflow
 depends on the Zonemaster Backend's JSON-RPC API or on the Zonemaster GUI, no:
-see [when not to use gonemaster](#when-not-to-use-gonemaster).
+see [when not to use gonemaster](#when-not-to-use-gonemaster). The
+[migration guide](https://pawal.codeberg.page/gonemaster/migration-from-zonemaster/)
+covers the mechanics: flags, profiles, API calls, and output consumers.
 
 ### Do results match Zonemaster? {#do-results-match}
 

@@ -10,6 +10,7 @@ The [architecture overview](architecture.md) is a one-sitting tour of the system
 | I want to... | Start here |
 |---|---|
 | Understand what gonemaster is and how it compares | [why.md](why.md) |
+| Migrate from a Zonemaster deployment | [migration-from-zonemaster.md](migration-from-zonemaster.md) |
 | Run one DNS check locally | [cli/](cli/README.md) |
 | Start and operate the HTTP server | [server/](server/README.md) |
 | Automate the server from a shell or script | [client/](client/README.md) |
@@ -57,5 +58,6 @@ Direct local tests with the `gonemaster` binary stay in [cli/](cli/README.md).
 - [server/metrics.md](server/metrics.md): Prometheus and JSON metrics.
 - [scoring.md](scoring.md): numeric scores and letter grades.
 - [cli/cache-format.md](cli/cache-format.md): packet cache save/restore file format.
+- [migration-from-zonemaster.md](migration-from-zonemaster.md): migrating from a Zonemaster deployment.
 - [MIGRATION-1.1.md](MIGRATION-1.1.md): JSON output migration guide.
 - [specifications/](specifications/README.md): canonical testcase and tag specifications.

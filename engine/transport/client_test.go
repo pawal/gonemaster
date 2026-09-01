@@ -1081,3 +1081,76 @@ func TestPrepareMessageZReachesTheWire(t *testing.T) {
 		t.Error("EDNS OPT did not reach the wire")
 	}
 }
+
+// The transport that carried a reply is not visible in the DNS message, so a
+// TC-triggered TCP requery is indistinguishable from a plain UDP exchange
+// unless the packet records it.
+func TestExchangeRecordsProtocol(t *testing.T) {
+	t.Run("udp", func(t *testing.T) {
+		addr, shutdown := startUDPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+			writeSimpleAResponse(w, req)
+		})
+		defer shutdown()
+
+		client := &Client{}
+		client.SetRetries(0)
+		client.SetTimeout(time.Second)
+
+		pkt, err := client.Exchange(context.Background(), addr, BuildQuery("udp-protocol.example.", dns.TypeA))
+		if err != nil {
+			t.Fatalf("exchange: %v", err)
+		}
+		if pkt.Protocol != "udp" {
+			t.Errorf("Protocol = %q, want udp", pkt.Protocol)
+		}
+	})
+
+	t.Run("forced tcp", func(t *testing.T) {
+		addr, _, shutdown := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+			writeSimpleAResponse(w, req)
+		}, nil)
+		defer shutdown()
+
+		client := &Client{}
+		client.SetUseTCP(true)
+		client.SetRetries(0)
+		client.SetTimeout(time.Second)
+
+		pkt, err := client.Exchange(context.Background(), addr, BuildQuery("tcp-protocol.example.", dns.TypeA))
+		if err != nil {
+			t.Fatalf("exchange: %v", err)
+		}
+		if pkt.Protocol != "tcp" {
+			t.Errorf("Protocol = %q, want tcp", pkt.Protocol)
+		}
+	})
+
+	t.Run("tcp after truncated udp", func(t *testing.T) {
+		addr, _, shutdownTCP := startTCPDNSServer(t, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+			writeSimpleAResponse(w, req)
+		}, nil)
+		defer shutdownTCP()
+
+		defer startUDPServerOnAddr(t, addr, func(_ context.Context, w dns.ResponseWriter, req *dns.Msg) {
+			resp := new(dns.Msg)
+			dnsutil.SetReply(resp, req)
+			resp.Truncated = true
+			_, _ = resp.WriteTo(w)
+		})()
+
+		client := &Client{}
+		client.SetUseTCP(false)
+		client.SetFallback(true)
+		client.SetRetries(0)
+		client.SetTimeout(time.Second)
+		client.SetRetrans(40 * time.Millisecond)
+
+		pkt, err := client.Exchange(context.Background(), addr, BuildQuery("fallback-protocol.example.", dns.TypeA))
+		if err != nil {
+			t.Fatalf("exchange: %v", err)
+		}
+		if pkt.Protocol != "tcp" {
+			t.Errorf("Protocol = %q, want tcp after the TC fallback", pkt.Protocol)
+		}
+	})
+}

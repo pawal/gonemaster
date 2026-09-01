@@ -204,7 +204,9 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 			continue
 		}
 
+		usedTCP := eff.UseTCP
 		if !eff.UseTCP && response.Truncated && eff.Fallback {
+			usedTCP = true
 			response, rtt, err = eff.tracedExchangeOnce(ctx, trace, server, prepared, qname, qtype, true, true, i+1)
 			if err != nil {
 				if ctx != nil {
@@ -222,6 +224,7 @@ func (c *Client) Exchange(ctx context.Context, server string, msg *dns.Msg) (pac
 		pkt.QueryTime = rtt
 		pkt.Timestamp = time.Now()
 		pkt.AnswerFrom = server
+		pkt.Protocol = protocolName(usedTCP)
 		return pkt, nil
 	}
 
@@ -241,21 +244,25 @@ func (c *Client) tracedExchangeOnce(ctx context.Context, trace querytrace.QueryT
 	start := time.Now()
 	response, rtt, err := c.exchangeOnce(ctx, server, msg, useTCP, fromUDPFallback)
 
-	protocol := "udp"
-	if useTCP {
-		protocol = "tcp"
-	}
 	trace.AttemptDone(querytrace.AttemptEvent{
 		NSAddr:   server,
 		QName:    qname,
 		QType:    qtype,
-		Protocol: protocol,
+		Protocol: protocolName(useTCP),
 		Attempt:  attempt,
 		Elapsed:  time.Since(start),
 		Outcome:  classifyOutcome(err),
 		Err:      errString(err),
 	})
 	return response, rtt, err
+}
+
+// protocolName names the transport of a completed exchange.
+func protocolName(useTCP bool) string {
+	if useTCP {
+		return "tcp"
+	}
+	return "udp"
 }
 
 // questionNameType extracts the query name and type string from a message's

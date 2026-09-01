@@ -10,14 +10,43 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
+	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/transport"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
+// ParentStatus reports why a delegation-chain walk returned the set it did.
+type ParentStatus int
+
+const (
+	// ParentFound indicates at least one parent nameserver was identified.
+	ParentFound ParentStatus = iota
+	// ParentNone indicates every query in the walk was answered and no parent
+	// nameserver exists for the zone.
+	ParentNone
+	// ParentUnreachable indicates no parent nameserver was identified while at
+	// least one query went unanswered, so absence is not proven.
+	ParentUnreachable
+)
+
+// String returns the status name.
+func (s ParentStatus) String() string {
+	switch s {
+	case ParentFound:
+		return "found"
+	case ParentNone:
+		return "none"
+	case ParentUnreachable:
+		return "unreachable"
+	default:
+		return "invalid"
+	}
+}
+
 type parentCacheEntry struct {
-	defined bool
+	status  ParentStatus
 	servers []parentCacheServer
 }
 
@@ -69,12 +98,12 @@ func (c *Cache) lookup(key string) (parentCacheEntry, bool) {
 	return entry, ok
 }
 
-func (c *Cache) store(key string, servers []nameserver.Nameserver, defined bool) {
+func (c *Cache) store(key string, servers []nameserver.Nameserver, status ParentStatus) {
 	if c == nil {
 		return
 	}
 	c.mu.Lock()
-	c.items[key] = parentCacheEntry{defined: defined, servers: snapshotParentServers(servers)}
+	c.items[key] = parentCacheEntry{status: status, servers: snapshotParentServers(servers)}
 	c.mu.Unlock()
 }
 
@@ -114,33 +143,54 @@ func cacheFromContext(ctx context.Context) *Cache {
 //
 // Errors are returned if z is nil, if z has no recursor, or if the chain
 // walk encounters a definitive failure. An unreachable intermediate
-// produces an empty result with no error - callers must check len().
+// produces an empty result with no error - callers must check len(), or use
+// [ParentNameserversStatus] to tell silence from proven absence.
 func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
+	servers, _, err := ParentNameserversStatus(ctx, z)
+	return servers, err
+}
+
+// ParentNameserversStatus is [ParentNameservers] with the reason for the
+// result. The returned slice is identical to what ParentNameservers yields;
+// the status distinguishes an empty result caused by unanswered queries
+// ([ParentUnreachable]) from one where the walk proved no parent nameserver
+// exists ([ParentNone]).
+func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver, ParentStatus, error) {
 	if z == nil {
-		return nil, fmt.Errorf("zone is nil")
+		return nil, ParentNone, fmt.Errorf("zone is nil")
 	}
 	r := z.Recursor()
 	if r == nil {
-		return nil, fmt.Errorf("missing recursor")
+		return nil, ParentNone, fmt.Errorf("missing recursor")
 	}
 	prof := profile.FromContext(ctx)
 	cache := cacheFromContext(ctx)
 
 	if z.Name.String() == "." || r.HasFakeAddresses(z.Name.String()) {
-		return []nameserver.Nameserver{}, nil
+		return []nameserver.Nameserver{}, ParentNone, nil
 	}
 
 	key := strings.ToLower(z.Name.String())
 	if cached, ok := cache.lookup(key); ok {
-		if !cached.defined {
-			return nil, nil
+		if cached.status != ParentFound {
+			return nil, cached.status, nil
 		}
-		return materializeParentServers(ctx, r.Client(), cached.servers), nil
+		return materializeParentServers(ctx, r.Client(), cached.servers), cached.status, nil
 	}
 
 	root, err := r.RootServers(ctx)
 	if err != nil {
-		return nil, err
+		return nil, ParentNone, err
+	}
+
+	// An unanswered probe means a later empty result is unproven, not negative.
+	silent := false
+	probe := func(ns nameserver.Nameserver, name string, qtype string) packet.Packet {
+		resp := queryPacket(ctx, ns, name, qtype)
+		if resp.Msg == nil {
+			silent = true
+		}
+		return resp
 	}
 
 	handled := map[string]map[string]bool{}
@@ -199,12 +249,12 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 				continue
 			}
 
-			pSOA := queryPacket(ctx, ns, zoneKey, "SOA")
+			pSOA := probe(ns, zoneKey, "SOA")
 			if !validSOA(pSOA, dnsname.New(zoneKey)) {
 				continue
 			}
 
-			pNS := queryPacket(ctx, ns, zoneKey, "NS")
+			pNS := probe(ns, zoneKey, "NS")
 			if !validNS(pNS, dnsname.New(zoneKey)) {
 				continue
 			}
@@ -235,8 +285,9 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 			for {
 				loopCount++
 				if loopCount >= 1000 {
-					cache.store(key, nil, false)
-					return nil, nil
+					status := emptyParentStatus(silent)
+					cache.store(key, nil, status)
+					return nil, status, nil
 				}
 
 				if len(intermediate.Labels()) >= len(zLabels) {
@@ -246,7 +297,7 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 				idx := len(zLabels) - len(intermediate.Labels()) - 1
 				intermediate = intermediate.Prepend(zLabels[idx])
 
-				pSOA = queryPacket(ctx, ns, intermediate.String(), "SOA")
+				pSOA = probe(ns, intermediate.String(), "SOA")
 				if pSOA.Msg == nil {
 					continue serverLoop
 				}
@@ -255,7 +306,7 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 					if strings.EqualFold(intermediate.String(), z.Name.String()) {
 						parentNS = append(parentNS, ns)
 					} else {
-						pNS = queryPacket(ctx, ns, intermediate.String(), "NS")
+						pNS = probe(ns, intermediate.String(), "NS")
 						if !validNS(pNS, intermediate) {
 							continue
 						}
@@ -315,7 +366,7 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 					// a referral at z.Name. Probe directly; if the child
 					// referral is present, accept this NS as the parent.
 					// Basic01 reports this as B01_PARENT_NXDOMAIN_HIDES_DELEGATION.
-					pChild := queryPacket(ctx, ns, z.Name.String(), "SOA")
+					pChild := probe(ns, z.Name.String(), "SOA")
 					if pChild.IsRedirect() && len(pChild.GetRecordsForName("NS", z.Name, "authority")) > 0 {
 						parentNS = append(parentNS, ns)
 					}
@@ -326,13 +377,23 @@ func ParentNameservers(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserv
 	}
 
 	if len(parentNS) == 0 {
-		cache.store(key, nil, false)
-		return nil, nil
+		status := emptyParentStatus(silent)
+		cache.store(key, nil, status)
+		return nil, status, nil
 	}
 
 	parentNS = uniqueSortedNameservers(parentNS)
-	cache.store(key, parentNS, true)
-	return cloneNameservers(parentNS), nil
+	cache.store(key, parentNS, ParentFound)
+	return cloneNameservers(parentNS), ParentFound, nil
+}
+
+// emptyParentStatus classifies an empty walk by whether any probe went
+// unanswered.
+func emptyParentStatus(silent bool) ParentStatus {
+	if silent {
+		return ParentUnreachable
+	}
+	return ParentNone
 }
 
 // parentNSIPs returns parent nameservers filtered to unique IPs.

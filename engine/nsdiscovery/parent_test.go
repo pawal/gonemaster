@@ -23,14 +23,14 @@ func TestParentCacheStoresSnapshotData(t *testing.T) {
 
 	ns := nstest.NS(t, ctx, nil, "ns1.example", "192.0.2.53")
 
-	cache.store("example", []nameserver.Nameserver{ns}, true)
+	cache.store("example", []nameserver.Nameserver{ns}, ParentFound)
 
 	entry, ok := cache.lookup("example")
 	if !ok {
 		t.Fatalf("expected parent cache entry")
 	}
-	if !entry.defined {
-		t.Fatalf("expected defined parent cache entry")
+	if entry.status != ParentFound {
+		t.Fatalf("expected ParentFound cache entry, got %s", entry.status)
 	}
 	if len(entry.servers) != 1 {
 		t.Fatalf("expected 1 cached parent server, got %d", len(entry.servers))
@@ -465,4 +465,166 @@ func TestCacheClearConcurrentWithParentNameservers(t *testing.T) {
 	}
 
 	wg.Wait()
+}
+
+// An empty result has two causes that callers must be able to tell apart: the
+// chain answered and proved no parent exists, or it stayed silent.
+func TestParentNameserversStatusSilentChainIsUnreachable(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	cache := NewCache()
+	ctx = WithCache(ctx, cache)
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{"ns1.root": {"192.0.2.1"}},
+	})
+
+	// The root server answers nothing at all.
+	nstest.HookedNS(t, ctx, r, "ns1.root", "192.0.2.1", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		return packet.Packet{}, nil
+	})
+
+	z := newZone(t, "example", r)
+
+	parent, status, err := ParentNameserversStatus(ctx, &z)
+	if err != nil {
+		t.Fatalf("ParentNameserversStatus: %v", err)
+	}
+	if len(parent) != 0 {
+		t.Fatalf("expected no parent nameservers, got %d", len(parent))
+	}
+	if status != ParentUnreachable {
+		t.Fatalf("status = %s, want unreachable", status)
+	}
+
+	// The status must survive memoisation, without re-walking the chain.
+	_, cachedStatus, err := ParentNameserversStatus(ctx, &z)
+	if err != nil {
+		t.Fatalf("second ParentNameserversStatus: %v", err)
+	}
+	if cachedStatus != ParentUnreachable {
+		t.Fatalf("cached status = %s, want unreachable", cachedStatus)
+	}
+}
+
+// A chain that answers every probe but holds no delegation proves absence.
+func TestParentNameserversStatusAnsweringChainIsNone(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, NewCache())
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{"ns1.root": {"192.0.2.1"}},
+	})
+
+	rootSOA := func(name string) packet.Packet {
+		soa := dnstest.SOARR(name, dnstest.MName("ns.example."), dnstest.RName("hostmaster.example."))
+		return dnstest.Response(dnstest.Answers(dnstest.TTL(0, soa)...))
+	}
+
+	// Every probe is answered, but the root claims the queried name itself.
+	nstest.HookedNS(t, ctx, r, "ns1.root", "192.0.2.1", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if name == "." && qtype == "SOA" {
+			return rootSOA("."), nil
+		}
+		if name == "." && qtype == "NS" {
+			return dnstest.Response(dnstest.Answers(dnstest.TTL(0, dnstest.NSRRs(".", "ns1.root.")...)...),
+				dnstest.Additional(dnstest.TTL(0, dnstest.ARR("ns1.root.", "192.0.2.1"))...)), nil
+		}
+		return dnstest.Response(), nil
+	})
+
+	z := newZone(t, "example", r)
+
+	parent, status, err := ParentNameserversStatus(ctx, &z)
+	if err != nil {
+		t.Fatalf("ParentNameserversStatus: %v", err)
+	}
+	if len(parent) != 0 {
+		t.Fatalf("expected no parent nameservers, got %d", len(parent))
+	}
+	if status != ParentNone {
+		t.Fatalf("status = %s, want none", status)
+	}
+}
+
+// A successful walk reports ParentFound, and the wrapper keeps returning the
+// same servers it always has.
+func TestParentNameserversStatusFound(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, NewCache())
+	prof.Net.IPv4 = true
+	prof.Net.IPv6 = true
+
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{"ns1.root": {"192.0.2.1"}},
+	})
+
+	rootSOA := func(name string) packet.Packet {
+		soa := dnstest.SOARR(name, dnstest.MName("ns.example."), dnstest.RName("hostmaster.example."))
+		return dnstest.Response(dnstest.Answers(dnstest.TTL(0, soa)...))
+	}
+
+	nstest.HookedNS(t, ctx, r, "ns1.root", "192.0.2.1", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		switch {
+		case name == "." && qtype == "SOA":
+			return rootSOA("."), nil
+		case name == "." && qtype == "NS":
+			return dnstest.Response(dnstest.Answers(dnstest.TTL(0, dnstest.NSRRs(".", "ns1.root.")...)...),
+				dnstest.Additional(dnstest.TTL(0, dnstest.ARR("ns1.root.", "192.0.2.1"))...)), nil
+		case name == "example" && qtype == "SOA":
+			return rootSOA("example"), nil
+		default:
+			return dnstest.Response(), nil
+		}
+	})
+
+	z := newZone(t, "example", r)
+
+	parent, status, err := ParentNameserversStatus(ctx, &z)
+	if err != nil {
+		t.Fatalf("ParentNameserversStatus: %v", err)
+	}
+	if status != ParentFound {
+		t.Fatalf("status = %s, want found", status)
+	}
+	if len(parent) != 1 || parent[0].String() != "ns1.root/192.0.2.1" {
+		t.Fatalf("unexpected parent nameservers %#v", parent)
+	}
+
+	legacy, err := ParentNameservers(ctx, &z)
+	if err != nil {
+		t.Fatalf("ParentNameservers: %v", err)
+	}
+	if len(legacy) != len(parent) || legacy[0].String() != parent[0].String() {
+		t.Fatalf("wrapper disagrees with status variant: %#v vs %#v", legacy, parent)
+	}
+}
+
+// The root and undelegated zones return an empty non-nil slice; callers rely on
+// that distinction from a nil result, so the status variant must preserve it.
+func TestParentNameserversStatusRootIsEmptyNotNil(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+	ctx = WithCache(ctx, NewCache())
+
+	r := nstest.Recursor(t, map[string]map[string][]string{
+		".": map[string][]string{"ns1.root": {"192.0.2.1"}},
+	})
+	z := newZone(t, ".", r)
+
+	parent, status, err := ParentNameserversStatus(ctx, &z)
+	if err != nil {
+		t.Fatalf("ParentNameserversStatus: %v", err)
+	}
+	if parent == nil {
+		t.Fatal("root parent list is nil, want an empty slice")
+	}
+	if len(parent) != 0 {
+		t.Fatalf("expected no parent nameservers for the root, got %d", len(parent))
+	}
+	if status != ParentNone {
+		t.Fatalf("status = %s, want none", status)
+	}
 }

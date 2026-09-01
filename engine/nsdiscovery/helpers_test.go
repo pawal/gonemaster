@@ -65,6 +65,6 @@ func newAuthoritativeNameserver(ctx context.Context, t *testing.T, r *recursor.R
 func seedParentCache(ctx context.Context, t *testing.T, r *recursor.Recursor, cache *Cache, zoneKey string, nsName string, nsAddr string) nameserver.Nameserver {
 	t.Helper()
 	ns := nstest.NS(t, ctx, r, nsName, nsAddr)
-	cache.store(zoneKey, []nameserver.Nameserver{ns}, true)
+	cache.store(zoneKey, []nameserver.Nameserver{ns}, ParentFound)
 	return ns
 }

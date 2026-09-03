@@ -7,9 +7,8 @@ import (
 	"github.com/cloudflare/circl/sign/ed448"
 )
 
-// ed448Verify verifies an Ed448 signature per RFC 8080: PureEdDSA, empty
-// context, no prehash. The DNS library has no ED448 case, so VerifyRRSIG
-// passes this as SignOption.VerifyFunc.
+// ed448Verify verifies per RFC 8080: PureEdDSA, empty context, no prehash.
+// The library has no ED448 case, so VerifyRRSIG passes this as VerifyFunc.
 func ed448Verify(key *dns.DNSKEY, message, signature []byte) bool {
 	if key == nil || key.Algorithm != dns.ED448 || len(signature) != ed448.SignatureSize {
 		return false

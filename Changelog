@@ -7,6 +7,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Added
 
 - engine: Ed448 (DNSSEC algorithm 16) RRSIG validation
+- engine: key sizes for ECC-GOST, ECC-GOST12 and SM2SM3 keys
 
 ## [v1.7.4] - 2026-09-01
 

@@ -59,6 +59,10 @@ func TestKeySizeFixedSizeAlgorithms(t *testing.T) {
 		{dns.ECDSAP384SHA384, 384},
 		{dns.ED25519, 256},
 		{dns.ED448, 456},
+		// Recognised, never verified; the size still comes from the curve.
+		{dns.ECCGOST, 256},
+		{dns.ECCGOST12, 256},
+		{dns.SM2SM3, 256},
 	}
 	for _, tc := range cases {
 		t.Run(dns.AlgorithmToString[tc.algo], func(t *testing.T) {
@@ -68,6 +72,32 @@ func TestKeySizeFixedSizeAlgorithms(t *testing.T) {
 				t.Errorf("KeySize = %d, want %d", got, tc.want)
 			}
 		})
+	}
+}
+
+// Types 5 (GOST R 34.11-2012) and 6 (SM3) are IANA-assigned, so reading the
+// gate as "known type" would admit them. The library computes an experimental
+// SHA-512 for 5, which would fail a sound delegation on a digest mismatch.
+func TestDigestSupportedExcludesUncomputableTypes(t *testing.T) {
+	for _, digest := range []uint8{1, 2, 3, 4} {
+		if !dnssecutil.DigestSupported(digest) {
+			t.Errorf("digest type %d should be supported", digest)
+		}
+	}
+	for _, digest := range []uint8{0, 5, 6, 7, 255} {
+		if dnssecutil.DigestSupported(digest) {
+			t.Errorf("digest type %d should not be supported", digest)
+		}
+	}
+
+	key := dnstest.RSADNSKEY("example.", dns.FlagZONE, dnstest.LBKSK3842)
+	ds := key.ToDS(5)
+	if ds == nil {
+		t.Skip("library no longer computes digest type 5; the exclusion can be revisited")
+	}
+	if len(ds.Digest) != 128 {
+		t.Errorf("digest type 5 produced %d hex chars, want 128 (SHA-512): the collision this guards may be gone",
+			len(ds.Digest))
 	}
 }
 
@@ -92,7 +122,7 @@ func TestKeySizeGeneratedCurveKeys(t *testing.T) {
 // An unknown algorithm has no derivable size, even when the payload happens to
 // parse as an RSA modulus.
 func TestKeySizeUnknownAlgorithmIsZero(t *testing.T) {
-	for _, algo := range []uint8{dns.DSA, dns.ECCGOST, dns.MLDSA44, 0, 99} {
+	for _, algo := range []uint8{dns.DSA, dns.MLDSA44, 0, 99} {
 		key := dnstest.RSADNSKEY("example.", dns.FlagZONE|dns.FlagSEP, dnstest.LBKSK3842)
 		key.Algorithm = algo
 		if got := dnssecutil.KeySize(key); got != 0 {

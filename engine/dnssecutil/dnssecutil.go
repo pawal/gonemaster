@@ -33,7 +33,9 @@ func KeyTag(key *dns.DNSKEY) uint16 {
 	return local.KeyTag()
 }
 
-// DigestSupported reports whether the DS digest type is a known IANA type.
+// DigestSupported reports whether the DS digest type may be handed to
+// DNSKEY.ToDS. Types 5 and 6 are excluded: the library answers 5 with an
+// experimental SHA-512, not the Streebog digest the type denotes.
 func DigestSupported(digest uint8) bool {
 	switch digest {
 	case 1, 2, 3, 4:
@@ -78,6 +80,8 @@ func KeySize(key *dns.DNSKEY) int {
 		return 256
 	case dns.ED448:
 		return 456
+	case dns.ECCGOST, dns.ECCGOST12, dns.SM2SM3:
+		return 256 // curve size, as for ECDSA
 	default:
 		return 0
 	}
@@ -168,9 +172,8 @@ func VerifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) 
 		}
 		copies = append(copies, rr.Clone())
 	}
-	// The hook lands in the library's default branch, shared by every algorithm
-	// it cannot verify, so attaching it for others would turn their ErrAlg into
-	// ErrSig and report unsupported algorithms as broken signatures.
+	// The hook shares the library's default branch with every unverifiable
+	// algorithm, so attaching it for those would turn ErrAlg into ErrSig.
 	opts := &dns.SignOption{}
 	if sig.Algorithm == dns.ED448 {
 		opts.VerifyFunc = ed448Verify

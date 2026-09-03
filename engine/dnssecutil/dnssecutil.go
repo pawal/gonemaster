@@ -33,12 +33,13 @@ func KeyTag(key *dns.DNSKEY) uint16 {
 	return local.KeyTag()
 }
 
-// DigestSupported reports whether the DS digest type may be handed to
-// DNSKEY.ToDS. Types 5 and 6 are excluded: the library answers 5 with an
-// experimental SHA-512, not the Streebog digest the type denotes.
+// DigestSupported reports whether DNSKEY.ToDS can recompute the digest type.
+// GOST (3, 5) and SM3 (6) cannot: the library has no GOST or SM3 digest, and
+// it answers type 5 with an experimental SHA-512 rather than the Streebog
+// digest RFC 9558 assigns there.
 func DigestSupported(digest uint8) bool {
 	switch digest {
-	case 1, 2, 3, 4:
+	case 1, 2, 4:
 		return true
 	default:
 		return false

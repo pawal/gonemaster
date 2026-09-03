@@ -7758,14 +7758,22 @@ func cdnskeyContentMatchesDS(cdnskeyRecs []*dns.CDNSKEY, dsRecs []*dns.DS) bool 
 	dsKeytagSet := make(map[uint16]bool, len(dsRecs))
 	dsSet := make(map[dsContentKey]bool, len(dsRecs))
 	for _, ds := range dsRecs {
-		digestTypes[ds.DigestType] = true
 		dsKeytagSet[ds.KeyTag] = true
+		// A digest we cannot recompute proves nothing, so it stays out of the
+		// comparison rather than counting as a mismatch.
+		if !dsDigestSupported(ds.DigestType) {
+			continue
+		}
+		digestTypes[ds.DigestType] = true
 		dsSet[makeDSContentKey(ds)] = true
 	}
 	for _, cdnskey := range cdnskeyRecs {
 		if !dsKeytagSet[keyTag(&cdnskey.DNSKEY)] {
 			return false
 		}
+	}
+	if len(dsSet) == 0 {
+		return true
 	}
 	for _, cdnskey := range cdnskeyRecs {
 		contributed := false

@@ -75,29 +75,29 @@ func TestKeySizeFixedSizeAlgorithms(t *testing.T) {
 	}
 }
 
-// Types 5 (GOST R 34.11-2012) and 6 (SM3) are IANA-assigned, so reading the
-// gate as "known type" would admit them. The library computes an experimental
-// SHA-512 for 5, which would fail a sound delegation on a digest mismatch.
-func TestDigestSupportedExcludesUncomputableTypes(t *testing.T) {
-	for _, digest := range []uint8{1, 2, 3, 4} {
+// The gate admits what ToDS recomputes correctly, which is narrower than what
+// IANA assigns. Type 5 is the trap: IANA gives it GOST R 34.11-2012, the
+// library answers SHA-512, so admitting it would fail a sound delegation.
+func TestDigestSupported(t *testing.T) {
+	for _, digest := range []uint8{1, 2, 4} {
 		if !dnssecutil.DigestSupported(digest) {
 			t.Errorf("digest type %d should be supported", digest)
 		}
 	}
-	for _, digest := range []uint8{0, 5, 6, 7, 255} {
+	for _, digest := range []uint8{0, 3, 5, 6, 7, 255} {
 		if dnssecutil.DigestSupported(digest) {
 			t.Errorf("digest type %d should not be supported", digest)
 		}
 	}
 
 	key := dnstest.RSADNSKEY("example.", dns.FlagZONE, dnstest.LBKSK3842)
-	ds := key.ToDS(5)
-	if ds == nil {
-		t.Skip("library no longer computes digest type 5; the exclusion can be revisited")
+	for _, digest := range []uint8{3, 6} {
+		if key.ToDS(digest) != nil {
+			t.Errorf("digest type %d became computable; revisit the gate", digest)
+		}
 	}
-	if len(ds.Digest) != 128 {
-		t.Errorf("digest type 5 produced %d hex chars, want 128 (SHA-512): the collision this guards may be gone",
-			len(ds.Digest))
+	if ds := key.ToDS(5); ds == nil || len(ds.Digest) != 128 {
+		t.Error("digest type 5 no longer answers SHA-512; the collision may be resolved")
 	}
 }
 

@@ -49,11 +49,12 @@ Status: Final
     - If `cdsKeySet == dsKeySet`, emit `DS18_CDS_MATCHES_DS` with `cds_keytags` and `ds_keytags`.
     - Otherwise emit `DS18_CDS_ROLLOVER_SIGNALED` with `cds_keytags` and `ds_keytags`.
 14. **CDNSKEY-vs-DS content comparison** (using the first nameserver with at least one non-DELETE CDNSKEY record):
-    - Collect `digestTypes` from the parent DS RRset.
     - Build `dsKeytagSet` from parent DS records.
     - Each non-DELETE CDNSKEY's `KeyTag()` must appear in `dsKeytagSet`; otherwise the comparison is a mismatch.
+    - Collect `digestTypes` from the parent DS RRset, keeping only the types this implementation can recompute (SHA-1, SHA-256, SHA-384). DS records of any other digest type, GOST and SM3 among them, are excluded from the comparison: a digest that cannot be recomputed cannot establish either a match or a mismatch.
+    - If no DS record remains after that exclusion, the content comparison is indeterminate and emits `DS18_CDNSKEY_MATCHES_DS`, since the keytag check above is the only evidence available and a rollover must not be inferred from an uncomputable digest.
     - For each non-DELETE CDNSKEY × digestType, compute a DS-equivalent digest using `DNSKEY.ToDS(digestType)`.
-    - If every CDNSKEY's keytag is in `dsKeytagSet`, every parent DS entry is covered by some CDNSKEY-derived digest, and every CDNSKEY contributes at least one matching DS entry, emit `DS18_CDNSKEY_MATCHES_DS` with `cdnskey_keytags` and `ds_keytags`.
+    - If every CDNSKEY's keytag is in `dsKeytagSet`, every remaining parent DS entry is covered by some CDNSKEY-derived digest, and every CDNSKEY contributes at least one matching DS entry, emit `DS18_CDNSKEY_MATCHES_DS` with `cdnskey_keytags` and `ds_keytags`.
     - Otherwise emit `DS18_CDNSKEY_ROLLOVER_SIGNALED` with `cdnskey_keytags` and `ds_keytags`.
 15. **Soft rollover signals** (evaluated whenever DNSKEY records are available, using first representative nameserver):
     - `sepKeytags` = keytags of DNSKEYs with SEP flag.
@@ -138,12 +139,14 @@ CDS-vs-DS content comparison (first NS with any non-DELETE CDS):
    (every NS has only DELETE sentinels -> emit neither)
 
 CDNSKEY-vs-DS content comparison (first NS with any non-DELETE CDNSKEY):
-   digestTypes = distinct DS.digestType values
+   digestTypes = distinct DS.digestType values that can be recomputed
+                 (SHA-1, SHA-256, SHA-384; GOST and SM3 excluded)
    dsKeytagSet = {DS.keyTag}
    every CDNSKEY.KeyTag() is in dsKeytagSet
-     AND every DS entry is covered by some
-         DNSKEY.ToDS(digestType).Digest for one of its digestTypes
-     AND every CDNSKEY contributes at least one matching DS entry
+     AND (no DS entry of a recomputable digest type remains
+          OR (every such DS entry is covered by some
+              DNSKEY.ToDS(digestType).Digest for one of its digestTypes
+              AND every CDNSKEY contributes at least one matching DS entry))
       -> DS18_CDNSKEY_MATCHES_DS         (cdnskey_keytags, ds_keytags)
    otherwise
       -> DS18_CDNSKEY_ROLLOVER_SIGNALED  (cdnskey_keytags, ds_keytags)

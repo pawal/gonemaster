@@ -2,6 +2,7 @@ package dnssecutil
 
 import (
 	"encoding/base64"
+	"errors"
 	"os"
 	"strings"
 	"testing"
@@ -225,8 +226,11 @@ func TestVerifyRRSIGMLDSA44Negative(t *testing.T) {
 }
 
 // kochen-specker.info publishes two ML-DSA-44 keys, so this cross-checks real
-// keys. The key tag is part of the signed RDATA, so rejection comes from either
-// the tag mismatch or the signature; the point is that neither is accepted.
+// keys. Verify rejects a key-tag mismatch before it looks at the signature, so
+// each pair is checked twice: once untouched, which pins that guard, and once
+// with the tag rewritten, which is the only way to reach mldsa.Verify with a
+// key that did not produce the signature. Only the second case would notice a
+// verifier that accepted everything.
 func TestVerifyRRSIGMLDSA44WrongKey(t *testing.T) {
 	keys, sigs, _ := loadZoneFixture(t, kochenSpeckerZone)
 	rrset := asRRset(keys)
@@ -250,8 +254,20 @@ func TestVerifyRRSIGMLDSA44WrongKey(t *testing.T) {
 			if KeyTag(k) == sig.KeyTag {
 				continue
 			}
-			if err := VerifyRRSIG(sig, rrset, k, liveCaptureTime()); err == nil {
-				t.Errorf("signature with key tag %d should not verify under key %d", sig.KeyTag, KeyTag(k))
+
+			if err := VerifyRRSIG(sig, rrset, k, liveCaptureTime()); !errors.Is(err, dns.ErrKey) {
+				t.Errorf("key tag %d under key %d: err = %v, want %v",
+					sig.KeyTag, KeyTag(k), err, dns.ErrKey)
+			}
+
+			// The key tag is part of the signed RDATA, so rewriting it changes
+			// the signed message as well as the key. Either way the rejection
+			// has to come from the signature check, not from the tag guard.
+			crossed := *sig
+			crossed.KeyTag = KeyTag(k)
+			if err := VerifyRRSIG(&crossed, rrset, k, liveCaptureTime()); !errors.Is(err, dns.ErrSig) {
+				t.Errorf("signature of key tag %d under key %d: err = %v, want %v",
+					sig.KeyTag, KeyTag(k), err, dns.ErrSig)
 			}
 			checked++
 		}

@@ -2,11 +2,15 @@ package dnstest
 
 import (
 	"crypto"
+	"crypto/rand"
+	"encoding/base64"
+	"fmt"
 	"testing"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
+	"github.com/cloudflare/circl/sign/ed448"
 
 	"codeberg.org/pawal/gonemaster/engine/dnssecutil"
 )
@@ -45,15 +49,33 @@ func GenKey(t testing.TB, owner string, algo uint8, sep bool) Keypair {
 	}
 	key.Protocol = 3
 	key.Algorithm = algo
-	priv, err := key.Generate(256)
+	signer, err := GenSigner(key)
 	if err != nil {
 		t.Fatalf("generate %s key for %s: %v", dns.AlgorithmToString[algo], owner, err)
 	}
+	return Keypair{Key: key, Priv: signer}
+}
+
+// GenSigner generates the private key for key's algorithm and fills in the
+// public half. The DNS library cannot generate Ed448, so that one is built here.
+func GenSigner(key *dns.DNSKEY) (crypto.Signer, error) {
+	if key.Algorithm == dns.ED448 {
+		pub, priv, err := ed448.GenerateKey(rand.Reader)
+		if err != nil {
+			return nil, err
+		}
+		key.PublicKey = base64.StdEncoding.EncodeToString(pub)
+		return priv, nil
+	}
+	priv, err := key.Generate(256)
+	if err != nil {
+		return nil, err
+	}
 	signer, ok := priv.(crypto.Signer)
 	if !ok {
-		t.Fatalf("%s key for %s is not a crypto.Signer", dns.AlgorithmToString[algo], owner)
+		return nil, fmt.Errorf("algorithm %d key is not a crypto.Signer", key.Algorithm)
 	}
-	return Keypair{Key: key, Priv: signer}
+	return signer, nil
 }
 
 // SignRRset produces an RRSIG over rrset signed by kp, valid across the window.

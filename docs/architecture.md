@@ -751,6 +751,7 @@ integrations do not appear in this document.
 | `github.com/lib/pq` | PostgreSQL driver. |
 | `modernc.org/sqlite` | Pure-Go SQLite driver. |
 | `github.com/ulikunitz/xz` | xz / LZMA compression for badkeys data. |
+| `github.com/cloudflare/circl` | Ed448 signature verification (DNSSEC algorithm 16), which the standard library does not provide. |
 | `golang.org/x/{net,sync,text}` | Go standard-library extensions: networking, sync, i18n / IDNA. |
 
 All direct dependencies are permissive OSS (BSD / MIT / MPL-2.0

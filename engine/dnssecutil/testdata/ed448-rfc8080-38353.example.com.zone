@@ -1,0 +1,7 @@
+; Second Ed448 example from RFC 8080 section 6.2, a different key over the same
+; RRset. Same transcription notes as the first: algorithm field reinserted,
+; labels count 3 as signed.
+example.com.	3600	IN	DNSKEY	257 3 16 kkreGWoccSDmUBGAe7+zsbG6ZAFQp+syPmYUurBRQc3tDjeMCJcVMRDmgcNLp5HlHAMy12VoISsA
+example.com.	3600	IN	DS	38353 16 2 645FF078B3568F5852B70CB60E8E696CC77B75BFAAFFC118CF79CBDA1BA28AF4
+example.com.	3600	IN	MX	10 mail.example.com.
+example.com.	3600	IN	RRSIG	MX 16 3 3600 20150819220000 20150729220000 38353 example.com. +JjANio/LIzp7osmMYE5XD3H/YES8kXs5Vb9H8MjPS8OAGZMD37+LsCIcjg5ivt0d4Om/UaqETEAsJjaYe56CEQP5lhRWuD2ivBqE0zfwJTyp4WqvpULbpvaukswvv/WNEFxzEYQEIm9+xDlXj4pMAMA

@@ -133,8 +133,8 @@ func TestMLDSA44Supported(t *testing.T) {
 	if !dnssecAlgorithmSupported(dns.MLDSA44) {
 		t.Error("algorithm 18 (ML-DSA-44) should be verifiable")
 	}
-	// Ed448 is still a real gap, so the widening has to stop at ML-DSA-44.
-	if dnssecAlgorithmSupported(dns.ED448) {
-		t.Error("algorithm 16 (ED448) is still unsupported by the DNS library")
+	// ECC-GOST has no local verifier, so the widening has to stop short of it.
+	if dnssecAlgorithmSupported(dns.ECCGOST) {
+		t.Error("algorithm 12 (ECC-GOST) is still unsupported")
 	}
 }

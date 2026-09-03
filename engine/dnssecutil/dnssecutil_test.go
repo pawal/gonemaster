@@ -14,13 +14,13 @@ import (
 )
 
 func TestAlgorithmSupported(t *testing.T) {
-	supported := []uint8{dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519, dns.MLDSA44}
+	supported := []uint8{dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519, dns.ED448, dns.MLDSA44}
 	for _, algo := range supported {
 		if !dnssecutil.AlgorithmSupported(algo) {
 			t.Errorf("algorithm %d should be supported", algo)
 		}
 	}
-	unsupported := []uint8{dns.RSAMD5, dns.DSA, dns.ECCGOST, dns.ED448, 0, 99}
+	unsupported := []uint8{dns.RSAMD5, dns.DSA, dns.ECCGOST, dns.SM2SM3, 0, 99}
 	for _, algo := range unsupported {
 		if dnssecutil.AlgorithmSupported(algo) {
 			t.Errorf("algorithm %d should not be supported", algo)

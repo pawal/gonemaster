@@ -1,0 +1,7 @@
+; First Ed448 example from RFC 8080 section 6.2. The published RRSIG omits the
+; algorithm field; the labels count is 3 as signed, not the 2 the owner name
+; would imply, which the section 6.1 Ed25519 examples confirm.
+example.com.	3600	IN	DNSKEY	257 3 16 3kgROaDjrh0H2iuixWBrc8g2EpBBLCdGzHmn+G2MpTPhpj/OiBVHHSfPodx1FYYUcJKm1MDpJtIA
+example.com.	3600	IN	DS	9713 16 2 6CCF18D5BC5D7FC2FCEB1D59D17321402F2AA8D368048DB93DD811F5CB2B19C7
+example.com.	3600	IN	MX	10 mail.example.com.
+example.com.	3600	IN	RRSIG	MX 16 3 3600 20150819220000 20150729220000 9713 example.com. Nmc0rgGKpr3GKYXcB1JmqqS4NYwhmechvJTqVzt3jR+Qy/lSLFoIk1L+9e39GPL+5tVzDPN3f9kAwiu8KCuPPjtl227ayaCZtRKZuJax7n9NuYlZJIusX0SOIOKBGzG+yWYtz1/jjbzl5GGkWvREUCUA

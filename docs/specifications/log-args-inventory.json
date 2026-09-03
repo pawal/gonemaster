@@ -8,7 +8,7 @@
     "logSystem(tag, args), logSystemWithLogger(..., tag, args)"
   ],
   "summary": {
-    "file_count": 132,
+    "file_count": 133,
     "log_call_count": 728,
     "unique_tag_count": 523,
     "unique_key_count": 90,

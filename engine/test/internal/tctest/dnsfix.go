@@ -249,13 +249,9 @@ func RRSIGRR(owner string, typeCovered uint16, opts ...SigOpt) *dns.RRSIG {
 func SignedKey(t TB, owner string, algo uint8, opts ...KeyOpt) (*dns.DNSKEY, crypto.Signer) {
 	t.Helper()
 	key := DNSKEYRR(owner, algo, opts...)
-	priv, err := key.Generate(256)
+	signer, err := dnstest.GenSigner(key)
 	if err != nil {
 		t.Fatalf("generate %d key: %v", algo, err)
-	}
-	signer, ok := priv.(crypto.Signer)
-	if !ok {
-		t.Fatalf("private key for algorithm %d is not a crypto.Signer", algo)
 	}
 	return key, signer
 }

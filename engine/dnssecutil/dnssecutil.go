@@ -16,7 +16,7 @@ import (
 // AlgorithmSupported reports whether the signing algorithm can be verified.
 func AlgorithmSupported(algo uint8) bool {
 	switch algo {
-	case dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519, dns.MLDSA44:
+	case dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512, dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519, dns.ED448, dns.MLDSA44:
 		return true
 	default:
 		return false
@@ -168,5 +168,12 @@ func VerifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) 
 		}
 		copies = append(copies, rr.Clone())
 	}
-	return local.Verify(keyCopy, copies, &dns.SignOption{})
+	// The hook lands in the library's default branch, shared by every algorithm
+	// it cannot verify, so attaching it for others would turn their ErrAlg into
+	// ErrSig and report unsupported algorithms as broken signatures.
+	opts := &dns.SignOption{}
+	if sig.Algorithm == dns.ED448 {
+		opts.VerifyFunc = ed448Verify
+	}
+	return local.Verify(keyCopy, copies, opts)
 }

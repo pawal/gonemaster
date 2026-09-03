@@ -9,19 +9,12 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 )
 
-// genMLDSA44Key generates an ML-DSA-44 DNSKEY; generating rather than replaying
-// a captured key means this also fails if the DNS library loses ML-DSA-44
-// support.
-func genMLDSA44Key(t *testing.T, owner string) dnstest.Keypair {
-	t.Helper()
-	return dnstest.GenKey(t, owner, dns.MLDSA44, true)
-}
-
-// The chain-view half of ML-DSA-44 validation. sigState used to short-circuit
-// to SigUnsupported for algorithm 18, so the chain reported
-// "unsupported_algorithm" on a good link; it now verifies like any other.
-func TestSigStateMLDSA44(t *testing.T) {
-	kp := genMLDSA44Key(t, testZone)
+// The chain-view half of Ed448 validation. sigState short-circuited to
+// SigUnsupported for algorithm 16, so a good link reported
+// unsupported_algorithm; it now verifies like any other. Generating the key
+// rather than replaying one also exercises the test helper's Ed448 branch.
+func TestSigStateEd448(t *testing.T) {
+	kp := dnstest.GenKey(t, testZone, dns.ED448, true)
 	rrset := []dns.RR{kp.Key}
 	inception := fixedAt.Add(-24 * time.Hour)
 	expiration := fixedAt.Add(24 * time.Hour)
@@ -29,7 +22,7 @@ func TestSigStateMLDSA44(t *testing.T) {
 	keys := []*dns.DNSKEY{kp.Key}
 
 	if got := sigState(sig, rrset, keys, fixedAt); got != SigValid {
-		t.Errorf("ML-DSA-44 sigState = %q, want %q", got, SigValid)
+		t.Errorf("Ed448 sigState = %q, want %q", got, SigValid)
 	}
 
 	// Window checks run before the algorithm check, so they must still decide
@@ -50,21 +43,5 @@ func TestSigStateMLDSA44(t *testing.T) {
 	tampered.Flags ^= 0x0001
 	if got := sigState(sig, []dns.RR{tampered}, keys, fixedAt); got != SigBogus {
 		t.Errorf("modified RRset: sigState = %q, want %q", got, SigBogus)
-	}
-}
-
-// Counterweight to the test above: adding ML-DSA-44 must not have widened the
-// supported set generally.
-func TestSigStateStillUnsupportedAlgorithms(t *testing.T) {
-	kp := genMLDSA44Key(t, testZone)
-	keys := []*dns.DNSKEY{kp.Key}
-
-	// The payload is irrelevant; sigState rejects on the algorithm first.
-	for _, algo := range []uint8{dns.ECCGOST, dns.DSA, dns.RSAMD5} {
-		sig := dummyRRSIG(kp.Key.KeyTag())
-		sig.Algorithm = algo
-		if got := sigState(sig, []dns.RR{kp.Key}, keys, fixedAt); got != SigUnsupported {
-			t.Errorf("algorithm %d: sigState = %q, want %q", algo, got, SigUnsupported)
-		}
 	}
 }

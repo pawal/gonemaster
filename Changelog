@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- build: update the DNS library to v0.6.108
+
 ## [v1.7.5] - 2026-09-04
 
 Widens the DNSSEC algorithm coverage in the engine.

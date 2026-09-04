@@ -12,8 +12,8 @@ import (
 )
 
 // A DS digest gonemaster cannot recompute must not be read as a rollover
-// signal. Digest type 5 is GOST R 34.11-2012, which the DNS library answers
-// with SHA-512, so comparing it claimed a mismatch that was never computed.
+// signal. Digest type 5 is GOST R 34.11-2012, which the library cannot compute,
+// so comparing it claimed a mismatch that was never computed.
 func TestDNSSEC18CDNSKEYUncomputableDigest(t *testing.T) {
 	ctx := tctest.Context(t)
 

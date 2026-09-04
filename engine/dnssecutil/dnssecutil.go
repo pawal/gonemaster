@@ -35,12 +35,10 @@ func KeyTag(key *dns.DNSKEY) uint16 {
 }
 
 // DigestSupported reports whether DNSKEY.ToDS can recompute the digest type.
-// GOST (3, 5) and SM3 (6) cannot: the library has no GOST or SM3 digest, and
-// it answers type 5 with an experimental SHA-512 rather than the Streebog
-// digest RFC 9558 assigns there.
+// GOST (3, 5) and SM3 (6) have no implementation.
 func DigestSupported(digest uint8) bool {
 	switch digest {
-	case 1, 2, 4:
+	case dns.SHA1, dns.SHA256, dns.SHA384:
 		return true
 	default:
 		return false

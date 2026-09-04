@@ -116,12 +116,11 @@ func rsaModulusBits(key *dns.DNSKEY) int {
 	return n.BitLen()
 }
 
-// RSAExponentBeyondLocalVerifier reports whether key is an RSA DNSKEY whose
-// public exponent exceeds what the local RRSIG verifier (miekg/dns + crypto/rsa)
-// can use. Both reject exponents encoded in more than 4 bytes or with a value
-// greater than 2^31-1, although such signatures may be perfectly valid (e.g.
-// the .lv TLD KSK, whose exponent is 2^32+1); VerifyRRSIG checks those keys
-// itself. Returns false for non-RSA algorithms and for unparseable keys.
+// rsaMaxLibraryExponent is crypto/rsa's exponent cap, mirrored from the library.
+const rsaMaxLibraryExponent = 1<<31 - 1
+
+// RSAExponentBeyondLocalVerifier reports whether the library refuses this RSA key
+// although RFC 3110 permits it (exponent past crypto/rsa, or leading zero bytes).
 func RSAExponentBeyondLocalVerifier(key *dns.DNSKEY) bool {
 	if key == nil {
 		return false
@@ -132,28 +131,25 @@ func RSAExponentBeyondLocalVerifier(key *dns.DNSKEY) bool {
 		return false
 	}
 	keybuf, err := base64.StdEncoding.DecodeString(key.PublicKey)
-	if err != nil || len(keybuf) < 3 {
+	if err != nil {
 		return false
 	}
 	explen, off, ok := parseRSAExponentLen(keybuf)
-	if !ok {
-		return false
+	modlen := len(keybuf) - off - explen
+	if !ok || explen == 0 || modlen < 64 || modlen > 512 {
+		return false // malformed or outside RFC 3110, the zone's problem
 	}
-	if explen > 4 {
-		return true // a >4-byte exponent is necessarily > 2^31-1
-	}
-	if off+explen > len(keybuf) {
-		return false // malformed; leave to existing handling
+	if explen > 4 || keybuf[off] == 0 || keybuf[off+explen] == 0 {
+		return true
 	}
 	var expo uint64
 	for _, b := range keybuf[off : off+explen] {
 		expo = expo<<8 | uint64(b)
 	}
-	return expo > (1<<31 - 1)
+	return expo > rsaMaxLibraryExponent
 }
 
 // VerifyRRSIG checks the signature against the RRset and key at the given time.
-// ErrRSAExponentUnsupported reports an RSA exponent no local path verifies.
 func VerifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) (err error) {
 	if sig == nil || key == nil {
 		return errors.New("missing rrsig or key")

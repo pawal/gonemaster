@@ -1113,8 +1113,7 @@ func TestSigStateRSAExponentUnsupported(t *testing.T) {
 	if got := sigState(dummyRRSIG(e65.KeyTag()), []dns.RR{e65}, []*dns.DNSKEY{e65}, fixedAt); got != SigUnsupportedKey {
 		t.Errorf("65-bit exponent sigState = %q, want %q", got, SigUnsupportedKey)
 	}
-	// The .lv KSK is verified locally, so a signature that does not match is
-	// bogus, exactly like one under the normal-exponent .lb KSK.
+	// The .lv KSK is verified locally, so a mismatch is bogus, as for the .lb KSK.
 	for name, key := range map[string]*dns.DNSKEY{"lv": lv, "lb": lb} {
 		if got := sigState(dummyRRSIG(key.KeyTag()), []dns.RR{key}, []*dns.DNSKEY{key}, fixedAt); got != SigBogus {
 			t.Errorf("%s KSK sigState = %q, want %q", name, got, SigBogus)
@@ -1131,9 +1130,7 @@ func TestSigStateRSAExponentUnsupported(t *testing.T) {
 func TestExtractRSAExponentPartial(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	// The child KSK carries a 65-bit exponent no local path verifies. The DS
-	// still digest-matches the key, so the chain is anchored, but the DNSKEY
-	// signature cannot be checked -> partial, not broken.
+	// A 65-bit exponent no local path verifies: DS anchored, DNSKEY signature unchecked -> partial.
 	ksk := dnstest.RSADNSKEY(testZone, 257, dnstest.LVKSK42018E65)
 	keytag := ksk.KeyTag()
 	dnskeySig := dummyRRSIG(keytag)

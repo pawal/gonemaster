@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - dnssec: verify RRSIGs from RSA keys with large public exponents, such as the .lv KSK
+- dnssec: verify RRSIGs from RSA keys with a leading zero byte in the exponent or modulus
 
 ## [v1.7.5] - 2026-09-04
 

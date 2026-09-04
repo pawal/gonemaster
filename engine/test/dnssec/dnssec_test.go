@@ -2381,8 +2381,7 @@ func TestDNSSEC09MissingRRSIG(t *testing.T) {
 	tctest.RequireTags(t, entries, "DS09_MISSING_RRSIG_IN_RESPONSE")
 }
 
-// The .lv KSK: DS-linkable, exponent 2^32+1, beyond the library but within the
-// local RSA path. Nobody holds its private key, so its signatures never verify.
+// The .lv KSK: DS-linkable, exponent 2^32+1; nobody holds its private key.
 func lvLargeExponentKSK(owner string) *dns.DNSKEY {
 	return tctest.DNSKEYRR(owner, 8, tctest.SEP(), tctest.PublicKey(dnstest.LVKSK42018)) // RSASHA256
 }
@@ -2397,10 +2396,7 @@ func largeExponentKeypair(t *testing.T) dnstest.Keypair {
 	return dnstest.GenRSAKeyWithExponent(t, "example", dnstest.LVExponent, 1024, true)
 }
 
-// A DS-linked DNSKEY whose only problem is an RSA exponent past what even the
-// local path verifies gets the NOTICE DS02_RSA_EXPONENT_UNSUPPORTED instead of
-// the ERROR DS02_RRSIG_NOT_VALID_BY_DNSKEY, and the DNSKEY-signed-by-DS
-// aggregate treats it as indeterminate rather than a hard failure.
+// An exponent past even the local path gives the NOTICE, not the ERROR, and stays indeterminate.
 func TestDNSSEC02RSAExponentUnsupported(t *testing.T) {
 	ctx := tctest.Context(t)
 
@@ -2625,8 +2621,7 @@ func dnssec02Entries(t *testing.T, now time.Time, key *dns.DNSKEY, ds *dns.DS, s
 	return entries
 }
 
-// A DS-linked key with the .lv exponent and a signature the local RSA path
-// verifies passes DNSSEC02 like any other key.
+// A DS-linked .lv-exponent key with a valid signature passes like any other key.
 func TestDNSSEC02LargeExponentSignatureVerifies(t *testing.T) {
 	now := time.Unix(1700000000, 0).UTC()
 	kp := largeExponentKeypair(t)
@@ -2645,8 +2640,7 @@ func TestDNSSEC02LargeExponentSignatureVerifies(t *testing.T) {
 		"DS02_NO_MATCHING_DNSKEY_RRSIG")
 }
 
-// A .lv-exponent key whose signature does not verify is a genuine failure; the
-// NOTICE is reserved for exponents the local path cannot check at all.
+// A .lv-exponent key with a bad signature is a genuine failure, not the NOTICE.
 func TestDNSSEC02LargeExponentBadSignature(t *testing.T) {
 	now := time.Unix(1700000000, 0).UTC()
 	key := lvLargeExponentKSK("example")

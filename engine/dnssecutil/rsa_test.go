@@ -1,6 +1,7 @@
 package dnssecutil_test
 
 import (
+	"encoding/base64"
 	"errors"
 	"math/big"
 	"net/netip"
@@ -14,9 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 )
 
-// The live .lv DNSKEY RRset and its RRSIGs, captured 2026-09-04 with the wire
-// TTL 204 the resolver returned (original TTL 1800). The KSK 42018 exponent is
-// 2^32+1, which the library refuses; the ZSK 31113 exponent is 65537.
+// Live .lv DNSKEY RRset and RRSIGs, captured 2026-09-04 (wire TTL 204, original TTL 1800).
 const lvDNSKEYAnswer = `
 lv.	204	IN	DNSKEY	256 3 8 AwEAAcDygkF9GrWafQuFEgldV8cU2zKs//pQvWGt6Mr12kw+IH3ILlzG QodUem6BhD0/zEsbfy/KiHiQ7QbcXBn7etz70bmHzb/ovH3//uNfjFfU gBdcFbtTRoYA1Hk67ibAI/1phRsOkdycOnk85monJ8fakMVG+7IMoeAc p2S+XBKMfK7aaMTCjG8nRmVyw4m2PnHiiGrwPfEJQBy80SuSbECn5CMM YhmpLn9EzvW33itnM3lCy2rBZj2spPiCzlZEnTeLNgp/Tao45kselo6z N+WhmDLzi2Om86wnO5YYCtadCKVZAWNAc4gMC5OKKPIV8WMuIrcyMp5N I89nioHf+zM=
 lv.	204	IN	DNSKEY	257 3 8 BQEAAAAByLU9dUcHHcl1eLgjLidTJKlwxsU9a580xierZ+WyfRBI47L3 LLXAZZ0ub6Sea3qKP2mhP5ZBG/reXvyh3OSlHa39WoMiUUZFcuouCajB g7XeLGVPL4U1Ja1UW9wq/Oc8WU1dq4e+2Q8Dt8tipFvbL0AD0BhJAsfQ uT3wperedwQAUKId0/JQOFNTWhEJaYN2P5IIhyRKWQp8OhtKmdNYQ5jf qqpXVO4zyqV+4ZxWurXJS8c7bKrE3OAewWEGAtTjeElfQ2CFAKWVjMOL eZ86+mgw7p3UHhGB+KuRaKg6fAtTcQYBF78Xe40wuj9EgGL19mp9v6tD wFe+Epow4SFSPQ==
@@ -27,8 +26,7 @@ lv.	204	IN	RRSIG	DNSKEY 8 1 1800 20260908071728 20260829071725 31113 lv. umUFvuA
 // lvAt lies inside the validity window of the captured RRSIGs.
 var lvAt = time.Date(2026, 9, 1, 0, 0, 0, 0, time.UTC)
 
-// lvFixture parses the captured answer into the DNSKEY RRset plus the keys and
-// RRSIGs by keytag. Every call parses afresh, so callers own their records.
+// lvFixture parses the capture afresh, so callers own their records.
 func lvFixture(t *testing.T) (rrset []dns.RR, keys map[uint16]*dns.DNSKEY, sigs map[uint16]*dns.RRSIG) {
 	t.Helper()
 	keys = map[uint16]*dns.DNSKEY{}
@@ -52,8 +50,7 @@ func lvFixture(t *testing.T) (rrset []dns.RR, keys map[uint16]*dns.DNSKEY, sigs 
 	return rrset, keys, sigs
 }
 
-// The signature .lv publishes verifies through the local RSA path on the very
-// records a resolver sees, while the library alone still refuses the key.
+// The signature .lv publishes verifies locally while the library alone refuses the key.
 func TestVerifyRRSIGLargeExponentLV(t *testing.T) {
 	rrset, keys, sigs := lvFixture(t)
 	if err := dnssecutil.VerifyRRSIG(sigs[42018], rrset, keys[42018], lvAt); err != nil {
@@ -76,8 +73,7 @@ func TestVerifyRRSIGLargeExponentLV(t *testing.T) {
 	}
 }
 
-// A mismatching signature under a large-exponent key is a real failure, never
-// the unsupported-exponent verdict, and the validity window still applies.
+// A mismatching signature under a large exponent is a real failure, not "unsupported".
 func TestVerifyRRSIGLargeExponentBadSignature(t *testing.T) {
 	rrset, keys, sigs := lvFixture(t)
 	rrset[0].(*dns.DNSKEY).Flags ^= 1
@@ -99,8 +95,7 @@ func TestVerifyRRSIGLargeExponentBadSignature(t *testing.T) {
 	}
 }
 
-// Past 64 exponent bits the local path declines as well, and says so with the
-// sentinel the testcases turn into the NOTICE.
+// Past 64 exponent bits the local path declines too, with the sentinel.
 func TestVerifyRRSIGDeclinesExponentPast64Bits(t *testing.T) {
 	key := dnstest.RSADNSKEY("lv.", dns.FlagZONE|dns.FlagSEP, dnstest.LVKSK42018E65)
 	if !dnssecutil.RSAExponentBeyondLocalVerifier(key) {
@@ -117,8 +112,7 @@ func TestVerifyRRSIGDeclinesExponentPast64Bits(t *testing.T) {
 	}
 }
 
-// Keys generated with exponents the library refuses round-trip through the
-// dnstest signer and the local verifier, right up to the 64-bit ceiling.
+// Generated large-exponent keys round-trip through the dnstest signer and the verifier.
 func TestVerifyRRSIGLargeExponentGenerated(t *testing.T) {
 	now := time.Now().UTC()
 	for _, tc := range []struct {
@@ -144,6 +138,69 @@ func TestVerifyRRSIGLargeExponentGenerated(t *testing.T) {
 			err := dnssecutil.VerifyRRSIG(sig, rrset, kp.Key, now)
 			if err == nil || errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 				t.Errorf("changed record: err = %v, want a plain verification failure", err)
+			}
+		})
+	}
+}
+
+// rfc3110 encodes exponent and modulus bytes verbatim, leading zeros included.
+func rfc3110(exponent, modulus []byte) string {
+	buf := append([]byte{byte(len(exponent))}, exponent...)
+	return base64.StdEncoding.EncodeToString(append(buf, modulus...))
+}
+
+// rsaKeyParts splits a DNSKEY public key into its exponent and modulus bytes.
+func rsaKeyParts(t *testing.T, key *dns.DNSKEY) (exponent, modulus []byte) {
+	t.Helper()
+	buf, err := base64.StdEncoding.DecodeString(key.PublicKey)
+	if err != nil {
+		t.Fatalf("decode public key: %v", err)
+	}
+	explen := int(buf[0])
+	return buf[1 : 1+explen], buf[1+explen:]
+}
+
+// Predicate and library must agree both ways, and VerifyRRSIG must pass every key.
+func TestRSAExponentBeyondLocalVerifierMirrorsTheLibrary(t *testing.T) {
+	now := time.Now().UTC()
+	leadingZero := func(b []byte) []byte { return append([]byte{0}, b...) }
+	for _, tc := range []struct {
+		name   string
+		e      *big.Int
+		encode func(exponent, modulus []byte) string // nil keeps the minimal encoding
+		beyond bool
+	}{
+		{"65537", big.NewInt(65537), nil, false},
+		{"2^31-1, the largest the library reads", big.NewInt(1<<31 - 1), nil, false},
+		{"2^31+1, past the library", big.NewInt(1<<31 + 1), nil, true},
+		{"2^32+1 as .lv and xelerance.com", dnstest.LVExponent, nil, true},
+		{"65537 with a leading zero byte", big.NewInt(65537), func(e, m []byte) string { return rfc3110(leadingZero(e), m) }, true},
+		{"65537 padded to five bytes", big.NewInt(65537), func(e, m []byte) string { return rfc3110(leadingZero(leadingZero(e)), m) }, true},
+		{"modulus with a leading zero byte", big.NewInt(65537), func(e, m []byte) string { return rfc3110(e, leadingZero(m)) }, true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			kp := dnstest.GenRSAKeyWithExponent(t, "example.test", tc.e, 1024, false)
+			if tc.encode != nil {
+				kp.Key.PublicKey = tc.encode(rsaKeyParts(t, kp.Key))
+			}
+			a := &dns.A{Hdr: dns.Header{Name: "example.test.", Class: dns.ClassINET, TTL: 300}}
+			a.Addr = netip.MustParseAddr("192.0.2.1")
+			rrset := []dns.RR{a}
+			sig := dnstest.SignRRset(t, kp, rrset, "example.test", "example.test", now.Add(-time.Hour), now.Add(time.Hour))
+
+			if got := dnssecutil.RSAExponentBeyondLocalVerifier(kp.Key); got != tc.beyond {
+				t.Errorf("RSAExponentBeyondLocalVerifier = %v, want %v", got, tc.beyond)
+			}
+			lib := *sig
+			libErr := lib.Verify(kp.Key.Clone().(*dns.DNSKEY), []dns.RR{a.Clone()}, &dns.SignOption{})
+			if tc.beyond && !errors.Is(libErr, dns.ErrKey) {
+				t.Errorf("library Verify = %v, want %v", libErr, dns.ErrKey)
+			}
+			if !tc.beyond && libErr != nil {
+				t.Errorf("library Verify = %v, want nil", libErr)
+			}
+			if err := dnssecutil.VerifyRRSIG(sig, rrset, kp.Key, now); err != nil {
+				t.Errorf("VerifyRRSIG = %v, want nil", err)
 			}
 		})
 	}

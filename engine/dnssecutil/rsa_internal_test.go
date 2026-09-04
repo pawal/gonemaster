@@ -39,8 +39,7 @@ func cloneRRs(rrset []dns.RR) []dns.RR {
 	return out
 }
 
-// sign builds an RRSIG over rrset with the library, valid around now. It signs
-// copies, so the caller's records keep their wire shape.
+// sign builds an RRSIG over copies of rrset with the library, valid around now.
 func sign(t *testing.T, key *dns.DNSKEY, signer crypto.Signer, rrset []dns.RR) *dns.RRSIG {
 	t.Helper()
 	now := time.Now().UTC()
@@ -62,15 +61,13 @@ func verifyLocal(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY) error {
 	return verifyLargeExponentRSA(&local, cloneRRs(rrset), key.Clone().(*dns.DNSKEY))
 }
 
-// The local path must rebuild the signed data exactly as the library does, so
-// its signatures under a normal exponent have to pass here as well.
+// The local path must rebuild the signed data exactly as the library does.
 func TestLargeExponentPathMatchesLibrary(t *testing.T) {
 	key, signer := rsaKey(t, "example.test")
 
 	single := []dns.RR{aRR("example.test", 300, "192.0.2.1")}
 
-	// Two records with wire TTLs unlike the original TTL, mixed-case owners,
-	// in the order the canonical sort reverses.
+	// Wire TTLs unlike the original TTL, mixed-case owners, canonical order reversed.
 	mixed := []dns.RR{aRR("B.Example.Test", 900, "192.0.2.2"), aRR("a.Example.Test", 300, "192.0.2.1")}
 
 	soa := &dns.SOA{Hdr: dns.Header{Name: "example.test.", Class: dns.ClassINET, TTL: 3600}}
@@ -103,8 +100,7 @@ func TestLargeExponentPathMatchesLibrary(t *testing.T) {
 	}
 }
 
-// Mismatching records or RRSIG fields fail as a bad signature, a foreign key as
-// a bad key; neither is softened to the unsupported-exponent verdict.
+// Mismatches fail as a bad signature, a foreign key as a bad key, never "unsupported".
 func TestLargeExponentPathRejects(t *testing.T) {
 	key, signer := rsaKey(t, "example.test")
 	rrset := []dns.RR{aRR("example.test", 300, "192.0.2.1")}

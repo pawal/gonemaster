@@ -17,11 +17,8 @@ import (
 // ErrRSAExponentUnsupported marks an RSA public exponent no local path verifies.
 var ErrRSAExponentUnsupported = errors.New("rsa public exponent unsupported")
 
-// OpenSSL's limits: wider exponents are declined, larger moduli are bad keys.
-const (
-	rsaMaxExponentBits = 64
-	rsaMaxModulusBits  = 16384
-)
+// rsaMaxExponentBits is OpenSSL's ceiling; wider exponents are declined.
+const rsaMaxExponentBits = 64
 
 // rsaPublicKey parses the RFC 3110 exponent and modulus.
 func rsaPublicKey(key *dns.DNSKEY) (e, n *big.Int, ok bool) {
@@ -39,15 +36,14 @@ func rsaPublicKey(key *dns.DNSKEY) (e, n *big.Int, ok bool) {
 	return new(big.Int).SetBytes(keybuf[off : off+explen]), new(big.Int).SetBytes(keybuf[off+explen:]), true
 }
 
-// verifyLargeExponentRSA checks an RSA signature the library refuses for its
-// exponent size: the library builds the signed data, math/big does the rest.
+// verifyLargeExponentRSA verifies in math/big what crypto/rsa refuses for its exponent.
 func verifyLargeExponentRSA(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY) error {
 	if sig.KeyTag != KeyTag(key) || sig.Hdr.Class != key.Hdr.Class || sig.Algorithm != key.Algorithm ||
 		key.Flags&dns.FlagZONE == 0 || key.Protocol != 3 || !dns.EqualName(sig.SignerName, key.Hdr.Name) {
 		return dns.ErrKey
 	}
 	e, n, ok := rsaPublicKey(key)
-	if !ok || n.Sign() <= 0 || n.BitLen() > rsaMaxModulusBits {
+	if !ok || n.Sign() <= 0 {
 		return dns.ErrKey
 	}
 	if e.BitLen() > rsaMaxExponentBits {
@@ -89,8 +85,7 @@ func (c *digestCapture) Sign(_ io.Reader, digest []byte, _ crypto.SignerOpts) ([
 	return []byte{0}, nil
 }
 
-// signedDataDigest hashes the RFC 4034 signed data by running Sign with a
-// capturing signer; Sign derives OrigTTL and Labels from the records.
+// signedDataDigest takes the RFC 4034 signed-data digest from Sign via a capturing signer.
 func signedDataDigest(sig *dns.RRSIG, rrset []dns.RR) ([]byte, error) {
 	if len(rrset) == 0 || dns.RRToType(rrset[0]) != sig.TypeCovered {
 		return nil, dns.ErrSig

@@ -23,13 +23,10 @@ import (
 // only ever parsed, never used to sign, so they stay stable across rotation.
 const (
 	// LVKSK42018 is the .lv KSK, keytag 42018: RSASHA256, 2048-bit, public
-	// exponent 2^32+1 (4294967297, 5 bytes). miekg/dns and crypto/rsa both
-	// reject exponents this large; dnssecutil verifies it through its own RSA
-	// path, as .lv validates on 1.1.1.1 / 8.8.8.8.
+	// exponent 2^32+1 (5 bytes), which the library refuses and dnssecutil verifies itself.
 	LVKSK42018 = "BQEAAAAByLU9dUcHHcl1eLgjLidTJKlwxsU9a580xierZ+WyfRBI47L3LLXAZZ0ub6Sea3qKP2mhP5ZBG/reXvyh3OSlHa39WoMiUUZFcuouCajBg7XeLGVPL4U1Ja1UW9wq/Oc8WU1dq4e+2Q8Dt8tipFvbL0AD0BhJAsfQuT3wperedwQAUKId0/JQOFNTWhEJaYN2P5IIhyRKWQp8OhtKmdNYQ5jfqqpXVO4zyqV+4ZxWurXJS8c7bKrE3OAewWEGAtTjeElfQ2CFAKWVjMOLeZ86+mgw7p3UHhGB+KuRaKg6fAtTcQYBF78Xe40wuj9EgGL19mp9v6tDwFe+Epow4SFSPQ=="
 
-	// LVKSK42018E65 is LVKSK42018 with a 2^64+1 exponent, one bit past the
-	// local verifier's ceiling. Parse-only: nobody holds a private key for it.
+	// LVKSK42018E65 is LVKSK42018 with a 2^64+1 exponent, past the local ceiling; parse-only.
 	LVKSK42018E65 = "CQEAAAAAAAAAAci1PXVHBx3JdXi4Iy4nUySpcMbFPWufNMYnq2flsn0QSOOy9yy1wGWdLm+knmt6ij9poT+WQRv63l78odzkpR2t/VqDIlFGRXLqLgmowYO13ixlTy+FNSWtVFvcKvznPFlNXauHvtkPA7fLYqRb2y9AA9AYSQLH0Lk98KXq3ncEAFCiHdPyUDhTU1oRCWmDdj+SCIckSlkKfDobSpnTWEOY36qqV1TuM8qlfuGcVrq1yUvHO2yqxNzgHsFhBgLU43hJX0NghQCllYzDi3mfOvpoMO6d1B4RgfirkWioOnwLU3EGARe/F3uNMLo/RIBi9fZqfb+rQ8BXvhKaMOEhUj0="
 
 	// LBKSK3842 is the .lb KSK, keytag 3842: RSASHA256, 2048-bit, exponent
@@ -115,8 +112,7 @@ func RSADNSKEY(owner string, flags uint16, pub string) *dns.DNSKEY {
 // LVExponent is the .lv KSK public exponent, 2^32+1.
 var LVExponent = new(big.Int).SetUint64(1<<32 + 1)
 
-// GenRSAKeyWithExponent generates an RSASHA256 zone key with the odd public
-// exponent e, signing in math/big so crypto/rsa's exponent cap does not apply.
+// GenRSAKeyWithExponent generates an RSASHA256 zone key with odd exponent e, signing in math/big.
 func GenRSAKeyWithExponent(t testing.TB, owner string, e *big.Int, bits int, sep bool) Keypair {
 	t.Helper()
 	if e.Bit(0) == 0 {

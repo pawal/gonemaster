@@ -774,7 +774,7 @@ SvelteKit (MIT, analysis UI only).
 
 | Path | Source | License / status |
 |---|---|---|
-| `share/named.root` | IANA root hints. | Public-domain reference. |
+| `share/named.root` | IANA root hints, from [IANA Root Files](https://www.iana.org/domains/root/files). | Public-domain reference. |
 | `share/iana-ipv*-special-registry.csv` | IANA special-purpose address registries. | Public-domain reference. |
 | `share/badkeys/` | Blocklist of compromised public-key fingerprints. Refreshed via [tools/badkeys-update/](../tools/badkeys-update/). | Inherits the upstream badkeys project licence; operator-driven refresh. |
 
@@ -792,9 +792,10 @@ The engine performs delegation tests by querying the public DNS
 hierarchy directly:
 
 - Root zone servers, enumerated in
-  [share/named.root](../share/named.root). The file ships with
-  the binary; operators refresh it manually when IANA publishes
-  updates.
+  [share/named.root](../share/named.root), taken from
+  [IANA Root Files](https://www.iana.org/domains/root/files). The
+  file ships with the binary; operators refresh it manually when
+  IANA publishes updates.
 - TLD and authoritative servers for the zone under test.
 - The operator's local resolver, only when explicitly configured
   as a fallback.
@@ -819,7 +820,7 @@ yet described here; see [Chapter 15](#15-known-limitations).
 | Source | Mechanism | Frequency |
 |---|---|---|
 | badkeys blocklist | [tools/badkeys-update/](../tools/badkeys-update/) | Explicit operator step. |
-| IANA registries (`named.root`, special-purpose CSVs) | Manual replacement of files in `share/`. | When IANA publishes updates. |
+| IANA registries (`named.root` from [IANA Root Files](https://www.iana.org/domains/root/files), special-purpose CSVs) | Manual replacement of files in `share/`. | When IANA publishes updates. |
 
 Further reading:
 [.woodpecker.yml](../.woodpecker.yml),

@@ -1,6 +1,7 @@
 // Package dnssecutil holds DNSSEC primitives shared by the DNSSEC testcases
 // and the per-run chain extractor: algorithm support checks, RSA key sizing,
-// and RRSIG verification.
+// RRSIG verification, the RFC 8624 algorithm and digest policy, and the fixed
+// key and signature lengths.
 package dnssecutil
 
 import (
@@ -87,6 +88,27 @@ func KeySize(key *dns.DNSKEY) int {
 		return 0
 	}
 }
+
+// Fixed rdata lengths in bits (RFC 5933, 6605, 8080). Encoded lengths, not the
+// curve size KeySize reports: a P-256 key is two 256-bit coordinates.
+var (
+	expectedKeyBits = map[uint8]int{
+		dns.ECCGOST: 512, dns.ECDSAP256SHA256: 512, dns.ECDSAP384SHA384: 768,
+		dns.ED25519: 256, dns.ED448: 456,
+	}
+	expectedSignatureBits = map[uint8]int{
+		dns.ECCGOST: 512, dns.ECDSAP256SHA256: 512, dns.ECDSAP384SHA384: 768,
+		dns.ED25519: 512, dns.ED448: 912,
+	}
+)
+
+// ExpectedKeyBits returns the DNSKEY public key length the algorithm fixes, or
+// 0 where it fixes none, as RSA does not.
+func ExpectedKeyBits(algorithm uint8) int { return expectedKeyBits[algorithm] }
+
+// ExpectedSignatureBits returns the RRSIG signature length the algorithm
+// fixes, or 0 where it fixes none.
+func ExpectedSignatureBits(algorithm uint8) int { return expectedSignatureBits[algorithm] }
 
 // rsaModulusBits returns the RSA modulus size in bits, or 0 when not derivable.
 func rsaModulusBits(key *dns.DNSKEY) int {

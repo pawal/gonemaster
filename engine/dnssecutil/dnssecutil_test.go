@@ -2,6 +2,7 @@ package dnssecutil_test
 
 import (
 	"crypto"
+	"encoding/base64"
 	"net/netip"
 	"testing"
 	"time"
@@ -351,5 +352,58 @@ func TestKeyTagDoesNotMemoizeIntoCallerRecord(t *testing.T) {
 	memoized.Tag = want
 	if got := dnssecutil.KeyTag(&memoized); got != want {
 		t.Errorf("pre-memoized key: KeyTag = %d, want %d", got, want)
+	}
+}
+
+// The fixed rdata lengths of RFC 8624's curve algorithms, per RFC 5933, 6605,
+// 8080. These are lengths of the encoded key and signature, which for ECDSA
+// are twice the curve size KeySize reports; the two must not be conflated.
+func TestExpectedBitsAreFixedOnlyForTheCurveAlgorithms(t *testing.T) {
+	for _, c := range []struct {
+		algorithm uint8
+		key, sig  int
+	}{
+		{dns.ECCGOST, 512, 512},
+		{dns.ECDSAP256SHA256, 512, 512},
+		{dns.ECDSAP384SHA384, 768, 768},
+		{dns.ED25519, 256, 512},
+		{dns.ED448, 456, 912},
+		{dns.RSASHA256, 0, 0},
+		{dns.MLDSA44, 0, 0},
+		{200, 0, 0},
+	} {
+		name := dns.AlgorithmToString[c.algorithm]
+		if got := dnssecutil.ExpectedKeyBits(c.algorithm); got != c.key {
+			t.Errorf("dnssecutil.ExpectedKeyBits(%s) = %d, want %d", name, got, c.key)
+		}
+		if got := dnssecutil.ExpectedSignatureBits(c.algorithm); got != c.sig {
+			t.Errorf("dnssecutil.ExpectedSignatureBits(%s) = %d, want %d", name, got, c.sig)
+		}
+	}
+}
+
+// A generated key of each fixed-length algorithm the library can make must
+// match the table, or the table is wrong about the wire format.
+func TestExpectedKeyBitsMatchesGeneratedKeys(t *testing.T) {
+	for _, algorithm := range []uint8{dns.ECDSAP256SHA256, dns.ECDSAP384SHA384, dns.ED25519} {
+		key := &dns.DNSKEY{Hdr: dns.Header{Name: "example.test.", Class: dns.ClassINET, TTL: 3600}}
+		key.Flags = dns.FlagZONE
+		key.Protocol = 3
+		key.Algorithm = algorithm
+		bits := 256
+		if algorithm == dns.ECDSAP384SHA384 {
+			bits = 384
+		}
+		if _, err := key.Generate(bits); err != nil {
+			t.Fatalf("generating %s: %v", dns.AlgorithmToString[algorithm], err)
+		}
+		raw, err := base64.StdEncoding.DecodeString(key.PublicKey)
+		if err != nil {
+			t.Fatalf("decoding %s key: %v", dns.AlgorithmToString[algorithm], err)
+		}
+		if got := len(raw) << 3; got != dnssecutil.ExpectedKeyBits(algorithm) {
+			t.Errorf("%s key is %d bits, table says %d",
+				dns.AlgorithmToString[algorithm], got, dnssecutil.ExpectedKeyBits(algorithm))
+		}
 	}
 }

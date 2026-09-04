@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.6] - 2026-09-04
+
+Validates RSA signatures from keys the engine previously refused, such as the .lv KSK.
 
 ### Added
 
@@ -10,12 +12,13 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Changed
 
-- build: update the DNS library to v0.6.108
+- build: update the DNS library to v0.6.109
 
 ### Fixed
 
 - dnssec: verify RRSIGs from RSA keys with large public exponents, such as the .lv KSK
 - dnssec: verify RRSIGs from RSA keys with a leading zero byte in the exponent or modulus
+- engine: pack SOA rnames holding several escaped dots in one label, such as the .mil rname
 
 ## [v1.7.5] - 2026-09-04
 

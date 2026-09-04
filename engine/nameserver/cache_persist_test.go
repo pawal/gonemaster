@@ -61,6 +61,56 @@ func TestCacheStoreExportImportRoundTrip(t *testing.T) {
 	}
 }
 
+// An rname label may carry any number of escaped dots; the .mil rname holds
+// four. Packing one with the wrong length wrote a NUL into the wire form, so
+// the restored cache reported an rname the zone never served.
+func TestCacheStoreExportImportEscapedDotRname(t *testing.T) {
+	const rname = `DISA\.COLUMBUS\.NS\.MBX\.HOSTMASTER-DOD-NIC.MAIL.mil.`
+
+	msg := new(dns.Msg)
+	dnsutil.SetQuestion(msg, "mil.", dns.TypeSOA)
+	msg.Response = true
+	soa := &dns.SOA{Hdr: dns.Header{Name: "mil.", Class: dns.ClassINET, TTL: 3600}}
+	soa.Ns = "CON1.NIPR.mil."
+	soa.Mbox = rname
+	soa.Serial = 2026090402
+	msg.Answer = []dns.RR{soa}
+
+	cache := NewCacheStore()
+	cache.cacheForAddress("192.0.2.53").set("mil.SOA.response", &packet.Packet{
+		Msg:        msg,
+		AnswerFrom: "192.0.2.53:53",
+	})
+
+	entries, err := cache.ExportEntries()
+	if err != nil {
+		t.Fatalf("export entries: %v", err)
+	}
+
+	restored := NewCacheStore()
+	if err := restored.ImportEntries(entries); err != nil {
+		t.Fatalf("import entries: %v", err)
+	}
+
+	loaded, ok := restored.cacheForAddress("192.0.2.53").get("mil.SOA.response")
+	if !ok || loaded == nil || loaded.Msg == nil {
+		t.Fatalf("expected restored SOA packet entry")
+	}
+	if len(loaded.Msg.Answer) != 1 {
+		t.Fatalf("expected one restored answer, got %d", len(loaded.Msg.Answer))
+	}
+	got, ok := loaded.Msg.Answer[0].(*dns.SOA)
+	if !ok {
+		t.Fatalf("expected restored SOA, got %T", loaded.Msg.Answer[0])
+	}
+	if got.Mbox != rname {
+		t.Fatalf("rname round-tripped to %q, want %q", got.Mbox, rname)
+	}
+	if got.Ns != soa.Ns || got.Serial != soa.Serial {
+		t.Fatalf("unexpected restored mname/serial: %s %d", got.Ns, got.Serial)
+	}
+}
+
 func TestCacheStoreExportsTimeoutAsNoMessage(t *testing.T) {
 	ctx, prof := testContext(t)
 	prof.Resolver.Defaults.ErrorCacheTTL = 0

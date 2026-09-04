@@ -338,6 +338,12 @@ func TestRnameToEmailEscapedDots(t *testing.T) {
 	if got != "host.master@example" {
 		t.Fatalf("expected host.master@example, got %q", got)
 	}
+
+	// Only the first unescaped dot splits the local part from the mail domain.
+	got = rnameToEmail(`DISA\.COLUMBUS\.NS\.MBX\.HOSTMASTER-DOD-NIC.MAIL.mil.`)
+	if got != "DISA.COLUMBUS.NS.MBX.HOSTMASTER-DOD-NIC@MAIL.mil" {
+		t.Fatalf("expected DISA.COLUMBUS.NS.MBX.HOSTMASTER-DOD-NIC@MAIL.mil, got %q", got)
+	}
 }
 
 func TestValidEmailAddress(t *testing.T) {

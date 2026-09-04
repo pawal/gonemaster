@@ -13,6 +13,7 @@ Validates RSA signatures from keys the engine previously refused, such as the .l
 ### Changed
 
 - build: update the DNS library to v0.6.109
+- build: update golang.org/x/crypto to v0.56.0
 
 ### Fixed
 

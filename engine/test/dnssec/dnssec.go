@@ -1289,7 +1289,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 										outcome.algoNotSupportedByZM[keytag] = map[uint8]bool{}
 									}
 									outcome.algoNotSupportedByZM[keytag][sig.Algorithm] = true
-								} else if dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+								} else if errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 									// RSA exponent we cannot verify locally: indeterminate, not a failure.
 									outcome.rsaExponentUnsupported[keytag] = true
 								} else {
@@ -2810,7 +2810,7 @@ func DNSSEC08(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
 							if errors.Is(err, dns.ErrAlg) {
 								algoUnsupported = true
-							} else if dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+							} else if errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 								rsaUnsupported = true
 							}
 							continue
@@ -3142,7 +3142,7 @@ func DNSSEC09(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						if err := verifyRRSIG(sig, rrset, dnskey, testTime); err != nil {
 							if errors.Is(err, dns.ErrAlg) {
 								algoUnsupported = true
-							} else if dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+							} else if errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 								rsaUnsupported = true
 							}
 							continue
@@ -3554,7 +3554,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 											}
 											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
-										} else if !dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+										} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 											// Skip an unsupported RSA exponent: indeterminate, not a verify error.
 											outcome.nsec3RRSIGVerifyError[keytag] = true
 										}
@@ -3633,7 +3633,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 											}
 											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
-										} else if !dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+										} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 											// Skip an unsupported RSA exponent: indeterminate, not a verify error.
 											outcome.nsecRRSIGVerifyError[keytag] = true
 										}
@@ -3729,7 +3729,7 @@ func DNSSEC10(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 												outcome.algoNotSupportedByZM[key] = map[uint8]bool{}
 											}
 											outcome.algoNotSupportedByZM[key][dnskey.Algorithm] = true
-										} else if !dnssecutil.RSAExponentBeyondLocalVerifier(dnskey) {
+										} else if !errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 											// Skip an unsupported RSA exponent: indeterminate, not a verify error.
 											outcome.nsecRRSIGVerifyError[keytag] = true
 										}
@@ -8416,7 +8416,7 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					if verr := verifyRRSIG(sig, dsRRset, k, testTime); verr != nil {
 						if errors.Is(verr, dns.ErrAlg) {
 							algoUnsupported = true
-						} else if dnssecutil.RSAExponentBeyondLocalVerifier(k) {
+						} else if errors.Is(verr, dnssecutil.ErrRSAExponentUnsupported) {
 							rsaUnsupported = true
 						}
 						continue

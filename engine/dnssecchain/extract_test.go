@@ -1107,27 +1107,34 @@ func dummyRRSIG(keytag uint16) *dns.RRSIG {
 func TestSigStateRSAExponentUnsupported(t *testing.T) {
 	lv := dnstest.RSADNSKEY(testZone, 257, dnstest.LVKSK42018)
 	lb := dnstest.RSADNSKEY(testZone, 257, dnstest.LBKSK3842)
+	e65 := dnstest.RSADNSKEY(testZone, 257, dnstest.LVKSK42018E65)
 
-	// The .lv KSK exponent is beyond the local verifier, so its signature is
-	// unproven (unsupported_key), not invalid.
-	if got := sigState(dummyRRSIG(lv.KeyTag()), []dns.RR{lv}, []*dns.DNSKEY{lv}, fixedAt); got != SigUnsupportedKey {
-		t.Errorf("lv KSK sigState = %q, want %q", got, SigUnsupportedKey)
+	// Only an exponent past the local RSA path leaves a signature unproven.
+	if got := sigState(dummyRRSIG(e65.KeyTag()), []dns.RR{e65}, []*dns.DNSKEY{e65}, fixedAt); got != SigUnsupportedKey {
+		t.Errorf("65-bit exponent sigState = %q, want %q", got, SigUnsupportedKey)
 	}
-	// The .lb KSK has a normal exponent; a signature that does not verify is
-	// genuinely bogus and must not be softened to unsupported_key.
-	if got := sigState(dummyRRSIG(lb.KeyTag()), []dns.RR{lb}, []*dns.DNSKEY{lb}, fixedAt); got != SigBogus {
-		t.Errorf("lb KSK sigState = %q, want %q", got, SigBogus)
+	// The .lv KSK is verified locally, so a signature that does not match is
+	// bogus, exactly like one under the normal-exponent .lb KSK.
+	for name, key := range map[string]*dns.DNSKEY{"lv": lv, "lb": lb} {
+		if got := sigState(dummyRRSIG(key.KeyTag()), []dns.RR{key}, []*dns.DNSKEY{key}, fixedAt); got != SigBogus {
+			t.Errorf("%s KSK sigState = %q, want %q", name, got, SigBogus)
+		}
+	}
+	// A real signature under the .lv exponent is valid.
+	kp := dnstest.GenRSAKeyWithExponent(t, testZone, dnstest.LVExponent, 1024, true)
+	sig := dnstest.SignRRset(t, kp, []dns.RR{kp.Key}, testZone, testZone, fixedAt.Add(-24*time.Hour), fixedAt.Add(24*time.Hour))
+	if got := sigState(sig, []dns.RR{kp.Key}, []*dns.DNSKEY{kp.Key}, fixedAt); got != SigValid {
+		t.Errorf("large-exponent sigState = %q, want %q", got, SigValid)
 	}
 }
 
 func TestExtractRSAExponentPartial(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 
-	// The child KSK is the real .lv KSK: a valid 2048-bit RSASHA256 key whose
-	// 2^32+1 exponent the local verifier cannot use. The DS still digest-matches
-	// the key (digests do not touch the exponent), so the chain is anchored, but
-	// the DNSKEY signature cannot be checked -> partial, not broken.
-	ksk := dnstest.RSADNSKEY(testZone, 257, dnstest.LVKSK42018)
+	// The child KSK carries a 65-bit exponent no local path verifies. The DS
+	// still digest-matches the key, so the chain is anchored, but the DNSKEY
+	// signature cannot be checked -> partial, not broken.
+	ksk := dnstest.RSADNSKEY(testZone, 257, dnstest.LVKSK42018E65)
 	keytag := ksk.KeyTag()
 	dnskeySig := dummyRRSIG(keytag)
 

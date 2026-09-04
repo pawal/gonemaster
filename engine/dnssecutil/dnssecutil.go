@@ -8,7 +8,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
-	"math/big"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
@@ -110,32 +109,19 @@ func ExpectedSignatureBits(algorithm uint8) int { return expectedSignatureBits[a
 
 // rsaModulusBits returns the RSA modulus size in bits, or 0 when not derivable.
 func rsaModulusBits(key *dns.DNSKEY) int {
-	if key.PublicKey == "" {
+	_, n, ok := rsaPublicKey(key)
+	if !ok {
 		return 0
 	}
-	keybuf, err := base64.StdEncoding.DecodeString(key.PublicKey)
-	if err != nil || len(keybuf) == 0 {
-		return 0
-	}
-
-	explen, keyoff, ok := parseRSAExponentLen(keybuf)
-	if !ok || explen <= 0 || keyoff+explen >= len(keybuf) {
-		return 0
-	}
-
-	modulus := keybuf[keyoff+explen:]
-	if len(modulus) == 0 {
-		return 0
-	}
-	return new(big.Int).SetBytes(modulus).BitLen()
+	return n.BitLen()
 }
 
 // RSAExponentBeyondLocalVerifier reports whether key is an RSA DNSKEY whose
 // public exponent exceeds what the local RRSIG verifier (miekg/dns + crypto/rsa)
 // can use. Both reject exponents encoded in more than 4 bytes or with a value
-// greater than 2^31-1. Such a key cannot be checked here even though its
-// signatures may be perfectly valid (e.g. the .lv TLD KSK, whose exponent is
-// 2^32+1). Returns false for non-RSA algorithms and for unparseable keys.
+// greater than 2^31-1, although such signatures may be perfectly valid (e.g.
+// the .lv TLD KSK, whose exponent is 2^32+1); VerifyRRSIG checks those keys
+// itself. Returns false for non-RSA algorithms and for unparseable keys.
 func RSAExponentBeyondLocalVerifier(key *dns.DNSKEY) bool {
 	if key == nil {
 		return false
@@ -167,6 +153,7 @@ func RSAExponentBeyondLocalVerifier(key *dns.DNSKEY) bool {
 }
 
 // VerifyRRSIG checks the signature against the RRset and key at the given time.
+// ErrRSAExponentUnsupported reports an RSA exponent no local path verifies.
 func VerifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) (err error) {
 	if sig == nil || key == nil {
 		return errors.New("missing rrsig or key")
@@ -192,6 +179,9 @@ func VerifyRRSIG(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY, at time.Time) 
 			continue
 		}
 		copies = append(copies, rr.Clone())
+	}
+	if RSAExponentBeyondLocalVerifier(key) {
+		return verifyLargeExponentRSA(&local, copies, keyCopy)
 	}
 	// The hook shares the library's default branch with every unverifiable
 	// algorithm, so attaching it for those would turn ErrAlg into ErrSig.

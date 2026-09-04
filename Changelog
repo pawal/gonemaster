@@ -8,6 +8,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 - build: update the DNS library to v0.6.108
 
+### Fixed
+
+- dnssec: verify RRSIGs from RSA keys with large public exponents, such as the .lv KSK
+
 ## [v1.7.5] - 2026-09-04
 
 Widens the DNSSEC algorithm coverage in the engine.

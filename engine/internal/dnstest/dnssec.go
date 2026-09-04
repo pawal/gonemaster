@@ -3,14 +3,18 @@ package dnstest
 import (
 	"crypto"
 	"crypto/rand"
+	"crypto/rsa"
 	"encoding/base64"
 	"fmt"
+	"io"
+	"math/big"
 	"testing"
 	"time"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 	"github.com/cloudflare/circl/sign/ed448"
+	tssrsa "github.com/cloudflare/circl/tss/rsa"
 
 	"codeberg.org/pawal/gonemaster/engine/dnssecutil"
 )
@@ -20,9 +24,13 @@ import (
 const (
 	// LVKSK42018 is the .lv KSK, keytag 42018: RSASHA256, 2048-bit, public
 	// exponent 2^32+1 (4294967297, 5 bytes). miekg/dns and crypto/rsa both
-	// reject exponents this large, so gonemaster cannot verify its signatures
-	// locally even though .lv validates on 1.1.1.1 / 8.8.8.8.
+	// reject exponents this large; dnssecutil verifies it through its own RSA
+	// path, as .lv validates on 1.1.1.1 / 8.8.8.8.
 	LVKSK42018 = "BQEAAAAByLU9dUcHHcl1eLgjLidTJKlwxsU9a580xierZ+WyfRBI47L3LLXAZZ0ub6Sea3qKP2mhP5ZBG/reXvyh3OSlHa39WoMiUUZFcuouCajBg7XeLGVPL4U1Ja1UW9wq/Oc8WU1dq4e+2Q8Dt8tipFvbL0AD0BhJAsfQuT3wperedwQAUKId0/JQOFNTWhEJaYN2P5IIhyRKWQp8OhtKmdNYQ5jfqqpXVO4zyqV+4ZxWurXJS8c7bKrE3OAewWEGAtTjeElfQ2CFAKWVjMOLeZ86+mgw7p3UHhGB+KuRaKg6fAtTcQYBF78Xe40wuj9EgGL19mp9v6tDwFe+Epow4SFSPQ=="
+
+	// LVKSK42018E65 is LVKSK42018 with a 2^64+1 exponent, one bit past the
+	// local verifier's ceiling. Parse-only: nobody holds a private key for it.
+	LVKSK42018E65 = "CQEAAAAAAAAAAci1PXVHBx3JdXi4Iy4nUySpcMbFPWufNMYnq2flsn0QSOOy9yy1wGWdLm+knmt6ij9poT+WQRv63l78odzkpR2t/VqDIlFGRXLqLgmowYO13ixlTy+FNSWtVFvcKvznPFlNXauHvtkPA7fLYqRb2y9AA9AYSQLH0Lk98KXq3ncEAFCiHdPyUDhTU1oRCWmDdj+SCIckSlkKfDobSpnTWEOY36qqV1TuM8qlfuGcVrq1yUvHO2yqxNzgHsFhBgLU43hJX0NghQCllYzDi3mfOvpoMO6d1B4RgfirkWioOnwLU3EGARe/F3uNMLo/RIBi9fZqfb+rQ8BXvhKaMOEhUj0="
 
 	// LBKSK3842 is the .lb KSK, keytag 3842: RSASHA256, 2048-bit, exponent
 	// 65537 (normal). Negative control: .lb is NOT affected by the
@@ -102,4 +110,69 @@ func RSADNSKEY(owner string, flags uint16, pub string) *dns.DNSKEY {
 	key.Algorithm = dns.RSASHA256
 	key.PublicKey = pub
 	return key
+}
+
+// LVExponent is the .lv KSK public exponent, 2^32+1.
+var LVExponent = new(big.Int).SetUint64(1<<32 + 1)
+
+// GenRSAKeyWithExponent generates an RSASHA256 zone key with the odd public
+// exponent e, signing in math/big so crypto/rsa's exponent cap does not apply.
+func GenRSAKeyWithExponent(t testing.TB, owner string, e *big.Int, bits int, sep bool) Keypair {
+	t.Helper()
+	if e.Bit(0) == 0 {
+		t.Fatalf("RSA exponent %s is even", e)
+	}
+	key := &dns.DNSKEY{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 3600}}
+	key.Flags = dns.FlagZONE
+	if sep {
+		key.Flags |= dns.FlagSEP
+	}
+	key.Protocol = 3
+	key.Algorithm = dns.RSASHA256
+	one := big.NewInt(1)
+	for {
+		p, err := rand.Prime(rand.Reader, bits/2)
+		if err != nil {
+			t.Fatalf("generate prime: %v", err)
+		}
+		q, err := rand.Prime(rand.Reader, bits-bits/2)
+		if err != nil {
+			t.Fatalf("generate prime: %v", err)
+		}
+		phi := new(big.Int).Mul(new(big.Int).Sub(p, one), new(big.Int).Sub(q, one))
+		d := new(big.Int).ModInverse(e, phi)
+		if d == nil {
+			continue // e shares a factor with phi, draw again
+		}
+		n := new(big.Int).Mul(p, q)
+		key.PublicKey = RSAPublicKey(e, n)
+		return Keypair{Key: key, Priv: &bigRSASigner{n: n, d: d}}
+	}
+}
+
+// RSAPublicKey encodes e and n per RFC 3110.
+func RSAPublicKey(e, n *big.Int) string {
+	eb := e.Bytes()
+	buf := []byte{byte(len(eb))}
+	if len(eb) > 255 {
+		buf = []byte{0, byte(len(eb) >> 8), byte(len(eb))}
+	}
+	buf = append(buf, eb...)
+	buf = append(buf, n.Bytes()...)
+	return base64.StdEncoding.EncodeToString(buf)
+}
+
+// bigRSASigner signs PKCS#1 v1.5 in math/big; Sign never asks for Public.
+type bigRSASigner struct{ n, d *big.Int }
+
+func (s *bigRSASigner) Public() crypto.PublicKey { return nil }
+
+func (s *bigRSASigner) Sign(_ io.Reader, digest []byte, opts crypto.SignerOpts) ([]byte, error) {
+	em, err := tssrsa.PKCS1v15Padder{}.Pad(&rsa.PublicKey{N: s.n}, opts.HashFunc(), digest)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]byte, (s.n.BitLen()+7)/8)
+	new(big.Int).Exp(new(big.Int).SetBytes(em), s.d, s.n).FillBytes(out)
+	return out, nil
 }

@@ -210,7 +210,7 @@ func sigState(sig *dns.RRSIG, rrset []dns.RR, keys []*dns.DNSKEY, at time.Time) 
 			return SigValid
 		} else if errors.Is(err, dns.ErrAlg) {
 			algoUnsupported = true
-		} else if dnssecutil.RSAExponentBeyondLocalVerifier(k) {
+		} else if errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
 			unsupportedKey = true // RSA exponent beyond the local verifier
 		}
 	}

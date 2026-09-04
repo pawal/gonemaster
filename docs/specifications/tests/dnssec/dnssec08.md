@@ -100,7 +100,7 @@ emit TEST_CASE_END
 | `DS08_MISSING_RRSIG_IN_RESPONSE` | DNSKEY answer exists but contains no RRSIG records. |
 | `DS08_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY in DNSKEY RRset. |
 | `DS08_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none validate the RRSIG. |
-| `DS08_RSA_EXPONENT_UNSUPPORTED` | RRSIG could not be checked only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports. |
+| `DS08_RSA_EXPONENT_UNSUPPORTED` | RRSIG could not be checked only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports (more than 64 bits). |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `IPV6_DISABLED` | IPv6 transport is disabled for a queried nameserver (`DNSKEY`). |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
@@ -161,4 +161,4 @@ emit TEST_CASE_END
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one query outcome.
 - Responses failing shape checks (`Msg`, `NOERROR`, `AA`, apex DNSKEY presence) are silently skipped for DS08 findings.
 - Unsupported algorithm can be detected either before verification (`dnssecAlgorithmSupported`) or during verification (`dns.ErrAlg`).
-- Large RSA public exponent exception: when an RRSIG fails verification only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier (miekg/dns plus `crypto/rsa`) can use, the finding is reclassified from the `ERROR` `DS08_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS08_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS08_DNSKEY_RRSIG_VALID` pass.
+- Large RSA public exponent handling: an RSA DNSKEY whose public exponent the DNS library refuses (more than 4 bytes, or greater than 2^31-1) is verified by gonemaster's own RSA path instead, so its RRSIGs pass or fail like any other. Only when the exponent exceeds 64 bits is the finding reclassified from the `ERROR` `DS08_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS08_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS08_DNSKEY_RRSIG_VALID` pass.

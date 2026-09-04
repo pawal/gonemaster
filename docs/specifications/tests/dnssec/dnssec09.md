@@ -88,7 +88,7 @@ emit TEST_CASE_END
 | `DS09_MISSING_RRSIG_IN_RESPONSE` | SOA response has no answer-section RRSIG records. |
 | `DS09_NO_MATCHING_DNSKEY` | RRSIG keytag has no matching DNSKEY keytag. |
 | `DS09_RRSIG_NOT_VALID_BY_DNSKEY` | Matching DNSKEY candidates exist but none verify the SOA signature. |
-| `DS09_RSA_EXPONENT_UNSUPPORTED` | SOA RRSIG could not be checked only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports. |
+| `DS09_RSA_EXPONENT_UNSUPPORTED` | SOA RRSIG could not be checked only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier supports (more than 64 bits). |
 | `DS09_SOA_RRSIG_EXPIRED` | SOA-related RRSIG expiration is before test time. |
 | `DS09_SOA_RRSIG_NOT_YET_VALID` | SOA-related RRSIG inception is after test time. |
 | `IPV4_DISABLED` | IPv4 transport is disabled for a queried nameserver (`DNSKEY`). |
@@ -152,4 +152,4 @@ emit TEST_CASE_END
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one DS09 outcome.
 - Nameservers failing response-shape checks (`Msg`, `NOERROR`, `AA`, apex owner match) are skipped for DS09 findings.
 - If no usable DNSKEY records are found for a nameserver, SOA signing checks are skipped for that nameserver.
-- Large RSA public exponent exception: when the SOA RRSIG fails verification only because the matching DNSKEY is an RSA key whose public exponent exceeds what the local verifier (miekg/dns plus `crypto/rsa`) can use, the finding is reclassified from the `ERROR` `DS09_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS09_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS09_SOA_RRSIG_VALID` pass.
+- Large RSA public exponent handling: an RSA DNSKEY whose public exponent the DNS library refuses (more than 4 bytes, or greater than 2^31-1) is verified by gonemaster's own RSA path instead, so the SOA RRSIG passes or fails like any other. Only when the exponent exceeds 64 bits is the finding reclassified from the `ERROR` `DS09_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS09_RSA_EXPONENT_UNSUPPORTED`. Such a nameserver is treated as indeterminate and is not counted as a `DS09_SOA_RRSIG_VALID` pass.

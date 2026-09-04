@@ -998,5 +998,7 @@
   "pub.glossary.ipv6": "IPv6 は新しい方式のインターネットアドレス (例えば 2001:db8::1) で、アドレス空間が枯渇するにつれて IPv4 を継ぐように設計されています。",
   "pub.glossary.ipv6.match": "IPv6",
   "pub.tag.dnssec.DS10_NONSTANDARD_NSEC_RESPONSE.header": "非標準のNSEC応答形式",
-  "pub.tag.dnssec.DS10_NONSTANDARD_NSEC_RESPONSE.desc": "ネームサーバーが、NSECクエリに対して、NSECレコードをアンサーセクションではなくオーソリティセクションに配置して応答しました。これはRFC 4470のwhite-liesや、RFC 9824のコンパクトな不在証明の実装(例: AWS Route 53、Cloudflare)で使われる応答形式です。検証リゾルバーはどちらの形式も受け入れます。この通知は情報提供のみを目的としており、運用者が自分のネームサーバーが非標準の形式を使っていることを把握できるようにするためのものです。"
+  "pub.tag.dnssec.DS10_NONSTANDARD_NSEC_RESPONSE.desc": "ネームサーバーが、NSECクエリに対して、NSECレコードをアンサーセクションではなくオーソリティセクションに配置して応答しました。これはRFC 4470のwhite-liesや、RFC 9824のコンパクトな不在証明の実装(例: AWS Route 53、Cloudflare)で使われる応答形式です。検証リゾルバーはどちらの形式も受け入れます。この通知は情報提供のみを目的としており、運用者が自分のネームサーバーが非標準の形式を使っていることを把握できるようにするためのものです。",
+  "pub.tag.dnssec.DNSKEY_RSA_EXPONENT_LARGE.header": "RSA DNSKEY の公開指数が異例に大きい",
+  "pub.tag.dnssec.DNSKEY_RSA_EXPONENT_LARGE.desc": "RSA 署名鍵のいずれかが 2^31-1 を超える公開指数を使用しています。この鍵は有効で、gonemaster はその署名を検証しますが、一部の暗号ライブラリ (Go の標準ライブラリを含む) に基づく検証器はこのような指数を扱えず、ゾーンの検証に失敗します。次にこの鍵をロールオーバーする際は、65537 のような一般的な指数を選んでください。"
 }

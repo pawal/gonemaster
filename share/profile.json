@@ -230,6 +230,7 @@
             "UNEXPECTED_RCODE": "WARNING"
         },
         "DNSSEC": {
+            "DNSKEY_RSA_EXPONENT_LARGE": "NOTICE",
             "DNSKEY_SMALLER_THAN_REC": "WARNING",
             "DNSKEY_TOO_LARGE_FOR_ALGO": "ERROR",
             "DNSKEY_TOO_SMALL_FOR_ALGO": "ERROR",

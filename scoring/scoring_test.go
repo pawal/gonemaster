@@ -541,6 +541,7 @@ func TestComputeScoreNeutralTags(t *testing.T) {
 			tags: []string{"DS02_RSA_EXPONENT_UNSUPPORTED", "DS08_RSA_EXPONENT_UNSUPPORTED", "DS09_RSA_EXPONENT_UNSUPPORTED"},
 		},
 		{"SPF macro target", "example.com", "ZONE", "zone_consistency", []string{"Z13_SPF_MACRO_TARGET", "Z13_SPF_MACRO_TARGET"}},
+		{"large RSA exponent", "example.se", "DNSSEC", "dnssec", []string{"DNSKEY_RSA_EXPONENT_LARGE", "DNSKEY_RSA_EXPONENT_LARGE"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			entries := make([]Entry, len(tc.tags))

@@ -36,6 +36,23 @@ func rsaPublicKey(key *dns.DNSKEY) (e, n *big.Int, ok bool) {
 	return new(big.Int).SetBytes(keybuf[off : off+explen]), new(big.Int).SetBytes(keybuf[off+explen:]), true
 }
 
+// RSAExponentBits returns the public exponent length in bits, or 0 when not derivable.
+func RSAExponentBits(key *dns.DNSKEY) int {
+	if key == nil {
+		return 0
+	}
+	switch key.Algorithm {
+	case dns.RSAMD5, dns.RSASHA1, dns.RSASHA1NSEC3SHA1, dns.RSASHA256, dns.RSASHA512:
+	default:
+		return 0
+	}
+	e, _, ok := rsaPublicKey(key)
+	if !ok {
+		return 0
+	}
+	return e.BitLen()
+}
+
 // verifyLargeExponentRSA verifies in math/big what crypto/rsa refuses for its exponent.
 func verifyLargeExponentRSA(sig *dns.RRSIG, rrset []dns.RR, key *dns.DNSKEY) error {
 	if sig.KeyTag != KeyTag(key) || sig.Hdr.Class != key.Hdr.Class || sig.Algorithm != key.Algorithm ||

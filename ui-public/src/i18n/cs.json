@@ -998,5 +998,7 @@
   "pub.glossary.ipv4": "IPv4 je starší schéma internetového adresování (například 192.0.2.1). Mnoho klientů se na něj stále spoléhá, proto by jmenné servery měly zůstat přes něj dostupné.",
   "pub.glossary.ipv4.match": "IPv4",
   "pub.glossary.ipv6": "IPv6 je novější schéma internetového adresování (například 2001:db8::1), navržené jako nástupce IPv4, jak dochází adresní prostor.",
-  "pub.glossary.ipv6.match": "IPv6"
+  "pub.glossary.ipv6.match": "IPv6",
+  "pub.tag.dnssec.DNSKEY_RSA_EXPONENT_LARGE.header": "RSA DNSKEY s neobvykle velkým veřejným exponentem",
+  "pub.tag.dnssec.DNSKEY_RSA_EXPONENT_LARGE.desc": "Jeden z vašich podepisovacích klíčů RSA používá veřejný exponent větší než 2^31-1. Klíč je platný a gonemaster jeho podpisy ověřuje, ale validátory postavené na některých kryptografických knihovnách, včetně standardní knihovny jazyka Go, takový exponent použít nedokážou a validace vaší zóny u nich selže. Při příští výměně tohoto klíče zvolte běžný exponent, například 65537."
 }

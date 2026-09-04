@@ -1032,6 +1032,12 @@ msgstr ""
 "({algo_descr}) a une taille ({keysize}) plus grande que la taille maximum "
 "({keysizemax}) spécifiée pour cet algorithme."
 
+msgctxt "DNSSEC:DNSKEY_RSA_EXPONENT_LARGE"
+msgid ""
+"DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has an RSA public exponent of {exponent_bits} bits, which validators built on some cryptographic libraries cannot use."
+msgstr ""
+"La clé (DNSKEY) avec le tag {keytag} utilisant l'algorithme {algo_num} ({algo_descr}) a un exposant public RSA de {exponent_bits} bits, que les validateurs reposant sur certaines bibliothèques cryptographiques ne peuvent pas utiliser."
+
 msgctxt "DNSSEC:DS01_DS_ALGO_2_MISSING"
 msgid ""
 "There is a DS record with keytag {keytag}. A DS record using digest "

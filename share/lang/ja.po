@@ -2260,6 +2260,12 @@ msgstr ""
 "タグ {keytag} の DNSKEY (アルゴリズム {algo_num} / {algo_descr}) の鍵長 "
 "({keysize}) が最大値 ({keysizemax}) を超えています。"
 
+msgctxt "DNSSEC:DNSKEY_RSA_EXPONENT_LARGE"
+msgid ""
+"DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has an RSA public exponent of {exponent_bits} bits, which validators built on some cryptographic libraries cannot use."
+msgstr ""
+"タグ {keytag} の DNSKEY (アルゴリズム {algo_num} / {algo_descr}) の RSA 公開指数は {exponent_bits} ビットで、一部の暗号ライブラリに基づく検証器では使用できません。"
+
 msgctxt "DNSSEC:DNSKEY_TOO_SMALL_FOR_ALGO"
 msgid ""
 "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a "

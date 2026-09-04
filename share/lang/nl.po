@@ -606,6 +606,12 @@ msgctxt "DNSSEC:DNSKEY_TOO_LARGE_FOR_ALGO"
 msgid "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a size ({keysize}) larger than the maximum one ({keysizemax})."
 msgstr "DNSKEY met tag {keytag} die algoritme {algo_num} ({algo_descr}) gebruikt, heeft een formaat ({keysize}) dat groter is dan het maximale formaat ({keysizemax})."
 
+msgctxt "DNSSEC:DNSKEY_RSA_EXPONENT_LARGE"
+msgid ""
+"DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has an RSA public exponent of {exponent_bits} bits, which validators built on some cryptographic libraries cannot use."
+msgstr ""
+"DNSKEY met tag {keytag} die algoritme {algo_num} ({algo_descr}) gebruikt, heeft een openbare RSA-exponent van {exponent_bits} bits, die validators gebouwd op sommige cryptografische bibliotheken niet kunnen gebruiken."
+
 msgctxt "DNSSEC:DS01_DS_ALGO_DEPRECATED"
 msgid "The DS record with keytag {keytag} uses a deprecated digest algorithm {ds_algo_num} ({ds_algo_descr}). Fetched from parent name servers \"{servers}\"."
 msgstr "Het DS-record met keytag {keytag} gebruikt een verouderd digest-algoritme {ds_algo_num} ({ds_algo_descr}). Opgehaald van bovenliggende naamservers \"{servers}\"."

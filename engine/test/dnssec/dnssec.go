@@ -525,6 +525,7 @@ func Metadata() map[string][]string {
 		"dnssec14": {
 			"NO_RESPONSE",
 			"NO_RESPONSE_DNSKEY",
+			"DNSKEY_RSA_EXPONENT_LARGE",
 			"DNSKEY_SMALLER_THAN_REC",
 			"DNSKEY_TOO_SMALL_FOR_ALGO",
 			"DNSKEY_TOO_LARGE_FOR_ALGO",
@@ -4970,6 +4971,19 @@ func DNSSEC14(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 		if keysize > details.maxSize {
 			if err := appendLog(ctx, &results, testcase, "DNSKEY_TOO_LARGE_FOR_ALGO", args); err != nil {
+				return results, err
+			}
+		}
+
+		// crypto/rsa and other libraries take public exponents up to 2^31-1 only.
+		if bits := dnssecutil.RSAExponentBits(key); bits > 31 {
+			args := map[string]any{
+				"algo_num":      algo,
+				"algo_descr":    prop.description,
+				"keytag":        keytag,
+				"exponent_bits": bits,
+			}
+			if err := appendLog(ctx, &results, testcase, "DNSKEY_RSA_EXPONENT_LARGE", args); err != nil {
 				return results, err
 			}
 		}

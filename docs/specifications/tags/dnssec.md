@@ -11,6 +11,7 @@ _Do not edit by hand - regenerate with the command above._
 
 | Tag | Level | Testcase(s) | i18n |
 | --- | --- | --- | --- |
+| `DNSKEY_RSA_EXPONENT_LARGE` | `NOTICE` | [dnssec14](../tests/dnssec/dnssec14.md) | yes |
 | `DNSKEY_SMALLER_THAN_REC` | `WARNING` | [dnssec14](../tests/dnssec/dnssec14.md) | yes |
 | `DNSKEY_TOO_LARGE_FOR_ALGO` | `ERROR` | [dnssec14](../tests/dnssec/dnssec14.md) | yes |
 | `DNSKEY_TOO_SMALL_FOR_ALGO` | `ERROR` | [dnssec14](../tests/dnssec/dnssec14.md) | yes |

@@ -998,5 +998,7 @@
   "pub.glossary.ipv4": "IPv4 is het oudere schema voor internetadressering (bijvoorbeeld 192.0.2.1). Veel clients zijn er nog van afhankelijk, dus naamservers zouden erover bereikbaar moeten blijven.",
   "pub.glossary.ipv4.match": "IPv4",
   "pub.glossary.ipv6": "IPv6 is het nieuwere schema voor internetadressering (bijvoorbeeld 2001:db8::1), bedoeld om IPv4 op te volgen naarmate de adresruimte opraakt.",
-  "pub.glossary.ipv6.match": "IPv6"
+  "pub.glossary.ipv6.match": "IPv6",
+  "pub.tag.dnssec.DNSKEY_RSA_EXPONENT_LARGE.header": "RSA-DNSKEY met een ongewoon grote openbare exponent",
+  "pub.tag.dnssec.DNSKEY_RSA_EXPONENT_LARGE.desc": "Een van uw RSA-ondertekeningssleutels gebruikt een openbare exponent groter dan 2^31-1. De sleutel is geldig en gonemaster verifieert de handtekeningen, maar validators gebouwd op sommige cryptografische bibliotheken, waaronder de standaardbibliotheek van Go, kunnen zo'n exponent niet gebruiken en zullen uw zone niet kunnen valideren. Kies bij de volgende sleutelwissel een gangbare exponent zoals 65537."
 }

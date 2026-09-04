@@ -4,6 +4,7 @@ Status: Final
 
 ## Purpose
 - Validate RSA DNSKEY key sizes against per-algorithm minimum/maximum ranges and recommended size thresholds.
+- Report RSA public exponents above 2^31-1, which validators built on some cryptographic libraries cannot use.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -32,12 +33,14 @@ Status: Final
      - `DNSKEY_TOO_SMALL_FOR_ALGO` when key size `< keysizemin`.
      - `DNSKEY_SMALLER_THAN_REC` when key size `< keysizerec`.
      - `DNSKEY_TOO_LARGE_FOR_ALGO` when key size `> keysizemax`.
+     - `DNSKEY_RSA_EXPONENT_LARGE` when the public exponent is longer than 31 bits.
 5. If at least one DNSKEY was collected and internal `KEY_SIZE_OK` condition is met, emit `KEY_SIZE_OK`.
 6. Emit `TEST_CASE_END`.
 
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
+| `DNSKEY_RSA_EXPONENT_LARGE` | RSA DNSKEY public exponent is above 2^31-1, beyond what validators built on some cryptographic libraries accept. |
 | `DNSKEY_SMALLER_THAN_REC` | RSA DNSKEY size is below recommended size for algorithm. |
 | `DNSKEY_TOO_LARGE_FOR_ALGO` | RSA DNSKEY size is above allowed maximum for algorithm. |
 | `DNSKEY_TOO_SMALL_FOR_ALGO` | RSA DNSKEY size is below allowed minimum for algorithm. |
@@ -52,6 +55,10 @@ Status: Final
 ## Tag Arguments
 | Tag | Argument key | Type | Meaning |
 | --- | --- | --- | --- |
+| `DNSKEY_RSA_EXPONENT_LARGE` | `algo_num` | `int` | DNSKEY algorithm number. |
+| `DNSKEY_RSA_EXPONENT_LARGE` | `algo_descr` | `string` | DNSKEY algorithm description. |
+| `DNSKEY_RSA_EXPONENT_LARGE` | `keytag` | `int` | DNSKEY keytag. |
+| `DNSKEY_RSA_EXPONENT_LARGE` | `exponent_bits` | `int` | Public exponent length in bits. |
 | `DNSKEY_SMALLER_THAN_REC` | `algo_num` | `int` | DNSKEY algorithm number. |
 | `DNSKEY_SMALLER_THAN_REC` | `algo_descr` | `string` | DNSKEY algorithm description. |
 | `DNSKEY_SMALLER_THAN_REC` | `keytag` | `int` | DNSKEY keytag. |
@@ -90,6 +97,7 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
+| `DNSKEY_RSA_EXPONENT_LARGE` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`); carries zero score penalty (`scoring` `TagPenalties`). |
 | `DNSKEY_SMALLER_THAN_REC` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DNSKEY_TOO_LARGE_FOR_ALGO` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DNSKEY_TOO_SMALL_FOR_ALGO` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -107,6 +115,7 @@ Status: Final
   - Upstream: default level table lists `NO_RESPONSE_DNSKEY` as `WARNING`. Gonemaster: default level is `ERROR` in `share/profile.json`.
   - Upstream: describes emitting `KEY_SIZE_OK` when no non-`NO_RESPONSE` issues occur. Gonemaster: current condition compares total result count (including testcase boundary tags) against `NO_RESPONSE` count, which makes `KEY_SIZE_OK` effectively unreachable.
   - Upstream: does not explicitly specify testcase boundary and transport-disabled debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+  - Upstream: has no public exponent check. Gonemaster: emits `DNSKEY_RSA_EXPONENT_LARGE` (`NOTICE`, no score penalty) for an RSA public exponent above 2^31-1, the limit of Go's `crypto/rsa` and of other validators. RFC 3110 permits such exponents and gonemaster verifies the key itself, so this is an interoperability note, not a failure.
 - Potential upstream report:
   - `no`
 

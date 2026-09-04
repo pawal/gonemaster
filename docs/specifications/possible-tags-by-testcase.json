@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 83,
-    "unique_tag_count": 574
+    "unique_tag_count": 575
   },
   "modules": {
     "address": {
@@ -549,6 +549,7 @@
         "TEST_CASE_START"
       ],
       "dnssec14": [
+        "DNSKEY_RSA_EXPONENT_LARGE",
         "DNSKEY_SMALLER_THAN_REC",
         "DNSKEY_TOO_LARGE_FOR_ALGO",
         "DNSKEY_TOO_SMALL_FOR_ALGO",

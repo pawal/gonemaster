@@ -938,6 +938,14 @@ Description:
 
 An algorithm present in your DNSKEY set is not used to sign the SOA. Resolvers that require a signature in every published algorithm will treat the SOA answer as bogus, which cascades to most validated operations.
 
+## Tag DNSKEY_RSA_EXPONENT_LARGE
+
+Header: RSA DNSKEY with an unusually large public exponent
+
+Description:
+
+One of your RSA signing keys uses a public exponent above 2^31-1. The key is valid and gonemaster verifies its signatures, but validators built on some cryptographic libraries, Go's standard library among them, cannot use such an exponent and will fail to validate your zone. When you next roll this key, choose a common exponent such as 65537.
+
 ## Tag DNSKEY_SMALLER_THAN_REC
 
 Header: RSA DNSKEY below recommended size

@@ -898,6 +898,12 @@ msgstr ""
 "velikostjo ključa ({keysize}), ki je večja od maksimalno dovoljene velikosti "
 "({keysizemax})."
 
+msgctxt "DNSSEC:DNSKEY_RSA_EXPONENT_LARGE"
+msgid ""
+"DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has an RSA public exponent of {exponent_bits} bits, which validators built on some cryptographic libraries cannot use."
+msgstr ""
+"DNSKEY z oznako {keytag} uporablja algoritem {algo_num} ({algo_descr}) z javnim eksponentom RSA dolžine {exponent_bits} bitov, ki ga validatorji, zgrajeni na nekaterih kriptografskih knjižnicah, ne morejo uporabiti."
+
 msgctxt "DNSSEC:DS01_DS_ALGO_DEPRECATED"
 msgid ""
 "The DS record with keytag {keytag} uses a deprecated digest algorithm "

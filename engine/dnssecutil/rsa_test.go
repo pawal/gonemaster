@@ -143,6 +143,28 @@ func TestVerifyRRSIGLargeExponentGenerated(t *testing.T) {
 	}
 }
 
+// RSAExponentBits reads the exponent length; non-RSA and unparseable keys give 0.
+func TestRSAExponentBits(t *testing.T) {
+	ecdsa := dnstest.RSADNSKEY("example.", dns.FlagZONE, dnstest.LVKSK42018)
+	ecdsa.Algorithm = dns.ECDSAP256SHA256
+	for _, tc := range []struct {
+		name string
+		key  *dns.DNSKEY
+		want int
+	}{
+		{"lv KSK 2^32+1", dnstest.RSADNSKEY("example.", dns.FlagZONE, dnstest.LVKSK42018), 33},
+		{"lb KSK 65537", dnstest.RSADNSKEY("example.", dns.FlagZONE, dnstest.LBKSK3842), 17},
+		{"65-bit exponent", dnstest.RSADNSKEY("example.", dns.FlagZONE, dnstest.LVKSK42018E65), 65},
+		{"non-RSA algorithm", ecdsa, 0},
+		{"garbage key", dnstest.RSADNSKEY("example.", dns.FlagZONE, "AQ=="), 0},
+		{"nil key", nil, 0},
+	} {
+		if got := dnssecutil.RSAExponentBits(tc.key); got != tc.want {
+			t.Errorf("%s: RSAExponentBits = %d, want %d", tc.name, got, tc.want)
+		}
+	}
+}
+
 // rfc3110 encodes exponent and modulus bytes verbatim, leading zeros included.
 func rfc3110(exponent, modulus []byte) string {
 	buf := append([]byte{byte(len(exponent))}, exponent...)

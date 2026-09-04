@@ -605,6 +605,12 @@ msgctxt "DNSSEC:DNSKEY_TOO_LARGE_FOR_ALGO"
 msgid "DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has a size ({keysize}) larger than the maximum one ({keysizemax})."
 msgstr "DNSKEY s tagem {keytag} používající algoritmus {algo_num} ({algo_descr}) má velikost ({keysize}) větší než maximální ({keysizemax})."
 
+msgctxt "DNSSEC:DNSKEY_RSA_EXPONENT_LARGE"
+msgid ""
+"DNSKEY with tag {keytag} and using algorithm {algo_num} ({algo_descr}) has an RSA public exponent of {exponent_bits} bits, which validators built on some cryptographic libraries cannot use."
+msgstr ""
+"DNSKEY s tagem {keytag} používající algoritmus {algo_num} ({algo_descr}) má veřejný exponent RSA o délce {exponent_bits} bitů, který validátory postavené na některých kryptografických knihovnách nedokážou použít."
+
 msgctxt "DNSSEC:DS01_DS_ALGO_DEPRECATED"
 msgid "The DS record with keytag {keytag} uses a deprecated digest algorithm {ds_algo_num} ({ds_algo_descr}). Fetched from parent name servers \"{servers}\"."
 msgstr "DS záznam s keytagem {keytag} používá zastaralý algoritmus digestu {ds_algo_num} ({ds_algo_descr}). Získáno z jmenných serverů nadřazené zóny \"{servers}\"."

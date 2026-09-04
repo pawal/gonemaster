@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- dnssec14: `DNSKEY_RSA_EXPONENT_LARGE` notice for RSA public exponents above 2^31-1
+
 ### Changed
 
 - build: update the DNS library to v0.6.108

@@ -3639,6 +3639,47 @@ func TestDNSSEC14KeySizeSmallerThanRec(t *testing.T) {
 	tctest.RequireTags(t, entries, "DNSKEY_SMALLER_THAN_REC")
 }
 
+// A public exponent above 2^31-1 is reported; the usual 65537 is not.
+func TestDNSSEC14RSAExponentLarge(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		key  *dns.DNSKEY
+		want bool
+	}{
+		{"lv KSK 2^32+1", lvLargeExponentKSK("example"), true},
+		{"65537", tctest.DNSKEYRR("example", 8, tctest.PublicKey(dnstest.LBKSK3842)), false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			ns := tctest.NS(t, ctx, "ns1.example", "198.51.100.9", func(q tctest.Query) packet.Packet {
+				if q.Type == "DNSKEY" {
+					return dnskeyPacket(q.Name, tc.key)
+				}
+				return packet.Packet{}
+			})
+			tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{ns}, nil
+			})
+			tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return nil, nil
+			})
+			z := zone.Zone{Name: dnsname.New("example")}
+			entries, err := DNSSEC14(ctx, &z)
+			if err != nil {
+				t.Fatalf("dnssec14: %v", err)
+			}
+			if !tc.want {
+				tctest.RequireNoTag(t, entries, "DNSKEY_RSA_EXPONENT_LARGE")
+				return
+			}
+			tctest.RequireTags(t, entries, "DNSKEY_RSA_EXPONENT_LARGE")
+			if got := tctest.First(entries, "DNSKEY_RSA_EXPONENT_LARGE").Args["exponent_bits"]; got != 33 {
+				t.Errorf("exponent_bits = %v, want 33", got)
+			}
+		})
+	}
+}
+
 func TestDNSSEC14ParallelDNSKEYQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)

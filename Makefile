@@ -8,8 +8,11 @@ UI_DIR := ui
 UI_BUILD_DIR := $(UI_DIR)/dist
 UI_PUBLIC_DIR := ui-public
 UI_ANALYSIS_DIR := analysis-ui
+UI_STAMP := $(UI_DIR)/node_modules/.install-stamp
+UI_PUBLIC_STAMP := $(UI_PUBLIC_DIR)/node_modules/.install-stamp
+UI_ANALYSIS_STAMP := $(UI_ANALYSIS_DIR)/node_modules/.install-stamp
 NODE_MIN ?= 20
-NPM_MIN ?= 9
+NPM_MIN ?= 11
 
 CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios gonemaster-mcp
 CMD ?= all
@@ -111,13 +114,17 @@ ui-check:
 	if [ -n "$$npm_version" ]; then \
 		major=$${npm_version%%.*}; \
 		if [ "$$major" -lt "$(NPM_MIN)" ]; then \
-			echo "Error: npm $$npm_version found. Need $(NPM_MIN)+ to build the UI."; \
+			echo "Error: npm $$npm_version found. Need $(NPM_MIN)+ (older npm installs every platform's binaries)."; \
 			exit 1; \
 		fi; \
 	fi
 
-ui-install: ui-check
-	$(NPM) --prefix $(UI_DIR) install
+# Reinstall only when the manifests change; the audit round-trip is slow.
+ui-install: $(UI_STAMP)
+
+$(UI_STAMP): $(UI_DIR)/package.json $(UI_DIR)/package-lock.json | ui-check
+	$(NPM) --prefix $(UI_DIR) install --no-audit --no-fund
+	@touch $@
 
 ui-build: ui-install ui-public-build ui-analysis-build
 	$(NPM) --prefix $(UI_DIR) run build
@@ -133,8 +140,11 @@ ui-dev: ui-install
 ui-test: ui-install
 	$(NPM) --prefix $(UI_DIR) run test
 
-ui-public-install: ui-check
-	$(NPM) --prefix $(UI_PUBLIC_DIR) install
+ui-public-install: $(UI_PUBLIC_STAMP)
+
+$(UI_PUBLIC_STAMP): $(UI_PUBLIC_DIR)/package.json $(UI_PUBLIC_DIR)/package-lock.json | ui-check
+	$(NPM) --prefix $(UI_PUBLIC_DIR) install --no-audit --no-fund
+	@touch $@
 
 ui-public-build: ui-public-install
 	$(NPM) --prefix $(UI_PUBLIC_DIR) run build
@@ -150,8 +160,11 @@ ui-public-dev: ui-public-install
 ui-public-test: ui-public-install
 	$(NPM) --prefix $(UI_PUBLIC_DIR) run test
 
-ui-analysis-install: ui-check
-	$(NPM) --prefix $(UI_ANALYSIS_DIR) install
+ui-analysis-install: $(UI_ANALYSIS_STAMP)
+
+$(UI_ANALYSIS_STAMP): $(UI_ANALYSIS_DIR)/package.json $(UI_ANALYSIS_DIR)/package-lock.json | ui-check
+	$(NPM) --prefix $(UI_ANALYSIS_DIR) install --no-audit --no-fund
+	@touch $@
 
 ui-analysis-build: ui-analysis-install
 	$(NPM) --prefix $(UI_ANALYSIS_DIR) run build

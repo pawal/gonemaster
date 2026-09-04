@@ -12,6 +12,10 @@ Widens the DNSSEC algorithm coverage in the engine.
 - engine: key sizes for ECC-GOST, ECC-GOST12 and SM2SM3 keys
 - engine: `dnssecutil` RFC 8624 policy and the fixed key and signature lengths
 
+### Changed
+
+- build: require npm 11 and reinstall UI dependencies only when the manifests change
+
 ### Fixed
 
 - dnssec18: a DS digest type gonemaster cannot recompute no longer reads as a CDNSKEY rollover

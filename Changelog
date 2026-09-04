@@ -15,6 +15,7 @@ Widens the DNSSEC algorithm coverage in the engine.
 ### Fixed
 
 - dnssec18: a DS digest type gonemaster cannot recompute no longer reads as a CDNSKEY rollover
+- ci: pin npm 11 so the UI installs skip other platforms' binaries
 
 ## [v1.7.4] - 2026-09-01
 

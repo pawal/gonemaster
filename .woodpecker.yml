@@ -26,6 +26,8 @@ steps:
   ui_checks:
     image: node:22-bookworm
     commands:
+      # node:22 ships npm 10, which ignores os/cpu and fetches every platform binary.
+      - npm i -g npm@11
       - npm --prefix ui ci
       - npm --prefix ui-public ci
       - npm --prefix analysis-ui ci
@@ -124,6 +126,8 @@ steps:
   ui_build:
     image: node:22-bookworm
     commands:
+      # node:22 ships npm 10, which ignores os/cpu and fetches every platform binary.
+      - npm i -g npm@11
       - npm --prefix ui ci
       - npm --prefix ui run build
 

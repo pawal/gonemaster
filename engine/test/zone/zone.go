@@ -343,6 +343,7 @@ func Metadata() map[string][]string {
 			"Z11_SPF_MULTIPLE_RECORDS",
 			"Z11_SPF_SYNTAX_ERROR",
 			"Z11_SPF_SYNTAX_OK",
+			"Z11_SPF_UNKNOWN_MODIFIER",
 			"Z11_UNABLE_TO_CHECK_FOR_SPF",
 		},
 		"zone12": {
@@ -1557,7 +1558,8 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			}
 		}
 
-		if spfSyntaxOk(spfText) {
+		check := spfCheckSyntax(spfText)
+		if check.ok {
 			if z.Name.String() == "." || nextHigherIsRoot(z.Name) || strings.HasSuffix(strings.ToLower(z.Name.String()), ".arpa") {
 				if nullSpfRegex.MatchString(spfText) {
 					if err := appendLog(ctx, &results, testcase, "Z11_NULL_SPF_NON_MAIL_DOMAIN", map[string]any{
@@ -1575,6 +1577,14 @@ func Zone11(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			} else {
 				if err := appendLog(ctx, &results, testcase, "Z11_SPF_SYNTAX_OK", map[string]any{
 					"domain": z.Name.String(),
+				}); err != nil {
+					return results, err
+				}
+			}
+			for _, modifier := range check.modifiers {
+				if err := appendLog(ctx, &results, testcase, "Z11_SPF_UNKNOWN_MODIFIER", map[string]any{
+					"domain":       z.Name.String(),
+					"spf_modifier": modifier,
 				}); err != nil {
 					return results, err
 				}
@@ -2114,88 +2124,186 @@ func retrieveRecordFromZone(ctx context.Context, results *[]*logger.Entry, testc
 	return packet.Packet{}, nil
 }
 
-func spfSyntaxOk(spf string) bool {
+// spfCheck is the outcome of an SPF record syntax check.
+type spfCheck struct {
+	ok        bool
+	modifiers []string // unknown modifier names, record order, deduplicated
+}
+
+func spfCheckSyntax(spf string) spfCheck {
 	spf = strings.TrimSpace(spf)
 	if spf == "" {
-		return false
+		return spfCheck{}
 	}
 	for i := 0; i < len(spf); i++ {
 		b := spf[i]
 		if b < 32 || b > 126 {
-			return false
+			return spfCheck{}
 		}
 	}
 
 	lower := strings.ToLower(spf)
 	if !strings.HasPrefix(lower, "v=spf1") {
-		return false
+		return spfCheck{}
 	}
 	if len(lower) > len("v=spf1") {
 		next := lower[len("v=spf1")]
 		if next != ' ' && next != '\t' {
-			return false
+			return spfCheck{}
 		}
 	}
 
 	rest := strings.TrimSpace(lower[len("v=spf1"):])
 	if rest == "" {
-		return true
+		return spfCheck{ok: true}
 	}
 
+	check := spfCheck{ok: true}
+	seen := map[string]bool{}
 	for term := range strings.FieldsSeq(rest) {
-		if !spfTermOk(term) {
-			return false
+		ok, modifier := spfTermOk(term)
+		if !ok {
+			return spfCheck{}
+		}
+		if modifier != "" && !seen[modifier] {
+			seen[modifier] = true
+			check.modifiers = append(check.modifiers, modifier)
 		}
 	}
-	return true
+	return check
 }
 
-func spfTermOk(term string) bool {
+// spfTermOk reports whether a term is valid, and names it when it is an
+// unknown modifier.
+func spfTermOk(term string) (bool, string) {
 	if term == "" {
-		return false
+		return false, ""
+	}
+
+	// A modifier takes no qualifier, so match it on the raw term.
+	if eq := strings.IndexByte(term, '='); eq > 0 {
+		if colon := strings.IndexByte(term, ':'); colon < 0 || eq < colon {
+			name, value := term[:eq], term[eq+1:]
+			if validModifierName(name) {
+				switch name {
+				case "redirect", "exp":
+					return validDomain(value), ""
+				case "v":
+					// A repeated version token means two merged policies.
+					return false, ""
+				}
+				return validMacroString(value), name
+			}
+		}
 	}
 
 	if term[0] == '+' || term[0] == '-' || term[0] == '~' || term[0] == '?' {
 		term = term[1:]
 		if term == "" {
-			return false
+			return false, ""
 		}
 	}
 
 	switch term {
 	case "all", "a", "mx", "ptr":
-		return true
+		return true, ""
 	}
 
 	if strings.HasPrefix(term, "ip4:") {
-		return validIPTerm(term[len("ip4:"):], 4)
+		return validIPTerm(term[len("ip4:"):], 4), ""
 	}
 	if strings.HasPrefix(term, "ip6:") {
-		return validIPTerm(term[len("ip6:"):], 6)
+		return validIPTerm(term[len("ip6:"):], 6), ""
 	}
 	if strings.HasPrefix(term, "include:") {
-		return validDomain(term[len("include:"):])
+		return validDomain(term[len("include:"):]), ""
 	}
 	if strings.HasPrefix(term, "exists:") {
-		return validDomain(term[len("exists:"):])
-	}
-	if strings.HasPrefix(term, "redirect=") {
-		return validDomain(term[len("redirect="):])
-	}
-	if strings.HasPrefix(term, "exp=") {
-		return validDomain(term[len("exp="):])
+		return validDomain(term[len("exists:"):]), ""
 	}
 	if strings.HasPrefix(term, "a") {
-		return validMechanismTerm(term, "a")
+		return validMechanismTerm(term, "a"), ""
 	}
 	if strings.HasPrefix(term, "mx") {
-		return validMechanismTerm(term, "mx")
+		return validMechanismTerm(term, "mx"), ""
 	}
 	if strings.HasPrefix(term, "ptr") {
-		return validMechanismTerm(term, "ptr")
+		return validMechanismTerm(term, "ptr"), ""
 	}
 
-	return false
+	return false, ""
+}
+
+// validModifierName matches ALPHA *( ALPHA / DIGIT / "-" / "_" / "." ).
+func validModifierName(name string) bool {
+	if name == "" || !isASCIILetter(name[0]) {
+		return false
+	}
+	for i := 1; i < len(name); i++ {
+		b := name[i]
+		if isASCIILetter(b) || (b >= '0' && b <= '9') || b == '-' || b == '_' || b == '.' {
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+func isASCIILetter(b byte) bool {
+	return (b >= 'a' && b <= 'z') || (b >= 'A' && b <= 'Z')
+}
+
+// validMacroString matches *( macro-expand / macro-literal ).
+func validMacroString(value string) bool {
+	for i := 0; i < len(value); {
+		b := value[i]
+		if b != '%' {
+			// macro-literal is any visible character except "%".
+			if b < 0x21 || b > 0x7e {
+				return false
+			}
+			i++
+			continue
+		}
+		if i+1 >= len(value) {
+			return false
+		}
+		switch value[i+1] {
+		case '%', '_', '-':
+			i += 2
+			continue
+		case '{':
+			end := strings.IndexByte(value[i+2:], '}')
+			if end < 0 || !validMacroExpand(value[i+2:i+2+end]) {
+				return false
+			}
+			i += 2 + end + 1
+			continue
+		}
+		return false
+	}
+	return true
+}
+
+// validMacroExpand matches macro-letter transformers *delimiter.
+func validMacroExpand(body string) bool {
+	if body == "" || strings.IndexByte("slodiphcrtv", body[0]) < 0 {
+		return false
+	}
+	rest := body[1:]
+	i := 0
+	for i < len(rest) && rest[i] >= '0' && rest[i] <= '9' {
+		i++
+	}
+	if i < len(rest) && rest[i] == 'r' {
+		i++
+	}
+	for ; i < len(rest); i++ {
+		if strings.IndexByte(".-+,/_=", rest[i]) < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func validMechanismTerm(term string, prefix string) bool {
@@ -2207,47 +2315,60 @@ func validMechanismTerm(term string, prefix string) bool {
 	}
 	rest := term[len(prefix):]
 	if strings.HasPrefix(rest, ":") {
-		parts := strings.Split(rest[1:], "/")
-		if len(parts) == 0 || !validDomain(parts[0]) {
-			return false
+		spec := rest[1:]
+		if i := strings.IndexByte(spec, '/'); i >= 0 {
+			return validDomain(spec[:i]) && validDualCIDR(spec[i:])
 		}
-		return validCidrParts(parts[1:])
+		return validDomain(spec)
 	}
-	if strings.HasPrefix(rest, "/") {
-		parts := strings.Split(rest[1:], "/")
-		return validCidrParts(parts)
-	}
-	return false
+	return validDualCIDR(rest)
 }
 
-func validCidrParts(parts []string) bool {
-	if len(parts) == 0 {
+// validDualCIDR matches [ ip4-cidr-length ] [ "/" ip6-cidr-length ].
+func validDualCIDR(value string) bool {
+	if value == "" {
 		return true
 	}
-	if len(parts) > 2 {
+	if !strings.HasPrefix(value, "/") {
 		return false
 	}
-	for _, part := range parts {
-		if part == "" {
-			return false
-		}
-		value, err := strconv.Atoi(part)
-		if err != nil || value < 0 || value > 128 {
+	rest := value[1:]
+	if strings.HasPrefix(rest, "/") {
+		return validCIDRNumber(rest[1:], 128)
+	}
+	v4, v6, hasV6 := strings.Cut(rest, "//")
+	if !validCIDRNumber(v4, 32) {
+		return false
+	}
+	if !hasV6 {
+		return true
+	}
+	return validCIDRNumber(v6, 128)
+}
+
+// validCIDRNumber matches "0" / %x31-39 0*2DIGIT bounded by max.
+func validCIDRNumber(s string, max int) bool {
+	if s == "" || len(s) > 3 {
+		return false
+	}
+	if len(s) > 1 && s[0] == '0' {
+		return false
+	}
+	for i := 0; i < len(s); i++ {
+		if s[i] < '0' || s[i] > '9' {
 			return false
 		}
 	}
-	return true
+	value, err := strconv.Atoi(s)
+	return err == nil && value <= max
 }
 
 func validIPTerm(value string, version int) bool {
 	if value == "" {
 		return false
 	}
-	parts := strings.Split(value, "/")
-	if len(parts) > 2 {
-		return false
-	}
-	addr, err := netip.ParseAddr(parts[0])
+	addrText, prefixText, hasPrefix := strings.Cut(value, "/")
+	addr, err := netip.ParseAddr(addrText)
 	if err != nil {
 		return false
 	}
@@ -2257,19 +2378,13 @@ func validIPTerm(value string, version int) bool {
 	if version == 6 && !addr.Is6() {
 		return false
 	}
-	if len(parts) == 2 {
-		prefix, err := strconv.Atoi(parts[1])
-		if err != nil {
-			return false
-		}
-		if version == 4 && (prefix < 0 || prefix > 32) {
-			return false
-		}
-		if version == 6 && (prefix < 0 || prefix > 128) {
-			return false
-		}
+	if !hasPrefix {
+		return true
 	}
-	return true
+	if version == 4 {
+		return validCIDRNumber(prefixText, 32)
+	}
+	return validCIDRNumber(prefixText, 128)
 }
 
 func validDomain(value string) bool {

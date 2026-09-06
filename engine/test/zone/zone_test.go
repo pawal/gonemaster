@@ -670,6 +670,65 @@ func TestZone09NonAuthMXResponseReportsResponders(t *testing.T) {
 	}
 }
 
+func TestSpfCheckSyntax(t *testing.T) {
+	// The record text is lowercased before the check, so every case is written
+	// in the form a nameserver would return it.
+	cases := []struct {
+		name      string
+		spf       string
+		wantOK    bool
+		modifiers []string
+	}{
+		// RFC 7208 section 6 requires receivers to ignore modifiers they do not
+		// recognise, so an RFC 6652 record is valid and reports its names.
+		{name: "rfc6652 modifiers", spf: "v=spf1 ra=postmaster rp=100 rr=e:f -all", wantOK: true, modifiers: []string{"ra", "rp", "rr"}},
+		{name: "single unknown modifier", spf: "v=spf1 ra=postmaster -all", wantOK: true, modifiers: []string{"ra"}},
+		{name: "macro value", spf: "v=spf1 foo=%{d} -all", wantOK: true, modifiers: []string{"foo"}},
+		{name: "no modifier", spf: "v=spf1 -all", wantOK: true},
+		{name: "repeated modifier name", spf: "v=spf1 ra=a ra=b -all", wantOK: true, modifiers: []string{"ra"}},
+		{name: "known modifiers stay unreported", spf: "v=spf1 redirect=example.com", wantOK: true},
+
+		// dual-cidr-length, valid per RFC 7208 section 12.
+		{name: "ipv6 length only", spf: "v=spf1 a:example.com//64 -all", wantOK: true},
+		{name: "both lengths", spf: "v=spf1 a:example.com/24//64 -all", wantOK: true},
+		{name: "mx ipv6 length", spf: "v=spf1 mx//48 -all", wantOK: true},
+
+		{name: "ipv4 length above 32", spf: "v=spf1 a:example.com/40 -all"},
+		{name: "ipv6 length above 128", spf: "v=spf1 a:example.com//129 -all"},
+		{name: "leading zero length", spf: "v=spf1 a:example.com/08 -all"},
+
+		{name: "empty modifier name", spf: "v=spf1 =bad -all"},
+		{name: "modifier name starts with digit", spf: "v=spf1 9foo=bar -all"},
+		{name: "invalid macro escape", spf: "v=spf1 foo=%z -all"},
+		{name: "invalid macro letter", spf: "v=spf1 foo=%{q} -all"},
+		{name: "redirect target not a domain", spf: "v=spf1 redirect=not a domain -all"},
+
+		// A qualifier is only legal on a directive, so it cannot introduce a
+		// modifier and cannot be glued to a verification token.
+		{name: "qualified modifier", spf: "v=spf1 -redirect=example.com"},
+		{name: "token glued to all", spf: "v=spf1 include:_spf.google.com -allgoogle-site-verification=abc"},
+
+		// The version token belongs to the record, not to the terms, so a
+		// repeated one is two policies merged into one record.
+		{name: "repeated version token", spf: "v=spf1 v=spf1 mx -all"},
+
+		// The colon precedes the equals sign, so this is a mechanism.
+		{name: "exists target with equals", spf: "v=spf1 exists:foo=bar.example.com -all", wantOK: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := spfCheckSyntax(tc.spf)
+			if got.ok != tc.wantOK {
+				t.Fatalf("spfCheckSyntax(%q).ok = %v, want %v", tc.spf, got.ok, tc.wantOK)
+			}
+			if !slices.Equal(got.modifiers, tc.modifiers) {
+				t.Fatalf("spfCheckSyntax(%q).modifiers = %v, want %v", tc.spf, got.modifiers, tc.modifiers)
+			}
+		})
+	}
+}
+
 func TestZone11SpfSyntaxError(t *testing.T) {
 	ctx := tctest.Context(t)
 
@@ -697,6 +756,54 @@ func TestZone11SpfSyntaxError(t *testing.T) {
 		t.Fatalf("zone11: %v", err)
 	}
 	tctest.RequireTags(t, entries, "Z11_SPF_SYNTAX_ERROR")
+}
+
+func TestZone11SpfUnknownModifier(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	z, err := zonepkg.New("example.com")
+	if err != nil {
+		t.Fatalf("zone11: %v", err)
+	}
+
+	tctest.NS(t, ctx, "ns1.example.com", "192.0.2.10", func(q tctest.Query) packet.Packet {
+		if q.Type != "TXT" {
+			return packet.Packet{}
+		}
+		return txtPacket(q.Name, "v=spf1 ra=postmaster rp=100 rr=e:f -all")
+	})
+
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return tctest.NSItems("ns1.example.com/192.0.2.10"), nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+
+	entries, err := Zone11(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone11: %v", err)
+	}
+	// Z11_SPF_SYNTAX_OK is also what lets Zone13 run on this record.
+	tctest.RequireTags(t, entries, "Z11_SPF_SYNTAX_OK")
+	tctest.RequireNoTag(t, entries, "Z11_SPF_SYNTAX_ERROR")
+
+	var names []string
+	for _, entry := range entries {
+		if entry != nil && entry.Tag == "Z11_SPF_UNKNOWN_MODIFIER" {
+			if domain, ok := entry.Args["domain"].(string); !ok || domain != "example.com" {
+				t.Fatalf("expected domain=\"example.com\", got %v", entry.Args["domain"])
+			}
+			name, ok := entry.Args["spf_modifier"].(string)
+			if !ok {
+				t.Fatalf("expected spf_modifier string, got %v", entry.Args["spf_modifier"])
+			}
+			names = append(names, name)
+		}
+	}
+	if !slices.Equal(names, []string{"ra", "rp", "rr"}) {
+		t.Fatalf("expected modifiers [ra rp rr], got %v", names)
+	}
 }
 
 func TestZone11NoSpfNonMailDomain(t *testing.T) {

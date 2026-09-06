@@ -685,6 +685,7 @@
             "Z11_SPF_MULTIPLE_RECORDS": "WARNING",
             "Z11_SPF_SYNTAX_ERROR": "WARNING",
             "Z11_SPF_SYNTAX_OK": "INFO",
+            "Z11_SPF_UNKNOWN_MODIFIER": "NOTICE",
             "Z11_UNABLE_TO_CHECK_FOR_SPF": "WARNING",
             "Z12_CSYNC_FOUND": "INFO",
             "Z12_INCONSISTENT_CSYNC": "WARNING",

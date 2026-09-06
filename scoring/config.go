@@ -163,6 +163,9 @@ func DefaultConfig() Config {
 			"N18_NO_RESPONSE":                0,
 			"N18_RESOLVER_BEHAVIOR_REPORTED": 0,
 			"N18_SERVER_ERROR_REPORTED":      0,
+			// Z11_SPF_UNKNOWN_MODIFIER: a modifier outside RFC 7208. The record
+			// is valid; RFC 7208 section 6 requires receivers to ignore it.
+			"Z11_SPF_UNKNOWN_MODIFIER": 0,
 			// Z13_SPF_MACRO_TARGET: an include/redirect target uses RFC 7208
 			// macros that can only be expanded at SMTP time. The construct is
 			// valid SPF; we just cannot audit the sub-lookup count statically.

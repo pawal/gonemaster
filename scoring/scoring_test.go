@@ -540,6 +540,7 @@ func TestComputeScoreNeutralTags(t *testing.T) {
 			module: "DNSSEC", category: "dnssec",
 			tags: []string{"DS02_RSA_EXPONENT_UNSUPPORTED", "DS08_RSA_EXPONENT_UNSUPPORTED", "DS09_RSA_EXPONENT_UNSUPPORTED"},
 		},
+		{"SPF unknown modifier", "example.com", "ZONE", "zone_consistency", []string{"Z11_SPF_UNKNOWN_MODIFIER", "Z11_SPF_UNKNOWN_MODIFIER"}},
 		{"SPF macro target", "example.com", "ZONE", "zone_consistency", []string{"Z13_SPF_MACRO_TARGET", "Z13_SPF_MACRO_TARGET"}},
 		{"large RSA exponent", "example.se", "DNSSEC", "dnssec", []string{"DNSKEY_RSA_EXPONENT_LARGE", "DNSKEY_RSA_EXPONENT_LARGE"}},
 	} {

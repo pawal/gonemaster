@@ -78,6 +78,7 @@ _Do not edit by hand - regenerate with the command above._
 | `Z11_SPF_MULTIPLE_RECORDS` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
 | `Z11_SPF_SYNTAX_ERROR` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
 | `Z11_SPF_SYNTAX_OK` | `INFO` | [zone11](../tests/zone/zone11.md) | yes |
+| `Z11_SPF_UNKNOWN_MODIFIER` | `NOTICE` | [zone11](../tests/zone/zone11.md) | yes |
 | `Z11_UNABLE_TO_CHECK_FOR_SPF` | `WARNING` | [zone11](../tests/zone/zone11.md) | yes |
 | `Z12_CSYNC_FOUND` | `INFO` | [zone12](../tests/zone/zone12.md) | yes |
 | `Z12_INCONSISTENT_CSYNC` | `WARNING` | [zone12](../tests/zone/zone12.md) | yes |

@@ -4,9 +4,18 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- zone11: `Z11_SPF_UNKNOWN_MODIFIER` notice for modifiers outside RFC 7208
+
 ### Changed
 
 - ui-public: chain of trust shows the algorithm and key size on the key and DS nodes
+
+### Fixed
+
+- zone11: SPF records with RFC 7208 unknown modifiers such as `ra=`, `rp=` and `rr=` are no longer syntax errors
+- zone11: accept the dual CIDR forms `a:example.com//64` and `a:example.com/24//64`
 
 ## [v1.7.6] - 2026-09-04
 

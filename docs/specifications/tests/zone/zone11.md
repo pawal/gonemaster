@@ -149,6 +149,9 @@ emit TEST_CASE_END
 | `Z11_SPF_UNKNOWN_MODIFIER` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`); carries zero score penalty (`scoring` `TagPenalties`). The record is valid: RFC 7208 section 6 requires receivers to ignore modifiers they do not recognize. Surfaced because not every receiver does. |
 | `Z11_UNABLE_TO_CHECK_FOR_SPF` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
+## Effect On Zone13
+`Z11_SPF_SYNTAX_OK`, `Z11_NULL_SPF_NON_MAIL_DOMAIN` and `Z11_NON_NULL_SPF_NON_MAIL_DOMAIN` are the three verdicts Zone11 emits once the policy passes the syntax check. Beyond reporting that verdict they signal to the module runner that the apex policy was accepted, which is what starts [Zone13](zone13.md). Any other Zone11 outcome leaves Zone13 unstarted. Changing which of these tags a branch emits therefore changes Zone13 coverage.
+
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
   - Upstream: defines SPF syntax against RFC 7208 ABNF semantics. Gonemaster: uses a local check (`spfCheckSyntax`/`spfTermOk`) that follows the RFC 7208 term grammar for mechanisms, modifiers and CIDR lengths, but validates domain targets with a permissive name check; see [SPF Syntax Check](#spf-syntax-check). Gonemaster additionally reports modifiers outside RFC 7208 with `Z11_SPF_UNKNOWN_MODIFIER`.

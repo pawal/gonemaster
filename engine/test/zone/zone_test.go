@@ -806,6 +806,139 @@ func TestZone11SpfUnknownModifier(t *testing.T) {
 	}
 }
 
+// stubZone13Apex wires Zone11 discovery and the Zone13 apex query to one
+// policy. An empty spf publishes no SPF record.
+func stubZone13Apex(t *testing.T, ctx context.Context, name string, spf string) {
+	t.Helper()
+	empty := func(qname string) packet.Packet {
+		return tctest.Response(tctest.Question(qname, dns.TypeTXT))
+	}
+	tctest.NS(t, ctx, "ns1."+name, "192.0.2.10", func(q tctest.Query) packet.Packet {
+		if q.Type != "TXT" {
+			return packet.Packet{}
+		}
+		if spf == "" {
+			return empty(q.Name)
+		}
+		return txtPacket(q.Name, spf)
+	})
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return tctest.NSItems("ns1." + name + "/192.0.2.10"), nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+	tctest.Stub(t, &queryAuth, func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		if spf == "" {
+			return empty(name), nil
+		}
+		return spfTxtPacket(name, spf), nil
+	})
+}
+
+func runZoneAll(t *testing.T, ctx context.Context, name string, testcases ...any) []*logger.Entry {
+	t.Helper()
+	profile.Effective().TestCases = testcases
+	z, err := zonepkg.New(name)
+	if err != nil {
+		t.Fatalf("zone: %v", err)
+	}
+	entries, err := All(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone all: %v", err)
+	}
+	return entries
+}
+
+// Selecting zone13 alone used to produce no output at all, because the runner
+// gate waited for a Zone11 tag that a zone11-less run can never emit.
+func TestZoneAllZone13AloneRuns(t *testing.T) {
+	ctx := tctest.Context(t)
+	stubZone13Apex(t, ctx, "example.com", "v=spf1 a mx -all")
+
+	entries := runZoneAll(t, ctx, "example.com", "zone13")
+	tctest.RequireTags(t, entries, "Z13_SPF_LOOKUP_COUNT_OK")
+	tctest.RequireNoTag(t, entries, "Z11_SPF_SYNTAX_OK", "Z13_NO_SPF_FOUND")
+}
+
+func TestZoneAllZone13AloneNoSPF(t *testing.T) {
+	ctx := tctest.Context(t)
+	stubZone13Apex(t, ctx, "example.com", "")
+
+	entries := runZoneAll(t, ctx, "example.com", "zone13")
+	tctest.RequireTags(t, entries, "Z13_NO_SPF_FOUND")
+}
+
+func TestZoneAllZone13AloneNoAuthoritativeTXT(t *testing.T) {
+	ctx := tctest.Context(t)
+	stubZone13Apex(t, ctx, "example.com", "v=spf1 -all")
+	tctest.Stub(t, &queryAuth, func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return packet.Packet{}, nil
+	})
+
+	entries := runZoneAll(t, ctx, "example.com", "zone13")
+	tctest.RequireTags(t, entries, "Z13_UNABLE_TO_CHECK")
+}
+
+// RFC 7208 section 4.6.4 exempts no zone class, so a TLD policy is walked.
+func TestZoneAllTLDNonNullPolicyReachesZone13(t *testing.T) {
+	ctx := tctest.Context(t)
+	stubZone13Apex(t, ctx, "se", "v=spf1 a mx -all")
+
+	entries := runZoneAll(t, ctx, "se", "zone11", "zone13")
+	tctest.RequireTags(t, entries, "Z11_NON_NULL_SPF_NON_MAIL_DOMAIN", "Z13_SPF_LOOKUP_COUNT_OK")
+	count := tctest.RequireTag(t, entries, "Z13_SPF_LOOKUP_COUNT_OK")
+	if got, _ := count.Args["count"].(int); got != 2 {
+		t.Fatalf("expected count=2, got %v", count.Args["count"])
+	}
+}
+
+func TestZoneAllTLDNullPolicyReachesZone13(t *testing.T) {
+	ctx := tctest.Context(t)
+	stubZone13Apex(t, ctx, "se", "v=spf1 -all")
+
+	entries := runZoneAll(t, ctx, "se", "zone11", "zone13")
+	tctest.RequireTags(t, entries, "Z11_NULL_SPF_NON_MAIL_DOMAIN", "Z13_SPF_LOOKUP_COUNT_OK")
+	count := tctest.RequireTag(t, entries, "Z13_SPF_LOOKUP_COUNT_OK")
+	if got, _ := count.Args["count"].(int); got != 0 {
+		t.Fatalf("expected count=0, got %v", count.Args["count"])
+	}
+}
+
+func TestZoneAllNoSPFSuppressesZone13(t *testing.T) {
+	ctx := tctest.Context(t)
+	stubZone13Apex(t, ctx, "example.com", "")
+
+	entries := runZoneAll(t, ctx, "example.com", "zone11", "zone13")
+	tctest.RequireTags(t, entries, "Z11_NO_SPF_FOUND")
+	tctest.RequireNoTag(t, entries, "Z13_SPF_LOOKUP_COUNT_OK", "Z13_NO_SPF_FOUND", "Z13_UNABLE_TO_CHECK")
+}
+
+func TestZoneAllSyntaxErrorSuppressesZone13(t *testing.T) {
+	ctx := tctest.Context(t)
+	stubZone13Apex(t, ctx, "example.com", "v=spf1 amx-all")
+
+	entries := runZoneAll(t, ctx, "example.com", "zone11", "zone13")
+	tctest.RequireTags(t, entries, "Z11_SPF_SYNTAX_ERROR")
+	tctest.RequireNoTag(t, entries, "Z13_SPF_LOOKUP_COUNT_OK", "Z13_NO_SPF_FOUND", "Z13_UNABLE_TO_CHECK")
+}
+
+// Zone13 skips for the same reason as Zone10 to Zone12 when the SOA is missing.
+func TestZoneAllNoSOAResponseSuppressesZone13(t *testing.T) {
+	ctx := tctest.Context(t)
+	stubZone13Apex(t, ctx, "example.com", "v=spf1 -all")
+	ns := tctest.NS(t, ctx, "ns2.example.com", "192.0.2.20", func(_ tctest.Query) packet.Packet {
+		return packet.Packet{}
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns}, nil
+	})
+
+	entries := runZoneAll(t, ctx, "example.com", "zone02", "zone13")
+	tctest.RequireTags(t, entries, "NO_RESPONSE_SOA_QUERY")
+	tctest.RequireNoTag(t, entries, "Z13_SPF_LOOKUP_COUNT_OK", "Z13_NO_SPF_FOUND", "Z13_UNABLE_TO_CHECK")
+}
+
 // Before unknown modifiers were accepted, this record failed Zone11 syntax and
 // the All gate then skipped Zone13 entirely.
 func TestZoneAllUnknownModifierDoesNotSuppressZone13(t *testing.T) {

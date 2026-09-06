@@ -806,6 +806,43 @@ func TestZone11SpfUnknownModifier(t *testing.T) {
 	}
 }
 
+// Before unknown modifiers were accepted, this record failed Zone11 syntax and
+// the All gate then skipped Zone13 entirely.
+func TestZoneAllUnknownModifierDoesNotSuppressZone13(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	const spf = "v=spf1 ra=postmaster -all"
+	profile.Effective().TestCases = []any{"zone11", "zone13"}
+
+	z, err := zonepkg.New("example.com")
+	if err != nil {
+		t.Fatalf("zone: %v", err)
+	}
+
+	tctest.NS(t, ctx, "ns1.example.com", "192.0.2.10", func(q tctest.Query) packet.Packet {
+		if q.Type != "TXT" {
+			return packet.Packet{}
+		}
+		return txtPacket(q.Name, spf)
+	})
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return tctest.NSItems("ns1.example.com/192.0.2.10"), nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zonepkg.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+	tctest.Stub(t, &queryAuth, func(_ context.Context, _ *zonepkg.Zone, _ string, _ string) (packet.Packet, error) {
+		return spfTxtPacket("example.com", spf), nil
+	})
+
+	entries, err := All(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone all: %v", err)
+	}
+	tctest.RequireTags(t, entries, "Z11_SPF_SYNTAX_OK", "Z11_SPF_UNKNOWN_MODIFIER", "Z13_SPF_LOOKUP_COUNT_OK")
+	tctest.RequireNoTag(t, entries, "Z11_SPF_SYNTAX_ERROR", "Z13_NO_SPF_FOUND")
+}
+
 func TestZone11NoSpfNonMailDomain(t *testing.T) {
 	ctx := tctest.Context(t)
 

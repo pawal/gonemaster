@@ -234,6 +234,14 @@ Description:
 
 Your zone's SPF record does not parse according to the SPF grammar defined in RFC 7208. Mail servers that try to evaluate it will return "permerror" and either reject mail claiming to come from your domain or pass it through without any authentication signal, depending on how strict the receiver is.
 
+## Tag Z11_SPF_UNKNOWN_MODIFIER
+
+Header: SPF record uses an unknown modifier
+
+Description:
+
+Your zone's SPF record carries a `name=value` modifier that RFC 7208 does not define, such as the reporting modifiers `ra=`, `rp=` and `rr=` from RFC 6652, or a vendor verification token that was pasted into the SPF record instead of a TXT record of its own. The record stays valid, because RFC 7208 requires receivers to ignore modifiers they do not recognise. It is reported because not every implementation follows that rule, and because a stray verification token usually means the intended TXT record is missing.
+
 ## Tag Z11_UNABLE_TO_CHECK_FOR_SPF
 
 Header: Unable to retrieve SPF

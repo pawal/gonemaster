@@ -2238,6 +2238,13 @@ msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
 msgid "SPF syntax is correct for {domain}."
 msgstr "{domain} の SPF 構文は正しいです。"
 
+msgctxt "ZONE:Z11_SPF_UNKNOWN_MODIFIER"
+msgid ""
+"The SPF policy of {domain} uses the modifier \"{spf_modifier}=\", "
+"which is not defined in RFC 7208. Conforming receivers ignore it, but "
+"not every implementation does."
+msgstr "{domain} の SPF ポリシーは RFC 7208 で定義されていない修飾子 \"{spf_modifier}=\" を使用しています。標準に準拠した受信側は無視しますが、すべての実装がそうとは限りません。"
+
 msgctxt "ZONE:Z11_UNABLE_TO_CHECK_FOR_SPF"
 msgid ""
 "None of the zone’s name servers responded with an authoritative response to "

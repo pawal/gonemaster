@@ -470,31 +470,31 @@
         {
           "tag": "Z15_CAA_FOUND",
           "file": "engine/test/zone/zone.go",
-          "line": 3231,
+          "line": 3238,
           "shape": "unknown"
         },
         {
           "tag": "Z15_NO_RESPONSE_CAA_QUERY",
           "file": "engine/test/zone/zone.go",
-          "line": 3147,
+          "line": 3154,
           "shape": "unknown"
         },
         {
           "tag": "Z15_RESERVED_FLAGS",
           "file": "engine/test/zone/zone.go",
-          "line": 3268,
+          "line": 3275,
           "shape": "unknown"
         },
         {
           "tag": "Z15_UNEXPECTED_RCODE_CAA",
           "file": "engine/test/zone/zone.go",
-          "line": 3154,
+          "line": 3161,
           "shape": "unknown"
         },
         {
           "tag": "Z15_UNKNOWN_PROPERTY_CRITICAL",
           "file": "engine/test/zone/zone.go",
-          "line": 3287,
+          "line": 3294,
           "shape": "unknown"
         }
       ]
@@ -521,49 +521,49 @@
         {
           "tag": "Z15_CAA_FOUND",
           "file": "engine/test/zone/zone.go",
-          "line": 3231,
+          "line": 3238,
           "shape": "unknown"
         },
         {
           "tag": "Z15_INVALID_ISSUE_VALUE",
           "file": "engine/test/zone/zone.go",
-          "line": 3315,
+          "line": 3322,
           "shape": "unknown"
         },
         {
           "tag": "Z15_INVALID_PROPERTY_TAG",
           "file": "engine/test/zone/zone.go",
-          "line": 3278,
+          "line": 3285,
           "shape": "unknown"
         },
         {
           "tag": "Z15_ISSUE_CONTRADICTION",
           "file": "engine/test/zone/zone.go",
-          "line": 3364,
+          "line": 3371,
           "shape": "unknown"
         },
         {
           "tag": "Z15_NO_RESPONSE_CAA_QUERY",
           "file": "engine/test/zone/zone.go",
-          "line": 3147,
+          "line": 3154,
           "shape": "unknown"
         },
         {
           "tag": "Z15_RESERVED_FLAGS",
           "file": "engine/test/zone/zone.go",
-          "line": 3268,
+          "line": 3275,
           "shape": "unknown"
         },
         {
           "tag": "Z15_UNEXPECTED_RCODE_CAA",
           "file": "engine/test/zone/zone.go",
-          "line": 3154,
+          "line": 3161,
           "shape": "unknown"
         },
         {
           "tag": "Z15_UNKNOWN_PROPERTY_CRITICAL",
           "file": "engine/test/zone/zone.go",
-          "line": 3287,
+          "line": 3294,
           "shape": "unknown"
         }
       ]
@@ -586,25 +586,25 @@
         {
           "tag": "Z15_INVALID_IODEF_VALUE",
           "file": "engine/test/zone/zone.go",
-          "line": 3335,
+          "line": 3342,
           "shape": "unknown"
         },
         {
           "tag": "Z15_INVALID_ISSUE_VALUE",
           "file": "engine/test/zone/zone.go",
-          "line": 3315,
+          "line": 3322,
           "shape": "unknown"
         },
         {
           "tag": "Z15_INVALID_PROPERTY_TAG",
           "file": "engine/test/zone/zone.go",
-          "line": 3278,
+          "line": 3285,
           "shape": "unknown"
         },
         {
           "tag": "Z15_RESERVED_FLAGS",
           "file": "engine/test/zone/zone.go",
-          "line": 3268,
+          "line": 3275,
           "shape": "unknown"
         }
       ]
@@ -4134,19 +4134,19 @@
     {
       "tag": "Z14_DUPLICATE_SCHEME_HASH",
       "file": "engine/test/zone/zone.go",
-      "line": 2830,
+      "line": 2837,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"scheme\":\tk.scheme,\n\t\"hash\":\t\tk.hash,\n})"
     },
     {
       "tag": "Z14_SERIAL_MISMATCH",
       "file": "engine/test/zone/zone.go",
-      "line": 2861,
+      "line": 2868,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"zonemd_serial\":\tr.serial,\n\t\"soa_serial\":\t\toutcome.soaSerial,\n})"
     },
     {
       "tag": "Z14_UNSUPPORTED_HASH",
       "file": "engine/test/zone/zone.go",
-      "line": 2845,
+      "line": 2852,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"hash\": r.hash,\n})"
     },
     {

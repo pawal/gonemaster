@@ -194,10 +194,10 @@ func All(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				return results, err
 			}
 		}
-	}
 
-	if hasEntryTag(results, "Z11_SPF_SYNTAX_OK") {
-		if util.ShouldRunTest(ctx, "zone13") {
+		// Zone13 walks a policy Zone11 accepted, or retrieves its own when
+		// Zone11 was not selected.
+		if util.ShouldRunTest(ctx, "zone13") && (spfPolicyAccepted(results) || !util.ShouldRunTest(ctx, "zone11")) {
 			entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 				return Zone13(ctx, z)
 			})
@@ -2632,6 +2632,13 @@ func maxUint32(values []uint32) uint32 {
 		}
 	}
 	return max
+}
+
+// spfPolicyAccepted reports the Zone11 verdicts that accept the apex policy.
+func spfPolicyAccepted(entries []*logger.Entry) bool {
+	return hasEntryTag(entries, "Z11_SPF_SYNTAX_OK") ||
+		hasEntryTag(entries, "Z11_NULL_SPF_NON_MAIL_DOMAIN") ||
+		hasEntryTag(entries, "Z11_NON_NULL_SPF_NON_MAIL_DOMAIN")
 }
 
 func hasEntryTag(entries []*logger.Entry, tag string) bool {

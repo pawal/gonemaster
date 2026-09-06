@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- ui-public: chain of trust shows the algorithm and key size on the key and DS nodes
+
 ## [v1.7.6] - 2026-09-04
 
 Validates RSA signatures from keys the engine previously refused, such as the .lv KSK.

@@ -605,3 +605,83 @@ describe("DnssecChain", () => {
     expect(screen.getByTestId("chain-facts").textContent).not.toContain("quantum_broken");
   });
 });
+
+describe("DnssecChain node faces", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  it("shows the algorithm and key size on the key and DS nodes", async () => {
+    const chain = secureChain();
+    chain.child.dnskeys[0].key_size = 256;
+    chain.child.dnskeys[1].algorithm = 8;
+    chain.child.dnskeys[1].key_size = 2048;
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const container = renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const ksk = container.querySelector("g.node-ksk").textContent;
+    expect(ksk).toContain("KSK");
+    expect(ksk).toContain("tag 1000");
+    expect(ksk).toContain("ECDSAP256SHA256");
+    expect(ksk).toContain("256 bit");
+
+    expect(container.querySelector("g.node-zsk").textContent).toContain("RSASHA256");
+    // The DS face carries the algorithm it must share with the key it anchors.
+    expect(container.querySelector("g.node-ds").textContent).toContain("ECDSAP256SHA256");
+  });
+
+  it("omits the size line when the key size is unknown", async () => {
+    // The fixture carries no key_size, so no node may claim one.
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const container = renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const ksk = container.querySelector("g.node-ksk");
+    expect(ksk.textContent).toContain("ECDSAP256SHA256");
+    expect(ksk.textContent).not.toContain("bit");
+    expect(ksk.querySelectorAll("text").length).toBe(3);
+  });
+
+  // The label block is centred on its ink, not on its baselines, so the space
+  // above the heading matches the space below the last line however many lines
+  // a node has. Centring on baselines leaves the bottom visibly tight.
+  it("centres the label block in the box whatever the line count", async () => {
+    // Cap height of the 13px bold heading: where the block's ink starts. The
+    // face has no descenders, so its ink ends on the last baseline.
+    const capHeight = 9.5;
+    const gaps = (g) => {
+      const box = g.querySelector("rect");
+      const top = Number(box.getAttribute("y"));
+      const bottom = top + Number(box.getAttribute("height"));
+      const ys = [...g.querySelectorAll("text")].map((t) => Number(t.getAttribute("y")));
+      return { above: ys[0] - capHeight - top, below: bottom - ys[ys.length - 1] };
+    };
+
+    const chain = secureChain();
+    chain.child.dnskeys[0].key_size = 256; // four lines: heading, tag, algorithm, size
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const container = renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const four = gaps(container.querySelector("g.node-ksk"));
+    expect(four.above).toBeCloseTo(four.below, 1);
+
+    // The ZSK carries no key size, so it renders one line shorter.
+    const three = gaps(container.querySelector("g.node-zsk"));
+    expect(three.above).toBeCloseTo(three.below, 1);
+    expect(three.above).toBeGreaterThan(four.above);
+  });
+
+  // The face is an addition, not a move: the hover text has to keep every
+  // detail it had, including the ones now duplicated on the node.
+  it("keeps the full algorithm label in the node tooltip", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const container = renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const tip = container.querySelector("g.node-ksk").dataset.tip;
+    expect(tip).toContain("ECDSAP256SHA256 (alg 13)");
+    expect(tip).toContain("KSK");
+  });
+});

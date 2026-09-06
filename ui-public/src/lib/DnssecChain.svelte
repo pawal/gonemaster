@@ -227,28 +227,54 @@
     }
   }
 
-  function nodeLines(node) {
+  function nodeHeading(node) {
     switch (node.kind) {
       case "ds":
       case "ds-input":
-        return ["DS", `tag ${node.keyTag}`];
       case "ds-ghost":
-        return ["DS", ""];
+        return "DS";
       case "ksk":
-        return ["KSK", `tag ${node.keyTag}`];
+        return "KSK";
       case "zsk":
-        return ["ZSK", `tag ${node.keyTag}`];
+        return "ZSK";
       case "key-ghost":
-        return ["DNSKEY", ""];
       case "key-phantom":
-        return ["DNSKEY", `tag ${node.keyTag}`];
       case "parent-key":
-        return ["DNSKEY", `tag ${node.keyTag}`];
+        return "DNSKEY";
       case "rrset":
-        return [node.label, ""];
+        return node.label;
       default:
-        return ["", ""];
+        return "";
     }
+  }
+
+  // Cap height of the 13px title, which is where the block's ink starts. The
+  // face has no descenders, so its ink ends on the last baseline.
+  const CAP_H = 9.5;
+
+  // Baseline step from the previous line, and class, per face line.
+  const LINE_STEP = [
+    { gap: 0, cls: "chain-node-title" },
+    { gap: 16, cls: "chain-node-sub" },
+    { gap: 14, cls: "chain-node-algo" },
+    { gap: 13, cls: "chain-node-bits" },
+  ];
+
+  // nodeLines returns the face lines with their baselines. The block is centred
+  // on its ink rather than its baselines, so the space above the title matches
+  // the space below the last line whatever the line count.
+  function nodeLines(node) {
+    const texts = [nodeHeading(node)];
+    if (node.keyTag != null) texts.push(`tag ${node.keyTag}`);
+    if (node.algoText) texts.push(node.algoText);
+    if (node.bitsText) texts.push(node.bitsText);
+    const steps = LINE_STEP.slice(0, texts.length);
+    const inkH = CAP_H + steps.reduce((sum, l) => sum + l.gap, 0);
+    let y = node.y + (node.h - inkH) / 2 + CAP_H;
+    return texts.map((text, i) => {
+      y += steps[i].gap;
+      return { text, cls: steps[i].cls, y };
+    });
   }
 </script>
 
@@ -346,10 +372,9 @@
               {@const lines = nodeLines(node)}
               <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} class:node-rollover={node.rollover} class:node-incoming={node.incoming} data-tip={buildTip(node.tip)}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
-                <text class="chain-node-label chain-node-title" x={node.x + node.w / 2} y={node.y + 21} text-anchor="middle">{lines[0]}</text>
-                {#if lines[1]}
-                  <text class="chain-node-label chain-node-sub" x={node.x + node.w / 2} y={node.y + 38} text-anchor="middle">{lines[1]}</text>
-                {/if}
+                {#each lines as line, i (i)}
+                  <text class="chain-node-label {line.cls}" x={node.x + node.w / 2} y={line.y} text-anchor="middle">{line.text}</text>
+                {/each}
               </g>
             {/each}
 
@@ -514,6 +539,11 @@
   }
   .chain-node-sub {
     font-size: 11px;
+    fill: var(--ink-2);
+  }
+  .chain-node-algo,
+  .chain-node-bits {
+    font-size: 10px;
     fill: var(--ink-2);
   }
   .node-ksk .chain-node-box {

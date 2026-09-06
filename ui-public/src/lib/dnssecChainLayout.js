@@ -2,9 +2,9 @@
 // A key signing the DNSKEY RRset self-loops and vouches for the keys below it.
 
 const NODE_W = 132;
-const NODE_H = 52;
+const NODE_H = 72;
 const H_GAP = 20;
-const V_GAP = 104;
+const V_GAP = 124;
 const PAD_X = 24;
 const PAD_TOP = 44;
 const PAD_BOTTOM = 16;
@@ -40,6 +40,21 @@ export function algoMnemonic(algo) {
 
 export function digestMnemonic(dt) {
   return DIGEST[dt] ?? String(dt);
+}
+
+// Widest mnemonic a NODE_W box fits at the 10px face size. A longer entry in
+// ALGO would overflow the node, so the table is pinned to this budget.
+export const ALGO_FACE_MAX = 18;
+
+// algoFace / bitsFace render the node-face lines. Unlike algoMnemonic, an
+// unknown algorithm keeps the "alg" prefix so a bare number cannot be read as
+// a key tag.
+export function algoFace(algo) {
+  return ALGO[algo] ?? `alg ${algo}`;
+}
+
+export function bitsFace(size) {
+  return size ? `${size} bit` : null;
 }
 
 function flagWords(k) {
@@ -223,6 +238,7 @@ export function layoutChain(chain) {
         kind: input ? "ds-input" : "ds",
         keyTag: tag,
         dsSigTone,
+        algoText: algoFace(first.algorithm),
         tip: [
           { k: input ? "pub.dnssec_chain_tip_ds_input" : "pub.dnssec_chain_tip_ds", p: { tag } },
           { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(first.algorithm) } },
@@ -242,6 +258,8 @@ export function layoutChain(chain) {
     id: `pkey-${pk.key_tag}`,
     kind: "parent-key",
     keyTag: pk.key_tag,
+    algoText: algoFace(pk.algorithm),
+    bitsText: bitsFace(pk.key_size),
     tip: [
       { k: "pub.dnssec_chain_tip_parent_key", p: { tag: pk.key_tag } },
       { k: "pub.dnssec_chain_tip_algorithm", p: { algo: algoLabel(pk.algorithm) } },
@@ -267,6 +285,8 @@ export function layoutChain(chain) {
     const node = {
       id: `key-${k.key_tag}`,
       keyTag: k.key_tag,
+      algoText: algoFace(k.algorithm),
+      bitsText: bitsFace(k.key_size),
       revoked: !!k.revoked,
       incoming,
       tip: [

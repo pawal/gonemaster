@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { secureChain } from "../test/helpers.js";
-import { layoutChain, truncateName, worstSigTone, worstSigState, algoMnemonic } from "./dnssecChainLayout.js";
+import { layoutChain, truncateName, worstSigTone, worstSigState, algoMnemonic, algoFace, bitsFace, ALGO_FACE_MAX } from "./dnssecChainLayout.js";
 
 // tipParams returns the params of the tip line with the given i18n key.
 function tipParams(el, k) {
@@ -732,6 +732,107 @@ describe("stale-signature strings", () => {
         expect(val.length > 0, `${loc} ${key}`).toBe(true);
       }
       expect(catalog["pub.dnssec_chain_stale_servers"].includes("{servers}"), loc).toBe(true);
+    }
+  });
+});
+
+describe("node face labels", () => {
+  it("puts the algorithm and key size on the key nodes", () => {
+    const chain = secureChain();
+    chain.child.dnskeys[0].key_size = 256;
+    chain.child.dnskeys[1].algorithm = 8;
+    chain.child.dnskeys[1].key_size = 2048;
+    const g = layoutChain(chain);
+
+    const ksk = g.nodes.find((n) => n.kind === "ksk");
+    expect(ksk.algoText).toBe("ECDSAP256SHA256");
+    expect(ksk.bitsText).toBe("256 bit");
+
+    const zsk = g.nodes.find((n) => n.kind === "zsk");
+    expect(zsk.algoText).toBe("RSASHA256");
+    expect(zsk.bitsText).toBe("2048 bit");
+  });
+
+  // The DS face carries the key algorithm, not the digest: that is the field
+  // that has to equal the DNSKEY's, and one DS node groups every digest type
+  // published for the tag, so a single digest line would be lossy.
+  it("puts the key algorithm on a DS node and keeps every digest in its tip", () => {
+    const chain = secureChain();
+    chain.parent.ds = [
+      { key_tag: 1000, algorithm: 13, digest_type: 1, digest: "aa", servers: ["192.0.2.1"] },
+      { key_tag: 1000, algorithm: 13, digest_type: 2, digest: "bb", servers: ["192.0.2.1"] },
+    ];
+    const g = layoutChain(chain);
+
+    const dsNodes = g.nodes.filter((n) => n.kind === "ds");
+    expect(dsNodes.length).toBe(1);
+    expect(dsNodes[0].algoText).toBe("ECDSAP256SHA256");
+    const digests = dsNodes[0].tip.filter((l) => l.k === "pub.dnssec_chain_tip_digest_type");
+    expect(digests.map((l) => l.p.dt)).toEqual(["SHA-1 (1)", "SHA-256 (2)"]);
+  });
+
+  it("keeps the alg prefix for an algorithm with no mnemonic", () => {
+    // A bare "99" on a node face reads as a key tag; "alg 99" does not.
+    expect(algoFace(99)).toBe("alg 99");
+
+    const chain = secureChain();
+    chain.child.dnskeys[0].algorithm = 99;
+    const g = layoutChain(chain);
+    expect(g.nodes.find((n) => n.kind === "ksk").algoText).toBe("alg 99");
+  });
+
+  it("omits the size line when the key size is unknown", () => {
+    expect(bitsFace(0)).toBe(null);
+    expect(bitsFace(undefined)).toBe(null);
+
+    // The default fixture carries no key_size.
+    const g = layoutChain(secureChain());
+    expect(g.nodes.find((n) => n.kind === "ksk").bitsText).toBe(null);
+  });
+
+  // Placeholder nodes stand in for a record nobody published, so there is no
+  // algorithm to show and the face must stay at two lines.
+  it("gives ghost and phantom nodes no algorithm or size", () => {
+    const noKeys = secureChain();
+    noKeys.child.dnskeys = [];
+    const ghost = layoutChain(noKeys).nodes.find((n) => n.kind === "key-ghost");
+    expect(ghost).toBeTruthy();
+    expect(ghost.algoText).toBe(undefined);
+
+    const noDS = secureChain();
+    noDS.parent.ds = [];
+    noDS.links = [];
+    const dsGhost = layoutChain(noDS).nodes.find((n) => n.kind === "ds-ghost");
+    expect(dsGhost).toBeTruthy();
+    expect(dsGhost.algoText).toBe(undefined);
+
+    // A DS naming a key tag the zone does not publish gets a phantom target.
+    const stale = secureChain();
+    stale.parent.ds.push({ key_tag: 5000, algorithm: 13, digest_type: 2, digest: "cc", servers: ["192.0.2.1"] });
+    stale.links.push({ ds_key_tag: 5000, ds_digest_type: 2, status: "no_dnskey", servers: ["192.0.2.1"] });
+    const phantom = layoutChain(stale).nodes.find((n) => n.kind === "key-phantom");
+    expect(phantom).toBeTruthy();
+    expect(phantom.algoText).toBe(undefined);
+    expect(phantom.bitsText).toBe(undefined);
+  });
+
+  // The face is 10px type in a fixed-width box. A longer mnemonic would spill
+  // out of the node, so adding an algorithm has to respect the budget.
+  it("keeps every mnemonic inside the width the node box allows", () => {
+    for (let n = 0; n < 256; n++) {
+      const m = algoMnemonic(n);
+      if (m === String(n)) continue; // unassigned: rendered as "alg N"
+      expect(m.length).toBeLessThanOrEqual(ALGO_FACE_MAX);
+    }
+  });
+
+  it("leaves room between the rows for the signature edges", () => {
+    const g = layoutChain(secureChain());
+    const rows = [...new Set(g.nodes.map((n) => n.y))].sort((a, b) => a - b);
+    expect(rows.length).toBeGreaterThan(1);
+    const h = g.nodes[0].h;
+    for (let i = 1; i < rows.length; i++) {
+      expect(rows[i] - rows[i - 1] - h).toBeGreaterThanOrEqual(40);
     }
   });
 });

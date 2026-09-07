@@ -98,7 +98,10 @@ cohort rebuild).
 The queries were made from wherever the instance runs, so the figures describe
 one network vantage point rather than the entity's latency everywhere. The
 column header and a footnote under the table repeat that caveat, as does the
-overview's response-time card.
+overview's response-time card. When the operator sets `analysis.vantage_label`
+the caveat names the location ("Measured from Stockholm, SE; a single vantage
+point."); otherwise it stays generic. See
+[configuration.md](../server/configuration.md#analysis-settings).
 
 ## Entity History
 

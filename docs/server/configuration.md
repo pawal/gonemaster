@@ -79,6 +79,7 @@ gonemaster-server --dump-config
 | `GONEMASTER_EXTERNAL_DATA_TIMEOUT` | `external_data.timeout` |
 | `GONEMASTER_EXTERNAL_DATA_MAX_REQUESTS_PER_MINUTE` | `external_data.max_requests_per_minute` |
 | `GONEMASTER_EXTERNAL_DATA_MAX_CACHED_RECORDS` | `external_data.max_cached_records` |
+| `GONEMASTER_ANALYSIS_VANTAGE_LABEL` | `analysis.vantage_label` |
 
 Invalid integer, boolean, or duration values emit a warning and are ignored.
 
@@ -120,6 +121,12 @@ External data flags:
 --external-data-timeout DURATION
 --external-data-max-requests-per-minute N
 --external-data-max-cached-records N
+```
+
+Analysis flags:
+
+```text
+--analysis-vantage-label LABEL
 ```
 
 Resolver override flags:
@@ -171,6 +178,10 @@ Database and public API flags are covered in [database.md](database.md) and
     "rate_limit_window": "10m",
     "allow_private_undelegated_ip": false,
     "allow_non_global_targets": false
+  },
+  "analysis": {
+    "tag_view_min_level": "NOTICE",
+    "vantage_label": "Stockholm, SE"
   },
   "external_data": {
     "enabled": false
@@ -294,6 +305,32 @@ The config file can hide score and nameserver timing UI elements:
 ```
 
 These settings affect UI display. They do not remove stored data.
+
+## Analysis Settings
+
+The `analysis` block holds capture-time and presentation policy for the
+analysis dashboard:
+
+```json
+{
+  "analysis": {
+    "tag_view_min_level": "NOTICE",
+    "vantage_label": "Stockholm, SE"
+  }
+}
+```
+
+| Setting | Purpose |
+|---|---|
+| `tag_view_min_level` | Floor for the tags written into a snapshot's tag view at capture time. A tag whose worst level in the snapshot is below the floor gets no row and no detail page. One of `INFO`, `NOTICE`, `WARNING`, `ERROR`, `CRITICAL`; default `NOTICE`. A cohort can override it. |
+| `vantage_label` | Name of the network location the runs were made from. Default empty. |
+
+`vantage_label` changes presentation only. The latency figures come from
+queries this instance made, which is one network location; the dashboard says
+so either way. With the label set the caveat names the place ("Measured from
+Stockholm, SE; a single vantage point."), which matters once results from
+several instances are compared. The label is served through the public
+catalog, is trimmed, and is ignored if longer than 64 characters.
 
 ## External Reference Data
 

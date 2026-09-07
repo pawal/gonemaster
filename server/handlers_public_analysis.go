@@ -32,6 +32,9 @@ type PublicAnalysisCatalogResponse struct {
 	Cohorts          []PublicAnalysisCohortView `json:"cohorts"`
 	SelectorEnabled  bool                       `json:"selector_enabled"`
 	BackendSupported bool                       `json:"backend_supported"`
+	// VantageLabel names the network location the runs were made from.
+	// Omitted when unconfigured; the UI then uses generic wording.
+	VantageLabel string `json:"vantage_label,omitempty"`
 }
 
 // PublicAnalysisOverviewResponse is the consolidated overview payload for
@@ -48,6 +51,11 @@ type PublicAnalysisOverviewResponse struct {
 	Snapshot              *PublicAnalysisSnapshotView `json:"snapshot,omitempty"`
 	Status                string                      `json:"status,omitempty"`
 	Overview              *SnapshotOverviewV2         `json:"overview,omitempty"`
+}
+
+// vantageLabel returns the configured measurement location, normalized.
+func (s *Server) vantageLabel() string {
+	return NormalizeVantageLabel(s.cfg.Analysis.VantageLabel)
 }
 
 func (s *Server) publicAnalysisCohortView(cohort AnalysisCohort) PublicAnalysisCohortView {
@@ -97,6 +105,7 @@ func (s *Server) handlePublicAnalysisCatalog(w http.ResponseWriter, r *http.Requ
 		Cohorts:          views,
 		SelectorEnabled:  len(views) > 1,
 		BackendSupported: s.analysisBackendSupported(),
+		VantageLabel:     s.vantageLabel(),
 	})
 }
 

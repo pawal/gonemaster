@@ -91,6 +91,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var extDataTimeout time.Duration
 	var extDataMaxRequestsPerMinute int
 	var extDataMaxCachedRecords int
+	var analysisVantageLabel string
 	var showVersion bool
 	var dumpConfig bool
 	var shutdownTimeout time.Duration
@@ -163,6 +164,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--external-data-timeout DURATION", detail: "Per-request timeout for outbound fetches (default 10s) (env: GONEMASTER_EXTERNAL_DATA_TIMEOUT)"},
 			{flag: "--external-data-max-requests-per-minute N", detail: "Outbound fetch budget shared by all sources (default 30) (env: GONEMASTER_EXTERNAL_DATA_MAX_REQUESTS_PER_MINUTE)"},
 			{flag: "--external-data-max-cached-records N", detail: "Maximum cached per-domain records (default 20000) (env: GONEMASTER_EXTERNAL_DATA_MAX_CACHED_RECORDS)"},
+			{flag: "--analysis-vantage-label LABEL", detail: "Network location the analysis latency figures were measured from, shown in the dashboard's latency footnotes (env: GONEMASTER_ANALYSIS_VANTAGE_LABEL)"},
 		})
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
@@ -216,6 +218,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.DurationVar(&extDataTimeout, "external-data-timeout", 0, "Per-request timeout for outbound fetches (default 10s)")
 	fs.IntVar(&extDataMaxRequestsPerMinute, "external-data-max-requests-per-minute", 0, "Outbound fetch budget per minute (default 30)")
 	fs.IntVar(&extDataMaxCachedRecords, "external-data-max-cached-records", 0, "Maximum cached per-domain records (default 20000)")
+	fs.StringVar(&analysisVantageLabel, "analysis-vantage-label", "", "Network location the analysis latency figures were measured from, e.g. \"Stockholm, SE\" (default empty)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.BoolVar(&dumpConfig, "dump-config", false, "Print effective config as JSON and exit")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
@@ -440,6 +443,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if flagsSet["external-data-max-cached-records"] {
 		cfg.ExternalData.MaxCachedRecords = extDataMaxCachedRecords
+	}
+	if flagsSet["analysis-vantage-label"] {
+		cfg.Analysis.VantageLabel = analysisVantageLabel
 	}
 	if flagsSet["trusted-proxy-cidrs"] {
 		cfg.TrustedProxyCIDRs = strings.Split(trustedProxyCIDRs, ",")

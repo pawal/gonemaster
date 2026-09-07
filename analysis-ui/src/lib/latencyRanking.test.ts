@@ -4,6 +4,7 @@ import {
   asnLatencyRows,
   endpointLatencyRows,
   hasAnyLatencyRanking,
+  latencyVantageNote,
   nameserverLatencyRows
 } from "./latencyRanking";
 
@@ -47,6 +48,25 @@ describe("latencyRanking", () => {
     ];
     const rows = asnLatencyRows(items);
     expect(rows[0]).toMatchObject({ key: "64500", label: "AS64500", sublabel: "Example AS", latencyP50: 42 });
+  });
+
+  it("names the configured vantage point in the latency caveat", () => {
+    expect(latencyVantageNote("Stockholm, SE")).toBe(
+      "Measured from Stockholm, SE; a single vantage point."
+    );
+  });
+
+  it("falls back to generic wording without a configured label", () => {
+    const generic = "Measured from this instance's network location; a single vantage point.";
+    // undefined, null, empty and whitespace all mean "no label configured".
+    expect(latencyVantageNote(undefined)).toBe(generic);
+    expect(latencyVantageNote(null)).toBe(generic);
+    expect(latencyVantageNote("")).toBe(generic);
+    expect(latencyVantageNote("   ")).toBe(generic);
+  });
+
+  it("trims a padded label rather than rendering the padding", () => {
+    expect(latencyVantageNote("  Oslo, NO  ")).toBe("Measured from Oslo, NO; a single vantage point.");
   });
 
   it("hasAnyLatencyRanking is false only when every list is empty", () => {

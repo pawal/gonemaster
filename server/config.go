@@ -44,6 +44,10 @@ type AnalysisConfig struct {
 	// page, and do not appear in the listing. Default "NOTICE".
 	// Valid: INFO, NOTICE, WARNING, ERROR, CRITICAL.
 	TagViewMinLevel string `json:"tag_view_min_level,omitempty"`
+	// VantageLabel names the network location the runs were made from,
+	// for example "Stockholm, SE". Empty leaves the dashboard's generic
+	// single-vantage wording in place.
+	VantageLabel string `json:"vantage_label,omitempty"`
 }
 
 // ExternalDataSources are the URLs the reference datasets are fetched from.
@@ -254,6 +258,7 @@ type DatabaseFileConfig struct {
 // AnalysisFileConfig holds optional analysis-layer configuration from JSON.
 type AnalysisFileConfig struct {
 	TagViewMinLevel *string `json:"tag_view_min_level,omitempty"`
+	VantageLabel    *string `json:"vantage_label,omitempty"`
 }
 
 // ExternalDataSourcesFileConfig holds optional source URLs from JSON.
@@ -570,6 +575,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 				c.Analysis.TagViewMinLevel = level
 			}
 		}
+		if file.Analysis.VantageLabel != nil {
+			c.Analysis.VantageLabel = *file.Analysis.VantageLabel
+		}
 	}
 	if file.ExternalData != nil {
 		c.applyExternalDataFileConfig(file.ExternalData)
@@ -611,6 +619,22 @@ func (c *Config) applyExternalDataFileConfig(file *ExternalDataFileConfig) {
 			c.ExternalData.Sources.RDAPBootstrap = *file.Sources.RDAPBootstrap
 		}
 	}
+}
+
+// maxVantageLabelLen bounds the label. It is rendered verbatim in a footnote
+// and a title attribute, so a long value is a layout problem, not a security
+// one; the cap keeps a mistyped config from filling the page.
+const maxVantageLabelLen = 64
+
+// NormalizeVantageLabel trims the label and drops it when it is empty or
+// longer than the cap. Applied where the label is served, so file, env and
+// flag all go through it.
+func NormalizeVantageLabel(label string) string {
+	trimmed := strings.TrimSpace(label)
+	if len([]rune(trimmed)) > maxVantageLabelLen {
+		return ""
+	}
+	return trimmed
 }
 
 // isValidTagViewMinLevel returns true when level is one of the levels the

@@ -145,6 +145,10 @@ func TestApplyEnvVarsSetsFields(t *testing.T) {
 			name: "external data max cached records", env: "GONEMASTER_EXTERNAL_DATA_MAX_CACHED_RECORDS", value: "500",
 			get: func(c server.Config) any { return c.ExternalData.MaxCachedRecords }, want: 500,
 		},
+		{
+			name: "analysis vantage label", env: "GONEMASTER_ANALYSIS_VANTAGE_LABEL", value: "Stockholm, SE",
+			get: func(c server.Config) any { return c.Analysis.VantageLabel }, want: "Stockholm, SE",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg, warn := runApplyEnvVars(tc)

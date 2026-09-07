@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 - analysis-ui: "Elsewhere" links from each detail page to IANA, ICANNWiki, RDAP and RIPEstat
 - analysis-ui, server: IPv6 coverage and weakest signing algorithm overview bars, plus sortable IPv4 NS, IPv6 NS, signing and key columns on the domains list
 - server, admin-ui: cohort `reference_list` setting reporting source-tag drift against the IANA TLD list
+- server, analysis-ui: `analysis.vantage_label` names the measurement location in the latency caveats
 - zone11: `Z11_SPF_UNKNOWN_MODIFIER` notice for modifiers outside RFC 7208
 
 ### Changed

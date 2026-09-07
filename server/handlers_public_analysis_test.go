@@ -90,6 +90,37 @@ func TestPublicAnalysisCatalogResolvesDefault(t *testing.T) {
 	}
 }
 
+func TestPublicAnalysisCatalogOmitsUnconfiguredVantageLabel(t *testing.T) {
+	srv := newTestServer(t)
+	resp := getPublic(t, srv, "/pub/api/v1/analysis/catalog")
+	wantStatus(t, resp, http.StatusOK)
+	if strings.Contains(resp.Body.String(), `"vantage_label"`) {
+		t.Errorf("vantage_label present with no label configured: %s", resp.Body.String())
+	}
+}
+
+func TestPublicAnalysisCatalogServesVantageLabel(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(c *Config) {
+		c.Analysis.VantageLabel = "  Stockholm, SE  "
+	}))
+	resp := getPublic(t, srv, "/pub/api/v1/analysis/catalog")
+	got := mustJSON[PublicAnalysisCatalogResponse](t, resp, http.StatusOK)
+	if got.VantageLabel != "Stockholm, SE" {
+		t.Errorf("vantage_label = %q, want the trimmed label", got.VantageLabel)
+	}
+}
+
+func TestPublicAnalysisCatalogDropsOverlongVantageLabel(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(c *Config) {
+		c.Analysis.VantageLabel = strings.Repeat("x", maxVantageLabelLen+1)
+	}))
+	resp := getPublic(t, srv, "/pub/api/v1/analysis/catalog")
+	got := mustJSON[PublicAnalysisCatalogResponse](t, resp, http.StatusOK)
+	if got.VantageLabel != "" {
+		t.Errorf("vantage_label = %q, want a label past the cap dropped", got.VantageLabel)
+	}
+}
+
 func TestPublicAnalysisCatalogRedactsInternalFields(t *testing.T) {
 	srv := newTestServer(t)
 	seedCohort(t, srv, AnalysisCohort{

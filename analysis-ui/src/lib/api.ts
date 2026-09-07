@@ -45,6 +45,9 @@ export type CatalogResponse = {
   cohorts: Cohort[];
   selector_enabled: boolean;
   backend_supported: boolean;
+  // Network location the runs were measured from. Absent when the operator
+  // configured none; the latency caveat then stays generic.
+  vantage_label?: string;
 };
 
 export type OverviewTotals = {

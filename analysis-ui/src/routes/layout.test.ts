@@ -31,6 +31,32 @@ describe("+layout.load", () => {
     expect(fetch).toHaveBeenCalledWith("/pub/api/v1/analysis/catalog");
   });
 
+  it("carries the catalog's vantage label into layout data", async () => {
+    const catalog: CatalogResponse = {
+      default_tag: "tld",
+      cohorts: [{ dataset_tag: "tld", label: "TLD", is_default: true }],
+      selector_enabled: false,
+      backend_supported: true,
+      vantage_label: "Stockholm, SE"
+    };
+    const fetch = vi.fn().mockResolvedValue(stubResponse(catalog));
+
+    const data = await load(event(fetch));
+    expect(data.vantageLabel).toBe("Stockholm, SE");
+  });
+
+  it("leaves the vantage label empty when the catalog omits it", async () => {
+    const catalog: CatalogResponse = {
+      cohorts: [{ dataset_tag: "tld", label: "TLD", is_default: true }],
+      selector_enabled: false,
+      backend_supported: true
+    };
+    const fetch = vi.fn().mockResolvedValue(stubResponse(catalog));
+
+    const data = await load(event(fetch));
+    expect(data.vantageLabel).toBe("");
+  });
+
   it("prefers the requested dataset_tag from the URL over the default", async () => {
     const catalog: CatalogResponse = {
       default_tag: "tld",

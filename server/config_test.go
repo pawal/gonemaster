@@ -548,6 +548,45 @@ func TestDefaultConfigExternalDataIsOff(t *testing.T) {
 	}
 }
 
+func TestApplyFileConfigAnalysisVantageLabel(t *testing.T) {
+	raw := `{"analysis": {"vantage_label": "Stockholm, SE"}}`
+	fileCfg, err := LoadFileConfig(writeTempJSON(t, raw))
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+	cfg := DefaultConfig()
+	cfg.ApplyFileConfig(fileCfg)
+	if cfg.Analysis.VantageLabel != "Stockholm, SE" {
+		t.Errorf("vantage_label = %q, want Stockholm, SE", cfg.Analysis.VantageLabel)
+	}
+	// An analysis block that sets only the label must not disturb the floor.
+	if cfg.Analysis.TagViewMinLevel != DefaultConfig().Analysis.TagViewMinLevel {
+		t.Errorf("tag_view_min_level = %q, want the default kept", cfg.Analysis.TagViewMinLevel)
+	}
+}
+
+func TestNormalizeVantageLabel(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"trims surrounding space", "  Stockholm, SE  ", "Stockholm, SE"},
+		{"empty stays empty", "   ", ""},
+		{"keeps a label at the cap", strings.Repeat("x", maxVantageLabelLen), strings.Repeat("x", maxVantageLabelLen)},
+		{"drops a label past the cap", strings.Repeat("x", maxVantageLabelLen+1), ""},
+		// The cap counts runes, so an accented label is not truncated early.
+		{"counts runes not bytes", strings.Repeat("ä", maxVantageLabelLen), strings.Repeat("ä", maxVantageLabelLen)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := NormalizeVantageLabel(tc.in); got != tc.want {
+				t.Errorf("NormalizeVantageLabel(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestApplyFileConfigExternalData(t *testing.T) {
 	raw := `{
 		"external_data": {

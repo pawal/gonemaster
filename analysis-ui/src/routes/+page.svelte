@@ -27,7 +27,7 @@
     endpointLatencyRows,
     hasAnyLatencyRanking,
     nameserverLatencyRows,
-    LATENCY_VANTAGE_NOTE,
+    latencyVantageNote,
     type LatencyRankRow
   } from "$lib/latencyRanking";
   import { netDirection, sortByMovement, summarizeDiff } from "$lib/diff";
@@ -46,6 +46,7 @@
   let { data }: { data: OverviewPageData } = $props();
 
   const layoutData = $derived(page.data as LayoutData);
+  const vantageNote = $derived(latencyVantageNote(layoutData.vantageLabel));
 
   // ── Hero metrics: latest value + movement + sparkline per tile. ──────────
   const domainsMetric = $derived(summarizeMetric(seriesTotals(data.severityTrend.points)));
@@ -603,7 +604,7 @@
 
     {#if showLatencyRankings}
       <section class="card latency-rankings">
-        <h3 title={LATENCY_VANTAGE_NOTE}>Response times</h3>
+        <h3 title={vantageNote}>Response times</h3>
         <p class="hint">
           Fastest and slowest by median (p50) response time, among entities with
           at least 5 timing samples in this snapshot.
@@ -619,7 +620,7 @@
             {/if}
           {/each}
         </div>
-        <p class="hint">{LATENCY_VANTAGE_NOTE}</p>
+        <p class="hint">{vantageNote}</p>
       </section>
     {/if}
   {/if}

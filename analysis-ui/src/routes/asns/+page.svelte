@@ -19,13 +19,14 @@
     type ExportColumn
   } from "$lib/exporters";
   import { listASNs, type ASNView, type AnalysisFilter } from "$lib/api";
-  import { LATENCY_VANTAGE_NOTE } from "$lib/latencyRanking";
+  import { latencyVantageNote } from "$lib/latencyRanking";
   import type { LayoutData } from "../+layout";
   import type { ASNsPageData } from "./+page";
 
   let { data }: { data: ASNsPageData } = $props();
 
   const layoutData = $derived(page.data as LayoutData);
+  const vantageNote = $derived(latencyVantageNote(layoutData.vantageLabel));
 
   const sortSpecs = {
     domainCount: { asc: "domain_count_asc", desc: "domain_count_desc" },
@@ -161,7 +162,7 @@
             </th>
             {#if hasLatency}
               <th scope="col" class="col-num">
-                <SortHeader label="Latency" spec={sortSpecs.latency} align="right" title={LATENCY_VANTAGE_NOTE} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+                <SortHeader label="Latency" spec={sortSpecs.latency} align="right" title={vantageNote} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
               </th>
             {/if}
           </tr>
@@ -200,7 +201,7 @@
     </div>
 
     {#if hasLatency}
-      <p class="hint">{LATENCY_VANTAGE_NOTE}</p>
+      <p class="hint">{vantageNote}</p>
     {/if}
 
     <Pagination {total} offset={currentOffset} limit={currentLimit} itemCount={data.list?.items.length ?? 0} />

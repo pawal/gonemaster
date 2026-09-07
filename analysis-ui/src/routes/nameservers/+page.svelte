@@ -20,13 +20,14 @@
     type ExportColumn
   } from "$lib/exporters";
   import { listNameservers, type NameserverView, type AnalysisFilter } from "$lib/api";
-  import { LATENCY_VANTAGE_NOTE } from "$lib/latencyRanking";
+  import { latencyVantageNote } from "$lib/latencyRanking";
   import type { LayoutData } from "../+layout";
   import type { NameserversPageData } from "./+page";
 
   let { data }: { data: NameserversPageData } = $props();
 
   const layoutData = $derived(page.data as LayoutData);
+  const vantageNote = $derived(latencyVantageNote(layoutData.vantageLabel));
 
   const sortSpecs = {
     name: { desc: "name_desc" },
@@ -160,7 +161,7 @@
             <th scope="col" class="col-num">IPv6</th>
             {#if hasLatency}
               <th scope="col" class="col-num">
-                <SortHeader label="Latency" spec={sortSpecs.latency} align="right" title={LATENCY_VANTAGE_NOTE} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+                <SortHeader label="Latency" spec={sortSpecs.latency} align="right" title={vantageNote} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
               </th>
             {/if}
           </tr>
@@ -201,7 +202,7 @@
     </div>
 
     {#if hasLatency}
-      <p class="hint">{LATENCY_VANTAGE_NOTE}</p>
+      <p class="hint">{vantageNote}</p>
     {/if}
 
     <Pagination {total} offset={currentOffset} limit={currentLimit} itemCount={data.list?.items.length ?? 0} />

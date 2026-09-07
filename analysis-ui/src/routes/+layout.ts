@@ -23,6 +23,8 @@ export type LayoutData = {
   // empty state instead of issuing a request.
   effectiveSnapshotSlug: string | null;
   effectiveSnapshotTagFloor: string;
+  // Where the latency figures were measured from; empty when unconfigured.
+  vantageLabel: string;
 };
 
 function resolveDefaultSnapshotSlug(
@@ -78,7 +80,8 @@ export async function load({ fetch, url }): Promise<LayoutData> {
       snapshots,
       defaultSnapshotSlug,
       effectiveSnapshotSlug,
-      effectiveSnapshotTagFloor: activeSnapshot?.tag_view_min_level ?? ""
+      effectiveSnapshotTagFloor: activeSnapshot?.tag_view_min_level ?? "",
+      vantageLabel: catalog.vantage_label ?? ""
     };
   } catch (error) {
     return {
@@ -89,7 +92,8 @@ export async function load({ fetch, url }): Promise<LayoutData> {
       snapshots: [],
       defaultSnapshotSlug: null,
       effectiveSnapshotSlug: urlSnapshot || null,
-      effectiveSnapshotTagFloor: ""
+      effectiveSnapshotTagFloor: "",
+      vantageLabel: ""
     };
   }
 }

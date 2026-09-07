@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"testing"
 	"time"
 )
@@ -405,6 +406,114 @@ func TestComputeSnapshotEntityViewsRequiresBatchID(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
 		if _, err := s.ComputeSnapshotEntityViews(1, "", ""); err == nil {
 			t.Fatal("expected error when batchID is empty")
+		}
+	})
+}
+
+// indexDomainViews keys the computed rows by domain name.
+func indexDomainViews(rows []AnalysisSnapshotDomainView) map[string]AnalysisSnapshotDomainView {
+	out := map[string]AnalysisSnapshotDomainView{}
+	for _, r := range rows {
+		out[r.DomainName] = r
+	}
+	return out
+}
+
+// TestComputeSnapshotDomainViewFamilyAndAlgoColumns covers the four columns
+// added for the zone-facts work: the per-family nameserver counts derived
+// from the endpoint rows, and the weakest-algorithm pair read from the
+// domain-fact table. example.test is dual-stack on one nameserver;
+// other.test has two IPv4-only nameservers and no DNSSEC facts at all.
+func TestComputeSnapshotDomainViewFamilyAndAlgoColumns(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID, snapID := snapshotViewFixture(t, s)
+
+		domA, ok := s.GetDomainByName("example.test")
+		if !ok {
+			t.Fatal("fixture domain example.test missing")
+		}
+		keys := int64(3)
+		if err := s.ReplaceAnalysisRunDomainFacts(cohortID, "run-a", []AnalysisRunDomainFact{{
+			CohortID: cohortID, RunID: "run-a", DomainID: domA.ID,
+			Category: FactCategoryDNSKEYAlgoWeakest, Key: "8", ValueNum: &keys,
+		}}); err != nil {
+			t.Fatalf("seed weakest-algo fact: %v", err)
+		}
+
+		views, err := s.ComputeSnapshotEntityViews(cohortID, "batch-x", "")
+		if err != nil {
+			t.Fatalf("compute: %v", err)
+		}
+		byName := indexDomainViews(views.Domains)
+
+		a := byName["example.test"]
+		if a.IPv4NSCount != 1 || a.IPv6NSCount != 1 {
+			t.Errorf("example.test family counts = (%d,%d), want (1,1)", a.IPv4NSCount, a.IPv6NSCount)
+		}
+		if a.DNSKEYAlgoWeakest == nil || *a.DNSKEYAlgoWeakest != 8 {
+			t.Errorf("example.test weakest algo = %v, want 8", a.DNSKEYAlgoWeakest)
+		}
+		if a.DNSKEYCount == nil || *a.DNSKEYCount != 3 {
+			t.Errorf("example.test key count = %v, want 3", a.DNSKEYCount)
+		}
+
+		b := byName["other.test"]
+		if b.IPv4NSCount != 2 || b.IPv6NSCount != 0 {
+			t.Errorf("other.test family counts = (%d,%d), want (2,0)", b.IPv4NSCount, b.IPv6NSCount)
+		}
+		if b.DNSKEYAlgoWeakest != nil || b.DNSKEYCount != nil {
+			t.Errorf("unsigned other.test carries algo columns: %v / %v", b.DNSKEYAlgoWeakest, b.DNSKEYCount)
+		}
+
+		// The columns must survive the write/read round trip, not just the
+		// in-memory compute.
+		if err := s.ReplaceSnapshotEntityViews(snapID, views); err != nil {
+			t.Fatalf("replace: %v", err)
+		}
+		got, found := s.GetSnapshotDomainViewByName(snapID, "example.test")
+		if !found {
+			t.Fatal("example.test not found after replace")
+		}
+		if got.IPv4NSCount != 1 || got.IPv6NSCount != 1 {
+			t.Errorf("stored family counts = (%d,%d), want (1,1)", got.IPv4NSCount, got.IPv6NSCount)
+		}
+		if got.DNSKEYAlgoWeakest == nil || *got.DNSKEYAlgoWeakest != 8 {
+			t.Errorf("stored weakest algo = %v, want 8", got.DNSKEYAlgoWeakest)
+		}
+		if got.DNSKEYCount == nil || *got.DNSKEYCount != 3 {
+			t.Errorf("stored key count = %v, want 3", got.DNSKEYCount)
+		}
+	})
+}
+
+// TestSnapshotDomainViewPreMigrationRowReadsAsUnknown covers a row written
+// before the four columns existed: the family counts default to zero and the
+// algorithm columns stay NULL, which the UI renders as "-" until the
+// snapshot is rematerialized.
+func TestSnapshotDomainViewPreMigrationRowReadsAsUnknown(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		_, snapID := snapshotViewFixture(t, s)
+
+		if _, err := s.db.Exec(
+			fmt.Sprintf(`INSERT INTO analysis_snapshot_domain_view
+				(snapshot_id, domain_id, domain_name, score, grade, worst_level, finished_at,
+				 nameserver_count, endpoint_count, asn_count, prefix_count,
+				 nameservers_json, addresses_json, tags_json)
+				VALUES (%s)`, s.phRange(1, 14)),
+			snapID, int64(9001), "old.test", nil, "", "OK", nil, 2, 2, 1, 1, "[]", "[]", "[]",
+		); err != nil {
+			t.Fatalf("insert legacy row: %v", err)
+		}
+
+		got, found := s.GetSnapshotDomainViewByName(snapID, "old.test")
+		if !found {
+			t.Fatal("legacy row not readable")
+		}
+		if got.IPv4NSCount != 0 || got.IPv6NSCount != 0 {
+			t.Errorf("legacy family counts = (%d,%d), want (0,0)", got.IPv4NSCount, got.IPv6NSCount)
+		}
+		if got.DNSKEYAlgoWeakest != nil || got.DNSKEYCount != nil {
+			t.Errorf("legacy algo columns = %v / %v, want nil", got.DNSKEYAlgoWeakest, got.DNSKEYCount)
 		}
 	})
 }

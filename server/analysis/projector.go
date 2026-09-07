@@ -311,7 +311,7 @@ func (p *Projector) prepareRun(input RunInput) preparedRun {
 	domainASNs = restrictDomainASNsToAuthoritative(domainASNs, addressFacts)
 	asnLabels := p.resolveASNLabels(addressFacts, domainASNs)
 	tagSummaries := extractTagSummaries(input)
-	domainFacts := extractDomainFacts(input)
+	domainFacts := extractDomainFacts(input, endpoints)
 	return preparedRun{
 		input:        input,
 		endpoints:    endpoints,

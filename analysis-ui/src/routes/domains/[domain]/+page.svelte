@@ -7,9 +7,16 @@
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
   import ExternalLinks from "$lib/ExternalLinks.svelte";
+  import SigningAlgoChip from "$lib/SigningAlgoChip.svelte";
   import { tagHref } from "$lib/entityLinks";
   import { domainLinks } from "$lib/externalLinks";
-  import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
+  import {
+    formatCount,
+    formatFamilyCoverage,
+    formatTimestamp,
+    gradeTone,
+    levelTone
+  } from "$lib/format";
   import { idnToUnicode } from "$lib/idn";
   import type { DomainDetailEntry, DomainDetailTag, NameserverTiming } from "$lib/api";
   import type { DomainDetailPageData } from "./+page";
@@ -181,6 +188,25 @@
       <div><dt>Endpoints</dt><dd>{formatCount(d.endpoint_count)}</dd></div>
       <div><dt>ASNs</dt><dd>{formatCount(d.asn_count)}</dd></div>
       <div><dt>Prefixes</dt><dd>{formatCount(d.prefix_count)}</dd></div>
+      <div>
+        <dt>IPv4 NS</dt>
+        <dd>{formatFamilyCoverage(d.ipv4_ns_count, d.nameserver_count, d.ipv6_ns_count)}</dd>
+      </div>
+      <div>
+        <dt>IPv6 NS</dt>
+        <dd>{formatFamilyCoverage(d.ipv6_ns_count, d.nameserver_count, d.ipv4_ns_count)}</dd>
+      </div>
+      <div>
+        <dt>Signing</dt>
+        <dd>
+          <SigningAlgoChip
+            algo={d.dnskey_algo_weakest}
+            label={d.dnskey_algo_weakest_label}
+            tone={d.dnskey_algo_weakest_tone}
+          />
+        </dd>
+      </div>
+      <div><dt>Keys</dt><dd>{d.dnskey_count ?? "-"}</dd></div>
     </dl>
     <ExternalLinks links={domainLinks(d.domain)} />
     <EntityHistorySparkline points={data.history} metric="score" label="Score over snapshots" />

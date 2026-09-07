@@ -125,6 +125,19 @@ export type ListResponse<T> = {
   offset: number;
 };
 
+// Facts derived from the run itself. The per-family counts are zero on
+// snapshots captured before the columns existed; the algorithm fields are
+// absent for an unsigned domain, and carry their own label and tone so the
+// client keeps no algorithm mnemonic table.
+export type ZoneFactFields = {
+  ipv4_ns_count: number;
+  ipv6_ns_count: number;
+  dnskey_algo_weakest?: number;
+  dnskey_algo_weakest_label?: string;
+  dnskey_algo_weakest_tone?: string;
+  dnskey_count?: number;
+};
+
 export type DomainView = {
   domain: string;
   score?: number;
@@ -137,7 +150,7 @@ export type DomainView = {
   operator?: string;
   operator_asn?: number;
   finished_at?: string;
-};
+} & ZoneFactFields;
 
 // Latency fields are absent on snapshots captured before latency aggregation.
 export type LatencyFields = {
@@ -265,7 +278,7 @@ export type DomainDetail = {
   entries?: DomainDetailEntry[];
   // Per-nameserver response times from the run; absent when it was purged.
   nameserver_timings?: NameserverTiming[];
-};
+} & ZoneFactFields;
 
 export type EndpointDetail = {
   nameserver: string;

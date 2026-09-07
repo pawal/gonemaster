@@ -117,3 +117,19 @@ export function gradeTone(grade: string | null | undefined): string {
       return "neutral";
   }
 }
+
+// Family coverage as "n/total". Snapshots captured before the per-family
+// columns existed store zero for both families, so a domain with
+// nameservers and zero of both reads as unknown.
+export function formatFamilyCoverage(
+  count: number | null | undefined,
+  total: number | null | undefined,
+  otherCount: number | null | undefined
+): string {
+  const n = Number(count ?? 0);
+  const other = Number(otherCount ?? 0);
+  const outOf = Number(total ?? 0);
+  if (outOf > 0 && n === 0 && other === 0) return "-";
+  if (!Number.isFinite(n) || !Number.isFinite(outOf)) return "-";
+  return `${n}/${outOf}`;
+}

@@ -98,6 +98,8 @@ function nsDetail(over: Partial<DomainDetail> = {}): DomainDetail {
     endpoint_count: 2,
     asn_count: 1,
     prefix_count: 1,
+    ipv4_ns_count: 1,
+    ipv6_ns_count: 1,
     nameservers: [],
     addresses: [],
     ...over
@@ -158,5 +160,38 @@ describe("/domains/[domain] response-times table", () => {
   it("omits the table when the run carried no timings", () => {
     render(DomainDetailPage, { data: nsPageData(nsDetail()) });
     expect(screen.queryByText("Nameserver response times")).toBeNull();
+  });
+});
+
+describe("/domains/[domain] zone facts", () => {
+  const countsFor = (detail: DomainDetail) => {
+    render(DomainDetailPage, { data: nsPageData(detail) });
+    return within(screen.getByText("Nameservers").closest("dl") as HTMLElement);
+  };
+
+  it("shows per-family nameserver coverage and the weakest signing algorithm", () => {
+    const counts = countsFor(
+      nsDetail({
+        nameserver_count: 3,
+        ipv4_ns_count: 3,
+        ipv6_ns_count: 1,
+        dnskey_algo_weakest: 5,
+        dnskey_algo_weakest_label: "RSASHA1",
+        dnskey_algo_weakest_tone: "error",
+        dnskey_count: 4
+      })
+    );
+    expect(counts.getByText("3/3")).toBeInTheDocument();
+    expect(counts.getByText("1/3")).toBeInTheDocument();
+    expect(counts.getByText("RSASHA1")).toBeInTheDocument();
+    expect(counts.getByText("4")).toBeInTheDocument();
+  });
+
+  it("reads a dash for an unsigned domain and for a snapshot without the columns", () => {
+    const counts = countsFor(
+      nsDetail({ nameserver_count: 2, ipv4_ns_count: 0, ipv6_ns_count: 0 })
+    );
+    // Two coverage cells plus the signing chip and the key count.
+    expect(counts.getAllByText("-").length).toBe(4);
   });
 });

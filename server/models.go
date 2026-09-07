@@ -538,20 +538,28 @@ type AnalysisSnapshotTagView struct {
 // AnalysisSnapshotDomainView is one pre-computed domain row for a
 // captured snapshot, serving the per-domain detail page in one lookup.
 type AnalysisSnapshotDomainView struct {
-	SnapshotID      int64                  `json:"snapshot_id"`
-	DomainID        int64                  `json:"domain_id"`
-	DomainName      string                 `json:"domain_name"`
-	Score           *int                   `json:"score,omitempty"`
-	Grade           string                 `json:"grade,omitempty"`
-	WorstLevel      string                 `json:"worst_level,omitempty"`
-	FinishedAt      *time.Time             `json:"finished_at,omitempty"`
-	NameserverCount int                    `json:"nameserver_count"`
-	EndpointCount   int                    `json:"endpoint_count"`
-	ASNCount        int                    `json:"asn_count"`
-	PrefixCount     int                    `json:"prefix_count"`
-	Nameservers     []DomainViewNameserver `json:"nameservers,omitempty"`
-	Addresses       []DomainViewAddress    `json:"addresses,omitempty"`
-	Tags            []DomainViewTag        `json:"tags,omitempty"`
+	SnapshotID      int64      `json:"snapshot_id"`
+	DomainID        int64      `json:"domain_id"`
+	DomainName      string     `json:"domain_name"`
+	Score           *int       `json:"score,omitempty"`
+	Grade           string     `json:"grade,omitempty"`
+	WorstLevel      string     `json:"worst_level,omitempty"`
+	FinishedAt      *time.Time `json:"finished_at,omitempty"`
+	NameserverCount int        `json:"nameserver_count"`
+	EndpointCount   int        `json:"endpoint_count"`
+	ASNCount        int        `json:"asn_count"`
+	PrefixCount     int        `json:"prefix_count"`
+	// Nameservers with at least one address of each family. Zero on
+	// snapshots captured before the columns existed.
+	IPv4NSCount int `json:"ipv4_ns_count"`
+	IPv6NSCount int `json:"ipv6_ns_count"`
+	// Weakest signing algorithm and distinct key count; nil when the
+	// domain is unsigned or the snapshot predates the columns.
+	DNSKEYAlgoWeakest *int                   `json:"dnskey_algo_weakest,omitempty"`
+	DNSKEYCount       *int                   `json:"dnskey_count,omitempty"`
+	Nameservers       []DomainViewNameserver `json:"nameservers,omitempty"`
+	Addresses         []DomainViewAddress    `json:"addresses,omitempty"`
+	Tags              []DomainViewTag        `json:"tags,omitempty"`
 }
 
 // DomainViewNameserver is one nameserver entry inside nameservers_json.

@@ -54,18 +54,27 @@ func severityBucket(level string) string {
 
 // PublicAnalysisDomainDetail is the per-domain detail view.
 type PublicAnalysisDomainDetail struct {
-	Domain          string                           `json:"domain"`
-	Score           *int                             `json:"score,omitempty"`
-	Grade           *string                          `json:"grade,omitempty"`
-	WorstLevel      string                           `json:"worst_level,omitempty"`
-	FinishedAt      *time.Time                       `json:"finished_at,omitempty"`
-	NameserverCount int                              `json:"nameserver_count"`
-	EndpointCount   int                              `json:"endpoint_count"`
-	ASNCount        int                              `json:"asn_count"`
-	PrefixCount     int                              `json:"prefix_count"`
-	Nameservers     []PublicAnalysisDomainNameserver `json:"nameservers"`
-	Addresses       []PublicAnalysisDomainAddress    `json:"addresses"`
-	Tags            []PublicAnalysisDomainTag        `json:"tags,omitempty"`
+	Domain          string     `json:"domain"`
+	Score           *int       `json:"score,omitempty"`
+	Grade           *string    `json:"grade,omitempty"`
+	WorstLevel      string     `json:"worst_level,omitempty"`
+	FinishedAt      *time.Time `json:"finished_at,omitempty"`
+	NameserverCount int        `json:"nameserver_count"`
+	EndpointCount   int        `json:"endpoint_count"`
+	ASNCount        int        `json:"asn_count"`
+	PrefixCount     int        `json:"prefix_count"`
+	// Nameservers reachable over each family, out of NameserverCount.
+	IPv4NSCount int `json:"ipv4_ns_count"`
+	IPv6NSCount int `json:"ipv6_ns_count"`
+	// Weakest signing algorithm the zone publishes, with the label and
+	// tone the bars use. Absent when the domain is unsigned.
+	DNSKEYAlgoWeakest      *int                             `json:"dnskey_algo_weakest,omitempty"`
+	DNSKEYAlgoWeakestLabel string                           `json:"dnskey_algo_weakest_label,omitempty"`
+	DNSKEYAlgoWeakestTone  string                           `json:"dnskey_algo_weakest_tone,omitempty"`
+	DNSKEYCount            *int                             `json:"dnskey_count,omitempty"`
+	Nameservers            []PublicAnalysisDomainNameserver `json:"nameservers"`
+	Addresses              []PublicAnalysisDomainAddress    `json:"addresses"`
+	Tags                   []PublicAnalysisDomainTag        `json:"tags,omitempty"`
 	// Localized log entries from the run; empty when the run was purged.
 	Entries []PublicAnalysisDomainEntry `json:"entries,omitempty"`
 	// Per-nameserver response times from the run; empty when it was purged.
@@ -348,12 +357,23 @@ func domainViewToDetail(v AnalysisSnapshotDomainView) PublicAnalysisDomainDetail
 		EndpointCount:   v.EndpointCount,
 		ASNCount:        v.ASNCount,
 		PrefixCount:     v.PrefixCount,
+		IPv4NSCount:     v.IPv4NSCount,
+		IPv6NSCount:     v.IPv6NSCount,
 		Nameservers:     make([]PublicAnalysisDomainNameserver, 0, len(v.Nameservers)),
 		Addresses:       make([]PublicAnalysisDomainAddress, 0, len(v.Addresses)),
 	}
 	if v.Grade != "" {
 		g := v.Grade
 		out.Grade = &g
+	}
+	if v.DNSKEYAlgoWeakest != nil {
+		algo := *v.DNSKEYAlgoWeakest
+		out.DNSKEYAlgoWeakest = &algo
+		out.DNSKEYAlgoWeakestLabel, out.DNSKEYAlgoWeakestTone = signingAlgoDisplay(&algo)
+	}
+	if v.DNSKEYCount != nil {
+		keys := *v.DNSKEYCount
+		out.DNSKEYCount = &keys
 	}
 	for _, ns := range v.Nameservers {
 		nsAddrs := make([]PublicAnalysisDomainAddress, 0, len(ns.Addresses))

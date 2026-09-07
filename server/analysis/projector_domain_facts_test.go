@@ -225,7 +225,7 @@ func TestExtractDomainFactsDedupesAcrossExtractors(t *testing.T) {
 			},
 		},
 	}
-	got := extractDomainFacts(input)
+	got := extractDomainFacts(input, nil)
 	sawAlgo := false
 	sawPosture := false
 	for _, f := range got {
@@ -343,6 +343,7 @@ func TestProjectorProjectRunDomainFactsIdempotent(t *testing.T) {
 	want := map[string]bool{
 		factCategoryDNSKEYAlgorithm + "/8":              true,
 		factCategoryDNSKEYAlgorithm + "/13":             true,
+		factCategoryDNSKEYAlgoWeakest + "/8":            true,
 		factCategoryDNSSECPosture + "/" + factKeySigned: true,
 		factCategoryGrade + "/A":                        true,
 		factCategorySeverity + "/OK":                    true,
@@ -392,5 +393,197 @@ func TestNumericArgCoercesCommonJSONShapes(t *testing.T) {
 	}
 	if _, ok := numericArg(nil, "k"); ok {
 		t.Fatalf("nil args should return ok=false")
+	}
+}
+
+// TestExtractIPv6Coverage covers the three buckets plus the two shapes that
+// must not produce a fact or a wrong one: a run with no nameservers at all,
+// and a nameserver the run never resolved (counts as lacking both families,
+// so a zone whose only IPv6-less NS is unresolved still reads "partial").
+func TestExtractIPv6Coverage(t *testing.T) {
+	ep := func(ns, family string) extractedEndpoint {
+		return extractedEndpoint{nameserver: ns, role: "authoritative", family: family}
+	}
+	cases := []struct {
+		name string
+		in   []extractedEndpoint
+		want string // empty means: no fact emitted
+	}{
+		{
+			name: "every nameserver has ipv6",
+			in: []extractedEndpoint{
+				ep("ns1.example", "ipv4"), ep("ns1.example", "ipv6"),
+				ep("ns2.example", "ipv6"),
+			},
+			want: factKeyCoverageFull,
+		},
+		{
+			name: "one of two nameservers has ipv6",
+			in: []extractedEndpoint{
+				ep("ns1.example", "ipv4"), ep("ns1.example", "ipv6"),
+				ep("ns2.example", "ipv4"),
+			},
+			want: factKeyCoveragePartial,
+		},
+		{
+			name: "no nameserver has ipv6",
+			in: []extractedEndpoint{
+				ep("ns1.example", "ipv4"), ep("ns2.example", "ipv4"),
+			},
+			want: factKeyCoverageNone,
+		},
+		{
+			name: "addressless nameserver lacks both families",
+			in: []extractedEndpoint{
+				ep("ns1.example", "ipv6"),
+				{nameserver: "ns2.example", role: "authoritative", source: "delegation"},
+			},
+			want: factKeyCoveragePartial,
+		},
+		{
+			name: "single addressless nameserver has no coverage",
+			in: []extractedEndpoint{
+				{nameserver: "ns1.example", role: "authoritative", source: "delegation"},
+			},
+			want: factKeyCoverageNone,
+		},
+		{
+			name: "no nameservers at all",
+			in:   nil,
+			want: "",
+		},
+		{
+			// Parent-side rows describe the delegation the parent serves,
+			// not the zone's own nameservers; the snapshot views drop them
+			// too, so counting them here would disagree with the columns.
+			name: "parent-side endpoints are ignored",
+			in: []extractedEndpoint{
+				{nameserver: "ns1.example", role: "parent", family: "ipv6"},
+			},
+			want: "",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := extractIPv6Coverage(c.in)
+			if c.want == "" {
+				if len(got) != 0 {
+					t.Fatalf("expected no fact, got %+v", got)
+				}
+				return
+			}
+			if len(got) != 1 {
+				t.Fatalf("expected exactly one fact, got %+v", got)
+			}
+			if got[0].category != factCategoryIPv6Coverage || got[0].key != c.want {
+				t.Fatalf("got (%s, %s), want (%s, %s)",
+					got[0].category, got[0].key, factCategoryIPv6Coverage, c.want)
+			}
+		})
+	}
+}
+
+// TestExtractDNSKEYAlgoWeakest proves the extractor picks by weakness class
+// rather than by algorithm number, and that value_num carries the zone's
+// distinct keytag count across all algorithms.
+func TestExtractDNSKEYAlgoWeakest(t *testing.T) {
+	algoEntry := func(keytag, algo int) serverpkg.Entry {
+		return serverpkg.Entry{
+			Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK",
+			Args: map[string]any{"keytag": uint16(keytag), "algo_num": uint8(algo)},
+		}
+	}
+	cases := []struct {
+		name     string
+		entries  []serverpkg.Entry
+		wantKey  string
+		wantKeys int64
+	}{
+		{
+			name:     "single algorithm",
+			entries:  []serverpkg.Entry{algoEntry(1234, 13)},
+			wantKey:  "13",
+			wantKeys: 1,
+		},
+		{
+			// 5 (RSASHA1) is deprecated and 13 is a modern curve, so the
+			// zone is only as strong as 5 even though 13 is the higher
+			// number.
+			name:     "dual algorithm picks the weaker class",
+			entries:  []serverpkg.Entry{algoEntry(1234, 13), algoEntry(5678, 5)},
+			wantKey:  "5",
+			wantKeys: 2,
+		},
+		{
+			// Same class (RSA/SHA-2), so the lower number wins.
+			name:     "same class falls back to the algorithm number",
+			entries:  []serverpkg.Entry{algoEntry(1, 10), algoEntry(2, 8)},
+			wantKey:  "8",
+			wantKeys: 2,
+		},
+		{
+			// 200 is unassigned: no validator can use it, so it is the
+			// weakest thing the zone publishes.
+			name:     "algorithm outside the tone table ranks lowest",
+			entries:  []serverpkg.Entry{algoEntry(1, 13), algoEntry(2, 200)},
+			wantKey:  "200",
+			wantKeys: 2,
+		},
+		{
+			// The same (keytag, algo) repeated per nameserver must not
+			// inflate the key count.
+			name:     "repeated entries collapse to one keytag",
+			entries:  []serverpkg.Entry{algoEntry(1234, 8), algoEntry(1234, 8)},
+			wantKey:  "8",
+			wantKeys: 1,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			got := extractDNSKEYAlgoWeakest(RunInput{Entries: c.entries})
+			if len(got) != 1 {
+				t.Fatalf("expected exactly one fact, got %+v", got)
+			}
+			if got[0].category != factCategoryDNSKEYAlgoWeakest || got[0].key != c.wantKey {
+				t.Fatalf("got (%s, %s), want (%s, %s)",
+					got[0].category, got[0].key, factCategoryDNSKEYAlgoWeakest, c.wantKey)
+			}
+			if got[0].valueNum == nil || *got[0].valueNum != c.wantKeys {
+				t.Fatalf("value_num = %v, want %d", got[0].valueNum, c.wantKeys)
+			}
+		})
+	}
+}
+
+func TestExtractDNSKEYAlgoWeakestEmptyWhenNotSigned(t *testing.T) {
+	input := RunInput{
+		Entries: []serverpkg.Entry{
+			{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED"},
+		},
+	}
+	if got := extractDNSKEYAlgoWeakest(input); len(got) != 0 {
+		t.Fatalf("expected no fact for an unsigned zone, got %+v", got)
+	}
+}
+
+// TestExtractDomainFactsEmitsCoverageFromEndpoints proves the dispatcher
+// passes the projector's endpoint set through instead of deriving it again.
+func TestExtractDomainFactsEmitsCoverageFromEndpoints(t *testing.T) {
+	endpoints := []extractedEndpoint{
+		{nameserver: "ns1.example", role: "authoritative", family: "ipv4"},
+		{nameserver: "ns1.example", role: "authoritative", family: "ipv6"},
+	}
+	got := extractDomainFacts(RunInput{}, endpoints)
+	found := false
+	for _, f := range got {
+		if f.category == factCategoryIPv6Coverage {
+			found = true
+			if f.key != factKeyCoverageFull {
+				t.Fatalf("coverage key = %q, want %q", f.key, factKeyCoverageFull)
+			}
+		}
+	}
+	if !found {
+		t.Fatalf("expected an ipv6_coverage fact, got %+v", got)
 	}
 }

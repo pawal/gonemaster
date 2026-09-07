@@ -48,9 +48,8 @@ rows alone.
 ### Adding a domain-fact category
 
 `analysis_run_domain_facts` is the generic per-(cohort, run, domain) fact
-store backing every distribution bar on the overview (severity, DNSSEC
-posture, grade, DNSKEY algorithms, ...). Adding a new category does not
-need a schema change; the data model is already a
+store backing every distribution bar on the overview. Adding a new category
+does not need a schema change; the data model is already a
 `(category, fact_key, value_num)` triple, and the snapshot aggregate row
 stores all categories in one `fact_distributions_json` blob.
 
@@ -67,8 +66,10 @@ stores all categories in one `fact_distributions_json` blob.
    Source from `input.Entries` (tags / args) or `input.Run` (typed run
    fields). Emit one row per distinct `(category, key)`; `value_num`
    is optional informational payload.
-4. Wire the extractor into the dispatcher in `extractDomainFacts`. The
-   dispatcher dedupes on `(category, key)` and sorts deterministically.
+4. Wire the extractor into the dispatcher in `extractDomainFacts`, which
+   also hands over the run's extracted endpoints for address-family
+   facts. The dispatcher dedupes on `(category, key)` and sorts
+   deterministically.
 5. Cover it with unit tests in
    `server/analysis/projector_domain_facts_test.go`. The existing
    `TestExtractDNSKEYAlgorithms` / `TestExtractSignedStatus` tests are
@@ -77,6 +78,28 @@ stores all categories in one `fact_distributions_json` blob.
 No new HTTP endpoint, no UI work: the cohort detail handler builds
 `fact_distributions` from any registered category, and
 `FactDistributionBar.svelte` iterates whatever the API returns.
+
+### Registered categories
+
+| Category | Keys | `value_num` |
+|---|---|---|
+| `severity` | worst finding level, `OK` when none | - |
+| `dnssec_posture` | `unsigned`, `signed`, `nsec`, `nsec3`, `mixed` | - |
+| `grade` | letter grade from the run's scoring config | - |
+| `dnskey_algo` | one row per algorithm number the zone publishes | distinct keytags on that algorithm |
+| `ipv6_coverage` | `full`, `partial`, `none` | - |
+| `dnskey_algo_weakest` | the weakest algorithm number the zone publishes | distinct keytags across all algorithms |
+
+`ipv6_coverage` counts a domain's authoritative nameservers that publish at
+least one IPv6 address; presence in DNS, not reachability. A nameserver the
+run never resolved counts as lacking both families.
+
+`dnskey_algo_weakest` gives each signed domain exactly one bucket, unlike
+`dnskey_algo`, which counts a dual-algorithm zone twice. Weakest means
+lowest `DNSKEYAlgorithmWeaknessRank`: the tone class from
+`dnskeyAlgorithmTones` first, then the algorithm number within the class.
+A validator accepts any algorithm it supports, so a zone signed with both
+RSASHA1 and ECDSAP256SHA256 is no stronger than RSASHA1.
 
 ## Scope Semantics
 
@@ -170,6 +193,13 @@ three pre-shaped tables written once at snapshot capture time:
   nameserver, address). Drives the Addresses tab.
 - `analysis_snapshot_asn_view` - one row per (snapshot, asn). Drives
   the ASNs tab and the top-N ASNs card.
+- `analysis_snapshot_domain_view` - one row per (snapshot, domain).
+  Drives the Domains tab and the per-domain detail page. Besides the
+  entity counts it carries `ipv4_ns_count` / `ipv6_ns_count`, derived
+  from the endpoint rows at capture, and `dnskey_algo_weakest` /
+  `dnskey_count`, read from the matching domain-fact row. Rows written
+  before those columns existed read as zero and NULL until the snapshot
+  is rematerialized.
 
 Plus one consolidated aggregate row in
 `analysis_cohort_snapshot_aggregates` keyed by category =

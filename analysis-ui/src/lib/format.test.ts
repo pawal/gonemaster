@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatCount,
   formatDate,
+  formatFamilyCoverage,
   formatMs,
   formatTimestamp,
   gradeTone,
@@ -95,5 +96,30 @@ describe("format helpers", () => {
     expect(gradeTone("F")).toBe("f");
     expect(gradeTone("")).toBe("neutral");
     expect(gradeTone(null)).toBe("neutral");
+  });
+});
+
+describe("formatFamilyCoverage", () => {
+  it("renders the count out of the nameserver total", () => {
+    expect(formatFamilyCoverage(2, 3, 1)).toBe("2/3");
+    expect(formatFamilyCoverage(3, 3, 3)).toBe("3/3");
+  });
+
+  it("reads as unknown when both families are zero on a domain with nameservers", () => {
+    // Snapshots captured before the columns existed store zero for both.
+    expect(formatFamilyCoverage(0, 2, 0)).toBe("-");
+  });
+
+  it("reports a genuine zero when the other family is present", () => {
+    expect(formatFamilyCoverage(0, 2, 2)).toBe("0/2");
+  });
+
+  it("renders zero of zero for a domain with no nameservers", () => {
+    expect(formatFamilyCoverage(0, 0, 0)).toBe("0/0");
+  });
+
+  it("treats missing values as zero", () => {
+    expect(formatFamilyCoverage(undefined, 2, 2)).toBe("0/2");
+    expect(formatFamilyCoverage(null, null, null)).toBe("0/0");
   });
 });

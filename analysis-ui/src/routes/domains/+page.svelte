@@ -5,8 +5,15 @@
   import FilterBar from "$lib/FilterBar.svelte";
   import Pagination from "$lib/Pagination.svelte";
   import SortHeader from "$lib/SortHeader.svelte";
+  import SigningAlgoChip from "$lib/SigningAlgoChip.svelte";
   import { asnHref, domainHref } from "$lib/entityLinks";
-  import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
+  import {
+    formatCount,
+    formatFamilyCoverage,
+    formatTimestamp,
+    gradeTone,
+    levelTone
+  } from "$lib/format";
   import { idnTooltip } from "$lib/idn";
   import { updateURLParam, filterFromURL } from "$lib/filters";
   import {
@@ -33,7 +40,11 @@
     nameservers: { asc: "nameserver_count_asc", desc: "nameserver_count_desc" },
     endpoints: { asc: "endpoint_count_asc", desc: "endpoint_count_desc" },
     asns: { asc: "asn_count_asc", desc: "asn_count_desc" },
-    prefixes: { asc: "prefix_count_asc", desc: "prefix_count_desc" }
+    prefixes: { asc: "prefix_count_asc", desc: "prefix_count_desc" },
+    ipv4NS: { asc: "ipv4_ns_count_asc", desc: "ipv4_ns_count_desc" },
+    ipv6NS: { asc: "ipv6_ns_count_asc", desc: "ipv6_ns_count_desc" },
+    signing: { asc: "dnskey_algo_weakest_asc", desc: "dnskey_algo_weakest_desc" },
+    keys: { asc: "dnskey_count_asc", desc: "dnskey_count_desc" }
   } as const;
 
   const currentSort = $derived(page.url.searchParams.get("sort") ?? "");
@@ -58,6 +69,14 @@
     { key: "endpoint_count", label: "Endpoints", value: (r) => r.endpoint_count },
     { key: "asn_count", label: "ASNs", value: (r) => r.asn_count },
     { key: "prefix_count", label: "Prefixes", value: (r) => r.prefix_count },
+    { key: "ipv4_ns_count", label: "IPv4 nameservers", value: (r) => r.ipv4_ns_count },
+    { key: "ipv6_ns_count", label: "IPv6 nameservers", value: (r) => r.ipv6_ns_count },
+    {
+      key: "dnskey_algo_weakest",
+      label: "Weakest signing algorithm",
+      value: (r) => r.dnskey_algo_weakest_label ?? r.dnskey_algo_weakest ?? ""
+    },
+    { key: "dnskey_count", label: "Keys", value: (r) => r.dnskey_count ?? "" },
     { key: "finished_at", label: "Last run", value: (r) => r.finished_at ?? "" }
   ];
 
@@ -170,6 +189,18 @@
             <th scope="col" class="col-num">
               <SortHeader label="Prefixes" spec={sortSpecs.prefixes} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="IPv4 NS" spec={sortSpecs.ipv4NS} align="right" title="Nameservers with at least one IPv4 address" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="IPv6 NS" spec={sortSpecs.ipv6NS} align="right" title="Nameservers with at least one IPv6 address" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col">
+              <SortHeader label="Signing" spec={sortSpecs.signing} title="Weakest signing algorithm the zone publishes" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
+            <th scope="col" class="col-num">
+              <SortHeader label="Keys" spec={sortSpecs.keys} align="right" title="Distinct DNSKEYs published" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+            </th>
             <th scope="col">Last analyzed</th>
           </tr>
         </thead>
@@ -208,6 +239,16 @@
               <td class="col-num">{formatCount(row.endpoint_count)}</td>
               <td class="col-num">{formatCount(row.asn_count)}</td>
               <td class="col-num">{formatCount(row.prefix_count)}</td>
+              <td class="col-num">{formatFamilyCoverage(row.ipv4_ns_count, row.nameserver_count, row.ipv6_ns_count)}</td>
+              <td class="col-num">{formatFamilyCoverage(row.ipv6_ns_count, row.nameserver_count, row.ipv4_ns_count)}</td>
+              <td>
+                <SigningAlgoChip
+                  algo={row.dnskey_algo_weakest}
+                  label={row.dnskey_algo_weakest_label}
+                  tone={row.dnskey_algo_weakest_tone}
+                />
+              </td>
+              <td class="col-num">{row.dnskey_count ?? "-"}</td>
               <td>{formatTimestamp(row.finished_at) || "-"}</td>
             </tr>
           {/each}

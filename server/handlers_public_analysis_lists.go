@@ -289,6 +289,26 @@ type PublicAnalysisDomainView struct {
 	Operator    string     `json:"operator,omitempty"`
 	OperatorASN *int64     `json:"operator_asn,omitempty"`
 	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+	// Nameservers reachable over each family, out of NameserverCount.
+	IPv4NSCount int `json:"ipv4_ns_count"`
+	IPv6NSCount int `json:"ipv6_ns_count"`
+	// Weakest signing algorithm the zone publishes, with the label and
+	// tone the bars use so the client keeps no mnemonic table. Absent
+	// when the domain is unsigned.
+	DNSKEYAlgoWeakest      *int   `json:"dnskey_algo_weakest,omitempty"`
+	DNSKEYAlgoWeakestLabel string `json:"dnskey_algo_weakest_label,omitempty"`
+	DNSKEYAlgoWeakestTone  string `json:"dnskey_algo_weakest_tone,omitempty"`
+	DNSKEYCount            *int   `json:"dnskey_count,omitempty"`
+}
+
+// signingAlgoDisplay returns the label and tone that travel with a weakest
+// signing algorithm number, or empty strings when there is none.
+func signingAlgoDisplay(algo *int) (label, tone string) {
+	if algo == nil {
+		return "", ""
+	}
+	key := strconv.Itoa(*algo)
+	return dnskeyAlgorithmKeyLabel(key), dnskeyAlgorithmKeyTone(key)
 }
 
 // PublicAnalysisListResponse is the shared envelope for paginated public list
@@ -372,6 +392,17 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 			EndpointCount:   row.EndpointCount,
 			ASNCount:        row.ASNCount,
 			PrefixCount:     row.PrefixCount,
+			IPv4NSCount:     row.IPv4NSCount,
+			IPv6NSCount:     row.IPv6NSCount,
+		}
+		if row.DNSKEYAlgoWeakest != nil {
+			algo := *row.DNSKEYAlgoWeakest
+			v.DNSKEYAlgoWeakest = &algo
+			v.DNSKEYAlgoWeakestLabel, v.DNSKEYAlgoWeakestTone = signingAlgoDisplay(&algo)
+		}
+		if row.DNSKEYCount != nil {
+			keys := *row.DNSKEYCount
+			v.DNSKEYCount = &keys
 		}
 		if row.Grade != "" {
 			g := row.Grade
@@ -469,6 +500,22 @@ func sortAnalysisDomainViews(items []PublicAnalysisDomainView, mode string) {
 		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.PrefixCount }, true)
 	case "prefix_count_desc":
 		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.PrefixCount }, false)
+	case "ipv4_ns_count_asc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.IPv4NSCount }, true)
+	case "ipv4_ns_count_desc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.IPv4NSCount }, false)
+	case "ipv6_ns_count_asc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.IPv6NSCount }, true)
+	case "ipv6_ns_count_desc":
+		sortByDomainCount(items, func(v PublicAnalysisDomainView) int { return v.IPv6NSCount }, false)
+	case "dnskey_algo_weakest_asc":
+		sortByDomainNullableInt(items, weakestAlgoRankOf, true)
+	case "dnskey_algo_weakest_desc":
+		sortByDomainNullableInt(items, weakestAlgoRankOf, false)
+	case "dnskey_count_asc":
+		sortByDomainNullableInt(items, dnskeyCountOf, true)
+	case "dnskey_count_desc":
+		sortByDomainNullableInt(items, dnskeyCountOf, false)
 	default:
 		sort.Slice(items, func(i, j int) bool { return items[i].Domain < items[j].Domain })
 	}
@@ -487,6 +534,45 @@ func sortByDomainCount(items []PublicAnalysisDomainView, get func(PublicAnalysis
 		}
 		return items[i].Domain < items[j].Domain
 	})
+}
+
+// sortByDomainNullableInt sorts by an optional integer with unsigned /
+// unknown rows last in both directions and the domain name as tiebreaker.
+func sortByDomainNullableInt(
+	items []PublicAnalysisDomainView,
+	get func(PublicAnalysisDomainView) (int, bool),
+	asc bool,
+) {
+	sort.Slice(items, func(i, j int) bool {
+		a, aok := get(items[i])
+		b, bok := get(items[j])
+		if aok != bok {
+			return aok
+		}
+		if aok && a != b {
+			if asc {
+				return a < b
+			}
+			return a > b
+		}
+		return items[i].Domain < items[j].Domain
+	})
+}
+
+// Sorting on the algorithm uses the weakness rank, not the raw number, so
+// the order matches the weakest-algorithm bar.
+func weakestAlgoRankOf(v PublicAnalysisDomainView) (int, bool) {
+	if v.DNSKEYAlgoWeakest == nil {
+		return 0, false
+	}
+	return DNSKEYAlgorithmWeaknessRank(strconv.Itoa(*v.DNSKEYAlgoWeakest)), true
+}
+
+func dnskeyCountOf(v PublicAnalysisDomainView) (int, bool) {
+	if v.DNSKEYCount == nil {
+		return 0, false
+	}
+	return *v.DNSKEYCount, true
 }
 
 func intFromPtr(p *int, fallback int) int {

@@ -556,6 +556,98 @@ func TestSortAnalysisDomainViewsByCountColumns(t *testing.T) {
 	}
 }
 
+// TestSortAnalysisDomainViewsByZoneFactColumns covers the four sort modes
+// added with the zone-fact columns. The algorithm mode sorts by weakness
+// rank, not by number: 5 (deprecated RSASHA1) must lead 13 (a modern
+// curve) ascending even though 13 is the larger number. Unsigned rows carry
+// no algorithm and no key count, so they sort last in both directions.
+// TestPublicAnalysisDomainsServesZoneFactColumns proves the list handler
+// maps the four zone-fact columns out of the view row, including the
+// algorithm label and tone that travel with the number.
+func TestPublicAnalysisDomainsServesZoneFactColumns(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		now := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		f.seedGraduatedRun("alpha.example", now, nil)
+		runID := "run-alpha.example-" + now.Format("20060102150405")
+		f.seedEndpoint(runID, "alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 0, "")
+		f.seedEndpoint(runID, "alpha.example", "ns1.example", "2001:db8::1", "ipv6", now, 0, "")
+		f.seedEndpoint(runID, "alpha.example", "ns2.example", "192.0.2.2", "ipv4", now, 0, "")
+
+		domain, ok := f.store.GetDomainByName("alpha.example")
+		if !ok {
+			t.Fatal("seeded domain missing")
+		}
+		keys := int64(2)
+		if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, runID, []AnalysisRunDomainFact{{
+			CohortID: f.cohort.ID, RunID: runID, DomainID: domain.ID,
+			Category: FactCategoryDNSKEYAlgoWeakest, Key: "5", ValueNum: &keys,
+		}}); err != nil {
+			t.Fatalf("replace domain facts: %v", err)
+		}
+		f.refreshSnapshotViews(f.batchID)
+
+		resp := getPublic(t, f.srv, f.publicURL("domains"))
+		got := decodeDomainList(t, resp)
+		if len(got.Items) != 1 {
+			t.Fatalf("expected 1 item, got %d: %+v", len(got.Items), got.Items)
+		}
+		row := got.Items[0]
+		if row.IPv4NSCount != 2 || row.IPv6NSCount != 1 {
+			t.Errorf("family counts = (%d,%d), want (2,1)", row.IPv4NSCount, row.IPv6NSCount)
+		}
+		if row.DNSKEYAlgoWeakest == nil || *row.DNSKEYAlgoWeakest != 5 {
+			t.Fatalf("weakest algo = %v, want 5", row.DNSKEYAlgoWeakest)
+		}
+		if row.DNSKEYAlgoWeakestLabel != "RSASHA1" || row.DNSKEYAlgoWeakestTone != "error" {
+			t.Errorf("algo display = (%q,%q), want (RSASHA1, error)",
+				row.DNSKEYAlgoWeakestLabel, row.DNSKEYAlgoWeakestTone)
+		}
+		if row.DNSKEYCount == nil || *row.DNSKEYCount != 2 {
+			t.Errorf("key count = %v, want 2", row.DNSKEYCount)
+		}
+	})
+}
+
+func TestSortAnalysisDomainViewsByZoneFactColumns(t *testing.T) {
+	algo := func(n int) *int { return &n }
+	base := []PublicAnalysisDomainView{
+		{Domain: "weak.example", IPv4NSCount: 2, IPv6NSCount: 0, DNSKEYAlgoWeakest: algo(5), DNSKEYCount: algo(4)},
+		{Domain: "modern.example", IPv4NSCount: 3, IPv6NSCount: 3, DNSKEYAlgoWeakest: algo(13), DNSKEYCount: algo(2)},
+		{Domain: "rsa.example", IPv4NSCount: 1, IPv6NSCount: 1, DNSKEYAlgoWeakest: algo(8), DNSKEYCount: algo(6)},
+		{Domain: "unsigned.example", IPv4NSCount: 4, IPv6NSCount: 2},
+	}
+	clone := func() []PublicAnalysisDomainView {
+		out := make([]PublicAnalysisDomainView, len(base))
+		copy(out, base)
+		return out
+	}
+
+	cases := []struct {
+		mode      string
+		wantOrder []string
+	}{
+		{"ipv4_ns_count_asc", []string{"rsa.example", "weak.example", "modern.example", "unsigned.example"}},
+		{"ipv4_ns_count_desc", []string{"unsigned.example", "modern.example", "weak.example", "rsa.example"}},
+		{"ipv6_ns_count_asc", []string{"weak.example", "rsa.example", "unsigned.example", "modern.example"}},
+		{"ipv6_ns_count_desc", []string{"modern.example", "unsigned.example", "rsa.example", "weak.example"}},
+		{"dnskey_algo_weakest_asc", []string{"weak.example", "rsa.example", "modern.example", "unsigned.example"}},
+		{"dnskey_algo_weakest_desc", []string{"modern.example", "rsa.example", "weak.example", "unsigned.example"}},
+		{"dnskey_count_asc", []string{"modern.example", "weak.example", "rsa.example", "unsigned.example"}},
+		{"dnskey_count_desc", []string{"rsa.example", "weak.example", "modern.example", "unsigned.example"}},
+	}
+	for _, c := range cases {
+		t.Run(c.mode, func(t *testing.T) {
+			got := clone()
+			sortAnalysisDomainViews(got, c.mode)
+			for i, want := range c.wantOrder {
+				if got[i].Domain != want {
+					t.Fatalf("%s: position %d = %q, want %q (full order=%+v)", c.mode, i, got[i].Domain, want, got)
+				}
+			}
+		})
+	}
+}
+
 func TestPublicAnalysisDomainsRedactsInternalIDs(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		finishedAt := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)

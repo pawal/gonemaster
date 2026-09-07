@@ -148,3 +148,76 @@ func TestDNSKEYAlgorithmKeyLabelFallback(t *testing.T) {
 		t.Fatalf("non-numeric key should pass through, got %q", got)
 	}
 }
+
+// TestDNSKEYAlgorithmWeaknessRankOrdersByClassThenNumber pins the ordering
+// the weakest-algorithm bar and the domain-list sort both depend on: the
+// tone class dominates, the algorithm number only separates peers inside a
+// class, and an algorithm the tone table does not know ranks below every
+// usable class because no validator can use it.
+func TestDNSKEYAlgorithmWeaknessRankOrdersByClassThenNumber(t *testing.T) {
+	// Weakest first: unassigned (no class), SHA-1 family (error),
+	// RSASHA1-NSEC3 (warning), RSA/SHA-256 (notice), curves (ok).
+	weakestFirst := []string{"200", "1", "5", "7", "8", "10", "13", "15"}
+	for i := 1; i < len(weakestFirst); i++ {
+		prev := DNSKEYAlgorithmWeaknessRank(weakestFirst[i-1])
+		cur := DNSKEYAlgorithmWeaknessRank(weakestFirst[i])
+		if prev >= cur {
+			t.Errorf("rank(%s)=%d must be below rank(%s)=%d",
+				weakestFirst[i-1], prev, weakestFirst[i], cur)
+		}
+	}
+
+	// Same class, so only the number separates them.
+	if DNSKEYAlgorithmWeaknessRank("8") >= DNSKEYAlgorithmWeaknessRank("10") {
+		t.Error("within one class the lower algorithm number must rank first")
+	}
+
+	// A non-numeric key cannot be ranked; it sorts last rather than
+	// masquerading as the weakest algorithm in the cohort.
+	if DNSKEYAlgorithmWeaknessRank("bogus") <= DNSKEYAlgorithmWeaknessRank("15") {
+		t.Error("a non-numeric key must sort after every real algorithm")
+	}
+}
+
+// TestNewFactCategoriesAreRegistered guards the registry wiring: an
+// extractor that emits a category with no display entry renders as a raw
+// token with neutral tones on the overview.
+func TestNewFactCategoriesAreRegistered(t *testing.T) {
+	for _, category := range []string{FactCategoryIPv6Coverage, FactCategoryDNSKEYAlgoWeakest} {
+		display, ok := factCategoryDisplays[category]
+		if !ok {
+			t.Fatalf("category %q has no display entry", category)
+		}
+		if display.Label == "" || display.KeyLabel == nil || display.KeyTone == nil || display.KeyOrder == nil {
+			t.Errorf("category %q display entry is incomplete: %+v", category, display)
+		}
+	}
+}
+
+// TestIPv6CoverageBucketsReadWorstFirst pins the coverage bar's tones and
+// order so "none" leads the bar in red and "full" closes it in green.
+func TestIPv6CoverageBucketsReadWorstFirst(t *testing.T) {
+	cases := []struct {
+		key   string
+		tone  string
+		order int
+	}{
+		{FactKeyCoverageNone, "error", 0},
+		{FactKeyCoveragePartial, "warning", 1},
+		{FactKeyCoverageFull, "ok", 2},
+	}
+	for _, c := range cases {
+		if got := coverageKeyTone(c.key); got != c.tone {
+			t.Errorf("tone(%s) = %q, want %q", c.key, got, c.tone)
+		}
+		if got := coverageKeyOrder(c.key); got != c.order {
+			t.Errorf("order(%s) = %d, want %d", c.key, got, c.order)
+		}
+		if got := coverageKeyLabel(c.key); got == "" || got == c.key {
+			t.Errorf("label(%s) = %q, want a human label", c.key, got)
+		}
+	}
+	if got := coverageKeyTone("unknown"); got != "neutral" {
+		t.Errorf("unknown coverage key tone = %q, want neutral", got)
+	}
+}

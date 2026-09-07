@@ -323,3 +323,77 @@ func TestDomainDetailIncludesNameserverTimings(t *testing.T) {
 		}
 	})
 }
+
+// TestDomainDetailZoneFactFields covers the zone-fact fields on the detail
+// response: the per-family nameserver counts, and the weakest signing
+// algorithm carrying its label and tone so the client needs no mnemonic
+// table of its own.
+func TestDomainDetailZoneFactFields(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+		f.seedGraduatedRun("alpha.example", now, []engine.LogEntry{
+			{Module: "DNSSEC", Testcase: "dnssec05", Tag: "DS05_ALGO_OK", Level: "INFO"},
+		})
+		runID := "run-alpha.example-" + now.Format("20060102150405")
+		// ns1 is dual-stack, ns2 is IPv4 only.
+		f.seedEndpoint(runID, "alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+		f.seedEndpoint(runID, "alpha.example", "ns1.example", "2001:db8::1", "ipv6", now, 64500, "2001:db8::/32")
+		f.seedEndpoint(runID, "alpha.example", "ns2.example", "192.0.2.2", "ipv4", now, 64500, "192.0.2.0/24")
+
+		domain, ok := f.store.GetDomainByName("alpha.example")
+		if !ok {
+			t.Fatal("seeded domain missing")
+		}
+		keys := int64(3)
+		if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, runID, []AnalysisRunDomainFact{{
+			CohortID: f.cohort.ID, RunID: runID, DomainID: domain.ID,
+			Category: FactCategoryDNSKEYAlgoWeakest, Key: "8", ValueNum: &keys,
+		}}); err != nil {
+			t.Fatalf("replace domain facts: %v", err)
+		}
+		f.refreshSnapshotViews(f.batchID)
+
+		resp := getPublic(t, f.srv, f.publicURL("domains/alpha.example"))
+		got := mustJSON[PublicAnalysisDomainDetail](t, resp, http.StatusOK)
+		if got.IPv4NSCount != 2 || got.IPv6NSCount != 1 {
+			t.Errorf("family counts = (%d,%d), want (2,1)", got.IPv4NSCount, got.IPv6NSCount)
+		}
+		if got.DNSKEYAlgoWeakest == nil || *got.DNSKEYAlgoWeakest != 8 {
+			t.Fatalf("weakest algo = %v, want 8", got.DNSKEYAlgoWeakest)
+		}
+		if got.DNSKEYAlgoWeakestLabel != "RSASHA256" || got.DNSKEYAlgoWeakestTone != "notice" {
+			t.Errorf("algo display = (%q,%q), want (RSASHA256, notice)",
+				got.DNSKEYAlgoWeakestLabel, got.DNSKEYAlgoWeakestTone)
+		}
+		if got.DNSKEYCount == nil || *got.DNSKEYCount != 3 {
+			t.Errorf("key count = %v, want 3", got.DNSKEYCount)
+		}
+	})
+}
+
+// TestDomainDetailOmitsAlgoFieldsWhenUnsigned proves an unsigned domain
+// carries no algorithm fields at all rather than a zero algorithm number,
+// which would render as a real (reserved) algorithm.
+func TestDomainDetailOmitsAlgoFieldsWhenUnsigned(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+		f.seedGraduatedRun("plain.example", now, []engine.LogEntry{
+			{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED", Level: "ERROR"},
+		})
+
+		resp := getPublic(t, f.srv, f.publicURL("domains/plain.example"))
+		got := mustJSON[PublicAnalysisDomainDetail](t, resp, http.StatusOK)
+		if got.DNSKEYAlgoWeakest != nil || got.DNSKEYCount != nil {
+			t.Errorf("unsigned domain carries algo fields: %v / %v", got.DNSKEYAlgoWeakest, got.DNSKEYCount)
+		}
+		if got.DNSKEYAlgoWeakestLabel != "" || got.DNSKEYAlgoWeakestTone != "" {
+			t.Errorf("unsigned domain carries algo display: %q / %q",
+				got.DNSKEYAlgoWeakestLabel, got.DNSKEYAlgoWeakestTone)
+		}
+		for _, needle := range []string{`"dnskey_algo_weakest"`, `"dnskey_count"`} {
+			if strings.Contains(resp.Body.String(), needle) {
+				t.Errorf("response should omit %s: %s", needle, resp.Body.String())
+			}
+		}
+	})
+}

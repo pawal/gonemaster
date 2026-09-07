@@ -11,16 +11,22 @@ import (
 // wire-format tokens. Adding a new statistic means adding one constant
 // plus one entry in factCategoryDisplay below.
 const (
-	FactCategorySeverity        = "severity"
-	FactCategoryDNSSECPosture   = "dnssec_posture"
-	FactCategoryGrade           = "grade"
-	FactCategoryDNSKEYAlgorithm = "dnskey_algo"
+	FactCategorySeverity          = "severity"
+	FactCategoryDNSSECPosture     = "dnssec_posture"
+	FactCategoryGrade             = "grade"
+	FactCategoryDNSKEYAlgorithm   = "dnskey_algo"
+	FactCategoryIPv6Coverage      = "ipv6_coverage"
+	FactCategoryDNSKEYAlgoWeakest = "dnskey_algo_weakest"
 
 	FactKeySigned    = "signed"
 	FactKeyUnsigned  = "unsigned"
 	FactKeyNSEC      = "nsec"
 	FactKeyNSEC3     = "nsec3"
 	FactKeyNSECMixed = "mixed"
+
+	FactKeyCoverageFull    = "full"
+	FactKeyCoveragePartial = "partial"
+	FactKeyCoverageNone    = "none"
 )
 
 // factCategoryDisplay carries the UI-side metadata for one category:
@@ -83,6 +89,61 @@ var factCategoryDisplays = map[string]factCategoryDisplay{
 		KeyTone:     dnskeyAlgorithmKeyTone,
 		KeyOrder:    dnskeyAlgorithmKeyOrder,
 	},
+	FactCategoryIPv6Coverage: {
+		Label:       "IPv6 coverage",
+		Description: "How many of a domain's nameservers publish an IPv6 address.",
+		Order:       12,
+		KeyLabel:    coverageKeyLabel,
+		KeyTone:     coverageKeyTone,
+		KeyOrder:    coverageKeyOrder,
+	},
+	FactCategoryDNSKEYAlgoWeakest: {
+		Label: "Weakest signing algorithm",
+		// A validator accepts any algorithm it supports, so a zone is only
+		// as strong as the weakest one it publishes. One bucket per signed
+		// domain, unlike the dnskey_algo bar.
+		Description: "The weakest signing algorithm each signed domain publishes.",
+		Order:       22,
+		KeyLabel:    dnskeyAlgorithmKeyLabel,
+		KeyTone:     dnskeyAlgorithmKeyTone,
+		KeyOrder:    DNSKEYAlgorithmWeaknessRank,
+	},
+}
+
+func coverageKeyLabel(key string) string {
+	switch key {
+	case FactKeyCoverageFull:
+		return "All nameservers"
+	case FactKeyCoveragePartial:
+		return "Some nameservers"
+	case FactKeyCoverageNone:
+		return "None"
+	}
+	return key
+}
+
+func coverageKeyTone(key string) string {
+	switch key {
+	case FactKeyCoverageFull:
+		return "ok"
+	case FactKeyCoveragePartial:
+		return "warning"
+	case FactKeyCoverageNone:
+		return "error"
+	}
+	return "neutral"
+}
+
+func coverageKeyOrder(key string) int {
+	switch key {
+	case FactKeyCoverageNone:
+		return 0
+	case FactKeyCoveragePartial:
+		return 1
+	case FactKeyCoverageFull:
+		return 2
+	}
+	return 99
 }
 
 // severityLabels mirrors the worst_level set the projector emits per run.
@@ -253,6 +314,29 @@ func dnskeyAlgorithmKeyOrder(key string) int {
 		return 1 << 30
 	}
 	return n
+}
+
+// dnskeyAlgorithmClassRank orders the tone classes weakest first. Derived
+// from dnskeyAlgorithmTones so there is no second policy table to keep in
+// sync; an algorithm with no tone entry (private, unassigned) gets class 0
+// because no validator can use it.
+var dnskeyAlgorithmClassRank = map[string]int{
+	"error":   1,
+	"warning": 2,
+	"notice":  3,
+	"ok":      4,
+}
+
+// DNSKEYAlgorithmWeaknessRank ranks a DNSKEY algorithm number weakest
+// first: tone class, then algorithm number within the class. Shared by the
+// weakest-algorithm bar order, the projector's per-zone pick, and the
+// domain-list sort.
+func DNSKEYAlgorithmWeaknessRank(key string) int {
+	n, err := strconv.Atoi(key)
+	if err != nil {
+		return 1 << 30
+	}
+	return dnskeyAlgorithmClassRank[dnskeyAlgorithmTones[n]]*1000 + n
 }
 
 // gradeTones maps the default scoring config's letter grades to bar

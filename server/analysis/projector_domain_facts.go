@@ -12,16 +12,22 @@ import (
 // code here and the display registry on the server side share the wire
 // token without a redeclaration drift risk.
 const (
-	factCategorySeverity        = serverpkg.FactCategorySeverity
-	factCategoryDNSSECPosture   = serverpkg.FactCategoryDNSSECPosture
-	factCategoryGrade           = serverpkg.FactCategoryGrade
-	factCategoryDNSKEYAlgorithm = serverpkg.FactCategoryDNSKEYAlgorithm
+	factCategorySeverity          = serverpkg.FactCategorySeverity
+	factCategoryDNSSECPosture     = serverpkg.FactCategoryDNSSECPosture
+	factCategoryGrade             = serverpkg.FactCategoryGrade
+	factCategoryDNSKEYAlgorithm   = serverpkg.FactCategoryDNSKEYAlgorithm
+	factCategoryIPv6Coverage      = serverpkg.FactCategoryIPv6Coverage
+	factCategoryDNSKEYAlgoWeakest = serverpkg.FactCategoryDNSKEYAlgoWeakest
 
 	factKeySigned    = serverpkg.FactKeySigned
 	factKeyUnsigned  = serverpkg.FactKeyUnsigned
 	factKeyNSEC      = serverpkg.FactKeyNSEC
 	factKeyNSEC3     = serverpkg.FactKeyNSEC3
 	factKeyNSECMixed = serverpkg.FactKeyNSECMixed
+
+	factKeyCoverageFull    = serverpkg.FactKeyCoverageFull
+	factKeyCoveragePartial = serverpkg.FactKeyCoveragePartial
+	factKeyCoverageNone    = serverpkg.FactKeyCoverageNone
 )
 
 // extractedDomainFact is one (category, key) fact to materialize for this
@@ -35,14 +41,86 @@ type extractedDomainFact struct {
 
 // extractDomainFacts is the dispatcher for all domain-fact extractors. Each
 // extractor returns its own slice; the dispatcher concatenates, dedupes on
-// (category, key), and keeps the first value_num seen per key.
-func extractDomainFacts(input RunInput) []extractedDomainFact {
+// (category, key), and keeps the first value_num seen per key. endpoints is
+// the set the projector already derived for this run, so address-family
+// facts do not derive it a second time.
+func extractDomainFacts(input RunInput, endpoints []extractedEndpoint) []extractedDomainFact {
 	var out []extractedDomainFact
 	out = append(out, extractSeverity(input)...)
 	out = append(out, extractDNSSECPosture(input)...)
 	out = append(out, extractDNSKEYAlgorithms(input)...)
+	out = append(out, extractDNSKEYAlgoWeakest(input)...)
+	out = append(out, extractIPv6Coverage(endpoints)...)
 	out = append(out, extractGrade(input)...)
 	return dedupeDomainFacts(out)
+}
+
+// extractIPv6Coverage emits one fact per run partitioning the domain by how
+// many of its authoritative nameservers publish an IPv6 address. Presence in
+// DNS, not reachability: an AAAA that timed out still counts. Parent-side
+// endpoints are excluded, matching the snapshot views.
+func extractIPv6Coverage(endpoints []extractedEndpoint) []extractedDomainFact {
+	hasV6 := map[string]bool{}
+	for _, ep := range endpoints {
+		if ep.nameserver == "" || ep.role == "parent" {
+			continue
+		}
+		if ep.family == "ipv6" {
+			hasV6[ep.nameserver] = true
+			continue
+		}
+		if _, seen := hasV6[ep.nameserver]; !seen {
+			hasV6[ep.nameserver] = false
+		}
+	}
+	if len(hasV6) == 0 {
+		return nil
+	}
+	covered := 0
+	for _, ok := range hasV6 {
+		if ok {
+			covered++
+		}
+	}
+	key := factKeyCoveragePartial
+	switch covered {
+	case len(hasV6):
+		key = factKeyCoverageFull
+	case 0:
+		key = factKeyCoverageNone
+	}
+	return []extractedDomainFact{{category: factCategoryIPv6Coverage, key: key}}
+}
+
+// extractDNSKEYAlgoWeakest emits one fact per signed zone carrying the
+// weakest algorithm it publishes, since a validator accepts any algorithm it
+// supports. value_num is the zone's distinct keytag count across all
+// algorithms. Unsigned zones emit nothing.
+func extractDNSKEYAlgoWeakest(input RunInput) []extractedDomainFact {
+	keytagsPerAlgo := dnskeyKeytagsPerAlgo(input)
+	if len(keytagsPerAlgo) == 0 {
+		return nil
+	}
+	weakest := int64(-1)
+	weakestRank := 0
+	keytags := map[int64]struct{}{}
+	for algo, tags := range keytagsPerAlgo {
+		for kt := range tags {
+			keytags[kt] = struct{}{}
+		}
+		rank := serverpkg.DNSKEYAlgorithmWeaknessRank(strconv.FormatInt(algo, 10))
+		if weakest < 0 || rank < weakestRank {
+			weakest, weakestRank = algo, rank
+		}
+	}
+	fact := extractedDomainFact{
+		category: factCategoryDNSKEYAlgoWeakest,
+		key:      strconv.FormatInt(weakest, 10),
+	}
+	if count := int64(len(keytags)); count > 0 {
+		fact.valueNum = &count
+	}
+	return []extractedDomainFact{fact}
 }
 
 // extractSeverity emits exactly one fact per run carrying the worst
@@ -102,24 +180,7 @@ func dedupeDomainFacts(in []extractedDomainFact) []extractedDomainFact {
 // dedupe to the set of algorithms observed for this domain in this run.
 // value_num carries the count of distinct keytags seen with that algorithm.
 func extractDNSKEYAlgorithms(input RunInput) []extractedDomainFact {
-	keytagsPerAlgo := map[int64]map[int64]struct{}{}
-	for _, entry := range input.Entries {
-		if !strings.HasPrefix(entry.Tag, "DS05_ALGO_") {
-			continue
-		}
-		algo, ok := numericArg(entry.Args, "algo_num")
-		if !ok {
-			continue
-		}
-		keytags, exists := keytagsPerAlgo[algo]
-		if !exists {
-			keytags = map[int64]struct{}{}
-			keytagsPerAlgo[algo] = keytags
-		}
-		if kt, ok := numericArg(entry.Args, "keytag"); ok {
-			keytags[kt] = struct{}{}
-		}
-	}
+	keytagsPerAlgo := dnskeyKeytagsPerAlgo(input)
 	if len(keytagsPerAlgo) == 0 {
 		return nil
 	}
@@ -134,6 +195,32 @@ func extractDNSKEYAlgorithms(input RunInput) []extractedDomainFact {
 			fact.valueNum = &count
 		}
 		out = append(out, fact)
+	}
+	return out
+}
+
+// dnskeyKeytagsPerAlgo collects the distinct keytags per algorithm number
+// from the DNSSEC05 entries. DNSSEC05 logs one entry per (keytag, algo)
+// combination and repeats it per nameserver, so both algorithm extractors
+// dedupe through this one scan.
+func dnskeyKeytagsPerAlgo(input RunInput) map[int64]map[int64]struct{} {
+	out := map[int64]map[int64]struct{}{}
+	for _, entry := range input.Entries {
+		if !strings.HasPrefix(entry.Tag, "DS05_ALGO_") {
+			continue
+		}
+		algo, ok := numericArg(entry.Args, "algo_num")
+		if !ok {
+			continue
+		}
+		keytags, exists := out[algo]
+		if !exists {
+			keytags = map[int64]struct{}{}
+			out[algo] = keytags
+		}
+		if kt, ok := numericArg(entry.Args, "keytag"); ok {
+			keytags[kt] = struct{}{}
+		}
 	}
 	return out
 }

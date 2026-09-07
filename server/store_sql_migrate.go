@@ -588,6 +588,18 @@ var sqlMigrations = []sqlMigration{
 		version: 9,
 		stmts:   renameAnalysisTagStmts(),
 	},
+	{
+		// Per-domain address-family and signing-algorithm columns on the
+		// snapshot domain view. The algorithm columns are nullable: an
+		// unsigned domain has no weakest algorithm and no keys.
+		version: 10,
+		stmts: []string{
+			`ALTER TABLE analysis_snapshot_domain_view ADD COLUMN ipv4_ns_count INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE analysis_snapshot_domain_view ADD COLUMN ipv6_ns_count INTEGER NOT NULL DEFAULT 0`,
+			`ALTER TABLE analysis_snapshot_domain_view ADD COLUMN dnskey_algo_weakest INTEGER`,
+			`ALTER TABLE analysis_snapshot_domain_view ADD COLUMN dnskey_count INTEGER`,
+		},
+	},
 }
 
 // retiredAnalysisTags is frozen at migration 9; a later rename needs its

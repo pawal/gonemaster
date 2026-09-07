@@ -3,7 +3,7 @@
 Status: Final
 
 ## Purpose
-- Verify that parent-side DS presence is consistent with child-side DNSKEY presence (zone signing expectation), including parent consistency and child consistency reporting.
+- Verify that parent-side DS presence is consistent with the child's signing state. A child nameserver counts as signed when it serves an apex DNSKEY RRset with at least one RRSIG covering DNSKEY. Parent consistency and child consistency are reported separately.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -11,7 +11,7 @@ Status: Final
 - Required inputs:
   - Parent nameservers from [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers).
   - Child nameservers from [`GlueNameservers`](../../nameserver-resolution.md#gluenameservers) and [`ApexNameservers`](../../nameserver-resolution.md#apexnameservers).
-  - DS, SOA, and DNSKEY query responses.
+  - DS, SOA, and DNSKEY (DO bit set) query responses.
   - Optional undelegated DS records (`FakeDSRecords`) when fake-address mode is active.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
@@ -37,13 +37,13 @@ Status: Final
    - For each nameserver (parallelized):
      - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtypes `SOA` and `DNSKEY` and skip.
      - Query SOA over UDP (`UseVC=false`); require usable authoritative apex SOA.
-     - Query DNSKEY over UDP (`UseVC=false`), retry over TCP on truncation.
-     - Classify nameserver as `Undetermined signed zone`, `No DNSKEY`, or `Has DNSKEY`.
+     - Query DNSKEY with DNSSEC enabled over UDP (`UseVC=false`), retry over TCP on truncation.
+     - Classify the nameserver as `Undetermined signed zone` when no usable authoritative `NOERROR` DNSKEY response is available; as `Unsigned` when the apex DNSKEY RRset is absent, or present without an RRSIG covering DNSKEY in the answer section; as `Signed` when apex DNSKEY records and at least one such RRSIG are present.
 7. Child decision:
    - `Undetermined` only => emit `DS11_UNDETERMINED_SIGNED_ZONE`.
-   - `No DNSKEY` only => emit `DS11_DS_BUT_UNSIGNED_ZONE`.
-   - Mixed `No DNSKEY` and `Has DNSKEY` => emit `DS11_INCONSISTENT_SIGNED_ZONE`, `DS11_NS_WITH_UNSIGNED_ZONE`, `DS11_NS_WITH_SIGNED_ZONE`.
-   - `Has DNSKEY` only (no undetermined, no absent) => emit `DS11_CONSISTENT_SIGNED`.
+   - `Unsigned` only => emit `DS11_DS_BUT_UNSIGNED_ZONE`.
+   - Mixed `Unsigned` and `Signed` => emit `DS11_INCONSISTENT_SIGNED_ZONE`, `DS11_NS_WITH_UNSIGNED_ZONE` for the unsigned subset, `DS11_NS_WITH_SIGNED_ZONE` for the signed subset.
+   - `Signed` only (no undetermined, no unsigned) => emit `DS11_CONSISTENT_SIGNED`.
 8. Emit `TEST_CASE_END`.
 
 ### Parent DS Phase (steps 4-5)
@@ -84,21 +84,22 @@ child set = GlueNameservers ++ ApexNameservers; dedupe by IP
 For each unique child NS IP (parallel):
 
    transport disabled for SOA/DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
-   query SOA at z.Name, DNSSEC=on, UseVC=false
-    +- no usable authoritative apex SOA          -> undeterminedSignedZone
+   query SOA at z.Name, DNSSEC=off, UseVC=false
+    +- no usable authoritative apex SOA          -> skipped, no child classification
    query DNSKEY at z.Name, DNSSEC=on, UseVC=false
       (resp.TC() -> retry with UseVC=true)
     +- no usable response                        -> undeterminedSignedZone
-    +- no apex DNSKEY in answer                  -> noDNSKEY
-    +- apex DNSKEY records in answer             -> hasDNSKEY
+    +- no apex DNSKEY in answer                  -> unsigned
+    +- apex DNSKEY, no RRSIG covering DNSKEY     -> unsigned
+    +- apex DNSKEY and RRSIG covering DNSKEY     -> signed
 
 Child decision:
    only undeterminedSignedZone                   -> DS11_UNDETERMINED_SIGNED_ZONE
-   only noDNSKEY                                 -> DS11_DS_BUT_UNSIGNED_ZONE
-   mixed noDNSKEY and hasDNSKEY                  -> DS11_INCONSISTENT_SIGNED_ZONE
+   only unsigned                                 -> DS11_DS_BUT_UNSIGNED_ZONE
+   mixed unsigned and signed                     -> DS11_INCONSISTENT_SIGNED_ZONE
                                                     DS11_NS_WITH_UNSIGNED_ZONE (addresses)
                                                     DS11_NS_WITH_SIGNED_ZONE   (addresses)
-   only hasDNSKEY (no undetermined, no noDNSKEY) -> DS11_CONSISTENT_SIGNED
+   only signed (no undetermined, no unsigned)    -> DS11_CONSISTENT_SIGNED
 
 emit TEST_CASE_END
 ```
@@ -107,12 +108,12 @@ emit TEST_CASE_END
 ## Emitted Tags (Possible Set)
 | Tag | Emitted when |
 | --- | --- |
-| `DS11_CONSISTENT_SIGNED` | Parent has DS and all child nameservers have DNSKEY - zone is consistently signed. |
-| `DS11_DS_BUT_UNSIGNED_ZONE` | Parent DS indicates signing expectation but child nameservers show no DNSKEY evidence. |
+| `DS11_CONSISTENT_SIGNED` | Parent has DS and every child nameserver serves a signed DNSKEY RRset. |
+| `DS11_DS_BUT_UNSIGNED_ZONE` | Parent has DS but no child nameserver serves a signed DNSKEY RRset, because the RRset is absent or unsigned. |
 | `DS11_INCONSISTENT_DS` | Parent nameservers disagree on DS existence. |
-| `DS11_INCONSISTENT_SIGNED_ZONE` | Child nameservers disagree on DNSKEY presence. |
-| `DS11_NS_WITH_SIGNED_ZONE` | Child nameservers in the signed subset are listed. |
-| `DS11_NS_WITH_UNSIGNED_ZONE` | Child nameservers in the unsigned subset are listed. |
+| `DS11_INCONSISTENT_SIGNED_ZONE` | Child nameservers disagree on whether the DNSKEY RRset is signed. |
+| `DS11_NS_WITH_SIGNED_ZONE` | Child nameservers serving a signed DNSKEY RRset are listed. |
+| `DS11_NS_WITH_UNSIGNED_ZONE` | Child nameservers not serving a signed DNSKEY RRset are listed. |
 | `DS11_PARENT_WITHOUT_DS` | Parent nameservers without DS are listed in mixed-DS state. |
 | `DS11_PARENT_WITH_DS` | Parent nameservers with DS are listed in mixed-DS state. |
 | `DS11_UNDETERMINED_DS` | Parent DS state could not be determined at all. |
@@ -168,11 +169,21 @@ emit TEST_CASE_END
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes normal parent lookup through z.Parent(ctx) and undelegated behavior from test-type inputs. Gonemaster: uses the [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers) abstraction plus a fake-DS shortcut via nameserver `FakeDSRecords`.
+  - Upstream: the child's signing state is decided by DNSKEY presence in a query without the DO bit. Gonemaster: a DNSKEY RRset must carry an RRSIG covering DNSKEY, observed with the DO bit, which is the same test DNSSEC07 applies (`DIV-DS11-UNSIGNED-DNSKEY`).
+  - Upstream: emits nothing when every child nameserver serves the DNSKEY RRset. Gonemaster: emits `DS11_CONSISTENT_SIGNED`, which has no upstream counterpart.
+  - Upstream: emits nothing when no parent nameserver publishes DS. Gonemaster: emits `DS11_NO_PARENT_DS`, which has no upstream counterpart.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
-  - `no`
+  - `yes`
+- If yes, include:
+  - Upstream expected behavior: A child that publishes an apex DNSKEY RRset counts as signed, so a DS at the parent raises no finding even when the RRset carries no signature.
+  - Gonemaster observed behavior: The child counts as signed only when the apex DNSKEY RRset carries an RRSIG covering DNSKEY, so a DS at the parent of such a zone yields `DS11_DS_BUT_UNSIGNED_ZONE` at `ERROR`.
+  - evidence: `engine/test/dnssec/dnssec.go` (DNSSEC11 child DNSKEY phase). Validating resolvers return SERVFAIL for a zone in this state, so the delegation is unusable while upstream reports it as signed.
+  - report status: `filed` ([zonemaster-engine#1549](https://github.com/zonemaster/zonemaster-engine/issues/1549))
 
 ## Edge Cases And Limitations
 - Nameserver evaluation is deduplicated by IP; repeated names on one IP share one DS11 outcome.
 - When parent evaluation yields only `No DS` (and no `Has DS`), testcase emits `DS11_NO_PARENT_DS` and exits without child checks.
 - Child-side `undetermined` classification requires SOA preconditions to pass first; unusable SOA responses are skipped before DNSKEY classification.
+- A zone that publishes DNSKEY records but serves no RRSIG over them is unsigned to a validating resolver. With a DS at the parent this is `DS11_DS_BUT_UNSIGNED_ZONE`.
+- The child DNSKEY query shares its cache key with the DNSSEC07 DNSKEY query, so in a full run the child phase issues no additional queries.

@@ -141,7 +141,7 @@ emit TEST_CASE_END
 | `DS07_INCONSISTENT_SIGNED` | Both child signed-response and child no-DNSKEY-signature sets are non-empty. |
 | `DS07_NON_AUTH_RESPONSE_DNSKEY` | Child nameservers returned DNSKEY responses without AA. |
 | `DS07_NOT_SIGNED` | Zone is determined not signed by child-evaluation logic. |
-| `DS07_NOT_SIGNED_ON_SERVER` | Child nameservers returned responses without DNSKEY-covering RRSIG evidence. |
+| `DS07_NOT_SIGNED_ON_SERVER` | Child nameservers whose DNSKEY response carries no RRSIG covering DNSKEY, either because the DNSKEY RRset is absent or because it is unsigned. |
 | `DS07_NO_DS_ON_PARENT_SERVER` | At least one parent nameserver returned no DS-signature evidence and at least one other parent nameserver did - i.e., the parent is inconsistent. Suppressed when every parent fails. |
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | Zone is considered signed but no parent DS-present evidence exists. |
 | `DS07_NO_RESPONSE_DNSKEY` | Child nameservers did not respond to DNSKEY query. |
@@ -162,7 +162,7 @@ emit TEST_CASE_END
 | `DS07_INCONSISTENT_SIGNED` | `-` | `-` | No arguments. |
 | `DS07_NON_AUTH_RESPONSE_DNSKEY` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) returning non-AA DNSKEY responses. |
 | `DS07_NOT_SIGNED` | `-` | `-` | No arguments. |
-| `DS07_NOT_SIGNED_ON_SERVER` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) without DNSKEY-signature evidence. |
+| `DS07_NOT_SIGNED_ON_SERVER` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) whose DNSKEY response carries no RRSIG covering DNSKEY, either because the DNSKEY RRset is absent or because it is unsigned. |
 | `DS07_NO_DS_ON_PARENT_SERVER` | `servers` | `array<object>` | Structured parent nameserver identities (`{ns,address}` object) with no DS-signature evidence. |
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | `-` | `-` | No arguments. |
 | `DS07_NO_RESPONSE_DNSKEY` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) with no DNSKEY response. |
@@ -204,6 +204,7 @@ emit TEST_CASE_END
 - Differences (Upstream vs Gonemaster):
   - Upstream: summary text states that if no DNSKEY records are found then no messages are output. Gonemaster: emits not-signed findings (`DS07_NOT_SIGNED_ON_SERVER`, `DS07_NOT_SIGNED`) in that case when child responses are otherwise usable.
   - Upstream: parent DS-positive condition is described as requiring DS plus RRSIG covering DS. Gonemaster: parent DS-positive check is driven by presence of an `RRSIG` covering `DS` for child owner and does not explicitly assert DS RR presence in the same branch.
+  - Upstream: the `DS07_NOT_SIGNED_ON_SERVER` message states that the servers respond with no DNSKEY. Gonemaster: the message states that the DNSKEY RRset is not signed, because the classification is RRSIG-based and also fires for zones that publish DNSKEYs (`DIV-DS11-UNSIGNED-DNSKEY`, reported together with dnssec11).
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
 - Potential upstream report:
   - `no`
@@ -212,3 +213,4 @@ emit TEST_CASE_END
 - Ignored parent nameserver outcomes are tracked internally but have no dedicated DS07 output tag.
 - Child transport-disabled path logs rrtypes `SOA`, `DNSKEY`, and `DS`, even though DS is only queried against parent nameservers in this testcase.
 - Parent DS evaluation is fully skipped when no signed child response is observed.
+- A DNSKEY RRset without a covering RRSIG is classified exactly like an absent DNSKEY RRset. The parent-DS consequence of that state is reported by DNSSEC11, which runs before the module short-circuit.

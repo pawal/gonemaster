@@ -472,7 +472,7 @@ Header: Zone is not signed
 
 Description:
 
-Nothing about the zone looks signed - no DNSKEYs or RRSIGs are visible. If the parent has DS for you, resolvers will currently report everything from the zone as bogus. Either complete the signing or remove the DS at the registry.
+No signatures are visible anywhere in the zone; publishing DNSKEYs alone does not sign it. If the parent has DS for you, resolvers currently report everything from the zone as bogus. Either complete the signing or remove the DS at the registry.
 
 ## Tag DS07_NOT_SIGNED_ON_SERVER
 
@@ -480,7 +480,7 @@ Header: Nameserver serves zone unsigned
 
 Description:
 
-A specific nameserver returns the zone without DNSSEC data even though other servers serve it signed. Resolvers that land on this server will see an unsigned answer, and will treat it as a downgrade attack when your parent has DS.
+This nameserver serves the zone without a signed DNSKEY RRset, either no DNSKEYs at all or DNSKEYs with no covering RRSIG. When every server is listed the whole zone is unsigned; when only some are, resolvers that land on them see an unsigned answer and, if the parent has DS, treat it as bogus.
 
 ## Tag DS07_NO_DS_FOR_SIGNED_ZONE
 
@@ -888,7 +888,7 @@ Header: Child servers disagree on signed state
 
 Description:
 
-Some of your nameservers serve the zone signed and others serve it unsigned. Resolvers will get mixed signals about whether to validate - strict resolvers will treat the unsigned answers as bogus.
+Some of your nameservers serve a signed zone and others do not, either answering without DNSSEC data or serving DNSKEYs with no signatures. Resolvers get mixed signals about whether to validate, and strict resolvers treat the unsigned answers as bogus.
 
 ## Tag DS11_NS_WITH_UNSIGNED_ZONE
 
@@ -896,7 +896,7 @@ Header: Specific nameserver serves unsigned
 
 Description:
 
-A specific nameserver for your zone does not serve DNSSEC material. If the parent has DS for you, this server looks to a validating resolver like a downgrade attempt, and everything coming from it is treated as bogus.
+A specific nameserver for your zone does not serve a signed zone. It either returns no DNSSEC data at all, or DNSKEYs with no signatures. If the parent has DS for you, this server looks to a validating resolver like a downgrade attempt, and everything coming from it is treated as bogus.
 
 ## Tag DS11_UNDETERMINED_DS
 

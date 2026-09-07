@@ -8,10 +8,10 @@
     "logSystem(tag, args), logSystemWithLogger(..., tag, args)"
   ],
   "summary": {
-    "file_count": 135,
-    "log_call_count": 730,
-    "unique_tag_count": 525,
-    "unique_key_count": 88,
+    "file_count": 136,
+    "log_call_count": 732,
+    "unique_tag_count": 526,
+    "unique_key_count": 89,
     "ns_string_call_count": 0,
     "packed_list_only_key_count": 0,
     "unresolved_log_call_count": 129
@@ -359,13 +359,13 @@
         {
           "tag": "IPV4_ONE_ASN",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 418,
+          "line": 474,
           "shape": "unknown"
         },
         {
           "tag": "IPV6_ONE_ASN",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 440,
+          "line": 496,
           "shape": "unknown"
         }
       ]
@@ -389,37 +389,37 @@
         {
           "tag": "ASN_INFOS_ANNOUNCE_BY",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 308,
+          "line": 364,
           "shape": "unknown"
         },
         {
           "tag": "ASN_INFOS_ANNOUNCE_BY",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 373,
+          "line": 429,
           "shape": "unknown"
         },
         {
           "tag": "IPV4_DIFFERENT_ASN",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 430,
+          "line": 486,
           "shape": "unknown"
         },
         {
           "tag": "IPV4_SAME_ASN",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 424,
+          "line": 480,
           "shape": "unknown"
         },
         {
           "tag": "IPV6_DIFFERENT_ASN",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 452,
+          "line": 508,
           "shape": "unknown"
         },
         {
           "tag": "IPV6_SAME_ASN",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 446,
+          "line": 502,
           "shape": "unknown"
         }
       ]
@@ -894,19 +894,19 @@
         {
           "tag": "ASN_INFOS_RAW",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 299,
+          "line": 355,
           "shape": "unknown"
         },
         {
           "tag": "ASN_INFOS_RAW",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 364,
+          "line": 420,
           "shape": "unknown"
         },
         {
           "tag": "CN04_ASN_INFOS_RAW",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 548,
+          "line": 604,
           "shape": "unknown"
         },
         {
@@ -2322,6 +2322,26 @@
         }
       ]
     },
+    "payload": {
+      "tags": [
+        "group.tag"
+      ],
+      "shapes": [
+        "unknown"
+      ],
+      "producer_files": [
+        "engine/test/connectivity/connectivity.go"
+      ],
+      "occurrences": 1,
+      "samples": [
+        {
+          "tag": "group.tag",
+          "file": "engine/test/connectivity/connectivity.go",
+          "line": 748,
+          "shape": "unknown"
+        }
+      ]
+    },
     "prefixes": {
       "tags": [
         "ASN_INFOS_ANNOUNCE_IN",
@@ -2338,19 +2358,19 @@
         {
           "tag": "ASN_INFOS_ANNOUNCE_IN",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 320,
+          "line": 376,
           "shape": "array"
         },
         {
           "tag": "ASN_INFOS_ANNOUNCE_IN",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 385,
+          "line": 441,
           "shape": "array"
         },
         {
           "tag": "CN04_ASN_INFOS_ANNOUNCE_IN",
           "file": "engine/test/connectivity/connectivity.go",
-          "line": 558,
+          "line": 614,
           "shape": "array"
         }
       ]
@@ -2536,7 +2556,8 @@
         "IS_REDIRECT",
         "NO_SUCH_NAME",
         "NO_SUCH_RECORD",
-        "QUERY"
+        "QUERY",
+        "group.tag"
       ],
       "shapes": [
         "string",
@@ -2546,9 +2567,10 @@
         "engine/nameserver/nameserver.go",
         "engine/nameserver/query_helpers.go",
         "engine/packet/packet.go",
+        "engine/test/connectivity/connectivity.go",
         "engine/test/nameserver/nameserver.go"
       ],
-      "occurrences": 12,
+      "occurrences": 13,
       "samples": [
         {
           "tag": "BLACKLISTING",
@@ -2660,25 +2682,25 @@
         {
           "tag": "N16_HAS_NSID",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 2083,
+          "line": 2071,
           "shape": "unknown"
         },
         {
           "tag": "N16_NO_NSID_REVEALED",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 2092,
+          "line": 2080,
           "shape": "unknown"
         },
         {
           "tag": "N16_NO_RESPONSE",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 2100,
+          "line": 2088,
           "shape": "unknown"
         },
         {
           "tag": "N16_UNEXPECTED_RCODE",
           "file": "engine/test/nameserver/nameserver.go",
-          "line": 2113,
+          "line": 2101,
           "shape": "unknown"
         }
       ]
@@ -3085,16 +3107,18 @@
         "PACKET_BIG",
         "REFERRAL_SIZE_LARGE",
         "REFERRAL_SIZE_OK",
-        "REFERRAL_SIZE_TOO_LARGE"
+        "REFERRAL_SIZE_TOO_LARGE",
+        "group.tag"
       ],
       "shapes": [
         "unknown"
       ],
       "producer_files": [
         "engine/nameserver/nameserver.go",
+        "engine/test/connectivity/connectivity.go",
         "engine/test/delegation/delegation.go"
       ],
-      "occurrences": 4,
+      "occurrences": 5,
       "samples": [
         {
           "tag": "PACKET_BIG",
@@ -3118,6 +3142,12 @@
           "tag": "REFERRAL_SIZE_TOO_LARGE",
           "file": "engine/test/delegation/delegation.go",
           "line": 489,
+          "shape": "unknown"
+        },
+        {
+          "tag": "group.tag",
+          "file": "engine/test/connectivity/connectivity.go",
+          "line": 748,
           "shape": "unknown"
         }
       ]
@@ -3236,7 +3266,7 @@
         "engine/test/syntax/syntax.go",
         "engine/test/zone/zone.go"
       ],
-      "occurrences": 118,
+      "occurrences": 119,
       "samples": [
         {
           "tag": "TEST_CASE_END",
@@ -3468,19 +3498,19 @@
     {
       "tag": "AAAA_BAD_RDATA",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 904,
+      "line": 905,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"length\": 0,\n})"
     },
     {
       "tag": "AAAA_QUERY_DROPPED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 883,
+      "line": 884,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "AAAA_UNEXPECTED_RCODE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 891,
+      "line": 892,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"rcode\": resp.Rcode(),\n})"
     },
     {
@@ -3492,19 +3522,19 @@
     {
       "tag": "AXFR_AVAILABLE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 727,
+      "line": 728,
       "args_expr": "args"
     },
     {
       "tag": "AXFR_FAILURE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 721,
+      "line": 722,
       "args_expr": "args"
     },
     {
       "tag": "A_UNEXPECTED_RCODE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 872,
+      "line": 873,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"rcode\": resp.Rcode(),\n})"
     },
     {
@@ -3564,37 +3594,37 @@
     {
       "tag": "BREAKS_ON_EDNS",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 596,
+      "line": 597,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "CASE_QUERY_DIFFERENT_ANSWER",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1266,
+      "line": 1267,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n})"
     },
     {
       "tag": "CASE_QUERY_DIFFERENT_RC",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1286,
+      "line": 1287,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n\t\"rcode1\":\tp1.Rcode(),\n\t\"rcode2\":\tp2.Rcode(),\n})"
     },
     {
       "tag": "CASE_QUERY_NO_ANSWER",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1298,
+      "line": 1299,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"domain\":\tfirstNonEmpty(random1, p1, random2),\n})"
     },
     {
       "tag": "CASE_QUERY_SAME_ANSWER",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1257,
+      "line": 1258,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n})"
     },
     {
       "tag": "CASE_QUERY_SAME_RC",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1276,
+      "line": 1277,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\":\trecordType,\n\t\"query1\":\trandom1,\n\t\"query2\":\trandom2,\n\t\"rcode\":\tp1.Rcode(),\n})"
     },
     {
@@ -3606,19 +3636,19 @@
     {
       "tag": "DIFFERENT_SOURCE_IP",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 777,
+      "line": 778,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"source\": resp.AnswerFrom,\n})"
     },
     {
       "tag": "EDNS_RESPONSE_WITHOUT_EDNS",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 574,
+      "line": 575,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "EDNS_VERSION_ERROR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 581,
+      "line": 582,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
@@ -3654,7 +3684,7 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/connectivity/connectivity.go",
-      "line": 820,
+      "line": 1101,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3678,7 +3708,7 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 2794,
+      "line": 2782,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3744,7 +3774,7 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/connectivity/connectivity.go",
-      "line": 810,
+      "line": 1091,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3768,7 +3798,7 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 2784,
+      "line": 2772,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3810,7 +3840,7 @@
     {
       "tag": "IS_A_RECURSOR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 509,
+      "line": 510,
       "args_expr": "args"
     },
     {
@@ -3822,7 +3852,7 @@
     {
       "tag": "MISSING_OPT_IN_TRUNCATED",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1755,
+      "line": 1743,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
@@ -3846,25 +3876,25 @@
     {
       "tag": "NO_EDNS_SUPPORT",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 566,
+      "line": 567,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NO_EDNS_SUPPORT",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1674,
+      "line": 1675,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NO_EDNS_SUPPORT",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1751,
+      "line": 1739,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NO_RECURSOR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 515,
+      "line": 516,
       "args_expr": "args"
     },
     {
@@ -3918,31 +3948,31 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 447,
+      "line": 448,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": name,\n})"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 603,
+      "line": 604,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 863,
+      "line": 864,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1689,
+      "line": 1690,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1766,
+      "line": 1754,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"domain\": z.Name.String(),\n})"
     },
     {
@@ -4032,37 +4062,37 @@
     {
       "tag": "NO_UPWARD_REFERRAL",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1097,
+      "line": 1098,
       "args_expr": "args"
     },
     {
       "tag": "NS_ERROR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 588,
+      "line": 589,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NS_ERROR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1684,
+      "line": 1685,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "NS_ERROR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1761,
+      "line": 1749,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
       "tag": "QNAME_CASE_INSENSITIVE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1193,
+      "line": 1194,
       "args_expr": "args"
     },
     {
       "tag": "QNAME_CASE_SENSITIVE",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1186,
+      "line": 1187,
       "args_expr": "args"
     },
     {
@@ -4086,7 +4116,7 @@
     {
       "tag": "UPWARD_REFERRAL",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1091,
+      "line": 1092,
       "args_expr": "args"
     },
     {
@@ -4152,7 +4182,7 @@
     {
       "tag": "Z_FLAGS_NOTCLEAR",
       "file": "engine/test/nameserver/nameserver.go",
-      "line": 1678,
+      "line": 1679,
       "args_expr": "withNameserverArgs(server, nil)"
     },
     {
@@ -4188,37 +4218,37 @@
     {
       "tag": "fmt.Sprintf(\"%s_%s_RECORD_NOT_AA_%s\", prefix, qtype, protocol)",
       "file": "engine/test/connectivity/connectivity.go",
-      "line": 742,
+      "line": 1023,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "fmt.Sprintf(\"%s_MISSING_%s_RECORD_%s\", prefix, qtype, protocol)",
       "file": "engine/test/connectivity/connectivity.go",
-      "line": 721,
+      "line": 1002,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "fmt.Sprintf(\"%s_NO_RESPONSE_%s\", prefix, protocol)",
       "file": "engine/test/connectivity/connectivity.go",
-      "line": 688,
+      "line": 969,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "fmt.Sprintf(\"%s_NO_RESPONSE_%s_QUERY_%s\", prefix, qtype, protocol)",
       "file": "engine/test/connectivity/connectivity.go",
-      "line": 702,
+      "line": 983,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "fmt.Sprintf(\"%s_UNEXPECTED_RCODE_%s_QUERY_%s\", prefix, qtype, protocol)",
       "file": "engine/test/connectivity/connectivity.go",
-      "line": 710,
+      "line": 991,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"rcode\": resp.Rcode(),\n})"
     },
     {
       "tag": "fmt.Sprintf(\"%s_WRONG_%s_RECORD_%s\", prefix, qtype, protocol)",
       "file": "engine/test/connectivity/connectivity.go",
-      "line": 731,
+      "line": 1012,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"domain_found\":\t\tstrings.ToLower(rrOwner),\n\t\"domain_expected\":\tstrings.ToLower(expected),\n})"
     },
     {

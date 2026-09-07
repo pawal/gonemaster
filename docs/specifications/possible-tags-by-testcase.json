@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 83,
-    "unique_tag_count": 576
+    "testcase_count": 84,
+    "unique_tag_count": 582
   },
   "modules": {
     "address": {
@@ -176,6 +176,18 @@
         "CN04_IPV6_DIFFERENT_PREFIX",
         "CN04_IPV6_SAME_PREFIX",
         "CN04_IPV6_SINGLE_PREFIX",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
+      ],
+      "connectivity05": [
+        "CN05_ANSWER_FITS_UDP",
+        "CN05_ANSWER_NEEDS_TCP",
+        "CN05_LARGE_ANSWER_DELIVERED_UDP",
+        "CN05_LARGE_ANSWER_NO_UDP_ANSWER",
+        "CN05_SERVER_CAPS_UDP_ANSWER",
+        "CN05_UDP_LOSS_SIZE_DEPENDENT",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
         "TEST_CASE_END",
         "TEST_CASE_START"
       ]

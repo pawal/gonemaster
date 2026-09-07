@@ -11,13 +11,16 @@ import (
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
+	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
+	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/cnamelog"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/queryopts"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -26,6 +29,38 @@ import (
 )
 
 const moduleName = "Connectivity"
+
+// Connectivity05 constants.
+const (
+	deliveryQueryType  = "DNSKEY"
+	defaultEDNSPayload = constants.EDNSUDPPayloadDNSSECDefault
+	maxEDNSPayload     = 4096
+	probePayloadStep   = 256
+	protocolUDP        = "udp"
+	protocolTCP        = "tcp"
+
+	tagAnswerFitsUDP        = "CN05_ANSWER_FITS_UDP"
+	tagAnswerNeedsTCP       = "CN05_ANSWER_NEEDS_TCP"
+	tagDeliveredUDP         = "CN05_LARGE_ANSWER_DELIVERED_UDP"
+	tagNoUDPAnswer          = "CN05_LARGE_ANSWER_NO_UDP_ANSWER"
+	tagServerCapsUDP        = "CN05_SERVER_CAPS_UDP_ANSWER"
+	tagUDPLossSizeDependent = "CN05_UDP_LOSS_SIZE_DEPENDENT"
+)
+
+// deliveryOutcome is one tag an address earned, before grouping.
+type deliveryOutcome struct {
+	tag     string
+	size    int
+	payload int
+}
+
+// deliveryGroup is one emitted entry: an outcome and the addresses sharing it.
+type deliveryGroup struct {
+	tag     string
+	size    int
+	payload int
+	servers []string
+}
 
 var (
 	delegationNameservers = nsdiscovery.DelegationNameservers
@@ -74,6 +109,15 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if util.ShouldRunTest(ctx, "connectivity04") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return Connectivity04(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+	if util.ShouldRunTest(ctx, "connectivity05") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return Connectivity05(ctx, z)
 		})
 		results = append(results, entries...)
 		if err != nil {
@@ -154,6 +198,18 @@ func Metadata() map[string][]string {
 			"CN04_IPV6_DIFFERENT_PREFIX",
 			"CN04_IPV6_SAME_PREFIX",
 			"CN04_IPV6_SINGLE_PREFIX",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"connectivity05": {
+			"CN05_ANSWER_FITS_UDP",
+			"CN05_ANSWER_NEEDS_TCP",
+			"CN05_LARGE_ANSWER_DELIVERED_UDP",
+			"CN05_LARGE_ANSWER_NO_UDP_ANSWER",
+			"CN05_SERVER_CAPS_UDP_ANSWER",
+			"CN05_UDP_LOSS_SIZE_DEPENDENT",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
 			"TEST_CASE_END",
 			"TEST_CASE_START",
 		},
@@ -639,6 +695,231 @@ func Connectivity04(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) 
 	}
 
 	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// Connectivity05 runs the CONNECTIVITY05 test case.
+func Connectivity05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "Connectivity05"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+	if z == nil {
+		return results, fmt.Errorf("zone is nil")
+	}
+
+	nsList, err := authoritativeNS(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	outcomes := make([][]deliveryOutcome, len(nsList))
+	if len(nsList) > 0 {
+		tasks := make([]runner.Task, len(nsList))
+		for i, ns := range nsList {
+			tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+				buf := testlogger.Wrap(log, moduleName, testcase)
+				if disabled, err := ipDisabledMessageWithLogger(ctx, buf, ns, deliveryQueryType); err != nil {
+					return err
+				} else if disabled {
+					return nil
+				}
+				outcomes[i] = udpDelivery(ctx, ns, z.Name.String())
+				return nil
+			}
+		}
+
+		parallelism := profile.FromContext(ctx).Resolver.Defaults.Parallel
+		entries, runErr := runner.Run(ctx, tasks, runner.Options{Parallel: parallelism, CancelOnError: false})
+		if runErr != nil {
+			return results, runErr
+		}
+		results = append(results, entries...)
+	}
+
+	for _, group := range groupDeliveryOutcomes(nsList, outcomes) {
+		args := map[string]any{
+			"size":       group.size,
+			"payload":    group.payload,
+			"query_type": deliveryQueryType,
+		}
+		setTypedServersFromNames(args, group.servers)
+		if err := appendLog(ctx, &results, testcase, group.tag, args); err != nil {
+			return results, err
+		}
+	}
+
+	return appendTestCaseEnd(ctx, results, testcase)
+}
+
+// udpDelivery classifies how one address delivers the apex DNSKEY answer.
+func udpDelivery(ctx context.Context, ns nameserver.Nameserver, name string) []deliveryOutcome {
+	resp, err := ns.QueryWithOptions(ctx, name, deliveryQueryType, apexDNSKEYOptions())
+	if err != nil || resp.Msg == nil {
+		return sizeDependentLoss(ctx, ns, name)
+	}
+	if resp.Rcode() != "NOERROR" {
+		return nil
+	}
+
+	var size int
+	switch {
+	case resp.Protocol == protocolTCP:
+		// Truncated at the default payload; the transport fell back.
+		size = answerSize(resp)
+	case resp.TC():
+		// Fallback is off in the profile, so learn the size over TCP.
+		fetched, ok := fetchOverTCP(ctx, ns, name)
+		if !ok {
+			return nil
+		}
+		size = answerSize(fetched)
+	case resp.Protocol == protocolUDP:
+		return []deliveryOutcome{{tag: tagAnswerFitsUDP, size: answerSize(resp), payload: defaultEDNSPayload}}
+	default:
+		// Synthesized response; the transport is unknown.
+		return nil
+	}
+
+	out := []deliveryOutcome{{tag: tagAnswerNeedsTCP, size: size, payload: defaultEDNSPayload}}
+	if size <= defaultEDNSPayload || size > maxEDNSPayload {
+		return out
+	}
+
+	payload := probePayload(size)
+	probe, err := ns.QueryWithOptions(ctx, name, deliveryQueryType, largePayloadProbeOptions(payload))
+	switch {
+	case err != nil || probe.Msg == nil:
+		return append(out, deliveryOutcome{tag: tagNoUDPAnswer, size: size, payload: int(payload)})
+	case probe.TC():
+		return append(out, deliveryOutcome{tag: tagServerCapsUDP, size: size, payload: int(payload)})
+	case probe.Rcode() == "NOERROR":
+		return append(out, deliveryOutcome{tag: tagDeliveredUDP, size: answerSize(probe), payload: int(payload)})
+	}
+	// Any other rcode is inconclusive, REFUSED after a burst in particular.
+	return out
+}
+
+// sizeDependentLoss decides whether a missing answer at the default payload is
+// explained by size: a 512-byte advertisement is answered with TC while TCP
+// delivers the full answer.
+func sizeDependentLoss(ctx context.Context, ns nameserver.Nameserver, name string) []deliveryOutcome {
+	small, err := ns.QueryWithOptions(ctx, name, deliveryQueryType, queryopts.SmallAnswerDNSKEY())
+	if err != nil || small.Msg == nil || !small.TC() {
+		return nil
+	}
+	fetched, ok := fetchOverTCP(ctx, ns, name)
+	if !ok {
+		return nil
+	}
+	return []deliveryOutcome{{tag: tagUDPLossSizeDependent, size: answerSize(fetched), payload: defaultEDNSPayload}}
+}
+
+func fetchOverTCP(ctx context.Context, ns nameserver.Nameserver, name string) (packet.Packet, bool) {
+	resp, err := ns.QueryWithOptions(ctx, name, deliveryQueryType, forcedTCPDNSKEYOptions())
+	if err != nil || resp.Msg == nil || resp.Rcode() != "NOERROR" {
+		return packet.Packet{}, false
+	}
+	return resp, true
+}
+
+// apexDNSKEYOptions matches the DNSSEC module's DNSKEY queries so the response
+// cache entry is shared instead of paying for a second exchange.
+func apexDNSKEYOptions() *nameserver.QueryOptions {
+	dnssec := true
+	return &nameserver.QueryOptions{DNSSEC: &dnssec}
+}
+
+func forcedTCPDNSKEYOptions() *nameserver.QueryOptions {
+	dnssec := true
+	useVC := true
+	return &nameserver.QueryOptions{DNSSEC: &dnssec, UseVC: &useVC}
+}
+
+// largePayloadProbeOptions is the one query this testcase adds. It is
+// diagnostic because losing it says nothing about the server's health, and it
+// carries no fallback, so silence stays visible instead of becoming a TCP
+// answer.
+func largePayloadProbeOptions(payload uint16) *nameserver.QueryOptions {
+	dnssec := true
+	fallback := false
+	retry := 1
+	return &nameserver.QueryOptions{
+		DNSSEC:     &dnssec,
+		EDNSSize:   &payload,
+		Fallback:   &fallback,
+		Retry:      &retry,
+		Diagnostic: true,
+	}
+}
+
+// answerSize is the wire length when it is known, else the packed estimate. A
+// restored cache holds messages repacked at save time, so a replay can differ
+// from the live run by the compression delta.
+func answerSize(resp packet.Packet) int {
+	if resp.Msg == nil {
+		return 0
+	}
+	if n := len(resp.Msg.Data); n > 0 {
+		return n
+	}
+	return resp.Msg.Len()
+}
+
+// probePayload is the smallest multiple of 256 above size, capped at 4096, so
+// the probe has headroom over a UDP rendering a few bytes larger than the TCP
+// one.
+func probePayload(size int) uint16 {
+	payload := (size/probePayloadStep + 1) * probePayloadStep
+	if payload > maxEDNSPayload {
+		payload = maxEDNSPayload
+	}
+	return uint16(payload)
+}
+
+// groupDeliveryOutcomes collapses per-address outcomes into one entry per
+// distinct tag, size and payload. The fits-UDP summary collapses further, into
+// a single entry carrying the largest answer seen.
+func groupDeliveryOutcomes(nsList []nameserver.Nameserver, outcomes [][]deliveryOutcome) []deliveryGroup {
+	index := map[string]int{}
+	var groups []deliveryGroup
+
+	for i, list := range outcomes {
+		if i >= len(nsList) {
+			break
+		}
+		server := nsList[i].NameString() + "/" + nsList[i].AddressString()
+		for _, out := range list {
+			if out.tag == "" {
+				continue
+			}
+			key := fmt.Sprintf("%s|%d|%d", out.tag, out.size, out.payload)
+			if out.tag == tagAnswerFitsUDP {
+				key = out.tag
+			}
+			pos, ok := index[key]
+			if !ok {
+				pos = len(groups)
+				index[key] = pos
+				groups = append(groups, deliveryGroup{tag: out.tag, size: out.size, payload: out.payload})
+			} else if out.size > groups[pos].size && out.tag == tagAnswerFitsUDP {
+				groups[pos].size = out.size
+			}
+			groups[pos].servers = append(groups[pos].servers, server)
+		}
+	}
+
+	sort.Slice(groups, func(a, b int) bool {
+		if groups[a].tag != groups[b].tag {
+			return groups[a].tag < groups[b].tag
+		}
+		if groups[a].size != groups[b].size {
+			return groups[a].size < groups[b].size
+		}
+		return groups[a].payload < groups[b].payload
+	})
+	return groups
 }
 
 func connectivityLoop(ctx context.Context, testcase string, name dnsname.Name, nsList []nameserver.Nameserver, results *[]*logger.Entry) error {

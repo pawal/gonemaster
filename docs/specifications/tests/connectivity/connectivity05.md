@@ -33,7 +33,7 @@ EDNS UDP payload for DNSSEC queries (`constants.EDNSUDPPayloadDNSSECDefault`, 12
       - `RCODE != NOERROR`: inconclusive for this testcase, which reports delivery and not response content. Emit nothing for the address.
       - Answered over UDP and not truncated: the answer fits within `D`. Record `S` for the `CN05_ANSWER_FITS_UDP` summary and stop.
       - Answered over TCP: the answer was truncated at `D` and the transport fell back. `S` is the size of the TCP answer. Continue at step 2.3.
-      - Truncated over UDP with no fallback: learn `S` with one forced-TCP query. If that query yields no message, emit nothing for the address, since TCP failures belong to Connectivity02. Otherwise continue at step 2.3.
+      - Truncated over UDP with no fallback: learn `S` with one forced-TCP query. If that query does not return a NOERROR answer, emit nothing for the address, since TCP failures belong to Connectivity02. Otherwise continue at step 2.3.
    3. Record `CN05_ANSWER_NEEDS_TCP` for the address, then decide whether a probe is warranted:
       - `S <= D`: the address truncates below the payload it was offered, so no larger advertisement can change the outcome. Stop.
       - `S > 4096`: no client advertising 4096 bytes or less can receive the answer over UDP. Stop.
@@ -46,7 +46,7 @@ EDNS UDP payload for DNSSEC queries (`constants.EDNSUDPPayloadDNSSECDefault`, 12
    5. Loss branch, entered when the reference query yielded no message. Issue the small-answer probe with the option set of Nameserver13 (DNSSEC enabled, EDNS version 0, advertised payload 512, fallback disabled) so it shares that testcase's cache entry. Classify:
       - No message: EDNS queries do not reach the address at all, or the address is unreachable. This is not a size question and is reported by Nameserver02, Nameserver13 and DNSSEC07. Emit nothing.
       - Answered without truncation: the answer fits 512 bytes, so the loss at `D` was not size-dependent. Emit nothing.
-      - Answered with truncation: a small answer arrives and the full answer exceeds 512 bytes. Learn `S` with one forced-TCP query. If TCP delivers, record `CN05_UDP_LOSS_SIZE_DEPENDENT`. If TCP yields no message, emit nothing.
+      - Answered with truncation: a small answer arrives and the full answer exceeds 512 bytes. Learn `S` with one forced-TCP query. If TCP returns a NOERROR answer, record `CN05_UDP_LOSS_SIZE_DEPENDENT`. Otherwise emit nothing.
 3. Group the recorded per-address outcomes by identical tag, `size` and `payload`, and emit one entry per group with the addresses of that group in `servers`. Emit `CN05_ANSWER_FITS_UDP` once for the addresses that answered over UDP at `D`, with `size` set to the largest `S` among them.
 4. Emit `TEST_CASE_END`.
 
@@ -67,8 +67,9 @@ For each address (parallel; fan-out = resolver.defaults.parallel):
     +- UDP, not truncated    -> record for CN05_ANSWER_FITS_UDP; stop
     +- TCP (fallback taken)  -> S = len(TCP answer); needs-TCP branch
     +- UDP, truncated        -> forced-TCP query
-                                 +- no message -> emit nothing
-                                 +- message    -> S = len(answer); needs-TCP branch
+                                 +- no NOERROR answer -> emit nothing
+                                 +- NOERROR answer    -> S = len(answer); needs-TCP
+                                                         branch
 
    needs-TCP branch: record CN05_ANSWER_NEEDS_TCP (size=S, payload=1232)
     +- S <= 1232 -> stop (address truncates below the offered payload)
@@ -95,9 +96,9 @@ Q1 yielded no message at payload 1232.
     +- no message        -> emit nothing (not a size question)
     +- not truncated     -> emit nothing (answer fits 512; loss was transient)
     +- truncated         -> forced-TCP query
-                              +- no message -> emit nothing
-                              +- message    -> CN05_UDP_LOSS_SIZE_DEPENDENT
-                                               (size=S, payload=1232)
+                              +- no NOERROR answer -> emit nothing
+                              +- NOERROR answer    -> CN05_UDP_LOSS_SIZE_DEPENDENT
+                                                      (size=S, payload=1232)
 ```
 {{% /expand %}}
 

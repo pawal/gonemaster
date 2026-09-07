@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.7] - 2026-09-07
+
+Adds opt-in external reference data, off by default: the new `--external-data-*` and `--analysis-vantage-label` flags, with `GONEMASTER_` env equivalents, let the server fetch the IANA TLD list and RDAP records and name its measurement location. Also fixes SPF handling in zone11 and zone13, and counts a DNSKEY RRset without RRSIG as unsigned.
 
 ### Added
 

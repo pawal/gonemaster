@@ -20,6 +20,7 @@
     type ExportColumn
   } from "$lib/exporters";
   import { listNameservers, type NameserverView, type AnalysisFilter } from "$lib/api";
+  import { LATENCY_VANTAGE_NOTE } from "$lib/latencyRanking";
   import type { LayoutData } from "../+layout";
   import type { NameserversPageData } from "./+page";
 
@@ -159,7 +160,7 @@
             <th scope="col" class="col-num">IPv6</th>
             {#if hasLatency}
               <th scope="col" class="col-num">
-                <SortHeader label="Latency" spec={sortSpecs.latency} align="right" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
+                <SortHeader label="Latency" spec={sortSpecs.latency} align="right" title={LATENCY_VANTAGE_NOTE} {currentSort} onsort={(v: string) => updateParam("sort", v)} />
               </th>
             {/if}
           </tr>
@@ -198,6 +199,10 @@
         </tbody>
       </table>
     </div>
+
+    {#if hasLatency}
+      <p class="hint">{LATENCY_VANTAGE_NOTE}</p>
+    {/if}
 
     <Pagination {total} offset={currentOffset} limit={currentLimit} itemCount={data.list?.items.length ?? 0} />
   {/if}

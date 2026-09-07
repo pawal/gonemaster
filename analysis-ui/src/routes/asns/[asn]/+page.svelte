@@ -5,6 +5,8 @@
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
+  import ExternalLinks from "$lib/ExternalLinks.svelte";
+  import { asnLinks } from "$lib/externalLinks";
   import { formatCount, formatMs } from "$lib/format";
   import type { ASNDetailPageData } from "./+page";
 
@@ -54,6 +56,7 @@
         {/if}
       {/if}
     </dl>
+    <ExternalLinks links={asnLinks(d.asn)} />
     <div class="history-sparks">
       <EntityHistorySparkline points={data.history} metric="domain_count" label="Domains over snapshots" />
       <EntityHistorySparkline points={data.history} metric="latency_p50_ms" label="Median latency over snapshots" />

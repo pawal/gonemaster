@@ -6,10 +6,12 @@
     spec: SortColumnSpec;
     currentSort: string;
     align?: "left" | "right";
+    // Tooltip for the column itself, not for the sort action.
+    title?: string;
     onsort: (nextToken: string) => void;
   };
 
-  let { label, spec, currentSort, align = "left", onsort }: Props = $props();
+  let { label, spec, currentSort, align = "left", title, onsort }: Props = $props();
 
   const state = $derived(currentSortState(currentSort, spec));
   const disabled = $derived(!spec.asc && !spec.desc);
@@ -25,6 +27,7 @@
   class:active={state !== "off"}
   class:align-right={align === "right"}
   {disabled}
+  title={title ?? undefined}
   aria-label={`Sort by ${label}${state === "asc" ? " (ascending)" : state === "desc" ? " (descending)" : ""}`}
   onclick={handleClick}
 >

@@ -5,6 +5,8 @@
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
   import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
+  import ExternalLinks from "$lib/ExternalLinks.svelte";
+  import { nameserverLinks } from "$lib/externalLinks";
   import { formatCount, formatMs } from "$lib/format";
   import { idnToUnicode } from "$lib/idn";
   import type { NameserverDetailPageData } from "./+page";
@@ -75,6 +77,7 @@
         {/if}
       {/if}
     </dl>
+    <ExternalLinks links={nameserverLinks(d.nameserver)} />
     <div class="history-sparks">
       <EntityHistorySparkline points={data.history} metric="domain_count" label="Domains over snapshots" />
       <EntityHistorySparkline points={data.history} metric="latency_p50_ms" label="Median latency over snapshots" />

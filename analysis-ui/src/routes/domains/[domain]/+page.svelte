@@ -6,7 +6,9 @@
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
+  import ExternalLinks from "$lib/ExternalLinks.svelte";
   import { tagHref } from "$lib/entityLinks";
+  import { domainLinks } from "$lib/externalLinks";
   import { formatCount, formatTimestamp, gradeTone, levelTone } from "$lib/format";
   import { idnToUnicode } from "$lib/idn";
   import type { DomainDetailEntry, DomainDetailTag, NameserverTiming } from "$lib/api";
@@ -180,6 +182,7 @@
       <div><dt>ASNs</dt><dd>{formatCount(d.asn_count)}</dd></div>
       <div><dt>Prefixes</dt><dd>{formatCount(d.prefix_count)}</dd></div>
     </dl>
+    <ExternalLinks links={domainLinks(d.domain)} />
     <EntityHistorySparkline points={data.history} metric="score" label="Score over snapshots" />
   </section>
 

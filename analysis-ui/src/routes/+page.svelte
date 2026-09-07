@@ -27,6 +27,7 @@
     endpointLatencyRows,
     hasAnyLatencyRanking,
     nameserverLatencyRows,
+    LATENCY_VANTAGE_NOTE,
     type LatencyRankRow
   } from "$lib/latencyRanking";
   import { netDirection, sortByMovement, summarizeDiff } from "$lib/diff";
@@ -602,7 +603,7 @@
 
     {#if showLatencyRankings}
       <section class="card latency-rankings">
-        <h3>Response times</h3>
+        <h3 title={LATENCY_VANTAGE_NOTE}>Response times</h3>
         <p class="hint">
           Fastest and slowest by median (p50) response time, among entities with
           at least 5 timing samples in this snapshot.
@@ -618,6 +619,7 @@
             {/if}
           {/each}
         </div>
+        <p class="hint">{LATENCY_VANTAGE_NOTE}</p>
       </section>
     {/if}
   {/if}

@@ -95,6 +95,11 @@ snapshot has latency data; snapshots captured before latency aggregation show
 no column until they are re-materialized (admin "Rebuild aggregates" or a
 cohort rebuild).
 
+The queries were made from wherever the instance runs, so the figures describe
+one network vantage point rather than the entity's latency everywhere. The
+column header and a footnote under the table repeat that caveat, as does the
+overview's response-time card.
+
 ## Entity History
 
 The nameserver, ASN, tag, and domain detail pages show a small sparkline of
@@ -103,6 +108,18 @@ nameserver/ASN/tag, score for a domain). It is fed by
 `GET /pub/api/v1/analysis/cohorts/{dataset_tag}/history?entity=&key=` and only
 appears when at least two snapshots carry the entity, so single-snapshot
 cohorts and brand-new entities show nothing rather than a flat line.
+
+## Reference Links
+
+Every detail page carries an "Elsewhere" block linking the entity to its
+authoritative external reference. A top-level domain links to the IANA root
+zone database, its ICANNWiki page, and IANA's RDAP service; any other domain
+links to an RDAP record for it. Addresses, prefixes, and ASNs link to
+RIPEstat.
+
+The links are plain navigations: nothing is requested from a third party until
+a visitor clicks one. They open in a new tab with `rel="noopener noreferrer"`,
+so the snapshot URL never reaches the target site.
 
 ## Keyboard Shortcuts
 

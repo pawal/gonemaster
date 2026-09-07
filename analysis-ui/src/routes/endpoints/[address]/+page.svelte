@@ -5,6 +5,8 @@
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import NameserverChip from "$lib/chips/NameserverChip.svelte";
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
+  import ExternalLinks from "$lib/ExternalLinks.svelte";
+  import { addressLinks } from "$lib/externalLinks";
   import { formatCount, formatMs } from "$lib/format";
   import type { EndpointDetailPageData } from "./+page";
 
@@ -61,6 +63,7 @@
         {/if}
       {/if}
     </dl>
+    <ExternalLinks links={addressLinks(d.address)} />
   </section>
 
   <section class="card">

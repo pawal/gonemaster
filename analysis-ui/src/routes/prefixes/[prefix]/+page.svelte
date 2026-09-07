@@ -4,6 +4,8 @@
   import ASNChip from "$lib/chips/ASNChip.svelte";
   import DomainChip from "$lib/chips/DomainChip.svelte";
   import EndpointChip from "$lib/chips/EndpointChip.svelte";
+  import ExternalLinks from "$lib/ExternalLinks.svelte";
+  import { prefixLinks } from "$lib/externalLinks";
   import { formatCount } from "$lib/format";
   import type { PrefixDetailPageData } from "./+page";
 
@@ -43,6 +45,7 @@
       <div><dt>Domains</dt><dd>{formatCount(d.domain_count)}</dd></div>
       <div><dt>Addresses</dt><dd>{formatCount(d.address_count)}</dd></div>
     </dl>
+    <ExternalLinks links={prefixLinks(d.prefix)} />
   </section>
 
   <section class="card">

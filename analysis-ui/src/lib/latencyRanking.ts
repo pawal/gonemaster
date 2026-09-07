@@ -1,5 +1,10 @@
 import type { ASNView, EndpointView, LatencyFields, NameserverView } from "$lib/api";
 
+// Latency is measured from wherever this instance runs, so every surface
+// that shows it repeats the caveat.
+export const LATENCY_VANTAGE_NOTE =
+  "Measured from this instance's network location; a single vantage point.";
+
 // One normalized row in a front-page latency ranking; href is built by the caller.
 export type LatencyRankRow = {
   key: string;

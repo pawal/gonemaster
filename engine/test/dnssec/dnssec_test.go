@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -1759,6 +1760,45 @@ func TestDNSSEC07NotSigned(t *testing.T) {
 	tctest.RequireTags(t, entries, "DS07_NOT_SIGNED")
 }
 
+// The helper mirrors DNSSEC07's classification, so TypeCovered decides.
+func TestDNSKEYRRSIGPresent(t *testing.T) {
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+	inception := time.Now().Add(-time.Hour).Unix()
+	expiration := time.Now().Add(time.Hour).Unix()
+
+	tests := []struct {
+		name string
+		resp packet.Packet
+		want bool
+	}{
+		{
+			name: "DNSKEY without any RRSIG",
+			resp: dnskeyPacket("example", key),
+			want: false,
+		},
+		{
+			name: "RRSIG covering another type",
+			resp: answerPacket("example", dns.TypeDNSKEY, key,
+				rrsigRecord("example", dns.TypeSOA, 12345, inception, expiration)),
+			want: false,
+		},
+		{
+			name: "RRSIG covering DNSKEY",
+			resp: answerPacket("example", dns.TypeDNSKEY, key,
+				rrsigRecord("example", dns.TypeDNSKEY, 12345, inception, expiration)),
+			want: true,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := dnskeyRRSIGPresent(tc.resp); got != tc.want {
+				t.Fatalf("dnskeyRRSIGPresent = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
 func TestDNSSEC07ChildOutcomeTagsTypedServers(t *testing.T) {
 	ctx := tctest.Context(t)
 
@@ -2165,6 +2205,116 @@ func TestDNSSECAllUnsignedNoParentDS(t *testing.T) {
 		return packet.Packet{}
 	})
 	childNS := unsignedChildNameserver(t, ctx)
+	stubAllDNSSECDiscovery(t, parentNS, childNS)
+
+	profile.ResetEffective()
+	if err := profile.Effective().Set("test_cases", []any{"dnssec07", "dnssec11", "dnssec01"}); err != nil {
+		t.Fatalf("set test_cases: %v", err)
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := All(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec all: %v", err)
+	}
+
+	tctest.RequireTags(t, entries, "DS07_NOT_SIGNED", "DS11_NO_PARENT_DS")
+	tctest.RequireNoTag(t, entries, "DS11_DS_BUT_UNSIGNED_ZONE")
+	if got := tctest.Count(entries, "TEST_CASE_START"); got != 2 {
+		t.Fatalf("expected exactly 2 testcases to run (dnssec07, dnssec11), got %d TEST_CASE_START", got)
+	}
+}
+
+// keysOnlyChildNameserver serves an authoritative SOA and a DNSKEY RRset with
+// no covering RRSIG. The returned func reports how many DNSKEY queries reached
+// the wire, i.e. missed the cache.
+func keysOnlyChildNameserver(t *testing.T, ctx context.Context) (nameserver.Nameserver, func() int) {
+	t.Helper()
+
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+	var mu sync.Mutex
+	dnskeyQueries := 0
+
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.160", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "SOA":
+			return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+		case "DNSKEY":
+			mu.Lock()
+			dnskeyQueries++
+			mu.Unlock()
+			return dnskeyPacket(q.Name, key)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	return ns, func() int {
+		mu.Lock()
+		defer mu.Unlock()
+		return dnskeyQueries
+	}
+}
+
+// TestDNSSECAllDNSKEYWithoutRRSIGStaleParentDS is the live case: two DNSKEYs, a
+// DS at the parent, and no signature anywhere, which every validating resolver
+// rejects. DNSSEC11 must call that unsigned and report the DS, and it must do so
+// from DNSSEC07's cached DO response rather than a second query.
+func TestDNSSECAllDNSKEYWithoutRRSIGStaleParentDS(t *testing.T) {
+
+	ctx := tctest.Context(t)
+
+	staleDS := tctest.DSRR("example", 54321, 8, 2, "DEADBEEF")
+
+	parentNS := tctest.NS(t, ctx, "ns.parent", "192.0.2.200", func(q tctest.Query) packet.Packet {
+		if q.Type == "DS" {
+			return dsPacketFromDS(q.Name, staleDS)
+		}
+		return packet.Packet{}
+	})
+	childNS, dnskeyQueries := keysOnlyChildNameserver(t, ctx)
+	stubAllDNSSECDiscovery(t, parentNS, childNS)
+
+	profile.ResetEffective()
+	if err := profile.Effective().Set("test_cases", []any{"dnssec07", "dnssec11", "dnssec01"}); err != nil {
+		t.Fatalf("set test_cases: %v", err)
+	}
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := All(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec all: %v", err)
+	}
+
+	tctest.RequireTags(t, entries, "DS07_NOT_SIGNED", "DS07_NOT_SIGNED_ON_SERVER", "DS11_DS_BUT_UNSIGNED_ZONE")
+	tctest.RequireNoTag(t, entries, "DS11_CONSISTENT_SIGNED")
+	if got := tctest.Count(entries, "TEST_CASE_START"); got != 2 {
+		t.Fatalf("expected exactly 2 testcases to run (dnssec07, dnssec11), got %d TEST_CASE_START", got)
+	}
+	if got := dnskeyQueries(); got != 1 {
+		t.Fatalf("expected 1 child DNSKEY query shared by dnssec07 and dnssec11, got %d", got)
+	}
+}
+
+// Without a DS the delegation is insecure, so unsigned keys break nothing and
+// the DS-but-unsigned error must stay away.
+func TestDNSSECAllDNSKEYWithoutRRSIGNoParentDS(t *testing.T) {
+
+	ctx := tctest.Context(t)
+
+	parentNS := tctest.NS(t, ctx, "ns.parent", "192.0.2.200", func(q tctest.Query) packet.Packet {
+		if q.Type == "DS" {
+			return dsPacketFromDS(q.Name, nil)
+		}
+		return packet.Packet{}
+	})
+	childNS, _ := keysOnlyChildNameserver(t, ctx)
 	stubAllDNSSECDiscovery(t, parentNS, childNS)
 
 	profile.ResetEffective()
@@ -3478,6 +3628,245 @@ func TestDNSSEC11DSButUnsignedZone(t *testing.T) {
 		t.Fatalf("dnssec11: %v", err)
 	}
 	tctest.RequireTags(t, entries, "DS11_DS_BUT_UNSIGNED_ZONE")
+}
+
+// signedChildDNSKEY answers a DNSKEY query with the key and an RRSIG covering
+// it, the state a validating resolver needs.
+func signedChildDNSKEY(name string, key *dns.DNSKEY) packet.Packet {
+	sig := rrsigRecord(name, dns.TypeDNSKEY, 12345,
+		time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+	keyCopy := *key
+	return answerPacket(name, dns.TypeDNSKEY, &keyCopy, sig)
+}
+
+// A child that publishes DNSKEYs but signs nothing is unsigned, so a DS at the
+// parent is an error, not a consistently signed zone.
+func TestDNSSEC11DSButUnsignedDNSKEYWithoutRRSIG(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	ds := tctest.DSRR("example", 54321, 8, 1, "FEEDBEEF")
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+
+	parentNS := tctest.NS(t, ctx, "ns1.example", "192.0.2.82", func(q tctest.Query) packet.Packet {
+		if q.Type == "DS" {
+			return dsPacketFromDS(q.Name, ds)
+		}
+		return packet.Packet{}
+	})
+
+	var mu sync.Mutex
+	var dnskeyDO []bool
+
+	childNS := tctest.NS(t, ctx, "nschild.example", "192.0.2.83", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "SOA":
+			return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+		case "DNSKEY":
+			mu.Lock()
+			dnskeyDO = append(dnskeyDO, q.Opts != nil && q.Opts.DNSSEC != nil && *q.Opts.DNSSEC)
+			mu.Unlock()
+			return dnskeyPacket(q.Name, key)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	tctest.Stub(t, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{childNS}, nil
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	})
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC11(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec11: %v", err)
+	}
+
+	tctest.RequireTags(t, entries, "DS11_DS_BUT_UNSIGNED_ZONE")
+	tctest.RequireNoTag(t, entries, "DS11_CONSISTENT_SIGNED")
+
+	// Without the DO bit the missing RRSIG cannot be observed at all.
+	mu.Lock()
+	defer mu.Unlock()
+	if len(dnskeyDO) == 0 {
+		t.Fatalf("expected at least one child DNSKEY query")
+	}
+	for i, withDO := range dnskeyDO {
+		if !withDO {
+			t.Fatalf("child DNSKEY query %d was sent without the DO bit", i)
+		}
+	}
+}
+
+// The mirror image: keys plus a covering RRSIG is the only signed state.
+func TestDNSSEC11ConsistentSignedRequiresDNSKEYRRSIG(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	ds := tctest.DSRR("example", 54321, 8, 1, "FEEDBEEF")
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+
+	parentNS := tctest.NS(t, ctx, "ns1.example", "192.0.2.82", func(q tctest.Query) packet.Packet {
+		if q.Type == "DS" {
+			return dsPacketFromDS(q.Name, ds)
+		}
+		return packet.Packet{}
+	})
+	childNS := tctest.NS(t, ctx, "nschild.example", "192.0.2.83", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "SOA":
+			return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+		case "DNSKEY":
+			return signedChildDNSKEY(q.Name, key)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	tctest.Stub(t, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{childNS}, nil
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	})
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC11(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec11: %v", err)
+	}
+
+	tctest.RequireTags(t, entries, "DS11_CONSISTENT_SIGNED")
+	tctest.RequireNoTag(t, entries, "DS11_DS_BUT_UNSIGNED_ZONE")
+}
+
+// One server signs, the other only publishes keys: the unsigned list must name
+// the unsigned server and nothing else.
+func TestDNSSEC11InconsistentSignedKeysWithoutRRSIGOnOneServer(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	ds := tctest.DSRR("example", 54321, 8, 1, "FEEDBEEF")
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+
+	parentNS := tctest.NS(t, ctx, "ns1.example", "192.0.2.82", func(q tctest.Query) packet.Packet {
+		if q.Type == "DS" {
+			return dsPacketFromDS(q.Name, ds)
+		}
+		return packet.Packet{}
+	})
+	signedNS := tctest.NS(t, ctx, "ns-signed.example", "192.0.2.84", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "SOA":
+			return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+		case "DNSKEY":
+			return signedChildDNSKEY(q.Name, key)
+		default:
+			return packet.Packet{}
+		}
+	})
+	keysOnlyNS := tctest.NS(t, ctx, "ns-keysonly.example", "192.0.2.85", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "SOA":
+			return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+		case "DNSKEY":
+			return dnskeyPacket(q.Name, key)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	tctest.Stub(t, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{signedNS, keysOnlyNS}, nil
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	})
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC11(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec11: %v", err)
+	}
+
+	tctest.RequireTags(t, entries, "DS11_INCONSISTENT_SIGNED_ZONE")
+	unsigned := tctest.RequireTag(t, entries, "DS11_NS_WITH_UNSIGNED_ZONE")
+	if got := tctest.Strings(t, unsigned.Args, "addresses"); !slices.Equal(got, []string{"192.0.2.85"}) {
+		t.Fatalf("unexpected unsigned addresses: %v", got)
+	}
+	signed := tctest.RequireTag(t, entries, "DS11_NS_WITH_SIGNED_ZONE")
+	if got := tctest.Strings(t, signed.Args, "addresses"); !slices.Equal(got, []string{"192.0.2.84"}) {
+		t.Fatalf("unexpected signed addresses: %v", got)
+	}
+}
+
+// An RRSIG in the answer that covers another type does not sign the DNSKEY
+// RRset, matching how DNSSEC07 reads the same response.
+func TestDNSSEC11RRSIGCoveringOtherTypeIsUnsigned(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	ds := tctest.DSRR("example", 54321, 8, 1, "FEEDBEEF")
+	key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+
+	parentNS := tctest.NS(t, ctx, "ns1.example", "192.0.2.82", func(q tctest.Query) packet.Packet {
+		if q.Type == "DS" {
+			return dsPacketFromDS(q.Name, ds)
+		}
+		return packet.Packet{}
+	})
+	childNS := tctest.NS(t, ctx, "nschild.example", "192.0.2.83", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "SOA":
+			return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+		case "DNSKEY":
+			sig := rrsigRecord(q.Name, dns.TypeSOA, 12345,
+				time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
+			keyCopy := *key
+			return answerPacket(q.Name, dns.TypeDNSKEY, &keyCopy, sig)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	tctest.Stub(t, &parentApexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{parentNS}, nil
+	})
+	tctest.Stub(t, &glueNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{childNS}, nil
+	})
+	tctest.Stub(t, &apexNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return nil, nil
+	})
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC11(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec11: %v", err)
+	}
+
+	tctest.RequireTags(t, entries, "DS11_DS_BUT_UNSIGNED_ZONE")
+	tctest.RequireNoTag(t, entries, "DS11_CONSISTENT_SIGNED")
 }
 
 func TestDNSSEC13AlgoNotSigned(t *testing.T) {

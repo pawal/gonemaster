@@ -227,6 +227,19 @@ func (p *Provider) TLDs() (*TLDList, State) {
 	return list, state
 }
 
+// ReferenceList returns the members and version of one named dataset.
+// ok is false when name matches no dataset or nothing is cached yet.
+func (p *Provider) ReferenceList(name string) (names []string, version string, ok bool) {
+	if p == nil || name != datasetIANATLDs {
+		return nil, "", false
+	}
+	list, _ := p.TLDs()
+	if list.Len() == 0 {
+		return nil, "", false
+	}
+	return list.Names(), list.Version, true
+}
+
 // Bootstrap returns the cached RDAP bootstrap table and its state.
 func (p *Provider) Bootstrap() (*RDAPBootstrap, State) {
 	item, state := p.Lookup(datasetKey(datasetRDAPBootstrap))

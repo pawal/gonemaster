@@ -32,6 +32,7 @@ describe("AnalysisCohorts", () => {
     const patched = [];
     const created = [];
     const actions = [];
+    const detailReads = [];
     global.fetch.mockImplementation((url, requestOptions = {}) => {
       const value = requestUrl(url);
       const method = requestOptions.method || "GET";
@@ -59,6 +60,14 @@ describe("AnalysisCohorts", () => {
         };
         cohorts = [...cohorts, next];
         return jsonResponse(next);
+      }
+      const detailMatch = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)$/);
+      if (detailMatch && method === "GET") {
+        const id = Number(detailMatch[1]);
+        detailReads.push(id);
+        const cohort = cohorts.find((c) => c.id === id) || {};
+        const drift = (scenario.drift || {})[id];
+        return jsonResponse(drift ? { ...cohort, source_drift: drift } : cohort);
       }
       const patchMatch = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)$/);
       if (patchMatch && method === "PATCH") {
@@ -98,7 +107,7 @@ describe("AnalysisCohorts", () => {
       }
       return jsonResponse({});
     });
-    return { created, patched, actions, getCohorts: () => cohorts };
+    return { created, patched, actions, detailReads, getCohorts: () => cohorts };
   };
 
   it("lists cohorts with status, default marker, and last-error detail", async () => {
@@ -201,6 +210,7 @@ describe("AnalysisCohorts", () => {
       analysis_enabled: true,
       public_enabled: false,
       is_default: false,
+      reference_list: "",
     });
   });
 
@@ -230,11 +240,92 @@ describe("AnalysisCohorts", () => {
         label: "Top-Level Domains",
         description: "All ICANN-managed TLDs",
         sort_order: 10,
+        reference_list: "",
       },
     });
     await waitFor(() => {
       expect(screen.getByRole("heading", { name: /^Create cohort$/i })).toBeInTheDocument();
     });
+  });
+
+  it("sends the selected reference list when creating a cohort", async () => {
+    const handles = installFetch();
+    render(AnalysisCohorts);
+
+    await screen.findByText("tld");
+    await fireEvent.input(screen.getByPlaceholderText("tld"), { target: { value: "anycast" } });
+    await fireEvent.change(screen.getByLabelText("Reference list"), {
+      target: { value: "iana_tlds" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /Create cohort/i }));
+
+    await waitFor(() => expect(handles.created).toHaveLength(1));
+    expect(handles.created[0].reference_list).toBe("iana_tlds");
+  });
+
+  it("PATCHes the reference list from the edit form", async () => {
+    const handles = installFetch();
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /^Edit$/ }));
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /Edit cohort/i })).toBeInTheDocument();
+    });
+
+    await fireEvent.change(screen.getByLabelText("Reference list"), {
+      target: { value: "iana_tlds" },
+    });
+    await fireEvent.click(screen.getByRole("button", { name: /^Save$/ }));
+
+    await waitFor(() => expect(handles.patched).toHaveLength(1));
+    expect(handles.patched[0].body.reference_list).toBe("iana_tlds");
+  });
+
+  it("shows the drift counts and both name lists for a cohort with a reference list", async () => {
+    installFetch({
+      initialCohorts: [tldCohort({ reference_list: "iana_tlds" }), govCohort()],
+      drift: {
+        1: {
+          checked_at: "2026-09-07T10:00:00Z",
+          list_version: "2026090700",
+          missing: ["newtld"],
+          extra: ["retired", "gone"],
+        },
+      },
+    });
+    render(AnalysisCohorts);
+
+    const summary = await screen.findByText("Drift: +1 / -2");
+    const row = summary.closest("tr");
+    expect(within(row).getByText("In the list, not in the tag")).toBeInTheDocument();
+    expect(within(row).getByText("newtld")).toBeInTheDocument();
+    expect(within(row).getByText("In the tag, not in the list")).toBeInTheDocument();
+    expect(within(row).getByText("retired, gone")).toBeInTheDocument();
+    expect(within(row).getByText(/list version 2026090700/)).toBeInTheDocument();
+  });
+
+  it("reports an in-sync cohort instead of a zero drift count", async () => {
+    installFetch({
+      initialCohorts: [tldCohort({ reference_list: "iana_tlds" })],
+      drift: {
+        1: { checked_at: "2026-09-07T10:00:00Z", list_version: "1", missing: [], extra: [] },
+      },
+    });
+    render(AnalysisCohorts);
+
+    expect(await screen.findByText("In sync with the list")).toBeInTheDocument();
+    expect(screen.queryByText(/Drift:/)).not.toBeInTheDocument();
+  });
+
+  it("reads the cohort detail only for cohorts that name a reference list", async () => {
+    const handles = installFetch({
+      initialCohorts: [tldCohort({ reference_list: "iana_tlds" }), govCohort()],
+    });
+    render(AnalysisCohorts);
+
+    await screen.findByText("gov");
+    await waitFor(() => expect(handles.detailReads).toEqual([1]));
   });
 
   it("deletes a cohort after confirming and removes it from the table", async () => {

@@ -232,25 +232,64 @@ type AnalysisCohort struct {
 	DefaultSnapshotPolicy    string    `json:"default_snapshot_policy,omitempty"`
 	DefaultSnapshotID        *int64    `json:"default_snapshot_id,omitempty"`
 	TagViewMinLevel          string    `json:"tag_view_min_level,omitempty"`
-	CreatedAt                time.Time `json:"created_at"`
-	UpdatedAt                time.Time `json:"updated_at"`
+	// ReferenceList names the external list the source tag is compared
+	// against. Empty means no comparison.
+	ReferenceList string    `json:"reference_list,omitempty"`
+	CreatedAt     time.Time `json:"created_at"`
+	UpdatedAt     time.Time `json:"updated_at"`
 }
+
+// analysisCohortFields carries the cohort's own JSON tags without the
+// MarshalJSON override, so both the cohort and its detail envelope can
+// re-encode the row and replace single fields.
+type analysisCohortFields AnalysisCohort
 
 // MarshalJSON omits LastMaterializedAt when it is the zero time.
 // Without this override encoding/json serializes a zero time.Time as
 // "0001-01-01T00:00:00Z" regardless of the `omitempty` tag, which leaks into
 // the admin UI as a bogus "1/1/1" timestamp.
 func (c AnalysisCohort) MarshalJSON() ([]byte, error) {
-	type alias AnalysisCohort
 	aux := struct {
-		*alias
+		*analysisCohortFields
 		LastMaterializedAt *time.Time `json:"last_materialized_at,omitempty"`
-	}{alias: (*alias)(&c)}
+	}{analysisCohortFields: (*analysisCohortFields)(&c)}
 	if !c.LastMaterializedAt.IsZero() {
 		t := c.LastMaterializedAt
 		aux.LastMaterializedAt = &t
 	}
 	return json.Marshal(aux)
+}
+
+// AnalysisCohortSourceDrift reports how the source tag differs from the
+// cohort's reference list. Derived at read time and never stored: the list
+// moves on its own schedule, and fixing drift stays a tag operation.
+type AnalysisCohortSourceDrift struct {
+	CheckedAt   time.Time `json:"checked_at"`
+	ListVersion string    `json:"list_version,omitempty"`
+	// Missing is in the reference list but not in the source tag.
+	Missing []string `json:"missing"`
+	// Extra is in the source tag but not in the reference list.
+	Extra []string `json:"extra"`
+}
+
+// AnalysisCohortDetail is one cohort row plus context derived at read time.
+type AnalysisCohortDetail struct {
+	*analysisCohortFields
+	LastMaterializedAt *time.Time                 `json:"last_materialized_at,omitempty"`
+	SourceDrift        *AnalysisCohortSourceDrift `json:"source_drift,omitempty"`
+}
+
+// NewAnalysisCohortDetail wraps cohort with optional drift.
+func NewAnalysisCohortDetail(cohort AnalysisCohort, drift *AnalysisCohortSourceDrift) AnalysisCohortDetail {
+	detail := AnalysisCohortDetail{
+		analysisCohortFields: (*analysisCohortFields)(&cohort),
+		SourceDrift:          drift,
+	}
+	if !cohort.LastMaterializedAt.IsZero() {
+		t := cohort.LastMaterializedAt
+		detail.LastMaterializedAt = &t
+	}
+	return detail
 }
 
 // AnalysisNameserver is one normalized nameserver hostname in the analysis layer.

@@ -107,6 +107,39 @@ func TestSQLJobStoreUpsertAnalysisCohort(t *testing.T) {
 	})
 }
 
+func TestSQLJobStoreAnalysisCohortReferenceList(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		created, err := s.UpsertAnalysisCohort(AnalysisCohort{
+			SourceType:      "tag",
+			SourceTag:       "tld",
+			AnalysisEnabled: true,
+			ReferenceList:   AnalysisReferenceListIANATLDs,
+		})
+		if err != nil {
+			t.Fatalf("UpsertAnalysisCohort create: %v", err)
+		}
+		if created.ReferenceList != AnalysisReferenceListIANATLDs {
+			t.Fatalf("ReferenceList = %q, want %q", created.ReferenceList, AnalysisReferenceListIANATLDs)
+		}
+		got, ok := s.GetAnalysisCohort(created.ID)
+		if !ok || got.ReferenceList != AnalysisReferenceListIANATLDs {
+			t.Fatalf("stored cohort = %+v, want reference_list %q", got, AnalysisReferenceListIANATLDs)
+		}
+
+		cleared, err := s.UpsertAnalysisCohort(AnalysisCohort{
+			SourceType:      "tag",
+			SourceTag:       "tld",
+			AnalysisEnabled: true,
+		})
+		if err != nil {
+			t.Fatalf("UpsertAnalysisCohort update: %v", err)
+		}
+		if cleared.ReferenceList != "" {
+			t.Fatalf("ReferenceList = %q, want cleared", cleared.ReferenceList)
+		}
+	})
+}
+
 func TestSQLJobStoreUpsertAnalysisCohortValidatesSource(t *testing.T) {
 	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
 		if _, err := s.UpsertAnalysisCohort(AnalysisCohort{}); err == nil {

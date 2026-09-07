@@ -59,6 +59,7 @@ type Server struct {
 	adminTokens                   atomic.Pointer[tokenSet]
 	extData                       *extdata.Provider
 	registry                      registryLookup
+	refLists                      referenceListLookup
 	logger                        *slog.Logger
 }
 
@@ -195,6 +196,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	s.extData = newExternalDataProvider(cfg, logger)
 	if s.extData != nil {
 		s.registry = s.extData
+		s.refLists = s.extData
 	}
 	s.routes()
 	return s

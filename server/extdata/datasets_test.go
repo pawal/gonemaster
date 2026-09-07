@@ -53,6 +53,55 @@ func TestParseTLDListRejectsEmpty(t *testing.T) {
 	}
 }
 
+func TestReferenceListUnknownName(t *testing.T) {
+	srv, _ := fixtureServer(t)
+	p := newTestProvider(t, srv, newTestClock(), nil)
+
+	if _, _, ok := p.ReferenceList("rdap_dns_bootstrap"); ok {
+		t.Error("ReferenceList accepted a dataset that is not a name list")
+	}
+	if _, _, ok := p.ReferenceList("nosuchlist"); ok {
+		t.Error("ReferenceList accepted an unknown name")
+	}
+}
+
+func TestReferenceListNotLoadedYet(t *testing.T) {
+	srv, _ := fixtureServer(t)
+	p := newTestProvider(t, srv, newTestClock(), nil)
+
+	// The first Lookup only enqueues, so nothing is cached yet. Reporting
+	// ok here would let a caller read an empty list as "the list is empty".
+	if _, _, ok := p.ReferenceList(datasetIANATLDs); ok {
+		t.Error("ReferenceList reported ok before the fetch landed")
+	}
+}
+
+func TestReferenceListServesFetchedNames(t *testing.T) {
+	srv, _ := fixtureServer(t)
+	p := newTestProvider(t, srv, newTestClock(), nil)
+
+	p.Lookup(datasetKey(datasetIANATLDs))
+	waitFor(t, "tld list fetch", func() bool {
+		_, _, ok := p.ReferenceList(datasetIANATLDs)
+		return ok
+	})
+
+	names, version, _ := p.ReferenceList(datasetIANATLDs)
+	if version != "2026090700" {
+		t.Errorf("version = %q, want 2026090700", version)
+	}
+	if len(names) != 8 || names[0] != "aaa" {
+		t.Errorf("names = %v, want the 8 sorted fixture names", names)
+	}
+}
+
+func TestReferenceListOnNilProvider(t *testing.T) {
+	var p *Provider
+	if _, _, ok := p.ReferenceList(datasetIANATLDs); ok {
+		t.Error("ReferenceList on a nil provider reported ok")
+	}
+}
+
 func TestParseRDAPBootstrap(t *testing.T) {
 	value, version, err := parseRDAPBootstrap(readFixture(t, "rdap-dns.json"))
 	if err != nil {

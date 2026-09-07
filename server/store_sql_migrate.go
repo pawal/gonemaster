@@ -600,6 +600,14 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_snapshot_domain_view ADD COLUMN dnskey_count INTEGER`,
 		},
 	},
+	{
+		// Reference list the cohort's source tag is compared against.
+		// Empty means no comparison.
+		version: 11,
+		stmts: []string{
+			`ALTER TABLE analysis_cohort_catalog ADD COLUMN reference_list VARCHAR(32) NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // retiredAnalysisTags is frozen at migration 9; a later rename needs its

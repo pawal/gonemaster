@@ -28,6 +28,20 @@ var (
 	ErrBatchNotFound                  = errors.New("batch not found")
 )
 
+// AnalysisReferenceListIANATLDs compares a cohort's source tag against the
+// IANA list of delegated top-level domains.
+const AnalysisReferenceListIANATLDs = "iana_tlds"
+
+// IsValidAnalysisReferenceList reports whether v names a supported reference
+// list. The empty string is valid and means no comparison.
+func IsValidAnalysisReferenceList(v string) bool {
+	switch v {
+	case "", AnalysisReferenceListIANATLDs:
+		return true
+	}
+	return false
+}
+
 // AnalysisScope describes how analysis queries should select runs before
 // grouping/filtering at the dashboard layer.
 type AnalysisScope struct {

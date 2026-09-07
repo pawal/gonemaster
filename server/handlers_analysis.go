@@ -71,6 +71,7 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 		IsDefault       bool   `json:"is_default"`
 		SortOrder       int    `json:"sort_order"`
 		TagViewMinLevel string `json:"tag_view_min_level"`
+		ReferenceList   string `json:"reference_list"`
 	}
 	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
@@ -101,6 +102,11 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 		writeError(w, http.StatusBadRequest, "invalid_tag_view_min_level", "tag_view_min_level must be one of INFO, NOTICE, WARNING, ERROR, CRITICAL", nil)
 		return
 	}
+	req.ReferenceList = strings.TrimSpace(req.ReferenceList)
+	if !IsValidAnalysisReferenceList(req.ReferenceList) {
+		writeError(w, http.StatusBadRequest, "invalid_reference_list", "reference_list must be empty or iana_tlds", nil)
+		return
+	}
 	if _, exists := s.store.GetAnalysisCohortBySource(req.SourceType, req.SourceTag); exists {
 		writeError(w, http.StatusConflict, "cohort_exists", "analysis cohort already exists for that source", nil)
 		return
@@ -124,6 +130,7 @@ func (s *Server) handleCreateAnalysisCohort(w http.ResponseWriter, r *http.Reque
 		IsDefault:       req.IsDefault,
 		SortOrder:       req.SortOrder,
 		TagViewMinLevel: tagFloor,
+		ReferenceList:   req.ReferenceList,
 	})
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
@@ -164,7 +171,7 @@ func (s *Server) handleAnalysisCohortByID(w http.ResponseWriter, r *http.Request
 	}
 	switch r.Method {
 	case http.MethodGet:
-		writeJSON(w, http.StatusOK, cohort)
+		writeJSON(w, http.StatusOK, NewAnalysisCohortDetail(cohort, s.analysisCohortSourceDrift(cohort)))
 	case http.MethodPatch:
 		if !s.enforceCSRF(w, r) {
 			return
@@ -207,6 +214,7 @@ func (s *Server) handlePatchAnalysisCohort(w http.ResponseWriter, r *http.Reques
 		IsDefault       *bool   `json:"is_default,omitempty"`
 		SortOrder       *int    `json:"sort_order,omitempty"`
 		TagViewMinLevel *string `json:"tag_view_min_level,omitempty"`
+		ReferenceList   *string `json:"reference_list,omitempty"`
 	}
 	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
@@ -238,6 +246,14 @@ func (s *Server) handlePatchAnalysisCohort(w http.ResponseWriter, r *http.Reques
 			return
 		}
 		desired.TagViewMinLevel = floor
+	}
+	if req.ReferenceList != nil {
+		list := strings.TrimSpace(*req.ReferenceList)
+		if !IsValidAnalysisReferenceList(list) {
+			writeError(w, http.StatusBadRequest, "invalid_reference_list", "reference_list must be empty or iana_tlds", nil)
+			return
+		}
+		desired.ReferenceList = list
 	}
 	if desired.PublicEnabled && !desired.AnalysisEnabled {
 		writeError(w, http.StatusBadRequest, "invalid_catalog", "public_enabled=true requires analysis_enabled=true", nil)

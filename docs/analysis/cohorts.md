@@ -27,9 +27,47 @@ operator task. A cohort is a publication decision.
 | `analysis_enabled` | Whether matching runs are projected into analysis tables. |
 | `public_enabled` | Whether the cohort appears in the public catalog. |
 | `sort_order` | Display order in the public catalog. |
+| `reference_list` | Optional external list the source tag is compared against. Empty means no comparison; the only other value is `iana_tlds`. |
 
 Only `analysis_enabled` cohorts receive materialized rows. Only
 `public_enabled` cohorts are listed on the public path.
+
+## Source Drift
+
+A source tag is filled once. Delegations change, so the tag and the
+population it was meant to represent diverge over time. Setting
+`reference_list` makes the server report that divergence.
+
+`reference_list = iana_tlds` compares the tag against the IANA list of
+delegated top-level domains. The list comes from the external data provider,
+so it is reported only when `external_data.enabled` is true and the dataset
+has been fetched. See
+[configuration.md](../server/configuration.md#external-reference-data).
+
+`GET /api/v1/analysis/cohorts/{id}` then carries a `source_drift` object:
+
+| Field | Meaning |
+|---|---|
+| `checked_at` | When the comparison was made. It is derived per request, not stored. |
+| `list_version` | Version marker of the reference list used. |
+| `missing` | Names in the list that are not in the source tag. |
+| `extra` | Names in the source tag that are not in the list. |
+
+Comparison is on the A-label, case-insensitive, with a trailing root dot
+ignored. The field is absent when the cohort names no list, the provider is
+off, or the list has not been fetched yet: an unfetched list would otherwise
+report every member of the tag as extra.
+
+The admin cohort row shows the two counts as `Drift: +N / -M` and expands to
+both name lists. Drift is reported only. Fixing it stays an explicit tag
+operation:
+
+```sh
+gonemaster-client tags add-domains tld --file new-tlds.txt
+gonemaster-client domains untag retired.example tld
+```
+
+The next rebuild or snapshot then reflects the corrected tag.
 
 ## End-to-End Workflow
 

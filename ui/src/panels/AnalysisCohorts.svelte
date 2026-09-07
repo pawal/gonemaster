@@ -71,6 +71,10 @@
   let promoteBatchIds = $state(new Set());
   let candidateLookupTag = $state("");
 
+  // Source-tag drift against a cohort's reference list, keyed by cohort id.
+  // Only cohorts with a reference list are fetched, and only on load.
+  let driftByCohortId = $state({});
+
   // Snapshots are loaded lazily per-cohort (expand toggled by admin).
   let snapshotsByCohortId = $state({});
   let snapshotsLoadingIds = $state(new Set());
@@ -106,6 +110,7 @@
       public_enabled: false,
       is_default: false,
       sort_order: 0,
+      reference_list: "",
     };
   }
 
@@ -128,6 +133,7 @@
       const result = await apiFetch("/analysis/cohorts");
       cohorts = Array.isArray(result) ? result : [];
       if (!preserveNotice) clearNotice();
+      loadDrift(cohorts);
     } catch (error) {
       loadError = error.message || $t("analysis_cohorts_load_error_generic");
     } finally {
@@ -146,6 +152,36 @@
       // Soft hint; don't block the cohort panel on this lookup.
     }
   }
+
+  // Drift is derived server-side per cohort, so only rows that name a
+  // reference list are asked for it.
+  async function loadDrift(rows) {
+    const next = {};
+    await Promise.all(
+      rows
+        .filter((c) => c.reference_list)
+        .map(async (c) => {
+          try {
+            const detail = await apiFetch(`/analysis/cohorts/${c.id}`);
+            if (detail?.source_drift) next[c.id] = detail.source_drift;
+          } catch (_) {
+            // Drift is a soft hint; a failed read just leaves it unshown.
+          }
+        })
+    );
+    driftByCohortId = next;
+  }
+
+  const REFERENCE_LISTS = ["", "iana_tlds"];
+
+  const referenceListLabel = (value) =>
+    value === "iana_tlds"
+      ? $t("analysis_cohorts_reference_list_iana_tlds")
+      : $t("analysis_cohorts_reference_list_none");
+
+  const driftCount = (drift, key) => (Array.isArray(drift?.[key]) ? drift[key].length : 0);
+
+  const driftNames = (drift, key) => (Array.isArray(drift?.[key]) ? drift[key].join(", ") : "");
 
   async function loadExistingTags() {
     try {
@@ -226,6 +262,7 @@
       public_enabled: !!cohort.public_enabled,
       is_default: !!cohort.is_default,
       sort_order: cohort.sort_order || 0,
+      reference_list: cohort.reference_list || "",
     };
     clearNotice();
     if (typeof document !== "undefined") {
@@ -253,6 +290,7 @@
           label: String(draft.label || "").trim(),
           description: String(draft.description || "").trim(),
           sort_order: Number(draft.sort_order) || 0,
+          reference_list: String(draft.reference_list || ""),
         }),
       });
       await loadCohorts({ preserveNotice: true });
@@ -328,6 +366,7 @@
           public_enabled: !!draft.public_enabled,
           is_default: !!draft.is_default,
           sort_order: Number(draft.sort_order) || 0,
+          reference_list: String(draft.reference_list || ""),
         }),
       });
       // The server rebuilds a new cohort right away when analysis is on.
@@ -851,11 +890,43 @@
               {@const busy = busyCohortId === cohort.id}
               {@const tone = materializationBadgeTone(cohort)}
               {@const runDisabled = busy || !cohort.analysis_enabled || submittingSnapshotCohortId === cohort.id}
+              {@const drift = driftByCohortId[cohort.id]}
               <tr class:row-editing={editingCohortId === cohort.id}>
                 <th scope="row" class="cohort-cell">
                   <span class="cohort-tag">{cohort.source_tag}</span>
                   {#if cohort.label && cohort.label !== cohort.source_tag}
                     <span class="cohort-label">{cohort.label}</span>
+                  {/if}
+                  {#if drift}
+                    {@const missing = driftCount(drift, "missing")}
+                    {@const extra = driftCount(drift, "extra")}
+                    {#if missing === 0 && extra === 0}
+                      <span class="cohort-drift muted">{$t("analysis_cohorts_drift_in_sync")}</span>
+                    {:else}
+                      <details class="cohort-drift">
+                        <summary>{$t("analysis_cohorts_drift")}: +{missing} / -{extra}</summary>
+                        <div class="drift-detail">
+                          <div class="small muted">
+                            {$t("analysis_cohorts_drift_checked", {
+                              time: formatTimestamp(drift.checked_at),
+                              version: drift.list_version || "?",
+                            })}
+                          </div>
+                          {#if missing > 0}
+                            <div class="drift-group">
+                              <span class="field-label">{$t("analysis_cohorts_drift_missing")}</span>
+                              <span class="mono drift-names">{driftNames(drift, "missing")}</span>
+                            </div>
+                          {/if}
+                          {#if extra > 0}
+                            <div class="drift-group">
+                              <span class="field-label">{$t("analysis_cohorts_drift_extra")}</span>
+                              <span class="mono drift-names">{driftNames(drift, "extra")}</span>
+                            </div>
+                          {/if}
+                        </div>
+                      </details>
+                    {/if}
                   {/if}
                 </th>
                 <td class="col-center">
@@ -1167,6 +1238,14 @@
         <span class="field-label">{$t("analysis_cohorts_field_sort_order")}</span>
         <input type="number" bind:value={draft.sort_order} min="0" />
       </label>
+      <label class="field">
+        <span class="field-label">{$t("analysis_cohorts_field_reference_list")}</span>
+        <select bind:value={draft.reference_list}>
+          {#each REFERENCE_LISTS as value (value)}
+            <option {value}>{referenceListLabel(value)}</option>
+          {/each}
+        </select>
+      </label>
       <label class="field field-full">
         <span class="field-label">{$t("analysis_cohorts_field_description")}</span>
         <input type="text" bind:value={draft.description} />
@@ -1291,6 +1370,36 @@
     display: block;
     margin-top: 2px;
     font-size: var(--text-xs);
+    color: var(--ink-2);
+  }
+
+  .cohort-drift {
+    display: block;
+    margin-top: 4px;
+    font-size: var(--text-xs);
+    font-family: var(--sans, inherit);
+    font-weight: 400;
+  }
+
+  .cohort-drift summary {
+    cursor: pointer;
+    color: var(--ink-2);
+  }
+
+  .drift-detail {
+    margin-top: 4px;
+    max-width: 320px;
+  }
+
+  .drift-group {
+    margin-top: 4px;
+  }
+
+  .drift-names {
+    display: block;
+    max-height: 8em;
+    overflow-y: auto;
+    overflow-wrap: anywhere;
     color: var(--ink-2);
   }
 

@@ -50,3 +50,14 @@ type registryLookup interface {
 	RDAPDomainURL(domain string) (string, extdata.State)
 	RDAPDomain(domain string) (*extdata.RDAPDomainSummary, time.Time, extdata.State)
 }
+
+// referenceListLookup is the part of the provider cohort drift reads.
+type referenceListLookup interface {
+	ReferenceList(name string) (names []string, version string, ok bool)
+}
+
+// ReferenceLists returns the reference-list source. Nil when the provider is
+// disabled, in which case no cohort reports drift.
+func (s *Server) ReferenceLists() referenceListLookup {
+	return s.refLists
+}

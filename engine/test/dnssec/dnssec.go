@@ -112,7 +112,8 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	// Runs before the DS07_NOT_SIGNED short-circuit so a stale parent DS is caught.
+	// Runs before the DS07_NOT_SIGNED short-circuit so a DS at the parent of an
+	// unsigned zone (no DNSKEY, or DNSKEY without RRSIG) is caught.
 	if util.ShouldRunTest(ctx, "dnssec11") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC11(ctx, z)
@@ -2298,6 +2299,16 @@ func DNSSEC06(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	return results, nil
 }
 
+// dnskeyRRSIGPresent reports whether the answer carries an RRSIG covering DNSKEY.
+func dnskeyRRSIGPresent(resp packet.Packet) bool {
+	for _, rr := range resp.GetRecords("RRSIG", "answer") {
+		if sig, ok := rr.(*dns.RRSIG); ok && sig.TypeCovered == dns.TypeDNSKEY {
+			return true
+		}
+	}
+	return false
+}
+
 // DNSSEC07 runs the DNSSEC07 test case.
 func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	const testcase = "DNSSEC07"
@@ -2312,7 +2323,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var signedResponse []string
 	var noAuthDNSKEY []string
 	errorRcodeDNSKEY := map[string][]string{}
-	var noDNSKEY []string
+	var notSigned []string
 	var noDS []string
 	var dsInResponse []string
 
@@ -2336,7 +2347,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		noAuth          bool
 		errorRcode      string
 		signed          bool
-		noDNSKEY        bool
+		notSigned       bool
 	}
 
 	childGroups := nameserversByIP(childNS)
@@ -2384,19 +2395,10 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
-				rrsigRRs := dnskeyResp.GetRecords("RRSIG", "answer")
-				coveredDNSKEY := false
-				for _, rr := range rrsigRRs {
-					if sig, ok := rr.(*dns.RRSIG); ok && sig.TypeCovered == dns.TypeDNSKEY {
-						coveredDNSKEY = true
-						break
-					}
-				}
-
-				if coveredDNSKEY {
+				if dnskeyRRSIGPresent(dnskeyResp) {
 					outcome.signed = true
 				} else {
-					outcome.noDNSKEY = true
+					outcome.notSigned = true
 				}
 
 				outcomes[i] = outcome
@@ -2426,8 +2428,8 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				errorRcodeDNSKEY[outcome.errorRcode] = append(errorRcodeDNSKEY[outcome.errorRcode], outcome.matchingStrings...)
 			case outcome.signed:
 				signedResponse = append(signedResponse, outcome.matchingStrings...)
-			case outcome.noDNSKEY:
-				noDNSKEY = append(noDNSKEY, outcome.matchingStrings...)
+			case outcome.notSigned:
+				notSigned = append(notSigned, outcome.matchingStrings...)
 			}
 		}
 	}
@@ -2586,27 +2588,27 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if len(noDNSKEY) > 0 {
+	if len(notSigned) > 0 {
 		args := map[string]any{}
-		setTypedServersFromNames(args, noDNSKEY)
+		setTypedServersFromNames(args, notSigned)
 		if err := appendLog(ctx, &results, testcase, "DS07_NOT_SIGNED_ON_SERVER", args); err != nil {
 			return results, err
 		}
 	}
 
-	if len(signedResponse) > 0 && len(noDNSKEY) > 0 {
+	if len(signedResponse) > 0 && len(notSigned) > 0 {
 		if err := appendLog(ctx, &results, testcase, "DS07_INCONSISTENT_SIGNED", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	if len(signedResponse) > 0 && len(noDNSKEY) == 0 {
+	if len(signedResponse) > 0 && len(notSigned) == 0 {
 		if err := appendLog(ctx, &results, testcase, "DS07_SIGNED", map[string]any{}); err != nil {
 			return results, err
 		}
 	}
 
-	if len(signedResponse) == 0 && len(noDNSKEY) > 0 {
+	if len(signedResponse) == 0 && len(notSigned) > 0 {
 		if err := appendLog(ctx, &results, testcase, "DS07_NOT_SIGNED", map[string]any{}); err != nil {
 			return results, err
 		}
@@ -2634,7 +2636,7 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	if len(noDNSKEY) == 0 && len(signedResponse) > 0 {
+	if len(notSigned) == 0 && len(signedResponse) > 0 {
 		if len(noDS) > 0 && len(dsInResponse) == 0 {
 			if err := appendLog(ctx, &results, testcase, "DS07_NO_DS_FOR_SIGNED_ZONE", map[string]any{}); err != nil {
 				return results, err
@@ -4507,8 +4509,8 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if continueWithChildTests {
 		queryTypes := []string{"SOA", "DNSKEY"}
 		var undeterminedDNSKEY []string
-		var noDNSKEYRecord []string
-		var hasDNSKEYRecord []string
+		var unsignedNS []string
+		var signedNS []string
 
 		nssDel, err := glueNameservers(ctx, z)
 		if err != nil {
@@ -4542,8 +4544,8 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			type childOutcome struct {
 				nsIP         string
 				undetermined bool
-				noDNSKEY     bool
-				hasDNSKEY    bool
+				unsigned     bool
+				signed       bool
 			}
 
 			outcomes := make([]childOutcome, len(ordered))
@@ -4571,11 +4573,13 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						return nil
 					}
 
+					// DO bit set: the RRSIG over DNSKEY decides signed or unsigned.
 					useVC = false
-					dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{UseVC: &useVC})
+					dnssecOn := true
+					dnskeyResp, _ := ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{UseVC: &useVC, DNSSEC: &dnssecOn})
 					if dnskeyResp.TC() {
 						useVC = true
-						dnskeyResp, _ = ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{UseVC: &useVC})
+						dnskeyResp, _ = ns.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &nameserver.QueryOptions{UseVC: &useVC, DNSSEC: &dnssecOn})
 					}
 
 					if dnskeyResp.Msg == nil || dnskeyResp.Rcode() != "NOERROR" || !dnskeyResp.AA() {
@@ -4585,10 +4589,10 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					}
 
 					dnskeyRRs := dnskeyResp.GetRecordsForName("DNSKEY", z.Name, "answer")
-					if len(dnskeyRRs) == 0 {
-						outcome.noDNSKEY = true
+					if len(dnskeyRRs) > 0 && dnskeyRRSIGPresent(dnskeyResp) {
+						outcome.signed = true
 					} else {
-						outcome.hasDNSKEY = true
+						outcome.unsigned = true
 					}
 					outcomes[i] = outcome
 					return nil
@@ -4606,38 +4610,38 @@ func DNSSEC11(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if outcome.undetermined {
 					undeterminedDNSKEY = append(undeterminedDNSKEY, outcome.nsIP)
 				}
-				if outcome.noDNSKEY {
-					noDNSKEYRecord = append(noDNSKEYRecord, outcome.nsIP)
+				if outcome.unsigned {
+					unsignedNS = append(unsignedNS, outcome.nsIP)
 				}
-				if outcome.hasDNSKEY {
-					hasDNSKEYRecord = append(hasDNSKEYRecord, outcome.nsIP)
+				if outcome.signed {
+					signedNS = append(signedNS, outcome.nsIP)
 				}
 			}
 		}
 
-		if len(undeterminedDNSKEY) > 0 && len(noDNSKEYRecord) == 0 && len(hasDNSKEYRecord) == 0 {
+		if len(undeterminedDNSKEY) > 0 && len(unsignedNS) == 0 && len(signedNS) == 0 {
 			if err := appendLog(ctx, &results, testcase, "DS11_UNDETERMINED_SIGNED_ZONE", map[string]any{}); err != nil {
 				return results, err
 			}
-		} else if len(noDNSKEYRecord) > 0 && len(hasDNSKEYRecord) == 0 {
+		} else if len(unsignedNS) > 0 && len(signedNS) == 0 {
 			if err := appendLog(ctx, &results, testcase, "DS11_DS_BUT_UNSIGNED_ZONE", map[string]any{}); err != nil {
 				return results, err
 			}
-		} else if len(noDNSKEYRecord) > 0 && len(hasDNSKEYRecord) > 0 {
+		} else if len(unsignedNS) > 0 && len(signedNS) > 0 {
 			if err := appendLog(ctx, &results, testcase, "DS11_INCONSISTENT_SIGNED_ZONE", map[string]any{}); err != nil {
 				return results, err
 			}
 			args := map[string]any{}
-			setTypedAddressesFromValues(args, noDNSKEYRecord)
+			setTypedAddressesFromValues(args, unsignedNS)
 			if err := appendLog(ctx, &results, testcase, "DS11_NS_WITH_UNSIGNED_ZONE", args); err != nil {
 				return results, err
 			}
 			args = map[string]any{}
-			setTypedAddressesFromValues(args, hasDNSKEYRecord)
+			setTypedAddressesFromValues(args, signedNS)
 			if err := appendLog(ctx, &results, testcase, "DS11_NS_WITH_SIGNED_ZONE", args); err != nil {
 				return results, err
 			}
-		} else if len(hasDNSKEYRecord) > 0 && len(noDNSKEYRecord) == 0 && len(undeterminedDNSKEY) == 0 {
+		} else if len(signedNS) > 0 && len(unsignedNS) == 0 && len(undeterminedDNSKEY) == 0 {
 			if err := appendLog(ctx, &results, testcase, "DS11_CONSISTENT_SIGNED", map[string]any{}); err != nil {
 				return results, err
 			}

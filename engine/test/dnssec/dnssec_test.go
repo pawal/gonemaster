@@ -3333,18 +3333,24 @@ func TestDNSSEC11ParallelChildQueries(t *testing.T) {
 		tctest.Stub(t, &hasFakeAddresses, func(_ *zone.Zone) bool { return false })
 
 		key := tctest.DNSKEYRR("example", 8, tctest.PublicKey("AwEAAc=="))
+		sig := rrsigRecord("example", dns.TypeDNSKEY, 12345,
+			time.Now().Add(-time.Hour).Unix(), time.Now().Add(time.Hour).Unix())
 
 		gate := tctest.NewGate()
 
-		hook := func(id string, withDNSKEY bool) tctest.Handler {
+		hook := func(id string, signed bool) tctest.Handler {
 			return func(q tctest.Query) packet.Packet {
 				switch q.Type {
 				case "SOA":
 					gate.Arrive(id)
 					return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
 				case "DNSKEY":
-					if withDNSKEY {
-						return dnskeyPacket(q.Name, key)
+					if signed {
+						// The signed server needs an RRSIG covering DNSKEY, not
+						// just the key. Copies keep the shared records out of
+						// two goroutines at once.
+						keyCopy, sigCopy := *key, *sig
+						return answerPacket(q.Name, dns.TypeDNSKEY, &keyCopy, &sigCopy)
 					}
 					return dnskeyPacket(q.Name, nil)
 				default:

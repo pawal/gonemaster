@@ -3724,6 +3724,12 @@ msgctxt "DNSSEC:DS07_NOT_SIGNED"
 msgid "The zone is not signed."
 msgstr "Sonen er ikke signert."
 
+msgctxt "DNSSEC:DS07_NOT_SIGNED_ON_SERVER"
+msgid ""
+"The following name servers respond without a signed DNSKEY RRset (unsigned "
+"child zone). Name servers: \"{servers}\"."
+msgstr "Følgende navnetjenere svarer uten et signert DNSKEY-RRset (usignert barnesone). Navnetjenere: \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "Sonen er signert med DNSSEC."

@@ -3766,6 +3766,12 @@ msgctxt "DNSSEC:DS07_NOT_SIGNED"
 msgid "The zone is not signed."
 msgstr "Zonen är inte signerad."
 
+msgctxt "DNSSEC:DS07_NOT_SIGNED_ON_SERVER"
+msgid ""
+"The following name servers respond without a signed DNSKEY RRset (unsigned "
+"child zone). Name servers: \"{servers}\"."
+msgstr "Följande namnservrar svarar utan ett signerat DNSKEY RRset (osignerad dotterzon). Namnservrar: \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "Föräldrazonen har ingen DS-post för den signerade dotterzonen."

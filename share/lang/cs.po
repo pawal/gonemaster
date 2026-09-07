@@ -2130,6 +2130,12 @@ msgctxt "DNSSEC:DS07_NOT_SIGNED"
 msgid "The zone is not signed."
 msgstr "Zóna není podepsaná."
 
+msgctxt "DNSSEC:DS07_NOT_SIGNED_ON_SERVER"
+msgid ""
+"The following name servers respond without a signed DNSKEY RRset (unsigned "
+"child zone). Name servers: \"{servers}\"."
+msgstr "Následující jmenné servery odpovídají bez podepsaného DNSKEY RRset (nepodepsaná podřízená zóna). Jmenné servery: \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "Nadřazená zóna nemá žádný DS záznam pro podepsanou podřízenou zónu."

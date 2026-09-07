@@ -3241,6 +3241,12 @@ msgctxt "DNSSEC:DS07_NOT_SIGNED"
 msgid "The zone is not signed."
 msgstr "Die Zone ist nicht signiert."
 
+msgctxt "DNSSEC:DS07_NOT_SIGNED_ON_SERVER"
+msgid ""
+"The following name servers respond without a signed DNSKEY RRset (unsigned "
+"child zone). Name servers: \"{servers}\"."
+msgstr "Die folgenden Nameserver antworten ohne ein signiertes DNSKEY-RRset (unsignierte untergeordnete Zone). Nameserver: \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "Die übergeordnete Zone hat keinen DS-Record für die signierte untergeordnete Zone."

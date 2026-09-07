@@ -8,7 +8,7 @@ reference it consistently.
 Every divergence reported upstream belongs in this file. The full set of reports,
 including the few that are not behavior divergences, is
 [`author:pawal org:zonemaster`](https://github.com/search?q=org%3Azonemaster+is%3Aissue+author%3Apawal+created%3A%3E%3D2026-01-01&type=issues)
-on GitHub: 21 issues since January 2026, 9 of them closed. The three not listed
+on GitHub: 22 issues since January 2026, 9 of them closed. The three not listed
 below are a GUI usability report ([zonemaster#1476](https://github.com/zonemaster/zonemaster/issues/1476)),
 a licensing-text issue ([zonemaster#1480](https://github.com/zonemaster/zonemaster/issues/1480)),
 and a root-hints refresh ([zonemaster-engine#1489](https://github.com/zonemaster/zonemaster-engine/issues/1489)).
@@ -30,6 +30,7 @@ Status meanings:
 | `DIV-DS02-PRIVATE-DS-ALGO` | `dnssec02` | open | reported | [zonemaster-engine#1544](https://github.com/zonemaster/zonemaster-engine/issues/1544) | Upstream reports a DS/DNSKEY mismatch without emitting anything that says the parent publishes a private DS algorithm (253 or 254), so the cause of the mismatch is invisible. Gonemaster classifies 253 and 254 explicitly as `DS01_DS_ALGO_PRIVATE` and `DS05_ALGO_PRIVATE`, so the run names the cause. | [dnssec.go](../../engine/test/dnssec/dnssec.go), upstream engine `DNSSEC.pm` | [tests/dnssec/dnssec01.md](tests/dnssec/dnssec01.md), [tests/dnssec/dnssec05.md](tests/dnssec/dnssec05.md) |
 | `DIV-DS05-ALGO18` | `dnssec05` | open | reported | [zonemaster#1530](https://github.com/zonemaster/zonemaster/issues/1530) | Upstream reports DNSKEY algorithm 18 (ML-DSA-44) as unassigned after IANA allocated it. Gonemaster recognises algorithm 18 and verifies its signatures. | IANA DNSSEC algorithm registry, [dnssec.go](../../engine/test/dnssec/dnssec.go) | [tests/dnssec/dnssec05.md](tests/dnssec/dnssec05.md) |
 | `DIV-DS09-RRSIG-FALSE-POSITIVE` | `dnssec09` | resolved | reported | [zonemaster-engine#1512](https://github.com/zonemaster/zonemaster-engine/issues/1512) | Resolved: upstream emitted `DS09_RRSIG_NOT_VALID_BY_DNSKEY` for a zone whose SOA RRSIG does validate against the matching algorithm-13 DNSKEY. Found while cross-checking DNSSEC09 results; no gonemaster-side deviation is recorded for this testcase. | upstream engine `DNSSEC.pm` | [tests/dnssec/dnssec09.md](tests/dnssec/dnssec09.md) |
+| `DIV-DS11-UNSIGNED-DNSKEY` | `dnssec11` (message wording also `dnssec07`) | open | reported | [zonemaster-engine#1549](https://github.com/zonemaster/zonemaster-engine/issues/1549) | Upstream decides the child's signing state from DNSKEY presence alone, so a zone that publishes DNSKEYs but serves no RRSIG passes as signed in `dnssec11` and the run reports at most a `WARNING`, while validating resolvers return SERVFAIL for it. Gonemaster requires an RRSIG covering DNSKEY in both testcases, so such a zone yields `DS11_DS_BUT_UNSIGNED_ZONE`, and words the `DS07_NOT_SIGNED_ON_SERVER` message accordingly. | [dnssec.go](../../engine/test/dnssec/dnssec.go), live case `broken13.alg18.westerbaan.name` | [tests/dnssec/dnssec11.md](tests/dnssec/dnssec11.md), [tests/dnssec/dnssec07.md](tests/dnssec/dnssec07.md) (`Differences From Upstream`) |
 | `DIV-DS21-PARENT-DS-RRSIG` | `dnssec21` (no upstream testcase) | open | reported | [zonemaster#1481](https://github.com/zonemaster/zonemaster/issues/1481) | No upstream testcase validates the parent's RRSIG over the DS RRset, so a parent-side DNSSEC failure leaves the child reporting a clean DNSSEC result while validating resolvers return SERVFAIL. Gonemaster ships this as `dnssec21` and proposed it upstream as a new testcase. | upstream DNSSEC test plan | [tests/dnssec/dnssec21.md](tests/dnssec/dnssec21.md) |
 | `DIV-NS01-NXDOMAIN-FLAGS` | `nameserver01` | open | reported | [zonemaster#1466](https://github.com/zonemaster/zonemaster/issues/1466) | Upstream classifies a server as a recursor when all probe responses are `NXDOMAIN`, regardless of the `AA` and `RA` flags, so authoritative-only servers that answer `NXDOMAIN` with `RA=0` are reported as open recursors. Gonemaster requires `RA=1` on some probe response and excludes `NXDOMAIN` answers carrying `AA=1`. | upstream engine `Nameserver.pm` | [tests/nameserver/nameserver01.md](tests/nameserver/nameserver01.md) (`Spec/Implementation Divergences`) |
 | `DIV-NS11-TAG-TYPO` | `nameserver11` | resolved | reported | [zonemaster-engine#1507](https://github.com/zonemaster/zonemaster-engine/issues/1507) | Resolved: upstream emitted the tag `N11_N11_NO_EDNS` where the message catalog defines `N11_NO_EDNS`. Gonemaster emits `N11_NO_EDNS`. | [nameserver.go](../../engine/test/nameserver/nameserver.go), upstream engine `Nameserver.pm` | [tests/nameserver/nameserver11.md](tests/nameserver/nameserver11.md) |
@@ -62,7 +63,9 @@ Status meanings:
 - `dnssec02`: `DIV-DS02-PRIVATE-DS-ALGO`
 - `dnssec03`: `DIV-DS03-SALT-LENGTH`
 - `dnssec05`: `DIV-DS05-ALGO18`
+- `dnssec07`: `DIV-DS11-UNSIGNED-DNSKEY` (message wording; see table)
 - `dnssec09`: `DIV-DS09-RRSIG-FALSE-POSITIVE` (resolved; see table)
+- `dnssec11`: `DIV-DS11-UNSIGNED-DNSKEY`
 - `dnssec21`: `DIV-DS21-PARENT-DS-RRSIG`
 - `nameserver01`: `DIV-NS01-NXDOMAIN-FLAGS`
 - `nameserver11`: `DIV-NS11-TAG-TYPO` (resolved; see table)

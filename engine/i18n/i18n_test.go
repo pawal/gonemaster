@@ -1,9 +1,12 @@
 package i18n
 
 import (
+	"io/fs"
 	"slices"
 	"strings"
 	"testing"
+
+	"codeberg.org/pawal/gonemaster/share"
 )
 
 func TestAvailableLocalesIncludesJapanese(t *testing.T) {
@@ -261,5 +264,68 @@ func TestDS01AlgoDeprecatedAllLocalesExpandArgs(t *testing.T) {
 			strings.Contains(out, "{ds_algo_descr}") || strings.Contains(out, "{servers}") {
 			t.Errorf("locale %s: unresolved placeholder in translation: %q", locale, out)
 		}
+	}
+}
+
+// TestDS07NotSignedOnServerWording pins the English rendering of
+// DNSSEC:DS07_NOT_SIGNED_ON_SERVER. The tag is RRSIG-based, so it also fires
+// for zones that publish DNSKEYs without any covering signature; the older
+// "respond with no DNSKEY" wording was false for those zones. Every locale that
+// carries the entry must still expand {servers}.
+func TestDS07NotSignedOnServerWording(t *testing.T) {
+	args := map[string]any{"servers": "ns1.example.com/192.0.2.1"}
+	expected := `The following name servers respond without a signed DNSKEY RRset (unsigned child zone). Name servers: "ns1.example.com/192.0.2.1".`
+
+	out, found := TranslateWithStatus("en", "dnssec", "DS07_NOT_SIGNED_ON_SERVER", args)
+	if !found {
+		t.Fatalf("expected english message for DS07_NOT_SIGNED_ON_SERVER")
+	}
+	if out != expected {
+		t.Fatalf("unexpected english message:\n got: %q\nwant: %q", out, expected)
+	}
+
+	for _, locale := range AvailableLocales() {
+		out, found := TranslateWithStatus(locale, "dnssec", "DS07_NOT_SIGNED_ON_SERVER", args)
+		if !found {
+			continue // catalog has no entry for this locale
+		}
+		if strings.Contains(out, "{servers}") {
+			t.Errorf("locale %s: unresolved placeholder: %q", locale, out)
+		}
+		if !strings.Contains(out, "ns1.example.com") {
+			t.Errorf("locale %s: servers argument not interpolated: %q", locale, out)
+		}
+	}
+}
+
+// The English text is taken from the first catalog (alphabetically) that
+// carries the msgid, so a catalog whose msgid drifts silently stops
+// contributing the English wording it appears to define.
+func TestDS07NotSignedOnServerMsgidIdenticalInAllCatalogs(t *testing.T) {
+	const key = "DNSSEC:DS07_NOT_SIGNED_ON_SERVER"
+	want := `The following name servers respond without a signed DNSKEY RRset (unsigned child zone). Name servers: "{servers}".`
+
+	paths, err := fs.Glob(share.POFiles, "lang/*.po")
+	if err != nil {
+		t.Fatalf("glob catalogs: %v", err)
+	}
+	seen := 0
+	for _, poPath := range paths {
+		data, err := share.POFiles.ReadFile(poPath)
+		if err != nil {
+			t.Fatalf("read %s: %v", poPath, err)
+		}
+		_, ids := parsePO(string(data))
+		msgid, ok := ids[key]
+		if !ok {
+			continue
+		}
+		seen++
+		if msgid != want {
+			t.Errorf("%s: msgid for %s differs:\n got: %q\nwant: %q", poPath, key, msgid, want)
+		}
+	}
+	if seen == 0 {
+		t.Fatalf("no catalog carries %s", key)
 	}
 }

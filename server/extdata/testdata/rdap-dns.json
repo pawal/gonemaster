@@ -1,0 +1,23 @@
+{
+  "version": "1.0",
+  "publication": "2026-09-01T00:00:00Z",
+  "description": "RDAP bootstrap file for Domain Name System registrations",
+  "services": [
+    [
+      ["se", "nu"],
+      ["https://rdap.iis.se/"]
+    ],
+    [
+      ["com", "net"],
+      ["https://rdap.verisign.com/com/v1/", "http://rdap.example.invalid/"]
+    ],
+    [
+      ["example"],
+      ["http://rdap.insecure.invalid/"]
+    ],
+    [
+      ["internal"],
+      ["https://127.0.0.1/rdap/"]
+    ]
+  ]
+}

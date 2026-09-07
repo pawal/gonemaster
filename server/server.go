@@ -15,6 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/scoring"
 	serveranalysisui "codeberg.org/pawal/gonemaster/server/analysisui"
+	"codeberg.org/pawal/gonemaster/server/extdata"
 	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 	serverui "codeberg.org/pawal/gonemaster/server/ui"
 )
@@ -56,6 +57,8 @@ type Server struct {
 	snapshotRematerializeMu       sync.Mutex
 	snapshotRematerializeInFlight map[int64]struct{}
 	adminTokens                   atomic.Pointer[tokenSet]
+	extData                       *extdata.Provider
+	registry                      registryLookup
 	logger                        *slog.Logger
 }
 
@@ -189,6 +192,10 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		ts = &tokenSet{}
 	}
 	s.adminTokens.Store(ts)
+	s.extData = newExternalDataProvider(cfg, logger)
+	if s.extData != nil {
+		s.registry = s.extData
+	}
 	s.routes()
 	return s
 }

@@ -7,6 +7,7 @@
   import PrefixChip from "$lib/chips/PrefixChip.svelte";
   import EntityHistorySparkline from "$lib/EntityHistorySparkline.svelte";
   import ExternalLinks from "$lib/ExternalLinks.svelte";
+  import RegistryCard from "$lib/RegistryCard.svelte";
   import SigningAlgoChip from "$lib/SigningAlgoChip.svelte";
   import { tagHref } from "$lib/entityLinks";
   import { domainLinks } from "$lib/externalLinks";
@@ -208,9 +209,11 @@
       </div>
       <div><dt>Keys</dt><dd>{d.dnskey_count ?? "-"}</dd></div>
     </dl>
-    <ExternalLinks links={domainLinks(d.domain)} />
+    <ExternalLinks links={domainLinks(d.domain, { rdapUrl: d.rdap_url })} />
     <EntityHistorySparkline points={data.history} metric="score" label="Score over snapshots" />
   </section>
+
+  <RegistryCard registry={d.registry} />
 
   <section class="card">
     <h3>Authoritative servers</h3>

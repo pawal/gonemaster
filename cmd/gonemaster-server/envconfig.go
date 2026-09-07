@@ -98,6 +98,13 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyDuration("read-timeout", "GONEMASTER_READ_TIMEOUT", &cfg.ReadTimeout)
 	applyDuration("write-timeout", "GONEMASTER_WRITE_TIMEOUT", &cfg.WriteTimeout)
 	applyDuration("idle-timeout", "GONEMASTER_IDLE_TIMEOUT", &cfg.IdleTimeout)
+	applyBool("external-data-enabled", "GONEMASTER_EXTERNAL_DATA_ENABLED", &cfg.ExternalData.Enabled)
+	applyDuration("external-data-refresh-interval", "GONEMASTER_EXTERNAL_DATA_REFRESH_INTERVAL", &cfg.ExternalData.RefreshInterval)
+	applyDuration("external-data-record-ttl", "GONEMASTER_EXTERNAL_DATA_RECORD_TTL", &cfg.ExternalData.RecordTTL)
+	applyDuration("external-data-negative-ttl", "GONEMASTER_EXTERNAL_DATA_NEGATIVE_TTL", &cfg.ExternalData.NegativeTTL)
+	applyDuration("external-data-timeout", "GONEMASTER_EXTERNAL_DATA_TIMEOUT", &cfg.ExternalData.Timeout)
+	applyInt("external-data-max-requests-per-minute", "GONEMASTER_EXTERNAL_DATA_MAX_REQUESTS_PER_MINUTE", &cfg.ExternalData.MaxRequestsPerMinute)
+	applyInt("external-data-max-cached-records", "GONEMASTER_EXTERNAL_DATA_MAX_CACHED_RECORDS", &cfg.ExternalData.MaxCachedRecords)
 	applyBool("cross-job-hot-cache", "GONEMASTER_CROSS_JOB_HOT_CACHE", &cfg.CrossJobHotCache)
 	applyInt("cross-job-hot-cache-ttl", "GONEMASTER_CROSS_JOB_HOT_CACHE_TTL", &cfg.CrossJobHotCacheTTLSeconds)
 }

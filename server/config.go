@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/server/extdata"
 	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 )
 
@@ -43,6 +44,33 @@ type AnalysisConfig struct {
 	// page, and do not appear in the listing. Default "NOTICE".
 	// Valid: INFO, NOTICE, WARNING, ERROR, CRITICAL.
 	TagViewMinLevel string `json:"tag_view_min_level,omitempty"`
+}
+
+// ExternalDataSources are the URLs the reference datasets are fetched from.
+// Operators can point them at a mirror.
+type ExternalDataSources struct {
+	IANATLDs      string `json:"iana_tlds,omitempty"`
+	RDAPBootstrap string `json:"rdap_bootstrap,omitempty"`
+}
+
+// ExternalDataConfig controls the optional provider that fetches public
+// registry reference data. Default off: it is the only feature that opens
+// outbound HTTPS connections on the server's own initiative.
+type ExternalDataConfig struct {
+	Enabled bool `json:"enabled"`
+	// RefreshInterval is how often the datasets are re-fetched.
+	RefreshInterval Duration `json:"refresh_interval"`
+	// RecordTTL is how long a per-object record is served before refresh.
+	RecordTTL Duration `json:"record_ttl"`
+	// NegativeTTL is how long a failed fetch suppresses retries.
+	NegativeTTL Duration `json:"negative_ttl"`
+	// Timeout caps one outbound request.
+	Timeout Duration `json:"timeout"`
+	// MaxRequestsPerMinute paces all outbound fetches together.
+	MaxRequestsPerMinute int `json:"max_requests_per_minute,omitempty"`
+	// MaxCachedRecords caps the record cache; least recently used go first.
+	MaxCachedRecords int                 `json:"max_cached_records,omitempty"`
+	Sources          ExternalDataSources `json:"sources"`
 }
 
 // AuthConfig configures admin-API auth. Empty AdminTokens means open mode.
@@ -171,11 +199,12 @@ type Config struct {
 	PublicURL string `json:"public_url,omitempty"`
 	// PublicUIPath is where visitors reach the UI under PublicURL. Empty means
 	// the root. Changes advertised URLs, not where the server mounts.
-	PublicUIPath string          `json:"public_ui_path"`
-	Database     DatabaseConfig  `json:"database"`
-	PublicAPI    PublicAPIConfig `json:"public_api"`
-	Analysis     AnalysisConfig  `json:"analysis"`
-	Auth         AuthConfig      `json:"auth"`
+	PublicUIPath string             `json:"public_ui_path"`
+	Database     DatabaseConfig     `json:"database"`
+	PublicAPI    PublicAPIConfig    `json:"public_api"`
+	Analysis     AnalysisConfig     `json:"analysis"`
+	ExternalData ExternalDataConfig `json:"external_data"`
+	Auth         AuthConfig         `json:"auth"`
 	// ScoringConfigPath is an optional path to a JSON file that overrides the
 	// default scoring configuration (weights, penalties, tag overrides, etc.).
 	// When empty, scoring.DefaultConfig() is used.
@@ -227,44 +256,63 @@ type AnalysisFileConfig struct {
 	TagViewMinLevel *string `json:"tag_view_min_level,omitempty"`
 }
 
+// ExternalDataSourcesFileConfig holds optional source URLs from JSON.
+type ExternalDataSourcesFileConfig struct {
+	IANATLDs      *string `json:"iana_tlds,omitempty"`
+	RDAPBootstrap *string `json:"rdap_bootstrap,omitempty"`
+}
+
+// ExternalDataFileConfig holds optional external-data configuration from JSON.
+type ExternalDataFileConfig struct {
+	Enabled              *bool                          `json:"enabled,omitempty"`
+	RefreshInterval      *string                        `json:"refresh_interval,omitempty"`
+	RecordTTL            *string                        `json:"record_ttl,omitempty"`
+	NegativeTTL          *string                        `json:"negative_ttl,omitempty"`
+	Timeout              *string                        `json:"timeout,omitempty"`
+	MaxRequestsPerMinute *int                           `json:"max_requests_per_minute,omitempty"`
+	MaxCachedRecords     *int                           `json:"max_cached_records,omitempty"`
+	Sources              *ExternalDataSourcesFileConfig `json:"sources,omitempty"`
+}
+
 // FileConfig captures optional configuration fields from JSON.
 type FileConfig struct {
-	ListenAddr                  *string              `json:"listen_addr"`
-	MaxBodySize                 *int64               `json:"max_body_size"`
-	Debug                       *bool                `json:"debug"`
-	WorkerCount                 *int                 `json:"worker_count"`
-	MaxConcurrentJobs           *int                 `json:"max_concurrent_jobs"`
-	StuckJobTimeoutMinutes      *int                 `json:"stuck_job_timeout_minutes,omitempty"`
-	PositiveCacheTTL            *int                 `json:"positive_cache_ttl"`
-	NegativeCacheTTL            *int                 `json:"negative_cache_ttl"`
-	Timeout                     *int                 `json:"timeout"`
-	Retry                       *int                 `json:"retry"`
-	Retrans                     *int                 `json:"retrans"`
-	Fallback                    *bool                `json:"fallback"`
-	SourceAddr4                 *string              `json:"source_addr4"`
-	SourceAddr6                 *string              `json:"source_addr6"`
-	MinLevel                    *string              `json:"min_level"`
-	ProfilePath                 *string              `json:"profile_path"`
-	LogFormat                   *string              `json:"log_format,omitempty"`
-	LogLevel                    *string              `json:"log_level,omitempty"`
-	TrustedProxyCIDRs           *[]string            `json:"trusted_proxy_cidrs,omitempty"`
-	ReadTimeout                 *string              `json:"read_timeout,omitempty"`
-	WriteTimeout                *string              `json:"write_timeout,omitempty"`
-	IdleTimeout                 *string              `json:"idle_timeout,omitempty"`
-	PublicURL                   *string              `json:"public_url,omitempty"`
-	PublicUIPath                *string              `json:"public_ui_path,omitempty"`
-	Database                    *DatabaseFileConfig  `json:"database,omitempty"`
-	PublicAPI                   *PublicAPIFileConfig `json:"public_api,omitempty"`
-	Analysis                    *AnalysisFileConfig  `json:"analysis,omitempty"`
-	Auth                        *AuthConfig          `json:"auth,omitempty"`
-	ScoringConfigPath           *string              `json:"scoring_config_path,omitempty"`
-	ShowScoreAdmin              *bool                `json:"show_score_admin,omitempty"`
-	ShowScorePublic             *bool                `json:"show_score_public,omitempty"`
-	ShowNameserverTimingsAdmin  *bool                `json:"show_nameserver_timings_admin,omitempty"`
-	ShowNameserverTimingsPublic *bool                `json:"show_nameserver_timings_public,omitempty"`
-	ShowDNSSECChainPublic       *bool                `json:"show_dnssec_chain_public,omitempty"`
-	CrossJobHotCache            *bool                `json:"cross_job_hot_cache,omitempty"`
-	CrossJobHotCacheTTLSeconds  *int                 `json:"cross_job_hot_cache_ttl_seconds,omitempty"`
+	ListenAddr                  *string                 `json:"listen_addr"`
+	MaxBodySize                 *int64                  `json:"max_body_size"`
+	Debug                       *bool                   `json:"debug"`
+	WorkerCount                 *int                    `json:"worker_count"`
+	MaxConcurrentJobs           *int                    `json:"max_concurrent_jobs"`
+	StuckJobTimeoutMinutes      *int                    `json:"stuck_job_timeout_minutes,omitempty"`
+	PositiveCacheTTL            *int                    `json:"positive_cache_ttl"`
+	NegativeCacheTTL            *int                    `json:"negative_cache_ttl"`
+	Timeout                     *int                    `json:"timeout"`
+	Retry                       *int                    `json:"retry"`
+	Retrans                     *int                    `json:"retrans"`
+	Fallback                    *bool                   `json:"fallback"`
+	SourceAddr4                 *string                 `json:"source_addr4"`
+	SourceAddr6                 *string                 `json:"source_addr6"`
+	MinLevel                    *string                 `json:"min_level"`
+	ProfilePath                 *string                 `json:"profile_path"`
+	LogFormat                   *string                 `json:"log_format,omitempty"`
+	LogLevel                    *string                 `json:"log_level,omitempty"`
+	TrustedProxyCIDRs           *[]string               `json:"trusted_proxy_cidrs,omitempty"`
+	ReadTimeout                 *string                 `json:"read_timeout,omitempty"`
+	WriteTimeout                *string                 `json:"write_timeout,omitempty"`
+	IdleTimeout                 *string                 `json:"idle_timeout,omitempty"`
+	PublicURL                   *string                 `json:"public_url,omitempty"`
+	PublicUIPath                *string                 `json:"public_ui_path,omitempty"`
+	Database                    *DatabaseFileConfig     `json:"database,omitempty"`
+	PublicAPI                   *PublicAPIFileConfig    `json:"public_api,omitempty"`
+	Analysis                    *AnalysisFileConfig     `json:"analysis,omitempty"`
+	ExternalData                *ExternalDataFileConfig `json:"external_data,omitempty"`
+	Auth                        *AuthConfig             `json:"auth,omitempty"`
+	ScoringConfigPath           *string                 `json:"scoring_config_path,omitempty"`
+	ShowScoreAdmin              *bool                   `json:"show_score_admin,omitempty"`
+	ShowScorePublic             *bool                   `json:"show_score_public,omitempty"`
+	ShowNameserverTimingsAdmin  *bool                   `json:"show_nameserver_timings_admin,omitempty"`
+	ShowNameserverTimingsPublic *bool                   `json:"show_nameserver_timings_public,omitempty"`
+	ShowDNSSECChainPublic       *bool                   `json:"show_dnssec_chain_public,omitempty"`
+	CrossJobHotCache            *bool                   `json:"cross_job_hot_cache,omitempty"`
+	CrossJobHotCacheTTLSeconds  *int                    `json:"cross_job_hot_cache_ttl_seconds,omitempty"`
 }
 
 // DefaultConfig returns baseline config values.
@@ -298,6 +346,26 @@ func DefaultConfig() Config {
 		},
 		Analysis: AnalysisConfig{
 			TagViewMinLevel: "NOTICE",
+		},
+		ExternalData: defaultExternalDataConfig(),
+	}
+}
+
+// defaultExternalDataConfig mirrors the provider's own defaults so the two
+// cannot drift.
+func defaultExternalDataConfig() ExternalDataConfig {
+	d := extdata.DefaultConfig()
+	return ExternalDataConfig{
+		Enabled:              d.Enabled,
+		RefreshInterval:      Duration{d.RefreshInterval},
+		RecordTTL:            Duration{d.RecordTTL},
+		NegativeTTL:          Duration{d.NegativeTTL},
+		Timeout:              Duration{d.Timeout},
+		MaxRequestsPerMinute: d.MaxRequestsPerMinute,
+		MaxCachedRecords:     d.MaxCachedRecords,
+		Sources: ExternalDataSources{
+			IANATLDs:      d.Sources.IANATLDs,
+			RDAPBootstrap: d.Sources.RDAPBootstrap,
 		},
 	}
 }
@@ -503,8 +571,45 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 			}
 		}
 	}
+	if file.ExternalData != nil {
+		c.applyExternalDataFileConfig(file.ExternalData)
+	}
 	if file.Auth != nil {
 		c.Auth = *file.Auth
+	}
+}
+
+// applyExternalDataFileConfig overwrites external-data fields provided by
+// file. Unparseable durations are left at their previous value.
+func (c *Config) applyExternalDataFileConfig(file *ExternalDataFileConfig) {
+	if file.Enabled != nil {
+		c.ExternalData.Enabled = *file.Enabled
+	}
+	applyDuration := func(value *string, dst *Duration) {
+		if value == nil {
+			return
+		}
+		if d, err := time.ParseDuration(*value); err == nil && d > 0 {
+			*dst = Duration{d}
+		}
+	}
+	applyDuration(file.RefreshInterval, &c.ExternalData.RefreshInterval)
+	applyDuration(file.RecordTTL, &c.ExternalData.RecordTTL)
+	applyDuration(file.NegativeTTL, &c.ExternalData.NegativeTTL)
+	applyDuration(file.Timeout, &c.ExternalData.Timeout)
+	if file.MaxRequestsPerMinute != nil && *file.MaxRequestsPerMinute > 0 {
+		c.ExternalData.MaxRequestsPerMinute = *file.MaxRequestsPerMinute
+	}
+	if file.MaxCachedRecords != nil && *file.MaxCachedRecords > 0 {
+		c.ExternalData.MaxCachedRecords = *file.MaxCachedRecords
+	}
+	if file.Sources != nil {
+		if file.Sources.IANATLDs != nil && *file.Sources.IANATLDs != "" {
+			c.ExternalData.Sources.IANATLDs = *file.Sources.IANATLDs
+		}
+		if file.Sources.RDAPBootstrap != nil && *file.Sources.RDAPBootstrap != "" {
+			c.ExternalData.Sources.RDAPBootstrap = *file.Sources.RDAPBootstrap
+		}
 	}
 }
 

@@ -117,6 +117,34 @@ func TestApplyEnvVarsSetsFields(t *testing.T) {
 			name: "public api rate limit window", env: "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", value: "2m",
 			get: func(c server.Config) any { return c.PublicAPI.RateLimitWindow.Duration }, want: 2 * time.Minute,
 		},
+		{
+			name: "external data enabled", env: "GONEMASTER_EXTERNAL_DATA_ENABLED", value: "true",
+			get: func(c server.Config) any { return c.ExternalData.Enabled }, want: true,
+		},
+		{
+			name: "external data refresh interval", env: "GONEMASTER_EXTERNAL_DATA_REFRESH_INTERVAL", value: "12h",
+			get: func(c server.Config) any { return c.ExternalData.RefreshInterval.Duration }, want: 12 * time.Hour,
+		},
+		{
+			name: "external data record ttl", env: "GONEMASTER_EXTERNAL_DATA_RECORD_TTL", value: "48h",
+			get: func(c server.Config) any { return c.ExternalData.RecordTTL.Duration }, want: 48 * time.Hour,
+		},
+		{
+			name: "external data negative ttl", env: "GONEMASTER_EXTERNAL_DATA_NEGATIVE_TTL", value: "30m",
+			get: func(c server.Config) any { return c.ExternalData.NegativeTTL.Duration }, want: 30 * time.Minute,
+		},
+		{
+			name: "external data timeout", env: "GONEMASTER_EXTERNAL_DATA_TIMEOUT", value: "5s",
+			get: func(c server.Config) any { return c.ExternalData.Timeout.Duration }, want: 5 * time.Second,
+		},
+		{
+			name: "external data max requests per minute", env: "GONEMASTER_EXTERNAL_DATA_MAX_REQUESTS_PER_MINUTE", value: "12",
+			get: func(c server.Config) any { return c.ExternalData.MaxRequestsPerMinute }, want: 12,
+		},
+		{
+			name: "external data max cached records", env: "GONEMASTER_EXTERNAL_DATA_MAX_CACHED_RECORDS", value: "500",
+			get: func(c server.Config) any { return c.ExternalData.MaxCachedRecords }, want: 500,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg, warn := runApplyEnvVars(tc)

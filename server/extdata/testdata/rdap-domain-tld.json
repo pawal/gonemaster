@@ -1,0 +1,22 @@
+{
+  "objectClassName": "domain",
+  "handle": "se",
+  "ldhName": "se",
+  "events": [
+    { "eventAction": "registration", "eventDate": "1986-09-04T04:00:00Z" },
+    { "eventAction": "last changed", "eventDate": "2026-03-11T20:07:56Z" }
+  ],
+  "entities": [
+    {
+      "roles": ["registrant"],
+      "vcardArray": [
+        "vcard",
+        [
+          ["version", {}, "text", "4.0"],
+          ["fn", {}, "text", "The Swedish Internet Foundation"]
+        ]
+      ]
+    }
+  ],
+  "nameservers": [{ "ldhName": "a.ns.se" }]
+}

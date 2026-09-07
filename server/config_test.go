@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 	"time"
 )
@@ -517,5 +518,125 @@ func TestLoadFileConfigRetentionDays(t *testing.T) {
 	}
 	if cfg.Database.Driver != "sqlite" {
 		t.Fatalf("expected driver sqlite, got %q", cfg.Database.Driver)
+	}
+}
+
+func TestDefaultConfigExternalDataIsOff(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.ExternalData.Enabled {
+		t.Error("external data must default to off: it is the only outbound HTTPS feature")
+	}
+	if cfg.ExternalData.RefreshInterval.Duration != 24*time.Hour {
+		t.Errorf("refresh_interval = %v, want 24h", cfg.ExternalData.RefreshInterval.Duration)
+	}
+	if cfg.ExternalData.RecordTTL.Duration != 168*time.Hour {
+		t.Errorf("record_ttl = %v, want 168h", cfg.ExternalData.RecordTTL.Duration)
+	}
+	if cfg.ExternalData.NegativeTTL.Duration != time.Hour {
+		t.Errorf("negative_ttl = %v, want 1h", cfg.ExternalData.NegativeTTL.Duration)
+	}
+	if cfg.ExternalData.Timeout.Duration != 10*time.Second {
+		t.Errorf("timeout = %v, want 10s", cfg.ExternalData.Timeout.Duration)
+	}
+	if cfg.ExternalData.MaxRequestsPerMinute != 30 || cfg.ExternalData.MaxCachedRecords != 20000 {
+		t.Errorf("budgets = %d/%d, want 30/20000",
+			cfg.ExternalData.MaxRequestsPerMinute, cfg.ExternalData.MaxCachedRecords)
+	}
+	if !strings.HasPrefix(cfg.ExternalData.Sources.IANATLDs, "https://data.iana.org/") ||
+		!strings.HasPrefix(cfg.ExternalData.Sources.RDAPBootstrap, "https://data.iana.org/") {
+		t.Errorf("sources = %+v, want the IANA locations", cfg.ExternalData.Sources)
+	}
+}
+
+func TestApplyFileConfigExternalData(t *testing.T) {
+	raw := `{
+		"external_data": {
+			"enabled": true,
+			"refresh_interval": "6h",
+			"record_ttl": "48h",
+			"negative_ttl": "15m",
+			"timeout": "3s",
+			"max_requests_per_minute": 5,
+			"max_cached_records": 100,
+			"sources": {
+				"iana_tlds": "https://mirror.example/tlds.txt",
+				"rdap_bootstrap": "https://mirror.example/dns.json"
+			}
+		}
+	}`
+	fileCfg, err := LoadFileConfig(writeTempJSON(t, raw))
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+	cfg := DefaultConfig()
+	cfg.ApplyFileConfig(fileCfg)
+	ext := cfg.ExternalData
+	if !ext.Enabled {
+		t.Error("enabled = false, want true")
+	}
+	if ext.RefreshInterval.Duration != 6*time.Hour || ext.RecordTTL.Duration != 48*time.Hour {
+		t.Errorf("intervals = %v/%v, want 6h/48h", ext.RefreshInterval.Duration, ext.RecordTTL.Duration)
+	}
+	if ext.NegativeTTL.Duration != 15*time.Minute || ext.Timeout.Duration != 3*time.Second {
+		t.Errorf("ttl/timeout = %v/%v, want 15m/3s", ext.NegativeTTL.Duration, ext.Timeout.Duration)
+	}
+	if ext.MaxRequestsPerMinute != 5 || ext.MaxCachedRecords != 100 {
+		t.Errorf("budgets = %d/%d, want 5/100", ext.MaxRequestsPerMinute, ext.MaxCachedRecords)
+	}
+	if ext.Sources.IANATLDs != "https://mirror.example/tlds.txt" ||
+		ext.Sources.RDAPBootstrap != "https://mirror.example/dns.json" {
+		t.Errorf("sources = %+v, want the mirror URLs", ext.Sources)
+	}
+}
+
+func TestApplyFileConfigExternalDataKeepsDefaultsForBadValues(t *testing.T) {
+	raw := `{
+		"external_data": {
+			"refresh_interval": "not a duration",
+			"max_requests_per_minute": 0,
+			"sources": { "iana_tlds": "" }
+		}
+	}`
+	fileCfg, err := LoadFileConfig(writeTempJSON(t, raw))
+	if err != nil {
+		t.Fatalf("LoadFileConfig: %v", err)
+	}
+	cfg := DefaultConfig()
+	cfg.ApplyFileConfig(fileCfg)
+	defaults := DefaultConfig().ExternalData
+	if cfg.ExternalData.RefreshInterval != defaults.RefreshInterval {
+		t.Errorf("refresh_interval = %v, want the default kept", cfg.ExternalData.RefreshInterval)
+	}
+	if cfg.ExternalData.MaxRequestsPerMinute != defaults.MaxRequestsPerMinute {
+		t.Errorf("max_requests_per_minute = %d, want the default kept", cfg.ExternalData.MaxRequestsPerMinute)
+	}
+	if cfg.ExternalData.Sources.IANATLDs != defaults.Sources.IANATLDs {
+		t.Errorf("iana_tlds = %q, want the default kept", cfg.ExternalData.Sources.IANATLDs)
+	}
+}
+
+func TestApplyFileConfigExternalDataNilIsNoop(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ExternalData.Enabled = true
+	cfg.ApplyFileConfig(FileConfig{})
+	if !cfg.ExternalData.Enabled {
+		t.Error("a config file with no external_data section must not disable it")
+	}
+}
+
+func TestExternalDataConfigMapsToProvider(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.ExternalData.Enabled = true
+	cfg.ExternalData.MaxRequestsPerMinute = 7
+	cfg.ExternalData.Sources.IANATLDs = "https://mirror.example/tlds.txt"
+	got := externalDataConfig(cfg)
+	if !got.Enabled || got.MaxRequestsPerMinute != 7 {
+		t.Errorf("provider config = %+v, want the server values carried over", got)
+	}
+	if got.Sources.IANATLDs != "https://mirror.example/tlds.txt" {
+		t.Errorf("sources = %+v", got.Sources)
+	}
+	if !strings.HasPrefix(got.UserAgent, "gonemaster/") {
+		t.Errorf("user agent = %q, want a gonemaster/<version> string", got.UserAgent)
 	}
 }

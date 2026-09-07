@@ -195,3 +195,34 @@ describe("/domains/[domain] zone facts", () => {
     expect(counts.getAllByText("-").length).toBe(4);
   });
 });
+
+describe("/domains/[domain] registry data", () => {
+  const rdapHref = () =>
+    screen.getByRole("link", { name: "RDAP" }).getAttribute("href") ?? "";
+
+  it("links the registry's own RDAP endpoint when the server resolved one", () => {
+    render(DomainDetailPage, {
+      data: nsPageData(nsDetail({ rdap_url: "https://rdap.iis.se/domain/alpha.example" }))
+    });
+    expect(rdapHref()).toBe("https://rdap.iis.se/domain/alpha.example");
+  });
+
+  it("falls back to the RDAP web client without one", () => {
+    render(DomainDetailPage, { data: nsPageData(nsDetail()) });
+    expect(rdapHref()).toContain("client.rdap.org");
+  });
+
+  it("renders the registry card only when the server sent the block", () => {
+    const { unmount } = render(DomainDetailPage, { data: nsPageData(nsDetail()) });
+    expect(screen.queryByRole("heading", { name: "Registry" })).toBeNull();
+    unmount();
+
+    render(DomainDetailPage, {
+      data: nsPageData(
+        nsDetail({ registry: { state: "fresh", registrar: "Example Registrar" } })
+      )
+    });
+    expect(screen.getByRole("heading", { name: "Registry" })).toBeInTheDocument();
+    expect(screen.getByText("Example Registrar")).toBeInTheDocument();
+  });
+});

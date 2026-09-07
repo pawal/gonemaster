@@ -6,6 +6,8 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
+- server: optional external data provider fetching the IANA TLD list, the RDAP bootstrap file and per-domain RDAP records, off by default
+- analysis-ui: "Registry" card on the domain detail page with the RDAP registration record
 - analysis-ui: "Elsewhere" links from each detail page to IANA, ICANNWiki, RDAP and RIPEstat
 - analysis-ui, server: IPv6 coverage and weakest signing algorithm overview bars, plus sortable IPv4 NS, IPv6 NS, signing and key columns on the domains list
 - zone11: `Z11_SPF_UNKNOWN_MODIFIER` notice for modifiers outside RFC 7208

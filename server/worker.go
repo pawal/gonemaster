@@ -65,6 +65,8 @@ func (s *Server) Start() {
 		}()
 	}
 
+	s.extData.Start(ctx)
+
 	if s.analysis != nil {
 		go func() {
 			if err := s.analysis.RepairAllCohorts(ctx); err != nil && ctx.Err() == nil {

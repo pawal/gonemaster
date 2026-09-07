@@ -68,13 +68,18 @@ type PublicAnalysisDomainDetail struct {
 	IPv6NSCount int `json:"ipv6_ns_count"`
 	// Weakest signing algorithm the zone publishes, with the label and
 	// tone the bars use. Absent when the domain is unsigned.
-	DNSKEYAlgoWeakest      *int                             `json:"dnskey_algo_weakest,omitempty"`
-	DNSKEYAlgoWeakestLabel string                           `json:"dnskey_algo_weakest_label,omitempty"`
-	DNSKEYAlgoWeakestTone  string                           `json:"dnskey_algo_weakest_tone,omitempty"`
-	DNSKEYCount            *int                             `json:"dnskey_count,omitempty"`
-	Nameservers            []PublicAnalysisDomainNameserver `json:"nameservers"`
-	Addresses              []PublicAnalysisDomainAddress    `json:"addresses"`
-	Tags                   []PublicAnalysisDomainTag        `json:"tags,omitempty"`
+	DNSKEYAlgoWeakest      *int   `json:"dnskey_algo_weakest,omitempty"`
+	DNSKEYAlgoWeakestLabel string `json:"dnskey_algo_weakest_label,omitempty"`
+	DNSKEYAlgoWeakestTone  string `json:"dnskey_algo_weakest_tone,omitempty"`
+	DNSKEYCount            *int   `json:"dnskey_count,omitempty"`
+	// RDAPURL is the registry's own RDAP endpoint for the domain, set only
+	// when the external-data provider resolved one.
+	RDAPURL string `json:"rdap_url,omitempty"`
+	// Registry is live registration data, absent when the provider is off.
+	Registry    *PublicAnalysisDomainRegistry    `json:"registry,omitempty"`
+	Nameservers []PublicAnalysisDomainNameserver `json:"nameservers"`
+	Addresses   []PublicAnalysisDomainAddress    `json:"addresses"`
+	Tags        []PublicAnalysisDomainTag        `json:"tags,omitempty"`
 	// Localized log entries from the run; empty when the run was purged.
 	Entries []PublicAnalysisDomainEntry `json:"entries,omitempty"`
 	// Per-nameserver response times from the run; empty when it was purged.
@@ -301,6 +306,7 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	}
 
 	detail := domainViewToDetail(view)
+	s.attachRegistryData(&detail, view.DomainName)
 	if entries, timings, ok := s.lookupSnapshotDomainRun(snapshot.BatchID, view.DomainID); ok {
 		detail.Entries = entries
 		detail.NameserverTimings = timings

@@ -72,6 +72,13 @@ gonemaster-server --dump-config
 | `GONEMASTER_IDLE_TIMEOUT` | `idle_timeout` |
 | `GONEMASTER_CROSS_JOB_HOT_CACHE` | `cross_job_hot_cache` |
 | `GONEMASTER_CROSS_JOB_HOT_CACHE_TTL` | `cross_job_hot_cache_ttl_seconds` |
+| `GONEMASTER_EXTERNAL_DATA_ENABLED` | `external_data.enabled` |
+| `GONEMASTER_EXTERNAL_DATA_REFRESH_INTERVAL` | `external_data.refresh_interval` |
+| `GONEMASTER_EXTERNAL_DATA_RECORD_TTL` | `external_data.record_ttl` |
+| `GONEMASTER_EXTERNAL_DATA_NEGATIVE_TTL` | `external_data.negative_ttl` |
+| `GONEMASTER_EXTERNAL_DATA_TIMEOUT` | `external_data.timeout` |
+| `GONEMASTER_EXTERNAL_DATA_MAX_REQUESTS_PER_MINUTE` | `external_data.max_requests_per_minute` |
+| `GONEMASTER_EXTERNAL_DATA_MAX_CACHED_RECORDS` | `external_data.max_cached_records` |
 
 Invalid integer, boolean, or duration values emit a warning and are ignored.
 
@@ -101,6 +108,18 @@ Common flags:
 --write-timeout DURATION
 --idle-timeout DURATION
 --public-api-allow-private-undelegated-ip
+```
+
+External data flags:
+
+```text
+--external-data-enabled
+--external-data-refresh-interval DURATION
+--external-data-record-ttl DURATION
+--external-data-negative-ttl DURATION
+--external-data-timeout DURATION
+--external-data-max-requests-per-minute N
+--external-data-max-cached-records N
 ```
 
 Resolver override flags:
@@ -152,6 +171,9 @@ Database and public API flags are covered in [database.md](database.md) and
     "rate_limit_window": "10m",
     "allow_private_undelegated_ip": false,
     "allow_non_global_targets": false
+  },
+  "external_data": {
+    "enabled": false
   },
   "trusted_proxy_cidrs": ["127.0.0.1/32"],
   "read_timeout": "30s",
@@ -272,6 +294,59 @@ The config file can hide score and nameserver timing UI elements:
 ```
 
 These settings affect UI display. They do not remove stored data.
+
+## External Reference Data
+
+The analysis dashboard can show public registry data next to a measurement:
+the RDAP registration record for a domain, and a direct link to the registry's
+own RDAP service. The data comes from a provider that fetches on its own
+schedule and serves from an in-memory cache. It is off by default:
+
+```json
+{
+  "external_data": {
+    "enabled": false,
+    "refresh_interval": "24h",
+    "record_ttl": "168h",
+    "negative_ttl": "1h",
+    "timeout": "10s",
+    "max_requests_per_minute": 30,
+    "max_cached_records": 20000,
+    "sources": {
+      "iana_tlds": "https://data.iana.org/TLD/tlds-alpha-by-domain.txt",
+      "rdap_bootstrap": "https://data.iana.org/rdap/dns.json"
+    }
+  }
+}
+```
+
+| Setting | Purpose |
+|---|---|
+| `enabled` | Turns the provider on. Default `false`. |
+| `refresh_interval` | How often the two IANA datasets are re-fetched. Conditional requests make an unchanged file cost one 304. |
+| `record_ttl` | How long a cached per-domain RDAP record is served before it is refreshed. |
+| `negative_ttl` | How long a failed fetch suppresses retries for the same object. |
+| `timeout` | Per-request timeout for one outbound fetch. |
+| `max_requests_per_minute` | Budget shared by all outbound fetches. It bounds what a crawler walking every detail page can make the server do. |
+| `max_cached_records` | Cache ceiling for per-domain records; least recently used are dropped first. |
+| `sources` | Dataset locations. Point them at a mirror if the deployment cannot reach IANA. |
+
+Enabling this makes the server open outbound HTTPS connections on its own
+initiative: to IANA for the two datasets, and to the RDAP service of the
+registry behind each domain a visitor opens. The domain names sent are already
+public in the cohorts the dashboard serves. Air-gapped and privacy-sensitive
+deployments should leave it off.
+
+Fetching is constrained: HTTPS only, redirects followed only to HTTPS, literal
+and resolved loopback, link-local and private destinations refused, a 2 MiB
+response cap, and a `gonemaster/<version>` user agent. A request for a page
+never waits on a third party: a cache miss renders a placeholder and the
+record appears on the next request. `GET /api/v1/analysis/status` reports the
+dataset freshness, the cached record count, the queue depth, and the last
+fetch error.
+
+The cache is memory only. A restart re-fetches the two datasets and repopulates
+records as they are viewed.
 
 ## Operational Logging
 

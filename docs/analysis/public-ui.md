@@ -121,6 +121,27 @@ The links are plain navigations: nothing is requested from a third party until
 a visitor clicks one. They open in a new tab with `rel="noopener noreferrer"`,
 so the snapshot URL never reaches the target site.
 
+## Registry Data
+
+When the server runs with external data enabled (see
+[configuration.md](../server/configuration.md)), the domain detail page adds a
+"Registry" card with the domain's registration record: registrar, registry
+organisation, handle, status, registration, expiry and last-change dates,
+delegated nameservers, and whether the delegation is signed. The card names
+the RDAP service it came from and the time it was retrieved, and the RDAP link
+in the "Elsewhere" block then points at that service instead of a generic web
+client.
+
+Registry data is not part of the snapshot. A snapshot records one measurement
+and never changes; a registration record changes on the registry's own
+timeline, so it is fetched separately, cached, and labelled with its own
+retrieval time. It never feeds a fact, a bar, or an aggregate.
+
+The server never fetches on the request path. The first visit to a domain the
+server has not fetched yet shows a one-line notice and the record appears on
+reload. Domains whose top-level domain publishes no RDAP service show that no
+data is available.
+
 ## Keyboard Shortcuts
 
 Press `?` for the list of shortcuts. `g` followed by a letter jumps between

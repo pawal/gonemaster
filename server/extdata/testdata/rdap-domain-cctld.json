@@ -1,0 +1,22 @@
+{
+  "objectClassName": "domain",
+  "ldhName": "example.se",
+  "status": ["active"],
+  "events": [
+    { "eventAction": "registration", "eventDate": "2010-01-02" },
+    { "eventAction": "expiration", "eventDate": "2027-01-02T00:00:00Z" }
+  ],
+  "entities": [
+    {
+      "roles": ["registrar"],
+      "vcardArray": [
+        "vcard",
+        [
+          ["version", {}, "text", "4.0"],
+          ["org", {}, "text", ["Registrar AB", "Domains Unit"]]
+        ]
+      ]
+    }
+  ],
+  "secureDNS": { "delegationSigned": false }
+}

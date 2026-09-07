@@ -84,6 +84,13 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var crossJobHotCache bool
 	var noCrossJobHotCache bool
 	var crossJobHotCacheTTL int
+	var extDataEnabled bool
+	var extDataRefreshInterval time.Duration
+	var extDataRecordTTL time.Duration
+	var extDataNegativeTTL time.Duration
+	var extDataTimeout time.Duration
+	var extDataMaxRequestsPerMinute int
+	var extDataMaxCachedRecords int
 	var showVersion bool
 	var dumpConfig bool
 	var shutdownTimeout time.Duration
@@ -148,6 +155,15 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--public-api-rate-limit-window DURATION", detail: "Rate limit sliding window e.g. 5m (default 10m) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW)"},
 			{flag: "--public-api-allow-private-undelegated-ip", detail: "Allow private/loopback IPs as undelegated NS targets on the public API (default off; enable for internal deployments) (env: GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP)"},
 		})
+		printUsageGroup(errOut, "External data", []usageLine{
+			{flag: "--external-data-enabled", detail: "Fetch public registry reference data (IANA lists, RDAP) for the analysis dashboard. Default off; enabling it makes the server contact IANA and registry RDAP servers. (env: GONEMASTER_EXTERNAL_DATA_ENABLED)"},
+			{flag: "--external-data-refresh-interval DURATION", detail: "How often the reference datasets are re-fetched (default 24h) (env: GONEMASTER_EXTERNAL_DATA_REFRESH_INTERVAL)"},
+			{flag: "--external-data-record-ttl DURATION", detail: "How long a cached per-domain record is served before refresh (default 168h) (env: GONEMASTER_EXTERNAL_DATA_RECORD_TTL)"},
+			{flag: "--external-data-negative-ttl DURATION", detail: "How long a failed fetch suppresses retries (default 1h) (env: GONEMASTER_EXTERNAL_DATA_NEGATIVE_TTL)"},
+			{flag: "--external-data-timeout DURATION", detail: "Per-request timeout for outbound fetches (default 10s) (env: GONEMASTER_EXTERNAL_DATA_TIMEOUT)"},
+			{flag: "--external-data-max-requests-per-minute N", detail: "Outbound fetch budget shared by all sources (default 30) (env: GONEMASTER_EXTERNAL_DATA_MAX_REQUESTS_PER_MINUTE)"},
+			{flag: "--external-data-max-cached-records N", detail: "Maximum cached per-domain records (default 20000) (env: GONEMASTER_EXTERNAL_DATA_MAX_CACHED_RECORDS)"},
+		})
 		printUsageGroup(errOut, "Output", []usageLine{
 			{flag: "--min-level LEVEL", detail: "Minimum result log level (default INFO)"},
 		})
@@ -193,6 +209,13 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&crossJobHotCache, "cross-job-hot-cache", false, "Enable cross-job nameserver cache sharing (default true)")
 	fs.BoolVar(&noCrossJobHotCache, "no-cross-job-hot-cache", false, "Disable cross-job nameserver cache sharing")
 	fs.IntVar(&crossJobHotCacheTTL, "cross-job-hot-cache-ttl", 0, "Hot-cache entry TTL in seconds (default 60)")
+	fs.BoolVar(&extDataEnabled, "external-data-enabled", false, "Fetch public registry reference data for the analysis dashboard (default off)")
+	fs.DurationVar(&extDataRefreshInterval, "external-data-refresh-interval", 0, "Reference dataset refresh interval (default 24h)")
+	fs.DurationVar(&extDataRecordTTL, "external-data-record-ttl", 0, "Cached per-domain record TTL (default 168h)")
+	fs.DurationVar(&extDataNegativeTTL, "external-data-negative-ttl", 0, "How long a failed fetch suppresses retries (default 1h)")
+	fs.DurationVar(&extDataTimeout, "external-data-timeout", 0, "Per-request timeout for outbound fetches (default 10s)")
+	fs.IntVar(&extDataMaxRequestsPerMinute, "external-data-max-requests-per-minute", 0, "Outbound fetch budget per minute (default 30)")
+	fs.IntVar(&extDataMaxCachedRecords, "external-data-max-cached-records", 0, "Maximum cached per-domain records (default 20000)")
 	fs.BoolVar(&showVersion, "version", false, "Print version and exit (optional)")
 	fs.BoolVar(&dumpConfig, "dump-config", false, "Print effective config as JSON and exit")
 	fs.DurationVar(&shutdownTimeout, "shutdown-timeout", 10*time.Second, "Graceful shutdown timeout (default 10s)")
@@ -396,6 +419,27 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if flagsSet["public-api-allow-non-global-targets"] {
 		cfg.PublicAPI.AllowNonGlobalTargets = pubAPIAllowNonGlobalTargets
+	}
+	if flagsSet["external-data-enabled"] {
+		cfg.ExternalData.Enabled = extDataEnabled
+	}
+	if flagsSet["external-data-refresh-interval"] {
+		cfg.ExternalData.RefreshInterval = server.Duration{Duration: extDataRefreshInterval}
+	}
+	if flagsSet["external-data-record-ttl"] {
+		cfg.ExternalData.RecordTTL = server.Duration{Duration: extDataRecordTTL}
+	}
+	if flagsSet["external-data-negative-ttl"] {
+		cfg.ExternalData.NegativeTTL = server.Duration{Duration: extDataNegativeTTL}
+	}
+	if flagsSet["external-data-timeout"] {
+		cfg.ExternalData.Timeout = server.Duration{Duration: extDataTimeout}
+	}
+	if flagsSet["external-data-max-requests-per-minute"] {
+		cfg.ExternalData.MaxRequestsPerMinute = extDataMaxRequestsPerMinute
+	}
+	if flagsSet["external-data-max-cached-records"] {
+		cfg.ExternalData.MaxCachedRecords = extDataMaxCachedRecords
 	}
 	if flagsSet["trusted-proxy-cidrs"] {
 		cfg.TrustedProxyCIDRs = strings.Split(trustedProxyCIDRs, ",")

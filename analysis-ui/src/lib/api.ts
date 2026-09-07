@@ -260,6 +260,26 @@ export type NameserverTiming = {
   status?: string;
 };
 
+// Live registration data from the server's external-data provider. It is
+// not part of the snapshot: it carries its own fetch time and its state
+// says whether the server has it yet.
+export type DomainRegistryState = "fresh" | "stale" | "pending" | "unavailable";
+
+export type DomainRegistry = {
+  state: DomainRegistryState;
+  fetched_at?: string;
+  source_url?: string;
+  handle?: string;
+  status?: string[];
+  registrar?: string;
+  registry_org?: string;
+  registered_at?: string;
+  expires_at?: string;
+  changed_at?: string;
+  nameservers?: string[];
+  delegation_signed?: boolean;
+};
+
 export type DomainDetail = {
   domain: string;
   score?: number;
@@ -278,6 +298,10 @@ export type DomainDetail = {
   entries?: DomainDetailEntry[];
   // Per-nameserver response times from the run; absent when it was purged.
   nameserver_timings?: NameserverTiming[];
+  // The registry's own RDAP endpoint, set when the server resolved one.
+  rdap_url?: string;
+  // Absent when the external-data provider is disabled.
+  registry?: DomainRegistry;
 } & ZoneFactFields;
 
 export type EndpointDetail = {

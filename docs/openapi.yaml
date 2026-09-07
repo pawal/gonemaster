@@ -3262,6 +3262,46 @@ components:
           type: boolean
         unsupported_message:
           type: string
+        external_data:
+          $ref: '#/components/schemas/ExternalDataStatus'
+
+    ExternalDataStatus:
+      type: object
+      description: >-
+        State of the reference-data provider. Absent when external data is
+        disabled.
+      required: [enabled, cached_records, queue_depth]
+      properties:
+        enabled:
+          type: boolean
+        cached_records:
+          type: integer
+        queue_depth:
+          type: integer
+        last_error:
+          type: string
+        last_error_at:
+          type: string
+          format: date-time
+        datasets:
+          type: array
+          items:
+            type: object
+            required: [name, state]
+            properties:
+              name:
+                type: string
+                enum: [iana_tlds, rdap_dns_bootstrap]
+              state:
+                type: string
+                enum: [fresh, stale, pending, unavailable, disabled]
+              fetched_at:
+                type: string
+                format: date-time
+              version:
+                type: string
+              entries:
+                type: integer
 
     AnalysisCohort:
       type: object

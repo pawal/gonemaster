@@ -25,6 +25,8 @@ All notable changes to all gonemaster components will be documented in this file
 - zone11: accept the dual CIDR forms `a:example.com//64` and `a:example.com/24//64`
 - zone13: runs when selected on its own instead of producing no output
 - zone13: check the lookup limit for root, TLD and .arpa zones publishing an SPF policy
+- dnssec11: a DNSKEY RRset served without RRSIG counts as unsigned, so a DS at the parent is an error
+- dnssec07: the DS07_NOT_SIGNED_ON_SERVER message no longer claims the DNSKEY RRset is missing
 
 ## [v1.7.6] - 2026-09-04
 

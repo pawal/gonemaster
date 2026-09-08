@@ -709,6 +709,7 @@
   "tc.connectivity02": "TCP konektivita",
   "tc.connectivity03": "Diverzita AS",
   "tc.connectivity04": "Rozmanitost IP prefixů",
+  "tc.connectivity05": "Doručení odpovědi přes UDP",
   "tc.consistency01": "Konzistence sériového čísla SOA",
   "tc.consistency02": "Konzistence SOA RNAME",
   "tc.consistency03": "Konzistence časovačů SOA",

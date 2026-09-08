@@ -709,6 +709,7 @@
   "tc.connectivity02": "TCP-connectiviteit",
   "tc.connectivity03": "AS-diversiteit",
   "tc.connectivity04": "Diversiteit van IP-prefixen",
+  "tc.connectivity05": "UDP-antwoordlevering",
   "tc.consistency01": "Consistentie van SOA-serienummer",
   "tc.consistency02": "Consistentie van SOA RNAME",
   "tc.consistency03": "Consistentie van SOA-timers",

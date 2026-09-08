@@ -709,6 +709,7 @@
   "tc.connectivity02": "TCP connectivity",
   "tc.connectivity03": "AS diversity",
   "tc.connectivity04": "IP prefix diversity",
+  "tc.connectivity05": "UDP answer delivery",
   "tc.consistency01": "SOA serial number consistency",
   "tc.consistency02": "SOA RNAME consistency",
   "tc.consistency03": "SOA timers consistency",

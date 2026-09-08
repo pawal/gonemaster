@@ -13,6 +13,7 @@ const TESTCASE_TITLES: Record<string, string> = {
   connectivity02: "TCP connectivity",
   connectivity03: "AS diversity",
   connectivity04: "IP prefix diversity",
+  connectivity05: "UDP answer delivery",
   consistency01: "SOA serial number consistency",
   consistency02: "SOA RNAME consistency",
   consistency03: "SOA timers consistency",

@@ -241,6 +241,7 @@
   "tc.connectivity02": "TCP接続性",
   "tc.connectivity03": "ASの多様性",
   "tc.connectivity04": "IPプレフィックスの多様性",
+  "tc.connectivity05": "UDP応答の配送",
   "tc.consistency01": "SOAシリアル番号の一貫性",
   "tc.consistency02": "SOA RNAMEの一貫性",
   "tc.consistency03": "SOAタイマーの一貫性",

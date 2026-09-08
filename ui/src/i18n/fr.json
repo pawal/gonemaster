@@ -241,6 +241,7 @@
   "tc.connectivity02": "Connectivité TCP",
   "tc.connectivity03": "Diversité des AS",
   "tc.connectivity04": "Diversité des préfixes IP",
+  "tc.connectivity05": "Livraison des réponses en UDP",
   "tc.consistency01": "Cohérence du numéro de série SOA",
   "tc.consistency02": "Cohérence du RNAME SOA",
   "tc.consistency03": "Cohérence des temporisateurs SOA",

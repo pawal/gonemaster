@@ -241,6 +241,7 @@
   "tc.connectivity02": "TCP-povezljivost",
   "tc.connectivity03": "Raznolikost AS",
   "tc.connectivity04": "Raznolikost IP-predpon",
+  "tc.connectivity05": "Dostava odgovorov po UDP",
   "tc.consistency01": "Skladnost zaporedne številke SOA",
   "tc.consistency02": "Skladnost RNAME SOA",
   "tc.consistency03": "Skladnost časovnikov SOA",

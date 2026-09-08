@@ -12,6 +12,10 @@ describe("testcaseTitle", () => {
     );
   });
 
+  it("resolves connectivity05", () => {
+    expect(testcaseTitle("connectivity05")).toBe("UDP answer delivery");
+  });
+
   it("is case-insensitive", () => {
     expect(testcaseTitle("ZONE14")).toBe("ZONEMD record at zone apex");
   });

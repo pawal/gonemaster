@@ -29,6 +29,13 @@ Scope:
 | `query_type` | `string` | DNS RR type queried. | Uppercase form (for example `SOA`). |
 | `query_class` | `string` | DNS class queried. | Usually `IN`. |
 
+## Message Size Keys
+
+| Key | Type | Meaning | Notes |
+| --- | --- | --- | --- |
+| `size` | `int` | DNS message size in bytes. | Wire length of the message observed. |
+| `payload` | `int` | Advertised EDNS(0) requestor UDP payload size in bytes. | The value carried on the query the observation describes. |
+
 ## Structured Collection Keys
 
 | Key | Type | Meaning | Notes |

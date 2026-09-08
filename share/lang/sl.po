@@ -659,6 +659,30 @@ msgid ""
 msgstr ""
 "Vsi IPv6 naslovi domenskih strežnikov so oglaševani v istem IPv6 \"prefixu\"."
 
+msgctxt "CONNECTIVITY:CN05_ANSWER_FITS_UDP"
+msgid "The {query_type} answer ({size} bytes at most) arrives over UDP within an advertised payload of {payload} bytes from name servers \"{servers}\"."
+msgstr "Odgovor {query_type} (največ {size} bajtov) prispe po UDP znotraj oglaševanega payloada {payload} bajtov od domenskih strežnikov \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_ANSWER_NEEDS_TCP"
+msgid "The {query_type} answer of {size} bytes is truncated at an advertised payload of {payload} bytes and had to be fetched over TCP from name servers \"{servers}\"."
+msgstr "Odgovor {query_type} velikosti {size} bajtov je pri oglaševanem payloadu {payload} bajtov skrajšan in ga je bilo treba pridobiti po TCP od domenskih strežnikov \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_DELIVERED_UDP"
+msgid "The complete {query_type} answer of {size} bytes arrived over UDP when a payload of {payload} bytes was advertised to name servers \"{servers}\"."
+msgstr "Celoten odgovor {query_type} velikosti {size} bajtov je prispel po UDP, ko je bil domenskim strežnikom \"{servers}\" oglaševan payload {payload} bajtov."
+
+msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
+msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
+msgstr "Odgovor {query_type} velikosti {size} bajtov je skrajšan tudi, ko je oglaševan payload {payload} bajtov, zato odjemalci od domenskih strežnikov \"{servers}\" prejmejo skrajšan odgovor in ne tišine."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
+msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
+msgstr "Na poizvedbo {query_type} po UDP ni prispel noben odgovor, ko je bil oglaševan payload {payload} bajtov, čeprav isti domenski strežniki odgovarjajo na manjše poizvedbe; odgovor je velik {size} bajtov. Domenski strežniki \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_UDP_LOSS_SIZE_DEPENDENT"
+msgid "The {query_type} query got no answer over UDP at an advertised payload of {payload} bytes, while a 512-byte advertisement is answered and TCP delivers {size} bytes, from name servers \"{servers}\"."
+msgstr "Poizvedba {query_type} po UDP ni dobila odgovora pri oglaševanem payloadu {payload} bajtov, medtem ko je oglaševanje 512 bajtov odgovorjeno in TCP dostavi {size} bajtov, od domenskih strežnikov \"{servers}\"."
+
 msgctxt "CONNECTIVITY:ERROR_ASN_DATABASE"
 msgid "ASN Database error. No data to analyze for {address}."
 msgstr "ASN napaka. Ni podatkov za analizo {address}."

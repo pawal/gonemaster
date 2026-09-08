@@ -551,6 +551,30 @@ msgid ""
 "All name server(s) IPv6 address(es) are announced in the same IPv6 prefix."
 msgstr "すべてのネームサーバー IPv6 アドレスは同じ IPv6 プレフィックスでアナウンスされています。"
 
+msgctxt "CONNECTIVITY:CN05_ANSWER_FITS_UDP"
+msgid "The {query_type} answer ({size} bytes at most) arrives over UDP within an advertised payload of {payload} bytes from name servers \"{servers}\"."
+msgstr "{query_type} 応答 (最大 {size} バイト) は、通知されたペイロード {payload} バイトの範囲内で UDP により届きました。ネームサーバー \"{servers}\"。"
+
+msgctxt "CONNECTIVITY:CN05_ANSWER_NEEDS_TCP"
+msgid "The {query_type} answer of {size} bytes is truncated at an advertised payload of {payload} bytes and had to be fetched over TCP from name servers \"{servers}\"."
+msgstr "{size} バイトの {query_type} 応答は、通知されたペイロード {payload} バイトでは切り詰められ、TCP で取得する必要がありました。ネームサーバー \"{servers}\"。"
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_DELIVERED_UDP"
+msgid "The complete {query_type} answer of {size} bytes arrived over UDP when a payload of {payload} bytes was advertised to name servers \"{servers}\"."
+msgstr "{payload} バイトのペイロードを通知したところ、{size} バイトの完全な {query_type} 応答が UDP で届きました。ネームサーバー \"{servers}\"。"
+
+msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
+msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
+msgstr "{size} バイトの {query_type} 応答は、{payload} バイトのペイロードを通知しても切り詰められます。クライアントは無応答ではなく切り詰められた応答を受け取ります。ネームサーバー \"{servers}\"。"
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
+msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
+msgstr "{payload} バイトのペイロードを通知したとき、{query_type} クエリに対する応答が UDP で届きませんでした。同じネームサーバーはより小さなクエリには応答します。応答のサイズは {size} バイトです。ネームサーバー \"{servers}\"。"
+
+msgctxt "CONNECTIVITY:CN05_UDP_LOSS_SIZE_DEPENDENT"
+msgid "The {query_type} query got no answer over UDP at an advertised payload of {payload} bytes, while a 512-byte advertisement is answered and TCP delivers {size} bytes, from name servers \"{servers}\"."
+msgstr "{query_type} クエリは、通知されたペイロード {payload} バイトでは UDP で応答を得られませんでしたが、512 バイトの通知には応答があり、TCP では {size} バイトが届きます。ネームサーバー \"{servers}\"。"
+
 msgctxt "CONNECTIVITY:ERROR_ASN_DATABASE"
 msgid "ASN Database error. No data to analyze for {address}."
 msgstr "ASN データベースエラー。{address} の解析データがありません。"

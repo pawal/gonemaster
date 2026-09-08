@@ -127,6 +127,10 @@ func DefaultConfig() Config {
 			"SYNTAX":       "zone_consistency",
 		},
 		TagPenalties: map[string]int{
+			// CN05_ANSWER_NEEDS_TCP: truncation of a large signed answer at the
+			// advertised payload is correct server behaviour. Reported for
+			// visibility, not scored.
+			"CN05_ANSWER_NEEDS_TCP": 0,
 			// DS07_NOT_SIGNED: zone has no DNSKEY records on any nameserver -
 			// entirely unsigned. Treated like an ERROR regardless of its WARNING level.
 			"DS07_NOT_SIGNED": 20,

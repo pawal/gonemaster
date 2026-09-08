@@ -12,7 +12,7 @@ Notes:
 
 ## Summary
 - Modules: 9
-- Implemented testcases: 83
+- Implemented testcases: 84
 
 ## Regeneration
 
@@ -32,11 +32,12 @@ make spec-export-implemented
 - address02 - Verify that every unique nameserver IP address has a usable reverse DNS PTR mapping.
 - address03 - Verify that reverse PTR hostnames for nameserver IPs match the corresponding nameserver hostname.
 
-### connectivity (4)
+### connectivity (5)
 - connectivity01 - Verify that nameservers are reachable over UDP for SOA and NS queries at the child zone name.
 - connectivity02 - Verify that nameservers are reachable over TCP for SOA and NS queries at the child zone name.
 - connectivity03 - Evaluate ASN diversity of authoritative nameserver IP addresses.
 - connectivity04 - Evaluate prefix diversity of nameserver IP addresses by IP family.
+- connectivity05 - Determine whether the zone apex `DNSKEY` answer, the largest routine answer of a signed zone, is delivered over UDP by each authoritative address.
 
 ### consistency (6)
 - consistency01 - Check SOA serial consistency across nameservers for the tested zone.
@@ -66,7 +67,7 @@ make spec-export-implemented
 - dnssec08 - Verify that DNSKEY RRset signatures are present, time-valid, algorithm-supported, and cryptographically match DNSKEY records at child nameservers.
 - dnssec09 - Verify that SOA responses are signed and that SOA RRSIG records are time-valid, algorithm-supported, and cryptographically matched by DNSKEY records from the same nameserver.
 - dnssec10 - Verify that signed child-zone nameservers consistently provide NSEC or NSEC3 denial-of-existence material (including signatures and owner/type-shape checks) when querying for apex `NSEC` and `NSEC3PARAM`.
-- dnssec11 - Verify that parent-side DS presence is consistent with child-side DNSKEY presence (zone signing expectation), including parent consistency and child consistency reporting.
+- dnssec11 - Verify that parent-side DS presence is consistent with the child's signing state. A child nameserver counts as signed when it serves an apex DNSKEY RRset with at least one RRSIG covering DNSKEY. Parent consistency and child consistency are reported separately.
 - dnssec13 - Verify that each DNSKEY algorithm observed in the DNSKEY RRset also appears in RRSIG records for DNSKEY, SOA, and NS answer flows at child nameservers.
 - dnssec14 - Validate RSA DNSKEY key sizes against per-algorithm minimum/maximum ranges and recommended size thresholds.
 - dnssec15 - Verify presence and consistency of CDS and CDNSKEY RRsets and detect mismatches between the two at child nameservers.

@@ -24,6 +24,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/test/internal/queryopts"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -1732,20 +1733,7 @@ func Nameserver13(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					return nil
 				}
 
-				ver0 := uint8(0)
-				doBit := true
-				size := uint16(512)
-				useVC := false
-				fallback := false
-				resp, err := server.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", &ns.QueryOptions{
-					UseVC:    &useVC,
-					Fallback: &fallback,
-					EDNSDetails: &transport.EDNSDetails{
-						Version: &ver0,
-						Do:      &doBit,
-						Size:    &size,
-					},
-				})
+				resp, err := server.QueryWithOptions(ctx, z.Name.String(), "DNSKEY", queryopts.SmallAnswerDNSKEY())
 				if err == nil && resp.Msg != nil {
 					if resp.Rcode() == "FORMERR" && !resp.HasEdns() {
 						if _, err := buf.Add("NO_EDNS_SUPPORT", withNameserverArgs(server, nil)); err != nil {

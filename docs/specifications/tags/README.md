@@ -12,7 +12,7 @@ coverage status across the supported locale files.
 | --- | --- | --- |
 | [address.md](address.md) | ADDRESS | address01-address03 |
 | [basic.md](basic.md) | BASIC | basic01-basic03 |
-| [connectivity.md](connectivity.md) | CONNECTIVITY | connectivity01-connectivity04 |
+| [connectivity.md](connectivity.md) | CONNECTIVITY | connectivity01-connectivity05 |
 | [consistency.md](consistency.md) | CONSISTENCY | consistency01-consistency06 |
 | [delegation.md](delegation.md) | DELEGATION | delegation01-delegation07 |
 | [dnssec.md](dnssec.md) | DNSSEC | dnssec01-dnssec19 |

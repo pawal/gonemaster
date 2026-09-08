@@ -677,6 +677,30 @@ msgid ""
 "All name server(s) IPv6 address(es) are announced in the same IPv6 prefix."
 msgstr "Kaikkien nimipalvelimien IPv6-osoitteet ilmoitetaan samalla IPv6-prefixillä."
 
+msgctxt "CONNECTIVITY:CN05_ANSWER_FITS_UDP"
+msgid "The {query_type} answer ({size} bytes at most) arrives over UDP within an advertised payload of {payload} bytes from name servers \"{servers}\"."
+msgstr "{query_type}-vastaus (enintään {size} tavua) saapuu UDP:llä ilmoitetun {payload} tavun hyötykuorman rajoissa nimipalvelimilta \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_ANSWER_NEEDS_TCP"
+msgid "The {query_type} answer of {size} bytes is truncated at an advertised payload of {payload} bytes and had to be fetched over TCP from name servers \"{servers}\"."
+msgstr "{size} tavun {query_type}-vastaus typistyy ilmoitetulla {payload} tavun hyötykuormalla, ja se oli haettava TCP:llä nimipalvelimilta \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_DELIVERED_UDP"
+msgid "The complete {query_type} answer of {size} bytes arrived over UDP when a payload of {payload} bytes was advertised to name servers \"{servers}\"."
+msgstr "Täydellinen {size} tavun {query_type}-vastaus saapui UDP:llä, kun nimipalvelimille \"{servers}\" ilmoitettiin {payload} tavun hyötykuorma."
+
+msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
+msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
+msgstr "{size} tavun {query_type}-vastaus typistyy myös silloin, kun ilmoitetaan {payload} tavun hyötykuorma, joten asiakkaat saavat typistetyn vastauksen eivätkä jää kokonaan ilman vastausta nimipalvelimilta \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
+msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
+msgstr "{query_type}-kyselyyn ei saapunut vastausta UDP:llä, kun ilmoitettiin {payload} tavun hyötykuorma, vaikka samat nimipalvelimet vastaavat pienempiin kyselyihin; vastaus on {size} tavua. Nimipalvelimet \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_UDP_LOSS_SIZE_DEPENDENT"
+msgid "The {query_type} query got no answer over UDP at an advertised payload of {payload} bytes, while a 512-byte advertisement is answered and TCP delivers {size} bytes, from name servers \"{servers}\"."
+msgstr "{query_type}-kyselyyn ei saatu vastausta UDP:llä ilmoitetulla {payload} tavun hyötykuormalla, kun taas 512 tavun ilmoitukseen vastataan ja TCP toimittaa {size} tavua, nimipalvelimilta \"{servers}\"."
+
 msgctxt "CONNECTIVITY:ERROR_ASN_DATABASE"
 msgid "ASN Database error. No data to analyze for {address}."
 msgstr "ASN-tietokantavirhe. Ei analysoitavia tietoja kohteelle {address}."

@@ -427,6 +427,30 @@ msgctxt "CONNECTIVITY:CN04_IPV6_SINGLE_PREFIX"
 msgid "All name server(s) IPv6 address(es) are announced in the same IPv6 prefix."
 msgstr "Alle IPv6-adres(sen) van de naamserver(s) worden aangekondigd in dezelfde IPv6-prefix."
 
+msgctxt "CONNECTIVITY:CN05_ANSWER_FITS_UDP"
+msgid "The {query_type} answer ({size} bytes at most) arrives over UDP within an advertised payload of {payload} bytes from name servers \"{servers}\"."
+msgstr "Het {query_type}-antwoord (maximaal {size} bytes) komt via UDP aan binnen een aangekondigde payload van {payload} bytes van de naamservers \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_ANSWER_NEEDS_TCP"
+msgid "The {query_type} answer of {size} bytes is truncated at an advertised payload of {payload} bytes and had to be fetched over TCP from name servers \"{servers}\"."
+msgstr "Het {query_type}-antwoord van {size} bytes wordt afgekapt bij een aangekondigde payload van {payload} bytes en moest via TCP worden opgehaald van de naamservers \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_DELIVERED_UDP"
+msgid "The complete {query_type} answer of {size} bytes arrived over UDP when a payload of {payload} bytes was advertised to name servers \"{servers}\"."
+msgstr "Het volledige {query_type}-antwoord van {size} bytes kwam via UDP aan toen een payload van {payload} bytes werd aangekondigd aan de naamservers \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
+msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
+msgstr "Het {query_type}-antwoord van {size} bytes wordt ook afgekapt wanneer een payload van {payload} bytes wordt aangekondigd, zodat clients een afgekapt antwoord krijgen in plaats van helemaal geen antwoord van de naamservers \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
+msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
+msgstr "Er kwam via UDP geen antwoord op de {query_type}-query toen een payload van {payload} bytes werd aangekondigd, terwijl dezelfde naamservers kleinere query's wel beantwoorden; het antwoord is {size} bytes. Naamservers \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_UDP_LOSS_SIZE_DEPENDENT"
+msgid "The {query_type} query got no answer over UDP at an advertised payload of {payload} bytes, while a 512-byte advertisement is answered and TCP delivers {size} bytes, from name servers \"{servers}\"."
+msgstr "De {query_type}-query kreeg via UDP geen antwoord bij een aangekondigde payload van {payload} bytes, terwijl een aankondiging van 512 bytes wel wordt beantwoord en TCP {size} bytes levert, van de naamservers \"{servers}\"."
+
 msgctxt "CONNECTIVITY:ERROR_ASN_DATABASE"
 msgid "ASN Database error. No data to analyze for {address}."
 msgstr "Fout in de ASN-database. Geen gegevens om te analyseren voor {address}."

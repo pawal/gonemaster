@@ -59,6 +59,7 @@ Some tags warrant a penalty disproportionate to their log level. The
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | WARNING | **20**   | Chain of trust broken              |
 | `NO_IPV6_NS_CHILD`          | NOTICE  | **20**   | Zone unreachable over IPv6         |
 | `NO_IPV6_NS_DEL`            | NOTICE  | **20**   | Delegation has no IPv6 addresses   |
+| `CN05_ANSWER_NEEDS_TCP`      | NOTICE  | **0**    | Correct behaviour, reported only   |
 | `N15_SOFTWARE_VERSION`       | NOTICE  | **0**    | Cosmetic - zone works correctly    |
 | `N16_HAS_NSID`               | NOTICE  | **0**    | Informational - explicit NSID reply|
 | `N18_NO_EXTENDED_ERROR`      | INFO    | **0**    | Diagnostic - EDE enrichment (RFC 8914)|
@@ -230,6 +231,7 @@ or the `scoring_config_path` server config key.
     "DS07_NO_DS_FOR_SIGNED_ZONE": 20,
     "NO_IPV6_NS_CHILD":           20,
     "NO_IPV6_NS_DEL":             20,
+    "CN05_ANSWER_NEEDS_TCP":       0,
     "N15_SOFTWARE_VERSION":        0,
     "N16_HAS_NSID":                0,
     "N18_NO_EXTENDED_ERROR":          0,
@@ -262,6 +264,11 @@ Fields absent from the file retain their default values. Map fields
 (`severity_penalties`, `category_weights`, `module_categories`,
 `tag_penalties`) are replaced entirely when present - they are not merged
 with defaults.
+
+A stored configuration is therefore a full snapshot, and a `tag_penalties`
+map written before a tag existed does not acquire its default override. A
+deployment whose file predates `CN05_ANSWER_NEEDS_TCP` scores that tag by its
+NOTICE severity until the entry is added.
 
 ### Disabling categories
 

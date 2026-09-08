@@ -50,21 +50,27 @@ _Do not edit by hand - regenerate with the command above._
 | `CN04_IPV6_DIFFERENT_PREFIX` | `INFO` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
 | `CN04_IPV6_SAME_PREFIX` | `NOTICE` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
 | `CN04_IPV6_SINGLE_PREFIX` | `WARNING` | [connectivity04](../tests/connectivity/connectivity04.md) | yes |
+| `CN05_ANSWER_FITS_UDP` | `INFO` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
+| `CN05_ANSWER_NEEDS_TCP` | `NOTICE` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
+| `CN05_LARGE_ANSWER_DELIVERED_UDP` | `INFO` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
+| `CN05_LARGE_ANSWER_NO_UDP_ANSWER` | `WARNING` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
+| `CN05_SERVER_CAPS_UDP_ANSWER` | `INFO` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
+| `CN05_UDP_LOSS_SIZE_DEPENDENT` | `WARNING` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
 | `CNAME_CHAIN_TOO_LONG` | `ERROR` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `CNAME_TARGET_UNRESOLVED` | `ERROR` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `CNAME_TOO_MANY_RECORDS` | `ERROR` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `EMPTY_ASN_SET` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `ERROR_ASN_DATABASE` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `IPV4_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `IPV4_DISABLED` | `DEBUG2` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
+| `IPV4_DISABLED` | `DEBUG2` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity05](../tests/connectivity/connectivity05.md) | yes |
 | `IPV4_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `IPV4_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `IPV6_DIFFERENT_ASN` | `INFO` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `IPV6_DISABLED` | `DEBUG2` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md) | yes |
+| `IPV6_DISABLED` | `DEBUG2` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity05](../tests/connectivity/connectivity05.md) | yes |
 | `IPV6_ONE_ASN` | `WARNING` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
 | `IPV6_SAME_ASN` | `NOTICE` | [connectivity03](../tests/connectivity/connectivity03.md) | yes |
-| `TEST_CASE_END` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md) | yes |
-| `TEST_CASE_START` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md) | yes |
+| `TEST_CASE_END` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md), [connectivity05](../tests/connectivity/connectivity05.md) | yes |
+| `TEST_CASE_START` | `DEBUG` | [connectivity01](../tests/connectivity/connectivity01.md), [connectivity02](../tests/connectivity/connectivity02.md), [connectivity03](../tests/connectivity/connectivity03.md), [connectivity04](../tests/connectivity/connectivity04.md), [connectivity05](../tests/connectivity/connectivity05.md) | yes |
 
 ## i18n Notes
 

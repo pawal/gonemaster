@@ -427,6 +427,30 @@ msgctxt "CONNECTIVITY:CN04_IPV6_SINGLE_PREFIX"
 msgid "All name server(s) IPv6 address(es) are announced in the same IPv6 prefix."
 msgstr "Všechny IPv6 adresy jmenných serverů jsou ohlašovány ve stejném IPv6 prefixu."
 
+msgctxt "CONNECTIVITY:CN05_ANSWER_FITS_UDP"
+msgid "The {query_type} answer ({size} bytes at most) arrives over UDP within an advertised payload of {payload} bytes from name servers \"{servers}\"."
+msgstr "Odpověď na dotaz {query_type} (nejvýše {size} bajtů) přichází přes UDP v rámci ohlášeného payloadu {payload} bajtů od jmenných serverů \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_ANSWER_NEEDS_TCP"
+msgid "The {query_type} answer of {size} bytes is truncated at an advertised payload of {payload} bytes and had to be fetched over TCP from name servers \"{servers}\"."
+msgstr "Odpověď na dotaz {query_type} o velikosti {size} bajtů je při ohlášeném payloadu {payload} bajtů zkrácena a musela být získána přes TCP od jmenných serverů \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_DELIVERED_UDP"
+msgid "The complete {query_type} answer of {size} bytes arrived over UDP when a payload of {payload} bytes was advertised to name servers \"{servers}\"."
+msgstr "Úplná odpověď na dotaz {query_type} o velikosti {size} bajtů přišla přes UDP, když byl jmenným serverům \"{servers}\" ohlášen payload {payload} bajtů."
+
+msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
+msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
+msgstr "Odpověď na dotaz {query_type} o velikosti {size} bajtů je zkrácena i tehdy, když je ohlášen payload {payload} bajtů, takže klienti dostanou zkrácenou odpověď namísto ticha od jmenných serverů \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
+msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
+msgstr "Na dotaz {query_type} nepřišla přes UDP žádná odpověď, když byl ohlášen payload {payload} bajtů, přesto tytéž jmenné servery odpovídají na menší dotazy; odpověď má {size} bajtů. Jmenné servery \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_UDP_LOSS_SIZE_DEPENDENT"
+msgid "The {query_type} query got no answer over UDP at an advertised payload of {payload} bytes, while a 512-byte advertisement is answered and TCP delivers {size} bytes, from name servers \"{servers}\"."
+msgstr "Dotaz {query_type} nedostal přes UDP žádnou odpověď při ohlášeném payloadu {payload} bajtů, zatímco ohlášení 512 bajtů je zodpovězeno a TCP doručí {size} bajtů, od jmenných serverů \"{servers}\"."
+
 msgctxt "CONNECTIVITY:ERROR_ASN_DATABASE"
 msgid "ASN Database error. No data to analyze for {address}."
 msgstr "Chyba databáze ASN. Pro {address} nejsou k dispozici žádná data k analýze."

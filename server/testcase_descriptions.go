@@ -20,6 +20,7 @@ var testcaseDescriptions = map[string]string{
 	"CONNECTIVITY02": "TCP connectivity",
 	"CONNECTIVITY03": "AS diversity",
 	"CONNECTIVITY04": "IP prefix diversity",
+	"CONNECTIVITY05": "UDP answer delivery",
 
 	// CONSISTENCY
 	"CONSISTENCY01": "SOA serial number consistency",

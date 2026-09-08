@@ -557,6 +557,30 @@ msgid ""
 msgstr ""
 "Alle IPv6-Adressen der Nameserver sind im selben IPv6-Präfix angekündigt."
 
+msgctxt "CONNECTIVITY:CN05_ANSWER_FITS_UDP"
+msgid "The {query_type} answer ({size} bytes at most) arrives over UDP within an advertised payload of {payload} bytes from name servers \"{servers}\"."
+msgstr "Die Antwort auf die {query_type}-Abfrage (höchstens {size} Byte) kommt über UDP innerhalb einer angekündigten Nutzlast von {payload} Byte von den Nameservern \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_ANSWER_NEEDS_TCP"
+msgid "The {query_type} answer of {size} bytes is truncated at an advertised payload of {payload} bytes and had to be fetched over TCP from name servers \"{servers}\"."
+msgstr "Die {size} Byte große Antwort auf die {query_type}-Abfrage wird bei einer angekündigten Nutzlast von {payload} Byte trunkiert und musste über TCP von den Nameservern \"{servers}\" geholt werden."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_DELIVERED_UDP"
+msgid "The complete {query_type} answer of {size} bytes arrived over UDP when a payload of {payload} bytes was advertised to name servers \"{servers}\"."
+msgstr "Die vollständige {size} Byte große Antwort auf die {query_type}-Abfrage kam über UDP, als den Nameservern \"{servers}\" eine Nutzlast von {payload} Byte angekündigt wurde."
+
+msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
+msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
+msgstr "Die {size} Byte große Antwort auf die {query_type}-Abfrage wird auch dann trunkiert, wenn eine Nutzlast von {payload} Byte angekündigt wird; Clients erhalten also eine trunkierte Antwort statt keiner Antwort von den Nameservern \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
+msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
+msgstr "Auf die {query_type}-Abfrage kam über UDP keine Antwort, als eine Nutzlast von {payload} Byte angekündigt wurde, obwohl dieselben Nameserver kleinere Abfragen beantworten; die Antwort ist {size} Byte groß. Nameserver \"{servers}\"."
+
+msgctxt "CONNECTIVITY:CN05_UDP_LOSS_SIZE_DEPENDENT"
+msgid "The {query_type} query got no answer over UDP at an advertised payload of {payload} bytes, while a 512-byte advertisement is answered and TCP delivers {size} bytes, from name servers \"{servers}\"."
+msgstr "Die {query_type}-Abfrage erhielt über UDP keine Antwort bei einer angekündigten Nutzlast von {payload} Byte, während eine Ankündigung von 512 Byte beantwortet wird und TCP {size} Byte liefert, von den Nameservern \"{servers}\"."
+
 msgctxt "CONNECTIVITY:ERROR_ASN_DATABASE"
 msgid "ASN Database error. No data to analyze for {address}."
 msgstr "Fehler in der AS-Datenbank. Keine Daten zur Analyse für {address}."

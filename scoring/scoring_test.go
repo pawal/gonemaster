@@ -543,6 +543,7 @@ func TestComputeScoreNeutralTags(t *testing.T) {
 		{"SPF unknown modifier", "example.com", "ZONE", "zone_consistency", []string{"Z11_SPF_UNKNOWN_MODIFIER", "Z11_SPF_UNKNOWN_MODIFIER"}},
 		{"SPF macro target", "example.com", "ZONE", "zone_consistency", []string{"Z13_SPF_MACRO_TARGET", "Z13_SPF_MACRO_TARGET"}},
 		{"large RSA exponent", "example.se", "DNSSEC", "dnssec", []string{"DNSKEY_RSA_EXPONENT_LARGE", "DNSKEY_RSA_EXPONENT_LARGE"}},
+		{"UDP answer needs TCP", "example.se", "CONNECTIVITY", "connectivity", []string{"CN05_ANSWER_NEEDS_TCP", "CN05_ANSWER_NEEDS_TCP"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			entries := make([]Entry, len(tc.tags))
@@ -557,6 +558,33 @@ func TestComputeScoreNeutralTags(t *testing.T) {
 				t.Errorf("%s penalties = %d, want 0", tc.category, got)
 			}
 		})
+	}
+}
+
+func TestComputeLargeAnswerNoUDPAnswerIsGraded(t *testing.T) {
+	// CN05_LARGE_ANSWER_NO_UDP_ANSWER has no tag override, so it keeps the
+	// WARNING severity penalty in the connectivity category and, being a
+	// WARNING, it clears the no_warnings_or_errors bonus criterion and blocks
+	// the A+ grade an otherwise perfect zone would reach.
+	entries := append(aPlusEntries("DS15_HAS_CDS_AND_CDNSKEY"),
+		e("CONNECTIVITY", "CN05_LARGE_ANSWER_NO_UDP_ANSWER", "WARNING"))
+
+	r := Compute("example.se", entries, cfg)
+	if got := r.Categories["connectivity"].Penalties; got != 5 {
+		t.Errorf("connectivity penalties = %d, want 5", got)
+	}
+	if got := r.Categories["connectivity"].Score; got != 95 {
+		t.Errorf("connectivity score = %d, want 95", got)
+	}
+	got := r.Bonus.Criteria["no_warnings_or_errors"]
+	if got == nil {
+		t.Fatal("no_warnings_or_errors is missing from the bonus criteria")
+	}
+	if *got != false {
+		t.Error("no_warnings_or_errors = true, want false")
+	}
+	if r.Grade == "A+" {
+		t.Error("a WARNING must block the A+ grade")
 	}
 }
 

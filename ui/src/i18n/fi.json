@@ -241,6 +241,7 @@
   "tc.connectivity02": "TCP-yhteys",
   "tc.connectivity03": "AS-monimuotoisuus",
   "tc.connectivity04": "IP-prefiksien monimuotoisuus",
+  "tc.connectivity05": "UDP-vastausten toimitus",
   "tc.consistency01": "SOA-sarjanumeron yhdenmukaisuus",
   "tc.consistency02": "SOA RNAME -yhdenmukaisuus",
   "tc.consistency03": "SOA-ajastimien yhdenmukaisuus",

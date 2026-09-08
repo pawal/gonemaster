@@ -241,6 +241,7 @@
   "tc.connectivity02": "TCP-tilkobling",
   "tc.connectivity03": "AS-mangfold",
   "tc.connectivity04": "IP-prefiksmangfold",
+  "tc.connectivity05": "UDP-svarlevering",
   "tc.consistency01": "Konsistens i SOA-serienummer",
   "tc.consistency02": "Konsistens i SOA RNAME",
   "tc.consistency03": "Konsistens i SOA-tidtakere",

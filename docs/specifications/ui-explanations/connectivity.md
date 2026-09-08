@@ -24,6 +24,12 @@ Description:
 
 Nameservers should live on different IP network prefixes (such as `192.0.2.0/24`) so that a single network outage cannot take them all down together. This check groups your nameserver addresses by network prefix per IP family and reports when everything ends up in the same prefix or when most addresses cluster together, which signals a single point of network failure.
 
+## Testcase connectivity05
+
+Description:
+
+A signed zone's DNSKEY answer is often larger than the UDP packet a resolver is prepared to receive, so the nameserver reports the answer as too big and the resolver asks again over TCP. This check measures how large your DNSKEY answer is, whether it arrives over UDP at the buffer size resolvers advertise today, and what each nameserver does when a client offers a buffer large enough for the whole answer. Receiving no answer at all is the case that hurts: the resolver waits out a timeout on every lookup, and some resolvers never recover with a retry.
+
 ## Tag CN01_MISSING_NS_RECORD_UDP
 
 Header: UDP: NS answer has no NS record
@@ -231,3 +237,51 @@ Header: All IPv6 nameservers in one network prefix
 Description:
 
 Every IPv6 address across your nameservers falls in a single network prefix. A single network-level failure in that prefix takes all of them offline together, so the redundancy your domain appears to have on paper is not real in practice.
+
+## Tag CN05_ANSWER_FITS_UDP
+
+Header: DNSKEY answer fits in a UDP reply
+
+Description:
+
+The DNSKEY answer for your zone arrived complete over UDP, within the buffer size resolvers advertise by default. Lookups need no second round trip over TCP, which is the fastest and most widely supported outcome.
+
+## Tag CN05_ANSWER_NEEDS_TCP
+
+Header: DNSKEY answer needs a TCP retry
+
+Description:
+
+Your DNSKEY answer does not fit the UDP buffer resolvers advertise by default, so the nameserver reports it as too big and the resolver asks again over TCP. This is correct behaviour for a large signed answer. It costs one extra round trip per lookup and works only where TCP to port 53 is reachable, so publishing fewer or smaller keys is worth considering.
+
+## Tag CN05_LARGE_ANSWER_DELIVERED_UDP
+
+Header: Full answer delivered over UDP
+
+Description:
+
+When a client offered a buffer large enough for the whole DNSKEY answer, the nameserver delivered it over UDP in a single exchange. Resolvers configured with a large buffer avoid the TCP retry entirely.
+
+## Tag CN05_SERVER_CAPS_UDP_ANSWER
+
+Header: Nameserver truncates whatever buffer is offered
+
+Description:
+
+Even with a buffer large enough for the entire DNSKEY answer on offer, the nameserver reported the answer as too big instead of sending it. Nothing is broken: clients receive that reply and retry over TCP, and capping the size of UDP responses is a common deliberate configuration.
+
+## Tag CN05_LARGE_ANSWER_NO_UDP_ANSWER
+
+Header: No answer when a large buffer is offered
+
+Description:
+
+A client that offers a buffer large enough for your whole DNSKEY answer receives nothing at all, although the same nameservers answer smaller queries. The large reply is being dropped in front of the nameserver, typically by a firewall or middlebox that discards oversized or fragmented UDP packets. Resolvers that advertise a large buffer, as many older and embedded ones still do, spend a full timeout on every DNSKEY lookup and some fail outright. Two fixes work: let large UDP responses and IP fragments through the network in front of the nameserver, or configure the nameserver to truncate at a smaller size so clients receive a "too big" reply and retry over TCP.
+
+## Tag CN05_UDP_LOSS_SIZE_DEPENDENT
+
+Header: Large UDP answers are lost, small ones arrive
+
+Description:
+
+Your nameservers answer small queries over UDP, and TCP delivers the DNSKEY answer, but nothing arrives over UDP at the buffer size resolvers advertise by default. The loss depends on the size of the reply, which points at the network in front of the nameserver rather than at the nameserver itself. Validating resolvers wait out a timeout before they fall back, making DNSSEC lookups for your zone slow and unreliable.

@@ -32,6 +32,7 @@ var moduleTestcases = map[string][]string{
 		"connectivity02",
 		"connectivity03",
 		"connectivity04",
+		"connectivity05",
 	},
 	"consistency": {
 		"consistency01",

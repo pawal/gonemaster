@@ -60,6 +60,10 @@ type QueryOptions struct {
 	EDNSDetails *transport.EDNSDetails
 	// BlacklistingDisabled bypasses temporary blacklisting for this query.
 	BlacklistingDisabled bool
+	// Diagnostic marks a query whose failure says nothing about the server's
+	// health; it is left out of timeout, fast-fail, error-cache, reachability
+	// and latency-budget bookkeeping.
+	Diagnostic bool
 }
 
 // NewWithContext creates a Nameserver using the cache store from ctx.
@@ -222,6 +226,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	usevc := resolveUseVC(opts)
+	diagnostic := opts != nil && opts.Diagnostic
 	fastFailThreshold := resolveFastFailTimeoutCount(prof)
 	latencyBudget := resolveLatencyBudget(prof)
 	if d := ns.shouldSkipQuery(prof, opts, qname, qtype, qclass, cacheKey, usevc, fastFailThreshold, latencyBudget); d != nil {
@@ -283,7 +288,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 	}
 
 	resp, err := ns.queryNetwork(ctx, qname, qtype, qclass, opts)
-	if ns.state != nil {
+	if ns.state != nil && !diagnostic {
 		// Only count timeouts attributable to the nameserver, not the calling
 		// job: if the outer ctx is cancelled the err may wrap a context error
 		// even though the nameserver itself never had a chance to respond.
@@ -307,7 +312,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			traceDecision(ctx, ns.decisionEvent(querytrace.DecisionBlacklisted, qname, qtype, usevc))
 		}
 	}
-	if err != nil && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
+	if err != nil && !diagnostic && (ctx == nil || ctx.Err() == nil) && ns.state != nil && ns.state.errorCache != nil {
 		if errorCacheTTL := resolveErrorCacheTTL(prof, opts); errorCacheTTL > 0 {
 			// Debounce timeouts: a single dropped UDP packet must not
 			// blackout this exact query for the rest of the run.
@@ -317,7 +322,7 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 			}
 		}
 	}
-	if ns.state != nil {
+	if ns.state != nil && !diagnostic {
 		if err != nil && (ctx == nil || ctx.Err() == nil) && isHardNetworkError(err) {
 			if ttl := resolveReachabilityTTL(prof, opts); ttl > 0 {
 				ns.state.reachability.mark(ns.Address.String(), ttl)
@@ -450,7 +455,10 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	resp, err := ns.queryNetworkRaw(ctx, qname, qtype, qclass, opts)
 	elapsed := time.Since(start)
 	attributable := ctx == nil || ctx.Err() == nil
-	if ns.cache != nil && err != nil && attributable && isTimeoutPatternError(err) {
+	// A diagnostic probe may time out by design, so it feeds neither the
+	// per-nameserver timeout count nor the latency budget.
+	health := attributable && (opts == nil || !opts.Diagnostic)
+	if ns.cache != nil && err != nil && health && isTimeoutPatternError(err) {
 		ns.cache.RecordQueryTimeout(ns.NameString() + "/" + ns.AddressString())
 	}
 	// REFUSED arrives as a parsed answer, not an error, so the timeout
@@ -458,7 +466,7 @@ func (ns Nameserver) queryNetwork(ctx context.Context, qname string, qtype strin
 	if ns.cache != nil && attributable && resp.Msg != nil && resp.Msg.Rcode == dns.RcodeRefused {
 		ns.cache.RecordQueryRefused(ns.NameString() + "/" + ns.AddressString())
 	}
-	if ns.state != nil && attributable {
+	if ns.state != nil && health {
 		if ns.state.latency.observe(elapsed, resolveLatencyBudget(profile.FromContext(ctx))) {
 			traceDecision(ctx, ns.decisionEvent(querytrace.DecisionLatencyBudgetBlocked, qname, qtype, resolveUseVC(opts)))
 		}
@@ -584,6 +592,9 @@ func queryFlags(qclass string, opts *QueryOptions) map[string]any {
 		}
 		if opts.Timeout != nil {
 			flags["timeout"] = int(opts.Timeout.Seconds())
+		}
+		if opts.Diagnostic {
+			flags["diagnostic"] = true
 		}
 	}
 	flags["edns_size"] = resolveEDNSSize(opts, flags["dnssec"].(bool))

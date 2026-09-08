@@ -766,14 +766,7 @@ func (s *Server) handleCancelJob(w http.ResponseWriter, _ *http.Request, jobID s
 			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 			return
 		}
-		s.metrics.ObserveJobStatusTransition(fromStatus, job.Status)
-		if !isTerminalMetricsStatus(fromStatus) && isTerminalMetricsStatus(job.Status) {
-			duration := time.Duration(-1)
-			if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
-				duration = job.FinishedAt.Sub(job.StartedAt)
-			}
-			s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, zeroMetricsSeverityTotals())
-		}
+		s.observeCancelGraduation(job, fromStatus)
 	}
 	writeJSON(w, http.StatusOK, job)
 }
@@ -889,14 +882,7 @@ func (s *Server) handleQueueRemove(w http.ResponseWriter, r *http.Request) {
 					writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 					return
 				}
-				s.metrics.ObserveJobStatusTransition(fromStatus, job.Status)
-				if !isTerminalMetricsStatus(fromStatus) && isTerminalMetricsStatus(job.Status) {
-					duration := time.Duration(-1)
-					if !job.StartedAt.IsZero() && !job.FinishedAt.IsZero() {
-						duration = job.FinishedAt.Sub(job.StartedAt)
-					}
-					s.metrics.ObserveJobCompletionWithContext(job.BatchID, job.Domain, job.Status, duration, zeroMetricsSeverityTotals())
-				}
+				s.observeCancelGraduation(job, fromStatus)
 			}
 		}
 		removed = append(removed, jobID)

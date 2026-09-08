@@ -229,3 +229,86 @@ func TestHandleTagBatchesUnknownTagReturns404(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodGet, "/api/v1/tags/does-not-exist/batches", nil)
 	wantStatus(t, resp, http.StatusNotFound)
 }
+
+// TestDeleteBatchRestoresQueueDepth covers the regression where deleting
+// a batch cancelled its queued jobs without reporting the transitions, so
+// gonemaster_queue_depth stayed high by the number of jobs cancelled and
+// never recovered for the lifetime of the process. A batch cancel must
+// leave the same metrics as cancelling each job individually.
+func TestDeleteBatchRestoresQueueDepth(t *testing.T) {
+	srv := newTestServer(t)
+
+	// Pause first so the submitted jobs stay queued.
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/queue/pause", nil)
+	wantStatus(t, resp, http.StatusOK)
+
+	resp = doJSON(t, srv, http.MethodPost, "/api/v1/jobs/batch", `{"domains":["example.com","example.net","example.org"]}`)
+	out := mustJSON[JobBatchResponse](t, resp, http.StatusAccepted)
+	if len(out.JobIDs) != 3 {
+		t.Fatalf("expected 3 job ids, got %d", len(out.JobIDs))
+	}
+
+	snapshot := getMetricsSnapshot(t, srv)
+	if snapshot.Health.QueueDepth != 3 {
+		t.Fatalf("queue_depth before delete = %d, want 3", snapshot.Health.QueueDepth)
+	}
+
+	resp = doJSON(t, srv, http.MethodDelete, "/api/v1/batches/"+out.BatchID, nil)
+	wantStatus(t, resp, http.StatusNoContent)
+
+	snapshot = getMetricsSnapshot(t, srv)
+	if snapshot.Health.QueueDepth != 0 {
+		t.Fatalf("queue_depth after delete = %d, want 0", snapshot.Health.QueueDepth)
+	}
+	if snapshot.Jobs.StatusCounts[string(JobQueued)] != 0 {
+		t.Fatalf("status_counts[queued] = %d, want 0", snapshot.Jobs.StatusCounts[string(JobQueued)])
+	}
+	if snapshot.Jobs.CanceledTotal != 3 {
+		t.Fatalf("canceled_total = %d, want 3", snapshot.Jobs.CanceledTotal)
+	}
+	if snapshot.Jobs.CompletedTotal != 3 {
+		t.Fatalf("completed_total = %d, want 3", snapshot.Jobs.CompletedTotal)
+	}
+}
+
+// TestDeleteBatchClearsInFlightForStaleRunningJob covers the same gap on
+// the stale-running branch: a running row with no registered cancel
+// function is graduated inline, which must also release its in-flight
+// slot.
+func TestDeleteBatchClearsInFlightForStaleRunningJob(t *testing.T) {
+	srv := newTestServer(t)
+	now := time.Now().UTC()
+	if err := srv.store.CreateBatch(Batch{
+		ID:        "batch_stale_inflight",
+		Tag:       "tld",
+		CreatedAt: now,
+	}); err != nil {
+		t.Fatalf("CreateBatch: %v", err)
+	}
+	if _, err := srv.store.Create(Job{
+		ID:        "job-stale-inflight",
+		BatchID:   "batch_stale_inflight",
+		Domain:    "example.com",
+		Status:    JobRunning,
+		CreatedAt: now,
+		StartedAt: now,
+	}); err != nil {
+		t.Fatalf("Create running job: %v", err)
+	}
+	// The store row is seeded directly, so tell the collector about it.
+	srv.metrics.ObserveJobStatusTransition("", JobRunning)
+	if snapshot := getMetricsSnapshot(t, srv); snapshot.Health.InFlightJobs != 1 {
+		t.Fatalf("in_flight_jobs before delete = %d, want 1", snapshot.Health.InFlightJobs)
+	}
+
+	resp := doJSON(t, srv, http.MethodDelete, "/api/v1/batches/batch_stale_inflight", nil)
+	wantStatus(t, resp, http.StatusNoContent)
+
+	snapshot := getMetricsSnapshot(t, srv)
+	if snapshot.Health.InFlightJobs != 0 {
+		t.Fatalf("in_flight_jobs after delete = %d, want 0", snapshot.Health.InFlightJobs)
+	}
+	if snapshot.Jobs.CanceledTotal != 1 {
+		t.Fatalf("canceled_total = %d, want 1", snapshot.Jobs.CanceledTotal)
+	}
+}

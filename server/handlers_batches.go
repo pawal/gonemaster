@@ -375,6 +375,7 @@ func (s *Server) cancelBatchJobs(batchID string) error {
 			if err := s.store.GraduateJob(updated, nil); err != nil {
 				return err
 			}
+			s.observeCancelGraduation(updated, job.Status)
 		case JobRunning:
 			if s.cancelJob(job.ID) {
 				continue
@@ -390,6 +391,7 @@ func (s *Server) cancelBatchJobs(batchID string) error {
 			if err := s.store.GraduateJob(updated, nil); err != nil {
 				return err
 			}
+			s.observeCancelGraduation(updated, job.Status)
 		}
 	}
 	return nil

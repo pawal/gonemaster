@@ -209,6 +209,7 @@ var connectivityTests = map[string]func(context.Context, *zone.Zone) ([]*logger.
 	"connectivity02": connectivity.Connectivity02,
 	"connectivity03": connectivity.Connectivity03,
 	"connectivity04": connectivity.Connectivity04,
+	"connectivity05": connectivity.Connectivity05,
 }
 
 var consistencyTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry, error){

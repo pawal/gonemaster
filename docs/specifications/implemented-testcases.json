@@ -7,7 +7,7 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 83
+    "testcase_count": 84
   },
   "module_order": [
     "basic",
@@ -35,7 +35,8 @@
       "connectivity01",
       "connectivity02",
       "connectivity03",
-      "connectivity04"
+      "connectivity04",
+      "connectivity05"
     ],
     "consistency": [
       "consistency01",
@@ -134,6 +135,7 @@
     "connectivity02": "Verify that nameservers are reachable over TCP for SOA and NS queries at the child zone name.",
     "connectivity03": "Evaluate ASN diversity of authoritative nameserver IP addresses.",
     "connectivity04": "Evaluate prefix diversity of nameserver IP addresses by IP family.",
+    "connectivity05": "Determine whether the zone apex `DNSKEY` answer, the largest routine answer of a signed zone, is delivered over UDP by each authoritative address.",
     "consistency01": "Check SOA serial consistency across nameservers for the tested zone.",
     "consistency02": "Check SOA RNAME consistency across nameservers for the tested zone.",
     "consistency03": "Check consistency of SOA timer fields (`refresh`, `retry`, `expire`, `minimum`) across nameservers.",

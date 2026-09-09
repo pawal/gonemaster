@@ -103,6 +103,13 @@ the caveat names the location ("Measured from Stockholm, SE; a single vantage
 point."); otherwise it stays generic. See
 [configuration.md](../server/configuration.md#analysis-settings).
 
+Each sample is the response time of one answered query, so the figures cover
+the authoritative exchange only. Unanswered queries are excluded and counted
+separately, retried attempts never enter the sample, and the queries behind a
+snapshot mix query types and both UDP and TCP. Two snapshots are only
+comparable when they ran the same profile, since fast-fail, the latency budget,
+and retry degradation change which queries are made at all.
+
 ## Entity History
 
 The nameserver, ASN, tag, and domain detail pages show a small sparkline of

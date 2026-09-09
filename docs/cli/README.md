@@ -60,7 +60,7 @@ stderr when stdout is a terminal.
 Additional output controls:
 
 - `--count` appends human-readable level and tag counts.
-- `--nstimes` appends per-nameserver timing statistics (max, min, avg, stddev, median, total, count, timeout, refused), sorted by nameserver name, address, then median. `timeout` counts exchanges that spent every attempt without an answer; `refused` counts responses carrying rcode REFUSED.
+- `--nstimes` appends per-nameserver timing statistics.
 - `--output PATH` writes selected output to a file.
 - `--save PATH` writes the DNS packet cache after the run.
 - `--restore PATH` primes the DNS packet cache before the run.
@@ -223,6 +223,11 @@ Show per-nameserver query timing statistics:
 ```sh
 gonemaster --nstimes example.com
 ```
+
+The table holds max, min, avg, stddev, median, total and count, sorted by
+nameserver name, address, then median, and covers answered queries only. The
+`timeout` column counts exchanges that spent every attempt without an answer,
+and `refused` counts responses carrying rcode REFUSED.
 
 Include nameserver timing data in JSON output:
 

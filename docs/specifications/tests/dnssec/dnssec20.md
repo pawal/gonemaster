@@ -27,9 +27,10 @@ Status: Final
    - If response is absent, non-`NOERROR`, or non-`AA`, classify nameserver as `no_dnssec` and skip.
    - If no apex DNSKEY records are present, classify nameserver as `no_dnssec` and skip.
    - Query `NSEC` (DNSSEC enabled) to obtain the apex type bitmap:
-     - If NSEC record for the apex is present in the answer section, extract its type bitmap (NSEC zone).
-     - Else if NSEC3 record matching the apex hash is present in the authority section, extract its type bitmap (NSEC3 zone).
-   - If no bitmap obtained from the NSEC query, try `NSEC3PARAM` query and look for an NSEC record in the authority section (NODATA response).
+     - If an NSEC record for the apex is present in the answer section, extract its type bitmap (NSEC zone).
+     - Else if an NSEC3 record matching the apex hash is present in the authority section, extract its type bitmap (NSEC3 zone).
+     - An NSEC or NSEC3 record whose covering RRSIG records all carry a Signer's Name other than the zone name belongs to the parent zone (RFC 4034, section 3.1.7) and MUST be ignored. A record without covering RRSIG records is accepted.
+   - If no bitmap obtained from the NSEC query, try `NSEC3PARAM` query and look for an NSEC record in the authority section (NODATA response). The same signer rule applies.
    - If no bitmap could be obtained, classify nameserver as `no_bitmap` and skip.
    - For each probed type (A, AAAA, MX, TXT):
      - Query the apex for that type with DNSSEC enabled.
@@ -61,9 +62,11 @@ For each unique nameserver IP (parallel; fan-out = resolver.defaults.parallel):
      query NSEC at z.Name, DNSSEC=on
        NSEC for apex in answer    -> bitmap from NSEC (mark zone style NSEC)
        NSEC3 for apex in authority -> bitmap from NSEC3 (mark zone style NSEC3)
+       every covering RRSIG signer != z.Name -> parent-side record, ignore
      no bitmap yet:
        query NSEC3PARAM at z.Name, DNSSEC=on
          NSEC for apex in authority (NODATA) -> bitmap from NSEC
+         every covering RRSIG signer != z.Name -> parent-side record, ignore
 
    no bitmap obtained                          -> classify ns as no_bitmap
    bitmap obtained:
@@ -147,13 +150,14 @@ emit TEST_CASE_END
 - The set of probed types (A, AAAA, MX, TXT) is intentionally limited to common apex types. DNSKEY, SOA, NS, RRSIG, and NSEC/NSEC3 are already validated structurally by DNSSEC10 and are not re-checked here.
 - Super-set bitmaps (types listed in the bitmap but not actually present) are not flagged - only subset bitmaps (existing types missing from the bitmap) are checked, as these are the security-relevant case per the ISC presentation.
 - For NSEC3 zones, the NSEC3 record must have an owner hash matching the apex for the bitmap to be used; non-matching NSEC3 records are ignored.
+- A nameserver serving both the parent and the child zone MAY answer the apex `NSEC` query from the parent zone with the delegation NSEC or NSEC3. Its RRSIG names the parent as signer, so the record is ignored and the bitmap comes from the `NSEC3PARAM` fallback. An NSEC3 child in that situation yields `DS20_NO_BITMAP`, since the fallback carries no NSEC3.
 - All queries in DNSSEC20 benefit from the per-nameserver query cache. In a full test run (after DNSSEC10, Basic, Zone, etc.), most queries are cache hits with zero network overhead.
 
 ## Evidence In Gonemaster
 - Code paths:
   - `engine/test/dnssec/dnssec.go` (DNSSEC20 testcase function)
 - Related tests:
-  - `engine/test/dnssec/dnssec_test.go` (TestDNSSEC20BitmapOK, TestDNSSEC20NSECSubsetBitmap, TestDNSSEC20NSEC3SubsetBitmap, TestDNSSEC20NoDNSSEC)
+  - `engine/test/dnssec/dnssec_test.go` (TestDNSSEC20BitmapOK, TestDNSSEC20NSECSubsetBitmap, TestDNSSEC20ParentSideNSECIgnored, TestDNSSEC20ParentSideNSEC3Ignored, TestDNSSEC20NSEC3SubsetBitmap, TestDNSSEC20NoDNSSEC)
 - References:
   - RFC 4034 (NSEC type bitmap format)
   - RFC 5155 (NSEC3 type bitmap format)

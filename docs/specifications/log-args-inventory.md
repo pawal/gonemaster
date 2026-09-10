@@ -1142,7 +1142,7 @@ These callsites use non-literal/non-tracked args expressions and require manual 
 | `IPV4_DISABLED` | `engine/test/delegation/delegation.go` | 1086 | `withNameserverArgs(ns, map[string]any{
 	"query_type": rrtype,
 })` |
-| `IPV4_DISABLED` | `engine/test/dnssec/dnssec.go` | 7450 | `withNameserverArgs(server, map[string]any{
+| `IPV4_DISABLED` | `engine/test/dnssec/dnssec.go` | 7464 | `withNameserverArgs(server, map[string]any{
 	"query_type": rrtype,
 })` |
 | `IPV4_DISABLED` | `engine/test/nameserver/nameserver.go` | 2782 | `withNameserverArgs(server, map[string]any{
@@ -1177,7 +1177,7 @@ These callsites use non-literal/non-tracked args expressions and require manual 
 | `IPV6_DISABLED` | `engine/test/delegation/delegation.go` | 1076 | `withNameserverArgs(ns, map[string]any{
 	"query_type": rrtype,
 })` |
-| `IPV6_DISABLED` | `engine/test/dnssec/dnssec.go` | 7440 | `withNameserverArgs(server, map[string]any{
+| `IPV6_DISABLED` | `engine/test/dnssec/dnssec.go` | 7454 | `withNameserverArgs(server, map[string]any{
 	"query_type": rrtype,
 })` |
 | `IPV6_DISABLED` | `engine/test/nameserver/nameserver.go` | 2772 | `withNameserverArgs(server, map[string]any{

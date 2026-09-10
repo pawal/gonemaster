@@ -7281,6 +7281,20 @@ func rrOwnerMatchesZone(rr dns.RR, zoneName dnsname.Name) bool {
 	return strings.EqualFold(owner.String(), zoneName.String())
 }
 
+// signedByOtherZone reports whether every RRSIG covering rrtype at owner names a zone other than zoneName as signer.
+func signedByOtherZone(resp packet.Packet, owner string, rrtype uint16, section string, zoneName dnsname.Name) bool {
+	sigs := filterRRSIGByType(resp.GetRecordsForName("RRSIG", dnsname.New(owner), section), rrtype)
+	if len(sigs) == 0 {
+		return false
+	}
+	for _, sig := range sigs {
+		if strings.EqualFold(dnsname.New(sig.SignerName).String(), zoneName.String()) {
+			return false
+		}
+	}
+	return true
+}
+
 // nsec3OwnerMatchesApex reports whether rr is the NSEC3 owned by the apex hash.
 // The owner hash is computed with SHA-1, the only NSEC3 hash algorithm IANA
 // defines; rr.Hash is not consulted, so a record declaring another algorithm is
@@ -8100,20 +8114,31 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					// NSEC zone: apex NSEC in answer section.
 					nsecRRs := nsecResp.GetRecords(typeNSEC, "answer")
 					for _, rr := range nsecRRs {
-						if nsec, ok := rr.(*dns.NSEC); ok && rrOwnerMatchesZone(rr, z.Name) {
-							typeMap = typeMapFromBitmap(nsec.TypeBitMap)
-							break
+						nsec, ok := rr.(*dns.NSEC)
+						if !ok || !rrOwnerMatchesZone(rr, z.Name) {
+							continue
 						}
+						// A parent-side delegation NSEC carries the parent's signer name.
+						if signedByOtherZone(nsecResp, nsec.Hdr.Name, dns.TypeNSEC, "answer", z.Name) {
+							continue
+						}
+						typeMap = typeMapFromBitmap(nsec.TypeBitMap)
+						break
 					}
 					// NSEC3 zone: NSEC3 in authority section (NODATA response).
 					if typeMap == nil {
 						nsec3RRs := nsecResp.GetRecords(typeNSEC3, "authority")
 						for _, rr := range nsec3RRs {
-							if nsec3, ok := rr.(*dns.NSEC3); ok && nsec3OwnerMatchesApex(nsec3, z.Name) {
-								typeMap = typeMapFromBitmap(nsec3.TypeBitMap)
-								isNSEC3 = true
-								break
+							nsec3, ok := rr.(*dns.NSEC3)
+							if !ok || !nsec3OwnerMatchesApex(nsec3, z.Name) {
+								continue
 							}
+							if signedByOtherZone(nsecResp, nsec3.Hdr.Name, dns.TypeNSEC3, "authority", z.Name) {
+								continue
+							}
+							typeMap = typeMapFromBitmap(nsec3.TypeBitMap)
+							isNSEC3 = true
+							break
 						}
 					}
 				}
@@ -8125,10 +8150,15 @@ func DNSSEC20(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						// NSEC zone: NSEC in authority section (NODATA response).
 						nsecRRs := nsec3paramResp.GetRecords(typeNSEC, "authority")
 						for _, rr := range nsecRRs {
-							if nsec, ok := rr.(*dns.NSEC); ok && rrOwnerMatchesZone(rr, z.Name) {
-								typeMap = typeMapFromBitmap(nsec.TypeBitMap)
-								break
+							nsec, ok := rr.(*dns.NSEC)
+							if !ok || !rrOwnerMatchesZone(rr, z.Name) {
+								continue
 							}
+							if signedByOtherZone(nsec3paramResp, nsec.Hdr.Name, dns.TypeNSEC, "authority", z.Name) {
+								continue
+							}
+							typeMap = typeMapFromBitmap(nsec.TypeBitMap)
+							break
 						}
 					}
 				}

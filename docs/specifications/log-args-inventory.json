@@ -3702,7 +3702,7 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/dnssec/dnssec.go",
-      "line": 7450,
+      "line": 7464,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3792,7 +3792,7 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/dnssec/dnssec.go",
-      "line": 7440,
+      "line": 7454,
       "args_expr": "withNameserverArgs(server, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {

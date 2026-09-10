@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - server: batch cancel no longer leaves the queue depth metric high
+- dnssec20: ignore the parent-side delegation NSEC when a nameserver answers the apex NSEC query from the parent zone
 
 ## [v1.7.7] - 2026-09-07
 

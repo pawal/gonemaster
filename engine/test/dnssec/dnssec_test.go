@@ -5870,6 +5870,107 @@ func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS20_BITMAP_OK")
 }
 
+func TestDNSSEC20ParentSideNSECIgnored(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	tctest.NS(t, ctx, "ns1.example", "192.0.2.201", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "DNSKEY":
+			return dnskeyPacket(q.Name, dnssec19P256Key(q.Name))
+		case "NSEC":
+			// The parent zone answers with its delegation NSEC.
+			nsecRR := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
+			nsecRR.NextDomain = "child-b.example."
+			nsecRR.TypeBitMap = []uint16{dns.TypeNS, dns.TypeDS, dns.TypeRRSIG, dns.TypeNSEC}
+			return answerPacket(q.Name, dns.TypeNSEC, nsecRR, tctest.RRSIGRR(q.Name, dns.TypeNSEC, tctest.Signer("example")))
+		case "NSEC3PARAM":
+			nsecRR := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
+			nsecRR.NextDomain = "\\000." + dnsutil.Fqdn(q.Name)
+			nsecRR.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeNSEC, dns.TypeDNSKEY}
+			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC3PARAM), tctest.Secure(),
+				tctest.Authority(soaRecord(q.Name), nsecRR, tctest.RRSIGRR(q.Name, dns.TypeNSEC)))
+		case "A":
+			aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
+			aRR.Addr = netip.MustParseAddr("192.0.2.1")
+			return answerPacket(q.Name, dns.TypeA, aRR)
+		case "AAAA":
+			aaaaRR := &dns.AAAA{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
+			aaaaRR.Addr = netip.MustParseAddr("2001:db8::1")
+			return answerPacket(q.Name, dns.TypeAAAA, aaaaRR)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
+			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
+		}}, nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+
+	z, err := zone.New("child.example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC20(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec20: %v", err)
+	}
+
+	tctest.RequireTags(t, entries, "DS20_BITMAP_OK")
+	tctest.RequireNoTag(t, entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE", "DS20_NO_BITMAP")
+}
+
+func TestDNSSEC20ParentSideNSEC3Ignored(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	// The parent zone answers NODATA with the NSEC3 matching the delegation name.
+	nsec3Owner := dnsutil.NSEC3Name("child.example.", "", 0) + ".example."
+
+	tctest.NS(t, ctx, "ns1.example", "192.0.2.201", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "DNSKEY":
+			return dnskeyPacket(q.Name, dnssec19P256Key(q.Name))
+		case "NSEC":
+			nsec3RR := &dns.NSEC3{Hdr: dns.Header{Name: nsec3Owner, Class: dns.ClassINET, TTL: 60}}
+			nsec3RR.Hash = dns.SHA1
+			nsec3RR.TypeBitMap = []uint16{dns.TypeNS, dns.TypeDS, dns.TypeRRSIG}
+			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC), tctest.Secure(),
+				tctest.Authority(soaRecord("example"), nsec3RR, tctest.RRSIGRR(nsec3Owner, dns.TypeNSEC3, tctest.Signer("example"))))
+		case "A":
+			aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
+			aRR.Addr = netip.MustParseAddr("192.0.2.1")
+			return answerPacket(q.Name, dns.TypeA, aRR)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
+			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
+		}}, nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+
+	z, err := zone.New("child.example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC20(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec20: %v", err)
+	}
+
+	tctest.RequireTags(t, entries, "DS20_NO_BITMAP")
+	tctest.RequireNoTag(t, entries, "DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE", "DS20_BITMAP_OK")
+}
+
 func TestDNSSEC20NSEC3SubsetBitmap(t *testing.T) {
 	ctx := tctest.Context(t)
 

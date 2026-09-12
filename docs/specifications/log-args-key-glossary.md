@@ -20,6 +20,7 @@ Scope:
 | `address` | `string` | Single nameserver IP address. | Use together with `ns` when both are known. |
 | `domain` | `string` | Domain name in testcase-specific contexts. | Keep testcase meaning explicit. |
 | `mname` | `string` | SOA MNAME hostname. | Hostname only. |
+| `signer` | `string` | Signer's Name of an RRSIG record. | Zone apex name. Never the owner name of the signed RRset. |
 
 ## Query Identity Keys
 

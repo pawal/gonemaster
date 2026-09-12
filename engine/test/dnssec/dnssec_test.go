@@ -6418,3 +6418,50 @@ func TestNSEC3OwnerMatchesApex(t *testing.T) {
 		t.Error("a record with a different iteration count matched")
 	}
 }
+
+// The generalised form hashes any name, not only the apex.
+func TestNSEC3OwnerMatchesName(t *testing.T) {
+	name := dnsname.New("a.ns.example.com")
+	hashed := dnsutil.NSEC3Name(name.FQDN(), "AB", 3)
+	if hashed == "" {
+		t.Fatal("could not hash the name")
+	}
+	rr := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(hashed + ".ns.example.com"), Class: dns.ClassINET, TTL: 60}}
+	rr.Hash = 1
+	rr.Salt = "AB"
+	rr.Iterations = 3
+
+	if !nsec3OwnerMatchesName(rr, name) {
+		t.Error("the hash owner of a non-apex name did not match")
+	}
+	if nsec3OwnerMatchesName(rr, dnsname.New("b.ns.example.com")) {
+		t.Error("the hash of another name matched")
+	}
+}
+
+// An unsupported digest type proves nothing, so it must not read as a mismatch.
+func TestDSDigestMatchesDNSKEY(t *testing.T) {
+	key, _ := tctest.SignedKey(t, "example.com", dns.ECDSAP256SHA256, tctest.SEP())
+	other, _ := tctest.SignedKey(t, "example.com", dns.ECDSAP256SHA256, tctest.SEP())
+
+	ds := key.ToDS(dns.SHA256)
+	if ds == nil {
+		t.Fatal("ToDS returned nil")
+	}
+	if !dsDigestMatchesDNSKEY(ds, key) {
+		t.Error("the key that produced the digest did not match")
+	}
+	if dsDigestMatchesDNSKEY(ds, other) {
+		t.Error("an unrelated key matched the digest")
+	}
+
+	unsupported := *ds
+	unsupported.DigestType = 200
+	if !dsDigestMatchesDNSKEY(&unsupported, other) {
+		t.Error("an unsupported digest type read as a mismatch")
+	}
+
+	if dsDigestMatchesDNSKEY(nil, key) || dsDigestMatchesDNSKEY(ds, nil) {
+		t.Error("a nil argument matched")
+	}
+}

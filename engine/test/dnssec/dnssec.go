@@ -1228,14 +1228,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 							continue
 						}
 						hasAlgoMatchCandidate = true
-						if dsDigestSupported(ds.DigestType) {
-							tmpDS := key.ToDS(ds.DigestType)
-							if tmpDS == nil || strings.EqualFold(tmpDS.Digest, ds.Digest) {
-								matchingDNSKEY = key
-								matchDSDNSKEY = true
-								break
-							}
-						} else {
+						if dsDigestMatchesDNSKEY(ds, key) {
 							matchingDNSKEY = key
 							matchDSDNSKEY = true
 							break
@@ -7296,14 +7289,19 @@ func signedByOtherZone(resp packet.Packet, owner string, rrtype uint16, section 
 }
 
 // nsec3OwnerMatchesApex reports whether rr is the NSEC3 owned by the apex hash.
+func nsec3OwnerMatchesApex(rr *dns.NSEC3, apex dnsname.Name) bool {
+	return nsec3OwnerMatchesName(rr, apex)
+}
+
+// nsec3OwnerMatchesName reports whether rr is the NSEC3 owned by the hash of name.
 // The owner hash is computed with SHA-1, the only NSEC3 hash algorithm IANA
 // defines; rr.Hash is not consulted, so a record declaring another algorithm is
 // compared against a SHA-1 hash and, in practice, fails to match.
-func nsec3OwnerMatchesApex(rr *dns.NSEC3, apex dnsname.Name) bool {
+func nsec3OwnerMatchesName(rr *dns.NSEC3, name dnsname.Name) bool {
 	if rr == nil {
 		return false
 	}
-	hash := dnsutil.NSEC3Name(apex.FQDN(), rr.Salt, rr.Iterations)
+	hash := dnsutil.NSEC3Name(name.FQDN(), rr.Salt, rr.Iterations)
 	if hash == "" {
 		return false
 	}
@@ -7905,6 +7903,20 @@ func containsDS(records []*dns.DS, candidate *dns.DS) bool {
 }
 
 var dsDigestSupported = dnssecutil.DigestSupported
+
+// dsDigestMatchesDNSKEY reports whether key hashes to the digest in ds.
+// A digest type this build cannot compute proves nothing, so it counts as a
+// match rather than as a mismatch.
+func dsDigestMatchesDNSKEY(ds *dns.DS, key *dns.DNSKEY) bool {
+	if ds == nil || key == nil {
+		return false
+	}
+	if !dsDigestSupported(ds.DigestType) {
+		return true
+	}
+	computed := key.ToDS(ds.DigestType)
+	return computed == nil || strings.EqualFold(computed.Digest, ds.Digest)
+}
 
 // cdsDigestMUST: digest types designated MUST in the IANA "Implement for
 // DNSSEC Delegation" column. RFC 9975 restricts CDS consistency checks to

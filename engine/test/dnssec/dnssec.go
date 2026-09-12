@@ -297,6 +297,16 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if util.ShouldRunTest(ctx, "dnssec22") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC22(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
 	return results, nil
 }
 
@@ -642,6 +652,21 @@ func Metadata() map[string][]string {
 			"DS21_NO_DS_RRSIG",
 			"DS21_NO_PARENT_ZONE",
 			"DS21_PARENT_DNSKEY_MISSING",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"dnssec22": {
+			"DS22_NO_IN_DOMAIN_NS",
+			"DS22_NS_ADDRESS_CHAIN_BROKEN",
+			"DS22_NS_ADDRESS_INSECURE",
+			"DS22_NS_ADDRESS_ORPHAN_ZONE",
+			"DS22_NS_ADDRESS_RRSIG_EXPIRED",
+			"DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
+			"DS22_NS_ADDRESS_UNSIGNED",
+			"DS22_NS_ADDRESS_VALIDATES",
+			"DS22_ZONE_NOT_SECURE",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -8665,6 +8690,691 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	return results, nil
+}
+
+// dnssec22CutStatus is what one nameserver says about a name as a zone cut.
+type dnssec22CutStatus int
+
+const (
+	dnssec22Indeterminate dnssec22CutStatus = iota
+	dnssec22NotACut
+	dnssec22InsecureCut
+	dnssec22SecureCut
+	dnssec22BrokenCut
+)
+
+// dnssec22Cut is one nameserver's view of a name as a zone cut.
+type dnssec22Cut struct {
+	status dnssec22CutStatus
+	keys   []*dns.DNSKEY
+}
+
+// dnssec22SigCheck is the outcome of verifying the RRSIGs covering one RRset.
+type dnssec22SigCheck struct {
+	verified    bool
+	expired     bool
+	failed      bool
+	unsupported bool
+	expiredTag  uint16
+	failedTag   uint16
+}
+
+// markExpired records the first expired signature.
+func (c *dnssec22SigCheck) markExpired(keytag uint16) {
+	if !c.expired {
+		c.expiredTag = keytag
+	}
+	c.expired = true
+}
+
+// markFailed records the first signature that definitely does not verify.
+func (c *dnssec22SigCheck) markFailed(keytag uint16) {
+	if !c.failed {
+		c.failedTag = keytag
+	}
+	c.failed = true
+}
+
+// dnssec22Finding is one classification of one name on one nameserver.
+type dnssec22Finding struct {
+	tag    string
+	ns     string
+	signer string
+	keytag uint16
+}
+
+// dnssec22Outcome is what one nameserver said about the whole name set.
+type dnssec22Outcome struct {
+	servers   []logargs.Server
+	validated bool
+	findings  []dnssec22Finding
+}
+
+// dnssec22ErrorTags are the DS22 tags that suppress the OK tag.
+var dnssec22ErrorTags = map[string]bool{
+	"DS22_NS_ADDRESS_CHAIN_BROKEN":              true,
+	"DS22_NS_ADDRESS_ORPHAN_ZONE":               true,
+	"DS22_NS_ADDRESS_RRSIG_EXPIRED":             true,
+	"DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY": true,
+	"DS22_NS_ADDRESS_UNSIGNED":                  true,
+}
+
+// dnssec22Walker holds the per-nameserver zone cut memo and referral set.
+type dnssec22Walker struct {
+	ns        nameserver.Nameserver
+	zone      dnsname.Name
+	zoneKeys  []*dns.DNSKEY
+	cuts      map[string]dnssec22Cut
+	refersFor []dnsname.Name
+}
+
+func newDNSSEC22Walker(ns nameserver.Nameserver, zoneName dnsname.Name, zoneKeys []*dns.DNSKEY) *dnssec22Walker {
+	return &dnssec22Walker{ns: ns, zone: zoneName, zoneKeys: zoneKeys, cuts: map[string]dnssec22Cut{}}
+}
+
+// dnssec22Query asks name/rrtype with DO set, retrying over TCP on truncation.
+func dnssec22Query(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name, rrtype string) packet.Packet {
+	dnssecOn := true
+	useVC := false
+	resp, _ := ns.QueryWithOptions(ctx, name.String(), rrtype, &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+	if resp.TC() {
+		useVC = true
+		resp, _ = ns.QueryWithOptions(ctx, name.String(), rrtype, &nameserver.QueryOptions{DNSSEC: &dnssecOn, UseVC: &useVC})
+	}
+	return resp
+}
+
+func (w *dnssec22Walker) query(ctx context.Context, name dnsname.Name, rrtype string) packet.Packet {
+	return dnssec22Query(ctx, w.ns, name, rrtype)
+}
+
+// referred reports whether this nameserver already refused the subtree name lies in.
+func (w *dnssec22Walker) referred(name dnsname.Name) bool {
+	for _, cut := range w.refersFor {
+		if cut.IsInBailiwick(name) {
+			return true
+		}
+	}
+	return false
+}
+
+// noteReferral records the zone cuts a referral response delegated to.
+func (w *dnssec22Walker) noteReferral(resp packet.Packet) {
+	for _, rr := range resp.GetRecords("NS", "authority") {
+		owner := dnsname.New(rr.Header().Name)
+		if !w.referred(owner) {
+			w.refersFor = append(w.refersFor, owner)
+		}
+	}
+}
+
+// cut returns the memoized zone cut status of name on this nameserver.
+func (w *dnssec22Walker) cut(ctx context.Context, name dnsname.Name) dnssec22Cut {
+	if name.Compare(w.zone) == 0 {
+		return dnssec22Cut{status: dnssec22SecureCut, keys: w.zoneKeys}
+	}
+	key := name.StringLower()
+	if cached, ok := w.cuts[key]; ok {
+		return cached
+	}
+	result := w.probeCut(ctx, name)
+	w.cuts[key] = result
+	return result
+}
+
+// probeCut asks name DS and classifies the response.
+func (w *dnssec22Walker) probeCut(ctx context.Context, name dnsname.Name) dnssec22Cut {
+	resp := w.query(ctx, name, "DS")
+	if resp.Msg == nil || !resp.AA() {
+		return dnssec22Cut{status: dnssec22Indeterminate}
+	}
+	switch resp.Rcode() {
+	case "NXDOMAIN":
+		return dnssec22Cut{status: dnssec22NotACut}
+	case "NOERROR":
+	default:
+		return dnssec22Cut{status: dnssec22Indeterminate}
+	}
+	dsRRs := resp.GetRecordsForName("DS", name, "answer")
+	if len(dsRRs) == 0 {
+		return dnssec22Cut{status: dnssec22CutFromDenial(name, resp)}
+	}
+	return w.cutFromDS(ctx, name, resp, dsRRs)
+}
+
+// dnssec22CutFromDenial reads the zone cut status off the NSEC or NSEC3 matching name.
+func dnssec22CutFromDenial(name dnsname.Name, resp packet.Packet) dnssec22CutStatus {
+	for _, rr := range resp.GetRecords("NSEC", "authority") {
+		nsec, ok := rr.(*dns.NSEC)
+		if !ok || !rrOwnerMatchesZone(rr, name) {
+			continue
+		}
+		return dnssec22CutFromBitmap(nsec.TypeBitMap)
+	}
+	for _, rr := range resp.GetRecords("NSEC3", "authority") {
+		nsec3, ok := rr.(*dns.NSEC3)
+		if !ok || !nsec3OwnerMatchesName(nsec3, name) {
+			continue
+		}
+		return dnssec22CutFromBitmap(nsec3.TypeBitMap)
+	}
+	// An unsigned enclosing zone proves nothing here; an ancestor decides.
+	return dnssec22NotACut
+}
+
+// dnssec22CutFromBitmap maps the NSEC or NSEC3 type bitmap onto a zone cut status.
+func dnssec22CutFromBitmap(types []uint16) dnssec22CutStatus {
+	typeMap := typeMapFromBitmap(types)
+	if !typeMap["NS"] {
+		return dnssec22NotACut
+	}
+	if typeMap["DS"] {
+		// The bitmap contradicts the NODATA it came with.
+		return dnssec22Indeterminate
+	}
+	return dnssec22InsecureCut
+}
+
+// cutFromDS validates the DS RRset of name and the DNSKEY RRset it points at.
+func (w *dnssec22Walker) cutFromDS(ctx context.Context, name dnsname.Name, resp packet.Packet, dsRRs []dns.RR) dnssec22Cut {
+	sigs := filterRRSIGByType(resp.GetRecordsForName("RRSIG", name, "answer"), dns.TypeDS)
+	if len(sigs) == 0 {
+		return dnssec22Cut{status: dnssec22BrokenCut}
+	}
+	parent := dnsname.New(sigs[0].SignerName)
+	if parent.Compare(name) == 0 || !parent.IsInBailiwick(name) || !w.zone.IsInBailiwick(parent) {
+		return dnssec22Cut{status: dnssec22BrokenCut}
+	}
+	parentCut := w.cut(ctx, parent)
+	if parentCut.status == dnssec22Indeterminate {
+		return dnssec22Cut{status: dnssec22Indeterminate}
+	}
+	if parentCut.status != dnssec22SecureCut {
+		return dnssec22Cut{status: dnssec22BrokenCut}
+	}
+
+	dsCheck := dnssec22VerifySigs(sigs, parentCut.keys, packetTime(resp), func(*dns.RRSIG) []dns.RR { return dsRRs })
+	if status := dnssec22CutFromCheck(dsCheck); status != dnssec22SecureCut {
+		return dnssec22Cut{status: status}
+	}
+
+	keyResp := w.query(ctx, name, "DNSKEY")
+	if keyResp.Msg == nil || !keyResp.AA() || keyResp.Rcode() != "NOERROR" {
+		return dnssec22Cut{status: dnssec22BrokenCut}
+	}
+	var keys []*dns.DNSKEY
+	for _, rr := range keyResp.GetRecordsForName("DNSKEY", name, "answer") {
+		if key, ok := rr.(*dns.DNSKEY); ok {
+			keys = append(keys, key)
+		}
+	}
+	matched := dnssec22KeysMatchingDS(dsRRs, keys)
+	if len(matched) == 0 {
+		return dnssec22Cut{status: dnssec22BrokenCut}
+	}
+	keyset := dnskeyRRset(keys)
+	keySigs := filterRRSIGByType(keyResp.GetRecordsForName("RRSIG", name, "answer"), dns.TypeDNSKEY)
+	keyCheck := dnssec22VerifySigs(keySigs, matched, packetTime(keyResp), func(*dns.RRSIG) []dns.RR { return keyset })
+	if status := dnssec22CutFromCheck(keyCheck); status != dnssec22SecureCut {
+		return dnssec22Cut{status: status}
+	}
+	return dnssec22Cut{status: dnssec22SecureCut, keys: keys}
+}
+
+// dnssec22CutFromCheck maps a signature check onto a zone cut status.
+func dnssec22CutFromCheck(check dnssec22SigCheck) dnssec22CutStatus {
+	switch {
+	case check.verified:
+		return dnssec22SecureCut
+	case check.expired, check.failed:
+		return dnssec22BrokenCut
+	case check.unsupported:
+		return dnssec22Indeterminate
+	default:
+		return dnssec22BrokenCut
+	}
+}
+
+// dnssec22KeysMatchingDS returns the keys a DS names by keytag, algorithm and digest.
+func dnssec22KeysMatchingDS(dsRRs []dns.RR, keys []*dns.DNSKEY) []*dns.DNSKEY {
+	var out []*dns.DNSKEY
+	for _, key := range keys {
+		for _, rr := range dsRRs {
+			ds, ok := rr.(*dns.DS)
+			if !ok || ds.KeyTag != keyTag(key) || ds.Algorithm != key.Algorithm {
+				continue
+			}
+			if dsDigestMatchesDNSKEY(ds, key) {
+				out = append(out, key)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// expectedSigner returns the walk index of the lowest zone cut at or above
+// order[start], and its cut. The zone apex terminates the walk unprobed.
+func (w *dnssec22Walker) expectedSigner(ctx context.Context, order []dnsname.Name, start int) (int, dnssec22Cut) {
+	for i := start; i < len(order)-1; i++ {
+		cut := w.cut(ctx, order[i])
+		switch cut.status {
+		case dnssec22SecureCut, dnssec22InsecureCut, dnssec22BrokenCut:
+			return i, cut
+		}
+	}
+	return len(order) - 1, dnssec22Cut{status: dnssec22SecureCut, keys: w.zoneKeys}
+}
+
+// evaluate classifies the address records of one in-domain name on this nameserver.
+func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) (*dnssec22Finding, bool) {
+	resp := w.query(ctx, name, "A")
+	if resp.Msg == nil {
+		return nil, false
+	}
+	if !resp.AA() {
+		if resp.Type() == "referral" {
+			w.noteReferral(resp)
+		}
+		return nil, false
+	}
+	switch resp.Rcode() {
+	case "NOERROR":
+	case "NXDOMAIN":
+		// Delegation and nameserver testcases own a name that does not exist.
+		return nil, false
+	default:
+		return nil, false
+	}
+	if len(resp.GetRecordsForName("CNAME", name, "answer")) > 0 {
+		// RFC 2181 section 10.3 forbids an alias here; Delegation05 reports it.
+		return nil, false
+	}
+
+	sigResp := resp
+	section := "answer"
+	var sigs []*dns.RRSIG
+	if len(resp.GetRecordsForName("A", name, "answer")) > 0 {
+		sigs = filterRRSIGByType(resp.GetRecordsForName("RRSIG", name, "answer"), dns.TypeA)
+	} else {
+		aaaaResp := w.query(ctx, name, "AAAA")
+		if aaaaResp.Msg != nil && aaaaResp.AA() && aaaaResp.Rcode() == "NOERROR" &&
+			len(aaaaResp.GetRecordsForName("AAAA", name, "answer")) > 0 {
+			sigResp = aaaaResp
+			sigs = filterRRSIGByType(aaaaResp.GetRecordsForName("RRSIG", name, "answer"), dns.TypeAAAA)
+		} else {
+			section = "authority"
+			sigs = dnssec22DenialSigs(resp)
+		}
+	}
+
+	order := dnssec22WalkOrder(name, w.zone)
+	var signer dnsname.Name
+	signerKnown := len(sigs) > 0
+	start := 0
+	if signerKnown {
+		signer = dnsname.New(sigs[0].SignerName)
+		if idx := dnssec22IndexOf(order, signer); idx >= 0 {
+			start = idx
+		}
+	}
+	expectedIdx, expectedCut := w.expectedSigner(ctx, order, start)
+	expected := order[expectedIdx]
+
+	switch expectedCut.status {
+	case dnssec22InsecureCut:
+		return &dnssec22Finding{tag: "DS22_NS_ADDRESS_INSECURE", ns: name.String()}, false
+	case dnssec22BrokenCut:
+		return &dnssec22Finding{tag: "DS22_NS_ADDRESS_CHAIN_BROKEN", ns: name.String(), signer: expected.String()}, false
+	}
+	if !signerKnown {
+		return &dnssec22Finding{tag: "DS22_NS_ADDRESS_UNSIGNED", ns: name.String()}, false
+	}
+
+	if signer.Compare(expected) == 0 {
+		check := dnssec22VerifySigs(sigs, expectedCut.keys, packetTime(sigResp), func(sig *dns.RRSIG) []dns.RR {
+			return rrsetForName(sigResp.GetRecords(rrsigTypeString(sig.TypeCovered), section), sig.Hdr.Name)
+		})
+		switch {
+		case check.verified:
+			return nil, true
+		case check.expired:
+			return &dnssec22Finding{tag: "DS22_NS_ADDRESS_RRSIG_EXPIRED", ns: name.String(), keytag: check.expiredTag}, false
+		case check.failed:
+			return &dnssec22Finding{
+				tag:    "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
+				ns:     name.String(),
+				signer: signer.String(),
+				keytag: check.failedTag,
+			}, false
+		}
+		// An algorithm the local verifier cannot process is indeterminate.
+		return nil, false
+	}
+
+	signerIdx := dnssec22IndexOf(order, signer)
+	if signerIdx >= 0 && signerIdx < expectedIdx && w.cut(ctx, signer).status == dnssec22NotACut {
+		return &dnssec22Finding{tag: "DS22_NS_ADDRESS_ORPHAN_ZONE", ns: name.String(), signer: signer.String()}, false
+	}
+	return &dnssec22Finding{
+		tag:    "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
+		ns:     name.String(),
+		signer: signer.String(),
+		keytag: sigs[0].KeyTag,
+	}, false
+}
+
+// dnssec22DenialSigs returns the authority-section RRSIGs covering NSEC or NSEC3.
+func dnssec22DenialSigs(resp packet.Packet) []*dns.RRSIG {
+	rrs := resp.GetRecords("RRSIG", "authority")
+	sigs := filterRRSIGByType(rrs, dns.TypeNSEC)
+	return append(sigs, filterRRSIGByType(rrs, dns.TypeNSEC3)...)
+}
+
+// dnssec22VerifySigs checks sigs against keys at time at, taking each covered
+// RRset from rrsetFor.
+func dnssec22VerifySigs(sigs []*dns.RRSIG, keys []*dns.DNSKEY, at time.Time, rrsetFor func(*dns.RRSIG) []dns.RR) dnssec22SigCheck {
+	var check dnssec22SigCheck
+	for _, sig := range sigs {
+		if int64(sig.Expiration) < at.Unix() {
+			check.markExpired(sig.KeyTag)
+			continue
+		}
+		if int64(sig.Inception) > at.Unix() {
+			check.markFailed(sig.KeyTag)
+			continue
+		}
+		if !dnssecAlgorithmSupported(sig.Algorithm) {
+			check.unsupported = true
+			continue
+		}
+		rrset := rrsetFor(sig)
+		if len(rrset) == 0 {
+			check.markFailed(sig.KeyTag)
+			continue
+		}
+		matched := false
+		unsupported := false
+		for _, key := range keys {
+			if keyTag(key) != sig.KeyTag {
+				continue
+			}
+			matched = true
+			err := verifyRRSIG(sig, rrset, key, at)
+			if err == nil {
+				check.verified = true
+				return check
+			}
+			if errors.Is(err, dns.ErrAlg) || errors.Is(err, dnssecutil.ErrRSAExponentUnsupported) {
+				unsupported = true
+			}
+		}
+		if !matched || !unsupported {
+			check.markFailed(sig.KeyTag)
+			continue
+		}
+		check.unsupported = true
+	}
+	return check
+}
+
+// dnssec22WalkOrder returns name, its ancestors below the apex, and the apex last.
+func dnssec22WalkOrder(name dnsname.Name, apex dnsname.Name) []dnsname.Name {
+	if !apex.IsInBailiwick(name) {
+		return []dnsname.Name{apex}
+	}
+	var order []dnsname.Name
+	current := name
+	for current.Compare(apex) != 0 {
+		order = append(order, current)
+		next, ok := current.NextHigher()
+		if !ok {
+			break
+		}
+		current = next
+	}
+	return append(order, apex)
+}
+
+// dnssec22IndexOf returns the position of name in the walk order, or -1.
+func dnssec22IndexOf(order []dnsname.Name, name dnsname.Name) int {
+	for i, candidate := range order {
+		if candidate.Compare(name) == 0 {
+			return i
+		}
+	}
+	return -1
+}
+
+// dnssec22InDomainNames returns the in-domain nameserver names of the zone, sorted.
+// The root zone has none by rule: every name is subordinate to it.
+func dnssec22InDomainNames(apex dnsname.Name, lists ...[]nsdiscovery.NSItem) []dnsname.Name {
+	if len(apex.Labels()) == 0 {
+		return nil
+	}
+	seen := map[string]bool{}
+	var names []dnsname.Name
+	for _, list := range lists {
+		for _, item := range list {
+			if !apex.IsInBailiwick(item.Name) {
+				continue
+			}
+			key := item.Name.StringLower()
+			if seen[key] {
+				continue
+			}
+			seen[key] = true
+			names = append(names, item.Name)
+		}
+	}
+	sort.Slice(names, func(i, j int) bool { return names[i].Compare(names[j]) < 0 })
+	return names
+}
+
+// dnssec22TransportEnabled reports whether the profile allows querying this address.
+func dnssec22TransportEnabled(ctx context.Context, ns nameserver.Nameserver) bool {
+	prof := profile.FromContext(ctx)
+	if ns.Address.Is6() {
+		return prof.Net.IPv6
+	}
+	return prof.Net.IPv4
+}
+
+// dnssec22ZoneKeys returns the apex DNSKEY RRset from the first child nameserver serving it.
+func dnssec22ZoneKeys(ctx context.Context, apex dnsname.Name, groups [][]nameserver.Nameserver) []*dns.DNSKEY {
+	for _, group := range groups {
+		if len(group) == 0 || !dnssec22TransportEnabled(ctx, group[0]) {
+			continue
+		}
+		resp := dnssec22Query(ctx, group[0], apex, "DNSKEY")
+		if resp.Msg == nil || !resp.AA() || resp.Rcode() != "NOERROR" {
+			continue
+		}
+		var keys []*dns.DNSKEY
+		for _, rr := range resp.GetRecordsForName("DNSKEY", apex, "answer") {
+			if key, ok := rr.(*dns.DNSKEY); ok {
+				keys = append(keys, key)
+			}
+		}
+		if len(keys) > 0 {
+			return keys
+		}
+	}
+	return nil
+}
+
+// dnssec22ParentHasDS reports whether any parent nameserver holds a DS for the zone.
+func dnssec22ParentHasDS(ctx context.Context, z *zone.Zone) bool {
+	servers, err := parentNameservers(ctx, z)
+	if err != nil {
+		return false
+	}
+	for _, ns := range servers {
+		if !dnssec22TransportEnabled(ctx, ns) {
+			continue
+		}
+		resp := dnssec22Query(ctx, ns, z.Name, "DS")
+		if resp.Msg == nil || !resp.AA() || resp.Rcode() != "NOERROR" {
+			continue
+		}
+		if len(resp.GetRecordsForName("DS", z.Name, "answer")) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// dnssec22Endpoints returns the nameserver identities sharing one address.
+func dnssec22Endpoints(group []nameserver.Nameserver) []logargs.Server {
+	out := make([]logargs.Server, 0, len(group))
+	for _, ns := range group {
+		out = append(out, logargs.Server{NS: ns.NameString(), Address: ns.AddressString()})
+	}
+	return out
+}
+
+// DNSSEC22 runs the DNSSEC22 test case.
+// It validates the address records of the in-domain nameserver names of the
+// zone against the zone's own chain of trust.
+func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "DNSSEC22"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+	endTestcase := func(tag string) ([]*logger.Entry, error) {
+		if tag != "" {
+			if err := appendLog(ctx, &results, testcase, tag, map[string]any{}); err != nil {
+				return results, err
+			}
+		}
+		return results, appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase})
+	}
+
+	if z == nil {
+		return endTestcase("DS22_NO_IN_DOMAIN_NS")
+	}
+
+	delItems, err := delegationNameservers(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	zoneItems, err := zoneNameservers(ctx, z)
+	if err != nil {
+		return results, err
+	}
+
+	names := dnssec22InDomainNames(z.Name, delItems, zoneItems)
+	if len(names) == 0 {
+		return endTestcase("DS22_NO_IN_DOMAIN_NS")
+	}
+
+	groups := nameserversByIP(nameserversFromNSItems(ctx, z, append(delItems, zoneItems...)))
+	zoneKeys := dnssec22ZoneKeys(ctx, z.Name, groups)
+	if len(zoneKeys) == 0 || !dnssec22ParentHasDS(ctx, z) {
+		return endTestcase("DS22_ZONE_NOT_SECURE")
+	}
+
+	outcomes := make([]dnssec22Outcome, len(groups))
+	tasks := make([]runner.Task, len(groups))
+	for i, group := range groups {
+		tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+			if len(group) == 0 {
+				return nil
+			}
+			buf := testlogger.Wrap(log, moduleName, testcase)
+			ns := group[0]
+			if disabled, derr := ipDisabledMessageWithLogger(ctx, buf, ns, "A"); derr != nil {
+				return derr
+			} else if disabled {
+				return nil
+			}
+
+			walker := newDNSSEC22Walker(ns, z.Name, zoneKeys)
+			outcome := dnssec22Outcome{servers: dnssec22Endpoints(group)}
+			for _, name := range names {
+				if walker.referred(name) {
+					continue
+				}
+				finding, validated := walker.evaluate(ctx, name)
+				if validated {
+					outcome.validated = true
+				}
+				if finding != nil {
+					outcome.findings = append(outcome.findings, *finding)
+				}
+			}
+			outcomes[i] = outcome
+			return nil
+		}
+	}
+
+	entries, err := runner.Run(ctx, tasks, runner.Options{
+		Parallel:      profile.FromContext(ctx).Resolver.Defaults.Parallel,
+		CancelOnError: false,
+	})
+	results = append(results, entries...)
+	if err != nil {
+		return results, err
+	}
+
+	byFinding := map[dnssec22Finding][]logargs.Server{}
+	var findings []dnssec22Finding
+	var validatedServers []logargs.Server
+	for _, outcome := range outcomes {
+		if outcome.validated {
+			validatedServers = append(validatedServers, outcome.servers...)
+		}
+		for _, finding := range outcome.findings {
+			if _, seen := byFinding[finding]; !seen {
+				findings = append(findings, finding)
+			}
+			byFinding[finding] = append(byFinding[finding], outcome.servers...)
+		}
+	}
+	sort.Slice(findings, func(i, j int) bool {
+		left, right := findings[i], findings[j]
+		if left.tag != right.tag {
+			return left.tag < right.tag
+		}
+		if left.ns != right.ns {
+			return left.ns < right.ns
+		}
+		if left.signer != right.signer {
+			return left.signer < right.signer
+		}
+		return left.keytag < right.keytag
+	})
+
+	sawError := false
+	for _, finding := range findings {
+		if dnssec22ErrorTags[finding.tag] {
+			sawError = true
+		}
+		args := map[string]any{"ns": finding.ns}
+		if finding.signer != "" {
+			args["signer"] = finding.signer
+		}
+		switch finding.tag {
+		case "DS22_NS_ADDRESS_RRSIG_EXPIRED", "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY":
+			args["keytag"] = finding.keytag
+		}
+		setTypedServersFromEndpoints(args, byFinding[finding])
+		if err := appendLog(ctx, &results, testcase, finding.tag, args); err != nil {
+			return results, err
+		}
+	}
+
+	if !sawError && len(validatedServers) > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, validatedServers)
+		if err := appendLog(ctx, &results, testcase, "DS22_NS_ADDRESS_VALIDATES", args); err != nil {
+			return results, err
+		}
+	}
+
+	return endTestcase("")
 }
 
 func algoPropertyFor(algo uint8) algoProperty {

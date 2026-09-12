@@ -61,6 +61,7 @@ var testcaseDescriptions = map[string]string{
 	"DNSSEC19": "Check DNSKEY records for known cryptographic weaknesses",
 	"DNSSEC20": "NSEC/NSEC3 type bitmap at zone apex matches actual RR types",
 	"DNSSEC21": "Parent zone signs the delegating DS RRset",
+	"DNSSEC22": "In-domain nameserver address records validate under the zone's chain of trust",
 
 	// NAMESERVER
 	"NAMESERVER01": "A name server should not be a recursor",

@@ -1316,6 +1316,42 @@ msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
 msgstr "De bovenliggende zone gaf geen autoritatief DNSKEY-antwoord terug, dus de verificatie van de DS-RRSIG is overgeslagen op bovenliggende naamserver(s) {addresses}."
 
+msgctxt "DNSSEC:DS22_NO_IN_DOMAIN_NS"
+msgid "No name server name of the zone is in-domain; there are no address records to validate."
+msgstr "Geen enkele naamservernaam van de zone is in-domain; er zijn geen adresrecords om te valideren."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_CHAIN_BROKEN"
+msgid "The chain of trust from the zone to {signer}, which signs the address records of name server {ns}, is broken on name server(s) {servers}."
+msgstr "De vertrouwensketen van de zone naar {signer}, die de adresrecords van naamserver {ns} ondertekent, is verbroken op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_INSECURE"
+msgid "The address records of name server {ns} lie below an insecure delegation on name server(s) {servers} and are accepted without validation."
+msgstr "De adresrecords van naamserver {ns} liggen onder een onbeveiligde delegatie op naamserver(s) {servers} en worden zonder validatie geaccepteerd."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_ORPHAN_ZONE"
+msgid "The address records of name server {ns} are signed by {signer}, but the enclosing zone proves no delegation there: the NSEC or NSEC3 record matching {ns} has no NS bit. Returned from name server(s) {servers}."
+msgstr "De adresrecords van naamserver {ns} zijn ondertekend door {signer}, maar de omsluitende zone bewijst daar geen delegatie: het NSEC- of NSEC3-record dat overeenkomt met {ns} heeft geen NS-bit. Geretourneerd door naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_EXPIRED"
+msgid "The RRSIG with keytag {keytag} covering the address records of name server {ns} has expired on name server(s) {servers}."
+msgstr "De RRSIG met key tag {keytag} die de adresrecords van naamserver {ns} dekt, is verlopen op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name on name server(s) {servers}."
+msgstr "De RRSIG met key tag {keytag} en ondertekenaar {signer} die de adresrecords van naamserver {ns} dekt, kan niet worden geverifieerd met de DNSKEY-RRset van de zone die autoritatief is voor die naam op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_UNSIGNED"
+msgid "The address records of name server {ns} carry no RRSIG on name server(s) {servers}, although the name lies in a signed zone."
+msgstr "De adresrecords van naamserver {ns} hebben geen RRSIG op naamserver(s) {servers}, hoewel de naam in een ondertekende zone ligt."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_VALIDATES"
+msgid "The address records of all in-domain name servers validate under the chain of trust of the zone on name server(s) {servers}."
+msgstr "De adresrecords van alle in-domain-naamservers valideren onder de vertrouwensketen van de zone op naamserver(s) {servers}."
+
+msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
+msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
+msgstr "De zone is niet ondertekend of heeft geen DS-record bij de bovenliggende zone; de adresrecords van in-domain-naamservers worden niet gevalideerd."
+
 msgctxt "NAMESERVER:NO_EDNS_SUPPORT"
 msgid "Nameserver {ns}/{address} does not support EDNS0 (replies with FORMERR)."
 msgstr "Naamserver {ns}/{address} ondersteunt geen EDNS0 (antwoordt met FORMERR)."

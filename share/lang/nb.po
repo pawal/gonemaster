@@ -2143,6 +2143,42 @@ msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
 msgstr "Foreldresonen returnerte ikke et autoritativt DNSKEY-svar, så validering av RRSIG-posten for DS-posten ble hoppet over på foreldresonens navnetjenere med IP-adressene \"{addresses}\"."
 
+msgctxt "DNSSEC:DS22_NO_IN_DOMAIN_NS"
+msgid "No name server name of the zone is in-domain; there are no address records to validate."
+msgstr "Ingen av sonens navnetjenernavn er in-domain. Det finnes ingen adresseposter å validere."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_CHAIN_BROKEN"
+msgid "The chain of trust from the zone to {signer}, which signs the address records of name server {ns}, is broken on name server(s) {servers}."
+msgstr "Tillitskjeden fra sonen til {signer}, som signerer adressepostene for navnetjeneren {ns}, er brutt på navnetjener(e) {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_INSECURE"
+msgid "The address records of name server {ns} lie below an insecure delegation on name server(s) {servers} and are accepted without validation."
+msgstr "Adressepostene for navnetjeneren {ns} ligger under en usikker delegering på navnetjener(e) {servers} og godtas uten validering."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_ORPHAN_ZONE"
+msgid "The address records of name server {ns} are signed by {signer}, but the enclosing zone proves no delegation there: the NSEC or NSEC3 record matching {ns} has no NS bit. Returned from name server(s) {servers}."
+msgstr "Adressepostene for navnetjeneren {ns} er signert av {signer}, men den omsluttende sonen beviser ingen delegering der: NSEC- eller NSEC3-posten som samsvarer med {ns}, mangler NS-bitet. Svar fra navnetjener(e) {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_EXPIRED"
+msgid "The RRSIG with keytag {keytag} covering the address records of name server {ns} has expired on name server(s) {servers}."
+msgstr "RRSIG-posten med \"key tag\" {keytag} som dekker adressepostene for navnetjeneren {ns}, har utløpt på navnetjener(e) {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name on name server(s) {servers}."
+msgstr "RRSIG-posten med \"key tag\" {keytag} og signerer {signer} som dekker adressepostene for navnetjeneren {ns}, kan ikke valideres mot DNSKEY-postsettet i sonen som er autoritativ for navnet, på navnetjener(e) {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_UNSIGNED"
+msgid "The address records of name server {ns} carry no RRSIG on name server(s) {servers}, although the name lies in a signed zone."
+msgstr "Adressepostene for navnetjeneren {ns} har ingen RRSIG-post på navnetjener(e) {servers}, selv om navnet ligger i en signert sone."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_VALIDATES"
+msgid "The address records of all in-domain name servers validate under the chain of trust of the zone on name server(s) {servers}."
+msgstr "Adressepostene for alle in-domain-navnetjenere valideres under sonens tillitskjede på navnetjener(e) {servers}."
+
+msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
+msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
+msgstr "Sonen er ikke signert eller mangler DS-post hos foreldresonen. Adressepostene for in-domain-navnetjenere valideres ikke."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

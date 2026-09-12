@@ -2222,6 +2222,42 @@ msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
 msgstr "Ylempi vyöhyke ei palauttanut autoritatiivista DNSKEY-vastausta, joten DS-tietueen RRSIG-tietueen validointi ohitettiin ylemmän vyöhykkeen nimipalvelimilla, joiden IP-osoitteet ovat \"{addresses}\"."
 
+msgctxt "DNSSEC:DS22_NO_IN_DOMAIN_NS"
+msgid "No name server name of the zone is in-domain; there are no address records to validate."
+msgstr "Yksikään vyöhykkeen nimipalvelinnimi ei ole in-domain; validoitavia osoitetietueita ei ole."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_CHAIN_BROKEN"
+msgid "The chain of trust from the zone to {signer}, which signs the address records of name server {ns}, is broken on name server(s) {servers}."
+msgstr "Luottamusketju vyöhykkeeltä kohteeseen {signer}, joka allekirjoittaa nimipalvelimen {ns} osoitetietueet, on katkennut nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_INSECURE"
+msgid "The address records of name server {ns} lie below an insecure delegation on name server(s) {servers} and are accepted without validation."
+msgstr "Nimipalvelimen {ns} osoitetietueet sijaitsevat turvattoman delegoinnin alapuolella nimipalvelimilla {servers}, ja ne hyväksytään ilman validointia."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_ORPHAN_ZONE"
+msgid "The address records of name server {ns} are signed by {signer}, but the enclosing zone proves no delegation there: the NSEC or NSEC3 record matching {ns} has no NS bit. Returned from name server(s) {servers}."
+msgstr "Nimipalvelimen {ns} osoitetietueet on allekirjoittanut {signer}, mutta ympäröivä vyöhyke ei osoita siellä mitään delegointia: nimeä {ns} vastaavassa NSEC- tai NSEC3-tietueessa ei ole NS-bittiä. Palautettu nimipalvelimilta {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_EXPIRED"
+msgid "The RRSIG with keytag {keytag} covering the address records of name server {ns} has expired on name server(s) {servers}."
+msgstr "Nimipalvelimen {ns} osoitetietueet kattava RRSIG-tietue avaintunnisteella {keytag} on vanhentunut nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name on name server(s) {servers}."
+msgstr "Nimipalvelimen {ns} osoitetietueet kattavaa RRSIG-tietuetta avaintunnisteella {keytag} ja allekirjoittajalla {signer} ei voida validoida sen vyöhykkeen DNSKEY-tietuejoukolla, joka on auktoritatiivinen kyseiselle nimelle, nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_UNSIGNED"
+msgid "The address records of name server {ns} carry no RRSIG on name server(s) {servers}, although the name lies in a signed zone."
+msgstr "Nimipalvelimen {ns} osoitetietueissa ei ole RRSIG-tietuetta nimipalvelimilla {servers}, vaikka nimi sijaitsee allekirjoitetulla vyöhykkeellä."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_VALIDATES"
+msgid "The address records of all in-domain name servers validate under the chain of trust of the zone on name server(s) {servers}."
+msgstr "Kaikkien in-domain-nimipalvelimien osoitetietueet validoituvat vyöhykkeen luottamusketjussa nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
+msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
+msgstr "Vyöhykettä ei ole allekirjoitettu tai sillä ei ole DS-tietuetta ylemmällä vyöhykkeellä; in-domain-nimipalvelimien osoitetietueita ei validoida."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

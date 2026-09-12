@@ -1315,6 +1315,42 @@ msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
 msgstr "Nadřazená strana nevrátila autoritativní DNSKEY odpověď, takže ověření DS RRSIG bylo přeskočeno na jmenném serveru / serverech nadřazené strany {addresses}."
 
+msgctxt "DNSSEC:DS22_NO_IN_DOMAIN_NS"
+msgid "No name server name of the zone is in-domain; there are no address records to validate."
+msgstr "Žádné jméno jmenného serveru zóny není v doméně (in-domain); nejsou žádné adresní záznamy k ověření."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_CHAIN_BROKEN"
+msgid "The chain of trust from the zone to {signer}, which signs the address records of name server {ns}, is broken on name server(s) {servers}."
+msgstr "Řetěz důvěry od zóny k {signer}, která podepisuje adresní záznamy jmenného serveru {ns}, je přerušen na jmenném serveru / serverech {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_INSECURE"
+msgid "The address records of name server {ns} lie below an insecure delegation on name server(s) {servers} and are accepted without validation."
+msgstr "Adresní záznamy jmenného serveru {ns} leží pod nezabezpečenou delegací na jmenném serveru / serverech {servers} a jsou přijímány bez ověření."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_ORPHAN_ZONE"
+msgid "The address records of name server {ns} are signed by {signer}, but the enclosing zone proves no delegation there: the NSEC or NSEC3 record matching {ns} has no NS bit. Returned from name server(s) {servers}."
+msgstr "Adresní záznamy jmenného serveru {ns} jsou podepsány zónou {signer}, ale obklopující zóna tam nedokládá žádnou delegaci: záznam NSEC nebo NSEC3 odpovídající {ns} nemá bit NS. Vráceno jmenným serverem / servery {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_EXPIRED"
+msgid "The RRSIG with keytag {keytag} covering the address records of name server {ns} has expired on name server(s) {servers}."
+msgstr "Záznam RRSIG s keytagem {keytag}, který kryje adresní záznamy jmenného serveru {ns}, vypršel na jmenném serveru / serverech {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name on name server(s) {servers}."
+msgstr "Záznam RRSIG s keytagem {keytag} a podepisující zónou {signer}, který kryje adresní záznamy jmenného serveru {ns}, nelze ověřit sadou DNSKEY zóny autoritativní pro toto jméno na jmenném serveru / serverech {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_UNSIGNED"
+msgid "The address records of name server {ns} carry no RRSIG on name server(s) {servers}, although the name lies in a signed zone."
+msgstr "Adresní záznamy jmenného serveru {ns} nemají žádný záznam RRSIG na jmenném serveru / serverech {servers}, ačkoli jméno leží v podepsané zóně."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_VALIDATES"
+msgid "The address records of all in-domain name servers validate under the chain of trust of the zone on name server(s) {servers}."
+msgstr "Adresní záznamy všech jmenných serverů v doméně (in-domain) jsou ověřeny řetězem důvěry zóny na jmenném serveru / serverech {servers}."
+
+msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
+msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
+msgstr "Zóna není podepsána nebo nemá záznam DS u nadřazené strany; adresní záznamy jmenných serverů v doméně (in-domain) se neověřují."
+
 msgctxt "NAMESERVER:NO_EDNS_SUPPORT"
 msgid "Nameserver {ns}/{address} does not support EDNS0 (replies with FORMERR)."
 msgstr "Jmenný server {ns}/{address} nepodporuje EDNS0 (odpovídá s FORMERR)."

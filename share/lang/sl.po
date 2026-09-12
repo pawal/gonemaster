@@ -2134,6 +2134,42 @@ msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
 msgstr "Starševska cona ni vrnila avtoritativnega odgovora DNSKEY, zato je bilo preverjanje RRSIG za DS zapis preskočeno na starševskih imenskih strežnikih z naslovi \"{addresses}\"."
 
+msgctxt "DNSSEC:DS22_NO_IN_DOMAIN_NS"
+msgid "No name server name of the zone is in-domain; there are no address records to validate."
+msgstr "Nobeno ime imenskega strežnika cone ni v domeni (in-domain); ni naslovnih zapisov za preverjanje."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_CHAIN_BROKEN"
+msgid "The chain of trust from the zone to {signer}, which signs the address records of name server {ns}, is broken on name server(s) {servers}."
+msgstr "Veriga zaupanja od cone do {signer}, ki podpisuje naslovne zapise imenskega strežnika {ns}, je prekinjena na imenskih strežnikih {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_INSECURE"
+msgid "The address records of name server {ns} lie below an insecure delegation on name server(s) {servers} and are accepted without validation."
+msgstr "Naslovni zapisi imenskega strežnika {ns} ležijo pod nezaščiteno delegacijo na imenskih strežnikih {servers} in so sprejeti brez preverjanja."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_ORPHAN_ZONE"
+msgid "The address records of name server {ns} are signed by {signer}, but the enclosing zone proves no delegation there: the NSEC or NSEC3 record matching {ns} has no NS bit. Returned from name server(s) {servers}."
+msgstr "Naslovne zapise imenskega strežnika {ns} je podpisal {signer}, vendar obdajajoča cona tam ne dokazuje nobene delegacije: zapis NSEC ali NSEC3, ki se ujema z {ns}, nima bita NS. Vrnjeno z imenskih strežnikov {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_EXPIRED"
+msgid "The RRSIG with keytag {keytag} covering the address records of name server {ns} has expired on name server(s) {servers}."
+msgstr "Zapis RRSIG z oznako {keytag}, ki pokriva naslovne zapise imenskega strežnika {ns}, je potekel na imenskih strežnikih {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name on name server(s) {servers}."
+msgstr "Zapisa RRSIG z oznako {keytag} in podpisnikom {signer}, ki pokriva naslovne zapise imenskega strežnika {ns}, ni mogoče preveriti z naborom DNSKEY cone, ki je avtoritativna za to ime, na imenskih strežnikih {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_UNSIGNED"
+msgid "The address records of name server {ns} carry no RRSIG on name server(s) {servers}, although the name lies in a signed zone."
+msgstr "Naslovni zapisi imenskega strežnika {ns} nimajo zapisa RRSIG na imenskih strežnikih {servers}, čeprav ime leži v podpisani coni."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_VALIDATES"
+msgid "The address records of all in-domain name servers validate under the chain of trust of the zone on name server(s) {servers}."
+msgstr "Naslovni zapisi vseh imenskih strežnikov v domeni (in-domain) so preverjeni v verigi zaupanja cone na imenskih strežnikih {servers}."
+
+msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
+msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
+msgstr "Cona ni podpisana ali nima zapisa DS pri starševski coni; naslovni zapisi imenskih strežnikov v domeni (in-domain) niso preverjeni."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

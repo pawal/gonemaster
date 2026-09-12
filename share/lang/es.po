@@ -2244,6 +2244,42 @@ msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
 msgstr "La zona padre no retornó una respuesta DNSKEY autoritativa, por lo que la validación de la firma RRSIG que cubre el registro DS se omitió en los servidores de nombres de la zona padre con direcciones IP \"{addresses}\"."
 
+msgctxt "DNSSEC:DS22_NO_IN_DOMAIN_NS"
+msgid "No name server name of the zone is in-domain; there are no address records to validate."
+msgstr "Ningún nombre de servidor de nombres de la zona es dependiente (\"in-domain\"); no hay registros de dirección que validar."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_CHAIN_BROKEN"
+msgid "The chain of trust from the zone to {signer}, which signs the address records of name server {ns}, is broken on name server(s) {servers}."
+msgstr "La cadena de confianza desde la zona hasta {signer}, que firma los registros de dirección del servidor de nombres {ns}, está rota en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_INSECURE"
+msgid "The address records of name server {ns} lie below an insecure delegation on name server(s) {servers} and are accepted without validation."
+msgstr "Los registros de dirección del servidor de nombres {ns} están por debajo de una delegación insegura en los servidores de nombres {servers} y se aceptan sin validación."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_ORPHAN_ZONE"
+msgid "The address records of name server {ns} are signed by {signer}, but the enclosing zone proves no delegation there: the NSEC or NSEC3 record matching {ns} has no NS bit. Returned from name server(s) {servers}."
+msgstr "Los registros de dirección del servidor de nombres {ns} están firmados por {signer}, pero la zona que lo contiene no demuestra ninguna delegación ahí: el registro NSEC o NSEC3 que corresponde a {ns} no tiene el bit NS. Devuelto por los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_EXPIRED"
+msgid "The RRSIG with keytag {keytag} covering the address records of name server {ns} has expired on name server(s) {servers}."
+msgstr "La firma RRSIG con tag {keytag} que cubre los registros de dirección del servidor de nombres {ns} ha expirado en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name on name server(s) {servers}."
+msgstr "La firma RRSIG con tag {keytag} y firmante {signer} que cubre los registros de dirección del servidor de nombres {ns} no puede validarse con el conjunto DNSKEY de la zona autoritativa para ese nombre en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_UNSIGNED"
+msgid "The address records of name server {ns} carry no RRSIG on name server(s) {servers}, although the name lies in a signed zone."
+msgstr "Los registros de dirección del servidor de nombres {ns} no llevan ninguna firma RRSIG en los servidores de nombres {servers}, aunque el nombre está en una zona firmada."
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_VALIDATES"
+msgid "The address records of all in-domain name servers validate under the chain of trust of the zone on name server(s) {servers}."
+msgstr "Los registros de dirección de todos los servidores de nombres dependientes (\"in-domain\") se validan bajo la cadena de confianza de la zona en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
+msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
+msgstr "La zona no está firmada o no tiene registro DS en la zona padre; los registros de dirección de los servidores de nombres dependientes (\"in-domain\") no se validan."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

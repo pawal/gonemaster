@@ -2439,6 +2439,42 @@ msgctxt "DNSSEC:DS21_PARENT_DNSKEY_MISSING"
 msgid "Parent did not return an authoritative DNSKEY response, so DS RRSIG verification was skipped on parent name server(s) {addresses}."
 msgstr "親ゾーンは権威ある DNSKEY 応答を返さなかったため、親ネームサーバー (IP: \"{addresses}\") での DS レコード対象 RRSIG 検証を省略しました。"
 
+msgctxt "DNSSEC:DS22_NO_IN_DOMAIN_NS"
+msgid "No name server name of the zone is in-domain; there are no address records to validate."
+msgstr "ゾーンのネームサーバー名に in-domain のものはありません。検証するアドレスレコードはありません。"
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_CHAIN_BROKEN"
+msgid "The chain of trust from the zone to {signer}, which signs the address records of name server {ns}, is broken on name server(s) {servers}."
+msgstr "ネームサーバー {ns} のアドレスレコードに署名する {signer} へのゾーンからの信頼チェーンは、ネームサーバー {servers} で切れています。"
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_INSECURE"
+msgid "The address records of name server {ns} lie below an insecure delegation on name server(s) {servers} and are accepted without validation."
+msgstr "ネームサーバー {ns} のアドレスレコードは、ネームサーバー {servers} で insecure な委任の配下にあり、検証なしで受け入れられます。"
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_ORPHAN_ZONE"
+msgid "The address records of name server {ns} are signed by {signer}, but the enclosing zone proves no delegation there: the NSEC or NSEC3 record matching {ns} has no NS bit. Returned from name server(s) {servers}."
+msgstr "ネームサーバー {ns} のアドレスレコードは {signer} によって署名されていますが、上位のゾーンはそこに委任があることを証明していません。{ns} に一致する NSEC または NSEC3 レコードに NS ビットがありません。ネームサーバー {servers} からの応答です。"
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_EXPIRED"
+msgid "The RRSIG with keytag {keytag} covering the address records of name server {ns} has expired on name server(s) {servers}."
+msgstr "ネームサーバー {ns} のアドレスレコードを対象とするキータグ {keytag} の RRSIG は、ネームサーバー {servers} で有効期限が切れています。"
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY"
+msgid "The RRSIG with keytag {keytag} and signer {signer} covering the address records of name server {ns} does not verify against the DNSKEY RRset of the zone authoritative for that name on name server(s) {servers}."
+msgstr "ネームサーバー {ns} のアドレスレコードを対象とするキータグ {keytag}、署名者 {signer} の RRSIG は、ネームサーバー {servers} でその名前に権威を持つゾーンの DNSKEY RRset で検証できません。"
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_UNSIGNED"
+msgid "The address records of name server {ns} carry no RRSIG on name server(s) {servers}, although the name lies in a signed zone."
+msgstr "ネームサーバー {ns} のアドレスレコードには、ネームサーバー {servers} で RRSIG がありません。名前は署名済みゾーン内にあります。"
+
+msgctxt "DNSSEC:DS22_NS_ADDRESS_VALIDATES"
+msgid "The address records of all in-domain name servers validate under the chain of trust of the zone on name server(s) {servers}."
+msgstr "すべての in-domain ネームサーバーのアドレスレコードは、ネームサーバー {servers} でゾーンの信頼チェーンにより検証されます。"
+
+msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
+msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
+msgstr "ゾーンは署名されていないか、親に DS レコードがありません。in-domain ネームサーバーのアドレスレコードは検証されません。"
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

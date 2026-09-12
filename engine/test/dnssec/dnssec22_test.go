@@ -3,9 +3,9 @@ package dnssec
 import (
 	"context"
 	"crypto"
-	"net/netip"
 	"strings"
 	"testing"
+	"time"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
@@ -15,6 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
+	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
@@ -95,6 +96,7 @@ type ds22Fixture struct {
 	zoneSigner crypto.Signer
 	cutKey     *dns.DNSKEY
 	cutSigner  crypto.Signer
+	parentIP   string
 	answers    ds22Answers
 	counts     map[string]int
 }
@@ -109,6 +111,7 @@ func newDS22Fixture(t *testing.T) *ds22Fixture {
 		zoneSigner: zoneSigner,
 		cutKey:     cutKey,
 		cutSigner:  cutSigner,
+		parentIP:   "192.0.2.99",
 		answers:    ds22Answers{},
 		counts:     map[string]int{},
 	}
@@ -401,14 +404,23 @@ func TestDNSSEC22InDomainNames(t *testing.T) {
 
 // --- testcase ---
 
-// ds22Run wires the fixture into DNSSEC22 and runs it.
-func (f *ds22Fixture) run(t *testing.T, ctx context.Context, nsNames ...string) []*logger.Entry {
+// run wires the fixture into DNSSEC22 and runs it on zone "example". Each spec
+// is "name" or "name/address"; the address defaults to 192.0.2.10.
+func (f *ds22Fixture) run(t *testing.T, ctx context.Context, specs ...string) []*logger.Entry {
 	t.Helper()
-	items := make([]nsdiscovery.NSItem, 0, len(nsNames))
-	for _, name := range nsNames {
-		items = append(items, nsdiscovery.NSItem{
-			Name: dnsname.New(name), Address: netip.MustParseAddr("192.0.2.10"), HasAddress: true,
-		})
+	return f.runZone(t, ctx, "example", specs...)
+}
+
+// runZone runs DNSSEC22 on another zone than the fixture's.
+func (f *ds22Fixture) runZone(t *testing.T, ctx context.Context, zoneName string, specs ...string) []*logger.Entry {
+	t.Helper()
+	items := make([]nsdiscovery.NSItem, 0, len(specs))
+	for _, spec := range specs {
+		name, address, found := strings.Cut(spec, "/")
+		if !found {
+			address = "192.0.2.10"
+		}
+		items = append(items, tctest.NSItem(name, address))
 	}
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return items, nil
@@ -417,7 +429,7 @@ func (f *ds22Fixture) run(t *testing.T, ctx context.Context, nsNames ...string) 
 		return nil, nil
 	})
 
-	z, err := zone.New("example")
+	z, err := zone.New(zoneName)
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
@@ -446,17 +458,17 @@ func (f *ds22Fixture) parentDS(t *testing.T, ctx context.Context, present bool) 
 		answers[ds22Key("example", "DS")] = tctest.Response(
 			tctest.Question("example", dns.TypeDS), tctest.Secure(), tctest.Answers(ds))
 	}
-	parent := ds22Server(t, ctx, "ns1.parent", "192.0.2.99", answers, nil)
+	parent := ds22Server(t, ctx, "ns1.parent", f.parentIP, answers, nil)
 	tctest.Stub(t, &parentNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{parent}, nil
 	})
 }
 
-// signedAddress publishes a signed A RRset for name.
-func (f *ds22Fixture) signedAddress(t *testing.T, name string, key *dns.DNSKEY, signer crypto.Signer) {
+// signedAddress publishes an A RRset for name, signed with the given options.
+func (f *ds22Fixture) signedAddress(t *testing.T, name string, key *dns.DNSKEY, signer crypto.Signer, opts ...tctest.SigOpt) {
 	t.Helper()
 	addr := tctest.ARR(name, "192.0.2.10")
-	sig := tctest.Sign(t, key, signer, dns.TypeA, []dns.RR{addr})
+	sig := tctest.Sign(t, key, signer, dns.TypeA, []dns.RR{addr}, opts...)
 	f.answers[ds22Key(name, "A")] = tctest.Response(
 		tctest.Question(name, dns.TypeA), tctest.Secure(), tctest.Answers(addr, sig))
 }
@@ -555,5 +567,460 @@ func TestDNSSEC22NoInDomainNS(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS22_ZONE_NOT_SECURE")
 	if got := f.counts[ds22Key("example", "DNSKEY")]; got != 0 {
 		t.Fatalf("DNSKEY questions = %d, want 0", got)
+	}
+}
+
+// copyAnswers returns a copy of the answer table.
+func (f *ds22Fixture) copyAnswers() ds22Answers {
+	out := ds22Answers{}
+	for key, resp := range f.answers {
+		out[key] = resp
+	}
+	return out
+}
+
+// into returns the fixture writing into another table, for a second nameserver
+// that answers differently.
+func (f *ds22Fixture) into(answers ds22Answers) *ds22Fixture {
+	clone := *f
+	clone.answers = answers
+	return &clone
+}
+
+// noDataOnA publishes an authoritative NODATA for the A question of name, with
+// a signed NSEC denial.
+func (f *ds22Fixture) noDataOnA(t *testing.T, name string) {
+	t.Helper()
+	nsec := ds22NSEC(name, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeNSEC)
+	sig := tctest.Sign(t, f.zoneKey, f.zoneSigner, dns.TypeNSEC, []dns.RR{nsec})
+	f.answers[ds22Key(name, "A")] = tctest.Response(
+		tctest.Question(name, dns.TypeA), tctest.Secure(),
+		tctest.Authority(tctest.SOARR("example"), nsec, sig))
+}
+
+// unsignedAddress publishes an A RRset with no RRSIG.
+func (f *ds22Fixture) unsignedAddress(t *testing.T, name string) {
+	t.Helper()
+	f.answers[ds22Key(name, "A")] = tctest.Response(
+		tctest.Question(name, dns.TypeA), tctest.Secure(), tctest.Answers(tctest.ARR(name, "192.0.2.10")))
+}
+
+// denyDS publishes an authoritative DS NODATA carrying the given authority records.
+func (f *ds22Fixture) denyDS(name string, authority ...dns.RR) {
+	f.answers[ds22Key(name, "DS")] = tctest.Response(
+		tctest.Question(name, dns.TypeDS), tctest.Secure(), tctest.Authority(authority...))
+}
+
+// orphan publishes an A RRset for name signed by a key of name itself, with the
+// enclosing zone proving no delegation there.
+func (f *ds22Fixture) orphan(t *testing.T, name string, denial ...dns.RR) {
+	t.Helper()
+	key, signer := tctest.SignedKey(t, name, dns.ECDSAP256SHA256, tctest.SEP())
+	f.signedAddress(t, name, key, signer)
+	f.denyDS(name, denial...)
+}
+
+// requireArg fails unless the entry carries the expected string argument.
+func requireArg(t *testing.T, entry *logger.Entry, key string, want string) {
+	t.Helper()
+	if got, _ := entry.Args[key].(string); got != want {
+		t.Fatalf("%s = %q, want %q", key, got, want)
+	}
+}
+
+// The enclosing zone denies the delegation with an NSEC record.
+func TestDNSSEC22OrphanZoneNSECParent(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.secureCut(t)
+	f.orphan(t, "a.ns.example", ds22NSEC("a.ns.example", dns.TypeA, dns.TypeRRSIG, dns.TypeNSEC))
+	ds22Server(t, ctx, "a.ns.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "a.ns.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_ORPHAN_ZONE")
+	requireArg(t, entry, "signer", "a.ns.example")
+}
+
+// An NXDOMAIN for the DS question proves no delegation either.
+func TestDNSSEC22OrphanZoneNXDOMAINParent(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.secureCut(t)
+	f.orphan(t, "a.ns.example")
+	f.answers[ds22Key("a.ns.example", "DS")] = tctest.Response(
+		tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure(), tctest.NXDOMAIN())
+	ds22Server(t, ctx, "a.ns.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "a.ns.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_ORPHAN_ZONE")
+	requireArg(t, entry, "signer", "a.ns.example")
+}
+
+// A nameserver name below a secure zone cut is signed by that zone cut.
+func TestDNSSEC22SecureZoneCutValidates(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.secureCut(t)
+	f.signedAddress(t, "b.ns.example", f.cutKey, f.cutSigner)
+	ds22Server(t, ctx, "b.ns.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "b.ns.example")
+	tctest.RequireTags(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+	tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_ORPHAN_ZONE", "DS22_NS_ADDRESS_CHAIN_BROKEN")
+	// The signer names the zone cut, so the name itself is never probed as one.
+	if got := f.counts[ds22Key("b.ns.example", "DS")]; got != 0 {
+		t.Fatalf("DS questions for the name = %d, want 0", got)
+	}
+}
+
+// Below an insecure delegation the address records are unsigned by design.
+func TestDNSSEC22InsecureDelegation(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.unsignedAddress(t, "ns1.sub.example")
+	f.denyDS("ns1.sub.example", tctest.SOARR("sub.example"))
+	f.denyDS("sub.example", ds22NSEC("sub.example", dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC))
+	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_INSECURE")
+	requireArg(t, entry, "ns", "ns1.sub.example")
+	tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_UNSIGNED", "DS22_NS_ADDRESS_VALIDATES")
+}
+
+// Unsigned address records in the signed zone itself are bogus.
+func TestDNSSEC22Unsigned(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.unsignedAddress(t, "ns1.example")
+	f.denyDS("ns1.example", ds22NSEC("ns1.example", dns.TypeA, dns.TypeRRSIG, dns.TypeNSEC))
+	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "ns1.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_UNSIGNED")
+	requireArg(t, entry, "ns", "ns1.example")
+	// A settles a name at fault; AAAA is never asked for it.
+	if got := f.counts[ds22Key("ns1.example", "AAAA")]; got != 0 {
+		t.Fatalf("AAAA questions = %d, want 0", got)
+	}
+}
+
+func TestDNSSEC22LeafSignatureFaults(t *testing.T) {
+	t.Run("expired", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		f.apexDNSKEY(t)
+		f.parentDS(t, ctx, true)
+		f.signedAddress(t, "ns1.example", f.zoneKey, f.zoneSigner,
+			tctest.Inception(time.Now().Add(-48*time.Hour)), tctest.Expiration(time.Now().Add(-time.Hour)))
+		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+		entries := f.run(t, ctx, "ns1.example")
+		entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_RRSIG_EXPIRED")
+		requireArg(t, entry, "ns", "ns1.example")
+		if entry.Args["keytag"] != keyTag(f.zoneKey) {
+			t.Fatalf("keytag = %#v, want %d", entry.Args["keytag"], keyTag(f.zoneKey))
+		}
+		tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+	})
+
+	t.Run("no DNSKEY with the keytag", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		f.apexDNSKEY(t)
+		f.parentDS(t, ctx, true)
+		// A key of the apex that the DNSKEY RRset does not publish.
+		other, otherSigner := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+		f.signedAddress(t, "ns1.example", other, otherSigner)
+		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+		entries := f.run(t, ctx, "ns1.example")
+		entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY")
+		requireArg(t, entry, "signer", "example")
+		if entry.Args["keytag"] != keyTag(other) {
+			t.Fatalf("keytag = %#v, want %d", entry.Args["keytag"], keyTag(other))
+		}
+	})
+
+	t.Run("signature does not verify", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		f.apexDNSKEY(t)
+		f.parentDS(t, ctx, true)
+		// Another key signs under the keytag of the published one.
+		other, otherSigner := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP())
+		f.signedAddress(t, "ns1.example", other, otherSigner, tctest.KeyTag(keyTag(f.zoneKey)))
+		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+		entries := f.run(t, ctx, "ns1.example")
+		entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY")
+		if entry.Args["keytag"] != keyTag(f.zoneKey) {
+			t.Fatalf("keytag = %#v, want %d", entry.Args["keytag"], keyTag(f.zoneKey))
+		}
+	})
+
+	t.Run("signer outside the zone", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		f.apexDNSKEY(t)
+		f.parentDS(t, ctx, true)
+		foreign, foreignSigner := tctest.SignedKey(t, "other", dns.ECDSAP256SHA256, tctest.SEP())
+		f.signedAddress(t, "ns1.example", foreign, foreignSigner)
+		f.denyDS("ns1.example", ds22NSEC("ns1.example", dns.TypeA, dns.TypeRRSIG, dns.TypeNSEC))
+		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+		entries := f.run(t, ctx, "ns1.example")
+		entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY")
+		requireArg(t, entry, "signer", "other")
+	})
+}
+
+// A zone cut whose own chain is broken carries every name below it with it.
+func TestDNSSEC22ChainBroken(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.secureCut(t)
+	// Republish the DNSKEY RRset of the zone cut with a key its DS does not name.
+	other, otherSigner := tctest.SignedKey(t, "ns.example", dns.ECDSAP256SHA256, tctest.SEP())
+	otherSig := tctest.Sign(t, other, otherSigner, dns.TypeDNSKEY, []dns.RR{other})
+	f.answers[ds22Key("ns.example", "DNSKEY")] = tctest.Response(
+		tctest.Question("ns.example", dns.TypeDNSKEY), tctest.Secure(), tctest.Answers(other, otherSig))
+	f.signedAddress(t, "a.ns.example", f.cutKey, f.cutSigner)
+	ds22Server(t, ctx, "a.ns.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "a.ns.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_CHAIN_BROKEN")
+	requireArg(t, entry, "ns", "a.ns.example")
+	requireArg(t, entry, "signer", "ns.example")
+	tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+}
+
+// Each nameserver is evaluated on its own; the finding names only its servers.
+func TestDNSSEC22PerServerDisagreement(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.orphan(t, "ns1.example", ds22NSEC("ns1.example", dns.TypeA, dns.TypeRRSIG, dns.TypeNSEC))
+	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+	healthy := f.copyAnswers()
+	f.into(healthy).signedAddress(t, "ns1.example", f.zoneKey, f.zoneSigner)
+	ds22Server(t, ctx, "ns1.example", "192.0.2.11", healthy, nil)
+
+	entries := f.run(t, ctx, "ns1.example/192.0.2.10", "ns1.example/192.0.2.11")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_ORPHAN_ZONE")
+	if got := tctest.ServerEndpoints(t, entry.Args); len(got) != 1 || got[0] != "ns1.example/192.0.2.10" {
+		t.Fatalf("servers = %v, want the orphaned nameserver alone", got)
+	}
+	tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+}
+
+// A signature the local verifier cannot process is indeterminate.
+func TestDNSSEC22UnsupportedAlgorithm(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	addr := tctest.ARR("ns1.example", "192.0.2.10")
+	sig := tctest.RRSIGRR("ns1.example", dns.TypeA, tctest.SigAlgo(dns.DSA),
+		tctest.Signer("example"), tctest.KeyTag(keyTag(f.zoneKey)))
+	f.answers[ds22Key("ns1.example", "A")] = tctest.Response(
+		tctest.Question("ns1.example", dns.TypeA), tctest.Secure(), tctest.Answers(addr, sig))
+	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "ns1.example")
+	if tags := tctest.TagsWithPrefix(entries, "DS22_"); len(tags) != 0 {
+		t.Fatalf("tags = %v, want none", tags)
+	}
+}
+
+func TestDNSSEC22TransportDisabled(t *testing.T) {
+	t.Run("IPv6 disabled", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		if err := profile.Effective().Set("net.ipv6", false); err != nil {
+			t.Fatalf("set net.ipv6: %v", err)
+		}
+		f.apexDNSKEY(t)
+		f.parentDS(t, ctx, true)
+		f.signedAddress(t, "ns1.example", f.zoneKey, f.zoneSigner)
+		f.signedAddress(t, "ns2.example", f.zoneKey, f.zoneSigner)
+		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+		ds22Server(t, ctx, "ns2.example", "2001:db8::1", f.answers, nil)
+
+		entries := f.run(t, ctx, "ns1.example/192.0.2.10", "ns2.example/2001:db8::1")
+		entry := tctest.RequireTag(t, entries, "IPV6_DISABLED")
+		tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "ns2.example", Address: "2001:db8::1"})
+		requireArg(t, entry, "query_type", "A")
+	})
+
+	t.Run("IPv4 disabled", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		f.parentIP = "2001:db8::99"
+		if err := profile.Effective().Set("net.ipv4", false); err != nil {
+			t.Fatalf("set net.ipv4: %v", err)
+		}
+		f.apexDNSKEY(t)
+		f.parentDS(t, ctx, true)
+		f.signedAddress(t, "ns1.example", f.zoneKey, f.zoneSigner)
+		f.signedAddress(t, "ns2.example", f.zoneKey, f.zoneSigner)
+		ds22Server(t, ctx, "ns1.example", "2001:db8::1", f.answers, f.counts)
+		ds22Server(t, ctx, "ns2.example", "192.0.2.20", f.answers, nil)
+
+		entries := f.run(t, ctx, "ns1.example/2001:db8::1", "ns2.example/192.0.2.20")
+		entry := tctest.RequireTag(t, entries, "IPV4_DISABLED")
+		tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "ns2.example", Address: "192.0.2.20"})
+		requireArg(t, entry, "query_type", "A")
+	})
+}
+
+// A name with no A RRset is settled by AAAA, or by the denial of both.
+func TestDNSSEC22NoDataOnA(t *testing.T) {
+	t.Run("AAAA RRset", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		f.apexDNSKEY(t)
+		f.parentDS(t, ctx, true)
+		f.noDataOnA(t, "ns1.example")
+		addr := tctest.AAAARR("ns1.example", "2001:db8::1")
+		sig := tctest.Sign(t, f.zoneKey, f.zoneSigner, dns.TypeAAAA, []dns.RR{addr})
+		f.answers[ds22Key("ns1.example", "AAAA")] = tctest.Response(
+			tctest.Question("ns1.example", dns.TypeAAAA), tctest.Secure(), tctest.Answers(addr, sig))
+		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+		entries := f.run(t, ctx, "ns1.example")
+		tctest.RequireTags(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+		if got := f.counts[ds22Key("ns1.example", "AAAA")]; got != 1 {
+			t.Fatalf("AAAA questions = %d, want 1", got)
+		}
+	})
+
+	t.Run("neither type", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		f.apexDNSKEY(t)
+		f.parentDS(t, ctx, true)
+		f.noDataOnA(t, "ns1.example")
+		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+		// The signer comes from the denial proof of the A question.
+		entries := f.run(t, ctx, "ns1.example")
+		tctest.RequireTags(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+	})
+}
+
+// A delegated name whose NSEC3 omits the NS bit is an orphan from this side.
+func TestDNSSEC22DelegatedNameWithoutTheNSBit(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.secureCut(t)
+	key, signer := tctest.SignedKey(t, "a.ns.example", dns.ECDSAP256SHA256, tctest.SEP())
+	f.signedAddress(t, "a.ns.example", key, signer)
+	f.denyDS("a.ns.example", tctest.SOARR("ns.example"), tctest.NSRR("a.ns.example", "ns1.other"),
+		ds22NSEC3("a.ns.example", "ns.example", dns.TypeA, dns.TypeRRSIG))
+	ds22Server(t, ctx, "a.ns.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "a.ns.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_ORPHAN_ZONE")
+	requireArg(t, entry, "signer", "a.ns.example")
+}
+
+// A referral costs one query and takes the whole subtree with it.
+func TestDNSSEC22ReferralShortCircuit(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	referral := tctest.Response(tctest.Question("ns1.sub.example", dns.TypeA), tctest.NotAuthoritative(),
+		tctest.Authority(tctest.NSRR("sub.example", "ns1.other")))
+	f.answers[ds22Key("ns1.sub.example", "A")] = referral
+	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "ns1.sub.example", "ns2.sub.example", "ns3.sub.example")
+	if tags := tctest.TagsWithPrefix(entries, "DS22_"); len(tags) != 0 {
+		t.Fatalf("tags = %v, want none", tags)
+	}
+	if got := f.counts[ds22Key("ns1.sub.example", "A")]; got != 1 {
+		t.Fatalf("A questions = %d, want 1", got)
+	}
+	for _, name := range []string{"ns2.sub.example", "ns3.sub.example"} {
+		if got := f.counts[ds22Key(name, "A")]; got != 0 {
+			t.Fatalf("%s A questions = %d, want 0", name, got)
+		}
+	}
+}
+
+// A referral for one subtree leaves the names outside it evaluated.
+func TestDNSSEC22ReferralKeepsOtherNames(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.orphan(t, "ns1.example", ds22NSEC("ns1.example", dns.TypeA, dns.TypeRRSIG, dns.TypeNSEC))
+	f.answers[ds22Key("ns1.sub.example", "A")] = tctest.Response(
+		tctest.Question("ns1.sub.example", dns.TypeA), tctest.NotAuthoritative(),
+		tctest.Authority(tctest.NSRR("sub.example", "ns1.other")))
+	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "ns1.example", "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_ORPHAN_ZONE")
+	requireArg(t, entry, "ns", "ns1.example")
+}
+
+// Every name is subordinate to the root, so the root zone has no name set.
+func TestDNSSEC22RootZone(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	ds22Server(t, ctx, "a.root-servers.net", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.runZone(t, ctx, ".", "a.root-servers.net/192.0.2.10")
+	tctest.RequireTags(t, entries, "DS22_NO_IN_DOMAIN_NS")
+	if len(f.counts) != 0 {
+		t.Fatalf("questions = %v, want none", f.counts)
+	}
+}
+
+// A zone cut the nameserver says nothing about yields no finding.
+func TestDNSSEC22IndeterminateCut(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.signedAddress(t, "a.ns.example", f.cutKey, f.cutSigner)
+	f.signedAddress(t, "b.ns.example", f.cutKey, f.cutSigner)
+
+	// The second nameserver answers the zone cut question, the first does not.
+	sound := f.copyAnswers()
+	f.into(sound).secureCut(t)
+	ds22Server(t, ctx, "a.ns.example", "192.0.2.10", f.answers, f.counts)
+	ds22Server(t, ctx, "a.ns.example", "192.0.2.11", sound, nil)
+
+	entries := f.run(t, ctx, "a.ns.example/192.0.2.10", "b.ns.example/192.0.2.10",
+		"a.ns.example/192.0.2.11", "b.ns.example/192.0.2.11")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+	if got := tctest.ServerEndpoints(t, entry.Args); len(got) != 2 || got[0] != "a.ns.example/192.0.2.11" {
+		t.Fatalf("servers = %v, want the answering nameserver alone", got)
+	}
+	tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_ORPHAN_ZONE",
+		"DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY", "DS22_NS_ADDRESS_CHAIN_BROKEN")
+	// The memo asks the question once for both names below the zone cut.
+	if got := f.counts[ds22Key("ns.example", "DS")]; got != 1 {
+		t.Fatalf("DS questions = %d, want 1", got)
 	}
 }

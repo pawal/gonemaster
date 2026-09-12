@@ -123,6 +123,9 @@ Status: Final
           is `not a cut`: `DS22_NS_ADDRESS_ORPHAN_ZONE` with `signer` S. X
           serves S as a zone apex while the enclosing zone proves no delegation
           there.
+        - S is a member of the walk order strictly below E and `cutStatus(X, S)`
+          is `indeterminate`: no finding. X stated nothing about S as a zone
+          cut, so neither the orphan nor the signer conclusion is available.
         - Otherwise: `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` with `signer`
           S and the `keytag` of the first covering RRSIG. The signature cannot
           verify under the chain of trust of the zone.
@@ -224,6 +227,7 @@ For each unique child NS IP X (parallel; fan-out = resolver.defaults.parallel):
             one verifies            -> N validates on X
       S in walk below E, cutStatus(X, S) == not a cut
                               -> DS22_NS_ADDRESS_ORPHAN_ZONE (ns, signer=S)
+      S in walk below E, cutStatus(X, S) == indeterminate -> no finding
       otherwise               -> DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY
 
 Aggregate:
@@ -366,6 +370,9 @@ Scoring takes the severity default in the `dnssec` dimension. No
 - A signature whose algorithm the local verifier cannot process is
   indeterminate and yields no finding, at the leaf and in the zone cut walk
   alike.
+- A zone cut whose `DS` question draws no answer on a nameserver stays
+  `indeterminate` for every name below it on that nameserver and yields no
+  finding there. Other nameservers are unaffected.
 - Running `--testcase dnssec22` alone makes the DNSKEY and DS queries of the
   gate itself; nothing is assumed cached.
 

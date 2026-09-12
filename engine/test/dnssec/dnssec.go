@@ -9053,8 +9053,14 @@ func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) (*dnss
 	}
 
 	signerIdx := dnssec22IndexOf(order, signer)
-	if signerIdx >= 0 && signerIdx < expectedIdx && w.cut(ctx, signer).status == dnssec22NotACut {
-		return &dnssec22Finding{tag: "DS22_NS_ADDRESS_ORPHAN_ZONE", ns: name.String(), signer: signer.String()}, false
+	if signerIdx >= 0 && signerIdx < expectedIdx {
+		switch w.cut(ctx, signer).status {
+		case dnssec22NotACut:
+			return &dnssec22Finding{tag: "DS22_NS_ADDRESS_ORPHAN_ZONE", ns: name.String(), signer: signer.String()}, false
+		case dnssec22Indeterminate:
+			// The nameserver said nothing about the signer as a zone cut.
+			return nil, false
+		}
 	}
 	return &dnssec22Finding{
 		tag:    "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",

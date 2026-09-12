@@ -3,8 +3,7 @@
 Status: Final
 
 ## Purpose
-- Verify that the address records (`A` and `AAAA`) of every in-domain
-  nameserver name of the zone validate under the chain of trust of the zone.
+- Verify that the address records (`A` and `AAAA`) of every in-domain nameserver name of the zone validate under the chain of trust of the zone.
 - An in-domain nameserver name (RFC 9499 section 7) is an `NS` target at or
   below the apex of the zone under test. Its address records are served by the
   zone itself or by a zone delegated below it, so they are inside the

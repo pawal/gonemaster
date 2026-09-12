@@ -276,6 +276,7 @@
   "tc.dnssec19": "Kontrollera DNSKEY-poster för kända kryptografiska svagheter",
   "tc.dnssec20": "NSEC/NSEC3-typbitkarta vid zonens apex matchar faktiska RR-typer",
   "tc.dnssec21": "Föräldrazonens DS RRset är signerat av en giltig DNSKEY",
+  "tc.dnssec22": "Adressposter för in-domain-namnservrar validerar under zonens tillitskedja",
   "tc.nameserver01": "En namnserver bör inte vara en rekursor",
   "tc.nameserver02": "Test av EDNS0-stöd",
   "tc.nameserver03": "Test av tillgänglighet för zonöverföring (AXFR)",

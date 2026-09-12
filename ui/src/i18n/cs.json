@@ -744,6 +744,7 @@
   "tc.dnssec19": "Kontrola záznamů DNSKEY na známé kryptografické slabiny",
   "tc.dnssec20": "Bitová mapa typů NSEC/NSEC3 v apexu zóny odpovídá skutečným typům RR",
   "tc.dnssec21": "DS RRset nadřazené zóny je podepsán platným DNSKEY",
+  "tc.dnssec22": "Adresní záznamy jmenných serverů v doméně (in-domain) jsou ověřeny řetězem důvěry zóny",
   "tc.nameserver01": "Jmenný server by neměl být rekurzor",
   "tc.nameserver02": "Test podpory EDNS0",
   "tc.nameserver03": "Test dostupnosti přenosu zóny (AXFR)",

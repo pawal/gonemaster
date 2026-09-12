@@ -114,6 +114,12 @@ Description:
 
 NSEC and NSEC3 records carry a type bitmap telling resolvers which record types exist at a name. If the bitmap lists fewer types than actually exist, resolvers using aggressive negative caching can be fooled into caching a wrong "does not exist" answer. This check compares the bitmap at the apex with the types really present and flags any mismatch.
 
+## Testcase dnssec22
+
+Description:
+
+The nameservers of a zone are often named inside the zone itself, and then their addresses are part of the data the zone signs. If those addresses do not validate, a validating resolver that looks them up gets a failure and stops using the nameserver, even while the rest of the zone is correct. This check reads the address records of every such nameserver name from each of your nameservers and verifies them against the chain of trust of the zone.
+
 ## Tag DS01_DS_ALGO_DEPRECATED
 
 Header: DS uses deprecated digest algorithm
@@ -1241,3 +1247,43 @@ Header: NSEC bitmap misses present record type
 Description:
 
 An NSEC record's type bitmap is missing an RR type that exists at the owner name. Resolvers using RFC 8198 aggressive negative caching can then serve wrong "no such type" answers from cache, so this is a correctness and security issue that must be fixed at the signer.
+
+## Tag DS22_NS_ADDRESS_CHAIN_BROKEN
+
+Header: Broken chain to nameserver address
+
+Description:
+
+The address records of one of your nameservers live in a signed zone below your own, and the link between the two zones is broken: the DS record does not match the key that signs the lower zone, or the signatures on those records do not verify. Validating resolvers cannot reach the key that signs the address, so they reject it and stop using that nameserver.
+
+## Tag DS22_NS_ADDRESS_ORPHAN_ZONE
+
+Header: Nameserver address in orphan zone
+
+Description:
+
+The address records of one of your nameservers are signed by a separate zone loaded on the same nameserver, but your zone proves no delegation to it: the NSEC or NSEC3 record matching that name carries no NS bit. Validating resolvers have no path to the signing key and treat the address as forged.
+
+## Tag DS22_NS_ADDRESS_RRSIG_EXPIRED
+
+Header: Nameserver address signature expired
+
+Description:
+
+The signature covering the address records of one of your nameservers has passed its expiration date. Validating resolvers reject expired signatures, so a resolver that looks the address up again receives a failure and stops using that nameserver. Re-sign the zone that holds the address records.
+
+## Tag DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY
+
+Header: Nameserver address signature invalid
+
+Description:
+
+The signature covering the address records of one of your nameservers does not verify against the keys of the zone that is supposed to sign that name. The signature may be corrupt, not yet valid, made with a key that is no longer published, or made by a zone that has no authority over the name. Validating resolvers treat the address as forged.
+
+## Tag DS22_NS_ADDRESS_UNSIGNED
+
+Header: Nameserver address not signed
+
+Description:
+
+The address records of one of your nameservers carry no signature, although the name lies in a signed part of your zone and no insecure delegation accounts for the gap. Validating resolvers require a signature there, reject the unsigned answer, and cannot look the nameserver up.

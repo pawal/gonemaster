@@ -276,6 +276,7 @@
   "tc.dnssec19": "Kontroller DNSKEY-poster for kjente kryptografiske svakheter",
   "tc.dnssec20": "NSEC/NSEC3-typebitkart ved sonens apex samsvarer med faktiske RR-typer",
   "tc.dnssec21": "Foreldresonens DS RRset er signert av en gyldig DNSKEY",
+  "tc.dnssec22": "Adresseposter for in-domain-navnetjenere validerer under sonens tillitskjede",
   "tc.nameserver01": "En navnetjener bør ikke være en rekursor",
   "tc.nameserver02": "Test av EDNS0-støtte",
   "tc.nameserver03": "Test av tilgjengelighet for soneoverføring (AXFR)",

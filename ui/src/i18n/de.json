@@ -744,6 +744,7 @@
   "tc.dnssec19": "DNSKEY-Records auf bekannte kryptografische Schwächen prüfen",
   "tc.dnssec20": "NSEC/NSEC3-Typ-Bitmap an der Zone-Apex stimmt mit tatsächlichen RR-Typen überein",
   "tc.dnssec21": "DS-RRset der übergeordneten Zone ist durch einen gültigen DNSKEY signiert",
+  "tc.dnssec22": "Adress-Records von In-Domain-Nameservern validieren unter der Vertrauenskette der Zone",
   "tc.nameserver01": "Ein Nameserver sollte kein Rekursor sein",
   "tc.nameserver02": "Test der EDNS0-Unterstützung",
   "tc.nameserver03": "Verfügbarkeit des Zonentransfers (AXFR) testen",

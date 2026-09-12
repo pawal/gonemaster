@@ -744,6 +744,7 @@
   "tc.dnssec19": "Controleer DNSKEY-records op bekende cryptografische zwakheden",
   "tc.dnssec20": "NSEC/NSEC3-typebitmap op zone-apex komt overeen met de werkelijke RR-typen",
   "tc.dnssec21": "DS-RRset van bovenliggende zone is ondertekend door een geldige DNSKEY",
+  "tc.dnssec22": "Adresrecords van in-domain-naamservers valideren onder de vertrouwensketen van de zone",
   "tc.nameserver01": "Een naamserver mag geen recursor zijn",
   "tc.nameserver02": "Test van EDNS0-ondersteuning",
   "tc.nameserver03": "Beschikbaarheid van zoneoverdracht (AXFR) testen",

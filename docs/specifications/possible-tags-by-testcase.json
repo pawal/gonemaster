@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 84,
-    "unique_tag_count": 582
+    "testcase_count": 85,
+    "unique_tag_count": 591
   },
   "modules": {
     "address": {
@@ -679,6 +679,21 @@
         "DS21_NO_DS_RRSIG",
         "DS21_NO_PARENT_ZONE",
         "DS21_PARENT_DNSKEY_MISSING",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
+      ],
+      "dnssec22": [
+        "DS22_NO_IN_DOMAIN_NS",
+        "DS22_NS_ADDRESS_CHAIN_BROKEN",
+        "DS22_NS_ADDRESS_INSECURE",
+        "DS22_NS_ADDRESS_ORPHAN_ZONE",
+        "DS22_NS_ADDRESS_RRSIG_EXPIRED",
+        "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
+        "DS22_NS_ADDRESS_UNSIGNED",
+        "DS22_NS_ADDRESS_VALIDATES",
+        "DS22_ZONE_NOT_SECURE",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",

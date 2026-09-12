@@ -48,6 +48,7 @@ const TESTCASE_TITLES: Record<string, string> = {
   dnssec19: "Check DNSKEY records for known cryptographic weaknesses",
   dnssec20: "NSEC/NSEC3 type bitmap at zone apex matches actual RR types",
   dnssec21: "Parent zone's DS RRset is signed by a valid DNSKEY",
+  dnssec22: "In-domain nameserver address records validate under the zone's chain of trust",
   nameserver01: "A name server should not be a recursor",
   nameserver02: "Test of EDNS0 support",
   nameserver03: "Test availability of zone transfer (AXFR)",

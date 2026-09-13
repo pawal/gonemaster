@@ -7,7 +7,7 @@ something else.
 
 ## What it is
 
-Give gonemaster a domain and it runs 83 testcases in 9 modules against the live
+Give gonemaster a domain and it runs 85 testcases in 9 modules against the live
 delegation: basic, address, connectivity, consistency, delegation, dnssec,
 nameserver, syntax, and zone. Every finding is a tagged message with a severity
 from DEBUG to CRITICAL, and the findings are scored into a number out of 100 and
@@ -40,7 +40,7 @@ specifications, in a different language. Independence is what made it quick: a
 testcase can be added the week its RFC question is settled, and a fix ships in
 the next tag rather than in the next release cycle.
 
-It has since moved past its starting point. gonemaster implements ten testcases
+It has since moved past its starting point. gonemaster implements twelve testcases
 that have no upstream counterpart, maintains its own specification corpus, and
 has found and reported cases where the shared specification and the reference
 implementation disagreed. For command-line, API, and batch testing, gonemaster
@@ -107,16 +107,18 @@ is published as the
 The two projects now maintain separate specification sets, and gonemaster's has
 moved ahead in two ways that can be counted.
 
-**Coverage.** gonemaster implements 83 testcases. Upstream publishes 74 testcase
+**Coverage.** gonemaster implements 85 testcases. Upstream publishes 74 testcase
 specifications, one of which (`dnssec12`, DNSSEC algorithm completeness) is a
 placeholder that upstream states is not yet implemented. gonemaster implements
-the other 73, and adds ten testcases that have no upstream counterpart:
+the other 73, and adds twelve testcases that have no upstream counterpart:
 
 | Testcase | What it checks | Reference |
 |---|---|---|
+| `connectivity05` | whether the apex DNSKEY answer is delivered over UDP, and what an address does when a payload large enough for it is advertised | RFC 6891 |
 | `dnssec19` | DNSKEY records against known cryptographic weaknesses and blocklists of compromised keys | RFC 3110, RFC 6605, RFC 8080 |
 | `dnssec20` | that the NSEC/NSEC3 apex type bitmap matches the RR types actually present | RFC 4034, RFC 5155, RFC 8198 |
 | `dnssec21` | that the parent zone signs the DS RRset delegating the child | RFC 4035 |
+| `dnssec22` | that the address records of every in-domain nameserver name validate under the chain of trust of the zone | RFC 4035, RFC 9499 |
 | `nameserver16` | NSID: which servers answer with one, and what it contains | RFC 5001 |
 | `nameserver17` | DNS Cookie support, and whether the Server Cookie is well formed and accepted | RFC 7873, RFC 9018 |
 | `nameserver18` | Extended DNS Errors from an authoritative server, classified by info-code | RFC 8914 |
@@ -135,7 +137,7 @@ release cycle; in gonemaster it waits for the next tag.
 
 |  | gonemaster | Zonemaster |
 |---|---|---|
-| Testcases | 83 implemented, 9 modules | 74 documented specifications, one of them a placeholder |
+| Testcases | 85 implemented, 9 modules | 74 documented specifications, one of them a placeholder |
 | Specification corpus | own corpus under CC BY 4.0, derived from upstream's | upstream corpus under CC BY 4.0 |
 | Release cadence | continuous from CI, 70 tags, v1.7.8 | about two feature releases a year |
 | Language and runtime | Go, one static binary | Perl |

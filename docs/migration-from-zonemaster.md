@@ -156,7 +156,7 @@ Each log entry is an object with `timestamp`, `module`, `testcase`, `tag`,
   shapes, so the same table applies when porting a consumer.
 - JSON output has no translated message text; render from `tag` and `args`,
   or use human output with `--locale`.
-- Expect tags upstream never emits: the ten testcases without an upstream
+- Expect tags upstream never emits: the twelve testcases without an upstream
   counterpart report findings of their own, and shared testcases with
   documented divergences are marked in the
   [upstream testcase matrix](specifications/upstream-testcase-matrix.md).

@@ -4,6 +4,10 @@ Status: Final
 
 ## Purpose
 - Determine whether the child zone is signed (based on DNSKEY + covering RRSIG observations) and, for signed zones, whether parent-side DS data is present and consistent.
+- Distinguish the two readings of a signed zone with no parent DS: a parent
+  that is silent about the zone, which is an island of security, and a parent
+  that proves under signature that no delegation exists at the name, which
+  every validating resolver rejects.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -12,6 +16,8 @@ Status: Final
   - Child nameserver name/IP items from [`DelegationNameservers`](../../nameserver-resolution.md#delegationnameservers) and [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers).
   - Parent nameservers from [`ParentNameservers`](../../nameserver-resolution.md#parentnameservers) (or undelegated fake-DS data path).
   - SOA, DNSKEY, and DS query responses.
+  - For the no-delegation verdict only: the `DS` RRset of the parent zone at a
+    grandparent nameserver, and the apex `DNSKEY` RRset of the parent zone.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
   - `resolver.defaults.parallel`: parallel child and parent query execution fanout.
@@ -39,7 +45,17 @@ Status: Final
    - Query `DS` with DNSSEC enabled.
    - If response fails required shape (`NOERROR`, `OPT`, `DO`, `AA`), classify parent nameserver as ignored.
    - Else, if answer contains `RRSIG` covering `DS` at child owner name, classify as DS present.
-   - Else classify as no DS.
+   - Else classify as no DS, and record the parent's statement about the name
+     as a delegation, read from the response already in hand:
+     - The NSEC record whose owner is the zone name, or the NSEC3 record whose
+       owner matches the hash of the zone name computed with the salt and
+       iteration count of that record:
+       - Type bitmap with the NS bit: `delegated`. The parent delegates the
+         name and the delegation is insecure.
+       - Type bitmap without the NS bit: `denied`. The parent proves no
+         delegation exists at the name.
+     - No NSEC and no NSEC3 record: `unproven`. The parent zone is unsigned, or
+       its denial is incomplete, and states nothing about the name.
 8. Emit child-side signing-state tags:
    - If the union of ignored/no-response/non-auth/unexpected-rcode child sets equals all child nameservers, emit `DS07_NOT_SIGNED`.
    - Emit detail tags for non-response, non-auth, unexpected-rcode groups.
@@ -55,7 +71,26 @@ Status: Final
    - If zone is considered signed (`signed response` non-empty and `no DNSKEY-signature` empty):
      - Emit `DS07_NO_DS_FOR_SIGNED_ZONE` when no-DS set non-empty and DS-present set empty.
      - Emit `DS07_DS_FOR_SIGNED_ZONE` when no-DS set empty and DS-present set non-empty.
-10. Emit `TEST_CASE_END`.
+10. No-delegation verdict. It is reached only when every condition below holds,
+    in this order. The first three are read from responses already made, so the
+    two queries of the fourth are issued only for a zone that is already
+    inconsistent.
+    1. `DS07_NO_DS_FOR_SIGNED_ZONE` was emitted: the child is signed and no
+       parent nameserver returned a DS.
+    2. At least one parent nameserver recorded `denied` in step 7.
+    3. No parent nameserver recorded `delegated`. Parent nameservers that
+       disagree are reported by `DS07_INCONSISTENT_DS` and reach no verdict
+       here.
+    4. The parent zone is anchored: query the parent zone's `DS` at a
+       grandparent nameserver and the parent zone's apex `DNSKEY` at a parent
+       nameserver, both with DNSSEC enabled. The DS RRset MUST carry an RRSIG,
+       a DNSKEY of the parent MUST match a DS by keytag, algorithm and digest,
+       and the RRSIG covering the NSEC or NSEC3 of step 7 MUST verify under a
+       DNSKEY of the parent. A signature whose algorithm the local verifier
+       cannot process yields no verdict.
+    - All conditions hold: emit `DS07_PARENT_PROVES_NO_DELEGATION` with
+      `parent` and the `servers` that proved it.
+11. Emit `TEST_CASE_END`.
 
 ### Child Signing-State Classification (steps 2-3, 8)
 
@@ -145,6 +180,7 @@ emit TEST_CASE_END
 | `DS07_NO_DS_ON_PARENT_SERVER` | At least one parent nameserver returned no DS-signature evidence and at least one other parent nameserver did - i.e., the parent is inconsistent. Suppressed when every parent fails. |
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | Zone is considered signed but no parent DS-present evidence exists. |
 | `DS07_NO_RESPONSE_DNSKEY` | Child nameservers did not respond to DNSKEY query. |
+| `DS07_PARENT_PROVES_NO_DELEGATION` | The child zone is signed, no parent nameserver has a DS, the NSEC or NSEC3 record matching the zone name in the parent carries no NS bit, and the parent zone is anchored by a DS at its own parent. |
 | `DS07_SIGNED` | Zone is determined signed by child-evaluation logic. |
 | `DS07_SIGNED_ON_SERVER` | Child nameservers returned DNSKEY-covering RRSIG evidence. |
 | `DS07_UNEXP_RCODE_RESP_DNSKEY` | Child nameservers returned unexpected DNSKEY query RCODE. |
@@ -166,6 +202,8 @@ emit TEST_CASE_END
 | `DS07_NO_DS_ON_PARENT_SERVER` | `servers` | `array<object>` | Structured parent nameserver identities (`{ns,address}` object) with no DS-signature evidence. |
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | `-` | `-` | No arguments. |
 | `DS07_NO_RESPONSE_DNSKEY` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) with no DNSKEY response. |
+| `DS07_PARENT_PROVES_NO_DELEGATION` | `parent` | `string` | Parent zone whose signed denial proves no delegation exists at the zone name. |
+| `DS07_PARENT_PROVES_NO_DELEGATION` | `servers` | `array<object>` | Structured parent nameserver identities (`{ns,address}` object) that returned the denial. |
 | `DS07_SIGNED` | `-` | `-` | No arguments. |
 | `DS07_SIGNED_ON_SERVER` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) with DNSKEY-signature evidence. |
 | `DS07_UNEXP_RCODE_RESP_DNSKEY` | `servers` | `array<object>` | Structured child nameserver identities (`{ns,address}` object) returning this unexpected RCODE. |
@@ -192,6 +230,7 @@ emit TEST_CASE_END
 | `DS07_NO_DS_ON_PARENT_SERVER` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS07_NO_RESPONSE_DNSKEY` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS07_PARENT_PROVES_NO_DELEGATION` | `ERROR` | The zone and every name in it are rejected by validating resolvers. `DS07_NO_DS_FOR_SIGNED_ZONE` keeps its WARNING and is emitted alongside. |
 | `DS07_SIGNED` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS07_SIGNED_ON_SERVER` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS07_UNEXP_RCODE_RESP_DNSKEY` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -214,3 +253,16 @@ emit TEST_CASE_END
 - Child transport-disabled path logs rrtypes `SOA`, `DNSKEY`, and `DS`, even though DS is only queried against parent nameservers in this testcase.
 - Parent DS evaluation is fully skipped when no signed child response is observed.
 - A DNSKEY RRset without a covering RRSIG is classified exactly like an absent DNSKEY RRset. The parent-DS consequence of that state is reported by DNSSEC11, which runs before the module short-circuit.
+- The anchoring check of step 10 is one level. It proves that the parent zone is
+  anchored by a DS at the grandparent; it does not walk to the root. A
+  grandparent that is itself insecure would make the whole subtree insecure, and
+  no resolver would reject the zone. The verdict is not reached when the
+  grandparent cannot be resolved or its DS query yields no RRSIG.
+- A parent that answers `AA` `NXDOMAIN` for the `DS` query also proves no
+  delegation, but the response shape check of step 7 classifies it as ignored,
+  so no verdict is reached. Basic01 owns a zone name that does not exist at the
+  parent.
+- An unsigned parent proves nothing about the name. Its `DS` NODATA carries no
+  NSEC and no NSEC3, so step 7 records `unproven` and no verdict is reached.
+- `DS07_NO_DS_FOR_SIGNED_ZONE` continues to fire whenever no parent nameserver
+  has a DS. It says the zone is not anchored; the new tag says why.

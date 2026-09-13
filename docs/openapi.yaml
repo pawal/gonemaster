@@ -2825,7 +2825,8 @@ components:
           description: >
             Schema version of the chain document. Version 2 added
             `servers_stale` on `parent` and `child` plus NSEC/NSEC3 signatures.
-          example: 2
+            Version 3 added `ns_names`.
+          example: 3
         zone:
           type: string
         parent_zone:
@@ -2852,6 +2853,31 @@ components:
           type: array
           items:
             type: object
+            additionalProperties: true
+        ns_names:
+          type: array
+          description: >
+            In-domain nameserver names of the zone with what the run concluded
+            about the signatures on their address records. Absent where the run
+            reached no such conclusion. The roll-up `status` above describes the
+            chain of the zone itself and is unaffected by these entries.
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [validates, insecure, unsigned, orphan, chain_broken, rrsig_expired, rrsig_invalid, indeterminate]
+              signer:
+                type: string
+                description: Zone whose key signed the address records, where one was seen.
+              key_tag:
+                type: integer
+              servers:
+                type: array
+                items:
+                  type: string
             additionalProperties: true
       additionalProperties: true
 

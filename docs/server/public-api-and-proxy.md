@@ -187,6 +187,17 @@ some servers serve expired or not-yet-valid signatures, so resolvers reaching
 those servers may still fail. Documents stored before this change stay at
 version 1 and have neither field.
 
+Version 3 adds `ns_names`, the in-domain nameserver names of the zone with what
+the run concluded about the signatures on their address records. Each entry
+carries `name`, `status`, the `signer` observed, and the `servers` that showed
+that status. `status` is one of `validates`, `insecure`, `unsigned`, `orphan`,
+`chain_broken`, `rrsig_expired`, `rrsig_invalid` or `indeterminate`; where a
+name was seen differently on different servers, the worst status is reported.
+The section is absent where the run reached no such conclusion, which is not
+the same as the zone having no in-domain nameserver name. The roll-up `status`
+describes the chain of the zone itself and does not change when a name in
+`ns_names` is bogus.
+
 ## Reverse Proxy
 
 Configure the proxy so public paths are reachable and admin paths are blocked

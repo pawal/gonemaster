@@ -685,3 +685,159 @@ describe("DnssecChain node faces", () => {
     expect(tip).toContain("KSK");
   });
 });
+
+describe("in-domain nameserver names", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  // The reference case: the zone's own chain is intact, and one of its
+  // nameserver names is signed by a zone nothing delegates.
+  const orphanChain = () =>
+    secureChain({
+      version: 3,
+      ns_names: [
+        { name: "a.ns.example.com", status: "orphan", signer: "a.ns.example.com", servers: ["192.0.2.1"] },
+        { name: "b.ns.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] }
+      ]
+    });
+
+  it("draws the branch with the orphan marked bad and the healthy name ok", async () => {
+    fetch.mockResolvedValue(jsonResponse(orphanChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const nodes = [...container.querySelectorAll("g.node-nsname")];
+    expect(nodes.length).toBe(2);
+    expect(nodes[0].classList.contains("node-ns-bad")).toBe(true);
+    expect(nodes[1].classList.contains("node-ns-ok")).toBe(true);
+    expect(container.querySelector("g.node-orphan")).toBeTruthy();
+  });
+
+  it("names the status and the signer on the node face and in its tip", async () => {
+    fetch.mockResolvedValue(jsonResponse(orphanChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const node = container.querySelector("g.node-nsname");
+    expect(node.textContent).toContain("a.ns");
+    expect(node.textContent).toContain("orphan zone");
+    expect(node.dataset.tip).toContain("a.ns.example.com");
+    expect(node.dataset.tip).toContain("Address records signed by a.ns.example.com");
+  });
+
+  // The zone's own chain is secure and the badge says so; the branch carries
+  // the fault. The badge must not be demoted by a fault below the apex.
+  it("keeps the secure badge while the branch is bad", async () => {
+    fetch.mockResolvedValue(jsonResponse(orphanChain()));
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+
+    const badge = screen.getByTestId("chain-status-badge");
+    expect(badge.textContent).toBe("Secure");
+    expect(badge.classList.contains("badge-ok")).toBe(true);
+  });
+
+  it("adds a legend entry only when the branch is drawn", async () => {
+    fetch.mockResolvedValue(jsonResponse(orphanChain()));
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-legend-nsname")).toBeTruthy());
+
+    cleanup();
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.queryByTestId("chain-legend-nsname")).toBeNull();
+  });
+
+  it("draws nothing new for a document stored without the section", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    expect(container.querySelector("g.node-nsname")).toBeNull();
+    expect(container.querySelector("g.node-orphan")).toBeNull();
+    expect(container.querySelector("path.chain-stub")).toBeNull();
+  });
+});
+
+describe("a bogus nameserver name is hard to miss", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  const orphanChain = () =>
+    secureChain({
+      version: 3,
+      ns_names: [
+        { name: "a.ns.example.com", status: "orphan", signer: "a.ns.example.com", servers: ["192.0.2.1"] },
+        { name: "b.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] }
+      ]
+    });
+
+  // The graph sits at the bottom of a tall diagram, so the fault also needs the
+  // callout channel every other fault on this card uses.
+  it("raises a red callout naming the name that does not validate", async () => {
+    fetch.mockResolvedValue(jsonResponse(orphanChain()));
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-ns-bogus")).toBeTruthy());
+
+    const callout = screen.getByTestId("chain-ns-bogus");
+    expect(callout.textContent).toContain("a.ns.example.com");
+    expect(callout.textContent).not.toContain("b.ns.example.com");
+    expect(callout.classList.contains("callout-bad")).toBe(true);
+  });
+
+  it("raises no callout when every name validates", async () => {
+    fetch.mockResolvedValue(
+      jsonResponse(
+        secureChain({
+          version: 3,
+          ns_names: [{ name: "ns1.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] }]
+        })
+      )
+    );
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.queryByTestId("chain-ns-bogus")).toBeNull();
+  });
+
+  // An insecure name is accepted by validators, so it is not a callout.
+  it("raises no callout for an insecure name", async () => {
+    fetch.mockResolvedValue(
+      jsonResponse(
+        secureChain({
+          version: 3,
+          ns_names: [{ name: "ns1.example.com", status: "insecure", servers: ["192.0.2.1"] }]
+        })
+      )
+    );
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.queryByTestId("chain-ns-bogus")).toBeNull();
+  });
+
+  // Two boxes reading only "a.ns" and "ns" differ by stroke colour alone; the
+  // word is what tells them apart.
+  it("says in words what each signer node is", async () => {
+    fetch.mockResolvedValue(jsonResponse(orphanChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    expect(container.querySelector("g.node-orphan").textContent).toContain("no delegation");
+    expect(container.querySelector("g.node-cut").textContent).toContain("delegation");
+  });
+
+  it("writes a bad status in the alerting style, not the muted one", async () => {
+    fetch.mockResolvedValue(jsonResponse(orphanChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const bad = container.querySelector("g.node-ns-bad");
+    const status = [...bad.querySelectorAll("text")].find((t) => t.textContent === "orphan zone");
+    expect(status.classList.contains("chain-node-ns-bad")).toBe(true);
+    const ok = container.querySelector("g.node-ns-ok");
+    const okStatus = [...ok.querySelectorAll("text")].find((t) => t.textContent === "validates");
+    expect(okStatus.classList.contains("chain-node-ns-ok")).toBe(true);
+  });
+});

@@ -37,8 +37,11 @@
   let graph = $derived(phase === "loaded" && chain ? layoutChain(chain) : null);
   // Reference edges (CDS/CDNSKEY -> DNSKEY) draw after the nodes so they are
   // not hidden behind the key boxes they span.
-  let mainEdges = $derived(graph ? graph.edges.filter((e) => e.kind !== "ref") : []);
+  let mainEdges = $derived(graph ? graph.edges.filter((e) => e.kind !== "ref" && e.kind !== "stub") : []);
   let refEdges = $derived(graph ? graph.edges.filter((e) => e.kind === "ref") : []);
+  // Stubs carry no arrowhead: they say how a signer zone is reached, not what
+  // points at what, and a broken one ends in a gap rather than a target.
+  let stubEdges = $derived(graph ? graph.edges.filter((e) => e.kind === "stub") : []);
 
   let dsSummary = $derived(
     (chain?.parent?.ds ?? [])
@@ -55,6 +58,12 @@
       .join(", ") || "-"
   );
   let hasRevoked = $derived((chain?.child?.dnskeys ?? []).some((k) => k.revoked));
+  let hasNSNames = $derived((chain?.ns_names ?? []).length > 0);
+  // Nameserver names validators reject. These drive the red callout, which is
+  // how the card reports every other fault; the graph alone is too quiet.
+  let bogusNSNames = $derived(
+    (chain?.ns_names ?? []).filter((n) => NS_TONE[n.status] === "edge-bad").map((n) => n.name)
+  );
 
   let disagreeingServers = $derived([
     ...(chain?.parent?.servers_disagreeing ?? []),
@@ -191,6 +200,7 @@
   // linkState carry values that must themselves be localized before substitution.
   function tipLine(l) {
     if (l.sig) return $t(l.k, { ...l.p, detail: sigDetail(l.sig) });
+    if (l.nsStatus) return $t(l.k, { status: $t(`pub.dnssec_chain_nsstatus_${l.nsStatus}`) });
     if (l.statusState) return $t(l.k, { status: $t(`pub.dnssec_chain_state_${l.statusState}`) });
     if (l.linkState) return $t(l.k, { status: $t(`pub.dnssec_chain_linkstatus_${l.linkState}`) });
     return $t(l.k, l.p);
@@ -201,7 +211,37 @@
     return (lines ?? []).map(tipLine).filter(Boolean).join("\n");
   }
 
+  // NS_TONE grades a nameserver name's status: bad for a name validators
+  // reject, warn for one they accept unsigned, ok for one that validates.
+  const NS_TONE = {
+    validates: "edge-ok",
+    insecure: "edge-warn",
+    unsigned: "edge-bad",
+    orphan: "edge-bad",
+    chain_broken: "edge-bad",
+    rrsig_expired: "edge-bad",
+    rrsig_invalid: "edge-bad",
+    indeterminate: "edge-neutral",
+  };
+
+  // nsTone is the node border grade for a nameserver name, from the same table
+  // that grades its edge.
+  function nsTone(node) {
+    if (!node.nsStatus) return "";
+    const cls = NS_TONE[node.nsStatus];
+    if (cls === "edge-bad") return "bad";
+    if (cls === "edge-warn") return "warn";
+    if (cls === "edge-ok") return "ok";
+    return "";
+  }
+
   function edgeClass(edge) {
+    if (edge.kind === "stub") {
+      return edge.bad ? "edge-bad" : "edge-ok";
+    }
+    if (edge.kind === "nssig") {
+      return NS_TONE[edge.nsStatus] ?? "edge-neutral";
+    }
     if (edge.kind === "ref") {
       return edge.rollover ? "edge-ref-pending" : "edge-ref";
     }
@@ -243,6 +283,11 @@
         return "DNSKEY";
       case "rrset":
         return node.label;
+      case "nsname":
+      case "cut":
+      case "cut-broken":
+      case "orphan":
+        return node.nameText;
       default:
         return "";
     }
@@ -264,16 +309,22 @@
   // on its ink rather than its baselines, so the space above the title matches
   // the space below the last line whatever the line count.
   function nodeLines(node) {
-    const texts = [nodeHeading(node)];
-    if (node.keyTag != null) texts.push(`tag ${node.keyTag}`);
-    if (node.algoText) texts.push(node.algoText);
-    if (node.bitsText) texts.push(node.bitsText);
+    const texts = [{ text: nodeHeading(node) }];
+    if (node.keyTag != null) texts.push({ text: `tag ${node.keyTag}` });
+    if (node.nsStatus) {
+      texts.push({ text: $t(`pub.dnssec_chain_nsstatus_${node.nsStatus}`), extra: `chain-node-ns-${nsTone(node) || "neutral"}` });
+    }
+    if (node.signerWordKey) {
+      texts.push({ text: $t(node.signerWordKey), extra: node.kind === "cut" ? "" : "chain-node-ns-bad" });
+    }
+    if (node.algoText) texts.push({ text: node.algoText });
+    if (node.bitsText) texts.push({ text: node.bitsText });
     const steps = LINE_STEP.slice(0, texts.length);
     const inkH = CAP_H + steps.reduce((sum, l) => sum + l.gap, 0);
     let y = node.y + (node.h - inkH) / 2 + CAP_H;
-    return texts.map((text, i) => {
+    return texts.map((line, i) => {
       y += steps[i].gap;
-      return { text, cls: steps[i].cls, y };
+      return { text: line.text, cls: line.extra ? `${steps[i].cls} ${line.extra}` : steps[i].cls, y };
     });
   }
 </script>
@@ -326,6 +377,9 @@
         {#if truncated}
           <p class="dnssec-chain-callout callout-info" data-testid="chain-truncated">{$t("pub.dnssec_chain_truncated")}</p>
         {/if}
+        {#if bogusNSNames.length}
+          <p class="dnssec-chain-callout callout-bad" data-testid="chain-ns-bogus">{$t("pub.dnssec_chain_ns_bogus", { names: bogusNSNames.join(", ") })}</p>
+        {/if}
         {#if rolloverKeys.length}
           <p class="dnssec-chain-callout callout-warn" data-testid="chain-rollover">{$t("pub.dnssec_chain_rollover", { keys: rolloverKeys.join(", ") })}</p>
         {/if}
@@ -370,12 +424,19 @@
 
             {#each graph.nodes as node (node.id)}
               {@const lines = nodeLines(node)}
-              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} class:node-rollover={node.rollover} class:node-incoming={node.incoming} data-tip={buildTip(node.tip)}>
+              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} class:node-rollover={node.rollover} class:node-incoming={node.incoming} class:node-ns-bad={nsTone(node) === "bad"} class:node-ns-warn={nsTone(node) === "warn"} class:node-ns-ok={nsTone(node) === "ok"} data-tip={buildTip(node.tip)}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
                 {#each lines as line, i (i)}
                   <text class="chain-node-label {line.cls}" x={node.x + node.w / 2} y={line.y} text-anchor="middle">{line.text}</text>
                 {/each}
               </g>
+            {/each}
+
+            {#each stubEdges as edge (edge.id)}
+              <path class="chain-edge chain-stub {edgeClass(edge)}" d={edge.d} data-tip={buildTip(edge.tip)}></path>
+              {#each edge.ticks ?? [] as tick, i (i)}
+                <path class="chain-edge chain-break-tick {edgeClass(edge)}" d={tick} data-tip={buildTip(edge.tip)}></path>
+              {/each}
             {/each}
 
             {#each refEdges as edge (edge.id)}
@@ -392,6 +453,9 @@
           <span class="chain-legend-item"><span class="chain-swatch swatch-sig"></span>{$t("pub.dnssec_chain_legend_sig")}</span>
           {#if hasRevoked}
             <span class="chain-legend-item" data-testid="chain-legend-revoked"><span class="chain-swatch swatch-revoked"></span>{$t("pub.dnssec_chain_legend_revoked")}</span>
+          {/if}
+          {#if hasNSNames}
+            <span class="chain-legend-item" data-testid="chain-legend-nsname"><span class="chain-swatch swatch-nsname"></span>{$t("pub.dnssec_chain_legend_nsname")}</span>
           {/if}
         </div>
       {/if}
@@ -541,6 +605,17 @@
     font-size: 11px;
     fill: var(--ink-2);
   }
+  .chain-node-ns-bad {
+    fill: var(--grade-f);
+    font-weight: 700;
+  }
+  .chain-node-ns-warn {
+    fill: var(--grade-c);
+    font-weight: 700;
+  }
+  .chain-node-ns-ok {
+    fill: var(--grade-a);
+  }
   .chain-node-algo,
   .chain-node-bits {
     font-size: 10px;
@@ -595,6 +670,42 @@
   .node-incoming .chain-node-box {
     stroke: var(--grade-c);
     stroke-dasharray: 5 3;
+  }
+  .node-cut .chain-node-box {
+    fill: var(--surface-2);
+    stroke: var(--accent);
+  }
+  .node-cut-broken .chain-node-box {
+    fill: var(--surface-2);
+    stroke: var(--grade-f);
+    stroke-width: 2;
+  }
+  .node-orphan .chain-node-box {
+    fill: var(--surface-2);
+    stroke: var(--grade-f);
+    stroke-width: 2;
+    stroke-dasharray: 5 3;
+  }
+  .node-nsname .chain-node-box {
+    fill: var(--surface);
+    stroke: var(--border);
+  }
+  .node-ns-bad .chain-node-box {
+    stroke: var(--grade-f);
+    stroke-width: 2;
+  }
+  .node-ns-warn .chain-node-box {
+    stroke: var(--grade-c);
+  }
+  .node-ns-ok .chain-node-box {
+    stroke: var(--grade-a);
+  }
+  .chain-stub {
+    stroke-width: 2.5;
+  }
+  .chain-break-tick {
+    stroke-width: 2;
+    stroke-linecap: round;
   }
   .chain-edge {
     stroke-width: 2;
@@ -667,6 +778,9 @@
   .swatch-revoked {
     border-color: var(--grade-f);
     border-style: dashed;
+  }
+  .swatch-nsname {
+    border-color: var(--border);
   }
   .chain-facts {
     margin: 0;

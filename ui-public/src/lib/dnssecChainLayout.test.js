@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { secureChain } from "../test/helpers.js";
-import { layoutChain, truncateName, worstSigTone, worstSigState, algoMnemonic, algoFace, bitsFace, ALGO_FACE_MAX } from "./dnssecChainLayout.js";
+import { layoutChain, relativeName, truncateName, worstSigTone, worstSigState, algoMnemonic, algoFace, bitsFace, ALGO_FACE_MAX } from "./dnssecChainLayout.js";
 
 // tipParams returns the params of the tip line with the given i18n key.
 function tipParams(el, k) {
@@ -834,5 +834,153 @@ describe("node face labels", () => {
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i] - rows[i - 1] - h).toBeGreaterThanOrEqual(40);
     }
+  });
+});
+
+describe("relativeName", () => {
+  it("drops the zone suffix so a name reads inside its own cluster", () => {
+    expect(relativeName("a.ns.example.com", "example.com")).toBe("a.ns");
+  });
+
+  it("ignores a trailing dot on either side", () => {
+    expect(relativeName("a.ns.example.com.", "example.com")).toBe("a.ns");
+    expect(relativeName("a.ns.example.com", "example.com.")).toBe("a.ns");
+  });
+
+  it("keeps a name that is not inside the zone", () => {
+    expect(relativeName("ns.example.net", "example.com")).toBe("ns.example.net");
+  });
+
+  it("keeps the apex itself whole", () => {
+    expect(relativeName("example.com", "example.com")).toBe("example.com");
+  });
+});
+
+describe("in-domain nameserver names", () => {
+  // The chain of the zone is intact and the branch below it is not: the graph
+  // must show the fault the run reports, not a clean chain.
+  const orphanChain = () =>
+    secureChain({
+      version: 3,
+      ns_names: [
+        { name: "a.ns.example.com", status: "orphan", signer: "a.ns.example.com", servers: ["192.0.2.1"] },
+        { name: "b.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] },
+        { name: "c.ns.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] }
+      ]
+    });
+
+  it("draws one node per name, labelled relative to the zone", () => {
+    const g = layoutChain(orphanChain());
+    const names = g.nodes.filter((n) => n.kind === "nsname");
+    expect(names.map((n) => n.nameText)).toEqual(["a.ns", "b.ns", "c.ns"]);
+    expect(names.map((n) => n.nsStatus)).toEqual(["orphan", "validates", "validates"]);
+  });
+
+  it("gives the orphan apex its own node with a severed stub", () => {
+    const g = layoutChain(orphanChain());
+    const orphan = g.nodes.find((n) => n.kind === "orphan");
+    expect(orphan.nameText).toBe("a.ns");
+    const stub = g.edges.find((e) => e.kind === "stub" && e.id === `stub-${orphan.id}`);
+    expect(stub.broken).toBe(true);
+    expect(stub.ticks.length).toBe(2);
+    // The severed stub reaches up into the gap above and stops there.
+    expect(stub.d).toContain("M");
+  });
+
+  it("draws a secure cut as an unbroken stub", () => {
+    const g = layoutChain(orphanChain());
+    const cut = g.nodes.find((n) => n.kind === "cut");
+    expect(cut.nameText).toBe("ns");
+    const stub = g.edges.find((e) => e.kind === "stub" && e.id === `stub-${cut.id}`);
+    expect(stub.broken).toBe(false);
+    expect(stub.ticks).toBe(null);
+  });
+
+  it("points each name at the zone that signs it, and leaves apex-signed names free", () => {
+    const g = layoutChain(orphanChain());
+    const edges = g.edges.filter((e) => e.kind === "nssig");
+    // c.ns is signed by the apex, whose chain the graph above already draws.
+    expect(edges.length).toBe(2);
+    expect(edges.map((e) => e.nsStatus).sort()).toEqual(["orphan", "validates"]);
+  });
+
+  it("labels the two new clusters with the zone", () => {
+    const g = layoutChain(orphanChain());
+    const ids = g.clusters.map((c) => c.id);
+    expect(ids).toContain("nsnames");
+    expect(ids).toContain("signers");
+    const nsCluster = g.clusters.find((c) => c.id === "nsnames");
+    expect(nsCluster.name).toBe("example.com");
+    expect(nsCluster.labelKey).toBe("pub.dnssec_chain_nsnames_label");
+  });
+
+  it("omits the signer row when every name is signed by the apex", () => {
+    const g = layoutChain(
+      secureChain({
+        version: 3,
+        ns_names: [{ name: "ns1.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] }]
+      })
+    );
+    expect(g.nodes.some((n) => n.kind === "cut" || n.kind === "orphan")).toBe(false);
+    expect(g.edges.some((e) => e.kind === "nssig")).toBe(false);
+    expect(g.nodes.filter((n) => n.kind === "nsname").length).toBe(1);
+  });
+
+  // A document stored before the section existed must render exactly as before.
+  it("adds nothing for a blob without the section", () => {
+    const before = layoutChain(secureChain());
+    const after = layoutChain(secureChain({ ns_names: [] }));
+    expect(after).toEqual(before);
+    expect(before.nodes.some((n) => n.kind === "nsname")).toBe(false);
+  });
+});
+
+describe("signer nodes", () => {
+  // A delegation that exists with a broken chain is a different fault from one
+  // nothing delegates, and must not be drawn as a healthy cut.
+  it("marks a broken cut bad without severing its stub", () => {
+    const g = layoutChain(
+      secureChain({
+        version: 3,
+        ns_names: [
+          { name: "a.ns.example.com", status: "chain_broken", signer: "ns.example.com", servers: ["192.0.2.1"] }
+        ]
+      })
+    );
+    const signer = g.nodes.find((n) => n.kind === "cut-broken");
+    expect(signer.nameText).toBe("ns");
+    const stub = g.edges.find((e) => e.kind === "stub");
+    expect(stub.broken).toBe(false);
+    expect(stub.bad).toBe(true);
+    expect(signer.tip[0].k).toBe("pub.dnssec_chain_tip_cut_broken");
+  });
+
+  it("keeps a healthy cut's stub unbroken and not bad", () => {
+    const g = layoutChain(
+      secureChain({
+        version: 3,
+        ns_names: [{ name: "a.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] }]
+      })
+    );
+    const stub = g.edges.find((e) => e.kind === "stub");
+    expect(stub.broken).toBe(false);
+    expect(stub.bad).toBe(false);
+  });
+
+  // Names sharing a signer collapse onto one node, which must carry the worst
+  // verdict rather than whichever name was listed first.
+  it("takes the worst verdict when names share a signer", () => {
+    const g = layoutChain(
+      secureChain({
+        version: 3,
+        ns_names: [
+          { name: "a.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] },
+          { name: "b.ns.example.com", status: "chain_broken", signer: "ns.example.com", servers: ["192.0.2.1"] }
+        ]
+      })
+    );
+    const signers = g.nodes.filter((n) => n.kind === "cut" || n.kind === "cut-broken" || n.kind === "orphan");
+    expect(signers.length).toBe(1);
+    expect(signers[0].kind).toBe("cut-broken");
   });
 });

@@ -177,6 +177,17 @@ export function truncateName(name, max = 28) {
   return s.slice(0, head) + "…" + s.slice(s.length - tail);
 }
 
+// relativeName drops the zone suffix so a name node reads "a.ns" inside the
+// zone's own cluster. A name outside the zone keeps its full form.
+export function relativeName(name, zone) {
+  const n = String(name ?? "").replace(/\.$/, "");
+  const z = String(zone ?? "").replace(/\.$/, "");
+  if (!z || n.toLowerCase() === z.toLowerCase()) return n;
+  const suffix = `.${z}`;
+  if (n.toLowerCase().endsWith(suffix.toLowerCase())) return n.slice(0, n.length - suffix.length);
+  return n;
+}
+
 function rowWidth(count) {
   if (count <= 0) return NODE_W;
   return count * NODE_W + (count - 1) * H_GAP;
@@ -350,6 +361,63 @@ export function layoutChain(chain) {
     kskNodes.sort((a, b) => a.keyTag - b.keyTag);
   }
 
+  // In-domain nameserver names and the zones that sign their address records.
+  // A signer that is the zone apex gets no node of its own: the chain to it is
+  // already the graph above. Everything else is a zone below the apex, drawn as
+  // a secure cut or, where nothing delegates it, as an orphan apex.
+  const nsNames = Array.isArray(chain.ns_names) ? chain.ns_names : [];
+  const signerNodes = [];
+  const signerById = new Map();
+  const zoneName = String(chain.zone ?? "").replace(/\.$/, "").toLowerCase();
+  // A signer's own node says how the zone is reached, which is a different
+  // fault from a signature that fails: orphan means nothing delegates it,
+  // cut-broken means the delegation exists and its chain of trust does not.
+  // Several names can share a signer, so the worst of their verdicts wins.
+  const SIGNER_KIND = { orphan: "orphan", chain_broken: "cut-broken" };
+  const SIGNER_RANK = { cut: 0, "cut-broken": 1, orphan: 2 };
+  for (const entry of nsNames) {
+    const signer = String(entry.signer ?? "").replace(/\.$/, "");
+    if (!signer || signer.toLowerCase() === zoneName) continue;
+    const id = `signer-${signer.toLowerCase()}`;
+    const kind = SIGNER_KIND[entry.status] ?? "cut";
+    const seen = signerById.get(id);
+    if (seen) {
+      if (SIGNER_RANK[kind] > SIGNER_RANK[seen.kind]) {
+        seen.kind = kind;
+        seen.signerWordKey = signerWordKey(kind);
+        seen.tip = [{ k: signerTipKey(kind), p: { name: signer } }];
+      }
+      continue;
+    }
+    const node = {
+      id,
+      kind,
+      nameText: truncateName(relativeName(signer, chain.zone), 17),
+      signer,
+      signerWordKey: signerWordKey(kind),
+      tip: [{ k: signerTipKey(kind), p: { name: signer } }],
+    };
+    signerById.set(id, node);
+    signerNodes.push(node);
+  }
+  const nsNameNodes = nsNames.map((entry) => {
+    const name = String(entry.name ?? "").replace(/\.$/, "");
+    const signer = String(entry.signer ?? "").replace(/\.$/, "");
+    return {
+      id: `nsname-${name.toLowerCase()}`,
+      kind: "nsname",
+      nameText: truncateName(relativeName(name, chain.zone), 17),
+      nsStatus: entry.status,
+      signerId: signer && signer.toLowerCase() !== zoneName ? `signer-${signer.toLowerCase()}` : null,
+      tip: [
+        { k: "pub.dnssec_chain_tip_nsname", p: { name } },
+        signer ? { k: "pub.dnssec_chain_tip_nsname_signer", p: { signer } } : null,
+        { k: "pub.dnssec_chain_tip_nsname_status", nsStatus: entry.status },
+        serversTip(entry.servers),
+      ].filter(Boolean),
+    };
+  });
+
   // Assemble the visible rows top to bottom, tagging which carries a label.
   // When the parent keys are known, they sit above the DS in the parent zone.
   const rows = [];
@@ -374,6 +442,12 @@ export function layoutChain(chain) {
   if (signedNodes.length > 0) {
     rows.push({ label: "signed", nodes: signedNodes });
   }
+  if (signerNodes.length > 0) {
+    rows.push({ label: "signers", nodes: signerNodes });
+  }
+  if (nsNameNodes.length > 0) {
+    rows.push({ label: "nsnames", nodes: nsNameNodes });
+  }
 
   const totalW = Math.max(...rows.map((r) => rowWidth(r.nodes.length)));
   rows.forEach((r, i) => place(r.nodes, PAD_TOP + i * V_GAP, totalW, i));
@@ -383,10 +457,17 @@ export function layoutChain(chain) {
 
   const nameFor = (label) => {
     if (label === "parent") return truncateName(chain.parent_zone ?? "");
-    if (label === "keys") return truncateName(chain.zone ?? "");
+    if (label === "keys" || label === "nsnames") return truncateName(chain.zone ?? "");
     return "";
   };
-  const labelKeyFor = (label) => `pub.dnssec_chain_${label === "parent" ? "parent_label" : label === "keys" ? "keys_label" : "signed_label"}`;
+  const LABEL_KEY = {
+    parent: "pub.dnssec_chain_parent_label",
+    keys: "pub.dnssec_chain_keys_label",
+    signed: "pub.dnssec_chain_signed_label",
+    signers: "pub.dnssec_chain_signers_label",
+    nsnames: "pub.dnssec_chain_nsnames_label",
+  };
+  const labelKeyFor = (label) => LABEL_KEY[label];
   const clusters = rows
     .filter((r) => r.label)
     .map((r) => ({ id: r.label, labelKey: labelKeyFor(r.label), name: nameFor(r.label), x: PAD_X, y: r.nodes[0].y - 22 }));
@@ -541,12 +622,83 @@ export function layoutChain(chain) {
     }
   }
 
+  // Each nameserver name points at the zone that signs its address records.
+  // A name signed by the apex itself gets no edge: its signer is the key row
+  // the whole graph above already reaches.
+  for (const node of nsNameNodes) {
+    if (!node.signerId) continue;
+    const signer = byId.get(node.signerId);
+    if (!signer) continue;
+    edges.push({
+      id: `nssig-${node.id}`,
+      kind: "nssig",
+      nsStatus: node.nsStatus,
+      from: edgePoint(signer, "bottom"),
+      to: edgePoint(node, "top"),
+    });
+  }
+
+  // A stub above each signer node says how it is reached: solid into the zone
+  // for a delegation the zone proves, broken for an apex nothing delegates.
+  for (const node of signerNodes) {
+    edges.push({
+      id: `stub-${node.id}`,
+      kind: "stub",
+      broken: node.kind === "orphan",
+      bad: node.kind !== "cut",
+      d: stubPath(node),
+      ticks: node.kind === "orphan" ? breakTicks(node) : null,
+      tip: node.tip,
+    });
+  }
+
   const hasLoop = edges.some((e) => e.kind === "selfsig");
   const hasRef = edges.some((e) => e.kind === "ref");
   const rightPad = Math.max(hasLoop ? LOOP_PAD : 0, hasRef ? REF_BOW + 12 : 0);
   const width = totalW + 2 * PAD_X + rightPad;
   const height = PAD_TOP + (rows.length - 1) * V_GAP + NODE_H + PAD_BOTTOM;
   return { width, height, clusters, nodes, edges };
+}
+
+// signerWordKey names the face line that says what a signer node is, so an
+// orphan apex and a healthy cut differ in words and not only in colour.
+function signerWordKey(kind) {
+  if (kind === "orphan") return "pub.dnssec_chain_signer_orphan";
+  if (kind === "cut-broken") return "pub.dnssec_chain_signer_cut_broken";
+  return "pub.dnssec_chain_signer_cut";
+}
+
+// signerTipKey names the line that explains how a signer zone is reached.
+function signerTipKey(kind) {
+  if (kind === "orphan") return "pub.dnssec_chain_tip_orphan";
+  if (kind === "cut-broken") return "pub.dnssec_chain_tip_cut_broken";
+  return "pub.dnssec_chain_tip_cut";
+}
+
+// STUB_H is how far a signer node's stub reaches above it, short enough to stay
+// inside the row gap and never cross the row above.
+const STUB_H = 34;
+
+// stubPath draws the stub above a signer node, with a gap in the middle when it
+// is broken so the two halves read as severed.
+function stubPath(node) {
+  const x = round(node.x + node.w / 2);
+  const top = round(node.y - STUB_H);
+  const bottom = round(node.y);
+  const mid = round(node.y - STUB_H / 2);
+  return `M ${x} ${top} L ${x} ${round(mid - 6)} M ${x} ${round(mid + 6)} L ${x} ${bottom}`;
+}
+
+// breakTicks draws the two diagonals that mark a severed stub.
+function breakTicks(node) {
+  const x = round(node.x + node.w / 2);
+  const mid = round(node.y - STUB_H / 2);
+  const w = 9;
+  const h = 7;
+  return [
+    `M ${round(x - w)} ${round(mid - 1)} L ${round(x + w)} ${round(mid - 1 - h)}`,
+    `M ${round(x - w)} ${round(mid + 6)} L ${round(x + w)} ${round(mid + 6 - h)}`,
+  ];
 }
 
 // refPath draws a reference edge as a quadratic curve bowed to the right so it

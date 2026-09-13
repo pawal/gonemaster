@@ -59,6 +59,7 @@ func TestKeySizeFixedSizeAlgorithms(t *testing.T) {
 		{dns.ECDSAP384SHA384, 384},
 		{dns.ED25519, 256},
 		{dns.ED448, 456},
+		{dns.MLDSA44, 10496},
 		// Recognised, never verified; the size still comes from the curve.
 		{dns.ECCGOST, 256},
 		{dns.ECCGOST12, 256},
@@ -118,7 +119,7 @@ func TestKeySizeGeneratedCurveKeys(t *testing.T) {
 // An unknown algorithm has no derivable size, even when the payload happens to
 // parse as an RSA modulus.
 func TestKeySizeUnknownAlgorithmIsZero(t *testing.T) {
-	for _, algo := range []uint8{dns.DSA, dns.MLDSA44, 0, 99} {
+	for _, algo := range []uint8{dns.DSA, 0, 99} {
 		key := dnstest.RSADNSKEY("example.", dns.FlagZONE|dns.FlagSEP, dnstest.LBKSK3842)
 		key.Algorithm = algo
 		if got := dnssecutil.KeySize(key); got != 0 {
@@ -360,7 +361,7 @@ func TestExpectedBitsAreFixedOnlyForTheCurveAlgorithms(t *testing.T) {
 		{dns.ED25519, 256, 512},
 		{dns.ED448, 456, 912},
 		{dns.RSASHA256, 0, 0},
-		{dns.MLDSA44, 0, 0},
+		{dns.MLDSA44, 10496, 19360},
 		{200, 0, 0},
 	} {
 		name := dns.AlgorithmToString[c.algorithm]
@@ -370,6 +371,41 @@ func TestExpectedBitsAreFixedOnlyForTheCurveAlgorithms(t *testing.T) {
 		if got := dnssecutil.ExpectedSignatureBits(c.algorithm); got != c.sig {
 			t.Errorf("dnssecutil.ExpectedSignatureBits(%s) = %d, want %d", name, got, c.sig)
 		}
+	}
+}
+
+// Real ML-DSA-44 material must confirm both table entries.
+func TestExpectedMLDSA44LengthsMatchRealMaterial(t *testing.T) {
+	kp := dnstest.GenKey(t, "example.test", dns.MLDSA44, false)
+	raw, err := base64.StdEncoding.DecodeString(kp.Key.PublicKey)
+	if err != nil {
+		t.Fatalf("decoding key: %v", err)
+	}
+	if got := len(raw) << 3; got != dnssecutil.ExpectedKeyBits(dns.MLDSA44) {
+		t.Errorf("key is %d bits, table says %d", got, dnssecutil.ExpectedKeyBits(dns.MLDSA44))
+	}
+
+	rr := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn("a.example.test"), Class: dns.ClassINET, TTL: 300}}
+	rr.Addr = netip.MustParseAddr("192.0.2.1")
+	now := time.Now().UTC()
+	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn("example.test"), Class: dns.ClassINET, TTL: 3600}}
+	sig.TypeCovered = dns.TypeA
+	sig.Algorithm = dns.MLDSA44
+	sig.Labels = uint8(dnsutil.Labels(dnsutil.Fqdn("a.example.test")))
+	sig.OrigTTL = 300
+	sig.Inception = uint32(now.Add(-time.Hour).Unix())
+	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
+	sig.KeyTag = dnssecutil.KeyTag(kp.Key)
+	sig.SignerName = kp.Key.Hdr.Name
+	if err := sig.Sign(kp.Priv, []dns.RR{rr}, &dns.SignOption{}); err != nil {
+		t.Fatalf("sign RRset: %v", err)
+	}
+	sigRaw, err := base64.StdEncoding.DecodeString(sig.Signature)
+	if err != nil {
+		t.Fatalf("decoding signature: %v", err)
+	}
+	if got := len(sigRaw) << 3; got != dnssecutil.ExpectedSignatureBits(dns.MLDSA44) {
+		t.Errorf("signature is %d bits, table says %d", got, dnssecutil.ExpectedSignatureBits(dns.MLDSA44))
 	}
 }
 

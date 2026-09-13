@@ -277,10 +277,9 @@ func TestVerifyRRSIGMLDSA44WrongKey(t *testing.T) {
 	}
 }
 
-// KeySize reads an RFC 3110 exponent-length prefix, which an ML-DSA-44 key
-// does not have, so its result describes nothing. Harmless only because
-// rsaKeySizeByAlgo keeps algorithm 18 off that path; the engine-side test
-// asserts that gate, this one pins why it matters.
+// KeySize must report the length ML-DSA-44 fixes, never an RSA modulus parse
+// of a key that is not RSA. The engine-side test asserts the gate that keeps
+// algorithm 18 off the RSA path; this one pins the value.
 func TestKeySizeMLDSA44(t *testing.T) {
 	keys, _, _ := loadZoneFixture(t, huqueZone)
 	key := keys[0]
@@ -288,9 +287,8 @@ func TestKeySizeMLDSA44(t *testing.T) {
 		t.Fatalf("fixture key: algorithm %d, want %d (MLDSA44)", key.Algorithm, dns.MLDSA44)
 	}
 
-	// Any non-zero result would be an RSA modulus parse of key material that is
-	// not RSA, and a plausible number is the dangerous kind.
-	if bits := KeySize(key); bits != 0 {
-		t.Errorf("KeySize on an ML-DSA-44 key returned %d bits, want 0", bits)
+	// The real 1312-byte public key, not the 2048 an RSA parse would invent.
+	if bits := KeySize(key); bits != 10496 {
+		t.Errorf("KeySize on an ML-DSA-44 key returned %d bits, want 10496", bits)
 	}
 }

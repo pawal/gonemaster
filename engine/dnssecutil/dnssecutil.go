@@ -79,6 +79,8 @@ func KeySize(key *dns.DNSKEY) int {
 		return 256
 	case dns.ED448:
 		return 456
+	case dns.MLDSA44:
+		return 10496 // the 1312-byte public key itself
 	case dns.ECCGOST, dns.ECCGOST12, dns.SM2SM3:
 		return 256 // curve size, as for ECDSA
 	default:
@@ -86,16 +88,17 @@ func KeySize(key *dns.DNSKEY) int {
 	}
 }
 
-// Fixed rdata lengths in bits (RFC 5933, 6605, 8080). Encoded lengths, not the
-// curve size KeySize reports: a P-256 key is two 256-bit coordinates.
+// Fixed rdata lengths in bits (RFC 5933, 6605, 8080, draft-westerbaan-dnssec-mldsa).
+// Encoded lengths, not the curve size KeySize reports: a P-256 key is two
+// 256-bit coordinates.
 var (
 	expectedKeyBits = map[uint8]int{
 		dns.ECCGOST: 512, dns.ECDSAP256SHA256: 512, dns.ECDSAP384SHA384: 768,
-		dns.ED25519: 256, dns.ED448: 456,
+		dns.ED25519: 256, dns.ED448: 456, dns.MLDSA44: 10496,
 	}
 	expectedSignatureBits = map[uint8]int{
 		dns.ECCGOST: 512, dns.ECDSAP256SHA256: 512, dns.ECDSAP384SHA384: 768,
-		dns.ED25519: 512, dns.ED448: 912,
+		dns.ED25519: 512, dns.ED448: 912, dns.MLDSA44: 19360,
 	}
 )
 

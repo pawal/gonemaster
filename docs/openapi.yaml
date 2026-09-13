@@ -2825,7 +2825,7 @@ components:
           description: >
             Schema version of the chain document. Version 2 added
             `servers_stale` on `parent` and `child` plus NSEC/NSEC3 signatures.
-            Version 3 added `ns_names`.
+            Version 3 added `ns_names` and the `undelegated` status.
           example: 3
         zone:
           type: string
@@ -2839,8 +2839,10 @@ components:
           description: >
             Roll-up verdict. `partial` means the validated path holds but some
             servers serve signatures outside their validity window, or a
-            DS-anchored signature cannot be verified locally.
-          enum: [secure, broken, partial, island, unsigned, indeterminate]
+            DS-anchored signature cannot be verified locally. `island` means the
+            parent is silent about the zone; `undelegated` means the parent
+            proves under signature that no delegation exists at the name.
+          enum: [secure, broken, partial, island, unsigned, indeterminate, undelegated]
         truncated:
           type: boolean
         parent:

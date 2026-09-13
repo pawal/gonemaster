@@ -198,6 +198,10 @@ the same as the zone having no in-domain nameserver name. The roll-up `status`
 describes the chain of the zone itself and does not change when a name in
 `ns_names` is bogus.
 
+Version 3 also adds the roll-up status `undelegated`, a signed zone whose
+parent proves under signature that no delegation exists at the name. It is
+distinct from `island`, where the parent is silent about the zone.
+
 ## Reverse Proxy
 
 Configure the proxy so public paths are reachable and admin paths are blocked

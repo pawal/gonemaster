@@ -512,6 +512,14 @@ Description:
 
 A nameserver did not respond to a DNSKEY query at all. Resolvers that validate the zone have to fetch DNSKEYs; if they happen to ask this server first, validation stalls or fails.
 
+## Tag DS07_PARENT_PROVES_NO_DELEGATION
+
+Header: Parent proves the zone is not delegated
+
+Description:
+
+The parent zone carries a signed record stating that no delegation exists at this name, and the parent is itself anchored by a DS at its own parent. The zone answers today only because the servers holding it are also authoritative for the parent, so a resolver that follows the delegation never reaches it, and a validating resolver rejects the zone and every name in it. Add the NS records for this zone to the parent, or remove the zone from those servers.
+
 ## Tag DS07_UNEXP_RCODE_RESP_DNSKEY
 
 Header: Unexpected code on DNSKEY query

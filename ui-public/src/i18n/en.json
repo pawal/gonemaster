@@ -81,6 +81,8 @@
   "pub.dnssec_chain_status_broken": "Broken",
   "pub.dnssec_chain_status_partial": "Partial",
   "pub.dnssec_chain_status_island": "No DS",
+  "pub.dnssec_chain_status_undelegated": "Not delegated",
+  "pub.dnssec_chain_undelegated": "The parent zone {parent} proves under signature that no delegation exists at this name. Validating resolvers reject this zone and every name in it.",
   "pub.dnssec_chain_status_unsigned": "Unsigned",
   "pub.dnssec_chain_status_indeterminate": "Indeterminate",
   "pub.dnssec_chain_disagree": "Nameservers returned different DNSSEC records - showing the most common answer.",
@@ -1048,5 +1050,7 @@
   "pub.tag.dnssec.DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY.desc": "The signature covering the address records of one of your nameservers does not verify against the keys of the zone that is supposed to sign that name. The signature may be corrupt, not yet valid, made with a key that is no longer published, or made by a zone that has no authority over the name. Validating resolvers treat the address as forged.",
   "pub.tag.dnssec.DS22_NS_ADDRESS_UNSIGNED.header": "Nameserver address not signed",
   "pub.tag.dnssec.DS22_NS_ADDRESS_UNSIGNED.desc": "The address records of one of your nameservers carry no signature, although the name lies in a signed part of your zone and no insecure delegation accounts for the gap. Validating resolvers require a signature there, reject the unsigned answer, and cannot look the nameserver up.",
-  "pub.tc_desc.dnssec22": "The nameservers of a zone are often named inside the zone itself, and then their addresses are part of the data the zone signs. If those addresses do not validate, a validating resolver that looks them up gets a failure and stops using the nameserver, even while the rest of the zone is correct. This check reads the address records of every such nameserver name from each of your nameservers and verifies them against the chain of trust of the zone."
+  "pub.tc_desc.dnssec22": "The nameservers of a zone are often named inside the zone itself, and then their addresses are part of the data the zone signs. If those addresses do not validate, a validating resolver that looks them up gets a failure and stops using the nameserver, even while the rest of the zone is correct. This check reads the address records of every such nameserver name from each of your nameservers and verifies them against the chain of trust of the zone.",
+  "pub.tag.dnssec.DS07_PARENT_PROVES_NO_DELEGATION.header": "Parent proves the zone is not delegated",
+  "pub.tag.dnssec.DS07_PARENT_PROVES_NO_DELEGATION.desc": "The parent zone carries a signed record stating that no delegation exists at this name, and the parent is itself anchored by a DS at its own parent. The zone answers today only because the servers holding it are also authoritative for the parent, so a resolver that follows the delegation never reaches it, and a validating resolver rejects the zone and every name in it. Add the NS records for this zone to the parent, or remove the zone from those servers."
 }

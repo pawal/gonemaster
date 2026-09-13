@@ -51,6 +51,52 @@ export function digestMnemonic(dt) {
 // ALGO would overflow the node, so the table is pinned to this budget.
 export const ALGO_FACE_MAX = 18;
 
+// FACE_PAD is the room a face line leaves inside its box on both sides.
+const FACE_PAD = 12;
+
+// isFullWidth reports whether a character takes a full em, as CJK does.
+function isFullWidth(ch) {
+  const c = ch.codePointAt(0);
+  return (
+    (c >= 0x1100 && c <= 0x115f) ||
+    (c >= 0x2e80 && c <= 0xa4cf) ||
+    (c >= 0xac00 && c <= 0xd7a3) ||
+    (c >= 0xf900 && c <= 0xfaff) ||
+    (c >= 0xfe30 && c <= 0xfe6f) ||
+    (c >= 0xff00 && c <= 0xff60) ||
+    (c >= 0xffe0 && c <= 0xffe6)
+  );
+}
+
+// faceWidth estimates what a face line renders to at the given type size.
+// Latin runs a little over half an em per character, full-width scripts an em.
+export function faceWidth(text, px) {
+  let w = 0;
+  for (const ch of String(text ?? "")) w += isFullWidth(ch) ? px : px * 0.58;
+  return w;
+}
+
+// wrapFace breaks a face line at a space so a translated word such as the
+// German "Vertrauenskette unterbrochen" reads inside the box instead of
+// spilling out of it. A single word wider than the box stays whole: the tip
+// repeats the text, so nothing is lost, and dropped characters would be.
+export function wrapFace(text, boxW, px, max = 2) {
+  const s = String(text ?? "");
+  const budget = boxW - FACE_PAD;
+  if (max <= 1 || faceWidth(s, px) <= budget) return [s];
+  const words = s.split(" ");
+  if (words.length < 2) return [s];
+  // Break where the two halves come out most even.
+  let best = null;
+  for (let i = 1; i < words.length; i++) {
+    const head = words.slice(0, i).join(" ");
+    const tail = words.slice(i).join(" ");
+    const worst = Math.max(faceWidth(head, px), faceWidth(tail, px));
+    if (best === null || worst < best.worst) best = { head, tail, worst };
+  }
+  return [best.head, ...wrapFace(best.tail, boxW, px, max - 1)];
+}
+
 // algoFace / bitsFace render the node-face lines. Unlike algoMnemonic, an
 // unknown algorithm keeps the "alg" prefix so a bare number cannot be read as
 // a key tag.

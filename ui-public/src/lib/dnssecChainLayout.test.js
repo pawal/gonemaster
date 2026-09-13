@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { secureChain } from "../test/helpers.js";
-import { layoutChain, relativeName, truncateName, worstSigTone, worstSigState, algoMnemonic, algoFace, bitsFace, ALGO_FACE_MAX } from "./dnssecChainLayout.js";
+import { layoutChain, relativeName, truncateName, worstSigTone, worstSigState, algoMnemonic, algoFace, bitsFace, faceWidth, wrapFace, ALGO_FACE_MAX } from "./dnssecChainLayout.js";
 
 // MAX_WIDTH is the widest graph the public card holds without scaling it down.
 const MAX_WIDTH = 660;
@@ -844,6 +844,48 @@ describe("node face labels", () => {
     const h = g.nodes[0].h;
     for (let i = 1; i < rows.length; i++) {
       expect(rows[i] - rows[i - 1] - h).toBeGreaterThanOrEqual(40);
+    }
+  });
+});
+
+describe("wrapFace", () => {
+  // A name box is 132 wide and renders its status line in 11px type.
+  const BOX = 132;
+  const SUB = 11;
+  const BUDGET = 120;
+
+  it("leaves a line that already fits alone", () => {
+    expect(wrapFace("validates", BOX, SUB)).toEqual(["validates"]);
+  });
+
+  it("breaks a long translation at the most even space", () => {
+    expect(wrapFace("Vertrauenskette unterbrochen", BOX, SUB)).toEqual(["Vertrauenskette", "unterbrochen"]);
+  });
+
+  it("keeps a single long word whole rather than losing characters", () => {
+    expect(wrapFace("allekirjoittamaton", BOX, SUB)).toEqual(["allekirjoittamaton"]);
+  });
+
+  it("makes no more lines than the box has room for", () => {
+    expect(wrapFace("one two three four five six seven eight", BOX, SUB).length).toBe(2);
+  });
+
+  it("counts a full-width script at an em per character", () => {
+    expect(faceWidth("署名", 11)).toBe(22);
+    expect(faceWidth("ab", 11)).toBeLessThan(22);
+  });
+
+  // Every status word a name or signer box shows has to read inside the box.
+  it("fits the name box status in every locale", async () => {
+    const locales = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
+    for (const loc of locales) {
+      const catalog = (await import(`../i18n/${loc}.json`)).default;
+      for (const [key, value] of Object.entries(catalog)) {
+        if (!key.startsWith("pub.dnssec_chain_nsstatus_") && !key.startsWith("pub.dnssec_chain_signer_")) continue;
+        for (const line of wrapFace(value, BOX, SUB)) {
+          expect(faceWidth(line, SUB), `${loc} ${key}`).toBeLessThanOrEqual(BUDGET);
+        }
+      }
     }
   });
 });

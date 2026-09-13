@@ -1,7 +1,7 @@
 <script>
   import { t } from "../i18n.js";
   import { getDnssecChain } from "../api.js";
-  import { layoutChain, algoMnemonic, digestMnemonic, fmtDate } from "./dnssecChainLayout.js";
+  import { layoutChain, algoMnemonic, digestMnemonic, fmtDate, wrapFace } from "./dnssecChainLayout.js";
 
   let { publicID, domain = "" } = $props();
 
@@ -306,6 +306,17 @@
     { gap: 13, cls: "chain-node-bits" },
   ];
 
+  // Type size per face class, which is what the CSS below sets.
+  const FACE_PX = {
+    "chain-node-title": 13,
+    "chain-node-sub": 11,
+    "chain-node-algo": 10,
+    "chain-node-bits": 10,
+  };
+
+  // Baseline step for a line a long translation wrapped onto.
+  const WRAP_STEP = 12;
+
   // nodeLines returns the face lines with their baselines. The block is centred
   // on its ink rather than its baselines, so the space above the title matches
   // the space below the last line whatever the line count.
@@ -320,12 +331,20 @@
     }
     if (node.algoText) texts.push({ text: node.algoText });
     if (node.bitsText) texts.push({ text: node.bitsText });
-    const steps = LINE_STEP.slice(0, texts.length);
-    const inkH = CAP_H + steps.reduce((sum, l) => sum + l.gap, 0);
+    // A line too wide for the box wraps, so the face keeps its own lines.
+    const lines = [];
+    texts.forEach((line, i) => {
+      const step = LINE_STEP[Math.min(i, LINE_STEP.length - 1)];
+      const cls = line.extra ? `${step.cls} ${line.extra}` : step.cls;
+      wrapFace(line.text, node.w, FACE_PX[step.cls]).forEach((text, part) => {
+        lines.push({ text, cls, gap: part === 0 ? step.gap : WRAP_STEP });
+      });
+    });
+    const inkH = CAP_H + lines.reduce((sum, l) => sum + l.gap, 0);
     let y = node.y + (node.h - inkH) / 2 + CAP_H;
-    return texts.map((line, i) => {
-      y += steps[i].gap;
-      return { text: line.text, cls: line.extra ? `${steps[i].cls} ${line.extra}` : steps[i].cls, y };
+    return lines.map((line) => {
+      y += line.gap;
+      return { text: line.text, cls: line.cls, y };
     });
   }
 </script>

@@ -2,6 +2,8 @@ import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/sv
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DnssecChain from "./DnssecChain.svelte";
 import { jsonResponse, secureChain } from "../test/helpers.js";
+import { locale, setCatalog } from "../i18n.js";
+import de from "../i18n/de.json";
 
 // openChain flips the <details> open and dispatches toggle, which jsdom does
 // not fire on its own.
@@ -68,6 +70,27 @@ describe("DnssecChain", () => {
     expect(facts).toContain("ECDSAP256SHA256");
     expect(facts).toContain("SHA-256");
     expect(facts).not.toContain("(13/2)");
+  });
+
+  it("wraps a status too long for its box onto a second line", async () => {
+    setCatalog("de", de);
+    locale.set("de");
+    try {
+      fetch.mockResolvedValue(
+        jsonResponse(
+          secureChain({
+            version: 3,
+            ns_names: [{ name: "ns1.example.com", status: "chain_broken", signer: "example.com", servers: ["192.0.2.1"] }],
+          })
+        )
+      );
+      const container = renderOpened();
+      await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+      const face = [...container.querySelectorAll("g.node-nsname text")].map((el) => el.textContent);
+      expect(face).toEqual(["ns1", "Vertrauenskette", "unterbrochen"]);
+    } finally {
+      locale.set("en");
+    }
   });
 
   it("draws the row labels after every edge so none cuts the text", async () => {

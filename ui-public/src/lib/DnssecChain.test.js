@@ -841,3 +841,49 @@ describe("a bogus nameserver name is hard to miss", () => {
     expect(okStatus.classList.contains("chain-node-ns-ok")).toBe(true);
   });
 });
+
+describe("a zone its parent proves does not exist", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  const undelegatedChain = () =>
+    secureChain({
+      version: 3,
+      status: "undelegated",
+      parent_zone: "ns.example.com",
+      parent: { ds_source: "none", ds: [], servers_disagreeing: [] },
+      links: []
+    });
+
+  // "No DS" reads as a parent that is merely silent. This parent denies the
+  // delegation, so the badge must not be neutral.
+  it("badges it bad, not the neutral island tone", async () => {
+    fetch.mockResolvedValue(jsonResponse(undelegatedChain()));
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+
+    const badge = screen.getByTestId("chain-status-badge");
+    expect(badge.textContent).toBe("Not delegated");
+    expect(badge.classList.contains("badge-bad")).toBe(true);
+  });
+
+  it("names the parent that carries the proof in a callout", async () => {
+    fetch.mockResolvedValue(jsonResponse(undelegatedChain()));
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-undelegated")).toBeTruthy());
+
+    const callout = screen.getByTestId("chain-undelegated");
+    expect(callout.textContent).toContain("ns.example.com");
+    expect(callout.classList.contains("callout-bad")).toBe(true);
+  });
+
+  it("leaves an ordinary island alone", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain({ status: "island" })));
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+
+    expect(screen.getByTestId("chain-status-badge").textContent).toBe("No DS");
+    expect(screen.queryByTestId("chain-undelegated")).toBeNull();
+  });
+});

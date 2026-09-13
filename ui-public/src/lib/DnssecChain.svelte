@@ -59,6 +59,7 @@
   );
   let hasRevoked = $derived((chain?.child?.dnskeys ?? []).some((k) => k.revoked));
   let hasNSNames = $derived((chain?.ns_names ?? []).length > 0);
+  let undelegated = $derived(chain?.status === "undelegated");
   // Nameserver names validators reject. These drive the red callout, which is
   // how the card reports every other fault; the graph alone is too quiet.
   let bogusNSNames = $derived(
@@ -114,7 +115,7 @@
   // status is the roll-up shown as a heading badge and the first facts line.
   // A status this build has no name for (a newer blob version) is left out
   // rather than shown as a raw token.
-  const KNOWN_STATUS = ["secure", "partial", "broken", "island", "unsigned", "indeterminate"];
+  const KNOWN_STATUS = ["secure", "partial", "broken", "island", "unsigned", "indeterminate", "undelegated"];
   let status = $derived(
     phase === "loaded" && KNOWN_STATUS.includes(chain?.status) ? chain.status : ""
   );
@@ -183,7 +184,7 @@
   // partial warn, everything else neutral.
   function statusTone(s) {
     if (s === "secure") return "ok";
-    if (s === "broken") return "bad";
+    if (s === "broken" || s === "undelegated") return "bad";
     if (s === "partial") return "warn";
     return "neutral";
   }
@@ -376,6 +377,9 @@
         {/if}
         {#if truncated}
           <p class="dnssec-chain-callout callout-info" data-testid="chain-truncated">{$t("pub.dnssec_chain_truncated")}</p>
+        {/if}
+        {#if undelegated}
+          <p class="dnssec-chain-callout callout-bad" data-testid="chain-undelegated">{$t("pub.dnssec_chain_undelegated", { parent: chain.parent_zone })}</p>
         {/if}
         {#if bogusNSNames.length}
           <p class="dnssec-chain-callout callout-bad" data-testid="chain-ns-bogus">{$t("pub.dnssec_chain_ns_bogus", { names: bogusNSNames.join(", ") })}</p>

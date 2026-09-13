@@ -1645,6 +1645,10 @@ msgstr ""
 "Les serveurs de noms suivants ne répondent pas à une requête de type DNSKEY "
 "avec le drapeau DO. Serveurs de noms : \"{servers}\"."
 
+msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
+msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
+msgstr "La zone parente {parent} prouve qu'aucune délégation n'existe à ce nom de zone : l'enregistrement NSEC ou NSEC3 qui lui correspond ne porte pas le bit NS, et {parent} est elle-même ancrée par un DS dans sa propre zone parente. Les résolveurs validants rejettent cette zone et tous les noms qu'elle contient. Réponse du ou des serveurs de noms {servers}."
+
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "La zone est signée avec DNSSEC."

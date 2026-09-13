@@ -3790,6 +3790,10 @@ msgid ""
 "child zone). Name servers: \"{servers}\"."
 msgstr "Følgende navnetjenere svarer uten et signert DNSKEY-RRset (usignert barnesone). Navnetjenere: \"{servers}\"."
 
+msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
+msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
+msgstr "Foreldresonen {parent} beviser at ingen delegering finnes ved dette sonenavnet: NSEC- eller NSEC3-posten som matcher det mangler NS-biten, og {parent} er selv forankret av en DS i sin egen foreldresone. Validerende resolvere avviser denne sonen og hvert navn i den. Svar fra navnetjener(e) {servers}."
+
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "Sonen er signert med DNSSEC."

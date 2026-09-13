@@ -3836,6 +3836,10 @@ msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "Föräldrazonen har ingen DS-post för den signerade dotterzonen."
 
+msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
+msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
+msgstr "Föräldrazonen {parent} bevisar att ingen delegering finns vid detta zonnamn: NSEC- eller NSEC3-posten som matchar det saknar NS-biten, och {parent} är själv förankrad av en DS i sin egen föräldrazon. Validerande resolvrar avvisar denna zon och varje namn i den. Svar från namnserver(ar) {servers}."
+
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "Zonen är DNSSEC-signerad."

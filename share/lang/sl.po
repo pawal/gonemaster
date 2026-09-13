@@ -3752,6 +3752,10 @@ msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "Nadrejena cona nima DS zapisa za podpisano podrejeno cono."
 
+msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
+msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
+msgstr "Nadrejena cona {parent} dokazuje, da pri tem imenu cone ni nobene delegacije: ustrezni zapis NSEC ali NSEC3 ne nosi bita NS, {parent} pa je sama zasidrana z zapisom DS v svoji nadrejeni coni. Validirajoči razreševalniki zavrnejo to cono in vsako ime v njej. Odgovor imenskega strežnika (strežnikov) {servers}."
+
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "Cona je podpisana z DNSSEC."

@@ -2961,6 +2961,10 @@ msgid ""
 "Name servers: \"{servers}\"."
 msgstr "次のネームサーバーは DO ビット付き DNSKEY クエリに応答しませんでした。ネームサーバー: \"{servers}\"。"
 
+msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
+msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
+msgstr "親ゾーン {parent} は、このゾーン名に委任が存在しないことを証明しています。対応する NSEC または NSEC3 レコードに NS ビットがなく、{parent} 自体はその親ゾーンの DS によって固定されています。検証するリゾルバーはこのゾーンとその中のすべての名前を拒否します。ネームサーバー {servers} からの応答。"
+
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "このゾーンは DNSSEC で署名されています。"

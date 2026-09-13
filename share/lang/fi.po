@@ -3889,6 +3889,10 @@ msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "Ylemmällä vyöhykkeellä ei ole DS-tietuetta allekirjoitetulle alemmalle vyöhykkeelle."
 
+msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
+msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
+msgstr "Ylempi vyöhyke {parent} todistaa, ettei tällä vyöhykenimellä ole delegointia: sitä vastaavassa NSEC- tai NSEC3-tietueessa ei ole NS-bittiä, ja {parent} on itse ankkuroitu DS-tietueella omassa ylemmässä vyöhykkeessään. Validoivat resolverit hylkäävät tämän vyöhykkeen ja jokaisen nimen siinä. Vastaus nimipalvelimelta/-palvelimilta {servers}."
+
 msgctxt "DNSSEC:DS07_SIGNED"
 msgid "The zone is signed with DNSSEC."
 msgstr "Vyöhyke on allekirjoitettu DNSSEC:llä."

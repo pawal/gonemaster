@@ -39,6 +39,10 @@ type recurseState struct {
 	nsFrom     func(context.Context, packet.Packet, *recurseState) ([]queryer, error)
 	trace      []traceEntry
 	glue       map[string]map[netip.Addr]bool
+	// answerSource is the server that gave the final answer. It is authoritative
+	// for the deepest zone serving the name, which a server that only delegated
+	// towards it is not.
+	answerSource queryer
 }
 
 type traceEntry struct {
@@ -289,6 +293,7 @@ func (r *Recursor) processOrderedResponse(ctx context.Context, nameObj dnsname.N
 	}
 
 	if resp.NoSuchRecord() || resp.NoSuchName() {
+		state.answerSource = ns
 		return resp, state, orderedActionReturn, nil
 	}
 
@@ -297,6 +302,7 @@ func (r *Recursor) processOrderedResponse(ctx context.Context, nameObj dnsname.N
 			cnameResp, nextState, err := r.resolveCNAME(ctx, nameObj, qtype, qclass, resp, state)
 			return cnameResp, nextState, orderedActionReturn, err
 		}
+		state.answerSource = ns
 		return resp, state, orderedActionReturn, nil
 	}
 
@@ -454,6 +460,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 				if resp.NoSuchRecord() || resp.NoSuchName() {
 					decided = true
 					decidedResp = resp
+					state.answerSource = res.ns
 					cancel()
 					break loop
 				}
@@ -468,6 +475,7 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 					}
 					decided = true
 					decidedResp = resp
+					state.answerSource = res.ns
 					cancel()
 					break loop
 				}

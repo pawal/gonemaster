@@ -79,12 +79,19 @@ func (r *Recursor) Parent(ctx context.Context, name string) (string, packet.Pack
 		}
 	}
 
+	// A zone between the last delegation and the name is invisible to the walk
+	// when the same servers serve both, so no referral is traversed. Ask for the
+	// intermediate SOA to find it, and ask the server that answered: the one
+	// that only delegated towards the name is not authoritative for it.
 	if nextHigher, ok := nameObj.NextHigher(); ok {
 		if !strings.EqualFold(nextHigher.String(), pnameObj.String()) {
-			entry := state.trace[0]
-			if entry.source != nil {
-				pp, err := entry.source.QueryWithClass(ctx, nextHigher.String(), "SOA", "IN")
-				if err == nil && pp.Msg != nil {
+			source := state.answerSource
+			if source == nil {
+				source = state.trace[0].source
+			}
+			if source != nil {
+				pp, err := source.QueryWithClass(ctx, nextHigher.String(), "SOA", "IN")
+				if err == nil && pp.Msg != nil && pp.AA() {
 					if soa := firstSOAOwner(pp); soa != "" {
 						pname = soa
 					}

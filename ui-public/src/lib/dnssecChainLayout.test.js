@@ -2,6 +2,9 @@ import { describe, it, expect } from "vitest";
 import { secureChain } from "../test/helpers.js";
 import { layoutChain, relativeName, truncateName, worstSigTone, worstSigState, algoMnemonic, algoFace, bitsFace, ALGO_FACE_MAX } from "./dnssecChainLayout.js";
 
+// MAX_WIDTH is the widest graph the public card holds without scaling it down.
+const MAX_WIDTH = 660;
+
 // tipParams returns the params of the tip line with the given i18n key.
 function tipParams(el, k) {
   const line = (el.tip ?? []).find((l) => l.k === k);
@@ -253,16 +256,24 @@ describe("layoutChain", () => {
     }
   });
 
-  it("grows in height only vertically as key count rises", () => {
+  it("wraps a wide key row onto a second line instead of widening the graph", () => {
     const one = layoutChain(secureChain());
     const many = secureChain();
     for (let i = 0; i < 6; i++) {
       many.child.dnskeys.push({ key_tag: 3000 + i, algorithm: 13, flags: 256, sep: false, servers: ["203.0.113.1"] });
     }
     const g = layoutChain(many);
-    // More keys widen the graph but do not change the number of rows (height).
-    expect(g.width).toBeGreaterThan(one.width);
-    expect(g.height).toBe(one.height);
+    // Seven ZSKs spill onto a second line: the graph grows down, not out.
+    expect(g.width).toBeLessThanOrEqual(MAX_WIDTH);
+    expect(g.height).toBeGreaterThan(one.height);
+    const zsks = g.nodes.filter((n) => n.kind === "zsk");
+    expect(new Set(zsks.map((n) => n.lineIndex)).size).toBe(2);
+    // Every line of the row is centred on the same axis.
+    const mid = (n) => n.x + n.w / 2;
+    const line0 = zsks.filter((n) => n.lineIndex === 0);
+    const line1 = zsks.filter((n) => n.lineIndex === 1);
+    const centre = (line) => (mid(line[0]) + mid(line[line.length - 1])) / 2;
+    expect(Math.abs(centre(line0) - centre(line1))).toBeLessThan(1);
   });
 
   it("adds a node and edge per signed RRset (SOA, CDS)", () => {
@@ -932,6 +943,81 @@ describe("in-domain nameserver names", () => {
     const after = layoutChain(secureChain({ ns_names: [] }));
     expect(after).toEqual(before);
     expect(before.nodes.some((n) => n.kind === "nsname")).toBe(false);
+  });
+});
+
+describe("wide rows", () => {
+  const named = (name, signer) => ({ name, status: "validates", signer, servers: ["192.0.2.1"] });
+
+  it("wraps a long name row so the graph stays inside the card", () => {
+    const g = layoutChain(
+      secureChain({
+        version: 3,
+        ns_names: Array.from({ length: 10 }, (_, i) => named(`ns${i}.example.com`, "example.com")),
+      })
+    );
+    const names = g.nodes.filter((n) => n.kind === "nsname");
+    expect(names.length).toBe(10);
+    expect(g.width).toBeLessThanOrEqual(MAX_WIDTH);
+    expect(new Set(names.map((n) => n.lineIndex)).size).toBe(3);
+    // Each line clears the one above it, and nothing leaves the canvas.
+    const top = (line) => names.find((n) => n.lineIndex === line).y;
+    expect(top(1)).toBeGreaterThanOrEqual(top(0) + names[0].h);
+    expect(top(2)).toBeGreaterThanOrEqual(top(1) + names[0].h);
+    for (const n of g.nodes) {
+      expect(n.x).toBeGreaterThanOrEqual(0);
+      expect(n.x + n.w).toBeLessThanOrEqual(g.width);
+      expect(n.y + n.h).toBeLessThanOrEqual(g.height);
+    }
+  });
+
+  it("keeps the names one zone signs on a single line", () => {
+    const g = layoutChain(
+      secureChain({
+        version: 3,
+        ns_names: [
+          named("ns1.first.example", "first.example"),
+          named("ns1.second.example", "second.example"),
+          named("ns2.first.example", "first.example"),
+          named("ns2.second.example", "second.example"),
+          named("ns.third.example", "third.example"),
+          named("ns.example.com", "example.com"),
+        ],
+      })
+    );
+    const lineOf = (name) => g.nodes.find((n) => n.id === `nsname-${name}`).lineIndex;
+    // A name signed elsewhere sits next to its sibling, whatever order the
+    // blob lists the names in.
+    expect(lineOf("ns1.first.example")).toBe(lineOf("ns2.first.example"));
+    expect(lineOf("ns1.second.example")).toBe(lineOf("ns2.second.example"));
+    // The apex-signed name draws no edge, so it trails the ones that do.
+    expect(lineOf("ns.example.com")).toBeGreaterThan(lineOf("ns1.first.example"));
+  });
+
+  it("holds the signed records of an NSEC3 zone on one line", () => {
+    const chain = secureChain();
+    chain.child.signed = ["SOA", "NSEC3", "NSEC3PARAM", "CDS", "CDNSKEY"].map((type) => ({
+      type,
+      rrsig: [{ key_tag: 2000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }],
+    }));
+    const g = layoutChain(chain);
+    const rrsets = g.nodes.filter((n) => n.kind === "rrset");
+    expect(rrsets.length).toBe(5);
+    expect(new Set(rrsets.map((n) => n.lineIndex)).size).toBe(1);
+    expect(g.width).toBeLessThanOrEqual(MAX_WIDTH);
+  });
+
+  it("ends the canvas at the ink rather than a fixed margin", () => {
+    const g = layoutChain(
+      secureChain({
+        version: 3,
+        ns_names: Array.from({ length: 4 }, (_, i) => named(`ns${i}.example.com`, "example.com")),
+      })
+    );
+    const right = Math.max(...g.nodes.map((n) => n.x + n.w));
+    // The widest row ends one margin short of the edge; the self-loop off the
+    // key sits well inside it.
+    expect(g.width - right).toBeLessThan(40);
   });
 });
 

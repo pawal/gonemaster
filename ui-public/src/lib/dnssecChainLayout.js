@@ -3,12 +3,17 @@
 
 const NODE_W = 132;
 const NODE_H = 72;
+const RRSET_W = 104; // a record box holds one type name, so it is narrower
+const LEAF_H = 52; // record, name and signer boxes carry at most two lines
 const H_GAP = 20;
-const V_GAP = 124;
+const LINE_GAP = 14; // between the lines a wrapped row spills into
+const ROW_GAP = 52; // between a row's last line and the row below it
+const MAX_ROW_W = 600; // a wider row wraps, so the card holds the graph unscaled
+const MIN_ROW_W = 320; // narrowest column a row centres in, so a row label fits
 const PAD_X = 24;
 const PAD_TOP = 44;
 const PAD_BOTTOM = 16;
-const LOOP_PAD = 36; // right margin so a key self-loop is not clipped
+const LOOP_PAD = 32; // how far a key self-loop reaches past the node
 const REF_BOW = 46; // sideways bow of a CDS/CDNSKEY reference edge
 
 // Mnemonics by IANA algorithm number. algoProperties in the engine is the
@@ -188,20 +193,83 @@ export function relativeName(name, zone) {
   return n;
 }
 
-function rowWidth(count) {
-  if (count <= 0) return NODE_W;
-  return count * NODE_W + (count - 1) * H_GAP;
+function rowWidth(count, w) {
+  if (count <= 0) return w;
+  return count * w + (count - 1) * H_GAP;
 }
 
-function place(nodes, y, totalW, rowIndex) {
-  const w = rowWidth(nodes.length);
-  const startX = PAD_X + (totalW - w) / 2;
-  nodes.forEach((n, i) => {
-    n.x = startX + i * (NODE_W + H_GAP);
-    n.y = y;
-    n.w = NODE_W;
-    n.h = NODE_H;
-    n.rowIndex = rowIndex;
+// nodesPerLine is how many boxes of width w the row budget holds.
+function nodesPerLine(w) {
+  return Math.max(1, Math.floor((MAX_ROW_W + H_GAP) / (w + H_GAP)));
+}
+
+// lineCounts splits a row into balanced lines, none wider than the budget:
+// five keys read as 3/2, not a full line and a lone box.
+function lineCounts(count, w) {
+  const lines = Math.max(1, Math.ceil(count / nodesPerLine(w)));
+  const base = Math.floor(count / lines);
+  const extra = count % lines;
+  return Array.from({ length: lines }, (_, i) => base + (i < extra ? 1 : 0));
+}
+
+// packLines fills lines up to the budget, keeping a group on one line whenever
+// it fits, so the names one zone signs stay together under their signer.
+function packLines(groups, w) {
+  const perLine = nodesPerLine(w);
+  const out = [];
+  let cur = 0;
+  for (const size of groups) {
+    if (cur > 0 && cur + size > perLine) {
+      out.push(cur);
+      cur = 0;
+    }
+    let rest = size;
+    while (cur + rest > perLine) {
+      const take = perLine - cur;
+      out.push(cur + take);
+      rest -= take;
+      cur = 0;
+    }
+    cur += rest;
+  }
+  if (cur > 0) out.push(cur);
+  return out.length > 0 ? out : [0];
+}
+
+// groupSizes counts the runs of names that share a signer.
+function groupSizes(nodes) {
+  const out = [];
+  let prev;
+  for (const n of nodes) {
+    const key = n.signerId ?? "";
+    if (out.length === 0 || key !== prev) out.push(1);
+    else out[out.length - 1] += 1;
+    prev = key;
+  }
+  return out;
+}
+
+// rowHeight is how tall a row stands once its lines are known.
+function rowHeight(row) {
+  return row.lines.length * row.h + (row.lines.length - 1) * LINE_GAP;
+}
+
+// place lays a row out line by line, each line centred in totalW.
+function place(row, y, totalW, rowIndex) {
+  let i = 0;
+  let lineY = y;
+  row.lines.forEach((count, line) => {
+    const startX = PAD_X + (totalW - rowWidth(count, row.w)) / 2;
+    for (let j = 0; j < count; j++, i++) {
+      const n = row.nodes[i];
+      n.x = startX + j * (row.w + H_GAP);
+      n.y = lineY;
+      n.w = row.w;
+      n.h = row.h;
+      n.rowIndex = rowIndex;
+      n.lineIndex = line;
+    }
+    lineY += row.h + LINE_GAP;
   });
 }
 
@@ -418,39 +486,57 @@ export function layoutChain(chain) {
     };
   });
 
+  // Order names by the signer they hang from so each signer's edges run into
+  // one contiguous block below it. A name the apex signs draws no edge, so
+  // those trail the ones that do.
+  const signerOrder = new Map(signerNodes.map((n, i) => [n.id, i]));
+  const signerRank = (n) => (n.signerId ? signerOrder.get(n.signerId) ?? 0 : signerNodes.length);
+  nsNameNodes.sort((a, b) => signerRank(a) - signerRank(b));
+
   // Assemble the visible rows top to bottom, tagging which carries a label.
   // When the parent keys are known, they sit above the DS in the parent zone.
+  const row = (label, nodes, w = NODE_W, h = NODE_H) => ({ label, nodes, w, h });
   const rows = [];
   if (parentKeyNodes.length > 0) {
-    rows.push({ label: "parent", nodes: parentKeyNodes });
-    rows.push({ label: null, nodes: dsNodes });
+    rows.push(row("parent", parentKeyNodes));
+    rows.push(row(null, dsNodes));
   } else {
-    rows.push({ label: "parent", nodes: dsNodes });
+    rows.push(row("parent", dsNodes));
   }
   if (keys.length === 0) {
-    rows.push({ label: "keys", nodes: [{ id: "key-ghost", kind: "key-ghost", tip: [{ k: "pub.dnssec_chain_tip_no_dnskey" }] }] });
+    rows.push(row("keys", [{ id: "key-ghost", kind: "key-ghost", tip: [{ k: "pub.dnssec_chain_tip_no_dnskey" }] }]));
   } else {
     let keyLabelUsed = false;
     if (kskNodes.length > 0) {
-      rows.push({ label: "keys", nodes: kskNodes });
+      rows.push(row("keys", kskNodes));
       keyLabelUsed = true;
     }
     if (zskNodes.length > 0) {
-      rows.push({ label: keyLabelUsed ? null : "keys", nodes: zskNodes });
+      rows.push(row(keyLabelUsed ? null : "keys", zskNodes));
     }
   }
   if (signedNodes.length > 0) {
-    rows.push({ label: "signed", nodes: signedNodes });
+    rows.push(row("signed", signedNodes, RRSET_W, LEAF_H));
   }
   if (signerNodes.length > 0) {
-    rows.push({ label: "signers", nodes: signerNodes });
+    rows.push(row("signers", signerNodes, NODE_W, LEAF_H));
   }
   if (nsNameNodes.length > 0) {
-    rows.push({ label: "nsnames", nodes: nsNameNodes });
+    const r = row("nsnames", nsNameNodes, NODE_W, LEAF_H);
+    r.groups = groupSizes(nsNameNodes);
+    rows.push(r);
   }
 
-  const totalW = Math.max(...rows.map((r) => rowWidth(r.nodes.length)));
-  rows.forEach((r, i) => place(r.nodes, PAD_TOP + i * V_GAP, totalW, i));
+  // Wrap every row to the budget first: the widest line that survives sets the
+  // column all rows are centred in.
+  for (const r of rows) r.lines = r.groups ? packLines(r.groups, r.w) : lineCounts(r.nodes.length, r.w);
+  const totalW = Math.max(MIN_ROW_W, ...rows.map((r) => rowWidth(Math.max(...r.lines), r.w)));
+  let rowY = PAD_TOP;
+  rows.forEach((r, i) => {
+    place(r, rowY, totalW, i);
+    rowY += rowHeight(r) + ROW_GAP;
+  });
+  const contentBottom = rowY - ROW_GAP;
 
   const nodes = rows.flatMap((r) => r.nodes);
   const byId = new Map(nodes.map((n) => [n.id, n]));
@@ -473,6 +559,9 @@ export function layoutChain(chain) {
     .map((r) => ({ id: r.label, labelKey: labelKeyFor(r.label), name: nameFor(r.label), x: PAD_X, y: r.nodes[0].y - 22 }));
 
   const edges = [];
+  // inkRight is the rightmost point anything is drawn at, so a self-loop or a
+  // reference bow widens the canvas only when it actually reaches past a row.
+  let inkRight = PAD_X + totalW;
 
   // Parent key(s) sign the DS RRset: an edge from the parent key to each DS.
   for (const [tag, group] of groupByKeyTag(dsRRSIG)) {
@@ -549,6 +638,7 @@ export function layoutChain(chain) {
     const status = worstSigState(group);
     // An unanchored KSK's signatures are valid but off the chain of trust.
     const incoming = !!signer.incoming;
+    inkRight = Math.max(inkRight, signer.x + signer.w + LOOP_PAD);
     edges.push({
       id: `self-${tag}`,
       kind: "selfsig",
@@ -576,8 +666,14 @@ export function layoutChain(chain) {
       if (downward) {
         edge.from = edgePoint(signer, "bottom");
         edge.to = edgePoint(target, "top");
-      } else {
+      } else if (target.lineIndex === signer.lineIndex) {
         edge.d = siblingSigPath(signer, target);
+      } else {
+        // The row wrapped: the sibling sits on another line, so the edge runs
+        // between the facing sides instead of bowing across one line.
+        const down = target.lineIndex > signer.lineIndex;
+        edge.from = edgePoint(signer, down ? "bottom" : "top");
+        edge.to = edgePoint(target, down ? "top" : "bottom");
       }
       edges.push(edge);
     }
@@ -608,6 +704,10 @@ export function layoutChain(chain) {
       const key = byId.get(`key-${tag}`);
       if (!key) continue;
       const pending = newKeys.includes(tag);
+      const a = edgePoint(to, "top");
+      const b = edgePoint(key, "bottom");
+      // A quadratic bows half way to its control point.
+      inkRight = Math.max(inkRight, (a.x + b.x) / 2 + REF_BOW / 2 + 8);
       edges.push({
         id: `ref-${entry.type}-${tag}`,
         kind: "ref",
@@ -617,7 +717,7 @@ export function layoutChain(chain) {
         tip: pending
           ? [{ k: "pub.dnssec_chain_tip_ref_pending", p: { type: entry.type, tag } }]
           : [{ k: "pub.dnssec_chain_tip_ref", p: { type: entry.type, tag } }],
-        d: refPath(edgePoint(to, "top"), edgePoint(key, "bottom")),
+        d: refPath(a, b),
       });
     }
   }
@@ -652,11 +752,8 @@ export function layoutChain(chain) {
     });
   }
 
-  const hasLoop = edges.some((e) => e.kind === "selfsig");
-  const hasRef = edges.some((e) => e.kind === "ref");
-  const rightPad = Math.max(hasLoop ? LOOP_PAD : 0, hasRef ? REF_BOW + 12 : 0);
-  const width = totalW + 2 * PAD_X + rightPad;
-  const height = PAD_TOP + (rows.length - 1) * V_GAP + NODE_H + PAD_BOTTOM;
+  const width = round(inkRight + PAD_X);
+  const height = contentBottom + PAD_BOTTOM;
   return { width, height, clusters, nodes, edges };
 }
 

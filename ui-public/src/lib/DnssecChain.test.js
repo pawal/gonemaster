@@ -70,6 +70,18 @@ describe("DnssecChain", () => {
     expect(facts).not.toContain("(13/2)");
   });
 
+  it("draws the row labels after every edge so none cuts the text", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const kids = [...screen.getByTestId("chain-svg").children];
+    const lastEdge = kids.findLastIndex((el) => el.classList.contains("chain-edge"));
+    const firstLabel = kids.findIndex((el) => el.classList.contains("chain-cluster-label"));
+    expect(lastEdge).toBeGreaterThan(-1);
+    expect(firstLabel).toBeGreaterThan(lastEdge);
+  });
+
   it("draws grey reference edges from CDS/CDNSKEY to the named key", async () => {
     const chain = secureChain();
     chain.child.signed = [

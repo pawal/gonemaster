@@ -406,10 +406,6 @@
               </marker>
             </defs>
 
-            {#each graph.clusters as cl (cl.id)}
-              <text class="chain-cluster-label" x={cl.x} y={cl.y}>{$t(cl.labelKey)}{#if cl.name}<tspan class="chain-cluster-name"> · {cl.name}</tspan>{/if}</text>
-            {/each}
-
             {#each mainEdges as edge (edge.id)}
               {#if edge.d}
                 <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={buildTip(edge.tip)}></path>
@@ -445,6 +441,11 @@
 
             {#each refEdges as edge (edge.id)}
               <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={buildTip(edge.tip)}></path>
+            {/each}
+
+            <!-- Row labels last: an edge that runs past one must not cut the text. -->
+            {#each graph.clusters as cl (cl.id)}
+              <text class="chain-cluster-label" x={cl.x} y={cl.y}>{$t(cl.labelKey)}{#if cl.name}<tspan class="chain-cluster-name"> · {cl.name}</tspan>{/if}</text>
             {/each}
           </svg>
         </div>
@@ -569,16 +570,15 @@
   .chain-scroll {
     overflow-x: auto;
     max-width: 100%;
+    /* A flex item must be free to shrink or it pushes the diagram past the card. */
+    min-width: 0;
   }
+  /* Scale a wide diagram down to the card; the viewBox keeps it proportional. */
   .chain-svg {
     display: block;
-  }
-  /* On small screens scale the diagram to fit; viewBox keeps it proportional. */
-  @media (max-width: 600px) {
-    .chain-svg {
-      max-width: 100%;
-      height: auto;
-    }
+    margin: 0 auto;
+    max-width: 100%;
+    height: auto;
   }
   .chain-cluster-label {
     fill: var(--ink-2);
@@ -586,6 +586,10 @@
     font-weight: 600;
     text-transform: uppercase;
     letter-spacing: 0.04em;
+    /* Halo in the card colour, so an edge behind the text stays out of it. */
+    stroke: var(--surface);
+    stroke-width: 3px;
+    paint-order: stroke;
   }
   .chain-cluster-name {
     fill: var(--ink);

@@ -7,6 +7,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Added
 
 - connectivity05: new testcase checking whether the DNSKEY answer arrives over UDP
+- dnssec22: new testcase validating the address records of in-domain nameserver names under the chain of trust of the zone
 
 ### Fixed
 

@@ -16,6 +16,7 @@ All notable changes to all gonemaster components will be documented in this file
 - engine: find a zone that sits between the last delegation and the queried name
 - server: batch cancel no longer leaves the queue depth metric high
 - dnssec20: ignore the parent-side delegation NSEC when a nameserver answers the apex NSEC query from the parent zone
+- ui-public: the DNSSEC chain diagram wraps a wide row onto more lines and scales to the card instead of running off it
 
 ## [v1.7.7] - 2026-09-07
 

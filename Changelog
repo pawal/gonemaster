@@ -9,9 +9,11 @@ All notable changes to all gonemaster components will be documented in this file
 - connectivity05: new testcase checking whether the DNSKEY answer arrives over UDP
 - dnssec22: new testcase validating the address records of in-domain nameserver names under the chain of trust of the zone
 - ui-public: the DNSSEC chain diagram draws the in-domain nameserver names and the zones that sign them; chain document version 3
+- dnssec07: report a signed zone whose parent proves no delegation exists at the name; new chain status `undelegated`
 
 ### Fixed
 
+- engine: find a zone that sits between the last delegation and the queried name
 - server: batch cancel no longer leaves the queue depth metric high
 - dnssec20: ignore the parent-side delegation NSEC when a nameserver answers the apex NSEC query from the parent zone
 

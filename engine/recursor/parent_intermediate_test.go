@@ -139,3 +139,62 @@ func slicesContains(haystack []string, needle string) bool {
 	}
 	return false
 }
+
+// refused builds a REFUSED response.
+func refused() packet.Packet {
+	msg := new(dns.Msg)
+	msg.Rcode = dns.RcodeRefused
+	return packet.Packet{Msg: msg}
+}
+
+// The name is delegated to servers of its own, so those servers hold nothing
+// above it. The intermediate zone has to be asked of the server that delegated
+// to the name.
+func TestParentFindsAnIntermediateZoneAboveADelegatedName(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+	r := fakeRootRecursor(t, "a.root.test", "192.0.2.1")
+
+	hookedNS(t, ctx, r, "a.root.test", "192.0.2.1", func(_ context.Context, _ string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}, errors.New("unexpected qtype")
+		}
+		return referral("test", "ns.test", "192.0.2.2"), nil
+	})
+
+	// One server holds "test" and "sub.test" and delegates "child.sub.test".
+	var asked []string
+	hookedNS(t, ctx, r, "ns.test", "192.0.2.2", func(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name = dnsname.New(name).String()
+		asked = append(asked, name)
+		if strings.ToUpper(qtype) != "SOA" {
+			return packet.Packet{}, errors.New("unexpected qtype")
+		}
+		switch name {
+		case "child.sub.test":
+			return referral("child.sub.test", "ns.child.sub.test", "192.0.2.3"), nil
+		case "sub.test", "test":
+			return soaAt(name), nil
+		}
+		return packet.Packet{}, errors.New("unexpected name " + name)
+	})
+
+	// The delegated servers serve the name and refuse everything else.
+	hookedNS(t, ctx, r, "ns.child.sub.test", "192.0.2.3", func(_ context.Context, name string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		name = dnsname.New(name).String()
+		if name != "child.sub.test" {
+			return refused(), nil
+		}
+		return soaAt(name), nil
+	})
+
+	got, _, err := r.Parent(ctx, "child.sub.test")
+	if err != nil {
+		t.Fatalf("Parent: %v", err)
+	}
+	if got != "sub.test" {
+		t.Errorf("Parent(child.sub.test) = %q, want sub.test", got)
+	}
+	if !slicesContains(asked, "sub.test") {
+		t.Errorf("the intermediate SOA was never asked of the delegating server; asked %v", asked)
+	}
+}

@@ -11,6 +11,10 @@ All notable changes to all gonemaster components will be documented in this file
 - engine: report a DS naming a key that signs nothing as a broken chain link, and roll the chain up as partial
 - ui-public: name the dead DS anchor in the DNSSEC chain diagram
 
+### Fixed
+
+- engine: find the zone cut above a delegated name when the same servers serve both, so `nominet.co.uk` reports `co.uk` as its parent
+
 ## [v1.7.8] - 2026-09-13
 
 Adds two testcases: connectivity05, whether the DNSKEY answer arrives over UDP, and dnssec22, which validates the address records of in-domain nameserver names under the chain of trust of the zone. The public DNSSEC chain diagram draws those names and the zones that sign them, and dnssec07 reports a signed zone whose parent proves no delegation exists at the name.

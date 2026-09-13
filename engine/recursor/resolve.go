@@ -67,7 +67,12 @@ func (r *Recursor) Parent(ctx context.Context, name string) (string, packet.Pack
 
 	pname := state.trace[0].zoneName
 	pnameObj := dnsname.New(pname)
+	// The server that answered holds the deepest zone covering the name.
+	probeSource := state.answerSource
 	if strings.EqualFold(pnameObj.String(), nameObj.String()) {
+		// The name is a zone of its own, so its servers hold nothing above it;
+		// the server that delegated to it does.
+		probeSource = state.trace[0].source
 		if len(state.trace) > 1 {
 			pname = state.trace[1].zoneName
 			pnameObj = dnsname.New(pname)
@@ -81,11 +86,10 @@ func (r *Recursor) Parent(ctx context.Context, name string) (string, packet.Pack
 
 	// A zone between the last delegation and the name is invisible to the walk
 	// when the same servers serve both, so no referral is traversed. Ask for the
-	// intermediate SOA to find it, and ask the server that answered: the one
-	// that only delegated towards the name is not authoritative for it.
+	// intermediate SOA to find it, and ask a server that holds the zone above.
 	if nextHigher, ok := nameObj.NextHigher(); ok {
 		if !strings.EqualFold(nextHigher.String(), pnameObj.String()) {
-			source := state.answerSource
+			source := probeSource
 			if source == nil {
 				source = state.trace[0].source
 			}

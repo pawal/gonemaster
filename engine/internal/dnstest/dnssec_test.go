@@ -29,6 +29,32 @@ func TestGenKeyProducesAVerifiableSignature(t *testing.T) {
 	}
 }
 
+// The library rejects an RRSIG whose key tag is zero before it looks at the
+// key, so a generator that hands one back makes every signing test flaky.
+func TestGenKeyKeyTagCanSign(t *testing.T) {
+	kp := GenKey(t, "example.test", dns.ECDSAP256SHA256, false)
+	if dnssecutil.KeyTag(kp.Key) == 0 {
+		t.Fatal("generated key tag is zero")
+	}
+
+	now := time.Date(2026, 1, 15, 12, 0, 0, 0, time.UTC)
+	rrset := []dns.RR{kp.Key}
+	sig := &dns.RRSIG{Hdr: dns.Header{Name: kp.Key.Hdr.Name, Class: dns.ClassINET, TTL: 3600}}
+	sig.Algorithm = kp.Key.Algorithm
+	sig.Inception = uint32(now.Add(-time.Hour).Unix())
+	sig.Expiration = uint32(now.Add(time.Hour).Unix())
+	sig.SignerName = kp.Key.Hdr.Name
+
+	sig.KeyTag = 0
+	if err := sig.Sign(kp.Priv, rrset, &dns.SignOption{}); err == nil {
+		t.Error("a zero key tag must not sign")
+	}
+	sig.KeyTag = dnssecutil.KeyTag(kp.Key)
+	if err := sig.Sign(kp.Priv, rrset, &dns.SignOption{}); err != nil {
+		t.Errorf("sign with the generated key tag: %v", err)
+	}
+}
+
 func TestGenKeyWithoutSEP(t *testing.T) {
 	kp := GenKey(t, "example.test", dns.ECDSAP256SHA256, false)
 	if kp.Key.Flags&dns.FlagSEP != 0 {

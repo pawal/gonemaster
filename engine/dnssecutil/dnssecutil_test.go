@@ -1,7 +1,6 @@
 package dnssecutil_test
 
 import (
-	"crypto"
 	"encoding/base64"
 	"net/netip"
 	"testing"
@@ -148,13 +147,9 @@ func TestVerifyRRSIG(t *testing.T) {
 	key.Flags = dns.FlagZONE
 	key.Protocol = 3
 	key.Algorithm = dns.RSASHA256
-	priv, err := key.Generate(1024)
+	signer, err := dnstest.GenSignerBits(key, 1024)
 	if err != nil {
 		t.Fatalf("generate key: %v", err)
-	}
-	signer, ok := priv.(crypto.Signer)
-	if !ok {
-		t.Fatalf("private key does not implement crypto.Signer")
 	}
 
 	aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn("example.test"), Class: dns.ClassINET, TTL: 3600}}

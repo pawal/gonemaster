@@ -62,8 +62,25 @@ func GenKey(t testing.TB, owner string, algo uint8, sep bool) Keypair {
 }
 
 // GenSigner generates the private key for key's algorithm and fills in the
-// public half. The DNS library cannot generate Ed448, so that one is built here.
+// public half.
 func GenSigner(key *dns.DNSKEY) (crypto.Signer, error) {
+	return GenSignerBits(key, 256)
+}
+
+// GenSignerBits is GenSigner at the given key size. It generates again when the
+// key tag comes out zero, which the DNS library refuses to sign with.
+func GenSignerBits(key *dns.DNSKEY, bits int) (crypto.Signer, error) {
+	for {
+		signer, err := genSigner(key, bits)
+		if err != nil || dnssecutil.KeyTag(key) != 0 {
+			return signer, err
+		}
+	}
+}
+
+// genSigner generates one key. The DNS library cannot generate Ed448, so that
+// one is built here.
+func genSigner(key *dns.DNSKEY, bits int) (crypto.Signer, error) {
 	if key.Algorithm == dns.ED448 {
 		pub, priv, err := ed448.GenerateKey(rand.Reader)
 		if err != nil {
@@ -72,7 +89,7 @@ func GenSigner(key *dns.DNSKEY) (crypto.Signer, error) {
 		key.PublicKey = base64.StdEncoding.EncodeToString(pub)
 		return priv, nil
 	}
-	priv, err := key.Generate(256)
+	priv, err := key.Generate(bits)
 	if err != nil {
 		return nil, err
 	}
@@ -142,6 +159,9 @@ func GenRSAKeyWithExponent(t testing.TB, owner string, e *big.Int, bits int, sep
 		}
 		n := new(big.Int).Mul(p, q)
 		key.PublicKey = RSAPublicKey(e, n)
+		if dnssecutil.KeyTag(key) == 0 {
+			continue // a zero key tag cannot sign, draw again
+		}
 		return Keypair{Key: key, Priv: &bigRSASigner{n: n, d: d}}
 	}
 }

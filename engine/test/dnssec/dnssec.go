@@ -16,6 +16,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
 	"codeberg.org/pawal/gonemaster/engine/dnssecutil"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
@@ -8744,10 +8745,55 @@ type dnssec22Finding struct {
 }
 
 // dnssec22Outcome is what one nameserver said about the whole name set.
+// results keeps one entry per name reached, in name-set order.
 type dnssec22Outcome struct {
-	servers   []logargs.Server
-	validated bool
-	findings  []dnssec22Finding
+	servers []logargs.Server
+	results []dnssec22NameResult
+}
+
+// dnssec22NameResult pairs one name with this nameserver's conclusion about it.
+type dnssec22NameResult struct {
+	name string
+	dnssec22Result
+}
+
+// dnssec22ChainStatus maps a DS22 tag onto the status the chain document uses
+// for the name. An unlisted tag is not a per-name verdict.
+var dnssec22ChainStatus = map[string]string{
+	"DS22_NS_ADDRESS_CHAIN_BROKEN":              dnssecchain.NSNameChainBroken,
+	"DS22_NS_ADDRESS_INSECURE":                  dnssecchain.NSNameInsecure,
+	"DS22_NS_ADDRESS_ORPHAN_ZONE":               dnssecchain.NSNameOrphan,
+	"DS22_NS_ADDRESS_RRSIG_EXPIRED":             dnssecchain.NSNameRRSIGExpired,
+	"DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY": dnssecchain.NSNameRRSIGInvalid,
+	"DS22_NS_ADDRESS_UNSIGNED":                  dnssecchain.NSNameUnsigned,
+}
+
+// dnssec22Collect publishes one nameserver's per-name conclusions to the chain
+// document collector, if a run installed one.
+func dnssec22Collect(ctx context.Context, outcome dnssec22Outcome) {
+	addresses := make([]string, 0, len(outcome.servers))
+	for _, server := range outcome.servers {
+		addresses = append(addresses, server.Address)
+	}
+	for _, result := range outcome.results {
+		obs := dnssecchain.NSName{
+			Name:    result.name,
+			Status:  dnssecchain.NSNameIndeterminate,
+			Signer:  result.signer,
+			Servers: addresses,
+		}
+		switch {
+		case result.finding != nil:
+			obs.Status = dnssec22ChainStatus[result.finding.tag]
+			obs.KeyTag = result.finding.keytag
+			if result.finding.signer != "" {
+				obs.Signer = result.finding.signer
+			}
+		case result.validated:
+			obs.Status = dnssecchain.NSNameValidates
+		}
+		dnssecchain.CollectNSName(ctx, obs)
+	}
 }
 
 // dnssec22ErrorTags are the DS22 tags that suppress the OK tag.
@@ -8966,29 +9012,38 @@ func (w *dnssec22Walker) expectedSigner(ctx context.Context, order []dnsname.Nam
 	return len(order) - 1, dnssec22Cut{status: dnssec22SecureCut, keys: w.zoneKeys}
 }
 
+// dnssec22Result is what one nameserver concluded about one in-domain name.
+// finding is nil where the name raises no tag; signer is the Signer's Name of
+// the covering RRSIG where one was seen.
+type dnssec22Result struct {
+	finding   *dnssec22Finding
+	validated bool
+	signer    string
+}
+
 // evaluate classifies the address records of one in-domain name on this nameserver.
-func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) (*dnssec22Finding, bool) {
+func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) dnssec22Result {
 	resp := w.query(ctx, name, "A")
 	if resp.Msg == nil {
-		return nil, false
+		return dnssec22Result{}
 	}
 	if !resp.AA() {
 		if resp.Type() == "referral" {
 			w.noteReferral(resp)
 		}
-		return nil, false
+		return dnssec22Result{}
 	}
 	switch resp.Rcode() {
 	case "NOERROR":
 	case "NXDOMAIN":
 		// Delegation and nameserver testcases own a name that does not exist.
-		return nil, false
+		return dnssec22Result{}
 	default:
-		return nil, false
+		return dnssec22Result{}
 	}
 	if len(resp.GetRecordsForName("CNAME", name, "answer")) > 0 {
 		// RFC 2181 section 10.3 forbids an alias here; Delegation05 reports it.
-		return nil, false
+		return dnssec22Result{}
 	}
 
 	sigResp := resp
@@ -9018,17 +9073,27 @@ func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) (*dnss
 			start = idx
 		}
 	}
+	signerName := ""
+	if signerKnown {
+		signerName = signer.String()
+	}
 	expectedIdx, expectedCut := w.expectedSigner(ctx, order, start)
 	expected := order[expectedIdx]
 
 	switch expectedCut.status {
 	case dnssec22InsecureCut:
-		return &dnssec22Finding{tag: "DS22_NS_ADDRESS_INSECURE", ns: name.String()}, false
+		return dnssec22Result{
+			finding: &dnssec22Finding{tag: "DS22_NS_ADDRESS_INSECURE", ns: name.String()},
+			signer:  signerName,
+		}
 	case dnssec22BrokenCut:
-		return &dnssec22Finding{tag: "DS22_NS_ADDRESS_CHAIN_BROKEN", ns: name.String(), signer: expected.String()}, false
+		return dnssec22Result{
+			finding: &dnssec22Finding{tag: "DS22_NS_ADDRESS_CHAIN_BROKEN", ns: name.String(), signer: expected.String()},
+			signer:  expected.String(),
+		}
 	}
 	if !signerKnown {
-		return &dnssec22Finding{tag: "DS22_NS_ADDRESS_UNSIGNED", ns: name.String()}, false
+		return dnssec22Result{finding: &dnssec22Finding{tag: "DS22_NS_ADDRESS_UNSIGNED", ns: name.String()}}
 	}
 
 	if signer.Compare(expected) == 0 {
@@ -9037,37 +9102,49 @@ func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) (*dnss
 		})
 		switch {
 		case check.verified:
-			return nil, true
+			return dnssec22Result{validated: true, signer: signerName}
 		case check.expired:
-			return &dnssec22Finding{tag: "DS22_NS_ADDRESS_RRSIG_EXPIRED", ns: name.String(), keytag: check.expiredTag}, false
+			return dnssec22Result{
+				finding: &dnssec22Finding{tag: "DS22_NS_ADDRESS_RRSIG_EXPIRED", ns: name.String(), keytag: check.expiredTag},
+				signer:  signerName,
+			}
 		case check.failed:
-			return &dnssec22Finding{
-				tag:    "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
-				ns:     name.String(),
-				signer: signer.String(),
-				keytag: check.failedTag,
-			}, false
+			return dnssec22Result{
+				finding: &dnssec22Finding{
+					tag:    "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
+					ns:     name.String(),
+					signer: signerName,
+					keytag: check.failedTag,
+				},
+				signer: signerName,
+			}
 		}
 		// An algorithm the local verifier cannot process is indeterminate.
-		return nil, false
+		return dnssec22Result{signer: signerName}
 	}
 
 	signerIdx := dnssec22IndexOf(order, signer)
 	if signerIdx >= 0 && signerIdx < expectedIdx {
 		switch w.cut(ctx, signer).status {
 		case dnssec22NotACut:
-			return &dnssec22Finding{tag: "DS22_NS_ADDRESS_ORPHAN_ZONE", ns: name.String(), signer: signer.String()}, false
+			return dnssec22Result{
+				finding: &dnssec22Finding{tag: "DS22_NS_ADDRESS_ORPHAN_ZONE", ns: name.String(), signer: signerName},
+				signer:  signerName,
+			}
 		case dnssec22Indeterminate:
 			// The nameserver said nothing about the signer as a zone cut.
-			return nil, false
+			return dnssec22Result{signer: signerName}
 		}
 	}
-	return &dnssec22Finding{
-		tag:    "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
-		ns:     name.String(),
-		signer: signer.String(),
-		keytag: sigs[0].KeyTag,
-	}, false
+	return dnssec22Result{
+		finding: &dnssec22Finding{
+			tag:    "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
+			ns:     name.String(),
+			signer: signerName,
+			keytag: sigs[0].KeyTag,
+		},
+		signer: signerName,
+	}
 }
 
 // dnssec22DenialSigs returns the authority-section RRSIGs covering NSEC or NSEC3.
@@ -9303,13 +9380,8 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				if walker.referred(name) {
 					continue
 				}
-				finding, validated := walker.evaluate(ctx, name)
-				if validated {
-					outcome.validated = true
-				}
-				if finding != nil {
-					outcome.findings = append(outcome.findings, *finding)
-				}
+				result := walker.evaluate(ctx, name)
+				outcome.results = append(outcome.results, dnssec22NameResult{name: name.String(), dnssec22Result: result})
 			}
 			outcomes[i] = outcome
 			return nil
@@ -9329,14 +9401,23 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var findings []dnssec22Finding
 	var validatedServers []logargs.Server
 	for _, outcome := range outcomes {
-		if outcome.validated {
-			validatedServers = append(validatedServers, outcome.servers...)
-		}
-		for _, finding := range outcome.findings {
+		dnssec22Collect(ctx, outcome)
+		validated := false
+		for _, result := range outcome.results {
+			if result.validated {
+				validated = true
+			}
+			if result.finding == nil {
+				continue
+			}
+			finding := *result.finding
 			if _, seen := byFinding[finding]; !seen {
 				findings = append(findings, finding)
 			}
 			byFinding[finding] = append(byFinding[finding], outcome.servers...)
+		}
+		if validated {
+			validatedServers = append(validatedServers, outcome.servers...)
 		}
 	}
 	sort.Slice(findings, func(i, j int) bool {

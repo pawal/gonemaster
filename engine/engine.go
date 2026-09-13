@@ -568,6 +568,9 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		runner.Logger.SetProfile(runner.Profile)
 	}
 	ctx = WithRunner(ctx, runner)
+	if req.DNSSECChainSink != nil {
+		ctx = dnssecchain.WithNSNames(ctx)
+	}
 
 	if runner.AutoIPv6Disabled {
 		if _, err := runner.Logger.AddWithoutCallback("IPV6_AUTO_DISABLED", map[string]any{"reason": "no global IPv6 address detected"}, "", ""); err != nil {

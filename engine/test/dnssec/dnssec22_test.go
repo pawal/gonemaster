@@ -11,6 +11,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
@@ -1022,5 +1023,119 @@ func TestDNSSEC22IndeterminateCut(t *testing.T) {
 	// The memo asks the question once for both names below the zone cut.
 	if got := f.counts[ds22Key("ns.example", "DS")]; got != 1 {
 		t.Fatalf("DS questions = %d, want 1", got)
+	}
+}
+
+// --- chain document ---
+
+// collected returns the chain-document entry for name, or fails.
+func collected(t *testing.T, ctx context.Context, name string) dnssecchain.NSName {
+	t.Helper()
+	for _, entry := range dnssecchain.NSNamesFromContext(ctx) {
+		if entry.Name == name {
+			return entry
+		}
+	}
+	t.Fatalf("no collected entry for %q in %+v", name, dnssecchain.NSNamesFromContext(ctx))
+	return dnssecchain.NSName{}
+}
+
+// The chain document learns the orphan the tag reports, with the same signer.
+func TestDNSSEC22CollectsOrphanZone(t *testing.T) {
+	ctx := dnssecchain.WithNSNames(tctest.Context(t))
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.secureCut(t)
+	f.orphan(t, "a.ns.example")
+	ds22Server(t, ctx, "a.ns.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "a.ns.example")
+	tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_ORPHAN_ZONE")
+
+	got := collected(t, ctx, "a.ns.example")
+	if got.Status != dnssecchain.NSNameOrphan {
+		t.Errorf("status = %q, want %q", got.Status, dnssecchain.NSNameOrphan)
+	}
+	if got.Signer != "a.ns.example" {
+		t.Errorf("signer = %q, want a.ns.example", got.Signer)
+	}
+	if len(got.Servers) != 1 || got.Servers[0] != "192.0.2.10" {
+		t.Errorf("servers = %v, want the one nameserver", got.Servers)
+	}
+}
+
+// A validating name is collected too, with the zone that signs it.
+func TestDNSSEC22CollectsValidatingName(t *testing.T) {
+	ctx := dnssecchain.WithNSNames(tctest.Context(t))
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.signedAddress(t, "ns1.example", f.zoneKey, f.zoneSigner)
+	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "ns1.example")
+	tctest.RequireTags(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+
+	got := collected(t, ctx, "ns1.example")
+	if got.Status != dnssecchain.NSNameValidates {
+		t.Errorf("status = %q, want %q", got.Status, dnssecchain.NSNameValidates)
+	}
+	if got.Signer != "example" {
+		t.Errorf("signer = %q, want the zone apex", got.Signer)
+	}
+}
+
+// A name below a secure zone cut names the cut as its signer, which is what
+// the chain document draws the edge to.
+func TestDNSSEC22CollectsSignerOfASecureCut(t *testing.T) {
+	ctx := dnssecchain.WithNSNames(tctest.Context(t))
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.secureCut(t)
+	f.signedAddress(t, "a.ns.example", f.cutKey, f.cutSigner)
+	ds22Server(t, ctx, "a.ns.example", "192.0.2.10", f.answers, f.counts)
+
+	f.run(t, ctx, "a.ns.example")
+
+	got := collected(t, ctx, "a.ns.example")
+	if got.Status != dnssecchain.NSNameValidates {
+		t.Errorf("status = %q, want %q", got.Status, dnssecchain.NSNameValidates)
+	}
+	if got.Signer != "ns.example" {
+		t.Errorf("signer = %q, want the zone cut", got.Signer)
+	}
+}
+
+// A run with no collector installed reaches the same verdict and stores nothing.
+func TestDNSSEC22WithoutCollectorStillReports(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.secureCut(t)
+	f.orphan(t, "a.ns.example")
+	ds22Server(t, ctx, "a.ns.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "a.ns.example")
+	tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_ORPHAN_ZONE")
+	if got := dnssecchain.NSNamesFromContext(ctx); got != nil {
+		t.Errorf("want nothing collected, got %+v", got)
+	}
+}
+
+// Every tag that is a per-name verdict maps onto a chain-document status.
+func TestDNSSEC22ChainStatusCoversEveryVerdictTag(t *testing.T) {
+	for tag := range dnssec22ErrorTags {
+		if dnssec22ChainStatus[tag] == "" {
+			t.Errorf("tag %s has no chain-document status", tag)
+		}
+	}
+	if dnssec22ChainStatus["DS22_NS_ADDRESS_INSECURE"] != dnssecchain.NSNameInsecure {
+		t.Error("DS22_NS_ADDRESS_INSECURE must map to the insecure status")
+	}
+	if len(dnssec22ChainStatus) != len(dnssec22ErrorTags)+1 {
+		t.Errorf("chain status table has %d rows, want the %d verdict tags", len(dnssec22ChainStatus), len(dnssec22ErrorTags)+1)
 	}
 }

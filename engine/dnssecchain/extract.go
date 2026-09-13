@@ -24,6 +24,7 @@ const (
 	maxRRSIG   = 8
 	maxLinks   = 32
 	maxServers = 16
+	maxNSNames = 32
 )
 
 const revokeFlag = 1 << 7 // DNSKEY REVOKE bit (RFC 5011)
@@ -82,6 +83,7 @@ func Extract(ctx context.Context, in Input) *Summary {
 
 	e.buildLinks()
 	e.markAnchoredKeys()
+	e.summary.NSNames = NSNamesFromContext(ctx)
 	e.finalize()
 	e.summary.Status = e.rollup()
 	return e.summary
@@ -735,6 +737,10 @@ func (e *extractor) applyCaps() {
 		c.Signed[i].RRSIG, trunc = capSlice(c.Signed[i].RRSIG, maxRRSIG, trunc)
 	}
 	e.summary.Links, trunc = capSlice(e.summary.Links, maxLinks, trunc)
+	e.summary.NSNames, trunc = capSlice(e.summary.NSNames, maxNSNames, trunc)
+	for i := range e.summary.NSNames {
+		e.summary.NSNames[i].Servers, trunc = capSlice(e.summary.NSNames[i].Servers, maxServers, trunc)
+	}
 
 	p.ServersQueried, trunc = capSlice(p.ServersQueried, maxServers, trunc)
 	p.ServersWithoutDS, trunc = capSlice(p.ServersWithoutDS, maxServers, trunc)

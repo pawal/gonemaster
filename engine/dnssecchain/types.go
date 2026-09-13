@@ -4,7 +4,9 @@ package dnssecchain
 
 // Version is the schema version of the emitted Summary. Changes are additive.
 // Version 2 added the per-side servers_stale lists and NSEC/NSEC3 signatures.
-const Version = 2
+// Version 3 added ns_names, the in-domain nameserver names of the zone with
+// what the run concluded about the signatures on their address records.
+const Version = 3
 
 // Roll-up status values.
 const (
@@ -62,6 +64,10 @@ type Summary struct {
 	Parent Parent `json:"parent"`
 	Child  Child  `json:"child"`
 	Links  []Link `json:"links"`
+
+	// NSNames is absent where the run reached no conclusion about any
+	// in-domain nameserver name, which is not the same as having none.
+	NSNames []NSName `json:"ns_names,omitempty"`
 }
 
 // Parent holds the DS evidence gathered from the parent zone's servers.

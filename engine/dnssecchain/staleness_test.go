@@ -470,8 +470,8 @@ func TestSummaryJSONVersionAndStaleArrays(t *testing.T) {
 	if err := json.Unmarshal(blob, &doc); err != nil {
 		t.Fatalf("unmarshal: %v", err)
 	}
-	if doc.Version != 2 {
-		t.Errorf("version = %d, want 2", doc.Version)
+	if doc.Version != 3 {
+		t.Errorf("version = %d, want 3", doc.Version)
 	}
 	if doc.Parent.ServersStale == nil || doc.Child.ServersStale == nil {
 		t.Errorf("servers_stale must marshal as an array, got %s", blob)

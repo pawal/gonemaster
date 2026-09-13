@@ -210,7 +210,7 @@ emit TEST_CASE_END
 | `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_MATCH_DS_DNSKEY` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_NO_DNSKEY_FOR_DS` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `DS02_NO_MATCHING_DNSKEY_RRSIG` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS02_NO_MATCHING_DNSKEY_RRSIG` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_NO_MATCH_DS_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -224,8 +224,9 @@ emit TEST_CASE_END
 - Differences (Upstream vs Gonemaster):
   - Upstream: explicitly describes a dedicated undelegated DS input branch in testcase flow. Gonemaster: `DNSSEC02` implementation uses parent DS discovery path directly and has no separate testcase-local undelegated DS branch.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+  - Upstream: emits `DS02_NO_MATCHING_DNSKEY_RRSIG` at `WARNING`. Gonemaster: emits it at `ERROR`, because RFC 4035 section 2.2 requires the apex DNSKEY RRset to be signed by each algorithm in the parent DS RRset, and a validator that implements the referenced algorithm answers SERVFAIL for a zone that omits those signatures. See `DIV-DS02-RRSIG-SEVERITY`.
 - Potential upstream report:
-  - `no`
+  - `yes`
 
 ## Edge Cases And Limitations
 - If parent DS discovery yields no DS records, testcase stops after boundary tags and emits no DS02 findings.

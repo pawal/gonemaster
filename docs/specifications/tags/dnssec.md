@@ -41,7 +41,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS02_DS_ALGO_DNSKEY_MISMATCH` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_MATCH_DS_DNSKEY` | `INFO` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_NO_DNSKEY_FOR_DS` | `WARNING` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
-| `DS02_NO_MATCHING_DNSKEY_RRSIG` | `WARNING` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
+| `DS02_NO_MATCHING_DNSKEY_RRSIG` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_NO_MATCH_DS_DNSKEY` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |
 | `DS02_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | [dnssec02](../tests/dnssec/dnssec02.md) | yes |

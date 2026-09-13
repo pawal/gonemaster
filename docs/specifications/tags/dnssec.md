@@ -87,6 +87,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS07_NO_DS_FOR_SIGNED_ZONE` | `WARNING` | [dnssec07](../tests/dnssec/dnssec07.md) | yes |
 | `DS07_NO_DS_ON_PARENT_SERVER` | `WARNING` | [dnssec07](../tests/dnssec/dnssec07.md) | yes |
 | `DS07_NO_RESPONSE_DNSKEY` | `WARNING` | [dnssec07](../tests/dnssec/dnssec07.md) | yes |
+| `DS07_PARENT_PROVES_NO_DELEGATION` | `ERROR` | [dnssec07](../tests/dnssec/dnssec07.md) | yes |
 | `DS07_SIGNED` | `INFO` | [dnssec07](../tests/dnssec/dnssec07.md) | yes |
 | `DS07_SIGNED_ON_SERVER` | `INFO` | [dnssec07](../tests/dnssec/dnssec07.md) | yes |
 | `DS07_UNEXP_RCODE_RESP_DNSKEY` | `WARNING` | [dnssec07](../tests/dnssec/dnssec07.md) | yes |

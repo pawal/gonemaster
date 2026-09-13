@@ -45,10 +45,12 @@ type NSName struct {
 }
 
 // nsNameCollector gathers per-name observations for one run, keeping the worst
-// status seen for each name.
+// status seen for each name. It also carries the run's undelegated verdict,
+// which is a statement about the zone itself rather than about a name in it.
 type nsNameCollector struct {
-	mu     sync.Mutex
-	byName map[string]*NSName
+	mu          sync.Mutex
+	byName      map[string]*NSName
+	undelegated string
 }
 
 type nsNamesKey struct{}
@@ -102,6 +104,30 @@ func CollectNSName(ctx context.Context, obs NSName) {
 			cur.KeyTag = obs.KeyTag
 		}
 	}
+}
+
+// CollectUndelegated records that the parent zone proves no delegation exists
+// at the zone under test. parent is the zone that carries the proof.
+func CollectUndelegated(ctx context.Context, parent string) {
+	c := collectorFromContext(ctx)
+	if c == nil || parent == "" {
+		return
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.undelegated = parent
+}
+
+// UndelegatedFromContext returns the parent zone that proved no delegation, or
+// the empty string.
+func UndelegatedFromContext(ctx context.Context) string {
+	c := collectorFromContext(ctx)
+	if c == nil {
+		return ""
+	}
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.undelegated
 }
 
 // NSNamesFromContext returns the collected names sorted by name, with each

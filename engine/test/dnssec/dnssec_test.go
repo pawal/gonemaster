@@ -20,6 +20,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -6464,4 +6465,245 @@ func TestDSDigestMatchesDNSKEY(t *testing.T) {
 	if dsDigestMatchesDNSKEY(nil, key) || dsDigestMatchesDNSKEY(ds, nil) {
 		t.Error("a nil argument matched")
 	}
+}
+
+// --- DNSSEC07: a parent that denies the delegation ---
+
+// ds07Env is a signed child "a.ns.example" whose parent "ns.example" is itself
+// anchored by a DS in "example". The parent's answer to the child's DS query is
+// supplied per test, which is the only thing the verdict turns on.
+type ds07Env struct {
+	parentKey    *dns.DNSKEY
+	parentSigner crypto.Signer
+	parentDS     *dns.DS
+	// The zone-signing key. The DS names the KSK only, so a denial signed by
+	// this key validates solely through the signed DNSKEY RRset.
+	parentZSK       *dns.DNSKEY
+	parentZSKSigner crypto.Signer
+}
+
+// newDS07Env wires the three zones and the stubs DNSSEC07 reads them through.
+// dsAnswer is what the parent nameserver returns for the child's DS question.
+func newDS07Env(t *testing.T, ctx context.Context, dsAnswer func(*ds07Env) packet.Packet) *ds07Env {
+	t.Helper()
+	childKey, childSigner := tctest.SignedKey(t, "a.ns.example", dns.ECDSAP256SHA256, tctest.SEP())
+	parentKey, parentSigner := tctest.SignedKey(t, "ns.example", dns.ECDSAP256SHA256, tctest.SEP())
+	parentZSK, parentZSKSigner := tctest.SignedKey(t, "ns.example", dns.ECDSAP256SHA256)
+	env := &ds07Env{
+		parentKey: parentKey, parentSigner: parentSigner, parentDS: parentKey.ToDS(dns.SHA256),
+		parentZSK: parentZSK, parentZSKSigner: parentZSKSigner,
+	}
+
+	parentZone, err := zone.New("ns.example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	grandZone, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+
+	tctest.Stub(t, &zoneParent, func(_ context.Context, z *zone.Zone) (*zone.Zone, error) {
+		if z != nil && z.Name.String() == "ns.example" {
+			return &grandZone, nil
+		}
+		return &parentZone, nil
+	})
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return tctest.NSItems("ns1.a.ns.example/192.0.2.50"), nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{}, nil
+	})
+	tctest.Stub(t, &parentNameservers, func(_ context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
+		if z != nil && z.Name.String() == "ns.example" {
+			ns, _ := nameserver.NewWithContext(ctx, "ns-grand.example", "192.0.2.52", nil)
+			return []nameserver.Nameserver{ns}, nil
+		}
+		ns, _ := nameserver.NewWithContext(ctx, "ns-parent.example", "192.0.2.51", nil)
+		return []nameserver.Nameserver{ns}, nil
+	})
+
+	// The child is signed, which is the gate DNSSEC07 evaluates first.
+	childSig := tctest.Sign(t, childKey, childSigner, dns.TypeDNSKEY, []dns.RR{childKey})
+	tctest.NS(t, ctx, "ns1.a.ns.example", "192.0.2.50", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "SOA":
+			return answerPacket(q.Name, dns.TypeSOA, soaRecord(q.Name))
+		case "DNSKEY":
+			return tctest.Response(tctest.Question(q.Name, dns.TypeDNSKEY), tctest.Secure(), tctest.Answers(childKey, childSig))
+		}
+		return packet.Packet{}
+	})
+
+	// The parent answers the child's DS question, and publishes its own keys.
+	keyset := []dns.RR{parentKey, parentZSK}
+	keySig := tctest.Sign(t, parentKey, parentSigner, dns.TypeDNSKEY, keyset)
+	tctest.NS(t, ctx, "ns-parent.example", "192.0.2.51", func(q tctest.Query) packet.Packet {
+		switch {
+		case q.Type == "DS" && q.Name == "a.ns.example":
+			return dsAnswer(env)
+		case q.Type == "DNSKEY" && q.Name == "ns.example":
+			return tctest.Response(tctest.Question(q.Name, dns.TypeDNSKEY), tctest.Secure(),
+				tctest.Answers(parentKey, parentZSK, keySig))
+		}
+		return packet.Packet{}
+	})
+
+	// The grandparent anchors the parent.
+	dsSig := tctest.Sign(t, parentKey, parentSigner, dns.TypeDS, []dns.RR{env.parentDS})
+	tctest.NS(t, ctx, "ns-grand.example", "192.0.2.52", func(q tctest.Query) packet.Packet {
+		if q.Type == "DS" && q.Name == "ns.example" {
+			return tctest.Response(tctest.Question(q.Name, dns.TypeDS), tctest.Secure(), tctest.Answers(env.parentDS, dsSig))
+		}
+		return packet.Packet{}
+	})
+	return env
+}
+
+// ds07Denied builds a signed DS NODATA whose NSEC3 for the child carries the
+// given types. Without the NS bit it proves there is no delegation.
+func ds07DeniedBy(t *testing.T, env *ds07Env, types ...uint16) packet.Packet {
+	t.Helper()
+	nsec3 := ds22NSEC3("a.ns.example", "ns.example", types...)
+	sig := tctest.Sign(t, env.parentZSK, env.parentZSKSigner, dns.TypeNSEC3, []dns.RR{nsec3})
+	return tctest.Response(tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(nsec3, sig))
+}
+
+// runDS07 runs DNSSEC07 on the child zone.
+func runDS07(t *testing.T, ctx context.Context) []*logger.Entry {
+	t.Helper()
+	z, err := zone.New("a.ns.example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC07(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec07: %v", err)
+	}
+	return entries
+}
+
+// The NSEC3 matching the name carries no NS bit, so the parent proves the zone
+// is not delegated, and the parent is anchored by a DS at the grandparent.
+func TestDNSSEC07ParentProvesNoDelegation(t *testing.T) {
+	ctx := tctest.Context(t)
+	env := newDS07Env(t, ctx, func(e *ds07Env) packet.Packet {
+		return ds07DeniedBy(t, e, dns.TypeA, dns.TypeRRSIG)
+	})
+	_ = env
+
+	entries := runDS07(t, ctx)
+	tctest.RequireTags(t, entries, "DS07_NO_DS_FOR_SIGNED_ZONE")
+	entry := tctest.RequireTag(t, entries, "DS07_PARENT_PROVES_NO_DELEGATION")
+	if parent, _ := entry.Args["parent"].(string); parent != "ns.example" {
+		t.Errorf("parent = %q, want ns.example", parent)
+	}
+	if servers := tctest.Servers(t, entry.Args["servers"]); len(servers) != 1 {
+		t.Errorf("want the one parent server, got %#v", entry.Args["servers"])
+	}
+	// The chain document learns the verdict too.
+	if got := dnssecchain.UndelegatedFromContext(ctx); got != "" {
+		t.Errorf("without a collector nothing is published, got %q", got)
+	}
+}
+
+// An ordinary insecure delegation carries the NS bit and is not a fault.
+func TestDNSSEC07InsecureDelegationIsNotADenial(t *testing.T) {
+	ctx := tctest.Context(t)
+	newDS07Env(t, ctx, func(e *ds07Env) packet.Packet {
+		return ds07DeniedBy(t, e, dns.TypeNS, dns.TypeRRSIG)
+	})
+
+	entries := runDS07(t, ctx)
+	tctest.RequireTags(t, entries, "DS07_NO_DS_FOR_SIGNED_ZONE")
+	tctest.RequireNoTag(t, entries, "DS07_PARENT_PROVES_NO_DELEGATION")
+}
+
+// An unsigned parent states nothing about the name, so no verdict is reached.
+func TestDNSSEC07UnsignedParentReachesNoVerdict(t *testing.T) {
+	ctx := tctest.Context(t)
+	newDS07Env(t, ctx, func(_ *ds07Env) packet.Packet {
+		return tctest.Response(tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure())
+	})
+
+	entries := runDS07(t, ctx)
+	tctest.RequireTags(t, entries, "DS07_NO_DS_FOR_SIGNED_ZONE")
+	tctest.RequireNoTag(t, entries, "DS07_PARENT_PROVES_NO_DELEGATION")
+}
+
+// A bitmap carrying both NS and DS contradicts the NODATA it came with.
+func TestDNSSEC07ContradictoryBitmapReachesNoVerdict(t *testing.T) {
+	ctx := tctest.Context(t)
+	newDS07Env(t, ctx, func(e *ds07Env) packet.Packet {
+		return ds07DeniedBy(t, e, dns.TypeNS, dns.TypeDS, dns.TypeRRSIG)
+	})
+
+	entries := runDS07(t, ctx)
+	tctest.RequireNoTag(t, entries, "DS07_PARENT_PROVES_NO_DELEGATION")
+}
+
+// The verdict claims validating resolvers reject the zone, so it is not
+// reached when the parent itself is not anchored.
+func TestDNSSEC07UnanchoredParentReachesNoVerdict(t *testing.T) {
+	ctx := tctest.Context(t)
+	newDS07Env(t, ctx, func(e *ds07Env) packet.Packet {
+		return ds07DeniedBy(t, e, dns.TypeA, dns.TypeRRSIG)
+	})
+	// The grandparent has no DS for the parent.
+	tctest.NS(t, ctx, "ns-grand.example", "192.0.2.52", func(q tctest.Query) packet.Packet {
+		return tctest.Response(tctest.Question(q.Name, dns.TypeDS), tctest.Secure())
+	})
+
+	entries := runDS07(t, ctx)
+	tctest.RequireTags(t, entries, "DS07_NO_DS_FOR_SIGNED_ZONE")
+	tctest.RequireNoTag(t, entries, "DS07_PARENT_PROVES_NO_DELEGATION")
+}
+
+// The verdict reaches the chain document when a run collects one.
+func TestDNSSEC07PublishesTheVerdictToTheChainDocument(t *testing.T) {
+	ctx := dnssecchain.WithNSNames(tctest.Context(t))
+	newDS07Env(t, ctx, func(e *ds07Env) packet.Packet {
+		return ds07DeniedBy(t, e, dns.TypeA, dns.TypeRRSIG)
+	})
+
+	entries := runDS07(t, ctx)
+	tctest.RequireTag(t, entries, "DS07_PARENT_PROVES_NO_DELEGATION")
+	if got := dnssecchain.UndelegatedFromContext(ctx); got != "ns.example" {
+		t.Errorf("collected parent = %q, want ns.example", got)
+	}
+}
+
+// The parent's statement is read off the record already in the response.
+func TestDS07ReadDenial(t *testing.T) {
+	name := dnsname.New("a.ns.example")
+	cases := []struct {
+		label string
+		types []uint16
+		want  ds07Delegation
+	}{
+		{"no NS bit denies the delegation", []uint16{dns.TypeA, dns.TypeRRSIG}, ds07Denied},
+		{"NS bit is an insecure delegation", []uint16{dns.TypeNS, dns.TypeRRSIG}, ds07Delegated},
+		{"NS and DS contradict the NODATA", []uint16{dns.TypeNS, dns.TypeDS}, ds07Unproven},
+	}
+	for _, tc := range cases {
+		t.Run(tc.label, func(t *testing.T) {
+			nsec3 := ds22NSEC3("a.ns.example", "ns.example", tc.types...)
+			resp := tctest.Response(tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(nsec3))
+			got, denial := ds07ReadDenial(name, resp)
+			if got != tc.want {
+				t.Errorf("delegation = %v, want %v", got, tc.want)
+			}
+			if tc.want != ds07Unproven && len(denial.rrset) != 1 {
+				t.Errorf("want the denial record kept, got %d", len(denial.rrset))
+			}
+		})
+	}
+
+	t.Run("no denial record states nothing", func(t *testing.T) {
+		resp := tctest.Response(tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure())
+		if got, _ := ds07ReadDenial(name, resp); got != ds07Unproven {
+			t.Errorf("delegation = %v, want unproven", got)
+		}
+	})
 }

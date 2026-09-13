@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 85,
-    "unique_tag_count": 591
+    "unique_tag_count": 592
   },
   "modules": {
     "address": {
@@ -453,6 +453,7 @@
         "DS07_NO_DS_FOR_SIGNED_ZONE",
         "DS07_NO_DS_ON_PARENT_SERVER",
         "DS07_NO_RESPONSE_DNSKEY",
+        "DS07_PARENT_PROVES_NO_DELEGATION",
         "DS07_SIGNED",
         "DS07_SIGNED_ON_SERVER",
         "DS07_UNEXP_RCODE_RESP_DNSKEY",

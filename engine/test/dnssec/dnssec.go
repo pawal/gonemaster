@@ -427,6 +427,7 @@ func Metadata() map[string][]string {
 			"DS07_NO_DS_ON_PARENT_SERVER",
 			"DS07_NO_DS_FOR_SIGNED_ZONE",
 			"DS07_NO_RESPONSE_DNSKEY",
+			"DS07_PARENT_PROVES_NO_DELEGATION",
 			"DS07_SIGNED",
 			"DS07_SIGNED_ON_SERVER",
 			"DS07_UNEXP_RCODE_RESP_DNSKEY",
@@ -2341,6 +2342,11 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	var noResponseDNSKEY []string
 	var signedResponse []string
 	var noAuthDNSKEY []string
+	// What the parent says about the zone name as a delegation, read from the
+	// DS responses the parent-side loop already makes.
+	var sawDelegated bool
+	var denials []ds07Denial
+	var denialServers []logargs.Server
 	errorRcodeDNSKEY := map[string][]string{}
 	var notSigned []string
 	var noDS []string
@@ -2487,6 +2493,9 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			ignored         bool
 			dsInResponse    bool
 			noDS            bool
+			delegation      ds07Delegation
+			denial          ds07Denial
+			endpoints       []logargs.Server
 		}
 
 		parentGroups := nameserversByIP(parentNS)
@@ -2529,6 +2538,10 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 					outcome.dsInResponse = true
 				} else {
 					outcome.noDS = true
+					// The proof of what the parent says about the name is in
+					// the response already made; no query is added to read it.
+					outcome.delegation, outcome.denial = ds07ReadDenial(z.Name, dsResp)
+					outcome.endpoints = dnssec22Endpoints(group)
 				}
 				outcomes[i] = outcome
 				return nil
@@ -2554,6 +2567,13 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 			if outcome.noDS {
 				noDS = append(noDS, outcome.matchingStrings...)
+				switch outcome.delegation {
+				case ds07Delegated:
+					sawDelegated = true
+				case ds07Denied:
+					denials = append(denials, outcome.denial)
+					denialServers = append(denialServers, outcome.endpoints...)
+				}
 			}
 		}
 	}
@@ -2659,6 +2679,18 @@ func DNSSEC07(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if len(noDS) > 0 && len(dsInResponse) == 0 {
 			if err := appendLog(ctx, &results, testcase, "DS07_NO_DS_FOR_SIGNED_ZONE", map[string]any{}); err != nil {
 				return results, err
+			}
+			// The parent denies the delegation on every server that answered,
+			// which is the only shape worth the two anchoring queries.
+			if !sawDelegated && len(denials) > 0 {
+				if parentName, ok := ds07ParentAnchors(ctx, z, parentNS, denials); ok {
+					args := map[string]any{"parent": parentName}
+					setTypedServersFromEndpoints(args, denialServers)
+					if err := appendLog(ctx, &results, testcase, "DS07_PARENT_PROVES_NO_DELEGATION", args); err != nil {
+						return results, err
+					}
+					dnssecchain.CollectUndelegated(ctx, parentName)
+				}
 			}
 		}
 		if len(noDS) == 0 && len(dsInResponse) > 0 {
@@ -8691,6 +8723,159 @@ func DNSSEC21(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	return results, nil
+}
+
+// ds07Delegation is what the parent's signed denial says about the zone name.
+type ds07Delegation int
+
+const (
+	// No NSEC or NSEC3 matches the name, so the parent states nothing.
+	ds07Unproven ds07Delegation = iota
+	// The bitmap carries the NS bit: an insecure delegation.
+	ds07Delegated
+	// The bitmap carries no NS bit: no delegation exists at the name.
+	ds07Denied
+)
+
+// ds07Denial is the record that denies the delegation and the signatures over
+// it, kept so the verdict can check that the parent really signed the denial.
+type ds07Denial struct {
+	rrset []dns.RR
+	sigs  []*dns.RRSIG
+	at    time.Time
+}
+
+// ds07ReadDenial reads the parent's statement about name off the NSEC or NSEC3
+// matching it in a DS NODATA response. It adds no query.
+func ds07ReadDenial(name dnsname.Name, resp packet.Packet) (ds07Delegation, ds07Denial) {
+	for _, rr := range resp.GetRecords("NSEC", "authority") {
+		nsec, ok := rr.(*dns.NSEC)
+		if !ok || !rrOwnerMatchesZone(rr, name) {
+			continue
+		}
+		return ds07DelegationFromBitmap(nsec.TypeBitMap), ds07DenialFor(resp, dns.TypeNSEC, rr)
+	}
+	for _, rr := range resp.GetRecords("NSEC3", "authority") {
+		nsec3, ok := rr.(*dns.NSEC3)
+		if !ok || !nsec3OwnerMatchesName(nsec3, name) {
+			continue
+		}
+		return ds07DelegationFromBitmap(nsec3.TypeBitMap), ds07DenialFor(resp, dns.TypeNSEC3, rr)
+	}
+	return ds07Unproven, ds07Denial{}
+}
+
+// ds07DelegationFromBitmap maps a type bitmap onto the parent's statement. A
+// bitmap carrying both NS and DS contradicts the NODATA it came with and is
+// treated as no statement.
+func ds07DelegationFromBitmap(types []uint16) ds07Delegation {
+	typeMap := typeMapFromBitmap(types)
+	if !typeMap["NS"] {
+		return ds07Denied
+	}
+	if typeMap["DS"] {
+		return ds07Unproven
+	}
+	return ds07Delegated
+}
+
+// ds07DenialFor collects the denial RRset of the given type and the signatures
+// covering it. Owner names are compared case-insensitively: a server is free to
+// vary the case it echoes, and 0x20 randomisation makes it do so.
+func ds07DenialFor(resp packet.Packet, rrtype uint16, owner dns.RR) ds07Denial {
+	ownerName := dnsname.New(owner.Header().Name)
+	typeName := rrsigTypeString(rrtype)
+	denial := ds07Denial{at: packetTime(resp)}
+	for _, rr := range resp.GetRecords(typeName, "authority") {
+		if rrOwnerMatchesZone(rr, ownerName) {
+			denial.rrset = append(denial.rrset, rr)
+		}
+	}
+	for _, rr := range resp.GetRecords("RRSIG", "authority") {
+		sig, ok := rr.(*dns.RRSIG)
+		if !ok || sig.TypeCovered != rrtype || !rrOwnerMatchesZone(rr, ownerName) {
+			continue
+		}
+		denial.sigs = append(denial.sigs, sig)
+	}
+	return denial
+}
+
+// ds07ParentAnchors reports whether the parent zone is anchored by a DS at the
+// grandparent and really signed the denial. It makes two queries and is called
+// only once the free evidence already shows the parent denying the delegation.
+// The walk is one level: a grandparent that is itself insecure is not detected.
+func ds07ParentAnchors(ctx context.Context, z *zone.Zone, parentNS []nameserver.Nameserver, denials []ds07Denial) (string, bool) {
+	if z == nil || len(parentNS) == 0 {
+		return "", false
+	}
+	parent, err := zoneParent(ctx, z)
+	if err != nil || parent == nil {
+		return "", false
+	}
+	// The grandparent's servers hold the DS that anchors the parent. They are
+	// the parent's own parent nameservers, resolved the same way the run
+	// resolved this zone's.
+	grandNS, err := parentNameservers(ctx, parent)
+	if err != nil || len(grandNS) == 0 {
+		return "", false
+	}
+
+	dsResp := ds07Answer(ctx, grandNS, parent.Name, "DS")
+	dsRRs := dsResp.GetRecordsForName("DS", parent.Name, "answer")
+	if len(dsRRs) == 0 {
+		return "", false
+	}
+	keyResp := ds07Answer(ctx, parentNS, parent.Name, "DNSKEY")
+	keyRRs := keyResp.GetRecordsForName("DNSKEY", parent.Name, "answer")
+	if len(keyRRs) == 0 {
+		return "", false
+	}
+	var keys []*dns.DNSKEY
+	for _, rr := range keyRRs {
+		if key, ok := rr.(*dns.DNSKEY); ok {
+			keys = append(keys, key)
+		}
+	}
+
+	// The DS anchors the DNSKEY RRset, not each signature in the zone: a key
+	// the DS names must sign the DNSKEY RRset, and any key in that RRset may
+	// then sign the denial.
+	matched := dnssec22KeysMatchingDS(dsRRs, keys)
+	if len(matched) == 0 {
+		return "", false
+	}
+	keySigs := filterRRSIGByType(keyResp.GetRecordsForName("RRSIG", parent.Name, "answer"), dns.TypeDNSKEY)
+	keyCheck := dnssec22VerifySigs(keySigs, matched, packetTime(keyResp), func(*dns.RRSIG) []dns.RR { return keyRRs })
+	if !keyCheck.verified {
+		return "", false
+	}
+
+	for _, denial := range denials {
+		if len(denial.sigs) == 0 || len(denial.rrset) == 0 {
+			continue
+		}
+		check := dnssec22VerifySigs(denial.sigs, keys, denial.at, func(*dns.RRSIG) []dns.RR { return denial.rrset })
+		if check.verified {
+			return parent.Name.String(), true
+		}
+	}
+	return "", false
+}
+
+// ds07Answer queries rrtype at name with DNSSEC enabled and returns the first
+// authoritative response carrying the RRset, or a zero packet.
+func ds07Answer(ctx context.Context, servers []nameserver.Nameserver, name dnsname.Name, rrtype string) packet.Packet {
+	for _, ns := range servers {
+		resp := dnssec22Query(ctx, ns, name, rrtype)
+		if resp.Msg == nil || !resp.AA() || resp.Rcode() != "NOERROR" {
+			continue
+		}
+		if len(resp.GetRecordsForName(rrtype, name, "answer")) > 0 {
+			return resp
+		}
+	}
+	return packet.Packet{}
 }
 
 // dnssec22CutStatus is what one nameserver says about a name as a zone cut.

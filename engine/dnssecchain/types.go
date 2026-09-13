@@ -5,7 +5,8 @@ package dnssecchain
 // Version is the schema version of the emitted Summary. Changes are additive.
 // Version 2 added the per-side servers_stale lists and NSEC/NSEC3 signatures.
 // Version 3 added ns_names, the in-domain nameserver names of the zone with
-// what the run concluded about the signatures on their address records.
+// what the run concluded about the signatures on their address records, and
+// the undelegated roll-up status.
 const Version = 3
 
 // Roll-up status values.
@@ -16,6 +17,10 @@ const (
 	StatusIsland        = "island"
 	StatusUnsigned      = "unsigned"
 	StatusIndeterminate = "indeterminate"
+	// StatusUndelegated is a signed zone whose parent proves, under signature,
+	// that no delegation exists at the name. Distinct from StatusIsland, where
+	// the parent is merely silent.
+	StatusUndelegated = "undelegated"
 )
 
 // Delegation kinds.

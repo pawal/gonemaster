@@ -86,6 +86,11 @@ func Extract(ctx context.Context, in Input) *Summary {
 	e.summary.NSNames = NSNamesFromContext(ctx)
 	e.finalize()
 	e.summary.Status = e.rollup()
+	// A parent that denies the delegation outranks the island reading, which
+	// says only that the parent is silent.
+	if UndelegatedFromContext(ctx) != "" && e.summary.Status == StatusIsland {
+		e.summary.Status = StatusUndelegated
+	}
 	return e.summary
 }
 

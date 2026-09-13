@@ -55,6 +55,9 @@ const (
 	LinkAlgorithmMismatch = "algorithm_mismatch"
 	LinkNoDNSKEY          = "no_dnskey"
 	LinkUnsupportedDigest = "unsupported_digest"
+	// LinkKeyNotSigning is a DS naming a key that contributes no signature over
+	// the DNSKEY RRset, which RFC 4035 section 5.2 requires of that key itself.
+	LinkKeyNotSigning = "key_not_signing"
 )
 
 // Summary is the versioned chain document persisted per public run.

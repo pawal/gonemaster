@@ -87,6 +87,8 @@ type fixtureOpts struct {
 	expiredKeySig    bool // child DNSKEY RRSIG expired
 	noDS             bool // parent serves no DS (island)
 	noDNSKEY         bool // child serves no DNSKEY
+	deadAnchorKSK    bool // second DS-anchored KSK that signs nothing
+	unsignedDNSKEY   bool // child serves the DNSKEY RRset with no RRSIG
 }
 
 func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
@@ -97,6 +99,11 @@ func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
 	parentKSK := genKey(t, testParent, true)
 
 	dnskeyRRset := []dns.RR{childKSK.Key, childZSK.Key}
+	var deadKSK dnstest.Keypair
+	if opts.deadAnchorKSK {
+		deadKSK = genKey(t, testZone, true)
+		dnskeyRRset = append(dnskeyRRset, deadKSK.Key)
+	}
 	keyInception := fixedAt.Add(-24 * time.Hour)
 	keyExpiration := fixedAt.Add(24 * time.Hour)
 	if opts.expiredKeySig {
@@ -116,6 +123,13 @@ func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
 		ds.Algorithm = 253
 	}
 	dsRRset := []dns.RR{ds}
+	if opts.deadAnchorKSK {
+		deadDS := deadKSK.Key.ToDS(dns.SHA256)
+		if deadDS == nil {
+			t.Fatalf("dead KSK ToDS returned nil")
+		}
+		dsRRset = append(dsRRset, deadDS)
+	}
 	if opts.extraWrongAlgoDS {
 		wrong := *ds
 		wrong.Algorithm = 253
@@ -132,7 +146,11 @@ func buildInput(t *testing.T, ctx context.Context, opts fixtureOpts) Input {
 			if opts.noDNSKEY {
 				return dnssecAnswer(testZone, dns.TypeDNSKEY)
 			}
-			return dnssecAnswer(testZone, dns.TypeDNSKEY, childKSK.Key, childZSK.Key, dnskeySig)
+			answers := append([]dns.RR{}, dnskeyRRset...)
+			if !opts.unsignedDNSKEY {
+				answers = append(answers, dnskeySig)
+			}
+			return dnssecAnswer(testZone, dns.TypeDNSKEY, answers...)
 		}
 		return packet.Packet{}
 	}
@@ -1185,5 +1203,67 @@ func TestExtractRSAExponentPartial(t *testing.T) {
 	link, ok := findLink(got, keytag)
 	if !ok || link.Status != LinkMatch {
 		t.Errorf("expected matching DS link for keytag %d, got %+v", keytag, link)
+	}
+}
+
+// RFC 4035 section 5.2 makes the DS-matched key itself sign the DNSKEY RRset,
+// so a DS naming a key that signs nothing is a dead anchor. The working DS
+// still carries the zone, which is partial, not broken.
+func TestExtractDeadAnchorIsPartial(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+	in := buildInput(t, ctx, fixtureOpts{deadAnchorKSK: true})
+
+	got := Extract(ctx, in)
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	if got.Status != StatusPartial {
+		t.Errorf("status = %q, want %q", got.Status, StatusPartial)
+	}
+
+	var match, dead int
+	for _, l := range got.Links {
+		switch l.Status {
+		case LinkMatch:
+			match++
+		case LinkKeyNotSigning:
+			dead++
+		default:
+			t.Errorf("link %d: unexpected status %q", l.DSKeyTag, l.Status)
+		}
+	}
+	if match != 1 || dead != 1 {
+		t.Errorf("links: %d match, %d key_not_signing, want 1 and 1", match, dead)
+	}
+
+	// A DS names the dead key, so the diagram still draws it as anchored.
+	var anchored int
+	for _, k := range got.Child.DNSKEYs {
+		if k.Anchored {
+			anchored++
+		}
+	}
+	if anchored != 2 {
+		t.Errorf("anchored keys = %d, want 2", anchored)
+	}
+}
+
+// A zone serving no DNSKEY RRSIG at all proves nothing about which key signs,
+// so every link keeps its digest verdict and the roll-up carries the fault.
+func TestExtractUnsignedDNSKEYKeepsLinkMatch(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+	in := buildInput(t, ctx, fixtureOpts{unsignedDNSKEY: true})
+
+	got := Extract(ctx, in)
+	if got == nil {
+		t.Fatal("expected a summary")
+	}
+	for _, l := range got.Links {
+		if l.Status != LinkMatch {
+			t.Errorf("link %d: status = %q, want %q", l.DSKeyTag, l.Status, LinkMatch)
+		}
+	}
+	if got.Status != StatusBroken {
+		t.Errorf("status = %q, want %q", got.Status, StatusBroken)
 	}
 }

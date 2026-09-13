@@ -351,14 +351,37 @@ func (e *extractor) buildLinks() {
 			})
 			continue
 		}
+		status := dsLinkStatus(ds, keys)
+		// Only a zone that signs its DNSKEY RRset at all can be judged here.
+		if status == LinkMatch && len(e.summary.Child.DNSKEYRRSIG) > 0 && !e.signsDNSKEYRRset(ds.KeyTag) {
+			status = LinkKeyNotSigning
+		}
 		e.summary.Links = append(e.summary.Links, Link{
 			DSKeyTag:     ds.KeyTag,
 			DSDigestType: ds.DigestType,
 			DNSKEYKeyTag: ds.KeyTag,
-			Status:       dsLinkStatus(ds, keys),
+			Status:       status,
 			Servers:      e.serversForKey(ds.KeyTag),
 		})
 	}
+}
+
+// signsDNSKEYRRset reports whether the key contributed any signature over the
+// DNSKEY RRset. A signature outside its window still counts: its state carries
+// that fault already.
+func (e *extractor) signsDNSKEYRRset(keytag uint16) bool {
+	for _, sig := range e.summary.Child.DNSKEYRRSIG {
+		if sig.KeyTag == keytag {
+			return true
+		}
+	}
+	return false
+}
+
+// linkAnchors reports whether the DS names a key the zone publishes, whether or
+// not that key signs the DNSKEY RRset.
+func linkAnchors(status string) bool {
+	return status == LinkMatch || status == LinkKeyNotSigning
 }
 
 // dsLinkStatus compares the DS against every key with its tag; a nil
@@ -426,6 +449,10 @@ func (e *extractor) rollup() string {
 			if e.hasStaleServer() {
 				return StatusPartial
 			}
+			// A DS whose key signs nothing fails every resolver that picks it.
+			if e.hasDeadAnchor() {
+				return StatusPartial
+			}
 			return StatusSecure
 		}
 		// A DS-anchored key we cannot verify locally is unproven, not broken.
@@ -460,7 +487,7 @@ func (e *extractor) allDSSignaturesStale() bool {
 func (e *extractor) markAnchoredKeys() {
 	matched := map[uint16]bool{}
 	for _, l := range e.summary.Links {
-		if l.Status == LinkMatch {
+		if linkAnchors(l.Status) {
 			matched[l.DNSKEYKeyTag] = true
 		}
 	}
@@ -473,7 +500,17 @@ func (e *extractor) markAnchoredKeys() {
 
 func (e *extractor) hasMatchingLink() bool {
 	for _, l := range e.summary.Links {
-		if l.Status == LinkMatch {
+		if linkAnchors(l.Status) {
+			return true
+		}
+	}
+	return false
+}
+
+// hasDeadAnchor reports whether a DS names a key that signs nothing.
+func (e *extractor) hasDeadAnchor() bool {
+	for _, l := range e.summary.Links {
+		if l.Status == LinkKeyNotSigning {
 			return true
 		}
 	}

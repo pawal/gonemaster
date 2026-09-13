@@ -226,6 +226,34 @@ describe("DnssecChain", () => {
     expect(tip).toContain("2023-11-14 to 2025-06-15");
   });
 
+  it("marks a DS that names a key signing nothing as a dead anchor", async () => {
+    // RFC 4035 section 5.2 makes the DS-matched key sign the DNSKEY RRset. A
+    // second DS whose key signs nothing cannot be entered, so its edge is red
+    // and the callout names the key, while the working DS keeps it partial.
+    const chain = secureChain();
+    chain.status = "partial";
+    chain.parent.ds.push({ key_tag: 3000, algorithm: 13, digest_type: 2, digest: "cd", servers: ["192.0.2.1"] });
+    chain.child.dnskeys.push({ key_tag: 3000, algorithm: 13, flags: 257, sep: true, anchored: true, servers: ["203.0.113.1"] });
+    chain.links.push({ ds_key_tag: 3000, dnskey_key_tag: 3000, status: "key_not_signing", servers: ["203.0.113.1"] });
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const container = renderOpened();
+
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const badge = screen.getByTestId("chain-status-badge");
+    expect(badge.textContent).toBe("Partial");
+
+    const callout = screen.getByTestId("chain-dead-anchor");
+    expect(callout.textContent).toContain("3000");
+
+    const dead = [...container.querySelectorAll(".chain-edge")].filter((p) =>
+      (p.getAttribute("data-tip") ?? "").includes("DS 3000")
+    );
+    expect(dead.length).toBe(1);
+    expect(dead[0].getAttribute("class")).toContain("edge-bad");
+    expect(dead[0].getAttribute("data-tip")).toContain("Status: key signs nothing");
+  });
+
   it("renders an unverifiable large-RSA-exponent chain as a warn (partial), not a failure", async () => {
     // The .lv shape: DS matches the KSK, but the local verifier cannot check
     // the KSK's RSA exponent, so the DNSKEY signature is unsupported_key. The

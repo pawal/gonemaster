@@ -88,6 +88,10 @@
       (chain?.child?.dnskey_rrsig ?? []).filter((s) => s.state === "unsupported_key").map((s) => s.key_tag)
     ),
   ]);
+  // A DS naming a key that signs nothing: resolvers picking that DS fail.
+  let deadAnchorKeys = $derived([
+    ...new Set((chain?.links ?? []).filter((l) => l.status === "key_not_signing").map((l) => l.ds_key_tag)),
+  ]);
   let noDS = $derived(chain?.parent?.ds_source === "none" && (chain?.child?.dnskeys?.length ?? 0) > 0);
   // Claiming "serves no DNSKEY" needs a server that answered without keys.
   let noDNSKEY = $derived(
@@ -381,6 +385,9 @@
         {/if}
         {#if unverifiableKeys.length}
           <p class="dnssec-chain-callout callout-warn" data-testid="chain-unsupported-key">{$t("pub.dnssec_chain_unsupported_key", { keys: unverifiableKeys.join(", ") })}</p>
+        {/if}
+        {#if deadAnchorKeys.length}
+          <p class="dnssec-chain-callout callout-bad" data-testid="chain-dead-anchor">{$t("pub.dnssec_chain_dead_anchor", { keys: deadAnchorKeys.join(", ") })}</p>
         {/if}
         {#if indeterminate}
           <p class="dnssec-chain-callout callout-info" data-testid="chain-indeterminate">{$t("pub.dnssec_chain_indeterminate")}</p>

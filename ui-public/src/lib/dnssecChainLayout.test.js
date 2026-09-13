@@ -221,6 +221,21 @@ describe("layoutChain", () => {
     expect(statusLine.linkState).toBe("algorithm_mismatch");
   });
 
+  it("carries a key_not_signing DS link through to the edge and tip", () => {
+    // A DS naming a key that signs nothing cannot be entered (RFC 4035
+    // section 5.2). The layout passes the status through untouched, so the
+    // edge colors as bad and the tip localizes via
+    // pub.dnssec_chain_linkstatus_key_not_signing.
+    const g = layoutChain(secureChain({
+      status: "partial",
+      links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "key_not_signing", servers: ["203.0.113.1"] }],
+    }));
+    const dsEdge = g.edges.find((e) => e.kind === "ds");
+    expect(dsEdge.status).toBe("key_not_signing");
+    const statusLine = dsEdge.tip.find((l) => l.k === "pub.dnssec_chain_tip_status");
+    expect(statusLine.linkState).toBe("key_not_signing");
+  });
+
   it("prefers the matching link when a mismatched sibling DS shares the key tag", () => {
     // Two DS records for the same key tag, one usable and one with a wrong
     // algorithm field: the single collapsed edge must stay a match, since a

@@ -210,11 +210,11 @@ A DS record at the parent does not match any DNSKEY in the child zone. The key t
 
 ## Tag DS02_NO_MATCHING_DNSKEY_RRSIG
 
-Header: No DNSKEY has a matching RRSIG
+Header: DS names a key that signs nothing
 
 Description:
 
-The DNSKEY set contains keys that are supposed to sign zone data, but none of their RRSIGs could be matched back to a DNSKEY. Resolvers cannot validate anything and will treat the zone as bogus.
+The DS record at the parent names a DNSKEY, but no valid signature over the child DNSKEY RRset was made with that key. When it is the only key the parent names for its algorithm, a validating resolver that implements that algorithm has no path into the zone and fails it. Sign the DNSKEY RRset with the key, or remove the DS record.
 
 ## Tag DS02_NO_MATCH_DS_DNSKEY
 

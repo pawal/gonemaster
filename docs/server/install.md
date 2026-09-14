@@ -1,50 +1,72 @@
 # Installing gonemaster from packages
 
-Linux packages (`.deb` and `.rpm`) are produced for `linux/amd64` and
-`linux/arm64`. They install the binaries, man pages, systemd unit, env file,
-and a separate data package for the badkeys blocklist.
+Tagged releases ship Linux binary archives and Linux packages (`.deb` and
+`.rpm`) for `linux/amd64` and `linux/arm64`. The packages install the
+binaries, man pages, systemd unit, and env file.
 
 ## Packages
 
 | Package | Architecture | Contents |
 |---|---|---|
-| `gonemaster` | amd64, arm64 | CLI binary at `/usr/bin/gonemaster`. Depends on `gonemaster-badkeys-data`. |
-| `gonemaster-server` | amd64, arm64 | HTTP server with the embedded admin and public UIs. Ships the systemd unit and `/etc/gonemaster/server.env`. Depends on `gonemaster-badkeys-data`. Conflicts with `gonemaster-server-nogui`. |
-| `gonemaster-server-nogui` | amd64, arm64 | API-only server, smaller binary, no UI. Same systemd unit and env file. Conflicts with `gonemaster-server`. |
+| `gonemaster` | amd64, arm64 | CLI binary at `/usr/bin/gonemaster`. Recommends `gonemaster-badkeys-data`. |
+| `gonemaster-server` | amd64, arm64 | HTTP server with the embedded admin, public, and analysis UIs. Ships the systemd unit and `/etc/gonemaster/server.env`. Recommends `gonemaster-badkeys-data`. Conflicts with `gonemaster-server-nogui`. |
 | `gonemaster-client` | amd64, arm64 | CLI client for the server REST API at `/usr/bin/gonemaster-client`. |
 | `gonemaster-nagios` | amd64, arm64 | Nagios/Icinga plugin at `/usr/lib/nagios/plugins/check_gonemaster`. |
-| `gonemaster-badkeys-data` | all/noarch | Compromised-key blocklist data refreshed independently of the binaries. |
+| `gonemaster-mcp` | amd64, arm64 | Model Context Protocol bridge at `/usr/bin/gonemaster-mcp`. |
+| `gonemaster-server-nogui` | amd64, arm64 | API-only server, smaller binary, no UI. Same systemd unit and env file. Conflicts with `gonemaster-server`. Not attached to releases; build it with `make packages`. |
+| `gonemaster-badkeys-data` | all/noarch | Compromised-key blocklist data refreshed independently of the binaries. Not attached to releases; see [Blocklist data](#blocklist-data). |
 
 The server packages are mutually exclusive: installing one replaces the other
 cleanly via `apt install` or `dnf install`.
 
-## Where to get packages
+## Release artifacts
 
-For now, packages are attached to the [Codeberg release](https://codeberg.org/pawal/gonemaster/releases)
-for each tagged version. A `SHA256SUMS` file is published alongside; verify
-downloads before installing.
+Each tagged version attaches 23 files to its
+[Codeberg release](https://codeberg.org/pawal/gonemaster/releases): two binary
+archives, twenty packages, and `checksums.txt`.
 
-A Forgejo package registry hosted on Codeberg is on the roadmap; once enabled
-it will support `apt install` / `dnf install` against a registry URL without
-manual download.
+An archive is named `gonemaster_vX.Y.Z_linux_<arch>.tar.gz` and holds the five
+binaries `gonemaster`, `gonemaster-server`, `gonemaster-client`,
+`gonemaster-nagios`, and `gonemaster-mcp`, plus `LICENSE` and `Changelog`. The
+server binary in the archive embeds the admin, public, and analysis UIs.
+
+`checksums.txt` lists the SHA-256 sum of every attached file, with no directory
+component. Verify before installing:
+
+    sha256sum --ignore-missing -c checksums.txt
+
+Attachments are kept on the three most recent releases and stripped from older
+ones. Release notes remain. A download link MUST therefore point at a current
+release rather than an arbitrary older tag.
+
+A Forgejo package registry hosted on Codeberg is planned. Once enabled, it
+serves `apt install` and `dnf install` from a registry URL without manual
+download.
 
 ## Install
 
 ### Debian / Ubuntu
 
     # Download the .deb files for your architecture from the release page.
-    sudo apt install \
-        ./gonemaster-badkeys-data_1.4.9_all.deb \
-        ./gonemaster-server_1.4.9_amd64.deb
+    sudo apt install ./gonemaster-server_1.7.9_amd64.deb
 
-`apt` resolves the `Depends:` relationship and installs the data package
-automatically. Add `./gonemaster_1.4.9_amd64.deb` and others as needed.
+Add `./gonemaster_1.7.9_amd64.deb` and others as needed. `apt` lists
+`gonemaster-badkeys-data` as a recommended package and proceeds without it.
 
 ### Fedora / RHEL / Rocky
 
-    sudo dnf install \
-        ./gonemaster-badkeys-data-1.4.9-1.noarch.rpm \
-        ./gonemaster-server-1.4.9-1.x86_64.rpm
+    sudo dnf install ./gonemaster-server-1.7.9-1.x86_64.rpm
+
+`dnf` treats `gonemaster-badkeys-data` as a weak dependency and proceeds
+without it.
+
+### Binary archive
+
+    tar xzf gonemaster_v1.7.9_linux_amd64.tar.gz
+    sudo install -m 0755 gonemaster-server /usr/local/bin/
+
+The archive carries no systemd unit, env file, or man pages. Installing from a
+package is required for a service install.
 
 ### Verifying the install
 
@@ -94,6 +116,28 @@ To switch, install the other package; apt/dnf removes the previous one. The
 env file, systemd unit, and `/var/lib/gonemaster/` are preserved across the
 swap.
 
+## Blocklist data
+
+The badkeys blocklist is not attached to releases. Without it, dnssec19 reports
+`DS19_BLOCKLIST_NOT_FOUND` and checks no keys against the blocklist. Every
+other test runs unchanged.
+
+Fetch the data with the CLI:
+
+    gonemaster --badkeys-update
+
+The files land in `~/.local/share/gonemaster/badkeys/`, which the binaries
+search before the system directories. For a system-wide install, write them to
+a directory on `XDG_DATA_DIRS`:
+
+    sudo gonemaster --badkeys-update --badkeys-path /usr/share/gonemaster/badkeys
+
+Refresh at whatever interval suits the deployment. The data is independent of
+the binaries.
+
+Building `gonemaster-badkeys-data` from a source checkout with `make packages`
+produces a package that installs the same two files.
+
 ## Common operations
 
 | Action | Command |
@@ -112,21 +156,16 @@ Drop in the newer `.deb` or `.rpm` and reinstall. Package upgrades:
 - preserve `/var/lib/gonemaster/` and its contents,
 - restart the service only if it was running.
 
-To pull a fresh badkeys blocklist without rebuilding the server, upgrade only
-`gonemaster-badkeys-data`:
-
-    sudo apt install ./gonemaster-badkeys-data_NEWVERSION_all.deb
-    # or
-    sudo dnf install ./gonemaster-badkeys-data-NEWVERSION-1.noarch.rpm
+The blocklist updates separately; see [Blocklist data](#blocklist-data).
 
 ## Uninstall
 
     # Debian/Ubuntu
-    sudo apt remove gonemaster-server gonemaster-badkeys-data
+    sudo apt remove gonemaster-server
     sudo apt purge gonemaster-server     # additionally wipes /etc/gonemaster
 
     # Fedora/RHEL
-    sudo dnf remove gonemaster-server gonemaster-badkeys-data
+    sudo dnf remove gonemaster-server
 
 `remove` leaves the `gonemaster` system user and `/var/lib/gonemaster/` in
 place so an accidental remove-and-reinstall keeps the database. To wipe

@@ -11,10 +11,28 @@ steps:
         ver="$(awk '/^var Version = /{gsub(/"/,"",$4); print $4}' engine/engine.go)"
         [ "$tag" = "$ver" ] || { echo "tag $CI_COMMIT_TAG != engine.Version $ver"; exit 1; }
 
+  token_guard:
+    image: golang:1.27
+    depends_on:
+      - version_guard
+    environment:
+      CODEBERG_RELEASE_TOKEN:
+        from_secret: CODEBERG_RELEASE_TOKEN
+    commands:
+      - |
+        set -eu
+        test -n "$CODEBERG_RELEASE_TOKEN" || { echo "secret not injected"; exit 1; }
+        echo "token length: $${#CODEBERG_RELEASE_TOKEN}"
+        code="$(curl -s -o /dev/null -w '%{http_code}' \
+          -H "Authorization: token $CODEBERG_RELEASE_TOKEN" \
+          "https://codeberg.org/api/v1/repos/$CI_REPO/releases")"
+        echo "releases api: $code"
+        [ "$code" = "200" ] || { echo "token rejected by the forge"; exit 1; }
+
   ui_build:
     image: node:24-trixie
     depends_on:
-      - version_guard
+      - token_guard
     commands:
       - npm --prefix ui ci          && npm --prefix ui run build
       - npm --prefix ui-public ci   && npm --prefix ui-public run build
@@ -85,10 +103,11 @@ steps:
       - build_archives
       - build_packages
       - release_notes
+    environment:
+      PLUGIN_API_KEY:
+        from_secret: CODEBERG_RELEASE_TOKEN
     settings:
       base_url: https://codeberg.org
-      api_key:
-        from_secret: CODEBERG_RELEASE_TOKEN
       title: gonemaster ${CI_COMMIT_TAG}
       note: dist/notes.md
       # A moved tag must republish metadata, not just replace assets.

@@ -395,6 +395,9 @@ VERSION := $(shell awk '/^var Version = /{gsub(/"/,"",$$4); print $$4}' engine/e
 PACKAGE_ARCHES ?= amd64 arm64
 # CI builds the UIs in a separate node step; set empty to skip the prereq.
 PACKAGE_UI_DEP ?= ui-build
+# Set empty to skip the badkeys-data package and its blocklist download.
+PACKAGE_BADKEYS ?= 1
+BADKEYS_DEP := $(if $(PACKAGE_BADKEYS),share/badkeys/blocklist.dat share/badkeys/badkeysdata.json)
 DIST_DIR := dist
 PKG_DIR := $(DIST_DIR)/packages
 NFPM := $(GO) run github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
@@ -429,7 +432,7 @@ package-binaries: $(PACKAGE_UI_DEP)
 # a per-arch temp file and feed that to nfpm.
 NFPM_CONF := $(DIST_DIR)/nfpm
 
-package-deb: package-binaries man-gz share/badkeys/blocklist.dat share/badkeys/badkeysdata.json
+package-deb: package-binaries man-gz $(BADKEYS_DEP)
 	@mkdir -p $(PKG_DIR) $(NFPM_CONF)
 	@for arch in $(PACKAGE_ARCHES); do \
 		for pkg in $(PER_ARCH_PKGS); do \
@@ -440,13 +443,15 @@ package-deb: package-binaries man-gz share/badkeys/blocklist.dat share/badkeys/b
 				--packager deb --target $(PKG_DIR)/ || exit 1; \
 		done; \
 	done
-	@echo "Building gonemaster-badkeys-data deb..."
-	@sed -e "s|\$${VERSION}|$(VERSION)|g" \
-		packaging/nfpm/gonemaster-badkeys-data.yaml > $(NFPM_CONF)/gonemaster-badkeys-data.yaml
-	@$(NFPM) pkg --config $(NFPM_CONF)/gonemaster-badkeys-data.yaml \
-		--packager deb --target $(PKG_DIR)/
+	@if [ -n "$(PACKAGE_BADKEYS)" ]; then \
+		echo "Building gonemaster-badkeys-data deb..."; \
+		sed -e "s|\$${VERSION}|$(VERSION)|g" \
+			packaging/nfpm/gonemaster-badkeys-data.yaml > $(NFPM_CONF)/gonemaster-badkeys-data.yaml; \
+		$(NFPM) pkg --config $(NFPM_CONF)/gonemaster-badkeys-data.yaml \
+			--packager deb --target $(PKG_DIR)/; \
+	fi
 
-package-rpm: package-binaries man-gz share/badkeys/blocklist.dat share/badkeys/badkeysdata.json
+package-rpm: package-binaries man-gz $(BADKEYS_DEP)
 	@mkdir -p $(PKG_DIR) $(NFPM_CONF)
 	@for arch in $(PACKAGE_ARCHES); do \
 		for pkg in $(PER_ARCH_PKGS); do \
@@ -457,11 +462,13 @@ package-rpm: package-binaries man-gz share/badkeys/blocklist.dat share/badkeys/b
 				--packager rpm --target $(PKG_DIR)/ || exit 1; \
 		done; \
 	done
-	@echo "Building gonemaster-badkeys-data rpm..."
-	@sed -e "s|\$${VERSION}|$(VERSION)|g" \
-		packaging/nfpm/gonemaster-badkeys-data.yaml > $(NFPM_CONF)/gonemaster-badkeys-data.yaml
-	@$(NFPM) pkg --config $(NFPM_CONF)/gonemaster-badkeys-data.yaml \
-		--packager rpm --target $(PKG_DIR)/
+	@if [ -n "$(PACKAGE_BADKEYS)" ]; then \
+		echo "Building gonemaster-badkeys-data rpm..."; \
+		sed -e "s|\$${VERSION}|$(VERSION)|g" \
+			packaging/nfpm/gonemaster-badkeys-data.yaml > $(NFPM_CONF)/gonemaster-badkeys-data.yaml; \
+		$(NFPM) pkg --config $(NFPM_CONF)/gonemaster-badkeys-data.yaml \
+			--packager rpm --target $(PKG_DIR)/; \
+	fi
 
 packages: package-deb package-rpm
 	@echo ""

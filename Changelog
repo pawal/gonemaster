@@ -6,7 +6,15 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
-- ci: attach per-target binary archives and Linux packages to tagged releases
+### Fixed
+
+## [v1.7.9] - 2026-09-14
+
+Tagged releases now carry Linux binary archives and `.deb` and `.rpm` packages, attached by CI. dnssec02 raises a DS with no matching DNSKEY RRSIG to an error, a DS naming a key that signs nothing counts as a broken chain link, and the engine finds the zone cut above a delegated name when the same servers serve both.
+
+### Added
+
+- ci: attach Linux binary archives and packages to tagged releases
 
 ### Changed
 

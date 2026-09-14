@@ -1,5 +1,6 @@
-# Shell expansions inside commands are escaped as $${...}: Woodpecker
-# pre-processes bare ${...} in the YAML. CI_* reach the shell as env vars.
+# Woodpecker pre-processes dollar-brace expansions across this whole file,
+# comments included, so shell expansions in commands double the dollar sign.
+# CI_* variables arrive as real env vars, so plain $CI_COMMIT_TAG is enough.
 steps:
   version_guard:
     image: golang:1.27

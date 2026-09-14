@@ -22,11 +22,15 @@ steps:
       - |
         set -eu
         test -n "$CODEBERG_RELEASE_TOKEN" || { echo "secret not injected"; exit 1; }
+        # Fingerprint only, so the stored value can be compared without printing it.
         echo "token length: $${#CODEBERG_RELEASE_TOKEN}"
-        code="$(curl -s -o /dev/null -w '%{http_code}' \
-          -H "Authorization: token $CODEBERG_RELEASE_TOKEN" \
-          "https://codeberg.org/api/v1/repos/$CI_REPO/releases")"
+        echo "token sha256 head: $(printf '%s' "$CODEBERG_RELEASE_TOKEN" | sha256sum | cut -c1-12)"
+        url="https://codeberg.org/api/v1/repos/$CI_REPO/releases"
+        echo "url: $url"
+        out="$(curl -s -w '\n%{http_code}' -H "Authorization: token $CODEBERG_RELEASE_TOKEN" "$url")"
+        code="$(printf '%s' "$out" | tail -n 1)"
         echo "releases api: $code"
+        echo "body: $(printf '%s' "$out" | head -n -1 | head -c 300)"
         [ "$code" = "200" ] || { echo "token rejected by the forge"; exit 1; }
 
   ui_build:

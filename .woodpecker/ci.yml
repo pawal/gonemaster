@@ -24,10 +24,8 @@ services:
 steps:
   # All three build into server/*/dist; a missing one skips its Go tests.
   ui_checks:
-    image: node:22-bookworm
+    image: node:24-trixie
     commands:
-      # node:22 ships npm 10, which ignores os/cpu and fetches every platform binary.
-      - npm i -g npm@11
       - npm --prefix ui ci
       - npm --prefix ui-public ci
       - npm --prefix analysis-ui ci
@@ -120,52 +118,3 @@ when:
   event:
     - push
     - pull_request
-
----
-steps:
-  ui_build:
-    image: node:22-bookworm
-    commands:
-      # node:22 ships npm 10, which ignores os/cpu and fetches every platform binary.
-      - npm i -g npm@11
-      - npm --prefix ui ci
-      - npm --prefix ui run build
-
-  build_artifacts:
-    image: golang:1.27
-    depends_on:
-      - ui_build
-    commands:
-      - |
-        set -eu
-        mkdir -p dist
-        for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64; do
-          goos=${target%/*}
-          goarch=${target#*/}
-          for bin in gonemaster gonemaster-server gonemaster-client gonemaster-nagios; do
-            ext=""
-            [ "$goos" = "windows" ] && ext=".exe"
-            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
-              go build -trimpath -o "dist/${bin}_${CI_COMMIT_TAG}_${goos}_${goarch}${ext}" "./cmd/${bin}"
-          done
-        done
-        (cd dist && sha256sum * > checksums.txt)
-
-  publish_release:
-    image: woodpeckerci/plugin-release
-    depends_on:
-      - build_artifacts
-    settings:
-      base_url: https://codeberg.org
-      api_key:
-        from_secret: CODEBERG_RELEASE_TOKEN
-      title: gonemaster ${CI_COMMIT_TAG}
-      files:
-        - dist/*
-
-when:
-  event:
-    - tag
-  ref:
-    include:
-      - refs/tags/v*

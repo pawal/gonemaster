@@ -1,0 +1,104 @@
+# Shell expansions inside commands are escaped as $${...}: Woodpecker
+# pre-processes bare ${...} in the YAML. CI_* reach the shell as env vars.
+steps:
+  version_guard:
+    image: golang:1.27
+    commands:
+      - |
+        set -eu
+        tag="$${CI_COMMIT_TAG#v}"
+        ver="$(awk '/^var Version = /{gsub(/"/,"",$4); print $4}' engine/engine.go)"
+        [ "$tag" = "$ver" ] || { echo "tag $CI_COMMIT_TAG != engine.Version $ver"; exit 1; }
+
+  ui_build:
+    image: node:24-trixie
+    depends_on:
+      - version_guard
+    commands:
+      - npm --prefix ui ci          && npm --prefix ui run build
+      - npm --prefix ui-public ci   && npm --prefix ui-public run build
+      - npm --prefix analysis-ui ci && npm --prefix analysis-ui run build
+
+  build_archives:
+    image: golang:1.27
+    depends_on:
+      - ui_build
+    commands:
+      - |
+        set -eu
+        mkdir -p dist
+        for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+          goos="$${target%/*}"; goarch="$${target#*/}"
+          stage="dist/stage/$${goos}_$${goarch}"
+          mkdir -p "$stage"
+          for bin in gonemaster gonemaster-server gonemaster-client gonemaster-nagios gonemaster-mcp; do
+            CGO_ENABLED=0 GOOS="$goos" GOARCH="$goarch" \
+              go build -trimpath -ldflags "-s -w -X main.version=$CI_COMMIT_TAG" \
+              -o "$stage/$bin" "./cmd/$bin"
+          done
+          cp LICENSE Changelog "$stage/"
+          tar czf "dist/gonemaster_$${CI_COMMIT_TAG}_$${goos}_$${goarch}.tar.gz" -C "$stage" .
+        done
+        rm -rf dist/stage
+
+  build_packages:
+    image: golang:1.27
+    depends_on:
+      - ui_build
+    commands:
+      # UIs already built by ui_build in the shared workspace; skip ui-build.
+      - make packages PACKAGE_UI_DEP=
+      # Stage exactly what the release attaches. badkeys-data is excluded:
+      # ~54 MB per format, and its content tracks the upstream blocklist
+      # rather than engine.Version.
+      - |
+        set -eu
+        mkdir -p dist/release
+        find dist/packages -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' \) \
+          ! -name 'gonemaster-badkeys-data*' -exec cp {} dist/release/ \;
+        ls -1 dist/release
+
+  release_notes:
+    image: golang:1.27
+    depends_on:
+      - version_guard
+    commands:
+      # The section for this version only, as the release body. Changelog
+      # headings carry the v prefix, so the tag is used unstripped here.
+      - |
+        set -eu
+        mkdir -p dist
+        awk -v v="$CI_COMMIT_TAG" '
+          $0 ~ "^## \\[" v "\\]" {f=1; next}
+          f && /^## \[/ {exit}
+          f {print}
+        ' Changelog > dist/notes.md
+        test -s dist/notes.md || { echo "no Changelog section for $CI_COMMIT_TAG"; exit 1; }
+
+  publish_release:
+    image: woodpeckerci/plugin-release
+    depends_on:
+      - build_archives
+      - build_packages
+      - release_notes
+    settings:
+      base_url: https://codeberg.org
+      api_key:
+        from_secret: CODEBERG_RELEASE_TOKEN
+      title: gonemaster ${CI_COMMIT_TAG}
+      note: dist/notes.md
+      # A moved tag must republish metadata, not just replace assets.
+      overwrite: true
+      checksum: sha256
+      checksum-file: checksums.txt
+      checksum-flatten: true
+      files:
+        - dist/*.tar.gz
+        - dist/release/*
+
+when:
+  event:
+    - tag
+  ref:
+    include:
+      - refs/tags/v*

@@ -4,8 +4,14 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- ci: attach per-target binary archives and Linux packages to tagged releases
+
 ### Changed
 
+- ci: split the Woodpecker config into per-workflow files
+- ci: build the UIs on node 24
 - dnssec02: raise DS02_NO_MATCHING_DNSKEY_RRSIG from WARNING to ERROR; stored profiles keep their own level
 - engine: report the key size of ML-DSA-44 DNSKEYs
 - engine: report a DS naming a key that signs nothing as a broken chain link, and roll the chain up as partial

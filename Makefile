@@ -393,6 +393,8 @@ clean-man:
 # data package for the badkeys blocklist. See plans/packaging.md.
 VERSION := $(shell awk '/^var Version = /{gsub(/"/,"",$$4); print $$4}' engine/engine.go)
 PACKAGE_ARCHES ?= amd64 arm64
+# CI builds the UIs in a separate node step; set empty to skip the prereq.
+PACKAGE_UI_DEP ?= ui-build
 DIST_DIR := dist
 PKG_DIR := $(DIST_DIR)/packages
 NFPM := $(GO) run github.com/goreleaser/nfpm/v2/cmd/nfpm@latest
@@ -403,7 +405,7 @@ PER_ARCH_PKGS := gonemaster gonemaster-server gonemaster-server-nogui gonemaster
 share/badkeys/blocklist.dat share/badkeys/badkeysdata.json:
 	$(MAKE) badkeys-update
 
-package-binaries: ui-build
+package-binaries: $(PACKAGE_UI_DEP)
 	@for arch in $(PACKAGE_ARCHES); do \
 		echo "Building binaries for linux/$$arch..."; \
 		mkdir -p $(DIST_DIR)/linux_$$arch; \

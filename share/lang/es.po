@@ -1114,10 +1114,8 @@ msgstr ""
 "Obtenido de los servidores de nombres con direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_MATCH_DS_DNSKEY"
-msgid ""
-"The DS record matches the DNSKEY and the DNSKEY RRSIG is valid. Found at "
-"the nameservers with IP addresses \"{addresses}\"."
-msgstr "El registro DS coincide con el DNSKEY y el RRSIG del DNSKEY es válido. Encontrado en los servidores de nombres con las direcciones IP \"{addresses}\"."
+msgid "The DS record with tag {keytag} matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "El registro DS con tag {keytag} coincide con el DNSKEY y el RRSIG del DNSKEY es válido. Encontrado en los servidores de nombres con las direcciones IP \"{addresses}\"."
 
 msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid ""

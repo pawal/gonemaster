@@ -696,8 +696,8 @@ msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot b
 msgstr "DNSKEY RRset je podepsán záznamem RRSIG s tagem {keytag}, který nelze ověřit odpovídajícím klíčem DNSKEY. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_MATCH_DS_DNSKEY"
-msgid "The DS record matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
-msgstr "DS záznam odpovídá klíči DNSKEY a RRSIG záznamu DNSKEY je platný. Nalezeno na jmenných serverech s IP adresami \"{addresses}\"."
+msgid "The DS record with tag {keytag} matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "DS záznam s tagem {keytag} odpovídá klíči DNSKEY a RRSIG záznamu DNSKEY je platný. Nalezeno na jmenných serverech s IP adresami \"{addresses}\"."
 
 msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid "The DNSKEY RRset is signed with an RRSIG with tag {keytag} which cannot be validated by the matching DNSKEY. Fetched from the nameservers with IP addresses \"{addresses}\"."

@@ -2684,10 +2684,8 @@ msgstr ""
 "対応する DNSKEY で検証できません。取得元ネームサーバー IP: \"{addresses}\"。"
 
 msgctxt "DNSSEC:DS02_MATCH_DS_DNSKEY"
-msgid ""
-"The DS record matches the DNSKEY and the DNSKEY RRSIG is valid. Found at "
-"the nameservers with IP addresses \"{addresses}\"."
-msgstr "DSレコードはDNSKEYと一致し、DNSKEYのRRSIGは有効です。IPアドレス\"{addresses}\"のネームサーバーで見つかりました。"
+msgid "The DS record with tag {keytag} matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "タグ {keytag} のDSレコードはDNSKEYと一致し、DNSKEYのRRSIGは有効です。IPアドレス\"{addresses}\"のネームサーバーで見つかりました。"
 
 msgctxt "DNSSEC:DS03_ERROR_RESPONSE_NSEC_QUERY"
 msgid ""

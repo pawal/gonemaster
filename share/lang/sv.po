@@ -1058,10 +1058,8 @@ msgstr ""
 "adresserna \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_MATCH_DS_DNSKEY"
-msgid ""
-"The DS record matches the DNSKEY and the DNSKEY RRSIG is valid. Found at "
-"the nameservers with IP addresses \"{addresses}\"."
-msgstr "DS-posten matchar DNSKEY och DNSKEY RRSIG är giltig. Hittades vid namnservrarna med IP-adresserna \"{addresses}\"."
+msgid "The DS record with tag {keytag} matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "DS-posten med \"key tag\" {keytag} matchar DNSKEY och DNSKEY RRSIG är giltig. Hittades vid namnservrarna med IP-adresserna \"{addresses}\"."
 
 msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid ""

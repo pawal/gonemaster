@@ -702,6 +702,60 @@ func TestDNSSEC02MatchWithoutAlgorithmMismatch(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS02_DS_ALGO_DNSKEY_MISMATCH", "DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
 }
 
+func TestDNSSEC02MatchNamesTheValidatingKeytag(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	signing, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP(), tctest.KeyTTL(3600))
+	stripped, _ := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP(), tctest.KeyTTL(3600))
+	if keyTag(signing) == keyTag(stripped) {
+		t.Skip("both generated keys share a keytag")
+	}
+	// The second DS names a key that signs nothing, as in an algorithm downgrade.
+	sig := tctest.Sign(t, signing, signer, dns.TypeDNSKEY, []dns.RR{signing, stripped})
+
+	signingDS := signing.ToDS(2)
+	strippedDS := stripped.ToDS(2)
+	if signingDS == nil || strippedDS == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+
+	parentNS := tctest.NS(t, ctx, "ns-parent.example", "192.0.2.48", func(q tctest.Query) packet.Packet {
+		if q.Type != "DS" {
+			return packet.Packet{}
+		}
+		signingCopy := *signingDS
+		strippedCopy := *strippedDS
+		return answerPacket(q.Name, dns.TypeDS, &signingCopy, &strippedCopy)
+	})
+	childNS := tctest.NS(t, ctx, "ns-child.example", "192.0.2.49", func(q tctest.Query) packet.Packet {
+		if q.Type != "DNSKEY" {
+			return packet.Packet{}
+		}
+		signingCopy := *signing
+		strippedCopy := *stripped
+		sigCopy := *sig
+		return answerPacket(q.Name, dns.TypeDNSKEY, &signingCopy, &strippedCopy, &sigCopy)
+	})
+	dnssec02Wire(t, parentNS, childNS)
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC02(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec02: %v", err)
+	}
+
+	match := tctest.RequireTag(t, entries, "DS02_MATCH_DS_DNSKEY")
+	if match.Args["keytag"] != keyTag(signing) {
+		t.Fatalf("expected keytag %d, got %#v", keyTag(signing), match.Args["keytag"])
+	}
+	missing := tctest.RequireTag(t, entries, "DS02_NO_MATCHING_DNSKEY_RRSIG")
+	if missing.Args["keytag"] != keyTag(stripped) {
+		t.Fatalf("expected keytag %d, got %#v", keyTag(stripped), missing.Args["keytag"])
+	}
+	// One DS-linked key validates, so the per-nameserver summaries stay silent.
+	tctest.RequireNoTag(t, entries, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS", "DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
+}
+
 func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)

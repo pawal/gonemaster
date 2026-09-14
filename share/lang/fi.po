@@ -1110,10 +1110,8 @@ msgstr ""
 "osoitteet ovat \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_MATCH_DS_DNSKEY"
-msgid ""
-"The DS record matches the DNSKEY and the DNSKEY RRSIG is valid. Found at "
-"the nameservers with IP addresses \"{addresses}\"."
-msgstr "DS-tietue vastaa DNSKEY-tietuetta ja DNSKEY RRSIG on voimassa. Löydettiin nimipalvelimista IP-osoitteilla \"{addresses}\"."
+msgid "The DS record with tag {keytag} matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "DS-tietue, jonka avaimen tunniste (keytag) on {keytag}, vastaa DNSKEY-tietuetta ja DNSKEY RRSIG on voimassa. Löydettiin nimipalvelimista IP-osoitteilla \"{addresses}\"."
 
 msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid ""

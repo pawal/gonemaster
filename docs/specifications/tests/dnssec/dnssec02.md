@@ -48,7 +48,7 @@ Status: Final
 7. Emit per-nameserver summary:
    - `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` for responding nameservers with no DS-matching DNSKEY.
    - Else `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` for responding nameservers with DS-matching DNSKEY but no validating RRSIG from those keys.
-8. Collect IPs where DS→DNSKEY match and RRSIG validation passed; if non-empty emit `DS02_MATCH_DS_DNSKEY`.
+8. For each DS-linked DNSKEY keytag whose RRSIG validated, emit `DS02_MATCH_DS_DNSKEY` with that keytag and the IPs where it validated. A keytag that failed on every nameserver is never reported as a match.
 9. Emit `TEST_CASE_END`.
 
 ### Parent DS Collection (steps 2-4)
@@ -117,7 +117,7 @@ For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
        success        -> foundMatch
      no matchingRRSIG OR no success
                        -> noMatchingDNSKEYRRSIG[keytag]
-     otherwise         -> mark hasRRSIGMatchDS for this NS
+     otherwise         -> rrsigMatchDS[keytag] for this NS
 
 Aggregation:
   per keytag per category, emit a tag with merged child NS IP list:
@@ -135,7 +135,7 @@ Aggregation:
   nsDNSKEY non-empty -> DS02_NO_VALID_DNSKEY_FOR_ANY_DS (addresses)
   else nsRRSIG non-empty -> DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS (addresses)
 
-  hasRRSIGMatchDS IPs non-empty -> DS02_MATCH_DS_DNSKEY (sorted addresses)
+  per keytag in rrsigMatchDS -> DS02_MATCH_DS_DNSKEY (keytag, addresses)
 
 emit TEST_CASE_END
 ```
@@ -146,7 +146,7 @@ emit TEST_CASE_END
 | --- | --- |
 | `DS02_ALGO_NOT_SUPPORTED_BY_ZM` | DNSKEY RRSIG verification requires an unsupported algorithm for this build/runtime. |
 | `DS02_DS_ALGO_DNSKEY_MISMATCH` | A DNSKEY matches the DS keytag but the DS algorithm field differs from the DNSKEY algorithm; validating resolvers ignore such a DS record. |
-| `DS02_MATCH_DS_DNSKEY` | At least one child nameserver has a DS-matching DNSKEY with a valid DNSKEY RRSIG. |
+| `DS02_MATCH_DS_DNSKEY` | A DS-matching DNSKEY validates the DNSKEY RRset; emitted once per such keytag. |
 | `DS02_DNSKEY_NOT_FOR_ZONE_SIGNING` | DS-matching DNSKEY is found but lacks ZONE flag. |
 | `DS02_DNSKEY_NOT_SEP` | DS-matching DNSKEY is found but lacks SEP flag. |
 | `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | Nameserver has DS-matching DNSKEY(s), but no validating DNSKEY RRSIG from those keys. |
@@ -179,6 +179,7 @@ emit TEST_CASE_END
 | `DS02_DNSKEY_NOT_SEP` | `keytag` | `int` | DS/DNSKEY keytag lacking SEP bit. |
 | `DS02_DNSKEY_NOT_SEP` | `addresses` | `array<string>` | Structured child nameserver IP list. |
 | `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
+| `DS02_MATCH_DS_DNSKEY` | `keytag` | `int` | DS-matching DNSKEY keytag whose RRSIG over the DNSKEY RRset validates. |
 | `DS02_MATCH_DS_DNSKEY` | `addresses` | `array<string>` | Structured child nameserver IP list with DS-matching DNSKEY and valid RRSIG. |
 | `DS02_NO_DNSKEY_FOR_DS` | `keytag` | `int` | DS keytag for which no DNSKEY was found. |
 | `DS02_NO_DNSKEY_FOR_DS` | `addresses` | `array<string>` | Structured child nameserver IP list. |
@@ -224,6 +225,7 @@ emit TEST_CASE_END
 - Differences (Upstream vs Gonemaster):
   - Upstream: explicitly describes a dedicated undelegated DS input branch in testcase flow. Gonemaster: `DNSSEC02` implementation uses parent DS discovery path directly and has no separate testcase-local undelegated DS branch.
   - Upstream: does not explicitly specify testcase boundary and per-query transport debug emissions in this testcase summary. Gonemaster: emits `TEST_CASE_START`, `TEST_CASE_END`, `IPV4_DISABLED`, and `IPV6_DISABLED`.
+  - Upstream: emits `DS02_MATCH_DS_DNSKEY` once for the zone, without naming a key. Gonemaster: emits it once per DS-linked keytag whose RRSIG validates and names that keytag, so a zone where one DS names a validating key and another names a key that signs nothing does not read as an all-clear.
   - Upstream: emits `DS02_NO_MATCHING_DNSKEY_RRSIG` at `WARNING`. Gonemaster: emits it at `ERROR`, because RFC 4035 section 2.2 requires the apex DNSKEY RRset to be signed by each algorithm in the parent DS RRset, and a validator that implements the referenced algorithm answers SERVFAIL for a zone that omits those signatures. See `DIV-DS02-RRSIG-SEVERITY`.
 - Potential upstream report:
   - `yes`
@@ -232,5 +234,6 @@ emit TEST_CASE_END
 - If parent DS discovery yields no DS records, testcase stops after boundary tags and emits no DS02 findings.
 - Child nameservers are deduplicated by IP before DNSKEY checks, so repeated names on one IP collapse into one probe context.
 - `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` and `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` are mutually exclusive by implementation (`else if` branch).
+- A zone whose DS RRset names one key that signs the DNSKEY RRset and one that does not gets `DS02_NO_MATCHING_DNSKEY_RRSIG` for the second keytag and `DS02_MATCH_DS_DNSKEY` for the first. The two findings name different keytags and both hold.
 - DS algorithm field mismatch: a DS whose algorithm field differs from the keytag-matching DNSKEY algorithm never counts as a match. A zone whose only DS has a mismatched algorithm therefore gets both `DS02_DS_ALGO_DNSKEY_MISMATCH` and the summary `DS02_NO_VALID_DNSKEY_FOR_ANY_DS`; a zone with an additional correct DS keeps `DS02_MATCH_DS_DNSKEY` alongside the mismatch tag. The keytag-fallback selection of the candidate for the ZONE/SEP flag checks is unaffected.
 - Large RSA public exponent handling: an RSA DNSKEY the DNS library refuses although RFC 3110 permits it (an exponent of more than 4 bytes or greater than 2^31-1, as with the `.lv` KSK and its exponent of 2^32+1, or a leading zero byte in the exponent or modulus) is verified by gonemaster's own RSA path instead, so its RRSIGs pass or fail like any other. Only when the exponent exceeds 64 bits, a ceiling most validators share, is the finding reclassified from the `ERROR` `DS02_RRSIG_NOT_VALID_BY_DNSKEY` to the `NOTICE` `DS02_RSA_EXPONENT_UNSUPPORTED`. Such a key is treated as indeterminate rather than failed: it does not raise `DS02_NO_MATCHING_DNSKEY_RRSIG`, and when it is the sole reason a nameserver has no validating DS-linked key, `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` is suppressed.

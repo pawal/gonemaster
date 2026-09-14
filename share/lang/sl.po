@@ -1060,10 +1060,8 @@ msgstr ""
 "validirati z ustreznim DNSKEY-em. Podatki pridobljeni iz \"{addresses}\"."
 
 msgctxt "DNSSEC:DS02_MATCH_DS_DNSKEY"
-msgid ""
-"The DS record matches the DNSKEY and the DNSKEY RRSIG is valid. Found at "
-"the nameservers with IP addresses \"{addresses}\"."
-msgstr "Zapis DS se ujema z DNSKEY in RRSIG za DNSKEY je veljaven. Najdeno pri imenskih strežnikih z IP-naslovi \"{addresses}\"."
+msgid "The DS record with tag {keytag} matches the DNSKEY and the DNSKEY RRSIG is valid. Found at the nameservers with IP addresses \"{addresses}\"."
+msgstr "Zapis DS z oznako {keytag} se ujema z DNSKEY in RRSIG za DNSKEY je veljaven. Najdeno pri imenskih strežnikih z IP-naslovi \"{addresses}\"."
 
 msgctxt "DNSSEC:DS08_RRSIG_NOT_VALID_BY_DNSKEY"
 msgid ""

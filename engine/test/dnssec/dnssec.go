@@ -1049,6 +1049,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	respondingChildNS := map[string]bool{}
 	hasDNSKEYMatchDS := map[string]bool{}
 	hasRRSIGMatchDS := map[string]bool{}
+	rrsigMatchDS := map[uint16][]string{}
 	hasRRSIGUnsupportedDS := map[string]bool{}
 	hasRRSIGHardFailDS := map[string]bool{}
 	var nsDNSKEY []string
@@ -1146,6 +1147,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			responding              bool
 			hasDNSKEYMatchDS        bool
 			hasRRSIGMatchDS         bool
+			rrsigMatchDS            map[uint16]bool
 			noDNSKEYForDS           map[uint16]bool
 			noMatchDSDNSKEY         map[uint16]bool
 			dsAlgoMismatch          map[uint16]map[[2]uint8]bool
@@ -1177,6 +1179,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				buf := testlogger.Wrap(log, moduleName, testcase)
 				outcome := childOutcome{
 					nsIP:                    ns.Address.String(),
+					rrsigMatchDS:            map[uint16]bool{},
 					noDNSKEYForDS:           map[uint16]bool{},
 					noMatchDSDNSKEY:         map[uint16]bool{},
 					dsAlgoMismatch:          map[uint16]map[[2]uint8]bool{},
@@ -1325,6 +1328,7 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						switch {
 						case foundMatch:
 							outcome.hasRRSIGMatchDS = true
+							outcome.rrsigMatchDS[keytag] = true
 						case outcome.rsaExponentUnsupported[keytag] && !outcome.rrsigNotValidByDNSKEY[keytag] && outcome.algoNotSupportedByZM[keytag] == nil:
 							// Sole reason this DS-linked key did not verify is the unsupported
 							// exponent; leave it indeterminate rather than raising a failure.
@@ -1402,6 +1406,9 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			}
 			for keytag := range outcome.rsaExponentUnsupported {
 				rsaExponentUnsupported[keytag] = append(rsaExponentUnsupported[keytag], outcome.nsIP)
+			}
+			for keytag := range outcome.rrsigMatchDS {
+				rrsigMatchDS[keytag] = append(rrsigMatchDS[keytag], outcome.nsIP)
 			}
 		}
 	}
@@ -1524,16 +1531,12 @@ func DNSSEC02(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
-	var matchedDSIPs []string
-	for nsIP := range respondingChildNS {
-		if hasRRSIGMatchDS[nsIP] {
-			matchedDSIPs = append(matchedDSIPs, nsIP)
+	// One entry per validating key, so a dead DS beside a good one is not read as an all-clear.
+	for _, keytag := range slices.Sorted(maps.Keys(rrsigMatchDS)) {
+		args := map[string]any{
+			"keytag": keytag,
 		}
-	}
-	if len(matchedDSIPs) > 0 {
-		sort.Strings(matchedDSIPs)
-		args := map[string]any{}
-		setTypedAddressesFromValues(args, matchedDSIPs)
+		setTypedAddressesFromValues(args, rrsigMatchDS[keytag])
 		if err := appendLog(ctx, &results, testcase, "DS02_MATCH_DS_DNSKEY", args); err != nil {
 			return results, err
 		}

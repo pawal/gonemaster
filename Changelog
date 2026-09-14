@@ -18,6 +18,7 @@ Tagged releases now carry Linux binary archives and `.deb` and `.rpm` packages, 
 
 ### Changed
 
+- build: the binary packages recommend gonemaster-badkeys-data instead of requiring it
 - ci: split the Woodpecker config into per-workflow files
 - ci: build the UIs on node 24
 - dnssec02: raise DS02_NO_MATCHING_DNSKEY_RRSIG from WARNING to ERROR; stored profiles keep their own level

@@ -13,7 +13,7 @@ vendor: Patrik Wallström
 homepage: https://codeberg.org/pawal/gonemaster
 license: BSD-2-Clause
 
-depends:
+recommends:
   - gonemaster-badkeys-data
 
 contents:

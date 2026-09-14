@@ -28,7 +28,7 @@ steps:
       - |
         set -eu
         mkdir -p dist
-        for target in linux/amd64 linux/arm64 darwin/amd64 darwin/arm64; do
+        for target in linux/amd64 linux/arm64; do
           goos="$${target%/*}"; goarch="$${target#*/}"
           stage="dist/stage/$${goos}_$${goarch}"
           mkdir -p "$stage"
@@ -51,12 +51,14 @@ steps:
       - make packages PACKAGE_UI_DEP=
       # Stage exactly what the release attaches. badkeys-data is excluded:
       # ~54 MB per format, and its content tracks the upstream blocklist
-      # rather than engine.Version.
+      # rather than engine.Version. server-nogui is excluded as the same
+      # server minus the embedded UIs, available by building with the tag.
       - |
         set -eu
         mkdir -p dist/release
         find dist/packages -maxdepth 1 -type f \( -name '*.deb' -o -name '*.rpm' \) \
-          ! -name 'gonemaster-badkeys-data*' -exec cp {} dist/release/ \;
+          ! -name 'gonemaster-badkeys-data*' ! -name 'gonemaster-server-nogui*' \
+          -exec cp {} dist/release/ \;
         ls -1 dist/release
 
   release_notes:

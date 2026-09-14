@@ -323,7 +323,7 @@ Further reading: [docs/server/configuration.md](server/configuration.md),
 ## 7. Build and distribution
 
 Build is driven by the [Makefile](../Makefile). CI runs on
-[Woodpecker](../.woodpecker.yml).
+[Woodpecker](../.woodpecker/).
 
 ### Build targets
 
@@ -348,7 +348,9 @@ The tags compose: `-tags "nogui badkeys_embed"` is a valid build.
 
 ### CI pipelines
 
-[.woodpecker.yml](../.woodpecker.yml) defines two pipelines.
+[.woodpecker/](../.woodpecker/) defines two workflows, one per file.
+Woodpecker loads every `.yml` file in that directory and gates each on
+its own `when` block.
 
 Default pipeline (every push and pull request):
 
@@ -372,12 +374,12 @@ Every Go step points `GOCACHE` and `GOMODCACHE` at the shared
 workspace volume, so steps that start later reuse the compiled
 dependency graph instead of rebuilding it.
 
-A second pipeline for release artifacts is declared in
-[.woodpecker.yml](../.woodpecker.yml) but has not yet been
-exercised; see [Chapter 15](#15-known-limitations).
+A second workflow for release artifacts is declared in
+[.woodpecker/release.yml](../.woodpecker/release.yml) but has not yet
+been exercised; see [Chapter 15](#15-known-limitations).
 
 Further reading: [Makefile](../Makefile),
-[.woodpecker.yml](../.woodpecker.yml).
+[.woodpecker/ci.yml](../.woodpecker/ci.yml).
 
 ## 8. Configuration and deployment
 
@@ -524,7 +526,7 @@ variables, never via the JSON config file:
 - `GONEMASTER_DB_DSN` carries the database connection string.
 - `CODEBERG_PAGES_TOKEN` and `CODEBERG_RELEASE_TOKEN` are injected
   into CI publish steps
-  ([.woodpecker.yml](../.woodpecker.yml)).
+  ([.woodpecker/](../.woodpecker/)).
 
 There are no API keys to manage; access control to admin routes is
 host-level.
@@ -604,7 +606,7 @@ Further reading: [docs/server/metrics.md](server/metrics.md).
 
 Tests run at three levels: Go unit and integration tests, frontend
 tests, and spec-coherency checks. CI
-([.woodpecker.yml](../.woodpecker.yml)) runs all of them on every
+([.woodpecker/ci.yml](../.woodpecker/ci.yml)) runs all of them on every
 commit.
 
 ### Layers
@@ -648,7 +650,7 @@ The first five need only Go and are grouped as `spec-check-go`; the
 last needs node and is `spec-check-node`. CI runs each half in the
 image that has the toolchain, so both stay reachable from the one
 `make spec-check` definition rather than being restated in
-[.woodpecker.yml](../.woodpecker.yml).
+[.woodpecker/ci.yml](../.woodpecker/ci.yml).
 
 Each substep is runnable in isolation for fix-and-recheck loops.
 
@@ -659,7 +661,7 @@ Docker Compose, points the test suite at them via
 `TEST_POSTGRES_DSN` and `TEST_MARIADB_DSN`, and runs the
 `server/...` test packages against all three drivers (SQLite is
 in-process and always runs). The CI pipeline mirrors this with
-services declared in [.woodpecker.yml](../.woodpecker.yml).
+services declared in [.woodpecker/ci.yml](../.woodpecker/ci.yml).
 
 Further reading:
 [docs/dev.md](dev.md),
@@ -707,7 +709,7 @@ the verification path used by CI.
 ### Enforcement
 
 CI runs `make spec-check-go` and `make spec-check-node` on every
-commit ([.woodpecker.yml](../.woodpecker.yml)), which together are
+commit ([.woodpecker/ci.yml](../.woodpecker/ci.yml)), which together are
 `make spec-check`. The six substeps listed in
 [Chapter 11](#11-testing-strategy) apply. Drift in any of them is a
 build failure.
@@ -823,7 +825,7 @@ yet described here; see [Chapter 15](#15-known-limitations).
 | IANA registries (`named.root` from [IANA Root Files](https://www.iana.org/domains/root/files), special-purpose CSVs) | Manual replacement of files in `share/`. | When IANA publishes updates. |
 
 Further reading:
-[.woodpecker.yml](../.woodpecker.yml),
+[.woodpecker/](../.woodpecker/),
 [go.mod](../go.mod).
 
 ## 15. Known limitations
@@ -837,7 +839,7 @@ or shaped by pragmatic compromise.
 |---|---|---|
 | Built-in admin authentication | Not implemented. Deployments rely on a reverse proxy or network isolation. | [Chapter 9](#9-security-posture). |
 | Structured (JSON) logs | Not implemented. Logs are plain text from Go's `log` package. | [Chapter 10](#10-observability). |
-| Release artifact pipeline | Declared in [.woodpecker.yml](../.woodpecker.yml) but not yet exercised; no `v*` tag has been published. Format, distribution channel, and signing are deferred until first release. | [Chapter 7](#7-build-and-distribution), [Chapter 14](#14-external-dependencies-and-vendors). |
+| Release artifact pipeline | Declared in [.woodpecker/release.yml](../.woodpecker/release.yml) but not yet exercised; no `v*` tag has been published. Artifacts are per-target `.tar.gz` archives plus `.deb` and `.rpm` packages attached to the Codeberg release; package signing is deferred. | [Chapter 7](#7-build-and-distribution), [Chapter 14](#14-external-dependencies-and-vendors). |
 | Generated third-party-licence inventory | Not generated. Direct dependencies are known; an indirect-dependency licence report is open work. | [Chapter 13](#13-ip-and-licensing-boundary). |
 
 ### Testcase coverage

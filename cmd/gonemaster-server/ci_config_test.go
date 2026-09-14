@@ -6,11 +6,11 @@ import (
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
 )
 
-// TestWoodpeckerIntegrationStep verifies that .woodpecker.yml declares the
+// TestWoodpeckerIntegrationStep verifies that .woodpecker/ci.yml declares the
 // integration_test step and references the postgres and mariadb services with
 // the DSN environment variables the parameterized store tests expect.
 func TestWoodpeckerIntegrationStep(t *testing.T) {
-	clitest.FileContains(t, "../../.woodpecker.yml",
+	clitest.FileContains(t, "../../.woodpecker/ci.yml",
 		"integration_test",
 		"TEST_POSTGRES_DSN",
 		"TEST_MARIADB_DSN",
@@ -22,7 +22,7 @@ func TestWoodpeckerIntegrationStep(t *testing.T) {
 // TestWoodpeckerServicesPresent verifies that the postgres and mariadb service
 // definitions are present so the integration_test step can reach them.
 func TestWoodpeckerServicesPresent(t *testing.T) {
-	clitest.FileContains(t, "../../.woodpecker.yml",
+	clitest.FileContains(t, "../../.woodpecker/ci.yml",
 		"POSTGRES_USER", "POSTGRES_DB", "MARIADB_USER", "MARIADB_DATABASE")
 }
 

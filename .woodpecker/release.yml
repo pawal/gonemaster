@@ -48,7 +48,8 @@ steps:
       - ui_build
     commands:
       # UIs already built by ui_build in the shared workspace; skip ui-build.
-      - make packages PACKAGE_UI_DEP=
+      # badkeys-data is not attached, so skip it and its 56 MB blocklist fetch.
+      - make packages PACKAGE_UI_DEP= PACKAGE_BADKEYS=
       # Stage exactly what the release attaches. badkeys-data is excluded:
       # ~54 MB per format, and its content tracks the upstream blocklist
       # rather than engine.Version. server-nogui is excluded as the same

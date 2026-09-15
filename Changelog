@@ -7,6 +7,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Added
 
 - ci: prune release attachments below the three newest versions after publishing
+- dnssec22: evaluate nameserver names below a referred delegation
 
 ### Fixed
 

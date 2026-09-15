@@ -2188,6 +2188,10 @@ msgctxt "DNSSEC:DS22_NS_ADDRESS_ORPHAN_ZONE"
 msgid "The address records of name server {ns} are signed by {signer}, but the enclosing zone proves no delegation there: the NSEC or NSEC3 record matching {ns} has no NS bit. Returned from name server(s) {servers}."
 msgstr "Adressposterna för namnservern {ns} är signerade av {signer}, men den omslutande zonen bevisar ingen delegering där: NSEC- eller NSEC3-posten som matchar {ns} saknar NS-biten. Svar från namnserver(ar) {servers}."
 
+msgctxt "DNSSEC:DS22_NS_ADDRESS_REFERRED"
+msgid "The address records of name server {ns} lie in the securely delegated zone {zone} and were not checked there. Name server(s) {servers} refer the name to that zone."
+msgstr "Adressposterna för namnservern {ns} ligger i den säkert delegerade zonen {zone} och kontrollerades inte där. Namnserver(ar) {servers} hänvisar namnet till den zonen."
+
 msgctxt "DNSSEC:DS22_NS_ADDRESS_RRSIG_EXPIRED"
 msgid "The RRSIG with keytag {keytag} covering the address records of name server {ns} has expired on name server(s) {servers}."
 msgstr "RRSIG-posten med \"key tag\" {keytag} som täcker adressposterna för namnservern {ns} har löpt ut på namnserver(ar) {servers}."

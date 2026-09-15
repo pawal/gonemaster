@@ -196,7 +196,8 @@ name was seen differently on different servers, the worst status is reported.
 The section is absent where the run reached no such conclusion, which is not
 the same as the zone having no in-domain nameserver name. The roll-up `status`
 describes the chain of the zone itself and does not change when a name in
-`ns_names` is bogus.
+`ns_names` is bogus. A `servers` entry may name a nameserver of a zone
+delegated below the apex, where names in that zone are evaluated.
 
 Version 3 also adds the roll-up status `undelegated`, a signed zone whose
 parent proves under signature that no delegation exists at the name. It is

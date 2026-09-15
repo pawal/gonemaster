@@ -21,6 +21,7 @@ Scope:
 | `domain` | `string` | Domain name in testcase-specific contexts. | Keep testcase meaning explicit. |
 | `mname` | `string` | SOA MNAME hostname. | Hostname only. |
 | `signer` | `string` | Signer's Name of an RRSIG record. | Zone apex name. Never the owner name of the signed RRset. |
+| `zone` | `string` | Zone apex name a finding is about. | Never the zone under test. Use `signer` where the name comes from an RRSIG. |
 
 ## Query Identity Keys
 

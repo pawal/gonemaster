@@ -100,6 +100,11 @@ type ds22Fixture struct {
 	parentIP   string
 	answers    ds22Answers
 	counts     map[string]int
+	// The delegated zone of the referral cases: its key and its own server.
+	childKey     *dns.DNSKEY
+	childSigner  crypto.Signer
+	childAnswers ds22Answers
+	childCounts  map[string]int
 }
 
 func newDS22Fixture(t *testing.T) *ds22Fixture {
@@ -1137,5 +1142,382 @@ func TestDNSSEC22ChainStatusCoversEveryVerdictTag(t *testing.T) {
 	}
 	if len(dnssec22ChainStatus) != len(dnssec22ErrorTags)+1 {
 		t.Errorf("chain status table has %d rows, want the %d verdict tags", len(dnssec22ChainStatus), len(dnssec22ErrorTags)+1)
+	}
+}
+
+// --- names the zone refers away ---
+
+// childIP is the address the referrals below carry as glue.
+const ds22ChildIP = "192.0.2.20"
+
+// delegatedZone builds the key of a delegated zone and its own answer table.
+func (f *ds22Fixture) delegatedZone(t *testing.T, cut string) {
+	t.Helper()
+	key, signer := tctest.SignedKey(t, cut, dns.ECDSAP256SHA256, tctest.SEP())
+	f.childKey, f.childSigner = key, signer
+	f.childAnswers = ds22Answers{}
+	f.childCounts = map[string]int{}
+	sig := tctest.Sign(t, key, signer, dns.TypeDNSKEY, []dns.RR{key})
+	f.childAnswers[ds22Key(cut, "DNSKEY")] = tctest.Response(
+		tctest.Question(cut, dns.TypeDNSKEY), tctest.Secure(), tctest.Answers(key, sig))
+}
+
+// secureDelegation publishes a DS for cut on the zone's nameservers, signed by
+// the apex key and matching the delegated zone's key.
+func (f *ds22Fixture) secureDelegation(t *testing.T, cut string) {
+	t.Helper()
+	ds := f.childKey.ToDS(dns.SHA256)
+	if ds == nil {
+		t.Fatal("ToDS returned nil")
+	}
+	ds.Hdr = dns.Header{Name: dnsutil.Fqdn(cut), Class: dns.ClassINET, TTL: 60}
+	sig := tctest.Sign(t, f.zoneKey, f.zoneSigner, dns.TypeDS, []dns.RR{ds})
+	f.answers[ds22Key(cut, "DS")] = tctest.Response(
+		tctest.Question(cut, dns.TypeDS), tctest.Secure(), tctest.Answers(ds, sig))
+}
+
+// referTo publishes a referral for name to cut, naming child as the nameserver
+// of the delegated zone. An empty childIP leaves the referral without glue.
+func (f *ds22Fixture) referTo(name string, cut string, child string, childIP string) {
+	opts := []tctest.MsgOpt{
+		tctest.Question(name, dns.TypeA),
+		tctest.NotAuthoritative(),
+		tctest.Authority(tctest.NSRR(cut, child)),
+	}
+	if childIP != "" {
+		opts = append(opts, tctest.Additional(tctest.ARR(child, childIP)))
+	}
+	f.answers[ds22Key(name, "A")] = tctest.Response(opts...)
+}
+
+// childAddress publishes a signed A RRset for name on the delegated zone.
+func (f *ds22Fixture) childAddress(t *testing.T, name string, key *dns.DNSKEY, signer crypto.Signer, opts ...tctest.SigOpt) {
+	t.Helper()
+	addr := tctest.ARR(name, "192.0.2.40")
+	sig := tctest.Sign(t, key, signer, dns.TypeA, []dns.RR{addr}, opts...)
+	f.childAnswers[ds22Key(name, "A")] = tctest.Response(
+		tctest.Question(name, dns.TypeA), tctest.Secure(), tctest.Answers(addr, sig))
+}
+
+// secureReferral is the common setup: a signed zone that refers one name to a
+// securely delegated child served by one nameserver of its own.
+func (f *ds22Fixture) secureReferral(t *testing.T, ctx context.Context, names ...string) {
+	t.Helper()
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.delegatedZone(t, "sub.example")
+	f.secureDelegation(t, "sub.example")
+	for _, name := range names {
+		f.referTo(name, "sub.example", "bow.sub.example", ds22ChildIP)
+	}
+	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+	ds22Server(t, ctx, "bow.sub.example", ds22ChildIP, f.childAnswers, f.childCounts)
+}
+
+// An insecure delegation is settled by the zone's own nameservers.
+func TestDNSSEC22ReferredInsecureDelegation(t *testing.T) {
+	ctx := dnssecchain.WithNSNames(tctest.Context(t))
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.referTo("ns1.sub.example", "sub.example", "bow.sub.example", ds22ChildIP)
+	f.denyDS("sub.example", ds22NSEC("sub.example", dns.TypeNS, dns.TypeRRSIG, dns.TypeNSEC))
+	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+	child := map[string]int{}
+	ds22Server(t, ctx, "bow.sub.example", ds22ChildIP, ds22Answers{}, child)
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_INSECURE")
+	requireArg(t, entry, "ns", "ns1.sub.example")
+	if got := f.counts[ds22Key("sub.example", "DNSKEY")]; got != 0 {
+		t.Errorf("DNSKEY questions on the zone server = %d, want 0", got)
+	}
+	if len(child) != 0 {
+		t.Errorf("questions to the delegated zone = %v, want none", child)
+	}
+	if got := collected(t, ctx, "ns1.sub.example").Status; got != dnssecchain.NSNameInsecure {
+		t.Errorf("status = %q, want %q", got, dnssecchain.NSNameInsecure)
+	}
+}
+
+// A DS the parent cannot vouch for is the fault itself, and the child is not
+// asked about it.
+func TestDNSSEC22ReferredBrokenDelegation(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.delegatedZone(t, "sub.example")
+	f.secureDelegation(t, "sub.example")
+	f.answers[ds22Key("sub.example", "DS")] = ds22WithoutRRSIG(f.answers[ds22Key("sub.example", "DS")])
+	f.referTo("ns1.sub.example", "sub.example", "bow.sub.example", ds22ChildIP)
+	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+	ds22Server(t, ctx, "bow.sub.example", ds22ChildIP, f.childAnswers, f.childCounts)
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_CHAIN_BROKEN")
+	requireArg(t, entry, "ns", "ns1.sub.example")
+	requireArg(t, entry, "signer", "sub.example")
+	if len(f.childCounts) != 0 {
+		t.Errorf("questions to the delegated zone = %v, want none", f.childCounts)
+	}
+}
+
+// A cut the nameserver says nothing about stays without a verdict.
+func TestDNSSEC22ReferredCutUnanswered(t *testing.T) {
+	ctx := dnssecchain.WithNSNames(tctest.Context(t))
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.referTo("ns1.sub.example", "sub.example", "bow.sub.example", ds22ChildIP)
+	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	if tags := tctest.TagsWithPrefix(entries, "DS22_"); len(tags) != 0 {
+		t.Fatalf("tags = %v, want none", tags)
+	}
+	if got := collected(t, ctx, "ns1.sub.example").Status; got != dnssecchain.NSNameIndeterminate {
+		t.Errorf("status = %q, want %q", got, dnssecchain.NSNameIndeterminate)
+	}
+}
+
+// A secure delegation is followed onto the nameservers of the delegated zone,
+// which hold the records and validate them.
+func TestDNSSEC22ReferredSecureDelegationValidates(t *testing.T) {
+	ctx := dnssecchain.WithNSNames(tctest.Context(t))
+	f := newDS22Fixture(t)
+	f.secureReferral(t, ctx, "ns1.sub.example")
+	f.childAddress(t, "ns1.sub.example", f.childKey, f.childSigner)
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+	if got := tctest.ServerEndpoints(t, entry.Args); len(got) != 1 || got[0] != "bow.sub.example/"+ds22ChildIP {
+		t.Errorf("servers = %v, want the delegated zone's nameserver", got)
+	}
+	tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_REFERRED")
+	if got := f.counts[ds22Key("sub.example", "DNSKEY")]; got != 0 {
+		t.Errorf("DNSKEY questions on the zone server = %d, want 0", got)
+	}
+	if got := f.childCounts[ds22Key("sub.example", "DNSKEY")]; got != 1 {
+		t.Errorf("DNSKEY questions on the delegated zone = %d, want 1", got)
+	}
+	got := collected(t, ctx, "ns1.sub.example")
+	if got.Status != dnssecchain.NSNameValidates {
+		t.Errorf("status = %q, want %q", got.Status, dnssecchain.NSNameValidates)
+	}
+	if len(got.Servers) != 1 || got.Servers[0] != ds22ChildIP {
+		t.Errorf("servers = %v, want the delegated zone's nameserver", got.Servers)
+	}
+}
+
+// A fault in the delegated zone is reported against the zone under test, with
+// the delegated zone's nameserver named.
+func TestDNSSEC22ReferredSecureDelegationLeafFaults(t *testing.T) {
+	t.Run("unsigned", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		f.secureReferral(t, ctx, "ns1.sub.example")
+		f.childAddress(t, "ns1.sub.example", f.childKey, f.childSigner)
+		f.childAnswers[ds22Key("ns1.sub.example", "A")] = ds22WithoutRRSIG(f.childAnswers[ds22Key("ns1.sub.example", "A")])
+
+		entries := f.run(t, ctx, "ns1.sub.example")
+		entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_UNSIGNED")
+		requireArg(t, entry, "ns", "ns1.sub.example")
+		if got := tctest.ServerEndpoints(t, entry.Args); len(got) != 1 || got[0] != "bow.sub.example/"+ds22ChildIP {
+			t.Errorf("servers = %v, want the delegated zone's nameserver", got)
+		}
+		tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+		tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_REFERRED")
+	})
+
+	t.Run("signed by a foreign key", func(t *testing.T) {
+		ctx := tctest.Context(t)
+		f := newDS22Fixture(t)
+		f.secureReferral(t, ctx, "ns1.sub.example")
+		foreign, foreignSigner := tctest.SignedKey(t, "sub.example", dns.ECDSAP256SHA256, tctest.SEP())
+		f.childAddress(t, "ns1.sub.example", foreign, foreignSigner)
+
+		entries := f.run(t, ctx, "ns1.sub.example")
+		entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY")
+		requireArg(t, entry, "signer", "sub.example")
+		tctest.RequireNoTag(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+	})
+}
+
+// A delegated zone whose keys do not match the DS breaks the chain the zone
+// under test signed.
+func TestDNSSEC22ReferredSecureDelegationChildKeysBroken(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.secureReferral(t, ctx, "ns1.sub.example")
+	other, otherSigner := tctest.SignedKey(t, "sub.example", dns.ECDSAP256SHA256, tctest.SEP())
+	sig := tctest.Sign(t, other, otherSigner, dns.TypeDNSKEY, []dns.RR{other})
+	f.childAnswers[ds22Key("sub.example", "DNSKEY")] = tctest.Response(
+		tctest.Question("sub.example", dns.TypeDNSKEY), tctest.Secure(), tctest.Answers(other, sig))
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_CHAIN_BROKEN")
+	requireArg(t, entry, "ns", "ns1.sub.example")
+	requireArg(t, entry, "signer", "sub.example")
+	if got := tctest.ServerEndpoints(t, entry.Args); len(got) != 1 || got[0] != "bow.sub.example/"+ds22ChildIP {
+		t.Errorf("servers = %v, want the delegated zone's nameserver", got)
+	}
+}
+
+// A delegated zone whose nameserver does not answer leaves the name unchecked
+// and says so.
+func TestDNSSEC22ReferredSecureDelegationChildSilent(t *testing.T) {
+	ctx := dnssecchain.WithNSNames(tctest.Context(t))
+	f := newDS22Fixture(t)
+	f.secureReferral(t, ctx, "ns1.sub.example")
+	delete(f.childAnswers, ds22Key("sub.example", "DNSKEY"))
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_REFERRED")
+	requireArg(t, entry, "ns", "ns1.sub.example")
+	requireArg(t, entry, "zone", "sub.example")
+	if got := tctest.ServerEndpoints(t, entry.Args); len(got) != 1 || got[0] != "ns1.sub.example/192.0.2.10" {
+		t.Errorf("servers = %v, want the referring nameserver", got)
+	}
+	if got := collected(t, ctx, "ns1.sub.example").Status; got != dnssecchain.NSNameIndeterminate {
+		t.Errorf("status = %q, want %q", got, dnssecchain.NSNameIndeterminate)
+	}
+}
+
+// A referral without glue names no nameserver to ask, so nothing is queried.
+func TestDNSSEC22ReferredSecureDelegationWithoutGlue(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.delegatedZone(t, "sub.example")
+	f.secureDelegation(t, "sub.example")
+	f.referTo("ns1.sub.example", "sub.example", "bow.sub.example", "")
+	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+	ds22Server(t, ctx, "bow.sub.example", ds22ChildIP, f.childAnswers, f.childCounts)
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_REFERRED")
+	requireArg(t, entry, "zone", "sub.example")
+	if len(f.childCounts) != 0 {
+		t.Errorf("questions to the delegated zone = %v, want none", f.childCounts)
+	}
+}
+
+// The follow is one level deep: a referral from the delegated zone is
+// classified there and not followed again.
+func TestDNSSEC22ReferredSecureDelegationDepthOne(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.secureReferral(t, ctx, "ns1.deep.sub.example")
+	ds22Server(t, ctx, "ns1.deep.sub.example", "192.0.2.10", f.answers, f.counts)
+
+	deepKey, deepSigner := tctest.SignedKey(t, "deep.sub.example", dns.ECDSAP256SHA256, tctest.SEP())
+	ds := deepKey.ToDS(dns.SHA256)
+	ds.Hdr = dns.Header{Name: dnsutil.Fqdn("deep.sub.example"), Class: dns.ClassINET, TTL: 60}
+	dsSig := tctest.Sign(t, f.childKey, f.childSigner, dns.TypeDS, []dns.RR{ds})
+	f.childAnswers[ds22Key("deep.sub.example", "DS")] = tctest.Response(
+		tctest.Question("deep.sub.example", dns.TypeDS), tctest.Secure(), tctest.Answers(ds, dsSig))
+	f.childAnswers[ds22Key("ns1.deep.sub.example", "A")] = tctest.Response(
+		tctest.Question("ns1.deep.sub.example", dns.TypeA), tctest.NotAuthoritative(),
+		tctest.Authority(tctest.NSRR("deep.sub.example", "deep.ns.example")),
+		tctest.Additional(tctest.ARR("deep.ns.example", "192.0.2.50")))
+	deepCounts := map[string]int{}
+	deepAnswers := ds22Answers{}
+	deepSig := tctest.Sign(t, deepKey, deepSigner, dns.TypeDNSKEY, []dns.RR{deepKey})
+	deepAnswers[ds22Key("deep.sub.example", "DNSKEY")] = tctest.Response(
+		tctest.Question("deep.sub.example", dns.TypeDNSKEY), tctest.Secure(), tctest.Answers(deepKey, deepSig))
+	ds22Server(t, ctx, "deep.ns.example", "192.0.2.50", deepAnswers, deepCounts)
+
+	entries := f.run(t, ctx, "ns1.deep.sub.example")
+	entry := tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_REFERRED")
+	requireArg(t, entry, "zone", "deep.sub.example")
+	if got := tctest.ServerEndpoints(t, entry.Args); len(got) != 1 || got[0] != "bow.sub.example/"+ds22ChildIP {
+		t.Errorf("servers = %v, want the delegated zone's nameserver", got)
+	}
+	if len(deepCounts) != 0 {
+		t.Errorf("questions two levels down = %v, want none", deepCounts)
+	}
+}
+
+// Every name below a referred cut is evaluated, at one DS question per
+// nameserver of the zone and one DNSKEY question per nameserver of the child.
+func TestDNSSEC22ReferralCoversEveryNameInTheSubtree(t *testing.T) {
+	ctx := dnssecchain.WithNSNames(tctest.Context(t))
+	names := []string{"ns1.sub.example", "ns2.sub.example", "ns3.sub.example"}
+	f := newDS22Fixture(t)
+	f.secureReferral(t, ctx, names...)
+	ds22Server(t, ctx, "ns2.sub.example", "192.0.2.11", f.answers, f.counts)
+	for _, name := range names {
+		f.childAddress(t, name, f.childKey, f.childSigner)
+	}
+
+	entries := f.run(t, ctx, "ns1.sub.example/192.0.2.10", "ns2.sub.example/192.0.2.11", "ns3.sub.example/192.0.2.10")
+	tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_VALIDATES")
+	if got := f.counts[ds22Key("sub.example", "DS")]; got != 2 {
+		t.Errorf("DS questions = %d, want one per nameserver of the zone", got)
+	}
+	if got := f.childCounts[ds22Key("sub.example", "DNSKEY")]; got != 1 {
+		t.Errorf("DNSKEY questions = %d, want one for the run", got)
+	}
+	for _, name := range names {
+		if got := f.childCounts[ds22Key(name, "A")]; got != 1 {
+			t.Errorf("%s A questions = %d, want 1", name, got)
+		}
+		if got := collected(t, ctx, name).Status; got != dnssecchain.NSNameValidates {
+			t.Errorf("%s status = %q, want %q", name, got, dnssecchain.NSNameValidates)
+		}
+	}
+}
+
+// A delegated zone nameserver on a disabled transport is reported and skipped.
+func TestDNSSEC22ReferredChildTransportDisabled(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	if err := profile.Effective().Set("net.ipv6", false); err != nil {
+		t.Fatalf("set net.ipv6: %v", err)
+	}
+	f.apexDNSKEY(t)
+	f.parentDS(t, ctx, true)
+	f.delegatedZone(t, "sub.example")
+	f.secureDelegation(t, "sub.example")
+	f.answers[ds22Key("ns1.sub.example", "A")] = tctest.Response(
+		tctest.Question("ns1.sub.example", dns.TypeA), tctest.NotAuthoritative(),
+		tctest.Authority(tctest.NSRR("sub.example", "bow.sub.example")),
+		tctest.Additional(tctest.AAAARR("bow.sub.example", "2001:db8::2")))
+	ds22Server(t, ctx, "ns1.sub.example", "192.0.2.10", f.answers, f.counts)
+	ds22Server(t, ctx, "bow.sub.example", "2001:db8::2", f.childAnswers, f.childCounts)
+
+	entries := f.run(t, ctx, "ns1.sub.example")
+	entry := tctest.RequireTag(t, entries, "IPV6_DISABLED")
+	tctest.RequireArgShape(t, entry, tctest.ArgShape{NS: "bow.sub.example", Address: "2001:db8::2"})
+	tctest.RequireTag(t, entries, "DS22_NS_ADDRESS_REFERRED")
+	if len(f.childCounts) != 0 {
+		t.Errorf("questions to the delegated zone = %v, want none", f.childCounts)
+	}
+}
+
+// The zone cut memo holds one entry per name whichever path asked first.
+func TestDNSSEC22ReferredCutIsNotContendedWithASignerCut(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS22Fixture(t)
+	f.apexDNSKEY(t)
+	f.delegatedZone(t, "ns.example")
+	f.secureDelegation(t, "ns.example")
+	walker := f.walker(t, ctx)
+
+	referral := tctest.Response(tctest.NotAuthoritative(), tctest.Authority(tctest.NSRR("ns.example", "bow.ns.example")))
+	walker.noteReferral(referral)
+	if got := walker.referredCut(ctx, dnsname.New("ns.example")).status; got != dnssec22SecureDelegation {
+		t.Fatalf("referred status = %v, want a secure delegation", got)
+	}
+	if got := walker.cut(ctx, dnsname.New("ns.example")).status; got != dnssec22SecureDelegation {
+		t.Errorf("memoized status = %v, want the referred one", got)
+	}
+	if got := len(walker.cuts); got != 1 {
+		t.Errorf("memo entries = %d, want 1", got)
+	}
+	if got := f.counts[ds22Key("ns.example", "DNSKEY")]; got != 0 {
+		t.Errorf("DNSKEY questions = %d, want 0", got)
 	}
 }

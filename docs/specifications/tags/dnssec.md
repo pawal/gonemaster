@@ -233,6 +233,7 @@ _Do not edit by hand - regenerate with the command above._
 | `DS22_NS_ADDRESS_CHAIN_BROKEN` | `ERROR` | [dnssec22](../tests/dnssec/dnssec22.md) | yes |
 | `DS22_NS_ADDRESS_INSECURE` | `INFO` | [dnssec22](../tests/dnssec/dnssec22.md) | yes |
 | `DS22_NS_ADDRESS_ORPHAN_ZONE` | `ERROR` | [dnssec22](../tests/dnssec/dnssec22.md) | yes |
+| `DS22_NS_ADDRESS_REFERRED` | `INFO` | [dnssec22](../tests/dnssec/dnssec22.md) | yes |
 | `DS22_NS_ADDRESS_RRSIG_EXPIRED` | `ERROR` | [dnssec22](../tests/dnssec/dnssec22.md) | yes |
 | `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | [dnssec22](../tests/dnssec/dnssec22.md) | yes |
 | `DS22_NS_ADDRESS_UNSIGNED` | `ERROR` | [dnssec22](../tests/dnssec/dnssec22.md) | yes |

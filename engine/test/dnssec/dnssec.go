@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"maps"
+	"net/netip"
 	"slices"
 	"sort"
 	"strconv"
@@ -664,6 +665,7 @@ func Metadata() map[string][]string {
 			"DS22_NS_ADDRESS_CHAIN_BROKEN",
 			"DS22_NS_ADDRESS_INSECURE",
 			"DS22_NS_ADDRESS_ORPHAN_ZONE",
+			"DS22_NS_ADDRESS_REFERRED",
 			"DS22_NS_ADDRESS_RRSIG_EXPIRED",
 			"DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY",
 			"DS22_NS_ADDRESS_UNSIGNED",
@@ -8890,12 +8892,16 @@ const (
 	dnssec22InsecureCut
 	dnssec22SecureCut
 	dnssec22BrokenCut
+	dnssec22SecureDelegation
 )
 
-// dnssec22Cut is one nameserver's view of a name as a zone cut.
+// dnssec22Cut is one nameserver's view of a name as a zone cut. keys hold the
+// DNSKEY RRset of a secure cut, ds the validated DS RRset of a secure
+// delegation this nameserver refers for.
 type dnssec22Cut struct {
 	status dnssec22CutStatus
 	keys   []*dns.DNSKEY
+	ds     []dns.RR
 }
 
 // dnssec22SigCheck is the outcome of verifying the RRSIGs covering one RRset.
@@ -8929,14 +8935,24 @@ type dnssec22Finding struct {
 	tag    string
 	ns     string
 	signer string
+	zone   string
 	keytag uint16
 }
 
 // dnssec22Outcome is what one nameserver said about the whole name set.
 // results keeps one entry per name reached, in name-set order.
 type dnssec22Outcome struct {
-	servers []logargs.Server
-	results []dnssec22NameResult
+	servers   []logargs.Server
+	results   []dnssec22NameResult
+	deferrals []dnssec22Deferral
+}
+
+// dnssec22Deferral is a secure delegation a nameserver referred names to, with
+// the nameservers of the delegated zone taken from the referral's glue.
+type dnssec22Deferral struct {
+	cut  dnsname.Name
+	ds   []dns.RR
+	glue []nsdiscovery.NSItem
 }
 
 // dnssec22NameResult pairs one name with this nameserver's conclusion about it.
@@ -9000,10 +9016,17 @@ type dnssec22Walker struct {
 	zoneKeys  []*dns.DNSKEY
 	cuts      map[string]dnssec22Cut
 	refersFor []dnsname.Name
+	glue      map[string][]nsdiscovery.NSItem
 }
 
 func newDNSSEC22Walker(ns nameserver.Nameserver, zoneName dnsname.Name, zoneKeys []*dns.DNSKEY) *dnssec22Walker {
-	return &dnssec22Walker{ns: ns, zone: zoneName, zoneKeys: zoneKeys, cuts: map[string]dnssec22Cut{}}
+	return &dnssec22Walker{
+		ns:       ns,
+		zone:     zoneName,
+		zoneKeys: zoneKeys,
+		cuts:     map[string]dnssec22Cut{},
+		glue:     map[string][]nsdiscovery.NSItem{},
+	}
 }
 
 // dnssec22Query asks name/rrtype with DO set, retrying over TCP on truncation.
@@ -9024,22 +9047,108 @@ func (w *dnssec22Walker) query(ctx context.Context, name dnsname.Name, rrtype st
 
 // referred reports whether this nameserver already refused the subtree name lies in.
 func (w *dnssec22Walker) referred(name dnsname.Name) bool {
-	for _, cut := range w.refersFor {
-		if cut.IsInBailiwick(name) {
-			return true
-		}
-	}
-	return false
+	_, ok := w.referredFor(name)
+	return ok
 }
 
-// noteReferral records the zone cuts a referral response delegated to.
+// referredFor returns the most specific cut this nameserver refused name under.
+func (w *dnssec22Walker) referredFor(name dnsname.Name) (dnsname.Name, bool) {
+	var best dnsname.Name
+	found := false
+	for _, cut := range w.refersFor {
+		if !cut.IsInBailiwick(name) {
+			continue
+		}
+		if !found || len(cut.Labels()) > len(best.Labels()) {
+			best, found = cut, true
+		}
+	}
+	return best, found
+}
+
+// noteReferral records the zone cuts a referral response delegated to and the
+// glue it carried for them.
 func (w *dnssec22Walker) noteReferral(resp packet.Packet) {
+	seen := map[string]bool{}
 	for _, rr := range resp.GetRecords("NS", "authority") {
 		owner := dnsname.New(rr.Header().Name)
+		if seen[owner.StringLower()] {
+			continue
+		}
+		seen[owner.StringLower()] = true
 		if !w.referred(owner) {
 			w.refersFor = append(w.refersFor, owner)
 		}
+		w.noteGlue(resp, owner)
 	}
+}
+
+// noteGlue keeps the addresses the referral carried for the nameservers of cut.
+func (w *dnssec22Walker) noteGlue(resp packet.Packet, cut dnsname.Name) {
+	targets := map[string]bool{}
+	for _, rr := range resp.GetRecordsForName("NS", cut, "authority") {
+		ns, ok := rr.(*dns.NS)
+		if !ok {
+			continue
+		}
+		targets[dnsname.New(ns.Ns).StringLower()] = true
+	}
+	if len(targets) == 0 {
+		return
+	}
+	key := cut.StringLower()
+	seen := map[string]bool{}
+	for _, item := range w.glue[key] {
+		seen[item.String()] = true
+	}
+	for _, rrtype := range []string{"A", "AAAA"} {
+		for _, rr := range resp.GetRecords(rrtype, "additional") {
+			owner := dnsname.New(rr.Header().Name)
+			if !targets[owner.StringLower()] {
+				continue
+			}
+			addr, ok := dnssec22GlueAddress(rr)
+			if !ok {
+				continue
+			}
+			item := nsdiscovery.NSItem{Name: owner, Address: addr, HasAddress: true}
+			if seen[item.String()] {
+				continue
+			}
+			seen[item.String()] = true
+			w.glue[key] = append(w.glue[key], item)
+		}
+	}
+}
+
+// dnssec22GlueAddress reads the address out of an A or AAAA record.
+func dnssec22GlueAddress(rr dns.RR) (netip.Addr, bool) {
+	var addr netip.Addr
+	switch record := rr.(type) {
+	case *dns.A:
+		addr = record.Addr
+	case *dns.AAAA:
+		addr = record.Addr
+	default:
+		return netip.Addr{}, false
+	}
+	if !addr.IsValid() {
+		return netip.Addr{}, false
+	}
+	return addr.Unmap(), true
+}
+
+// deferrals returns the secure delegations this nameserver referred names to.
+func (w *dnssec22Walker) deferrals() []dnssec22Deferral {
+	var out []dnssec22Deferral
+	for _, cut := range w.refersFor {
+		entry, ok := w.cuts[cut.StringLower()]
+		if !ok || entry.status != dnssec22SecureDelegation {
+			continue
+		}
+		out = append(out, dnssec22Deferral{cut: cut, ds: entry.ds, glue: w.glue[cut.StringLower()]})
+	}
+	return out
 }
 
 // cut returns the memoized zone cut status of name on this nameserver.
@@ -9051,13 +9160,27 @@ func (w *dnssec22Walker) cut(ctx context.Context, name dnsname.Name) dnssec22Cut
 	if cached, ok := w.cuts[key]; ok {
 		return cached
 	}
-	result := w.probeCut(ctx, name)
+	result := w.probeCut(ctx, name, false)
 	w.cuts[key] = result
 	return result
 }
 
-// probeCut asks name DS and classifies the response.
-func (w *dnssec22Walker) probeCut(ctx context.Context, name dnsname.Name) dnssec22Cut {
+// referredCut returns the memoized parent-side status of a cut this nameserver
+// referred to. It never asks for the keys of the cut, which this nameserver
+// does not serve.
+func (w *dnssec22Walker) referredCut(ctx context.Context, name dnsname.Name) dnssec22Cut {
+	key := name.StringLower()
+	if cached, ok := w.cuts[key]; ok {
+		return cached
+	}
+	result := w.probeCut(ctx, name, true)
+	w.cuts[key] = result
+	return result
+}
+
+// probeCut asks name DS and classifies the response. referred stops at the DS
+// RRset, the whole statement a nameserver on the parent side can make.
+func (w *dnssec22Walker) probeCut(ctx context.Context, name dnsname.Name, referred bool) dnssec22Cut {
 	resp := w.query(ctx, name, "DS")
 	if resp.Msg == nil || !resp.AA() {
 		return dnssec22Cut{status: dnssec22Indeterminate}
@@ -9072,6 +9195,9 @@ func (w *dnssec22Walker) probeCut(ctx context.Context, name dnsname.Name) dnssec
 	dsRRs := resp.GetRecordsForName("DS", name, "answer")
 	if len(dsRRs) == 0 {
 		return dnssec22Cut{status: dnssec22CutFromDenial(name, resp)}
+	}
+	if referred {
+		return w.dsStatus(ctx, name, resp, dsRRs)
 	}
 	return w.cutFromDS(ctx, name, resp, dsRRs)
 }
@@ -9111,6 +9237,22 @@ func dnssec22CutFromBitmap(types []uint16) dnssec22CutStatus {
 
 // cutFromDS validates the DS RRset of name and the DNSKEY RRset it points at.
 func (w *dnssec22Walker) cutFromDS(ctx context.Context, name dnsname.Name, resp packet.Packet, dsRRs []dns.RR) dnssec22Cut {
+	cut := w.dsStatus(ctx, name, resp, dsRRs)
+	if cut.status != dnssec22SecureDelegation {
+		return cut
+	}
+	keys, answered := dnssec22ChildKeys(ctx, w.ns, name, dsRRs)
+	if !answered {
+		// This nameserver serves both sides of the cut, so a missing apex
+		// DNSKEY RRset is a fault and not a gap.
+		return dnssec22Cut{status: dnssec22BrokenCut}
+	}
+	return keys
+}
+
+// dsStatus validates the DS RRset of name without asking for the keys it points
+// at. A DS RRset that verifies is a secure delegation.
+func (w *dnssec22Walker) dsStatus(ctx context.Context, name dnsname.Name, resp packet.Packet, dsRRs []dns.RR) dnssec22Cut {
 	sigs := filterRRSIGByType(resp.GetRecordsForName("RRSIG", name, "answer"), dns.TypeDS)
 	if len(sigs) == 0 {
 		return dnssec22Cut{status: dnssec22BrokenCut}
@@ -9131,28 +9273,34 @@ func (w *dnssec22Walker) cutFromDS(ctx context.Context, name dnsname.Name, resp 
 	if status := dnssec22CutFromCheck(dsCheck); status != dnssec22SecureCut {
 		return dnssec22Cut{status: status}
 	}
+	return dnssec22Cut{status: dnssec22SecureDelegation, ds: dsRRs}
+}
 
-	keyResp := w.query(ctx, name, "DNSKEY")
-	if keyResp.Msg == nil || !keyResp.AA() || keyResp.Rcode() != "NOERROR" {
-		return dnssec22Cut{status: dnssec22BrokenCut}
+// dnssec22ChildKeys asks ns for the DNSKEY RRset of name and checks it against
+// an already validated DS RRset. answered is false where ns does not serve name
+// as a zone apex.
+func dnssec22ChildKeys(ctx context.Context, ns nameserver.Nameserver, name dnsname.Name, dsRRs []dns.RR) (dnssec22Cut, bool) {
+	resp := dnssec22Query(ctx, ns, name, "DNSKEY")
+	if resp.Msg == nil || !resp.AA() || resp.Rcode() != "NOERROR" {
+		return dnssec22Cut{status: dnssec22Indeterminate}, false
 	}
 	var keys []*dns.DNSKEY
-	for _, rr := range keyResp.GetRecordsForName("DNSKEY", name, "answer") {
+	for _, rr := range resp.GetRecordsForName("DNSKEY", name, "answer") {
 		if key, ok := rr.(*dns.DNSKEY); ok {
 			keys = append(keys, key)
 		}
 	}
 	matched := dnssec22KeysMatchingDS(dsRRs, keys)
 	if len(matched) == 0 {
-		return dnssec22Cut{status: dnssec22BrokenCut}
+		return dnssec22Cut{status: dnssec22BrokenCut}, true
 	}
 	keyset := dnskeyRRset(keys)
-	keySigs := filterRRSIGByType(keyResp.GetRecordsForName("RRSIG", name, "answer"), dns.TypeDNSKEY)
-	keyCheck := dnssec22VerifySigs(keySigs, matched, packetTime(keyResp), func(*dns.RRSIG) []dns.RR { return keyset })
-	if status := dnssec22CutFromCheck(keyCheck); status != dnssec22SecureCut {
-		return dnssec22Cut{status: status}
+	sigs := filterRRSIGByType(resp.GetRecordsForName("RRSIG", name, "answer"), dns.TypeDNSKEY)
+	check := dnssec22VerifySigs(sigs, matched, packetTime(resp), func(*dns.RRSIG) []dns.RR { return keyset })
+	if status := dnssec22CutFromCheck(check); status != dnssec22SecureCut {
+		return dnssec22Cut{status: status}, true
 	}
-	return dnssec22Cut{status: dnssec22SecureCut, keys: keys}
+	return dnssec22Cut{status: dnssec22SecureCut, keys: keys}, true
 }
 
 // dnssec22CutFromCheck maps a signature check onto a zone cut status.
@@ -9202,11 +9350,42 @@ func (w *dnssec22Walker) expectedSigner(ctx context.Context, order []dnsname.Nam
 
 // dnssec22Result is what one nameserver concluded about one in-domain name.
 // finding is nil where the name raises no tag; signer is the Signer's Name of
-// the covering RRSIG where one was seen.
+// the covering RRSIG where one was seen; deferredTo names the secure delegation
+// the name lies below, whose own nameservers hold the records.
 type dnssec22Result struct {
-	finding   *dnssec22Finding
-	validated bool
-	signer    string
+	finding    *dnssec22Finding
+	validated  bool
+	signer     string
+	deferredTo string
+}
+
+// referredResult classifies a name this nameserver referred away, from the
+// parent-side status of the cut it named.
+func (w *dnssec22Walker) referredResult(ctx context.Context, name dnsname.Name, cut dnsname.Name) dnssec22Result {
+	if cut.Compare(w.zone) == 0 || !w.zone.IsInBailiwick(cut) {
+		return dnssec22Result{}
+	}
+	switch w.referredCut(ctx, cut).status {
+	case dnssec22InsecureCut:
+		return dnssec22Result{finding: &dnssec22Finding{tag: "DS22_NS_ADDRESS_INSECURE", ns: name.String()}}
+	case dnssec22BrokenCut:
+		return dnssec22Result{
+			finding: &dnssec22Finding{tag: "DS22_NS_ADDRESS_CHAIN_BROKEN", ns: name.String(), signer: cut.String()},
+			signer:  cut.String(),
+		}
+	case dnssec22SecureDelegation:
+		return dnssec22Result{deferredTo: cut.String()}
+	}
+	return dnssec22Result{}
+}
+
+// classify evaluates name on this nameserver, reading a subtree it already
+// referred for from the memo instead of asking again.
+func (w *dnssec22Walker) classify(ctx context.Context, name dnsname.Name) dnssec22Result {
+	if cut, ok := w.referredFor(name); ok {
+		return w.referredResult(ctx, name, cut)
+	}
+	return w.evaluate(ctx, name)
 }
 
 // evaluate classifies the address records of one in-domain name on this nameserver.
@@ -9218,6 +9397,9 @@ func (w *dnssec22Walker) evaluate(ctx context.Context, name dnsname.Name) dnssec
 	if !resp.AA() {
 		if resp.Type() == "referral" {
 			w.noteReferral(resp)
+			if cut, ok := w.referredFor(name); ok {
+				return w.referredResult(ctx, name, cut)
+			}
 		}
 		return dnssec22Result{}
 	}
@@ -9504,6 +9686,139 @@ func dnssec22Endpoints(group []nameserver.Nameserver) []logargs.Server {
 	return out
 }
 
+// dnssec22FindingOf returns the finding one result contributes. A name deferred
+// to a secure delegation that no nameserver settled is reported as referred.
+func dnssec22FindingOf(result dnssec22NameResult, resolved map[string]bool) (dnssec22Finding, bool) {
+	if result.finding != nil {
+		return *result.finding, true
+	}
+	if result.deferredTo == "" || resolved[result.name] {
+		return dnssec22Finding{}, false
+	}
+	return dnssec22Finding{tag: "DS22_NS_ADDRESS_REFERRED", ns: result.name, zone: result.deferredTo}, true
+}
+
+// dnssec22MergeDeferrals unions the deferred cuts of every nameserver, keeping
+// the first DS RRset seen and every glue endpoint.
+func dnssec22MergeDeferrals(outcomes []dnssec22Outcome) []dnssec22Deferral {
+	index := map[string]int{}
+	var merged []dnssec22Deferral
+	for _, outcome := range outcomes {
+		for _, deferral := range outcome.deferrals {
+			key := deferral.cut.StringLower()
+			idx, ok := index[key]
+			if !ok {
+				index[key] = len(merged)
+				entry := deferral
+				entry.glue = append([]nsdiscovery.NSItem(nil), deferral.glue...)
+				merged = append(merged, entry)
+				continue
+			}
+			merged[idx].glue = append(merged[idx].glue, deferral.glue...)
+		}
+	}
+	return merged
+}
+
+// dnssec22NamesBelow returns the names of the set at or below cut.
+func dnssec22NamesBelow(names []dnsname.Name, cut dnsname.Name) []dnsname.Name {
+	var out []dnsname.Name
+	for _, name := range names {
+		if cut.IsInBailiwick(name) {
+			out = append(out, name)
+		}
+	}
+	return out
+}
+
+// dnssec22FollowTask is one delegated zone nameserver and the names it holds.
+type dnssec22FollowTask struct {
+	deferral dnssec22Deferral
+	group    []nameserver.Nameserver
+	names    []dnsname.Name
+}
+
+// dnssec22Follow evaluates the names below each secure delegation the zone's
+// nameservers referred to, on the nameservers of the delegated zone. Their
+// addresses come from the glue of the referral and from nowhere else.
+func dnssec22Follow(ctx context.Context, z *zone.Zone, names []dnsname.Name, outcomes []dnssec22Outcome) ([]dnssec22Outcome, []*logger.Entry, error) {
+	var planned []dnssec22FollowTask
+	for _, deferral := range dnssec22MergeDeferrals(outcomes) {
+		below := dnssec22NamesBelow(names, deferral.cut)
+		if len(below) == 0 {
+			continue
+		}
+		for _, group := range nameserversByIP(nameserversFromNSItems(ctx, z, deferral.glue)) {
+			planned = append(planned, dnssec22FollowTask{deferral: deferral, group: group, names: below})
+		}
+	}
+	if len(planned) == 0 {
+		return nil, nil, nil
+	}
+
+	followed := make([]dnssec22Outcome, len(planned))
+	tasks := make([]runner.Task, len(planned))
+	for i, plan := range planned {
+		tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+			if len(plan.group) == 0 {
+				return nil
+			}
+			buf := testlogger.Wrap(log, moduleName, "DNSSEC22")
+			ns := plan.group[0]
+			if disabled, derr := ipDisabledMessageWithLogger(ctx, buf, ns, "A"); derr != nil {
+				return derr
+			} else if disabled {
+				return nil
+			}
+			followed[i] = dnssec22FollowOne(ctx, plan, ns)
+			return nil
+		}
+	}
+
+	entries, err := runner.Run(ctx, tasks, runner.Options{
+		Parallel:      profile.FromContext(ctx).Resolver.Defaults.Parallel,
+		CancelOnError: false,
+	})
+
+	out := make([]dnssec22Outcome, 0, len(followed))
+	for _, outcome := range followed {
+		if len(outcome.results) > 0 {
+			out = append(out, outcome)
+		}
+	}
+	return out, entries, err
+}
+
+// dnssec22FollowOne evaluates one delegated zone nameserver.
+func dnssec22FollowOne(ctx context.Context, plan dnssec22FollowTask, ns nameserver.Nameserver) dnssec22Outcome {
+	cut := plan.deferral.cut
+	keys, answered := dnssec22ChildKeys(ctx, ns, cut, plan.deferral.ds)
+	if !answered {
+		// This nameserver does not serve the delegated zone; others may.
+		return dnssec22Outcome{}
+	}
+	outcome := dnssec22Outcome{servers: dnssec22Endpoints(plan.group)}
+	switch keys.status {
+	case dnssec22BrokenCut:
+		for _, name := range plan.names {
+			outcome.results = append(outcome.results, dnssec22NameResult{
+				name: name.String(),
+				dnssec22Result: dnssec22Result{
+					finding: &dnssec22Finding{tag: "DS22_NS_ADDRESS_CHAIN_BROKEN", ns: name.String(), signer: cut.String()},
+					signer:  cut.String(),
+				},
+			})
+		}
+	case dnssec22SecureCut:
+		walker := newDNSSEC22Walker(ns, cut, keys.keys)
+		for _, name := range plan.names {
+			result := walker.classify(ctx, name)
+			outcome.results = append(outcome.results, dnssec22NameResult{name: name.String(), dnssec22Result: result})
+		}
+	}
+	return outcome
+}
+
 // DNSSEC22 runs the DNSSEC22 test case.
 // It validates the address records of the in-domain nameserver names of the
 // zone against the zone's own chain of trust.
@@ -9565,12 +9880,10 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			walker := newDNSSEC22Walker(ns, z.Name, zoneKeys)
 			outcome := dnssec22Outcome{servers: dnssec22Endpoints(group)}
 			for _, name := range names {
-				if walker.referred(name) {
-					continue
-				}
-				result := walker.evaluate(ctx, name)
+				result := walker.classify(ctx, name)
 				outcome.results = append(outcome.results, dnssec22NameResult{name: name.String(), dnssec22Result: result})
 			}
+			outcome.deferrals = walker.deferrals()
 			outcomes[i] = outcome
 			return nil
 		}
@@ -9585,6 +9898,22 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		return results, err
 	}
 
+	followed, entries, err := dnssec22Follow(ctx, z, names, outcomes)
+	results = append(results, entries...)
+	if err != nil {
+		return results, err
+	}
+	outcomes = append(outcomes, followed...)
+
+	resolved := map[string]bool{}
+	for _, outcome := range outcomes {
+		for _, result := range outcome.results {
+			if result.finding != nil || result.validated {
+				resolved[result.name] = true
+			}
+		}
+	}
+
 	byFinding := map[dnssec22Finding][]logargs.Server{}
 	var findings []dnssec22Finding
 	var validatedServers []logargs.Server
@@ -9595,10 +9924,10 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if result.validated {
 				validated = true
 			}
-			if result.finding == nil {
+			finding, ok := dnssec22FindingOf(result, resolved)
+			if !ok {
 				continue
 			}
-			finding := *result.finding
 			if _, seen := byFinding[finding]; !seen {
 				findings = append(findings, finding)
 			}
@@ -9619,6 +9948,9 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if left.signer != right.signer {
 			return left.signer < right.signer
 		}
+		if left.zone != right.zone {
+			return left.zone < right.zone
+		}
 		return left.keytag < right.keytag
 	})
 
@@ -9630,6 +9962,9 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		args := map[string]any{"ns": finding.ns}
 		if finding.signer != "" {
 			args["signer"] = finding.signer
+		}
+		if finding.zone != "" {
+			args["zone"] = finding.zone
 		}
 		switch finding.tag {
 		case "DS22_NS_ADDRESS_RRSIG_EXPIRED", "DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY":

@@ -13,6 +13,9 @@ Status: Final
   nameserver. No other testcase reads a signature below the apex: the address
   records of in-domain names are resolved with DO=0 and glue is accepted, so a
   bogus name is reported as resolvable.
+- A name a nameserver of the zone refers to a delegated zone whose DS validates
+  is evaluated on the nameservers of that zone. The zone under test signs the
+  DS, so the chain into the delegated zone is its own.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -35,6 +38,12 @@ Status: Final
   - Per child nameserver IP: `A` responses (and `AAAA` where required) for each
     in-domain name, and `DS` and `DNSKEY` responses for each probed zone cut,
     all with DNSSEC enabled.
+  - Per referred zone cut whose DS validates: the `NS` names in the authority
+    section of the referral and their glue in its additional section. No other
+    source of address for the delegated zone is used.
+  - Per nameserver IP of such a cut: a `DNSKEY` response for the cut, and `A`
+    responses (and `AAAA` where required) for each in-domain name at or below
+    it, all with DNSSEC enabled.
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport
     debug tags.
@@ -62,15 +71,21 @@ Status: Final
    - Initialise the per-server state: an empty referral set and an empty zone
      cut memo.
    - Process the names of the name set in order. For each name N:
-     1. If N is at or below a name in the referral set, skip N. X has stated it
-        does not serve that subtree.
+     1. If N is at or below a cut C in the referral set, classify N by
+        `referredCutStatus(X, C)` as step 3 does. No query is made.
      2. Query `N A` at X with DNSSEC enabled (UDP, retry over TCP on `TC`).
      3. Classify the response and select the covering RRSIG records:
         - No response, or a response whose RCODE is neither `NOERROR` nor
           `NXDOMAIN`: no finding for N.
         - Referral (not `AA`, empty answer section, `NS` RRset in the authority
-          section): add the owner name of that `NS` RRset to the referral set;
-          no finding for N.
+          section): C is the owner name of that `NS` RRset. Add C to the
+          referral set and retain the `NS` names of the RRset with their glue
+          from the additional section. Classify N by
+          `referredCutStatus(X, C)`. Steps 3.4 onward are not reached for N.
+          - `insecure`: `DS22_NS_ADDRESS_INSECURE`.
+          - `broken`: `DS22_NS_ADDRESS_CHAIN_BROKEN` with `signer` C.
+          - `secure delegation`: N is deferred to C. Step 5 decides it.
+          - `indeterminate`: no finding for N.
         - `AA` `NXDOMAIN`: no finding for N. Delegation and nameserver
           testcases own a nameserver name that does not exist.
         - `CNAME` in the answer section: no finding for N. RFC 2181 section
@@ -128,20 +143,40 @@ Status: Final
         - Otherwise: `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` with `signer`
           S and the `keytag` of the first covering RRSIG. The signature cannot
           verify under the chain of trust of the zone.
-5. Aggregate across nameservers: one emission per tag and per distinct
+5. For each zone cut C with a name deferred in step 4, once per run. The
+   nameservers of C are the `NS` names of its retained referrals that have
+   glue, deduplicated by IP across every nameserver that referred to C. An `NS`
+   name without glue is not resolved. For each unique nameserver IP Y of C
+   (parallelized as step 4 is):
+   1. If the transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED`
+      with `query_type` `A`, and skip Y.
+   2. Take the DNSKEY RRset of C at Y from `childKeys(Y, C, DS)`, DS being the
+      RRset `referredCutStatus` validated.
+      - `indeterminate`: no result on Y.
+      - `broken`: `DS22_NS_ADDRESS_CHAIN_BROKEN` with `signer` C for every name
+        deferred to C.
+      - `secure`: continue at step 5.3.
+   3. Process every name of the name set at or below C by step 4, with Y as the
+      nameserver, C as the zone and that DNSKEY RRset as the zone keys. The
+      referral set and the zone cut memo are Y's own. A referral Y answers is
+      classified and MUST NOT be followed: the follow is one level deep.
+6. A name deferred to C that no nameserver settled, by a finding or by a
+   validated address RRset, yields `DS22_NS_ADDRESS_REFERRED` with `ns` N,
+   `zone` C and `servers` the nameservers that referred it.
+7. Aggregate across nameservers: one emission per tag and per distinct
    combination of its arguments other than `servers`, with the matching
    `servers` merged and sorted.
-6. If no ERROR-level `DS22_*` tag was emitted and at least one address RRset
+8. If no ERROR-level `DS22_*` tag was emitted and at least one address RRset
    validated, emit `DS22_NS_ADDRESS_VALIDATES` with the nameservers that
    validated at least one address RRset.
-7. Emit `TEST_CASE_END`.
+9. Emit `TEST_CASE_END`.
 
 ### Zone Cut Status
 
 `cutStatus(X, M)` is the statement of nameserver X about the name M as a zone
-cut. It queries `M DS` at X with DNSSEC enabled (UDP, retry over TCP on `TC`)
-and returns one of `secure`, `insecure`, `broken`, `not a cut` or
-`indeterminate`:
+cut, for a cut X itself serves. It queries `M DS` at X with DNSSEC enabled
+(UDP, retry over TCP on `TC`) and returns one of `secure`, `insecure`,
+`broken`, `not a cut` or `indeterminate`:
 
 - No response, a response that is not `AA`, or a referral: `indeterminate`. X
   does not serve the parent side of M.
@@ -153,10 +188,8 @@ and returns one of `secure`, `insecure`, `broken`, `not a cut` or
     status yields `broken`. The recursion is bounded by the labels between M
     and the zone apex.
   - The DS RRSIG MUST verify against a DNSKEY of P, otherwise `broken`.
-  - `M DNSKEY` is queried at X. The response MUST be `AA` `NOERROR` with a
-    DNSKEY RRset containing a key that matches a DS by keytag, algorithm and
-    digest, and the DNSKEY RRset MUST carry an RRSIG that verifies under that
-    key, otherwise `broken`.
+  - `childKeys(X, M, DS)` MUST be `secure`, otherwise its status is the status
+    of M.
   - All conditions hold: `secure`, retaining the DNSKEY RRset of M.
   - A signature whose algorithm the local verifier cannot process is
     `indeterminate`, not `broken`.
@@ -178,7 +211,26 @@ and returns one of `secure`, `insecure`, `broken`, `not a cut` or
 Every result is memoized per (X, M), `indeterminate` included, and reused by
 every name below M on X.
 
-### Per-NS Name Validation And Aggregation (steps 2-7)
+`childKeys(Y, M, DS)` is the statement of nameserver Y about the keys of M
+against an already validated DS RRset. It queries `M DNSKEY` at Y with DNSSEC
+enabled and returns `secure`, `broken` or `indeterminate`:
+
+- No response, or a response that is not `AA` `NOERROR`: `indeterminate`. Y
+  does not serve M as a zone apex.
+- No DNSKEY matching a DS by keytag, algorithm and digest: `broken`.
+- No RRSIG covering the DNSKEY RRset verifies under a matched key: `broken`.
+- A signature whose algorithm the local verifier cannot process:
+  `indeterminate`.
+- All conditions hold: `secure`, retaining the DNSKEY RRset of M.
+
+`referredCutStatus(X, C)` is the statement of nameserver X about a name C it
+referred to. It is `cutStatus(X, C)` up to and including the validation of the
+DS RRset, and MUST NOT query `C DNSKEY`, which X does not serve. It returns
+`insecure`, `broken`, `indeterminate` or `secure delegation`, the last
+retaining the validated DS RRset of C. It shares the memo of `cutStatus`: a cut
+X refers for is never a cut X serves.
+
+### Per-NS Name Validation And Aggregation (steps 2-9)
 
 {{% expand "Show diagram" %}}
 ```
@@ -196,10 +248,18 @@ For each unique child NS IP X (parallel; fan-out = resolver.defaults.parallel):
    refersFor = {}; cuts = {}
 
    For each in-domain name N:
-      N at or below a name in refersFor  -> skip N
+      N at or below a cut C in refersFor -> classify by referredCutStatus(X, C),
+                                            no query
       query N A at X, DNSSEC=on (TC -> retry over TCP)
        +- no resp / RCODE not NOERROR|NXDOMAIN -> no finding
-       +- referral       -> refersFor += authority NS owner; no finding
+       +- referral       -> C = authority NS owner; refersFor += C
+                            keep the referral's NS names and glue
+                            referredCutStatus(X, C)
+                              insecure          -> DS22_NS_ADDRESS_INSECURE
+                              broken            -> DS22_NS_ADDRESS_CHAIN_BROKEN
+                                                   (signer=C)
+                              secure delegation -> N deferred to C
+                              indeterminate     -> no finding
        +- AA NXDOMAIN    -> no finding
        +- CNAME          -> no finding (Delegation05)
        +- AA answer      -> sigs = RRSIG(A) in answer
@@ -229,6 +289,24 @@ For each unique child NS IP X (parallel; fan-out = resolver.defaults.parallel):
       S in walk below E, cutStatus(X, S) == indeterminate -> no finding
       otherwise               -> DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY
 
+For each cut C with a deferred name (once per run):
+   child NS = authority NS names of the retained referrals that have glue,
+              deduplicated by IP; no glue -> no child NS
+   For each unique child NS IP Y (parallel):
+      transport disabled -> IPV4_DISABLED / IPV6_DISABLED (query_type A), skip Y
+      childKeys(Y, C, DS)
+       +- indeterminate -> no result on Y
+       +- broken        -> DS22_NS_ADDRESS_CHAIN_BROKEN (signer=C) for every
+                           name deferred to C, servers=Y
+       +- secure        -> for each name N of the name set at or below C:
+                              the per-name block above, with zone=C,
+                              zone keys=DNSKEY(C), nameserver=Y
+                           a referral on Y is classified, never followed
+
+Deferred names:
+   any nameserver reached a finding or validated -> that outcome
+   otherwise -> DS22_NS_ADDRESS_REFERRED (ns, zone=C, servers=the referrers)
+
 Aggregate:
    per tag and per distinct non-servers argument set -> merge and sort servers
    no ERROR-level DS22 tag AND at least one RRset validated
@@ -246,6 +324,7 @@ emit TEST_CASE_END
 | `DS22_NS_ADDRESS_INSECURE` | The name lies below an insecure delegation served by the same nameserver. |
 | `DS22_NS_ADDRESS_ORPHAN_ZONE` | The address records are signed by a name the nameserver serves as a zone apex, while the NSEC or NSEC3 record matching that name in the enclosing zone carries no NS bit, so no zone cut is proven. |
 | `DS22_NS_ADDRESS_RRSIG_EXPIRED` | The expiration of the RRSIG covering the address records is in the past. |
+| `DS22_NS_ADDRESS_REFERRED` | The name lies below a delegation whose DS validates, and no nameserver of the delegated zone was reachable for it: no `NS` name of the referral carries glue, no such nameserver answered the `DNSKEY` question authoritatively, or the referral came from a nameserver of the delegated zone itself. |
 | `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | The RRSIG covering the address records does not verify against the DNSKEY RRset of the zone that must sign the name: bad signature, inception in the future, no DNSKEY with the keytag, or a signer that is neither the expected zone nor an orphan apex. |
 | `DS22_NS_ADDRESS_UNSIGNED` | The address records, or the NODATA proof standing for them, carry no RRSIG and no insecure delegation lies between the name and the zone apex. |
 | `DS22_NS_ADDRESS_VALIDATES` | At least one in-domain address RRset validated and no ERROR-level `DS22_*` tag was emitted. |
@@ -266,6 +345,9 @@ emit TEST_CASE_END
 | `DS22_NS_ADDRESS_ORPHAN_ZONE` | `ns` | `string` | In-domain nameserver name whose address records were evaluated. |
 | `DS22_NS_ADDRESS_ORPHAN_ZONE` | `signer` | `string` | Signer's Name of the RRSIG covering the address records, served as a zone apex without a proven delegation. |
 | `DS22_NS_ADDRESS_ORPHAN_ZONE` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) exhibiting the orphan zone. |
+| `DS22_NS_ADDRESS_REFERRED` | `ns` | `string` | In-domain nameserver name whose address records were evaluated. |
+| `DS22_NS_ADDRESS_REFERRED` | `zone` | `string` | Zone cut the name lies below, whose DS validates. |
+| `DS22_NS_ADDRESS_REFERRED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that referred the name to that zone. |
 | `DS22_NS_ADDRESS_RRSIG_EXPIRED` | `ns` | `string` | In-domain nameserver name whose address records were evaluated. |
 | `DS22_NS_ADDRESS_RRSIG_EXPIRED` | `keytag` | `int` | Keytag of the expired RRSIG. |
 | `DS22_NS_ADDRESS_RRSIG_EXPIRED` | `servers` | `array<object>` | Structured nameserver identities (`{ns,address}` object) that returned the expired RRSIG. |
@@ -287,6 +369,9 @@ emit TEST_CASE_END
 
 `DS22_NO_IN_DOMAIN_NS` and `DS22_ZONE_NOT_SECURE` carry no arguments.
 
+A `servers` value names the nameservers that showed the status, of the zone
+under test or of a zone delegated below its apex.
+
 ## Severity Levels Per Tag
 The five failure tags describe a name that validating resolvers answer with
 SERVFAIL, the outcome `CAN_NOT_BE_RESOLVED` (ERROR) describes for a name with
@@ -299,6 +384,7 @@ that glue gives the zone under test.
 | `DS22_NS_ADDRESS_CHAIN_BROKEN` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS22_NS_ADDRESS_INSECURE` | `INFO` | Data below an insecure delegation is accepted by validators. |
 | `DS22_NS_ADDRESS_ORPHAN_ZONE` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS22_NS_ADDRESS_REFERRED` | `INFO` | The run reached no verdict for the name; it states what was not checked. |
 | `DS22_NS_ADDRESS_RRSIG_EXPIRED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS22_NS_ADDRESS_RRSIG_NOT_VALID_BY_DNSKEY` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS22_NS_ADDRESS_UNSIGNED` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
@@ -334,11 +420,18 @@ Scoring takes the severity default in the `dnssec` dimension. No
   unsigned zone under `net`: a root server serves that zone authoritatively but
   answers `root-servers.net DS` with a referral, so every zone cut walk from a
   root server ends `indeterminate` and no finding is possible.
-- A nameserver that answers a referral for a name serves neither that name nor
-  its subtree, and the whole subtree is skipped on that nameserver without a
-  finding. The delegated zone is a test target of its own. This is the shape of
-  `de`, whose nameserver names live in the delegated zone `nic.de`: DNSSEC22
-  sees only referrals there and validates none of the three names.
+- A nameserver that answers a referral serves the parent side of the cut. One
+  `DS` question there settles every name in the subtree. This is the shape of
+  `de`, whose nameserver names live in the delegated zone `nic.de`, and of
+  `dj`, whose names live in the insecurely delegated `djibtelecom.dj`.
+- An `NS` name of a referral without glue is not resolved. A cut whose `NS`
+  names all lack glue yields `DS22_NS_ADDRESS_REFERRED` for every name below
+  it.
+- The follow is one level deep. A further referral on a nameserver of the
+  delegated zone is classified by the parent-side status of that cut; a secure
+  delegation there yields `DS22_NS_ADDRESS_REFERRED`.
+- A nameserver of a delegated zone is asked only for the `DNSKEY` of that zone
+  and for the names of the name set at or below it.
 - An undelegated zone and a correctly delegated zone whose signer omitted the
   NS bit from the matching NSEC or NSEC3 record are indistinguishable from the
   parent side when one nameserver holds both zones: an `NS` query for the name
@@ -387,7 +480,13 @@ Implementation-defined choices, none of them mandated by the protocol:
   authoritative NODATA on `A`.
 - The referral set and the zone cut memo are per nameserver. The names of one
   nameserver are processed in sequence, so no two names share a partial memo
-  entry. `indeterminate` is memoized like every other status.
+  entry. `indeterminate` is memoized like every other status. A name below an
+  already referred cut is classified from that memo and costs no query.
+- The follow runs once per zone cut per run. Its results join the aggregation
+  of step 7 as any nameserver's do. A delegated zone's nameservers are built
+  from glue as the zone's own are built from discovery, so their responses
+  share the per-run query cache.
+- No recursion is used. Every address comes from discovery or from glue.
 - The zone cut walk is bounded by the labels between the name and the zone
   apex; no ancestor of the zone under test is derived.
 - `DS22_NS_ADDRESS_VALIDATES` is OK-tag gated: it is emitted only when no

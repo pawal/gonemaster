@@ -375,8 +375,12 @@ workspace volume, so steps that start later reuse the compiled
 dependency graph instead of rebuilding it.
 
 A second workflow for release artifacts is declared in
-[.woodpecker/release.yml](../.woodpecker/release.yml) but has not yet
-been exercised; see [Chapter 15](#15-known-limitations).
+[.woodpecker/release.yml](../.woodpecker/release.yml). It runs on a
+`v*` tag, publishes the archives and packages to the Codeberg release,
+and then runs [tools/release-prune/](../tools/release-prune/), which
+deletes the attachments of every release below the three newest
+versions. Tags and release notes are never removed. See
+[Chapter 15](#15-known-limitations).
 
 Further reading: [Makefile](../Makefile),
 [.woodpecker/ci.yml](../.woodpecker/ci.yml).
@@ -839,7 +843,7 @@ or shaped by pragmatic compromise.
 |---|---|---|
 | Built-in admin authentication | Not implemented. Deployments rely on a reverse proxy or network isolation. | [Chapter 9](#9-security-posture). |
 | Structured (JSON) logs | Not implemented. Logs are plain text from Go's `log` package. | [Chapter 10](#10-observability). |
-| Release artifact pipeline | Declared in [.woodpecker/release.yml](../.woodpecker/release.yml) but not yet exercised; no `v*` tag has been published. Artifacts are per-target `.tar.gz` archives plus `.deb` and `.rpm` packages attached to the Codeberg release; package signing is deferred. | [Chapter 7](#7-build-and-distribution), [Chapter 14](#14-external-dependencies-and-vendors). |
+| Release artifact pipeline | Runs on a `v*` tag. Artifacts are per-target `.tar.gz` archives plus `.deb` and `.rpm` packages attached to the Codeberg release; package signing is deferred. Attachments are kept on the three newest releases only, because the forge allows 1.5 GiB for packages, LFS and attachments combined. | [Chapter 7](#7-build-and-distribution), [Chapter 14](#14-external-dependencies-and-vendors). |
 | Generated third-party-licence inventory | Not generated. Direct dependencies are known; an indirect-dependency licence report is open work. | [Chapter 13](#13-ip-and-licensing-boundary). |
 
 ### Testcase coverage
@@ -930,7 +934,7 @@ Top-level directories tracked in the repository.
 | [server/](../server/) | HTTP handlers, job queue, batches, snapshots, persistence drivers. |
 | [scoring/](../scoring/) | Score and grade computation from run entries. |
 | [share/](../share/) | Embedded assets: default profile, named.root, IANA registries, translations, badkeys data. |
-| [tools/](../tools/) | Code-generation and spec tooling: testcase metadata, log-args inventory, i18n placeholders, badkeys-update. |
+| [tools/](../tools/) | Code-generation and spec tooling: testcase metadata, log-args inventory, i18n placeholders, badkeys-update, release-prune. |
 | [ui/](../ui/) | Admin UI source (Svelte 5 + Vite). Embedded into `gonemaster-server`. |
 | [ui-public/](../ui-public/) | Public UI source. Embedded. |
 | [analysis-ui/](../analysis-ui/) | Cohort analysis UI source. Embedded. |

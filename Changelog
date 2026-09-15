@@ -6,6 +6,8 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
+- ci: prune release attachments below the three newest versions after publishing
+
 ### Fixed
 
 - dnssec02: DS02_MATCH_DS_DNSKEY names the keytag whose RRSIG validated

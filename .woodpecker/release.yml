@@ -123,6 +123,17 @@ steps:
         - dist/*.tar.gz
         - dist/release/*
 
+  prune_attachments:
+    image: golang:1.27
+    depends_on:
+      - publish_release
+    environment:
+      CODEBERG_RELEASE_TOKEN:
+        from_secret: CODEBERG_RELEASE_TOKEN
+    commands:
+      # Older tags keep their notes and lose their binaries. Repo from CI_REPO.
+      - go run ./tools/release-prune --keep 3 --dry-run=false
+
 when:
   event:
     - tag

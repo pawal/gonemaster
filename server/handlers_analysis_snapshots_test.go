@@ -376,3 +376,139 @@ func TestAdminSnapshotMethodNotAllowed(t *testing.T) {
 		wantStatus(t, resp, http.StatusMethodNotAllowed)
 	})
 }
+
+// seedSweepSnapshot adds a captured snapshot whose batch carries a run.
+func (f *analysisFixture) seedSweepSnapshot(batchID, slug, domainName string, capturedAt time.Time) AnalysisCohortSnapshot {
+	f.t.Helper()
+	snap := f.seedAlternateSnapshot(batchID, slug, capturedAt)
+	domain, err := f.store.GetOrCreateDomain(domainName)
+	if err != nil {
+		f.t.Fatalf("create domain %q: %v", domainName, err)
+	}
+	insertTestRun(f.t, f.store, Run{
+		ID: "run-" + slug, DomainID: domain.ID, Domain: domainName, BatchID: batchID,
+		Status: JobSucceeded, CreatedAt: capturedAt, StartedAt: capturedAt, FinishedAt: capturedAt,
+	})
+	return snap
+}
+
+// Every eligible snapshot is rebuilt and keeps its identity.
+func TestAdminCohortSnapshotsRematerializeSweep(t *testing.T) {
+	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
+		older := f.seedSweepSnapshot("batch-sweep", "2026-04-01-older", "older.test",
+			time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC))
+		before, ok := f.snapshotByID(f.snapshot.ID)
+		if !ok {
+			t.Fatal("fixture snapshot not readable")
+		}
+
+		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/rematerialize", f.cohort.ID)
+		resp := f.call(http.MethodPost, path, "")
+		queued := mustJSON[map[string]int](t, resp, http.StatusAccepted)
+		if queued["queued"] != 2 {
+			t.Fatalf("queued = %d, want 2", queued["queued"])
+		}
+
+		for _, id := range []int64{f.snapshot.ID, older.ID} {
+			snap, ok := f.waitForMaterialization(id, AnalysisMaterializationReady)
+			if !ok {
+				t.Fatalf("snapshot %d did not reach ready: status=%q err=%q",
+					id, snap.MaterializationStatus, snap.LastMaterializationError)
+			}
+			if snap.MaterializationDone != rematerializePhases {
+				t.Errorf("snapshot %d progress = %d/%d", id, snap.MaterializationDone, snap.MaterializationTotal)
+			}
+		}
+
+		after, _ := f.snapshotByID(f.snapshot.ID)
+		if !after.CapturedAt.Equal(before.CapturedAt) {
+			t.Errorf("CapturedAt changed to %s, want unchanged %s", after.CapturedAt, before.CapturedAt)
+		}
+		if after.Slug != before.Slug || after.Label != before.Label {
+			t.Errorf("identity changed: slug %q->%q label %q->%q",
+				before.Slug, after.Slug, before.Label, after.Label)
+		}
+		if _, ok := f.store.GetSnapshotOverview(older.ID); !ok {
+			t.Error("expected the older snapshot's overview to be written by the sweep")
+		}
+	})
+}
+
+// A snapshot with purged source runs is skipped, not emptied.
+func TestAdminCohortSnapshotsRematerializeSkipsPurgedSource(t *testing.T) {
+	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
+		purged := f.seedAlternateSnapshot("batch-purged", "2026-04-01-purged",
+			time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC))
+
+		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/rematerialize", f.cohort.ID)
+		resp := f.call(http.MethodPost, path, "")
+		queued := mustJSON[map[string]int](t, resp, http.StatusAccepted)
+		if queued["queued"] != 1 {
+			t.Fatalf("queued = %d, want 1 (the purged snapshot must be skipped)", queued["queued"])
+		}
+		if _, ok := f.waitForMaterialization(f.snapshot.ID, AnalysisMaterializationReady); !ok {
+			t.Fatal("eligible snapshot did not reach ready")
+		}
+		skipped, _ := f.snapshotByID(purged.ID)
+		if skipped.MaterializationStatus != "" {
+			t.Fatalf("purged-source snapshot was touched: status=%q", skipped.MaterializationStatus)
+		}
+	})
+}
+
+// A second sweep for the same cohort is refused while one runs.
+func TestAdminCohortSnapshotsRematerializeRejectsConcurrentSweep(t *testing.T) {
+	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
+		f.srv.snapshotSweepsMu.Lock()
+		f.srv.snapshotSweepsInFlight[f.cohort.ID] = struct{}{}
+		f.srv.snapshotSweepsMu.Unlock()
+
+		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/rematerialize", f.cohort.ID)
+		resp := f.call(http.MethodPost, path, "")
+		wantStatus(t, resp, http.StatusConflict)
+		if !strings.Contains(resp.Body.String(), "sweep_in_progress") {
+			t.Fatalf("expected sweep_in_progress error code, got %s", resp.Body)
+		}
+	})
+}
+
+func TestAdminCohortSnapshotsRematerializeUnknownCohort(t *testing.T) {
+	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
+		resp := f.call(http.MethodPost, "/api/v1/analysis/cohorts/999999/snapshots/rematerialize", "")
+		wantStatus(t, resp, http.StatusNotFound)
+	})
+}
+
+// A snapshot already being rematerialized on its own is left to that run.
+func TestAdminCohortSnapshotsRematerializeSkipsSnapshotAlreadyRunning(t *testing.T) {
+	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
+		busy := f.seedSweepSnapshot("batch-sweep", "2026-04-01-busy", "busy.test",
+			time.Date(2026, 4, 1, 12, 0, 0, 0, time.UTC))
+		f.srv.snapshotRematerializeMu.Lock()
+		f.srv.snapshotRematerializeInFlight[busy.ID] = struct{}{}
+		f.srv.snapshotRematerializeMu.Unlock()
+
+		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/rematerialize", f.cohort.ID)
+		resp := f.call(http.MethodPost, path, "")
+		wantStatus(t, resp, http.StatusAccepted)
+		if _, ok := f.waitForMaterialization(f.snapshot.ID, AnalysisMaterializationReady); !ok {
+			t.Fatal("the other snapshot did not reach ready")
+		}
+		held, _ := f.snapshotByID(busy.ID)
+		if held.MaterializationStatus != "" {
+			t.Fatalf("snapshot already in flight was swept too: status=%q", held.MaterializationStatus)
+		}
+	})
+}
+
+// A snapshot renamed to the route's verb would shadow its own edit route.
+func TestAdminSnapshotPatchRejectsReservedSlug(t *testing.T) {
+	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
+		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s", f.cohort.ID, f.snapshot.Slug)
+		resp := f.call(http.MethodPost, path, `{"slug":"rematerialize"}`)
+		wantStatus(t, resp, http.StatusBadRequest)
+		if !strings.Contains(resp.Body.String(), "reserved_slug") {
+			t.Fatalf("expected reserved_slug error code, got %s", resp.Body)
+		}
+	})
+}

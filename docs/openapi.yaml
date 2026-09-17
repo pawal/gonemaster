@@ -1715,6 +1715,38 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /analysis/cohorts/{id}/snapshots/rematerialize:
+    post:
+      tags: [Analysis]
+      summary: Recompute the aggregates of every snapshot in a cohort
+      description: >-
+        Rebuilds each snapshot of the cohort in turn, one at a time, and returns
+        202 with the number queued. Snapshots whose source runs have been purged
+        are skipped. Each snapshot passes through the pending materialization
+        state as its turn comes, so the snapshot list reports progress the same
+        way it does for a single rebuild. Unlike the cohort rebuild this keeps
+        every snapshot's slug, label, captured_at and default pin: it recomputes
+        views, it does not re-capture. Returns 409 while a sweep for the same
+        cohort is already running. The slug "rematerialize" is reserved by this
+        route and cannot be assigned to a snapshot.
+      operationId: rematerializeAnalysisCohortSnapshots
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '202':
+          description: Sweep accepted; queued is the number of snapshots to rebuild
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queued:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
   /analysis/cohorts/{id}/snapshots/{slug}/rematerialize:
     post:
       tags: [Analysis]

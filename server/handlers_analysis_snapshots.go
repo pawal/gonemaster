@@ -162,6 +162,9 @@ func (s *Server) handleAnalysisCohortSnapshotByID(w http.ResponseWriter, r *http
 // entity-view compute + write.
 const rematerializePhases = 4
 
+// snapshotsCollectionVerb is the slug position the cohort-wide route takes.
+const snapshotsCollectionVerb = "rematerialize"
+
 // handleAnalysisCohortSnapshotRematerialize rebuilds a snapshot's views in the
 // background and returns 202 with the snapshot pending so the UI can poll.
 // captured_at is left intact: a rebuild recomputes views, it does not recapture.
@@ -198,6 +201,99 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 	s.dispatchSnapshotRematerialize(store, aggWriter, cohort.ID, snap, floor)
 	refreshed, _ := store.GetAnalysisCohortSnapshotBySlug(cohort.ID, snap.Slug)
 	writeJSON(w, http.StatusAccepted, adminAnalysisSnapshotView(refreshed, s.store.BatchHasRuns(refreshed.BatchID)))
+}
+
+// handleAnalysisCohortSnapshotsRematerialize rebuilds every snapshot in a
+// cohort, one at a time, keeping each snapshot's identity.
+func (s *Server) handleAnalysisCohortSnapshotsRematerialize(w http.ResponseWriter, r *http.Request) {
+	if !s.enforceCSRF(w, r) {
+		return
+	}
+	id, ok := parseCohortID(w, r)
+	if !ok {
+		return
+	}
+	cohort, found := s.store.GetAnalysisCohort(id)
+	if !found {
+		writeError(w, http.StatusNotFound, "not_found", "cohort not found", nil)
+		return
+	}
+	store, ok := s.adminSnapshotStore(w)
+	if !ok {
+		return
+	}
+	aggWriter, ok := s.store.(adminSnapshotAggregator)
+	if !ok {
+		writeError(w, http.StatusServiceUnavailable, "analysis_unavailable", "analysis store does not support rematerialize", nil)
+		return
+	}
+	floor := cohort.TagViewMinLevel
+	if !IsValidTagViewMinLevel(floor) {
+		floor = aggWriter.TagViewMinLevel()
+	}
+	// Purged source runs would rematerialize to empty views.
+	var queued []AnalysisCohortSnapshot
+	for _, snap := range store.ListAnalysisCohortSnapshots(cohort.ID) {
+		if s.store.BatchHasRuns(snap.BatchID) {
+			queued = append(queued, snap)
+		}
+	}
+	if len(queued) == 0 {
+		writeJSON(w, http.StatusAccepted, map[string]int{"queued": 0})
+		return
+	}
+	if !s.dispatchCohortSnapshotSweep(store, aggWriter, cohort.ID, queued, floor) {
+		writeError(w, http.StatusConflict, "sweep_in_progress",
+			"a snapshot rebuild for this cohort is already running", nil)
+		return
+	}
+	writeJSON(w, http.StatusAccepted, map[string]int{"queued": len(queued)})
+}
+
+// dispatchCohortSnapshotSweep starts the sweep, false when one already runs.
+// The guard is taken here so the caller can answer 409.
+func (s *Server) dispatchCohortSnapshotSweep(store adminSnapshotStore, aggWriter adminSnapshotAggregator, cohortID int64, queued []AnalysisCohortSnapshot, floor string) bool {
+	s.snapshotSweepsMu.Lock()
+	if _, running := s.snapshotSweepsInFlight[cohortID]; running {
+		s.snapshotSweepsMu.Unlock()
+		return false
+	}
+	s.snapshotSweepsInFlight[cohortID] = struct{}{}
+	s.snapshotSweepsMu.Unlock()
+
+	go func() {
+		defer func() {
+			s.snapshotSweepsMu.Lock()
+			delete(s.snapshotSweepsInFlight, cohortID)
+			s.snapshotSweepsMu.Unlock()
+		}()
+		for _, snap := range queued {
+			s.sweepOneSnapshot(store, aggWriter, cohortID, snap, floor)
+		}
+	}()
+	return true
+}
+
+// sweepOneSnapshot rebuilds one snapshot synchronously, skipping one already
+// in flight and recording a failure without stopping the sweep.
+func (s *Server) sweepOneSnapshot(store adminSnapshotStore, aggWriter adminSnapshotAggregator, cohortID int64, snap AnalysisCohortSnapshot, floor string) {
+	s.snapshotRematerializeMu.Lock()
+	if _, running := s.snapshotRematerializeInFlight[snap.ID]; running {
+		s.snapshotRematerializeMu.Unlock()
+		return
+	}
+	s.snapshotRematerializeInFlight[snap.ID] = struct{}{}
+	s.snapshotRematerializeMu.Unlock()
+	defer func() {
+		s.snapshotRematerializeMu.Lock()
+		delete(s.snapshotRematerializeInFlight, snap.ID)
+		s.snapshotRematerializeMu.Unlock()
+	}()
+
+	_ = aggWriter.SetAnalysisSnapshotMaterialization(snap.ID, AnalysisMaterializationPending, 0, rematerializePhases, "", nil)
+	if err := s.runSnapshotRematerialize(store, aggWriter, cohortID, snap, floor); err != nil {
+		_ = aggWriter.SetAnalysisSnapshotMaterialization(snap.ID, AnalysisMaterializationFailed, 0, rematerializePhases, err.Error(), nil)
+	}
 }
 
 // dispatchSnapshotRematerialize marks the snapshot pending and rebuilds it in a
@@ -285,6 +381,11 @@ func (s *Server) handlePatchAnalysisCohortSnapshot(w http.ResponseWriter, r *htt
 			return
 		}
 		if newSlug != snap.Slug {
+			if newSlug == snapshotsCollectionVerb {
+				writeError(w, http.StatusBadRequest, "reserved_slug",
+					"slug "+snapshotsCollectionVerb+" is reserved by the cohort-wide rebuild route", nil)
+				return
+			}
 			if existing, found := store.GetAnalysisCohortSnapshotBySlug(cohort.ID, newSlug); found && existing.ID != snap.ID {
 				writeError(w, http.StatusConflict, "slug_exists", "slug is already in use within this cohort", nil)
 				return

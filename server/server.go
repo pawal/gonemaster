@@ -56,11 +56,15 @@ type Server struct {
 	// of the same snapshot, keyed by snapshot ID.
 	snapshotRematerializeMu       sync.Mutex
 	snapshotRematerializeInFlight map[int64]struct{}
-	adminTokens                   atomic.Pointer[tokenSet]
-	extData                       *extdata.Provider
-	registry                      registryLookup
-	refLists                      referenceListLookup
-	logger                        *slog.Logger
+	// snapshotSweepsInFlight guards one cohort-wide snapshot sweep per
+	// cohort, keyed by cohort ID.
+	snapshotSweepsMu       sync.Mutex
+	snapshotSweepsInFlight map[int64]struct{}
+	adminTokens            atomic.Pointer[tokenSet]
+	extData                *extdata.Provider
+	registry               registryLookup
+	refLists               referenceListLookup
+	logger                 *slog.Logger
 }
 
 // setScoringConfig loads an optional scoring config file and sets it on the
@@ -172,6 +176,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		progressWriteMinInterval:      defaultProgressWriteMinInterval,
 		cohortRebuildsInFlight:        map[int64]struct{}{},
 		snapshotRematerializeInFlight: map[int64]struct{}{},
+		snapshotSweepsInFlight:        map[int64]struct{}{},
 		engineRunner:                  engine.Run,
 		engineLimiter:                 newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                       map[string]context.CancelFunc{},
@@ -350,6 +355,7 @@ func (s *Server) routes() {
 
 	apiMux.HandleFunc("POST /analysis/cohorts/{id}/rebuild", s.handleAnalysisCohortRebuild)
 	apiMux.HandleFunc("POST /analysis/cohorts/{id}/clear", s.handleAnalysisCohortClear)
+	apiMux.HandleFunc("POST /analysis/cohorts/{id}/snapshots/rematerialize", s.handleAnalysisCohortSnapshotsRematerialize)
 	apiMux.HandleFunc("POST /analysis/cohorts/{id}/snapshots/{slug}/rematerialize", s.handleAnalysisCohortSnapshotRematerialize)
 	apiMux.HandleFunc("/analysis/cohorts/{id}/snapshots/{slug}", s.handleAnalysisCohortSnapshotByID)
 	apiMux.HandleFunc("GET /analysis/cohorts/{id}/snapshots", s.handleAnalysisCohortSnapshots)

@@ -4,7 +4,7 @@
   import { page } from "$app/state";
   import FilterBar from "$lib/FilterBar.svelte";
   import TrendLine from "$lib/charts/TrendLine.svelte";
-  import { domainsGradeHref, domainsSeverityHref, tagHref } from "$lib/entityLinks";
+  import { domainsGradeHref, domainsPostureHref, domainsSeverityHref, tagHref } from "$lib/entityLinks";
   import { downloadCSV, type ExportColumn } from "$lib/exporters";
   import { formatCount, levelTone, snapshotDisplayLabel, snapshotSourceDate } from "$lib/format";
   import { computeTagMovers, pinnedSeries } from "$lib/trends";
@@ -27,8 +27,7 @@
   // accessible table below the chart.
   const TINY_PCT = 5;
 
-  // Deep-link a severity/grade segment to the domains behind it, in that
-  // snapshot. Other categories have no matching domains filter.
+  // Deep-link a severity, grade or posture segment to its domains.
   function segmentHref(key: string, slug: string): string | null {
     const params = new URLSearchParams();
     if (data.datasetTag) params.set("dataset_tag", data.datasetTag);
@@ -36,6 +35,7 @@
     const q = `?${params.toString()}`;
     if (data.category === "severity") return domainsSeverityHref(base, key, q);
     if (data.category === "grade") return domainsGradeHref(base, key, q);
+    if (data.category === "dnssec_posture") return domainsPostureHref(base, key, q);
     return null;
   }
 

@@ -6,6 +6,7 @@
   import Pagination from "$lib/Pagination.svelte";
   import SortHeader from "$lib/SortHeader.svelte";
   import SigningAlgoChip from "$lib/SigningAlgoChip.svelte";
+  import PostureChip from "$lib/PostureChip.svelte";
   import { asnHref, domainHref } from "$lib/entityLinks";
   import {
     formatCount,
@@ -58,6 +59,20 @@
 
   const rows = $derived((data.list?.items ?? []) as DomainView[]);
 
+  // Filters that narrow the list rather than scope it.
+  const narrowingKeys = ["search", "worst_level", "grade", "dnssec_posture"] as const;
+  const hasNarrowingFilter = $derived(
+    narrowingKeys.some((key) => (page.url.searchParams.get(key) ?? "") !== "")
+  );
+
+  // Same page with only the cohort and snapshot pins kept.
+  const clearFilterHref = $derived.by(() => {
+    const params = new URLSearchParams(page.url.searchParams);
+    for (const key of narrowingKeys) params.delete(key);
+    const q = params.toString();
+    return `${base}/domains${q ? `?${q}` : ""}`;
+  });
+
   const exportColumns: ExportColumn<DomainView>[] = [
     { key: "domain", label: "Domain", value: (r) => r.domain },
     { key: "score", label: "Score", value: (r) => r.score ?? "" },
@@ -77,6 +92,11 @@
       value: (r) => r.dnskey_algo_weakest_label ?? r.dnskey_algo_weakest ?? ""
     },
     { key: "dnskey_count", label: "Keys", value: (r) => r.dnskey_count ?? "" },
+    {
+      key: "dnssec_posture",
+      label: "Denial of existence",
+      value: (r) => r.dnssec_posture_label ?? r.dnssec_posture ?? ""
+    },
     { key: "finished_at", label: "Last run", value: (r) => r.finished_at ?? "" }
   ];
 
@@ -159,7 +179,12 @@
     <p class="status-banner error">Failed to load domains: {data.error}</p>
   {:else if !data.list || data.list.items.length === 0}
     <div class="empty-state">
-      <p class="hint">No domains materialized for this cohort yet.</p>
+      {#if hasNarrowingFilter}
+        <p class="hint">No domains in this snapshot match the active filter.</p>
+        <p class="hint"><a href={clearFilterHref}>Show all domains</a></p>
+      {:else}
+        <p class="hint">No domains materialized for this cohort yet.</p>
+      {/if}
     </div>
   {:else}
     <div class="table-wrap">
@@ -201,6 +226,7 @@
             <th scope="col" class="col-num">
               <SortHeader label="Keys" spec={sortSpecs.keys} align="right" title="Distinct DNSKEYs published" {currentSort} onsort={(v: string) => updateParam("sort", v)} />
             </th>
+            <th scope="col" title="Denial-of-existence mode the zone serves">Denial</th>
             <th scope="col">Last analyzed</th>
           </tr>
         </thead>
@@ -249,6 +275,13 @@
                 />
               </td>
               <td class="col-num">{row.dnskey_count ?? "-"}</td>
+              <td>
+                <PostureChip
+                  posture={row.dnssec_posture}
+                  label={row.dnssec_posture_label}
+                  tone={row.dnssec_posture_tone}
+                />
+              </td>
               <td>{formatTimestamp(row.finished_at) || "-"}</td>
             </tr>
           {/each}

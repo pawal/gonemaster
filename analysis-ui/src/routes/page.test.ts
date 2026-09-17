@@ -291,6 +291,48 @@ function overviewData(overrides: Partial<OverviewPageData> = {}): OverviewPageDa
   };
 }
 
+// The posture bar segments must reach the domains behind the count.
+describe("overview posture drill-down", () => {
+  const postureData = () =>
+    overviewData({
+      factDistributions: {
+        dnssec_posture: {
+          category: "dnssec_posture",
+          label: "DNSSEC posture",
+          order: 10,
+          buckets: [
+            { key: "unsigned", label: "Unsigned", tone: "warning", count: 70, order: 0 },
+            { key: "nsec", label: "NSEC", tone: "notice", count: 20, order: 2 },
+            { key: "nsec3", label: "NSEC3", tone: "ok", count: 25, order: 3 },
+            { key: "mixed", label: "Mixed NSEC/NSEC3", tone: "warning", count: 5, order: 4 }
+          ]
+        },
+        ipv6_coverage: {
+          category: "ipv6_coverage",
+          label: "IPv6 coverage",
+          order: 12,
+          buckets: [{ key: "full", label: "Full", tone: "ok", count: 100, order: 0 }]
+        }
+      }
+    });
+
+  it("links each posture segment to the domains list filtered on that bucket", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, { data: postureData() });
+    const nsec3 = screen.getByRole("link", { name: /NSEC3: 25/ });
+    expect(nsec3.getAttribute("href")).toBe("/analysis/domains?dataset_tag=tld&dnssec_posture=nsec3");
+    // Mixed is its own bucket, not folded into nsec3.
+    const mixed = screen.getByRole("link", { name: /Mixed NSEC\/NSEC3: 5/ });
+    expect(mixed.getAttribute("href")).toBe("/analysis/domains?dataset_tag=tld&dnssec_posture=mixed");
+  });
+
+  it("leaves categories without a domains filter as plain segments", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, { data: postureData() });
+    expect(screen.queryByRole("link", { name: /Full: 100/ })).toBeNull();
+  });
+});
+
 describe("overview page rendering", () => {
   it("leads with hero tiles for domains, health, and signed share", () => {
     h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");

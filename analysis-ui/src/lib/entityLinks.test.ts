@@ -3,6 +3,7 @@ import {
   asnHref,
   cohortHref,
   domainHref,
+  domainsPostureHref,
   endpointHref,
   nameserverHref,
   prefixHref,
@@ -86,5 +87,16 @@ describe("entity link builders", () => {
         "?offset=50&nameserver=ns1.example&nameserver=ns2.example"
       )
     ).toBe("/analysis/endpoints/192.0.2.10?offset=50&nameserver=ns3.example");
+  });
+
+  it("domainsPostureHref filters the domains list on one posture bucket", () => {
+    expect(domainsPostureHref(BASE, "nsec3")).toBe("/analysis/domains?dnssec_posture=nsec3");
+    expect(domainsPostureHref(BASE, "nsec3", QUERY)).toBe(
+      "/analysis/domains?dataset_tag=tld&dnssec_posture=nsec3"
+    );
+    // A stale bucket in the caller's query is replaced, not appended.
+    expect(domainsPostureHref(BASE, "mixed", "?dnssec_posture=nsec")).toBe(
+      "/analysis/domains?dnssec_posture=mixed"
+    );
   });
 });

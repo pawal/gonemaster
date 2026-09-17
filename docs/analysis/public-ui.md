@@ -45,9 +45,14 @@ testcase opens a filtered detail view.
 The UI preserves the active snapshot as visitors click through detail pages.
 Shared links should include `snapshot` when the numbers must remain stable.
 
-Some views add their own parameters: the diff `tab`, and the trends focused
-bucket `key` and scale `scale`. Back, forward, and shared links reproduce the
-same view.
+Some views add their own parameters: the diff `tab`, the trends focused
+bucket `key` and scale `scale`, and the domains list filters `search`,
+`worst_level`, `grade`, and `dnssec_posture`. Back, forward, and shared links
+reproduce the same view.
+
+`dnssec_posture` takes one of `unsigned`, `signed`, `nsec`, `nsec3`, `mixed`.
+`mixed` means different servers of the same zone answered with NSEC and with
+NSEC3, so the zones serving NSEC3 anywhere are `nsec3` plus `mixed`.
 
 ## Overview
 
@@ -58,6 +63,14 @@ sparkline across snapshots. Below the tiles it lists the top issues and the
 main nameservers, ASNs, and prefixes, including the leading provider's share
 of domains. A movers card lists the domains that improved or regressed most
 since the previous snapshot.
+
+Distribution bars below the cards partition the cohort by domain health,
+grade, DNSSEC posture, DNSKEY algorithm, and IPv6 coverage. Health, grade,
+and posture segments link to the domains list filtered to that bucket. The
+other bars carry no link, since the domains list has no matching filter.
+
+A posture segment matches no domains on a snapshot captured before the
+posture column existed. Rebuilding that snapshot's views fills it in.
 
 ## Trends
 

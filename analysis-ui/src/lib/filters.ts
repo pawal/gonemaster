@@ -15,6 +15,7 @@
 //                  the overview health bar).
 //   - grade:       exact grade filter on /domains (linked from the
 //                  overview grade distribution bar).
+//   - dnssec_posture: exact posture bucket filter on /domains.
 
 import { goto } from "$app/navigation";
 import type { AnalysisFilter } from "$lib/api";
@@ -24,7 +25,8 @@ const FILTER_KEYS = [
   "snapshot",
   "search",
   "worst_level",
-  "grade"
+  "grade",
+  "dnssec_posture"
 ] as const satisfies readonly (keyof AnalysisFilter)[];
 
 export type FilterKey = (typeof FILTER_KEYS)[number];

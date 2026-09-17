@@ -25,6 +25,15 @@ describe("filters", () => {
     });
   });
 
+  it("filterFromURL forwards dnssec_posture so the posture drill-down filters", () => {
+    // Dropping the key here would land the visitor on the unfiltered list.
+    const url = new URL("http://x/?dataset_tag=tld&dnssec_posture=nsec3");
+    expect(filterFromURL(url)).toEqual({
+      dataset_tag: "tld",
+      dnssec_posture: "nsec3"
+    });
+  });
+
   it("filterFromURL drops empty values", () => {
     const url = new URL("http://x/?dataset_tag=tld&search=");
     expect(filterFromURL(url)).toEqual({ dataset_tag: "tld" });

@@ -139,6 +139,10 @@ export type ZoneFactFields = {
   dnskey_algo_weakest_label?: string;
   dnskey_algo_weakest_tone?: string;
   dnskey_count?: number;
+  // Denial-of-existence posture, absent before the column existed.
+  dnssec_posture?: string;
+  dnssec_posture_label?: string;
+  dnssec_posture_tone?: string;
 };
 
 export type DomainView = {
@@ -373,6 +377,7 @@ export type AnalysisFilter = {
   min_level?: string;
   worst_level?: string;
   grade?: string;
+  dnssec_posture?: string;
   min_latency_samples?: number;
 };
 

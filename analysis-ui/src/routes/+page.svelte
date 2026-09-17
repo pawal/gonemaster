@@ -9,6 +9,7 @@
     asnHref,
     domainHref,
     domainsGradeHref,
+    domainsPostureHref,
     domainsSeverityHref,
     endpointHref,
     nameserverHref,
@@ -166,6 +167,7 @@
   function buildHrefForKey(category: string): ((key: string) => string) | undefined {
     if (category === "severity") return (k) => domainsSeverityHref(base, k, query);
     if (category === "grade") return (k) => domainsGradeHref(base, k, query);
+    if (category === "dnssec_posture") return (k) => domainsPostureHref(base, k, query);
     return undefined;
   }
 

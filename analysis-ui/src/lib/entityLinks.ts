@@ -93,3 +93,10 @@ export function domainsGradeHref(base: string, grade: string, query = ""): strin
   params.set("grade", grade);
   return `${base}/domains?${params.toString()}`;
 }
+
+// domainsPostureHref filters the domains list by one DNSSEC posture bucket.
+export function domainsPostureHref(base: string, posture: string, query = ""): string {
+  const params = new URLSearchParams(query);
+  params.set("dnssec_posture", posture);
+  return `${base}/domains?${params.toString()}`;
+}

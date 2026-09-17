@@ -615,12 +615,10 @@
     /* A flex item must be free to shrink or it pushes the diagram past the card. */
     min-width: 0;
   }
-  /* Scale a wide diagram down to the card; the viewBox keeps it proportional. */
+  /* A drawing wider than the card scrolls; scaling it down loses the face. */
   .chain-svg {
     display: block;
     margin: 0 auto;
-    max-width: 100%;
-    height: auto;
     font-family: var(--sans);
   }
   .chain-toolbar {
@@ -900,7 +898,8 @@
     left: 0;
     top: 0;
     z-index: 50;
-    max-width: 340px;
+    max-width: min(64ch, 90vw);
+    overflow-wrap: anywhere;
     padding: 0.5rem 0.65rem;
     border-radius: 6px;
     background: var(--surface);

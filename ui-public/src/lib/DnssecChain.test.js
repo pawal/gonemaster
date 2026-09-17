@@ -1044,3 +1044,25 @@ describe("zone frames and the saved file", () => {
     expect(screen.queryByTestId("chain-export")).toBeNull();
   });
 });
+
+describe("a narrow card scrolls the diagram", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  // Scaling the drawing to the card takes the 10px face below legibility, so
+  // the svg keeps its own size and the card scrolls.
+  it("draws the svg at its own size inside the scrolling wrapper", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const svg = screen.getByTestId("chain-svg");
+    const width = svg.getAttribute("width");
+    const height = svg.getAttribute("height");
+    expect(Number(width)).toBeGreaterThan(0);
+    expect(svg.getAttribute("viewBox")).toBe(`0 0 ${width} ${height}`);
+    expect(svg.parentElement.classList.contains("chain-scroll")).toBe(true);
+    expect(container.querySelector(".chain-svg[style]")).toBeNull();
+  });
+});

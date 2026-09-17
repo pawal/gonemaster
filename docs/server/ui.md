@@ -73,7 +73,8 @@ graph frames each zone under a header naming it, and the tested zone's frame
 carries the roll-up status. Every box is a tab stop, and clicking or pressing
 Enter on one repeats its details in a panel below the graph. A "Save as SVG"
 button saves the graph as a standalone file in the theme the reader is
-viewing. The section only appears
+viewing. Every state is drawn as a shape or a line treatment as well as a
+colour, and the legend names them. The section only appears
 when `show_dnssec_chain_public` is enabled and the run has chain data
 (public-UI runs only).
 

@@ -1202,3 +1202,99 @@ describe("pinning an object into the detail panel", () => {
     }
   });
 });
+
+describe("a shape for every colour", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  const draw = async (chain) => {
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    return container;
+  };
+
+  // A colourblind reader and a monochrome print lose a tint, so a marked box
+  // carries its verdict as a shape too.
+  it("marks a failure with a triangle and leaves a settled box plain", async () => {
+    const container = await draw(
+      secureChain({
+        status: "partial",
+        links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "key_not_signing", servers: ["192.0.2.1"] }],
+      })
+    );
+    expect(container.querySelector("g.node-ds .mark-bad")).toBeTruthy();
+    expect(container.querySelector("g.node-ksk .chain-mark")).toBeNull();
+  });
+
+  it("marks a caution with a square", async () => {
+    const chain = secureChain();
+    chain.child.dnskeys[0].anchored = true;
+    chain.child.dnskeys.push({ key_tag: 3000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] });
+    const container = await draw(chain);
+    expect(container.querySelector("g.node-incoming .mark-warn")).toBeTruthy();
+  });
+
+  it("marks a record the zone does not publish with a cross", async () => {
+    const container = await draw(secureChain({ parent: { ds_source: "none", ds: [] }, links: [] }));
+    expect(container.querySelector("g.node-ds-ghost .mark-ghost")).toBeTruthy();
+  });
+
+  it("marks a nameserver name validators reject, and not one that validates", async () => {
+    const container = await draw(
+      secureChain({
+        version: 3,
+        ns_names: [
+          { name: "bad.ns.example.com", status: "orphan", signer: "ns.example.com", servers: ["192.0.2.1"] },
+          { name: "good.ns.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] },
+        ],
+      })
+    );
+    const names = [...container.querySelectorAll("g.node-nsname")];
+    expect(names[0].querySelector(".mark-bad")).toBeTruthy();
+    expect(names[1].querySelector(".chain-mark")).toBeNull();
+  });
+});
+
+describe("the legend names every treatment", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  it("lists the three line treatments and the three marks, and no gradient", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    for (const id of ["edge-ok", "edge-warn", "edge-bad"]) {
+      const item = screen.getByTestId(`chain-legend-${id}`);
+      expect(item.querySelector(`line.chain-edge.${id}`)).toBeTruthy();
+    }
+    expect(screen.getByTestId("chain-legend-mark-bad").querySelector("path.mark-bad")).toBeTruthy();
+    expect(screen.getByTestId("chain-legend-mark-warn").querySelector("rect.mark-warn")).toBeTruthy();
+    expect(screen.getByTestId("chain-legend-mark-ghost").querySelector("path.mark-ghost")).toBeTruthy();
+    expect(container.querySelector(".swatch-sig")).toBeNull();
+    expect(screen.getByTestId("chain-legend").textContent).toContain("Solid line: valid signature or matching DS");
+  });
+
+  it("names the severed line only where one is drawn", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.queryByTestId("chain-legend-severed")).toBeNull();
+
+    cleanup();
+    fetch.mockResolvedValue(
+      jsonResponse(
+        secureChain({
+          version: 3,
+          ns_names: [{ name: "a.ns.example.com", status: "orphan", signer: "ns.example.com", servers: ["192.0.2.1"] }],
+        })
+      )
+    );
+    renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    expect(screen.getByTestId("chain-legend-severed").querySelector("path.chain-break-tick")).toBeTruthy();
+  });
+});

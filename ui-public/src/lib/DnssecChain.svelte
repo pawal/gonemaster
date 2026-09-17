@@ -3,7 +3,10 @@
   import { getDnssecChain } from "../api.js";
   import { layoutChain, algoMnemonic, digestMnemonic, fmtDate, nsTone, statusTone, wrapFace } from "./dnssecChainLayout.js";
   import { chainFileName, downloadSVG, serializeSVG } from "./chainExport.js";
+  import "./chain.css";
   import ChainDetail from "./ChainDetail.svelte";
+  import ChainLegend from "./ChainLegend.svelte";
+  import ChainMark from "./ChainMark.svelte";
 
   // saveSVG is injected so a test can read the file without a blob URL.
   let { publicID, domain = "", saveSVG = downloadSVG } = $props();
@@ -135,6 +138,7 @@
   );
   let hasRevoked = $derived((chain?.child?.dnskeys ?? []).some((k) => k.revoked));
   let hasNSNames = $derived((chain?.ns_names ?? []).length > 0);
+  let hasSevered = $derived(!!graph?.edges.some((e) => e.kind === "stub" && e.broken));
   let undelegated = $derived(chain?.status === "undelegated");
   // Nameserver names validators reject. These drive the red callout, which is
   // how the card reports every other fault; the graph alone is too quiet.
@@ -536,6 +540,7 @@
                 {#each lines as line, i (i)}
                   <text class="chain-node-label {line.cls}" x={node.x + node.w / 2} y={line.y} text-anchor="middle">{line.text}</text>
                 {/each}
+                <ChainMark tone={node.tone} x={node.x + 12} y={node.y + 12} />
               </g>
             {/each}
 
@@ -568,18 +573,7 @@
 
         <div bind:this={tipEl} class="chain-tip" class:chain-tip-shown={tipShown} aria-hidden="true">{tipText}</div>
 
-        <div class="chain-legend" data-testid="chain-legend">
-          <span class="chain-legend-item"><span class="chain-swatch swatch-ksk"></span>{$t("pub.dnssec_chain_legend_ksk")}</span>
-          <span class="chain-legend-item"><span class="chain-swatch swatch-zsk"></span>{$t("pub.dnssec_chain_legend_zsk")}</span>
-          <span class="chain-legend-item"><span class="chain-swatch swatch-ds"></span>{$t("pub.dnssec_chain_legend_ds")}</span>
-          <span class="chain-legend-item"><span class="chain-swatch swatch-sig"></span>{$t("pub.dnssec_chain_legend_sig")}</span>
-          {#if hasRevoked}
-            <span class="chain-legend-item" data-testid="chain-legend-revoked"><span class="chain-swatch swatch-revoked"></span>{$t("pub.dnssec_chain_legend_revoked")}</span>
-          {/if}
-          {#if hasNSNames}
-            <span class="chain-legend-item" data-testid="chain-legend-nsname"><span class="chain-swatch swatch-nsname"></span>{$t("pub.dnssec_chain_legend_nsname")}</span>
-          {/if}
-        </div>
+        <ChainLegend {hasRevoked} {hasNSNames} {hasSevered} />
       {/if}
 
       <ul class="chain-facts" data-testid="chain-facts">
@@ -876,88 +870,6 @@
   .node-pinned .chain-node-box,
   .chain-node:focus-visible .chain-node-box {
     stroke-width: 3.5;
-  }
-  .chain-stub {
-    stroke-width: 2.5;
-  }
-  .chain-break-tick {
-    stroke-width: 2;
-    stroke-linecap: round;
-  }
-  .chain-edge {
-    stroke-width: 2;
-    fill: none;
-  }
-  .edge-ok {
-    stroke: var(--grade-a);
-  }
-  .edge-bad {
-    stroke: var(--grade-f);
-  }
-  .edge-warn {
-    stroke: var(--grade-c);
-  }
-  .edge-neutral {
-    stroke: var(--ink-2);
-    stroke-dasharray: 5 4;
-  }
-  .edge-ref {
-    stroke: var(--ink-2);
-    stroke-width: 1.75;
-    stroke-dasharray: 4 3;
-    opacity: 0.85;
-  }
-  .edge-ref-pending {
-    stroke: var(--grade-c);
-    stroke-width: 2;
-    stroke-dasharray: 4 3;
-    fill: none;
-  }
-  .edge-incoming {
-    stroke: var(--ink-2);
-    stroke-width: 1.5;
-    stroke-dasharray: 3 3;
-    opacity: 0.45;
-    fill: none;
-  }
-  .chain-legend {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 0.75rem 1.25rem;
-    font-size: 0.82rem;
-    color: var(--ink-2);
-  }
-  .chain-legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-  }
-  .chain-swatch {
-    width: 14px;
-    height: 14px;
-    border-radius: 3px;
-    border: 2px solid var(--border);
-  }
-  .swatch-ksk {
-    border-color: var(--accent-2);
-    border-width: 3px;
-  }
-  .swatch-zsk {
-    border-color: var(--accent-2);
-  }
-  .swatch-ds {
-    border-color: var(--accent);
-  }
-  .swatch-sig {
-    border: none;
-    background: linear-gradient(90deg, var(--grade-a), var(--grade-c), var(--grade-f));
-  }
-  .swatch-revoked {
-    border-color: var(--grade-f);
-    border-style: dashed;
-  }
-  .swatch-nsname {
-    border-color: var(--border);
   }
   .chain-facts {
     margin: 0;

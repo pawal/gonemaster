@@ -19,6 +19,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 - ui-public: the DNSSEC chain diagram frames each zone under its own header
 - ui-public: a chain diagram wider than the card scrolls at its own size instead of shrinking
+- ui-public: every chain diagram state carries a shape or a line treatment as well as a colour
 
 ### Fixed
 

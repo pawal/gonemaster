@@ -1,0 +1,48 @@
+/* Edge treatments for the DNSSEC chain diagram, shared with its legend so a
+   legend line is drawn by the same rule as the edge it stands for. Each tone
+   carries a line treatment as well as a colour, so a monochrome print and a
+   colourblind reader keep the verdict. */
+
+.chain-stub {
+  stroke-width: 2.5;
+}
+.chain-break-tick {
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.chain-edge {
+  stroke-width: 2;
+  fill: none;
+}
+.chain-edge.edge-ok {
+  stroke: var(--grade-a);
+}
+.chain-edge.edge-warn {
+  stroke: var(--grade-c);
+  stroke-dasharray: 6 3;
+}
+.chain-edge.edge-bad {
+  stroke: var(--grade-f);
+  stroke-width: 3;
+}
+.chain-edge.edge-neutral {
+  stroke: var(--ink-2);
+  stroke-dasharray: 5 4;
+}
+.chain-edge.edge-ref {
+  stroke: var(--ink-2);
+  stroke-width: 1.75;
+  stroke-dasharray: 4 3;
+  opacity: 0.85;
+}
+.chain-edge.edge-ref-pending {
+  stroke: var(--grade-c);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+.chain-edge.edge-incoming {
+  stroke: var(--ink-2);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+  opacity: 0.45;
+}

@@ -1331,3 +1331,36 @@ describe("clipToWidth", () => {
     expect(clipToWidth(null, 100, 12)).toBe("");
   });
 });
+
+describe("legend strings", () => {
+  const LOCALES = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
+  const KEYS = [
+    "pub.dnssec_chain_detail_heading",
+    "pub.dnssec_chain_detail_close",
+    "pub.dnssec_chain_legend_line_ok",
+    "pub.dnssec_chain_legend_line_warn",
+    "pub.dnssec_chain_legend_line_bad",
+    "pub.dnssec_chain_legend_line_severed",
+    "pub.dnssec_chain_legend_mark_bad",
+    "pub.dnssec_chain_legend_mark_warn",
+    "pub.dnssec_chain_legend_mark_ghost",
+  ];
+
+  it("ships the panel and legend words in every locale", async () => {
+    for (const loc of LOCALES) {
+      const catalog = (await import(`../i18n/${loc}.json`)).default;
+      for (const key of KEYS) {
+        expect(typeof catalog[key], `${loc} ${key}`).toBe("string");
+        expect(catalog[key].length > 0, `${loc} ${key}`).toBe(true);
+      }
+    }
+  });
+
+  // The three line items replaced it, and a stale key would still render.
+  it("drops the gradient swatch string from every locale", async () => {
+    for (const loc of LOCALES) {
+      const catalog = (await import(`../i18n/${loc}.json`)).default;
+      expect(catalog["pub.dnssec_chain_legend_sig"], loc).toBeUndefined();
+    }
+  });
+});

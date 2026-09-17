@@ -445,6 +445,140 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 	})
 }
 
+// seedDomainPosture re-seeds one run's facts with a posture, then refreshes.
+func (f *analysisFixture) seedDomainPosture(run Run, posture string) {
+	f.t.Helper()
+	domain, ok := f.store.GetDomainByName(run.Domain)
+	if !ok {
+		f.t.Fatalf("seeded domain %q missing", run.Domain)
+	}
+	severity := run.WorstLevel
+	if severity == "" {
+		severity = "OK"
+	}
+	if err := f.store.ReplaceAnalysisRunDomainFacts(f.cohort.ID, run.ID, []AnalysisRunDomainFact{
+		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: domain.ID, Category: FactCategorySeverity, Key: severity},
+		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: domain.ID, Category: FactCategoryGrade, Key: "B"},
+		{CohortID: f.cohort.ID, RunID: run.ID, DomainID: domain.ID, Category: FactCategoryDNSSECPosture, Key: posture},
+	}); err != nil {
+		f.t.Fatalf("replace domain facts: %v", err)
+	}
+	f.refreshSnapshotViews(f.batchID)
+}
+
+// The filter partitions the cohort the way the overview bar does.
+func TestPublicAnalysisDomainsFilterByDNSSECPosture(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		seeded := map[string]string{
+			"nsec3a.example": FactKeyNSEC3,
+			"nsec3b.example": FactKeyNSEC3,
+			"nsec.example":   FactKeyNSEC,
+			"mixed.example":  FactKeyNSECMixed,
+			"plain.example":  FactKeyUnsigned,
+		}
+		for _, name := range []string{
+			"nsec3a.example", "nsec3b.example", "nsec.example", "mixed.example", "plain.example",
+		} {
+			f.seedDomainPosture(f.seedGraduatedRun(name, ts, nil), seeded[name])
+		}
+
+		cases := []struct {
+			bucket  string
+			domains []string
+		}{
+			{FactKeyNSEC3, []string{"nsec3a.example", "nsec3b.example"}},
+			{FactKeyNSEC, []string{"nsec.example"}},
+			{FactKeyNSECMixed, []string{"mixed.example"}},
+			{FactKeyUnsigned, []string{"plain.example"}},
+			{FactKeySigned, nil},
+		}
+		for _, c := range cases {
+			t.Run(c.bucket, func(t *testing.T) {
+				resp := getPublic(t, f.srv, f.publicURL("domains?dnssec_posture=")+c.bucket)
+				wantStatus(t, resp, http.StatusOK)
+				got := decodeDomainList(t, resp)
+				if got.Total != len(c.domains) {
+					t.Fatalf("bucket %q: expected %d, got %d (items=%+v)",
+						c.bucket, len(c.domains), got.Total, got.Items)
+				}
+				seen := map[string]struct{}{}
+				for _, v := range got.Items {
+					seen[v.Domain] = struct{}{}
+					if v.DNSSECPosture != c.bucket {
+						t.Fatalf("bucket %q leaked posture %q on %s", c.bucket, v.DNSSECPosture, v.Domain)
+					}
+				}
+				for _, want := range c.domains {
+					if _, ok := seen[want]; !ok {
+						t.Fatalf("bucket %q: expected %q in result, got %+v", c.bucket, want, got.Items)
+					}
+				}
+			})
+		}
+
+		// Uppercase input normalizes to the stored lowercase key.
+		resp := getPublic(t, f.srv, f.publicURL("domains?dnssec_posture=NSEC3"))
+		wantStatus(t, resp, http.StatusOK)
+		if got := decodeDomainList(t, resp); got.Total != 2 {
+			t.Fatalf("expected uppercase filter to match 2 NSEC3 domains, got %d", got.Total)
+		}
+	})
+}
+
+// The label and tone travel with the key.
+func TestPublicAnalysisDomainsServesDNSSECPostureDisplay(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		f.seedDomainPosture(f.seedGraduatedRun("nsec3.example", ts, nil), FactKeyNSEC3)
+
+		resp := getPublic(t, f.srv, f.publicURL("domains"))
+		got := decodeDomainList(t, resp)
+		if len(got.Items) != 1 {
+			t.Fatalf("expected 1 item, got %d: %+v", len(got.Items), got.Items)
+		}
+		row := got.Items[0]
+		if row.DNSSECPosture != FactKeyNSEC3 {
+			t.Fatalf("posture = %q, want %q", row.DNSSECPosture, FactKeyNSEC3)
+		}
+		if row.DNSSECPostureLabel != "NSEC3" || row.DNSSECPostureTone != "ok" {
+			t.Errorf("posture display = (%q,%q), want (NSEC3, ok)",
+				row.DNSSECPostureLabel, row.DNSSECPostureTone)
+		}
+	})
+}
+
+// No posture fact means an empty column, which no bucket matches.
+func TestPublicAnalysisDomainsPostureFilterSkipsRowsWithoutFact(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
+		f.seedGraduatedRun("nofact.example", ts, nil)
+
+		resp := getPublic(t, f.srv, f.publicURL("domains"))
+		got := decodeDomainList(t, resp)
+		if len(got.Items) != 1 || got.Items[0].DNSSECPosture != "" {
+			t.Fatalf("expected one row with empty posture, got %+v", got.Items)
+		}
+		for _, bucket := range []string{FactKeyNSEC3, FactKeyUnsigned, FactKeySigned} {
+			resp := getPublic(t, f.srv, f.publicURL("domains?dnssec_posture=")+bucket)
+			wantStatus(t, resp, http.StatusOK)
+			if got := decodeDomainList(t, resp); got.Total != 0 {
+				t.Fatalf("bucket %q matched a row with no posture fact: %+v", bucket, got.Items)
+			}
+		}
+	})
+}
+
+func TestPublicAnalysisDomainsRejectsInvalidDNSSECPosture(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		resp := getPublic(t, f.srv, f.publicURL("domains?dnssec_posture=nsec4"))
+		wantStatus(t, resp, http.StatusBadRequest)
+		if !strings.Contains(resp.Body.String(), "invalid_dnssec_posture") {
+			t.Fatalf("expected invalid_dnssec_posture error code, got %s", resp.Body)
+		}
+	})
+}
+
 func TestPublicAnalysisDomainsRejectsInvalidWorstLevel(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=bogus"))

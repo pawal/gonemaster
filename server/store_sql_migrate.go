@@ -608,6 +608,14 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_cohort_catalog ADD COLUMN reference_list VARCHAR(32) NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		// Denial-of-existence posture on the snapshot domain view, so the
+		// domains list can filter on it. Rematerialize to fill it in.
+		version: 12,
+		stmts: []string{
+			`ALTER TABLE analysis_snapshot_domain_view ADD COLUMN dnssec_posture VARCHAR(16) NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // retiredAnalysisTags is frozen at migration 9; a later rename needs its

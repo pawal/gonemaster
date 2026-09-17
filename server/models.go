@@ -594,11 +594,13 @@ type AnalysisSnapshotDomainView struct {
 	IPv6NSCount int `json:"ipv6_ns_count"`
 	// Weakest signing algorithm and distinct key count; nil when the
 	// domain is unsigned or the snapshot predates the columns.
-	DNSKEYAlgoWeakest *int                   `json:"dnskey_algo_weakest,omitempty"`
-	DNSKEYCount       *int                   `json:"dnskey_count,omitempty"`
-	Nameservers       []DomainViewNameserver `json:"nameservers,omitempty"`
-	Addresses         []DomainViewAddress    `json:"addresses,omitempty"`
-	Tags              []DomainViewTag        `json:"tags,omitempty"`
+	DNSKEYAlgoWeakest *int `json:"dnskey_algo_weakest,omitempty"`
+	DNSKEYCount       *int `json:"dnskey_count,omitempty"`
+	// Denial-of-existence posture; empty before the column existed.
+	DNSSECPosture string                 `json:"dnssec_posture,omitempty"`
+	Nameservers   []DomainViewNameserver `json:"nameservers,omitempty"`
+	Addresses     []DomainViewAddress    `json:"addresses,omitempty"`
+	Tags          []DomainViewTag        `json:"tags,omitempty"`
 }
 
 // DomainViewNameserver is one nameserver entry inside nameservers_json.

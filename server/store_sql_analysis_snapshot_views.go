@@ -67,6 +67,10 @@ func (s *SQLJobStore) ComputeSnapshotEntityViews(cohortID int64, batchID string,
 	if err != nil {
 		return SnapshotEntityViews{}, err
 	}
+	posture, err := s.queryBatchDNSSECPosture(cohortID, batchID)
+	if err != nil {
+		return SnapshotEntityViews{}, err
+	}
 	domainNames := s.collectDomainNames(endpoints, addrFacts, domainASNs, tagSummaries)
 	for _, sm := range summaries {
 		if _, ok := domainNames[sm.DomainID]; !ok {
@@ -80,7 +84,7 @@ func (s *SQLJobStore) ComputeSnapshotEntityViews(cohortID int64, batchID string,
 		Endpoints:   buildEndpointViews(endpoints, addrFacts, asnByID, prefixByID, domainNames),
 		ASNs:        buildASNViews(endpoints, addrFacts, domainASNs, asnByID, prefixByID, domainNames, nameserverNames),
 		Tags:        buildTagViews(tagSummaries, domainNames, floor),
-		Domains:     buildDomainViews(summaries, finishedAt, endpoints, addrFacts, asnByID, prefixByID, domainNames, tagSummaries, weakestAlgo, floor),
+		Domains:     buildDomainViews(summaries, finishedAt, endpoints, addrFacts, asnByID, prefixByID, domainNames, tagSummaries, weakestAlgo, posture, floor),
 		Prefixes:    buildPrefixViews(addrFacts, prefixByID, asnByID, domainNames, addressLiterals),
 	}, nil
 }
@@ -283,6 +287,7 @@ func buildDomainViews(
 	domainNames map[int64]string,
 	tagSummaries []AnalysisRunTagSummary,
 	weakestAlgo map[runDomainKey]weakestAlgoFact,
+	posture map[runDomainKey]string,
 	minLevel string,
 ) []AnalysisSnapshotDomainView {
 	floor := severityRank(minLevel)
@@ -360,6 +365,7 @@ func buildDomainViews(
 				v.DNSKEYCount = &keys
 			}
 		}
+		v.DNSSECPosture = posture[runDomainKey{RunID: sm.RunID, DomainID: sm.DomainID}]
 		v.Tags = buildDomainTags(tagsByDomain[sm.DomainID], floor)
 		out = append(out, v)
 	}
@@ -696,6 +702,38 @@ func (s *SQLJobStore) queryBatchWeakestDNSKEYAlgo(cohortID int64, batchID string
 			fact.Keys = &keys
 		}
 		out[key] = fact
+	}
+	return out, rows.Err()
+}
+
+// queryBatchDNSSECPosture returns the dnssec_posture fact per (run, domain)
+// for one batch. Keyed by run like the algorithm fact above.
+func (s *SQLJobStore) queryBatchDNSSECPosture(cohortID int64, batchID string) (map[runDomainKey]string, error) {
+	rows, err := s.db.Query(
+		fmt.Sprintf(`SELECT f.run_id, f.domain_id, f.fact_key
+			FROM analysis_run_domain_facts f
+			JOIN runs r ON r.id = f.run_id
+			WHERE f.cohort_id = %s AND r.batch_id = %s AND f.category = %s`,
+			s.ph(1), s.ph(2), s.ph(3)),
+		cohortID, batchID, FactCategoryDNSSECPosture,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("query dnssec posture: %w", err)
+	}
+	defer rows.Close()
+
+	out := map[runDomainKey]string{}
+	for rows.Next() {
+		var (
+			key     runDomainKey
+			factKey string
+		)
+		if err := rows.Scan(&key.RunID, &key.DomainID, &factKey); err != nil {
+			return nil, fmt.Errorf("scan dnssec posture: %w", err)
+		}
+		if factKey = strings.TrimSpace(factKey); factKey != "" {
+			out[key] = factKey
+		}
 	}
 	return out, rows.Err()
 }
@@ -1464,12 +1502,12 @@ func (s *SQLJobStore) ReplaceSnapshotEntityViews(snapshotID int64, views Snapsho
 				(snapshot_id, domain_id, domain_name, score, grade, worst_level, finished_at,
 				 nameserver_count, endpoint_count, asn_count, prefix_count,
 				 ipv4_ns_count, ipv6_ns_count, dnskey_algo_weakest, dnskey_count,
-				 nameservers_json, addresses_json, tags_json)
-				VALUES (%s)`, s.phRange(1, 18)),
+				 dnssec_posture, nameservers_json, addresses_json, tags_json)
+				VALUES (%s)`, s.phRange(1, 19)),
 			snapshotID, v.DomainID, v.DomainName, score, v.Grade, v.WorstLevel, finishedAt,
 			v.NameserverCount, v.EndpointCount, v.ASNCount, v.PrefixCount,
 			v.IPv4NSCount, v.IPv6NSCount, weakestAlgo, keyCount,
-			nsJSON, addrJSON, tagsJSON,
+			v.DNSSECPosture, nsJSON, addrJSON, tagsJSON,
 		); err != nil {
 			_ = tx.Rollback()
 			return fmt.Errorf("insert domain view dom=%d: %w", v.DomainID, err)
@@ -1918,7 +1956,7 @@ const analysisSnapshotDomainViewCols = `snapshot_id, domain_id, domain_name,
 	score, grade, worst_level, finished_at,
 	nameserver_count, endpoint_count, asn_count, prefix_count,
 	ipv4_ns_count, ipv6_ns_count, dnskey_algo_weakest, dnskey_count,
-	nameservers_json, addresses_json, tags_json`
+	dnssec_posture, nameservers_json, addresses_json, tags_json`
 
 func scanSnapshotDomainView(row rowScanner) (AnalysisSnapshotDomainView, error) {
 	var (
@@ -1936,7 +1974,7 @@ func scanSnapshotDomainView(row rowScanner) (AnalysisSnapshotDomainView, error) 
 		&score, &v.Grade, &v.WorstLevel, &finishedAt,
 		&v.NameserverCount, &v.EndpointCount, &v.ASNCount, &v.PrefixCount,
 		&v.IPv4NSCount, &v.IPv6NSCount, &weakestAlgo, &keyCount,
-		&nsJSON, &addrJSON, &tagsJSON,
+		&v.DNSSECPosture, &nsJSON, &addrJSON, &tagsJSON,
 	); err != nil {
 		return AnalysisSnapshotDomainView{}, err
 	}

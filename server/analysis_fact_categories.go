@@ -226,6 +226,29 @@ func dnssecPostureKeyTone(key string) string {
 	return "neutral"
 }
 
+// dnssecPostureKeys is the closed set of posture buckets, in display order.
+var dnssecPostureKeys = []string{
+	FactKeyUnsigned, FactKeySigned, FactKeyNSEC, FactKeyNSEC3, FactKeyNSECMixed,
+}
+
+// isValidDNSSECPostureKey reports whether key names a posture bucket.
+func isValidDNSSECPostureKey(key string) bool {
+	for _, k := range dnssecPostureKeys {
+		if k == key {
+			return true
+		}
+	}
+	return false
+}
+
+// dnssecPostureDisplay returns the label and tone for a posture key.
+func dnssecPostureDisplay(key string) (label, tone string) {
+	if key == "" {
+		return "", ""
+	}
+	return dnssecPostureKeyLabel(key), dnssecPostureKeyTone(key)
+}
+
 func dnssecPostureKeyOrder(key string) int {
 	switch key {
 	case FactKeyUnsigned:

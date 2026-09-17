@@ -299,6 +299,10 @@ type PublicAnalysisDomainView struct {
 	DNSKEYAlgoWeakestLabel string `json:"dnskey_algo_weakest_label,omitempty"`
 	DNSKEYAlgoWeakestTone  string `json:"dnskey_algo_weakest_tone,omitempty"`
 	DNSKEYCount            *int   `json:"dnskey_count,omitempty"`
+	// Denial-of-existence posture, with label and tone like the algorithm.
+	DNSSECPosture      string `json:"dnssec_posture,omitempty"`
+	DNSSECPostureLabel string `json:"dnssec_posture_label,omitempty"`
+	DNSSECPostureTone  string `json:"dnssec_posture_tone,omitempty"`
 }
 
 // signingAlgoDisplay returns the label and tone that travel with a weakest
@@ -375,6 +379,17 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 	}
 	gradeFilter := strings.TrimSpace(r.URL.Query().Get("grade"))
 
+	postureFilter := ""
+	if raw := strings.TrimSpace(r.URL.Query().Get("dnssec_posture")); raw != "" {
+		normalized := strings.ToLower(raw)
+		if !isValidDNSSECPostureKey(normalized) {
+			writeError(w, http.StatusBadRequest, "invalid_dnssec_posture",
+				"dnssec_posture must be one of "+strings.Join(dnssecPostureKeys, ", "), nil)
+			return
+		}
+		postureFilter = normalized
+	}
+
 	rows := readStore.ListSnapshotDomainViews(snapshot.ID)
 	items := make([]PublicAnalysisDomainView, 0, len(rows))
 	for _, row := range rows {
@@ -382,6 +397,9 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 			continue
 		}
 		if gradeFilter != "" && row.Grade != gradeFilter {
+			continue
+		}
+		if postureFilter != "" && row.DNSSECPosture != postureFilter {
 			continue
 		}
 		v := PublicAnalysisDomainView{
@@ -404,6 +422,8 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 			keys := *row.DNSKEYCount
 			v.DNSKEYCount = &keys
 		}
+		v.DNSSECPosture = row.DNSSECPosture
+		v.DNSSECPostureLabel, v.DNSSECPostureTone = dnssecPostureDisplay(row.DNSSECPosture)
 		if row.Grade != "" {
 			g := row.Grade
 			v.Grade = &g

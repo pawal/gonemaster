@@ -16,6 +16,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - server: --db-driver memory selects the in-memory store instead of failing
+- server: the weakest-algorithm tone reports algorithms 7 and 12 as deprecated
 - dnssec02: DS02_MATCH_DS_DNSKEY names the keytag whose RRSIG validated
 - ui-public: the DS02_NO_MATCHING_DNSKEY_RRSIG explanation describes the key the DS names
 - docs: the package install guide matches the release attachments

@@ -155,8 +155,8 @@ func TestDNSKEYAlgorithmKeyLabelFallback(t *testing.T) {
 // class, and an algorithm the tone table does not know ranks below every
 // usable class because no validator can use it.
 func TestDNSKEYAlgorithmWeaknessRankOrdersByClassThenNumber(t *testing.T) {
-	// Weakest first: unassigned (no class), SHA-1 family (error),
-	// RSASHA1-NSEC3 (warning), RSA/SHA-256 (notice), curves (ok).
+	// Weakest first: unassigned (no class), deprecated (error),
+	// dated RSA (notice), curves (ok).
 	weakestFirst := []string{"200", "1", "5", "7", "8", "10", "13", "15"}
 	for i := 1; i < len(weakestFirst); i++ {
 		prev := DNSKEYAlgorithmWeaknessRank(weakestFirst[i-1])

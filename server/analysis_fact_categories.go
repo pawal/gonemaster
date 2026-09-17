@@ -287,19 +287,18 @@ var dnskeyAlgorithmMnemonics = map[int]string{
 	23: "ECC-GOST12",
 }
 
-// dnskeyAlgorithmTones colors each algorithm by current best-practice:
-// modern curves green, SHA-256 RSA blue (acceptable), SHA-1 family red
-// (deprecated), unknown/private neutral. Regional national-standard curves
-// are sound but not the default choice, so they get the acceptable tone.
+// dnskeyAlgorithmTones colors each algorithm: red where the engine reports it
+// deprecated, blue for sound but dated, green for modern curves, neutral for
+// unknown or private.
 var dnskeyAlgorithmTones = map[int]string{
 	1:  "error",
 	3:  "error",
 	5:  "error",
 	6:  "error",
-	7:  "warning",
+	7:  "error",
 	8:  "notice",
 	10: "notice",
-	12: "warning",
+	12: "error",
 	13: "ok",
 	14: "ok",
 	15: "ok",

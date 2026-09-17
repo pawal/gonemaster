@@ -145,6 +145,8 @@
   "pub.dnssec_chain_root": "rot (.)",
   "pub.dnssec_chain_zone_label": "Testet sone",
   "pub.dnssec_chain_export": "Lagre som SVG",
+  "pub.dnssec_chain_detail_heading": "Valgt element",
+  "pub.dnssec_chain_detail_close": "Lukk detaljer",
   "pub.dnssec_chain_keys_label": "Sonenøkler",
   "pub.dnssec_chain_signed_label": "Signerte poster",
   "pub.dnssec_chain_nsnames_label": "Navnetjenernavn",

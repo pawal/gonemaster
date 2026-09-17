@@ -145,6 +145,8 @@
   "pub.dnssec_chain_root": "koren (.)",
   "pub.dnssec_chain_zone_label": "Testirana cona",
   "pub.dnssec_chain_export": "Shrani kot SVG",
+  "pub.dnssec_chain_detail_heading": "Izbrani element",
+  "pub.dnssec_chain_detail_close": "Zapri podrobnosti",
   "pub.dnssec_chain_keys_label": "Ključi cone",
   "pub.dnssec_chain_signed_label": "Podpisani zapisi",
   "pub.dnssec_chain_nsnames_label": "Imena imenskih strežnikov",

@@ -145,6 +145,8 @@
   "pub.dnssec_chain_root": "ルート (.)",
   "pub.dnssec_chain_zone_label": "テスト対象ゾーン",
   "pub.dnssec_chain_export": "SVG として保存",
+  "pub.dnssec_chain_detail_heading": "選択した項目",
+  "pub.dnssec_chain_detail_close": "詳細を閉じる",
   "pub.dnssec_chain_keys_label": "ゾーンの鍵",
   "pub.dnssec_chain_signed_label": "署名されたレコード",
   "pub.dnssec_chain_nsnames_label": "ネームサーバー名",

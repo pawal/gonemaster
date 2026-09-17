@@ -13,6 +13,7 @@ All notable changes to all gonemaster components will be documented in this file
 - server: dnssec_posture filter on the public analysis domains list
 - server: rematerialize every snapshot in a cohort in sequence
 - ui-public: save the DNSSEC chain diagram as an SVG file
+- ui-public: pin a chain diagram box or edge to read its details by tap or keyboard
 
 ### Changed
 

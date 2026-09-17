@@ -58,7 +58,8 @@ describe("DnssecChain", () => {
 
     await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
     const svg = screen.getByTestId("chain-svg");
-    expect(svg.getAttribute("role")).toBe("img");
+    // A group, not an image: the boxes inside it take focus of their own.
+    expect(svg.getAttribute("role")).toBe("group");
     // DS + KSK + ZSK = 3 node groups (no abstract DNSKEY-RRset box).
     expect(container.querySelectorAll("g.chain-node").length).toBe(3);
     expect(container.querySelector("g.node-ksk")).toBeTruthy();
@@ -1064,5 +1065,140 @@ describe("a narrow card scrolls the diagram", () => {
     expect(svg.getAttribute("viewBox")).toBe(`0 0 ${width} ${height}`);
     expect(svg.parentElement.classList.contains("chain-scroll")).toBe(true);
     expect(container.querySelector(".chain-svg[style]")).toBeNull();
+  });
+});
+
+describe("pinning an object into the detail panel", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  // jsdom carries no PointerEvent, so a MouseEvent under the pointer name is
+  // what delivers the coordinates the drag guard reads.
+  const pointer = (type, clientX, clientY) => new MouseEvent(type, { clientX, clientY, bubbles: true });
+
+  // A tooltip is out of reach on a phone and from a keyboard, so every tip
+  // line is repeated in a panel below the drawing.
+  const pinFirst = async (selector, chain = secureChain()) => {
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await fireEvent.click(container.querySelector(selector));
+    return container;
+  };
+
+  it("pins a key box on a click, headed and listed from its own tip", async () => {
+    const container = await pinFirst("g.node-ksk");
+
+    const panel = screen.getByRole("complementary", { name: "Selected item" });
+    expect(panel.querySelector("h3").textContent).toBe("KSK · key tag 1000");
+    const lines = [...panel.querySelectorAll("li")].map((li) => li.textContent);
+    expect(lines).toContain("Algorithm: ECDSAP256SHA256 (alg 13)");
+    // The heading is not repeated in the list below it.
+    expect(lines).not.toContain("KSK · key tag 1000");
+    expect(container.querySelector("g.node-ksk").classList.contains("node-pinned")).toBe(true);
+  });
+
+  it("pins an edge as readily as a box", async () => {
+    await pinFirst("path.chain-edge");
+
+    const panel = screen.getByTestId("chain-detail");
+    expect(panel.querySelector("h3").textContent).toBe("RRSIG over DNSKEY RRset");
+    expect(panel.textContent).toContain("Signing key: 1000");
+    expect(panel.textContent).toContain("Status: valid");
+  });
+
+  it("lets the pin go on a click that names no object", async () => {
+    const container = await pinFirst("g.node-ksk");
+    expect(screen.queryByTestId("chain-detail")).toBeTruthy();
+
+    await fireEvent.click(container.querySelector("svg.chain-svg"));
+    expect(screen.queryByTestId("chain-detail")).toBeNull();
+  });
+
+  it("lets the pin go on Escape and on the close button", async () => {
+    const container = await pinFirst("g.node-ksk");
+    await fireEvent.keyDown(container.querySelector("svg.chain-svg"), { key: "Escape" });
+    expect(screen.queryByTestId("chain-detail")).toBeNull();
+
+    await fireEvent.click(container.querySelector("g.node-ksk"));
+    expect(screen.queryByTestId("chain-detail")).toBeTruthy();
+    await fireEvent.click(screen.getByTestId("chain-detail-close"));
+    expect(screen.queryByTestId("chain-detail")).toBeNull();
+  });
+
+  it("makes every box a labelled tab stop that pins on Enter and on Space", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const ksk = container.querySelector("g.node-ksk");
+    expect(ksk.getAttribute("tabindex")).toBe("0");
+    expect(ksk.getAttribute("role")).toBe("button");
+    expect(ksk.getAttribute("aria-label")).toBe("KSK · key tag 1000");
+
+    await fireEvent.keyDown(ksk, { key: "Enter" });
+    expect(screen.getByTestId("chain-detail").querySelector("h3").textContent).toBe("KSK · key tag 1000");
+
+    await fireEvent.keyDown(container.querySelector("svg.chain-svg"), { key: "Escape" });
+    await fireEvent.keyDown(container.querySelector("g.node-zsk"), { key: " " });
+    expect(screen.getByTestId("chain-detail").querySelector("h3").textContent).toBe("ZSK · key tag 2000");
+  });
+
+  it("keeps a drag that scrolls the card from pinning the box it started on", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const ksk = container.querySelector("g.node-ksk");
+    await fireEvent(ksk, pointer("pointerdown", 100, 100));
+    await fireEvent(ksk, pointer("pointermove", 160, 100));
+    await fireEvent.click(ksk);
+    expect(screen.queryByTestId("chain-detail")).toBeNull();
+
+    // A press that stays put still pins.
+    await fireEvent(ksk, pointer("pointerdown", 100, 100));
+    await fireEvent(ksk, pointer("pointermove", 102, 101));
+    await fireEvent.click(ksk);
+    expect(screen.queryByTestId("chain-detail")).toBeTruthy();
+  });
+
+  it("pins an orphan nameserver name with its signer and status", async () => {
+    const chain = secureChain({
+      version: 3,
+      ns_names: [{ name: "a.ns.example.com", status: "orphan", signer: "ns.example.com", servers: ["192.0.2.1"] }],
+    });
+    await pinFirst("g.node-nsname", chain);
+
+    const panel = screen.getByTestId("chain-detail");
+    expect(panel.querySelector("h3").textContent).toBe("Name server name a.ns.example.com");
+    expect(panel.textContent).toContain("Address records signed by ns.example.com");
+    expect(panel.textContent).toContain("Status: orphan zone");
+  });
+
+  it("says nothing of an edge that carries no tip", async () => {
+    const chain = secureChain({
+      version: 3,
+      ns_names: [{ name: "a.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] }],
+    });
+    fetch.mockResolvedValue(jsonResponse(chain));
+    const container = renderOpened();
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    await fireEvent.click(container.querySelector('[data-object^="nssig-"]'));
+    expect(screen.queryByTestId("chain-detail")).toBeNull();
+  });
+
+  it("reads the panel in the active language", async () => {
+    setCatalog("de", de);
+    locale.set("de");
+    try {
+      await pinFirst("g.node-ksk");
+      const panel = screen.getByRole("complementary", { name: "Ausgewähltes Element" });
+      expect(panel.textContent).toContain("Algorithmus");
+      expect(screen.getByTestId("chain-detail-close").getAttribute("aria-label")).toBe("Details schließen");
+    } finally {
+      locale.set("en");
+    }
   });
 });

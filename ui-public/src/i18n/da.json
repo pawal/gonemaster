@@ -145,6 +145,8 @@
   "pub.dnssec_chain_root": "rod (.)",
   "pub.dnssec_chain_zone_label": "Testet zone",
   "pub.dnssec_chain_export": "Gem som SVG",
+  "pub.dnssec_chain_detail_heading": "Valgt element",
+  "pub.dnssec_chain_detail_close": "Luk detaljer",
   "pub.dnssec_chain_keys_label": "Zonenøgler",
   "pub.dnssec_chain_signed_label": "Signerede poster",
   "pub.dnssec_chain_nsnames_label": "Navneservernavne",

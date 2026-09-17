@@ -145,6 +145,8 @@
   "pub.dnssec_chain_root": "kořen (.)",
   "pub.dnssec_chain_zone_label": "Testovaná zóna",
   "pub.dnssec_chain_export": "Uložit jako SVG",
+  "pub.dnssec_chain_detail_heading": "Vybraná položka",
+  "pub.dnssec_chain_detail_close": "Zavřít podrobnosti",
   "pub.dnssec_chain_keys_label": "Klíče zóny",
   "pub.dnssec_chain_signed_label": "Podepsané záznamy",
   "pub.dnssec_chain_nsnames_label": "Jména jmenných serverů",

@@ -145,6 +145,8 @@
   "pub.dnssec_chain_root": "Root (.)",
   "pub.dnssec_chain_zone_label": "Getestete Zone",
   "pub.dnssec_chain_export": "Als SVG speichern",
+  "pub.dnssec_chain_detail_heading": "Ausgewähltes Element",
+  "pub.dnssec_chain_detail_close": "Details schließen",
   "pub.dnssec_chain_keys_label": "Zonenschlüssel",
   "pub.dnssec_chain_signed_label": "Signierte Records",
   "pub.dnssec_chain_nsnames_label": "Nameserver-Namen",

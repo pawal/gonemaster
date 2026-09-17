@@ -3,6 +3,7 @@
   import { getDnssecChain } from "../api.js";
   import { layoutChain, algoMnemonic, digestMnemonic, fmtDate, nsTone, statusTone, wrapFace } from "./dnssecChainLayout.js";
   import { chainFileName, downloadSVG, serializeSVG } from "./chainExport.js";
+  import ChainDetail from "./ChainDetail.svelte";
 
   // saveSVG is injected so a test can read the file without a blob URL.
   let { publicID, domain = "", saveSVG = downloadSVG } = $props();
@@ -51,6 +52,63 @@
   function onSave() {
     if (!svgEl || !graph) return;
     saveSVG(serializeSVG(svgEl, { width: graph.width, height: graph.height }), chainFileName(domain));
+  }
+
+  // Pinning an object repeats its hover tip in a panel below the drawing,
+  // which is the only way a tap or a keyboard reaches it.
+  let pinnedID = $state("");
+  let pinned = $derived(objectFor(pinnedID));
+  let pinnedHeading = $derived(headingOf(pinned));
+  let pinnedLines = $derived(pinned ? pinned.tip.slice(1).map(tipLine).filter(Boolean) : []);
+
+  // An object with nothing to say does not pin; a nameserver name's edge
+  // repeats the box it points at.
+  function objectFor(id) {
+    if (!id || !graph) return null;
+    const el = graph.nodes.find((n) => n.id === id) ?? graph.edges.find((e) => e.id === id);
+    return (el?.tip ?? []).length > 0 ? el : null;
+  }
+
+  // The first tip line heads the box and its panel.
+  const headingOf = (el) => (el?.tip?.length ? tipLine(el.tip[0]) : "");
+
+  // A drag that scrolls the card must not pin the box it started on.
+  const DRAG_SLOP = 5;
+  let pressed = null;
+  let moved = false;
+  let origin = { x: 0, y: 0 };
+
+  function onDown(event) {
+    pressed = event.target;
+    moved = false;
+    origin = { x: event.clientX, y: event.clientY };
+  }
+
+  function onDrag(event) {
+    if (!pressed || moved) return;
+    if (Math.abs(event.clientX - origin.x) > DRAG_SLOP || Math.abs(event.clientY - origin.y) > DRAG_SLOP) moved = true;
+  }
+
+  // The element under the press is what the click acts on.
+  function onClick(event) {
+    const hit = pressed ?? event.target;
+    pressed = null;
+    if (moved) {
+      moved = false;
+      return;
+    }
+    const id = hit.closest?.("[data-object]")?.dataset?.object ?? "";
+    pinnedID = objectFor(id) ? id : "";
+  }
+
+  function onNodeKey(event, id) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    pinnedID = objectFor(id) ? id : "";
+  }
+
+  function onKey(event) {
+    if (event.key === "Escape") pinnedID = "";
   }
 
   // Reference edges (CDS/CDNSKEY -> DNSKEY) draw after the nodes so they are
@@ -408,17 +466,23 @@
         </div>
 
         <div class="chain-scroll">
+          <!-- The boxes inside are the buttons; these listeners only resolve which one a press hit. -->
+          <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
           <svg
             bind:this={svgEl}
             class="chain-svg"
             width={graph.width}
             height={graph.height}
             viewBox="0 0 {graph.width} {graph.height}"
-            role="img"
+            role="group"
             aria-label={$t("pub.dnssec_chain_aria", { domain })}
             data-testid="chain-svg"
             onmousemove={onSvgMove}
             onmouseleave={hideTip}
+            onpointerdown={onDown}
+            onpointermove={onDrag}
+            onclick={onClick}
+            onkeydown={onKey}
           >
             <defs>
               <marker id="chain-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
@@ -450,7 +514,7 @@
 
             {#each mainEdges as edge (edge.id)}
               {#if edge.d}
-                <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={buildTip(edge.tip)}></path>
+                <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-object={edge.id} data-tip={buildTip(edge.tip)}></path>
               {:else}
                 <line
                   class="chain-edge {edgeClass(edge)}"
@@ -459,6 +523,7 @@
                   x2={edge.to.x}
                   y2={edge.to.y}
                   marker-end="url(#chain-arrow)"
+                  data-object={edge.id}
                   data-tip={buildTip(edge.tip)}
                 ></line>
               {/if}
@@ -466,7 +531,7 @@
 
             {#each graph.nodes as node (node.id)}
               {@const lines = nodeLines(node)}
-              <g class="chain-node node-{node.kind} node-tone-{node.tone || 'none'}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} class:node-rollover={node.rollover} class:node-incoming={node.incoming} class:node-ns-bad={node.nsStatus && node.tone === "bad"} class:node-ns-warn={node.nsStatus && node.tone === "warn"} class:node-ns-ok={node.nsStatus && node.tone === "ok"} data-tip={buildTip(node.tip)}>
+              <g class="chain-node node-{node.kind} node-tone-{node.tone || 'none'}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} class:node-rollover={node.rollover} class:node-incoming={node.incoming} class:node-ns-bad={node.nsStatus && node.tone === "bad"} class:node-ns-warn={node.nsStatus && node.tone === "warn"} class:node-ns-ok={node.nsStatus && node.tone === "ok"} class:node-pinned={pinnedID === node.id} role="button" tabindex="0" aria-label={headingOf(node)} data-object={node.id} data-tip={buildTip(node.tip)} onkeydown={(event) => onNodeKey(event, node.id)}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
                 {#each lines as line, i (i)}
                   <text class="chain-node-label {line.cls}" x={node.x + node.w / 2} y={line.y} text-anchor="middle">{line.text}</text>
@@ -475,22 +540,32 @@
             {/each}
 
             {#each stubEdges as edge (edge.id)}
-              <path class="chain-edge chain-stub {edgeClass(edge)}" d={edge.d} data-tip={buildTip(edge.tip)}></path>
+              <path class="chain-edge chain-stub {edgeClass(edge)}" d={edge.d} data-object={edge.id} data-tip={buildTip(edge.tip)}></path>
               {#each edge.ticks ?? [] as tick, i (i)}
-                <path class="chain-edge chain-break-tick {edgeClass(edge)}" d={tick} data-tip={buildTip(edge.tip)}></path>
+                <path class="chain-edge chain-break-tick {edgeClass(edge)}" d={tick} data-object={edge.id} data-tip={buildTip(edge.tip)}></path>
               {/each}
             {/each}
 
             {#each refEdges as edge (edge.id)}
-              <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-tip={buildTip(edge.tip)}></path>
+              <path class="chain-edge {edgeClass(edge)}" d={edge.d} marker-end="url(#chain-arrow)" data-object={edge.id} data-tip={buildTip(edge.tip)}></path>
             {/each}
 
             <!-- Row labels last: an edge that runs past one must not cut the text. -->
             {#each graph.clusters as cl (cl.id)}
-              <text class="chain-cluster-label" x={cl.x} y={cl.y}>{$t(cl.labelKey)}{#if cl.name}<tspan class="chain-cluster-name"> · {cl.name}</tspan>{/if}</text>
+              <text class="chain-cluster-label" x={cl.x} y={cl.y}>{$t(cl.labelKey)}</text>
             {/each}
           </svg>
         </div>
+        {#if pinned}
+          <ChainDetail
+            heading={pinnedHeading}
+            lines={pinnedLines}
+            label={$t("pub.dnssec_chain_detail_heading")}
+            closeLabel={$t("pub.dnssec_chain_detail_close")}
+            onclose={() => (pinnedID = "")}
+          />
+        {/if}
+
         <div bind:this={tipEl} class="chain-tip" class:chain-tip-shown={tipShown} aria-hidden="true">{tipText}</div>
 
         <div class="chain-legend" data-testid="chain-legend">
@@ -696,12 +771,6 @@
     stroke-width: 3px;
     paint-order: stroke;
   }
-  .chain-cluster-name {
-    fill: var(--ink);
-    font-weight: 400;
-    text-transform: none;
-    letter-spacing: 0;
-  }
   .chain-node-box {
     fill: var(--surface);
     stroke: var(--border);
@@ -803,6 +872,10 @@
   }
   .node-tone-ok .chain-node-box {
     stroke: var(--grade-a);
+  }
+  .node-pinned .chain-node-box,
+  .chain-node:focus-visible .chain-node-box {
+    stroke-width: 3.5;
   }
   .chain-stub {
     stroke-width: 2.5;

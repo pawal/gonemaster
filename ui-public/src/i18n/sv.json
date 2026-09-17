@@ -145,6 +145,8 @@
   "pub.dnssec_chain_root": "rot (.)",
   "pub.dnssec_chain_zone_label": "Testad zon",
   "pub.dnssec_chain_export": "Spara som SVG",
+  "pub.dnssec_chain_detail_heading": "Valt objekt",
+  "pub.dnssec_chain_detail_close": "Stäng detaljer",
   "pub.dnssec_chain_keys_label": "Zonnycklar",
   "pub.dnssec_chain_signed_label": "Signerade poster",
   "pub.dnssec_chain_nsnames_label": "Namnservernamn",

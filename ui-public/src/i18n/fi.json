@@ -145,6 +145,8 @@
   "pub.dnssec_chain_root": "juuri (.)",
   "pub.dnssec_chain_zone_label": "Testattu vyöhyke",
   "pub.dnssec_chain_export": "Tallenna SVG-muodossa",
+  "pub.dnssec_chain_detail_heading": "Valittu kohde",
+  "pub.dnssec_chain_detail_close": "Sulje tiedot",
   "pub.dnssec_chain_keys_label": "Vyöhykkeen avaimet",
   "pub.dnssec_chain_signed_label": "Allekirjoitetut tietueet",
   "pub.dnssec_chain_nsnames_label": "Nimipalvelinnimet",

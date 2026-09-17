@@ -106,17 +106,21 @@ func New(cfg Config) *Server {
 	return newServer(cfg, store, NewInMemoryQueue())
 }
 
+// Unset or "memory" selects the in-memory store.
+func memoryDriver(driver string) bool {
+	return driver == "" || driver == "memory"
+}
+
 // NewWithOptions builds a server using the configured storage backend.
-// When cfg.Database.Driver is set, a SQL store is opened, schema migrations
-// are run, and any jobs from an unclean shutdown are recovered. An error is
-// returned if the database cannot be opened or migrated.
+// A SQL driver opens a store, runs migrations, and recovers jobs from an
+// unclean shutdown.
 func NewWithOptions(cfg Config) (*Server, error) {
 	if cfg.ListenAddr == "" {
 		cfg = DefaultConfig()
 	}
 
 	var store JobStore
-	if cfg.Database.Driver == "" {
+	if memoryDriver(cfg.Database.Driver) {
 		store = NewInMemoryJobStore()
 	} else {
 		dialect, err := dialectFor(cfg.Database.Driver)

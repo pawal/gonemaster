@@ -1660,6 +1660,18 @@ func TestNewWithOptionsInMemory(t *testing.T) {
 	}
 }
 
+func TestNewWithOptionsMemoryDriver(t *testing.T) {
+	cfg := DefaultConfig()
+	cfg.Database.Driver = "memory"
+	srv, err := NewWithOptions(cfg)
+	if err != nil {
+		t.Fatalf("NewWithOptions (memory driver): %v", err)
+	}
+	if _, ok := srv.store.(*InMemoryJobStore); !ok {
+		t.Fatalf("store = %T, want *InMemoryJobStore", srv.store)
+	}
+}
+
 func TestNewWithOptionsInvalidDriver(t *testing.T) {
 	cfg := DefaultConfig()
 	cfg.Database.Driver = "notadriver"

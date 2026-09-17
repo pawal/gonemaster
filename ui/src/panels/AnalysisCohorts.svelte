@@ -40,6 +40,12 @@
         confirmLabel: $t("analysis_snapshots_retire"),
       };
     }
+    if (s.kind === "rebuild-all-snapshots") {
+      return {
+        title: $t("analysis_snapshots_rebuild_all_confirm", { count: s.count }),
+        confirmLabel: $t("analysis_snapshots_rebuild_all"),
+      };
+    }
     return {
       title: $t("analysis_snapshots_purge_confirm", { slug: s.snap.slug }),
       confirmLabel: $t("analysis_snapshots_purge"),
@@ -55,6 +61,7 @@
     if (s.kind === "delete-cohort") await performDeleteCohort(s.cohort);
     else if (s.kind === "retire-snapshot") await performRetireSnapshot(s.cohort, s.snap);
     else if (s.kind === "purge-snapshot") await performPurgeSnapshot(s.cohort, s.snap);
+    else if (s.kind === "rebuild-all-snapshots") await performRebuildAllSnapshots(s.cohort);
   };
   let busyCohortId = $state(null);
   let creating = $state(false);
@@ -548,6 +555,26 @@
       setNotice($t("analysis_snapshots_action_error", { error: error.message || "" }), "warn");
     } finally {
       busySnapshotKey = "";
+    }
+  }
+
+  const rebuildAllSnapshots = (cohort, count) => {
+    confirmState = { kind: "rebuild-all-snapshots", cohort, count };
+  };
+
+  // The server walks the snapshots one at a time; the poll loop tracks them.
+  async function performRebuildAllSnapshots(cohort) {
+    busyCohortId = cohort.id;
+    try {
+      const result = await apiFetch(`/analysis/cohorts/${cohort.id}/snapshots/rematerialize`, {
+        method: "POST"
+      });
+      await loadSnapshots(cohort, { refresh: true });
+      setNotice($t("analysis_snapshots_rebuild_all_started", { count: result?.queued ?? 0 }), "ok");
+    } catch (error) {
+      setNotice($t("analysis_snapshots_action_error", { error: error.message || "" }), "warn");
+    } finally {
+      busyCohortId = null;
     }
   }
 
@@ -1059,6 +1086,16 @@
                           {$t("analysis_snapshots_mixed_profile_banner")}
                         </div>
                       {/if}
+                      {@const rebuildable = snaps.filter((s) => s.source_runs_available !== false)}
+                      <div class="snapshot-toolbar">
+                        <button type="button" class="row-action"
+                                title={$t("analysis_snapshots_rebuild_all_title")}
+                                disabled={busyCohortId === cohort.id || rebuildable.length === 0
+                                  || snaps.some((s) => s.materialization_status === "pending")}
+                                onclick={() => rebuildAllSnapshots(cohort, rebuildable.length)}>
+                          {$t("analysis_snapshots_rebuild_all")}
+                        </button>
+                      </div>
                       <table class="data-table snapshot-table">
                         <thead>
                           <tr>
@@ -1655,6 +1692,12 @@
   .snapshot-subrow > td {
     padding: 12px 14px;
     background: var(--surface-2);
+  }
+
+  .snapshot-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 8px;
   }
 
   .snapshot-table {

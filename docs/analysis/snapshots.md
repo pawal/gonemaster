@@ -39,6 +39,29 @@ the snapshot will cover only the selected domains.
 Mixed-profile snapshots are intentionally hidden. A snapshot should represent
 one comparable run profile across the cohort.
 
+## Rebuild Snapshot Views
+
+A snapshot's views are computed at capture. A release that adds a column to a
+view table leaves earlier snapshots on the old shape until their views are
+recomputed, so a filter reading that column matches nothing there.
+
+Two controls in **Settings > Analysis > Cohorts** recompute them:
+
+- **Rebuild aggregates** on a snapshot row recomputes that snapshot.
+- **Rebuild all aggregates** above the snapshot list recomputes every
+  snapshot in the cohort, one at a time, newest first. Snapshots whose source
+  runs are purged are skipped. A second request for the same cohort is
+  refused while one is in progress.
+
+Both preserve slug, label, `captured_at` and the default pin. The cohort
+**Rebuild** button is a different operation: it re-projects the cohort's runs
+and recreates its snapshot rows, so custom slugs, labels, the default pin and
+the public flags do not survive it. Use it for a corrupt projection.
+
+Recomputation reads the stored per-run analysis rows. A statistic added to
+the projector after a run was projected is absent from those rows, and only a
+cohort rebuild recovers it.
+
 ## Stable URLs
 
 Every public analysis URL can carry `?snapshot=<slug>`.

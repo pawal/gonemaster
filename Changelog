@@ -6,6 +6,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
+- admin-ui: rebuild the aggregates of every snapshot in a cohort from one action
 - analysis-ui: DNSSEC posture segments link to the domains list filtered on that bucket
 - ci: prune release attachments below the three newest versions after publishing
 - dnssec22: evaluate nameserver names below a referred delegation

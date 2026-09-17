@@ -392,6 +392,7 @@ describe("AnalysisCohorts", () => {
     const submittedBatches = [];
     const snapshotPatches = [];
     const snapshotDeletes = [];
+    const snapshotSweeps = [];
     global.fetch.mockImplementation((url, requestOptions = {}) => {
       const value = requestUrl(url);
       const method = requestOptions.method || "GET";
@@ -403,6 +404,15 @@ describe("AnalysisCohorts", () => {
       const listSnaps = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots$/);
       if (listSnaps && method === "GET") {
         return jsonResponse(snapshotsByCohort[Number(listSnaps[1])] || []);
+      }
+      const sweep = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots\/rematerialize$/);
+      if (sweep && method === "POST") {
+        const id = Number(sweep[1]);
+        const queued = (snapshotsByCohort[id] || []).filter(
+          (s) => s.source_runs_available !== false
+        ).length;
+        snapshotSweeps.push({ id, queued });
+        return jsonResponse({ queued });
       }
       const snapPatch = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/snapshots\/([^/?]+)$/);
       if (snapPatch && method === "POST") {
@@ -433,6 +443,7 @@ describe("AnalysisCohorts", () => {
       submittedBatches,
       snapshotPatches,
       snapshotDeletes,
+      snapshotSweeps,
       getSnapshots: (id) => snapshotsByCohort[id] || [],
     };
   };
@@ -591,6 +602,63 @@ describe("AnalysisCohorts", () => {
     expect(await screen.findByText("2026-04-20-a")).toBeInTheDocument();
     expect(screen.getByText("2026-04-10-mixed")).toBeInTheDocument();
     expect(screen.getByText(/mixed profiles/i)).toBeInTheDocument();
+  });
+
+  it("rebuilds every snapshot in the cohort from one action, counting only the rebuildable ones", async () => {
+    const snapshotsByCohort = {
+      1: [
+        {
+          id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
+          profile_name: "strict", run_count: 3, domain_count: 3,
+          status: "captured", is_public: true, is_default: false
+        },
+        {
+          id: 101, slug: "2026-04-10", label: "", captured_at: "2026-04-10T12:00:00Z",
+          profile_name: "strict", run_count: 3, domain_count: 3,
+          status: "captured", is_public: true, is_default: false
+        },
+        {
+          id: 102, slug: "2026-04-01-purged", label: "", captured_at: "2026-04-01T12:00:00Z",
+          profile_name: "strict", run_count: 3, domain_count: 3,
+          status: "captured", is_public: true, is_default: false,
+          source_runs_available: false
+        },
+      ],
+    };
+    const handles = installSnapshotFetch({ snapshotsByCohort });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+    await screen.findByText("2026-04-20");
+
+    await fireEvent.click(screen.getByRole("button", { name: /Rebuild all aggregates/i }));
+    const dialog = await screen.findByRole("dialog");
+    // The purged-source snapshot is not offered to the sweep.
+    expect(within(dialog).getByText(/all 2 snapshots/i)).toBeInTheDocument();
+    await fireEvent.click(within(dialog).getByRole("button", { name: /Rebuild all aggregates/i }));
+
+    await waitFor(() => expect(handles.snapshotSweeps).toHaveLength(1));
+    expect(handles.snapshotSweeps[0]).toMatchObject({ id: 1, queued: 2 });
+  });
+
+  it("disables the rebuild-all action while a snapshot is being rebuilt", async () => {
+    const snapshotsByCohort = {
+      1: [{
+        id: 100, slug: "2026-04-20", label: "", captured_at: "2026-04-20T12:00:00Z",
+        profile_name: "strict", run_count: 3, domain_count: 3,
+        status: "captured", is_public: true, is_default: false,
+        materialization_status: "pending"
+      }],
+    };
+    installSnapshotFetch({ snapshotsByCohort });
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: /Snapshots/i }));
+    await screen.findByText("2026-04-20");
+
+    expect(screen.getByRole("button", { name: /Rebuild all aggregates/i })).toBeDisabled();
   });
 
   it("sets a snapshot as default via POST is_default=true", async () => {

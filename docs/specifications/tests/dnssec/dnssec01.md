@@ -33,7 +33,7 @@ Status: Final
    - Send DS query with DNSSEC enabled.
    - If response is absent or fails required shape checks (`NOERROR`, `OPT`, `DO`, `AA`), mark nameserver as ignored.
    - If response has no DS record with owner matching child zone name, mark nameserver in `Responds Without Valid DS`.
-   - Else mark nameserver in `Responds With DS` and classify each DS digest algorithm and each DS algorithm field value into the corresponding DS01 tag sets.
+   - Else mark nameserver in `Responds With DS` and classify each DS digest algorithm and each DS algorithm field value into the corresponding DS01 tag sets. A digest type the IANA DS Digest Algorithms registry marks `MUST NOT` for delegation maps to `DS01_DS_ALGO_DEPRECATED`, digest 0 maps to `DS01_DS_ALGO_NOT_DS`, and every other value follows the registry status (RFC 9904).
 6. Emit DS classification tags (`DS01_DS_ALGO_*`) grouped by `(digest, keytag)` with merged `servers`, and DS algorithm field classification tags (`DS01_KEY_ALGO_*`) grouped by `(algorithm, keytag)` with merged `servers`. The algorithm-to-class mapping mirrors the DNSKEY algorithm classification of DNSSEC05 (`dnssec01TagForKeyAlgorithm` reuses the ranges of `dnssec05TagForAlgorithm`; 253 and 254 map to `_PRIVATE`).
 7. Emit `DS01_DS_ALGO_2_MISSING` for keytags that have non-2 DS but no digest-2 DS on the same source nameservers.
 8. If no valid/non-valid DS responders exist and ignored responders exist, emit `DS01_NO_RESPONSE`.
@@ -257,3 +257,4 @@ emit TEST_CASE_END
 - If no parent nameservers are available and no undelegated DS data exists, only the applicable root/undelegated informational tags and testcase boundary tags are emitted.
 - For undelegated DS input, `servers` uses the sentinel source value `-`.
 - DS answer processing requires at least one DS with owner matching child zone, but once accepted the testcase classifies all DS records in that answer section.
+- A DS algorithm field of 5 or 7 maps to `DS01_KEY_ALGO_DEPRECATED` at `ERROR`, stricter than the `NOT RECOMMENDED` the IANA registry gives both, and identical to the DNSSEC05 classification.

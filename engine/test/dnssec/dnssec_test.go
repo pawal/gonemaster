@@ -21,6 +21,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/badkeys"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
+	"codeberg.org/pawal/gonemaster/engine/dnssecutil"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -166,8 +167,11 @@ func TestDNSSEC01TagForKeyAlgorithmTable(t *testing.T) {
 		{3, "DS01_KEY_ALGO_DEPRECATED"},
 		{4, "DS01_KEY_ALGO_RESERVED"},
 		{5, "DS01_KEY_ALGO_DEPRECATED"},
+		{6, "DS01_KEY_ALGO_DEPRECATED"},
+		{7, "DS01_KEY_ALGO_DEPRECATED"},
 		{8, "DS01_KEY_ALGO_OK"},
 		{10, "DS01_KEY_ALGO_NOT_RECOMMENDED"},
+		{12, "DS01_KEY_ALGO_DEPRECATED"},
 		{13, "DS01_KEY_ALGO_OK"},
 		{16, "DS01_KEY_ALGO_OK"},
 		{17, "DS01_KEY_ALGO_OK"},
@@ -207,6 +211,67 @@ func TestDNSSEC01TagMirrorsDNSSEC05(t *testing.T) {
 		want := "DS01_KEY_ALGO_" + strings.TrimPrefix(ds05, "DS05_ALGO_")
 		if got := dnssec01TagForKeyAlgorithm(algo); got != want {
 			t.Errorf("algo %d: DS01 class %s diverges from DS05 class %s", algo, got, ds05)
+		}
+	}
+}
+
+// The registry signing column decides the deprecated and not-recommended classes, SHA-1 signing aside.
+func TestDNSSEC05TagFollowsSigningPolicy(t *testing.T) {
+	for i := 0; i < 256; i++ {
+		algo := uint8(i)
+		got := dnssec05TagForAlgorithm(algo)
+		switch {
+		case algo == 5 || algo == 7:
+			if got != "DS05_ALGO_DEPRECATED" {
+				t.Errorf("algo %d: got %s, want DS05_ALGO_DEPRECATED", algo, got)
+			}
+		case dnssecutil.AlgorithmSigningProhibited(algo):
+			if got != "DS05_ALGO_DEPRECATED" {
+				t.Errorf("algo %d: got %s, want DS05_ALGO_DEPRECATED", algo, got)
+			}
+		case dnssecutil.AlgorithmSigningNotRecommended(algo):
+			if got != "DS05_ALGO_NOT_RECOMMENDED" {
+				t.Errorf("algo %d: got %s, want DS05_ALGO_NOT_RECOMMENDED", algo, got)
+			}
+		default:
+			if got == "DS05_ALGO_DEPRECATED" || got == "DS05_ALGO_NOT_RECOMMENDED" {
+				t.Errorf("algo %d: got %s without a registry recommendation", algo, got)
+			}
+		}
+	}
+}
+
+func TestDNSSEC01TagForDigestTable(t *testing.T) {
+	cases := []struct {
+		digest uint8
+		want   string
+	}{
+		{0, "DS01_DS_ALGO_NOT_DS"},
+		{1, "DS01_DS_ALGO_DEPRECATED"},
+		{2, "DS01_DS_ALGO_OK"},
+		{3, "DS01_DS_ALGO_DEPRECATED"},
+		{4, "DS01_DS_ALGO_OK"},
+		{5, "DS01_DS_ALGO_OK"},
+		{6, "DS01_DS_ALGO_OK"},
+		{7, "DS01_DS_ALGO_UNASSIGNED"},
+		{127, "DS01_DS_ALGO_UNASSIGNED"},
+		{128, "DS01_DS_ALGO_RESERVED"},
+		{252, "DS01_DS_ALGO_RESERVED"},
+		{253, "DS01_DS_ALGO_PRIVATE"},
+		{254, "DS01_DS_ALGO_PRIVATE"},
+		{255, "DS01_DS_ALGO_UNASSIGNED"},
+	}
+	for _, tc := range cases {
+		if got := dnssec01TagForDigest(tc.digest); got != tc.want {
+			t.Errorf("digest %d: got %s, want %s", tc.digest, got, tc.want)
+		}
+	}
+	// Digest 0 has its own tag, so the delegation column decides every other deprecated class.
+	for i := 1; i < 256; i++ {
+		digest := uint8(i)
+		got := dnssec01TagForDigest(digest)
+		if dnssecutil.DigestSigningProhibited(digest) != (got == "DS01_DS_ALGO_DEPRECATED") {
+			t.Errorf("digest %d: got %s, disagrees with the delegation policy", digest, got)
 		}
 	}
 }

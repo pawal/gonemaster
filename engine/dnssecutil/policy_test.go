@@ -6,10 +6,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 )
 
-// RFC 8624 section 3.1, one case per row of the DNSKEY algorithm table.
-// Signing and validation are judged apart: ECC-GOST must not sign, yet a
-// validator that implements it may still use it, and RSASHA1 is the reverse
-// of nothing at all - discouraged for signing while validation stays a MUST.
+// One case per row of the IANA algorithm registry signing and validation columns (RFC 9904).
 func TestAlgorithmPolicy(t *testing.T) {
 	for _, c := range []struct {
 		algorithm                                     uint8
@@ -41,8 +38,7 @@ func TestAlgorithmPolicy(t *testing.T) {
 	}
 }
 
-// Prohibited and not recommended are alternatives in RFC 8624, never both, so
-// an algorithm reported under each at once would be a table error.
+// An algorithm cannot be both MUST NOT and NOT RECOMMENDED for signing.
 func TestAlgorithmPolicyDoesNotOverlap(t *testing.T) {
 	for algorithm := range 256 {
 		algo := uint8(algorithm)
@@ -52,9 +48,7 @@ func TestAlgorithmPolicyDoesNotOverlap(t *testing.T) {
 	}
 }
 
-// RFC 8624 section 3.3, the DS and CDS digest table. Digest 0 is the RFC 8078
-// delete signal and belongs in neither direction; SHA-1 and GOST must not be
-// used in a delegation while validation still accepts them.
+// The IANA digest registry delegation and validation columns (RFC 9904); 0 is the RFC 8078 delete signal.
 func TestDigestPolicy(t *testing.T) {
 	for _, c := range []struct {
 		digest              uint8
@@ -75,9 +69,7 @@ func TestDigestPolicy(t *testing.T) {
 	}
 }
 
-// RFC 4509 section 3 names SHA-256 alone: its presence in a DS RRset makes the
-// SHA-1 records of that RRset ignored. SHA-384 is stronger without carrying
-// that mandate, which is why the two questions are asked separately.
+// RFC 4509 s3 names SHA-256 alone; SHA-384 is stronger without that mandate.
 func TestSHA1IsSupersededBySHA256Alone(t *testing.T) {
 	for _, c := range []struct {
 		digest               uint8

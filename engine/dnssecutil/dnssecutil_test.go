@@ -347,9 +347,7 @@ func TestKeyTagDoesNotMemoizeIntoCallerRecord(t *testing.T) {
 	}
 }
 
-// The fixed rdata lengths of RFC 8624's curve algorithms, per RFC 5933, 6605,
-// 8080. These are lengths of the encoded key and signature, which for ECDSA
-// are twice the curve size KeySize reports; the two must not be conflated.
+// Encoded key and signature lengths of the curve algorithms (RFC 5933, 6605, 8080), twice the curve size KeySize reports for ECDSA.
 func TestExpectedBitsAreFixedOnlyForTheCurveAlgorithms(t *testing.T) {
 	for _, c := range []struct {
 		algorithm uint8

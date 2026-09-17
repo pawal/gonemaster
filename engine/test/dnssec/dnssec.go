@@ -7644,16 +7644,15 @@ func differenceStrings(left []string, right []string) []string {
 	return out
 }
 
+// dnssec01TagForDigest classifies a DS digest type by registry status and delegation recommendation.
 func dnssec01TagForDigest(digest uint8) string {
 	switch {
 	case digest == 0:
 		return "DS01_DS_ALGO_NOT_DS"
-	case digest == 1:
+	case dnssecutil.DigestSigningProhibited(digest):
 		return "DS01_DS_ALGO_DEPRECATED"
 	case digest == 2:
 		return "DS01_DS_ALGO_OK"
-	case digest == 3:
-		return "DS01_DS_ALGO_DEPRECATED"
 	case digest == 4:
 		return "DS01_DS_ALGO_OK"
 	case digest == 5:
@@ -7678,34 +7677,28 @@ func dnssec01TagForKeyAlgorithm(algo uint8) string {
 	return "DS01_KEY_ALGO_" + strings.TrimPrefix(dnssec05TagForAlgorithm(algo), "DS05_ALGO_")
 }
 
+// dnssec05TagForAlgorithm classifies a DNSKEY algorithm by registry status and signing recommendation.
 func dnssec05TagForAlgorithm(algo uint8) string {
 	switch {
+	// SHA-1 signing is reported deprecated, stricter than the registry's NOT RECOMMENDED.
+	case algo == 5 || algo == 7:
+		return "DS05_ALGO_DEPRECATED"
+	case dnssecutil.AlgorithmSigningProhibited(algo):
+		return "DS05_ALGO_DEPRECATED"
+	case dnssecutil.AlgorithmSigningNotRecommended(algo):
+		return "DS05_ALGO_NOT_RECOMMENDED"
 	case algo == 0:
 		return "DS05_ALGO_NOT_ZONE_SIGN"
-	case algo == 1:
-		return "DS05_ALGO_DEPRECATED"
 	case algo == 2:
 		return "DS05_ALGO_NOT_ZONE_SIGN"
-	case algo == 3:
-		return "DS05_ALGO_DEPRECATED"
 	case algo == 4:
 		return "DS05_ALGO_RESERVED"
-	case algo == 5:
-		return "DS05_ALGO_DEPRECATED"
-	case algo == 6:
-		return "DS05_ALGO_DEPRECATED"
-	case algo == 7:
-		return "DS05_ALGO_DEPRECATED"
 	case algo == 8:
 		return "DS05_ALGO_OK"
 	case algo == 9:
 		return "DS05_ALGO_RESERVED"
-	case algo == 10:
-		return "DS05_ALGO_NOT_RECOMMENDED"
 	case algo == 11:
 		return "DS05_ALGO_RESERVED"
-	case algo == 12:
-		return "DS05_ALGO_DEPRECATED"
 	case algo == 13:
 		return "DS05_ALGO_OK"
 	case algo == 14:

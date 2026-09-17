@@ -1,6 +1,6 @@
 // Package dnssecutil holds DNSSEC primitives shared by the DNSSEC testcases
 // and the per-run chain extractor: algorithm support checks, RSA key sizing,
-// RRSIG verification, the RFC 8624 algorithm and digest policy, and the fixed
+// RRSIG verification, the IANA algorithm and digest recommendations (RFC 9904), and the fixed
 // key and signature lengths.
 package dnssecutil
 

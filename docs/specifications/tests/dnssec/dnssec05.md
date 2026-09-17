@@ -25,7 +25,7 @@ Status: Final
    - If no apex DNSKEY records are present, classify nameserver as `Responds Without DNSKEY`.
    - Else classify nameserver as `Responds With DNSKEY`, and for each DNSKEY:
      - Compute keytag.
-     - Classify `Algorithm` value with `dnssec05TagForAlgorithm`.
+     - Classify `Algorithm` value with `dnssec05TagForAlgorithm`: algorithms 5 and 7, and every algorithm the IANA DNS Security Algorithm Numbers registry marks `MUST NOT` for signing, map to `DS05_ALGO_DEPRECATED`; `NOT RECOMMENDED` maps to `DS05_ALGO_NOT_RECOMMENDED`; every other value follows the registry status (RFC 9904).
      - Store `(tag, algo, keytag, ns)` tuple.
 4. Emit all `DS05_ALGO_*` tags grouped by `(algo, keytag)` with merged `servers`, including `algo_descr` and `algo_mnemo`.
 5. If both `Responds Without DNSKEY` and `Responds With DNSKEY` are empty, emit `DS05_NO_RESPONSE` for ignored nameservers.
@@ -164,5 +164,6 @@ emit TEST_CASE_END
 
 ## Edge Cases And Limitations
 - Nameserver evaluation is deduplicated by IP; multiple names mapped to one IP are merged into one query outcome and expanded in `servers`.
+- Algorithms 5 and 7 sign with SHA-1. The IANA registry marks both `NOT RECOMMENDED` for signing, while this testcase maps them to `DS05_ALGO_DEPRECATED` at `ERROR`, matching the `MUST NOT` the registry gives the SHA-1 DS digest.
 - Nameservers with non-`NOERROR` or non-`AA` DNSKEY responses are treated as ignored for DS05 classification and can only contribute to `DS05_NO_RESPONSE`.
 - If a DNSKEY algorithm maps outside explicit switch cases, Gonemaster classifies it as `DS05_ALGO_UNASSIGNED`.

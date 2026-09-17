@@ -1,9 +1,17 @@
 import { describe, it, expect } from "vitest";
 import { secureChain } from "../test/helpers.js";
-import { layoutChain, relativeName, truncateName, worstSigTone, worstSigState, algoMnemonic, algoFace, bitsFace, faceWidth, wrapFace, ALGO_FACE_MAX } from "./dnssecChainLayout.js";
+import { layoutChain, relativeName, truncateName, worstSigTone, worstSigState, algoMnemonic, algoFace, bitsFace, clipToWidth, faceWidth, nsTone, statusTone, wrapFace, ALGO_FACE_MAX } from "./dnssecChainLayout.js";
 
 // MAX_WIDTH is the widest graph the public card holds without scaling it down.
 const MAX_WIDTH = 660;
+
+// The header words a caller hands in, which the layout measures and elides.
+const WORDS = {
+  parent: "Parent zone",
+  zone: "Tested zone",
+  root: "root (.)",
+  status: (s) => ({ secure: "Secure", partial: "Partial", broken: "Broken", undelegated: "Not delegated" })[s] ?? "",
+};
 
 // tipParams returns the params of the tip line with the given i18n key.
 function tipParams(el, k) {
@@ -153,36 +161,36 @@ describe("layoutChain", () => {
     expect(edge).toBeTruthy();
     expect(edge.status).toBe("valid");
     expect(edge.from.y).toBeLessThan(edge.to.y);
-    // The parent cluster label is on the parent-key row.
-    const parent = g.clusters.find((c) => c.id === "parent");
-    expect(parent.y).toBeLessThan(ds.y);
+    // The parent frame holds both parent rows.
+    const frame = g.frames.find((f) => f.id === "parent");
+    expect(frame.y).toBeLessThan(pk.y);
+    expect(frame.y + frame.h).toBeGreaterThan(ds.y + ds.h);
   });
 
   it("keeps the DS as the parent row when the parent key is unknown", () => {
     const g = layoutChain(secureChain());
     expect(g.nodes.some((n) => n.kind === "parent-key")).toBe(false);
-    const parent = g.clusters.find((c) => c.id === "parent");
     const ds = g.nodes.find((n) => n.kind === "ds");
-    // The parent label sits on the DS row (no separate parent-key row).
-    expect(parent.y).toBeLessThan(ds.y);
-    expect(parent.y).toBeGreaterThan(ds.y - 40);
+    const frame = g.frames.find((f) => f.id === "parent");
+    // The parent frame holds the DS row and nothing else.
+    expect(frame.y).toBeLessThan(ds.y);
+    expect(g.nodes.filter((n) => n.y >= frame.y && n.y + n.h <= frame.y + frame.h)).toEqual([ds]);
   });
 
-  it("labels the parent and key clusters with their zone names", () => {
-    const g = layoutChain(secureChain());
-    const parent = g.clusters.find((c) => c.id === "parent");
-    const keys = g.clusters.find((c) => c.id === "keys");
-    expect(parent.name).toBe("com");
-    expect(keys.name).toBe("example.com");
+  it("names the two zones on the frames, not on the row labels", () => {
+    const g = layoutChain(secureChain(), { words: WORDS });
+    expect(g.frames.map((f) => f.header.roleText)).toEqual(["Parent zone", "Tested zone"]);
+    expect(g.frames.map((f) => f.header.name)).toEqual(["com", "example.com"]);
+    // A row label names its row alone, and the parent rows need none.
+    expect(g.clusters.every((c) => c.name === undefined)).toBe(true);
+    expect(g.clusters.some((c) => c.id === "parent")).toBe(false);
     // No signed-records row without a zone-data signature.
     expect(g.clusters.some((c) => c.id === "signed")).toBe(false);
   });
 
-  it("keeps the root parent name as a dot, not an em dash", () => {
-    const chain = secureChain({ parent_zone: "." });
-    const g = layoutChain(chain);
-    const parent = g.clusters.find((c) => c.id === "parent");
-    expect(parent.name).toBe(".");
+  it("reads the root as the word the caller hands in, not a lone dot", () => {
+    const g = layoutChain(secureChain({ parent_zone: "." }), { words: WORDS });
+    expect(g.frames.find((f) => f.id === "parent").header.name).toBe("root (.)");
   });
 
   it("produces a matching DS edge and a self-signing KSK loop", () => {
@@ -972,13 +980,13 @@ describe("in-domain nameserver names", () => {
     expect(edges.map((e) => e.nsStatus).sort()).toEqual(["orphan", "validates"]);
   });
 
-  it("labels the two new clusters with the zone", () => {
+  it("labels the two new rows without repeating the zone", () => {
     const g = layoutChain(orphanChain());
     const ids = g.clusters.map((c) => c.id);
     expect(ids).toContain("nsnames");
     expect(ids).toContain("signers");
     const nsCluster = g.clusters.find((c) => c.id === "nsnames");
-    expect(nsCluster.name).toBe("example.com");
+    expect(nsCluster.name).toBeUndefined();
     expect(nsCluster.labelKey).toBe("pub.dnssec_chain_nsnames_label");
   });
 
@@ -1125,5 +1133,201 @@ describe("signer nodes", () => {
     const signers = g.nodes.filter((n) => n.kind === "cut" || n.kind === "cut-broken" || n.kind === "orphan");
     expect(signers.length).toBe(1);
     expect(signers[0].kind).toBe("cut-broken");
+  });
+});
+
+describe("zone frames", () => {
+  const named = (name, status, signer) => ({ name, status, signer, servers: ["192.0.2.1"] });
+
+  // A frame holds exactly the rows of its side of the delegation, so a reader
+  // can tell the parent's records from the tested zone's.
+  it("frames the parent above the tested zone, each around its own rows", () => {
+    const g = layoutChain(
+      secureChain({
+        version: 3,
+        child: {
+          dnskeys: [{ key_tag: 1000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] }],
+          dnskey_rrsig: [{ key_tag: 1000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }],
+          signed: [{ type: "SOA", rrsig: [{ key_tag: 1000, state: "valid" }] }],
+        },
+        ns_names: [named("a.ns.example.com", "orphan", "ns.example.com")],
+      }),
+      { words: WORDS }
+    );
+    const [parent, zone] = g.frames;
+    expect(parent.id).toBe("parent");
+    expect(zone.id).toBe("zone");
+    expect(parent.y + parent.h).toBeLessThan(zone.y);
+
+    const held = (frame) =>
+      g.nodes.filter((n) => n.y >= frame.y && n.y + n.h <= frame.y + frame.h).map((n) => n.kind);
+    expect(held(parent)).toEqual(["ds"]);
+    expect(held(zone)).toEqual(["ksk", "rrset", "orphan", "nsname"]);
+    // Every node belongs to one frame or the other.
+    expect(held(parent).length + held(zone).length).toBe(g.nodes.length);
+  });
+
+  it("keeps every frame inside the drawing", () => {
+    const g = layoutChain(secureChain(), { words: WORDS });
+    for (const f of g.frames) {
+      expect(f.x).toBeGreaterThanOrEqual(0);
+      expect(f.y).toBeGreaterThanOrEqual(0);
+      expect(f.x + f.w).toBeLessThanOrEqual(g.width);
+      expect(f.y + f.h).toBeLessThanOrEqual(g.height);
+    }
+    for (const n of g.nodes) {
+      expect(n.y + n.h).toBeLessThanOrEqual(g.height);
+    }
+  });
+
+  // The chip is what carries the verdict into a saved file, where the badge
+  // above the card does not follow.
+  it("chips the tested frame with the roll-up word and tone", () => {
+    const g = layoutChain(secureChain({ status: "partial" }), { words: WORDS });
+    const [parent, zone] = g.frames;
+    expect(zone.header.chip.text).toBe("Partial");
+    expect(zone.tone).toBe("warn");
+    expect(parent.header.chip).toBeNull();
+    expect(parent.tone).toBe("neutral");
+  });
+
+  it("tones the frame from the roll-up, bad for a zone the parent proves undelegated", () => {
+    const g = layoutChain(secureChain({ status: "undelegated" }), { words: WORDS });
+    expect(g.frames.find((f) => f.id === "zone").tone).toBe("bad");
+  });
+
+  // A long name must not push the drawing wider than the card holds.
+  it("elides a long zone name in the middle instead of widening the drawing", () => {
+    const long = `${"a".repeat(60)}.example.com`;
+    const plain = layoutChain(secureChain(), { words: WORDS });
+    const g = layoutChain(secureChain({ zone: long }), { words: WORDS });
+    expect(g.width).toBe(plain.width);
+    const name = g.frames.find((f) => f.id === "zone").header.name;
+    expect(name).not.toBe(long);
+    expect(name).toContain("…");
+    expect(name.startsWith("aaa")).toBe(true);
+    expect(name.endsWith(".com")).toBe(true);
+    // The name stops short of the chip beside it.
+    const zone = g.frames.find((f) => f.id === "zone");
+    expect(faceWidth(name, 12)).toBeLessThanOrEqual(zone.header.chip.x - zone.header.nameX);
+  });
+
+  it("ships the frame header words in every locale", async () => {
+    const locales = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
+    const keys = ["pub.dnssec_chain_root", "pub.dnssec_chain_zone_label", "pub.dnssec_chain_export"];
+    for (const loc of locales) {
+      const catalog = (await import(`../i18n/${loc}.json`)).default;
+      for (const key of keys) {
+        expect(typeof catalog[key], `${loc} ${key}`).toBe("string");
+        expect(catalog[key].length > 0, `${loc} ${key}`).toBe(true);
+      }
+    }
+  });
+
+  // Without words the layout still lays out; only the header reads empty.
+  it("lays out with no words at all", () => {
+    const g = layoutChain(secureChain());
+    expect(g.frames).toHaveLength(2);
+    expect(g.frames[0].header.roleText).toBe("");
+    expect(g.frames[1].header.chip).toBeNull();
+  });
+});
+
+describe("node tone", () => {
+  const toneOf = (chain, pick) => layoutChain(chain).nodes.find(pick)?.tone;
+  const ds = (over = {}) => ({ key_tag: 1000, algorithm: 13, digest_type: 2, digest: "ab", servers: ["192.0.2.1"], ...over });
+  const nsName = (status) => ({
+    version: 3,
+    ns_names: [{ name: "a.ns.example.com", status, signer: "example.com", servers: ["192.0.2.1"] }],
+  });
+
+  it("grades a DS whose key tag names no published key as bad", () => {
+    const chain = secureChain({ links: [{ ds_key_tag: 1000, dnskey_key_tag: 9999, status: "match", servers: ["192.0.2.1"] }] });
+    expect(toneOf(chain, (n) => n.kind === "ds")).toBe("bad");
+  });
+
+  // The dead anchor was drawn on the edge alone, leaving the record plain.
+  it("grades a DS naming a key that signs nothing as bad", () => {
+    const chain = secureChain({
+      status: "partial",
+      links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "key_not_signing", servers: ["192.0.2.1"] }],
+    });
+    expect(toneOf(chain, (n) => n.kind === "ds")).toBe("bad");
+  });
+
+  it("grades a revoked key and an expired DS signature as bad", () => {
+    const revoked = secureChain();
+    revoked.child.dnskeys[0].revoked = true;
+    expect(toneOf(revoked, (n) => n.kind === "ksk")).toBe("bad");
+
+    const expired = secureChain({ parent: { ds_source: "parent", ds: [ds()], ds_rrsig: [{ key_tag: 5, state: "expired" }] } });
+    expect(toneOf(expired, (n) => n.kind === "ds")).toBe("bad");
+  });
+
+  it("grades a not-yet-valid DS signature and an unanchored key as warn", () => {
+    const early = secureChain({ parent: { ds_source: "parent", ds: [ds()], ds_rrsig: [{ key_tag: 5, state: "not_yet_valid" }] } });
+    expect(toneOf(early, (n) => n.kind === "ds")).toBe("warn");
+
+    const rolling = secureChain();
+    rolling.child.dnskeys[0].anchored = true;
+    rolling.child.dnskeys.push({ key_tag: 3000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] });
+    expect(toneOf(rolling, (n) => n.keyTag === 3000)).toBe("warn");
+  });
+
+  it("grades a record the zone does not publish as ghost", () => {
+    const island = secureChain({ parent: { ds_source: "none", ds: [] }, links: [] });
+    expect(toneOf(island, (n) => n.kind === "ds-ghost")).toBe("ghost");
+
+    const phantom = secureChain({ links: [{ ds_key_tag: 4000, status: "no_dnskey", servers: ["192.0.2.1"] }] });
+    expect(toneOf(phantom, (n) => n.kind === "key-phantom")).toBe("ghost");
+  });
+
+  it("grades a nameserver name from its own status", () => {
+    expect(toneOf(secureChain(nsName("validates")), (n) => n.kind === "nsname")).toBe("ok");
+    expect(toneOf(secureChain(nsName("insecure")), (n) => n.kind === "nsname")).toBe("warn");
+    expect(toneOf(secureChain(nsName("rrsig_expired")), (n) => n.kind === "nsname")).toBe("bad");
+    expect(toneOf(secureChain(nsName("indeterminate")), (n) => n.kind === "nsname")).toBe("");
+  });
+
+  it("grades a signer the zone does not delegate as bad and a settled key as plain", () => {
+    const orphan = secureChain({
+      version: 3,
+      ns_names: [{ name: "a.ns.example.com", status: "orphan", signer: "ns.example.com", servers: ["192.0.2.1"] }],
+    });
+    expect(toneOf(orphan, (n) => n.kind === "orphan")).toBe("bad");
+    expect(toneOf(secureChain(), (n) => n.kind === "ksk")).toBe("");
+  });
+
+  it("names the same grades through nsTone and statusTone", () => {
+    expect(nsTone("chain_broken")).toBe("bad");
+    expect(nsTone("nonsense")).toBe("");
+    expect(statusTone("secure")).toBe("ok");
+    expect(statusTone("broken")).toBe("bad");
+    expect(statusTone("island")).toBe("neutral");
+  });
+});
+
+describe("clipToWidth", () => {
+  it("leaves a string that fits untouched", () => {
+    expect(clipToWidth("example.com", 400, 12)).toBe("example.com");
+  });
+
+  it("keeps both ends of a name it has to shorten", () => {
+    const out = clipToWidth("verylongsubdomain.example.com", 80, 12);
+    expect(out).toContain("…");
+    expect(out.startsWith("very")).toBe(true);
+    expect(out.endsWith(".com")).toBe(true);
+    expect(faceWidth(out, 12)).toBeLessThanOrEqual(80);
+  });
+
+  // Full-width scripts take an em each, so a Japanese header elides sooner.
+  it("measures a full-width script at an em per character", () => {
+    expect(clipToWidth("テスト対象ゾーン", 40, 10)).not.toBe("テスト対象ゾーン");
+    expect(faceWidth(clipToWidth("テスト対象ゾーン", 40, 10), 10)).toBeLessThanOrEqual(40);
+  });
+
+  it("returns nothing when there is no room at all", () => {
+    expect(clipToWidth("example.com", 2, 12)).toBe("");
+    expect(clipToWidth(null, 100, 12)).toBe("");
   });
 });

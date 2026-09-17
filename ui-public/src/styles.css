@@ -1266,7 +1266,8 @@ details[open] > .score-bonus-summary > .score-bonus-chevron {
   [data-testid="test-form"],
   .fork-ribbon,
   .version-footer,
-  .print-button { display: none !important; }
+  .print-button,
+  .chain-toolbar { display: none !important; }
 
   header {
     border-bottom: none;

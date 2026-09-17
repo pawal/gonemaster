@@ -1,9 +1,11 @@
 <script>
   import { t } from "../i18n.js";
   import { getDnssecChain } from "../api.js";
-  import { layoutChain, algoMnemonic, digestMnemonic, fmtDate, wrapFace } from "./dnssecChainLayout.js";
+  import { layoutChain, algoMnemonic, digestMnemonic, fmtDate, nsTone, statusTone, wrapFace } from "./dnssecChainLayout.js";
+  import { chainFileName, downloadSVG, serializeSVG } from "./chainExport.js";
 
-  let { publicID, domain = "" } = $props();
+  // saveSVG is injected so a test can read the file without a blob URL.
+  let { publicID, domain = "", saveSVG = downloadSVG } = $props();
 
   // phase: idle | loading | loaded | empty | error
   let phase = $state("idle");
@@ -34,7 +36,23 @@
     if (e.target.open && (phase === "idle" || phase === "error")) load();
   }
 
-  let graph = $derived(phase === "loaded" && chain ? layoutChain(chain) : null);
+  // The layout measures the header words it draws, so the component owns the
+  // translations and hands them in.
+  let words = $derived({
+    parent: $t("pub.dnssec_chain_parent_label"),
+    zone: $t("pub.dnssec_chain_zone_label"),
+    root: $t("pub.dnssec_chain_root"),
+    status: (s) => (KNOWN_STATUS.includes(s) ? $t(`pub.dnssec_chain_status_${s}`) : ""),
+  });
+  let graph = $derived(phase === "loaded" && chain ? layoutChain(chain, { words }) : null);
+  let svgEl = $state(null);
+
+  // The saved file is the diagram at rest, in the theme the reader is viewing.
+  function onSave() {
+    if (!svgEl || !graph) return;
+    saveSVG(serializeSVG(svgEl, { width: graph.width, height: graph.height }), chainFileName(domain));
+  }
+
   // Reference edges (CDS/CDNSKEY -> DNSKEY) draw after the nodes so they are
   // not hidden behind the key boxes they span.
   let mainEdges = $derived(graph ? graph.edges.filter((e) => e.kind !== "ref" && e.kind !== "stub") : []);
@@ -62,9 +80,7 @@
   let undelegated = $derived(chain?.status === "undelegated");
   // Nameserver names validators reject. These drive the red callout, which is
   // how the card reports every other fault; the graph alone is too quiet.
-  let bogusNSNames = $derived(
-    (chain?.ns_names ?? []).filter((n) => NS_TONE[n.status] === "edge-bad").map((n) => n.name)
-  );
+  let bogusNSNames = $derived((chain?.ns_names ?? []).filter((n) => nsTone(n.status) === "bad").map((n) => n.name));
 
   let disagreeingServers = $derived([
     ...(chain?.parent?.servers_disagreeing ?? []),
@@ -124,6 +140,7 @@
     phase === "loaded" && KNOWN_STATUS.includes(chain?.status) ? chain.status : ""
   );
   let truncated = $derived(!!chain?.truncated);
+  let parentZoneText = $derived(chain?.parent_zone === "." ? $t("pub.dnssec_chain_root") : chain?.parent_zone || "-");
   // rolloverKeys: keys not yet anchored by a DS - unanchored KSKs plus any
   // CDS/CDNSKEY signals a new key. A rollover is only meaningful when some key
   // is already anchored.
@@ -184,15 +201,6 @@
     else hideTip();
   }
 
-  // statusTone maps a roll-up status to a badge color: secure ok, broken bad,
-  // partial warn, everything else neutral.
-  function statusTone(s) {
-    if (s === "secure") return "ok";
-    if (s === "broken" || s === "undelegated") return "bad";
-    if (s === "partial") return "warn";
-    return "neutral";
-  }
-
   // sigDetail localizes a signature's state and appends its window.
   function sigDetail(sig) {
     const st = $t(`pub.dnssec_chain_state_${sig.state}`);
@@ -216,36 +224,15 @@
     return (lines ?? []).map(tipLine).filter(Boolean).join("\n");
   }
 
-  // NS_TONE grades a nameserver name's status: bad for a name validators
-  // reject, warn for one they accept unsigned, ok for one that validates.
-  const NS_TONE = {
-    validates: "edge-ok",
-    insecure: "edge-warn",
-    unsigned: "edge-bad",
-    orphan: "edge-bad",
-    chain_broken: "edge-bad",
-    rrsig_expired: "edge-bad",
-    rrsig_invalid: "edge-bad",
-    indeterminate: "edge-neutral",
-  };
-
-  // nsTone is the node border grade for a nameserver name, from the same table
-  // that grades its edge.
-  function nsTone(node) {
-    if (!node.nsStatus) return "";
-    const cls = NS_TONE[node.nsStatus];
-    if (cls === "edge-bad") return "bad";
-    if (cls === "edge-warn") return "warn";
-    if (cls === "edge-ok") return "ok";
-    return "";
-  }
+  // edgeTone maps a node tone onto the edge classes.
+  const edgeTone = (tone) => (tone ? `edge-${tone}` : "edge-neutral");
 
   function edgeClass(edge) {
     if (edge.kind === "stub") {
       return edge.bad ? "edge-bad" : "edge-ok";
     }
     if (edge.kind === "nssig") {
-      return NS_TONE[edge.nsStatus] ?? "edge-neutral";
+      return edgeTone(nsTone(edge.nsStatus));
     }
     if (edge.kind === "ref") {
       return edge.rollover ? "edge-ref-pending" : "edge-ref";
@@ -328,7 +315,7 @@
     const texts = [{ text: nodeHeading(node) }];
     if (node.keyTag != null) texts.push({ text: `tag ${node.keyTag}` });
     if (node.nsStatus) {
-      texts.push({ text: $t(`pub.dnssec_chain_nsstatus_${node.nsStatus}`), extra: `chain-node-ns-${nsTone(node) || "neutral"}` });
+      texts.push({ text: $t(`pub.dnssec_chain_nsstatus_${node.nsStatus}`), extra: `chain-node-ns-${node.tone || "neutral"}` });
     }
     if (node.signerWordKey) {
       texts.push({ text: $t(node.signerWordKey), extra: node.kind === "cut" ? "" : "chain-node-ns-bad" });
@@ -414,8 +401,15 @@
           <p class="dnssec-chain-callout callout-warn" data-testid="chain-rollover">{$t("pub.dnssec_chain_rollover", { keys: rolloverKeys.join(", ") })}</p>
         {/if}
 
+        <div class="chain-toolbar">
+          <button type="button" class="chain-toolbar-button" data-testid="chain-export" onclick={onSave}>
+            {$t("pub.dnssec_chain_export")}
+          </button>
+        </div>
+
         <div class="chain-scroll">
           <svg
+            bind:this={svgEl}
             class="chain-svg"
             width={graph.width}
             height={graph.height}
@@ -431,6 +425,28 @@
                 <path d="M0,0 L10,5 L0,10 z" fill="context-stroke" />
               </marker>
             </defs>
+
+            {#each graph.frames as frame (frame.id)}
+              <g class="chain-frame frame-{frame.tone}" data-testid="chain-frame-{frame.id}">
+                <rect class="chain-frame-box" x={frame.x} y={frame.y} width={frame.w} height={frame.h} rx="10" />
+                <path class="chain-frame-head" d={frame.headPath}></path>
+                <text class="chain-frame-role" x={frame.header.roleX} y={frame.header.roleY}>{frame.header.roleText}</text>
+                <text class="chain-frame-name" x={frame.header.nameX} y={frame.header.nameY}>{frame.header.name}</text>
+                {#if frame.header.chip}
+                  <rect
+                    class="chain-frame-chip"
+                    x={frame.header.chip.x}
+                    y={frame.header.chip.y}
+                    width={frame.header.chip.w}
+                    height={frame.header.chip.h}
+                    rx="8"
+                  />
+                  <text class="chain-frame-chip-label" x={frame.header.chip.textX} y={frame.header.chip.textY} text-anchor="middle">
+                    {frame.header.chip.text}
+                  </text>
+                {/if}
+              </g>
+            {/each}
 
             {#each mainEdges as edge (edge.id)}
               {#if edge.d}
@@ -450,7 +466,7 @@
 
             {#each graph.nodes as node (node.id)}
               {@const lines = nodeLines(node)}
-              <g class="chain-node node-{node.kind}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} class:node-rollover={node.rollover} class:node-incoming={node.incoming} class:node-ns-bad={nsTone(node) === "bad"} class:node-ns-warn={nsTone(node) === "warn"} class:node-ns-ok={nsTone(node) === "ok"} data-tip={buildTip(node.tip)}>
+              <g class="chain-node node-{node.kind} node-tone-{node.tone || 'none'}" class:node-unmatched={node.unmatched} class:node-revoked={node.revoked} class:node-sig-bad={node.dsSigTone === "bad"} class:node-sig-warn={node.dsSigTone === "warn"} class:node-rollover={node.rollover} class:node-incoming={node.incoming} class:node-ns-bad={node.nsStatus && node.tone === "bad"} class:node-ns-warn={node.nsStatus && node.tone === "warn"} class:node-ns-ok={node.nsStatus && node.tone === "ok"} data-tip={buildTip(node.tip)}>
                 <rect x={node.x} y={node.y} width={node.w} height={node.h} rx="8" class="chain-node-box" />
                 {#each lines as line, i (i)}
                   <text class="chain-node-label {line.cls}" x={node.x + node.w / 2} y={line.y} text-anchor="middle">{line.text}</text>
@@ -495,7 +511,7 @@
         {#if status}
           <li data-testid="chain-status-fact">{$t("pub.dnssec_chain_status_label")}: {$t(`pub.dnssec_chain_status_${status}`)}</li>
         {/if}
-        <li>{$t("pub.dnssec_chain_parent_label")}: {chain?.parent_zone || "-"}</li>
+        <li>{$t("pub.dnssec_chain_parent_label")}: {parentZoneText}</li>
         <li>DS: {dsSummary}</li>
         <li>{$t("pub.dnssec_chain_keys_label")}: {keySummary}</li>
         {#if staleServers.length}
@@ -605,6 +621,71 @@
     margin: 0 auto;
     max-width: 100%;
     height: auto;
+    font-family: var(--sans);
+  }
+  .chain-toolbar {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .chain-toolbar-button {
+    padding: 0.3rem 0.8rem;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: 0.82rem;
+    cursor: pointer;
+  }
+  .chain-frame-box {
+    fill: none;
+    stroke: var(--border);
+    stroke-width: 1.5;
+  }
+  .chain-frame-head {
+    fill: var(--surface-2);
+    stroke: none;
+  }
+  .chain-frame-role {
+    font-size: 11px;
+    font-weight: 700;
+    fill: var(--ink-2);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+  }
+  .chain-frame-name {
+    font-family: var(--mono);
+    font-size: 12px;
+    fill: var(--ink);
+  }
+  .chain-frame-chip {
+    fill: none;
+    stroke: var(--border);
+  }
+  .chain-frame-chip-label {
+    font-size: 10px;
+    font-weight: 700;
+    fill: var(--ink-2);
+  }
+  .frame-ok .chain-frame-box,
+  .frame-ok .chain-frame-chip {
+    stroke: var(--grade-a);
+  }
+  .frame-ok .chain-frame-chip-label {
+    fill: var(--grade-a);
+  }
+  .frame-warn .chain-frame-box,
+  .frame-warn .chain-frame-chip {
+    stroke: var(--grade-c);
+  }
+  .frame-warn .chain-frame-chip-label {
+    fill: var(--grade-c);
+  }
+  .frame-bad .chain-frame-box,
+  .frame-bad .chain-frame-chip {
+    stroke: var(--grade-f);
+  }
+  .frame-bad .chain-frame-chip-label {
+    fill: var(--grade-f);
   }
   .chain-cluster-label {
     fill: var(--ink-2);
@@ -670,18 +751,8 @@
     stroke: var(--ink-2);
     stroke-dasharray: 4 3;
   }
-  .node-unmatched .chain-node-box {
-    stroke: var(--grade-f);
-  }
   .node-revoked .chain-node-box {
-    stroke: var(--grade-f);
     stroke-dasharray: 5 3;
-  }
-  .node-sig-bad .chain-node-box {
-    stroke: var(--grade-f);
-  }
-  .node-sig-warn .chain-node-box {
-    stroke: var(--grade-c);
   }
   .node-ds-ghost .chain-node-box,
   .node-key-ghost .chain-node-box,
@@ -698,11 +769,9 @@
     stroke: var(--border);
   }
   .node-rollover .chain-node-box {
-    stroke: var(--grade-c);
     stroke-width: 2;
   }
   .node-incoming .chain-node-box {
-    stroke: var(--grade-c);
     stroke-dasharray: 5 3;
   }
   .node-cut .chain-node-box {
@@ -725,13 +794,16 @@
     stroke: var(--border);
   }
   .node-ns-bad .chain-node-box {
-    stroke: var(--grade-f);
     stroke-width: 2;
   }
-  .node-ns-warn .chain-node-box {
+  /* Tone paints the border; a flag adds only the treatment that tells two faults apart. */
+  .node-tone-bad .chain-node-box {
+    stroke: var(--grade-f);
+  }
+  .node-tone-warn .chain-node-box {
     stroke: var(--grade-c);
   }
-  .node-ns-ok .chain-node-box {
+  .node-tone-ok .chain-node-box {
     stroke: var(--grade-a);
   }
   .chain-stub {

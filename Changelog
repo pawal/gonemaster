@@ -12,6 +12,11 @@ All notable changes to all gonemaster components will be documented in this file
 - dnssec22: evaluate nameserver names below a referred delegation
 - server: dnssec_posture filter on the public analysis domains list
 - server: rematerialize every snapshot in a cohort in sequence
+- ui-public: save the DNSSEC chain diagram as an SVG file
+
+### Changed
+
+- ui-public: the DNSSEC chain diagram frames each zone under its own header
 
 ### Fixed
 

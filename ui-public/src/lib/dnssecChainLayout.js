@@ -11,8 +11,22 @@ const ROW_GAP = 52; // between a row's last line and the row below it
 const MAX_ROW_W = 600; // a wider row wraps, so the card holds the graph unscaled
 const MIN_ROW_W = 320; // narrowest column a row centres in, so a row label fits
 const PAD_X = 24;
-const PAD_TOP = 44;
 const PAD_BOTTOM = 16;
+const FRAME_TOP = 4; // room above the first frame
+const FRAME_PAD_X = 18; // frame border to the nearest box
+const FRAME_HEAD_H = 28; // header strip holding the role word and the zone name
+const FRAME_PAD_BOTTOM = 14;
+const FRAME_GAP = 26; // between the two frames
+const FRAME_TEXT_PAD = 12;
+const FRAME_TEXT_GAP = 10;
+const FRAME_ROLE_FONT = 11;
+const FRAME_NAME_FONT = 12;
+const FRAME_CHIP_FONT = 10;
+const CHIP_PAD_X = 8;
+const CHIP_H = 16;
+const FRAME_PAD_TOP = 16; // header strip to a first row that carries no label
+const ROW_LABEL_GAP = 34; // header strip to a first row that carries one
+const LABEL_BASE = 22; // row label baseline above its boxes
 const LOOP_PAD = 32; // how far a key self-loop reaches past the node
 const REF_BOW = 46; // sideways bow of a CDS/CDNSKEY reference edge
 
@@ -95,6 +109,53 @@ export function wrapFace(text, boxW, px, max = 2) {
     if (best === null || worst < best.worst) best = { head, tail, worst };
   }
   return [best.head, ...wrapFace(best.tail, boxW, px, max - 1)];
+}
+
+// clipToWidth elides the middle, so both ends of a name survive.
+export function clipToWidth(text, width, px) {
+  const s = String(text ?? "");
+  if (faceWidth(s, px) <= width) return s;
+  const chars = [...s];
+  const fit = (keep) =>
+    chars.slice(0, Math.ceil(keep / 2)).join("") + "…" + chars.slice(chars.length - Math.floor(keep / 2)).join("");
+  let keep = chars.length - 1;
+  while (keep > 0 && faceWidth(fit(keep), px) > width) keep--;
+  return keep > 0 ? fit(keep) : "";
+}
+
+// NS_TONE grades a nameserver name's status: bad where validators reject the
+// name, warn where they accept it unsigned, ok where it validates.
+const NS_TONE = {
+  validates: "ok",
+  insecure: "warn",
+  unsigned: "bad",
+  orphan: "bad",
+  chain_broken: "bad",
+  rrsig_expired: "bad",
+  rrsig_invalid: "bad",
+  indeterminate: "",
+};
+
+export const nsTone = (status) => NS_TONE[status] ?? "";
+
+// statusTone grades a roll-up status for the heading badge, the frame border
+// and the frame's chip.
+export function statusTone(status) {
+  if (status === "secure") return "ok";
+  if (status === "broken" || status === "undelegated") return "bad";
+  if (status === "partial") return "warn";
+  return "neutral";
+}
+
+// nodeTone grades a node's own flags, so every tint is also a shape and a
+// word: bad for a fault, warn for a caution, ghost for a record the zone does
+// not publish, ok for a name that validates.
+function nodeTone(n) {
+  if (n.unmatched || n.revoked || n.deadAnchor || n.dsSigTone === "bad") return "bad";
+  if (n.kind === "cut-broken" || n.kind === "orphan") return "bad";
+  if (n.kind === "ds-ghost" || n.kind === "key-ghost" || n.kind === "key-phantom") return "ghost";
+  if (n.dsSigTone === "warn" || n.rollover || n.incoming) return "warn";
+  return nsTone(n.nsStatus);
 }
 
 // algoFace / bitsFace render the node-face lines. Unlike algoMnemonic, an
@@ -320,9 +381,11 @@ function place(row, y, totalW, rowIndex) {
 }
 
 // layoutChain builds the graph. Returns null for an unsigned zone (rendered as
-// a callout, not a graph) or when there is nothing to draw.
-export function layoutChain(chain) {
+// a callout, not a graph) or when there is nothing to draw. words carries the
+// localized frame header text, which the caller owns and the layout measures.
+export function layoutChain(chain, options = {}) {
   if (!chain || chain.status === "unsigned") return null;
+  const words = options.words ?? {};
 
   const dsList = Array.isArray(chain.parent?.ds) ? chain.parent.ds : [];
   const dsSource = chain.parent?.ds_source ?? "none";
@@ -541,14 +604,13 @@ export function layoutChain(chain) {
 
   // Assemble the visible rows top to bottom, tagging which carries a label.
   // When the parent keys are known, they sit above the DS in the parent zone.
-  const row = (label, nodes, w = NODE_W, h = NODE_H) => ({ label, nodes, w, h });
+  const row = (label, nodes, w = NODE_W, h = NODE_H, side = "zone") => ({ label, nodes, w, h, side });
   const rows = [];
+  // The parent rows carry no label: their frame header says whose they are.
   if (parentKeyNodes.length > 0) {
-    rows.push(row("parent", parentKeyNodes));
-    rows.push(row(null, dsNodes));
-  } else {
-    rows.push(row("parent", dsNodes));
+    rows.push(row(null, parentKeyNodes, NODE_W, NODE_H, "parent"));
   }
+  rows.push(row(null, dsNodes, NODE_W, NODE_H, "parent"));
   if (keys.length === 0) {
     rows.push(row("keys", [{ id: "key-ghost", kind: "key-ghost", tip: [{ k: "pub.dnssec_chain_tip_no_dnskey" }] }]));
   } else {
@@ -577,32 +639,38 @@ export function layoutChain(chain) {
   // column all rows are centred in.
   for (const r of rows) r.lines = r.groups ? packLines(r.groups, r.w) : lineCounts(r.nodes.length, r.w);
   const totalW = Math.max(MIN_ROW_W, ...rows.map((r) => rowWidth(Math.max(...r.lines), r.w)));
-  let rowY = PAD_TOP;
-  rows.forEach((r, i) => {
-    place(r, rowY, totalW, i);
-    rowY += rowHeight(r) + ROW_GAP;
-  });
-  const contentBottom = rowY - ROW_GAP;
+
+  // Each side of the delegation is framed, so its rows start below a header
+  // strip and the frame closes under the last of them.
+  const sides = ["parent", "zone"]
+    .map((id) => ({ id, rows: rows.filter((r) => r.side === id) }))
+    .filter((s) => s.rows.length > 0);
+  let rowIndex = 0;
+  let frameTop = FRAME_TOP;
+  for (const side of sides) {
+    let rowY = frameTop + FRAME_HEAD_H + (side.rows[0].label ? ROW_LABEL_GAP : FRAME_PAD_TOP);
+    for (const r of side.rows) {
+      place(r, rowY, totalW, rowIndex++);
+      rowY += rowHeight(r) + ROW_GAP;
+    }
+    side.y = frameTop;
+    side.h = round(rowY - ROW_GAP + FRAME_PAD_BOTTOM - frameTop);
+    frameTop = round(side.y + side.h + FRAME_GAP);
+  }
+  const contentBottom = frameTop - FRAME_GAP;
 
   const nodes = rows.flatMap((r) => r.nodes);
   const byId = new Map(nodes.map((n) => [n.id, n]));
 
-  const nameFor = (label) => {
-    if (label === "parent") return truncateName(chain.parent_zone ?? "");
-    if (label === "keys" || label === "nsnames") return truncateName(chain.zone ?? "");
-    return "";
-  };
   const LABEL_KEY = {
-    parent: "pub.dnssec_chain_parent_label",
     keys: "pub.dnssec_chain_keys_label",
     signed: "pub.dnssec_chain_signed_label",
     signers: "pub.dnssec_chain_signers_label",
     nsnames: "pub.dnssec_chain_nsnames_label",
   };
-  const labelKeyFor = (label) => LABEL_KEY[label];
   const clusters = rows
     .filter((r) => r.label)
-    .map((r) => ({ id: r.label, labelKey: labelKeyFor(r.label), name: nameFor(r.label), x: PAD_X, y: r.nodes[0].y - 22 }));
+    .map((r) => ({ id: r.label, labelKey: LABEL_KEY[r.label], x: PAD_X, y: round(r.nodes[0].y - LABEL_BASE) }));
 
   const edges = [];
   // inkRight is the rightmost point anything is drawn at, so a self-loop or a
@@ -649,6 +717,9 @@ export function layoutChain(chain) {
     } else {
       toId = `key-${link.dnskey_key_tag}`;
     }
+    // A DS naming a key that signs nothing cannot be entered, so the record
+    // itself is at fault and not only the edge leaving it.
+    if (link.status === "key_not_signing") from.deadAnchor = true;
     const to = byId.get(toId);
     if (!to) {
       from.unmatched = true;
@@ -800,7 +871,62 @@ export function layoutChain(chain) {
 
   const width = round(inkRight + PAD_X);
   const height = contentBottom + PAD_BOTTOM;
-  return { width, height, clusters, nodes, edges };
+  // The frames span the drawing, so a self-loop or a reference bow stays inside.
+  const frameX = PAD_X - FRAME_PAD_X;
+  const frames = sides.map((side) => buildFrame(side, frameX, round(width - 2 * frameX), chain, words));
+  for (const n of nodes) n.tone = nodeTone(n);
+  return { width, height, frames, clusters, nodes, edges };
+}
+
+// The role word is drawn uppercase with tracking, so it runs wider than the estimate.
+const roleWidth = (text, px) => faceWidth(text, px) * 1.25;
+
+// parentName reads the root as the word the caller hands in, never a lone dot
+// beside a full name.
+function parentName(chain, words) {
+  const raw = String(chain.parent_zone ?? "");
+  if (raw === ".") return words.root ?? ".";
+  return raw.replace(/\.$/, "");
+}
+
+// buildFrame wraps one side of the delegation: a header strip naming the zone,
+// a border tinted by the roll-up, and on the tested side a status chip, which
+// is what carries the verdict into an exported file.
+function buildFrame(side, x, w, chain, words) {
+  const parent = side.id === "parent";
+  const roleText = (parent ? words.parent : words.zone) ?? "";
+  const rawName = parent ? parentName(chain, words) : String(chain.zone ?? "").replace(/\.$/, "");
+  const chipText = parent ? "" : words.status?.(chain.status) ?? "";
+  const baseline = round(side.y + FRAME_HEAD_H / 2 + 4);
+  const roleX = round(x + FRAME_TEXT_PAD);
+  const nameX = round(roleX + (roleText ? roleWidth(roleText, FRAME_ROLE_FONT) + FRAME_TEXT_GAP : 0));
+  let chip = null;
+  if (chipText) {
+    const cw = round(faceWidth(chipText, FRAME_CHIP_FONT) + 2 * CHIP_PAD_X);
+    const cx = round(x + w - FRAME_TEXT_PAD - cw);
+    const cy = round(side.y + (FRAME_HEAD_H - CHIP_H) / 2);
+    chip = { text: chipText, x: cx, y: cy, w: cw, h: CHIP_H, textX: round(cx + cw / 2), textY: round(cy + CHIP_H / 2 + 3.5) };
+  }
+  // The name takes what the header has left, then elides, so it never widens
+  // the drawing.
+  const room = (chip ? chip.x - FRAME_TEXT_GAP : x + w - FRAME_TEXT_PAD) - nameX;
+  return {
+    id: side.id,
+    x,
+    y: side.y,
+    w,
+    h: side.h,
+    tone: parent ? "neutral" : statusTone(chain.status),
+    headPath: headPath(x, side.y, w),
+    header: { roleText, roleX, roleY: baseline, name: clipToWidth(rawName, room, FRAME_NAME_FONT), nameX, nameY: baseline, chip },
+  };
+}
+
+// headPath rounds the strip where it meets the frame's top corners and leaves
+// it square where the rows begin.
+function headPath(x, y, w, r = 10) {
+  const right = round(x + w);
+  return `M ${x} ${round(y + r)} A ${r} ${r} 0 0 1 ${round(x + r)} ${y} H ${round(right - r)} A ${r} ${r} 0 0 1 ${right} ${round(y + r)} V ${round(y + FRAME_HEAD_H)} H ${x} Z`;
 }
 
 // signerWordKey names the face line that says what a signer node is, so an

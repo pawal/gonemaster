@@ -950,3 +950,97 @@ describe("a zone its parent proves does not exist", () => {
     expect(screen.queryByTestId("chain-undelegated")).toBeNull();
   });
 });
+
+describe("zone frames and the saved file", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn();
+  });
+
+  // Renders opened, which is when it fetches, with the props a case needs.
+  const openWith = (props) => {
+    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com", ...props } });
+    openChain(container);
+    return container;
+  };
+
+  it("draws a frame per zone, with the role word, the name and the roll-up chip", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    openWith({});
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const parent = screen.getByTestId("chain-frame-parent");
+    const zone = screen.getByTestId("chain-frame-zone");
+    expect(parent.textContent).toContain("Parent zone");
+    expect(parent.textContent).toContain("com");
+    expect(zone.textContent).toContain("Tested zone");
+    expect(zone.textContent).toContain("example.com");
+    expect(zone.textContent).toContain("Secure");
+    expect(zone.classList.contains("frame-ok")).toBe(true);
+    // The parent frame carries no chip: the roll-up is the tested zone's.
+    expect(parent.textContent).not.toContain("Secure");
+  });
+
+  it("draws the frames behind the rows they hold", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    openWith({});
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const kids = [...screen.getByTestId("chain-svg").children];
+    const lastFrame = kids.findLastIndex((el) => el.classList.contains("chain-frame"));
+    const firstNode = kids.findIndex((el) => el.classList.contains("chain-node"));
+    expect(lastFrame).toBeGreaterThan(-1);
+    expect(firstNode).toBeGreaterThan(lastFrame);
+  });
+
+  it("names the root on the parent frame and in the facts", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain({ zone: "se", parent_zone: "." })));
+    openWith({ domain: "se" });
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    expect(screen.getByTestId("chain-frame-parent").textContent).toContain("root (.)");
+    expect(screen.getByTestId("chain-facts").textContent).toContain("root (.)");
+  });
+
+  it("tones the frame of a zone the parent proves undelegated", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain({ status: "undelegated" })));
+    openWith({});
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    const zone = screen.getByTestId("chain-frame-zone");
+    expect(zone.classList.contains("frame-bad")).toBe(true);
+    expect(zone.textContent).toContain("Not delegated");
+  });
+
+  it("hands the serialized diagram and its file name to the saver", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain()));
+    const saved = [];
+    openWith({ saveSVG: (text, name) => saved.push({ text, name }) });
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    await fireEvent.click(screen.getByTestId("chain-export"));
+    expect(saved).toHaveLength(1);
+    expect(saved[0].name).toBe("example.com-dnssec-chain.svg");
+    expect(saved[0].text.startsWith("<?xml")).toBe(true);
+    expect(saved[0].text).toContain('xmlns="http://www.w3.org/2000/svg"');
+    expect(saved[0].text).toContain("chain-node");
+    // The file is the diagram at its own size, not the card's.
+    expect(saved[0].text).toContain('viewBox="0 0 368');
+  });
+
+  it("names a root test's file for the root", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain({ zone: ".", parent_zone: "." })));
+    const saved = [];
+    openWith({ domain: ".", saveSVG: (text, name) => saved.push({ text, name }) });
+    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+
+    await fireEvent.click(screen.getByTestId("chain-export"));
+    expect(saved[0].name).toBe("root-dnssec-chain.svg");
+  });
+
+  it("offers no save button where there is no diagram", async () => {
+    fetch.mockResolvedValue(jsonResponse(secureChain({ status: "unsigned" })));
+    openWith({});
+    await waitFor(() => expect(screen.getByTestId("chain-unsigned")).toBeTruthy());
+    expect(screen.queryByTestId("chain-export")).toBeNull();
+  });
+});

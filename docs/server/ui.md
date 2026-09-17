@@ -69,8 +69,11 @@ When a signed zone is tested, the result page shows a collapsed "DNSSEC chain of
 trust" section. Expanding it lazily fetches the stored chain summary and draws a
 hand-rolled SVG graph of the parent DS records, the zone's DNSKEYs, and the
 signatures linking them, with a parallel text summary for assistive tech. The
-section only appears when `show_dnssec_chain_public` is enabled and the run has
-chain data (public-UI runs only).
+graph frames each zone under a header naming it, and the tested zone's frame
+carries the roll-up status. A "Save as SVG" button saves the graph as a
+standalone file in the theme the reader is viewing. The section only appears
+when `show_dnssec_chain_public` is enabled and the run has chain data
+(public-UI runs only).
 
 The start page also shows a "Recent tests" list: tests started in the same
 browser, with the domain, the finish time, and the grade when public scoring

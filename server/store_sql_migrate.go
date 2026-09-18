@@ -626,6 +626,15 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN scoring_config_hash VARCHAR(64) NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		// The version string a domain's nameservers disclose, on the
+		// snapshot domain view so the cohort report can group movers by
+		// it. Empty when unknown or when the domain reports several.
+		version: 14,
+		stmts: []string{
+			`ALTER TABLE analysis_snapshot_domain_view ADD COLUMN software_version VARCHAR(64) NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // retiredAnalysisTags is frozen at migration 9; a later rename needs its

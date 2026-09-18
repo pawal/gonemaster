@@ -606,10 +606,13 @@ type AnalysisSnapshotDomainView struct {
 	DNSKEYAlgoWeakest *int `json:"dnskey_algo_weakest,omitempty"`
 	DNSKEYCount       *int `json:"dnskey_count,omitempty"`
 	// Denial-of-existence posture; empty before the column existed.
-	DNSSECPosture string                 `json:"dnssec_posture,omitempty"`
-	Nameservers   []DomainViewNameserver `json:"nameservers,omitempty"`
-	Addresses     []DomainViewAddress    `json:"addresses,omitempty"`
-	Tags          []DomainViewTag        `json:"tags,omitempty"`
+	DNSSECPosture string `json:"dnssec_posture,omitempty"`
+	// Version string the domain's nameservers disclose. Empty when none
+	// was seen or when the nameservers disagree.
+	SoftwareVersion string                 `json:"software_version,omitempty"`
+	Nameservers     []DomainViewNameserver `json:"nameservers,omitempty"`
+	Addresses       []DomainViewAddress    `json:"addresses,omitempty"`
+	Tags            []DomainViewTag        `json:"tags,omitempty"`
 }
 
 // DomainViewNameserver is one nameserver entry inside nameservers_json.

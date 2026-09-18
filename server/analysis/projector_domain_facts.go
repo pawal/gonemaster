@@ -18,6 +18,7 @@ const (
 	factCategoryDNSKEYAlgorithm   = serverpkg.FactCategoryDNSKEYAlgorithm
 	factCategoryIPv6Coverage      = serverpkg.FactCategoryIPv6Coverage
 	factCategoryDNSKEYAlgoWeakest = serverpkg.FactCategoryDNSKEYAlgoWeakest
+	factCategorySoftwareVersion   = serverpkg.FactCategorySoftwareVersion
 
 	factKeySigned    = serverpkg.FactKeySigned
 	factKeyUnsigned  = serverpkg.FactKeyUnsigned
@@ -52,6 +53,7 @@ func extractDomainFacts(input RunInput, endpoints []extractedEndpoint) []extract
 	out = append(out, extractDNSKEYAlgoWeakest(input)...)
 	out = append(out, extractIPv6Coverage(endpoints)...)
 	out = append(out, extractGrade(input)...)
+	out = append(out, extractSoftwareVersion(input)...)
 	return dedupeDomainFacts(out)
 }
 
@@ -121,6 +123,37 @@ func extractDNSKEYAlgoWeakest(input RunInput) []extractedDomainFact {
 		fact.valueNum = &count
 	}
 	return []extractedDomainFact{fact}
+}
+
+// softwareVersionKeyMax bounds a version-string key so one malformed
+// answer cannot widen the category's key space without limit.
+const softwareVersionKeyMax = 64
+
+// extractSoftwareVersion emits one fact per distinct version string the
+// domain's nameservers disclosed. Read from the raw entries, so the
+// snapshot tag floor does not apply.
+func extractSoftwareVersion(input RunInput) []extractedDomainFact {
+	seen := map[string]struct{}{}
+	var out []extractedDomainFact
+	for _, entry := range input.Entries {
+		if entry.Tag != "N15_SOFTWARE_VERSION" {
+			continue
+		}
+		value, _ := entry.Args["string"].(string)
+		value = strings.TrimSpace(value)
+		if value == "" {
+			continue
+		}
+		if len(value) > softwareVersionKeyMax {
+			value = value[:softwareVersionKeyMax]
+		}
+		if _, dup := seen[value]; dup {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, extractedDomainFact{category: factCategorySoftwareVersion, key: value})
+	}
+	return out
 }
 
 // extractSeverity emits exactly one fact per run carrying the worst

@@ -88,6 +88,8 @@
   "previous": "Edellinen",
   "next": "Seuraava",
   "showing_jobs": "Näytetään {shown} / {total} vastaavaa työtä (siirtymä {offset})",
+  "showing_jobs_range": "{first}-{last} / {total}",
+  "time_ago": "{age} sitten",
   "no_jobs": "Ei töitä vielä. Suorita yksittäinen työ tai erätyö yllä olevista välilehdistä.",
   "no_jobs_severity": "Mikään työ ei vastaa valittua vakavuussuodatinta.",
   "batch_prefix": "Erä:",

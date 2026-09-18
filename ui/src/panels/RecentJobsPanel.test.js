@@ -109,6 +109,35 @@ describe("RecentJobsPanel", () => {
     expect(onNavigateJob).toHaveBeenCalledWith("job_a");
   });
 
+  it("shows how long ago a job ran and hides the progress bar once it is done", async () => {
+    const finished = new Date(Date.now() - 3 * 3600 * 1000).toISOString();
+    const apiFetch = vi.fn().mockResolvedValue({
+      items: [{ id: "job_done", domain: "example.com", status: "succeeded", progress: 100, finished_at: finished, severity_totals: {} }],
+      total: 1,
+      offset: 0,
+    });
+    const { container } = render(RecentJobsPanel, { props: baseProps({ apiFetch }) });
+    expect(await screen.findByText("3h ago")).toBeInTheDocument();
+    expect(container.querySelector(".recent-progress")).toBeNull();
+  });
+
+  it("keeps the progress bar on a job still in flight", async () => {
+    const apiFetch = vi.fn().mockResolvedValue({
+      items: [{ id: "job_run", domain: "example.com", status: "running", progress: 40 }],
+      total: 1,
+      offset: 0,
+    });
+    const { container } = render(RecentJobsPanel, { props: baseProps({ apiFetch }) });
+    await screen.findByText("job_run");
+    expect(container.querySelector(".recent-progress")).not.toBeNull();
+  });
+
+  it("reports the page position against the server total", async () => {
+    const apiFetch = vi.fn().mockResolvedValue({ ...sampleJobs(), total: 26063, offset: 40 });
+    render(RecentJobsPanel, { props: baseProps({ apiFetch }) });
+    expect(await screen.findByText("41-42 of 26,063")).toBeInTheDocument();
+  });
+
   it("links a job's batch id to the batches route", async () => {
     const onNavigateBatch = vi.fn();
     const withBatch = () => ({ items: [{ id: "job_a", domain: "example.com", status: "succeeded", progress: 100, batch_id: "batch_x", severity_totals: {} }], total: 1, offset: 0 });

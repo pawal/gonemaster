@@ -353,6 +353,47 @@ func TestJobStoreGraduateMissingJobReturnsError(t *testing.T) {
 	})
 }
 
+// The /jobs list pages the runs table by the sort it was asked for, so every
+// store has to order runs the same way.
+func TestJobStoreListRunsOrdersByStartedAt(t *testing.T) {
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		base := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
+		// Reversed finishing order exposes a fallback to finished_at.
+		for i, id := range []string{"r1", "r2", "r3"} {
+			createAndGraduate(t, s, Job{
+				ID:         id,
+				Domain:     fmt.Sprintf("%s.example", id),
+				Status:     JobSucceeded,
+				CreatedAt:  base.Add(time.Duration(i) * time.Minute),
+				StartedAt:  base.Add(time.Duration(i) * time.Minute),
+				FinishedAt: base.Add(time.Duration(10-i) * time.Minute),
+			}, nil)
+		}
+
+		for _, tc := range []struct {
+			sort JobSort
+			want []string
+		}{
+			{JobSortStartedAtAsc, []string{"r1", "r2", "r3"}},
+			{JobSortStartedAtDesc, []string{"r3", "r2", "r1"}},
+		} {
+			list := s.ListRuns(RunFilter{Sort: tc.sort, Limit: 10})
+			got := make([]string, len(list.Items))
+			for i, run := range list.Items {
+				got[i] = run.ID
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("%s: got %v, want %v", tc.sort, got, tc.want)
+			}
+			for i := range tc.want {
+				if got[i] != tc.want[i] {
+					t.Fatalf("%s: got %v, want %v", tc.sort, got, tc.want)
+				}
+			}
+		}
+	})
+}
+
 func TestJobStoreListRunsByDomain(t *testing.T) {
 	forEachStore(t, func(t *testing.T, s JobStore) {
 		base := time.Now().UTC()

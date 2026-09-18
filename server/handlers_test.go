@@ -1514,3 +1514,49 @@ func TestAutoDetectedBaseURLHonoursTrustedForwardedHost(t *testing.T) {
 		t.Fatalf("robots.txt ignored the trusted proxy headers\ngot: %s", got)
 	}
 }
+
+// The list once read a fixed window of the newest runs, hiding everything
+// older and reporting the window as the total.
+func TestListJobsReachesRunsBeyondTheMergeWindow(t *testing.T) {
+	srv := newTestServer(t)
+	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
+	total := inFlightMergeCap + 25
+	for i := range total {
+		at := base.Add(time.Duration(i) * time.Second)
+		createAndGraduate(t, srv.store, Job{
+			ID:         fmt.Sprintf("job_%05d", i),
+			Domain:     fmt.Sprintf("d%05d.example", i),
+			Status:     JobSucceeded,
+			CreatedAt:  at,
+			StartedAt:  at,
+			FinishedAt: at.Add(time.Second),
+		}, nil)
+	}
+
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/jobs?limit=5&sort=started_at_asc", nil)
+	oldest := mustJSON[JobList](t, resp, http.StatusOK)
+	if oldest.Total != total {
+		t.Fatalf("total: got %d, want %d", oldest.Total, total)
+	}
+	if len(oldest.Items) != 5 || oldest.Items[0].ID != "job_00000" {
+		t.Fatalf("oldest page should start at job_00000, got %v", jobIDs(oldest.Items))
+	}
+
+	last := total - 5
+	resp = doJSON(t, srv, http.MethodGet, fmt.Sprintf("/api/v1/jobs?limit=5&sort=started_at_asc&cursor=%d", last), nil)
+	tail := mustJSON[JobList](t, resp, http.StatusOK)
+	if tail.NextCursor != "" || len(tail.Items) != 5 {
+		t.Fatalf("last page should hold the final 5 with no next cursor, got %d items next=%q", len(tail.Items), tail.NextCursor)
+	}
+	if tail.Items[4].ID != fmt.Sprintf("job_%05d", total-1) {
+		t.Fatalf("last page should end at the newest run, got %v", jobIDs(tail.Items))
+	}
+}
+
+func jobIDs(items []Job) []string {
+	ids := make([]string, len(items))
+	for i, item := range items {
+		ids[i] = item.ID
+	}
+	return ids
+}

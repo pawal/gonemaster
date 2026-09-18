@@ -88,6 +88,8 @@
   "previous": "Prejšnja",
   "next": "Naslednja",
   "showing_jobs": "Prikazano {shown} od {total} ujemajočih opravil (odmik {offset})",
+  "showing_jobs_range": "{first}-{last} od {total}",
+  "time_ago": "pred {age}",
   "no_jobs": "Še ni opravil. Zaženite posamezno ali paketno opravilo z zavihkov zgoraj.",
   "no_jobs_severity": "Nobeno opravilo ne ustreza izbranemu filtru resnosti.",
   "batch_prefix": "Serija:",

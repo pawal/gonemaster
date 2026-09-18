@@ -548,6 +548,8 @@
   "previous": "Zurück",
   "next": "Weiter",
   "showing_jobs": "{shown} von {total} passenden Jobs angezeigt (Versatz {offset})",
+  "showing_jobs_range": "{first}-{last} von {total}",
+  "time_ago": "vor {age}",
   "no_jobs": "Noch keine Jobs. Einzeljob oder Batch-Job über die obigen Tabs starten.",
   "no_jobs_severity": "Keine Jobs entsprechen dem gewählten Schweregrad-Filter.",
   "batch_prefix": "Batch:",

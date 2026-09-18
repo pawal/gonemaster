@@ -88,6 +88,8 @@
   "previous": "Forrige",
   "next": "Næste",
   "showing_jobs": "Viser {shown} af {total} matchende job (offset {offset})",
+  "showing_jobs_range": "{first}-{last} af {total}",
+  "time_ago": "for {age} siden",
   "no_jobs": "Ingen job endnu. Kør et enkelt- eller batchjob fra fanerne ovenfor.",
   "no_jobs_severity": "Ingen job matcher det valgte alvorlighedsfilter.",
   "batch_prefix": "Batch:",

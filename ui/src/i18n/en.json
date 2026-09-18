@@ -548,6 +548,8 @@
   "previous": "Previous",
   "next": "Next",
   "showing_jobs": "Showing {shown} of {total} matching jobs (offset {offset})",
+  "showing_jobs_range": "{first}-{last} of {total}",
+  "time_ago": "{age} ago",
   "no_jobs": "No jobs yet. Run a single or batch job from the tabs above.",
   "no_jobs_severity": "No jobs match the selected severity filter.",
   "batch_prefix": "Batch:",

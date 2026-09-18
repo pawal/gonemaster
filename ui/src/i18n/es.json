@@ -88,6 +88,8 @@
   "previous": "Anterior",
   "next": "Siguiente",
   "showing_jobs": "Mostrando {shown} de {total} tareas coincidentes (desplazamiento {offset})",
+  "showing_jobs_range": "{first}-{last} de {total}",
+  "time_ago": "hace {age}",
   "no_jobs": "Sin tareas todavía. Ejecute una tarea individual o por lotes desde las pestañas de arriba.",
   "no_jobs_severity": "Ninguna tarea coincide con el filtro de severidad seleccionado.",
   "batch_prefix": "Lote:",

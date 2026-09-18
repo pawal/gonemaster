@@ -88,6 +88,8 @@
   "previous": "Précédent",
   "next": "Suivant",
   "showing_jobs": "Affichage de {shown} sur {total} tâches correspondantes (décalage {offset})",
+  "showing_jobs_range": "{first}-{last} sur {total}",
+  "time_ago": "il y a {age}",
   "no_jobs": "Aucune tâche pour l'instant. Lancez une tâche unique ou en lot depuis les onglets ci-dessus.",
   "no_jobs_severity": "Aucune tâche ne correspond au filtre de sévérité sélectionné.",
   "batch_prefix": "Lot :",

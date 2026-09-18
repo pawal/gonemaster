@@ -88,6 +88,8 @@
   "previous": "前へ",
   "next": "次へ",
   "showing_jobs": "{total} 件中 {shown} 件を表示 (オフセット {offset})",
+  "showing_jobs_range": "{total} 件中 {first}-{last}",
+  "time_ago": "{age}前",
   "no_jobs": "ジョブはまだありません。上のタブからシングルまたはバッチジョブを実行してください。",
   "no_jobs_severity": "選択した深刻度フィルターに一致するジョブはありません。",
   "batch_prefix": "バッチ:",

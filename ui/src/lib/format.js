@@ -84,6 +84,17 @@ export const formatDateLocal = (value) => {
   return `${parsed.getFullYear()}-${pad2(parsed.getMonth() + 1)}-${pad2(parsed.getDate())}`;
 };
 
+// Compact age for list rows, e.g. "45s", "12m", "3h", "8d". "" when unusable.
+export const formatAgeShort = (value, now = Date.now()) => {
+  const parsed = parseTimestamp(value);
+  if (!parsed) return "";
+  const seconds = Math.max(0, Math.round((now - parsed.getTime()) / 1000));
+  if (seconds < 60) return `${seconds}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h`;
+  return `${Math.floor(seconds / 86400)}d`;
+};
+
 export const formatBatchTotalRuntime = (batch) => {
   const created = parseTimestamp(batch?.created_at);
   if (!created) return translate("value_unknown");

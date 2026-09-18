@@ -553,11 +553,21 @@ func normalizeUndelegatedInputs(nameservers []UndelegatedNameserverInput, dsInfo
 	return engine.NormalizeUndelegatedInputs(normalizedNS, normalizedDS)
 }
 
+// inFlightMergeCap bounds the in-flight jobs a /jobs page merges in. The jobs
+// table only holds unfinished work, so it never binds.
+const inFlightMergeCap = 10000
+
 func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 	filter, code, message := parseListFilter(r, 100)
 	if code != "" {
 		writeError(w, http.StatusBadRequest, code, message, nil)
 		return
+	}
+
+	offset := max(filter.Offset, 0)
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = 100
 	}
 
 	// Determine which sources to query based on the status filter.
@@ -569,41 +579,45 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 	// results yet), so skip the in-flight source when one is set.
 	hasSeverityFilter := isValidJobSeverityFilter(filter.Severity)
 
-	var allItems []Job
-
+	// In-flight jobs are few enough to merge whole. The runs table is not, so
+	// read only as far as this page reaches: in-flight work displaces at most
+	// len(inFlight) runs.
+	var inFlight []Job
 	if !isTerminalOnly && !hasSeverityFilter {
 		inFlightFilter := filter
-		inFlightFilter.Limit = 10000
+		inFlightFilter.Limit = inFlightMergeCap
 		inFlightFilter.Offset = 0
-		allItems = append(allItems, s.store.List(inFlightFilter).Items...)
+		inFlight = s.store.List(inFlightFilter).Items
 	}
 
+	allItems := make([]Job, 0, len(inFlight)+limit)
+	allItems = append(allItems, inFlight...)
+
+	runTotal := 0
 	if !isActiveOnly {
 		runFilter := RunFilter{
 			Domain:   filter.Domain,
 			BatchID:  filter.BatchID,
 			Severity: filter.Severity,
-			Limit:    10000,
+			Sort:     filter.Sort,
+			Limit:    offset + limit + len(inFlight),
 			Offset:   0,
 		}
 		if isTerminalOnly {
 			runFilter.Status = filter.Status
 		}
-		for _, run := range s.store.ListRuns(runFilter).Items {
+		runs := s.store.ListRuns(runFilter)
+		runTotal = runs.Total
+		for _, run := range runs.Items {
 			allItems = append(allItems, jobFromRun(run))
 		}
 	}
 
 	sortJobSlice(allItems, filter.Sort)
 
-	total := len(allItems)
-	offset := max(filter.Offset, 0)
-	limit := filter.Limit
-	if limit <= 0 {
-		limit = 100
-	}
-	start := min(offset, total)
-	end := min(start+limit, total)
+	total := len(inFlight) + runTotal
+	start := min(offset, len(allItems))
+	end := min(start+limit, len(allItems))
 	pageItems := make([]Job, end-start)
 	copy(pageItems, allItems[start:end])
 
@@ -614,12 +628,11 @@ func (s *Server) handleListJobs(w http.ResponseWriter, r *http.Request) {
 		Offset: offset,
 		Sort:   string(normalizeJobSort(filter.Sort)),
 	}
-	if start > 0 {
-		prevOffset := max(start-limit, 0)
-		list.PrevCursor = strconv.Itoa(prevOffset)
+	if offset > 0 {
+		list.PrevCursor = strconv.Itoa(max(offset-limit, 0))
 	}
-	if end < total {
-		list.NextCursor = strconv.Itoa(end)
+	if next := offset + len(pageItems); next < total {
+		list.NextCursor = strconv.Itoa(next)
 	}
 	writeJSON(w, http.StatusOK, list)
 }

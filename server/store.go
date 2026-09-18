@@ -1009,6 +1009,14 @@ func (s *InMemoryJobStore) GetRunByPublicID(publicID string) (Run, bool) {
 }
 
 // ListRuns returns graduated runs matching filter with sorting and pagination.
+// runStartTime mirrors SQL's COALESCE(started_at, created_at) ordering key.
+func runStartTime(r Run) time.Time {
+	if !r.StartedAt.IsZero() {
+		return r.StartedAt
+	}
+	return r.CreatedAt
+}
+
 func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 	s.mu.RLock()
 	snapshot := make([]Run, 0, len(s.runs))
@@ -1091,6 +1099,16 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 		case JobSortCreatedAtDesc:
 			if !l.CreatedAt.Equal(r.CreatedAt) {
 				return l.CreatedAt.After(r.CreatedAt)
+			}
+		case JobSortStartedAtDesc:
+			ls, rs := runStartTime(l), runStartTime(r)
+			if !ls.Equal(rs) {
+				return ls.After(rs)
+			}
+		case JobSortStartedAtAsc:
+			ls, rs := runStartTime(l), runStartTime(r)
+			if !ls.Equal(rs) {
+				return ls.Before(rs)
 			}
 		case JobSortDomainAsc:
 			if l.Domain != r.Domain {
@@ -1945,12 +1963,31 @@ func sortJobSlice(items []Job, sortOrder JobSort) {
 			if leftBatchID != rightBatchID {
 				return leftBatchID > rightBatchID
 			}
+		case JobSortErrorDesc:
+			if leftErrors, rightErrors := jobErrorCount(left), jobErrorCount(right); leftErrors != rightErrors {
+				return leftErrors > rightErrors
+			}
+			if leftCritical, rightCritical := left.SeverityTotals["CRITICAL"], right.SeverityTotals["CRITICAL"]; leftCritical != rightCritical {
+				return leftCritical > rightCritical
+			}
+		case JobSortCriticalDesc:
+			if leftCritical, rightCritical := left.SeverityTotals["CRITICAL"], right.SeverityTotals["CRITICAL"]; leftCritical != rightCritical {
+				return leftCritical > rightCritical
+			}
+			if leftErrors, rightErrors := jobErrorCount(left), jobErrorCount(right); leftErrors != rightErrors {
+				return leftErrors > rightErrors
+			}
 		}
 		if !left.CreatedAt.Equal(right.CreatedAt) {
 			return left.CreatedAt.After(right.CreatedAt)
 		}
 		return left.ID < right.ID
 	})
+}
+
+// jobErrorCount counts a graduated job's failures. In-flight jobs count zero.
+func jobErrorCount(job Job) int {
+	return job.SeverityTotals["ERROR"] + job.SeverityTotals["CRITICAL"]
 }
 
 func effectiveStartTime(job Job) time.Time {

@@ -88,6 +88,8 @@
   "previous": "Föregående",
   "next": "Nästa",
   "showing_jobs": "Visar {shown} av {total} matchande jobb (förskjutning {offset})",
+  "showing_jobs_range": "{first}-{last} av {total}",
+  "time_ago": "för {age} sedan",
   "no_jobs": "Inga jobb ännu. Kör ett enkelt jobb eller batchjobb från flikarna ovan.",
   "no_jobs_severity": "Inga jobb matchar det valda allvarlighetsfiltret.",
   "batch_prefix": "Batch:",

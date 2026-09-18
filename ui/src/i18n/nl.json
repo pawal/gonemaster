@@ -548,6 +548,8 @@
   "previous": "Vorige",
   "next": "Volgende",
   "showing_jobs": "{shown} van {total} overeenkomende taken weergegeven (offset {offset})",
+  "showing_jobs_range": "{first}-{last} van {total}",
+  "time_ago": "{age} geleden",
   "no_jobs": "Nog geen taken. Start een losse taak of een batchtaak via de tabbladen hierboven.",
   "no_jobs_severity": "Geen taken voldoen aan het geselecteerde ernstfilter.",
   "batch_prefix": "Batch:",

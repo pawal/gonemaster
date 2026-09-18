@@ -7,6 +7,7 @@ import {
   formatRate,
   formatUptime,
   parseTimestamp,
+  formatAgeShort,
   formatTimestampLocal,
   formatDateLocal,
   formatBatchTotalRuntime,
@@ -108,6 +109,26 @@ describe("parseTimestamp", () => {
     const d = parseTimestamp("2026-01-02T03:04:05Z");
     expect(d).not.toBeNull();
     expect(d.toISOString()).toBe("2026-01-02T03:04:05.000Z");
+  });
+});
+
+describe("formatAgeShort", () => {
+  const now = Date.parse("2026-01-02T12:00:00Z");
+
+  it("returns an empty string without a usable timestamp", () => {
+    expect(formatAgeShort("", now)).toBe("");
+    expect(formatAgeShort("garbage", now)).toBe("");
+  });
+
+  it("steps through seconds, minutes, hours and days", () => {
+    expect(formatAgeShort("2026-01-02T11:59:15Z", now)).toBe("45s");
+    expect(formatAgeShort("2026-01-02T11:48:00Z", now)).toBe("12m");
+    expect(formatAgeShort("2026-01-02T09:00:00Z", now)).toBe("3h");
+    expect(formatAgeShort("2025-12-25T12:00:00Z", now)).toBe("8d");
+  });
+
+  it("does not run backwards for a timestamp in the future", () => {
+    expect(formatAgeShort("2026-01-02T12:00:30Z", now)).toBe("0s");
   });
 });
 

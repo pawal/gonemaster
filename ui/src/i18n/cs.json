@@ -548,6 +548,8 @@
   "previous": "Předchozí",
   "next": "Další",
   "showing_jobs": "Zobrazeno {shown} z {total} odpovídajících úloh (offset {offset})",
+  "showing_jobs_range": "{first}-{last} z {total}",
+  "time_ago": "před {age}",
   "no_jobs": "Zatím žádné úlohy. Spusťte jednotlivý nebo dávkový test ze záložek výše.",
   "no_jobs_severity": "Žádné úlohy neodpovídají vybranému filtru závažnosti.",
   "batch_prefix": "Dávka:",

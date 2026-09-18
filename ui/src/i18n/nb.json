@@ -88,6 +88,8 @@
   "previous": "Forrige",
   "next": "Neste",
   "showing_jobs": "Viser {shown} av {total} samsvarende jobber (forskyvning {offset})",
+  "showing_jobs_range": "{first}-{last} av {total}",
+  "time_ago": "for {age} siden",
   "no_jobs": "Ingen jobber ennå. Kjør en enkelt- eller batchjobb fra fanene ovenfor.",
   "no_jobs_severity": "Ingen jobber samsvarer med valgt alvorlighetsfilter.",
   "batch_prefix": "Batch:",

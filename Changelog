@@ -6,6 +6,8 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
+- server: record the tag vocabulary and scoring configuration identity of a cohort snapshot at capture, and backfill the vocabulary from retained runs
+
 ### Changed
 
 - admin-ui: the recent tests list leads with the domain and dates each row

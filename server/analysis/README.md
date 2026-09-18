@@ -164,6 +164,33 @@ collapsing runs to "latest per domain" on every request.
   `is_public = false` so a broken batch does not leak into the public
   path. Admins see a banner in the cohort panel.
 
+### Capture provenance
+
+Three columns on `analysis_cohort_snapshots` record the measurement regime
+the snapshot's runs were produced under, so a later comparison can tell an
+engine change from a cohort change:
+
+| Column | Source | Unknown value |
+|--------|--------|---------------|
+| `engine_version`, `mixed_engine_version` | the runs' `GLOBAL_VERSION` entries | `''` |
+| `vocabulary_json` | the sample run's `effective_profile.test_levels`, marshalled with sorted keys | `''` |
+| `scoring_config_hash` | SHA-256 of the `scoring_config` setting, or `default` when unset | `''` |
+
+Rules:
+
+- Provenance MUST be read from the run, never from the running build. An
+  unreadable value stays empty; an empty value means unknown, not default.
+- `scoring_config_hash` covers the database setting only. A scoring
+  configuration supplied by CLI flag or config file reads as `default`.
+- `BackfillSnapshotEngineVersions` and `BackfillSnapshotVocabularies` run at
+  startup from `RepairAllCohorts`. Both are idempotent and skip a snapshot
+  that already carries the value. A snapshot whose runs were purged stays
+  unknown.
+- `scoring_config_hash` is not backfillable: what was in force at capture is
+  not recoverable afterwards.
+- Rematerialize MUST NOT rewrite these columns. They are capture provenance,
+  not a derived view.
+
 ### First-boot backfill (Phase 7)
 
 On the first server start after the snapshot model ships the runtime

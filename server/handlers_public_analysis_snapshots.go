@@ -25,6 +25,13 @@ type PublicAnalysisSnapshotListEntry struct {
 	// Empty engine_version means provenance could not be recovered.
 	EngineVersion      string `json:"engine_version,omitempty"`
 	MixedEngineVersion bool   `json:"mixed_engine_version,omitempty"`
+	// VocabularyAvailable reports whether the tag vocabulary in force at
+	// capture is known. False means a comparison cannot tell an engine
+	// change from a cohort change on this side.
+	VocabularyAvailable bool `json:"vocabulary_available"`
+	// ScoringConfigHash identifies the scoring configuration at capture;
+	// "default" means no stored override, empty means unknown.
+	ScoringConfigHash string `json:"scoring_config_hash,omitempty"`
 }
 
 // PublicAnalysisSnapshotListResponse envelopes the list + cohort anchor.
@@ -37,20 +44,22 @@ type PublicAnalysisSnapshotListResponse struct {
 // PublicAnalysisSnapshotDetail is the /snapshots/{slug} response shape:
 // metadata plus the captured aggregates the trends/diff views consume.
 type PublicAnalysisSnapshotDetail struct {
-	DatasetTag         string                     `json:"dataset_tag"`
-	Slug               string                     `json:"slug"`
-	Label              string                     `json:"label,omitempty"`
-	Description        string                     `json:"description,omitempty"`
-	CapturedAt         time.Time                  `json:"captured_at"`
-	FirstRunAt         time.Time                  `json:"first_run_at"`
-	LastRunAt          time.Time                  `json:"last_run_at"`
-	RunCount           int                        `json:"run_count"`
-	DomainCount        int                        `json:"domain_count"`
-	ProfileName        string                     `json:"profile_name,omitempty"`
-	EngineVersion      string                     `json:"engine_version,omitempty"`
-	MixedEngineVersion bool                       `json:"mixed_engine_version,omitempty"`
-	IsDefault          bool                       `json:"is_default"`
-	Aggregates         map[string]json.RawMessage `json:"aggregates,omitempty"`
+	DatasetTag          string                     `json:"dataset_tag"`
+	Slug                string                     `json:"slug"`
+	Label               string                     `json:"label,omitempty"`
+	Description         string                     `json:"description,omitempty"`
+	CapturedAt          time.Time                  `json:"captured_at"`
+	FirstRunAt          time.Time                  `json:"first_run_at"`
+	LastRunAt           time.Time                  `json:"last_run_at"`
+	RunCount            int                        `json:"run_count"`
+	DomainCount         int                        `json:"domain_count"`
+	ProfileName         string                     `json:"profile_name,omitempty"`
+	EngineVersion       string                     `json:"engine_version,omitempty"`
+	MixedEngineVersion  bool                       `json:"mixed_engine_version,omitempty"`
+	VocabularyAvailable bool                       `json:"vocabulary_available"`
+	ScoringConfigHash   string                     `json:"scoring_config_hash,omitempty"`
+	IsDefault           bool                       `json:"is_default"`
+	Aggregates          map[string]json.RawMessage `json:"aggregates,omitempty"`
 }
 
 // PublicAnalysisTrendPoint is one (snapshot, payload) pair in a trend series.
@@ -183,19 +192,21 @@ func (s *Server) handlePublicAnalysisSnapshots(w http.ResponseWriter, r *http.Re
 			continue
 		}
 		entries = append(entries, PublicAnalysisSnapshotListEntry{
-			Slug:               snap.Slug,
-			Label:              snap.Label,
-			Description:        snap.Description,
-			CapturedAt:         snap.CapturedAt,
-			FirstRunAt:         snap.FirstRunAt,
-			LastRunAt:          snap.LastRunAt,
-			RunCount:           snap.RunCount,
-			DomainCount:        snap.DomainCount,
-			ProfileName:        snap.ProfileName,
-			IsDefault:          snap.ID == defaultID,
-			TagViewMinLevel:    snap.TagViewMinLevel,
-			EngineVersion:      snap.EngineVersion,
-			MixedEngineVersion: snap.MixedEngineVersion,
+			Slug:                snap.Slug,
+			Label:               snap.Label,
+			Description:         snap.Description,
+			CapturedAt:          snap.CapturedAt,
+			FirstRunAt:          snap.FirstRunAt,
+			LastRunAt:           snap.LastRunAt,
+			RunCount:            snap.RunCount,
+			DomainCount:         snap.DomainCount,
+			ProfileName:         snap.ProfileName,
+			IsDefault:           snap.ID == defaultID,
+			TagViewMinLevel:     snap.TagViewMinLevel,
+			EngineVersion:       snap.EngineVersion,
+			MixedEngineVersion:  snap.MixedEngineVersion,
+			VocabularyAvailable: snap.Vocabulary != "",
+			ScoringConfigHash:   snap.ScoringConfigHash,
 		})
 	}
 	w.Header().Set("Cache-Control", "public, max-age=60")
@@ -239,20 +250,22 @@ func (s *Server) handlePublicAnalysisSnapshotDetail(w http.ResponseWriter, r *ht
 	}
 	def, _ := readStore.GetDefaultSnapshotForCohort(cohort.ID)
 	resp := PublicAnalysisSnapshotDetail{
-		DatasetTag:         cohort.SourceTag,
-		Slug:               snap.Slug,
-		Label:              snap.Label,
-		Description:        snap.Description,
-		CapturedAt:         snap.CapturedAt,
-		FirstRunAt:         snap.FirstRunAt,
-		LastRunAt:          snap.LastRunAt,
-		RunCount:           snap.RunCount,
-		DomainCount:        snap.DomainCount,
-		ProfileName:        snap.ProfileName,
-		EngineVersion:      snap.EngineVersion,
-		MixedEngineVersion: snap.MixedEngineVersion,
-		IsDefault:          snap.ID == def.ID,
-		Aggregates:         aggregates,
+		DatasetTag:          cohort.SourceTag,
+		Slug:                snap.Slug,
+		Label:               snap.Label,
+		Description:         snap.Description,
+		CapturedAt:          snap.CapturedAt,
+		FirstRunAt:          snap.FirstRunAt,
+		LastRunAt:           snap.LastRunAt,
+		RunCount:            snap.RunCount,
+		DomainCount:         snap.DomainCount,
+		ProfileName:         snap.ProfileName,
+		EngineVersion:       snap.EngineVersion,
+		MixedEngineVersion:  snap.MixedEngineVersion,
+		VocabularyAvailable: snap.Vocabulary != "",
+		ScoringConfigHash:   snap.ScoringConfigHash,
+		IsDefault:           snap.ID == def.ID,
+		Aggregates:          aggregates,
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

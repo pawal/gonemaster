@@ -616,6 +616,16 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_snapshot_domain_view ADD COLUMN dnssec_posture VARCHAR(16) NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		// Snapshot provenance: the tag vocabulary the runs were levelled
+		// against, and the identity of the scoring configuration in force.
+		// Without them a score move cannot be told from a measurement move.
+		version: 13,
+		stmts: []string{
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN vocabulary_json TEXT NOT NULL DEFAULT ''`,
+			`ALTER TABLE analysis_cohort_snapshots ADD COLUMN scoring_config_hash VARCHAR(64) NOT NULL DEFAULT ''`,
+		},
+	},
 }
 
 // retiredAnalysisTags is frozen at migration 9; a later rename needs its

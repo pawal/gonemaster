@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 )
@@ -274,6 +275,52 @@ func TestPublicAnalysisOverviewSlugInPath(t *testing.T) {
 		payload = mustJSON[PublicAnalysisOverviewResponse](t, resp, http.StatusOK)
 		if payload.Snapshot == nil || payload.Snapshot.Slug != older.Slug {
 			t.Fatalf("older slug: got %+v, want %q", payload.Snapshot, older.Slug)
+		}
+	})
+}
+
+// The public API reports whether the vocabulary is known, never the
+// vocabulary itself, so a reader can tell a classifiable pair from one the
+// report can only mark unknown.
+func TestPublicAnalysisSnapshotReportsProvenanceAvailability(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		listPath := "/pub/api/v1/analysis/cohorts/tld/snapshots"
+		detailPath := listPath + "/" + f.snapshot.Slug
+
+		list := mustJSON[PublicAnalysisSnapshotListResponse](t, getPublic(t, f.srv, listPath), http.StatusOK)
+		if len(list.Snapshots) != 1 {
+			t.Fatalf("expected 1 public snapshot, got %d", len(list.Snapshots))
+		}
+		if list.Snapshots[0].VocabularyAvailable {
+			t.Fatal("an unstamped snapshot must report vocabulary_available false")
+		}
+		detail := mustJSON[PublicAnalysisSnapshotDetail](t, getPublic(t, f.srv, detailPath), http.StatusOK)
+		if detail.VocabularyAvailable || detail.ScoringConfigHash != "" {
+			t.Fatalf("unstamped detail: available=%v hash=%q", detail.VocabularyAvailable, detail.ScoringConfigHash)
+		}
+
+		stamped := f.snapshot
+		stamped.Vocabulary = `{"ZONE":{"Z15_NO_CAA":"NOTICE"}}`
+		stamped.ScoringConfigHash = "default"
+		if _, err := f.store.UpsertAnalysisCohortSnapshot(stamped); err != nil {
+			t.Fatalf("stamp provenance: %v", err)
+		}
+
+		list = mustJSON[PublicAnalysisSnapshotListResponse](t, getPublic(t, f.srv, listPath), http.StatusOK)
+		if !list.Snapshots[0].VocabularyAvailable {
+			t.Fatal("a stamped snapshot must report vocabulary_available true")
+		}
+		if list.Snapshots[0].ScoringConfigHash != "default" {
+			t.Fatalf("list scoring_config_hash = %q, want default", list.Snapshots[0].ScoringConfigHash)
+		}
+		detail = mustJSON[PublicAnalysisSnapshotDetail](t, getPublic(t, f.srv, detailPath), http.StatusOK)
+		if !detail.VocabularyAvailable || detail.ScoringConfigHash != "default" {
+			t.Fatalf("stamped detail: available=%v hash=%q", detail.VocabularyAvailable, detail.ScoringConfigHash)
+		}
+
+		// The blob itself stays server side.
+		if strings.Contains(getPublic(t, f.srv, detailPath).Body.String(), "Z15_NO_CAA") {
+			t.Fatal("the vocabulary blob must not reach the public response")
 		}
 	})
 }

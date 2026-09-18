@@ -196,6 +196,8 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 		snap.ProfileName = existing.ProfileName
 		snap.EngineVersion = existing.EngineVersion
 		snap.MixedEngineVersion = existing.MixedEngineVersion
+		snap.Vocabulary = existing.Vocabulary
+		snap.ScoringConfigHash = existing.ScoringConfigHash
 		snap.CapturedAt = existing.CapturedAt
 		snap.Status = existing.Status
 		snap.IsDefault = existing.IsDefault
@@ -208,6 +210,8 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 		snap.ProfileID = cloneInt64Ptr(sampleRun.ProfileID)
 		snap.ProfileName = sampleRun.ProfileName
 		snap.EngineVersion = sample.engineVersion
+		snap.Vocabulary = runVocabulary(sampleRun)
+		snap.ScoringConfigHash = c.scoringConfigIdentity()
 	}
 	snap.TagViewMinLevel = c.resolveTagViewMinLevel(cohort.TagViewMinLevel)
 
@@ -227,6 +231,14 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 	// An unknown version can still be learned from a later run in the batch.
 	if snap.EngineVersion == "" {
 		snap.EngineVersion = sample.engineVersion
+	}
+	// So can an unreadable vocabulary; mixed-profile batches fail capture,
+	// so any run of the batch is representative.
+	if snap.Vocabulary == "" {
+		snap.Vocabulary = runVocabulary(sampleRun)
+	}
+	if snap.ScoringConfigHash == "" {
+		snap.ScoringConfigHash = c.scoringConfigIdentity()
 	}
 
 	if _, err := c.store.UpsertAnalysisCohortSnapshot(snap); err != nil {
@@ -317,6 +329,9 @@ func (c *Controller) RepairAllCohorts(ctx context.Context) error {
 	// Snapshots captured before provenance was recorded still have their
 	// runs, so stamp them before any rebuild decision.
 	if err := c.BackfillSnapshotEngineVersions(ctx); err != nil {
+		return err
+	}
+	if err := c.BackfillSnapshotVocabularies(ctx); err != nil {
 		return err
 	}
 	for _, cohort := range c.store.ListAnalysisCohorts() {

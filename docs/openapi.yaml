@@ -3482,6 +3482,12 @@ components:
         mixed_engine_version:
           type: boolean
           description: Batch spanned an engine upgrade, so its numbers mix two measurement regimes.
+        scoring_config_hash:
+          type: string
+          description: >-
+            Identity of the scoring configuration in force at capture. "default"
+            means no stored override. Absent means unknown and not recoverable,
+            so a score change cannot be fully attributed.
         captured_at:
           type: string
           format: date-time
@@ -3545,7 +3551,7 @@ components:
 
     PublicAnalysisSnapshotListEntry:
       type: object
-      required: [slug, captured_at, run_count, domain_count]
+      required: [slug, captured_at, run_count, domain_count, vocabulary_available]
       properties:
         slug:
           type: string
@@ -3576,6 +3582,17 @@ components:
         mixed_engine_version:
           type: boolean
           description: Batch spanned an engine upgrade, so its numbers mix two measurement regimes.
+        vocabulary_available:
+          type: boolean
+          description: >-
+            The tag vocabulary in force at capture is known. False means a
+            comparison against another snapshot cannot tell an engine change
+            from a cohort change on this side.
+        scoring_config_hash:
+          type: string
+          description: >-
+            Identity of the scoring configuration in force at capture. "default"
+            means no stored override. Absent means unknown.
         is_default:
           type: boolean
 

@@ -353,3 +353,97 @@ func TestDiffNilOverride(t *testing.T) {
 		t.Fatalf("expected no properties, got %+v", result.Properties)
 	}
 }
+
+// vocabulary builds a profile carrying only a test_levels table.
+func vocabulary(levels map[string]map[string]string) *Profile {
+	p := New()
+	p.TestLevels = levels
+	return p
+}
+
+func TestDiffTestLevels(t *testing.T) {
+	june := vocabulary(map[string]map[string]string{
+		"DNSSEC": {"DS02_NO_MATCHING_DNSKEY_RRSIG": "WARNING"},
+		"ZONE":   {"Z01_SOA_OK": "INFO"},
+	})
+	september := vocabulary(map[string]map[string]string{
+		"DNSSEC": {"DS02_NO_MATCHING_DNSKEY_RRSIG": "ERROR"},
+		"ZONE":   {"Z15_NO_CAA": "NOTICE"},
+	})
+
+	t.Run("added", func(t *testing.T) {
+		diff := DiffTestLevels(june, september)
+		if len(diff.Added) != 1 {
+			t.Fatalf("added: got %d, want 1: %+v", len(diff.Added), diff.Added)
+		}
+		want := TestLevelEntry{Module: "ZONE", Tag: "Z15_NO_CAA", Level: "NOTICE"}
+		if diff.Added[0] != want {
+			t.Fatalf("added: got %+v, want %+v", diff.Added[0], want)
+		}
+	})
+
+	t.Run("removed", func(t *testing.T) {
+		diff := DiffTestLevels(june, september)
+		if len(diff.Removed) != 1 {
+			t.Fatalf("removed: got %d, want 1: %+v", len(diff.Removed), diff.Removed)
+		}
+		want := TestLevelEntry{Module: "ZONE", Tag: "Z01_SOA_OK", Level: "INFO"}
+		if diff.Removed[0] != want {
+			t.Fatalf("removed: got %+v, want %+v", diff.Removed[0], want)
+		}
+	})
+
+	t.Run("level changed", func(t *testing.T) {
+		diff := DiffTestLevels(june, september)
+		if len(diff.LevelChanged) != 1 {
+			t.Fatalf("level changed: got %d, want 1: %+v", len(diff.LevelChanged), diff.LevelChanged)
+		}
+		want := TestLevelChange{
+			Module: "DNSSEC", Tag: "DS02_NO_MATCHING_DNSKEY_RRSIG", From: "WARNING", To: "ERROR",
+		}
+		if diff.LevelChanged[0] != want {
+			t.Fatalf("level changed: got %+v, want %+v", diff.LevelChanged[0], want)
+		}
+	})
+
+	t.Run("identical vocabularies", func(t *testing.T) {
+		diff := DiffTestLevels(june, june)
+		if !diff.Empty() {
+			t.Fatalf("expected an empty diff, got %+v", diff)
+		}
+	})
+}
+
+func TestDiffTestLevelsWholeModules(t *testing.T) {
+	a := vocabulary(map[string]map[string]string{
+		"BASIC": {"B01_CHILD_FOUND": "INFO"},
+	})
+	b := vocabulary(map[string]map[string]string{
+		"BASIC":        {"B01_CHILD_FOUND": "info"},
+		"CONNECTIVITY": {"CN05_NO_RESPONSE": "ERROR", "CN05_OK": "INFO"},
+	})
+	diff := DiffTestLevels(a, b)
+	if len(diff.Added) != 2 || len(diff.Removed) != 0 {
+		t.Fatalf("got %+v", diff)
+	}
+	if diff.Added[0].Tag != "CN05_NO_RESPONSE" || diff.Added[1].Tag != "CN05_OK" {
+		t.Fatalf("expected the added tags sorted: %+v", diff.Added)
+	}
+	// Level case is not a change.
+	if len(diff.LevelChanged) != 0 {
+		t.Fatalf("level changed: got %+v, want none", diff.LevelChanged)
+	}
+}
+
+func TestDiffTestLevelsNilProfile(t *testing.T) {
+	only := vocabulary(map[string]map[string]string{"ZONE": {"Z01_SOA_OK": "INFO"}})
+	if diff := DiffTestLevels(nil, only); len(diff.Added) != 1 || len(diff.Removed) != 0 {
+		t.Fatalf("nil from: got %+v", diff)
+	}
+	if diff := DiffTestLevels(only, nil); len(diff.Removed) != 1 || len(diff.Added) != 0 {
+		t.Fatalf("nil to: got %+v", diff)
+	}
+	if !DiffTestLevels(nil, nil).Empty() {
+		t.Fatal("expected two nil profiles to produce an empty diff")
+	}
+}

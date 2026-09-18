@@ -14,8 +14,10 @@ and an MCP bridge for AI agents.
 Try it without installing anything: a public instance runs at
 [gonemaster.evilbit.de](https://gonemaster.evilbit.de/).
 
+**Development happens on Codeberg at https://codeberg.org/pawal/gonemaster. The GitHub repository is a read-only mirror; open issues and pull requests on Codeberg.**
+
 New to the project?
-[Why gonemaster](https://pawal.codeberg.page/gonemaster/why/) covers what it is,
+**[Why gonemaster](https://pawal.codeberg.page/gonemaster/why/)** covers what it is,
 how it compares with Zonemaster, and when to use something else.
 
 ## What gonemaster Tests

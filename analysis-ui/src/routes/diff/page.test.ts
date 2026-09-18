@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
 import { load, type DiffPageData } from "./+page";
 import { previousSlug } from "$lib/diff";
-import type { DiffResponse, TagDiffResponse } from "$lib/api";
+import type { DiffResponse, ReportResponse, TagDiffResponse } from "$lib/api";
 
 // A mutable URL holder so each render can set the active ?tab= before mounting.
 const h = vi.hoisted(() => ({
@@ -59,6 +59,7 @@ function pageData(overrides: Partial<DiffPageData> = {}): DiffPageData {
     fromDefaulted: false,
     diff: sampleDiff,
     tagDiff: null,
+    report: null,
     error: null,
     ...overrides
   };
@@ -249,5 +250,190 @@ describe("diff engine provenance", () => {
   it("renders without a banner when the server sent no provenance at all", () => {
     const { container } = render(DiffPage, { data: pageData() });
     expect(container.querySelector(".engine-banner")).toBeNull();
+  });
+});
+
+const sampleReport: ReportResponse = {
+  dataset_tag: "tld",
+  from_slug: "s1",
+  to_slug: "s2",
+  min_cluster: 3,
+  max_spread: 3,
+  header: {
+    from: { slug: "s1", captured_at: "s1", engine_version: "v1.6.3", profile_name: "default", domain_count: 3 },
+    to: { slug: "s2", captured_at: "s2", engine_version: "v1.6.6", profile_name: "default", domain_count: 3 },
+    engine: { from_engine_version: "v1.6.3", to_engine_version: "v1.6.6", crossed_engine_versions: true },
+    vocabulary: {
+      from_available: true,
+      to_available: true,
+      from_tag_count: 614,
+      to_tag_count: 686,
+      added: [{ tag: "Z15_NO_CAA", module: "ZONE", level: "NOTICE" }],
+      removed: [],
+      level_changed: []
+    },
+    scoring_config_changed: "false",
+    tag_floor: "NOTICE"
+  },
+  totals: {
+    from_domain_count: 3,
+    to_domain_count: 3,
+    both_domain_count: 3,
+    added: 0,
+    removed: 0,
+    identical_score: 1,
+    improved: 0,
+    regressed: 2,
+    from_mean_score: 95,
+    to_mean_score: 88,
+    domain_categories: { real: 1, measurement: 1 }
+  },
+  tags: {
+    appeared: [
+      {
+        tag: "Z15_NO_CAA",
+        module: "ZONE",
+        to_level: "NOTICE",
+        from_domain_count: 0,
+        to_domain_count: 2,
+        domain_delta: 2,
+        classification: "new_in_engine"
+      },
+      {
+        tag: "NS_FEW",
+        module: "DELEGATION",
+        to_level: "WARNING",
+        from_domain_count: 0,
+        to_domain_count: 8,
+        domain_delta: 8,
+        classification: "cohort_change"
+      }
+    ],
+    cleared: [],
+    level_changed: []
+  },
+  domains: [
+    {
+      domain: "reg.se",
+      from_score: 90,
+      to_score: 70,
+      score_delta: -20,
+      from_grade: "B",
+      to_grade: "D",
+      grade_changed: true,
+      category: "real",
+      explained_delta: -20,
+      unexplained_delta: 0,
+      appeared: [
+        { tag: "NS_FEW", module: "DELEGATION", to_level: "WARNING", classification: "cohort_change" }
+      ],
+      cleared: [],
+      level_changed: []
+    },
+    {
+      domain: "calm.se",
+      from_score: 100,
+      to_score: 99,
+      score_delta: -1,
+      from_grade: "A",
+      to_grade: "A",
+      grade_changed: false,
+      category: "measurement",
+      explained_delta: -1,
+      unexplained_delta: 0,
+      appeared: [
+        { tag: "Z15_NO_CAA", module: "ZONE", to_level: "NOTICE", classification: "new_in_engine" }
+      ],
+      cleared: [],
+      level_changed: []
+    }
+  ],
+  clusters: [
+    {
+      dimensions: [{ dimension: "nameserver", value: "ns1.example", total_domains: 41 }],
+      domains: ["a.se", "b.se", "c.se"],
+      size: 3,
+      min_delta: 8,
+      max_delta: 9,
+      direction: "improved"
+    }
+  ]
+};
+
+// The report turns the diff page from "what moved" into "what moved and
+// why", so the provenance, the causes and the clusters are load-bearing.
+describe("diff report", () => {
+  const renderReport = (overrides: Partial<DiffPageData> = {}, search = "") => {
+    h.url = new URL(`http://localhost/analysis/diff?from=s1&to=s2${search}`);
+    return render(DiffPage, { data: pageData({ report: sampleReport, ...overrides }) });
+  };
+
+  it("states both engine versions and the vocabulary move", () => {
+    const { container } = renderReport();
+    const banner = container.querySelector(".provenance");
+    expect(banner).not.toBeNull();
+    expect(banner?.textContent).toContain("v1.6.3");
+    expect(banner?.textContent).toContain("v1.6.6");
+    expect(banner?.textContent).toContain("614");
+    expect(banner?.textContent).toContain("686");
+    expect(banner?.textContent).toContain("Scoring configuration unchanged");
+  });
+
+  it("warns when the vocabulary is unknown on one side", () => {
+    const { container } = renderReport({
+      report: {
+        ...sampleReport,
+        header: {
+          ...sampleReport.header,
+          vocabulary: { ...sampleReport.header.vocabulary, from_available: false },
+          scoring_config_changed: "unknown"
+        }
+      }
+    });
+    const banner = container.querySelector(".provenance");
+    expect(banner?.textContent).toContain("tag vocabulary is unknown");
+    expect(banner?.textContent).toContain("provenance is unknown");
+  });
+
+  it("counts the movers by cause and lists the clusters", () => {
+    renderReport();
+    const card = within(screen.getByLabelText("Report"));
+    expect(card.getByText("Real").closest(".stat")?.textContent).toContain("1");
+    expect(card.getByText("Measurement").closest(".stat")?.textContent).toContain("1");
+    expect(card.getByText("ns1.example")).toBeInTheDocument();
+    expect(card.getByText("3 of 41")).toBeInTheDocument();
+    expect(card.getByText("+8 to +9")).toBeInTheDocument();
+  });
+
+  it("offers a Markdown export of the report", () => {
+    renderReport();
+    const card = within(screen.getByLabelText("Report"));
+    expect(card.getByRole("button", { name: "Export Markdown" })).toBeInTheDocument();
+  });
+
+  it("shows movers with their delta, explained delta and cause", () => {
+    renderReport();
+    const movers = within(screen.getByLabelText("Movers"));
+    expect(movers.getByRole("link", { name: "reg.se" })).toBeInTheDocument();
+    expect(movers.getByText("90 → 70")).toBeInTheDocument();
+    expect(movers.getAllByText("-20").length).toBe(2);
+    const causes = screen.getByLabelText("Movers").querySelectorAll("td .cause");
+    expect([...causes].map((c) => c.textContent?.trim())).toEqual(["Real", "Measurement"]);
+  });
+
+  it("filters the movers by cause from the URL", () => {
+    renderReport({}, "&cause=measurement");
+    const movers = within(screen.getByLabelText("Movers"));
+    expect(movers.getByRole("link", { name: "calm.se" })).toBeInTheDocument();
+    expect(movers.queryByRole("link", { name: "reg.se" })).toBeNull();
+  });
+
+  it("puts engine-driven tag rows behind a disclosure and leads with cohort changes", () => {
+    renderReport();
+    const section = within(screen.getByLabelText("Tag changes"));
+    expect(section.getByRole("link", { name: "NS_FEW" })).toBeInTheDocument();
+    const disclosure = section.getByText("1 explained by the engine's tag vocabulary");
+    expect(disclosure.closest("details")).not.toBeNull();
+    expect(section.getByRole("link", { name: "Z15_NO_CAA" })).toBeInTheDocument();
   });
 });

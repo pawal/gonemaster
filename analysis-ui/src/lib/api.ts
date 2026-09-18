@@ -397,6 +397,8 @@ export type SnapshotListEntry = {
   tag_view_min_level?: string;
   engine_version?: string;
   mixed_engine_version?: boolean;
+  vocabulary_available?: boolean;
+  scoring_config_hash?: string;
 };
 
 export type SnapshotListResponse = {
@@ -498,6 +500,143 @@ export type TagDiffResponse = {
   appeared: TagDiffEntry[];
   cleared: TagDiffEntry[];
   level_changed: TagDiffEntry[];
+};
+
+// Whether the engine's tag vocabulary moved with a finding, the cohort
+// moved, or the vocabulary could not be read.
+export type ChangeClassification =
+  | "new_in_engine"
+  | "removed_from_engine"
+  | "level_reclassified"
+  | "cohort_change"
+  | "unknown";
+
+// Why a domain moved: the cohort changed, the engine changed, both, or a
+// cause the report cannot attribute.
+export type DomainCategory = "real" | "measurement" | "mixed" | "unknown";
+
+export type VocabularyEntry = {
+  tag: string;
+  module?: string;
+  level?: string;
+};
+
+export type VocabularyChange = {
+  tag: string;
+  module?: string;
+  from_level: string;
+  to_level: string;
+};
+
+export type VocabularyDelta = {
+  from_available: boolean;
+  to_available: boolean;
+  from_tag_count: number;
+  to_tag_count: number;
+  added: VocabularyEntry[];
+  removed: VocabularyEntry[];
+  level_changed: VocabularyChange[];
+};
+
+export type ReportSide = {
+  slug: string;
+  label?: string;
+  captured_at: string;
+  engine_version?: string;
+  mixed_engine_version?: boolean;
+  profile_name?: string;
+  scoring_config_hash?: string;
+  tag_view_min_level?: string;
+  domain_count: number;
+};
+
+export type ReportHeader = {
+  from: ReportSide;
+  to: ReportSide;
+  engine: EngineDelta;
+  vocabulary: VocabularyDelta;
+  scoring_config_changed: "true" | "false" | "unknown";
+  tag_floor?: string;
+};
+
+export type ReportTotals = {
+  from_domain_count: number;
+  to_domain_count: number;
+  both_domain_count: number;
+  added: number;
+  removed: number;
+  identical_score: number;
+  improved: number;
+  regressed: number;
+  from_mean_score?: number;
+  to_mean_score?: number;
+  from_grades?: Record<string, number>;
+  to_grades?: Record<string, number>;
+  domain_categories?: Record<string, number>;
+};
+
+export type ReportTagEntry = TagDiffEntry & {
+  classification: ChangeClassification;
+};
+
+export type ReportTags = {
+  appeared: ReportTagEntry[];
+  cleared: ReportTagEntry[];
+  level_changed: ReportTagEntry[];
+};
+
+export type ReportTagChange = {
+  tag: string;
+  module?: string;
+  testcase?: string;
+  from_level?: string;
+  to_level?: string;
+  classification: ChangeClassification;
+};
+
+export type ReportDomain = {
+  domain: string;
+  from_score?: number;
+  to_score?: number;
+  score_delta?: number;
+  from_grade?: string;
+  to_grade?: string;
+  grade_changed: boolean;
+  category: DomainCategory;
+  explained_delta: number;
+  unexplained_delta: number;
+  appeared: ReportTagChange[];
+  cleared: ReportTagChange[];
+  level_changed: ReportTagChange[];
+};
+
+export type ReportClusterDimension = {
+  dimension: string;
+  value: string;
+  label?: string;
+  total_domains: number;
+};
+
+export type ReportCluster = {
+  dimensions: ReportClusterDimension[];
+  domains: string[];
+  size: number;
+  min_delta: number;
+  max_delta: number;
+  direction: "improved" | "regressed";
+};
+
+export type ReportResponse = {
+  dataset_tag: string;
+  from_slug: string;
+  to_slug: string;
+  min_cluster: number;
+  max_spread: number;
+  header: ReportHeader;
+  totals: ReportTotals;
+  tags: ReportTags;
+  domains: ReportDomain[];
+  clusters: ReportCluster[];
 };
 
 export type HistoryPoint = {
@@ -733,6 +872,18 @@ export const getTagDiff = (
       to: string;
       granularity: string;
     },
+    fetchFn
+  );
+
+export const getReport = (
+  datasetTag: string,
+  from: string,
+  to: string,
+  fetchFn: FetchLike = fetch
+) =>
+  getJSON<ReportResponse>(
+    `/cohorts/${encodeURIComponent(datasetTag)}/report`,
+    { from, to } as AnalysisFilter & { from: string; to: string },
     fetchFn
   );
 

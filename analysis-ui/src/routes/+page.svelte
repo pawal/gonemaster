@@ -41,6 +41,8 @@
     summarizeMetric
   } from "$lib/overview";
   import { idnTooltip } from "$lib/idn";
+  import { CATEGORY_LABELS, categoryTone } from "$lib/report";
+  import type { DomainCategory } from "$lib/api";
   import type { LayoutData } from "./+layout";
   import type { OverviewPageData } from "./+page";
 
@@ -110,6 +112,13 @@
   const improvements = $derived(
     gradeChanges.filter((e) => netDirection(e) === "improved").reverse().slice(0, 5)
   );
+  // Cause per mover, from the classified report; absent when it did not load.
+  const causeByDomain = $derived.by(() => {
+    const out = new Map<string, DomainCategory>();
+    for (const row of data.report?.domains ?? []) out.set(row.domain, row.category);
+    return out;
+  });
+
   const hasMovement = $derived(
     !!data.diff &&
       (diffSummary.regressed > 0 ||
@@ -446,6 +455,10 @@
                       <span class="sr-only">to</span>
                       <GradeChip grade={e.to_grade} />
                     </span>
+                    {#if causeByDomain.has(e.domain)}
+                      {@const cause = causeByDomain.get(e.domain)!}
+                      <span class="cause cause-{categoryTone(cause)}">{CATEGORY_LABELS[cause]}</span>
+                    {/if}
                   </li>
                 {/each}
               </ul>
@@ -466,6 +479,10 @@
                       <span class="sr-only">to</span>
                       <GradeChip grade={e.to_grade} />
                     </span>
+                    {#if causeByDomain.has(e.domain)}
+                      {@const cause = causeByDomain.get(e.domain)!}
+                      <span class="cause cause-{categoryTone(cause)}">{CATEGORY_LABELS[cause]}</span>
+                    {/if}
                   </li>
                 {/each}
               </ul>
@@ -938,6 +955,17 @@
   .hero-delta.tone-error { color: var(--bar-error); }
   .hero-delta.tone-neutral { color: var(--ink-2); }
 
+  .cause {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 999px;
+    font-size: var(--text-xs);
+    border: 1px solid var(--border);
+  }
+  .cause-error   { color: var(--bar-error); }
+  .cause-warning { color: var(--bar-warning); }
+  .cause-notice  { color: var(--bar-notice); }
+  .cause-neutral { color: var(--ink-2); }
   .movers-card {
     gap: var(--space-3);
   }

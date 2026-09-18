@@ -1,4 +1,11 @@
-import { getDiff, getTagDiff, type DiffResponse, type TagDiffResponse } from "$lib/api";
+import {
+  getDiff,
+  getReport,
+  getTagDiff,
+  type DiffResponse,
+  type ReportResponse,
+  type TagDiffResponse
+} from "$lib/api";
 import { previousSlug } from "$lib/diff";
 
 export type DiffPageData = {
@@ -12,6 +19,9 @@ export type DiffPageData = {
   // Tag-level diff degrades independently: null when it could not be
   // fetched, so the domain diff still renders.
   tagDiff: TagDiffResponse | null;
+  // Classified report; null on a server that predates it, which leaves the
+  // page on the unclassified tag diff.
+  report: ReportResponse | null;
   error: string | null;
 };
 
@@ -26,14 +36,28 @@ export async function load({ parent, fetch, url }): Promise<DiffPageData> {
   const fromSlug = urlFrom || (fromDefaulted ? previousSlug(layout.snapshots ?? [], toSlug) : "");
 
   if (!datasetTag || !fromSlug || !toSlug) {
-    return { datasetTag, fromSlug, toSlug, fromDefaulted, diff: null, tagDiff: null, error: null };
+    return {
+      datasetTag,
+      fromSlug,
+      toSlug,
+      fromDefaulted,
+      diff: null,
+      tagDiff: null,
+      report: null,
+      error: null
+    };
   }
   try {
-    const [diff, tagDiff] = await Promise.all([
+    const [diff, report] = await Promise.all([
       getDiff(datasetTag, fromSlug, toSlug, fetch),
-      getTagDiff(datasetTag, fromSlug, toSlug, fetch).catch(() => null)
+      getReport(datasetTag, fromSlug, toSlug, fetch).catch(() => null)
     ]);
-    return { datasetTag, fromSlug, toSlug, fromDefaulted, diff, tagDiff, error: null };
+    // The report's tag lists are a superset of the tag diff; fall back to
+    // the plain one only when the report is unavailable.
+    const tagDiff = report
+      ? null
+      : await getTagDiff(datasetTag, fromSlug, toSlug, fetch).catch(() => null);
+    return { datasetTag, fromSlug, toSlug, fromDefaulted, diff, tagDiff, report, error: null };
   } catch (error) {
     return {
       datasetTag,
@@ -42,6 +66,7 @@ export async function load({ parent, fetch, url }): Promise<DiffPageData> {
       fromDefaulted,
       diff: null,
       tagDiff: null,
+      report: null,
       error: error instanceof Error ? error.message : String(error)
     };
   }

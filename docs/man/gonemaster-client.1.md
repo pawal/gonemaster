@@ -40,6 +40,11 @@ manage the job queue, and query the domain/tag/run/entry analysis APIs.
 **--version**
 : Print version and exit.
 
+**-h**, **--help**
+: Print usage and exit. The only single-dash option; it also applies to a
+  command group (**gonemaster-client domains -h**) and to a subcommand
+  (**gonemaster-client domains list -h**).
+
 ## COMMANDS
 
 ### jobs create
@@ -313,8 +318,16 @@ snapshot captured before it.
 **--max-spread** *N*
 : Score spread a cluster allows (server default 3).
 
-**--snapshots**
-: List the cohort's snapshot slugs instead of reporting.
+### cohorts list
+
+List the public analysis cohorts with their labels, snapshot counts, and
+which one is the default.
+
+### cohorts snapshots [*DATASET-TAG*]
+
+List one cohort's snapshot slugs, newest first, with the capture date and
+the domain count. The dataset tag defaults to the server's default public
+cohort.
 
 ### queue pause
 
@@ -392,6 +405,11 @@ Purge completed jobs older than 90 days:
 Report the two newest snapshots of a cohort as Markdown:
 
     gonemaster-client report kommuner --output report.md
+
+Find the cohorts and their snapshot slugs:
+
+    gonemaster-client cohorts list
+    gonemaster-client cohorts snapshots kommuner
 
 Use a remote server with JSON output:
 

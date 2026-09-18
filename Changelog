@@ -8,12 +8,13 @@ All notable changes to all gonemaster components will be documented in this file
 
 - server: capture a cohort snapshot's tag vocabulary and scoring configuration identity
 - server, analysis-ui: a cohort report classifies each change between two snapshots as engine-driven or real
-- cli: gonemaster-client report renders a cohort report as Markdown or JSON
+- cli: gonemaster-client report renders a cohort report as Markdown or JSON, and cohorts list|snapshots names the cohorts and slugs it takes
 - mcp: cohort_report compares two snapshots of an analysis cohort
 
 ### Changed
 
 - admin-ui: the recent tests list leads with the domain and dates each row
+- cli: gonemaster-client takes -h for --help, on a command group as well as a subcommand; asking for usage now exits 0
 
 ### Fixed
 

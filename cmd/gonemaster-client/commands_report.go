@@ -30,9 +30,10 @@ func (c *apiClient) getPublic(ctx context.Context, path string, out any) error {
 // ── Response types ───────────────────────────────────────────────────────────
 
 type cohortView struct {
-	DatasetTag string `json:"dataset_tag"`
-	Label      string `json:"label"`
-	IsDefault  bool   `json:"is_default"`
+	DatasetTag    string `json:"dataset_tag"`
+	Label         string `json:"label"`
+	IsDefault     bool   `json:"is_default"`
+	SnapshotCount int    `json:"snapshot_count"`
 }
 
 type analysisCatalog struct {
@@ -502,15 +503,13 @@ func runReport(ctx context.Context, client *apiClient, opts globalOptions, args 
 	setSubcommandUsage(fs)
 	var from, to string
 	var minCluster, maxSpread int
-	var listSnapshots bool
 	fs.StringVar(&from, "from", "", "Baseline snapshot slug (default: the snapshot before --to)")
 	fs.StringVar(&to, "to", "", "Later snapshot slug (default: the newest snapshot)")
 	fs.IntVar(&minCluster, "min-cluster", 0, "Domains a cluster needs (server default 3)")
 	fs.IntVar(&maxSpread, "max-spread", 0, "Score spread a cluster allows (server default 3)")
-	fs.BoolVar(&listSnapshots, "snapshots", false, "List the cohort's snapshot slugs instead of reporting")
 	fs.StringVar(&opts.format, "format", opts.format, "Output format: markdown (default), json")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	datasetTag := ""
 	if rest := fs.Args(); len(rest) > 0 {
@@ -520,9 +519,6 @@ func runReport(ctx context.Context, client *apiClient, opts globalOptions, args 
 	if err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
-	}
-	if listSnapshots {
-		return runReportSnapshots(ctx, client, opts, datasetTag, out, errOut)
 	}
 	from, to, err = resolveReportPair(ctx, client, datasetTag, strings.TrimSpace(from), strings.TrimSpace(to))
 	if err != nil {
@@ -551,7 +547,80 @@ func isJSONFormat(format string) bool {
 	return format == "json" || format == "jsonl"
 }
 
-func runReportSnapshots(ctx context.Context, client *apiClient, opts globalOptions, datasetTag string, out io.Writer, errOut io.Writer) int {
+// ── cohorts ──────────────────────────────────────────────────────────────────
+
+func runCohorts(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	const subs = "list|snapshots"
+	if len(args) == 0 {
+		fmt.Fprintln(errOut, "cohorts subcommand is required: "+subs)
+		return 2
+	}
+	if isHelpArg(args[0]) {
+		return groupUsage(out, "cohorts", subs)
+	}
+	cmd := args[0]
+	args = args[1:]
+	switch cmd {
+	case "list":
+		return runCohortsList(ctx, client, opts, args, out, errOut)
+	case "snapshots":
+		return runCohortsSnapshots(ctx, client, opts, args, out, errOut)
+	default:
+		fmt.Fprintf(errOut, "Unknown cohorts command %q\n", cmd)
+		return 2
+	}
+}
+
+// runCohortsList names the cohorts a report can be run over.
+func runCohortsList(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	fs := flag.NewFlagSet("cohorts list", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	setSubcommandUsage(fs)
+	if err := parseWithReorderedFlags(fs, args); err != nil {
+		return parseExit(err)
+	}
+	var catalog analysisCatalog
+	if err := client.getPublic(ctx, "/analysis/catalog", &catalog); err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+	if isJSONFormat(opts.format) {
+		if err := writeOutput(out, opts.format, catalog); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
+		return 0
+	}
+	fmt.Fprintf(out, "Cohorts: %d\n", len(catalog.Cohorts))
+	for _, c := range catalog.Cohorts {
+		marker := ""
+		if c.IsDefault || c.DatasetTag == catalog.DefaultTag {
+			marker = "  (default)"
+		}
+		fmt.Fprintf(out, "  %-24s  %-24s  snapshots=%-4d%s\n",
+			c.DatasetTag, c.Label, c.SnapshotCount, marker)
+	}
+	return 0
+}
+
+// runCohortsSnapshots lists one cohort's snapshot slugs, which are what the
+// report compares.
+func runCohortsSnapshots(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	fs := flag.NewFlagSet("cohorts snapshots", flag.ContinueOnError)
+	fs.SetOutput(errOut)
+	setSubcommandUsage(fs)
+	if err := parseWithReorderedFlags(fs, args); err != nil {
+		return parseExit(err)
+	}
+	datasetTag := ""
+	if rest := fs.Args(); len(rest) > 0 {
+		datasetTag = strings.TrimSpace(rest[0])
+	}
+	datasetTag, err := resolveReportCohort(ctx, client, datasetTag)
+	if err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
 	var list snapshotList
 	path := "/analysis/cohorts/" + url.PathEscape(datasetTag) + "/snapshots"
 	if err := client.getPublic(ctx, path, &list); err != nil {

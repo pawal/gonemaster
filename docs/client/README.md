@@ -30,7 +30,9 @@ public analysis API, which the client derives from that same base.
 | `--header NAME:VALUE` | repeatable | Add an HTTP header. |
 | `--version` | bool | Print version information and exit. |
 
-Subcommand flags may be placed before or after positional arguments.
+Subcommand flags may be placed before or after positional arguments. `-h` is
+the only single-dash option; it is an alias for `--help` and works on a
+command group and on a subcommand alike.
 
 ## Output Formats
 
@@ -53,6 +55,7 @@ Exit codes:
 - `tags`: manage named domain collections.
 - `runs`: inspect completed historical runs.
 - `entries`: query stored log entries.
+- `cohorts`: list the public analysis cohorts and their snapshots.
 - `report`: compare two cohort snapshots and classify every change.
 
 ## Guides

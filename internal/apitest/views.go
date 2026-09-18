@@ -251,9 +251,10 @@ func DiffResults(idBefore, idAfter string) map[string]Result {
 
 // AnalysisCohortView is one cohort of GET /pub/api/v1/analysis/cohorts.
 type AnalysisCohortView struct {
-	DatasetTag string `json:"dataset_tag"`
-	Label      string `json:"label"`
-	IsDefault  bool   `json:"is_default"`
+	DatasetTag    string `json:"dataset_tag"`
+	Label         string `json:"label"`
+	IsDefault     bool   `json:"is_default"`
+	SnapshotCount int    `json:"snapshot_count"`
 }
 
 // AnalysisCatalog is GET /pub/api/v1/analysis/catalog.

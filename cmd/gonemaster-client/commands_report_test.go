@@ -106,11 +106,53 @@ func TestReportForwardsClusterBounds(t *testing.T) {
 	}
 }
 
-func TestReportSnapshotsList(t *testing.T) {
+func TestCohortsSnapshots(t *testing.T) {
 	reportFixture(t, nil)
-	res := clitest.Run(t, run, "report", "--snapshots")
+	res := clitest.Run(t, run, "cohorts", "snapshots")
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "Snapshots in kommuner: 2", apitest.ReportToSlug, apitest.ReportFromSlug)
+}
+
+func TestCohortsList(t *testing.T) {
+	catalog := apitest.AnalysisCatalog{
+		DefaultTag: "tld",
+		Cohorts: []apitest.AnalysisCohortView{
+			{DatasetTag: "tld", Label: "TLDs", IsDefault: true, SnapshotCount: 13},
+			{DatasetTag: apitest.ReportDatasetTag, Label: "Kommuner", SnapshotCount: 2},
+		},
+	}
+	apitest.StubFake(t, &newHTTPClient, apitest.Opts{AnalysisCatalog: &catalog})
+	res := clitest.Run(t, run, "cohorts", "list")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Cohorts: 2", "tld", "TLDs", "snapshots=13", "(default)", "Kommuner")
+}
+
+// The listing is the discovery path, so it must not need a resolvable
+// default cohort of its own.
+func TestCohortsListWithoutDefault(t *testing.T) {
+	catalog := apitest.AnalysisCatalog{Cohorts: []apitest.AnalysisCohortView{
+		{DatasetTag: "tld"}, {DatasetTag: apitest.ReportDatasetTag},
+	}}
+	apitest.StubFake(t, &newHTTPClient, apitest.Opts{AnalysisCatalog: &catalog})
+	res := clitest.Run(t, run, "cohorts", "list")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Cohorts: 2")
+}
+
+func TestCohortsListJSON(t *testing.T) {
+	catalog := apitest.AnalysisCatalog{DefaultTag: "tld", Cohorts: []apitest.AnalysisCohortView{
+		{DatasetTag: "tld", Label: "TLDs", IsDefault: true, SnapshotCount: 13},
+	}}
+	apitest.StubFake(t, &newHTTPClient, apitest.Opts{AnalysisCatalog: &catalog})
+	res := clitest.Run(t, run, "--format", "json", "cohorts", "list")
+	res.RequireCode(t, 0)
+	var got analysisCatalog
+	if err := json.Unmarshal([]byte(res.Out), &got); err != nil {
+		t.Fatalf("decode catalog: %v", err)
+	}
+	if got.DefaultTag != "tld" || len(got.Cohorts) != 1 || got.Cohorts[0].SnapshotCount != 13 {
+		t.Fatalf("catalog decoded wrong: %+v", got)
+	}
 }
 
 func TestReportRejectsSingleSnapshotCohort(t *testing.T) {

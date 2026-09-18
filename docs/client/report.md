@@ -31,23 +31,27 @@ Options:
 - `--min-cluster N`: how many domains a cluster needs (server default 3).
 - `--max-spread N`: how far the score moves within a cluster may spread
   (server default 3).
-- `--snapshots`: list the cohort's snapshot slugs and exit.
 
 `--format` selects the rendering and takes either position: `markdown` is
 the default and `json` writes the response verbatim. `--output PATH` writes
 to a file.
 
-## Finding a Snapshot Slug
+## Finding a Cohort and a Snapshot Slug
 
-A snapshot is captured per batch, so comparing two batches of a cohort is the
-same call. List the slugs with:
+The `cohorts` group answers both:
 
 ```sh
-gonemaster-client report kommuner --snapshots
+gonemaster-client cohorts list
+gonemaster-client cohorts snapshots kommuner
 ```
 
-Each row gives the slug, the capture date, and the domain count. The same
-list is served by `GET /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots`.
+`cohorts list` names every public cohort with its label, its snapshot count,
+and which one is the default. `cohorts snapshots` gives one cohort's slugs
+with the capture date and the domain count, newest first; its dataset tag is
+optional and resolves the same way `report` does.
+
+A snapshot is captured per batch, so comparing two batches of a cohort is the
+same call as comparing their snapshots.
 
 ## Output
 

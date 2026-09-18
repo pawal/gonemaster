@@ -111,6 +111,8 @@ func (s *Server) handlePutScoringConfig(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	applyScoringConfigToStore(s.store, cfg)
+	// Report attribution is computed under the scoring config.
+	s.reportCache.reset()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
@@ -137,6 +139,7 @@ func (s *Server) handleDeleteScoringConfig(w http.ResponseWriter, _ *http.Reques
 		revertCfg = scoring.DefaultConfig()
 	}
 	applyScoringConfigToStore(s.store, revertCfg)
+	s.reportCache.reset()
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 

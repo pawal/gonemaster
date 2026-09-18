@@ -2358,6 +2358,58 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/report:
+    get:
+      tags: [Public]
+      summary: Classified comparison of two cohort snapshots
+      description: >-
+        Superset of the diff: every tag and domain change is classified as
+        engine-driven or as a cohort change, score movement is attributed to
+        the findings that explain it, and movers that moved together are
+        grouped into clusters.
+      operationId: publicAnalysisReport
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: min_cluster
+          in: query
+          required: false
+          description: Minimum number of domains a cluster must hold.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 3
+        - name: max_spread
+          in: query
+          required: false
+          description: Maximum score spread within one cluster, in points.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 3
+      responses:
+        '200':
+          description: Report response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisReportResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
   /pub/api/v1/analysis/cohorts/{dataset_tag}/history:
     get:
       tags: [Public]
@@ -3768,6 +3820,304 @@ components:
           type: integer
         domain_delta:
           type: integer
+
+    PublicAnalysisReportResponse:
+      type: object
+      required: [dataset_tag, from_slug, to_slug, min_cluster, max_spread, header, totals, tags, domains, clusters]
+      properties:
+        dataset_tag:
+          type: string
+        from_slug:
+          type: string
+        to_slug:
+          type: string
+        min_cluster:
+          type: integer
+        max_spread:
+          type: integer
+        header:
+          $ref: '#/components/schemas/PublicAnalysisReportHeader'
+        totals:
+          $ref: '#/components/schemas/PublicAnalysisReportTotals'
+        tags:
+          $ref: '#/components/schemas/PublicAnalysisReportTags'
+        domains:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportDomain'
+        clusters:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportCluster'
+
+    PublicAnalysisReportHeader:
+      type: object
+      required: [from, to, engine, vocabulary, scoring_config_changed]
+      properties:
+        from:
+          $ref: '#/components/schemas/PublicAnalysisReportSide'
+        to:
+          $ref: '#/components/schemas/PublicAnalysisReportSide'
+        engine:
+          $ref: '#/components/schemas/PublicAnalysisEngineDelta'
+        vocabulary:
+          $ref: '#/components/schemas/PublicAnalysisVocabularyDelta'
+        scoring_config_changed:
+          type: string
+          enum: ["true", "false", "unknown"]
+          description: >-
+            Whether the scoring configuration differs between the two
+            snapshots. "unknown" when either side carries no identity, in
+            which case a score move cannot be fully attributed.
+        tag_floor:
+          type: string
+          description: >-
+            The stricter of the two snapshots' tag view floors. Findings
+            below it are absent from the per-domain lists.
+
+    PublicAnalysisReportSide:
+      type: object
+      required: [slug, captured_at, domain_count]
+      properties:
+        slug:
+          type: string
+        label:
+          type: string
+        captured_at:
+          type: string
+          format: date-time
+        engine_version:
+          type: string
+        mixed_engine_version:
+          type: boolean
+        profile_name:
+          type: string
+        scoring_config_hash:
+          type: string
+        tag_view_min_level:
+          type: string
+        domain_count:
+          type: integer
+
+    PublicAnalysisVocabularyDelta:
+      type: object
+      required: [from_available, to_available, from_tag_count, to_tag_count, added, removed, level_changed]
+      properties:
+        from_available:
+          type: boolean
+        to_available:
+          type: boolean
+        from_tag_count:
+          type: integer
+        to_tag_count:
+          type: integer
+        added:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisVocabularyEntry'
+        removed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisVocabularyEntry'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisVocabularyChange'
+
+    PublicAnalysisVocabularyEntry:
+      type: object
+      required: [tag]
+      properties:
+        tag:
+          type: string
+        module:
+          type: string
+        level:
+          type: string
+
+    PublicAnalysisVocabularyChange:
+      type: object
+      required: [tag, from_level, to_level]
+      properties:
+        tag:
+          type: string
+        module:
+          type: string
+        from_level:
+          type: string
+        to_level:
+          type: string
+
+    PublicAnalysisReportTotals:
+      type: object
+      required: [from_domain_count, to_domain_count, both_domain_count, added, removed, identical_score, improved, regressed]
+      properties:
+        from_domain_count:
+          type: integer
+        to_domain_count:
+          type: integer
+        both_domain_count:
+          type: integer
+        added:
+          type: integer
+        removed:
+          type: integer
+        identical_score:
+          type: integer
+        improved:
+          type: integer
+        regressed:
+          type: integer
+        from_mean_score:
+          type: number
+        to_mean_score:
+          type: number
+        from_grades:
+          type: object
+          additionalProperties:
+            type: integer
+        to_grades:
+          type: object
+          additionalProperties:
+            type: integer
+        domain_categories:
+          type: object
+          additionalProperties:
+            type: integer
+
+    PublicAnalysisReportTags:
+      type: object
+      required: [appeared, cleared, level_changed]
+      properties:
+        appeared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagEntry'
+        cleared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagEntry'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagEntry'
+
+    PublicAnalysisReportTagEntry:
+      allOf:
+        - $ref: '#/components/schemas/PublicAnalysisTagDiffEntry'
+        - type: object
+          required: [classification]
+          properties:
+            classification:
+              $ref: '#/components/schemas/PublicAnalysisChangeClassification'
+
+    PublicAnalysisChangeClassification:
+      type: string
+      enum: [new_in_engine, removed_from_engine, level_reclassified, cohort_change, unknown]
+      description: >-
+        Whether the engine's tag vocabulary moved with the finding
+        (new_in_engine, removed_from_engine, level_reclassified), the cohort
+        moved (cohort_change), or the vocabulary could not be read (unknown).
+
+    PublicAnalysisReportTagChange:
+      type: object
+      required: [tag, classification]
+      properties:
+        tag:
+          type: string
+        module:
+          type: string
+        testcase:
+          type: string
+        from_level:
+          type: string
+        to_level:
+          type: string
+        classification:
+          $ref: '#/components/schemas/PublicAnalysisChangeClassification'
+
+    PublicAnalysisReportDomain:
+      type: object
+      required: [domain, grade_changed, category, explained_delta, unexplained_delta, appeared, cleared, level_changed]
+      properties:
+        domain:
+          type: string
+        from_score:
+          type: integer
+        to_score:
+          type: integer
+        score_delta:
+          type: integer
+        from_grade:
+          type: string
+        to_grade:
+          type: string
+        grade_changed:
+          type: boolean
+        category:
+          type: string
+          enum: [real, measurement, mixed, unknown]
+          description: >-
+            Whether the domain moved because the cohort changed (real),
+            because the engine changed (measurement), because of both
+            (mixed), or for a reason the report cannot attribute (unknown).
+        explained_delta:
+          type: integer
+          description: Score movement the listed findings account for.
+        unexplained_delta:
+          type: integer
+          description: Score movement left over, which names a cause the report cannot see.
+        appeared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagChange'
+        cleared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagChange'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagChange'
+
+    PublicAnalysisReportCluster:
+      type: object
+      required: [dimensions, domains, size, min_delta, max_delta, direction]
+      properties:
+        dimensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportClusterDimension'
+        domains:
+          type: array
+          items:
+            type: string
+        size:
+          type: integer
+        min_delta:
+          type: integer
+        max_delta:
+          type: integer
+        direction:
+          type: string
+          enum: [improved, regressed]
+
+    PublicAnalysisReportClusterDimension:
+      type: object
+      required: [dimension, value, total_domains]
+      properties:
+        dimension:
+          type: string
+          description: >-
+            nameserver, asn, prefix, or a registered domain-fact category
+            such as software_version.
+        value:
+          type: string
+        label:
+          type: string
+        total_domains:
+          type: integer
+          description: Domains on the "to" side carrying this value.
 
     PublicAnalysisEntityHistoryResponse:
       type: object

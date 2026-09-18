@@ -6,29 +6,32 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
-- admin-ui: rebuild the aggregates of every snapshot in a cohort from one action
-- analysis-ui: DNSSEC posture segments link to the domains list filtered on that bucket
+### Fixed
+
+## [v1.7.10] - 2026-09-18
+
+The public DNSSEC chain diagram gains a detail panel, an SVG export, zone frames and a shape for every status. dnssec22 evaluates a nameserver name the zone refers away, adding `DS22_NS_ADDRESS_REFERRED` at INFO.
+
+### Added
+
 - ci: prune release attachments below the three newest versions after publishing
 - dnssec22: evaluate nameserver names below a referred delegation
-- server: dnssec_posture filter on the public analysis domains list
-- server: rematerialize every snapshot in a cohort in sequence
-- ui-public: save the DNSSEC chain diagram as an SVG file
-- ui-public: pin a chain diagram box or edge to read its details by tap or keyboard
+- server, admin-ui: rebuild the aggregates of every snapshot in a cohort from one action
+- server, analysis-ui: filter the public analysis domains list by DNSSEC posture from a chart segment
+- ui-public: pin a chain diagram box or edge for its details, and save the diagram as SVG
 
 ### Changed
 
-- ui-public: the DNSSEC chain diagram frames each zone under its own header
-- ui-public: a chain diagram wider than the card scrolls at its own size instead of shrinking
-- ui-public: every chain diagram state carries a shape or a line treatment as well as a colour
+- ui-public: the DNSSEC chain diagram frames each zone, marks every state with a shape, and scrolls instead of shrinking
 
 ### Fixed
 
-- ui-public: a long name or server list wraps inside the chain diagram tooltip
+- dnssec02: DS02_MATCH_DS_DNSKEY names the keytag whose RRSIG validated
+- docs: the package install guide matches the release attachments
 - server: --db-driver memory selects the in-memory store instead of failing
 - server: the weakest-algorithm tone reports algorithms 7 and 12 as deprecated
-- dnssec02: DS02_MATCH_DS_DNSKEY names the keytag whose RRSIG validated
+- ui-public: a long name or server list wraps inside the chain diagram tooltip
 - ui-public: the DS02_NO_MATCHING_DNSKEY_RRSIG explanation describes the key the DS names
-- docs: the package install guide matches the release attachments
 
 ## [v1.7.9] - 2026-09-14
 

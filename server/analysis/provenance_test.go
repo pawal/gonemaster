@@ -591,3 +591,62 @@ func TestBackfillSnapshotVocabulariesIsIdempotent(t *testing.T) {
 		t.Fatalf("backfill overwrote a captured vocabulary: %q", snap.Vocabulary)
 	}
 }
+
+// A rebuild reconstructs a snapshot from stored runs. The vocabulary comes
+// from the runs and is recovered; the scoring configuration can only be read
+// as the server stands now, which says nothing about a batch from June, so
+// it stays unknown.
+func TestRebuildCohortRecoversVocabularyButNotScoringHash(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-rebuilt", true)
+	if err := store.SetSetting(scoringConfigSetting, `{"severity_penalties":{"WARNING":7}}`); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	seedRunWithProfile(store, "batch-rebuilt", "run-a", 100, "alpha.example",
+		time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC), testEffectiveProfile)
+
+	controller := NewController(store)
+	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+		t.Fatalf("RebuildCohort: %v", err)
+	}
+
+	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-rebuilt")
+	if !ok {
+		t.Fatal("expected snapshot")
+	}
+	if snap.Vocabulary != testVocabulary {
+		t.Fatalf("Vocabulary = %q, want %q recovered from the run", snap.Vocabulary, testVocabulary)
+	}
+	if snap.ScoringConfigHash != "" {
+		t.Fatalf("ScoringConfigHash = %q, want empty on a rebuild", snap.ScoringConfigHash)
+	}
+}
+
+// An unknown scoring hash is load-bearing: the report reads it as "cannot
+// rule out a penalty change". A later projection must not quietly replace it
+// with the configuration in force today.
+func TestApplySnapshotStateNeverBackfillsScoringHash(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-unknown", true)
+	if _, err := store.UpsertAnalysisCohortSnapshot(serverpkg.AnalysisCohortSnapshot{
+		CohortID: 10,
+		BatchID:  "batch-unknown",
+		Slug:     "2026-06-03-unknown",
+		Status:   serverpkg.AnalysisSnapshotStatusCaptured,
+		IsPublic: true,
+	}); err != nil {
+		t.Fatalf("seed snapshot: %v", err)
+	}
+	if err := store.SetSetting(scoringConfigSetting, `{"severity_penalties":{"WARNING":7}}`); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+
+	controller := NewController(store)
+	projectRunWithVersion(t, store, controller, "batch-unknown", "run-a", 100, "alpha.example",
+		time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC), "v1.7.10")
+
+	snap, _ := store.GetAnalysisCohortSnapshotByBatch(10, "batch-unknown")
+	if snap.ScoringConfigHash != "" {
+		t.Fatalf("ScoringConfigHash = %q, want the unknown state preserved", snap.ScoringConfigHash)
+	}
+}

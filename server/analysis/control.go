@@ -160,6 +160,10 @@ type snapshotSample struct {
 	engineVersion     string
 	forceMixedProfile bool
 	forceMixedVersion bool
+	// rebuilt marks a snapshot reconstructed from stored runs rather than
+	// captured as they completed, so server-side state read now does not
+	// describe the capture.
+	rebuilt bool
 }
 
 // accumulateSnapshot is the per-run wrapper around applySnapshotState used
@@ -211,7 +215,12 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 		snap.ProfileName = sampleRun.ProfileName
 		snap.EngineVersion = sample.engineVersion
 		snap.Vocabulary = runVocabulary(sampleRun)
-		snap.ScoringConfigHash = c.scoringConfigIdentity()
+		// The vocabulary comes from the run; the scoring configuration can
+		// only be read from the server as it stands, so a rebuild of an old
+		// batch leaves it unknown rather than claiming today's.
+		if !sample.rebuilt {
+			snap.ScoringConfigHash = c.scoringConfigIdentity()
+		}
 	}
 	snap.TagViewMinLevel = c.resolveTagViewMinLevel(cohort.TagViewMinLevel)
 
@@ -236,9 +245,6 @@ func (c *Controller) applySnapshotState(cohort serverpkg.AnalysisCohort, batch s
 	// so any run of the batch is representative.
 	if snap.Vocabulary == "" {
 		snap.Vocabulary = runVocabulary(sampleRun)
-	}
-	if snap.ScoringConfigHash == "" {
-		snap.ScoringConfigHash = c.scoringConfigIdentity()
 	}
 
 	if _, err := c.store.UpsertAnalysisCohortSnapshot(snap); err != nil {
@@ -562,6 +568,7 @@ pages:
 			engineVersion:     ps.engineVersion,
 			forceMixedProfile: ps.mixed,
 			forceMixedVersion: ps.mixedVersion,
+			rebuilt:           true,
 		}
 		if err := c.applySnapshotState(ps.cohort, ps.batch, sample); err != nil {
 			_ = c.setCohortMaterialization(cohort, serverpkg.AnalysisMaterializationFailed, time.Time{}, err.Error())

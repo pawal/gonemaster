@@ -293,10 +293,13 @@ Remove a batch. Use **--cancel-running** to cancel active jobs first.
 ### report [*DATASET-TAG*]
 
 Compare two snapshots of an analysis cohort and classify every change as
-engine-driven or real. Prints Markdown under **--format pretty** and the raw
-response under **--format json**. The dataset tag defaults to the server's
-default public cohort, **--to** to the newest snapshot, and **--from** to the
+engine-driven or real. The dataset tag defaults to the server's default
+public cohort, **--to** to the newest snapshot, and **--from** to the
 snapshot captured before it.
+
+**--format** *FORMAT*
+: **markdown** (the default, also named **pretty**) or **json**. Accepted
+  before or after the command.
 
 **--from** *SLUG*
 : Baseline snapshot.

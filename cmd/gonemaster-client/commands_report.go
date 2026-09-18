@@ -508,6 +508,7 @@ func runReport(ctx context.Context, client *apiClient, opts globalOptions, args 
 	fs.IntVar(&minCluster, "min-cluster", 0, "Domains a cluster needs (server default 3)")
 	fs.IntVar(&maxSpread, "max-spread", 0, "Score spread a cluster allows (server default 3)")
 	fs.BoolVar(&listSnapshots, "snapshots", false, "List the cohort's snapshot slugs instead of reporting")
+	fs.StringVar(&opts.format, "format", opts.format, "Output format: markdown (default), json")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return 2
 	}
@@ -533,7 +534,7 @@ func runReport(ctx context.Context, client *apiClient, opts globalOptions, args 
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
-	if opts.format != "pretty" {
+	if isJSONFormat(opts.format) {
 		if err := writeOutput(out, opts.format, report); err != nil {
 			fmt.Fprintln(errOut, err.Error())
 			return 2
@@ -544,6 +545,12 @@ func runReport(ctx context.Context, client *apiClient, opts globalOptions, args 
 	return 0
 }
 
+// isJSONFormat reports whether the format asks for the raw response. The
+// report's pretty rendering is Markdown, so markdown names it too.
+func isJSONFormat(format string) bool {
+	return format == "json" || format == "jsonl"
+}
+
 func runReportSnapshots(ctx context.Context, client *apiClient, opts globalOptions, datasetTag string, out io.Writer, errOut io.Writer) int {
 	var list snapshotList
 	path := "/analysis/cohorts/" + url.PathEscape(datasetTag) + "/snapshots"
@@ -551,7 +558,7 @@ func runReportSnapshots(ctx context.Context, client *apiClient, opts globalOptio
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
-	if opts.format != "pretty" {
+	if isJSONFormat(opts.format) {
 		if err := writeOutput(out, opts.format, list); err != nil {
 			fmt.Fprintln(errOut, err.Error())
 			return 2

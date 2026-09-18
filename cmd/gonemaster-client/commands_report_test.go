@@ -159,3 +159,31 @@ func TestReportVocabularyUnknownLine(t *testing.T) {
 		"Scoring configuration provenance unknown",
 	)
 }
+
+// --format takes markdown by name, and works in the subcommand position.
+func TestReportFormatNames(t *testing.T) {
+	for _, format := range []string{"markdown", "pretty"} {
+		reportFixture(t, nil)
+		res := clitest.Run(t, run, "report", "--format", format)
+		res.RequireCode(t, 0)
+		res.RequireOutContains(t, "# kommuner: 2026-06 to 2026-09")
+	}
+	reportFixture(t, nil)
+	res := clitest.Run(t, run, "report", "--format", "json")
+	res.RequireCode(t, 0)
+	var got cohortReport
+	if err := json.Unmarshal([]byte(res.Out), &got); err != nil {
+		t.Fatalf("decode report: %v", err)
+	}
+	if got.DatasetTag != apitest.ReportDatasetTag {
+		t.Errorf("subcommand --format json did not emit the response: %+v", got)
+	}
+}
+
+// The global --format still reaches the command when it is given first.
+func TestReportGlobalFormatMarkdown(t *testing.T) {
+	reportFixture(t, nil)
+	res := clitest.Run(t, run, "--format", "markdown", "report")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "# kommuner: 2026-06 to 2026-09")
+}

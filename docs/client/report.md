@@ -33,9 +33,9 @@ Options:
   (server default 3).
 - `--snapshots`: list the cohort's snapshot slugs and exit.
 
-The global `--format` selects the rendering: `pretty` (the default) writes
-Markdown, `json` writes the response verbatim. `--output PATH` writes to a
-file.
+`--format` selects the rendering and takes either position: `markdown` is
+the default and `json` writes the response verbatim. `--output PATH` writes
+to a file.
 
 ## Finding a Snapshot Slug
 

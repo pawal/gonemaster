@@ -63,7 +63,12 @@ func normalizeBaseURL(raw string) (string, error) {
 // doJSON sends a JSON request and decodes the response into out. Non-2xx returns
 // an *httpError carrying the status code.
 func (c *apiClient) doJSON(ctx context.Context, method, path string, body, out any) error {
-	full := strings.TrimRight(c.baseURL, "/") + path
+	return c.doJSONURL(ctx, method, strings.TrimRight(c.baseURL, "/")+path, body, out)
+}
+
+// doJSONURL is doJSON against an absolute URL, for the public API, which
+// sits beside the admin base rather than under it.
+func (c *apiClient) doJSONURL(ctx context.Context, method, full string, body, out any) error {
 	var payload io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -420,4 +425,176 @@ func (c *apiClient) listRuns(ctx context.Context, domain string, limit int) (run
 		q.Set("limit", strconv.Itoa(limit))
 	}
 	return c.getRuns(ctx, q)
+}
+
+// publicBaseURL maps the admin API base onto the public API base, which
+// serves the analysis reads and needs no token.
+func publicBaseURL(base string) string {
+	trimmed := strings.TrimRight(base, "/")
+	if strings.HasSuffix(trimmed, "/api/v1") {
+		return strings.TrimSuffix(trimmed, "/api/v1") + "/pub/api/v1"
+	}
+	return trimmed + "/pub/api/v1"
+}
+
+// getPublic decodes a GET against the public API into out.
+func (c *apiClient) getPublic(ctx context.Context, path string, out any) error {
+	return c.doJSONURL(ctx, http.MethodGet, publicBaseURL(c.baseURL)+path, nil, out)
+}
+
+// analysisCohortView is one cohort of GET /analysis/catalog.
+type analysisCohortView struct {
+	DatasetTag string `json:"dataset_tag"`
+	Label      string `json:"label"`
+	IsDefault  bool   `json:"is_default"`
+}
+
+type analysisCatalogView struct {
+	DefaultTag string               `json:"default_tag"`
+	Cohorts    []analysisCohortView `json:"cohorts"`
+}
+
+// analysisSnapshotView is one row of a cohort's snapshot list.
+type analysisSnapshotView struct {
+	Slug        string    `json:"slug"`
+	Label       string    `json:"label"`
+	CapturedAt  time.Time `json:"captured_at"`
+	DomainCount int       `json:"domain_count"`
+}
+
+type analysisSnapshotListView struct {
+	DatasetTag string                 `json:"dataset_tag"`
+	Snapshots  []analysisSnapshotView `json:"snapshots"`
+}
+
+// The report views below decode only the fields the tool reports.
+type reportVocabularyView struct {
+	FromAvailable bool `json:"from_available"`
+	ToAvailable   bool `json:"to_available"`
+	FromTagCount  int  `json:"from_tag_count"`
+	ToTagCount    int  `json:"to_tag_count"`
+	Added         []struct {
+		Tag string `json:"tag"`
+	} `json:"added"`
+	Removed []struct {
+		Tag string `json:"tag"`
+	} `json:"removed"`
+	LevelChanged []struct {
+		Tag string `json:"tag"`
+	} `json:"level_changed"`
+}
+
+type reportSideView struct {
+	Slug          string    `json:"slug"`
+	CapturedAt    time.Time `json:"captured_at"`
+	EngineVersion string    `json:"engine_version"`
+	ProfileName   string    `json:"profile_name"`
+	DomainCount   int       `json:"domain_count"`
+}
+
+type reportHeaderView struct {
+	From                 reportSideView       `json:"from"`
+	To                   reportSideView       `json:"to"`
+	Vocabulary           reportVocabularyView `json:"vocabulary"`
+	ScoringConfigChanged string               `json:"scoring_config_changed"`
+	TagFloor             string               `json:"tag_floor"`
+}
+
+type reportTotalsView struct {
+	FromDomainCount  int            `json:"from_domain_count"`
+	ToDomainCount    int            `json:"to_domain_count"`
+	BothDomainCount  int            `json:"both_domain_count"`
+	Added            int            `json:"added"`
+	Removed          int            `json:"removed"`
+	IdenticalScore   int            `json:"identical_score"`
+	Improved         int            `json:"improved"`
+	Regressed        int            `json:"regressed"`
+	FromMeanScore    *float64       `json:"from_mean_score"`
+	ToMeanScore      *float64       `json:"to_mean_score"`
+	FromGrades       map[string]int `json:"from_grades"`
+	ToGrades         map[string]int `json:"to_grades"`
+	DomainCategories map[string]int `json:"domain_categories"`
+}
+
+type reportTagEntryView struct {
+	Tag            string `json:"tag"`
+	Module         string `json:"module"`
+	FromLevel      string `json:"from_level"`
+	ToLevel        string `json:"to_level"`
+	DomainDelta    int    `json:"domain_delta"`
+	Classification string `json:"classification"`
+}
+
+type reportTagsView struct {
+	Appeared     []reportTagEntryView `json:"appeared"`
+	Cleared      []reportTagEntryView `json:"cleared"`
+	LevelChanged []reportTagEntryView `json:"level_changed"`
+}
+
+type reportDomainView struct {
+	Domain           string `json:"domain"`
+	FromScore        *int   `json:"from_score"`
+	ToScore          *int   `json:"to_score"`
+	ScoreDelta       *int   `json:"score_delta"`
+	FromGrade        string `json:"from_grade"`
+	ToGrade          string `json:"to_grade"`
+	Category         string `json:"category"`
+	ExplainedDelta   int    `json:"explained_delta"`
+	UnexplainedDelta int    `json:"unexplained_delta"`
+	Appeared         []struct {
+		Tag            string `json:"tag"`
+		Classification string `json:"classification"`
+	} `json:"appeared"`
+	Cleared []struct {
+		Tag            string `json:"tag"`
+		Classification string `json:"classification"`
+	} `json:"cleared"`
+}
+
+type reportClusterView struct {
+	Dimensions []struct {
+		Dimension    string `json:"dimension"`
+		Value        string `json:"value"`
+		Label        string `json:"label"`
+		TotalDomains int    `json:"total_domains"`
+	} `json:"dimensions"`
+	Domains   []string `json:"domains"`
+	Size      int      `json:"size"`
+	MinDelta  int      `json:"min_delta"`
+	MaxDelta  int      `json:"max_delta"`
+	Direction string   `json:"direction"`
+}
+
+// analysisReportView decodes the cohort report endpoint.
+type analysisReportView struct {
+	DatasetTag string              `json:"dataset_tag"`
+	FromSlug   string              `json:"from_slug"`
+	ToSlug     string              `json:"to_slug"`
+	Header     reportHeaderView    `json:"header"`
+	Totals     reportTotalsView    `json:"totals"`
+	Tags       reportTagsView      `json:"tags"`
+	Domains    []reportDomainView  `json:"domains"`
+	Clusters   []reportClusterView `json:"clusters"`
+}
+
+func (c *apiClient) getAnalysisCatalog(ctx context.Context) (analysisCatalogView, error) {
+	var out analysisCatalogView
+	err := c.getPublic(ctx, "/analysis/catalog", &out)
+	return out, err
+}
+
+func (c *apiClient) listAnalysisSnapshots(ctx context.Context, datasetTag string) (analysisSnapshotListView, error) {
+	var out analysisSnapshotListView
+	err := c.getPublic(ctx, "/analysis/cohorts/"+url.PathEscape(datasetTag)+"/snapshots", &out)
+	return out, err
+}
+
+func (c *apiClient) getAnalysisReport(ctx context.Context, datasetTag string, q url.Values) (analysisReportView, error) {
+	var out analysisReportView
+	path := "/analysis/cohorts/" + url.PathEscape(datasetTag) + "/report"
+	if len(q) > 0 {
+		path += "?" + q.Encode()
+	}
+	err := c.getPublic(ctx, path, &out)
+	return out, err
 }

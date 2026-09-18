@@ -70,6 +70,15 @@ type Opts struct {
 	SpecList *SpecTestcaseList
 	// SpecDetail answers GET /spec/testcases/{id}; nil yields 404.
 	SpecDetail *SpecTestcaseDetail
+
+	// AnalysisCatalog answers GET /pub/api/v1/analysis/catalog.
+	AnalysisCatalog *AnalysisCatalog
+	// AnalysisSnapshots answers a cohort's public snapshot list.
+	AnalysisSnapshots *AnalysisSnapshotList
+	// AnalysisReport answers a cohort's public report; nil yields 404.
+	AnalysisReport *AnalysisReport
+	// AnalysisReportQuery, when set, captures the report query.
+	AnalysisReportQuery *url.Values
 }
 
 // terminal reports whether a job status is final.
@@ -269,6 +278,34 @@ func Handler(t testing.TB, opts Opts) http.Handler {
 		}
 		writeJSON(w, http.StatusOK, *opts.SpecDetail)
 	}))
+
+	// Public analysis reads. They carry no token guard, as on the server.
+	mux.HandleFunc("GET /pub/api/v1/analysis/catalog", func(w http.ResponseWriter, _ *http.Request) {
+		if opts.AnalysisCatalog == nil {
+			writeJSON(w, http.StatusOK, AnalysisCatalog{})
+			return
+		}
+		writeJSON(w, http.StatusOK, *opts.AnalysisCatalog)
+	})
+	mux.HandleFunc("GET /pub/api/v1/analysis/cohorts/{tag}/snapshots", func(w http.ResponseWriter, _ *http.Request) {
+		if opts.AnalysisSnapshots == nil {
+			writeJSON(w, http.StatusOK, AnalysisSnapshotList{})
+			return
+		}
+		writeJSON(w, http.StatusOK, *opts.AnalysisSnapshots)
+	})
+	mux.HandleFunc("GET /pub/api/v1/analysis/cohorts/{tag}/report", func(w http.ResponseWriter, r *http.Request) {
+		if opts.AnalysisReportQuery != nil {
+			mu.Lock()
+			*opts.AnalysisReportQuery = r.URL.Query()
+			mu.Unlock()
+		}
+		if opts.AnalysisReport == nil {
+			writeJSON(w, http.StatusNotFound, errBody("no report"))
+			return
+		}
+		writeJSON(w, http.StatusOK, *opts.AnalysisReport)
+	})
 
 	return mux
 }

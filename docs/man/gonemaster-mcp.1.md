@@ -42,7 +42,11 @@ written to stderr so that stdout carries only the MCP protocol.
 
 **GONEMASTER_MCP_ALLOW_WRITE**
 : When set to **1** (or true/yes/on), registers the mutating tools
-  (**batch_enqueue**, **batch_cancel**, **cancel_job**). Unset by default, so a
+  (**cohort_report**
+: Compare two snapshots of an analysis cohort and classify every change as
+  engine-driven or real, with the movers and the clusters they form.
+
+**batch_enqueue**, **batch_cancel**, **cancel_job**). Unset by default, so a
   default install exposes read and single-domain test tools only.
 
 ## TOOLS

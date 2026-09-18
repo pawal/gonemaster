@@ -284,6 +284,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return runRuns(ctx, client, opts, rest, writer, errOut)
 	case "entries":
 		return runEntries(ctx, client, opts, rest, writer, errOut)
+	case "report":
+		return runReport(ctx, client, opts, rest, writer, errOut)
 	case "help", "-h", "--help":
 		printUsage(writer)
 		return 0
@@ -347,6 +349,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  tags list|create|delete|domains|summary|add-domains")
 	fmt.Fprintln(out, "  runs list|get|results|diff")
 	fmt.Fprintln(out, "  entries query")
+	fmt.Fprintln(out, "  report [dataset-tag] --from SLUG --to SLUG")
 }
 
 func setSubcommandUsage(fs *flag.FlagSet) {
@@ -521,7 +524,12 @@ func flagExpectsValue(f *flag.Flag) bool {
 }
 
 func (c *apiClient) doJSON(ctx context.Context, method string, path string, body any, out any) error {
-	full := strings.TrimRight(c.baseURL, "/") + path
+	return c.doJSONURL(ctx, method, strings.TrimRight(c.baseURL, "/")+path, body, out)
+}
+
+// doJSONURL is doJSON against an absolute URL, for the public API, which
+// sits beside the admin base rather than under it.
+func (c *apiClient) doJSONURL(ctx context.Context, method string, full string, body any, out any) error {
 	var payload io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)

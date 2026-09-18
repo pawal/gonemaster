@@ -290,6 +290,29 @@ Cancel all jobs in a batch.
 
 Remove a batch. Use **--cancel-running** to cancel active jobs first.
 
+### report [*DATASET-TAG*]
+
+Compare two snapshots of an analysis cohort and classify every change as
+engine-driven or real. Prints Markdown under **--format pretty** and the raw
+response under **--format json**. The dataset tag defaults to the server's
+default public cohort, **--to** to the newest snapshot, and **--from** to the
+snapshot captured before it.
+
+**--from** *SLUG*
+: Baseline snapshot.
+
+**--to** *SLUG*
+: Later snapshot.
+
+**--min-cluster** *N*
+: Domains a cluster needs (server default 3).
+
+**--max-spread** *N*
+: Score spread a cluster allows (server default 3).
+
+**--snapshots**
+: List the cohort's snapshot slugs instead of reporting.
+
 ### queue pause
 
 Pause the job queue.
@@ -362,6 +385,10 @@ Watch a batch in progress:
 Purge completed jobs older than 90 days:
 
     gonemaster-client jobs purge --older-than 90
+
+Report the two newest snapshots of a cohort as Markdown:
+
+    gonemaster-client report kommuner --output report.md
 
 Use a remote server with JSON output:
 

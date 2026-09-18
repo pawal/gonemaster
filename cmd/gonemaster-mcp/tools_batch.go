@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/url"
 	"sort"
 	"strconv"
@@ -18,6 +19,7 @@ func registerBatchTools(srv *mcp.Server, api *apiClient) {
 	registerCohortStats(srv, api)
 	registerCohortTagValues(srv, api)
 	registerFailuresByTag(srv, api)
+	registerCohortReport(srv, api)
 }
 
 type batchListInput struct {
@@ -360,5 +362,306 @@ func registerFailuresByTag(srv *mcp.Server, api *apiClient) {
 			ranked = ranked[:topN]
 		}
 		return nil, failuresByTagOutput{BatchID: id, SeverityMin: minLevel, Scanned: scanned, Capped: capped, Tags: ranked}, nil
+	})
+}
+
+// Caps on the report tool's lists, so one call cannot page a whole cohort.
+const (
+	defaultReportRows = 20
+	maxReportRows     = 200
+)
+
+type cohortReportInput struct {
+	DatasetTag string `json:"dataset_tag,omitempty" jsonschema:"the cohort's dataset tag; the default public cohort when omitted"`
+	From       string `json:"from,omitempty" jsonschema:"baseline snapshot slug; the snapshot before to when omitted"`
+	To         string `json:"to,omitempty" jsonschema:"later snapshot slug; the newest snapshot when omitted"`
+	Limit      int    `json:"limit,omitempty" jsonschema:"max tag rows per list and max mover rows (default 20, max 200)"`
+	MinCluster int    `json:"min_cluster,omitempty" jsonschema:"domains a cluster needs (server default 3)"`
+	MaxSpread  int    `json:"max_spread,omitempty" jsonschema:"score spread a cluster allows (server default 3)"`
+}
+
+type cohortReportProvenance struct {
+	FromEngineVersion     string `json:"from_engine_version,omitempty"`
+	ToEngineVersion       string `json:"to_engine_version,omitempty"`
+	VocabularyKnown       bool   `json:"vocabulary_known" jsonschema:"false means no change can be attributed to the engine"`
+	TagsAddedToEngine     int    `json:"tags_added_to_engine"`
+	TagsRemovedFromEngine int    `json:"tags_removed_from_engine"`
+	TagsReclassified      int    `json:"tags_reclassified"`
+	ScoringConfigChanged  string `json:"scoring_config_changed" jsonschema:"true, false or unknown"`
+	TagFloor              string `json:"tag_floor,omitempty" jsonschema:"findings below this level are absent from the per-domain lists"`
+	FromProfile           string `json:"from_profile,omitempty"`
+	ToProfile             string `json:"to_profile,omitempty"`
+}
+
+type cohortReportTotals struct {
+	FromDomainCount  int            `json:"from_domain_count"`
+	ToDomainCount    int            `json:"to_domain_count"`
+	BothDomainCount  int            `json:"both_domain_count"`
+	Added            int            `json:"added"`
+	Removed          int            `json:"removed"`
+	IdenticalScore   int            `json:"identical_score"`
+	Improved         int            `json:"improved"`
+	Regressed        int            `json:"regressed"`
+	FromMeanScore    *float64       `json:"from_mean_score,omitempty"`
+	ToMeanScore      *float64       `json:"to_mean_score,omitempty"`
+	FromGrades       map[string]int `json:"from_grades,omitempty"`
+	ToGrades         map[string]int `json:"to_grades,omitempty"`
+	DomainCategories map[string]int `json:"domain_categories,omitempty" jsonschema:"movers per cause: real, measurement, mixed, unknown"`
+}
+
+type cohortReportTag struct {
+	Tag            string `json:"tag"`
+	Module         string `json:"module,omitempty"`
+	FromLevel      string `json:"from_level,omitempty"`
+	ToLevel        string `json:"to_level,omitempty"`
+	DomainDelta    int    `json:"domain_delta"`
+	Classification string `json:"classification" jsonschema:"new_in_engine, removed_from_engine, level_reclassified, cohort_change or unknown"`
+}
+
+type cohortReportMover struct {
+	Domain           string   `json:"domain"`
+	FromScore        *int     `json:"from_score,omitempty"`
+	ToScore          *int     `json:"to_score,omitempty"`
+	ScoreDelta       *int     `json:"score_delta,omitempty"`
+	FromGrade        string   `json:"from_grade,omitempty"`
+	ToGrade          string   `json:"to_grade,omitempty"`
+	Category         string   `json:"category" jsonschema:"real, measurement, mixed or unknown"`
+	ExplainedDelta   int      `json:"explained_delta" jsonschema:"score movement the listed findings account for"`
+	UnexplainedDelta int      `json:"unexplained_delta" jsonschema:"non-zero names a cause the report cannot see"`
+	Appeared         []string `json:"appeared,omitempty" jsonschema:"tags that appeared on this domain"`
+	Cleared          []string `json:"cleared,omitempty" jsonschema:"tags that cleared on this domain"`
+}
+
+type cohortReportCluster struct {
+	Dimensions []string `json:"dimensions" jsonschema:"the shared values, as dimension=value (n of total)"`
+	Domains    []string `json:"domains"`
+	Size       int      `json:"size"`
+	MinDelta   int      `json:"min_delta"`
+	MaxDelta   int      `json:"max_delta"`
+	Direction  string   `json:"direction" jsonschema:"improved or regressed"`
+}
+
+type cohortReportOutput struct {
+	DatasetTag       string                 `json:"dataset_tag"`
+	FromSlug         string                 `json:"from_slug"`
+	ToSlug           string                 `json:"to_slug"`
+	Provenance       cohortReportProvenance `json:"provenance"`
+	Totals           cohortReportTotals     `json:"totals"`
+	TagsAppeared     []cohortReportTag      `json:"tags_appeared"`
+	TagsCleared      []cohortReportTag      `json:"tags_cleared"`
+	TagsLevelChanged []cohortReportTag      `json:"tags_level_changed"`
+	Movers           []cohortReportMover    `json:"movers" jsonschema:"biggest score movements first, in either direction"`
+	Clusters         []cohortReportCluster  `json:"clusters" jsonschema:"movers that moved together and share a nameserver, ASN, prefix or software version"`
+	Truncated        bool                   `json:"truncated" jsonschema:"true when a list was cut to limit"`
+}
+
+// resolveReportPair fills the dataset tag from the catalog and a missing
+// slug from the snapshot list, newest first.
+func resolveReportPair(ctx context.Context, api *apiClient, in cohortReportInput) (string, string, string, error) {
+	datasetTag := strings.TrimSpace(in.DatasetTag)
+	if datasetTag == "" {
+		catalog, err := api.getAnalysisCatalog(ctx)
+		if err != nil {
+			return "", "", "", toolError("get analysis catalog", err)
+		}
+		datasetTag = catalog.DefaultTag
+		if datasetTag == "" && len(catalog.Cohorts) == 1 {
+			datasetTag = catalog.Cohorts[0].DatasetTag
+		}
+		if datasetTag == "" {
+			names := make([]string, 0, len(catalog.Cohorts))
+			for _, c := range catalog.Cohorts {
+				names = append(names, c.DatasetTag)
+			}
+			if len(names) == 0 {
+				return "", "", "", errors.New("no public analysis cohort is available")
+			}
+			return "", "", "", errors.New("dataset_tag is required; available: " + strings.Join(names, ", "))
+		}
+	}
+	from, to := strings.TrimSpace(in.From), strings.TrimSpace(in.To)
+	if from != "" && to != "" {
+		return datasetTag, from, to, nil
+	}
+	list, err := api.listAnalysisSnapshots(ctx, datasetTag)
+	if err != nil {
+		return "", "", "", toolError("list snapshots", err)
+	}
+	if len(list.Snapshots) < 2 {
+		return "", "", "", errors.New("cohort " + datasetTag + " has fewer than two snapshots to compare")
+	}
+	if to == "" {
+		to = list.Snapshots[0].Slug
+	}
+	if from != "" {
+		return datasetTag, from, to, nil
+	}
+	for i, snap := range list.Snapshots {
+		if snap.Slug == to && i+1 < len(list.Snapshots) {
+			return datasetTag, list.Snapshots[i+1].Slug, to, nil
+		}
+	}
+	return "", "", "", errors.New("no snapshot precedes " + to + " in cohort " + datasetTag)
+}
+
+// rankTags puts the largest movement first, so a cut list keeps the rows
+// worth reading.
+func rankTags(entries []reportTagEntryView, limit int) ([]cohortReportTag, bool) {
+	sorted := append([]reportTagEntryView(nil), entries...)
+	sort.Slice(sorted, func(i, j int) bool {
+		di, dj := abs(sorted[i].DomainDelta), abs(sorted[j].DomainDelta)
+		if di != dj {
+			return di > dj
+		}
+		return sorted[i].Tag < sorted[j].Tag
+	})
+	truncated := len(sorted) > limit
+	if truncated {
+		sorted = sorted[:limit]
+	}
+	out := make([]cohortReportTag, 0, len(sorted))
+	for _, e := range sorted {
+		out = append(out, cohortReportTag{
+			Tag: e.Tag, Module: e.Module, FromLevel: e.FromLevel, ToLevel: e.ToLevel,
+			DomainDelta: e.DomainDelta, Classification: e.Classification,
+		})
+	}
+	return out, truncated
+}
+
+func abs(v int) int {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+
+func deltaOrZero(v *int) int {
+	if v == nil {
+		return 0
+	}
+	return *v
+}
+
+// rankMovers orders by the size of the score movement in either direction.
+func rankMovers(domains []reportDomainView, limit int) ([]cohortReportMover, bool) {
+	sorted := append([]reportDomainView(nil), domains...)
+	sort.Slice(sorted, func(i, j int) bool {
+		di, dj := abs(deltaOrZero(sorted[i].ScoreDelta)), abs(deltaOrZero(sorted[j].ScoreDelta))
+		if di != dj {
+			return di > dj
+		}
+		return sorted[i].Domain < sorted[j].Domain
+	})
+	truncated := len(sorted) > limit
+	if truncated {
+		sorted = sorted[:limit]
+	}
+	out := make([]cohortReportMover, 0, len(sorted))
+	for _, d := range sorted {
+		mover := cohortReportMover{
+			Domain: d.Domain, FromScore: d.FromScore, ToScore: d.ToScore, ScoreDelta: d.ScoreDelta,
+			FromGrade: d.FromGrade, ToGrade: d.ToGrade, Category: d.Category,
+			ExplainedDelta: d.ExplainedDelta, UnexplainedDelta: d.UnexplainedDelta,
+		}
+		for _, t := range d.Appeared {
+			mover.Appeared = append(mover.Appeared, t.Tag+" ("+t.Classification+")")
+		}
+		for _, t := range d.Cleared {
+			mover.Cleared = append(mover.Cleared, t.Tag+" ("+t.Classification+")")
+		}
+		out = append(out, mover)
+	}
+	return out, truncated
+}
+
+func registerCohortReport(srv *mcp.Server, api *apiClient) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name: "cohort_report",
+		Description: "Compare two snapshots of an analysis cohort and classify every change as engine-driven " +
+			"or real. Returns the provenance of both sides (engine version, tag vocabulary delta, scoring " +
+			"configuration state, tag floor), what moved cohort-wide, each moving domain with its cause, and " +
+			"clusters of domains that moved together behind a shared nameserver, ASN, prefix or software " +
+			"version. Answers \"did the cohort get worse, or did the engine start looking harder?\": a tag " +
+			"classified new_in_engine appeared because the engine gained it, a cohort_change tag appeared " +
+			"because the domains changed. With no arguments it compares the two newest snapshots of the " +
+			"default cohort. Snapshots are keyed by batch, so this is also the batch-to-batch comparison.",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in cohortReportInput) (*mcp.CallToolResult, cohortReportOutput, error) {
+		datasetTag, from, to, err := resolveReportPair(ctx, api, in)
+		if err != nil {
+			return nil, cohortReportOutput{}, err
+		}
+		limit := in.Limit
+		if limit <= 0 {
+			limit = defaultReportRows
+		}
+		if limit > maxReportRows {
+			limit = maxReportRows
+		}
+		q := url.Values{}
+		q.Set("from", from)
+		q.Set("to", to)
+		if in.MinCluster > 0 {
+			q.Set("min_cluster", strconv.Itoa(in.MinCluster))
+		}
+		if in.MaxSpread > 0 {
+			q.Set("max_spread", strconv.Itoa(in.MaxSpread))
+		}
+		report, err := api.getAnalysisReport(ctx, datasetTag, q)
+		if err != nil {
+			return nil, cohortReportOutput{}, toolError("get cohort report", err)
+		}
+
+		vocab := report.Header.Vocabulary
+		out := cohortReportOutput{
+			DatasetTag: report.DatasetTag, FromSlug: report.FromSlug, ToSlug: report.ToSlug,
+			Provenance: cohortReportProvenance{
+				FromEngineVersion:     report.Header.From.EngineVersion,
+				ToEngineVersion:       report.Header.To.EngineVersion,
+				VocabularyKnown:       vocab.FromAvailable && vocab.ToAvailable,
+				TagsAddedToEngine:     len(vocab.Added),
+				TagsRemovedFromEngine: len(vocab.Removed),
+				TagsReclassified:      len(vocab.LevelChanged),
+				ScoringConfigChanged:  report.Header.ScoringConfigChanged,
+				TagFloor:              report.Header.TagFloor,
+				FromProfile:           report.Header.From.ProfileName,
+				ToProfile:             report.Header.To.ProfileName,
+			},
+			Totals: cohortReportTotals{
+				FromDomainCount: report.Totals.FromDomainCount, ToDomainCount: report.Totals.ToDomainCount,
+				BothDomainCount: report.Totals.BothDomainCount, Added: report.Totals.Added,
+				Removed: report.Totals.Removed, IdenticalScore: report.Totals.IdenticalScore,
+				Improved: report.Totals.Improved, Regressed: report.Totals.Regressed,
+				FromMeanScore: report.Totals.FromMeanScore, ToMeanScore: report.Totals.ToMeanScore,
+				FromGrades: report.Totals.FromGrades, ToGrades: report.Totals.ToGrades,
+				DomainCategories: report.Totals.DomainCategories,
+			},
+		}
+		var cut bool
+		out.TagsAppeared, cut = rankTags(report.Tags.Appeared, limit)
+		out.Truncated = out.Truncated || cut
+		out.TagsCleared, cut = rankTags(report.Tags.Cleared, limit)
+		out.Truncated = out.Truncated || cut
+		out.TagsLevelChanged, cut = rankTags(report.Tags.LevelChanged, limit)
+		out.Truncated = out.Truncated || cut
+		out.Movers, cut = rankMovers(report.Domains, limit)
+		out.Truncated = out.Truncated || cut
+
+		out.Clusters = make([]cohortReportCluster, 0, len(report.Clusters))
+		for _, c := range report.Clusters {
+			cluster := cohortReportCluster{
+				Domains: c.Domains, Size: c.Size, MinDelta: c.MinDelta, MaxDelta: c.MaxDelta, Direction: c.Direction,
+			}
+			for _, d := range c.Dimensions {
+				value := d.Label
+				if value == "" {
+					value = d.Value
+				}
+				cluster.Dimensions = append(cluster.Dimensions,
+					fmt.Sprintf("%s=%s (%d of %d)", d.Dimension, value, c.Size, d.TotalDomains))
+			}
+			out.Clusters = append(out.Clusters, cluster)
+		}
+		return nil, out, nil
 	})
 }

@@ -14,8 +14,8 @@ The default server is:
 gonemaster-client --server http://localhost:8080/api/v1 jobs list
 ```
 
-Set `--server` to the admin API base URL. Public API endpoints are not the
-default target for this client.
+Set `--server` to the admin API base URL. The `report` command reads the
+public analysis API, which the client derives from that same base.
 
 ## Global Options
 
@@ -53,12 +53,14 @@ Exit codes:
 - `tags`: manage named domain collections.
 - `runs`: inspect completed historical runs.
 - `entries`: query stored log entries.
+- `report`: compare two cohort snapshots and classify every change.
 
 ## Guides
 
 - Jobs: [jobs.md](jobs.md)
 - Batches: [batches.md](batches.md)
 - Domains, tags, runs, and entries: [domains-tags-runs-entries.md](domains-tags-runs-entries.md)
+- Cohort report: [report.md](report.md)
 - Examples: [examples.md](examples.md)
 
 The concise Unix man-page form is kept at

@@ -64,3 +64,13 @@ gonemaster-client jobs results job_123 --view raw --format json \
 ```sh
 gonemaster-client jobs results job_123 --view translated --locale sv
 ```
+
+## Report a Cohort's Two Newest Snapshots
+
+```sh
+gonemaster-client report kommuner --output kommuner-report.md
+```
+
+Reports the tags that appeared or cleared, every moving domain, and whether
+each change came from the cohort or from the engine. See
+[report.md](report.md).

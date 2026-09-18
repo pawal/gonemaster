@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -29,6 +30,9 @@ func ds22Key(name string, qtype string) string {
 	return strings.ToLower(strings.TrimSuffix(name, ".")) + "/" + qtype
 }
 
+// ds22CountMu guards counts, which several query goroutines share.
+var ds22CountMu sync.Mutex
+
 // ds22Server answers from answers and counts the questions it was asked.
 // A query without the DO bit loses its RRSIG records, so a testcase that
 // forgets DO sees unsigned data.
@@ -37,7 +41,9 @@ func ds22Server(t *testing.T, ctx context.Context, name string, ip string, answe
 	return tctest.NS(t, ctx, name, ip, func(q tctest.Query) packet.Packet {
 		key := ds22Key(q.Name, q.Type)
 		if counts != nil {
+			ds22CountMu.Lock()
 			counts[key]++
+			ds22CountMu.Unlock()
 		}
 		resp, ok := answers[key]
 		if !ok {

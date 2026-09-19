@@ -85,6 +85,16 @@ go build -o gonemaster ./cmd/gonemaster
 sudo install -m 0755 gonemaster /usr/local/bin/gonemaster
 ```
 
+On Nix or NixOS, build from the repository flake:
+
+```console
+nix run git+https://codeberg.org/pawal/gonemaster -- example.com
+nix build git+https://codeberg.org/pawal/gonemaster#gonemaster-nogui
+```
+
+The `gonemaster-nogui` output is the server without the embedded web UIs and
+builds without Node.js.
+
 `make packages` builds Debian and RPM packages (building the embedded web UIs
 requires Node.js), and `make help` lists the other targets: builds, tests,
 UI builds, packaging, and documentation checks.

@@ -51,3 +51,7 @@
 # CI Go caches, shared between pipeline steps via the workspace
 /.gocache/
 /.gomodcache/
+
+# Nix build symlinks
+/result
+/result-*

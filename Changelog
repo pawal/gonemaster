@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- build: a Nix flake builds every binary, with a nogui output that needs no Node.js
+
 ### Fixed
 
 - badkeys: the small private exponent check detects Wiener vulnerable keys of real size

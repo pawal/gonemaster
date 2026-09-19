@@ -129,9 +129,7 @@ describe("DnssecChain", () => {
     expect(tip.textContent).toContain("Algorithm: ECDSAP256SHA256");
   });
 
-  // The tip box is measured once per text change, not per pointer move: the
-  // per-move read forced a layout and returned the previous text's box,
-  // because the DOM updates only after the handler returns.
+  // The tip box is measured once per text change, not per pointer move.
   it("measures the tooltip once per text change and flips it at the viewport edge", async () => {
     const container = await draw(secureChain());
 
@@ -232,9 +230,7 @@ describe("DnssecChain", () => {
   });
 
   it("renders an unverifiable large-RSA-exponent chain as a warn (partial), not a failure", async () => {
-    // The .lv shape: DS matches the KSK, but the local verifier cannot check
-    // the KSK's RSA exponent, so the DNSKEY signature is unsupported_key. The
-    // chain rolls up to partial and the signature edge is amber, not red.
+    // A DS matching a KSK whose RSA exponent the verifier cannot check.
     const chain = secureChain();
     chain.status = "partial";
     chain.child.dnskey_rrsig = [
@@ -260,10 +256,7 @@ describe("DnssecChain", () => {
   });
 
   it("renders when the parent serves multiple DS RRSIGs with the same key tag and day", async () => {
-    // The real .lv shape: root servers re-sign the DS RRset on staggered
-    // schedules, so the same signer (key 57780) appears twice, differing only
-    // sub-day. The facts list must not derive a duplicate {#each} key from
-    // (key_tag, day) or Svelte throws each_key_duplicate and the section hangs.
+    // Two DS RRSIGs by one key, differing sub-day.
     const chain = secureChain();
     chain.status = "partial";
     chain.parent.ds_rrsig = [
@@ -637,9 +630,7 @@ describe("DnssecChain node faces", () => {
     expect(ksk.querySelectorAll("text").length).toBe(3);
   });
 
-  // The label block is centred on its ink, not on its baselines, so the space
-  // above the heading matches the space below the last line however many lines
-  // a node has. Centring on baselines leaves the bottom visibly tight.
+  // The label block is centred on its ink, not on its baselines.
   it("centres the label block in the box whatever the line count", async () => {
     // Cap height of the 13px bold heading: where the block's ink starts. The
     // face has no descenders, so its ink ends on the last baseline.

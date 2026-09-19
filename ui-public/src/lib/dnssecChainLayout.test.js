@@ -28,9 +28,7 @@ function hasTip(el, k) {
 }
 
 describe("algoMnemonic", () => {
-  // The diagram keeps its own algorithm table, so a new algorithm reads as a
-  // bare number until it is added here. ML-DSA-44 shipped verifying but shown
-  // as "alg 18", which looks unsupported.
+  // An algorithm missing from the diagram's table reads as a bare number.
   it("names ML-DSA-44 instead of showing a bare algorithm number", () => {
     expect(algoMnemonic(18)).toBe("MLDSA44");
 
@@ -111,8 +109,8 @@ describe("layoutChain", () => {
 
     const ksk = g.nodes.find((n) => n.kind === "ksk");
     const zsk = g.nodes.find((n) => n.kind === "zsk");
-    expect(ksk).toBeTruthy();
-    expect(zsk).toBeTruthy();
+    expect(ksk.keyTag).toBe(1000);
+    expect(zsk.keyTag).toBe(2000);
     // KSK sits in a row above the ZSK.
     expect(ksk.rowIndex).toBeLessThan(zsk.rowIndex);
 
@@ -161,7 +159,7 @@ describe("layoutChain", () => {
     expect(pk.y).toBeLessThan(ds.y);
     // A signing edge runs from the parent key down to the DS.
     const edge = g.edges.find((e) => e.kind === "keysig" && e.keyTag === 5000);
-    expect(edge).toBeTruthy();
+    expect(edge).toBeDefined();
     expect(edge.status).toBe("valid");
     expect(edge.from.y).toBeLessThan(edge.to.y);
     // The parent frame holds both parent rows.
@@ -204,20 +202,16 @@ describe("layoutChain", () => {
 
     // The KSK signs the DNSKEY RRset: a self-loop plus a "signs" edge to the ZSK.
     const selfLoop = g.edges.find((e) => e.kind === "selfsig" && e.keyTag === 1000);
-    expect(selfLoop).toBeTruthy();
+    expect(selfLoop).toBeDefined();
     expect(selfLoop.status).toBe("valid");
     expect(typeof selfLoop.d).toBe("string");
 
     const keySig = g.edges.find((e) => e.kind === "keysig" && e.keyTag === 1000 && e.targetTag === 2000);
-    expect(keySig).toBeTruthy();
+    expect(keySig.status).toBe("valid");
   });
 
   it("carries an algorithm_mismatch DS link through to the edge and tip", () => {
-    // A DS whose algorithm field disagrees with the DNSKEY it points at is
-    // unusable for validators (RFC 4034 section 5.2). The layout must pass
-    // the status through untouched: DnssecChain.svelte colors any non-match
-    // DS edge as bad, and the tip localizes the status via
-    // pub.dnssec_chain_linkstatus_algorithm_mismatch.
+    // algorithm_mismatch passes through to the DS edge and its tip.
     const g = layoutChain(secureChain({
       status: "broken",
       parent: {
@@ -312,7 +306,7 @@ describe("layoutChain", () => {
     // CDS names the KSK (key tag 1000): a grey reference edge points to it,
     // drawn as a bowed path so it clears the signature edge.
     const ref = g.edges.find((e) => e.kind === "ref" && e.id === "ref-CDS-1000");
-    expect(ref).toBeTruthy();
+    expect(ref).toBeDefined();
     expect(ref.targetTag).toBe(1000);
     expect(typeof ref.d).toBe("string");
   });
@@ -424,7 +418,7 @@ describe("layoutChain", () => {
     chain.child.dnskey_rrsig = [{ key_tag: 10075, algorithm: 8, state: "valid" }];
     const g = layoutChain(chain);
     const sibling = g.edges.find((e) => e.kind === "keysig" && e.keyTag === 10075 && e.targetTag === 37745);
-    expect(sibling).toBeTruthy();
+    expect(sibling.status).toBe("valid");
     // Same-row sibling edges render as a path, not a straight line.
     expect(typeof sibling.d).toBe("string");
     // 10075 still vouches downward for the ZSK too.
@@ -505,16 +499,14 @@ describe("layoutChain", () => {
     });
     const g = layoutChain(chain);
     const input = g.nodes.find((n) => n.kind === "ds-input");
-    expect(input).toBeTruthy();
+    expect(input).toBeDefined();
     // The "-" placeholder for input DS must not render as a servers line.
     expect(hasTip(input, "pub.dnssec_chain_tip_servers")).toBe(false);
     expect(hasTip(input, "pub.dnssec_chain_tip_ds_input")).toBe(true);
   });
 
   it("groups dual-digest DS records for one key tag into a single node and edge", () => {
-    // A parent commonly publishes SHA-256 and SHA-384 DS records for the same
-    // KSK. They collapse to one DS node (both digests listed in its tooltip)
-    // and one DS -> DNSKEY edge, rather than two boxes with the same tag.
+    // Two digest types for one key tag collapse to one DS node and one edge.
     const chain = secureChain();
     chain.parent.ds = [
       { key_tag: 1000, algorithm: 13, digest_type: 2, digest: "ab", servers: ["192.0.2.1"] },
@@ -559,9 +551,7 @@ describe("layoutChain", () => {
   });
 
   it("merges overlapping signatures by the same key into one identified edge", () => {
-    // During re-signing a zone serves two RRSIGs by the same key with
-    // different validity windows. They share one path, so they share one edge
-    // rather than being drawn on top of each other, and ids stay unique.
+    // Two RRSIGs by one key over one RRset share a single edge.
     const chain = secureChain();
     chain.child.dnskey_rrsig = [
       { key_tag: 1000, algorithm: 13, state: "valid", inception: 100, expiration: 200, servers: ["203.0.113.1"] },
@@ -576,9 +566,7 @@ describe("layoutChain", () => {
   });
 
   it("draws a phantom key node for a DS naming an absent key, with an edge to it", () => {
-    // Stale DS after a rollover: keytag 1000 has a DS but is gone from the
-    // DNSKEY RRset. A grey phantom key node stands in for it and the broken
-    // DS edge points at it, rather than the DS floating with no target.
+    // A DS whose key tag is gone from the DNSKEY RRset gets a phantom target.
     const chain = secureChain();
     chain.links = [{ ds_key_tag: 1000, ds_digest_type: 2, status: "no_dnskey", servers: ["192.0.2.1"] }];
     chain.child.dnskeys = [{ key_tag: 2000, algorithm: 13, flags: 256, sep: false, servers: ["203.0.113.1"] }];
@@ -610,9 +598,7 @@ describe("layoutChain", () => {
   });
 
   it("orders the key row by key tag so DS edges do not cross the phantom", () => {
-    // A DS for the absent key 11155 (phantom) and a DS for the present KSK
-    // 34586. The key row must be [11155, 34586] to match the DS row order, so
-    // the two DS edges stay parallel.
+    // The key row follows the DS row order, so the two DS edges stay parallel.
     const chain = secureChain();
     chain.parent.ds = [
       { key_tag: 11155, algorithm: 8, digest_type: 2, digest: "ab", servers: ["192.0.2.1"] },
@@ -646,7 +632,7 @@ describe("layoutChain", () => {
     const chain = secureChain();
     const g = layoutChain(chain);
     const dsEdge = g.edges.find((e) => e.kind === "ds");
-    expect(dsEdge).toBeTruthy();
+    expect(dsEdge).toBeDefined();
     expect(dsEdge.status).toBe("match");
   });
 });
@@ -670,9 +656,7 @@ describe("worstSigState", () => {
 });
 
 describe("layoutChain signature overlap", () => {
-  // A lagging secondary serves an expired signature over the same RRset as the
-  // fresh servers. Both edges share a path, so the fresh one used to be drawn
-  // on top of the expired one and hide it.
+  // A fresh and an expired signature over one RRset share a path.
   it("collapses same-path DNSKEY signatures into one worst-state edge", () => {
     const chain = secureChain();
     chain.child.dnskey_rrsig = [
@@ -783,9 +767,7 @@ describe("node face labels", () => {
     expect(zsk.bitsText).toBe("2048 bit");
   });
 
-  // The DS face carries the key algorithm, not the digest: that is the field
-  // that has to equal the DNSKEY's, and one DS node groups every digest type
-  // published for the tag, so a single digest line would be lossy.
+  // A DS node carries the key algorithm and every published digest in its tip.
   it("puts the key algorithm on a DS node and keeps every digest in its tip", () => {
     const chain = secureChain();
     chain.parent.ds = [
@@ -826,14 +808,14 @@ describe("node face labels", () => {
     const noKeys = secureChain();
     noKeys.child.dnskeys = [];
     const ghost = layoutChain(noKeys).nodes.find((n) => n.kind === "key-ghost");
-    expect(ghost).toBeTruthy();
+    expect(ghost).toBeDefined();
     expect(ghost.algoText).toBe(undefined);
 
     const noDS = secureChain();
     noDS.parent.ds = [];
     noDS.links = [];
     const dsGhost = layoutChain(noDS).nodes.find((n) => n.kind === "ds-ghost");
-    expect(dsGhost).toBeTruthy();
+    expect(dsGhost).toBeDefined();
     expect(dsGhost.algoText).toBe(undefined);
 
     // A DS naming a key tag the zone does not publish gets a phantom target.
@@ -841,7 +823,7 @@ describe("node face labels", () => {
     stale.parent.ds.push({ key_tag: 5000, algorithm: 13, digest_type: 2, digest: "cc", servers: ["192.0.2.1"] });
     stale.links.push({ ds_key_tag: 5000, ds_digest_type: 2, status: "no_dnskey", servers: ["192.0.2.1"] });
     const phantom = layoutChain(stale).nodes.find((n) => n.kind === "key-phantom");
-    expect(phantom).toBeTruthy();
+    expect(phantom).toBeDefined();
     expect(phantom.algoText).toBe(undefined);
     expect(phantom.bitsText).toBe(undefined);
   });

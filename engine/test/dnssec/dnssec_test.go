@@ -1048,6 +1048,62 @@ func TestDNSSEC03SaltLengthCountsOctets(t *testing.T) {
 	}
 }
 
+// Two NSEC3 chains in one response must both be reported, whatever the wire order.
+func TestDNSSEC03SamplesEveryNSEC3Chain(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	chain := func(owner string, iterations uint16, salt string) *dns.NSEC3 {
+		rr := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+		rr.Hash = 1
+		rr.Flags = 0
+		rr.Iterations = iterations
+		rr.SaltLength = uint8(len(salt) / 2)
+		rr.Salt = salt
+		return rr
+	}
+
+	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.13", func(q tctest.Query) packet.Packet {
+		switch q.Type {
+		case "DNSKEY":
+			key := tctest.DNSKEYRR(q.Name, 8, tctest.PublicKey("AwEAAc=="))
+			return dnskeyPacket(q.Name, key)
+		case "NSEC":
+			return tctest.Response(
+				tctest.Question(q.Name, dns.TypeNSEC),
+				tctest.Secure(),
+				tctest.Authority(chain(q.Name, 0, ""), chain(q.Name, 10, "aabbccdd")),
+			)
+		default:
+			return packet.Packet{}
+		}
+	})
+
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{ns}, nil
+	})
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC03(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec03: %v", err)
+	}
+
+	tctest.RequireTag(t, entries, "DS03_ERR_MULT_NSEC3")
+	tctest.RequireTag(t, entries, "DS03_INCONSISTENT_ITERATION")
+	tctest.RequireTag(t, entries, "DS03_INCONSISTENT_SALT_LENGTH")
+	tctest.RequireTag(t, entries, "DS03_LEGAL_ITERATION_VALUE")
+	tctest.RequireTag(t, entries, "DS03_LEGAL_EMPTY_SALT")
+
+	illegal := tctest.RequireTag(t, entries, "DS03_ILLEGAL_ITERATION_VALUE")
+	if got, ok := illegal.Args["int"].(uint16); !ok || got != 10 {
+		t.Fatalf("expected iteration 10 from the second chain, got %#v", illegal.Args["int"])
+	}
+	salt := tctest.RequireTag(t, entries, "DS03_ILLEGAL_SALT_LENGTH")
+	if got, ok := salt.Args["int"].(int); !ok || got != 4 {
+		t.Fatalf("expected salt length 4 octets from the second chain, got %#v", salt.Args["int"])
+	}
+}
+
 // An absent salt is the recommended practice and stays legal at length 0.
 func TestDNSSEC03EmptySaltIsLegal(t *testing.T) {
 	ctx := tctest.Context(t)

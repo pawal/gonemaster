@@ -29,7 +29,7 @@ Status: Final
      - Non-`NOERROR` or non-`AA` -> mark `Error Response NSEC Query`.
      - No NSEC3 in authority -> mark `Responds Without NSEC3`.
      - Otherwise mark `Responds With NSEC3`; if multiple NSEC3 RRs exist, also mark `Multiple NSEC3`.
-     - Use the first NSEC3 RR to extract hash algorithm, flags, iterations, and salt length in octets (RFC 5155 section 3.1.5).
+     - Extract hash algorithm, flags, iterations, and salt length in octets (RFC 5155 section 3.1.5) from every NSEC3 RR in the response. Each distinct value is recorded once per nameserver, so a nameserver serving two NSEC3 chains contributes both parameter sets.
 4. Emit DNSSEC-support summary tags:
    - `DS03_NO_DNSSEC_SUPPORT` if no nameserver had DNSKEY but at least one lacked DNSKEY.
    - `DS03_SERVER_NO_DNSSEC_SUPPORT` if mixed DNSKEY support exists.
@@ -79,7 +79,7 @@ For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
     +- NSEC3 present
                                                  -> respondsWithNSEC3
         count > 1                                -> multipleNSEC3
-        first NSEC3 record -> capture hashAlgorithm, nsec3Flags,
+        every NSEC3 record -> capture distinct hashAlgorithm, nsec3Flags,
                               nsec3Iterations, nsec3SaltLength = len(Salt)
 
 DNSSEC-support summary:
@@ -230,6 +230,6 @@ emit TEST_CASE_END
   - `yes` (the upstream salt length is the hex-string length, which is twice the octet count the message text promises).
 
 ## Edge Cases And Limitations
-- When multiple NSEC3 records are present, only the first NSEC3 RR is used for parameter extraction (hash, flags, iterations, salt length).
+- A nameserver that serves more than one NSEC3 chain reports every distinct parameter set, so the inconsistency tags fire on a single nameserver as well as across nameservers. RFC 5155 section 7.2 requires all NSEC3 RRs in one response to share hash algorithm, iterations, and salt.
 - Nameservers whose DNSKEY response fails shape checks (`NOERROR` and `AA`) are silently skipped for DS03 finding sets.
 - Salt length is the octet count carried by the NSEC3 `Salt` field, so an absent salt is length `0` and yields `DS03_LEGAL_EMPTY_SALT`.

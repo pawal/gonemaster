@@ -1583,11 +1583,10 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		respondsWithoutNSEC3   bool
 		respondsWithNSEC3      bool
 		multipleNSEC3          bool
-		hasNSEC3Details        bool
-		hashAlgorithm          uint8
-		nsec3Flags             uint8
-		nsec3Iterations        uint16
-		nsec3SaltLength        int
+		hashAlgorithm          []uint8
+		nsec3Flags             []uint8
+		nsec3Iterations        []uint16
+		nsec3SaltLength        []int
 		noResponseNSECQuery    bool
 		errorResponseNSECQuery bool
 	}
@@ -1656,19 +1655,19 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 				outcome.multipleNSEC3 = true
 			}
 
-			rr, ok := nsec3RRs[0].(*dns.NSEC3)
-			if !ok {
-				outcomes[i] = outcome
-				return nil
+			// Every chain in the response is sampled, not just the first record.
+			for _, record := range nsec3RRs {
+				rr, ok := record.(*dns.NSEC3)
+				if !ok {
+					continue
+				}
+				outcome.hashAlgorithm = appendDistinct(outcome.hashAlgorithm, rr.Hash)
+				outcome.nsec3Flags = appendDistinct(outcome.nsec3Flags, rr.Flags)
+				outcome.nsec3Iterations = appendDistinct(outcome.nsec3Iterations, rr.Iterations)
+
+				// RFC 5155 section 3.1.5 counts the salt in octets, and Salt is hex text.
+				outcome.nsec3SaltLength = appendDistinct(outcome.nsec3SaltLength, len(rr.Salt)/2)
 			}
-
-			outcome.hashAlgorithm = rr.Hash
-			outcome.nsec3Flags = rr.Flags
-			outcome.nsec3Iterations = rr.Iterations
-
-			// RFC 5155 section 3.1.5 counts the salt in octets, and Salt is hex text.
-			outcome.nsec3SaltLength = len(rr.Salt) / 2
-			outcome.hasNSEC3Details = true
 
 			outcomes[i] = outcome
 			return nil
@@ -1698,11 +1697,17 @@ func DNSSEC03(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if outcome.multipleNSEC3 {
 			multipleNSEC3 = append(multipleNSEC3, outcome.ns)
 		}
-		if outcome.hasNSEC3Details {
-			hashAlgorithm[outcome.hashAlgorithm] = append(hashAlgorithm[outcome.hashAlgorithm], outcome.ns)
-			nsec3Flags[outcome.nsec3Flags] = append(nsec3Flags[outcome.nsec3Flags], outcome.ns)
-			nsec3Iterations[outcome.nsec3Iterations] = append(nsec3Iterations[outcome.nsec3Iterations], outcome.ns)
-			nsec3SaltLength[outcome.nsec3SaltLength] = append(nsec3SaltLength[outcome.nsec3SaltLength], outcome.ns)
+		for _, value := range outcome.hashAlgorithm {
+			hashAlgorithm[value] = append(hashAlgorithm[value], outcome.ns)
+		}
+		for _, value := range outcome.nsec3Flags {
+			nsec3Flags[value] = append(nsec3Flags[value], outcome.ns)
+		}
+		for _, value := range outcome.nsec3Iterations {
+			nsec3Iterations[value] = append(nsec3Iterations[value], outcome.ns)
+		}
+		for _, value := range outcome.nsec3SaltLength {
+			nsec3SaltLength[value] = append(nsec3SaltLength[value], outcome.ns)
 		}
 		if outcome.noResponseNSECQuery {
 			noResponseNSECQuery = append(noResponseNSECQuery, outcome.ns)
@@ -7610,6 +7615,14 @@ func setTypedServersFromEndpoints(args map[string]any, values []logargs.Server) 
 	if typed, ok := logargs.Servers(servers)["servers"]; ok {
 		args["servers"] = typed
 	}
+}
+
+// Appends v unless dst already holds it.
+func appendDistinct[T comparable](dst []T, v T) []T {
+	if slices.Contains(dst, v) {
+		return dst
+	}
+	return append(dst, v)
 }
 
 func setTypedServersFromNames(args map[string]any, values []string) {

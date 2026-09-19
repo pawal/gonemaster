@@ -77,10 +77,10 @@ func TestEffectiveProfileDebugOverride(t *testing.T) {
 }
 
 func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
-	// Timeout-bound; safe to overlap: all run state is per-Runner.
+	// Safe to overlap: all run state is per-Runner.
 	t.Parallel()
-	runner1 := newTestRunner(t, withRunLimits(1))
-	runner2 := newTestRunner(t, withRunLimits(2))
+	runner1 := newTestRunner(t, withRunLimits(1), withTestcases("syntax01"))
+	runner2 := newTestRunner(t, withRunLimits(2), withTestcases("syntax01"))
 	log1, log2 := runner1.Logger, runner2.Logger
 
 	req1 := RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}
@@ -121,9 +121,9 @@ func TestRunWithRunnerConcurrentIsolation(t *testing.T) {
 }
 
 func TestRunEmitsStartupTags(t *testing.T) {
-	// Timeout-bound; safe to overlap: all run state is per-Runner.
+	// Safe to overlap: all run state is per-Runner.
 	t.Parallel()
-	runner := newTestRunner(t, withRunLimits(1))
+	runner := newTestRunner(t, withRunLimits(1), withTestcases("syntax01"))
 	log := runner.Logger
 	_, _ = RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner)
 
@@ -136,7 +136,7 @@ func TestRunEmitsStartupTags(t *testing.T) {
 }
 
 func TestRunEmitsSkipIPv4Disabled(t *testing.T) {
-	runner := newTestRunner(t, withRunLimits(1))
+	runner := newTestRunner(t, withRunLimits(1), withTestcases("syntax01"))
 	runner.Profile.Net.IPv4 = false
 	log := runner.Logger
 	_, _ = RunWithRunner(RunRequest{Domain: "example.com", Testcases: []string{"syntax01"}}, runner)

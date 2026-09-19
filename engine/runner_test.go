@@ -33,19 +33,20 @@ func withCache(cache *nameserver.CacheStore) runnerOpt {
 	return func(r *Runner) { r.NameserverCache = cache }
 }
 
+// withTestcases narrows the profile to the named testcases. RunWithRunner
+// takes the caller's profile as given, so only the module is selected without
+// this and every testcase in it queries the network.
+func withTestcases(names ...string) runnerOpt {
+	return func(r *Runner) { _ = r.Profile.Set("test_cases", toAnySlice(names)) }
+}
+
 // newTestRunner returns a runner with a default profile and a fresh logger.
 // Callers read back runner.Profile and runner.Logger to set up and assert.
 func newTestRunner(t *testing.T, opts ...runnerOpt) *Runner {
 	t.Helper()
-	runner := &Runner{}
+	runner := &Runner{Profile: testhelpers.DefaultProfile(t), Logger: logger.New()}
 	for _, opt := range opts {
 		opt(runner)
-	}
-	if runner.Profile == nil {
-		runner.Profile = testhelpers.DefaultProfile(t)
-	}
-	if runner.Logger == nil {
-		runner.Logger = logger.New()
 	}
 	return runner
 }

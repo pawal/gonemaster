@@ -170,21 +170,6 @@ func TestReportWithoutCohortNames(t *testing.T) {
 	res.RequireErrContains(t, "name a cohort: tld, kommuner")
 }
 
-func TestPublicAPIBase(t *testing.T) {
-	cases := map[string]string{
-		"http://localhost:8080/api/v1":  "http://localhost:8080/pub/api/v1",
-		"http://localhost:8080/api/v1/": "http://localhost:8080/pub/api/v1",
-		"https://example.com":           "https://example.com/pub/api/v1",
-	}
-	for in, want := range cases {
-		t.Run(in, func(t *testing.T) {
-			if got := publicAPIBase(in); got != want {
-				t.Errorf("publicAPIBase(%q) = %q, want %q", in, got, want)
-			}
-		})
-	}
-}
-
 // An unknown vocabulary must never read as an unchanged one.
 func TestReportVocabularyUnknownLine(t *testing.T) {
 	report := apitest.SampleReport()
@@ -257,4 +242,39 @@ func TestReportMarksPartialMoverPage(t *testing.T) {
 		"--from", apitest.ReportFromSlug, "--to", apitest.ReportToSlug)
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "Showing 2 of 290 movers, from offset 0.")
+}
+
+func TestReportErrors(t *testing.T) {
+	withoutReport := apitest.ReportOpts(nil)
+	withoutReport.AnalysisReport = nil
+
+	cases := []struct {
+		name string
+		opts apitest.Opts
+		args []string
+		want string
+	}{
+		{
+			"no cohort", apitest.Opts{}, []string{"report"},
+			"no public analysis cohort is available",
+		},
+		{
+			"no baseline", apitest.ReportOpts(nil), []string{"report", "--to", apitest.ReportFromSlug},
+			"no snapshot precedes " + apitest.ReportFromSlug + " in cohort " + apitest.ReportDatasetTag,
+		},
+		{
+			"report missing", withoutReport,
+			[]string{"report", "--from", apitest.ReportFromSlug, "--to", apitest.ReportToSlug},
+			"no report (code=x)",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			apitest.StubFake(t, &newHTTPClient, tc.opts)
+			res := clitest.Run(t, run, tc.args...)
+			res.RequireCode(t, 2)
+			res.RequireErrContains(t, tc.want)
+			res.RequireOutEmpty(t)
+		})
+	}
 }

@@ -63,7 +63,7 @@ func TestSpecGetToolNotFound(t *testing.T) {
 	if !res.IsError {
 		t.Fatalf("expected a not-found tool error")
 	}
-	if got := errorText(res); got == "" {
-		t.Errorf("expected an error message")
+	if got, want := errorText(res), "get testcase failed: not found (404)"; got != want {
+		t.Errorf("error = %q, want %q", got, want)
 	}
 }

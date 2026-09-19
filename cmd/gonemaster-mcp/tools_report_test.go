@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"net/url"
 	"strings"
 	"testing"
@@ -145,17 +146,69 @@ func TestCohortReportUnknownVocabulary(t *testing.T) {
 	}
 }
 
-func TestPublicBaseURL(t *testing.T) {
-	cases := map[string]string{
-		"http://localhost:8080/api/v1":  "http://localhost:8080/pub/api/v1",
-		"http://localhost:8080/api/v1/": "http://localhost:8080/pub/api/v1",
-		"https://example.com":           "https://example.com/pub/api/v1",
+func TestCohortReportErrors(t *testing.T) {
+	withoutReport := apitest.ReportOpts(nil)
+	withoutReport.AnalysisReport = nil
+
+	cases := []struct {
+		name string
+		opts apitest.Opts
+		args map[string]any
+		want string
+	}{
+		{
+			"no cohort", apitest.Opts{}, map[string]any{},
+			"no public analysis cohort is available",
+		},
+		{
+			"no baseline", apitest.ReportOpts(nil), map[string]any{"to": apitest.ReportFromSlug},
+			"no snapshot precedes " + apitest.ReportFromSlug + " in cohort " + apitest.ReportDatasetTag,
+		},
+		{
+			"report missing", withoutReport, map[string]any{},
+			"get cohort report failed: not found (404)",
+		},
 	}
-	for in, want := range cases {
-		t.Run(in, func(t *testing.T) {
-			if got := publicBaseURL(in); got != want {
-				t.Errorf("publicBaseURL(%q) = %q, want %q", in, got, want)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			api := fakeAPI(t, tc.opts)
+			res := callTool(t, api, "cohort_report", tc.args, nil)
+			if !res.IsError {
+				t.Fatalf("expected a tool error")
+			}
+			if got := errorText(res); got != tc.want {
+				t.Errorf("error = %q, want %q", got, tc.want)
 			}
 		})
+	}
+}
+
+// The lists stay at maxReportRows however large the requested limit is.
+func TestCohortReportClampsLimitToMax(t *testing.T) {
+	opts := apitest.ReportOpts(nil)
+	report := apitest.SampleReport()
+	report.Domains = nil
+	for i := range maxReportRows + 50 {
+		score, delta := 100, -(i + 1)
+		report.Domains = append(report.Domains, apitest.AnalysisReportDomain{
+			Domain:     fmt.Sprintf("d%03d.example", i),
+			FromScore:  &score,
+			ScoreDelta: &delta,
+			Category:   "real",
+		})
+	}
+	report.DomainTotal = len(report.Domains)
+	opts.AnalysisReport = &report
+
+	var out cohortReportOutput
+	callTool(t, fakeAPI(t, opts), "cohort_report", map[string]any{"limit": float64(maxReportRows + 300)}, &out)
+	if len(out.Movers) != maxReportRows {
+		t.Fatalf("movers = %d, want %d", len(out.Movers), maxReportRows)
+	}
+	if !out.Truncated {
+		t.Errorf("expected truncated=true after the clamp cut the list")
+	}
+	if out.Movers[0].Domain != "d249.example" {
+		t.Errorf("first mover = %q, want d249.example, the largest move", out.Movers[0].Domain)
 	}
 }

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"slices"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -87,18 +88,19 @@ func TestPrunableFewerReleasesThanKeep(t *testing.T) {
 	}
 }
 
-// forge serves one page of releases and records the assets deleted.
-func forge(t *testing.T, rels []release) (*httptest.Server, *[]string) {
+// forge serves the given pages of releases and records the assets deleted.
+func forge(t *testing.T, pages ...[]release) (*httptest.Server, *[]string) {
 	t.Helper()
 	var deleted []string
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/api/v1/repos/owner/name/releases":
-			if r.URL.Query().Get("page") != "1" {
-				fmt.Fprint(w, "[]")
-				return
+			page, _ := strconv.Atoi(r.URL.Query().Get("page"))
+			batch := []release{}
+			if page >= 1 && page <= len(pages) {
+				batch = pages[page-1]
 			}
-			if err := json.NewEncoder(w).Encode(rels); err != nil {
+			if err := json.NewEncoder(w).Encode(batch); err != nil {
 				t.Errorf("encode releases: %v", err)
 			}
 		case r.Method == http.MethodDelete && strings.Contains(r.URL.Path, "/assets/"):
@@ -181,5 +183,64 @@ func TestRunReportsForgeError(t *testing.T) {
 	err := run(&bytes.Buffer{}, c, 3, false)
 	if err == nil || !strings.Contains(err.Error(), "token required") {
 		t.Fatalf("err = %v, want the forge message", err)
+	}
+}
+
+func TestReleasesReadsEveryPage(t *testing.T) {
+	var first []release
+	for i := range pageLimit {
+		first = append(first, rel(int64(i+1), fmt.Sprintf("v1.0.%d", i)))
+	}
+	second := []release{rel(100, "v0.9.0"), rel(101, "v0.9.1")}
+	srv, _ := forge(t, first, second)
+	c := &client{base: srv.URL, repo: "owner/name", token: "t", http: srv.Client()}
+
+	all, err := c.releases()
+	if err != nil {
+		t.Fatalf("releases: %v", err)
+	}
+	if len(all) != pageLimit+2 {
+		t.Fatalf("releases = %d, want %d", len(all), pageLimit+2)
+	}
+	if all[pageLimit].TagName != "v0.9.0" || all[pageLimit+1].TagName != "v0.9.1" {
+		t.Fatalf("page two = %q, %q, want v0.9.0, v0.9.1", all[pageLimit].TagName, all[pageLimit+1].TagName)
+	}
+}
+
+func TestRunReportsNothingToPrune(t *testing.T) {
+	srv, deleted := forge(t, []release{rel(1, "v1.8.0")})
+	c := &client{base: srv.URL, repo: "owner/name", token: "t", http: srv.Client()}
+
+	var out bytes.Buffer
+	if err := run(&out, c, 3, false); err != nil {
+		t.Fatalf("run: %v", err)
+	}
+	if len(*deleted) != 0 {
+		t.Fatalf("deleted = %v, want none", *deleted)
+	}
+	if got, want := out.String(), "nothing to prune: 1 releases, keeping 3\n"; got != want {
+		t.Fatalf("output = %q, want %q", got, want)
+	}
+}
+
+func TestRunReportsAFailedDelete(t *testing.T) {
+	rels := []release{rel(1, "v1.8.0"), rel(2, "v1.7.9"), rel(3, "v1.7.8"), rel(4, "v1.7.7")}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			w.WriteHeader(http.StatusInternalServerError)
+			fmt.Fprint(w, "boom")
+			return
+		}
+		if err := json.NewEncoder(w).Encode(rels); err != nil {
+			t.Errorf("encode releases: %v", err)
+		}
+	}))
+	t.Cleanup(srv.Close)
+	c := &client{base: srv.URL, repo: "owner/name", token: "t", http: srv.Client()}
+
+	err := run(&bytes.Buffer{}, c, 3, false)
+	want := "delete v1.7.7 v1.7.7.tar.gz: DELETE /releases/4/assets/40: 500 Internal Server Error: boom"
+	if err == nil || err.Error() != want {
+		t.Fatalf("err = %v, want %q", err, want)
 	}
 }

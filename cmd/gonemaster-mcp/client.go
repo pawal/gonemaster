@@ -11,6 +11,8 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"codeberg.org/pawal/gonemaster/cmd/internal/publicapi"
 )
 
 // apiClient is a thin bearer-authenticated HTTP client for the admin API.
@@ -427,19 +429,9 @@ func (c *apiClient) listRuns(ctx context.Context, domain string, limit int) (run
 	return c.getRuns(ctx, q)
 }
 
-// publicBaseURL maps the admin API base onto the public API base, which
-// serves the analysis reads and needs no token.
-func publicBaseURL(base string) string {
-	trimmed := strings.TrimRight(base, "/")
-	if strings.HasSuffix(trimmed, "/api/v1") {
-		return strings.TrimSuffix(trimmed, "/api/v1") + "/pub/api/v1"
-	}
-	return trimmed + "/pub/api/v1"
-}
-
 // getPublic decodes a GET against the public API into out.
 func (c *apiClient) getPublic(ctx context.Context, path string, out any) error {
-	return c.doJSONURL(ctx, http.MethodGet, publicBaseURL(c.baseURL)+path, nil, out)
+	return c.doJSONURL(ctx, http.MethodGet, publicapi.Base(c.baseURL)+path, nil, out)
 }
 
 // analysisCohortView is one cohort of GET /analysis/catalog.

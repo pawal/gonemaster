@@ -10,25 +10,8 @@ import (
 	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
-// reportFixture stubs the public analysis routes with the shared report.
-func reportFixture(t *testing.T, captured *url.Values) {
-	t.Helper()
-	catalog := apitest.AnalysisCatalog{
-		DefaultTag: apitest.ReportDatasetTag,
-		Cohorts:    []apitest.AnalysisCohortView{{DatasetTag: apitest.ReportDatasetTag, Label: "Kommuner", IsDefault: true}},
-	}
-	snapshots := apitest.SnapshotPair()
-	report := apitest.SampleReport()
-	apitest.StubFake(t, &newHTTPClient, apitest.Opts{
-		AnalysisCatalog:     &catalog,
-		AnalysisSnapshots:   &snapshots,
-		AnalysisReport:      &report,
-		AnalysisReportQuery: captured,
-	})
-}
-
 func TestReportMarkdown(t *testing.T) {
-	reportFixture(t, nil)
+	apitest.StubFake(t, &newHTTPClient, apitest.ReportOpts(nil))
 	res := clitest.Run(t, run, "report", apitest.ReportDatasetTag, "--from", apitest.ReportFromSlug, "--to", apitest.ReportToSlug)
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t,
@@ -58,7 +41,7 @@ func TestReportMarkdown(t *testing.T) {
 }
 
 func TestReportJSON(t *testing.T) {
-	reportFixture(t, nil)
+	apitest.StubFake(t, &newHTTPClient, apitest.ReportOpts(nil))
 	res := clitest.Run(t, run, "--format", "json", "report", apitest.ReportDatasetTag,
 		"--from", apitest.ReportFromSlug, "--to", apitest.ReportToSlug)
 	res.RequireCode(t, 0)
@@ -77,7 +60,7 @@ func TestReportJSON(t *testing.T) {
 // With no slugs the client compares the two newest snapshots.
 func TestReportDefaultsToNewestPair(t *testing.T) {
 	var captured url.Values
-	reportFixture(t, &captured)
+	apitest.StubFake(t, &newHTTPClient, apitest.ReportOpts(&captured))
 	res := clitest.Run(t, run, "report")
 	res.RequireCode(t, 0)
 	if captured.Get("from") != apitest.ReportFromSlug || captured.Get("to") != apitest.ReportToSlug {
@@ -88,7 +71,7 @@ func TestReportDefaultsToNewestPair(t *testing.T) {
 // Only --to given: the snapshot before it becomes the baseline.
 func TestReportResolvesBaselineForTo(t *testing.T) {
 	var captured url.Values
-	reportFixture(t, &captured)
+	apitest.StubFake(t, &newHTTPClient, apitest.ReportOpts(&captured))
 	res := clitest.Run(t, run, "report", "--to", apitest.ReportToSlug)
 	res.RequireCode(t, 0)
 	if captured.Get("from") != apitest.ReportFromSlug {
@@ -98,7 +81,7 @@ func TestReportResolvesBaselineForTo(t *testing.T) {
 
 func TestReportForwardsClusterBounds(t *testing.T) {
 	var captured url.Values
-	reportFixture(t, &captured)
+	apitest.StubFake(t, &newHTTPClient, apitest.ReportOpts(&captured))
 	res := clitest.Run(t, run, "report", "--from", apitest.ReportFromSlug, "--to", apitest.ReportToSlug,
 		"--min-cluster", "5", "--max-spread", "2")
 	res.RequireCode(t, 0)
@@ -108,7 +91,7 @@ func TestReportForwardsClusterBounds(t *testing.T) {
 }
 
 func TestCohortsSnapshots(t *testing.T) {
-	reportFixture(t, nil)
+	apitest.StubFake(t, &newHTTPClient, apitest.ReportOpts(nil))
 	res := clitest.Run(t, run, "cohorts", "snapshots")
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "Snapshots in kommuner: 2", apitest.ReportToSlug, apitest.ReportFromSlug)
@@ -128,8 +111,7 @@ func TestCohortsList(t *testing.T) {
 	res.RequireOutContains(t, "Cohorts: 2", "tld", "TLDs", "snapshots=13", "(default)", "Kommuner")
 }
 
-// The listing is the discovery path, so it must not need a resolvable
-// default cohort of its own.
+// cohorts list needs no default cohort.
 func TestCohortsListWithoutDefault(t *testing.T) {
 	catalog := apitest.AnalysisCatalog{Cohorts: []apitest.AnalysisCohortView{
 		{DatasetTag: "tld"}, {DatasetTag: apitest.ReportDatasetTag},
@@ -154,6 +136,18 @@ func TestCohortsListJSON(t *testing.T) {
 	if got.DefaultTag != "tld" || len(got.Cohorts) != 1 || got.Cohorts[0].SnapshotCount != 13 {
 		t.Fatalf("catalog decoded wrong: %+v", got)
 	}
+}
+
+func TestCohortsRequiresSubcommand(t *testing.T) {
+	res := clitest.Run(t, run, "cohorts")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "cohorts subcommand is required: list|snapshots")
+}
+
+func TestCohortsRejectsUnknownSubcommand(t *testing.T) {
+	res := clitest.Run(t, run, "cohorts", "bogus")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, `Unknown cohorts command "bogus"`)
 }
 
 func TestReportRejectsSingleSnapshotCohort(t *testing.T) {
@@ -183,9 +177,11 @@ func TestPublicAPIBase(t *testing.T) {
 		"https://example.com":           "https://example.com/pub/api/v1",
 	}
 	for in, want := range cases {
-		if got := publicAPIBase(in); got != want {
-			t.Errorf("publicAPIBase(%q) = %q, want %q", in, got, want)
-		}
+		t.Run(in, func(t *testing.T) {
+			if got := publicAPIBase(in); got != want {
+				t.Errorf("publicAPIBase(%q) = %q, want %q", in, got, want)
+			}
+		})
 	}
 }
 
@@ -203,37 +199,41 @@ func TestReportVocabularyUnknownLine(t *testing.T) {
 	)
 }
 
-// --format takes markdown by name, and works in the subcommand position.
+// --format takes markdown by name, before or after the command.
 func TestReportFormatNames(t *testing.T) {
-	for _, format := range []string{"markdown", "pretty"} {
-		reportFixture(t, nil)
-		res := clitest.Run(t, run, "report", "--format", format)
-		res.RequireCode(t, 0)
-		res.RequireOutContains(t, "# kommuner: 2026-06 to 2026-09")
+	cases := []struct {
+		name     string
+		args     []string
+		wantJSON bool
+	}{
+		{"markdown after command", []string{"report", "--format", "markdown"}, false},
+		{"pretty after command", []string{"report", "--format", "pretty"}, false},
+		{"markdown before command", []string{"--format", "markdown", "report"}, false},
+		{"json after command", []string{"report", "--format", "json"}, true},
 	}
-	reportFixture(t, nil)
-	res := clitest.Run(t, run, "report", "--format", "json")
-	res.RequireCode(t, 0)
-	var got cohortReport
-	if err := json.Unmarshal([]byte(res.Out), &got); err != nil {
-		t.Fatalf("decode report: %v", err)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			apitest.StubFake(t, &newHTTPClient, apitest.ReportOpts(nil))
+			res := clitest.Run(t, run, tc.args...)
+			res.RequireCode(t, 0)
+			if !tc.wantJSON {
+				res.RequireOutContains(t, "# kommuner: 2026-06 to 2026-09")
+				return
+			}
+			var got cohortReport
+			if err := json.Unmarshal([]byte(res.Out), &got); err != nil {
+				t.Fatalf("decode report: %v", err)
+			}
+			if got.DatasetTag != apitest.ReportDatasetTag {
+				t.Errorf("--format json did not emit the response: %+v", got)
+			}
+		})
 	}
-	if got.DatasetTag != apitest.ReportDatasetTag {
-		t.Errorf("subcommand --format json did not emit the response: %+v", got)
-	}
-}
-
-// The global --format still reaches the command when it is given first.
-func TestReportGlobalFormatMarkdown(t *testing.T) {
-	reportFixture(t, nil)
-	res := clitest.Run(t, run, "--format", "markdown", "report")
-	res.RequireCode(t, 0)
-	res.RequireOutContains(t, "# kommuner: 2026-06 to 2026-09")
 }
 
 func TestReportForwardsPaging(t *testing.T) {
 	var captured url.Values
-	reportFixture(t, &captured)
+	apitest.StubFake(t, &newHTTPClient, apitest.ReportOpts(&captured))
 	res := clitest.Run(t, run, "report", "--limit", "50", "--offset", "100")
 	res.RequireCode(t, 0)
 	if captured.Get("limit") != "50" || captured.Get("offset") != "100" {
@@ -243,7 +243,7 @@ func TestReportForwardsPaging(t *testing.T) {
 
 // A partial page says so; a whole one stays silent.
 func TestReportMarksPartialMoverPage(t *testing.T) {
-	reportFixture(t, nil)
+	apitest.StubFake(t, &newHTTPClient, apitest.ReportOpts(nil))
 	whole := clitest.Run(t, run, "report")
 	whole.RequireCode(t, 0)
 	if strings.Contains(whole.Out, "Showing") {

@@ -2,29 +2,14 @@ package main
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/internal/apitest"
 )
 
-// reportOpts is the fake server carrying the shared report fixture.
-func reportOpts(captured *url.Values) apitest.Opts {
-	catalog := apitest.AnalysisCatalog{
-		DefaultTag: apitest.ReportDatasetTag,
-		Cohorts:    []apitest.AnalysisCohortView{{DatasetTag: apitest.ReportDatasetTag, IsDefault: true}},
-	}
-	snapshots := apitest.SnapshotPair()
-	report := apitest.SampleReport()
-	return apitest.Opts{
-		AnalysisCatalog:     &catalog,
-		AnalysisSnapshots:   &snapshots,
-		AnalysisReport:      &report,
-		AnalysisReportQuery: captured,
-	}
-}
-
 func TestCohortReport(t *testing.T) {
-	api := fakeAPI(t, reportOpts(nil))
+	api := fakeAPI(t, apitest.ReportOpts(nil))
 	var out cohortReportOutput
 	res := callTool(t, api, "cohort_report", map[string]any{
 		"dataset_tag": apitest.ReportDatasetTag,
@@ -78,7 +63,7 @@ func TestCohortReport(t *testing.T) {
 // default cohort.
 func TestCohortReportDefaultsToNewestPair(t *testing.T) {
 	var captured url.Values
-	api := fakeAPI(t, reportOpts(&captured))
+	api := fakeAPI(t, apitest.ReportOpts(&captured))
 	var out cohortReportOutput
 	res := callTool(t, api, "cohort_report", map[string]any{}, &out)
 	if res.IsError {
@@ -90,7 +75,7 @@ func TestCohortReportDefaultsToNewestPair(t *testing.T) {
 }
 
 func TestCohortReportTruncatesToLimit(t *testing.T) {
-	api := fakeAPI(t, reportOpts(nil))
+	api := fakeAPI(t, apitest.ReportOpts(nil))
 	var out cohortReportOutput
 	callTool(t, api, "cohort_report", map[string]any{"limit": float64(1)}, &out)
 	if len(out.TagsAppeared) != 1 || len(out.Movers) != 1 {
@@ -103,7 +88,7 @@ func TestCohortReportTruncatesToLimit(t *testing.T) {
 
 func TestCohortReportForwardsClusterBounds(t *testing.T) {
 	var captured url.Values
-	api := fakeAPI(t, reportOpts(&captured))
+	api := fakeAPI(t, apitest.ReportOpts(&captured))
 	var out cohortReportOutput
 	callTool(t, api, "cohort_report", map[string]any{
 		"min_cluster": float64(5), "max_spread": float64(2),
@@ -114,7 +99,7 @@ func TestCohortReportForwardsClusterBounds(t *testing.T) {
 }
 
 func TestCohortReportNeedsTwoSnapshots(t *testing.T) {
-	opts := reportOpts(nil)
+	opts := apitest.ReportOpts(nil)
 	single := apitest.SnapshotPair()
 	single.Snapshots = single.Snapshots[:1]
 	opts.AnalysisSnapshots = &single
@@ -123,14 +108,28 @@ func TestCohortReportNeedsTwoSnapshots(t *testing.T) {
 	if !res.IsError {
 		t.Fatalf("expected a tool error for a single-snapshot cohort")
 	}
-	if got := errorText(res); got == "" {
-		t.Errorf("expected an explanation, got none")
+	if got := errorText(res); !strings.Contains(got, "fewer than two snapshots to compare") {
+		t.Errorf("error = %q, want the snapshot count", got)
+	}
+}
+
+func TestCohortReportNamesCohortsWithoutDefault(t *testing.T) {
+	catalog := apitest.AnalysisCatalog{Cohorts: []apitest.AnalysisCohortView{
+		{DatasetTag: "tld"}, {DatasetTag: apitest.ReportDatasetTag},
+	}}
+	api := fakeAPI(t, apitest.Opts{AnalysisCatalog: &catalog})
+	res := callTool(t, api, "cohort_report", map[string]any{}, nil)
+	if !res.IsError {
+		t.Fatalf("expected a tool error without a default cohort")
+	}
+	if got := errorText(res); !strings.Contains(got, "dataset_tag is required; available: tld, kommuner") {
+		t.Errorf("error = %q, want the cohort names", got)
 	}
 }
 
 // An unreadable vocabulary must not read as an unchanged one.
 func TestCohortReportUnknownVocabulary(t *testing.T) {
-	opts := reportOpts(nil)
+	opts := apitest.ReportOpts(nil)
 	report := apitest.SampleReport()
 	report.Header.Vocabulary.ToAvailable = false
 	report.Header.ScoringConfigChanged = "unknown"
@@ -153,8 +152,10 @@ func TestPublicBaseURL(t *testing.T) {
 		"https://example.com":           "https://example.com/pub/api/v1",
 	}
 	for in, want := range cases {
-		if got := publicBaseURL(in); got != want {
-			t.Errorf("publicBaseURL(%q) = %q, want %q", in, got, want)
-		}
+		t.Run(in, func(t *testing.T) {
+			if got := publicBaseURL(in); got != want {
+				t.Errorf("publicBaseURL(%q) = %q, want %q", in, got, want)
+			}
+		})
 	}
 }

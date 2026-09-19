@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -13,20 +14,24 @@ import (
 func TestParseVersion(t *testing.T) {
 	cases := []struct {
 		tag  string
-		want bool
+		want version
+		ok   bool
 	}{
-		{"v1.7.9", true},
-		{"v10.0.12", true},
-		{"1.7.9", false},
-		{"v1.7", false},
-		{"v1.7.9-rc1", false},
-		{"vnext", false},
-		{"v1.7.x", false},
+		{"v1.7.9", version{1, 7, 9}, true},
+		{"v10.0.12", version{10, 0, 12}, true},
+		{"1.7.9", version{}, false},
+		{"v1.7", version{}, false},
+		{"v1.7.9-rc1", version{}, false},
+		{"vnext", version{}, false},
+		{"v1.7.x", version{}, false},
 	}
 	for _, c := range cases {
-		if _, ok := parseVersion(c.tag); ok != c.want {
-			t.Errorf("parseVersion(%q) = %v, want %v", c.tag, ok, c.want)
-		}
+		t.Run(c.tag, func(t *testing.T) {
+			got, ok := parseVersion(c.tag)
+			if got != c.want || ok != c.ok {
+				t.Errorf("parseVersion(%q) = %+v, %v, want %+v, %v", c.tag, got, ok, c.want, c.ok)
+			}
+		})
 	}
 }
 
@@ -38,7 +43,7 @@ func TestParseVersionOrdersByNumber(t *testing.T) {
 	}
 }
 
-// One attachment, so a release counts as carrying some.
+// rel is a release with one attachment.
 func rel(id int64, tag string) release {
 	return release{ID: id, TagName: tag, Assets: []asset{{ID: id * 10, Name: tag + ".tar.gz", Size: 1 << 20}}}
 }
@@ -56,7 +61,7 @@ func TestPrunableKeepsNewest(t *testing.T) {
 
 	got := tags(prunable(rels, 3))
 	want := []string{"v1.7.7", "v1.7.6"}
-	if strings.Join(got, ",") != strings.Join(want, ",") {
+	if !slices.Equal(got, want) {
 		t.Fatalf("prunable = %v, want %v", got, want)
 	}
 }
@@ -71,7 +76,7 @@ func TestPrunableSkipsUnversionedAndEmpty(t *testing.T) {
 
 	got := tags(prunable(rels, 3))
 	want := []string{"v1.7.6"}
-	if strings.Join(got, ",") != strings.Join(want, ",") {
+	if !slices.Equal(got, want) {
 		t.Fatalf("prunable = %v, want %v", got, want)
 	}
 }
@@ -149,15 +154,17 @@ func TestRunRejectsBadArguments(t *testing.T) {
 		c      *client
 		keep   int
 		dryRun bool
+		want   string
 	}{
-		{"no repo", &client{base: srv.URL, token: "t", http: srv.Client()}, 3, false},
-		{"keep zero", &client{base: srv.URL, repo: "owner/name", token: "t", http: srv.Client()}, 0, false},
-		{"no token", &client{base: srv.URL, repo: "owner/name", http: srv.Client()}, 3, false},
+		{"no repo", &client{base: srv.URL, token: "t", http: srv.Client()}, 3, false, "no repository: pass --repo owner/name"},
+		{"keep zero", &client{base: srv.URL, repo: "owner/name", token: "t", http: srv.Client()}, 0, false, "--keep must be at least 1"},
+		{"no token", &client{base: srv.URL, repo: "owner/name", http: srv.Client()}, 3, false, "CODEBERG_RELEASE_TOKEN is not set"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
-			if err := run(&bytes.Buffer{}, c.c, c.keep, c.dryRun); err == nil {
-				t.Fatal("want an error")
+			err := run(&bytes.Buffer{}, c.c, c.keep, c.dryRun)
+			if err == nil || err.Error() != c.want {
+				t.Fatalf("err = %v, want %q", err, c.want)
 			}
 		})
 	}

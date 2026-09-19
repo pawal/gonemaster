@@ -94,3 +94,9 @@ export const secureChain = (overrides = {}) => ({
   links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] }],
   ...overrides
 });
+
+// One in-domain nameserver name as the chain document lists it.
+export const nsName = (name, status, signer = "example.com") => ({ name, status, signer, servers: ["192.0.2.1"] });
+
+// A secure chain carrying the version 3 nameserver name section.
+export const nsNamesChain = (names, overrides = {}) => secureChain({ version: 3, ns_names: names, ...overrides });

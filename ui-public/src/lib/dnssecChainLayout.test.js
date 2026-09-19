@@ -1,9 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { secureChain } from "../test/helpers.js";
+import { nsName, nsNamesChain, secureChain } from "../test/helpers.js";
 import { layoutChain, relativeName, truncateName, worstSigTone, worstSigState, algoMnemonic, algoFace, bitsFace, clipToWidth, faceWidth, nsTone, statusTone, wrapFace, ALGO_FACE_MAX } from "./dnssecChainLayout.js";
 
 // MAX_WIDTH is the widest graph the public card holds without scaling it down.
 const MAX_WIDTH = 660;
+
+// The public UI catalogs.
+const LOCALES = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
 
 // The header words a caller hands in, which the layout measures and elides.
 const WORDS = {
@@ -230,10 +233,7 @@ describe("layoutChain", () => {
   });
 
   it("carries a key_not_signing DS link through to the edge and tip", () => {
-    // A DS naming a key that signs nothing cannot be entered (RFC 4035
-    // section 5.2). The layout passes the status through untouched, so the
-    // edge colors as bad and the tip localizes via
-    // pub.dnssec_chain_linkstatus_key_not_signing.
+    // key_not_signing passes through to the DS edge and its tip.
     const g = layoutChain(secureChain({
       status: "partial",
       links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "key_not_signing", servers: ["203.0.113.1"] }],
@@ -245,9 +245,7 @@ describe("layoutChain", () => {
   });
 
   it("prefers the matching link when a mismatched sibling DS shares the key tag", () => {
-    // Two DS records for the same key tag, one usable and one with a wrong
-    // algorithm field: the single collapsed edge must stay a match, since a
-    // validator needs only one usable DS.
+    // Two DS for one key tag, one usable.
     const g = layoutChain(secureChain({
       links: [
         { ds_key_tag: 1000, dnskey_key_tag: 1000, status: "algorithm_mismatch", servers: ["203.0.113.1"] },
@@ -260,8 +258,7 @@ describe("layoutChain", () => {
   });
 
   it("ships a localized label for the algorithm_mismatch link status in every locale", async () => {
-    const locales = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
-    for (const loc of locales) {
+    for (const loc of LOCALES) {
       const catalog = (await import(`../i18n/${loc}.json`)).default;
       const val = catalog["pub.dnssec_chain_linkstatus_algorithm_mismatch"];
       expect(typeof val, loc).toBe("string");
@@ -757,8 +754,7 @@ describe("layoutChain authenticated denial", () => {
 
 describe("stale-signature strings", () => {
   it("are translated in every locale", async () => {
-    const locales = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
-    for (const loc of locales) {
+    for (const loc of LOCALES) {
       const catalog = (await import(`../i18n/${loc}.json`)).default;
       for (const key of ["pub.dnssec_chain_stale_secondary", "pub.dnssec_chain_stale_servers"]) {
         const val = catalog[key];
@@ -898,52 +894,38 @@ describe("wrapFace", () => {
     expect(faceWidth("ab", 11)).toBeLessThan(22);
   });
 
-  // Every status word a name or signer box shows has to read inside the box.
-  it("fits the name box status in every locale", async () => {
-    const locales = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
-    for (const loc of locales) {
-      const catalog = (await import(`../i18n/${loc}.json`)).default;
-      for (const [key, value] of Object.entries(catalog)) {
-        if (!key.startsWith("pub.dnssec_chain_nsstatus_") && !key.startsWith("pub.dnssec_chain_signer_")) continue;
-        for (const line of wrapFace(value, BOX, SUB)) {
-          expect(faceWidth(line, SUB), `${loc} ${key}`).toBeLessThanOrEqual(BUDGET);
-        }
+  // Every status word a name or signer box shows reads inside the box.
+  it.each(LOCALES)("fits the name box status in %s", async (loc) => {
+    const catalog = (await import(`../i18n/${loc}.json`)).default;
+    for (const [key, value] of Object.entries(catalog)) {
+      if (!key.startsWith("pub.dnssec_chain_nsstatus_") && !key.startsWith("pub.dnssec_chain_signer_")) continue;
+      for (const line of wrapFace(value, BOX, SUB)) {
+        expect(faceWidth(line, SUB), key).toBeLessThanOrEqual(BUDGET);
       }
     }
   });
 });
 
 describe("relativeName", () => {
-  it("drops the zone suffix so a name reads inside its own cluster", () => {
-    expect(relativeName("a.ns.example.com", "example.com")).toBe("a.ns");
-  });
-
-  it("ignores a trailing dot on either side", () => {
-    expect(relativeName("a.ns.example.com.", "example.com")).toBe("a.ns");
-    expect(relativeName("a.ns.example.com", "example.com.")).toBe("a.ns");
-  });
-
-  it("keeps a name that is not inside the zone", () => {
-    expect(relativeName("ns.example.net", "example.com")).toBe("ns.example.net");
-  });
-
-  it("keeps the apex itself whole", () => {
-    expect(relativeName("example.com", "example.com")).toBe("example.com");
+  it.each([
+    ["a.ns.example.com", "example.com", "a.ns"],
+    ["a.ns.example.com.", "example.com", "a.ns"],
+    ["a.ns.example.com", "example.com.", "a.ns"],
+    ["ns.example.net", "example.com", "ns.example.net"],
+    ["example.com", "example.com", "example.com"]
+  ])("reads %s inside %s as %s", (name, zone, want) => {
+    expect(relativeName(name, zone)).toBe(want);
   });
 });
 
 describe("in-domain nameserver names", () => {
-  // The chain of the zone is intact and the branch below it is not: the graph
-  // must show the fault the run reports, not a clean chain.
+  // An intact zone chain with an orphan name, a name under a cut and an apex-signed name.
   const orphanChain = () =>
-    secureChain({
-      version: 3,
-      ns_names: [
-        { name: "a.ns.example.com", status: "orphan", signer: "a.ns.example.com", servers: ["192.0.2.1"] },
-        { name: "b.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] },
-        { name: "c.ns.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] }
-      ]
-    });
+    nsNamesChain([
+      nsName("a.ns.example.com", "orphan", "a.ns.example.com"),
+      nsName("b.ns.example.com", "validates", "ns.example.com"),
+      nsName("c.ns.example.com", "validates")
+    ]);
 
   it("draws one node per name, labelled relative to the zone", () => {
     const g = layoutChain(orphanChain());
@@ -959,8 +941,15 @@ describe("in-domain nameserver names", () => {
     const stub = g.edges.find((e) => e.kind === "stub" && e.id === `stub-${orphan.id}`);
     expect(stub.broken).toBe(true);
     expect(stub.ticks.length).toBe(2);
-    // The severed stub reaches up into the gap above and stops there.
-    expect(stub.d).toContain("M");
+    // The stub climbs the box's centre line from its top and stops below the row above.
+    const points = stub.d.match(/-?\d+(?:\.\d+)?/g).map(Number);
+    const xs = points.filter((_, i) => i % 2 === 0);
+    const ys = points.filter((_, i) => i % 2 === 1);
+    for (const x of xs) expect(x).toBeCloseTo(orphan.x + orphan.w / 2, 1);
+    expect(Math.max(...ys)).toBeCloseTo(orphan.y, 1);
+    const rowAbove = Math.max(...g.nodes.filter((n) => n.y + n.h <= orphan.y).map((n) => n.y + n.h));
+    expect(Math.min(...ys)).toBeGreaterThan(rowAbove);
+    expect(Math.min(...ys)).toBeLessThan(orphan.y);
   });
 
   it("draws a secure cut as an unbroken stub", () => {
@@ -991,12 +980,7 @@ describe("in-domain nameserver names", () => {
   });
 
   it("omits the signer row when every name is signed by the apex", () => {
-    const g = layoutChain(
-      secureChain({
-        version: 3,
-        ns_names: [{ name: "ns1.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] }]
-      })
-    );
+    const g = layoutChain(nsNamesChain([nsName("ns1.example.com", "validates")]));
     expect(g.nodes.some((n) => n.kind === "cut" || n.kind === "orphan")).toBe(false);
     expect(g.edges.some((e) => e.kind === "nssig")).toBe(false);
     expect(g.nodes.filter((n) => n.kind === "nsname").length).toBe(1);
@@ -1012,15 +996,8 @@ describe("in-domain nameserver names", () => {
 });
 
 describe("wide rows", () => {
-  const named = (name, signer) => ({ name, status: "validates", signer, servers: ["192.0.2.1"] });
-
   it("wraps a long name row so the graph stays inside the card", () => {
-    const g = layoutChain(
-      secureChain({
-        version: 3,
-        ns_names: Array.from({ length: 10 }, (_, i) => named(`ns${i}.example.com`, "example.com")),
-      })
-    );
+    const g = layoutChain(nsNamesChain(Array.from({ length: 10 }, (_, i) => nsName(`ns${i}.example.com`, "validates"))));
     const names = g.nodes.filter((n) => n.kind === "nsname");
     expect(names.length).toBe(10);
     expect(g.width).toBeLessThanOrEqual(MAX_WIDTH);
@@ -1038,17 +1015,14 @@ describe("wide rows", () => {
 
   it("keeps the names one zone signs on a single line", () => {
     const g = layoutChain(
-      secureChain({
-        version: 3,
-        ns_names: [
-          named("ns1.first.example", "first.example"),
-          named("ns1.second.example", "second.example"),
-          named("ns2.first.example", "first.example"),
-          named("ns2.second.example", "second.example"),
-          named("ns.third.example", "third.example"),
-          named("ns.example.com", "example.com"),
-        ],
-      })
+      nsNamesChain([
+        nsName("ns1.first.example", "validates", "first.example"),
+        nsName("ns1.second.example", "validates", "second.example"),
+        nsName("ns2.first.example", "validates", "first.example"),
+        nsName("ns2.second.example", "validates", "second.example"),
+        nsName("ns.third.example", "validates", "third.example"),
+        nsName("ns.example.com", "validates")
+      ])
     );
     const lineOf = (name) => g.nodes.find((n) => n.id === `nsname-${name}`).lineIndex;
     // A name signed elsewhere sits next to its sibling, whatever order the
@@ -1073,12 +1047,7 @@ describe("wide rows", () => {
   });
 
   it("ends the canvas at the ink rather than a fixed margin", () => {
-    const g = layoutChain(
-      secureChain({
-        version: 3,
-        ns_names: Array.from({ length: 4 }, (_, i) => named(`ns${i}.example.com`, "example.com")),
-      })
-    );
+    const g = layoutChain(nsNamesChain(Array.from({ length: 4 }, (_, i) => nsName(`ns${i}.example.com`, "validates"))));
     const right = Math.max(...g.nodes.map((n) => n.x + n.w));
     // The widest row ends one margin short of the edge; the self-loop off the
     // key sits well inside it.
@@ -1087,17 +1056,9 @@ describe("wide rows", () => {
 });
 
 describe("signer nodes", () => {
-  // A delegation that exists with a broken chain is a different fault from one
-  // nothing delegates, and must not be drawn as a healthy cut.
+  // A delegated signer with a broken chain is neither a healthy cut nor an orphan.
   it("marks a broken cut bad without severing its stub", () => {
-    const g = layoutChain(
-      secureChain({
-        version: 3,
-        ns_names: [
-          { name: "a.ns.example.com", status: "chain_broken", signer: "ns.example.com", servers: ["192.0.2.1"] }
-        ]
-      })
-    );
+    const g = layoutChain(nsNamesChain([nsName("a.ns.example.com", "chain_broken", "ns.example.com")]));
     const signer = g.nodes.find((n) => n.kind === "cut-broken");
     expect(signer.nameText).toBe("ns");
     const stub = g.edges.find((e) => e.kind === "stub");
@@ -1107,28 +1068,19 @@ describe("signer nodes", () => {
   });
 
   it("keeps a healthy cut's stub unbroken and not bad", () => {
-    const g = layoutChain(
-      secureChain({
-        version: 3,
-        ns_names: [{ name: "a.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] }]
-      })
-    );
+    const g = layoutChain(nsNamesChain([nsName("a.ns.example.com", "validates", "ns.example.com")]));
     const stub = g.edges.find((e) => e.kind === "stub");
     expect(stub.broken).toBe(false);
     expect(stub.bad).toBe(false);
   });
 
-  // Names sharing a signer collapse onto one node, which must carry the worst
-  // verdict rather than whichever name was listed first.
+  // Names sharing a signer collapse onto one node carrying the worst verdict.
   it("takes the worst verdict when names share a signer", () => {
     const g = layoutChain(
-      secureChain({
-        version: 3,
-        ns_names: [
-          { name: "a.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] },
-          { name: "b.ns.example.com", status: "chain_broken", signer: "ns.example.com", servers: ["192.0.2.1"] }
-        ]
-      })
+      nsNamesChain([
+        nsName("a.ns.example.com", "validates", "ns.example.com"),
+        nsName("b.ns.example.com", "chain_broken", "ns.example.com")
+      ])
     );
     const signers = g.nodes.filter((n) => n.kind === "cut" || n.kind === "cut-broken" || n.kind === "orphan");
     expect(signers.length).toBe(1);
@@ -1137,20 +1089,15 @@ describe("signer nodes", () => {
 });
 
 describe("zone frames", () => {
-  const named = (name, status, signer) => ({ name, status, signer, servers: ["192.0.2.1"] });
-
-  // A frame holds exactly the rows of its side of the delegation, so a reader
-  // can tell the parent's records from the tested zone's.
+  // A frame holds exactly the rows of its side of the delegation.
   it("frames the parent above the tested zone, each around its own rows", () => {
     const g = layoutChain(
-      secureChain({
-        version: 3,
+      nsNamesChain([nsName("a.ns.example.com", "orphan", "ns.example.com")], {
         child: {
           dnskeys: [{ key_tag: 1000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] }],
           dnskey_rrsig: [{ key_tag: 1000, algorithm: 13, state: "valid", servers: ["203.0.113.1"] }],
           signed: [{ type: "SOA", rrsig: [{ key_tag: 1000, state: "valid" }] }],
         },
-        ns_names: [named("a.ns.example.com", "orphan", "ns.example.com")],
       }),
       { words: WORDS }
     );
@@ -1180,8 +1127,7 @@ describe("zone frames", () => {
     }
   });
 
-  // The chip is what carries the verdict into a saved file, where the badge
-  // above the card does not follow.
+  // The chip carries the verdict into a saved file.
   it("chips the tested frame with the roll-up word and tone", () => {
     const g = layoutChain(secureChain({ status: "partial" }), { words: WORDS });
     const [parent, zone] = g.frames;
@@ -1212,15 +1158,11 @@ describe("zone frames", () => {
     expect(faceWidth(name, 12)).toBeLessThanOrEqual(zone.header.chip.x - zone.header.nameX);
   });
 
-  it("ships the frame header words in every locale", async () => {
-    const locales = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
-    const keys = ["pub.dnssec_chain_root", "pub.dnssec_chain_zone_label", "pub.dnssec_chain_export"];
-    for (const loc of locales) {
-      const catalog = (await import(`../i18n/${loc}.json`)).default;
-      for (const key of keys) {
-        expect(typeof catalog[key], `${loc} ${key}`).toBe("string");
-        expect(catalog[key].length > 0, `${loc} ${key}`).toBe(true);
-      }
+  it.each(LOCALES)("ships the frame header words in %s", async (loc) => {
+    const catalog = (await import(`../i18n/${loc}.json`)).default;
+    for (const key of ["pub.dnssec_chain_root", "pub.dnssec_chain_zone_label", "pub.dnssec_chain_export"]) {
+      expect(typeof catalog[key], key).toBe("string");
+      expect(catalog[key], key).toMatch(/\S/);
     }
   });
 
@@ -1236,10 +1178,6 @@ describe("zone frames", () => {
 describe("node tone", () => {
   const toneOf = (chain, pick) => layoutChain(chain).nodes.find(pick)?.tone;
   const ds = (over = {}) => ({ key_tag: 1000, algorithm: 13, digest_type: 2, digest: "ab", servers: ["192.0.2.1"], ...over });
-  const nsName = (status) => ({
-    version: 3,
-    ns_names: [{ name: "a.ns.example.com", status, signer: "example.com", servers: ["192.0.2.1"] }],
-  });
 
   it("grades a DS whose key tag names no published key as bad", () => {
     const chain = secureChain({ links: [{ ds_key_tag: 1000, dnskey_key_tag: 9999, status: "match", servers: ["192.0.2.1"] }] });
@@ -1282,28 +1220,29 @@ describe("node tone", () => {
     expect(toneOf(phantom, (n) => n.kind === "key-phantom")).toBe("ghost");
   });
 
-  it("grades a nameserver name from its own status", () => {
-    expect(toneOf(secureChain(nsName("validates")), (n) => n.kind === "nsname")).toBe("ok");
-    expect(toneOf(secureChain(nsName("insecure")), (n) => n.kind === "nsname")).toBe("warn");
-    expect(toneOf(secureChain(nsName("rrsig_expired")), (n) => n.kind === "nsname")).toBe("bad");
-    expect(toneOf(secureChain(nsName("indeterminate")), (n) => n.kind === "nsname")).toBe("");
+  it.each([
+    ["validates", "ok"],
+    ["insecure", "warn"],
+    ["rrsig_expired", "bad"],
+    ["indeterminate", ""]
+  ])("grades a nameserver name with status %s as %j", (status, want) => {
+    expect(toneOf(nsNamesChain([nsName("a.ns.example.com", status)]), (n) => n.kind === "nsname")).toBe(want);
   });
 
   it("grades a signer the zone does not delegate as bad and a settled key as plain", () => {
-    const orphan = secureChain({
-      version: 3,
-      ns_names: [{ name: "a.ns.example.com", status: "orphan", signer: "ns.example.com", servers: ["192.0.2.1"] }],
-    });
+    const orphan = nsNamesChain([nsName("a.ns.example.com", "orphan", "ns.example.com")]);
     expect(toneOf(orphan, (n) => n.kind === "orphan")).toBe("bad");
     expect(toneOf(secureChain(), (n) => n.kind === "ksk")).toBe("");
   });
 
-  it("names the same grades through nsTone and statusTone", () => {
-    expect(nsTone("chain_broken")).toBe("bad");
-    expect(nsTone("nonsense")).toBe("");
-    expect(statusTone("secure")).toBe("ok");
-    expect(statusTone("broken")).toBe("bad");
-    expect(statusTone("island")).toBe("neutral");
+  it.each([
+    ["nsTone", nsTone, "chain_broken", "bad"],
+    ["nsTone", nsTone, "nonsense", ""],
+    ["statusTone", statusTone, "secure", "ok"],
+    ["statusTone", statusTone, "broken", "bad"],
+    ["statusTone", statusTone, "island", "neutral"]
+  ])("%s grades %s as %j", (_name, grade, status, want) => {
+    expect(grade(status)).toBe(want);
   });
 });
 
@@ -1333,7 +1272,6 @@ describe("clipToWidth", () => {
 });
 
 describe("legend strings", () => {
-  const LOCALES = ["cs", "da", "de", "en", "es", "fi", "fr", "ja", "nb", "nl", "sl", "sv"];
   const KEYS = [
     "pub.dnssec_chain_detail_heading",
     "pub.dnssec_chain_detail_close",
@@ -1346,21 +1284,17 @@ describe("legend strings", () => {
     "pub.dnssec_chain_legend_mark_ghost",
   ];
 
-  it("ships the panel and legend words in every locale", async () => {
-    for (const loc of LOCALES) {
-      const catalog = (await import(`../i18n/${loc}.json`)).default;
-      for (const key of KEYS) {
-        expect(typeof catalog[key], `${loc} ${key}`).toBe("string");
-        expect(catalog[key].length > 0, `${loc} ${key}`).toBe(true);
-      }
+  it.each(LOCALES)("ships the panel and legend words in %s", async (loc) => {
+    const catalog = (await import(`../i18n/${loc}.json`)).default;
+    for (const key of KEYS) {
+      expect(typeof catalog[key], key).toBe("string");
+      expect(catalog[key], key).toMatch(/\S/);
     }
   });
 
-  // The three line items replaced it, and a stale key would still render.
-  it("drops the gradient swatch string from every locale", async () => {
-    for (const loc of LOCALES) {
-      const catalog = (await import(`../i18n/${loc}.json`)).default;
-      expect(catalog["pub.dnssec_chain_legend_sig"], loc).toBeUndefined();
-    }
+  // The three line items replaced the gradient swatch.
+  it.each(LOCALES)("drops the gradient swatch string from %s", async (loc) => {
+    const catalog = (await import(`../i18n/${loc}.json`)).default;
+    expect(catalog["pub.dnssec_chain_legend_sig"]).toBeUndefined();
   });
 });

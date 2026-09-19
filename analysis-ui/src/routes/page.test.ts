@@ -1,4 +1,4 @@
-import { appNavigation, appPaths, appState, fetchRouter, loadEvent, stubResponse } from "../test/helpers";
+import { appNavigation, appPaths, appState, fetchRouter, loadEvent, reportFixture, stubResponse } from "../test/helpers";
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/svelte";
 import type { NameserverView } from "$lib/api";
@@ -388,44 +388,12 @@ describe("overview page rendering", () => {
     expect(full.getAttribute("href")).toContain("to=s2");
   });
 
-  // A mover that only moved because the engine gained a tag must not read
-  // as an operator regression on the front page.
+  // The movers card labels each row with the report's cause.
   it("labels each mover with its cause when the report loaded", () => {
     h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
     render(OverviewPage, {
       data: overviewData({
-        report: {
-          dataset_tag: "tld",
-          from_slug: "s1",
-          to_slug: "s2",
-          min_cluster: 3,
-          max_spread: 3,
-          header: {
-            from: { slug: "s1", captured_at: "s1", domain_count: 120 },
-            to: { slug: "s2", captured_at: "s2", domain_count: 120 },
-            engine: { crossed_engine_versions: false },
-            vocabulary: {
-              from_available: true,
-              to_available: true,
-              from_tag_count: 10,
-              to_tag_count: 11,
-              added: [],
-              removed: [],
-              level_changed: []
-            },
-            scoring_config_changed: "false"
-          },
-          totals: {
-            from_domain_count: 120,
-            to_domain_count: 120,
-            both_domain_count: 120,
-            added: 0,
-            removed: 0,
-            identical_score: 119,
-            improved: 0,
-            regressed: 1
-          },
-          tags: { appeared: [], cleared: [], level_changed: [] },
+        report: reportFixture({
           domains: [
             {
               domain: "reg.se",
@@ -438,9 +406,8 @@ describe("overview page rendering", () => {
               cleared: [],
               level_changed: []
             }
-          ],
-          clusters: []
-        }
+          ]
+        })
       })
     });
     const chip = screen.getByRole("link", { name: "reg.se" }).closest("li")?.querySelector(".cause");

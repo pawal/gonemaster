@@ -1917,6 +1917,12 @@ pre {
   }
 }
 
+/* Dark theme grades are pastel solids, so every letter needs dark ink. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .grade-chip-letter { color: #1a1a1a; }
+}
+:root[data-theme="dark"] .grade-chip-letter { color: #1a1a1a; }
+
 :root[data-theme="dark"] .brand-logo {
   filter: invert(1) sepia(1) saturate(3) hue-rotate(30deg) brightness(1.0);
 }

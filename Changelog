@@ -12,6 +12,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 - badkeys: the small private exponent check detects Wiener vulnerable keys of real size
 - server: only a succeeded run is scored and projected
+- ui-public: grade letters keep readable contrast on light and dark backgrounds
 - server: analysis snapshots are ordered by run window, not capture time
 
 ### Changed

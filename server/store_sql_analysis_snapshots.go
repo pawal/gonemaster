@@ -98,6 +98,17 @@ func snapshotStoredTimestamp(t time.Time) string {
 	return formatSortableTimestamp(t)
 }
 
+// snapshotChronoExpr renders the SQL ordering key for a cohort's snapshot
+// series: the batch run window, falling back to captured_at. A rebuild
+// rewrites captured_at, so it does not order the series.
+func snapshotChronoExpr(alias string) string {
+	if alias != "" {
+		alias += "."
+	}
+	return fmt.Sprintf("COALESCE(NULLIF(%slast_run_at, ''), NULLIF(%sfirst_run_at, ''), %scaptured_at)",
+		alias, alias, alias)
+}
+
 // GetAnalysisCohortSnapshot returns one snapshot by numeric id.
 func (s *SQLJobStore) GetAnalysisCohortSnapshot(id int64) (AnalysisCohortSnapshot, bool) {
 	row := s.db.QueryRow(
@@ -146,14 +157,14 @@ func (s *SQLJobStore) GetAnalysisCohortSnapshotByBatch(cohortID int64, batchID s
 }
 
 // ListAnalysisCohortSnapshots returns all snapshots for one cohort ordered
-// newest-captured-first, with pending snapshots surfaced after captured ones
+// newest-measured-first, with pending snapshots surfaced after captured ones
 // so UIs default to the most recent addressable snapshot.
 func (s *SQLJobStore) ListAnalysisCohortSnapshots(cohortID int64) []AnalysisCohortSnapshot {
 	rows, err := s.db.Query(
 		fmt.Sprintf(`SELECT %s FROM analysis_cohort_snapshots
 			WHERE cohort_id = %s
-			ORDER BY captured_at DESC, created_at DESC, id DESC`,
-			analysisCohortSnapshotCols, s.ph(1)),
+			ORDER BY %s DESC, created_at DESC, id DESC`,
+			analysisCohortSnapshotCols, s.ph(1), snapshotChronoExpr("")),
 		cohortID,
 	)
 	if err != nil {
@@ -177,7 +188,7 @@ func (s *SQLJobStore) ListAnalysisCohortSnapshots(cohortID int64) []AnalysisCoho
 // to auto-latest when the pin is dangling or resolves to a non-public
 // snapshot, so a stale pointer left behind by a wipe does not hide every
 // remaining captured snapshot from the public path. `auto_latest` (and the
-// fallback) picks the most recent captured public snapshot.
+// fallback) picks the captured public snapshot with the latest run window.
 func (s *SQLJobStore) GetDefaultSnapshotForCohort(cohortID int64) (AnalysisCohortSnapshot, bool) {
 	cohort, ok := s.GetAnalysisCohort(cohortID)
 	if !ok {
@@ -195,9 +206,9 @@ func (s *SQLJobStore) GetDefaultSnapshotForCohort(cohortID int64) (AnalysisCohor
 	row := s.db.QueryRow(
 		fmt.Sprintf(`SELECT %s FROM analysis_cohort_snapshots
 			WHERE cohort_id = %s AND status = %s AND is_public = 1
-			ORDER BY captured_at DESC, id DESC
+			ORDER BY %s DESC, id DESC
 			LIMIT 1`,
-			analysisCohortSnapshotCols, s.ph(1), s.ph(2)),
+			analysisCohortSnapshotCols, s.ph(1), s.ph(2), snapshotChronoExpr("")),
 		cohortID, AnalysisSnapshotStatusCaptured,
 	)
 	snap, err := s.scanAnalysisCohortSnapshot(row)

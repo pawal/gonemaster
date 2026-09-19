@@ -55,8 +55,8 @@ func (s *SQLJobStore) AnalysisEntityHistory(cohortID int64, entity, key string) 
 		FROM analysis_cohort_snapshots s
 		LEFT JOIN %s v ON v.snapshot_id = s.id AND %s
 		WHERE s.cohort_id = %s AND s.status = %s AND s.is_public = 1
-		ORDER BY s.captured_at ASC, s.id ASC`,
-		metrics, table, onCond, s.ph(2), s.ph(3))
+		ORDER BY %s ASC, s.id ASC`,
+		metrics, table, onCond, s.ph(2), s.ph(3), snapshotChronoExpr("s"))
 
 	rows, err := s.db.Query(query, keyArg, cohortID, AnalysisSnapshotStatusCaptured)
 	if err != nil {

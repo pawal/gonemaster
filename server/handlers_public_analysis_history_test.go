@@ -119,3 +119,34 @@ func TestPublicEntityHistoryValidation(t *testing.T) {
 		}
 	})
 }
+
+// A rebuild restamps captured_at out of order; history stays oldest first.
+func TestAnalysisEntityHistoryOrdersByRunWindow(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		seedHistoryFixture(t, f)
+
+		older, ok := f.store.GetAnalysisCohortSnapshotByBatch(f.cohort.ID, "batch-old")
+		if !ok {
+			t.Fatal("missing older snapshot")
+		}
+		current, ok := f.store.GetAnalysisCohortSnapshotByBatch(f.cohort.ID, f.batchID)
+		if !ok {
+			t.Fatal("missing current snapshot")
+		}
+		older.CapturedAt = current.CapturedAt.Add(time.Second)
+		if _, err := f.store.UpsertAnalysisCohortSnapshot(older); err != nil {
+			t.Fatalf("restamp older snapshot: %v", err)
+		}
+
+		points, err := f.store.AnalysisEntityHistory(f.cohort.ID, "nameserver", "ns1.example")
+		if err != nil {
+			t.Fatalf("nameserver history: %v", err)
+		}
+		if len(points) != 2 {
+			t.Fatalf("points = %d, want 2", len(points))
+		}
+		if points[0].Slug != "2026-04-17-old" {
+			t.Errorf("first point slug = %q, want 2026-04-17-old", points[0].Slug)
+		}
+	})
+}

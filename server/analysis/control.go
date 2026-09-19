@@ -5,6 +5,7 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -562,7 +563,20 @@ pages:
 	}
 	progress.flush()
 
+	// Map order is random; work oldest batch first so captured_at follows
+	// the cohort's chronology.
+	ordered := make([]*pendingSnap, 0, len(pending))
 	for _, ps := range pending {
+		ordered = append(ordered, ps)
+	}
+	sort.Slice(ordered, func(i, j int) bool {
+		if !ordered[i].batch.CreatedAt.Equal(ordered[j].batch.CreatedAt) {
+			return ordered[i].batch.CreatedAt.Before(ordered[j].batch.CreatedAt)
+		}
+		return ordered[i].batch.ID < ordered[j].batch.ID
+	})
+
+	for _, ps := range ordered {
 		sample := snapshotSample{
 			run:               ps.sample,
 			engineVersion:     ps.engineVersion,
@@ -577,7 +591,7 @@ pages:
 	}
 
 	// Capture inline instead of waiting for the 30s polling tick.
-	for _, ps := range pending {
+	for _, ps := range ordered {
 		snap, found := c.store.GetAnalysisCohortSnapshotByBatch(ps.cohort.ID, ps.batch.ID)
 		if !found {
 			continue

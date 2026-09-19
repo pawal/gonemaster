@@ -155,8 +155,13 @@ collapsing runs to "latest per domain" on every request.
   Once captured, the snapshot is immutable - rematerialize explicitly to
   rebuild its aggregates.
 - `analysis_cohort_catalog.default_snapshot_policy` is `auto_latest` by
-  default (the newest captured public snapshot wins) or `pinned`
+  default (the latest-measured captured public snapshot wins) or `pinned`
   (`default_snapshot_id`). Admin UI's "Make default" action pins.
+- The snapshot series is ordered by the batch run window: `last_run_at`,
+  then `first_run_at`, then `captured_at`. `captured_at` MUST NOT order
+  the series on its own, because a cohort rebuild restamps it on every
+  snapshot. Rebuild captures oldest batch first, so `captured_at` also
+  follows the chronology after a rebuild.
 - Non-snapshot-intent batches still run and their jobs graduate normally,
   but the projector never writes fact rows or snapshot rows for them -
   ad-hoc retests stay out of the cohort series entirely.
@@ -191,7 +196,7 @@ Rules:
 - Rematerialize MUST NOT rewrite these columns. They are capture provenance,
   not a derived view.
 
-### First-boot backfill (Phase 7)
+### First-boot backfill
 
 On the first server start after the snapshot model ships the runtime
 enumerates every `(cohort_id, batch_id)` pair with materialized
@@ -205,7 +210,7 @@ analysis: snapshot backfill complete - cohorts=2 created=17 skipped=0
 ```
 
 Existing `/pub/api/v1/analysis/` bookmarks keep working because
-auto-latest resolution picks the newest captured snapshot, which after
+auto-latest resolution picks the latest-measured snapshot, which after
 backfill is the most recent historical batch.
 
 ## Per-snapshot read-view tables

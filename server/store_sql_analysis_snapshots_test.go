@@ -753,3 +753,53 @@ func TestSQLJobStoreSnapshotVocabularySurvivesRunPurge(t *testing.T) {
 		}
 	})
 }
+
+// A rebuild restamps captured_at, so the batch run window orders the series.
+func TestSQLJobStoreSnapshotOrderFollowsRunWindow(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID := seedCohortForSnapshotTest(t, s, "tld")
+		rebuiltAt := time.Date(2026, 9, 18, 21, 23, 4, 0, time.UTC)
+
+		if _, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+			CohortID:   cohortID,
+			BatchID:    "batch-june",
+			Slug:       "2026-06-03",
+			Status:     AnalysisSnapshotStatusCaptured,
+			IsPublic:   true,
+			CapturedAt: rebuiltAt.Add(time.Second),
+			FirstRunAt: time.Date(2026, 6, 3, 8, 55, 0, 0, time.UTC),
+			LastRunAt:  time.Date(2026, 6, 3, 8, 59, 0, 0, time.UTC),
+		}); err != nil {
+			t.Fatalf("seed june snapshot: %v", err)
+		}
+		september, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+			CohortID:   cohortID,
+			BatchID:    "batch-september",
+			Slug:       "2026-09-18",
+			Status:     AnalysisSnapshotStatusCaptured,
+			IsPublic:   true,
+			CapturedAt: rebuiltAt,
+			FirstRunAt: time.Date(2026, 9, 18, 9, 22, 0, 0, time.UTC),
+			LastRunAt:  time.Date(2026, 9, 18, 9, 28, 0, 0, time.UTC),
+		})
+		if err != nil {
+			t.Fatalf("seed september snapshot: %v", err)
+		}
+
+		list := s.ListAnalysisCohortSnapshots(cohortID)
+		if len(list) != 2 {
+			t.Fatalf("len list = %d, want 2", len(list))
+		}
+		if list[0].Slug != "2026-09-18" {
+			t.Errorf("list order: got %q first, want 2026-09-18", list[0].Slug)
+		}
+
+		def, ok := s.GetDefaultSnapshotForCohort(cohortID)
+		if !ok {
+			t.Fatal("expected a default snapshot")
+		}
+		if def.ID != september.ID {
+			t.Errorf("auto_latest default = %q, want 2026-09-18", def.Slug)
+		}
+	})
+}

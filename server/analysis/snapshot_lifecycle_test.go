@@ -689,3 +689,40 @@ func TestControllerRebuildCohortFlagsMixedProfilesAcrossRuns(t *testing.T) {
 		t.Fatal("mixed-profile snapshot must be hidden from public path")
 	}
 }
+
+// Rebuild captures oldest batch first, so captured_at keeps the cohort's
+// chronology instead of following random map order.
+func TestControllerRebuildCohortCapturesOldestBatchFirst(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	batchIDs := []string{"batch-1", "batch-2", "batch-3", "batch-4"}
+	for i, batchID := range batchIDs {
+		seedSnapshotBatch(store, batchID, true)
+		batch := store.batches[batchID]
+		batch.CreatedAt = time.Date(2026, 4, 20, 9, 0, 0, 0, time.UTC).AddDate(0, 0, i)
+		store.batches[batchID] = batch
+
+		run := testAnalysisRun("run-"+batchID, int64(100+i), "alpha.example", batch.CreatedAt, "192.0.2.10", "2001:db8::10")
+		run.BatchID = batchID
+		store.runs[run.ID] = run
+		store.entries[run.ID] = testAnalysisEntries(run)
+		store.tags[run.DomainID] = []string{"tld"}
+	}
+
+	controller := NewController(store)
+	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+		t.Fatalf("RebuildCohort: %v", err)
+	}
+
+	var previous serverpkg.AnalysisCohortSnapshot
+	for _, batchID := range batchIDs {
+		snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, batchID)
+		if !ok {
+			t.Fatalf("missing snapshot for %s", batchID)
+		}
+		if previous.BatchID != "" && snap.CapturedAt.Before(previous.CapturedAt) {
+			t.Fatalf("%s captured before %s: %s < %s",
+				batchID, previous.BatchID, snap.CapturedAt, previous.CapturedAt)
+		}
+		previous = snap
+	}
+}

@@ -31,6 +31,8 @@ Options:
 - `--min-cluster N`: how many domains a cluster needs (server default 3).
 - `--max-spread N`: how far the score moves within a cluster may spread
   (server default 3).
+- `--limit N`: movers to list, at most 500 (server default 500).
+- `--offset N`: the first mover to list.
 
 `--format` selects the rendering and takes either position: `markdown` is
 the default and `json` writes the response verbatim. `--output PATH` writes
@@ -58,6 +60,9 @@ same call as comparing their snapshots.
 The Markdown report carries, in order: a provenance paragraph, the totals,
 the movers by cause, the clusters, the three tag tables, and the movers. It
 is the same content the Diff tab renders, in the same order.
+
+A cohort with more movers than one page holds is marked under the movers
+table. Every other section covers the whole comparison.
 
 ## Examples
 

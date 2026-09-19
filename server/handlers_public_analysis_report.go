@@ -107,6 +107,20 @@ func parseReportBound(w http.ResponseWriter, r *http.Request, name string, def, 
 	return v, true
 }
 
+// parseReportOffset reads the mover page offset, or writes a 400.
+func parseReportOffset(w http.ResponseWriter, r *http.Request) (int, bool) {
+	raw := strings.TrimSpace(r.URL.Query().Get("offset"))
+	if raw == "" {
+		return 0, true
+	}
+	v, err := strconv.Atoi(raw)
+	if err != nil || v < 0 {
+		writeError(w, http.StatusBadRequest, "invalid_offset", "offset must not be negative", nil)
+		return 0, false
+	}
+	return v, true
+}
+
 // handlePublicAnalysisReport handles
 // GET /pub/api/v1/analysis/cohorts/{dataset_tag}/report?from=&to=.
 // Returns the classified comparison of two snapshots: what the engine
@@ -152,6 +166,14 @@ func (s *Server) handlePublicAnalysisReport(w http.ResponseWriter, r *http.Reque
 	if !ok {
 		return
 	}
+	limit, ok := parseReportBound(w, r, "limit", defaultReportDomainLimit, maxReportDomainLimit)
+	if !ok {
+		return
+	}
+	offset, ok := parseReportOffset(w, r)
+	if !ok {
+		return
+	}
 
 	cfg, err := s.effectiveScoringConfig()
 	if err != nil {
@@ -174,5 +196,5 @@ func (s *Server) handlePublicAnalysisReport(w http.ResponseWriter, r *http.Reque
 		})
 	})
 	writeSnapshotCacheHeaders(w, r, toSnap)
-	writeJSON(w, http.StatusOK, resp)
+	writeJSON(w, http.StatusOK, pageDomains(resp, limit, offset))
 }

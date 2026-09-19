@@ -120,6 +120,10 @@
 
   const categoryCounts = $derived(data.report?.totals.domain_categories ?? {});
   const movers = $derived(filterDomainsByCategory(data.report?.domains, categoryFilter));
+  // The server pages the movers; the other sections still cover them all.
+  const partialMovers = $derived(
+    !!data.report && data.report.domain_total > data.report.domains.length
+  );
 
   function signedCount(n: number): string {
     if (n > 0) return `+${formatCount(n)}`;
@@ -144,7 +148,7 @@
   });
 
   function countFor(key: TabKey): number {
-    if (key === "movers") return data.report?.domains.length ?? 0;
+    if (key === "movers") return data.report?.domain_total ?? 0;
     if (!data.diff) return 0;
     return (data.diff[key] ?? []).length;
   }
@@ -562,6 +566,12 @@
             </tbody>
           </table>
         </div>
+        {#if partialMovers}
+          <p class="hint">
+            Showing {data.report.domains.length} of {data.report.domain_total} movers. The counts,
+            tag tables and clusters cover every one.
+          </p>
+        {/if}
       {/if}
     </section>
   {:else}

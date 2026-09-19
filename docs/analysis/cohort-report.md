@@ -26,6 +26,11 @@ carries a header, totals, cohort-wide tag rows, the moving domains, and the
 clusters. `GET .../diff` keeps its shape for existing consumers; the report
 is a superset.
 
+`domains` carries one page of movers, at most 500, selected by `limit` and
+`offset`. `domain_total` is the whole count. The header, the totals, the tag
+rows and the clusters are computed over every mover and do not narrow with
+the page.
+
 ## Provenance
 
 The header records what a reader needs before trusting any row below it:
@@ -35,6 +40,12 @@ the scoring configuration changed, and the tag floor.
 The tag floor is the stricter of the two snapshots' tag view floors. Findings
 below it are absent from the per-domain lists. `NOTICE` carries a one-point
 penalty and `INFO` none, so this bounds what a score attribution can explain.
+
+When the two snapshots recorded different floors, both sides are compared at
+the stricter one. A finding the looser view carries and the stricter one
+omits is therefore reported as neither appearing nor clearing. Comparing the
+views as captured would report it as a cohort change on the strength of a
+view setting.
 
 `scoring_config_changed` is `true`, `false` or `unknown`. A rebuilt snapshot
 reports `unknown`: the engine version and the vocabulary can be recovered

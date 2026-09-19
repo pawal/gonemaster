@@ -637,6 +637,10 @@ export type ReportResponse = {
   tags: ReportTags;
   domains: ReportDomain[];
   clusters: ReportCluster[];
+  // domains carries one page; totals, tags and clusters cover them all.
+  domain_total: number;
+  domain_limit?: number;
+  domain_offset?: number;
 };
 
 export type HistoryPoint = {

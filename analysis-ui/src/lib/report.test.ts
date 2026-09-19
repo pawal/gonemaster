@@ -128,7 +128,8 @@ const sampleReport: ReportResponse = {
       max_delta: 9,
       direction: "improved"
     }
-  ]
+  ],
+  domain_total: 2
 };
 
 describe("signedNumber", () => {
@@ -256,6 +257,12 @@ describe("reportToMarkdown", () => {
     });
     expect(blind).toContain("Tag vocabulary unknown on at least one side");
     expect(blind).toContain("Scoring configuration provenance unknown");
+  });
+
+  it("marks a partial movers page and stays silent on a whole one", () => {
+    expect(md).not.toContain("Showing");
+    const paged = reportToMarkdown({ ...sampleReport, domain_total: 290, domain_offset: 0 });
+    expect(paged).toContain("Showing 2 of 290 movers, from offset 0.");
   });
 });
 

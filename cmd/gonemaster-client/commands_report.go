@@ -179,16 +179,19 @@ type reportCluster struct {
 }
 
 type cohortReport struct {
-	DatasetTag string          `json:"dataset_tag"`
-	FromSlug   string          `json:"from_slug"`
-	ToSlug     string          `json:"to_slug"`
-	MinCluster int             `json:"min_cluster"`
-	MaxSpread  int             `json:"max_spread"`
-	Header     reportHeader    `json:"header"`
-	Totals     reportTotals    `json:"totals"`
-	Tags       reportTags      `json:"tags"`
-	Domains    []reportDomain  `json:"domains"`
-	Clusters   []reportCluster `json:"clusters"`
+	DatasetTag   string          `json:"dataset_tag"`
+	FromSlug     string          `json:"from_slug"`
+	ToSlug       string          `json:"to_slug"`
+	MinCluster   int             `json:"min_cluster"`
+	MaxSpread    int             `json:"max_spread"`
+	Header       reportHeader    `json:"header"`
+	Totals       reportTotals    `json:"totals"`
+	Tags         reportTags      `json:"tags"`
+	Domains      []reportDomain  `json:"domains"`
+	Clusters     []reportCluster `json:"clusters"`
+	DomainTotal  int             `json:"domain_total"`
+	DomainLimit  int             `json:"domain_limit,omitempty"`
+	DomainOffset int             `json:"domain_offset,omitempty"`
 }
 
 // ── Labels ───────────────────────────────────────────────────────────────────
@@ -281,7 +284,7 @@ func resolveReportPair(ctx context.Context, client *apiClient, datasetTag, from,
 	return "", "", fmt.Errorf("no snapshot precedes %s in cohort %s", to, datasetTag)
 }
 
-func fetchCohortReport(ctx context.Context, client *apiClient, datasetTag, from, to string, minCluster, maxSpread int) (cohortReport, error) {
+func fetchCohortReport(ctx context.Context, client *apiClient, datasetTag, from, to string, minCluster, maxSpread, limit, offset int) (cohortReport, error) {
 	q := url.Values{}
 	q.Set("from", from)
 	q.Set("to", to)
@@ -290,6 +293,12 @@ func fetchCohortReport(ctx context.Context, client *apiClient, datasetTag, from,
 	}
 	if maxSpread > 0 {
 		q.Set("max_spread", strconv.Itoa(maxSpread))
+	}
+	if limit > 0 {
+		q.Set("limit", strconv.Itoa(limit))
+	}
+	if offset > 0 {
+		q.Set("offset", strconv.Itoa(offset))
 	}
 	path := "/analysis/cohorts/" + url.PathEscape(datasetTag) + "/report?" + q.Encode()
 	var report cohortReport
@@ -483,6 +492,10 @@ func reportMarkdown(report cohortReport) string {
 		lines = append(lines, "## Movers", "")
 		lines = append(lines, markdownTable(
 			[]string{"Domain", "Score", "Delta", "Explained", "Grade", "Cause"}, rows)...)
+		if report.DomainTotal > len(report.Domains) {
+			lines = append(lines, fmt.Sprintf("Showing %d of %d movers, from offset %d.",
+				len(report.Domains), report.DomainTotal, report.DomainOffset), "")
+		}
 	}
 
 	return strings.TrimRight(strings.Join(lines, "\n"), "\n") + "\n"
@@ -502,11 +515,13 @@ func runReport(ctx context.Context, client *apiClient, opts globalOptions, args 
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	var from, to string
-	var minCluster, maxSpread int
+	var minCluster, maxSpread, limit, offset int
 	fs.StringVar(&from, "from", "", "Baseline snapshot slug (default: the snapshot before --to)")
 	fs.StringVar(&to, "to", "", "Later snapshot slug (default: the newest snapshot)")
 	fs.IntVar(&minCluster, "min-cluster", 0, "Domains a cluster needs (server default 3)")
 	fs.IntVar(&maxSpread, "max-spread", 0, "Score spread a cluster allows (server default 3)")
+	fs.IntVar(&limit, "limit", 0, "Max movers to list (server default 500)")
+	fs.IntVar(&offset, "offset", 0, "First mover to list")
 	fs.StringVar(&opts.format, "format", opts.format, "Output format: markdown (default), json")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
 		return parseExit(err)
@@ -525,7 +540,7 @@ func runReport(ctx context.Context, client *apiClient, opts globalOptions, args 
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
-	report, err := fetchCohortReport(ctx, client, datasetTag, from, to, minCluster, maxSpread)
+	report, err := fetchCohortReport(ctx, client, datasetTag, from, to, minCluster, maxSpread, limit, offset)
 	if err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2

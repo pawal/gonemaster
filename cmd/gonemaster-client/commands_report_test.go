@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/url"
+	"strings"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/cmd/internal/clitest"
@@ -228,4 +229,32 @@ func TestReportGlobalFormatMarkdown(t *testing.T) {
 	res := clitest.Run(t, run, "--format", "markdown", "report")
 	res.RequireCode(t, 0)
 	res.RequireOutContains(t, "# kommuner: 2026-06 to 2026-09")
+}
+
+func TestReportForwardsPaging(t *testing.T) {
+	var captured url.Values
+	reportFixture(t, &captured)
+	res := clitest.Run(t, run, "report", "--limit", "50", "--offset", "100")
+	res.RequireCode(t, 0)
+	if captured.Get("limit") != "50" || captured.Get("offset") != "100" {
+		t.Fatalf("paging not forwarded: %v", captured)
+	}
+}
+
+// A partial page says so; a whole one stays silent.
+func TestReportMarksPartialMoverPage(t *testing.T) {
+	reportFixture(t, nil)
+	whole := clitest.Run(t, run, "report")
+	whole.RequireCode(t, 0)
+	if strings.Contains(whole.Out, "Showing") {
+		t.Errorf("whole page must not claim a partial list:\n%s", whole.Out)
+	}
+
+	report := apitest.SampleReport()
+	report.DomainTotal = 290
+	apitest.StubFake(t, &newHTTPClient, apitest.Opts{AnalysisReport: &report})
+	res := clitest.Run(t, run, "report", apitest.ReportDatasetTag,
+		"--from", apitest.ReportFromSlug, "--to", apitest.ReportToSlug)
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, "Showing 2 of 290 movers, from offset 0.")
 }

@@ -7,7 +7,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Added
 
 - server: capture a cohort snapshot's tag vocabulary and scoring configuration identity
-- server, analysis-ui: a cohort report classifies each change between two snapshots as engine-driven or real
+- server, analysis-ui: a cohort report classifies each change between two snapshots as engine-driven or real; its movers page at 500 like every other public list
 - cli: gonemaster-client report renders a cohort report as Markdown or JSON, and cohorts list|snapshots names the cohorts and slugs it takes
 - mcp: cohort_report compares two snapshots of an analysis cohort
 

@@ -55,6 +55,12 @@ const (
 	maxReportMaxSpread      = 100
 )
 
+// Movers are paged like every other public list.
+const (
+	defaultReportDomainLimit = 500
+	maxReportDomainLimit     = 500
+)
+
 // PublicAnalysisVocabularyEntry is one tag present in only one of the two
 // snapshots' profiles.
 type PublicAnalysisVocabularyEntry struct {
@@ -207,6 +213,23 @@ type PublicAnalysisReportResponse struct {
 	Tags       PublicAnalysisReportTags      `json:"tags"`
 	Domains    []PublicAnalysisReportDomain  `json:"domains"`
 	Clusters   []PublicAnalysisReportCluster `json:"clusters"`
+	// DomainTotal is every mover, of which Domains carries one page.
+	DomainTotal  int `json:"domain_total"`
+	DomainLimit  int `json:"domain_limit,omitempty"`
+	DomainOffset int `json:"domain_offset,omitempty"`
+}
+
+// pageDomains returns resp carrying one page of movers. Totals, tags and
+// clusters stay whole; they are computed over every mover.
+func pageDomains(resp PublicAnalysisReportResponse, limit, offset int) PublicAnalysisReportResponse {
+	resp.DomainLimit, resp.DomainOffset = limit, offset
+	if offset >= len(resp.Domains) {
+		resp.Domains = []PublicAnalysisReportDomain{}
+		return resp
+	}
+	end := min(offset+limit, len(resp.Domains))
+	resp.Domains = resp.Domains[offset:end]
+	return resp
 }
 
 // reportInput is everything the report needs, so the computation stays a
@@ -368,6 +391,7 @@ func buildAnalysisReport(in reportInput) PublicAnalysisReportResponse {
 	fromVocab := parseReportVocabulary(in.From.Vocabulary)
 	toVocab := parseReportVocabulary(in.To.Vocabulary)
 	delta := diffReportVocabularies(fromVocab, toVocab)
+	floor := alignFloorRank(in.From.TagViewMinLevel, in.To.TagViewMinLevel)
 
 	resp := PublicAnalysisReportResponse{
 		DatasetTag: in.DatasetTag,
@@ -383,16 +407,17 @@ func buildAnalysisReport(in reportInput) PublicAnalysisReportResponse {
 			ScoringConfigChanged: scoringConfigChanged(in.From, in.To),
 			TagFloor:             stricterFloor(in.From.TagViewMinLevel, in.To.TagViewMinLevel),
 		},
-		Tags:     buildReportTags(in.FromTags, in.ToTags, delta),
+		Tags:     buildReportTags(atFloorTagViews(in.FromTags, floor), atFloorTagViews(in.ToTags, floor), delta),
 		Domains:  []PublicAnalysisReportDomain{},
 		Clusters: []PublicAnalysisReportCluster{},
 	}
 
-	fromByName := indexDomainViewsByName(in.FromDomains)
-	toByName := indexDomainViewsByName(in.ToDomains)
+	fromByName := indexDomainViewsByName(atFloorDomainViews(in.FromDomains, floor))
+	toByName := indexDomainViewsByName(atFloorDomainViews(in.ToDomains, floor))
 	resp.Domains = buildReportDomains(fromByName, toByName, delta, in.Scoring)
 	resp.Totals = buildReportTotals(fromByName, toByName, resp.Domains)
 	resp.Clusters = buildReportClusters(toByName, resp.Domains, in.MinCluster, in.MaxSpread)
+	resp.DomainTotal = len(resp.Domains)
 	return resp
 }
 
@@ -420,6 +445,49 @@ func scoringConfigChanged(from, to AnalysisCohortSnapshot) string {
 		return ReportStateFalse
 	}
 	return ReportStateTrue
+}
+
+// alignFloorRank is the severity both sides must clear when the two views
+// were floored differently. Zero leaves the lists as captured.
+func alignFloorRank(from, to string) int {
+	fromRank, toRank := severityRank(from), severityRank(to)
+	if fromRank == toRank {
+		return 0
+	}
+	return max(fromRank, toRank)
+}
+
+// atFloorTagViews drops the cohort-wide rows below rank.
+func atFloorTagViews(views []AnalysisSnapshotTagView, rank int) []AnalysisSnapshotTagView {
+	if rank == 0 {
+		return views
+	}
+	out := make([]AnalysisSnapshotTagView, 0, len(views))
+	for _, v := range views {
+		if severityRank(v.Level) >= rank {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// atFloorDomainViews drops each domain's findings below rank.
+func atFloorDomainViews(views []AnalysisSnapshotDomainView, rank int) []AnalysisSnapshotDomainView {
+	if rank == 0 {
+		return views
+	}
+	out := make([]AnalysisSnapshotDomainView, 0, len(views))
+	for _, view := range views {
+		tags := make([]DomainViewTag, 0, len(view.Tags))
+		for _, t := range view.Tags {
+			if severityRank(t.Level) >= rank {
+				tags = append(tags, t)
+			}
+		}
+		view.Tags = tags
+		out = append(out, view)
+	}
+	return out
 }
 
 // stricterFloor returns the higher of two tag view floors, which is the one

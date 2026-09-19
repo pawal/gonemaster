@@ -431,6 +431,9 @@ type AnalysisReport struct {
 	Tags       AnalysisReportTags      `json:"tags"`
 	Domains    []AnalysisReportDomain  `json:"domains"`
 	Clusters   []AnalysisReportCluster `json:"clusters"`
+	// DomainTotal is every mover; Domains carries one page.
+	DomainTotal  int `json:"domain_total"`
+	DomainOffset int `json:"domain_offset,omitempty"`
 }
 
 // Identifiers of the report fixture, so both CLIs assert on names.
@@ -527,5 +530,6 @@ func SampleReport() AnalysisReport {
 				Size:       3, MinDelta: 8, MaxDelta: 9, Direction: "improved",
 			},
 		},
+		DomainTotal: 2,
 	}
 }

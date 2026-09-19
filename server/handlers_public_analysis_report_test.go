@@ -226,3 +226,45 @@ func TestAnalysisReportCacheEviction(t *testing.T) {
 		t.Errorf("cache holds %d entries, want at most %d", len(cache.entries), analysisReportCacheSize)
 	}
 }
+
+// Movers page like every other public list, and one compute serves every
+// page: totals, tags and clusters stay whole.
+func TestPublicAnalysisReportPagesMovers(t *testing.T) {
+	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
+		older := seedReportPair(t, f)
+
+		full := mustJSON[PublicAnalysisReportResponse](t,
+			getPublic(t, f.srv, f.reportURL(older.Slug, "")), http.StatusOK)
+		if full.DomainTotal != 2 || len(full.Domains) != 2 {
+			t.Fatalf("unpaged report = %d of %d movers, want 2 of 2", len(full.Domains), full.DomainTotal)
+		}
+
+		first := mustJSON[PublicAnalysisReportResponse](t,
+			getPublic(t, f.srv, f.reportURL(older.Slug, "limit=1")), http.StatusOK)
+		if len(first.Domains) != 1 || first.DomainTotal != 2 {
+			t.Fatalf("page one = %d of %d, want 1 of 2", len(first.Domains), first.DomainTotal)
+		}
+		if first.Domains[0].Domain != full.Domains[0].Domain {
+			t.Errorf("page one holds %q, want %q", first.Domains[0].Domain, full.Domains[0].Domain)
+		}
+		if first.Totals.Regressed != full.Totals.Regressed || len(first.Tags.Appeared) != len(full.Tags.Appeared) {
+			t.Errorf("paging must not narrow the totals or the tag tables: %+v", first.Totals)
+		}
+
+		second := mustJSON[PublicAnalysisReportResponse](t,
+			getPublic(t, f.srv, f.reportURL(older.Slug, "limit=1&offset=1")), http.StatusOK)
+		if len(second.Domains) != 1 || second.Domains[0].Domain != full.Domains[1].Domain {
+			t.Fatalf("page two = %+v, want %q", second.Domains, full.Domains[1].Domain)
+		}
+
+		past := mustJSON[PublicAnalysisReportResponse](t,
+			getPublic(t, f.srv, f.reportURL(older.Slug, "offset=99")), http.StatusOK)
+		if len(past.Domains) != 0 || past.DomainTotal != 2 {
+			t.Errorf("offset past the end = %d of %d, want 0 of 2", len(past.Domains), past.DomainTotal)
+		}
+
+		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "limit=0")), http.StatusBadRequest)
+		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "limit=501")), http.StatusBadRequest)
+		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "offset=-1")), http.StatusBadRequest)
+	})
+}

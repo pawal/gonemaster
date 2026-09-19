@@ -595,3 +595,102 @@ func findReportTag(entries []PublicAnalysisReportTagEntry, tag string) (PublicAn
 	}
 	return PublicAnalysisReportTagEntry{}, false
 }
+
+// A finding hidden only by the stricter of two tag view floors is not a
+// cohort change. Both sides are compared at the floor they share.
+func TestReportAlignsMismatchedTagFloors(t *testing.T) {
+	vocab := vocabJSON(t, map[string]map[string]string{
+		"NAMESERVER": {"N15_SOFTWARE_VERSION": "NOTICE"},
+		"DNSSEC":     {"DS08_EXPIRED": "ERROR"},
+	})
+	report := buildAnalysisReport(reportInput{
+		DatasetTag: "kommuner",
+		From: AnalysisCohortSnapshot{
+			Slug: "june", EngineVersion: "1.2.0", Vocabulary: vocab,
+			ScoringConfigHash: "default", TagViewMinLevel: "NOTICE",
+		},
+		To: AnalysisCohortSnapshot{
+			Slug: "sept", EngineVersion: "1.2.0", Vocabulary: vocab,
+			ScoringConfigHash: "default", TagViewMinLevel: "WARNING",
+		},
+		FromDomains: []AnalysisSnapshotDomainView{{
+			DomainName: "salem.se", Score: intPtr(99), Grade: "A",
+			Tags: []DomainViewTag{
+				{Tag: "N15_SOFTWARE_VERSION", Module: "NAMESERVER", Level: "NOTICE"},
+				{Tag: "DS08_EXPIRED", Module: "DNSSEC", Level: "ERROR"},
+			},
+		}},
+		// The NOTICE finding still holds but sits below the later floor.
+		ToDomains: []AnalysisSnapshotDomainView{{
+			DomainName: "salem.se", Score: intPtr(98), Grade: "A",
+			Tags: []DomainViewTag{{Tag: "DS08_EXPIRED", Module: "DNSSEC", Level: "ERROR"}},
+		}},
+		FromTags: []AnalysisSnapshotTagView{
+			{Tag: "N15_SOFTWARE_VERSION", Module: "NAMESERVER", Level: "NOTICE", DomainCount: 1},
+			{Tag: "DS08_EXPIRED", Module: "DNSSEC", Level: "ERROR", DomainCount: 1},
+		},
+		ToTags: []AnalysisSnapshotTagView{
+			{Tag: "DS08_EXPIRED", Module: "DNSSEC", Level: "ERROR", DomainCount: 1},
+		},
+		Scoring:    oneCategoryScoring(),
+		MinCluster: defaultReportMinCluster,
+		MaxSpread:  defaultReportMaxSpread,
+	})
+
+	if report.Header.TagFloor != "WARNING" {
+		t.Fatalf("TagFloor = %q, want WARNING", report.Header.TagFloor)
+	}
+	if len(report.Tags.Cleared) != 0 {
+		t.Errorf("cohort-wide cleared = %+v, want none below the floor", report.Tags.Cleared)
+	}
+	if len(report.Domains) != 1 {
+		t.Fatalf("domains = %+v, want the one mover", report.Domains)
+	}
+	row := report.Domains[0]
+	if len(row.Cleared) != 0 {
+		t.Errorf("%s cleared = %+v, want none below the floor", row.Domain, row.Cleared)
+	}
+	// No finding moved above the floor, so the score move is unattributable.
+	if row.Category != ReportCategoryUnknown {
+		t.Errorf("%s category = %q, want %q", row.Domain, row.Category, ReportCategoryUnknown)
+	}
+}
+
+// A shared floor leaves both sides exactly as captured.
+func TestReportKeepsFindingsWhenFloorsAgree(t *testing.T) {
+	vocab := vocabJSON(t, map[string]map[string]string{
+		"NAMESERVER": {"N15_SOFTWARE_VERSION": "NOTICE"},
+	})
+	report := buildAnalysisReport(reportInput{
+		DatasetTag: "kommuner",
+		From: AnalysisCohortSnapshot{
+			Slug: "june", EngineVersion: "1.2.0", Vocabulary: vocab,
+			ScoringConfigHash: "default", TagViewMinLevel: "NOTICE",
+		},
+		To: AnalysisCohortSnapshot{
+			Slug: "sept", EngineVersion: "1.2.0", Vocabulary: vocab,
+			ScoringConfigHash: "default", TagViewMinLevel: "NOTICE",
+		},
+		FromDomains: []AnalysisSnapshotDomainView{{
+			DomainName: "salem.se", Score: intPtr(99), Grade: "A",
+			Tags: []DomainViewTag{{Tag: "N15_SOFTWARE_VERSION", Module: "NAMESERVER", Level: "NOTICE"}},
+		}},
+		ToDomains: []AnalysisSnapshotDomainView{{
+			DomainName: "salem.se", Score: intPtr(100), Grade: "A",
+		}},
+		FromTags: []AnalysisSnapshotTagView{
+			{Tag: "N15_SOFTWARE_VERSION", Module: "NAMESERVER", Level: "NOTICE", DomainCount: 1},
+		},
+		ToTags:     []AnalysisSnapshotTagView{},
+		Scoring:    oneCategoryScoring(),
+		MinCluster: defaultReportMinCluster,
+		MaxSpread:  defaultReportMaxSpread,
+	})
+
+	if len(report.Tags.Cleared) != 1 || report.Tags.Cleared[0].Classification != ReportChangeCohort {
+		t.Fatalf("cleared = %+v, want one cohort change", report.Tags.Cleared)
+	}
+	if len(report.Domains) != 1 || report.Domains[0].Category != ReportCategoryReal {
+		t.Fatalf("domains = %+v, want one real mover", report.Domains)
+	}
+}

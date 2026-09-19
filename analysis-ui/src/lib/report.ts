@@ -217,6 +217,13 @@ export function reportToMarkdown(report: ReportResponse): string {
         ])
       )
     );
+    if (report.domain_total > report.domains.length) {
+      lines.push(
+        `Showing ${report.domains.length} of ${report.domain_total} movers, ` +
+          `from offset ${report.domain_offset ?? 0}.`,
+        ""
+      );
+    }
   }
 
   return lines.join("\n").replace(/\n{3,}/g, "\n\n").trimEnd() + "\n";

@@ -247,6 +247,9 @@ func (s *fakeStore) ListRuns(filter serverpkg.RunFilter) serverpkg.RunList {
 		if filter.DomainID != 0 && run.DomainID != filter.DomainID {
 			continue
 		}
+		if filter.BatchID != "" && run.BatchID != filter.BatchID {
+			continue
+		}
 		if filter.Tag != "" {
 			if !containsString(s.tags[run.DomainID], filter.Tag) {
 				continue

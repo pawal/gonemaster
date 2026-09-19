@@ -3,6 +3,7 @@ import {
   NoSnapshotError,
   getDiff,
   getOverview,
+  getReport,
   getTrends,
   listASNs,
   listEndpoints,
@@ -16,6 +17,7 @@ import {
   type NameserverView,
   type OverviewResponse,
   type OverviewTotals,
+  type ReportResponse,
   type SnapshotView,
   type TopASNEntry,
   type TopNameserverEntry,
@@ -56,6 +58,8 @@ export type OverviewPageData = {
   dnssecTrend: TrendBundle;
   // Diff into the viewed snapshot for the "since last snapshot" card.
   diff: DiffResponse | null;
+  // Classified report for the same pair, so each mover carries its cause.
+  report: ReportResponse | null;
   diffFrom: string;
   diffTo: string;
   // Snapshot anchor the overview is pinned to. When snapshot is null and
@@ -115,6 +119,7 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
     gradeTrend,
     dnssecTrend,
     diff,
+    report,
     nsFast,
     nsSlow,
     epFast,
@@ -127,6 +132,9 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
     trend("dnssec_posture"),
     prevSlug && snapshotSlug
       ? getDiff(datasetTag, prevSlug, snapshotSlug, fetch).catch(() => null)
+      : Promise.resolve(null),
+    prevSlug && snapshotSlug
+      ? getReport(datasetTag, prevSlug, snapshotSlug, fetch).catch(() => null)
       : Promise.resolve(null),
     rank<NameserverView>(listNameservers, "latency_p50_asc"),
     rank<NameserverView>(listNameservers, "latency_p50_desc"),
@@ -156,6 +164,7 @@ export async function load({ parent, fetch }): Promise<OverviewPageData> {
     gradeTrend,
     dnssecTrend,
     diff,
+    report,
     diffFrom: prevSlug,
     diffTo: snapshotSlug,
     snapshot: overview.snapshot ?? null,
@@ -184,6 +193,7 @@ function emptyPageData(datasetTag: string | null): OverviewPageData {
     gradeTrend: EMPTY_TREND,
     dnssecTrend: EMPTY_TREND,
     diff: null,
+    report: null,
     diffFrom: "",
     diffTo: "",
     snapshot: null,

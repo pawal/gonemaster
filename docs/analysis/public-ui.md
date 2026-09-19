@@ -95,9 +95,28 @@ snapshot before it is used as "from".
 Alongside the per-domain changes it shows a tag-level summary: which finding
 tags appeared, cleared, or changed severity cohort-wide, with domain counts.
 This makes a regression explainable, for example "14 domains regressed;
-DS02_NO_MATCHING_DS appeared on 12 of them". The tag section degrades
-gracefully: if a snapshot has no materialized tag view it shows a short notice
-rather than an error.
+DS02_NO_MATCHING_DS appeared on 12 of them".
+
+### The Report
+
+The page leads with a provenance banner naming both engine versions, both
+profile names, the tag vocabulary delta and the scoring configuration state.
+Below it, cohort-change tag rows render inline, while engine-driven rows and
+unattributable rows sit behind their own disclosures with their counts
+visible. A Movers tab lists each moving domain with its score delta, the part
+of that delta its findings account for, a cause chip and a cause filter. A
+clusters table names the domains that moved together behind a shared
+nameserver, ASN, prefix or software version.
+
+What the classifications and the categories mean is in
+[cohort-report.md](cohort-report.md).
+
+"Export Markdown" writes the whole report as a Markdown document, and a print
+stylesheet makes the page print as the report.
+
+The page degrades rather than failing. A server that predates the report
+keeps the engine banner and the tag tables it had; a snapshot with no
+materialized tag view shows a short notice rather than an error.
 
 ## Latency
 

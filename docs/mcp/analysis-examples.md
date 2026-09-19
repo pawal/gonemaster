@@ -129,6 +129,32 @@ The `(tag, arg)` pair must come from the
 `spec_list_testcases` and `spec_get_testcase` to find which tags a module
 emits and which args they carry.
 
+## Compare Two Snapshots of a Cohort
+
+Goal: the cohort looks worse than last time. Did it get worse, or did the
+engine start looking harder?
+
+```
+cohort_report()
+```
+
+With no arguments it compares the two newest snapshots of the default
+public cohort. Name a `dataset_tag`, a `from` slug and a `to` slug to
+compare a specific pair, and raise `limit` past its default of 20 for more
+tag and mover rows.
+
+The response leads with provenance: both engine versions, how many tags the
+engine gained, lost or relevelled, whether the scoring configuration
+changed, and the severity floor below which findings are absent. Read it
+before the rows. Then each tag row and each moving domain carries a
+classification, and clusters group the domains that moved together behind
+one operator. The model is documented in
+[../analysis/cohort-report.md](../analysis/cohort-report.md).
+
+Snapshots are captured per batch, so this is also how two batches of a
+cohort compare. `batch_list` does not give snapshot slugs; call
+`cohort_report` without them and it resolves the newest pair.
+
 ## Follow a Finding to the Affected Runs
 
 Goal: which runs raised a particular tag, and what did the worst-case look
@@ -189,6 +215,11 @@ result into "what is gonemaster actually checking here".
 - **Paging `run_search` to compute per-cohort stats.** Use
   `cohort_stats`, `failures_by_tag`, or `cohort_tag_values` instead -
   they aggregate server-side in one call.
+- **Reading a snapshot-to-snapshot tag movement as a cohort change.** Use
+  `cohort_report`, which classifies each row against the tag vocabulary
+  both snapshots were levelled under. A tag that appears on 48 domains
+  because the engine gained a testcase is indistinguishable from 48 domains
+  breaking until the classification is read.
 - **Treating MCP as the only path.** For repeated programmatic use over
   large result sets, `gonemaster-client` or direct SQL is faster and
   cheaper. MCP shines for agent-driven exploration where the next

@@ -587,3 +587,50 @@ func TestExtractDomainFactsEmitsCoverageFromEndpoints(t *testing.T) {
 		t.Fatalf("expected an ipv6_coverage fact, got %+v", got)
 	}
 }
+
+func TestExtractSoftwareVersion(t *testing.T) {
+	long := "PowerDNS Authoritative Server 5.0.7 with a build identifier that runs well past the key limit"
+	input := RunInput{
+		Entries: []serverpkg.Entry{
+			{Module: "NAMESERVER", Testcase: "nameserver15", Tag: "N15_SOFTWARE_VERSION",
+				Args: map[string]any{"string": "PowerDNS Authoritative Server 5.0.7", "query_name": "version.bind"}},
+			// The same string from a second query name is one fact.
+			{Module: "NAMESERVER", Testcase: "nameserver15", Tag: "N15_SOFTWARE_VERSION",
+				Args: map[string]any{"string": "PowerDNS Authoritative Server 5.0.7", "query_name": "version.server"}},
+			{Module: "NAMESERVER", Testcase: "nameserver15", Tag: "N15_SOFTWARE_VERSION",
+				Args: map[string]any{"string": "  NSD 4.8.0  ", "query_name": "version.bind"}},
+			{Module: "NAMESERVER", Testcase: "nameserver15", Tag: "N15_SOFTWARE_VERSION",
+				Args: map[string]any{"string": "", "query_name": "version.bind"}},
+			{Module: "NAMESERVER", Testcase: "nameserver15", Tag: "N15_SOFTWARE_VERSION",
+				Args: map[string]any{"string": long, "query_name": "version.bind"}},
+			{Module: "NAMESERVER", Testcase: "nameserver16", Tag: "N16_HAS_NSID",
+				Args: map[string]any{"string": "not a version"}},
+		},
+	}
+	got := extractSoftwareVersion(input)
+	want := []string{
+		"PowerDNS Authoritative Server 5.0.7",
+		"NSD 4.8.0",
+		long[:softwareVersionKeyMax],
+	}
+	if len(got) != len(want) {
+		t.Fatalf("facts = %d, want %d: %+v", len(got), len(want), got)
+	}
+	for i, key := range want {
+		if got[i].category != factCategorySoftwareVersion {
+			t.Errorf("fact %d category = %q, want %q", i, got[i].category, factCategorySoftwareVersion)
+		}
+		if got[i].key != key {
+			t.Errorf("fact %d key = %q, want %q", i, got[i].key, key)
+		}
+	}
+}
+
+func TestExtractSoftwareVersionEmptyWithoutTag(t *testing.T) {
+	input := RunInput{Entries: []serverpkg.Entry{
+		{Module: "DNSSEC", Testcase: "dnssec07", Tag: "DS07_NOT_SIGNED"},
+	}}
+	if got := extractSoftwareVersion(input); len(got) != 0 {
+		t.Errorf("facts = %+v, want none", got)
+	}
+}

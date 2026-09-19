@@ -248,3 +248,288 @@ func DiffResults(idBefore, idAfter string) map[string]Result {
 		},
 	}
 }
+
+// AnalysisCohortView is one cohort of GET /pub/api/v1/analysis/cohorts.
+type AnalysisCohortView struct {
+	DatasetTag    string `json:"dataset_tag"`
+	Label         string `json:"label"`
+	IsDefault     bool   `json:"is_default"`
+	SnapshotCount int    `json:"snapshot_count"`
+}
+
+// AnalysisCatalog is GET /pub/api/v1/analysis/catalog.
+type AnalysisCatalog struct {
+	DefaultTag string               `json:"default_tag,omitempty"`
+	Cohorts    []AnalysisCohortView `json:"cohorts"`
+}
+
+// AnalysisSnapshot is one row of a cohort's snapshot list.
+type AnalysisSnapshot struct {
+	Slug                string    `json:"slug"`
+	Label               string    `json:"label,omitempty"`
+	CapturedAt          time.Time `json:"captured_at"`
+	DomainCount         int       `json:"domain_count"`
+	EngineVersion       string    `json:"engine_version,omitempty"`
+	IsDefault           bool      `json:"is_default,omitempty"`
+	VocabularyAvailable bool      `json:"vocabulary_available"`
+}
+
+// AnalysisSnapshotList is GET /pub/api/v1/analysis/cohorts/{tag}/snapshots,
+// newest snapshot first.
+type AnalysisSnapshotList struct {
+	DatasetTag string             `json:"dataset_tag"`
+	Label      string             `json:"label"`
+	Snapshots  []AnalysisSnapshot `json:"snapshots"`
+}
+
+// AnalysisVocabularyEntry is one tag only one side's profile levels.
+type AnalysisVocabularyEntry struct {
+	Tag    string `json:"tag"`
+	Module string `json:"module,omitempty"`
+	Level  string `json:"level,omitempty"`
+}
+
+// AnalysisVocabularyChange is one tag the two profiles level differently.
+type AnalysisVocabularyChange struct {
+	Tag       string `json:"tag"`
+	Module    string `json:"module,omitempty"`
+	FromLevel string `json:"from_level"`
+	ToLevel   string `json:"to_level"`
+}
+
+// AnalysisVocabularyDelta is the tag vocabulary comparison of two snapshots.
+type AnalysisVocabularyDelta struct {
+	FromAvailable bool                       `json:"from_available"`
+	ToAvailable   bool                       `json:"to_available"`
+	FromTagCount  int                        `json:"from_tag_count"`
+	ToTagCount    int                        `json:"to_tag_count"`
+	Added         []AnalysisVocabularyEntry  `json:"added"`
+	Removed       []AnalysisVocabularyEntry  `json:"removed"`
+	LevelChanged  []AnalysisVocabularyChange `json:"level_changed"`
+}
+
+// AnalysisReportSide identifies one snapshot in the report header.
+type AnalysisReportSide struct {
+	Slug              string    `json:"slug"`
+	Label             string    `json:"label,omitempty"`
+	CapturedAt        time.Time `json:"captured_at"`
+	EngineVersion     string    `json:"engine_version,omitempty"`
+	ProfileName       string    `json:"profile_name,omitempty"`
+	ScoringConfigHash string    `json:"scoring_config_hash,omitempty"`
+	TagViewMinLevel   string    `json:"tag_view_min_level,omitempty"`
+	DomainCount       int       `json:"domain_count"`
+}
+
+// AnalysisEngineDelta is the engine provenance of a snapshot pair.
+type AnalysisEngineDelta struct {
+	FromEngineVersion string `json:"from_engine_version,omitempty"`
+	ToEngineVersion   string `json:"to_engine_version,omitempty"`
+	Crossed           bool   `json:"crossed_engine_versions"`
+	Unknown           bool   `json:"engine_version_unknown,omitempty"`
+}
+
+// AnalysisReportHeader is the provenance block of a report.
+type AnalysisReportHeader struct {
+	From                 AnalysisReportSide      `json:"from"`
+	To                   AnalysisReportSide      `json:"to"`
+	Engine               AnalysisEngineDelta     `json:"engine"`
+	Vocabulary           AnalysisVocabularyDelta `json:"vocabulary"`
+	ScoringConfigChanged string                  `json:"scoring_config_changed"`
+	TagFloor             string                  `json:"tag_floor,omitempty"`
+}
+
+// AnalysisReportTotals is the headline count of what moved.
+type AnalysisReportTotals struct {
+	FromDomainCount  int            `json:"from_domain_count"`
+	ToDomainCount    int            `json:"to_domain_count"`
+	BothDomainCount  int            `json:"both_domain_count"`
+	Added            int            `json:"added"`
+	Removed          int            `json:"removed"`
+	IdenticalScore   int            `json:"identical_score"`
+	Improved         int            `json:"improved"`
+	Regressed        int            `json:"regressed"`
+	FromMeanScore    *float64       `json:"from_mean_score,omitempty"`
+	ToMeanScore      *float64       `json:"to_mean_score,omitempty"`
+	FromGrades       map[string]int `json:"from_grades,omitempty"`
+	ToGrades         map[string]int `json:"to_grades,omitempty"`
+	DomainCategories map[string]int `json:"domain_categories,omitempty"`
+}
+
+// AnalysisReportTagEntry is one cohort-wide tag row with its classification.
+type AnalysisReportTagEntry struct {
+	Tag             string `json:"tag"`
+	Module          string `json:"module,omitempty"`
+	Testcase        string `json:"testcase,omitempty"`
+	FromLevel       string `json:"from_level,omitempty"`
+	ToLevel         string `json:"to_level,omitempty"`
+	FromDomainCount int    `json:"from_domain_count"`
+	ToDomainCount   int    `json:"to_domain_count"`
+	DomainDelta     int    `json:"domain_delta"`
+	Classification  string `json:"classification"`
+}
+
+// AnalysisReportTags groups the cohort-wide tag rows.
+type AnalysisReportTags struct {
+	Appeared     []AnalysisReportTagEntry `json:"appeared"`
+	Cleared      []AnalysisReportTagEntry `json:"cleared"`
+	LevelChanged []AnalysisReportTagEntry `json:"level_changed"`
+}
+
+// AnalysisReportTagChange is one tag that moved on one domain.
+type AnalysisReportTagChange struct {
+	Tag            string `json:"tag"`
+	Module         string `json:"module,omitempty"`
+	FromLevel      string `json:"from_level,omitempty"`
+	ToLevel        string `json:"to_level,omitempty"`
+	Classification string `json:"classification"`
+}
+
+// AnalysisReportDomain is one domain whose score or grade moved.
+type AnalysisReportDomain struct {
+	Domain           string                    `json:"domain"`
+	FromScore        *int                      `json:"from_score,omitempty"`
+	ToScore          *int                      `json:"to_score,omitempty"`
+	ScoreDelta       *int                      `json:"score_delta,omitempty"`
+	FromGrade        string                    `json:"from_grade,omitempty"`
+	ToGrade          string                    `json:"to_grade,omitempty"`
+	GradeChanged     bool                      `json:"grade_changed"`
+	Category         string                    `json:"category"`
+	ExplainedDelta   int                       `json:"explained_delta"`
+	UnexplainedDelta int                       `json:"unexplained_delta"`
+	Appeared         []AnalysisReportTagChange `json:"appeared"`
+	Cleared          []AnalysisReportTagChange `json:"cleared"`
+	LevelChanged     []AnalysisReportTagChange `json:"level_changed"`
+}
+
+// AnalysisReportClusterDimension is one dimension a cluster shares.
+type AnalysisReportClusterDimension struct {
+	Dimension    string `json:"dimension"`
+	Value        string `json:"value"`
+	Label        string `json:"label,omitempty"`
+	TotalDomains int    `json:"total_domains"`
+}
+
+// AnalysisReportCluster is a set of domains that moved together.
+type AnalysisReportCluster struct {
+	Dimensions []AnalysisReportClusterDimension `json:"dimensions"`
+	Domains    []string                         `json:"domains"`
+	Size       int                              `json:"size"`
+	MinDelta   int                              `json:"min_delta"`
+	MaxDelta   int                              `json:"max_delta"`
+	Direction  string                           `json:"direction"`
+}
+
+// AnalysisReport is GET /pub/api/v1/analysis/cohorts/{tag}/report.
+type AnalysisReport struct {
+	DatasetTag string                  `json:"dataset_tag"`
+	FromSlug   string                  `json:"from_slug"`
+	ToSlug     string                  `json:"to_slug"`
+	MinCluster int                     `json:"min_cluster"`
+	MaxSpread  int                     `json:"max_spread"`
+	Header     AnalysisReportHeader    `json:"header"`
+	Totals     AnalysisReportTotals    `json:"totals"`
+	Tags       AnalysisReportTags      `json:"tags"`
+	Domains    []AnalysisReportDomain  `json:"domains"`
+	Clusters   []AnalysisReportCluster `json:"clusters"`
+	// DomainTotal is every mover; Domains carries one page.
+	DomainTotal  int `json:"domain_total"`
+	DomainOffset int `json:"domain_offset,omitempty"`
+}
+
+// Identifiers of the report fixture, so both CLIs assert on names.
+const (
+	ReportDatasetTag  = "kommuner"
+	ReportFromSlug    = "2026-06"
+	ReportToSlug      = "2026-09"
+	ReportEngineTag   = "Z09_NO_RESPONSE_MX_QUERY"
+	ReportCohortTag   = "DS08_DNSKEY_RRSIG_EXPIRED"
+	ReportRealDomain  = "osteraker.se"
+	ReportMeasDomain  = "salem.se"
+	ReportClusterHost = "ns1.example.net"
+)
+
+// SnapshotPair is the two-snapshot list the report fixture belongs to,
+// newest first.
+func SnapshotPair() AnalysisSnapshotList {
+	return AnalysisSnapshotList{
+		DatasetTag: ReportDatasetTag,
+		Label:      "Kommuner",
+		Snapshots: []AnalysisSnapshot{
+			{Slug: ReportToSlug, CapturedAt: time.Unix(1789700000, 0).UTC(), DomainCount: 3, EngineVersion: "1.7.10", IsDefault: true, VocabularyAvailable: true},
+			{Slug: ReportFromSlug, CapturedAt: time.Unix(1780400000, 0).UTC(), DomainCount: 3, EngineVersion: "1.7.0", VocabularyAvailable: true},
+		},
+	}
+}
+
+// SampleReport carries one row of every classification, one domain per
+// category, and one cluster, so a renderer that drops a section fails.
+func SampleReport() AnalysisReport {
+	fromMean, toMean := 91.07, 91.21
+	fromScore, toScore := 88, 76
+	measFrom, measTo := 82, 90
+	regressed, improved := -12, 8
+	return AnalysisReport{
+		DatasetTag: ReportDatasetTag,
+		FromSlug:   ReportFromSlug,
+		ToSlug:     ReportToSlug,
+		MinCluster: 3,
+		MaxSpread:  3,
+		Header: AnalysisReportHeader{
+			From: AnalysisReportSide{Slug: ReportFromSlug, CapturedAt: time.Unix(1780400000, 0).UTC(), EngineVersion: "1.7.0", ProfileName: "default", DomainCount: 3},
+			To:   AnalysisReportSide{Slug: ReportToSlug, CapturedAt: time.Unix(1789700000, 0).UTC(), EngineVersion: "1.7.10", ProfileName: "default", DomainCount: 3},
+			Engine: AnalysisEngineDelta{
+				FromEngineVersion: "1.7.0", ToEngineVersion: "1.7.10", Crossed: true,
+			},
+			Vocabulary: AnalysisVocabularyDelta{
+				FromAvailable: true, ToAvailable: true, FromTagCount: 570, ToTagCount: 571,
+				Added:        []AnalysisVocabularyEntry{{Tag: ReportEngineTag, Module: "ZONE", Level: "WARNING"}},
+				Removed:      []AnalysisVocabularyEntry{},
+				LevelChanged: []AnalysisVocabularyChange{{Tag: "N11_NO_RESPONSE", Module: "NAMESERVER", FromLevel: "NOTICE", ToLevel: "WARNING"}},
+			},
+			ScoringConfigChanged: "false",
+			TagFloor:             "NOTICE",
+		},
+		Totals: AnalysisReportTotals{
+			FromDomainCount: 3, ToDomainCount: 3, BothDomainCount: 3,
+			IdenticalScore: 1, Improved: 1, Regressed: 1,
+			FromMeanScore: &fromMean, ToMeanScore: &toMean,
+			FromGrades:       map[string]int{"A": 2, "B": 1},
+			ToGrades:         map[string]int{"A": 2, "D": 1},
+			DomainCategories: map[string]int{"real": 1, "measurement": 1},
+		},
+		Tags: AnalysisReportTags{
+			Appeared: []AnalysisReportTagEntry{
+				{Tag: ReportEngineTag, Module: "ZONE", ToLevel: "WARNING", ToDomainCount: 2, DomainDelta: 2, Classification: "new_in_engine"},
+				{Tag: ReportCohortTag, Module: "DNSSEC", ToLevel: "ERROR", ToDomainCount: 1, DomainDelta: 1, Classification: "cohort_change"},
+			},
+			Cleared: []AnalysisReportTagEntry{
+				{Tag: "N15_SOFTWARE_VERSION", Module: "NAMESERVER", FromLevel: "NOTICE", FromDomainCount: 1, DomainDelta: -1, Classification: "removed_from_engine"},
+			},
+			LevelChanged: []AnalysisReportTagEntry{
+				{Tag: "N11_NO_RESPONSE", Module: "NAMESERVER", FromLevel: "NOTICE", ToLevel: "WARNING", FromDomainCount: 1, ToDomainCount: 1, Classification: "level_reclassified"},
+			},
+		},
+		Domains: []AnalysisReportDomain{
+			{
+				Domain: ReportRealDomain, FromScore: &fromScore, ToScore: &toScore, ScoreDelta: &regressed,
+				FromGrade: "B", ToGrade: "D", GradeChanged: true, Category: "real",
+				ExplainedDelta: -12, UnexplainedDelta: 0,
+				Appeared: []AnalysisReportTagChange{{Tag: ReportCohortTag, Module: "DNSSEC", ToLevel: "ERROR", Classification: "cohort_change"}},
+			},
+			{
+				Domain: ReportMeasDomain, FromScore: &measFrom, ToScore: &measTo, ScoreDelta: &improved,
+				FromGrade: "A", ToGrade: "A", Category: "measurement",
+				ExplainedDelta: 8, UnexplainedDelta: 0,
+				Cleared: []AnalysisReportTagChange{{Tag: "N15_SOFTWARE_VERSION", Module: "NAMESERVER", FromLevel: "NOTICE", Classification: "removed_from_engine"}},
+			},
+		},
+		Clusters: []AnalysisReportCluster{
+			{
+				Dimensions: []AnalysisReportClusterDimension{{Dimension: "nameserver", Value: ReportClusterHost, TotalDomains: 9}},
+				Domains:    []string{ReportMeasDomain, "degerfors.se", "mala.se"},
+				Size:       3, MinDelta: 8, MaxDelta: 9, Direction: "improved",
+			},
+		},
+		DomainTotal: 2,
+	}
+}

@@ -497,16 +497,25 @@ type AnalysisCohortSnapshot struct {
 	EngineVersion string `json:"engine_version,omitempty"`
 	// MixedEngineVersion marks a batch that spanned an engine upgrade, so
 	// its numbers mix two measurement regimes.
-	MixedEngineVersion bool      `json:"mixed_engine_version,omitempty"`
-	CapturedAt         time.Time `json:"captured_at"`
-	FirstRunAt         time.Time `json:"first_run_at"`
-	LastRunAt          time.Time `json:"last_run_at"`
-	RunCount           int       `json:"run_count"`
-	DomainCount        int       `json:"domain_count"`
-	Status             string    `json:"status"`
-	IsDefault          bool      `json:"is_default"`
-	IsPublic           bool      `json:"is_public"`
-	TagViewMinLevel    string    `json:"tag_view_min_level,omitempty"`
+	MixedEngineVersion bool `json:"mixed_engine_version,omitempty"`
+	// Vocabulary is the profile test_levels table the runs were levelled
+	// against, as stored JSON. Empty means unknown: the snapshot predates
+	// the capture and no run survived to backfill it. Kept off the wire;
+	// callers are told whether it is present, not what it holds.
+	Vocabulary string `json:"-"`
+	// ScoringConfigHash identifies the scoring configuration in force at
+	// capture. "default" means no stored override. Empty means unknown and
+	// cannot be backfilled, so a score move can never be fully attributed.
+	ScoringConfigHash string    `json:"scoring_config_hash,omitempty"`
+	CapturedAt        time.Time `json:"captured_at"`
+	FirstRunAt        time.Time `json:"first_run_at"`
+	LastRunAt         time.Time `json:"last_run_at"`
+	RunCount          int       `json:"run_count"`
+	DomainCount       int       `json:"domain_count"`
+	Status            string    `json:"status"`
+	IsDefault         bool      `json:"is_default"`
+	IsPublic          bool      `json:"is_public"`
+	TagViewMinLevel   string    `json:"tag_view_min_level,omitempty"`
 	// Rematerialize progress; distinct from the capture-lifecycle Status.
 	MaterializationStatus    string    `json:"materialization_status,omitempty"`
 	MaterializationDone      int       `json:"materialization_done,omitempty"`
@@ -597,10 +606,13 @@ type AnalysisSnapshotDomainView struct {
 	DNSKEYAlgoWeakest *int `json:"dnskey_algo_weakest,omitempty"`
 	DNSKEYCount       *int `json:"dnskey_count,omitempty"`
 	// Denial-of-existence posture; empty before the column existed.
-	DNSSECPosture string                 `json:"dnssec_posture,omitempty"`
-	Nameservers   []DomainViewNameserver `json:"nameservers,omitempty"`
-	Addresses     []DomainViewAddress    `json:"addresses,omitempty"`
-	Tags          []DomainViewTag        `json:"tags,omitempty"`
+	DNSSECPosture string `json:"dnssec_posture,omitempty"`
+	// Version string the domain's nameservers disclose. Empty when none
+	// was seen or when the nameservers disagree.
+	SoftwareVersion string                 `json:"software_version,omitempty"`
+	Nameservers     []DomainViewNameserver `json:"nameservers,omitempty"`
+	Addresses       []DomainViewAddress    `json:"addresses,omitempty"`
+	Tags            []DomainViewTag        `json:"tags,omitempty"`
 }
 
 // DomainViewNameserver is one nameserver entry inside nameservers_json.

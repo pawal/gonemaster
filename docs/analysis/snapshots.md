@@ -39,6 +39,37 @@ the snapshot will cover only the selected domains.
 Mixed-profile snapshots are intentionally hidden. A snapshot should represent
 one comparable run profile across the cohort.
 
+## Captured Provenance
+
+A snapshot records the measurement regime its runs were produced under, so a
+comparison of two snapshots can tell an engine change from a cohort change:
+
+- **Engine version**, read from the runs' own version entries, with a flag
+  for a batch that spanned an upgrade.
+- **Tag vocabulary**, the `test_levels` table of the run profile: every tag
+  that carried a severity level at the time. A tag absent from a snapshot
+  means either that the testcase did not exist or that every domain passed;
+  the vocabulary is what separates the two.
+- **Scoring configuration hash**, the identity of the scoring configuration
+  in force. A score can move because penalties changed rather than because
+  findings changed.
+
+Each value is read from the stored runs, never from the running server. An
+unrecoverable value stays unknown; it is never defaulted to what the server
+does today.
+
+The engine version and the vocabulary are backfilled at startup for snapshots
+captured before they were recorded, from any surviving run of the batch. A
+snapshot whose runs have been purged stays unknown. The scoring configuration
+hash cannot be backfilled: what was in force at capture is not recoverable
+afterwards.
+
+Rebuilding a snapshot's views does not rewrite any of these. They describe
+the capture, not the derived views.
+
+The public API reports `vocabulary_available` and `scoring_config_hash` on
+each snapshot. The vocabulary itself stays server side.
+
 ## Rebuild Snapshot Views
 
 A snapshot's views are computed at capture. A release that adds a column to a

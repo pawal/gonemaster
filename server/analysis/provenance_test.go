@@ -357,3 +357,296 @@ func TestControllerProjectRunLearnsEngineVersionFromLaterRun(t *testing.T) {
 		t.Fatal("filling an unknown version is not a version disagreement")
 	}
 }
+
+// testEffectiveProfile is the shape a run stores: a full profile of which
+// only test_levels is provenance.
+const testEffectiveProfile = `{"net":{"ipv6":true},"test_levels":{"DNSSEC":{"DS02_NO_MATCHING_DNSKEY_RRSIG":"ERROR"},"ZONE":{"Z15_NO_CAA":"NOTICE"}}}`
+
+// testVocabulary is what capture stores for testEffectiveProfile.
+const testVocabulary = `{"DNSSEC":{"DS02_NO_MATCHING_DNSKEY_RRSIG":"ERROR"},"ZONE":{"Z15_NO_CAA":"NOTICE"}}`
+
+func TestRunVocabulary(t *testing.T) {
+	tests := []struct {
+		name             string
+		effectiveProfile string
+		want             string
+	}{
+		{name: "no effective profile", effectiveProfile: "", want: ""},
+		{name: "whitespace only", effectiveProfile: "   ", want: ""},
+		{name: "unparseable JSON", effectiveProfile: "{", want: ""},
+		{name: "unknown property", effectiveProfile: `{"not_a_property":1}`, want: ""},
+		{name: "no test_levels", effectiveProfile: `{"net":{"ipv6":true}}`, want: ""},
+		{name: "test_levels present", effectiveProfile: testEffectiveProfile, want: testVocabulary},
+		{
+			// Modules and tags come out sorted, so two captures of the
+			// same vocabulary compare equal byte for byte.
+			name:             "key order is canonical",
+			effectiveProfile: `{"test_levels":{"ZONE":{"Z15_NO_CAA":"NOTICE"},"DNSSEC":{"DS02_NO_MATCHING_DNSKEY_RRSIG":"ERROR"}}}`,
+			want:             testVocabulary,
+		},
+		{
+			// Retired tag identifiers migrate on parse, as they do
+			// everywhere else a stored profile is read.
+			name:             "renamed tag migrates",
+			effectiveProfile: `{"test_levels":{"NAMESERVER":{"IN_BAILIWICK_ADDR_MISMATCH":"WARNING"}}}`,
+			want:             `{"NAMESERVER":{"IN_DOMAIN_ADDR_MISMATCH":"WARNING"}}`,
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			run := serverpkg.Run{ID: "run-1", EffectiveProfile: tc.effectiveProfile}
+			if got := runVocabulary(run); got != tc.want {
+				t.Fatalf("runVocabulary = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestScoringConfigIdentity(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	controller := NewController(store)
+
+	if got := controller.scoringConfigIdentity(); got != scoringConfigDefault {
+		t.Fatalf("unset setting = %q, want %q", got, scoringConfigDefault)
+	}
+	if err := store.SetSetting(scoringConfigSetting, "   "); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	if got := controller.scoringConfigIdentity(); got != scoringConfigDefault {
+		t.Fatalf("blank setting = %q, want %q", got, scoringConfigDefault)
+	}
+
+	if err := store.SetSetting(scoringConfigSetting, `{"severity_penalties":{"WARNING":7}}`); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	first := controller.scoringConfigIdentity()
+	if len(first) != 64 {
+		t.Fatalf("hash = %q, want 64 hex characters", first)
+	}
+	if controller.scoringConfigIdentity() != first {
+		t.Fatal("expected the hash to be stable for one configuration")
+	}
+	if err := store.SetSetting(scoringConfigSetting, `{"severity_penalties":{"WARNING":8}}`); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	if controller.scoringConfigIdentity() == first {
+		t.Fatal("expected a different configuration to hash differently")
+	}
+}
+
+// seedRunWithProfile adds an unprojected run carrying an effective profile,
+// which is what the backfill reads.
+func seedRunWithProfile(store *fakeStore, batchID, runID string, domainID int64, domain string, at time.Time, effectiveProfile string) {
+	seedRunWithVersion(store, batchID, runID, domainID, domain, at, "v1.7.10")
+	run := store.runs[runID]
+	run.EffectiveProfile = effectiveProfile
+	store.runs[runID] = run
+}
+
+func TestControllerProjectRunStampsVocabularyAndScoringHash(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-vocab", true)
+	if err := store.SetSetting(scoringConfigSetting, `{"severity_penalties":{"WARNING":7}}`); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	controller := NewController(store)
+
+	run := testAnalysisRun("run-a", 100, "alpha.example",
+		time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC), "192.0.2.10", "2001:db8::10")
+	run.BatchID = "batch-vocab"
+	run.EffectiveProfile = testEffectiveProfile
+	entries := withGlobalVersion(testAnalysisEntries(run), run, "v1.7.10")
+	run.EntryCount = len(entries)
+	store.runs[run.ID] = run
+	store.entries[run.ID] = entries
+	store.tags[run.DomainID] = []string{"tld"}
+	if err := controller.ProjectRun(run.ID); err != nil {
+		t.Fatalf("ProjectRun: %v", err)
+	}
+
+	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-vocab")
+	if !ok {
+		t.Fatal("expected snapshot")
+	}
+	if snap.Vocabulary != testVocabulary {
+		t.Fatalf("Vocabulary = %q, want %q", snap.Vocabulary, testVocabulary)
+	}
+	if len(snap.ScoringConfigHash) != 64 {
+		t.Fatalf("ScoringConfigHash = %q, want the stored configuration hashed", snap.ScoringConfigHash)
+	}
+}
+
+func TestControllerProjectRunStampsDefaultScoringHash(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-default", true)
+	controller := NewController(store)
+
+	projectRunWithVersion(t, store, controller, "batch-default", "run-a", 100, "alpha.example",
+		time.Date(2026, 9, 18, 10, 0, 0, 0, time.UTC), "v1.7.10")
+
+	snap, _ := store.GetAnalysisCohortSnapshotByBatch(10, "batch-default")
+	if snap.ScoringConfigHash != scoringConfigDefault {
+		t.Fatalf("ScoringConfigHash = %q, want %q", snap.ScoringConfigHash, scoringConfigDefault)
+	}
+	// The fixture run carries no effective profile, so the vocabulary is
+	// unknown rather than invented from the running build.
+	if snap.Vocabulary != "" {
+		t.Fatalf("Vocabulary = %q, want empty", snap.Vocabulary)
+	}
+}
+
+func TestBackfillSnapshotVocabulariesStampsCapturedSnapshots(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-old", true)
+	seedRunWithProfile(store, "batch-old", "run-a", 100, "alpha.example",
+		time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC), testEffectiveProfile)
+	seedUnstampedSnapshot(t, store, "batch-old", "2026-06-03-old")
+
+	controller := NewController(store)
+	if err := controller.BackfillSnapshotVocabularies(context.Background()); err != nil {
+		t.Fatalf("BackfillSnapshotVocabularies: %v", err)
+	}
+
+	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-old")
+	if !ok {
+		t.Fatal("expected snapshot")
+	}
+	if snap.Vocabulary != testVocabulary {
+		t.Fatalf("Vocabulary = %q, want %q recovered from a stored run", snap.Vocabulary, testVocabulary)
+	}
+	// What was in force at capture is not recoverable, so it stays unknown.
+	if snap.ScoringConfigHash != "" {
+		t.Fatalf("ScoringConfigHash = %q, want empty: it is not backfillable", snap.ScoringConfigHash)
+	}
+}
+
+// The first run of a batch may have no effective profile; a later one still
+// answers for the batch, because mixed-profile batches fail capture.
+func TestBackfillSnapshotVocabulariesSkipsRunsWithoutProfile(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-partial", true)
+	seedRunWithProfile(store, "batch-partial", "run-a", 100, "alpha.example",
+		time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC), "")
+	seedRunWithProfile(store, "batch-partial", "run-b", 101, "beta.example",
+		time.Date(2026, 6, 3, 10, 5, 0, 0, time.UTC), testEffectiveProfile)
+	seedUnstampedSnapshot(t, store, "batch-partial", "2026-06-03-partial")
+
+	controller := NewController(store)
+	if err := controller.BackfillSnapshotVocabularies(context.Background()); err != nil {
+		t.Fatalf("BackfillSnapshotVocabularies: %v", err)
+	}
+
+	snap, _ := store.GetAnalysisCohortSnapshotByBatch(10, "batch-partial")
+	if snap.Vocabulary != testVocabulary {
+		t.Fatalf("Vocabulary = %q, want %q", snap.Vocabulary, testVocabulary)
+	}
+}
+
+// A snapshot whose runs are gone stays unknown, which the report reads as
+// "cannot classify", never as "nothing changed".
+func TestBackfillSnapshotVocabulariesLeavesUnrecoverableUnknown(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-purged", true)
+	seedUnstampedSnapshot(t, store, "batch-purged", "2026-06-03-purged")
+
+	controller := NewController(store)
+	if err := controller.BackfillSnapshotVocabularies(context.Background()); err != nil {
+		t.Fatalf("BackfillSnapshotVocabularies: %v", err)
+	}
+
+	snap, _ := store.GetAnalysisCohortSnapshotByBatch(10, "batch-purged")
+	if snap.Vocabulary != "" {
+		t.Fatalf("Vocabulary = %q, want empty when no run survives", snap.Vocabulary)
+	}
+}
+
+// Backfill runs on every startup, so it must not rewrite a vocabulary that
+// capture already recorded.
+func TestBackfillSnapshotVocabulariesIsIdempotent(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-old", true)
+	seedRunWithProfile(store, "batch-old", "run-a", 100, "alpha.example",
+		time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC), testEffectiveProfile)
+	if _, err := store.UpsertAnalysisCohortSnapshot(serverpkg.AnalysisCohortSnapshot{
+		CohortID:   10,
+		BatchID:    "batch-old",
+		Slug:       "2026-06-03-old",
+		Status:     serverpkg.AnalysisSnapshotStatusCaptured,
+		IsPublic:   true,
+		Vocabulary: `{"ZONE":{"Z01_SOA_OK":"INFO"}}`,
+	}); err != nil {
+		t.Fatalf("seed snapshot: %v", err)
+	}
+
+	controller := NewController(store)
+	for i := 0; i < 3; i++ {
+		if err := controller.BackfillSnapshotVocabularies(context.Background()); err != nil {
+			t.Fatalf("BackfillSnapshotVocabularies pass %d: %v", i, err)
+		}
+	}
+
+	snap, _ := store.GetAnalysisCohortSnapshotByBatch(10, "batch-old")
+	if snap.Vocabulary != `{"ZONE":{"Z01_SOA_OK":"INFO"}}` {
+		t.Fatalf("backfill overwrote a captured vocabulary: %q", snap.Vocabulary)
+	}
+}
+
+// A rebuild reconstructs a snapshot from stored runs. The vocabulary comes
+// from the runs and is recovered; the scoring configuration can only be read
+// as the server stands now, which says nothing about a batch from June, so
+// it stays unknown.
+func TestRebuildCohortRecoversVocabularyButNotScoringHash(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-rebuilt", true)
+	if err := store.SetSetting(scoringConfigSetting, `{"severity_penalties":{"WARNING":7}}`); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	seedRunWithProfile(store, "batch-rebuilt", "run-a", 100, "alpha.example",
+		time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC), testEffectiveProfile)
+
+	controller := NewController(store)
+	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+		t.Fatalf("RebuildCohort: %v", err)
+	}
+
+	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-rebuilt")
+	if !ok {
+		t.Fatal("expected snapshot")
+	}
+	if snap.Vocabulary != testVocabulary {
+		t.Fatalf("Vocabulary = %q, want %q recovered from the run", snap.Vocabulary, testVocabulary)
+	}
+	if snap.ScoringConfigHash != "" {
+		t.Fatalf("ScoringConfigHash = %q, want empty on a rebuild", snap.ScoringConfigHash)
+	}
+}
+
+// An unknown scoring hash is load-bearing: the report reads it as "cannot
+// rule out a penalty change". A later projection must not quietly replace it
+// with the configuration in force today.
+func TestApplySnapshotStateNeverBackfillsScoringHash(t *testing.T) {
+	store, _ := snapshotLifecycleStore(t)
+	seedSnapshotBatch(store, "batch-unknown", true)
+	if _, err := store.UpsertAnalysisCohortSnapshot(serverpkg.AnalysisCohortSnapshot{
+		CohortID: 10,
+		BatchID:  "batch-unknown",
+		Slug:     "2026-06-03-unknown",
+		Status:   serverpkg.AnalysisSnapshotStatusCaptured,
+		IsPublic: true,
+	}); err != nil {
+		t.Fatalf("seed snapshot: %v", err)
+	}
+	if err := store.SetSetting(scoringConfigSetting, `{"severity_penalties":{"WARNING":7}}`); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+
+	controller := NewController(store)
+	projectRunWithVersion(t, store, controller, "batch-unknown", "run-a", 100, "alpha.example",
+		time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC), "v1.7.10")
+
+	snap, _ := store.GetAnalysisCohortSnapshotByBatch(10, "batch-unknown")
+	if snap.ScoringConfigHash != "" {
+		t.Fatalf("ScoringConfigHash = %q, want the unknown state preserved", snap.ScoringConfigHash)
+	}
+}

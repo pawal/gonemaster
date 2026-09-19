@@ -298,3 +298,73 @@ func sortedUnion[V any](left, right map[string]V) []string {
 	}
 	return slices.Sorted(maps.Keys(union))
 }
+
+// TestLevelEntry is one tag of a profile's test_levels table.
+type TestLevelEntry struct {
+	Module string `json:"module"`
+	Tag    string `json:"tag"`
+	Level  string `json:"level"`
+}
+
+// TestLevelChange is one tag the two profiles level differently.
+type TestLevelChange struct {
+	Module string `json:"module"`
+	Tag    string `json:"tag"`
+	From   string `json:"from"`
+	To     string `json:"to"`
+}
+
+// TestLevelsDiff is the tag vocabulary comparison of two profiles.
+type TestLevelsDiff struct {
+	Added        []TestLevelEntry  `json:"added,omitempty"`
+	Removed      []TestLevelEntry  `json:"removed,omitempty"`
+	LevelChanged []TestLevelChange `json:"level_changed,omitempty"`
+}
+
+// Empty reports whether the two vocabularies agree.
+func (d *TestLevelsDiff) Empty() bool {
+	if d == nil {
+		return true
+	}
+	return len(d.Added)+len(d.Removed)+len(d.LevelChanged) == 0
+}
+
+// DiffTestLevels compares the test_levels tables of two profiles as two tag
+// vocabularies: a tag only in b is added, a tag only in a is removed, a tag
+// in both at different levels is level-changed. Unlike Diff this is a
+// symmetric comparison of two full profiles, not an override against a base,
+// so it reads the table directly and never treats an unset property as
+// inherited. Levels compare case-insensitively and are reported as stored.
+// A nil profile is an empty vocabulary. Results are sorted by module, then
+// tag.
+func DiffTestLevels(a, b *Profile) *TestLevelsDiff {
+	left := profileTestLevels(a)
+	right := profileTestLevels(b)
+	diff := &TestLevelsDiff{}
+	for _, module := range sortedUnion(left, right) {
+		leftTags := left[module]
+		rightTags := right[module]
+		for _, tag := range sortedUnion(leftTags, rightTags) {
+			fromLevel, inLeft := leftTags[tag]
+			toLevel, inRight := rightTags[tag]
+			switch {
+			case !inLeft:
+				diff.Added = append(diff.Added, TestLevelEntry{Module: module, Tag: tag, Level: toLevel})
+			case !inRight:
+				diff.Removed = append(diff.Removed, TestLevelEntry{Module: module, Tag: tag, Level: fromLevel})
+			case !strings.EqualFold(fromLevel, toLevel):
+				diff.LevelChanged = append(diff.LevelChanged,
+					TestLevelChange{Module: module, Tag: tag, From: fromLevel, To: toLevel})
+			}
+		}
+	}
+	return diff
+}
+
+// profileTestLevels reads the table off the struct, ignoring the set map.
+func profileTestLevels(p *Profile) map[string]map[string]string {
+	if p == nil {
+		return map[string]map[string]string{}
+	}
+	return p.TestLevels
+}

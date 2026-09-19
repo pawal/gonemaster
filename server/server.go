@@ -60,11 +60,13 @@ type Server struct {
 	// cohort, keyed by cohort ID.
 	snapshotSweepsMu       sync.Mutex
 	snapshotSweepsInFlight map[int64]struct{}
-	adminTokens            atomic.Pointer[tokenSet]
-	extData                *extdata.Provider
-	registry               registryLookup
-	refLists               referenceListLookup
-	logger                 *slog.Logger
+	// reportCache holds rendered cohort reports per snapshot pair.
+	reportCache *analysisReportCache
+	adminTokens atomic.Pointer[tokenSet]
+	extData     *extdata.Provider
+	registry    registryLookup
+	refLists    referenceListLookup
+	logger      *slog.Logger
 }
 
 // setScoringConfig loads an optional scoring config file and sets it on the
@@ -181,6 +183,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		cohortRebuildsInFlight:        map[int64]struct{}{},
 		snapshotRematerializeInFlight: map[int64]struct{}{},
 		snapshotSweepsInFlight:        map[int64]struct{}{},
+		reportCache:                   newAnalysisReportCache(),
 		engineRunner:                  engine.Run,
 		engineLimiter:                 newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                       map[string]context.CancelFunc{},
@@ -438,6 +441,7 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}", s.handlePublicAnalysisSnapshotDetail)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/trends", s.handlePublicAnalysisTrends)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/diff", s.handlePublicAnalysisDiff)
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/report", s.handlePublicAnalysisReport)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/history", s.handlePublicAnalysisEntityHistory)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}", s.handlePublicAnalysisCohortDetail)
 	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", captureRoute("/pub/api/v1", pubMux))

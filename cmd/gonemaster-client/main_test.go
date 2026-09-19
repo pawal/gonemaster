@@ -450,3 +450,35 @@ func TestJobsPurgeInUsage(t *testing.T) {
 		t.Fatalf("expected 'purge' in usage output, got:\n%s", combined)
 	}
 }
+
+// ── help ──────────────────────────────────────────────────────────────────────
+
+// -h is an alias for --help at every level, and asking for usage succeeds.
+func TestHelpShorthand(t *testing.T) {
+	cases := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"-h"}, "Usage: gonemaster-client [global options]"},
+		{[]string{"--help"}, "Usage: gonemaster-client [global options]"},
+		{[]string{"domains", "-h"}, "Usage: gonemaster-client domains <list|get|runs|tag|untag>"},
+		{[]string{"domains", "--help"}, "Usage: gonemaster-client domains <list|get|runs|tag|untag>"},
+		{[]string{"cohorts", "-h"}, "Usage: gonemaster-client cohorts <list|snapshots>"},
+		{[]string{"domains", "list", "-h"}, "Usage of domains list:"},
+		{[]string{"report", "-h"}, "Usage of report:"},
+	}
+	for _, tc := range cases {
+		res := clitest.Run(t, run, tc.args...)
+		res.RequireCode(t, 0)
+		if combined := res.Out + res.Err; !strings.Contains(combined, tc.want) {
+			t.Errorf("%v: missing %q in:\n%s", tc.args, tc.want, combined)
+		}
+	}
+}
+
+// Every other single-dash option stays rejected.
+func TestSingleDashStillRejected(t *testing.T) {
+	res := clitest.Run(t, run, "domains", "list", "-tag", "se")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "use double-hyphen options")
+}

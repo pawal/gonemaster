@@ -132,9 +132,13 @@ func resolveDomain(ctx context.Context, client *apiClient, name string) (domain,
 // ── domains ──────────────────────────────────────────────────────────────────
 
 func runDomains(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	const subs = "list|get|runs|tag|untag"
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "domains subcommand is required: list|get|runs|tag|untag")
+		fmt.Fprintln(errOut, "domains subcommand is required: "+subs)
 		return 2
+	}
+	if isHelpArg(args[0]) {
+		return groupUsage(out, "domains", subs)
 	}
 	cmd := args[0]
 	args = args[1:]
@@ -166,7 +170,7 @@ func runDomainsList(ctx context.Context, client *apiClient, opts globalOptions, 
 	fs.StringVar(&name, "name", "", "Filter by domain name substring")
 	fs.IntVar(&limit, "limit", 100, "Max results")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	q := url.Values{}
 	if tag != "" {
@@ -225,7 +229,7 @@ func runDomainsGet(ctx context.Context, client *apiClient, opts globalOptions, a
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -273,7 +277,7 @@ func runDomainsRuns(ctx context.Context, client *apiClient, opts globalOptions, 
 	var limit int
 	fs.IntVar(&limit, "limit", 20, "Max results")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -319,7 +323,7 @@ func runDomainsTag(ctx context.Context, client *apiClient, opts globalOptions, a
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) < 2 {
@@ -346,7 +350,7 @@ func runDomainsUntag(ctx context.Context, client *apiClient, opts globalOptions,
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) < 2 {
@@ -371,9 +375,13 @@ func runDomainsUntag(ctx context.Context, client *apiClient, opts globalOptions,
 // ── tags ──────────────────────────────────────────────────────────────────────
 
 func runTags(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	const subs = "list|create|delete|domains|summary|add-domains"
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "tags subcommand is required: list|create|delete|domains|summary|add-domains")
+		fmt.Fprintln(errOut, "tags subcommand is required: "+subs)
 		return 2
+	}
+	if isHelpArg(args[0]) {
+		return groupUsage(out, "tags", subs)
 	}
 	cmd := args[0]
 	args = args[1:]
@@ -401,7 +409,7 @@ func runTagsList(ctx context.Context, client *apiClient, opts globalOptions, arg
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	var list []tag
 	if err := client.doJSON(ctx, http.MethodGet, "/tags", nil, &list); err != nil {
@@ -433,7 +441,7 @@ func runTagsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 	var description string
 	fs.StringVar(&description, "description", "", "Tag description")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -463,7 +471,7 @@ func runTagsDelete(ctx context.Context, client *apiClient, opts globalOptions, a
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -488,7 +496,7 @@ func runTagsDomains(ctx context.Context, client *apiClient, opts globalOptions, 
 	var limit int
 	fs.IntVar(&limit, "limit", 100, "Max results")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -525,7 +533,7 @@ func runTagsSummary(ctx context.Context, client *apiClient, opts globalOptions, 
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -561,7 +569,7 @@ func runTagsAddDomains(ctx context.Context, client *apiClient, opts globalOption
 	fs.Var(&files, "file", "File with domain names (repeatable)")
 	fs.BoolVar(&useStdin, "stdin", false, "Read domains from stdin")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -592,9 +600,13 @@ func runTagsAddDomains(ctx context.Context, client *apiClient, opts globalOption
 // ── runs ──────────────────────────────────────────────────────────────────────
 
 func runRuns(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	const subs = "list|get|results|diff"
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "runs subcommand is required: list|get|results|diff")
+		fmt.Fprintln(errOut, "runs subcommand is required: "+subs)
 		return 2
+	}
+	if isHelpArg(args[0]) {
+		return groupUsage(out, "runs", subs)
 	}
 	cmd := args[0]
 	args = args[1:]
@@ -625,7 +637,7 @@ func runRunsList(ctx context.Context, client *apiClient, opts globalOptions, arg
 	fs.StringVar(&level, "level", "", "Filter by worst level")
 	fs.IntVar(&limit, "limit", 100, "Max results")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	q := url.Values{}
 	if tagName != "" {
@@ -687,7 +699,7 @@ func runRunsGet(ctx context.Context, client *apiClient, opts globalOptions, args
 	fs.SetOutput(errOut)
 	setSubcommandUsage(fs)
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -734,7 +746,7 @@ func runRunsResults(ctx context.Context, client *apiClient, opts globalOptions, 
 	fs.BoolVar(&noScoreFlag, "no-score", false, "Suppress scoring output")
 	fs.StringVar(&scoringConfig, "scoring-config", "", "Path to JSON scoring config file (implies --score)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -782,9 +794,13 @@ func runRunsResults(ctx context.Context, client *apiClient, opts globalOptions, 
 // ── entries ───────────────────────────────────────────────────────────────────
 
 func runEntries(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	const subs = "query"
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "entries subcommand is required: query")
+		fmt.Fprintln(errOut, "entries subcommand is required: "+subs)
 		return 2
+	}
+	if isHelpArg(args[0]) {
+		return groupUsage(out, "entries", subs)
 	}
 	cmd := args[0]
 	args = args[1:]
@@ -812,7 +828,7 @@ func runEntriesQuery(ctx context.Context, client *apiClient, opts globalOptions,
 	fs.BoolVar(&latest, "latest", false, "Only entries from each domain's latest run")
 	fs.IntVar(&limit, "limit", 100, "Max results")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	q := url.Values{}
 	if tagName != "" {

@@ -282,6 +282,7 @@ function overviewData(overrides: Partial<OverviewPageData> = {}): OverviewPageDa
       grade_changed: [{ domain: "reg.se", from_grade: "A", to_grade: "D" }],
       level_changed: []
     },
+    report: null,
     diffFrom: "s1",
     diffTo: "s2",
     snapshot: { slug: "s2", captured_at: "2026-04-20T00:00:00Z", run_count: 1, domain_count: 120 },
@@ -385,6 +386,65 @@ describe("overview page rendering", () => {
     const full = screen.getByRole("link", { name: /view full diff/i });
     expect(full.getAttribute("href")).toContain("from=s1");
     expect(full.getAttribute("href")).toContain("to=s2");
+  });
+
+  // A mover that only moved because the engine gained a tag must not read
+  // as an operator regression on the front page.
+  it("labels each mover with its cause when the report loaded", () => {
+    h.page.url = new URL("http://localhost/analysis?dataset_tag=tld");
+    render(OverviewPage, {
+      data: overviewData({
+        report: {
+          dataset_tag: "tld",
+          from_slug: "s1",
+          to_slug: "s2",
+          min_cluster: 3,
+          max_spread: 3,
+          header: {
+            from: { slug: "s1", captured_at: "s1", domain_count: 120 },
+            to: { slug: "s2", captured_at: "s2", domain_count: 120 },
+            engine: { crossed_engine_versions: false },
+            vocabulary: {
+              from_available: true,
+              to_available: true,
+              from_tag_count: 10,
+              to_tag_count: 11,
+              added: [],
+              removed: [],
+              level_changed: []
+            },
+            scoring_config_changed: "false"
+          },
+          totals: {
+            from_domain_count: 120,
+            to_domain_count: 120,
+            both_domain_count: 120,
+            added: 0,
+            removed: 0,
+            identical_score: 119,
+            improved: 0,
+            regressed: 1
+          },
+          tags: { appeared: [], cleared: [], level_changed: [] },
+          domains: [
+            {
+              domain: "reg.se",
+              score_delta: -20,
+              grade_changed: true,
+              category: "measurement",
+              explained_delta: -20,
+              unexplained_delta: 0,
+              appeared: [],
+              cleared: [],
+              level_changed: []
+            }
+          ],
+          clusters: []
+        }
+      })
+    });
+    const chip = screen.getByRole("link", { name: "reg.se" }).closest("li")?.querySelector(".cause");
+    expect(chip?.textContent?.trim()).toBe("Measurement");
   });
 
   it("omits the movers card when there is no diff", () => {

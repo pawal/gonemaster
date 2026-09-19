@@ -17,6 +17,7 @@ const (
 	FactCategoryDNSKEYAlgorithm   = "dnskey_algo"
 	FactCategoryIPv6Coverage      = "ipv6_coverage"
 	FactCategoryDNSKEYAlgoWeakest = "dnskey_algo_weakest"
+	FactCategorySoftwareVersion   = "software_version"
 
 	FactKeySigned    = "signed"
 	FactKeyUnsigned  = "unsigned"
@@ -96,6 +97,11 @@ var factCategoryDisplays = map[string]factCategoryDisplay{
 		KeyLabel:    coverageKeyLabel,
 		KeyTone:     coverageKeyTone,
 		KeyOrder:    coverageKeyOrder,
+	},
+	FactCategorySoftwareVersion: {
+		Label:       "Nameserver software",
+		Description: "Version strings a domain's nameservers disclose over version.bind.",
+		Order:       30,
 	},
 	FactCategoryDNSKEYAlgoWeakest: {
 		Label: "Weakest signing algorithm",

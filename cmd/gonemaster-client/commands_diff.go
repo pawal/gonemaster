@@ -103,7 +103,7 @@ func runRunsDiff(ctx context.Context, client *apiClient, opts globalOptions, arg
 	var quiet bool
 	fs.BoolVar(&quiet, "quiet", false, "Report through the exit status only")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) < 2 {
@@ -185,7 +185,7 @@ func runBatchesDiff(ctx context.Context, client *apiClient, opts globalOptions, 
 	fs.BoolVar(&perDomain, "per-domain", false, "Include per-domain deltas")
 	fs.IntVar(&limit, "limit", 5000, "Max runs per batch")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	rest := fs.Args()
 	if len(rest) < 2 {

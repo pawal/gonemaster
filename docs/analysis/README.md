@@ -25,5 +25,6 @@ read-only cohort views for public analysis.
 - Cohorts: [cohorts.md](cohorts.md)
 - Snapshots: [snapshots.md](snapshots.md)
 - Querying: [querying.md](querying.md)
+- Cohort report: [cohort-report.md](cohort-report.md)
 - Public UI: [public-ui.md](public-ui.md)
 - Agent-driven analysis (MCP): [../mcp/analysis-examples.md](../mcp/analysis-examples.md)

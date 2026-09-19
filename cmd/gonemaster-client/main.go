@@ -284,6 +284,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return runRuns(ctx, client, opts, rest, writer, errOut)
 	case "entries":
 		return runEntries(ctx, client, opts, rest, writer, errOut)
+	case "report":
+		return runReport(ctx, client, opts, rest, writer, errOut)
+	case "cohorts":
+		return runCohorts(ctx, client, opts, rest, writer, errOut)
 	case "help", "-h", "--help":
 		printUsage(writer)
 		return 0
@@ -347,6 +351,8 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  tags list|create|delete|domains|summary|add-domains")
 	fmt.Fprintln(out, "  runs list|get|results|diff")
 	fmt.Fprintln(out, "  entries query")
+	fmt.Fprintln(out, "  cohorts list|snapshots")
+	fmt.Fprintln(out, "  report [dataset-tag] --from SLUG --to SLUG")
 }
 
 func setSubcommandUsage(fs *flag.FlagSet) {
@@ -366,7 +372,7 @@ func setSubcommandUsage(fs *flag.FlagSet) {
 
 func rejectSingleDashFlags(args []string) error {
 	for _, arg := range args {
-		if arg == "-" {
+		if arg == "-" || arg == helpShorthand {
 			continue
 		}
 		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") {
@@ -452,6 +458,7 @@ func openOutput(path string, fallback io.Writer) (io.Writer, func(), error) {
 
 func parseWithReorderedFlags(fs *flag.FlagSet, args []string) error {
 	setSubcommandUsage(fs)
+	args = expandHelpShorthand(args)
 	for _, arg := range args {
 		if arg == "-" || arg == "--" {
 			break
@@ -463,6 +470,47 @@ func parseWithReorderedFlags(fs *flag.FlagSet, args []string) error {
 		}
 	}
 	return fs.Parse(reorderFlags(fs, args))
+}
+
+// isHelpArg reports whether arg asks for usage rather than naming a
+// subcommand.
+func isHelpArg(arg string) bool {
+	return arg == helpShorthand || arg == "--help" || arg == "help"
+}
+
+// groupUsage names a command group's subcommands.
+func groupUsage(out io.Writer, group, subs string) int {
+	fmt.Fprintf(out, "Usage: gonemaster-client %s <%s>\n", group, subs)
+	return 0
+}
+
+// parseExit maps a flag parse failure to an exit code. Asking for usage is
+// a request, not an error.
+func parseExit(err error) int {
+	if errors.Is(err, flag.ErrHelp) {
+		return 0
+	}
+	return 2
+}
+
+// helpShorthand is the one single-dash option the client takes.
+const helpShorthand = "-h"
+
+// expandHelpShorthand rewrites -h to --help so flag.Parse reaches its help
+// path; reorderFlags would otherwise file it as a positional.
+func expandHelpShorthand(args []string) []string {
+	out := make([]string, len(args))
+	for i, arg := range args {
+		if arg == "--" {
+			copy(out[i:], args[i:])
+			break
+		}
+		if arg == helpShorthand {
+			arg = "--help"
+		}
+		out[i] = arg
+	}
+	return out
 }
 
 func reorderFlags(fs *flag.FlagSet, args []string) []string {
@@ -521,7 +569,12 @@ func flagExpectsValue(f *flag.Flag) bool {
 }
 
 func (c *apiClient) doJSON(ctx context.Context, method string, path string, body any, out any) error {
-	full := strings.TrimRight(c.baseURL, "/") + path
+	return c.doJSONURL(ctx, method, strings.TrimRight(c.baseURL, "/")+path, body, out)
+}
+
+// doJSONURL is doJSON against an absolute URL, for the public API, which
+// sits beside the admin base rather than under it.
+func (c *apiClient) doJSONURL(ctx context.Context, method string, full string, body any, out any) error {
 	var payload io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -569,9 +622,13 @@ func (c *apiClient) doJSON(ctx context.Context, method string, path string, body
 }
 
 func runJobs(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	const subs = "create|batch|list|get|watch|cancel|results|purge"
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "jobs subcommand is required")
+		fmt.Fprintln(errOut, "jobs subcommand is required: "+subs)
 		return 2
+	}
+	if isHelpArg(args[0]) {
+		return groupUsage(out, "jobs", subs)
 	}
 	cmd := args[0]
 	args = args[1:]
@@ -599,9 +656,13 @@ func runJobs(ctx context.Context, client *apiClient, opts globalOptions, args []
 }
 
 func runBatches(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	const subs = "get|watch|results|cancel|remove|diff"
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "batches subcommand is required")
+		fmt.Fprintln(errOut, "batches subcommand is required: "+subs)
 		return 2
+	}
+	if isHelpArg(args[0]) {
+		return groupUsage(out, "batches", subs)
 	}
 	cmd := args[0]
 	args = args[1:]
@@ -625,9 +686,13 @@ func runBatches(ctx context.Context, client *apiClient, opts globalOptions, args
 }
 
 func runQueue(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
+	const subs = "pause|resume|reorder|remove"
 	if len(args) == 0 {
-		fmt.Fprintln(errOut, "queue subcommand is required")
+		fmt.Fprintln(errOut, "queue subcommand is required: "+subs)
 		return 2
+	}
+	if isHelpArg(args[0]) {
+		return groupUsage(out, "queue", subs)
 	}
 	cmd := args[0]
 	args = args[1:]
@@ -674,7 +739,7 @@ func runJobsCreate(ctx context.Context, client *apiClient, opts globalOptions, a
 	fs.BoolVar(&noScoreFlag, "no-score", false, "Suppress scoring output")
 	fs.StringVar(&scoringConfig, "scoring-config", "", "Path to JSON scoring config file (implies --score)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	if strings.TrimSpace(domain) == "" {
 		fmt.Fprintln(errOut, "--domain is required")
@@ -769,7 +834,7 @@ func runJobsBatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 	fs.BoolVar(&noScoreFlag, "no-score", false, "Suppress scoring output")
 	fs.StringVar(&scoringConfig, "scoring-config", "", "Path to JSON scoring config file (implies --score)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	overrides, err := parseOverrides(overridePairs, overrideFile)
 	if err != nil {
@@ -857,7 +922,7 @@ func runJobsList(ctx context.Context, client *apiClient, opts globalOptions, arg
 	fs.IntVar(&limit, "limit", 100, "Limit (1-500)")
 	fs.IntVar(&offset, "offset", 0, "Offset")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	if createdAfter != "" {
 		if _, err := time.Parse(time.RFC3339, createdAfter); err != nil {
@@ -943,7 +1008,7 @@ func runJobsWatch(ctx context.Context, client *apiClient, opts globalOptions, ar
 	fs.SetOutput(errOut)
 	fs.DurationVar(&poll, "poll", 3*time.Second, "Poll interval")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	if fs.NArg() == 0 {
 		fmt.Fprintln(errOut, "job id is required")
@@ -1042,7 +1107,7 @@ func runBatchesWatch(ctx context.Context, client *apiClient, opts globalOptions,
 	fs.SetOutput(errOut)
 	fs.DurationVar(&poll, "poll", 4*time.Second, "Poll interval")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	if fs.NArg() == 0 {
 		fmt.Fprintln(errOut, "batch id is required")
@@ -1118,7 +1183,7 @@ func runBatchesRemove(ctx context.Context, client *apiClient, opts globalOptions
 	fs.SetOutput(errOut)
 	fs.BoolVar(&cancelRunning, "cancel-running", false, "Cancel running jobs in the batch")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	args = fs.Args()
 	if len(args) == 0 {
@@ -1227,7 +1292,7 @@ func runQueueReorder(ctx context.Context, client *apiClient, opts globalOptions,
 	fs.SetOutput(errOut)
 	fs.Var(&jobIDs, "job-id", "Job id (repeatable)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	jobIDs = append(jobIDs, fs.Args()...)
 	jobIDs = normalizeIDs(jobIDs)
@@ -1257,7 +1322,7 @@ func runQueueRemove(ctx context.Context, client *apiClient, opts globalOptions, 
 	fs.SetOutput(errOut)
 	fs.Var(&jobIDs, "job-id", "Job id (repeatable)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 	jobIDs = append(jobIDs, fs.Args()...)
 	jobIDs = normalizeIDs(jobIDs)
@@ -1314,7 +1379,7 @@ func runResults(ctx context.Context, client *apiClient, opts globalOptions, args
 	fs.BoolVar(&noScoreFlag, "no-score", false, "Suppress scoring output")
 	fs.StringVar(&scoringConfig, "scoring-config", "", "Path to JSON scoring config file (implies --score)")
 	if err := parseWithReorderedFlags(fs, args); err != nil {
-		return 2
+		return parseExit(err)
 	}
 
 	if batchMode {

@@ -40,6 +40,11 @@ manage the job queue, and query the domain/tag/run/entry analysis APIs.
 **--version**
 : Print version and exit.
 
+**-h**, **--help**
+: Print usage and exit. The only single-dash option; it also applies to a
+  command group (**gonemaster-client domains -h**) and to a subcommand
+  (**gonemaster-client domains list -h**).
+
 ## COMMANDS
 
 ### jobs create
@@ -290,6 +295,40 @@ Cancel all jobs in a batch.
 
 Remove a batch. Use **--cancel-running** to cancel active jobs first.
 
+### report [*DATASET-TAG*]
+
+Compare two snapshots of an analysis cohort and classify every change as
+engine-driven or real. The dataset tag defaults to the server's default
+public cohort, **--to** to the newest snapshot, and **--from** to the
+snapshot captured before it.
+
+**--format** *FORMAT*
+: **markdown** (the default, also named **pretty**) or **json**. Accepted
+  before or after the command.
+
+**--from** *SLUG*
+: Baseline snapshot.
+
+**--to** *SLUG*
+: Later snapshot.
+
+**--min-cluster** *N*
+: Domains a cluster needs (server default 3).
+
+**--max-spread** *N*
+: Score spread a cluster allows (server default 3).
+
+### cohorts list
+
+List the public analysis cohorts with their labels, snapshot counts, and
+which one is the default.
+
+### cohorts snapshots [*DATASET-TAG*]
+
+List one cohort's snapshot slugs, newest first, with the capture date and
+the domain count. The dataset tag defaults to the server's default public
+cohort.
+
 ### queue pause
 
 Pause the job queue.
@@ -362,6 +401,15 @@ Watch a batch in progress:
 Purge completed jobs older than 90 days:
 
     gonemaster-client jobs purge --older-than 90
+
+Report the two newest snapshots of a cohort as Markdown:
+
+    gonemaster-client report kommuner --output report.md
+
+Find the cohorts and their snapshot slugs:
+
+    gonemaster-client cohorts list
+    gonemaster-client cohorts snapshots kommuner
 
 Use a remote server with JSON output:
 

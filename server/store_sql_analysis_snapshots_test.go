@@ -659,3 +659,103 @@ func TestSQLJobStoreBatchSnapshotIntentRoundTrip(t *testing.T) {
 		}
 	})
 }
+
+// testSnapshotVocabulary is a two-module test_levels table as capture stores it.
+const testSnapshotVocabulary = `{"DNSSEC":{"DS02_NO_MATCHING_DNSKEY_RRSIG":"ERROR"},"ZONE":{"Z15_NO_CAA":"NOTICE"}}`
+
+func TestSQLJobStoreSnapshotCarriesVocabularyProvenance(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID := seedCohortForSnapshotTest(t, s, "tld")
+		now := time.Now().UTC().Truncate(time.Microsecond)
+
+		created, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+			CohortID:          cohortID,
+			BatchID:           "batch-vocab",
+			Slug:              "2026-09-18",
+			Status:            AnalysisSnapshotStatusCaptured,
+			IsPublic:          true,
+			Vocabulary:        testSnapshotVocabulary,
+			ScoringConfigHash: "default",
+			CapturedAt:        now,
+		})
+		if err != nil {
+			t.Fatalf("insert: %v", err)
+		}
+		if created.Vocabulary != testSnapshotVocabulary {
+			t.Fatalf("Vocabulary: got %q", created.Vocabulary)
+		}
+		if created.ScoringConfigHash != "default" {
+			t.Fatalf("ScoringConfigHash: got %q want default", created.ScoringConfigHash)
+		}
+
+		read, ok := s.GetAnalysisCohortSnapshot(created.ID)
+		if !ok {
+			t.Fatal("expected the snapshot to be readable")
+		}
+		if read.Vocabulary != testSnapshotVocabulary || read.ScoringConfigHash != "default" {
+			t.Fatalf("read back: vocabulary=%q hash=%q", read.Vocabulary, read.ScoringConfigHash)
+		}
+
+		updated, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+			CohortID:          cohortID,
+			BatchID:           "batch-vocab",
+			Slug:              "2026-09-18",
+			Status:            AnalysisSnapshotStatusCaptured,
+			Vocabulary:        testSnapshotVocabulary,
+			ScoringConfigHash: "9f2c",
+		})
+		if err != nil {
+			t.Fatalf("update: %v", err)
+		}
+		if updated.Vocabulary != testSnapshotVocabulary || updated.ScoringConfigHash != "9f2c" {
+			t.Fatalf("update: vocabulary=%q hash=%q", updated.Vocabulary, updated.ScoringConfigHash)
+		}
+	})
+}
+
+// The vocabulary is provenance stored on the snapshot row, so it has to
+// outlive the runs it was read from.
+func TestSQLJobStoreSnapshotVocabularySurvivesRunPurge(t *testing.T) {
+	forEachBackend(t, func(t *testing.T, s *SQLJobStore) {
+		cohortID := seedCohortForSnapshotTest(t, s, "tld")
+		old := time.Now().UTC().Add(-48 * time.Hour).Truncate(time.Microsecond)
+
+		job, err := s.Create(Job{
+			ID: "job-purged", Domain: "alpha.example", BatchID: "batch-purge",
+			Status: JobQueued, CreatedAt: old,
+		})
+		if err != nil {
+			t.Fatalf("create job: %v", err)
+		}
+		job.Status = JobSucceeded
+		job.FinishedAt = old.Add(time.Second)
+		job.EffectiveProfile = `{"test_levels":{"ZONE":{"Z15_NO_CAA":"NOTICE"}}}`
+		graduate(t, s, job, nil)
+
+		snap, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
+			CohortID:   cohortID,
+			BatchID:    "batch-purge",
+			Slug:       "2026-09-18-purge",
+			Status:     AnalysisSnapshotStatusCaptured,
+			IsPublic:   true,
+			Vocabulary: testSnapshotVocabulary,
+		})
+		if err != nil {
+			t.Fatalf("insert snapshot: %v", err)
+		}
+
+		if _, err := s.PurgeOlderThan(time.Now().UTC().Add(-24 * time.Hour)); err != nil {
+			t.Fatalf("purge: %v", err)
+		}
+		if _, ok := s.GetRun(job.ID); ok {
+			t.Fatal("expected the run to be purged")
+		}
+		read, ok := s.GetAnalysisCohortSnapshot(snap.ID)
+		if !ok {
+			t.Fatal("expected the snapshot to survive the purge")
+		}
+		if read.Vocabulary != testSnapshotVocabulary {
+			t.Fatalf("Vocabulary after purge: got %q", read.Vocabulary)
+		}
+	})
+}

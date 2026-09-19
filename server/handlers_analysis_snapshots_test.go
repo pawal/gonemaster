@@ -512,3 +512,33 @@ func TestAdminSnapshotPatchRejectsReservedSlug(t *testing.T) {
 		}
 	})
 }
+
+// Rematerialize recomputes derived views. The vocabulary and the scoring
+// configuration hash are capture provenance, not derived, so a rebuild must
+// leave both exactly as they were.
+func TestAdminSnapshotRematerializeKeepsProvenance(t *testing.T) {
+	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
+		before, ok := f.snapshotByID(f.snapshot.ID)
+		if !ok {
+			t.Fatal("fixture snapshot not readable")
+		}
+		before.Vocabulary = `{"ZONE":{"Z15_NO_CAA":"NOTICE"}}`
+		before.ScoringConfigHash = "default"
+		if _, err := f.store.UpsertAnalysisCohortSnapshot(before); err != nil {
+			t.Fatalf("stamp provenance: %v", err)
+		}
+
+		path := fmt.Sprintf("/api/v1/analysis/cohorts/%d/snapshots/%s/rematerialize", f.cohort.ID, f.snapshot.Slug)
+		wantStatus(t, f.call(http.MethodPost, path, ""), http.StatusAccepted)
+		snap, ok := f.waitForMaterialization(f.snapshot.ID, AnalysisMaterializationReady)
+		if !ok {
+			t.Fatalf("snapshot did not reach ready: status=%q", snap.MaterializationStatus)
+		}
+		if snap.Vocabulary != before.Vocabulary {
+			t.Fatalf("Vocabulary = %q, want unchanged %q", snap.Vocabulary, before.Vocabulary)
+		}
+		if snap.ScoringConfigHash != before.ScoringConfigHash {
+			t.Fatalf("ScoringConfigHash = %q, want unchanged %q", snap.ScoringConfigHash, before.ScoringConfigHash)
+		}
+	})
+}

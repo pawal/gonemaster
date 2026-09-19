@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.11] - 2026-09-19
+
+A cohort report compares two snapshots of an analysis cohort and classifies every change as engine-driven or real, reaching the analysis UI, the public analysis API, gonemaster-client and the MCP bridge. A snapshot now records the tag vocabulary and the scoring configuration it was captured with.
 
 ### Added
 

@@ -5,6 +5,7 @@ import (
 	"crypto"
 	"encoding/base64"
 	"encoding/json"
+	"math/big"
 	"net/netip"
 	"os"
 	"path/filepath"
@@ -5832,6 +5833,158 @@ func TestDNSSEC19TransportDisabled(t *testing.T) {
 	}
 
 	tctest.RequireTags(t, entries, "IPV4_DISABLED")
+}
+
+// RSA moduli that each trigger one badkeys check, hex encoded.
+const (
+	dnssec19FermatN       = "ea24cb608de13557ba9e581e92c5c2452800e957fc27719c51d6e5e0cf08ec0c431533ae968a66d48252200d4ec93c2270fce6a2c94d780b1bf9bbae3fad3889e33e32748430e682df092d676df87539f4869efda42ba738d9c9560b2b65e6877ec49be20ec33f01c0769f44f978b4e8599c143437a66ab9c492863a5f2aa69d"
+	dnssec19SmallFactorsN = "285f5f09b38d6a998935567cc0c25d8be818426c69142cf6c0b4a3cfb0421fee49ac6d3d65706f39026023c1f973b08735b7fc0b545d78f40bdff4e20901f5791dfdfd3935c0ce15d98bffc9a3820a7664c1c01ddbe2d59c507650918be0ba50d07ec8781af1cce3232bb440b5666b7473f26cb6073c3a2bc29d5a3cefc5db7"
+	dnssec19PatternN      = "b14c3db07cd3067db53a155ee5b8c5f4f54dc954c972a21825cb0a0aa36179b8b1650196bb359037aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaea3adbc6470b3fd2c0f9f0e6c518111509b47a6f02f3fe853789fd268886fb39901d3cc4e238e778c1770d38f21322a4414413b4dee63a4299be89d367e3cbc746c20d6498cb"
+	dnssec19ROCAN         = "7d12998bbf6752b494947fb98be7c472e33923b8dde8937a52b67b4b46ee7f71993677162eb9170f404c5cbbd2b256bb9c9e809c9f11a7134af6116cda04219dce34853c2dd353ca26364de98a7064e6d5ea2b0bfe8a1e23d022ef3b715052122a05a76bf20762f1ac55b638e9153e3e1655a27eb7d6fb48f6096c75cdc88293ef7ec521bfb2ec906410e868d7dbd716f30482f008fb04f9818edaf"
+	dnssec19SoundN        = "6d98eaa945de464387ad0aea857c6c98bc8dad91ea77b924aa8bd5a713db04348a20aec98884ea375164dab7a1ac21db53592bd80f391eb436d2fa706068cf521ade134f27cdfc29454a204da61f6c36c680eb7bf46c35004f13a11f9d993fcacc58bfe9f199504e7d898ecbce73522e23184e2fad0625dbddbef08d9c2dbbd5"
+)
+
+// dnssec19RSAKey builds an RSA DNSKEY in the RFC 3110 section 2 wire format.
+func dnssec19RSAKey(t *testing.T, owner, modulusHex, exponentHex string) *dns.DNSKEY {
+	t.Helper()
+
+	n, ok := new(big.Int).SetString(modulusHex, 16)
+	if !ok {
+		t.Fatalf("parse modulus %q", modulusHex)
+	}
+	e, ok := new(big.Int).SetString(exponentHex, 16)
+	if !ok {
+		t.Fatalf("parse exponent %q", exponentHex)
+	}
+
+	eb := e.Bytes()
+	var wire []byte
+	if len(eb) < 256 {
+		wire = append(wire, byte(len(eb)))
+	} else {
+		wire = append(wire, 0, byte(len(eb)>>8), byte(len(eb)))
+	}
+	wire = append(wire, eb...)
+	wire = append(wire, n.Bytes()...)
+
+	return tctest.DNSKEYRR(owner, dns.RSASHA256, tctest.PublicKey(base64.StdEncoding.EncodeToString(wire)))
+}
+
+func TestDNSSEC19WeakRSAKeys(t *testing.T) {
+	tests := []struct {
+		name     string
+		modulus  string
+		exponent string
+		tag      string
+		// alsoTags are the other checks the same key trips.
+		alsoTags []string
+	}{
+		{name: "close primes", modulus: dnssec19FermatN, exponent: "010001", tag: "DS19_BADKEY_FERMAT"},
+		{name: "small factors", modulus: dnssec19SmallFactorsN, exponent: "010001", tag: "DS19_BADKEY_SMALL_FACTORS"},
+		{name: "repeated bytes", modulus: dnssec19PatternN, exponent: "010001", tag: "DS19_BADKEY_PATTERN"},
+		{name: "roca fingerprint", modulus: dnssec19ROCAN, exponent: "010001", tag: "DS19_BADKEY_ROCA"},
+		{name: "exponent below three", modulus: dnssec19SoundN, exponent: "01", tag: "DS19_BADKEY_RSA_INVALID"},
+		// Wiener vulnerable parameters, small enough that the primes are also close.
+		{name: "small private exponent", modulus: "e8d7076a6f", exponent: "5d22c38f1d", tag: "DS19_BADKEY_SMALL_D", alsoTags: []string{"DS19_BADKEY_FERMAT"}},
+	}
+
+	for i, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			addr := netip.AddrFrom4([4]byte{192, 0, 2, byte(210 + i)})
+
+			if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
+				t.Fatalf("set badkeys.path: %v", err)
+			}
+
+			tctest.NS(t, ctx, "ns1.example", addr.String(), func(q tctest.Query) packet.Packet {
+				if q.Type != "DNSKEY" {
+					return packet.Packet{}
+				}
+				return dnskeyPacket(q.Name, dnssec19RSAKey(t, q.Name, tt.modulus, tt.exponent))
+			})
+
+			tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+				return []nsdiscovery.NSItem{{
+					Name:       dnsname.New("ns1.example"),
+					Address:    addr,
+					HasAddress: true,
+				}}, nil
+			})
+			tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+				return nil, nil
+			})
+
+			z, err := zone.New("example")
+			if err != nil {
+				t.Fatalf("zone new: %v", err)
+			}
+			entries, err := DNSSEC19(ctx, &z)
+			if err != nil {
+				t.Fatalf("dnssec19: %v", err)
+			}
+
+			tctest.RequireTags(t, entries, tt.tag)
+			tctest.RequireNoTag(t, entries, "DS19_KEY_OK")
+
+			finding := tctest.RequireTag(t, entries, tt.tag)
+			if got, _ := finding.Args["algo_num"].(uint8); got != dns.RSASHA256 {
+				t.Errorf("algo_num = %v, want %d", finding.Args["algo_num"], dns.RSASHA256)
+			}
+			if tt.tag == "DS19_BADKEY_RSA_INVALID" {
+				if got, _ := finding.Args["subtest"].(string); got != "invalid_params" {
+					t.Errorf("subtest = %q, want %q", got, "invalid_params")
+				}
+			}
+			for _, also := range tt.alsoTags {
+				tctest.RequireTags(t, entries, also)
+			}
+		})
+	}
+}
+
+// A sound RSA key passes every check.
+func TestDNSSEC19SoundRSAKey(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
+		t.Fatalf("set badkeys.path: %v", err)
+	}
+
+	tctest.NS(t, ctx, "ns1.example", "192.0.2.220", func(q tctest.Query) packet.Packet {
+		if q.Type != "DNSKEY" {
+			return packet.Packet{}
+		}
+		return dnskeyPacket(q.Name, dnssec19RSAKey(t, q.Name, dnssec19SoundN, "010001"))
+	})
+
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return []nsdiscovery.NSItem{{
+			Name:       dnsname.New("ns1.example"),
+			Address:    netip.MustParseAddr("192.0.2.220"),
+			HasAddress: true,
+		}}, nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC19(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec19: %v", err)
+	}
+
+	tctest.RequireTags(t, entries, "DS19_KEY_OK")
+	for _, tag := range []string{
+		"DS19_BADKEY_FERMAT", "DS19_BADKEY_PATTERN", "DS19_BADKEY_ROCA",
+		"DS19_BADKEY_RSA_INVALID", "DS19_BADKEY_SMALL_FACTORS", "DS19_BADKEY_SMALL_D",
+	} {
+		tctest.RequireNoTag(t, entries, tag)
+	}
 }
 
 func dsPacket(owner string, keytag uint16, algo uint8, digestType uint8) packet.Packet {

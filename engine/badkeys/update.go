@@ -34,15 +34,43 @@ type Metadata struct {
 	BlocklistSHA256 string `json:"blocklist_sha256"`
 }
 
+// Updater downloads the badkeys blocklist. The zero value fetches from
+// UpdateURL over the default HTTP client.
+type Updater struct {
+	// URL overrides the metadata endpoint.
+	URL string
+	// Client overrides the HTTP client.
+	Client *http.Client
+}
+
+// Update downloads the badkeys blocklist from the upstream endpoint.
+func Update(outputDir string, w io.Writer) error {
+	return Updater{}.Update(outputDir, w)
+}
+
+func (u Updater) metadataURL() string {
+	if u.URL != "" {
+		return u.URL
+	}
+	return UpdateURL
+}
+
+func (u Updater) client() *http.Client {
+	if u.Client != nil {
+		return u.Client
+	}
+	return http.DefaultClient
+}
+
 // Update downloads the badkeys blocklist to outputDir.
 // It returns nil on success. Progress messages are written to w.
-func Update(outputDir string, w io.Writer) error {
+func (u Updater) Update(outputDir string, w io.Writer) error {
 	if err := os.MkdirAll(outputDir, 0o755); err != nil {
 		return fmt.Errorf("create output dir: %w", err)
 	}
 
 	fmt.Fprintln(w, "Downloading badkeysdata.json...")
-	jsonBytes, err := httpGet(UpdateURL)
+	jsonBytes, err := u.httpGet(u.metadataURL())
 	if err != nil {
 		return fmt.Errorf("download badkeysdata.json: %w", err)
 	}
@@ -74,7 +102,7 @@ func Update(outputDir string, w io.Writer) error {
 	}
 
 	fmt.Fprintf(w, "Downloading blocklist from %s...\n", data.BlocklistURL)
-	xzBytes, err := httpGet(data.BlocklistURL)
+	xzBytes, err := u.httpGet(data.BlocklistURL)
 	if err != nil {
 		return fmt.Errorf("download blocklist: %w", err)
 	}
@@ -130,8 +158,8 @@ func DefaultDataDir() string {
 	return filepath.Join(home, ".gonemaster", "badkeys")
 }
 
-func httpGet(url string) ([]byte, error) {
-	resp, err := http.Get(url)
+func (u Updater) httpGet(url string) ([]byte, error) {
+	resp, err := u.client().Get(url)
 	if err != nil {
 		return nil, err
 	}

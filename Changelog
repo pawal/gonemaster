@@ -8,6 +8,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 - tests: the engine startup and isolation tests narrow the runner profile to one testcase instead of running the whole module against the network
 - tests: the public lookup tests answer from a loopback DNS fixture, and a test server resolves nothing by default
+- badkeys: Updater takes a metadata URL and HTTP client, so the blocklist update is covered against a local server
 
 ## [v1.7.11] - 2026-09-19
 

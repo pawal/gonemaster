@@ -111,15 +111,12 @@ func newAnalysisFixture(t *testing.T, opts ...analysisFixtureOpt) *analysisFixtu
 		t.Fatalf("create fixture batch: %v", err)
 	}
 	if setup.seededRun != "" {
-		insertTestRun(t, store, Run{
-			ID:         "run-admin-1",
-			DomainID:   1,
-			Domain:     setup.seededRun,
-			BatchID:    setup.batchID,
-			Status:     JobSucceeded,
-			CreatedAt:  now,
-			StartedAt:  now,
-			FinishedAt: now,
+		seedGraduatedRun(t, store, runSpec{
+			ID:            "run-admin-1",
+			Domain:        setup.seededRun,
+			BatchID:       setup.batchID,
+			At:            now,
+			ResolveDomain: true,
 		})
 	}
 	snap := AnalysisCohortSnapshot{

@@ -171,11 +171,8 @@ func TestAdminSnapshotRetireUnpinsCohort(t *testing.T) {
 	})
 }
 
-// waitForMaterialization polls the snapshot row until its materialization
-// status reaches want, returning the final row. The rematerialize endpoint
-// dispatches the rebuild in a goroutine, so tests must wait for completion
-// rather than reading the row immediately after the 202. It stays on the
-// real clock: the rebuild talks to the database outside any bubble.
+// waitForMaterialization polls the snapshot row until its status reaches want.
+// It stays on the real clock: the rebuild talks to the database outside any bubble.
 func (f *analysisFixture) waitForMaterialization(id int64, want string) (AnalysisCohortSnapshot, bool) {
 	f.t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
@@ -191,11 +188,7 @@ func (f *analysisFixture) waitForMaterialization(id int64, want string) (Analysi
 	}
 }
 
-// TestAdminSnapshotRematerialize verifies the rematerialize action rebuilds the
-// overview view asynchronously, reports progress to completion, marks the
-// snapshot ready, and - the ordering-fix contract - leaves captured_at intact.
-// A rebuild recomputes derived views; it does not re-capture, so it must not
-// bump captured_at and thereby reorder the newest-captured-first snapshot list.
+// Rematerialize rebuilds the overview view, reports progress to ready, and leaves captured_at intact.
 func TestAdminSnapshotRematerialize(t *testing.T) {
 	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
 		before, ok := f.snapshotByID(f.snapshot.ID)

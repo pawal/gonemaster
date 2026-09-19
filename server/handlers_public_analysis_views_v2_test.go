@@ -350,6 +350,9 @@ func TestASNViewRoundTripPreservesRosters(t *testing.T) {
 			t.Fatalf("replace: %v", err)
 		}
 		rows := s.ListSnapshotASNViews(snapID)
+		if len(rows) != 2 {
+			t.Fatalf("ASN views = %d, want the 2 the fixture seeds", len(rows))
+		}
 		for _, row := range rows {
 			if row.DomainCount > 0 && row.Domains == nil {
 				t.Errorf("asn %d: Domains lost (domain_count=%d)", row.ASN, row.DomainCount)

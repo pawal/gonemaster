@@ -140,6 +140,9 @@ func TestHandleBatchTagValuesWeightByScore(t *testing.T) {
 	if body.WeightByScore != true {
 		t.Fatalf("expected weight_by_score echo true, got %+v", body)
 	}
+	if len(body.Values) != 2 {
+		t.Fatalf("values = %d, want the 2 seeded NSID strings", len(body.Values))
+	}
 	for _, v := range body.Values {
 		if v.AvgScore == nil {
 			t.Errorf("value %q missing avg_score under weight_by_score", v.Value)

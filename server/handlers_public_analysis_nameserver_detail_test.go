@@ -139,6 +139,9 @@ func TestNameserverViewRoundTripPreservesRosters(t *testing.T) {
 		}
 
 		got := s.ListSnapshotNameserverViews(snapID)
+		if len(got) != 2 {
+			t.Fatalf("nameserver views = %d, want the 2 the fixture seeds", len(got))
+		}
 		for _, row := range got {
 			if row.Addresses == nil && row.EndpointCount > 0 {
 				t.Errorf("ns %q: addresses round-trip lost (endpoint_count=%d but addresses nil)", row.NameserverName, row.EndpointCount)

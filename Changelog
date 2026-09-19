@@ -14,6 +14,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - admin-ui: the recent tests list leads with the domain and dates each row
+- tests: the tests added for dnssec22, the cohort report, the chain diagram and release pruning use the shared test-support helpers, tables and slices comparisons; no behaviour change
 - cli: gonemaster-client takes -h for --help, on a command group as well as a subcommand; asking for usage now exits 0
 
 ### Fixed

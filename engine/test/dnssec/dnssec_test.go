@@ -5842,6 +5842,8 @@ const (
 	dnssec19PatternN      = "b14c3db07cd3067db53a155ee5b8c5f4f54dc954c972a21825cb0a0aa36179b8b1650196bb359037aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaea3adbc6470b3fd2c0f9f0e6c518111509b47a6f02f3fe853789fd268886fb39901d3cc4e238e778c1770d38f21322a4414413b4dee63a4299be89d367e3cbc746c20d6498cb"
 	dnssec19ROCAN         = "7d12998bbf6752b494947fb98be7c472e33923b8dde8937a52b67b4b46ee7f71993677162eb9170f404c5cbbd2b256bb9c9e809c9f11a7134af6116cda04219dce34853c2dd353ca26364de98a7064e6d5ea2b0bfe8a1e23d022ef3b715052122a05a76bf20762f1ac55b638e9153e3e1655a27eb7d6fb48f6096c75cdc88293ef7ec521bfb2ec906410e868d7dbd716f30482f008fb04f9818edaf"
 	dnssec19SoundN        = "6d98eaa945de464387ad0aea857c6c98bc8dad91ea77b924aa8bd5a713db04348a20aec98884ea375164dab7a1ac21db53592bd80f391eb436d2fa706068cf521ade134f27cdfc29454a204da61f6c36c680eb7bf46c35004f13a11f9d993fcacc58bfe9f199504e7d898ecbce73522e23184e2fad0625dbddbef08d9c2dbbd5"
+	dnssec19SmallDN       = "cdec712893e6e0e7f7a4f567d0eed420c2d1753bf53d94e536be1fe893da5164a0ae6287e08be416afdfba68694139066f92d3ad0461d549e350dd469bd95c92659a4c3fc19a2bdcaff8461a1a7eb74bcb736861c1cd574184c7f697d4491c24fccb089a2a0e08b76c1d3d01f8d1c30fbd6fbd1cec2ba4fa806c5c5cf0dd2e3f"
+	dnssec19SmallDE       = "c9e987ac0c187c242f608654df9c8dd2d6b76e0bf6f3fc4a0e21b4a569696c1bd1a70d3c1ad1b2220aa87ad71f62a9c8ec7fc93b77ba6ce868f2e25b3166bf188da6b61f48883cde3e844f10e2445e0dfebd2425cc5a45b3f29d5fc6995660378e43feb4caa18874c06031f5e4a6c6380b42229d8563dfbd70e44bb5a7c5588d"
 )
 
 // dnssec19RSAKey builds an RSA DNSKEY in the RFC 3110 section 2 wire format.
@@ -5876,16 +5878,13 @@ func TestDNSSEC19WeakRSAKeys(t *testing.T) {
 		modulus  string
 		exponent string
 		tag      string
-		// alsoTags are the other checks the same key trips.
-		alsoTags []string
 	}{
 		{name: "close primes", modulus: dnssec19FermatN, exponent: "010001", tag: "DS19_BADKEY_FERMAT"},
 		{name: "small factors", modulus: dnssec19SmallFactorsN, exponent: "010001", tag: "DS19_BADKEY_SMALL_FACTORS"},
 		{name: "repeated bytes", modulus: dnssec19PatternN, exponent: "010001", tag: "DS19_BADKEY_PATTERN"},
 		{name: "roca fingerprint", modulus: dnssec19ROCAN, exponent: "010001", tag: "DS19_BADKEY_ROCA"},
 		{name: "exponent below three", modulus: dnssec19SoundN, exponent: "01", tag: "DS19_BADKEY_RSA_INVALID"},
-		// Wiener vulnerable parameters, small enough that the primes are also close.
-		{name: "small private exponent", modulus: "e8d7076a6f", exponent: "5d22c38f1d", tag: "DS19_BADKEY_SMALL_D", alsoTags: []string{"DS19_BADKEY_FERMAT"}},
+		{name: "small private exponent", modulus: dnssec19SmallDN, exponent: dnssec19SmallDE, tag: "DS19_BADKEY_SMALL_D"},
 	}
 
 	for i, tt := range tests {
@@ -5935,9 +5934,6 @@ func TestDNSSEC19WeakRSAKeys(t *testing.T) {
 				if got, _ := finding.Args["subtest"].(string); got != "invalid_params" {
 					t.Errorf("subtest = %q, want %q", got, "invalid_params")
 				}
-			}
-			for _, also := range tt.alsoTags {
-				tctest.RequireTags(t, entries, also)
 			}
 		})
 	}

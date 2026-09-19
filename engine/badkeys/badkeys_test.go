@@ -498,3 +498,32 @@ func loadDNSKEYVector(t *testing.T, name string) (uint8, []byte) {
 
 	return uint8(algoNum), keyData
 }
+
+// Wiener vulnerable keys at real sizes, and a sound key whose e is large.
+const (
+	smallD1024N = "cdec712893e6e0e7f7a4f567d0eed420c2d1753bf53d94e536be1fe893da5164a0ae6287e08be416afdfba68694139066f92d3ad0461d549e350dd469bd95c92659a4c3fc19a2bdcaff8461a1a7eb74bcb736861c1cd574184c7f697d4491c24fccb089a2a0e08b76c1d3d01f8d1c30fbd6fbd1cec2ba4fa806c5c5cf0dd2e3f"
+	smallD1024E = "c9e987ac0c187c242f608654df9c8dd2d6b76e0bf6f3fc4a0e21b4a569696c1bd1a70d3c1ad1b2220aa87ad71f62a9c8ec7fc93b77ba6ce868f2e25b3166bf188da6b61f48883cde3e844f10e2445e0dfebd2425cc5a45b3f29d5fc6995660378e43feb4caa18874c06031f5e4a6c6380b42229d8563dfbd70e44bb5a7c5588d"
+	smallD2048N = "c7ce3416e7696c989779f1f4382cb8d3265aec8050dfefd5e49434029464f6daa25acf14ed2edd05ec82082d18bfb43baefa97a80cc21e9176b70eebfc3bc252f6f0f170abadf37a63f5ac8e9440bf9a7a3bf0af04379b5c1d0dae518c122e429f4e198889b5ea31fc6e123a408a0302e589c0d7225d7b1fef21171de2291ed690956b38a9b666b9f15fc5fa3e39bcc890fb15d2779d79e863dea09c583f3901d9b40b9bb57e2fd3dc81206262a37746fb38f95161aaddf150ad80afb3977308c2210a37f99ee110ad269ab96b579b7269b7981c3ffa21d6142293ce7bf0fb47bbc45fd7a8e5b7f1c9b26230c19f3738062f345682822873eff8d71edd4aa87b"
+	smallD2048E = "9893323ce4996f93da4724b4f34e6e97cd26b81190e4acfbc8729788d3c513f299f1ac5429b24db7de9f75949e7b028cedd356728f71fdfec77390286afab842aa44b4dbc3fa5cdd74bab96fd7cddc36e4f101abeb0da59f745f08bd40fb725fe215183aaed6c01aacba914de7752b00fdf0655f55b7ec5099e7f11ff10295f6ed25b3a31d88aeaff620c4e1b26720917a6a81413afce3ffc7c2b58c258b30250090a6245c5c1e10d27baf07d6d3523c95feaba10903f35b76f8277f5830d6c001764647dc852c5a2cafa78b6848bfde3f5b20cae4af331834d357801c037f03d9db59438ea280e7f34cad6b15f92b7ed8d86c8e58bdf54069c5eff77cb2741b"
+	largeE1024N = "88333463aeb2b00d0e802d3b33e4f5a29837c14f2892eba8d551a7a1c3cd7bee5d5790a16ee7c71788458dbdc41ad24c934ff0d1de4813fb60e0f048a7f7d03822cbc33fbb38a137c0c5c66ac8c1c83cea28189ce7739a83ab392072205dde196dca2ea418f6e8ed1ca922506ddb4de634f010164f872510ed6c38aafa201921"
+	largeE1024E = "55558b47af7d3515512a882c729dea96ba1465e56feda0b796bc10ead5054012330a697e9b1046d54c6d315e2f05f5864a919024d613ca180dfad1ad2de0ae34c2a4d506a0389de01a68430b7034011d78383846154adf2f945470169ad953268865ecb36e6bf1e7a4b8c928f9913e9a6ddb31d5a6b82f607b2b492adba558c9"
+)
+
+func TestCheckSmallDRealSizes(t *testing.T) {
+	tests := []struct {
+		name string
+		n, e string
+		want bool
+	}{
+		{name: "1024 bit modulus, 200 bit d", n: smallD1024N, e: smallD1024E, want: true},
+		{name: "2048 bit modulus, 400 bit d", n: smallD2048N, e: smallD2048E, want: true},
+		{name: "1024 bit modulus, full size d", n: largeE1024N, e: largeE1024E, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := checkSmallD(newBigFromHex(tt.n), newBigFromHex(tt.e)); got != tt.want {
+				t.Fatalf("checkSmallD = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

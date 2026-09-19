@@ -142,14 +142,13 @@ func checkSmallD(n, e *big.Int) bool {
 	prevN, prevD := big.NewInt(1), big.NewInt(0)
 
 	a := new(big.Int)
-	temp := new(big.Int)
 	idx := 0
 
 	for y.Sign() > 0 {
-		a.Div(x, y)
-		// x, y = y, x - a*y
-		temp.Mul(a, y)
-		x, y = y, temp.Sub(x, temp)
+		// A fresh remainder each round keeps x and y distinct values.
+		r := new(big.Int)
+		a.DivMod(x, y, r)
+		x, y = y, r
 
 		// Compute rational from continued fraction: n = a*n1 + n0, d = a*d1 + d0
 		nn := new(big.Int).Mul(a, n1)

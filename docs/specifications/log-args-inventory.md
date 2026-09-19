@@ -1310,8 +1310,8 @@ These callsites use non-literal/non-tracked args expressions and require manual 
 | `a` | `engine/badkeys/rsa_checks.go` | 47 | `bigOne` |
 | `d.tag` | `engine/nameserver/nameserver.go` | 234 | `d.args` |
 | `d.tag` | `engine/nameserver/nameserver.go` | 236 | `d.args` |
-| `dd` | `engine/badkeys/rsa_checks.go` | 158 | `d0` |
-| `dd` | `engine/badkeys/rsa_checks.go` | 164 | `prevD` |
+| `dd` | `engine/badkeys/rsa_checks.go` | 157 | `d0` |
+| `dd` | `engine/badkeys/rsa_checks.go` | 163 | `prevD` |
 | `fmt.Sprintf("%s_%s_RECORD_NOT_AA_%s", prefix, qtype, protocol)` | `engine/test/connectivity/connectivity.go` | 1023 | `withNameserverArgs(ns, nil)` |
 | `fmt.Sprintf("%s_MISSING_%s_RECORD_%s", prefix, qtype, protocol)` | `engine/test/connectivity/connectivity.go` | 1002 | `withNameserverArgs(ns, nil)` |
 | `fmt.Sprintf("%s_NO_RESPONSE_%s", prefix, protocol)` | `engine/test/connectivity/connectivity.go` | 969 | `withNameserverArgs(ns, nil)` |
@@ -1323,7 +1323,7 @@ These callsites use non-literal/non-tracked args expressions and require manual 
 	"domain_found":		strings.ToLower(rrOwner),
 	"domain_expected":	strings.ToLower(expected),
 })` |
-| `nn` | `engine/badkeys/rsa_checks.go` | 156 | `n0` |
-| `nn` | `engine/badkeys/rsa_checks.go` | 163 | `prevN` |
-| `xVal` | `engine/badkeys/rsa_checks.go` | 189 | `bigOne` |
+| `nn` | `engine/badkeys/rsa_checks.go` | 155 | `n0` |
+| `nn` | `engine/badkeys/rsa_checks.go` | 162 | `prevN` |
+| `xVal` | `engine/badkeys/rsa_checks.go` | 188 | `bigOne` |
 

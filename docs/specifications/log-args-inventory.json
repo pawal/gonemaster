@@ -4287,13 +4287,13 @@
     {
       "tag": "dd",
       "file": "engine/badkeys/rsa_checks.go",
-      "line": 158,
+      "line": 157,
       "args_expr": "d0"
     },
     {
       "tag": "dd",
       "file": "engine/badkeys/rsa_checks.go",
-      "line": 164,
+      "line": 163,
       "args_expr": "prevD"
     },
     {
@@ -4335,19 +4335,19 @@
     {
       "tag": "nn",
       "file": "engine/badkeys/rsa_checks.go",
-      "line": 156,
+      "line": 155,
       "args_expr": "n0"
     },
     {
       "tag": "nn",
       "file": "engine/badkeys/rsa_checks.go",
-      "line": 163,
+      "line": 162,
       "args_expr": "prevN"
     },
     {
       "tag": "xVal",
       "file": "engine/badkeys/rsa_checks.go",
-      "line": 189,
+      "line": 188,
       "args_expr": "bigOne"
     }
   ]

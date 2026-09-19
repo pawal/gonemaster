@@ -4,13 +4,17 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Fixed
+
+- badkeys: the small private exponent check detects Wiener vulnerable keys of real size
+
 ### Changed
 
-- tests: the engine startup and isolation tests narrow the runner profile to one testcase instead of running the whole module against the network
-- tests: the public lookup tests answer from a loopback DNS fixture, and a test server resolves nothing by default
-- badkeys: Updater takes a metadata URL and HTTP client, so the blocklist update is covered against a local server
-- badkeys: the blocklist update covers every branch, including the download, decompression, verification and write failures
-- dnssec19: the weak RSA key findings are covered by synthetic moduli, one per check
+- tests: the engine startup tests run one testcase and stay off the network
+- tests: the public lookup tests answer from a loopback DNS fixture
+- badkeys: Updater takes a metadata URL and HTTP client
+- badkeys: the blocklist update is covered against a local server
+- dnssec19: every weak RSA key finding is covered
 
 ## [v1.7.11] - 2026-09-19
 

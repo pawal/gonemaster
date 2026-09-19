@@ -35,6 +35,27 @@ type DelegationDS struct {
 	Digest    string `json:"digest"`
 }
 
+// lookupResolvers selects the DNS servers and host resolver a delegation
+// lookup uses. The zero value uses the system configuration.
+type lookupResolvers struct {
+	servers []string
+	host    *net.Resolver
+}
+
+func (l lookupResolvers) addresses() []string {
+	if len(l.servers) > 0 {
+		return l.servers
+	}
+	return resolverAddresses()
+}
+
+func (l lookupResolvers) hostResolver() *net.Resolver {
+	if l.host != nil {
+		return l.host
+	}
+	return net.DefaultResolver
+}
+
 // handlePublicLookupDomain handles GET /pub/api/v1/lookup/{domain}.
 func (s *Server) handlePublicLookupDomain(w http.ResponseWriter, r *http.Request) {
 	domain := strings.TrimSpace(r.PathValue("domain"))
@@ -52,25 +73,30 @@ func (s *Server) handlePublicLookupDomain(w http.ResponseWriter, r *http.Request
 	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 	defer cancel()
 
-	info := lookupDelegation(ctx, domain)
+	info := s.delegationLookup(ctx, domain)
 	writeJSON(w, http.StatusOK, info)
 }
 
+// lookupDelegation resolves a delegation through the server's resolvers.
+func (s *Server) lookupDelegation(ctx context.Context, domain string) DelegationInfo {
+	return lookupDelegation(ctx, domain, s.lookup)
+}
+
 // lookupDelegation queries DNS for NS and DS records of a domain.
-func lookupDelegation(ctx context.Context, domain string) DelegationInfo {
+func lookupDelegation(ctx context.Context, domain string, res lookupResolvers) DelegationInfo {
 	info := DelegationInfo{
 		Nameservers: []DelegationNS{},
 		DSRecords:   []DelegationDS{},
 	}
 
-	info.Nameservers = lookupNS(ctx, domain)
-	info.DSRecords = lookupDS(ctx, domain)
+	info.Nameservers = lookupNS(ctx, domain, res)
+	info.DSRecords = lookupDS(ctx, domain, res)
 
 	return info
 }
 
 // lookupNS queries for NS records via DNS wire protocol.
-func lookupNS(ctx context.Context, domain string) []DelegationNS {
+func lookupNS(ctx context.Context, domain string, res lookupResolvers) []DelegationNS {
 	msg := transport.BuildQuery(domain, dns.TypeNS)
 	msg.RecursionDesired = true
 
@@ -80,7 +106,7 @@ func lookupNS(ctx context.Context, domain string) []DelegationNS {
 		EDNSSize: 4096,
 	}
 
-	servers := resolverAddresses()
+	servers := res.addresses()
 	for _, server := range servers {
 		pkt, err := c.Exchange(ctx, server, msg)
 		if err != nil || pkt.Msg == nil {
@@ -93,7 +119,7 @@ func lookupNS(ctx context.Context, domain string) []DelegationNS {
 				continue
 			}
 			nsName := strings.TrimSuffix(ns.Ns, ".")
-			addrs, err := net.DefaultResolver.LookupHost(ctx, nsName)
+			addrs, err := res.hostResolver().LookupHost(ctx, nsName)
 			if err != nil || len(addrs) == 0 {
 				nameservers = append(nameservers, DelegationNS{NS: nsName})
 			} else {
@@ -111,7 +137,7 @@ func lookupNS(ctx context.Context, domain string) []DelegationNS {
 }
 
 // lookupDS queries the system resolver for DS records.
-func lookupDS(ctx context.Context, domain string) []DelegationDS {
+func lookupDS(ctx context.Context, domain string, res lookupResolvers) []DelegationDS {
 	msg := transport.BuildQuery(domain, dns.TypeDS)
 	msg.RecursionDesired = true
 
@@ -122,7 +148,7 @@ func lookupDS(ctx context.Context, domain string) []DelegationDS {
 		EDNSSize: 4096,
 	}
 
-	servers := resolverAddresses()
+	servers := res.addresses()
 	for _, server := range servers {
 		pkt, err := c.Exchange(ctx, server, msg)
 		if err != nil || pkt.Msg == nil {

@@ -36,6 +36,7 @@ type Server struct {
 	progressWriteMinStep     int
 	progressWriteMinInterval time.Duration
 	engineRunner             func(engine.RunRequest) ([]engine.LogEntry, error)
+	lookup                   lookupResolvers
 	engineLimiter            *engineLimiter
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
@@ -187,8 +188,9 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		engineRunner:                  engine.Run,
 		engineLimiter:                 newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                       map[string]context.CancelFunc{},
-		delegationLookup:              lookupDelegation,
 	}
+	// Bound as a method value so it reads s.lookup at call time.
+	s.delegationLookup = s.lookupDelegation
 	if cfg.PublicAPI.RateLimitEnabled {
 		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)
 		s.metrics.SetRateLimitKeysSource(s.rateLimiter.Keys)

@@ -2,9 +2,11 @@ package server
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -242,6 +244,13 @@ func withEngineRunner(fn func(engine.RunRequest) ([]engine.LogEntry, error)) srv
 	}
 }
 
+// withLookupResolvers points delegation lookups at a test DNS server.
+func withLookupResolvers(res lookupResolvers) srvOpt {
+	return func(s *testServerSetup) {
+		s.post = append(s.post, func(srv *Server) { srv.lookup = res })
+	}
+}
+
 // withLogTo sends the server log to w as JSON, for the tests that assert on
 // log lines.
 func withLogTo(w io.Writer, level string) srvOpt {
@@ -290,10 +299,20 @@ func newTestServer(t testing.TB, opts ...srvOpt) *Server {
 	} else {
 		srv = New(cfg)
 	}
+	// Closed port by default, so no test reaches a real resolver.
+	srv.lookup = lookupResolvers{servers: []string{"127.0.0.1:1"}, host: blackholeResolver}
 	for _, apply := range setup.post {
 		apply(srv)
 	}
 	return srv
+}
+
+// blackholeResolver refuses instead of querying the system resolver.
+var blackholeResolver = &net.Resolver{
+	PreferGo: true,
+	Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
+		return (&net.Dialer{}).DialContext(ctx, "udp", "127.0.0.1:1")
+	},
 }
 
 // fakeJobStore wraps a store so a test can observe or fail individual calls.

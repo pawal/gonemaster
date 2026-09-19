@@ -28,7 +28,10 @@ func (f *analysisFixture) setRunScore(batchID, runID, domainName string, score i
 	if !ok {
 		f.t.Fatalf("seeded domain %q missing", domainName)
 	}
-	run, _ := f.store.GetRun(runID)
+	run, ok := f.store.GetRun(runID)
+	if !ok {
+		f.t.Fatalf("seeded run %q missing", runID)
+	}
 	scr, grd := score, grade
 	if err := f.store.UpsertAnalysisRunDomainSummary(AnalysisRunDomainSummary{
 		CohortID: f.cohort.ID, RunID: runID, DomainID: domain.ID,
@@ -47,9 +50,17 @@ const (
 	reportVocabNew = `{"DNSSEC":{"DS07_NOT_SIGNED":"ERROR"},"ZONE":{"Z15_NO_CAA":"NOTICE"}}`
 )
 
-// seedReportPair builds two captured snapshots one engine version apart:
-// a.example gains a tag the engine gained, b.example gains a tag both
-// engines knew.
+// reloadSnapshot reads a snapshot back by slug.
+func (f *analysisFixture) reloadSnapshot(slug string) AnalysisCohortSnapshot {
+	f.t.Helper()
+	snap, ok := f.store.GetAnalysisCohortSnapshotBySlug(f.cohort.ID, slug)
+	if !ok {
+		f.t.Fatalf("snapshot %q missing", slug)
+	}
+	return snap
+}
+
+// seedReportPair builds two captured snapshots one engine version apart.
 func seedReportPair(t *testing.T, f *analysisFixture) AnalysisCohortSnapshot {
 	t.Helper()
 	t1 := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
@@ -72,8 +83,8 @@ func seedReportPair(t *testing.T, f *analysisFixture) AnalysisCohortSnapshot {
 
 	f.stampProvenance(older, "1.2.0", reportVocabOld, "default")
 	f.stampProvenance(f.snapshot, "1.3.0", reportVocabNew, "default")
-	older, _ = f.store.GetAnalysisCohortSnapshotBySlug(f.cohort.ID, older.Slug)
-	f.snapshot, _ = f.store.GetAnalysisCohortSnapshotBySlug(f.cohort.ID, f.snapshot.Slug)
+	older = f.reloadSnapshot(older.Slug)
+	f.snapshot = f.reloadSnapshot(f.snapshot.Slug)
 	return older
 }
 
@@ -143,7 +154,7 @@ func TestPublicAnalysisReportUnknownWithoutVocabulary(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		older := seedReportPair(t, f)
 		f.stampProvenance(older, "1.2.0", "", "")
-		older, _ = f.store.GetAnalysisCohortSnapshotBySlug(f.cohort.ID, older.Slug)
+		older = f.reloadSnapshot(older.Slug)
 
 		resp := getPublic(t, f.srv, f.reportURL(older.Slug, ""))
 		got := mustJSON[PublicAnalysisReportResponse](t, resp, http.StatusOK)
@@ -167,20 +178,33 @@ func TestPublicAnalysisReportUnknownWithoutVocabulary(t *testing.T) {
 	})
 }
 
-// Both snapshots must be named and the cluster bounds must be in range.
+// Both snapshots must be named and the cluster and paging bounds must be in range.
 func TestPublicAnalysisReportValidatesParameters(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		older := seedReportPair(t, f)
 		base := "/pub/api/v1/analysis/cohorts/" + f.cohort.SourceTag + "/report"
-
-		wantStatus(t, getPublic(t, f.srv, base), http.StatusBadRequest)
-		wantStatus(t, getPublic(t, f.srv, base+"?from="+older.Slug), http.StatusBadRequest)
-		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "min_cluster=0")), http.StatusBadRequest)
-		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "min_cluster=abc")), http.StatusBadRequest)
-		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "max_spread=0")), http.StatusBadRequest)
-		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "max_spread=1000")), http.StatusBadRequest)
-		wantStatus(t, getPublic(t, f.srv, f.reportURL("no-such-snapshot", "")), http.StatusNotFound)
-		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "min_cluster=2&max_spread=5")), http.StatusOK)
+		cases := []struct {
+			name string
+			path string
+			want int
+		}{
+			{"no snapshots", base, http.StatusBadRequest},
+			{"only from", base + "?from=" + older.Slug, http.StatusBadRequest},
+			{"min_cluster zero", f.reportURL(older.Slug, "min_cluster=0"), http.StatusBadRequest},
+			{"min_cluster text", f.reportURL(older.Slug, "min_cluster=abc"), http.StatusBadRequest},
+			{"max_spread zero", f.reportURL(older.Slug, "max_spread=0"), http.StatusBadRequest},
+			{"max_spread too large", f.reportURL(older.Slug, "max_spread=1000"), http.StatusBadRequest},
+			{"limit zero", f.reportURL(older.Slug, "limit=0"), http.StatusBadRequest},
+			{"limit too large", f.reportURL(older.Slug, "limit=501"), http.StatusBadRequest},
+			{"negative offset", f.reportURL(older.Slug, "offset=-1"), http.StatusBadRequest},
+			{"unknown from", f.reportURL("no-such-snapshot", ""), http.StatusNotFound},
+			{"bounds in range", f.reportURL(older.Slug, "min_cluster=2&max_spread=5"), http.StatusOK},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				wantStatus(t, getPublic(t, f.srv, tc.path), tc.want)
+			})
+		}
 	})
 }
 
@@ -222,8 +246,8 @@ func TestAnalysisReportCacheEviction(t *testing.T) {
 	for i := range analysisReportCacheSize + 1 {
 		cache.compute(string(rune('a'+i)), build)
 	}
-	if len(cache.entries) > analysisReportCacheSize {
-		t.Errorf("cache holds %d entries, want at most %d", len(cache.entries), analysisReportCacheSize)
+	if len(cache.entries) != analysisReportCacheSize {
+		t.Errorf("cache holds %d entries, want %d", len(cache.entries), analysisReportCacheSize)
 	}
 }
 
@@ -262,9 +286,5 @@ func TestPublicAnalysisReportPagesMovers(t *testing.T) {
 		if len(past.Domains) != 0 || past.DomainTotal != 2 {
 			t.Errorf("offset past the end = %d of %d, want 0 of 2", len(past.Domains), past.DomainTotal)
 		}
-
-		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "limit=0")), http.StatusBadRequest)
-		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "limit=501")), http.StatusBadRequest)
-		wantStatus(t, getPublic(t, f.srv, f.reportURL(older.Slug, "offset=-1")), http.StatusBadRequest)
 	})
 }

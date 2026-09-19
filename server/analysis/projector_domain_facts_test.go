@@ -2,6 +2,7 @@ package analysis
 
 import (
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 	"time"
@@ -616,13 +617,15 @@ func TestExtractSoftwareVersion(t *testing.T) {
 	if len(got) != len(want) {
 		t.Fatalf("facts = %d, want %d: %+v", len(got), len(want), got)
 	}
-	for i, key := range want {
-		if got[i].category != factCategorySoftwareVersion {
-			t.Errorf("fact %d category = %q, want %q", i, got[i].category, factCategorySoftwareVersion)
+	keys := make([]string, len(got))
+	for i, fact := range got {
+		if fact.category != factCategorySoftwareVersion {
+			t.Errorf("fact %d category = %q, want %q", i, fact.category, factCategorySoftwareVersion)
 		}
-		if got[i].key != key {
-			t.Errorf("fact %d key = %q, want %q", i, got[i].key, key)
-		}
+		keys[i] = fact.key
+	}
+	if !slices.Equal(keys, want) {
+		t.Errorf("keys = %q, want %q", keys, want)
 	}
 }
 

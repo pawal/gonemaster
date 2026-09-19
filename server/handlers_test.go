@@ -1515,8 +1515,7 @@ func TestAutoDetectedBaseURLHonoursTrustedForwardedHost(t *testing.T) {
 	}
 }
 
-// The list once read a fixed window of the newest runs, hiding everything
-// older and reporting the window as the total.
+// The list pages past inFlightMergeCap runs and reports the full total.
 func TestListJobsReachesRunsBeyondTheMergeWindow(t *testing.T) {
 	srv := newTestServer(t)
 	base := time.Date(2026, 2, 3, 0, 0, 0, 0, time.UTC)
@@ -1539,7 +1538,7 @@ func TestListJobsReachesRunsBeyondTheMergeWindow(t *testing.T) {
 		t.Fatalf("total: got %d, want %d", oldest.Total, total)
 	}
 	if len(oldest.Items) != 5 || oldest.Items[0].ID != "job_00000" {
-		t.Fatalf("oldest page should start at job_00000, got %v", jobIDs(oldest.Items))
+		t.Fatalf("oldest page should start at job_00000, got %v", ids(oldest.Items))
 	}
 
 	last := total - 5
@@ -1549,14 +1548,6 @@ func TestListJobsReachesRunsBeyondTheMergeWindow(t *testing.T) {
 		t.Fatalf("last page should hold the final 5 with no next cursor, got %d items next=%q", len(tail.Items), tail.NextCursor)
 	}
 	if tail.Items[4].ID != fmt.Sprintf("job_%05d", total-1) {
-		t.Fatalf("last page should end at the newest run, got %v", jobIDs(tail.Items))
+		t.Fatalf("last page should end at the newest run, got %v", ids(tail.Items))
 	}
-}
-
-func jobIDs(items []Job) []string {
-	ids := make([]string, len(items))
-	for i, item := range items {
-		ids[i] = item.ID
-	}
-	return ids
 }

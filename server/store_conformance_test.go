@@ -2,6 +2,7 @@ package server
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -353,8 +354,7 @@ func TestJobStoreGraduateMissingJobReturnsError(t *testing.T) {
 	})
 }
 
-// The /jobs list pages the runs table by the sort it was asked for, so every
-// store has to order runs the same way.
+// ListRuns orders by started_at in both directions on every store.
 func TestJobStoreListRunsOrdersByStartedAt(t *testing.T) {
 	forEachStore(t, func(t *testing.T, s JobStore) {
 		base := time.Date(2026, 3, 1, 0, 0, 0, 0, time.UTC)
@@ -382,13 +382,8 @@ func TestJobStoreListRunsOrdersByStartedAt(t *testing.T) {
 			for i, run := range list.Items {
 				got[i] = run.ID
 			}
-			if len(got) != len(tc.want) {
+			if !slices.Equal(got, tc.want) {
 				t.Fatalf("%s: got %v, want %v", tc.sort, got, tc.want)
-			}
-			for i := range tc.want {
-				if got[i] != tc.want[i] {
-					t.Fatalf("%s: got %v, want %v", tc.sort, got, tc.want)
-				}
 			}
 		}
 	})

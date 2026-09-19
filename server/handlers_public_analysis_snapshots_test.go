@@ -279,9 +279,7 @@ func TestPublicAnalysisOverviewSlugInPath(t *testing.T) {
 	})
 }
 
-// The public API reports whether the vocabulary is known, never the
-// vocabulary itself, so a reader can tell a classifiable pair from one the
-// report can only mark unknown.
+// The public API reports whether the vocabulary is known, never the vocabulary itself.
 func TestPublicAnalysisSnapshotReportsProvenanceAvailability(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		listPath := "/pub/api/v1/analysis/cohorts/tld/snapshots"

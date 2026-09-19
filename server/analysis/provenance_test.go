@@ -403,6 +403,9 @@ func TestRunVocabulary(t *testing.T) {
 	}
 }
 
+// scoringConfigHashWarning7 is the sha256 of `{"severity_penalties":{"WARNING":7}}`.
+const scoringConfigHashWarning7 = "b522aeef6c4386637f21ec3bc705332200dbbc41f4f5d0e86d8533ab48616687"
+
 func TestScoringConfigIdentity(t *testing.T) {
 	store, _ := snapshotLifecycleStore(t)
 	controller := NewController(store)
@@ -421,8 +424,8 @@ func TestScoringConfigIdentity(t *testing.T) {
 		t.Fatalf("SetSetting: %v", err)
 	}
 	first := controller.scoringConfigIdentity()
-	if len(first) != 64 {
-		t.Fatalf("hash = %q, want 64 hex characters", first)
+	if first != scoringConfigHashWarning7 {
+		t.Fatalf("hash = %q, want %q", first, scoringConfigHashWarning7)
 	}
 	if controller.scoringConfigIdentity() != first {
 		t.Fatal("expected the hash to be stable for one configuration")
@@ -472,8 +475,8 @@ func TestControllerProjectRunStampsVocabularyAndScoringHash(t *testing.T) {
 	if snap.Vocabulary != testVocabulary {
 		t.Fatalf("Vocabulary = %q, want %q", snap.Vocabulary, testVocabulary)
 	}
-	if len(snap.ScoringConfigHash) != 64 {
-		t.Fatalf("ScoringConfigHash = %q, want the stored configuration hashed", snap.ScoringConfigHash)
+	if snap.ScoringConfigHash != scoringConfigHashWarning7 {
+		t.Fatalf("ScoringConfigHash = %q, want %q", snap.ScoringConfigHash, scoringConfigHashWarning7)
 	}
 }
 
@@ -504,7 +507,7 @@ func TestBackfillSnapshotVocabulariesStampsCapturedSnapshots(t *testing.T) {
 	seedUnstampedSnapshot(t, store, "batch-old", "2026-06-03-old")
 
 	controller := NewController(store)
-	if err := controller.BackfillSnapshotVocabularies(context.Background()); err != nil {
+	if err := controller.BackfillSnapshotVocabularies(t.Context()); err != nil {
 		t.Fatalf("BackfillSnapshotVocabularies: %v", err)
 	}
 
@@ -533,7 +536,7 @@ func TestBackfillSnapshotVocabulariesSkipsRunsWithoutProfile(t *testing.T) {
 	seedUnstampedSnapshot(t, store, "batch-partial", "2026-06-03-partial")
 
 	controller := NewController(store)
-	if err := controller.BackfillSnapshotVocabularies(context.Background()); err != nil {
+	if err := controller.BackfillSnapshotVocabularies(t.Context()); err != nil {
 		t.Fatalf("BackfillSnapshotVocabularies: %v", err)
 	}
 
@@ -551,7 +554,7 @@ func TestBackfillSnapshotVocabulariesLeavesUnrecoverableUnknown(t *testing.T) {
 	seedUnstampedSnapshot(t, store, "batch-purged", "2026-06-03-purged")
 
 	controller := NewController(store)
-	if err := controller.BackfillSnapshotVocabularies(context.Background()); err != nil {
+	if err := controller.BackfillSnapshotVocabularies(t.Context()); err != nil {
 		t.Fatalf("BackfillSnapshotVocabularies: %v", err)
 	}
 
@@ -580,8 +583,8 @@ func TestBackfillSnapshotVocabulariesIsIdempotent(t *testing.T) {
 	}
 
 	controller := NewController(store)
-	for i := 0; i < 3; i++ {
-		if err := controller.BackfillSnapshotVocabularies(context.Background()); err != nil {
+	for i := range 3 {
+		if err := controller.BackfillSnapshotVocabularies(t.Context()); err != nil {
 			t.Fatalf("BackfillSnapshotVocabularies pass %d: %v", i, err)
 		}
 	}
@@ -592,10 +595,7 @@ func TestBackfillSnapshotVocabulariesIsIdempotent(t *testing.T) {
 	}
 }
 
-// A rebuild reconstructs a snapshot from stored runs. The vocabulary comes
-// from the runs and is recovered; the scoring configuration can only be read
-// as the server stands now, which says nothing about a batch from June, so
-// it stays unknown.
+// A rebuild recovers the vocabulary from the runs and leaves the scoring hash unknown.
 func TestRebuildCohortRecoversVocabularyButNotScoringHash(t *testing.T) {
 	store, _ := snapshotLifecycleStore(t)
 	seedSnapshotBatch(store, "batch-rebuilt", true)
@@ -606,7 +606,7 @@ func TestRebuildCohortRecoversVocabularyButNotScoringHash(t *testing.T) {
 		time.Date(2026, 6, 3, 10, 0, 0, 0, time.UTC), testEffectiveProfile)
 
 	controller := NewController(store)
-	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+	if err := controller.RebuildCohort(t.Context(), 10); err != nil {
 		t.Fatalf("RebuildCohort: %v", err)
 	}
 
@@ -622,9 +622,7 @@ func TestRebuildCohortRecoversVocabularyButNotScoringHash(t *testing.T) {
 	}
 }
 
-// An unknown scoring hash is load-bearing: the report reads it as "cannot
-// rule out a penalty change". A later projection must not quietly replace it
-// with the configuration in force today.
+// A later projection never replaces an unknown scoring hash.
 func TestApplySnapshotStateNeverBackfillsScoringHash(t *testing.T) {
 	store, _ := snapshotLifecycleStore(t)
 	seedSnapshotBatch(store, "batch-unknown", true)

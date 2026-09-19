@@ -381,14 +381,7 @@ func TestAdminSnapshotMethodNotAllowed(t *testing.T) {
 func (f *analysisFixture) seedSweepSnapshot(batchID, slug, domainName string, capturedAt time.Time) AnalysisCohortSnapshot {
 	f.t.Helper()
 	snap := f.seedAlternateSnapshot(batchID, slug, capturedAt)
-	domain, err := f.store.GetOrCreateDomain(domainName)
-	if err != nil {
-		f.t.Fatalf("create domain %q: %v", domainName, err)
-	}
-	insertTestRun(f.t, f.store, Run{
-		ID: "run-" + slug, DomainID: domain.ID, Domain: domainName, BatchID: batchID,
-		Status: JobSucceeded, CreatedAt: capturedAt, StartedAt: capturedAt, FinishedAt: capturedAt,
-	})
+	seedGraduatedRun(f.t, f.store, runSpec{ID: "run-" + slug, Domain: domainName, BatchID: batchID, At: capturedAt})
 	return snap
 }
 
@@ -513,9 +506,7 @@ func TestAdminSnapshotPatchRejectsReservedSlug(t *testing.T) {
 	})
 }
 
-// Rematerialize recomputes derived views. The vocabulary and the scoring
-// configuration hash are capture provenance, not derived, so a rebuild must
-// leave both exactly as they were.
+// A rebuild leaves the captured vocabulary and scoring hash untouched.
 func TestAdminSnapshotRematerializeKeepsProvenance(t *testing.T) {
 	forEachAdminSnapshotFixture(t, func(t *testing.T, f *analysisFixture) {
 		before, ok := f.snapshotByID(f.snapshot.ID)

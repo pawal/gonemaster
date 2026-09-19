@@ -1206,9 +1206,7 @@ func TestExtractRSAExponentPartial(t *testing.T) {
 	}
 }
 
-// RFC 4035 section 5.2 makes the DS-matched key itself sign the DNSKEY RRset,
-// so a DS naming a key that signs nothing is a dead anchor. The working DS
-// still carries the zone, which is partial, not broken.
+// A DS naming a key that signs nothing is a dead anchor; the working DS keeps the zone partial.
 func TestExtractDeadAnchorIsPartial(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	in := buildInput(t, ctx, fixtureOpts{deadAnchorKSK: true})
@@ -1248,8 +1246,7 @@ func TestExtractDeadAnchorIsPartial(t *testing.T) {
 	}
 }
 
-// A zone serving no DNSKEY RRSIG at all proves nothing about which key signs,
-// so every link keeps its digest verdict and the roll-up carries the fault.
+// An unsigned DNSKEY RRset keeps every link at its digest verdict and breaks the roll-up.
 func TestExtractUnsignedDNSKEYKeepsLinkMatch(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	in := buildInput(t, ctx, fixtureOpts{unsignedDNSKEY: true})
@@ -1257,6 +1254,9 @@ func TestExtractUnsignedDNSKEYKeepsLinkMatch(t *testing.T) {
 	got := Extract(ctx, in)
 	if got == nil {
 		t.Fatal("expected a summary")
+	}
+	if len(got.Links) != 1 {
+		t.Fatalf("links = %+v, want 1", got.Links)
 	}
 	for _, l := range got.Links {
 		if l.Status != LinkMatch {

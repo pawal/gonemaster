@@ -277,9 +277,7 @@ func TestVerifyRRSIGMLDSA44WrongKey(t *testing.T) {
 	}
 }
 
-// KeySize must report the length ML-DSA-44 fixes, never an RSA modulus parse
-// of a key that is not RSA. The engine-side test asserts the gate that keeps
-// algorithm 18 off the RSA path; this one pins the value.
+// KeySize reports the fixed ML-DSA-44 public key length for a captured key.
 func TestKeySizeMLDSA44(t *testing.T) {
 	keys, _, _ := loadZoneFixture(t, huqueZone)
 	key := keys[0]

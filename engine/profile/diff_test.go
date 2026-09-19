@@ -2,6 +2,7 @@ package profile
 
 import (
 	"encoding/json"
+	"slices"
 	"testing"
 )
 
@@ -370,9 +371,9 @@ func TestDiffTestLevels(t *testing.T) {
 		"DNSSEC": {"DS02_NO_MATCHING_DNSKEY_RRSIG": "ERROR"},
 		"ZONE":   {"Z15_NO_CAA": "NOTICE"},
 	})
+	diff := DiffTestLevels(june, september)
 
 	t.Run("added", func(t *testing.T) {
-		diff := DiffTestLevels(june, september)
 		if len(diff.Added) != 1 {
 			t.Fatalf("added: got %d, want 1: %+v", len(diff.Added), diff.Added)
 		}
@@ -383,7 +384,6 @@ func TestDiffTestLevels(t *testing.T) {
 	})
 
 	t.Run("removed", func(t *testing.T) {
-		diff := DiffTestLevels(june, september)
 		if len(diff.Removed) != 1 {
 			t.Fatalf("removed: got %d, want 1: %+v", len(diff.Removed), diff.Removed)
 		}
@@ -394,7 +394,6 @@ func TestDiffTestLevels(t *testing.T) {
 	})
 
 	t.Run("level changed", func(t *testing.T) {
-		diff := DiffTestLevels(june, september)
 		if len(diff.LevelChanged) != 1 {
 			t.Fatalf("level changed: got %d, want 1: %+v", len(diff.LevelChanged), diff.LevelChanged)
 		}
@@ -423,11 +422,15 @@ func TestDiffTestLevelsWholeModules(t *testing.T) {
 		"CONNECTIVITY": {"CN05_NO_RESPONSE": "ERROR", "CN05_OK": "INFO"},
 	})
 	diff := DiffTestLevels(a, b)
-	if len(diff.Added) != 2 || len(diff.Removed) != 0 {
-		t.Fatalf("got %+v", diff)
+	want := []TestLevelEntry{
+		{Module: "CONNECTIVITY", Tag: "CN05_NO_RESPONSE", Level: "ERROR"},
+		{Module: "CONNECTIVITY", Tag: "CN05_OK", Level: "INFO"},
 	}
-	if diff.Added[0].Tag != "CN05_NO_RESPONSE" || diff.Added[1].Tag != "CN05_OK" {
-		t.Fatalf("expected the added tags sorted: %+v", diff.Added)
+	if !slices.Equal(diff.Added, want) {
+		t.Fatalf("added = %+v, want %+v", diff.Added, want)
+	}
+	if len(diff.Removed) != 0 {
+		t.Fatalf("removed = %+v, want none", diff.Removed)
 	}
 	// Level case is not a change.
 	if len(diff.LevelChanged) != 0 {
@@ -437,11 +440,12 @@ func TestDiffTestLevelsWholeModules(t *testing.T) {
 
 func TestDiffTestLevelsNilProfile(t *testing.T) {
 	only := vocabulary(map[string]map[string]string{"ZONE": {"Z01_SOA_OK": "INFO"}})
-	if diff := DiffTestLevels(nil, only); len(diff.Added) != 1 || len(diff.Removed) != 0 {
-		t.Fatalf("nil from: got %+v", diff)
+	want := []TestLevelEntry{{Module: "ZONE", Tag: "Z01_SOA_OK", Level: "INFO"}}
+	if diff := DiffTestLevels(nil, only); !slices.Equal(diff.Added, want) || len(diff.Removed) != 0 {
+		t.Fatalf("nil from: got %+v, want added %+v", diff, want)
 	}
-	if diff := DiffTestLevels(only, nil); len(diff.Removed) != 1 || len(diff.Added) != 0 {
-		t.Fatalf("nil to: got %+v", diff)
+	if diff := DiffTestLevels(only, nil); !slices.Equal(diff.Removed, want) || len(diff.Added) != 0 {
+		t.Fatalf("nil to: got %+v, want removed %+v", diff, want)
 	}
 	if !DiffTestLevels(nil, nil).Empty() {
 		t.Fatal("expected two nil profiles to produce an empty diff")

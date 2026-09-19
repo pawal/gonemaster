@@ -149,8 +149,14 @@ func DefaultDataDir() string {
 	if err != nil {
 		home = "."
 	}
-	if runtime.GOOS == "linux" || runtime.GOOS == "darwin" {
-		if xdg := os.Getenv("XDG_DATA_HOME"); xdg != "" {
+	return dataDir(runtime.GOOS, home, os.Getenv("XDG_DATA_HOME"))
+}
+
+// dataDir resolves the data directory for one platform. XDG_DATA_HOME applies
+// on Linux and macOS only.
+func dataDir(goos, home, xdg string) string {
+	if goos == "linux" || goos == "darwin" {
+		if xdg != "" {
 			return filepath.Join(xdg, "gonemaster", "badkeys")
 		}
 		return filepath.Join(home, ".local", "share", "gonemaster", "badkeys")

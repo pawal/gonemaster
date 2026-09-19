@@ -337,6 +337,11 @@ func TestNewAnalysisFixtureOptions(t *testing.T) {
 	if run.Domain != "opt.example" || run.BatchID != "batch-opt" {
 		t.Fatalf("seeded run = %+v", run)
 	}
+	// The run's domain id must name a domain row, not a hardcoded id.
+	domain, ok := f.store.GetDomain(run.DomainID)
+	if !ok || domain.Name != "opt.example" {
+		t.Fatalf("seeded run domain id %d = %+v (ok=%v), want opt.example", run.DomainID, domain, ok)
+	}
 }
 
 func TestNewAnalysisFixtureWithoutSnapshot(t *testing.T) {

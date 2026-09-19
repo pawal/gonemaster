@@ -174,6 +174,21 @@ func RequireArgShape(t TB, entry *logger.Entry, want ArgShape) {
 	}
 }
 
+// RequireArg asserts the entry carries key as the string want.
+func RequireArg(t TB, entry *logger.Entry, key string, want string) {
+	t.Helper()
+	if entry == nil {
+		t.Fatalf("expected an entry to check %s", key)
+	}
+	got, ok := entry.Args[key].(string)
+	if !ok {
+		t.Fatalf("expected string arg %s on %s, got %#v", key, entry.Tag, entry.Args[key])
+	}
+	if got != want {
+		t.Fatalf("%s = %q, want %q", key, got, want)
+	}
+}
+
 func requireServers(t TB, args map[string]any, key string) []map[string]any {
 	t.Helper()
 	raw, ok := args[key]

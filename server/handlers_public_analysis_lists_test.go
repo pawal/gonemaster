@@ -3,7 +3,6 @@ package server
 import (
 	"fmt"
 	"net/http"
-	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -112,15 +111,12 @@ func newAnalysisFixture(t *testing.T, opts ...analysisFixtureOpt) *analysisFixtu
 		t.Fatalf("create fixture batch: %v", err)
 	}
 	if setup.seededRun != "" {
-		insertTestRun(t, store, Run{
-			ID:         "run-admin-1",
-			DomainID:   1,
-			Domain:     setup.seededRun,
-			BatchID:    setup.batchID,
-			Status:     JobSucceeded,
-			CreatedAt:  now,
-			StartedAt:  now,
-			FinishedAt: now,
+		seedGraduatedRun(t, store, runSpec{
+			ID:            "run-admin-1",
+			Domain:        setup.seededRun,
+			BatchID:       setup.batchID,
+			At:            now,
+			ResolveDomain: true,
 		})
 	}
 	snap := AnalysisCohortSnapshot{
@@ -308,17 +304,10 @@ func insertTestRun(t *testing.T, store *SQLJobStore, run Run) {
 	}
 }
 
-func decodeDomainList(t *testing.T, body *httptest.ResponseRecorder) PublicAnalysisListResponse[PublicAnalysisDomainView] {
-	t.Helper()
-	got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, body, http.StatusOK)
-	return got
-}
-
 func TestPublicAnalysisDomainsEmpty(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		resp := getPublic(t, f.srv, f.publicURL("domains"))
-		wantStatus(t, resp, http.StatusOK)
-		got := decodeDomainList(t, resp)
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if got.Total != 0 || len(got.Items) != 0 {
 			t.Fatalf("expected empty list, got %+v", got)
 		}
@@ -337,8 +326,7 @@ func TestPublicAnalysisDomainsReturnsLatestPerDomain(t *testing.T) {
 		f.seedDomainSummary("beta.example", "run-beta-1", t1, 80, "B", "WARNING")
 
 		resp := getPublic(t, f.srv, f.publicURL("domains"))
-		wantStatus(t, resp, http.StatusOK)
-		got := decodeDomainList(t, resp)
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if got.Total != 2 || len(got.Items) != 2 {
 			t.Fatalf("expected 2 items (latest per domain), got total=%d len=%d", got.Total, len(got.Items))
 		}
@@ -379,8 +367,7 @@ func TestPublicAnalysisDomainsFilterByWorstLevel(t *testing.T) {
 		for _, c := range cases {
 			t.Run(c.bucket, func(t *testing.T) {
 				resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=")+c.bucket)
-				wantStatus(t, resp, http.StatusOK)
-				got := decodeDomainList(t, resp)
+				got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 				if got.Total != len(c.domains) {
 					t.Fatalf("bucket %q: expected %d, got %d (items=%+v)",
 						c.bucket, len(c.domains), got.Total, got.Items)
@@ -399,8 +386,7 @@ func TestPublicAnalysisDomainsFilterByWorstLevel(t *testing.T) {
 
 		// Lowercase input is accepted and normalized to the same bucket.
 		resp := getPublic(t, f.srv, f.publicURL("domains?worst_level=error"))
-		wantStatus(t, resp, http.StatusOK)
-		if got := decodeDomainList(t, resp); got.Total != 2 {
+		if got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK); got.Total != 2 {
 			t.Fatalf("expected lowercase filter to match 2 ERROR domains, got %d", got.Total)
 		}
 	})
@@ -415,8 +401,7 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 		f.seedDomainSummary("f1.example", "run-f1", ts, 10, "F", "CRITICAL")
 
 		resp := getPublic(t, f.srv, f.publicURL("domains?grade=A"))
-		wantStatus(t, resp, http.StatusOK)
-		got := decodeDomainList(t, resp)
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if got.Total != 2 {
 			t.Fatalf("expected 2 A-grade domains, got %d (items=%+v)", got.Total, got.Items)
 		}
@@ -430,16 +415,14 @@ func TestPublicAnalysisDomainsFilterByGrade(t *testing.T) {
 		// not match "A" because custom scoring profiles may legitimately use
 		// distinct labels differing only in case.
 		resp = getPublic(t, f.srv, f.publicURL("domains?grade=a"))
-		wantStatus(t, resp, http.StatusOK)
-		if got := decodeDomainList(t, resp); got.Total != 0 {
+		if got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK); got.Total != 0 {
 			t.Fatalf("lowercase filter should not match uppercase grades, got %d", got.Total)
 		}
 
 		// Unknown grade returns empty without 400 - the filter is
 		// pluggable-config-friendly, not enum-validated.
 		resp = getPublic(t, f.srv, f.publicURL("domains?grade=Z"))
-		wantStatus(t, resp, http.StatusOK)
-		if got := decodeDomainList(t, resp); got.Total != 0 {
+		if got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK); got.Total != 0 {
 			t.Fatalf("unknown grade should match zero domains, got %d", got.Total)
 		}
 	})
@@ -470,17 +453,15 @@ func (f *analysisFixture) seedDomainPosture(run Run, posture string) {
 func TestPublicAnalysisDomainsFilterByDNSSECPosture(t *testing.T) {
 	forEachAnalysisAPIFixture(t, func(t *testing.T, f *analysisFixture) {
 		ts := time.Date(2026, 4, 17, 12, 0, 0, 0, time.UTC)
-		seeded := map[string]string{
-			"nsec3a.example": FactKeyNSEC3,
-			"nsec3b.example": FactKeyNSEC3,
-			"nsec.example":   FactKeyNSEC,
-			"mixed.example":  FactKeyNSECMixed,
-			"plain.example":  FactKeyUnsigned,
+		seeded := []struct{ name, posture string }{
+			{"nsec3a.example", FactKeyNSEC3},
+			{"nsec3b.example", FactKeyNSEC3},
+			{"nsec.example", FactKeyNSEC},
+			{"mixed.example", FactKeyNSECMixed},
+			{"plain.example", FactKeyUnsigned},
 		}
-		for _, name := range []string{
-			"nsec3a.example", "nsec3b.example", "nsec.example", "mixed.example", "plain.example",
-		} {
-			f.seedDomainPosture(f.seedGraduatedRun(name, ts, nil), seeded[name])
+		for _, d := range seeded {
+			f.seedDomainPosture(f.seedGraduatedRun(d.name, ts, nil), d.posture)
 		}
 
 		cases := []struct {
@@ -496,8 +477,7 @@ func TestPublicAnalysisDomainsFilterByDNSSECPosture(t *testing.T) {
 		for _, c := range cases {
 			t.Run(c.bucket, func(t *testing.T) {
 				resp := getPublic(t, f.srv, f.publicURL("domains?dnssec_posture=")+c.bucket)
-				wantStatus(t, resp, http.StatusOK)
-				got := decodeDomainList(t, resp)
+				got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 				if got.Total != len(c.domains) {
 					t.Fatalf("bucket %q: expected %d, got %d (items=%+v)",
 						c.bucket, len(c.domains), got.Total, got.Items)
@@ -519,8 +499,7 @@ func TestPublicAnalysisDomainsFilterByDNSSECPosture(t *testing.T) {
 
 		// Uppercase input normalizes to the stored lowercase key.
 		resp := getPublic(t, f.srv, f.publicURL("domains?dnssec_posture=NSEC3"))
-		wantStatus(t, resp, http.StatusOK)
-		if got := decodeDomainList(t, resp); got.Total != 2 {
+		if got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK); got.Total != 2 {
 			t.Fatalf("expected uppercase filter to match 2 NSEC3 domains, got %d", got.Total)
 		}
 	})
@@ -533,7 +512,7 @@ func TestPublicAnalysisDomainsServesDNSSECPostureDisplay(t *testing.T) {
 		f.seedDomainPosture(f.seedGraduatedRun("nsec3.example", ts, nil), FactKeyNSEC3)
 
 		resp := getPublic(t, f.srv, f.publicURL("domains"))
-		got := decodeDomainList(t, resp)
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if len(got.Items) != 1 {
 			t.Fatalf("expected 1 item, got %d: %+v", len(got.Items), got.Items)
 		}
@@ -555,14 +534,13 @@ func TestPublicAnalysisDomainsPostureFilterSkipsRowsWithoutFact(t *testing.T) {
 		f.seedGraduatedRun("nofact.example", ts, nil)
 
 		resp := getPublic(t, f.srv, f.publicURL("domains"))
-		got := decodeDomainList(t, resp)
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if len(got.Items) != 1 || got.Items[0].DNSSECPosture != "" {
 			t.Fatalf("expected one row with empty posture, got %+v", got.Items)
 		}
 		for _, bucket := range []string{FactKeyNSEC3, FactKeyUnsigned, FactKeySigned} {
 			resp := getPublic(t, f.srv, f.publicURL("domains?dnssec_posture=")+bucket)
-			wantStatus(t, resp, http.StatusOK)
-			if got := decodeDomainList(t, resp); got.Total != 0 {
+			if got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK); got.Total != 0 {
 				t.Fatalf("bucket %q matched a row with no posture fact: %+v", bucket, got.Items)
 			}
 		}
@@ -600,7 +578,7 @@ func TestPublicAnalysisDomainsSearchAndPagination(t *testing.T) {
 		}
 
 		resp := getPublic(t, f.srv, f.publicURL("domains?search=alpha"))
-		got := decodeDomainList(t, resp)
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if got.Total != 5 {
 			t.Fatalf("expected 5 alpha matches, got %d", got.Total)
 		}
@@ -611,7 +589,7 @@ func TestPublicAnalysisDomainsSearchAndPagination(t *testing.T) {
 		}
 
 		resp = getPublic(t, f.srv, f.publicURL("domains?limit=3&offset=2"))
-		got = decodeDomainList(t, resp)
+		got = mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if got.Total != 10 {
 			t.Fatalf("expected total=10, got %d", got.Total)
 		}
@@ -639,7 +617,7 @@ func TestPublicAnalysisDomainsSortScoreDesc(t *testing.T) {
 		f.seedDomainSummary("mid.example", "run-mid", finishedAt, 70, "B", "WARNING")
 
 		resp := getPublic(t, f.srv, f.publicURL("domains?sort=score_desc"))
-		got := decodeDomainList(t, resp)
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if len(got.Items) != 3 {
 			t.Fatalf("expected 3 items, got %d", len(got.Items))
 		}
@@ -721,7 +699,7 @@ func TestPublicAnalysisDomainsServesZoneFactColumns(t *testing.T) {
 		f.refreshSnapshotViews(f.batchID)
 
 		resp := getPublic(t, f.srv, f.publicURL("domains"))
-		got := decodeDomainList(t, resp)
+		got := mustJSON[PublicAnalysisListResponse[PublicAnalysisDomainView]](t, resp, http.StatusOK)
 		if len(got.Items) != 1 {
 			t.Fatalf("expected 1 item, got %d: %+v", len(got.Items), got.Items)
 		}

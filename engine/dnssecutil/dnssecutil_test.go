@@ -379,31 +379,19 @@ func TestExpectedMLDSA44LengthsMatchRealMaterial(t *testing.T) {
 	if err != nil {
 		t.Fatalf("decoding key: %v", err)
 	}
-	if got := len(raw) << 3; got != dnssecutil.ExpectedKeyBits(dns.MLDSA44) {
-		t.Errorf("key is %d bits, table says %d", got, dnssecutil.ExpectedKeyBits(dns.MLDSA44))
+	if got := len(raw) << 3; got != 10496 {
+		t.Errorf("key is %d bits, want 10496", got)
 	}
 
-	rr := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn("a.example.test"), Class: dns.ClassINET, TTL: 300}}
-	rr.Addr = netip.MustParseAddr("192.0.2.1")
 	now := time.Now().UTC()
-	sig := &dns.RRSIG{Hdr: dns.Header{Name: dnsutil.Fqdn("example.test"), Class: dns.ClassINET, TTL: 3600}}
-	sig.TypeCovered = dns.TypeA
-	sig.Algorithm = dns.MLDSA44
-	sig.Labels = uint8(dnsutil.Labels(dnsutil.Fqdn("a.example.test")))
-	sig.OrigTTL = 300
-	sig.Inception = uint32(now.Add(-time.Hour).Unix())
-	sig.Expiration = uint32(now.Add(24 * time.Hour).Unix())
-	sig.KeyTag = dnssecutil.KeyTag(kp.Key)
-	sig.SignerName = kp.Key.Hdr.Name
-	if err := sig.Sign(kp.Priv, []dns.RR{rr}, &dns.SignOption{}); err != nil {
-		t.Fatalf("sign RRset: %v", err)
-	}
+	rr := dnstest.ARR("a.example.test", "192.0.2.1")
+	sig := dnstest.SignRRset(t, kp, []dns.RR{rr}, "a.example.test", "example.test", now.Add(-time.Hour), now.Add(24*time.Hour))
 	sigRaw, err := base64.StdEncoding.DecodeString(sig.Signature)
 	if err != nil {
 		t.Fatalf("decoding signature: %v", err)
 	}
-	if got := len(sigRaw) << 3; got != dnssecutil.ExpectedSignatureBits(dns.MLDSA44) {
-		t.Errorf("signature is %d bits, table says %d", got, dnssecutil.ExpectedSignatureBits(dns.MLDSA44))
+	if got := len(sigRaw) << 3; got != 19360 {
+		t.Errorf("signature is %d bits, want 19360", got)
 	}
 }
 

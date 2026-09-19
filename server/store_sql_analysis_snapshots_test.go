@@ -720,17 +720,11 @@ func TestSQLJobStoreSnapshotVocabularySurvivesRunPurge(t *testing.T) {
 		cohortID := seedCohortForSnapshotTest(t, s, "tld")
 		old := time.Now().UTC().Add(-48 * time.Hour).Truncate(time.Microsecond)
 
-		job, err := s.Create(Job{
+		job := createAndGraduate(t, s, Job{
 			ID: "job-purged", Domain: "alpha.example", BatchID: "batch-purge",
 			Status: JobQueued, CreatedAt: old,
-		})
-		if err != nil {
-			t.Fatalf("create job: %v", err)
-		}
-		job.Status = JobSucceeded
-		job.FinishedAt = old.Add(time.Second)
-		job.EffectiveProfile = `{"test_levels":{"ZONE":{"Z15_NO_CAA":"NOTICE"}}}`
-		graduate(t, s, job, nil)
+			EffectiveProfile: `{"test_levels":{"ZONE":{"Z15_NO_CAA":"NOTICE"}}}`,
+		}, nil)
 
 		snap, err := s.UpsertAnalysisCohortSnapshot(AnalysisCohortSnapshot{
 			CohortID:   cohortID,

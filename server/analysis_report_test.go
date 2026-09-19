@@ -28,9 +28,7 @@ func oneCategoryScoring() scoring.Config {
 	}
 }
 
-// A tag only in the newer vocabulary is engine-driven; one both sides level
-// is a cohort change; a level move matching the re-level is reclassified and
-// any other level move is a cohort change.
+// Appeared, cleared and re-levelled tags classified against a vocabulary delta.
 func TestReportTagClassification(t *testing.T) {
 	from := parseReportVocabulary(vocabJSON(t, map[string]map[string]string{
 		"DNSSEC":      {"DS08_EXPIRED": "WARNING", "DS02_MISMATCH": "WARNING"},
@@ -276,21 +274,23 @@ func TestReportDomainUnexplainedDelta(t *testing.T) {
 // scoringConfigChanged never guesses: an unstamped side is unknown.
 func TestScoringConfigChangedStates(t *testing.T) {
 	cases := []struct {
-		from, to, want string
+		name, from, to, want string
 	}{
-		{"abc", "abc", ReportStateFalse},
-		{"abc", "def", ReportStateTrue},
-		{"", "def", ReportStateUnknown},
-		{"abc", "", ReportStateUnknown},
+		{"same hash", "abc", "abc", ReportStateFalse},
+		{"different hash", "abc", "def", ReportStateTrue},
+		{"from unstamped", "", "def", ReportStateUnknown},
+		{"to unstamped", "abc", "", ReportStateUnknown},
 	}
 	for _, tc := range cases {
-		got := scoringConfigChanged(
-			AnalysisCohortSnapshot{ScoringConfigHash: tc.from},
-			AnalysisCohortSnapshot{ScoringConfigHash: tc.to},
-		)
-		if got != tc.want {
-			t.Errorf("scoringConfigChanged(%q, %q) = %q, want %q", tc.from, tc.to, got, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			got := scoringConfigChanged(
+				AnalysisCohortSnapshot{ScoringConfigHash: tc.from},
+				AnalysisCohortSnapshot{ScoringConfigHash: tc.to},
+			)
+			if got != tc.want {
+				t.Errorf("scoringConfigChanged(%q, %q) = %q, want %q", tc.from, tc.to, got, tc.want)
+			}
+		})
 	}
 }
 
@@ -352,32 +352,27 @@ func TestReportClustersCollapseDimensions(t *testing.T) {
 	}
 }
 
-// The same nine domains spread over 40 points are not one movement.
-func TestReportClustersRejectWideSpread(t *testing.T) {
-	views, rows := clusterFixture("b", []int{1, 2, 3, 4, 5, 20, 30, 40, 41})
-	clusters := buildReportClusters(views, rows, defaultReportMinCluster, defaultReportMaxSpread)
-	if len(clusters) != 0 {
-		t.Fatalf("clusters = %+v, want none", clusters)
+// A cluster has one direction, a spread within max_spread and at least min_cluster members.
+func TestReportClustersBounds(t *testing.T) {
+	cases := []struct {
+		name       string
+		deltas     []int
+		minCluster int
+		want       int
+	}{
+		{"wide spread", []int{1, 2, 3, 4, 5, 20, 30, 40, 41}, defaultReportMinCluster, 0},
+		{"mixed direction", []int{2, 2, -2}, defaultReportMinCluster, 0},
+		{"two below min 3", []int{5, 5}, defaultReportMinCluster, 0},
+		{"two at min 2", []int{5, 5}, 2, 1},
 	}
-}
-
-// A group that mixes improvement and regression is not a cluster.
-func TestReportClustersRejectMixedDirection(t *testing.T) {
-	views, rows := clusterFixture("c", []int{2, 2, -2})
-	clusters := buildReportClusters(views, rows, defaultReportMinCluster, defaultReportMaxSpread)
-	if len(clusters) != 0 {
-		t.Fatalf("clusters = %+v, want none", clusters)
-	}
-}
-
-// A group below min_cluster is dropped.
-func TestReportClustersRespectMinCluster(t *testing.T) {
-	views, rows := clusterFixture("d", []int{5, 5})
-	if got := buildReportClusters(views, rows, defaultReportMinCluster, defaultReportMaxSpread); len(got) != 0 {
-		t.Fatalf("clusters = %+v, want none at min 3", got)
-	}
-	if got := buildReportClusters(views, rows, 2, defaultReportMaxSpread); len(got) != 1 {
-		t.Fatalf("clusters = %+v, want one at min 2", got)
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			views, rows := clusterFixture("b", tc.deltas)
+			got := buildReportClusters(views, rows, tc.minCluster, defaultReportMaxSpread)
+			if len(got) != tc.want {
+				t.Fatalf("clusters = %+v, want %d", got, tc.want)
+			}
+		})
 	}
 }
 
@@ -448,10 +443,7 @@ func kommunerVocabularies(t *testing.T) (string, string) {
 	return vocabJSON(t, june), vocabJSON(t, september)
 }
 
-// The reference pair reproduces the hand analysis: two domains moved only by
-// tags the engine gained, two by the cohort, the MX timeout is a cohort
-// change on an unchanged vocabulary, and the nine domains sharing one
-// version string form a single cluster.
+// The reference pair: two measurement movers, two cohort movers, one nine-domain cluster.
 func TestBuildAnalysisReportKommunerFixture(t *testing.T) {
 	june, september := kommunerVocabularies(t)
 	asn := int64(64500)

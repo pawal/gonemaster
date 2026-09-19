@@ -29,8 +29,7 @@ func TestGenKeyProducesAVerifiableSignature(t *testing.T) {
 	}
 }
 
-// The library rejects an RRSIG whose key tag is zero before it looks at the
-// key, so a generator that hands one back makes every signing test flaky.
+// GenKey never hands back a key whose tag is zero.
 func TestGenKeyKeyTagCanSign(t *testing.T) {
 	kp := GenKey(t, "example.test", dns.ECDSAP256SHA256, false)
 	if dnssecutil.KeyTag(kp.Key) == 0 {

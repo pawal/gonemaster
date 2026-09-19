@@ -365,3 +365,34 @@ func TestCaptureJSONRecordsTheLastRequest(t *testing.T) {
 		t.Fatalf("Path = %q, want the last request", rec.Path())
 	}
 }
+
+func TestReportOptsServesTheReportFixture(t *testing.T) {
+	var captured url.Values
+	srv := apitest.New(t, apitest.ReportOpts(&captured))
+
+	var catalog apitest.AnalysisCatalog
+	if code := doGet(t, srv.URL, "/pub/api/v1/analysis/catalog", "", &catalog); code != http.StatusOK {
+		t.Fatalf("catalog status = %d, want 200", code)
+	}
+	if catalog.DefaultTag != apitest.ReportDatasetTag || len(catalog.Cohorts) != 1 {
+		t.Fatalf("catalog = %+v, want one default cohort %s", catalog, apitest.ReportDatasetTag)
+	}
+	if c := catalog.Cohorts[0]; c.DatasetTag != apitest.ReportDatasetTag || c.Label != "Kommuner" || !c.IsDefault {
+		t.Fatalf("cohort = %+v, want %s labelled Kommuner and default", c, apitest.ReportDatasetTag)
+	}
+
+	var snapshots apitest.AnalysisSnapshotList
+	doGet(t, srv.URL, "/pub/api/v1/analysis/cohorts/"+apitest.ReportDatasetTag+"/snapshots", "", &snapshots)
+	if len(snapshots.Snapshots) != 2 || snapshots.Snapshots[0].Slug != apitest.ReportToSlug || snapshots.Snapshots[1].Slug != apitest.ReportFromSlug {
+		t.Fatalf("snapshots = %+v, want %s then %s", snapshots.Snapshots, apitest.ReportToSlug, apitest.ReportFromSlug)
+	}
+
+	var report apitest.AnalysisReport
+	doGet(t, srv.URL, "/pub/api/v1/analysis/cohorts/"+apitest.ReportDatasetTag+"/report?from=a&to=b", "", &report)
+	if report.DatasetTag != apitest.ReportDatasetTag || len(report.Domains) != 2 || len(report.Clusters) != 1 {
+		t.Fatalf("report = %+v, want SampleReport", report)
+	}
+	if captured.Get("from") != "a" || captured.Get("to") != "b" {
+		t.Fatalf("captured query = %v, want from=a to=b", captured)
+	}
+}

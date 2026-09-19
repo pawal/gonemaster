@@ -468,11 +468,13 @@ func TestHelpShorthand(t *testing.T) {
 		{[]string{"report", "-h"}, "Usage of report:"},
 	}
 	for _, tc := range cases {
-		res := clitest.Run(t, run, tc.args...)
-		res.RequireCode(t, 0)
-		if combined := res.Out + res.Err; !strings.Contains(combined, tc.want) {
-			t.Errorf("%v: missing %q in:\n%s", tc.args, tc.want, combined)
-		}
+		t.Run(strings.Join(tc.args, " "), func(t *testing.T) {
+			res := clitest.Run(t, run, tc.args...)
+			res.RequireCode(t, 0)
+			if combined := res.Out + res.Err; !strings.Contains(combined, tc.want) {
+				t.Errorf("%v: missing %q in:\n%s", tc.args, tc.want, combined)
+			}
+		})
 	}
 }
 

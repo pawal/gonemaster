@@ -1,6 +1,9 @@
 package apitest
 
-import "time"
+import (
+	"net/url"
+	"time"
+)
 
 // The views below are the wire shapes gonemaster-server sends. They are
 // deliberately separate from each binary's decode types, so a test encodes
@@ -531,5 +534,21 @@ func SampleReport() AnalysisReport {
 			},
 		},
 		DomainTotal: 2,
+	}
+}
+
+// ReportOpts is the report fixture as fake server state; captured receives the report query.
+func ReportOpts(captured *url.Values) Opts {
+	catalog := AnalysisCatalog{
+		DefaultTag: ReportDatasetTag,
+		Cohorts:    []AnalysisCohortView{{DatasetTag: ReportDatasetTag, Label: "Kommuner", IsDefault: true}},
+	}
+	snapshots := SnapshotPair()
+	report := SampleReport()
+	return Opts{
+		AnalysisCatalog:     &catalog,
+		AnalysisSnapshots:   &snapshots,
+		AnalysisReport:      &report,
+		AnalysisReportQuery: captured,
 	}
 }

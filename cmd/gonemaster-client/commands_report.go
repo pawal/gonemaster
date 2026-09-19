@@ -9,22 +9,15 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
+
+	"codeberg.org/pawal/gonemaster/cmd/internal/publicapi"
 )
 
 // ── Public API addressing ────────────────────────────────────────────────────
 
-// publicAPIBase maps the admin API base onto the public API base.
-func publicAPIBase(base string) string {
-	trimmed := strings.TrimRight(base, "/")
-	if strings.HasSuffix(trimmed, "/api/v1") {
-		return strings.TrimSuffix(trimmed, "/api/v1") + "/pub/api/v1"
-	}
-	return trimmed + "/pub/api/v1"
-}
-
 // getPublic performs a GET against the public API, which takes no token.
 func (c *apiClient) getPublic(ctx context.Context, path string, out any) error {
-	return c.doJSONURL(ctx, http.MethodGet, publicAPIBase(c.baseURL)+path, nil, out)
+	return c.doJSONURL(ctx, http.MethodGet, publicapi.Base(c.baseURL)+path, nil, out)
 }
 
 // ── Response types ───────────────────────────────────────────────────────────

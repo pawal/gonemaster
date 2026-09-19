@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 
@@ -169,10 +170,15 @@ func TestScoreDoesNotLeakInfoIntoJSONOutput(t *testing.T) {
 	if err := json.Unmarshal([]byte(res.Out), &entries); err != nil {
 		t.Fatalf("invalid JSON: %v - got: %s", err, res.Out)
 	}
+	var tags []string
 	for _, e := range entries {
 		if strings.EqualFold(e.Level, "INFO") {
 			t.Fatalf("INFO entry leaked into --json output: %+v", e)
 		}
+		tags = append(tags, e.Tag)
+	}
+	if !slices.Contains(tags, "REFRESH_MINIMUM_VALUE_LOWER") {
+		t.Fatalf("the NOTICE entry is missing from --json output: %v", tags)
 	}
 }
 

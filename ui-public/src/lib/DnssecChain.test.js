@@ -1,7 +1,7 @@
-import { render, screen, waitFor, fireEvent, cleanup } from "@testing-library/svelte";
+import { render, screen, fireEvent, cleanup } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import DnssecChain from "./DnssecChain.svelte";
-import { jsonResponse, secureChain } from "../test/helpers.js";
+import { jsonResponse, nsName, nsNamesChain, secureChain } from "../test/helpers.js";
 import { locale, setCatalog } from "../i18n.js";
 import de from "../i18n/de.json";
 
@@ -15,16 +15,32 @@ function openChain(container) {
 }
 
 // Renders the section already opened, which is when it fetches.
-function renderOpened() {
-  const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
+function renderOpened(props = {}) {
+  const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com", ...props } });
   openChain(container);
   return container;
 }
 
+// Serves the chain document, renders opened and waits for the diagram.
+async function draw(chain, props = {}) {
+  fetch.mockResolvedValue(jsonResponse(chain));
+  const container = renderOpened(props);
+  await screen.findByTestId("chain-svg");
+  return container;
+}
+
+// A secure zone whose name a.ns is signed by a zone nothing delegates.
+const orphanChain = (bSigner = "example.com") =>
+  nsNamesChain([
+    nsName("a.ns.example.com", "orphan", "a.ns.example.com"),
+    nsName("b.ns.example.com", "validates", bSigner)
+  ]);
+
+beforeEach(() => {
+  global.fetch = vi.fn();
+});
+
 describe("DnssecChain", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
   it("does not fetch before the section is opened", () => {
     render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
     expect(fetch).not.toHaveBeenCalled();
@@ -35,7 +51,7 @@ describe("DnssecChain", () => {
     const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
 
     const details = openChain(container);
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await screen.findByTestId("chain-svg");
     expect(fetch).toHaveBeenCalledTimes(1);
 
     // Close then reopen: must not refetch.
@@ -49,23 +65,20 @@ describe("DnssecChain", () => {
   it("shows a loading note while the request is pending", async () => {
     fetch.mockReturnValue(new Promise(() => {})); // never resolves
     const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-loading")).toBeTruthy());
+    await screen.findByTestId("chain-loading");
   });
 
   it("renders an SVG with the expected nodes on success", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
     const svg = screen.getByTestId("chain-svg");
     // A group, not an image: the boxes inside it take focus of their own.
     expect(svg.getAttribute("role")).toBe("group");
     // DS + KSK + ZSK = 3 node groups (no abstract DNSKEY-RRset box).
     expect(container.querySelectorAll("g.chain-node").length).toBe(3);
-    expect(container.querySelector("g.node-ksk")).toBeTruthy();
+    expect(container.querySelector("g.node-ksk")).not.toBeNull();
     // The KSK self-signs the DNSKEY RRset: a loop path is drawn.
-    expect(container.querySelector("path.chain-edge")).toBeTruthy();
-    expect(screen.getByTestId("chain-legend")).toBeTruthy();
+    expect(container.querySelector("path.chain-edge")).not.toBeNull();
+    expect(screen.getByTestId("chain-legend")).toBeInTheDocument();
     // Facts use IANA mnemonics, not raw algorithm/digest numbers.
     const facts = screen.getByTestId("chain-facts").textContent;
     expect(facts).toContain("ECDSAP256SHA256");
@@ -77,16 +90,7 @@ describe("DnssecChain", () => {
     setCatalog("de", de);
     locale.set("de");
     try {
-      fetch.mockResolvedValue(
-        jsonResponse(
-          secureChain({
-            version: 3,
-            ns_names: [{ name: "ns1.example.com", status: "chain_broken", signer: "example.com", servers: ["192.0.2.1"] }],
-          })
-        )
-      );
-      const container = renderOpened();
-      await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+      const container = await draw(nsNamesChain([nsName("ns1.example.com", "chain_broken")]));
       const face = [...container.querySelectorAll("g.node-nsname text")].map((el) => el.textContent);
       expect(face).toEqual(["ns1", "Vertrauenskette", "unterbrochen"]);
     } finally {
@@ -95,10 +99,7 @@ describe("DnssecChain", () => {
   });
 
   it("draws the row labels after every edge so none cuts the text", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(secureChain());
     const kids = [...screen.getByTestId("chain-svg").children];
     const lastEdge = kids.findLastIndex((el) => el.classList.contains("chain-edge"));
     const firstLabel = kids.findIndex((el) => el.classList.contains("chain-cluster-label"));
@@ -112,18 +113,12 @@ describe("DnssecChain", () => {
       { type: "CDS", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000] },
       { type: "CDNSKEY", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000] },
     ];
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     expect(container.querySelectorAll("path.edge-ref").length).toBe(2);
   });
 
   it("shows a custom tooltip immediately on hover, localized from tip data", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
     const ksk = container.querySelector("g.node-ksk");
     await fireEvent.mouseMove(ksk, { clientX: 120, clientY: 120 });
 
@@ -134,13 +129,9 @@ describe("DnssecChain", () => {
     expect(tip.textContent).toContain("Algorithm: ECDSAP256SHA256");
   });
 
-  // The tip box is measured once per text change, not per pointer move: the
-  // per-move read forced a layout and returned the previous text's box,
-  // because the DOM updates only after the handler returns.
+  // The tip box is measured once per text change, not per pointer move.
   it("measures the tooltip once per text change and flips it at the viewport edge", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
 
     const tip = container.querySelector(".chain-tip");
     const measure = vi.fn(() => ({ width: 200, height: 80, x: 0, y: 0, top: 0, left: 0, right: 0, bottom: 0 }));
@@ -173,12 +164,9 @@ describe("DnssecChain", () => {
     const chain = secureChain();
     chain.parent.dnskeys = [{ key_tag: 5000, algorithm: 13, flags: 256, key_size: 2048, servers: ["192.0.2.1"] }];
     chain.parent.ds_rrsig = [{ key_tag: 5000, algorithm: 13, state: "valid", inception: 100, expiration: 200, servers: ["192.0.2.1"] }];
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     const pk = container.querySelector("g.node-parent-key");
-    expect(pk).toBeTruthy();
+    expect(pk).not.toBeNull();
     expect(pk.getAttribute("data-tip")).toContain("Parent zone DNSKEY");
   });
 
@@ -186,10 +174,7 @@ describe("DnssecChain", () => {
     const chain = secureChain();
     chain.parent.ds[0].ttl = 86400;
     chain.child.dnskeys[0].ttl = 3600;
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     expect(container.querySelector("g.node-ds").getAttribute("data-tip")).toContain("TTL: 86400");
     expect(container.querySelector("g.node-ksk").getAttribute("data-tip")).toContain("TTL: 3600");
   });
@@ -199,10 +184,7 @@ describe("DnssecChain", () => {
     chain.child.dnskey_rrsig = [
       { key_tag: 1000, algorithm: 13, state: "valid", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] },
     ];
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     // The ZSK does not sign the DNSKEY RRset, but its box tip still shows the
     // covering signature and window (like the DS and SOA boxes do).
     const zsk = container.querySelector("g.node-zsk");
@@ -216,10 +198,7 @@ describe("DnssecChain", () => {
     chain.child.dnskey_rrsig = [
       { key_tag: 1000, algorithm: 13, state: "expired", inception: 1700000000, expiration: 1750000000, servers: ["203.0.113.1"] },
     ];
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     const self = container.querySelector("path.chain-edge");
     // The data-tip attribute holds the rendered, localized multi-line string.
     const tip = self.getAttribute("data-tip");
@@ -228,18 +207,13 @@ describe("DnssecChain", () => {
   });
 
   it("marks a DS that names a key signing nothing as a dead anchor", async () => {
-    // RFC 4035 section 5.2 makes the DS-matched key sign the DNSKEY RRset. A
-    // second DS whose key signs nothing cannot be entered, so its edge is red
-    // and the callout names the key, while the working DS keeps it partial.
+    // A second DS names a key that signs nothing.
     const chain = secureChain();
     chain.status = "partial";
     chain.parent.ds.push({ key_tag: 3000, algorithm: 13, digest_type: 2, digest: "cd", servers: ["192.0.2.1"] });
     chain.child.dnskeys.push({ key_tag: 3000, algorithm: 13, flags: 257, sep: true, anchored: true, servers: ["203.0.113.1"] });
     chain.links.push({ ds_key_tag: 3000, dnskey_key_tag: 3000, status: "key_not_signing", servers: ["203.0.113.1"] });
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
 
     const badge = screen.getByTestId("chain-status-badge");
     expect(badge.textContent).toBe("Partial");
@@ -256,18 +230,13 @@ describe("DnssecChain", () => {
   });
 
   it("renders an unverifiable large-RSA-exponent chain as a warn (partial), not a failure", async () => {
-    // The .lv shape: DS matches the KSK, but the local verifier cannot check
-    // the KSK's RSA exponent, so the DNSKEY signature is unsupported_key. The
-    // chain rolls up to partial and the signature edge is amber, not red.
+    // A DS matching a KSK whose RSA exponent the verifier cannot check.
     const chain = secureChain();
     chain.status = "partial";
     chain.child.dnskey_rrsig = [
       { key_tag: 1000, algorithm: 8, state: "unsupported_key", inception: 1700000000, expiration: 1800000000, servers: ["203.0.113.1"] },
     ];
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
 
     // The heading badge is the amber "partial" tone, not the red "broken" one.
     const badge = screen.getByTestId("chain-status-badge");
@@ -287,20 +256,14 @@ describe("DnssecChain", () => {
   });
 
   it("renders when the parent serves multiple DS RRSIGs with the same key tag and day", async () => {
-    // The real .lv shape: root servers re-sign the DS RRset on staggered
-    // schedules, so the same signer (key 57780) appears twice, differing only
-    // sub-day. The facts list must not derive a duplicate {#each} key from
-    // (key_tag, day) or Svelte throws each_key_duplicate and the section hangs.
+    // Two DS RRSIGs by one key, differing sub-day.
     const chain = secureChain();
     chain.status = "partial";
     chain.parent.ds_rrsig = [
       { key_tag: 57780, algorithm: 8, state: "valid", inception: 1784044800, expiration: 1785171600, servers: ["192.203.230.10"] },
       { key_tag: 57780, algorithm: 8, state: "valid", inception: 1784052000, expiration: 1785178800, servers: ["198.41.0.4"] },
     ];
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     // Both DS RRSIG facts lines render rather than collapsing or crashing.
     expect(screen.getAllByTestId("chain-ds-sig-fact").length).toBe(2);
   });
@@ -309,7 +272,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse({}, 404));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-empty")).toBeTruthy());
+    await screen.findByTestId("chain-empty");
     expect(screen.queryByTestId("chain-svg")).toBeNull();
   });
 
@@ -317,12 +280,12 @@ describe("DnssecChain", () => {
     fetch.mockRejectedValueOnce(new Error("network"));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-error")).toBeTruthy());
+    await screen.findByTestId("chain-error");
     expect(fetch).toHaveBeenCalledTimes(1);
 
     fetch.mockResolvedValue(jsonResponse(secureChain()));
     await fireEvent.click(screen.getByTestId("chain-retry"));
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await screen.findByTestId("chain-svg");
     expect(fetch).toHaveBeenCalledTimes(2);
   });
 
@@ -330,7 +293,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse({ version: 1, zone: "example.com", status: "unsigned", parent: {}, child: {}, links: [] }));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-unsigned")).toBeTruthy());
+    await screen.findByTestId("chain-unsigned");
     expect(screen.queryByTestId("chain-svg")).toBeNull();
   });
 
@@ -340,7 +303,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(chain));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-disagree")).toBeTruthy());
+    await screen.findByTestId("chain-disagree");
   });
 
   it("lists disagreeing and record-less server addresses in the facts", async () => {
@@ -351,7 +314,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(chain));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-disagree-servers")).toBeTruthy());
+    await screen.findByTestId("chain-disagree-servers");
     expect(screen.getByTestId("chain-disagree-servers").textContent).toContain("192.0.2.2");
     expect(screen.getByTestId("chain-servers-without-ds").textContent).toContain("192.0.2.3");
     expect(screen.getByTestId("chain-servers-without-dnskey").textContent).toContain("203.0.113.9");
@@ -361,7 +324,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-facts")).toBeTruthy());
+    await screen.findByTestId("chain-facts");
     expect(screen.queryByTestId("chain-disagree-servers")).toBeNull();
     expect(screen.queryByTestId("chain-servers-without-ds")).toBeNull();
     expect(screen.queryByTestId("chain-servers-without-dnskey")).toBeNull();
@@ -375,7 +338,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(chain));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-provided-ds")).toBeTruthy());
+    await screen.findByTestId("chain-provided-ds");
   });
 
   it("shows the no-DNSKEY callout only with positive server evidence", async () => {
@@ -389,7 +352,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(cold));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-indeterminate")).toBeTruthy());
+    await screen.findByTestId("chain-indeterminate");
     expect(screen.queryByTestId("chain-no-dnskey")).toBeNull();
 
     cleanup();
@@ -402,7 +365,7 @@ describe("DnssecChain", () => {
     const second = render(DnssecChain, { props: { publicID: "abc", domain: "example.com" } });
     openChain(second.container);
 
-    await waitFor(() => expect(screen.getByTestId("chain-no-dnskey")).toBeTruthy());
+    await screen.findByTestId("chain-no-dnskey");
     expect(screen.queryByTestId("chain-indeterminate")).toBeNull();
   });
 
@@ -412,7 +375,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(chain));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-facts")).toBeTruthy());
+    await screen.findByTestId("chain-facts");
     expect(screen.getByTestId("chain-facts").textContent).toContain("2048 bit");
   });
 
@@ -420,7 +383,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(secureChain()));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-facts")).toBeTruthy());
+    await screen.findByTestId("chain-facts");
     const facts = screen.getByTestId("chain-facts").textContent;
     // inception 1700000000 -> 2023-11-14, expiration 1800000000 -> 2027-01-15.
     expect(facts).toContain("2023-11-14");
@@ -435,7 +398,7 @@ describe("DnssecChain", () => {
     expect(screen.queryByTestId("chain-status-badge")).toBeNull();
     openChain(container);
 
-    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+    await screen.findByTestId("chain-status-badge");
     const badge = screen.getByTestId("chain-status-badge");
     expect(badge.textContent).toBe("Secure");
     expect(badge.classList.contains("badge-ok")).toBe(true);
@@ -449,7 +412,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(broken));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+    await screen.findByTestId("chain-status-badge");
     const badge = screen.getByTestId("chain-status-badge");
     expect(badge.textContent).toBe("Broken");
     expect(badge.classList.contains("badge-bad")).toBe(true);
@@ -459,7 +422,7 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse({ version: 1, zone: "example.com", status: "unsigned", parent: {}, child: {}, links: [] }));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+    await screen.findByTestId("chain-status-badge");
     const badge = screen.getByTestId("chain-status-badge");
     expect(badge.textContent).toBe("Unsigned");
     expect(badge.classList.contains("badge-neutral")).toBe(true);
@@ -470,11 +433,8 @@ describe("DnssecChain", () => {
     chain.parent.ds_rrsig = [
       { key_tag: 5000, state: "expired", inception: 1700000000, expiration: 1750000000 },
     ];
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
-    expect(container.querySelector("g.node-ds.node-sig-bad")).toBeTruthy();
+    const container = await draw(chain);
+    expect(container.querySelector("g.node-ds.node-sig-bad")).not.toBeNull();
     const facts = screen.getByTestId("chain-facts").textContent;
     expect(facts).toContain("RRSIG DS (5000)");
     expect(facts).toContain("expired");
@@ -492,12 +452,9 @@ describe("DnssecChain", () => {
       { ds_key_tag: 1000, ds_digest_type: 2, dnskey_key_tag: 1000, status: "match", servers: ["203.0.113.1"] },
       { ds_key_tag: 5000, ds_digest_type: 2, status: "no_dnskey", servers: ["192.0.2.1"] },
     ];
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     const phantom = container.querySelector("g.node-key-phantom");
-    expect(phantom).toBeTruthy();
+    expect(phantom).not.toBeNull();
     expect(phantom.textContent).toContain("5000");
   });
 
@@ -518,20 +475,17 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(chain));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-rollover")).toBeTruthy());
+    await screen.findByTestId("chain-rollover");
     expect(screen.getByTestId("chain-rollover").textContent).toContain("3000");
     // The incoming KSK node is marked and its edges de-emphasized.
-    expect(container.querySelector("g.node-incoming")).toBeTruthy();
-    expect(container.querySelector("path.edge-incoming")).toBeTruthy();
+    expect(container.querySelector("g.node-incoming")).not.toBeNull();
+    expect(container.querySelector("path.edge-incoming")).not.toBeNull();
   });
 
   it("does not flag a rollover for a plain single-KSK secure zone", async () => {
     const chain = secureChain();
     chain.child.dnskeys[0].anchored = true;
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     expect(screen.queryByTestId("chain-rollover")).toBeNull();
     expect(container.querySelector("g.node-incoming")).toBeNull();
   });
@@ -546,12 +500,12 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(chain));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-rollover")).toBeTruthy());
+    await screen.findByTestId("chain-rollover");
     // The incoming key tag is named in the callout.
     expect(screen.getByTestId("chain-rollover").textContent).toContain("3000");
     // The CDS node is toned as a rollover, and a pending ref edge is drawn.
-    expect(container.querySelector("g.node-rollover")).toBeTruthy();
-    expect(container.querySelector("path.edge-ref-pending")).toBeTruthy();
+    expect(container.querySelector("g.node-rollover")).not.toBeNull();
+    expect(container.querySelector("path.edge-ref-pending")).not.toBeNull();
   });
 
   it("shows no rollover callout when CDS matches the parent DS", async () => {
@@ -559,10 +513,7 @@ describe("DnssecChain", () => {
     chain.child.signed = [
       { type: "CDS", rrsig: [{ key_tag: 1000, state: "valid" }], refs: [1000], ds_match: "match" },
     ];
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     expect(screen.queryByTestId("chain-rollover")).toBeNull();
     expect(container.querySelector("g.node-rollover")).toBeNull();
   });
@@ -573,34 +524,25 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(chain));
     const container = renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-truncated")).toBeTruthy());
+    await screen.findByTestId("chain-truncated");
   });
 
   it("omits the truncation callout when nothing was capped", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
     expect(screen.queryByTestId("chain-truncated")).toBeNull();
   });
 
   it("marks a revoked key on the node, legend, and facts", async () => {
     const chain = secureChain();
     chain.child.dnskeys[0].revoked = true;
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
-    expect(container.querySelector("g.node-revoked")).toBeTruthy();
-    expect(screen.getByTestId("chain-legend-revoked")).toBeTruthy();
+    const container = await draw(chain);
+    expect(container.querySelector("g.node-revoked")).not.toBeNull();
+    expect(screen.getByTestId("chain-legend-revoked")).toBeInTheDocument();
     expect(screen.getByTestId("chain-facts").textContent).toContain("revoked");
   });
 
   it("omits the revoked legend item when no key is revoked", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
     expect(container.querySelector("g.node-revoked")).toBeNull();
     expect(screen.queryByTestId("chain-legend-revoked")).toBeNull();
   });
@@ -615,20 +557,17 @@ describe("DnssecChain", () => {
       key_tag: 1000, algorithm: 13, state: "expired",
       inception: 1600000000, expiration: 1650000000, servers: ["203.0.113.9"],
     });
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     const badge = screen.getByTestId("chain-status-badge");
     expect(badge.textContent).toBe("Partial");
     expect(badge.classList.contains("badge-warn")).toBe(true);
-    expect(screen.getByTestId("chain-stale")).toBeTruthy();
+    expect(screen.getByTestId("chain-stale")).toBeInTheDocument();
     const staleFact = screen.getByTestId("chain-stale-servers").textContent;
     expect(staleFact).toContain("203.0.113.9");
     expect(staleFact).toContain("203.0.113.10");
     // The expired signature colors the self-loop even though a fresh
     // signature by the same key covers the same RRset.
-    expect(container.querySelector("path.chain-edge.edge-bad")).toBeTruthy();
+    expect(container.querySelector("path.chain-edge.edge-bad")).not.toBeNull();
   });
 
   it("merges parent and child stale servers into one callout", async () => {
@@ -639,17 +578,14 @@ describe("DnssecChain", () => {
     fetch.mockResolvedValue(jsonResponse(chain));
     renderOpened();
 
-    await waitFor(() => expect(screen.getByTestId("chain-stale")).toBeTruthy());
+    await screen.findByTestId("chain-stale");
     const staleFact = screen.getByTestId("chain-stale-servers").textContent;
     expect(staleFact).toContain("192.0.2.1");
     expect(staleFact).toContain("203.0.113.9");
   });
 
   it("omits the stale callout when no server serves an expired signature", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(secureChain());
     expect(screen.queryByTestId("chain-stale")).toBeNull();
     expect(screen.queryByTestId("chain-stale-servers")).toBeNull();
   });
@@ -660,10 +596,7 @@ describe("DnssecChain", () => {
     const chain = secureChain();
     chain.version = 3;
     chain.status = "quantum_broken";
-    fetch.mockResolvedValue(jsonResponse(chain));
-    renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(chain);
     expect(screen.queryByTestId("chain-status-badge")).toBeNull();
     expect(screen.queryByTestId("chain-status-fact")).toBeNull();
     expect(screen.getByTestId("chain-facts").textContent).not.toContain("quantum_broken");
@@ -671,19 +604,12 @@ describe("DnssecChain", () => {
 });
 
 describe("DnssecChain node faces", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
   it("shows the algorithm and key size on the key and DS nodes", async () => {
     const chain = secureChain();
     chain.child.dnskeys[0].key_size = 256;
     chain.child.dnskeys[1].algorithm = 8;
     chain.child.dnskeys[1].key_size = 2048;
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     const ksk = container.querySelector("g.node-ksk").textContent;
     expect(ksk).toContain("KSK");
     expect(ksk).toContain("tag 1000");
@@ -697,19 +623,14 @@ describe("DnssecChain node faces", () => {
 
   it("omits the size line when the key size is unknown", async () => {
     // The fixture carries no key_size, so no node may claim one.
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
     const ksk = container.querySelector("g.node-ksk");
     expect(ksk.textContent).toContain("ECDSAP256SHA256");
     expect(ksk.textContent).not.toContain("bit");
     expect(ksk.querySelectorAll("text").length).toBe(3);
   });
 
-  // The label block is centred on its ink, not on its baselines, so the space
-  // above the heading matches the space below the last line however many lines
-  // a node has. Centring on baselines leaves the bottom visibly tight.
+  // The label block is centred on its ink, not on its baselines.
   it("centres the label block in the box whatever the line count", async () => {
     // Cap height of the 13px bold heading: where the block's ink starts. The
     // face has no descenders, so its ink ends on the last baseline.
@@ -724,10 +645,7 @@ describe("DnssecChain node faces", () => {
 
     const chain = secureChain();
     chain.child.dnskeys[0].key_size = 256; // four lines: heading, tag, algorithm, size
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     const four = gaps(container.querySelector("g.node-ksk"));
     expect(four.above).toBeCloseTo(four.below, 1);
 
@@ -740,10 +658,7 @@ describe("DnssecChain node faces", () => {
   // The face is an addition, not a move: the hover text has to keep every
   // detail it had, including the ones now duplicated on the node.
   it("keeps the full algorithm label in the node tooltip", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
     const tip = container.querySelector("g.node-ksk").dataset.tip;
     expect(tip).toContain("ECDSAP256SHA256 (alg 13)");
     expect(tip).toContain("KSK");
@@ -751,37 +666,18 @@ describe("DnssecChain node faces", () => {
 });
 
 describe("in-domain nameserver names", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
-  // The reference case: the zone's own chain is intact, and one of its
-  // nameserver names is signed by a zone nothing delegates.
-  const orphanChain = () =>
-    secureChain({
-      version: 3,
-      ns_names: [
-        { name: "a.ns.example.com", status: "orphan", signer: "a.ns.example.com", servers: ["192.0.2.1"] },
-        { name: "b.ns.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] }
-      ]
-    });
-
   it("draws the branch with the orphan marked bad and the healthy name ok", async () => {
-    fetch.mockResolvedValue(jsonResponse(orphanChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(orphanChain());
 
     const nodes = [...container.querySelectorAll("g.node-nsname")];
     expect(nodes.length).toBe(2);
     expect(nodes[0].classList.contains("node-ns-bad")).toBe(true);
     expect(nodes[1].classList.contains("node-ns-ok")).toBe(true);
-    expect(container.querySelector("g.node-orphan")).toBeTruthy();
+    expect(container.querySelector("g.node-orphan")).not.toBeNull();
   });
 
   it("names the status and the signer on the node face and in its tip", async () => {
-    fetch.mockResolvedValue(jsonResponse(orphanChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(orphanChain());
 
     const node = container.querySelector("g.node-nsname");
     expect(node.textContent).toContain("a.ns");
@@ -790,34 +686,29 @@ describe("in-domain nameserver names", () => {
     expect(node.dataset.tip).toContain("Address records signed by a.ns.example.com");
   });
 
-  // The zone's own chain is secure and the badge says so; the branch carries
-  // the fault. The badge must not be demoted by a fault below the apex.
+  // The badge reports the zone's own chain, not the branch.
   it("keeps the secure badge while the branch is bad", async () => {
     fetch.mockResolvedValue(jsonResponse(orphanChain()));
     renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+    await screen.findByTestId("chain-status-badge");
 
     const badge = screen.getByTestId("chain-status-badge");
     expect(badge.textContent).toBe("Secure");
     expect(badge.classList.contains("badge-ok")).toBe(true);
   });
 
-  it("adds a legend entry only when the branch is drawn", async () => {
-    fetch.mockResolvedValue(jsonResponse(orphanChain()));
-    renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-legend-nsname")).toBeTruthy());
+  it("adds a legend entry when the branch is drawn", async () => {
+    await draw(orphanChain());
+    expect(screen.getByTestId("chain-legend-nsname")).toBeInTheDocument();
+  });
 
-    cleanup();
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+  it("omits the legend entry for a chain without the branch", async () => {
+    await draw(secureChain());
     expect(screen.queryByTestId("chain-legend-nsname")).toBeNull();
   });
 
   it("draws nothing new for a document stored without the section", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
 
     expect(container.querySelector("g.node-nsname")).toBeNull();
     expect(container.querySelector("g.node-orphan")).toBeNull();
@@ -826,25 +717,11 @@ describe("in-domain nameserver names", () => {
 });
 
 describe("a bogus nameserver name is hard to miss", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
-  const orphanChain = () =>
-    secureChain({
-      version: 3,
-      ns_names: [
-        { name: "a.ns.example.com", status: "orphan", signer: "a.ns.example.com", servers: ["192.0.2.1"] },
-        { name: "b.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] }
-      ]
-    });
-
-  // The graph sits at the bottom of a tall diagram, so the fault also needs the
-  // callout channel every other fault on this card uses.
+  // The fault also gets the callout channel the other faults use.
   it("raises a red callout naming the name that does not validate", async () => {
-    fetch.mockResolvedValue(jsonResponse(orphanChain()));
+    fetch.mockResolvedValue(jsonResponse(orphanChain("ns.example.com")));
     renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-ns-bogus")).toBeTruthy());
+    await screen.findByTestId("chain-ns-bogus");
 
     const callout = screen.getByTestId("chain-ns-bogus");
     expect(callout.textContent).toContain("a.ns.example.com");
@@ -853,49 +730,26 @@ describe("a bogus nameserver name is hard to miss", () => {
   });
 
   it("raises no callout when every name validates", async () => {
-    fetch.mockResolvedValue(
-      jsonResponse(
-        secureChain({
-          version: 3,
-          ns_names: [{ name: "ns1.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] }]
-        })
-      )
-    );
-    renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(nsNamesChain([nsName("ns1.example.com", "validates")]));
     expect(screen.queryByTestId("chain-ns-bogus")).toBeNull();
   });
 
   // An insecure name is accepted by validators, so it is not a callout.
   it("raises no callout for an insecure name", async () => {
-    fetch.mockResolvedValue(
-      jsonResponse(
-        secureChain({
-          version: 3,
-          ns_names: [{ name: "ns1.example.com", status: "insecure", servers: ["192.0.2.1"] }]
-        })
-      )
-    );
-    renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(nsNamesChain([{ name: "ns1.example.com", status: "insecure", servers: ["192.0.2.1"] }]));
     expect(screen.queryByTestId("chain-ns-bogus")).toBeNull();
   });
 
-  // Two boxes reading only "a.ns" and "ns" differ by stroke colour alone; the
-  // word is what tells them apart.
+  // The word, not the stroke colour, tells the two signer boxes apart.
   it("says in words what each signer node is", async () => {
-    fetch.mockResolvedValue(jsonResponse(orphanChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(orphanChain("ns.example.com"));
 
     expect(container.querySelector("g.node-orphan").textContent).toContain("no delegation");
     expect(container.querySelector("g.node-cut").textContent).toContain("delegation");
   });
 
   it("writes a bad status in the alerting style, not the muted one", async () => {
-    fetch.mockResolvedValue(jsonResponse(orphanChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(orphanChain("ns.example.com"));
 
     const bad = container.querySelector("g.node-ns-bad");
     const status = [...bad.querySelectorAll("text")].find((t) => t.textContent === "orphan zone");
@@ -907,10 +761,6 @@ describe("a bogus nameserver name is hard to miss", () => {
 });
 
 describe("a zone its parent proves does not exist", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
   const undelegatedChain = () =>
     secureChain({
       version: 3,
@@ -920,12 +770,11 @@ describe("a zone its parent proves does not exist", () => {
       links: []
     });
 
-  // "No DS" reads as a parent that is merely silent. This parent denies the
-  // delegation, so the badge must not be neutral.
+  // A parent that denies the delegation is not a silent one.
   it("badges it bad, not the neutral island tone", async () => {
     fetch.mockResolvedValue(jsonResponse(undelegatedChain()));
     renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+    await screen.findByTestId("chain-status-badge");
 
     const badge = screen.getByTestId("chain-status-badge");
     expect(badge.textContent).toBe("Not delegated");
@@ -935,7 +784,7 @@ describe("a zone its parent proves does not exist", () => {
   it("names the parent that carries the proof in a callout", async () => {
     fetch.mockResolvedValue(jsonResponse(undelegatedChain()));
     renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-undelegated")).toBeTruthy());
+    await screen.findByTestId("chain-undelegated");
 
     const callout = screen.getByTestId("chain-undelegated");
     expect(callout.textContent).toContain("ns.example.com");
@@ -945,7 +794,7 @@ describe("a zone its parent proves does not exist", () => {
   it("leaves an ordinary island alone", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain({ status: "island" })));
     renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-status-badge")).toBeTruthy());
+    await screen.findByTestId("chain-status-badge");
 
     expect(screen.getByTestId("chain-status-badge").textContent).toBe("No DS");
     expect(screen.queryByTestId("chain-undelegated")).toBeNull();
@@ -953,21 +802,8 @@ describe("a zone its parent proves does not exist", () => {
 });
 
 describe("zone frames and the saved file", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
-  // Renders opened, which is when it fetches, with the props a case needs.
-  const openWith = (props) => {
-    const { container } = render(DnssecChain, { props: { publicID: "abc", domain: "example.com", ...props } });
-    openChain(container);
-    return container;
-  };
-
   it("draws a frame per zone, with the role word, the name and the roll-up chip", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    openWith({});
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(secureChain());
 
     const parent = screen.getByTestId("chain-frame-parent");
     const zone = screen.getByTestId("chain-frame-zone");
@@ -982,9 +818,7 @@ describe("zone frames and the saved file", () => {
   });
 
   it("draws the frames behind the rows they hold", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    openWith({});
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(secureChain());
 
     const kids = [...screen.getByTestId("chain-svg").children];
     const lastFrame = kids.findLastIndex((el) => el.classList.contains("chain-frame"));
@@ -994,18 +828,14 @@ describe("zone frames and the saved file", () => {
   });
 
   it("names the root on the parent frame and in the facts", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain({ zone: "se", parent_zone: "." })));
-    openWith({ domain: "se" });
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(secureChain({ zone: "se", parent_zone: "." }), { domain: "se" });
 
     expect(screen.getByTestId("chain-frame-parent").textContent).toContain("root (.)");
     expect(screen.getByTestId("chain-facts").textContent).toContain("root (.)");
   });
 
   it("tones the frame of a zone the parent proves undelegated", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain({ status: "undelegated" })));
-    openWith({});
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(secureChain({ status: "undelegated" }));
 
     const zone = screen.getByTestId("chain-frame-zone");
     expect(zone.classList.contains("frame-bad")).toBe(true);
@@ -1013,10 +843,8 @@ describe("zone frames and the saved file", () => {
   });
 
   it("hands the serialized diagram and its file name to the saver", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
     const saved = [];
-    openWith({ saveSVG: (text, name) => saved.push({ text, name }) });
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(secureChain(), { saveSVG: (text, name) => saved.push({ text, name }) });
 
     await fireEvent.click(screen.getByTestId("chain-export"));
     expect(saved).toHaveLength(1);
@@ -1029,10 +857,8 @@ describe("zone frames and the saved file", () => {
   });
 
   it("names a root test's file for the root", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain({ zone: ".", parent_zone: "." })));
     const saved = [];
-    openWith({ domain: ".", saveSVG: (text, name) => saved.push({ text, name }) });
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    await draw(secureChain({ zone: ".", parent_zone: "." }), { domain: ".", saveSVG: (text, name) => saved.push({ text, name }) });
 
     await fireEvent.click(screen.getByTestId("chain-export"));
     expect(saved[0].name).toBe("root-dnssec-chain.svg");
@@ -1040,23 +866,16 @@ describe("zone frames and the saved file", () => {
 
   it("offers no save button where there is no diagram", async () => {
     fetch.mockResolvedValue(jsonResponse(secureChain({ status: "unsigned" })));
-    openWith({});
-    await waitFor(() => expect(screen.getByTestId("chain-unsigned")).toBeTruthy());
+    renderOpened();
+    await screen.findByTestId("chain-unsigned");
     expect(screen.queryByTestId("chain-export")).toBeNull();
   });
 });
 
 describe("a narrow card scrolls the diagram", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
-  // Scaling the drawing to the card takes the 10px face below legibility, so
-  // the svg keeps its own size and the card scrolls.
+  // The svg keeps its own size and the card scrolls.
   it("draws the svg at its own size inside the scrolling wrapper", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
 
     const svg = screen.getByTestId("chain-svg");
     const width = svg.getAttribute("width");
@@ -1069,20 +888,12 @@ describe("a narrow card scrolls the diagram", () => {
 });
 
 describe("pinning an object into the detail panel", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
-  // jsdom carries no PointerEvent, so a MouseEvent under the pointer name is
-  // what delivers the coordinates the drag guard reads.
+  // jsdom has no PointerEvent, so a MouseEvent carries the coordinates.
   const pointer = (type, clientX, clientY) => new MouseEvent(type, { clientX, clientY, bubbles: true });
 
-  // A tooltip is out of reach on a phone and from a keyboard, so every tip
-  // line is repeated in a panel below the drawing.
+  // Draws the chain and clicks the first match of the selector.
   const pinFirst = async (selector, chain = secureChain()) => {
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(chain);
     await fireEvent.click(container.querySelector(selector));
     return container;
   };
@@ -1110,7 +921,7 @@ describe("pinning an object into the detail panel", () => {
 
   it("lets the pin go on a click that names no object", async () => {
     const container = await pinFirst("g.node-ksk");
-    expect(screen.queryByTestId("chain-detail")).toBeTruthy();
+    expect(screen.getByTestId("chain-detail")).toBeInTheDocument();
 
     await fireEvent.click(container.querySelector("svg.chain-svg"));
     expect(screen.queryByTestId("chain-detail")).toBeNull();
@@ -1122,15 +933,13 @@ describe("pinning an object into the detail panel", () => {
     expect(screen.queryByTestId("chain-detail")).toBeNull();
 
     await fireEvent.click(container.querySelector("g.node-ksk"));
-    expect(screen.queryByTestId("chain-detail")).toBeTruthy();
+    expect(screen.getByTestId("chain-detail")).toBeInTheDocument();
     await fireEvent.click(screen.getByTestId("chain-detail-close"));
     expect(screen.queryByTestId("chain-detail")).toBeNull();
   });
 
   it("makes every box a labelled tab stop that pins on Enter and on Space", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
 
     const ksk = container.querySelector("g.node-ksk");
     expect(ksk.getAttribute("tabindex")).toBe("0");
@@ -1146,9 +955,7 @@ describe("pinning an object into the detail panel", () => {
   });
 
   it("keeps a drag that scrolls the card from pinning the box it started on", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
 
     const ksk = container.querySelector("g.node-ksk");
     await fireEvent(ksk, pointer("pointerdown", 100, 100));
@@ -1160,15 +967,11 @@ describe("pinning an object into the detail panel", () => {
     await fireEvent(ksk, pointer("pointerdown", 100, 100));
     await fireEvent(ksk, pointer("pointermove", 102, 101));
     await fireEvent.click(ksk);
-    expect(screen.queryByTestId("chain-detail")).toBeTruthy();
+    expect(screen.getByTestId("chain-detail")).toBeInTheDocument();
   });
 
   it("pins an orphan nameserver name with its signer and status", async () => {
-    const chain = secureChain({
-      version: 3,
-      ns_names: [{ name: "a.ns.example.com", status: "orphan", signer: "ns.example.com", servers: ["192.0.2.1"] }],
-    });
-    await pinFirst("g.node-nsname", chain);
+    await pinFirst("g.node-nsname", nsNamesChain([nsName("a.ns.example.com", "orphan", "ns.example.com")]));
 
     const panel = screen.getByTestId("chain-detail");
     expect(panel.querySelector("h3").textContent).toBe("Name server name a.ns.example.com");
@@ -1177,13 +980,7 @@ describe("pinning an object into the detail panel", () => {
   });
 
   it("says nothing of an edge that carries no tip", async () => {
-    const chain = secureChain({
-      version: 3,
-      ns_names: [{ name: "a.ns.example.com", status: "validates", signer: "ns.example.com", servers: ["192.0.2.1"] }],
-    });
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(nsNamesChain([nsName("a.ns.example.com", "validates", "ns.example.com")]));
 
     await fireEvent.click(container.querySelector('[data-object^="nssig-"]'));
     expect(screen.queryByTestId("chain-detail")).toBeNull();
@@ -1204,19 +1001,7 @@ describe("pinning an object into the detail panel", () => {
 });
 
 describe("a shape for every colour", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
-  const draw = async (chain) => {
-    fetch.mockResolvedValue(jsonResponse(chain));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
-    return container;
-  };
-
-  // A colourblind reader and a monochrome print lose a tint, so a marked box
-  // carries its verdict as a shape too.
+  // A marked box carries its verdict as a shape as well as a tint.
   it("marks a failure with a triangle and leaves a settled box plain", async () => {
     const container = await draw(
       secureChain({
@@ -1224,7 +1009,7 @@ describe("a shape for every colour", () => {
         links: [{ ds_key_tag: 1000, dnskey_key_tag: 1000, status: "key_not_signing", servers: ["192.0.2.1"] }],
       })
     );
-    expect(container.querySelector("g.node-ds .mark-bad")).toBeTruthy();
+    expect(container.querySelector("g.node-ds .mark-bad")).not.toBeNull();
     expect(container.querySelector("g.node-ksk .chain-mark")).toBeNull();
   });
 
@@ -1233,68 +1018,49 @@ describe("a shape for every colour", () => {
     chain.child.dnskeys[0].anchored = true;
     chain.child.dnskeys.push({ key_tag: 3000, algorithm: 13, flags: 257, sep: true, servers: ["203.0.113.1"] });
     const container = await draw(chain);
-    expect(container.querySelector("g.node-incoming .mark-warn")).toBeTruthy();
+    expect(container.querySelector("g.node-incoming .mark-warn")).not.toBeNull();
   });
 
   it("marks a record the zone does not publish with a cross", async () => {
     const container = await draw(secureChain({ parent: { ds_source: "none", ds: [] }, links: [] }));
-    expect(container.querySelector("g.node-ds-ghost .mark-ghost")).toBeTruthy();
+    expect(container.querySelector("g.node-ds-ghost .mark-ghost")).not.toBeNull();
   });
 
   it("marks a nameserver name validators reject, and not one that validates", async () => {
     const container = await draw(
-      secureChain({
-        version: 3,
-        ns_names: [
-          { name: "bad.ns.example.com", status: "orphan", signer: "ns.example.com", servers: ["192.0.2.1"] },
-          { name: "good.ns.example.com", status: "validates", signer: "example.com", servers: ["192.0.2.1"] },
-        ],
-      })
+      nsNamesChain([
+        nsName("bad.ns.example.com", "orphan", "ns.example.com"),
+        nsName("good.ns.example.com", "validates")
+      ])
     );
     const names = [...container.querySelectorAll("g.node-nsname")];
-    expect(names[0].querySelector(".mark-bad")).toBeTruthy();
+    expect(names[0].querySelector(".mark-bad")).not.toBeNull();
     expect(names[1].querySelector(".chain-mark")).toBeNull();
   });
 });
 
 describe("the legend names every treatment", () => {
-  beforeEach(() => {
-    global.fetch = vi.fn();
-  });
-
   it("lists the three line treatments and the three marks, and no gradient", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    const container = renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+    const container = await draw(secureChain());
 
     for (const id of ["edge-ok", "edge-warn", "edge-bad"]) {
       const item = screen.getByTestId(`chain-legend-${id}`);
-      expect(item.querySelector(`line.chain-edge.${id}`)).toBeTruthy();
+      expect(item.querySelector(`line.chain-edge.${id}`)).not.toBeNull();
     }
-    expect(screen.getByTestId("chain-legend-mark-bad").querySelector("path.mark-bad")).toBeTruthy();
-    expect(screen.getByTestId("chain-legend-mark-warn").querySelector("rect.mark-warn")).toBeTruthy();
-    expect(screen.getByTestId("chain-legend-mark-ghost").querySelector("path.mark-ghost")).toBeTruthy();
+    expect(screen.getByTestId("chain-legend-mark-bad").querySelector("path.mark-bad")).not.toBeNull();
+    expect(screen.getByTestId("chain-legend-mark-warn").querySelector("rect.mark-warn")).not.toBeNull();
+    expect(screen.getByTestId("chain-legend-mark-ghost").querySelector("path.mark-ghost")).not.toBeNull();
     expect(container.querySelector(".swatch-sig")).toBeNull();
     expect(screen.getByTestId("chain-legend").textContent).toContain("Solid line: valid signature or matching DS");
   });
 
-  it("names the severed line only where one is drawn", async () => {
-    fetch.mockResolvedValue(jsonResponse(secureChain()));
-    renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
+  it("omits the severed line from the legend of a plain chain", async () => {
+    await draw(secureChain());
     expect(screen.queryByTestId("chain-legend-severed")).toBeNull();
+  });
 
-    cleanup();
-    fetch.mockResolvedValue(
-      jsonResponse(
-        secureChain({
-          version: 3,
-          ns_names: [{ name: "a.ns.example.com", status: "orphan", signer: "ns.example.com", servers: ["192.0.2.1"] }],
-        })
-      )
-    );
-    renderOpened();
-    await waitFor(() => expect(screen.getByTestId("chain-svg")).toBeTruthy());
-    expect(screen.getByTestId("chain-legend-severed").querySelector("path.chain-break-tick")).toBeTruthy();
+  it("names the severed line in the legend when one is drawn", async () => {
+    await draw(nsNamesChain([nsName("a.ns.example.com", "orphan", "ns.example.com")]));
+    expect(screen.getByTestId("chain-legend-severed").querySelector("path.chain-break-tick")).not.toBeNull();
   });
 });

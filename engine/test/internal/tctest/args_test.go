@@ -164,3 +164,13 @@ func TestRequireArgShape(t *testing.T) {
 	tbtest.MustFail(t, "expected ns=b.root", func(tb *tbtest.TB) { RequireArgShape(tb, split, ArgShape{NS: "b.root"}) })
 	tbtest.MustFail(t, "expected address=192.0.2.2", func(tb *tbtest.TB) { RequireArgShape(tb, split, ArgShape{Address: "192.0.2.2"}) })
 }
+
+func TestRequireArg(t *testing.T) {
+	e := entry("T", map[string]any{"ns": "ns1.example", "keytag": 42})
+	RequireArg(t, e, "ns", "ns1.example")
+
+	tbtest.MustFail(t, "expected an entry", func(tb *tbtest.TB) { RequireArg(tb, nil, "ns", "ns1.example") })
+	tbtest.MustFail(t, `ns = "ns1.example", want "ns2.example"`, func(tb *tbtest.TB) { RequireArg(tb, e, "ns", "ns2.example") })
+	tbtest.MustFail(t, "expected string arg keytag", func(tb *tbtest.TB) { RequireArg(tb, e, "keytag", "42") })
+	tbtest.MustFail(t, "expected string arg address", func(tb *tbtest.TB) { RequireArg(tb, e, "address", "192.0.2.1") })
+}

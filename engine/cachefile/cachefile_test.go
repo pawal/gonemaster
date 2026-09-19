@@ -1095,6 +1095,9 @@ func TestCachefileProtocolRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("re-export: %v", err)
 	}
+	if len(entries) != len(file.Entries) {
+		t.Fatalf("restored %d entries, want the exported %d", len(entries), len(file.Entries))
+	}
 	for _, e := range entries {
 		want := ""
 		if e.Key == "tcp/a" {

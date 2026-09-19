@@ -1,14 +1,14 @@
 package dnssecchain
 
 import (
-	"context"
+	"slices"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 )
 
 func TestCollectNSNameWithoutCollectorIsNoOp(t *testing.T) {
-	ctx := context.Background()
+	ctx := t.Context()
 	CollectNSName(ctx, NSName{Name: "ns.example.", Status: NSNameOrphan})
 	if got := NSNamesFromContext(ctx); got != nil {
 		t.Errorf("want nil without a collector, got %+v", got)
@@ -16,7 +16,7 @@ func TestCollectNSNameWithoutCollectorIsNoOp(t *testing.T) {
 }
 
 func TestCollectNSNameWorstStatusWins(t *testing.T) {
-	ctx := WithNSNames(context.Background())
+	ctx := WithNSNames(t.Context())
 	CollectNSName(ctx, NSName{Name: "a.ns.example.", Status: NSNameValidates, Signer: "ns.example.", Servers: []string{"192.0.2.1"}})
 	CollectNSName(ctx, NSName{Name: "a.ns.example.", Status: NSNameOrphan, Signer: "a.ns.example.", Servers: []string{"192.0.2.2"}})
 	CollectNSName(ctx, NSName{Name: "a.ns.example.", Status: NSNameValidates, Servers: []string{"192.0.2.3"}})
@@ -32,13 +32,13 @@ func TestCollectNSNameWorstStatusWins(t *testing.T) {
 		t.Errorf("signer = %q, want the orphan apex", got[0].Signer)
 	}
 	// The servers of the losing status are not merged into the winner.
-	if len(got[0].Servers) != 1 || got[0].Servers[0] != "192.0.2.2" {
-		t.Errorf("servers = %v, want only the orphaning server", got[0].Servers)
+	if want := []string{"192.0.2.2"}; !slices.Equal(got[0].Servers, want) {
+		t.Errorf("servers = %v, want %v", got[0].Servers, want)
 	}
 }
 
 func TestCollectNSNameMergesEqualStatus(t *testing.T) {
-	ctx := WithNSNames(context.Background())
+	ctx := WithNSNames(t.Context())
 	CollectNSName(ctx, NSName{Name: "a.ns.example.", Status: NSNameOrphan, Servers: []string{"192.0.2.2"}})
 	CollectNSName(ctx, NSName{Name: "a.ns.example.", Status: NSNameOrphan, Signer: "a.ns.example.", Servers: []string{"192.0.2.1", "192.0.2.2"}})
 
@@ -46,8 +46,8 @@ func TestCollectNSNameMergesEqualStatus(t *testing.T) {
 	if len(got) != 1 {
 		t.Fatalf("want 1 entry, got %d", len(got))
 	}
-	if len(got[0].Servers) != 2 || got[0].Servers[0] != "192.0.2.1" || got[0].Servers[1] != "192.0.2.2" {
-		t.Errorf("servers = %v, want the sorted union", got[0].Servers)
+	if want := []string{"192.0.2.1", "192.0.2.2"}; !slices.Equal(got[0].Servers, want) {
+		t.Errorf("servers = %v, want the sorted union %v", got[0].Servers, want)
 	}
 	if got[0].Signer != "a.ns.example." {
 		t.Errorf("signer = %q, want the one the later observation supplied", got[0].Signer)
@@ -55,18 +55,16 @@ func TestCollectNSNameMergesEqualStatus(t *testing.T) {
 }
 
 func TestNSNamesFromContextSortsByName(t *testing.T) {
-	ctx := WithNSNames(context.Background())
+	ctx := WithNSNames(t.Context())
 	for _, name := range []string{"c.ns.example.", "a.ns.example.", "b.ns.example."} {
 		CollectNSName(ctx, NSName{Name: name, Status: NSNameValidates, Servers: []string{"192.0.2.1"}})
 	}
-	got := NSNamesFromContext(ctx)
-	if len(got) != 3 {
-		t.Fatalf("want 3 entries, got %d", len(got))
+	var names []string
+	for _, n := range NSNamesFromContext(ctx) {
+		names = append(names, n.Name)
 	}
-	for i, want := range []string{"a.ns.example.", "b.ns.example.", "c.ns.example."} {
-		if got[i].Name != want {
-			t.Errorf("entry %d = %q, want %q", i, got[i].Name, want)
-		}
+	if want := []string{"a.ns.example.", "b.ns.example.", "c.ns.example."}; !slices.Equal(names, want) {
+		t.Errorf("names = %v, want %v", names, want)
 	}
 }
 
@@ -112,7 +110,7 @@ func TestExtractWithoutCollectorHasNoNSNames(t *testing.T) {
 func TestExtractCapsNSNames(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	ctx = WithNSNames(ctx)
-	for i := 0; i < maxNSNames+5; i++ {
+	for i := range maxNSNames + 5 {
 		CollectNSName(ctx, NSName{
 			Name:    string(rune('a'+i%26)) + string(rune('a'+i/26)) + ".ns." + testZone,
 			Status:  NSNameValidates,

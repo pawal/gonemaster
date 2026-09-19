@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { EXPORT_TOKENS, chainFileName, collectStyles, downloadSVG, readTokens, serializeSVG } from "./chainExport.js";
 
 // A stand-in for one same-origin stylesheet.
@@ -67,7 +67,6 @@ describe("collecting the styles an exported diagram needs", () => {
         throw new Error("cross-origin");
       },
     };
-    expect(() => collectStyles([blocked, sheet(".chain-edge")], {})).not.toThrow();
     expect(collectStyles([blocked, sheet(".chain-edge")], {})).toContain(".chain-edge");
   });
 
@@ -125,27 +124,30 @@ describe("serializing the diagram", () => {
 });
 
 describe("naming the saved file", () => {
-  it("names the file for the zone, without a trailing dot", () => {
-    expect(chainFileName("example.com")).toBe("example.com-dnssec-chain.svg");
-    expect(chainFileName("example.com.")).toBe("example.com-dnssec-chain.svg");
-  });
-
-  it("names the root, which has no name of its own", () => {
-    expect(chainFileName(".")).toBe("root-dnssec-chain.svg");
-    expect(chainFileName("")).toBe("root-dnssec-chain.svg");
-  });
-
-  it("keeps a separator out of the file name", () => {
-    expect(chainFileName("a/b.example")).toBe("a_b.example-dnssec-chain.svg");
+  it.each([
+    ["example.com", "example.com-dnssec-chain.svg"],
+    ["example.com.", "example.com-dnssec-chain.svg"],
+    [".", "root-dnssec-chain.svg"],
+    ["", "root-dnssec-chain.svg"],
+    ["a/b.example", "a_b.example-dnssec-chain.svg"]
+  ])("names the file for zone %j %s", (zone, want) => {
+    expect(chainFileName(zone)).toBe(want);
   });
 });
 
 describe("handing the diagram to the browser", () => {
+  // jsdom has no object URLs, so each test gets fresh stubs and leaves none behind.
+  beforeEach(() => {
+    Object.defineProperty(globalThis.URL, "createObjectURL", { value: vi.fn(() => "blob:one"), configurable: true });
+    Object.defineProperty(globalThis.URL, "revokeObjectURL", { value: vi.fn(), configurable: true });
+  });
+
+  afterEach(() => {
+    delete globalThis.URL.createObjectURL;
+    delete globalThis.URL.revokeObjectURL;
+  });
+
   it("names the file and releases the object URL again", () => {
-    const create = vi.fn(() => "blob:one");
-    const revoke = vi.fn();
-    Object.defineProperty(globalThis.URL, "createObjectURL", { value: create, configurable: true });
-    Object.defineProperty(globalThis.URL, "revokeObjectURL", { value: revoke, configurable: true });
     const clicked = [];
     const anchor = globalThis.document.createElement("a");
     anchor.click = () => clicked.push({ href: anchor.href, download: anchor.download });
@@ -153,15 +155,13 @@ describe("handing the diagram to the browser", () => {
 
     downloadSVG("<svg/>", "example.com-dnssec-chain.svg");
 
-    expect(create).toHaveBeenCalled();
+    expect(globalThis.URL.createObjectURL).toHaveBeenCalledTimes(1);
     expect(clicked[0].download).toBe("example.com-dnssec-chain.svg");
-    expect(revoke).toHaveBeenCalledWith("blob:one");
+    expect(globalThis.URL.revokeObjectURL).toHaveBeenCalledWith("blob:one");
   });
 
   it("does nothing with an empty diagram", () => {
-    const create = vi.fn();
-    Object.defineProperty(globalThis.URL, "createObjectURL", { value: create, configurable: true });
     downloadSVG("", "empty.svg");
-    expect(create).not.toHaveBeenCalled();
+    expect(globalThis.URL.createObjectURL).not.toHaveBeenCalled();
   });
 });

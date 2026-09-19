@@ -117,6 +117,38 @@ func TestControllerProjectRunSkipsNonSnapshotIntentBatch(t *testing.T) {
 	}
 }
 
+// TestControllerProjectRunSkipsUnsuccessfulRun covers the third pollution
+// gate: a run that failed or was canceled carries no entries, so projecting
+// it would count the domain as ungraded at severity OK.
+func TestControllerProjectRunSkipsUnsuccessfulRun(t *testing.T) {
+	for _, status := range []serverpkg.JobStatus{serverpkg.JobFailed, serverpkg.JobCanceled} {
+		t.Run(string(status), func(t *testing.T) {
+			store, _ := snapshotLifecycleStore(t)
+			seedSnapshotBatch(store, "batch-unsuccessful", true)
+			run := testAnalysisRun("run-"+string(status), 100, "alpha.example", time.Now().UTC(), "192.0.2.10", "2001:db8::10")
+			run.BatchID = "batch-unsuccessful"
+			run.Status = status
+			store.runs[run.ID] = run
+			store.entries[run.ID] = testAnalysisEntries(run)
+			store.tags[run.DomainID] = []string{"tld"}
+
+			controller := NewController(store)
+			if err := controller.ProjectRun(run.ID); err != nil {
+				t.Fatalf("ProjectRun: %v", err)
+			}
+			if _, ok := store.summaries[projectionKey(10, run.ID)]; ok {
+				t.Fatalf("expected no summary row for a %s run", status)
+			}
+			if _, ok := store.states[projectionKey(10, run.ID)]; ok {
+				t.Fatalf("expected no projection state row for a %s run", status)
+			}
+			if len(store.snapshots) != 0 {
+				t.Fatalf("expected no snapshot rows, got %d", len(store.snapshots))
+			}
+		})
+	}
+}
+
 // TestControllerRebuildCohortCapturesSnapshotsInline asserts the rebuild
 // promotes pending snapshots to captured before returning so the public
 // read path does not have to wait for the 30s capture loop.

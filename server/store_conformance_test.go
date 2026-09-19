@@ -354,6 +354,60 @@ func TestJobStoreGraduateMissingJobReturnsError(t *testing.T) {
 	})
 }
 
+// A run that did not succeed carries no entries, so it must carry no score:
+// scoring an empty entry set yields 100 and a top grade.
+func TestJobStoreGraduateScoresOnlySucceededRuns(t *testing.T) {
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		now := time.Now().UTC()
+		for _, tc := range []struct {
+			id     string
+			domain string
+			status JobStatus
+			scored bool
+		}{
+			{"r-ok", "ok.example", JobSucceeded, true},
+			{"r-fail", "fail.example", JobFailed, false},
+			{"r-cancel", "cancel.example", JobCanceled, false},
+		} {
+			createAndGraduate(t, s, Job{
+				ID: tc.id, Domain: tc.domain, Status: tc.status,
+				CreatedAt: now, StartedAt: now, FinishedAt: now,
+			}, nil)
+
+			run, ok := s.GetRun(tc.id)
+			if !ok {
+				t.Fatalf("%s: run not found", tc.id)
+			}
+			if got := run.Score != nil; got != tc.scored {
+				t.Fatalf("%s: run scored %v, want %v", tc.id, got, tc.scored)
+			}
+			if got := run.Grade != nil; got != tc.scored {
+				t.Fatalf("%s: run graded %v, want %v", tc.id, got, tc.scored)
+			}
+
+			// The result payload feeds the public API and must agree.
+			result, ok := s.GetResult(tc.id)
+			if !ok {
+				t.Fatalf("%s: result not found", tc.id)
+			}
+			if got := result.Score != nil; got != tc.scored {
+				t.Fatalf("%s: result scored %v, want %v", tc.id, got, tc.scored)
+			}
+		}
+
+		// The denormalized domain fields follow the run.
+		for _, d := range s.ListDomains(DomainFilter{Limit: 10}).Items {
+			scored := d.Name == "ok.example"
+			if got := d.LatestScore != nil; got != scored {
+				t.Fatalf("%s: domain scored %v, want %v", d.Name, got, scored)
+			}
+			if got := d.LatestGrade != nil; got != scored {
+				t.Fatalf("%s: domain graded %v, want %v", d.Name, got, scored)
+			}
+		}
+	})
+}
+
 // ListRuns orders by started_at in both directions on every store.
 func TestJobStoreListRunsOrdersByStartedAt(t *testing.T) {
 	forEachStore(t, func(t *testing.T, s JobStore) {

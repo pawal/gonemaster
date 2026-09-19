@@ -100,15 +100,17 @@ func NewControllerFromJobStore(store serverpkg.JobStore) (*Controller, bool) {
 }
 
 // ProjectRun materializes one completed run and updates cohort-level
-// materialization state for the matched cohorts. Two pollution gates run
+// materialization state for the matched cohorts. Three pollution gates run
 // before any write:
 //  1. A run with an empty batch_id never enters the analysis layer - public
 //     UI one-offs and unbatched admin retests are excluded entirely.
 //  2. A run whose batch carries snapshot_intent = false is also skipped;
 //     that flag is the admin-UI checkbox's switch for "this batch becomes a
 //     cohort snapshot".
+//  3. A run that did not succeed is skipped; it carries no entries, so it
+//     would count as an ungraded domain at severity OK.
 //
-// Both gates return nil so the worker's graduation path does not treat a
+// All three gates return nil so the worker's graduation path does not treat a
 // deliberately-excluded run as a projection error.
 func (c *Controller) ProjectRun(runID string) error {
 	run, ok := c.store.GetRun(runID)
@@ -116,6 +118,9 @@ func (c *Controller) ProjectRun(runID string) error {
 		return fmt.Errorf("%w: %s", ErrRunNotFound, runID)
 	}
 	if run.BatchID == "" {
+		return nil
+	}
+	if run.Status != serverpkg.JobSucceeded {
 		return nil
 	}
 	batch, ok := c.store.GetBatch(run.BatchID)
@@ -621,6 +626,9 @@ pages:
 // the caller slot a WriteStore wrapper around each per-run transaction.
 func (c *Controller) projectRunForRebuild(run serverpkg.Run, catalog []serverpkg.AnalysisCohort, wrap WriteStoreWrapper) (RunInput, serverpkg.Batch, bool, error) {
 	if run.BatchID == "" {
+		return RunInput{}, serverpkg.Batch{}, false, nil
+	}
+	if run.Status != serverpkg.JobSucceeded {
 		return RunInput{}, serverpkg.Batch{}, false, nil
 	}
 	batch, ok := c.store.GetBatch(run.BatchID)

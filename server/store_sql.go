@@ -509,14 +509,16 @@ func (s *SQLJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry) erro
 		vals.durationMs = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
 	}
 
-	// Compute score eagerly at graduation time.
-	scoringEntries := make([]scoring.Entry, len(engineEntries))
-	for i, e := range engineEntries {
-		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	// Score eagerly, but only a succeeded run: an empty entry set grades 100.
+	if job.Status == JobSucceeded {
+		scoringEntries := make([]scoring.Entry, len(engineEntries))
+		for i, e := range engineEntries {
+			scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+		}
+		scoreResult := scoring.Compute(job.Domain, scoringEntries, s.scoringCfg)
+		vals.scoreVal = sql.NullInt64{Int64: int64(scoreResult.Score), Valid: true}
+		vals.gradeVal = sql.NullString{String: scoreResult.Grade, Valid: true}
 	}
-	scoreResult := scoring.Compute(job.Domain, scoringEntries, s.scoringCfg)
-	vals.scoreVal = sql.NullInt64{Int64: int64(scoreResult.Score), Valid: true}
-	vals.gradeVal = sql.NullString{String: scoreResult.Grade, Valid: true}
 	nameserverTimingsJSON, err := toNullJSON(job.NameserverTimings)
 	if err != nil {
 		return fmt.Errorf("marshal nameserver timings: %w", err)
@@ -731,12 +733,7 @@ func (s *SQLJobStore) GetResult(jobID string) (JobResult, bool) {
 	if err != nil {
 		return JobResult{}, false
 	}
-	scoringEntries := make([]scoring.Entry, len(entries))
-	for i, e := range entries {
-		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
-	}
-	sr := scoring.Compute(run.Domain, scoringEntries, s.scoringCfg)
-	result := buildJobResult(run, entries, &sr)
+	result := buildJobResult(run, entries, scoreSucceededRun(run, entries, s.scoringCfg))
 	var probe int
 	if err := s.db.QueryRow(
 		fmt.Sprintf("SELECT 1 FROM run_dnssec_chain WHERE run_id = %s", s.ph(1)), jobID,
@@ -1406,8 +1403,12 @@ func (s *SQLJobStore) scanRun(row rowScanner) (Run, error) {
 
 // lazyComputeScore loads entries for runID, computes the score, writes it back
 // to the DB, and sets Score/Grade on run. Used for rows stored before scoring
-// existed, which carry a NULL score.
+// existed, which carry a NULL score. A NULL score also marks a run that did
+// not succeed, which must stay unscored.
 func (s *SQLJobStore) lazyComputeScore(run *Run) {
+	if run.Status != JobSucceeded {
+		return
+	}
 	entries, err := s.loadEntries(run.ID)
 	if err != nil {
 		return

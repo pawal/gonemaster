@@ -526,14 +526,18 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 		durationMs = job.FinishedAt.Sub(job.StartedAt).Milliseconds()
 	}
 
-	// Compute score eagerly at graduation time.
-	scoringEntries := make([]scoring.Entry, len(engineEntries))
-	for i, e := range engineEntries {
-		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	// Score eagerly, but only a succeeded run: an empty entry set grades 100.
+	var scorePtr *int
+	var gradePtr *string
+	if job.Status == JobSucceeded {
+		scoringEntries := make([]scoring.Entry, len(engineEntries))
+		for i, e := range engineEntries {
+			scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+		}
+		scoreResult := scoring.Compute(job.Domain, scoringEntries, s.scoringCfg)
+		scoreVal, gradeVal := scoreResult.Score, scoreResult.Grade
+		scorePtr, gradePtr = &scoreVal, &gradeVal
 	}
-	scoreResult := scoring.Compute(job.Domain, scoringEntries, s.scoringCfg)
-	scoreVal := scoreResult.Score
-	gradeVal := scoreResult.Grade
 
 	run := Run{
 		ID:                job.ID,
@@ -557,8 +561,8 @@ func (s *InMemoryJobStore) GraduateJob(job Job, engineEntries []engine.LogEntry)
 		ProfileName:       job.ProfileName,
 		EffectiveProfile:  job.EffectiveProfile,
 		PublicID:          job.PublicID,
-		Score:             &scoreVal,
-		Grade:             &gradeVal,
+		Score:             scorePtr,
+		Grade:             gradePtr,
 		NameserverTimings: cloneNameserverTimings(job.NameserverTimings),
 		Error:             job.Error,
 	}
@@ -629,12 +633,7 @@ func (s *InMemoryJobStore) GetResult(jobID string) (JobResult, bool) {
 		return JobResult{}, false
 	}
 	entries := s.entries[jobID]
-	scoringEntries := make([]scoring.Entry, len(entries))
-	for i, e := range entries {
-		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
-	}
-	sr := scoring.Compute(run.Domain, scoringEntries, s.scoringCfg)
-	result := buildJobResult(run, entries, &sr)
+	result := buildJobResult(run, entries, scoreSucceededRun(run, entries, s.scoringCfg))
 	if _, ok := s.dnssecChains[jobID]; ok {
 		result.HasDNSSECChain = true
 	}
@@ -1791,6 +1790,20 @@ func cloneInt64Ptr(v *int64) *int64 {
 	}
 	cloned := *v
 	return &cloned
+}
+
+// scoreSucceededRun scores a run's entries, or returns nil for a run that did
+// not succeed: an empty entry set scores 100 and grades A.
+func scoreSucceededRun(r Run, entries []Entry, cfg scoring.Config) *scoring.Result {
+	if r.Status != JobSucceeded {
+		return nil
+	}
+	scoringEntries := make([]scoring.Entry, len(entries))
+	for i, e := range entries {
+		scoringEntries[i] = scoring.Entry{Module: e.Module, Tag: e.Tag, Level: e.Level}
+	}
+	sr := scoring.Compute(r.Domain, scoringEntries, cfg)
+	return &sr
 }
 
 // buildJobResult constructs a JobResult from a run, its stored entries, and a

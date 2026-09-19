@@ -635,6 +635,15 @@ var sqlMigrations = []sqlMigration{
 			`ALTER TABLE analysis_snapshot_domain_view ADD COLUMN software_version VARCHAR(64) NOT NULL DEFAULT ''`,
 		},
 	},
+	{
+		// Runs that never succeeded were scored over an empty entry set,
+		// which yields 100 and a top grade. Drop those stored values.
+		version: 15,
+		stmts: []string{
+			`UPDATE runs SET score = NULL, grade = NULL WHERE status <> 'succeeded'`,
+			`UPDATE domains SET latest_score = NULL, latest_grade = NULL WHERE latest_status <> 'succeeded'`,
+		},
+	},
 }
 
 // retiredAnalysisTags is frozen at migration 9; a later rename needs its

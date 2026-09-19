@@ -355,13 +355,87 @@ func TestRunMigrationsRecordsVersion(t *testing.T) {
 		}
 		versions = append(versions, v)
 	}
-	want := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14}
+	want := []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15}
 	if len(versions) != len(want) {
 		t.Fatalf("expected %d versions, got %d: %v", len(want), len(versions), versions)
 	}
 	for i, v := range want {
 		if versions[i] != v {
 			t.Fatalf("expected versions %v, got %v", want, versions)
+		}
+	}
+}
+
+func TestRunMigrationsClearsScoresOnUnsuccessfulRuns(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	db.SetMaxOpenConns(1)
+	defer db.Close()
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("runMigrations: %v", err)
+	}
+
+	// Re-arm the backfill so it sees the legacy rows inserted below.
+	if _, err := db.Exec(`DELETE FROM schema_migrations WHERE version = 15`); err != nil {
+		t.Fatalf("reset migration 15: %v", err)
+	}
+
+	for _, r := range []struct {
+		id     string
+		status string
+	}{
+		{"run-ok", "succeeded"},
+		{"run-fail", "failed"},
+		{"run-cancel", "canceled"},
+	} {
+		if _, err := db.Exec(
+			`INSERT INTO runs (id, domain, status, created_at, score, grade) VALUES (?, ?, ?, ?, ?, ?)`,
+			r.id, r.id+".example", r.status, "2026-01-01T00:00:00Z", 100, "A",
+		); err != nil {
+			t.Fatalf("insert %s: %v", r.id, err)
+		}
+		if _, err := db.Exec(
+			`INSERT INTO domains (name, created_at, latest_run_id, latest_status, latest_score, latest_grade)
+			 VALUES (?, ?, ?, ?, ?, ?)`,
+			r.id+".example", "2026-01-01T00:00:00Z", r.id, r.status, 100, "A",
+		); err != nil {
+			t.Fatalf("insert domain %s: %v", r.id, err)
+		}
+	}
+
+	if err := runMigrations(db, sqliteDialect{}); err != nil {
+		t.Fatalf("rerun migrations: %v", err)
+	}
+
+	for _, tc := range []struct {
+		id     string
+		scored bool
+	}{
+		{"run-ok", true},
+		{"run-fail", false},
+		{"run-cancel", false},
+	} {
+		var score sql.NullInt64
+		var grade sql.NullString
+		if err := db.QueryRow(`SELECT score, grade FROM runs WHERE id = ?`, tc.id).Scan(&score, &grade); err != nil {
+			t.Fatalf("select %s: %v", tc.id, err)
+		}
+		if score.Valid != tc.scored || grade.Valid != tc.scored {
+			t.Fatalf("%s: run score %v grade %v, want valid %v", tc.id, score.Valid, grade.Valid, tc.scored)
+		}
+
+		var latestScore sql.NullInt64
+		var latestGrade sql.NullString
+		if err := db.QueryRow(
+			`SELECT latest_score, latest_grade FROM domains WHERE name = ?`, tc.id+".example",
+		).Scan(&latestScore, &latestGrade); err != nil {
+			t.Fatalf("select domain %s: %v", tc.id, err)
+		}
+		if latestScore.Valid != tc.scored || latestGrade.Valid != tc.scored {
+			t.Fatalf("%s: domain score %v grade %v, want valid %v", tc.id, latestScore.Valid, latestGrade.Valid, tc.scored)
 		}
 	}
 }

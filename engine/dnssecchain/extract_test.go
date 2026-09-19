@@ -3,6 +3,7 @@ package dnssecchain
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -397,16 +398,22 @@ func TestExtractCDSRolloverSignaled(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected a summary")
 	}
+	var signalled []string
 	for _, s := range got.Child.Signed {
 		if s.Type != "CDS" && s.Type != "CDNSKEY" {
 			continue
 		}
+		signalled = append(signalled, s.Type)
 		if s.DSMatch != CDSMatchRollover {
 			t.Errorf("%s ds_match = %q, want rollover", s.Type, s.DSMatch)
 		}
 		if len(s.NewKeys) != 1 || s.NewKeys[0] != newKSK.Key.KeyTag() {
 			t.Errorf("%s new_keys = %v, want [%d]", s.Type, s.NewKeys, newKSK.Key.KeyTag())
 		}
+	}
+	slices.Sort(signalled)
+	if want := []string{"CDNSKEY", "CDS"}; !slices.Equal(signalled, want) {
+		t.Errorf("signalling types = %v, want %v", signalled, want)
 	}
 }
 
@@ -513,10 +520,18 @@ func TestExtractCDSNoParentDSLeavesMatchEmpty(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected a summary")
 	}
+	cdsSeen := 0
 	for _, s := range got.Child.Signed {
-		if s.Type == "CDS" && s.DSMatch != "" {
+		if s.Type != "CDS" {
+			continue
+		}
+		cdsSeen++
+		if s.DSMatch != "" {
 			t.Errorf("CDS ds_match = %q, want empty (no parent DS)", s.DSMatch)
 		}
+	}
+	if cdsSeen != 1 {
+		t.Errorf("CDS entries = %d, want 1", cdsSeen)
 	}
 }
 
@@ -1022,15 +1037,16 @@ func TestExtractKeySizeAndLinkDigestType(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected a summary")
 	}
-	// The fixture keys are ECDSA P-256: key_size must be the curve size, not
-	// a bogus value from parsing the EC point as an RSA modulus.
+	// The fixture publishes a KSK and a ZSK, both ECDSA P-256.
+	if len(got.Child.DNSKEYs) != 2 {
+		t.Fatalf("child DNSKEYs = %d, want 2", len(got.Child.DNSKEYs))
+	}
 	for _, k := range got.Child.DNSKEYs {
 		if k.KeySize != 256 {
 			t.Errorf("key %d size = %d, want 256", k.KeyTag, k.KeySize)
 		}
 	}
-	// Links carry the DS digest type so the UI can tell dual-digest DS
-	// records for the same key tag apart.
+	// A link carries the digest type of the DS it came from.
 	link, ok := findLink(got, got.Parent.DS[0].KeyTag)
 	if !ok {
 		t.Fatal("expected a link for the DS")

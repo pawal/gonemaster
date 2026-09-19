@@ -175,6 +175,9 @@ func TestCacheStoreExportImportPreservesProtocol(t *testing.T) {
 	if err != nil {
 		t.Fatalf("export entries: %v", err)
 	}
+	if len(entries) != 2 {
+		t.Fatalf("exported %d entries, want the 2 cached", len(entries))
+	}
 	for _, entry := range entries {
 		want := ""
 		if entry.Key == "k.tcp" {

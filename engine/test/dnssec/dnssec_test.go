@@ -217,7 +217,7 @@ func TestDNSSEC01TagMirrorsDNSSEC05(t *testing.T) {
 
 // The registry signing column decides the deprecated and not-recommended classes, SHA-1 signing aside.
 func TestDNSSEC05TagFollowsSigningPolicy(t *testing.T) {
-	for i := 0; i < 256; i++ {
+	for i := range 256 {
 		algo := uint8(i)
 		got := dnssec05TagForAlgorithm(algo)
 		switch {
@@ -772,8 +772,8 @@ func TestDNSSEC02MatchNamesTheValidatingKeytag(t *testing.T) {
 
 	signing, signer := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP(), tctest.KeyTTL(3600))
 	stripped, _ := tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP(), tctest.KeyTTL(3600))
-	if keyTag(signing) == keyTag(stripped) {
-		t.Skip("both generated keys share a keytag")
+	for keyTag(stripped) == keyTag(signing) {
+		stripped, _ = tctest.SignedKey(t, "example", dns.ECDSAP256SHA256, tctest.SEP(), tctest.KeyTTL(3600))
 	}
 	// The second DS names a key that signs nothing, as in an algorithm downgrade.
 	sig := tctest.Sign(t, signing, signer, dns.TypeDNSKEY, []dns.RR{signing, stripped})
@@ -5877,6 +5877,29 @@ func rrsigRecord(owner string, typeCovered uint16, keytag uint16, inception int6
 		tctest.Expiration(time.Unix(expiration, 0)))
 }
 
+// nsecRecord builds an NSEC at owner with the given type bitmap and the minimal next owner.
+func nsecRecord(owner string, types ...uint16) *dns.NSEC {
+	rr := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	rr.NextDomain = "\\000." + dnsutil.Fqdn(owner)
+	rr.TypeBitMap = types
+	return rr
+}
+
+// nsec3At builds an NSEC3 owned by owner, claiming the given salt and iterations.
+func nsec3At(owner string, salt string, iterations uint16, types ...uint16) *dns.NSEC3 {
+	rr := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	rr.Hash = dns.SHA1
+	rr.Iterations = iterations
+	rr.Salt = salt
+	rr.TypeBitMap = types
+	return rr
+}
+
+// nsec3Record builds the NSEC3 owned by the unsalted hash of name in zoneName.
+func nsec3Record(name string, zoneName string, types ...uint16) *dns.NSEC3 {
+	return nsec3At(dnsutil.NSEC3Name(dnsutil.Fqdn(name), "", 0)+"."+zoneName, "", 0, types...)
+}
+
 func answerPacket(owner string, qtype uint16, answers ...dns.RR) packet.Packet {
 	return tctest.Response(tctest.Question(owner, qtype), tctest.Secure(),
 		tctest.Answers(answers...))
@@ -5990,6 +6013,26 @@ func TestDNSSEC20NSECSubsetBitmap(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS20_BITMAP_OK")
 }
 
+// runDS20 runs DNSSEC20 on zoneName with ns1.example/192.0.2.201 as its only delegated nameserver.
+func runDS20(t *testing.T, ctx context.Context, zoneName string) []*logger.Entry {
+	t.Helper()
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return tctest.NSItems("ns1.example/192.0.2.201"), nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+	z, err := zone.New(zoneName)
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	entries, err := DNSSEC20(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec20: %v", err)
+	}
+	return entries
+}
+
 func TestDNSSEC20ParentSideNSECIgnored(t *testing.T) {
 	ctx := tctest.Context(t)
 
@@ -5999,47 +6042,23 @@ func TestDNSSEC20ParentSideNSECIgnored(t *testing.T) {
 			return dnskeyPacket(q.Name, dnssec19P256Key(q.Name))
 		case "NSEC":
 			// The parent zone answers with its delegation NSEC.
-			nsecRR := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
+			nsecRR := nsecRecord(q.Name, dns.TypeNS, dns.TypeDS, dns.TypeRRSIG, dns.TypeNSEC)
 			nsecRR.NextDomain = "child-b.example."
-			nsecRR.TypeBitMap = []uint16{dns.TypeNS, dns.TypeDS, dns.TypeRRSIG, dns.TypeNSEC}
 			return answerPacket(q.Name, dns.TypeNSEC, nsecRR, tctest.RRSIGRR(q.Name, dns.TypeNSEC, tctest.Signer("example")))
 		case "NSEC3PARAM":
-			nsecRR := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-			nsecRR.NextDomain = "\\000." + dnsutil.Fqdn(q.Name)
-			nsecRR.TypeBitMap = []uint16{dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeNSEC, dns.TypeDNSKEY}
+			nsecRR := nsecRecord(q.Name, dns.TypeA, dns.TypeNS, dns.TypeSOA, dns.TypeAAAA, dns.TypeRRSIG, dns.TypeNSEC, dns.TypeDNSKEY)
 			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC3PARAM), tctest.Secure(),
 				tctest.Authority(soaRecord(q.Name), nsecRR, tctest.RRSIGRR(q.Name, dns.TypeNSEC)))
 		case "A":
-			aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-			aRR.Addr = netip.MustParseAddr("192.0.2.1")
-			return answerPacket(q.Name, dns.TypeA, aRR)
+			return answerPacket(q.Name, dns.TypeA, tctest.ARR(q.Name, "192.0.2.1"))
 		case "AAAA":
-			aaaaRR := &dns.AAAA{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-			aaaaRR.Addr = netip.MustParseAddr("2001:db8::1")
-			return answerPacket(q.Name, dns.TypeAAAA, aaaaRR)
+			return answerPacket(q.Name, dns.TypeAAAA, tctest.AAAARR(q.Name, "2001:db8::1"))
 		default:
 			return packet.Packet{}
 		}
 	})
 
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{{
-			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
-		}}, nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return nil, nil
-	})
-
-	z, err := zone.New("child.example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	entries, err := DNSSEC20(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec20: %v", err)
-	}
-
+	entries := runDS20(t, ctx, "child.example")
 	tctest.RequireTags(t, entries, "DS20_BITMAP_OK")
 	tctest.RequireNoTag(t, entries, "DS20_NSEC_BITMAP_MISMATCHES_RRTYPE", "DS20_NO_BITMAP")
 }
@@ -6047,46 +6066,23 @@ func TestDNSSEC20ParentSideNSECIgnored(t *testing.T) {
 func TestDNSSEC20ParentSideNSEC3Ignored(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	// The parent zone answers NODATA with the NSEC3 matching the delegation name.
-	nsec3Owner := dnsutil.NSEC3Name("child.example.", "", 0) + ".example."
-
 	tctest.NS(t, ctx, "ns1.example", "192.0.2.201", func(q tctest.Query) packet.Packet {
 		switch q.Type {
 		case "DNSKEY":
 			return dnskeyPacket(q.Name, dnssec19P256Key(q.Name))
 		case "NSEC":
-			nsec3RR := &dns.NSEC3{Hdr: dns.Header{Name: nsec3Owner, Class: dns.ClassINET, TTL: 60}}
-			nsec3RR.Hash = dns.SHA1
-			nsec3RR.TypeBitMap = []uint16{dns.TypeNS, dns.TypeDS, dns.TypeRRSIG}
+			// The parent zone answers NODATA with the NSEC3 matching the delegation name.
+			nsec3RR := nsec3Record("child.example", "example", dns.TypeNS, dns.TypeDS, dns.TypeRRSIG)
 			return tctest.Response(tctest.Question(q.Name, dns.TypeNSEC), tctest.Secure(),
-				tctest.Authority(soaRecord("example"), nsec3RR, tctest.RRSIGRR(nsec3Owner, dns.TypeNSEC3, tctest.Signer("example"))))
+				tctest.Authority(soaRecord("example"), nsec3RR, tctest.RRSIGRR(nsec3RR.Hdr.Name, dns.TypeNSEC3, tctest.Signer("example"))))
 		case "A":
-			aRR := &dns.A{Hdr: dns.Header{Name: dnsutil.Fqdn(q.Name), Class: dns.ClassINET, TTL: 60}}
-			aRR.Addr = netip.MustParseAddr("192.0.2.1")
-			return answerPacket(q.Name, dns.TypeA, aRR)
+			return answerPacket(q.Name, dns.TypeA, tctest.ARR(q.Name, "192.0.2.1"))
 		default:
 			return packet.Packet{}
 		}
 	})
 
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{{
-			Name: dnsname.New("ns1.example"), Address: netip.MustParseAddr("192.0.2.201"), HasAddress: true,
-		}}, nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return nil, nil
-	})
-
-	z, err := zone.New("child.example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	entries, err := DNSSEC20(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec20: %v", err)
-	}
-
+	entries := runDS20(t, ctx, "child.example")
 	tctest.RequireTags(t, entries, "DS20_NO_BITMAP")
 	tctest.RequireNoTag(t, entries, "DS20_NSEC3_BITMAP_MISMATCHES_RRTYPE", "DS20_BITMAP_OK")
 }
@@ -6503,38 +6499,30 @@ func TestNSEC3OwnerMatchesApex(t *testing.T) {
 	const apex = "example.com"
 	apexName := dnsname.New(apex)
 
-	nsec3 := func(owner string, salt string, iterations uint16) *dns.NSEC3 {
-		rr := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-		rr.Hash = 1
-		rr.Iterations = iterations
-		rr.Salt = salt
-		return rr
-	}
-
 	hashed := dnsutil.NSEC3Name(apexName.FQDN(), "", 0)
 	if hashed == "" {
 		t.Fatal("could not hash the apex name")
 	}
 
-	if !nsec3OwnerMatchesApex(nsec3(hashed+"."+apex, "", 0), apexName) {
+	if !nsec3OwnerMatchesApex(nsec3At(hashed+"."+apex, "", 0), apexName) {
 		t.Error("the apex hash owner did not match")
 	}
 	// The comparison is case-insensitive on the base32 label.
-	if !nsec3OwnerMatchesApex(nsec3(strings.ToUpper(hashed)+"."+apex, "", 0), apexName) {
+	if !nsec3OwnerMatchesApex(nsec3At(strings.ToUpper(hashed)+"."+apex, "", 0), apexName) {
 		t.Error("an upper-case owner label did not match")
 	}
 	if nsec3OwnerMatchesApex(nil, apexName) {
 		t.Error("a nil record matched")
 	}
-	if nsec3OwnerMatchesApex(nsec3(apex, "", 0), apexName) {
+	if nsec3OwnerMatchesApex(nsec3At(apex, "", 0), apexName) {
 		t.Error("an unhashed owner matched")
 	}
 	// Salt and iterations feed the hash, so a record using different parameters
 	// owns a different name.
-	if nsec3OwnerMatchesApex(nsec3(hashed+"."+apex, "AABB", 0), apexName) {
+	if nsec3OwnerMatchesApex(nsec3At(hashed+"."+apex, "AABB", 0), apexName) {
 		t.Error("a record with a different salt matched")
 	}
-	if nsec3OwnerMatchesApex(nsec3(hashed+"."+apex, "", 5), apexName) {
+	if nsec3OwnerMatchesApex(nsec3At(hashed+"."+apex, "", 5), apexName) {
 		t.Error("a record with a different iteration count matched")
 	}
 }
@@ -6546,10 +6534,7 @@ func TestNSEC3OwnerMatchesName(t *testing.T) {
 	if hashed == "" {
 		t.Fatal("could not hash the name")
 	}
-	rr := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(hashed + ".ns.example.com"), Class: dns.ClassINET, TTL: 60}}
-	rr.Hash = 1
-	rr.Salt = "AB"
-	rr.Iterations = 3
+	rr := nsec3At(hashed+".ns.example.com", "AB", 3)
 
 	if !nsec3OwnerMatchesName(rr, name) {
 		t.Error("the hash owner of a non-apex name did not match")
@@ -6586,23 +6571,17 @@ func TestDSDigestMatchesDNSKEY(t *testing.T) {
 	}
 }
 
-// --- DNSSEC07: a parent that denies the delegation ---
-
-// ds07Env is a signed child "a.ns.example" whose parent "ns.example" is itself
-// anchored by a DS in "example". The parent's answer to the child's DS query is
-// supplied per test, which is the only thing the verdict turns on.
+// ds07Env is a signed child "a.ns.example" under a parent "ns.example" anchored by a DS in "example".
 type ds07Env struct {
 	parentKey    *dns.DNSKEY
 	parentSigner crypto.Signer
 	parentDS     *dns.DS
-	// The zone-signing key. The DS names the KSK only, so a denial signed by
-	// this key validates solely through the signed DNSKEY RRset.
+	// The zone-signing key, which the DS does not name.
 	parentZSK       *dns.DNSKEY
 	parentZSKSigner crypto.Signer
 }
 
-// newDS07Env wires the three zones and the stubs DNSSEC07 reads them through.
-// dsAnswer is what the parent nameserver returns for the child's DS question.
+// newDS07Env wires the three zones; dsAnswer is the parent's answer to the child's DS question.
 func newDS07Env(t *testing.T, ctx context.Context, dsAnswer func(*ds07Env) packet.Packet) *ds07Env {
 	t.Helper()
 	childKey, childSigner := tctest.SignedKey(t, "a.ns.example", dns.ECDSAP256SHA256, tctest.SEP())
@@ -6634,15 +6613,6 @@ func newDS07Env(t *testing.T, ctx context.Context, dsAnswer func(*ds07Env) packe
 	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return []nsdiscovery.NSItem{}, nil
 	})
-	tctest.Stub(t, &parentNameservers, func(_ context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
-		if z != nil && z.Name.String() == "ns.example" {
-			ns, _ := nameserver.NewWithContext(ctx, "ns-grand.example", "192.0.2.52", nil)
-			return []nameserver.Nameserver{ns}, nil
-		}
-		ns, _ := nameserver.NewWithContext(ctx, "ns-parent.example", "192.0.2.51", nil)
-		return []nameserver.Nameserver{ns}, nil
-	})
-
 	// The child is signed, which is the gate DNSSEC07 evaluates first.
 	childSig := tctest.Sign(t, childKey, childSigner, dns.TypeDNSKEY, []dns.RR{childKey})
 	tctest.NS(t, ctx, "ns1.a.ns.example", "192.0.2.50", func(q tctest.Query) packet.Packet {
@@ -6658,7 +6628,7 @@ func newDS07Env(t *testing.T, ctx context.Context, dsAnswer func(*ds07Env) packe
 	// The parent answers the child's DS question, and publishes its own keys.
 	keyset := []dns.RR{parentKey, parentZSK}
 	keySig := tctest.Sign(t, parentKey, parentSigner, dns.TypeDNSKEY, keyset)
-	tctest.NS(t, ctx, "ns-parent.example", "192.0.2.51", func(q tctest.Query) packet.Packet {
+	parentNS := tctest.NS(t, ctx, "ns-parent.example", "192.0.2.51", func(q tctest.Query) packet.Packet {
 		switch {
 		case q.Type == "DS" && q.Name == "a.ns.example":
 			return dsAnswer(env)
@@ -6671,20 +6641,25 @@ func newDS07Env(t *testing.T, ctx context.Context, dsAnswer func(*ds07Env) packe
 
 	// The grandparent anchors the parent.
 	dsSig := tctest.Sign(t, parentKey, parentSigner, dns.TypeDS, []dns.RR{env.parentDS})
-	tctest.NS(t, ctx, "ns-grand.example", "192.0.2.52", func(q tctest.Query) packet.Packet {
+	grandNS := tctest.NS(t, ctx, "ns-grand.example", "192.0.2.52", func(q tctest.Query) packet.Packet {
 		if q.Type == "DS" && q.Name == "ns.example" {
 			return tctest.Response(tctest.Question(q.Name, dns.TypeDS), tctest.Secure(), tctest.Answers(env.parentDS, dsSig))
 		}
 		return packet.Packet{}
 	})
+	tctest.Stub(t, &parentNameservers, func(_ context.Context, z *zone.Zone) ([]nameserver.Nameserver, error) {
+		if z != nil && z.Name.String() == "ns.example" {
+			return []nameserver.Nameserver{grandNS}, nil
+		}
+		return []nameserver.Nameserver{parentNS}, nil
+	})
 	return env
 }
 
-// ds07Denied builds a signed DS NODATA whose NSEC3 for the child carries the
-// given types. Without the NS bit it proves there is no delegation.
+// ds07DeniedBy builds a signed DS NODATA whose NSEC3 for the child carries types.
 func ds07DeniedBy(t *testing.T, env *ds07Env, types ...uint16) packet.Packet {
 	t.Helper()
-	nsec3 := ds22NSEC3("a.ns.example", "ns.example", types...)
+	nsec3 := nsec3Record("a.ns.example", "ns.example", types...)
 	sig := tctest.Sign(t, env.parentZSK, env.parentZSKSigner, dns.TypeNSEC3, []dns.RR{nsec3})
 	return tctest.Response(tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(nsec3, sig))
 }
@@ -6703,27 +6678,20 @@ func runDS07(t *testing.T, ctx context.Context) []*logger.Entry {
 	return entries
 }
 
-// The NSEC3 matching the name carries no NS bit, so the parent proves the zone
-// is not delegated, and the parent is anchored by a DS at the grandparent.
+// An NSEC3 without the NS bit at an anchored parent proves the zone is not delegated.
 func TestDNSSEC07ParentProvesNoDelegation(t *testing.T) {
 	ctx := tctest.Context(t)
-	env := newDS07Env(t, ctx, func(e *ds07Env) packet.Packet {
+	newDS07Env(t, ctx, func(e *ds07Env) packet.Packet {
 		return ds07DeniedBy(t, e, dns.TypeA, dns.TypeRRSIG)
 	})
-	_ = env
 
 	entries := runDS07(t, ctx)
 	tctest.RequireTags(t, entries, "DS07_NO_DS_FOR_SIGNED_ZONE")
 	entry := tctest.RequireTag(t, entries, "DS07_PARENT_PROVES_NO_DELEGATION")
-	if parent, _ := entry.Args["parent"].(string); parent != "ns.example" {
-		t.Errorf("parent = %q, want ns.example", parent)
-	}
-	if servers := tctest.Servers(t, entry.Args["servers"]); len(servers) != 1 {
-		t.Errorf("want the one parent server, got %#v", entry.Args["servers"])
-	}
-	// The chain document learns the verdict too.
-	if got := dnssecchain.UndelegatedFromContext(ctx); got != "" {
-		t.Errorf("without a collector nothing is published, got %q", got)
+	tctest.RequireArg(t, entry, "parent", "ns.example")
+	want := []string{"ns-parent.example/192.0.2.51"}
+	if got := tctest.ServerEndpoints(t, entry.Args); !slices.Equal(got, want) {
+		t.Errorf("servers = %v, want %v", got, want)
 	}
 }
 
@@ -6762,8 +6730,7 @@ func TestDNSSEC07ContradictoryBitmapReachesNoVerdict(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS07_PARENT_PROVES_NO_DELEGATION")
 }
 
-// The verdict claims validating resolvers reject the zone, so it is not
-// reached when the parent itself is not anchored.
+// The verdict is not reached when the parent itself is not anchored.
 func TestDNSSEC07UnanchoredParentReachesNoVerdict(t *testing.T) {
 	ctx := tctest.Context(t)
 	newDS07Env(t, ctx, func(e *ds07Env) packet.Packet {
@@ -6807,7 +6774,7 @@ func TestDS07ReadDenial(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.label, func(t *testing.T) {
-			nsec3 := ds22NSEC3("a.ns.example", "ns.example", tc.types...)
+			nsec3 := nsec3Record("a.ns.example", "ns.example", tc.types...)
 			resp := tctest.Response(tctest.Question("a.ns.example", dns.TypeDS), tctest.Secure(), tctest.Authority(nsec3))
 			got, denial := ds07ReadDenial(name, resp)
 			if got != tc.want {

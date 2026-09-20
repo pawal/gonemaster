@@ -4,11 +4,12 @@ package ednsopt
 import dns "codeberg.org/miekg/dns"
 
 // OPT header bit layout, RFC 6891 section 6.1.3. The DNS library keeps these
-// unexported, so gonemaster encodes them here.
+// unexported, so gonemaster encodes them here. FlagCO and FlagDE are exported
+// because a caller's 16-bit Z value carries them above the 13-bit Z field.
 const (
 	flagDO = 1 << 15 // DNSSEC OK
-	flagCO = 1 << 14 // Compact Answers OK
-	flagDE = 1 << 13 // DELEG OK
+	FlagCO = 1 << 14 // Compact Answers OK
+	FlagDE = 1 << 13 // DELEG OK
 
 	maskRcode   = 0xFF000000 // extended RCODE, the upper 8 bits of a 12-bit rcode
 	maskVersion = 0x00FF0000 // EDNS version
@@ -46,16 +47,16 @@ func Security(rr *dns.OPT) bool { return rr.Hdr.TTL&flagDO == flagDO }
 func SetSecurity(rr *dns.OPT, do bool) { setFlag(rr, flagDO, do) }
 
 // CompactAnswers reports the CO bit.
-func CompactAnswers(rr *dns.OPT) bool { return rr.Hdr.TTL&flagCO == flagCO }
+func CompactAnswers(rr *dns.OPT) bool { return rr.Hdr.TTL&FlagCO == FlagCO }
 
 // SetCompactAnswers sets the CO bit.
-func SetCompactAnswers(rr *dns.OPT, co bool) { setFlag(rr, flagCO, co) }
+func SetCompactAnswers(rr *dns.OPT, co bool) { setFlag(rr, FlagCO, co) }
 
 // Delegation reports the DE bit.
-func Delegation(rr *dns.OPT) bool { return rr.Hdr.TTL&flagDE == flagDE }
+func Delegation(rr *dns.OPT) bool { return rr.Hdr.TTL&FlagDE == FlagDE }
 
 // SetDelegation sets the DE bit.
-func SetDelegation(rr *dns.OPT, de bool) { setFlag(rr, flagDE, de) }
+func SetDelegation(rr *dns.OPT, de bool) { setFlag(rr, FlagDE, de) }
 
 func setFlag(rr *dns.OPT, bit uint32, on bool) {
 	if on {

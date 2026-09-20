@@ -7,6 +7,8 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - engine: an explicit EDNS OPT clears the message Z bits, so a query never carries two OPT records
+- engine: an explicit EDNS OPT carries the message Z value, and keeps the CO and DE bits a caller passes in Z
+- engine: a synthesized delegation or DS response reaches a testcase in wire shape, like a real response
 
 ## [v1.7.12] - 2026-09-20
 

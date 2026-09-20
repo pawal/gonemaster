@@ -8,7 +8,7 @@
     "logSystem(tag, args), logSystemWithLogger(..., tag, args)"
   ],
   "summary": {
-    "file_count": 138,
+    "file_count": 139,
     "log_call_count": 738,
     "unique_tag_count": 529,
     "unique_key_count": 90,
@@ -1529,7 +1529,7 @@
         {
           "tag": "FAKE_DELEGATION_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 252,
+          "line": 272,
           "shape": "string"
         },
         {
@@ -2329,7 +2329,7 @@
         {
           "tag": "FAKE_PACKET_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 254,
+          "line": 274,
           "shape": "string"
         }
       ]
@@ -2527,7 +2527,7 @@
         {
           "tag": "FAKE_DELEGATION_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 252,
+          "line": 272,
           "shape": "unknown"
         },
         {
@@ -2601,7 +2601,7 @@
         {
           "tag": "FAKE_DELEGATION_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 252,
+          "line": 272,
           "shape": "string"
         },
         {
@@ -2680,7 +2680,7 @@
         {
           "tag": "FAKE_DELEGATION_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 252,
+          "line": 272,
           "shape": "unknown"
         },
         {

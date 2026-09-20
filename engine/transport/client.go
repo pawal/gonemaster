@@ -20,12 +20,6 @@ import (
 
 const defaultTimeout = 5 * time.Second
 
-// Top Z bits the DNS library carries as named flags rather than in SetZ.
-const (
-	ednsZCompactAnswers = 0x4000
-	ednsZDelegation     = 0x2000
-)
-
 // Client performs DNS exchanges; Exchange treats it as read-only and is safe to share.
 type Client struct {
 	// Timeout is the per-attempt timeout.
@@ -496,66 +490,11 @@ func (c *Client) prepareMessage(msg *dns.Msg) *dns.Msg {
 		// The dns v2 auto-OPT path ignores Version and omits OPT when UDPSize is 512.
 		// Force explicit OPT for EDNSDetails and 512-byte EDNS queries.
 		if c.EDNSDetails != nil || prepared.UDPSize <= dns.MinMsgSize {
-			applyExplicitEDNS(prepared, z)
+			ednsopt.ApplyExplicit(prepared, z)
 		}
 	}
 
 	return prepared
-}
-
-func applyExplicitEDNS(msg *dns.Msg, z *uint16) {
-	if msg == nil {
-		return
-	}
-
-	// If pseudo contains non-EDNS records (e.g. TSIG), keep default packing path
-	// to avoid changing section ordering semantics.
-	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
-	for _, rr := range msg.Pseudo {
-		edns, ok := rr.(dns.EDNS0)
-		if !ok {
-			return
-		}
-		opt.Options = append(opt.Options, edns)
-	}
-
-	compactAnswers, delegation := msg.CompactAnswers, msg.Delegation
-	if z != nil {
-		compactAnswers = compactAnswers || *z&ednsZCompactAnswers != 0
-		delegation = delegation || *z&ednsZDelegation != 0
-	}
-
-	udpSize := max(msg.UDPSize, dns.MinMsgSize)
-	ednsopt.SetUDPSize(opt, udpSize)
-	ednsopt.SetVersion(opt, msg.Version)
-	ednsopt.SetSecurity(opt, msg.Security)
-	ednsopt.SetCompactAnswers(opt, compactAnswers)
-	ednsopt.SetDelegation(opt, delegation)
-	ednsopt.SetRcode(opt, msg.Rcode)
-	if z != nil {
-		ednsopt.SetZ(opt, *z)
-	}
-
-	extra := make([]dns.RR, 0, len(msg.Extra)+1)
-	for _, rr := range msg.Extra {
-		if _, isOPT := rr.(*dns.OPT); isOPT {
-			continue
-		}
-		extra = append(extra, rr)
-	}
-	extra = append(extra, opt)
-	msg.Extra = extra
-
-	// Prevent Msg.Pack from auto-synthesizing a second OPT RR. The explicit OPT
-	// above now carries EDNS settings/options, with the base rcode kept in header.
-	msg.Pseudo = nil
-	msg.UDPSize = 0
-	msg.Security = false
-	msg.CompactAnswers = false
-	msg.Delegation = false
-	msg.Version = 0
-	msg.Z = 0
-	msg.Rcode &= 0xF
 }
 
 func ensurePort(server string) string {

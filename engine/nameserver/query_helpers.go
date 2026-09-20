@@ -187,7 +187,7 @@ func (ns Nameserver) fakeDSResponse(name string, qtype string, qclass string, op
 	ednsSize := resolveEDNSSize(opts, dnssec)
 	setResponseEDNS(msg, dnssec, ednsSize, opts)
 
-	resp := packet.Packet{Msg: msg, AnswerFrom: ns.Address.String(), Log: runLog}
+	resp := packet.Packet{Msg: wireForm(msg), AnswerFrom: ns.Address.String(), Log: runLog}
 	logArgs := map[string]any{
 		"query_name":  nameObj.String(),
 		"query_type":  qtype,
@@ -202,6 +202,26 @@ func (ns Nameserver) fakeDSResponse(name string, qtype string, qclass string, op
 		})
 	}
 	return resp, true
+}
+
+// wireForm returns the message as a responder would put it on the wire, so a
+// synthesized packet reaches a testcase in the same shape as a real response:
+// Unpack moves the OPT out of the additional section. The original stands in
+// when the round trip fails.
+func wireForm(msg *dns.Msg) *dns.Msg {
+	if msg == nil {
+		return nil
+	}
+	sent := msg.Copy()
+	if err := sent.Pack(); err != nil {
+		return msg
+	}
+	wire := new(dns.Msg)
+	wire.Data = sent.Data
+	if err := wire.Unpack(); err != nil {
+		return msg
+	}
+	return wire
 }
 
 func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass string, opts *QueryOptions, runLog *logger.Logger) (packet.Packet, bool) {
@@ -241,7 +261,7 @@ func (ns Nameserver) fakeDelegationResponse(name string, qtype string, qclass st
 		ednsSize := resolveEDNSSize(opts, dnssec)
 		setResponseEDNS(msg, dnssec, ednsSize, opts)
 
-		resp := packet.Packet{Msg: msg, AnswerFrom: ns.Address.String(), Log: runLog}
+		resp := packet.Packet{Msg: wireForm(msg), AnswerFrom: ns.Address.String(), Log: runLog}
 		logArgs := map[string]any{
 			"query_name":  nameObj.String(),
 			"query_type":  qtype,
@@ -318,51 +338,8 @@ func setResponseEDNS(msg *dns.Msg, dnssec bool, size uint16, opts *QueryOptions)
 		msg.Pseudo = append(msg.Pseudo, opt)
 	}
 	if opts.EDNSDetails.Z != nil {
-		setMessageEDNSZ(msg, *opts.EDNSDetails.Z)
+		ednsopt.ApplyExplicit(msg, opts.EDNSDetails.Z)
 	}
-}
-
-func setMessageEDNSZ(msg *dns.Msg, z uint16) {
-	if msg == nil {
-		return
-	}
-
-	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
-	for _, rr := range msg.Pseudo {
-		edns, ok := rr.(dns.EDNS0)
-		if !ok {
-			return
-		}
-		opt.Options = append(opt.Options, edns)
-	}
-
-	udpSize := max(msg.UDPSize, dns.MinMsgSize)
-	ednsopt.SetUDPSize(opt, udpSize)
-	ednsopt.SetVersion(opt, msg.Version)
-	ednsopt.SetSecurity(opt, msg.Security)
-	ednsopt.SetCompactAnswers(opt, msg.CompactAnswers)
-	ednsopt.SetDelegation(opt, msg.Delegation)
-	ednsopt.SetRcode(opt, msg.Rcode)
-	ednsopt.SetZ(opt, z)
-
-	extra := make([]dns.RR, 0, len(msg.Extra)+1)
-	for _, rr := range msg.Extra {
-		if _, isOPT := rr.(*dns.OPT); isOPT {
-			continue
-		}
-		extra = append(extra, rr)
-	}
-	extra = append(extra, opt)
-	msg.Extra = extra
-
-	msg.Pseudo = nil
-	msg.UDPSize = 0
-	msg.Security = false
-	msg.CompactAnswers = false
-	msg.Delegation = false
-	msg.Version = 0
-	msg.Z = 0
-	msg.Rcode &= 0xF
 }
 
 func buildCacheKey(name string, qtype string, qclass string, opts *QueryOptions) (string, uint16, bool, error) {

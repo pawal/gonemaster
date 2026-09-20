@@ -1050,11 +1050,11 @@ func TestPrepareMessageZCarriesCOAndDE(t *testing.T) {
 			// constants above are pinned against the encoded OPT: a bump that
 			// moves either flag must fail here rather than silently set the
 			// wrong bit for a caller's Z value.
-			if got := opt.Hdr.TTL&ednsZCompactAnswers != 0; got != tc.wantCompactAns {
-				t.Errorf("TTL bit %#04x = %v, want %v; the library moved CO", ednsZCompactAnswers, got, tc.wantCompactAns)
+			if got := opt.Hdr.TTL&ednsopt.FlagCO != 0; got != tc.wantCompactAns {
+				t.Errorf("TTL bit %#04x = %v, want %v; the library moved CO", ednsopt.FlagCO, got, tc.wantCompactAns)
 			}
-			if got := opt.Hdr.TTL&ednsZDelegation != 0; got != tc.wantDelegation {
-				t.Errorf("TTL bit %#04x = %v, want %v; the library moved DE", ednsZDelegation, got, tc.wantDelegation)
+			if got := opt.Hdr.TTL&ednsopt.FlagDE != 0; got != tc.wantDelegation {
+				t.Errorf("TTL bit %#04x = %v, want %v; the library moved DE", ednsopt.FlagDE, got, tc.wantDelegation)
 			}
 		})
 	}
@@ -1213,27 +1213,5 @@ func TestPrepareMessageCheckingDisabledDoesNotClearCallerBit(t *testing.T) {
 	}
 	if msg.CheckingDisabled != true {
 		t.Error("prepareMessage mutated the caller's message")
-	}
-}
-
-// Msg.Z is an OPT trigger in Pack, so a residual value would emit a second OPT
-// alongside the explicit one and make the query unparseable.
-func TestApplyExplicitEDNSClearsResidualZ(t *testing.T) {
-	msg := new(dns.Msg)
-	msg.UDPSize = 512
-	msg.Z = 3
-
-	applyExplicitEDNS(msg, nil)
-	if msg.Z != 0 {
-		t.Fatalf("Msg.Z = %d after applyExplicitEDNS, want 0", msg.Z)
-	}
-
-	if err := msg.Pack(); err != nil {
-		t.Fatalf("pack: %v", err)
-	}
-	wire := new(dns.Msg)
-	wire.Data = msg.Data
-	if err := wire.Unpack(); err != nil {
-		t.Fatalf("unpack: %v; the query carried more than one OPT", err)
 	}
 }

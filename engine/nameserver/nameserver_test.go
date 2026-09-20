@@ -1674,27 +1674,49 @@ func TestNonGlobalQueryGuard(t *testing.T) {
 	}
 }
 
-// Msg.Z is an OPT trigger in Pack, so a residual value would emit a second OPT
-// alongside the explicit one and make the message unparseable.
-func TestSetMessageEDNSZClearsResidualZ(t *testing.T) {
+// A synthesized response must reach a testcase in wire shape, with the OPT
+// moved out of the additional section, or its EDNS accessors read differently
+// than they do for a real response.
+func TestWireFormMatchesARealResponse(t *testing.T) {
 	msg := new(dns.Msg)
-	msg.UDPSize = 512
-	msg.Z = 3
+	msg.Response = true
+	msg.Authoritative = true
+	dnsutil.SetQuestion(msg, "example.", dns.TypeDS)
+	setResponseEDNS(msg, true, 1232, nil)
 
-	setMessageEDNSZ(msg, 1)
-	if msg.Z != 0 {
-		t.Fatalf("Msg.Z = %d after setMessageEDNSZ, want 0", msg.Z)
+	wire := wireForm(msg)
+	for _, rr := range wire.Extra {
+		if _, isOPT := rr.(*dns.OPT); isOPT {
+			t.Fatal("OPT left in the additional section; the packet is not in wire shape")
+		}
 	}
 
-	if err := msg.Pack(); err != nil {
-		t.Fatalf("pack: %v", err)
+	pkt := packet.Packet{Msg: wire}
+	if !pkt.HasEdns() {
+		t.Error("EDNS lost in the round trip")
 	}
-	wire := new(dns.Msg)
-	wire.Data = msg.Data
-	if err := wire.Unpack(); err != nil {
-		t.Fatalf("unpack: %v; the message carried more than one OPT", err)
+	if !pkt.DO() {
+		t.Error("DO bit lost in the round trip")
 	}
-	if wire.Z != 1 {
-		t.Fatalf("Z = %d over the wire, want 1", wire.Z)
+	if pkt.EdnsSize() != 1232 {
+		t.Errorf("EDNS size = %d, want 1232", pkt.EdnsSize())
+	}
+	if len(wire.Question) != 1 {
+		t.Fatalf("question section holds %d records, want 1", len(wire.Question))
+	}
+	if !wire.Authoritative || !wire.Response {
+		t.Error("header flags lost in the round trip")
+	}
+}
+
+// A message that cannot be packed still yields a usable packet.
+func TestWireFormFallsBackOnPackFailure(t *testing.T) {
+	msg := new(dns.Msg)
+	msg.Response = true
+	dnsutil.SetQuestion(msg, "bad..name.", dns.TypeA)
+	msg.Answer = append(msg.Answer, &dns.A{Hdr: dns.Header{Name: "bad..name.", Class: dns.ClassINET}})
+
+	if got := wireForm(msg); got != msg {
+		t.Error("expected the original message back when the round trip fails")
 	}
 }

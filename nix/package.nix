@@ -14,7 +14,7 @@
 }:
 
 let
-  version = "1.7.11";
+  version = "1.7.12";
 
   source =
     if src != null then

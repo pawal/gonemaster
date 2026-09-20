@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.12] - 2026-09-20
+
+Three checks change their findings: dnssec03 reads NSEC3 parameters from every record in a response, nameserver12 reports non-zero EDNS Z bits at WARNING, and the badkeys small private exponent check detects Wiener vulnerable keys of real size. A Nix flake builds every binary, with a nogui output that needs no Node.js, and the DNS library moves to miekg/dns v0.6.114.
 
 ### Added
 
@@ -13,18 +15,15 @@ All notable changes to all gonemaster components will be documented in this file
 - dnssec03: NSEC3 parameters are read from every record in the response, not only the first
 - nameserver12: Z_FLAGS_NOTCLEAR detects non-zero EDNS Z bits; the tag is WARNING and now affects scoring
 - badkeys: the small private exponent check detects Wiener vulnerable keys of real size
-- server: only a succeeded run is scored and projected
+- server: only a succeeded run is scored and projected, and analysis snapshots are ordered by run window
 - ui-public: grade letters keep readable contrast on light and dark backgrounds
-- server: analysis snapshots are ordered by run window, not capture time
 
 ### Changed
 
-- tests: the engine startup tests run one testcase and stay off the network
-- tests: the public lookup tests answer from a loopback DNS fixture
-- badkeys: Updater takes a metadata URL and HTTP client
-- badkeys: the blocklist update is covered against a local server
-- dnssec19: every weak RSA key finding is covered
 - build: bump to miekg/dns v0.6.114
+- badkeys: Updater takes a metadata URL and HTTP client
+- tests: the engine startup and public lookup tests stay off the network, answering from local fixtures
+- tests: the badkeys blocklist update and the dnssec19 weak RSA key findings are covered in full
 
 ## [v1.7.11] - 2026-09-19
 

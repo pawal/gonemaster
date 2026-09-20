@@ -554,6 +554,7 @@ func applyExplicitEDNS(msg *dns.Msg, z *uint16) {
 	msg.CompactAnswers = false
 	msg.Delegation = false
 	msg.Version = 0
+	msg.Z = 0
 	msg.Rcode &= 0xF
 }
 

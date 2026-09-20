@@ -1673,3 +1673,28 @@ func TestNonGlobalQueryGuard(t *testing.T) {
 		}
 	}
 }
+
+// Msg.Z is an OPT trigger in Pack, so a residual value would emit a second OPT
+// alongside the explicit one and make the message unparseable.
+func TestSetMessageEDNSZClearsResidualZ(t *testing.T) {
+	msg := new(dns.Msg)
+	msg.UDPSize = 512
+	msg.Z = 3
+
+	setMessageEDNSZ(msg, 1)
+	if msg.Z != 0 {
+		t.Fatalf("Msg.Z = %d after setMessageEDNSZ, want 0", msg.Z)
+	}
+
+	if err := msg.Pack(); err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	wire := new(dns.Msg)
+	wire.Data = msg.Data
+	if err := wire.Unpack(); err != nil {
+		t.Fatalf("unpack: %v; the message carried more than one OPT", err)
+	}
+	if wire.Z != 1 {
+		t.Fatalf("Z = %d over the wire, want 1", wire.Z)
+	}
+}

@@ -1215,3 +1215,25 @@ func TestPrepareMessageCheckingDisabledDoesNotClearCallerBit(t *testing.T) {
 		t.Error("prepareMessage mutated the caller's message")
 	}
 }
+
+// Msg.Z is an OPT trigger in Pack, so a residual value would emit a second OPT
+// alongside the explicit one and make the query unparseable.
+func TestApplyExplicitEDNSClearsResidualZ(t *testing.T) {
+	msg := new(dns.Msg)
+	msg.UDPSize = 512
+	msg.Z = 3
+
+	applyExplicitEDNS(msg, nil)
+	if msg.Z != 0 {
+		t.Fatalf("Msg.Z = %d after applyExplicitEDNS, want 0", msg.Z)
+	}
+
+	if err := msg.Pack(); err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+	wire := new(dns.Msg)
+	wire.Data = msg.Data
+	if err := wire.Unpack(); err != nil {
+		t.Fatalf("unpack: %v; the query carried more than one OPT", err)
+	}
+}

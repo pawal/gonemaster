@@ -549,7 +549,8 @@
             "TEST_CASE_END": "DEBUG",
             "TEST_CASE_START": "DEBUG",
             "UPWARD_REFERRAL": "WARNING",
-            "UPWARD_REFERRAL_IRRELEVANT": "INFO"
+            "UPWARD_REFERRAL_IRRELEVANT": "INFO",
+            "Z_FLAGS_NOTCLEAR": "WARNING"
         },
         "SYNTAX": {
             "DISCOURAGED_DOUBLE_DASH": "WARNING",

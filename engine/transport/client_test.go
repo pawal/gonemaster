@@ -13,6 +13,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
+	"codeberg.org/pawal/gonemaster/engine/ednsopt"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/querytrace"
 )
@@ -197,19 +198,19 @@ func TestPrepareMessageEncodesOPT(t *testing.T) {
 			}
 
 			opt := singleOPT(t, prepared)
-			if got := opt.UDPSize(); got != tc.wantUDPSize {
+			if got := ednsopt.UDPSize(opt); got != tc.wantUDPSize {
 				t.Fatalf("OPT UDP size: got %d want %d", got, tc.wantUDPSize)
 			}
-			if got := opt.Version(); got != tc.wantVersion {
+			if got := ednsopt.Version(opt); got != tc.wantVersion {
 				t.Fatalf("OPT version: got %d want %d", got, tc.wantVersion)
 			}
-			if got := opt.Rcode(); got != uint16(tc.wantRcode) {
+			if got := ednsopt.Rcode(opt); got != uint16(tc.wantRcode) {
 				t.Fatalf("OPT extended rcode: got %d want %d", got, tc.wantRcode)
 			}
-			if opt.Security() != tc.wantDO {
-				t.Fatalf("OPT DO bit: got %v want %v", opt.Security(), tc.wantDO)
+			if ednsopt.Security(opt) != tc.wantDO {
+				t.Fatalf("OPT DO bit: got %v want %v", ednsopt.Security(opt), tc.wantDO)
 			}
-			if got := opt.Z(); got != tc.wantZ {
+			if got := ednsopt.Z(opt); got != tc.wantZ {
 				t.Fatalf("OPT Z value: got %d want %d", got, tc.wantZ)
 			}
 			if len(opt.Options) != tc.wantOptions {
@@ -1036,13 +1037,13 @@ func TestPrepareMessageZCarriesCOAndDE(t *testing.T) {
 			prepared := client.prepareMessage(BuildQuery("z-flags.example.", dns.TypeA))
 
 			opt := singleOPT(t, prepared)
-			if got := opt.Z(); got != tc.wantZ {
+			if got := ednsopt.Z(opt); got != tc.wantZ {
 				t.Errorf("OPT Z = %#04x, want %#04x", got, tc.wantZ)
 			}
-			if got := opt.CompactAnswers(); got != tc.wantCompactAns {
+			if got := ednsopt.CompactAnswers(opt); got != tc.wantCompactAns {
 				t.Errorf("CO = %v, want %v", got, tc.wantCompactAns)
 			}
-			if got := opt.Delegation(); got != tc.wantDelegation {
+			if got := ednsopt.Delegation(opt); got != tc.wantDelegation {
 				t.Errorf("DE = %v, want %v", got, tc.wantDelegation)
 			}
 			// The library keeps the CO and DE bit positions unexported, so the

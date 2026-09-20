@@ -150,6 +150,14 @@ Description:
 
 The check's EDNS probes against a nameserver produced an error response or an unexpected rcode that is not one of the known EDNS success or failure signals. The server is likely running non-standard or broken DNS software, which shows up as unpredictable behaviour for resolvers that contact it.
 
+## Tag Z_FLAGS_NOTCLEAR
+
+Header: EDNS Z flags not cleared
+
+Description:
+
+A nameserver returned an EDNS response with reserved Z bits set instead of zero. RFC 6891 requires a sender to clear those bits, and each one that is assigned later carries a real meaning, so a resolver implementing a newer EDNS flag can read the stray bits as a capability the server does not actually have.
+
 ## Tag DIFFERENT_SOURCE_IP
 
 Header: Reply came from a different IP

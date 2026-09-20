@@ -12,6 +12,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/constants"
+	"codeberg.org/pawal/gonemaster/engine/ednsopt"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
 	"codeberg.org/pawal/gonemaster/engine/querytrace"
@@ -525,14 +526,14 @@ func applyExplicitEDNS(msg *dns.Msg, z *uint16) {
 	}
 
 	udpSize := max(msg.UDPSize, dns.MinMsgSize)
-	opt.SetUDPSize(udpSize)
-	opt.SetVersion(msg.Version)
-	opt.SetSecurity(msg.Security)
-	opt.SetCompactAnswers(compactAnswers)
-	opt.SetDelegation(delegation)
-	opt.SetRcode(msg.Rcode)
+	ednsopt.SetUDPSize(opt, udpSize)
+	ednsopt.SetVersion(opt, msg.Version)
+	ednsopt.SetSecurity(opt, msg.Security)
+	ednsopt.SetCompactAnswers(opt, compactAnswers)
+	ednsopt.SetDelegation(opt, delegation)
+	ednsopt.SetRcode(opt, msg.Rcode)
 	if z != nil {
-		opt.SetZ(*z)
+		ednsopt.SetZ(opt, *z)
 	}
 
 	extra := make([]dns.RR, 0, len(msg.Extra)+1)

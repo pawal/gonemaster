@@ -80,7 +80,7 @@ _Do not edit by hand - regenerate with the command above._
 | `TEST_CASE_START` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md), [nameserver17](../tests/nameserver/nameserver17.md), [nameserver18](../tests/nameserver/nameserver18.md) | yes |
 | `UPWARD_REFERRAL` | `WARNING` | [nameserver07](../tests/nameserver/nameserver07.md) | yes |
 | `UPWARD_REFERRAL_IRRELEVANT` | `INFO` | [nameserver07](../tests/nameserver/nameserver07.md) | yes |
-| `Z_FLAGS_NOTCLEAR` | `-` | [nameserver12](../tests/nameserver/nameserver12.md) | yes |
+| `Z_FLAGS_NOTCLEAR` | `WARNING` | [nameserver12](../tests/nameserver/nameserver12.md) | yes |
 
 ## i18n Notes
 

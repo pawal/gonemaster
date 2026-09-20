@@ -8,6 +8,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/ednsopt"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
@@ -155,11 +156,11 @@ func TestEdnsHelpers(t *testing.T) {
 func TestEdnsHelpersFromExplicitOPTRecord(t *testing.T) {
 	msg := new(dns.Msg)
 	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
-	opt.SetUDPSize(1232)
-	opt.SetVersion(1)
-	opt.SetSecurity(true)
-	opt.SetRcode(16)
-	opt.SetZ(3)
+	ednsopt.SetUDPSize(opt, 1232)
+	ednsopt.SetVersion(opt, 1)
+	ednsopt.SetSecurity(opt, true)
+	ednsopt.SetRcode(opt, 16)
+	ednsopt.SetZ(opt, 3)
 	opt.Options = []dns.EDNS0{&dns.NSID{Nsid: "beef"}}
 	msg.Extra = []dns.RR{opt}
 
@@ -345,5 +346,44 @@ func TestUniquePushInvalidInputs(t *testing.T) {
 	}
 	if pkt.UniquePush("answer", nil) {
 		t.Fatalf("expected nil rr to fail")
+	}
+}
+
+// A wire response carries the EDNS header fields on the message, not on an OPT
+// in the additional section; a fixture-only test hides that.
+func TestEdnsHelpersAfterWireRoundTrip(t *testing.T) {
+	msg := new(dns.Msg)
+	msg.Response = true
+	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
+	ednsopt.SetUDPSize(opt, 1232)
+	ednsopt.SetVersion(opt, 1)
+	ednsopt.SetSecurity(opt, true)
+	ednsopt.SetZ(opt, 3)
+	msg.Extra = []dns.RR{opt}
+	if err := msg.Pack(); err != nil {
+		t.Fatalf("pack: %v", err)
+	}
+
+	wire := new(dns.Msg)
+	wire.Data = msg.Data
+	if err := wire.Unpack(); err != nil {
+		t.Fatalf("unpack: %v", err)
+	}
+
+	pkt := New(wire)
+	if !pkt.HasEdns() {
+		t.Fatalf("expected EDNS present after wire round trip")
+	}
+	if pkt.EdnsSize() != 1232 {
+		t.Fatalf("unexpected EDNS size: %d", pkt.EdnsSize())
+	}
+	if pkt.EdnsVersion() != 1 {
+		t.Fatalf("unexpected EDNS version: %d", pkt.EdnsVersion())
+	}
+	if pkt.EdnsZ() != 3 {
+		t.Fatalf("unexpected EDNS Z: %d", pkt.EdnsZ())
+	}
+	if !pkt.DO() {
+		t.Fatalf("expected DO bit set after wire round trip")
 	}
 }

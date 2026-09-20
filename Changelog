@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - dnssec03: NSEC3 parameters are read from every record in the response, not only the first
+- nameserver12: Z_FLAGS_NOTCLEAR detects non-zero EDNS Z bits; the tag is WARNING and now affects scoring
 - badkeys: the small private exponent check detects Wiener vulnerable keys of real size
 - server: only a succeeded run is scored and projected
 - ui-public: grade letters keep readable contrast on light and dark backgrounds
@@ -23,7 +24,7 @@ All notable changes to all gonemaster components will be documented in this file
 - badkeys: Updater takes a metadata URL and HTTP client
 - badkeys: the blocklist update is covered against a local server
 - dnssec19: every weak RSA key finding is covered
-- build: update the DNS library to v0.6.110; a response with more than one OPT record fails to unpack
+- build: bump to miekg/dns v0.6.114
 
 ## [v1.7.11] - 2026-09-19
 

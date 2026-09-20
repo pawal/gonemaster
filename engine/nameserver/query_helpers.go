@@ -12,6 +12,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/ednsopt"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/packet"
@@ -336,13 +337,13 @@ func setMessageEDNSZ(msg *dns.Msg, z uint16) {
 	}
 
 	udpSize := max(msg.UDPSize, dns.MinMsgSize)
-	opt.SetUDPSize(udpSize)
-	opt.SetVersion(msg.Version)
-	opt.SetSecurity(msg.Security)
-	opt.SetCompactAnswers(msg.CompactAnswers)
-	opt.SetDelegation(msg.Delegation)
-	opt.SetRcode(msg.Rcode)
-	opt.SetZ(z)
+	ednsopt.SetUDPSize(opt, udpSize)
+	ednsopt.SetVersion(opt, msg.Version)
+	ednsopt.SetSecurity(opt, msg.Security)
+	ednsopt.SetCompactAnswers(opt, msg.CompactAnswers)
+	ednsopt.SetDelegation(opt, msg.Delegation)
+	ednsopt.SetRcode(opt, msg.Rcode)
+	ednsopt.SetZ(opt, z)
 
 	extra := make([]dns.RR, 0, len(msg.Extra)+1)
 	for _, rr := range msg.Extra {

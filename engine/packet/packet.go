@@ -8,6 +8,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/ednsopt"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 )
 
@@ -152,7 +153,7 @@ func (p Packet) EdnsSize() uint16 {
 		return p.Msg.UDPSize
 	}
 	if opt := ednsOPT(p.Msg); opt != nil {
-		return opt.UDPSize()
+		return ednsopt.UDPSize(opt)
 	}
 	return 0
 }
@@ -166,7 +167,7 @@ func (p Packet) EdnsRcode() int {
 		return int(p.Msg.Rcode >> 4)
 	}
 	if opt := ednsOPT(p.Msg); opt != nil {
-		return int(opt.Rcode() >> 4)
+		return int(ednsopt.Rcode(opt) >> 4)
 	}
 	return 0
 }
@@ -180,18 +181,23 @@ func (p Packet) EdnsVersion() uint8 {
 		return p.Msg.Version
 	}
 	if opt := ednsOPT(p.Msg); opt != nil {
-		return opt.Version()
+		return ednsopt.Version(opt)
 	}
 	return 0
 }
 
-// EdnsZ returns the raw EDNS Z bits.
+// EdnsZ returns the raw EDNS Z bits, the low 13 bits of the OPT TTL.
 func (p Packet) EdnsZ() uint16 {
 	if p.Msg == nil {
 		return 0
 	}
+	// Unpack moves the OPT out of the additional section, so a wire response
+	// carries Z here; the fallback below serves hand-built messages.
+	if p.Msg.Z != 0 {
+		return p.Msg.Z
+	}
 	if opt := ednsOPT(p.Msg); opt != nil {
-		return opt.Z()
+		return ednsopt.Z(opt)
 	}
 	return 0
 }
@@ -244,7 +250,7 @@ func (p Packet) DO() bool {
 		return true
 	}
 	if opt := ednsOPT(p.Msg); opt != nil {
-		return opt.Security()
+		return ednsopt.Security(opt)
 	}
 	return false
 }

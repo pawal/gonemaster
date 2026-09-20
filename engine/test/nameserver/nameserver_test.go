@@ -16,6 +16,7 @@ import (
 	"codeberg.org/miekg/dns/dnsutil"
 
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
+	"codeberg.org/pawal/gonemaster/engine/ednsopt"
 	"codeberg.org/pawal/gonemaster/engine/internal/dnstest"
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	ens "codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -889,7 +890,7 @@ func soaPacketWithEdns(owner string, version uint8, z uint16, options []dns.EDNS
 	if z != 0 {
 		optRR := &dns.OPT{}
 		optRR.Hdr = dns.Header{Name: "."}
-		optRR.SetZ(z)
+		ednsopt.SetZ(optRR, z)
 		msg.Extra = append(msg.Extra, optRR)
 	}
 	return packet.Packet{Msg: msg}

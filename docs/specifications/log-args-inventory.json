@@ -8,7 +8,7 @@
     "logSystem(tag, args), logSystemWithLogger(..., tag, args)"
   ],
   "summary": {
-    "file_count": 137,
+    "file_count": 138,
     "log_call_count": 738,
     "unique_tag_count": 529,
     "unique_key_count": 90,
@@ -912,19 +912,19 @@
         {
           "tag": "FAKE_DELEGATION_ADDED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 107,
+          "line": 108,
           "shape": "unknown"
         },
         {
           "tag": "FAKE_DELEGATION_TO_SELF",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 76,
+          "line": 77,
           "shape": "unknown"
         },
         {
           "tag": "FAKE_DS_ADDED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 147,
+          "line": 148,
           "shape": "unknown"
         }
       ]
@@ -1029,19 +1029,19 @@
         {
           "tag": "FAKE_DELEGATION_ADDED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 107,
+          "line": 108,
           "shape": "unknown"
         },
         {
           "tag": "FAKE_DELEGATION_TO_SELF",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 76,
+          "line": 77,
           "shape": "unknown"
         },
         {
           "tag": "FAKE_DS_ADDED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 147,
+          "line": 148,
           "shape": "unknown"
         },
         {
@@ -1529,13 +1529,13 @@
         {
           "tag": "FAKE_DELEGATION_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 251,
+          "line": 252,
           "shape": "string"
         },
         {
           "tag": "FAKE_DS_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 197,
+          "line": 198,
           "shape": "string"
         }
       ]
@@ -2323,13 +2323,13 @@
         {
           "tag": "FAKE_PACKET_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 199,
+          "line": 200,
           "shape": "string"
         },
         {
           "tag": "FAKE_PACKET_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 253,
+          "line": 254,
           "shape": "string"
         }
       ]
@@ -2527,19 +2527,19 @@
         {
           "tag": "FAKE_DELEGATION_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 251,
+          "line": 252,
           "shape": "unknown"
         },
         {
           "tag": "FAKE_DS_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 197,
+          "line": 198,
           "shape": "unknown"
         },
         {
           "tag": "NO_SUCH_RECORD",
           "file": "engine/packet/packet.go",
-          "line": 285,
+          "line": 291,
           "shape": "string"
         },
         {
@@ -2601,19 +2601,19 @@
         {
           "tag": "FAKE_DELEGATION_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 251,
+          "line": 252,
           "shape": "string"
         },
         {
           "tag": "FAKE_DS_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 197,
+          "line": 198,
           "shape": "string"
         },
         {
           "tag": "NO_SUCH_RECORD",
           "file": "engine/packet/packet.go",
-          "line": 285,
+          "line": 291,
           "shape": "unknown"
         },
         {
@@ -2680,19 +2680,19 @@
         {
           "tag": "FAKE_DELEGATION_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 251,
+          "line": 252,
           "shape": "unknown"
         },
         {
           "tag": "FAKE_DS_RETURNED",
           "file": "engine/nameserver/query_helpers.go",
-          "line": 197,
+          "line": 198,
           "shape": "unknown"
         },
         {
           "tag": "NO_SUCH_RECORD",
           "file": "engine/packet/packet.go",
-          "line": 285,
+          "line": 291,
           "shape": "unknown"
         },
         {
@@ -3434,7 +3434,7 @@
         {
           "tag": "IS_REDIRECT",
           "file": "engine/packet/packet.go",
-          "line": 318,
+          "line": 324,
           "shape": "unknown"
         }
       ]

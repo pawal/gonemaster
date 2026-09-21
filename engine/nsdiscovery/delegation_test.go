@@ -237,6 +237,37 @@ func TestZoneNameserversUndelegatedInBailiwickUsesProvidedGlue(t *testing.T) {
 	}
 }
 
+func TestZoneNameserversUndelegatedRootUsesProvidedGlue(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := nstest.HintedRecursor(t, nil)
+	if err := r.SetUndelegatedRoot(map[string][]string{"ns1": {"192.0.2.53"}}); err != nil {
+		t.Fatalf("set undelegated root: %v", err)
+	}
+	z := newZone(t, ".", r)
+
+	ns := nstest.NS(t, ctx, r, "ns1", "192.0.2.53")
+	queryCalls := 0
+	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+		queryCalls++
+		return packet.Packet{}, nil
+	})
+
+	items, err := ZoneNameservers(ctx, &z)
+	if err != nil {
+		t.Fatalf("ZoneNameservers: %v", err)
+	}
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item, got %d", len(items))
+	}
+	if !items[0].HasAddress || items[0].Name.String() != "ns1" || items[0].Address.String() != "192.0.2.53" {
+		t.Fatalf("unexpected item: %#v", items[0])
+	}
+	if queryCalls != 0 {
+		t.Fatalf("expected the root hints to be ignored, got %d queries", queryCalls)
+	}
+}
+
 // delegationPacket builds a referral response for zoneName with NS records
 // pointing to the given nsNames and optional A glue for in-bailiwick names.
 func delegationPacket(zoneName string, nsGlue map[string]string) packet.Packet {

@@ -488,7 +488,7 @@ func TestApplyUndelegatedDelegationKeepsHintsForNonRoot(t *testing.T) {
 	if names := r.GetFakeNames("."); !slices.Equal(names, []string{"ns1.root"}) {
 		t.Fatalf("expected the root hints to survive, got %v", names)
 	}
-	if r.UndelegatedRoot() {
+	if r.Undelegated(".") {
 		t.Fatalf("did not expect an undelegated root")
 	}
 }

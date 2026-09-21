@@ -48,10 +48,7 @@ func (z *Zone) isUndelegated() bool {
 	if z == nil || z.recursor == nil {
 		return false
 	}
-	if z.Name.String() == "." {
-		return z.recursor.UndelegatedRoot()
-	}
-	return z.recursor.HasFakeAddresses(z.Name.String())
+	return z.recursor.Undelegated(z.Name.String())
 }
 
 // New creates a Zone from a domain name.

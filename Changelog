@@ -10,6 +10,7 @@ All notable changes to all gonemaster components will be documented in this file
 - engine: an explicit EDNS OPT carries the message Z value, and keeps the CO and DE bits a caller passes in Z
 - engine: a synthesized delegation or DS response reaches a testcase in wire shape, like a real response
 - engine: undelegated data for the root zone replaces the root hints instead of adding to them
+- engine: an undelegated root zone test queries the supplied nameservers, not the servers named in the root zone
 
 ## [v1.7.12] - 2026-09-20
 

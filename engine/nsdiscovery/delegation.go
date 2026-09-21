@@ -102,7 +102,7 @@ func zoneNSNames(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) {
 	if z == nil {
 		return nil, fmt.Errorf("zone is nil")
 	}
-	if r := z.Recursor(); r != nil && z.Name.String() != "." && r.HasFakeAddresses(z.Name.String()) {
+	if r := z.Recursor(); r != nil && r.Undelegated(z.Name.String()) {
 		return delNSNames(ctx, z)
 	}
 
@@ -438,7 +438,7 @@ func getIBAddrInZone(ctx context.Context, z *zone.Zone) ([]nameserver.Nameserver
 	if r == nil {
 		return nil, fmt.Errorf("missing recursor")
 	}
-	if z.Name.String() != "." && r.HasFakeAddresses(z.Name.String()) {
+	if r.Undelegated(z.Name.String()) {
 		seen := map[string]nameserver.Nameserver{}
 		for _, item := range delItems {
 			if !item.HasAddress || !z.Name.IsInBailiwick(item.Name) {

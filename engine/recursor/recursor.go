@@ -158,9 +158,16 @@ func (r *Recursor) SetUndelegatedRoot(data map[string][]string) error {
 	return r.AddFakeAddresses(".", data)
 }
 
-// UndelegatedRoot reports whether undelegated data replaced the root hints.
-func (r *Recursor) UndelegatedRoot() bool {
-	return r != nil && r.undelegatedRoot
+// Undelegated reports whether a domain carries undelegated delegation data.
+// The root always has fake addresses, so it counts only once overridden.
+func (r *Recursor) Undelegated(domain string) bool {
+	if r == nil {
+		return false
+	}
+	if strings.ToLower(domain) == "." {
+		return r.undelegatedRoot
+	}
+	return r.HasFakeAddresses(domain)
 }
 
 // RootServers returns nameservers initialized from root hints.

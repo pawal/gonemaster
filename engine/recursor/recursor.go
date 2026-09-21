@@ -36,6 +36,7 @@ type Recursor struct {
 	recurseCount     int
 	inflight         map[string]*inflightLookup
 	negativeCacheTTL time.Duration
+	undelegatedRoot  bool
 	cacheMu          sync.Mutex
 }
 
@@ -148,6 +149,18 @@ func (r *Recursor) GetFakeNames(domain string) []string {
 func (r *Recursor) RemoveFakeAddresses(domain string) {
 	domain = strings.ToLower(domain)
 	delete(r.fakeAddresses, domain)
+}
+
+// SetUndelegatedRoot replaces the root hints with undelegated delegation data.
+func (r *Recursor) SetUndelegatedRoot(data map[string][]string) error {
+	r.RemoveFakeAddresses(".")
+	r.undelegatedRoot = true
+	return r.AddFakeAddresses(".", data)
+}
+
+// UndelegatedRoot reports whether undelegated data replaced the root hints.
+func (r *Recursor) UndelegatedRoot() bool {
+	return r != nil && r.undelegatedRoot
 }
 
 // RootServers returns nameservers initialized from root hints.

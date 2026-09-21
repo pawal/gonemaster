@@ -281,6 +281,8 @@ func applyUndelegatedDelegation(ctx context.Context, r *recursor.Recursor, z *zo
 		_, err := util.Info(ctx, tag, args)
 		return err
 	}
+	isRoot := z.Name.String() == "."
+
 	var delegation map[string][]string
 	if len(nameservers) > 0 {
 		var err error
@@ -288,7 +290,13 @@ func applyUndelegatedDelegation(ctx context.Context, r *recursor.Recursor, z *zo
 		if err != nil {
 			return err
 		}
-		if err := r.AddFakeAddresses(z.Name.String(), delegation); err != nil {
+		// Undelegated data for the root replaces the hints, never adds to them.
+		if isRoot {
+			err = r.SetUndelegatedRoot(delegation)
+		} else {
+			err = r.AddFakeAddresses(z.Name.String(), delegation)
+		}
+		if err != nil {
 			return err
 		}
 	}
@@ -301,7 +309,8 @@ func applyUndelegatedDelegation(ctx context.Context, r *recursor.Recursor, z *zo
 		return nil
 	}
 
-	if len(delegation) > 0 {
+	// The root has no parent to hold a delegation; its servers answer directly.
+	if len(delegation) > 0 && !isRoot {
 		for _, ns := range parentNS {
 			if err := ns.AddFakeDelegation(z.Name.String(), delegation); err != nil {
 				return err

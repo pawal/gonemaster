@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"net/netip"
+	"slices"
 	"strings"
 	"testing"
 
@@ -409,5 +410,85 @@ func TestOperatorPinnedTargets(t *testing.T) {
 	}
 	if operatorPinnedTargets([]UndelegatedNameserver{{Name: "ns.example"}}) != nil {
 		t.Errorf("expected nil allow-set when no IP is pinned")
+	}
+}
+
+func TestApplyUndelegatedDelegationRootReplacesHints(t *testing.T) {
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := nstest.HintedRecursor(t, nil)
+
+	z, err := zone.NewWithRecursor(".", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	err = applyUndelegatedDelegation(
+		ctx,
+		r,
+		&z,
+		[]UndelegatedNameserver{
+			{Name: "ns1", IP: "192.0.2.1"},
+			{Name: "ns2", IP: "192.0.2.2"},
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("apply undelegated delegation: %v", err)
+	}
+
+	names := r.GetFakeNames(".")
+	slices.Sort(names)
+	if !slices.Equal(names, []string{"ns1", "ns2"}) {
+		t.Fatalf("expected the root hints to be replaced, got %v", names)
+	}
+
+	servers, err := z.NS(ctx)
+	if err != nil {
+		t.Fatalf("zone NS: %v", err)
+	}
+	if len(servers) != 2 {
+		t.Fatalf("expected 2 root servers, got %d", len(servers))
+	}
+
+	// The root has no parent, so the delegation comes from the undelegated data.
+	glue, err := z.GlueNames(ctx)
+	if err != nil {
+		t.Fatalf("zone glue names: %v", err)
+	}
+	if len(glue) != 2 || glue[0].String() != "ns1" || glue[1].String() != "ns2" {
+		t.Fatalf("unexpected delegation names: %v", glue)
+	}
+}
+
+func TestApplyUndelegatedDelegationKeepsHintsForNonRoot(t *testing.T) {
+	// Timeout-bound (TEST-NET queries); per-test ctx state, safe to overlap.
+	t.Parallel()
+
+	ctx, _, _ := testhelpers.Context(t)
+
+	r := nstest.RootRecursor(t, map[string][]string{"ns1.root": {"192.0.2.1"}})
+
+	z, err := zone.NewWithRecursor("example", r)
+	if err != nil {
+		t.Fatalf("new zone: %v", err)
+	}
+
+	err = applyUndelegatedDelegation(
+		ctx,
+		r,
+		&z,
+		[]UndelegatedNameserver{{Name: "ns1.example", IP: "192.0.2.10"}},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("apply undelegated delegation: %v", err)
+	}
+
+	if names := r.GetFakeNames("."); !slices.Equal(names, []string{"ns1.root"}) {
+		t.Fatalf("expected the root hints to survive, got %v", names)
+	}
+	if r.UndelegatedRoot() {
+		t.Fatalf("did not expect an undelegated root")
 	}
 }

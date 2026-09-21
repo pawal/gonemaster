@@ -49,7 +49,7 @@ func (z *Zone) isUndelegated() bool {
 		return false
 	}
 	if z.Name.String() == "." {
-		return false
+		return z.recursor.UndelegatedRoot()
 	}
 	return z.recursor.HasFakeAddresses(z.Name.String())
 }

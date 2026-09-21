@@ -323,23 +323,6 @@ func TestBuildUndelegatedFakeDelegationOutOfBailiwickNoFillEmitsNoIP(t *testing.
 	}
 }
 
-func TestFakeDelegationToSelf(t *testing.T) {
-	ctx, _, _ := testhelpers.Context(t)
-	ns := nstest.NS(t, ctx, nil, "ns1.example.com", "192.0.2.1")
-
-	if !fakeDelegationToSelf(ns, map[string][]string{
-		"ns1.example.com": {"192.0.2.1"},
-	}) {
-		t.Fatalf("expected self match")
-	}
-
-	if fakeDelegationToSelf(ns, map[string][]string{
-		"ns1.example.com": {"192.0.2.2"},
-	}) {
-		t.Fatalf("did not expect self match")
-	}
-}
-
 func TestApplyUndelegatedDelegationEmitsFakeDelegationToSelf(t *testing.T) {
 	// Timeout-bound (TEST-NET queries); per-test ctx state, safe to overlap.
 	t.Parallel()

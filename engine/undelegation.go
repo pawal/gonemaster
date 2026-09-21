@@ -443,21 +443,3 @@ func buildUndelegatedFakeDelegation(ctx context.Context, zoneName dnsname.Name, 
 
 	return out, nil
 }
-
-func fakeDelegationToSelf(ns nameserver.Nameserver, delegation map[string][]string) bool {
-	nsName := strings.ToLower(ns.Name.String())
-	ips := delegation[nsName]
-	if len(ips) == 0 {
-		return false
-	}
-	for _, ip := range ips {
-		addr, err := netip.ParseAddr(ip)
-		if err != nil {
-			continue
-		}
-		if addr == ns.Address {
-			return true
-		}
-	}
-	return false
-}

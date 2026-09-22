@@ -144,7 +144,7 @@ Header: MX target is a CNAME
 
 Description:
 
-One of your MX records points at a hostname that turns out to be defined as a CNAME (alias). The mail standards forbid this - a sending mail server is not required to follow the CNAME and may refuse to deliver mail. The target of an MX must be a real hostname with its own A or AAAA records.
+One of your MX records points at a hostname that turns out to be defined as a CNAME (alias). RFC 2181 section 10.3 forbids an alias as an MX target, and RFC 5321 section 5.1 requires that target to answer with an address record, so a sending mail server may refuse to deliver mail. The target of an MX must be a real hostname with its own A or AAAA records.
 
 ## Tag Z09_INCONSISTENT_MX
 

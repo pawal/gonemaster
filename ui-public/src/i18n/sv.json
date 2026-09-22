@@ -642,7 +642,7 @@
   "pub.tag.zone.MULTIPLE_SOA.header": "Flera SOA-poster returnerade",
   "pub.tag.zone.MULTIPLE_SOA.desc": "En namnserver returnerade fler än en SOA-post för din zon. En zon måste ha exakt en SOA i zonens apex; flera SOA-poster tyder på en allvarligt felkonfigurerad server som antingen serverar mer än en vy av zonen eller har en skadad zonfil.",
   "pub.tag.zone.MX_RECORD_IS_CNAME.header": "MX-mål är ett CNAME",
-  "pub.tag.zone.MX_RECORD_IS_CNAME.desc": "En av dina MX-poster pekar på ett värdnamn som visar sig vara definierat som ett CNAME (alias). E-poststandarderna förbjuder detta - en sändande e-postserver är inte skyldig att följa CNAME och kan vägra att leverera e-post. Målet för ett MX måste vara ett verkligt värdnamn med egna A- eller AAAA-poster.",
+  "pub.tag.zone.MX_RECORD_IS_CNAME.desc": "En av dina MX-poster pekar på ett värdnamn som visar sig vara definierat som ett CNAME (alias). RFC 2181 avsnitt 10.3 förbjuder ett alias som MX-mål, och RFC 5321 avsnitt 5.1 kräver att målet svarar med en adresspost, så en sändande e-postserver kan vägra att leverera e-post. Målet för ett MX måste vara ett verkligt värdnamn med egna A- eller AAAA-poster.",
   "pub.tag.zone.SOA_AND_CNAME.header": "CNAME-post i zonens apex tillsammans med SOA",
   "pub.tag.zone.SOA_AND_CNAME.desc": "En namnserver returnerade en CNAME-post i zonens apex tillsammans med en SOA-post. Detta strider mot RFC 1034 avsnitt 3.6.2, som förbjuder att ett CNAME samexisterar med andra poster för samma ägarnamn. En auktoritativ namnserver som uppvisar detta beteende är felkonfigurerad och kan komma att ignoreras eller behandlas på oförutsägbart sätt av resolvers.",
   "pub.tag.zone.Z09_INCONSISTENT_MX.header": "Inkonsekventa MX-uppsättningar mellan namnservrar",

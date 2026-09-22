@@ -4,6 +4,12 @@ Status: Final
 
 ## Purpose
 - Validate that MX exchange hostnames are not aliases (CNAME).
+- RFC 2181 section 10.3 states that the domain name used as part of the value
+  of an MX resource record must not be an alias, and that the name may carry
+  any RR but never a CNAME RR.
+- RFC 5321 section 5.1 requires that name, when queried, to return at least one
+  address record, and places a response that returns a CNAME outside the scope
+  of the standard.
 
 ## Preconditions And Inputs
 - Preconditions:
@@ -48,7 +54,7 @@ Status: Final
 ## Severity Levels Per Tag
 | Tag | Level | Notes |
 | --- | --- | --- |
-| `MX_RECORD_IS_CNAME` | `ERROR` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `MX_RECORD_IS_CNAME` | `ERROR` | Default from `share/profile.json` (`test_levels.ZONE`). RFC 5321 section 5.1 requires the exchange to return an address record. |
 | `MX_RECORD_IS_NOT_CNAME` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `NO_RESPONSE_MX_QUERY` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `TEST_CASE_END` | `DEBUG` | Default from `share/profile.json` (`test_levels.ZONE`). |

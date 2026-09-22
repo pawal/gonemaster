@@ -456,6 +456,53 @@ func TestResolveCNAMELoopReturnsUnresolved(t *testing.T) {
 	}
 }
 
+func TestResolveCNAMEOuterLoopReturnsUnresolved(t *testing.T) {
+	// The target is already being resolved on this chain, so the chain loops
+	// across responses rather than inside one answer.
+	resp := cnamePacket("www.example.com", "alias.example.net", "203.0.113.12")
+	state := &recurseState{
+		inProgress: map[string]map[string]bool{
+			"alias.example.net": {"A": true},
+		},
+	}
+
+	r := &Recursor{}
+	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, state)
+	var ce *CNAMEError
+	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "loop-outer" {
+		t.Fatalf("expected *CNAMEError unresolved/loop-outer, got: %v", err)
+	}
+	if out.Msg != nil {
+		t.Fatalf("expected no response for outer CNAME loop")
+	}
+}
+
+// Authoritative servers answer from zone-file casing, not query casing, so a
+// classless IN-ADDR.ARPA chain arrives with an owner name in a different case
+// than the query name.
+func TestRecurseFollowsMixedCaseCNAMEChain(t *testing.T) {
+	resp := cnamePacket("66.53.113.195.IN-ADDR.ARPA", "66.64-127.53.113.195.in-addr.arpa", "203.0.113.13")
+	resp.Msg.Answer = append(resp.Msg.Answer, dnstest.PTRRR("66.64-127.53.113.195.in-addr.arpa", "ns.example.com"))
+
+	state := &recurseState{
+		ns: []queryer{
+			fakeQueryer{resp: resp},
+		},
+	}
+
+	r := &Recursor{}
+	out, _, err := r.recurse(context.Background(), "66.53.113.195.in-addr.arpa", "PTR", "IN", state)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.Msg == nil {
+		t.Fatalf("expected response")
+	}
+	if len(out.GetRecordsForName("PTR", dnsname.New("66.64-127.53.113.195.in-addr.arpa"), "answer")) == 0 {
+		t.Fatalf("expected PTR answer for the mixed-case CNAME target")
+	}
+}
+
 // TestResolveCNAMEDoesNotShareInProgress verifies that CNAME resolution
 // can re-resolve nameserver addresses that the parent recursion already
 // resolved. This reproduces a bug where the shared inProgress map blocked

@@ -10,6 +10,7 @@ All notable changes to all gonemaster components will be documented in this file
 - engine: an explicit EDNS OPT carries the message Z value, and keeps the CO and DE bits a caller passes in Z
 - engine: a synthesized delegation or DS response reaches a testcase in wire shape, like a real response
 - engine: an undelegated root zone test replaces the root hints and queries only the supplied nameservers
+- engine: a CNAME target already being resolved reports an unresolved CNAME target instead of no response
 - zone09: MX findings carry the full RDATA, duplicate records collapse, TLD apex MX is NOTICE
 
 ### Changed

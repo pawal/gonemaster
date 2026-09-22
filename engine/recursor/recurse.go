@@ -692,7 +692,8 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 	}
 	if state.inProgress[targetKey] != nil && state.inProgress[targetKey][qtype] {
 		state.unlock()
-		return packet.Packet{}, state, nil
+		// Target already being resolved on this chain: a loop across responses.
+		return packet.Packet{}, state, &CNAMEError{Reason: CNAMEUnresolved, Name: name.String(), Target: targetKey, Detail: "loop-outer"}
 	}
 	state.tseen[targetKey] = true
 	state.tcount++

@@ -48,6 +48,7 @@ Scope:
 | `prefixes` | `array<string>` | CIDR prefix list. | |
 | `ptr_names` | `array<string>` | PTR hostname list from reverse-DNS checks. | Used for PTR mismatch detail payloads. |
 | `mail_targets` | `array<string>` | MX target hostname list. | Replaces `mailtarget_list`. |
+| `mx_rdata` | `array<string>` | MX RDATA list, each element a preference and exchange separated by a space. | `mail_targets` carries the exchange names of the same RRset. |
 
 ## DNSSEC Algorithm Keys
 

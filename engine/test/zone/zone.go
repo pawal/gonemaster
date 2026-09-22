@@ -2,7 +2,6 @@ package zone
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"maps"
 	"net/netip"
@@ -1213,16 +1212,18 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 	}
 
 	if len(mxSet) > 0 {
-		// Group servers by MX RDATA, ignoring TTL and record order.
+		// Group servers by MX RDATA, ignoring TTL, record order and duplicate records.
 		variants := map[string][]string{}
-		variantTargets := map[string][]string{}
+		variantRDATA := map[string][]mxRDATA{}
+		normalized := map[string][]mxRDATA{}
 		var variantOrder []string
 		for _, ip := range sortedStrings(mxSetOrder) {
-			records := mxSet[ip]
-			key := encodeMXRRSetRDATA(records)
+			list := normalizeMXRDATA(mxSet[ip])
+			normalized[ip] = list
+			key := mxRDATAKey(list)
 			if _, ok := variants[key]; !ok {
 				variantOrder = append(variantOrder, key)
-				variantTargets[key] = mxExchangeList(records)
+				variantRDATA[key] = list
 			}
 			variants[key] = append(variants[key], ip)
 		}
@@ -1232,7 +1233,8 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			// One self-contained WARNING per RDATA variant.
 			for _, key := range variantOrder {
 				args := map[string]any{
-					"mail_targets": variantTargets[key],
+					"mail_targets": mxExchanges(variantRDATA[key]),
+					"mx_rdata":     mxRDATAStrings(variantRDATA[key]),
 				}
 				setTypedServersFromEndpoints(args, endpointsFor(variants[key]))
 				if err := appendLog(ctx, &results, testcase, "Z09_INCONSISTENT_MX_DATA", args); err != nil {
@@ -1240,30 +1242,27 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 				}
 			}
 		} else {
-			firstIP := mxSetOrder[0]
+			list := normalized[mxSetOrder[0]]
 			hasNullMX := false
-			for _, rr := range mxSet[firstIP] {
-				mx, ok := rr.(*dns.MX)
-				if !ok {
+			for _, entry := range list {
+				if entry.exchange != "." {
 					continue
 				}
-				if mx.Mx == "." {
-					if len(mxSet[firstIP]) > 1 && !hasEntryTag(results, "Z09_NULL_MX_WITH_OTHER_MX") {
-						if err := appendLog(ctx, &results, testcase, "Z09_NULL_MX_WITH_OTHER_MX", map[string]any{}); err != nil {
-							return results, err
-						}
+				if len(list) > 1 && !hasEntryTag(results, "Z09_NULL_MX_WITH_OTHER_MX") {
+					if err := appendLog(ctx, &results, testcase, "Z09_NULL_MX_WITH_OTHER_MX", map[string]any{}); err != nil {
+						return results, err
 					}
-					if mx.Preference > 0 && !hasEntryTag(results, "Z09_NULL_MX_NON_ZERO_PREF") {
-						if err := appendLog(ctx, &results, testcase, "Z09_NULL_MX_NON_ZERO_PREF", map[string]any{}); err != nil {
-							return results, err
-						}
-					}
-					hasNullMX = true
 				}
+				if entry.pref > 0 && !hasEntryTag(results, "Z09_NULL_MX_NON_ZERO_PREF") {
+					if err := appendLog(ctx, &results, testcase, "Z09_NULL_MX_NON_ZERO_PREF", map[string]any{}); err != nil {
+						return results, err
+					}
+				}
+				hasNullMX = true
 			}
 
 			if !hasNullMX {
-				mailTargets := mxExchangeList(mxSet[firstIP])
+				mailTargets := mxExchanges(list)
 				if z.Name.String() == "." {
 					if err := appendLog(ctx, &results, testcase, "Z09_ROOT_EMAIL_DOMAIN", map[string]any{"mail_targets": mailTargets}); err != nil {
 						return results, err
@@ -1277,7 +1276,7 @@ func Zone09(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 						return results, err
 					}
 				} else {
-					args := map[string]any{"mail_targets": mailTargets}
+					args := map[string]any{"mail_targets": mailTargets, "mx_rdata": mxRDATAStrings(list)}
 					setTypedServersFromEndpoints(args, endpointsFor(mxSetOrder))
 					if err := appendLog(ctx, &results, testcase, "Z09_MX_DATA", args); err != nil {
 						return results, err
@@ -2451,36 +2450,61 @@ func nsStrings(servers []nameserver.Nameserver) []string {
 	return values
 }
 
-// encodeMXRRSetRDATA keys an MX RRset by RDATA only (preference + target), TTL excluded.
-func encodeMXRRSetRDATA(records []dns.RR) string {
-	var data []string
-	for _, rr := range records {
-		mx, ok := rr.(*dns.MX)
-		if !ok {
-			continue
-		}
-		data = append(data, fmt.Sprintf("%d %s", mx.Preference, strings.ToLower(dnsname.New(mx.Mx).String())))
-	}
-	sort.Strings(data)
-	encoded, _ := json.Marshal(data)
-	return string(encoded)
+// One MX record reduced to its RDATA, for comparison and reporting.
+type mxRDATA struct {
+	pref     uint16
+	exchange string
 }
 
-func mxExchangeList(records []dns.RR) []string {
-	seen := map[string]bool{}
-	var out []string
+// normalizeMXRDATA reduces MX records to deduplicated RDATA sorted by preference then exchange.
+func normalizeMXRDATA(records []dns.RR) []mxRDATA {
+	seen := map[mxRDATA]bool{}
+	var out []mxRDATA
 	for _, rr := range records {
 		mx, ok := rr.(*dns.MX)
 		if !ok {
 			continue
 		}
-		mxName := dnsname.New(mx.Mx)
-		value := mxName.String()
-		if value == "" || seen[value] {
+		entry := mxRDATA{pref: mx.Preference, exchange: dnsname.New(mx.Mx).StringLower()}
+		if seen[entry] {
 			continue
 		}
-		seen[value] = true
-		out = append(out, value)
+		seen[entry] = true
+		out = append(out, entry)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if out[i].pref != out[j].pref {
+			return out[i].pref < out[j].pref
+		}
+		return out[i].exchange < out[j].exchange
+	})
+	return out
+}
+
+// mxRDATAStrings renders each RDATA element as "preference SP exchange".
+func mxRDATAStrings(list []mxRDATA) []string {
+	out := make([]string, 0, len(list))
+	for _, entry := range list {
+		out = append(out, fmt.Sprintf("%d %s", entry.pref, entry.exchange))
+	}
+	return out
+}
+
+// mxRDATAKey keys an MX RRset by RDATA only; TTL, record order and case are excluded.
+func mxRDATAKey(list []mxRDATA) string {
+	return strings.Join(mxRDATAStrings(list), "\n")
+}
+
+// mxExchanges lists the exchange names of an RDATA list, deduplicated and sorted.
+func mxExchanges(list []mxRDATA) []string {
+	seen := map[string]bool{}
+	var out []string
+	for _, entry := range list {
+		if entry.exchange == "" || seen[entry.exchange] {
+			continue
+		}
+		seen[entry.exchange] = true
+		out = append(out, entry.exchange)
 	}
 	sort.Strings(out)
 	return out

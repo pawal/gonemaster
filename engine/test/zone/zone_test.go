@@ -456,47 +456,56 @@ func noMXPacket(owner string) packet.Packet {
 	return tctest.Response(tctest.Question(owner, dns.TypeMX))
 }
 
-// TestEncodeMXRRSetRDATA verifies the MX consistency key: it is built from
-// RDATA (preference + mail target) only, is independent of TTL and record
-// order, is case-insensitive on the target, and distinguishes genuine RDATA
-// differences (preference or target).
-func TestEncodeMXRRSetRDATA(t *testing.T) {
+// TestMXRDATAKey verifies the MX consistency key: it is built from RDATA
+// (preference + mail target) only, is independent of TTL, record order and
+// duplicate records, is case-insensitive on the target, and distinguishes
+// genuine RDATA differences (preference or target).
+func TestMXRDATAKey(t *testing.T) {
 	mk := func(ttl uint32, pref uint16, target string) dns.RR {
 		mx := &dns.MX{Hdr: dns.Header{Name: "example.com.", Class: dns.ClassINET, TTL: ttl}}
 		mx.Mx = target
 		mx.Preference = pref
 		return mx
 	}
+	key := func(records []dns.RR) string {
+		return mxRDATAKey(normalizeMXRDATA(records))
+	}
 
 	base := []dns.RR{mk(3600, 10, "mx1.example."), mk(3600, 20, "mx2.example.")}
 
 	// TTL is not part of the key.
 	ttlDiff := []dns.RR{mk(300, 10, "mx1.example."), mk(300, 20, "mx2.example.")}
-	if encodeMXRRSetRDATA(base) != encodeMXRRSetRDATA(ttlDiff) {
+	if key(base) != key(ttlDiff) {
 		t.Errorf("TTL difference must not change the key")
 	}
 
 	// Record order is not part of the key.
 	reordered := []dns.RR{mk(3600, 20, "mx2.example."), mk(3600, 10, "mx1.example.")}
-	if encodeMXRRSetRDATA(base) != encodeMXRRSetRDATA(reordered) {
+	if key(base) != key(reordered) {
 		t.Errorf("record order must not change the key")
 	}
 
 	// Target comparison is case-insensitive.
 	mixedCase := []dns.RR{mk(3600, 10, "MX1.Example."), mk(3600, 20, "mx2.EXAMPLE.")}
-	if encodeMXRRSetRDATA(base) != encodeMXRRSetRDATA(mixedCase) {
+	if key(base) != key(mixedCase) {
 		t.Errorf("target case must not change the key")
+	}
+
+	// RFC 2181 s5: an RRset is a set, so a repeated record adds nothing.
+	duplicated := []dns.RR{mk(3600, 10, "mx1.example."), mk(3600, 20, "mx2.example."), mk(3600, 10, "mx1.example.")}
+	if key(base) != key(duplicated) {
+		t.Errorf("duplicate record must not change the key")
 	}
 
 	// A different preference is a real difference.
 	prefDiff := []dns.RR{mk(3600, 15, "mx1.example."), mk(3600, 20, "mx2.example.")}
-	if encodeMXRRSetRDATA(base) == encodeMXRRSetRDATA(prefDiff) {
+	if key(base) == key(prefDiff) {
 		t.Errorf("preference difference must change the key")
 	}
 
 	// A different mail target is a real difference.
 	targetDiff := []dns.RR{mk(3600, 10, "mx9.example."), mk(3600, 20, "mx2.example.")}
-	if encodeMXRRSetRDATA(base) == encodeMXRRSetRDATA(targetDiff) {
+	if key(base) == key(targetDiff) {
 		t.Errorf("target difference must change the key")
 	}
 }
@@ -2945,5 +2954,132 @@ func TestZone15QueryBudget(t *testing.T) {
 		if len(types) != 1 || types[0] != "CAA" {
 			t.Fatalf("endpoint %s: expected exactly one CAA query, got %v", endpoint, types)
 		}
+	}
+}
+
+// runZone09Pair wires a two-nameserver zone09 run with one MX handler per server.
+func runZone09Pair(t *testing.T, name string, mx1, mx2 func() packet.Packet) []*logger.Entry {
+	t.Helper()
+	ctx := tctest.Context(t)
+
+	build := func(host, ip string, mx func() packet.Packet) ens.Nameserver {
+		return tctest.NS(t, ctx, host, ip, func(q tctest.Query) packet.Packet {
+			switch q.Type {
+			case "SOA":
+				return soaPacket(name, 1, 1, 1, 1, 1)
+			case "MX":
+				return mx()
+			default:
+				return packet.Packet{}
+			}
+		})
+	}
+	ns1 := build("ns1.example", "192.0.2.1", mx1)
+	ns2 := build("ns2.example", "192.0.2.2", mx2)
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1, ns2}, nil
+	})
+
+	z := zonepkg.Zone{Name: dnsname.New(name)}
+	entries, err := Zone09(ctx, &z)
+	if err != nil {
+		t.Fatalf("zone09: %v", err)
+	}
+	return entries
+}
+
+// mxRDATAOf returns the mx_rdata argument of an entry.
+func mxRDATAOf(t *testing.T, entry *logger.Entry) []string {
+	t.Helper()
+	values, ok := entry.Args["mx_rdata"].([]string)
+	if !ok {
+		t.Fatalf("%s: expected mx_rdata list, got %#v", entry.Tag, entry.Args["mx_rdata"])
+	}
+	return values
+}
+
+// RFC 2181 s5: a repeated record carries one record's worth of data, so a
+// server repeating an MX record agrees with a server sending it once.
+func TestZone09DuplicateMXRecordIsOneVariant(t *testing.T) {
+	entries := runZone09Pair(t, "example.com",
+		func() packet.Packet {
+			return mxPacket("example.com", 300, mxRR{10, "mail.example."}, mxRR{10, "mail.example."})
+		},
+		func() packet.Packet {
+			return mxPacket("example.com", 300, mxRR{10, "mail.example."})
+		})
+
+	tctest.RequireNoTag(t, entries, "Z09_INCONSISTENT_MX_DATA")
+	tctest.RequireCount(t, entries, "Z09_MX_DATA", 1)
+}
+
+// A null MX returned twice is still a single null MX, not a mixed RRset.
+func TestZone09DuplicateNullMXIsValid(t *testing.T) {
+	entries := runZone09(t, "example.com", func() packet.Packet {
+		return mxPacket("example.com", 300, mxRR{0, "."}, mxRR{0, "."})
+	})
+
+	tctest.RequireTags(t, entries, "Z09_VALID_NULL_MX")
+	tctest.RequireNoTag(t, entries, "Z09_NULL_MX_WITH_OTHER_MX", "Z09_NULL_MX_NON_ZERO_PREF")
+}
+
+// Two servers sharing exchanges but differing in preference must be
+// distinguishable: mx_rdata differs while mail_targets matches.
+func TestZone09PreferenceOnlyDifferenceIsVisible(t *testing.T) {
+	entries := runZone09Pair(t, "example.com",
+		func() packet.Packet {
+			return mxPacket("example.com", 300, mxRR{10, "mail1.example."}, mxRR{20, "mail2.example."})
+		},
+		func() packet.Packet {
+			return mxPacket("example.com", 300, mxRR{20, "mail1.example."}, mxRR{10, "mail2.example."})
+		})
+
+	variants := tctest.All(entries, "Z09_INCONSISTENT_MX_DATA")
+	if len(variants) != 2 {
+		t.Fatalf("expected 2 Z09_INCONSISTENT_MX_DATA entries, got %d (%v)", len(variants), tctest.Tags(entries))
+	}
+
+	first := mxRDATAOf(t, variants[0])
+	second := mxRDATAOf(t, variants[1])
+	if slices.Equal(first, second) {
+		t.Fatalf("preference-only difference must change mx_rdata, both are %v", first)
+	}
+
+	want := []string{"mail1.example", "mail2.example"}
+	for _, entry := range variants {
+		targets, ok := entry.Args["mail_targets"].([]string)
+		if !ok || !slices.Equal(targets, want) {
+			t.Fatalf("expected mail_targets %v, got %#v", want, entry.Args["mail_targets"])
+		}
+	}
+}
+
+// mx_rdata is sorted by preference then exchange, with the exchange lowercased.
+func TestZone09MXDataRDATAIsSortedAndLowercased(t *testing.T) {
+	entries := runZone09(t, "example.com", func() packet.Packet {
+		return mxPacket("example.com", 300, mxRR{20, "MX2.Example."}, mxRR{10, "Mx1.EXAMPLE."})
+	})
+
+	entry := tctest.RequireTag(t, entries, "Z09_MX_DATA")
+	want := []string{"10 mx1.example", "20 mx2.example"}
+	if got := mxRDATAOf(t, entry); !slices.Equal(got, want) {
+		t.Fatalf("expected mx_rdata %v, got %v", want, got)
+	}
+}
+
+// mail_targets stays the deduplicated exchange list, the rollup dimension.
+func TestZone09MXDataMailTargetsDeduplicated(t *testing.T) {
+	entries := runZone09(t, "example.com", func() packet.Packet {
+		return mxPacket("example.com", 300, mxRR{10, "mail.example."}, mxRR{20, "mail.example."})
+	})
+
+	entry := tctest.RequireTag(t, entries, "Z09_MX_DATA")
+	targets, ok := entry.Args["mail_targets"].([]string)
+	if !ok || !slices.Equal(targets, []string{"mail.example"}) {
+		t.Fatalf("expected mail_targets [mail.example], got %#v", entry.Args["mail_targets"])
+	}
+	want := []string{"10 mail.example", "20 mail.example"}
+	if got := mxRDATAOf(t, entry); !slices.Equal(got, want) {
+		t.Fatalf("expected mx_rdata %v, got %v", want, got)
 	}
 }

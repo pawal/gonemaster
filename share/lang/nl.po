@@ -1789,16 +1789,16 @@ msgid "Some name servers return an MX RRset while others return none."
 msgstr "Sommige naamservers geven een MX-RRset terug terwijl andere er geen teruggeven."
 
 msgctxt "ZONE:Z09_INCONSISTENT_MX_DATA"
-msgid "The MX RRset differs between name servers: \"{servers}\" return the mail targets \"{mail_targets}\"."
-msgstr "De MX-RRset verschilt tussen de naamservers: \"{servers}\" geven de mailbestemmingen \"{mail_targets}\" terug."
+msgid "The MX RRset differs between name servers: \"{servers}\" return the MX records \"{mx_rdata}\"."
+msgstr "De MX-RRset verschilt tussen de naamservers: \"{servers}\" geven de MX-records \"{mx_rdata}\" terug."
 
 msgctxt "ZONE:Z09_MISSING_MAIL_TARGET"
 msgid "The child zone has no mail target (no MX)."
 msgstr "De onderliggende zone heeft geen mailbestemming (geen MX)."
 
 msgctxt "ZONE:Z09_MX_DATA"
-msgid "Mail targets in the MX RRset \"{mail_targets}\" returned from name servers \"{servers}\"."
-msgstr "Mailbestemmingen in de MX-RRset \"{mail_targets}\" teruggegeven door naamservers \"{servers}\"."
+msgid "MX records in the MX RRset \"{mx_rdata}\" returned from name servers \"{servers}\"."
+msgstr "MX-records in de MX-RRset \"{mx_rdata}\" teruggegeven door naamservers \"{servers}\"."
 
 msgctxt "ZONE:Z09_MX_FOUND"
 msgid "MX RRset was returned by name servers \"{servers}\"."

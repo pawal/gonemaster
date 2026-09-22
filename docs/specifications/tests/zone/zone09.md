@@ -36,23 +36,29 @@ Status: Final
    - `Z09_NO_MX_FOUND` (`servers`: name servers by host name and IP)
    - `Z09_MX_FOUND` (`servers`: name servers by host name and IP)
 6. If MX RRset bucket is non-empty:
-   - Compute a per-server key from the MX RDATA: the set of
-     `preference SP lower(mail-target)` pairs, sorted. This key is the data
-     compared for consistency.
+   - Normalize each responding server's MX RRset to a list of
+     `preference SP lower(mail-target)` elements. Duplicate identical elements
+     MUST be collapsed, per RFC 2181 section 5, and the list MUST be sorted by
+     preference ascending then mail target ascending. TTL and record order are
+     excluded.
+   - The per-server key is that normalized list. This key is the data compared
+     for consistency.
    - Group the responding servers by that key.
    - If more than one distinct key exists, emit `Z09_INCONSISTENT_MX_DATA`
      once per distinct key, each with `servers` (that key's name servers by
-     host name and IP) and `mail_targets` (that key's mail targets).
+     host name and IP), `mx_rdata` (that key's normalized list) and
+     `mail_targets` (that key's mail targets).
    - If exactly one key exists:
-     - evaluate null-MX conditions:
-       - `Z09_NULL_MX_WITH_OTHER_MX` when `.` mailtarget is mixed with other MX RRs;
-       - `Z09_NULL_MX_NON_ZERO_PREF` when null-MX preference is not zero;
+     - evaluate the null-MX conditions on the normalized list:
+       - `Z09_NULL_MX_WITH_OTHER_MX` when the `.` mail target is one of two or
+         more elements;
+       - `Z09_NULL_MX_NON_ZERO_PREF` when the null-MX preference is not zero;
      - if no null-MX:
        - emit `Z09_ROOT_EMAIL_DOMAIN` for root zone (`mail_targets`);
        - emit `Z09_TLD_EMAIL_DOMAIN` for TLD zone (`mail_targets`);
        - emit `Z09_ARPA_EMAIL_DOMAIN` for a zone under `.arpa` (`mail_targets`);
        - otherwise emit `Z09_MX_DATA` with `servers` (name servers by host name
-         and IP) and `mail_targets`.
+         and IP), `mx_rdata` and `mail_targets`.
      - if null-MX and neither `Z09_NULL_MX_WITH_OTHER_MX` nor
        `Z09_NULL_MX_NON_ZERO_PREF` fired, emit `Z09_VALID_NULL_MX` (a single
        zero-preference null-MX is a valid "no mail" statement).
@@ -93,22 +99,23 @@ Mixed presence:
          Z09_NO_MX_FOUND     (servers = noMXSet endpoints)
          Z09_MX_FOUND        (servers = mxSet endpoints)
 
-mxSet non-empty (servers grouped by MX RDATA key: pref + lower(target), sorted):
+mxSet non-empty; per IP normalize to RDATA list: pref + lower(target),
+duplicates collapsed, sorted by pref then target; the key is that list:
 
    more than one distinct RDATA key
       -> per RDATA variant:
-            Z09_INCONSISTENT_MX_DATA (servers = variant endpoints, mail_targets)
+            Z09_INCONSISTENT_MX_DATA (servers = variant endpoints, mx_rdata, mail_targets)
 
    exactly one RDATA key:
-      examine first IP's MX records:
-         any MX with target == "." -> hasNullMX = true
-            len(records) > 1       -> Z09_NULL_MX_WITH_OTHER_MX (no args)
-            MX.Preference > 0      -> Z09_NULL_MX_NON_ZERO_PREF (no args)
+      examine first IP's normalized list:
+         any element with target == "." -> hasNullMX = true
+            len(list) > 1               -> Z09_NULL_MX_WITH_OTHER_MX (no args)
+            preference > 0              -> Z09_NULL_MX_NON_ZERO_PREF (no args)
       !hasNullMX:
          z.Name == "."             -> Z09_ROOT_EMAIL_DOMAIN (mail_targets)
          nextHigherIsRoot(z.Name)  -> Z09_TLD_EMAIL_DOMAIN  (mail_targets)
          isArpaTree(z.Name)        -> Z09_ARPA_EMAIL_DOMAIN (mail_targets)
-         otherwise                 -> Z09_MX_DATA (servers = mxSet endpoints, mail_targets)
+         otherwise                 -> Z09_MX_DATA (servers = mxSet endpoints, mx_rdata, mail_targets)
       hasNullMX AND no null-MX problem tag fired
                                    -> Z09_VALID_NULL_MX (no args)
 
@@ -157,9 +164,11 @@ emit TEST_CASE_END
 | `Z09_INCONSISTENT_MX` | `-` | `-` | No arguments. |
 | `Z09_INCONSISTENT_MX_DATA` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) returning this RDATA variant. |
 | `Z09_INCONSISTENT_MX_DATA` | `mail_targets` | `array<string>` | Structured MX exchange hostname list for this RDATA variant. |
+| `Z09_INCONSISTENT_MX_DATA` | `mx_rdata` | `array<string>` | Normalized MX RDATA list for this RDATA variant, each element `preference SP exchange`. |
 | `Z09_MISSING_MAIL_TARGET` | `-` | `-` | No arguments. |
 | `Z09_MX_DATA` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) for this data group. |
 | `Z09_MX_DATA` | `mail_targets` | `array<string>` | Structured MX exchange hostname list. |
+| `Z09_MX_DATA` | `mx_rdata` | `array<string>` | Normalized MX RDATA list, each element `preference SP exchange`. |
 | `Z09_MX_FOUND` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) that returned MX RRset. |
 | `Z09_NON_AUTH_MX_RESPONSE` | `addresses` | `array<string>` | Structured nameserver IPs reported as non-authoritative. |
 | `Z09_NO_MX_FOUND` | `servers` | `array<object>` | Structured name servers (`{ns,address}`) with no MX RRset. |
@@ -192,7 +201,7 @@ emit TEST_CASE_END
 | `Z09_NULL_MX_NON_ZERO_PREF` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z09_NULL_MX_WITH_OTHER_MX` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z09_ROOT_EMAIL_DOMAIN` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
-| `Z09_TLD_EMAIL_DOMAIN` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
+| `Z09_TLD_EMAIL_DOMAIN` | `NOTICE` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z09_UNEXPECTED_RCODE_MX` | `WARNING` | Default from `share/profile.json` (`test_levels.ZONE`). |
 | `Z09_VALID_NULL_MX` | `INFO` | Default from `share/profile.json` (`test_levels.ZONE`). |
 
@@ -200,6 +209,9 @@ emit TEST_CASE_END
 - Differences (Upstream vs Gonemaster):
   - Upstream: describes name server IP set processing. Gonemaster: deduplicates probing by IP before classification and separately keeps name-group reporting views.
   - Upstream: does not describe testcase boundary debug markers. Gonemaster: emits `TEST_CASE_START` and `TEST_CASE_END`.
+  - Upstream: emits `Z09_MX_DATA` once per RDATA variant and gives `Z09_INCONSISTENT_MX_DATA` no arguments. Gonemaster: emits one self-contained `Z09_INCONSISTENT_MX_DATA` per variant, carrying that variant's `servers`, `mx_rdata` and `mail_targets`.
+  - Upstream: requires a successful SOA query before the MX query. Gonemaster: queries MX without that precondition, which is what allows `Z09_NON_AUTH_MX_RESPONSE` to be reported.
+  - Upstream: names the tag `Z09_MISSING_MAIL_EXCHANGE`. Gonemaster: keeps `Z09_MISSING_MAIL_TARGET`; the two names denote the same condition.
 - Potential upstream report:
   - `no`
 

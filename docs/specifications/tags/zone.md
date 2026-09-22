@@ -66,7 +66,7 @@ _Do not edit by hand - regenerate with the command above._
 | `Z09_NULL_MX_NON_ZERO_PREF` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_NULL_MX_WITH_OTHER_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_ROOT_EMAIL_DOMAIN` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
-| `Z09_TLD_EMAIL_DOMAIN` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
+| `Z09_TLD_EMAIL_DOMAIN` | `NOTICE` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_UNEXPECTED_RCODE_MX` | `WARNING` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z09_VALID_NULL_MX` | `INFO` | [zone09](../tests/zone/zone09.md) | yes |
 | `Z11_DIFFERENT_SPF_POLICIES_FOUND` | `NOTICE` | [zone11](../tests/zone/zone11.md) | yes |

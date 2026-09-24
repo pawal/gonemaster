@@ -1,0 +1,4477 @@
+openapi: 3.0.3
+info:
+  title: Gonemaster API
+  version: 0.1.0
+  description: |
+    REST API for running Gonemaster engine tests with queueing, streaming, and cancellation.
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development (API base)
+
+tags:
+  - name: Jobs
+  - name: Batches
+  - name: Domains
+  - name: Tags
+  - name: Profiles
+  - name: Runs
+  - name: Entries
+  - name: Queue
+  - name: Ops
+  - name: Analysis
+  - name: Public
+
+paths:
+  /whoami:
+    get:
+      tags: [Auth]
+      summary: Report auth mode and whether the request is authenticated
+      operationId: whoami
+      responses:
+        '200':
+          description: Auth status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mode:
+                    type: string
+                    enum: [open, token]
+                  authenticated:
+                    type: boolean
+  /session:
+    post:
+      tags: [Auth]
+      summary: Admin UI login - validate a token and set the session cookie
+      operationId: sessionLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token:
+                  type: string
+      responses:
+        '200':
+          description: Authenticated; sets the gm_admin session cookie
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Auth]
+      summary: Admin UI logout - clear the session cookie
+      operationId: sessionLogout
+      responses:
+        '200':
+          description: Session cookie cleared
+  /jobs:
+    post:
+      tags: [Jobs]
+      summary: Submit a single test job
+      operationId: createJob
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCreateRequest'
+      responses:
+        '201':
+          description: Job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+    get:
+      tags: [Jobs]
+      summary: List jobs
+      operationId: listJobs
+      parameters:
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+        - name: batch_id
+          in: query
+          schema:
+            type: string
+        - name: created_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: created_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: domain
+          in: query
+          schema:
+            type: string
+        - name: severity
+          in: query
+          description: Filter by aggregated severity totals before pagination.
+          schema:
+            type: string
+            enum: [warnings_plus, errors_only]
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Job list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobList'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/batch:
+    post:
+      tags: [Jobs]
+      summary: Submit a batch of test jobs
+      description: "Submit multiple domains as a single batch. Each job is assigned priority=1 (batch) and will only be dequeued after all priority=0 (normal) jobs have been processed. Undelegated input (`nameservers`, `ds_info`) is not supported for batch submission."
+      operationId: createJobBatch
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobBatchRequest'
+      responses:
+        '202':
+          description: Batch accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobBatchResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/purge:
+    post:
+      tags: [Jobs]
+      summary: Purge completed jobs older than a retention window
+      operationId: purgeJobs
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobPurgeRequest'
+      responses:
+        '200':
+          description: Purge count
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobPurgeResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /batches/{batch_id}:
+    get:
+      tags: [Batches]
+      summary: Get batch summary
+      operationId: getBatch
+      parameters:
+        - name: batch_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchSummary'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Batches]
+      summary: Delete a batch and derived records
+      operationId: deleteBatch
+      parameters:
+        - name: batch_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Batch deleted
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /batches/{batch_id}/delete-preview:
+    get:
+      tags: [Batches]
+      summary: Preview batch deletion impact
+      operationId: getBatchDeletePreview
+      parameters:
+        - name: batch_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Batch deletion impact
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchDeletePreview'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/{job_id}:
+    get:
+      tags: [Jobs]
+      summary: Get job status
+      operationId: getJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/{job_id}/result:
+    get:
+      tags: [Jobs]
+      summary: Get job result
+      operationId: getJobResult
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: locale
+          in: query
+          description: Locale for translated messages (default en)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/{job_id}/events:
+    get:
+      tags: [Jobs]
+      summary: Stream job events (SSE)
+      operationId: streamJobEvents
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Event stream
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /jobs/{job_id}/cancel:
+    post:
+      tags: [Jobs]
+      summary: Cancel a running or queued job
+      operationId: cancelJob
+      parameters:
+        - name: job_id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job canceled
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Job'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /domains:
+    get:
+      tags: [Domains]
+      summary: List domains
+      operationId: listDomains
+      parameters:
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Filter to domains belonging to this tag.
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Substring filter on domain name.
+        - name: level
+          in: query
+          schema:
+            type: string
+          description: Exact `latest_level` filter (e.g. `ERROR`).
+        - name: min_level
+          in: query
+          schema:
+            type: string
+          description: Minimum severity threshold; `WARNING` matches WARNING/ERROR/CRITICAL.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Domain list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainList'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /domains/{id}:
+    get:
+      tags: [Domains]
+      summary: Get domain by ID
+      operationId: getDomain
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Domain with tags populated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Domain'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /domains/{id}/runs:
+    get:
+      tags: [Domains]
+      summary: List run history for a domain
+      operationId: listDomainRuns
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Run list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunList'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /runs:
+    get:
+      tags: [Runs]
+      summary: List runs
+      operationId: listRuns
+      parameters:
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Filter to runs for domains in this tag.
+        - name: domain
+          in: query
+          schema:
+            type: string
+          description: Filter by domain name substring.
+        - name: batch
+          in: query
+          schema:
+            type: string
+          description: Filter by batch ID.
+        - name: status
+          in: query
+          schema:
+            $ref: '#/components/schemas/JobStatus'
+        - name: level
+          in: query
+          schema:
+            type: string
+          description: Filter by `worst_level`.
+        - name: grade
+          in: query
+          schema:
+            type: string
+            enum: ['A+', 'A', 'B', 'C', 'D', 'F']
+          description: Filter by letter grade.
+        - name: finished_after
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: finished_before
+          in: query
+          schema:
+            type: string
+            format: date-time
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Run list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RunList'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /runs/{id}:
+    get:
+      tags: [Runs]
+      summary: Get run by ID
+      operationId: getRun
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Run
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Run'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /runs/{id}/result:
+    get:
+      tags: [Runs]
+      summary: Get run result (same shape as GET /jobs/{id}/result)
+      operationId: getRunResult
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: locale
+          in: query
+          description: Locale for translated messages (default en)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Run result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /runs/{id}/dnssec-chain:
+    get:
+      tags: [Runs]
+      summary: Get the stored DNSSEC chain summary for a run
+      description: >
+        Returns the per-run DNSSEC authentication-chain summary extracted at
+        run end. Only runs created through the public UI ever have chain data.
+      operationId: getRunDNSSECChain
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: DNSSEC chain summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DNSSECChain'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /spec/testcases:
+    get:
+      tags: [Spec]
+      summary: List implemented testcases
+      operationId: listSpecTestcases
+      parameters:
+        - name: category
+          in: query
+          description: "Filter to one module (alias: module)"
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Testcase catalog
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecTestcaseList'
+
+  /spec/testcases/{id}:
+    get:
+      tags: [Spec]
+      summary: Get one testcase with its emitted tags and rendered messages
+      operationId: getSpecTestcase
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: locale
+          in: query
+          description: Locale for rendered messages (default en)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Testcase detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SpecTestcaseDetail'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags:
+    get:
+      tags: [Tags]
+      summary: List tags
+      operationId: listTags
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Tag array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tag'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Tags]
+      summary: Create a tag
+      operationId: createTag
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagCreateRequest'
+      responses:
+        '201':
+          description: Tag created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          description: Tag already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /tags/{name}:
+    put:
+      tags: [Tags]
+      summary: Update tag description
+      operationId: updateTag
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+      responses:
+        '200':
+          description: Updated tag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tag'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Tags]
+      summary: Delete a tag
+      operationId: deleteTag
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Tag deleted
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags/{name}/domains:
+    get:
+      tags: [Tags]
+      summary: List domains in a tag
+      operationId: listTagDomains
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Domain list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DomainList'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    post:
+      tags: [Tags]
+      summary: Add domains to a tag (creates domain records if needed)
+      operationId: addTagDomains
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagDomainsRequest'
+      responses:
+        '204':
+          description: Domains added
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Tags]
+      summary: Remove domains from a tag
+      operationId: removeTagDomains
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagDomainsRequest'
+      responses:
+        '204':
+          description: Domains removed
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags/{name}/profile:
+    put:
+      tags: [Tags]
+      summary: Set a tag's default stored profile
+      operationId: setTagProfile
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TagProfileRequest'
+      responses:
+        '204':
+          description: Tag default profile updated
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Tags]
+      summary: Clear a tag's default stored profile
+      operationId: deleteTagProfile
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Tag default profile removed
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags/{name}/summary:
+    get:
+      tags: [Tags]
+      summary: Get tag severity summary
+      operationId: getTagSummary
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Per-severity domain counts for the tag
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TagSummary'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags/{name}/purge:
+    post:
+      tags: [Tags]
+      summary: Purge completed runs for a tag
+      description: >
+        Deletes all terminal-status runs (and their entries) for domains in the
+        tag. Active or queued jobs are never touched. Useful before re-running a
+        full batch to reclaim disk space.
+      operationId: purgeTagRuns
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Number of runs purged
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  purged_runs:
+                    type: integer
+                    format: int64
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /tags/{name}/batches:
+    get:
+      tags: [Tags]
+      summary: List batches for a tag
+      operationId: listTagBatches
+      parameters:
+        - name: name
+          in: path
+          required: true
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Batch list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchList'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles:
+    get:
+      tags: [Profiles]
+      summary: List stored profiles
+      operationId: listProfiles
+      responses:
+        '200':
+          description: Stored profile array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Profile'
+    post:
+      tags: [Profiles]
+      summary: Create a stored profile
+      operationId: createProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpsertRequest'
+      responses:
+        '201':
+          description: Profile created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/default:
+    get:
+      tags: [Profiles]
+      summary: Get the server default profile
+      operationId: getDefaultProfile
+      responses:
+        '200':
+          description: The server base profile after config-file overrides are applied
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/defaults:
+    get:
+      tags: [Profiles]
+      summary: Get the engine default test_cases and test_levels
+      description: Returns the current engine default profile's `test_cases` and `test_levels`. Used by the admin UI as the canonical reference when checking stored profile compatibility.
+      operationId: getProfileDefaults
+      responses:
+        '200':
+          description: Engine default reference data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileDefaults'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/compatibility:
+    get:
+      tags: [Profiles]
+      summary: Batch compatibility summary for all stored profiles
+      description: Returns one entry per stored profile with its compatibility status against the current engine default. Used by the admin UI to drive the "Needs review" badges and the *N profile(s) need review* summary.
+      operationId: listProfileCompatibility
+      responses:
+        '200':
+          description: Array of compatibility summaries
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CompatibilitySummary'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/diff:
+    post:
+      tags: [Profiles]
+      summary: Compare a profile config against the engine defaults
+      description: |
+        Compares the supplied profile config against the current engine default
+        profile and reports, per overridden property, whether it deviates from
+        the default or merely restates it. The config travels in the request
+        body, so an unsaved editor draft can be compared without being stored.
+        The endpoint changes no state.
+
+        Only properties the config actually sets take part: an unset property is
+        inherited and never a deviation. A property reported `redundant`
+        restates the default exactly, so removing it leaves the merged profile
+        the engine runs unchanged.
+      operationId: diffProfile
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                config:
+                  type: object
+                  description: Profile config to compare. Defaults to an empty object.
+                  additionalProperties: true
+      responses:
+        '200':
+          description: Diff result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileDiff'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/mark-all-reviewed:
+    post:
+      tags: [Profiles]
+      summary: Mark every stored profile as reviewed
+      description: Bumps `schema_version` to the current engine version on every stored profile that is not already current. Returns the count of profiles that were updated.
+      operationId: markAllProfilesReviewed
+      responses:
+        '200':
+          description: Mark-all result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MarkAllReviewedResult'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/{id}/compatibility:
+    get:
+      tags: [Profiles]
+      summary: Detailed compatibility result for one stored profile
+      description: |
+        Compares the stored profile against the current engine default and returns the list of gaps with suggested remediations. The profile is considered incompatible only when it explicitly overrides a key (`test_cases` or a `test_levels` module) in a way that no longer covers what the current default ships.
+
+        The comparison always runs. When `schema_version` equals the current engine version the profile is `reviewed`: it stays `compatible`, `issues` is empty, and any gaps found are listed in `waived_issues` so the review can be inspected and undone with the `clear_reviewed` patch op. An unparseable config is never waived.
+      operationId: getProfileCompatibility
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Compatibility result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompatibilityResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /profiles/{id}:
+    get:
+      tags: [Profiles]
+      summary: Get a stored profile
+      operationId: getProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '200':
+          description: Stored profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [Profiles]
+      summary: Update a stored profile
+      operationId: updateProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfileUpsertRequest'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+    patch:
+      tags: [Profiles]
+      summary: Apply a targeted compatibility fix to a stored profile
+      description: |
+        Applies one targeted operation. The fix ops change the config only, so a
+        fixed profile then reports compatible on its own merits; only the review
+        ops touch `schema_version`. The supported operations are:
+
+        - `add_missing_test_cases` - append default test cases missing from the profile's `test_cases` array. No-op if the profile does not explicitly set `test_cases`.
+        - `add_missing_test_levels` - for each `test_levels` module already overridden by the profile, fill any tags present in the default but missing in the override.
+        - `reset_test_cases` - remove the `test_cases` override entirely so the profile inherits all defaults.
+        - `reset_test_levels` - remove one module from the `test_levels` override (requires `module`).
+        - `mark_reviewed` - leave the config unchanged but bump `schema_version` so the remaining gaps are reported as waived instead of open.
+        - `clear_reviewed` - leave the config unchanged but clear `schema_version`, so the next compatibility fetch runs the full check and the waived issues return as open ones.
+      operationId: patchProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProfilePatchRequest'
+      responses:
+        '200':
+          description: Updated profile
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Profile'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Profiles]
+      summary: Delete a stored profile
+      operationId: deleteProfile
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+      responses:
+        '204':
+          description: Profile deleted
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /entries:
+    get:
+      tags: [Entries]
+      summary: Query engine log entries across runs
+      operationId: listEntries
+      parameters:
+        - name: run
+          in: query
+          schema:
+            type: string
+          description: Exact run ID.
+        - name: domain
+          in: query
+          schema:
+            type: integer
+            format: int64
+          description: Domain ID (integer).
+        - name: tag
+          in: query
+          schema:
+            type: string
+          description: Domain tag filter.
+        - name: module
+          in: query
+          schema:
+            type: string
+          description: Exact module name (e.g. `DNSSEC`).
+        - name: testcase
+          in: query
+          schema:
+            type: string
+          description: Exact testcase name (e.g. `dnssec01`).
+        - name: entry_tag
+          in: query
+          schema:
+            type: string
+          description: Log event tag (engine `tag` field, e.g. `DS_ALGO_NOT_SUPPORTED`).
+        - name: level
+          in: query
+          schema:
+            type: string
+          description: Exact severity level.
+        - name: latest
+          in: query
+          schema:
+            type: string
+            enum: ['1', 'true']
+          description: Restrict to each domain's latest run only.
+        - name: batch
+          in: query
+          schema:
+            type: string
+          description: Restrict to runs from this batch.
+        - name: format
+          in: query
+          schema:
+            type: string
+            enum: [csv]
+          description: >
+            `csv` returns a CSV download with columns:
+            id, run_id, domain_id, domain, timestamp, module, testcase, tag, level, args.
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 100
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Entry list (JSON) or CSV download
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EntryList'
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /queue/pause:
+    post:
+      tags: [Queue]
+      summary: Pause queue processing
+      operationId: pauseQueue
+      responses:
+        '200':
+          description: Queue paused
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: paused
+
+  /queue/resume:
+    post:
+      tags: [Queue]
+      summary: Resume queue processing
+      operationId: resumeQueue
+      responses:
+        '200':
+          description: Queue resumed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: resumed
+
+  /queue/reorder:
+    post:
+      tags: [Queue]
+      summary: Reorder queued jobs
+      description: "Replaces the queued job order. The provided list must contain all currently queued job IDs. Reordering is within-tier only: all normal-priority jobs (priority=0) must appear before all batch-priority jobs (priority=1) in the list. Placing a batch job before a normal job returns 400."
+      operationId: reorderQueue
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueReorderRequest'
+      responses:
+        '200':
+          description: Queue reordered
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /queue/remove:
+    post:
+      tags: [Queue]
+      summary: Remove queued jobs
+      operationId: removeQueueJobs
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QueueRemoveRequest'
+      responses:
+        '200':
+          description: Jobs removed from queue
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QueueRemoveResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /metrics:
+    get:
+      tags: [Ops]
+      summary: Metrics snapshot
+      operationId: metrics
+      parameters:
+        - in: query
+          name: format
+          required: false
+          schema:
+            type: string
+            enum: [json, prom]
+            default: json
+          description: Response format. `prom` returns Prometheus text exposition; JSON-only query params are ignored.
+        - in: query
+          name: window
+          required: false
+          schema:
+            type: string
+            enum: [1h, 6h, 24h, 48h]
+          description: Optional trend window selection for `trends.windows`.
+        - in: query
+          name: include
+          required: false
+          schema:
+            type: string
+          description: Comma-separated sections to include (`all`, `health`, `jobs`, `api`, `quality`, `insights`, `trends`).
+        - in: query
+          name: limit_domains
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Max number of domain insight rows in the response.
+        - in: query
+          name: limit_batches
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+          description: Max number of batch insight rows in the response.
+      responses:
+        '200':
+          description: Metrics snapshot or Prometheus text exposition
+          content:
+            application/json:
+              schema:
+                type: object
+            text/plain:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /locales:
+    get:
+      tags: [Ops]
+      summary: List available translation locales
+      operationId: listLocales
+      description: >
+        Returns the list of locale codes for which translated result messages
+        are available. The list always includes `en` (English). Pass one of
+        these codes as the `locale` query parameter on `GET /jobs/{id}/result`
+        to receive translated messages.
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [locales]
+                properties:
+                  locales:
+                    type: array
+                    items:
+                      type: string
+                    example: [da, en, es, fi, fr, nb, sl, sv]
+
+  /healthz:
+    get:
+      tags: [Ops]
+      summary: Health check
+      operationId: healthz
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+
+  /features:
+    get:
+      tags: [Ops]
+      summary: Admin UI feature flags
+      operationId: getFeatures
+      responses:
+        '200':
+          description: Feature flags
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FeatureFlags'
+
+  /settings:
+    get:
+      tags: [Ops]
+      summary: Get runtime settings
+      operationId: getSettings
+      responses:
+        '200':
+          description: Settings map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  $ref: '#/components/schemas/SettingEntry'
+    put:
+      tags: [Ops]
+      summary: Update mutable runtime settings
+      operationId: updateSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: Settings updated
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: ok
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/status:
+    get:
+      tags: [Analysis]
+      summary: Get analysis subsystem status
+      operationId: getAnalysisStatus
+      responses:
+        '200':
+          description: Analysis status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisStatusResponse'
+
+  /analysis/cohorts:
+    get:
+      tags: [Analysis]
+      summary: List analysis cohorts
+      operationId: listAnalysisCohorts
+      responses:
+        '200':
+          description: Cohort array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisCohort'
+    post:
+      tags: [Analysis]
+      summary: Create an analysis cohort
+      operationId: createAnalysisCohort
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisCohortUpsertRequest'
+      responses:
+        '202':
+          description: Cohort accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}:
+    get:
+      tags: [Analysis]
+      summary: Get an analysis cohort
+      operationId: getAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '200':
+          description: Cohort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    patch:
+      tags: [Analysis]
+      summary: Patch an analysis cohort
+      operationId: patchAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisCohortPatchRequest'
+      responses:
+        '200':
+          description: Updated cohort
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Analysis]
+      summary: Delete an analysis cohort
+      operationId: deleteAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '204':
+          description: Cohort deleted
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/rebuild:
+    post:
+      tags: [Analysis]
+      summary: Rebuild one analysis cohort
+      operationId: rebuildAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '202':
+          description: Rebuild started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/clear:
+    post:
+      tags: [Analysis]
+      summary: Clear one analysis cohort
+      operationId: clearAnalysisCohort
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '200':
+          description: Cohort cleared
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohort'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/snapshots:
+    get:
+      tags: [Analysis]
+      summary: List snapshots for an analysis cohort
+      operationId: listAnalysisCohortSnapshots
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '200':
+          description: Snapshot array
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisCohortSnapshot'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/snapshots/{slug}:
+    post:
+      tags: [Analysis]
+      summary: Patch an analysis cohort snapshot
+      operationId: patchAnalysisCohortSnapshot
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+        - $ref: '#/components/parameters/SlugPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisCohortSnapshotPatchRequest'
+      responses:
+        '200':
+          description: Updated snapshot
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohortSnapshot'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Analysis]
+      summary: Retire or purge an analysis cohort snapshot
+      operationId: deleteAnalysisCohortSnapshot
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+        - $ref: '#/components/parameters/SlugPath'
+        - name: purge
+          in: query
+          schema:
+            type: boolean
+            default: false
+      responses:
+        '204':
+          description: Snapshot retired or purged
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/snapshots/rematerialize:
+    post:
+      tags: [Analysis]
+      summary: Recompute the aggregates of every snapshot in a cohort
+      description: >-
+        Rebuilds each snapshot of the cohort in turn, one at a time, and returns
+        202 with the number queued. Snapshots whose source runs have been purged
+        are skipped. Each snapshot passes through the pending materialization
+        state as its turn comes, so the snapshot list reports progress the same
+        way it does for a single rebuild. Unlike the cohort rebuild this keeps
+        every snapshot's slug, label, captured_at and default pin: it recomputes
+        views, it does not re-capture. Returns 409 while a sweep for the same
+        cohort is already running. The slug "rematerialize" is reserved by this
+        route and cannot be assigned to a snapshot.
+      operationId: rematerializeAnalysisCohortSnapshots
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '202':
+          description: Sweep accepted; queued is the number of snapshots to rebuild
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  queued:
+                    type: integer
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/cohorts/{id}/snapshots/{slug}/rematerialize:
+    post:
+      tags: [Analysis]
+      summary: Recompute snapshot aggregates
+      description: >-
+        Rebuilds the snapshot's overview and entity views in the background and
+        returns 202 with the snapshot in the pending materialization state. Poll
+        the snapshot list for materialization_status/done/total to track
+        progress. captured_at is left unchanged: a rebuild recomputes derived
+        views, it does not re-capture the snapshot.
+      operationId: rematerializeAnalysisCohortSnapshot
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '202':
+          description: Rebuild accepted; snapshot returned in pending materialization state
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohortSnapshot'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/jobs:
+    post:
+      tags: [Public]
+      summary: Submit a public job
+      operationId: createPublicJob
+      description: Public jobs return opaque public IDs. `profile_id` is allowed only for public stored profiles. `profile_overrides` is rejected.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/JobCreateRequest'
+      responses:
+        '201':
+          description: Public job created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicJob'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/jobs/{public_id}:
+    get:
+      tags: [Public]
+      summary: Get public job status
+      operationId: getPublicJob
+      parameters:
+        - $ref: '#/components/parameters/PublicIDPath'
+      responses:
+        '200':
+          description: Public job
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicJob'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/jobs/{public_id}/result:
+    get:
+      tags: [Public]
+      summary: Get public job result
+      operationId: getPublicJobResult
+      parameters:
+        - $ref: '#/components/parameters/PublicIDPath'
+        - name: locale
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Job result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/JobResult'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/jobs/{public_id}/dnssec-chain:
+    get:
+      tags: [Public]
+      summary: Get the DNSSEC chain summary for a public run
+      description: >
+        Returns the stored DNSSEC authentication-chain summary, fetched lazily
+        by the public UI when the chain section is first expanded. Gated by the
+        `show_dnssec_chain_public` operator flag: when the flag is off, or the
+        id is unknown, the endpoint answers 404 `not_found` (indistinguishable,
+        fail-safe). A run that exists without chain data answers 404
+        `no_chain_data` and is not cached.
+      operationId: getPublicJobDNSSECChain
+      parameters:
+        - $ref: '#/components/parameters/PublicIDPath'
+      responses:
+        '200':
+          description: DNSSEC chain summary
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DNSSECChain'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/locales:
+    get:
+      tags: [Public]
+      summary: List public locales
+      operationId: listPublicLocales
+      responses:
+        '200':
+          description: Locale list
+          content:
+            application/json:
+              schema:
+                type: object
+
+  /pub/api/v1/profiles:
+    get:
+      tags: [Public]
+      summary: List public stored profiles
+      operationId: listPublicProfiles
+      responses:
+        '200':
+          description: Public profiles
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PublicProfile'
+
+  /pub/api/v1/lookup/{domain}:
+    get:
+      tags: [Public]
+      summary: Lookup delegation information for a domain
+      operationId: publicLookupDomain
+      parameters:
+        - $ref: '#/components/parameters/DomainPath'
+      responses:
+        '200':
+          description: Delegation information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DelegationInfo'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/version:
+    get:
+      tags: [Public]
+      summary: Public version metadata
+      operationId: publicVersion
+      responses:
+        '200':
+          description: Version map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+
+  /pub/api/v1/info:
+    get:
+      tags: [Public]
+      summary: Public UI feature flags
+      operationId: publicInfo
+      responses:
+        '200':
+          description: Public info
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicInfo'
+
+  /pub/api/v1/analysis/catalog:
+    get:
+      tags: [Public]
+      summary: Public analysis catalog
+      operationId: publicAnalysisCatalog
+      responses:
+        '200':
+          description: Public analysis catalog
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/version:
+    get:
+      tags: [Public]
+      summary: Public version metadata, mirrored under the analysis surface
+      operationId: publicAnalysisVersion
+      responses:
+        '200':
+          description: Version map
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: string
+
+  /pub/api/v1/analysis/cohorts:
+    get:
+      tags: [Public]
+      summary: List public analysis cohorts
+      operationId: publicAnalysisCohorts
+      responses:
+        '200':
+          description: Public cohorts
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/overview:
+    get:
+      tags: [Public]
+      summary: Public analysis overview
+      operationId: publicAnalysisOverview
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis overview
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains:
+    get:
+      tags: [Public]
+      summary: Public analysis domain list
+      operationId: publicAnalysisDomains
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis domains
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains/{domain}:
+    get:
+      tags: [Public]
+      summary: Public analysis domain detail
+      operationId: publicAnalysisDomainDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+        - $ref: '#/components/parameters/DomainPath'
+      responses:
+        '200':
+          description: Public analysis domain detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/nameservers:
+    get:
+      tags: [Public]
+      summary: Public analysis nameserver list
+      operationId: publicAnalysisNameservers
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis nameservers
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/nameservers/{name}:
+    get:
+      tags: [Public]
+      summary: Public analysis nameserver detail
+      operationId: publicAnalysisNameserverDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+        - $ref: '#/components/parameters/NamePath'
+      responses:
+        '200':
+          description: Public analysis nameserver detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/endpoints:
+    get:
+      tags: [Public]
+      summary: Public analysis endpoint list
+      operationId: publicAnalysisEndpoints
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis endpoints
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/endpoints/{address}:
+    get:
+      tags: [Public]
+      summary: Public analysis endpoint detail
+      operationId: publicAnalysisEndpointDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+        - $ref: '#/components/parameters/AddressPath'
+      responses:
+        '200':
+          description: Public analysis endpoint detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/asns:
+    get:
+      tags: [Public]
+      summary: Public analysis ASN list
+      operationId: publicAnalysisASNs
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis ASNs
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/asns/{asn}:
+    get:
+      tags: [Public]
+      summary: Public analysis ASN detail
+      operationId: publicAnalysisASNDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+        - $ref: '#/components/parameters/ASNPath'
+      responses:
+        '200':
+          description: Public analysis ASN detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/prefixes:
+    get:
+      tags: [Public]
+      summary: Public analysis prefix list
+      operationId: publicAnalysisPrefixes
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis prefixes
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/prefix:
+    get:
+      tags: [Public]
+      summary: Public analysis prefix detail
+      operationId: publicAnalysisPrefixDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis prefix detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/tags:
+    get:
+      tags: [Public]
+      summary: Public analysis finding tag list
+      operationId: publicAnalysisTags
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis tags
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/tags/{tag}:
+    get:
+      tags: [Public]
+      summary: Public analysis finding tag detail
+      operationId: publicAnalysisTagDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+        - $ref: '#/components/parameters/TagPath'
+      responses:
+        '200':
+          description: Public analysis tag detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/testcases:
+    get:
+      tags: [Public]
+      summary: Public analysis testcase list
+      operationId: publicAnalysisTestcases
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis testcases
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/testcase:
+    get:
+      tags: [Public]
+      summary: Public analysis testcase detail
+      operationId: publicAnalysisTestcaseDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public analysis testcase detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}:
+    get:
+      tags: [Public]
+      summary: Public analysis cohort detail
+      operationId: publicAnalysisCohortDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+      responses:
+        '200':
+          description: Public cohort detail
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots:
+    get:
+      tags: [Public]
+      summary: List public cohort snapshots
+      operationId: publicAnalysisSnapshots
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+      responses:
+        '200':
+          description: Public snapshot list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisSnapshotListResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}:
+    get:
+      tags: [Public]
+      summary: Get public cohort snapshot detail
+      operationId: publicAnalysisSnapshotDetail
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - $ref: '#/components/parameters/SlugPath'
+      responses:
+        '200':
+          description: Public snapshot detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisSnapshotDetail'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/trends:
+    get:
+      tags: [Public]
+      summary: Public cohort snapshot trend
+      operationId: publicAnalysisTrends
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - name: category
+          in: query
+          schema:
+            type: string
+        - name: from
+          in: query
+          schema:
+            type: string
+        - name: to
+          in: query
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Trend response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisTrendResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/diff:
+    get:
+      tags: [Public]
+      summary: Public cohort snapshot diff
+      operationId: publicAnalysisDiff
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: granularity
+          in: query
+          required: false
+          description: >-
+            Diff granularity. Omitted or "domains" returns the per-domain
+            diff; "tags" returns which finding tags appeared, cleared, or
+            changed worst severity cohort-wide.
+          schema:
+            type: string
+            enum: [domains, tags]
+      responses:
+        '200':
+          description: Diff response (shape depends on granularity)
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/PublicAnalysisDiffResponse'
+                  - $ref: '#/components/schemas/PublicAnalysisTagDiffResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/report:
+    get:
+      tags: [Public]
+      summary: Classified comparison of two cohort snapshots
+      description: >-
+        Superset of the diff: every tag and domain change is classified as
+        engine-driven or as a cohort change, score movement is attributed to
+        the findings that explain it, and movers that moved together are
+        grouped into clusters.
+      operationId: publicAnalysisReport
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: min_cluster
+          in: query
+          required: false
+          description: Minimum number of domains a cluster must hold.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 3
+        - name: max_spread
+          in: query
+          required: false
+          description: Maximum score spread within one cluster, in points.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 3
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of movers in the domains page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 500
+            default: 500
+        - name: offset
+          in: query
+          required: false
+          description: Index of the first mover in the domains page.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Report response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisReportResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /pub/api/v1/analysis/cohorts/{dataset_tag}/history:
+    get:
+      tags: [Public]
+      summary: Per-entity history across a cohort's captured snapshots
+      operationId: publicAnalysisEntityHistory
+      parameters:
+        - $ref: '#/components/parameters/DatasetTagPath'
+        - name: entity
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [nameserver, asn, tag, domain]
+        - name: key
+          in: query
+          required: true
+          description: Entity identifier (nameserver name, ASN number, tag, or domain).
+          schema:
+            type: string
+      responses:
+        '200':
+          description: History response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicAnalysisEntityHistoryResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: >-
+        Admin token. Required on /api/v1 endpoints when the server is started
+        with admin tokens configured (token mode); ignored in open mode. Clients
+        send "Authorization: Bearer <token>"; the admin UI uses a session cookie
+        set via POST /session.
+  parameters:
+    IDPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+    PublicIDPath:
+      name: public_id
+      in: path
+      required: true
+      schema:
+        type: string
+    DatasetTagPath:
+      name: dataset_tag
+      in: path
+      required: true
+      schema:
+        type: string
+    SlugPath:
+      name: slug
+      in: path
+      required: true
+      schema:
+        type: string
+    DomainPath:
+      name: domain
+      in: path
+      required: true
+      schema:
+        type: string
+    NamePath:
+      name: name
+      in: path
+      required: true
+      schema:
+        type: string
+    AddressPath:
+      name: address
+      in: path
+      required: true
+      schema:
+        type: string
+    ASNPath:
+      name: asn
+      in: path
+      required: true
+      schema:
+        type: integer
+    TagPath:
+      name: tag
+      in: path
+      required: true
+      schema:
+        type: string
+
+  schemas:
+    SpecTestcase:
+      type: object
+      required: [id, module]
+      properties:
+        id:
+          type: string
+          example: basic01
+        module:
+          type: string
+          example: basic
+        description:
+          type: string
+
+    SpecTestcaseList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SpecTestcase'
+        total:
+          type: integer
+
+    SpecTag:
+      type: object
+      required: [tag]
+      properties:
+        tag:
+          type: string
+        message:
+          type: string
+
+    SpecTestcaseDetail:
+      allOf:
+        - $ref: '#/components/schemas/SpecTestcase'
+        - type: object
+          properties:
+            locale:
+              type: string
+            tags:
+              type: array
+              items:
+                $ref: '#/components/schemas/SpecTag'
+
+    JobStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, canceled, expired, paused]
+
+    Job:
+      type: object
+      required: [id, domain, status, created_at]
+      properties:
+        id:
+          type: string
+        batch_id:
+          type: string
+          description: Optional unique identifier for batch runs.
+        domain:
+          type: string
+        severity_totals:
+          type: object
+          additionalProperties:
+            type: integer
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        progress:
+          type: integer
+          format: int32
+          minimum: 0
+          maximum: 100
+          description: Progress percentage (0-100).
+        priority:
+          type: integer
+          format: int32
+          enum: [0, 1]
+          description: "Queue priority: 0=normal (interactive), 1=batch (background). Normal jobs are always dequeued before batch jobs."
+        profile_id:
+          type: integer
+          format: int64
+        profile_name:
+          type: string
+        error:
+          type: string
+
+    JobCreateRequest:
+      type: object
+      required: [domain]
+      properties:
+        domain:
+          type: string
+        tests:
+          type: array
+          items:
+            type: string
+        profile_id:
+          type: integer
+          format: int64
+          description: Optional stored profile reference. If set, the stored profile is loaded before applying any inline overrides.
+        profile_overrides:
+          type: object
+          additionalProperties: true
+        nameservers:
+          type: array
+          description: Optional undelegated nameserver/glue input for single-job pre-delegation testing.
+          items:
+            $ref: '#/components/schemas/UndelegatedNameserverInput'
+        ds_info:
+          type: array
+          description: Optional undelegated DS input for single-job pre-delegation testing (DS-only mode allowed).
+          items:
+            $ref: '#/components/schemas/UndelegatedDSInput'
+        min_level:
+          type: string
+          description: >
+            Minimum severity of the entries returned for the run. One of
+            DEBUG3, DEBUG2, DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL
+            (case-insensitive). Omit to use the server default. An unknown
+            value is rejected with `400 invalid_min_level`.
+        tags:
+          type: array
+          description: Tag names to apply to the created domain (creates tags/domains if needed).
+          items:
+            type: string
+
+    JobBatchRequest:
+      type: object
+      description: >
+        Either `domains` or `from_tag` (or both) must be provided.
+        Undelegated input (`nameservers`, `ds_info`) is rejected with `400 undelegated_not_supported_for_batch`.
+      properties:
+        domains:
+          type: array
+          items:
+            type: string
+        from_tag:
+          type: string
+          description: Expand all domains currently in this tag into the batch.
+        tests:
+          type: array
+          items:
+            type: string
+        profile_id:
+          type: integer
+          format: int64
+          description: Optional stored profile reference applied to every submitted job in the batch.
+        profile_overrides:
+          type: object
+          additionalProperties: true
+        min_level:
+          type: string
+          description: >
+            Minimum severity of the entries returned for the run. One of
+            DEBUG3, DEBUG2, DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL
+            (case-insensitive). Omit to use the server default. An unknown
+            value is rejected with `400 invalid_min_level`.
+        tags:
+          type: array
+          description: Tag names to apply to the batch (creates domain/tag records as needed).
+          items:
+            type: string
+        description:
+          type: string
+          description: Human-readable label stored on the batch record.
+        snapshot_intent:
+          type: boolean
+          description: When true, the batch is intended to become a cohort snapshot.
+
+    UndelegatedNameserverInput:
+      type: object
+      required: [ns]
+      properties:
+        ns:
+          type: string
+          description: Nameserver hostname (normalized/canonicalized server-side).
+        ip:
+          type: string
+          description: Optional IPv4 or IPv6 address for this nameserver row.
+
+    UndelegatedDSInput:
+      type: object
+      required: [keytag, algorithm, digtype, digest]
+      properties:
+        keytag:
+          type: integer
+          minimum: 0
+          maximum: 65535
+        algorithm:
+          type: integer
+          minimum: 0
+          maximum: 255
+        digtype:
+          type: integer
+          minimum: 0
+          maximum: 255
+        digest:
+          type: string
+          description: Hex-encoded DS digest.
+
+    JobBatchResponse:
+      type: object
+      required: [batch_id, job_ids]
+      properties:
+        batch_id:
+          type: string
+        job_ids:
+          type: array
+          items:
+            type: string
+
+    JobPurgeRequest:
+      type: object
+      properties:
+        older_than_days:
+          type: integer
+          minimum: 0
+          description: Days before now. Zero uses the server retention setting.
+
+    JobPurgeResponse:
+      type: object
+      required: [purged_jobs]
+      properties:
+        purged_jobs:
+          type: integer
+          format: int64
+
+    Batch:
+      type: object
+      required: [id, created_at, domain_count]
+      properties:
+        id:
+          type: string
+        tag:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        domain_count:
+          type: integer
+        description:
+          type: string
+        snapshot_intent:
+          type: boolean
+
+    BatchSummary:
+      type: object
+      required: [batch_id, total, status_counts, items, created_at]
+      properties:
+        batch_id:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        total:
+          type: integer
+        status_counts:
+          type: object
+          additionalProperties:
+            type: integer
+        grades:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Per-grade count of graduated runs in this batch. Absent when no runs have been scored.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+
+    BatchList:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Batch'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    BatchDeletePreviewSnapshot:
+      type: object
+      properties:
+        cohort_id:
+          type: integer
+          format: int64
+        cohort_label:
+          type: string
+        snapshot_slug:
+          type: string
+        snapshot_label:
+          type: string
+        is_default:
+          type: boolean
+
+    BatchDeletePreview:
+      type: object
+      required: [batch_id, exists, queued_jobs, running_jobs, completed_runs, entries, fact_rows]
+      properties:
+        batch_id:
+          type: string
+        tag:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        snapshot_intent:
+          type: boolean
+        exists:
+          type: boolean
+        queued_jobs:
+          type: integer
+        running_jobs:
+          type: integer
+        completed_runs:
+          type: integer
+        entries:
+          type: integer
+        fact_rows:
+          type: integer
+        snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchDeletePreviewSnapshot'
+
+    JobList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Job'
+        total:
+          type: integer
+
+    JobResult:
+      type: object
+      properties:
+        job_id:
+          type: string
+        batch_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        summary:
+          type: object
+          additionalProperties: true
+        score:
+          type: object
+          description: Full scoring result including numeric score, letter grade, per-category breakdown, and A+ bonus criteria. Absent when no entries are available.
+          properties:
+            score:
+              type: integer
+            grade:
+              type: string
+            categories:
+              type: object
+              additionalProperties: true
+            bonus:
+              type: object
+              additionalProperties: true
+        raw:
+          $ref: '#/components/schemas/JobResultRaw'
+        has_dnssec_chain:
+          type: boolean
+          description: >
+            True when a stored DNSSEC chain summary exists for this run and can
+            be fetched from the dnssec-chain endpoint. Omitted (false) for runs
+            without chain data or when the public flag is off.
+
+    DNSSECChain:
+      type: object
+      description: >
+        Per-run DNSSEC authentication-chain summary. The blob is versioned via
+        its own `version` field and evolves additively, so this schema is
+        intentionally loose. Served verbatim from storage.
+      properties:
+        version:
+          type: integer
+          description: >
+            Schema version of the chain document. Version 2 added
+            `servers_stale` on `parent` and `child` plus NSEC/NSEC3 signatures.
+            Version 3 added `ns_names` and the `undelegated` status.
+          example: 3
+        zone:
+          type: string
+        parent_zone:
+          type: string
+        delegation:
+          type: string
+          enum: [normal, undelegated]
+        status:
+          type: string
+          description: >
+            Roll-up verdict. `partial` means the validated path holds but some
+            servers serve signatures outside their validity window, or a
+            DS-anchored signature cannot be verified locally. `island` means the
+            parent is silent about the zone; `undelegated` means the parent
+            proves under signature that no delegation exists at the name.
+          enum: [secure, broken, partial, island, unsigned, indeterminate, undelegated]
+        truncated:
+          type: boolean
+        parent:
+          type: object
+          additionalProperties: true
+        child:
+          type: object
+          additionalProperties: true
+        links:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+        ns_names:
+          type: array
+          description: >
+            In-domain nameserver names of the zone with what the run concluded
+            about the signatures on their address records. Absent where the run
+            reached no such conclusion. The roll-up `status` above describes the
+            chain of the zone itself and is unaffected by these entries.
+          items:
+            type: object
+            properties:
+              name:
+                type: string
+              status:
+                type: string
+                enum: [validates, insecure, unsigned, orphan, chain_broken, rrsig_expired, rrsig_invalid, indeterminate]
+              signer:
+                type: string
+                description: Zone whose key signed the address records, where one was seen.
+              key_tag:
+                type: integer
+              servers:
+                type: array
+                items:
+                  type: string
+            additionalProperties: true
+      additionalProperties: true
+
+    JobResultRaw:
+      type: object
+      properties:
+        locale:
+          type: string
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/JobResultEntry'
+
+    JobResultEntry:
+      type: object
+      properties:
+        timestamp:
+          type: number
+          format: float
+        module:
+          type: string
+        testcase:
+          type: string
+        tag:
+          type: string
+        level:
+          type: string
+        args:
+          type: object
+          description: |
+            Structured log arguments map.
+
+            Canonical key semantics/types/optionality for coherency-migrated
+            entries are defined in `docs/specifications/log-args-coherency.md`.
+
+            Schema `1.x` is additive-only; consumers should ignore unknown keys.
+          externalDocs:
+            description: Log argument coherency contract (v1.1)
+            url: ./specifications/log-args-coherency.md
+          example:
+            ns: ns1.example
+            address: 192.0.2.53
+            query_name: example
+            query_type: SOA
+            query_class: IN
+          additionalProperties: true
+        message:
+          type: string
+          description: Translated message for the entry (default locale).
+        raw:
+          type: string
+          description: Raw entry string in CLI raw format.
+
+    QueueReorderRequest:
+      type: object
+      required: [job_ids]
+      properties:
+        job_ids:
+          type: array
+          items:
+            type: string
+
+    QueueRemoveRequest:
+      type: object
+      required: [job_ids]
+      properties:
+        job_ids:
+          type: array
+          items:
+            type: string
+
+    QueueRemoveResponse:
+      type: object
+      required: [removed]
+      properties:
+        removed:
+          type: array
+          items:
+            type: string
+
+    Domain:
+      type: object
+      required: [id, name, created_at, run_count]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        latest_run_id:
+          type: string
+        latest_run_at:
+          type: string
+          format: date-time
+        latest_status:
+          type: string
+        latest_level:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        run_count:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+
+    DomainList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Domain'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        next_cursor:
+          type: string
+        prev_cursor:
+          type: string
+
+    Tag:
+      type: object
+      required: [name, created_at, domain_count]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        domain_count:
+          type: integer
+        default_profile_id:
+          type: integer
+          format: int64
+
+    TagCreateRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    TagDomainsRequest:
+      type: object
+      required: [domains]
+      properties:
+        domains:
+          type: array
+          items:
+            type: string
+
+    TagProfileRequest:
+      type: object
+      required: [profile_id]
+      properties:
+        profile_id:
+          type: integer
+          format: int64
+
+    TagSummary:
+      type: object
+      required: [tag, domain_count, ok, notice, warning, error, critical]
+      properties:
+        tag:
+          type: string
+        domain_count:
+          type: integer
+        ok:
+          type: integer
+        notice:
+          type: integer
+        warning:
+          type: integer
+        error:
+          type: integer
+        critical:
+          type: integer
+        grades:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Per-grade count of domains (keyed by grade letter, e.g. "A", "B"). Absent when no runs have been scored.
+
+    Run:
+      type: object
+      required: [id, domain_id, domain, status, created_at, entry_count]
+      properties:
+        id:
+          type: string
+        domain_id:
+          type: integer
+          format: int64
+        domain:
+          type: string
+        batch_id:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        created_at:
+          type: string
+          format: date-time
+        started_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        duration_ms:
+          type: integer
+          format: int64
+          description: Wall-clock duration of the run in milliseconds.
+        sev_notice:
+          type: integer
+        sev_warning:
+          type: integer
+        sev_error:
+          type: integer
+        sev_critical:
+          type: integer
+        worst_level:
+          type: string
+        entry_count:
+          type: integer
+        profile:
+          type: string
+        public_id:
+          type: string
+        priority:
+          type: integer
+          format: int32
+          enum: [0, 1]
+          description: "Queue priority at the time of submission: 0=normal, 1=batch."
+        profile_id:
+          type: integer
+          format: int64
+        profile_name:
+          type: string
+        effective_profile:
+          type: string
+          description: JSON snapshot of the fully merged profile used for execution.
+        severity_totals:
+          type: object
+          additionalProperties:
+            type: integer
+        score:
+          type: integer
+          description: Numeric quality score in the range [0, 100].
+        grade:
+          type: string
+          description: Letter grade derived from score ("A+", "A", "B", "C", "D", or "F").
+
+    Profile:
+      type: object
+      required: [id, name, description, config, public, schema_version, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+          description: Stored engine profile JSON. A sparse override on top of the engine default profile - only the keys present here are applied; everything else is inherited.
+        public:
+          type: boolean
+        schema_version:
+          type: string
+          description: Engine version that was current when this profile was last created, updated, or marked reviewed. Used to drive compatibility checks against the running engine version.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ProfileUpsertRequest:
+      type: object
+      required: [name, config]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        config:
+          type: object
+          additionalProperties: true
+          description: Engine profile JSON validated server-side.
+        public:
+          type: boolean
+
+    PublicProfile:
+      type: object
+      required: [id, name, description]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        description:
+          type: string
+
+    PublicJob:
+      type: object
+      required: [public_id, domain, status, progress]
+      properties:
+        public_id:
+          type: string
+        domain:
+          type: string
+        status:
+          $ref: '#/components/schemas/JobStatus'
+        progress:
+          type: integer
+          minimum: 0
+          maximum: 100
+        finished_at:
+          type: string
+          format: date-time
+
+    PublicInfo:
+      type: object
+      required: [show_score_public, show_nameserver_timings_public]
+      properties:
+        show_score_public:
+          type: boolean
+        show_nameserver_timings_public:
+          type: boolean
+        show_dnssec_chain_public:
+          type: boolean
+
+    FeatureFlags:
+      type: object
+      required: [show_score_admin, show_nameserver_timings_admin]
+      properties:
+        show_score_admin:
+          type: boolean
+        show_nameserver_timings_admin:
+          type: boolean
+
+    SettingEntry:
+      type: object
+      required: [value, source]
+      properties:
+        value:
+          description: Current effective setting value.
+          oneOf:
+            - type: string
+            - type: number
+            - type: integer
+            - type: boolean
+        source:
+          type: string
+          enum: [default, config_file, database, cli_flag]
+        readonly:
+          type: boolean
+
+    DelegationInfo:
+      type: object
+      required: [nameservers, ds_records]
+      properties:
+        nameservers:
+          type: array
+          items:
+            type: object
+            required: [ns]
+            properties:
+              ns:
+                type: string
+              ip:
+                type: string
+        ds_records:
+          type: array
+          items:
+            type: object
+            required: [keytag, algorithm, digtype, digest]
+            properties:
+              keytag:
+                type: integer
+              algorithm:
+                type: integer
+              digtype:
+                type: integer
+              digest:
+                type: string
+
+    AnalysisStatusResponse:
+      type: object
+      required: [backend_supported, controller_enabled]
+      properties:
+        backend_supported:
+          type: boolean
+        controller_enabled:
+          type: boolean
+        unsupported_message:
+          type: string
+        external_data:
+          $ref: '#/components/schemas/ExternalDataStatus'
+
+    ExternalDataStatus:
+      type: object
+      description: >-
+        State of the reference-data provider. Absent when external data is
+        disabled.
+      required: [enabled, cached_records, queue_depth]
+      properties:
+        enabled:
+          type: boolean
+        cached_records:
+          type: integer
+        queue_depth:
+          type: integer
+        last_error:
+          type: string
+        last_error_at:
+          type: string
+          format: date-time
+        datasets:
+          type: array
+          items:
+            type: object
+            required: [name, state]
+            properties:
+              name:
+                type: string
+                enum: [iana_tlds, rdap_dns_bootstrap]
+              state:
+                type: string
+                enum: [fresh, stale, pending, unavailable, disabled]
+              fetched_at:
+                type: string
+                format: date-time
+              version:
+                type: string
+              entries:
+                type: integer
+
+    AnalysisCohort:
+      type: object
+      required: [id, source_type, source_tag, label, analysis_enabled, public_enabled, is_default, sort_order, materialization_status, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        source_type:
+          type: string
+          enum: [tag]
+        source_tag:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        analysis_enabled:
+          type: boolean
+        public_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+        sort_order:
+          type: integer
+        materialization_status:
+          type: string
+          enum: [pending, ready, failed]
+        materialization_done:
+          type: integer
+        materialization_total:
+          type: integer
+        last_materialized_at:
+          type: string
+          format: date-time
+        last_materialization_error:
+          type: string
+        default_snapshot_policy:
+          type: string
+          enum: [auto_latest, pinned]
+        default_snapshot_id:
+          type: integer
+          format: int64
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AnalysisCohortUpsertRequest:
+      type: object
+      required: [source_tag]
+      properties:
+        source_type:
+          type: string
+          enum: [tag]
+          default: tag
+        source_tag:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        analysis_enabled:
+          type: boolean
+        public_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+        sort_order:
+          type: integer
+
+    AnalysisCohortPatchRequest:
+      type: object
+      properties:
+        label:
+          type: string
+        description:
+          type: string
+        analysis_enabled:
+          type: boolean
+        public_enabled:
+          type: boolean
+        is_default:
+          type: boolean
+        sort_order:
+          type: integer
+
+    AnalysisCohortSnapshot:
+      type: object
+      required: [id, cohort_id, batch_id, slug, run_count, domain_count, status, is_default, is_public, created_at, updated_at]
+      properties:
+        id:
+          type: integer
+          format: int64
+        cohort_id:
+          type: integer
+          format: int64
+        batch_id:
+          type: string
+        slug:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        profile_id:
+          type: integer
+          format: int64
+        profile_name:
+          type: string
+        engine_version:
+          type: string
+          description: >-
+            gonemaster version that produced this snapshot's runs. Absent when
+            provenance could not be recovered; never defaults to the running build.
+        mixed_engine_version:
+          type: boolean
+          description: Batch spanned an engine upgrade, so its numbers mix two measurement regimes.
+        scoring_config_hash:
+          type: string
+          description: >-
+            Identity of the scoring configuration in force at capture. "default"
+            means no stored override. Absent means unknown and not recoverable,
+            so a score change cannot be fully attributed.
+        captured_at:
+          type: string
+          format: date-time
+        first_run_at:
+          type: string
+          format: date-time
+        last_run_at:
+          type: string
+          format: date-time
+        run_count:
+          type: integer
+        domain_count:
+          type: integer
+        status:
+          type: string
+          enum: [pending, captured, retired, failed_mixed_profiles]
+        is_default:
+          type: boolean
+        is_public:
+          type: boolean
+        materialization_status:
+          type: string
+          description: Rematerialize progress state; distinct from the capture-lifecycle status. Empty until first rebuilt.
+          enum: ['', pending, ready, failed]
+        materialization_done:
+          type: integer
+          description: Completed rebuild phases (0..materialization_total).
+        materialization_total:
+          type: integer
+          description: Total rebuild phases for the in-flight or last rematerialize.
+        last_materialization_error:
+          type: string
+          description: Error from the last failed rematerialize, if any.
+        last_materialized_at:
+          type: string
+          format: date-time
+          description: When the snapshot was last successfully rebuilt.
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    AnalysisCohortSnapshotPatchRequest:
+      type: object
+      properties:
+        slug:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        is_public:
+          type: boolean
+        is_default:
+          type: boolean
+        status:
+          type: string
+          enum: [captured, retired]
+
+    PublicAnalysisSnapshotListEntry:
+      type: object
+      required: [slug, captured_at, run_count, domain_count, vocabulary_available]
+      properties:
+        slug:
+          type: string
+        label:
+          type: string
+        description:
+          type: string
+        captured_at:
+          type: string
+          format: date-time
+        first_run_at:
+          type: string
+          format: date-time
+        last_run_at:
+          type: string
+          format: date-time
+        run_count:
+          type: integer
+        domain_count:
+          type: integer
+        profile_name:
+          type: string
+        engine_version:
+          type: string
+          description: >-
+            gonemaster version that produced this snapshot's runs. Absent when
+            provenance could not be recovered; never defaults to the running build.
+        mixed_engine_version:
+          type: boolean
+          description: Batch spanned an engine upgrade, so its numbers mix two measurement regimes.
+        vocabulary_available:
+          type: boolean
+          description: >-
+            The tag vocabulary in force at capture is known. False means a
+            comparison against another snapshot cannot tell an engine change
+            from a cohort change on this side.
+        scoring_config_hash:
+          type: string
+          description: >-
+            Identity of the scoring configuration in force at capture. "default"
+            means no stored override. Absent means unknown.
+        is_default:
+          type: boolean
+
+    PublicAnalysisSnapshotListResponse:
+      type: object
+      required: [dataset_tag, label, snapshots]
+      properties:
+        dataset_tag:
+          type: string
+        label:
+          type: string
+        snapshots:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisSnapshotListEntry'
+
+    PublicAnalysisSnapshotDetail:
+      allOf:
+        - $ref: '#/components/schemas/PublicAnalysisSnapshotListEntry'
+        - type: object
+          required: [dataset_tag, is_default]
+          properties:
+            dataset_tag:
+              type: string
+            aggregates:
+              type: object
+              additionalProperties: true
+
+    PublicAnalysisTrendResponse:
+      type: object
+      required: [dataset_tag, category, points]
+      properties:
+        dataset_tag:
+          type: string
+        category:
+          type: string
+        points:
+          type: array
+          items:
+            type: object
+            required: [slug, captured_at, payload]
+            properties:
+              slug:
+                type: string
+              label:
+                type: string
+              captured_at:
+                type: string
+                format: date-time
+              first_run_at:
+                type: string
+                format: date-time
+              last_run_at:
+                type: string
+                format: date-time
+              engine_version:
+                type: string
+              mixed_engine_version:
+                type: boolean
+              payload:
+                type: object
+                additionalProperties: true
+
+    PublicAnalysisDiffResponse:
+      type: object
+      required: [dataset_tag, from_slug, to_slug, added, removed, grade_changed, level_changed]
+      properties:
+        dataset_tag:
+          type: string
+        from_slug:
+          type: string
+        to_slug:
+          type: string
+        engine:
+          $ref: '#/components/schemas/PublicAnalysisEngineDelta'
+        added:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisDiffEntry'
+        removed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisDiffEntry'
+        grade_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisDiffEntry'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisDiffEntry'
+
+    PublicAnalysisEngineDelta:
+      type: object
+      required: [crossed_engine_versions]
+      description: >-
+        Engine provenance for the two sides of a diff. crossed_engine_versions
+        means they ran different versions, so a finding that appears or clears
+        may be new engine capability rather than cohort change.
+      properties:
+        from_engine_version:
+          type: string
+        to_engine_version:
+          type: string
+        crossed_engine_versions:
+          type: boolean
+        engine_version_unknown:
+          type: boolean
+          description: One side has no recoverable version, so no comparison can be made.
+
+    PublicAnalysisDiffEntry:
+      type: object
+      required: [domain]
+      properties:
+        domain:
+          type: string
+        from_grade:
+          type: string
+        to_grade:
+          type: string
+        from_level:
+          type: string
+        to_level:
+          type: string
+        worst_level:
+          type: string
+
+    PublicAnalysisTagDiffResponse:
+      type: object
+      required: [dataset_tag, from_slug, to_slug, granularity, appeared, cleared, level_changed]
+      properties:
+        dataset_tag:
+          type: string
+        from_slug:
+          type: string
+        to_slug:
+          type: string
+        granularity:
+          type: string
+          enum: [tags]
+        engine:
+          $ref: '#/components/schemas/PublicAnalysisEngineDelta'
+        appeared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisTagDiffEntry'
+        cleared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisTagDiffEntry'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisTagDiffEntry'
+
+    PublicAnalysisTagDiffEntry:
+      type: object
+      required: [tag, from_domain_count, to_domain_count, domain_delta]
+      properties:
+        tag:
+          type: string
+        module:
+          type: string
+        testcase:
+          type: string
+        from_level:
+          type: string
+        to_level:
+          type: string
+        from_domain_count:
+          type: integer
+        to_domain_count:
+          type: integer
+        domain_delta:
+          type: integer
+
+    PublicAnalysisReportResponse:
+      type: object
+      required: [dataset_tag, from_slug, to_slug, min_cluster, max_spread, header, totals, tags, domains, clusters, domain_total]
+      properties:
+        dataset_tag:
+          type: string
+        from_slug:
+          type: string
+        to_slug:
+          type: string
+        min_cluster:
+          type: integer
+        max_spread:
+          type: integer
+        header:
+          $ref: '#/components/schemas/PublicAnalysisReportHeader'
+        totals:
+          $ref: '#/components/schemas/PublicAnalysisReportTotals'
+        tags:
+          $ref: '#/components/schemas/PublicAnalysisReportTags'
+        domains:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportDomain'
+        clusters:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportCluster'
+        domain_total:
+          type: integer
+          description: >-
+            Movers in the whole comparison. The domains array carries one
+            page of them; totals, tags and clusters cover all of them.
+        domain_limit:
+          type: integer
+        domain_offset:
+          type: integer
+
+    PublicAnalysisReportHeader:
+      type: object
+      required: [from, to, engine, vocabulary, scoring_config_changed]
+      properties:
+        from:
+          $ref: '#/components/schemas/PublicAnalysisReportSide'
+        to:
+          $ref: '#/components/schemas/PublicAnalysisReportSide'
+        engine:
+          $ref: '#/components/schemas/PublicAnalysisEngineDelta'
+        vocabulary:
+          $ref: '#/components/schemas/PublicAnalysisVocabularyDelta'
+        scoring_config_changed:
+          type: string
+          enum: ["true", "false", "unknown"]
+          description: >-
+            Whether the scoring configuration differs between the two
+            snapshots. "unknown" when either side carries no identity, in
+            which case a score move cannot be fully attributed.
+        tag_floor:
+          type: string
+          description: >-
+            The stricter of the two snapshots' tag view floors. Findings
+            below it are absent from the per-domain lists.
+
+    PublicAnalysisReportSide:
+      type: object
+      required: [slug, captured_at, domain_count]
+      properties:
+        slug:
+          type: string
+        label:
+          type: string
+        captured_at:
+          type: string
+          format: date-time
+        engine_version:
+          type: string
+        mixed_engine_version:
+          type: boolean
+        profile_name:
+          type: string
+        scoring_config_hash:
+          type: string
+        tag_view_min_level:
+          type: string
+        domain_count:
+          type: integer
+
+    PublicAnalysisVocabularyDelta:
+      type: object
+      required: [from_available, to_available, from_tag_count, to_tag_count, added, removed, level_changed]
+      properties:
+        from_available:
+          type: boolean
+        to_available:
+          type: boolean
+        from_tag_count:
+          type: integer
+        to_tag_count:
+          type: integer
+        added:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisVocabularyEntry'
+        removed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisVocabularyEntry'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisVocabularyChange'
+
+    PublicAnalysisVocabularyEntry:
+      type: object
+      required: [tag]
+      properties:
+        tag:
+          type: string
+        module:
+          type: string
+        level:
+          type: string
+
+    PublicAnalysisVocabularyChange:
+      type: object
+      required: [tag, from_level, to_level]
+      properties:
+        tag:
+          type: string
+        module:
+          type: string
+        from_level:
+          type: string
+        to_level:
+          type: string
+
+    PublicAnalysisReportTotals:
+      type: object
+      required: [from_domain_count, to_domain_count, both_domain_count, added, removed, identical_score, improved, regressed]
+      properties:
+        from_domain_count:
+          type: integer
+        to_domain_count:
+          type: integer
+        both_domain_count:
+          type: integer
+        added:
+          type: integer
+        removed:
+          type: integer
+        identical_score:
+          type: integer
+        improved:
+          type: integer
+        regressed:
+          type: integer
+        from_mean_score:
+          type: number
+        to_mean_score:
+          type: number
+        from_grades:
+          type: object
+          additionalProperties:
+            type: integer
+        to_grades:
+          type: object
+          additionalProperties:
+            type: integer
+        domain_categories:
+          type: object
+          additionalProperties:
+            type: integer
+
+    PublicAnalysisReportTags:
+      type: object
+      required: [appeared, cleared, level_changed]
+      properties:
+        appeared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagEntry'
+        cleared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagEntry'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagEntry'
+
+    PublicAnalysisReportTagEntry:
+      allOf:
+        - $ref: '#/components/schemas/PublicAnalysisTagDiffEntry'
+        - type: object
+          required: [classification]
+          properties:
+            classification:
+              $ref: '#/components/schemas/PublicAnalysisChangeClassification'
+
+    PublicAnalysisChangeClassification:
+      type: string
+      enum: [new_in_engine, removed_from_engine, level_reclassified, cohort_change, unknown]
+      description: >-
+        Whether the engine's tag vocabulary moved with the finding
+        (new_in_engine, removed_from_engine, level_reclassified), the cohort
+        moved (cohort_change), or the vocabulary could not be read (unknown).
+
+    PublicAnalysisReportTagChange:
+      type: object
+      required: [tag, classification]
+      properties:
+        tag:
+          type: string
+        module:
+          type: string
+        testcase:
+          type: string
+        from_level:
+          type: string
+        to_level:
+          type: string
+        classification:
+          $ref: '#/components/schemas/PublicAnalysisChangeClassification'
+
+    PublicAnalysisReportDomain:
+      type: object
+      required: [domain, grade_changed, category, explained_delta, unexplained_delta, appeared, cleared, level_changed]
+      properties:
+        domain:
+          type: string
+        from_score:
+          type: integer
+        to_score:
+          type: integer
+        score_delta:
+          type: integer
+        from_grade:
+          type: string
+        to_grade:
+          type: string
+        grade_changed:
+          type: boolean
+        category:
+          type: string
+          enum: [real, measurement, mixed, unknown]
+          description: >-
+            Whether the domain moved because the cohort changed (real),
+            because the engine changed (measurement), because of both
+            (mixed), or for a reason the report cannot attribute (unknown).
+        explained_delta:
+          type: integer
+          description: Score movement the listed findings account for.
+        unexplained_delta:
+          type: integer
+          description: Score movement left over, which names a cause the report cannot see.
+        appeared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagChange'
+        cleared:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagChange'
+        level_changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportTagChange'
+
+    PublicAnalysisReportCluster:
+      type: object
+      required: [dimensions, domains, size, min_delta, max_delta, direction]
+      properties:
+        dimensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisReportClusterDimension'
+        domains:
+          type: array
+          items:
+            type: string
+        size:
+          type: integer
+        min_delta:
+          type: integer
+        max_delta:
+          type: integer
+        direction:
+          type: string
+          enum: [improved, regressed]
+
+    PublicAnalysisReportClusterDimension:
+      type: object
+      required: [dimension, value, total_domains]
+      properties:
+        dimension:
+          type: string
+          description: >-
+            nameserver, asn, prefix, or a registered domain-fact category
+            such as software_version.
+        value:
+          type: string
+        label:
+          type: string
+        total_domains:
+          type: integer
+          description: Domains on the "to" side carrying this value.
+
+    PublicAnalysisEntityHistoryResponse:
+      type: object
+      required: [dataset_tag, entity, key, points]
+      properties:
+        dataset_tag:
+          type: string
+        entity:
+          type: string
+          enum: [nameserver, asn, tag, domain]
+        key:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: '#/components/schemas/PublicAnalysisEntityHistoryPoint'
+
+    PublicAnalysisEntityHistoryPoint:
+      type: object
+      required: [slug, captured_at, present, domain_count]
+      properties:
+        slug:
+          type: string
+        captured_at:
+          type: string
+          format: date-time
+        present:
+          type: boolean
+        domain_count:
+          type: integer
+        latency_p50_ms:
+          type: number
+        score:
+          type: integer
+        grade:
+          type: string
+
+    ProfileDefaults:
+      type: object
+      required: [test_cases, test_levels]
+      description: Engine default profile reference data used by the admin UI when checking stored profile compatibility.
+      properties:
+        test_cases:
+          type: array
+          description: Sorted list of test case IDs the engine default profile selects.
+          items:
+            type: string
+        test_levels:
+          type: object
+          description: Per-module map of tag → severity level from the engine default profile.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              type: string
+
+    CompatibilityIssue:
+      type: object
+      required: [type, detail, suggestion]
+      properties:
+        type:
+          type: string
+          enum: [missing_test_case, missing_test_levels, invalid_config]
+          description: Issue category.
+        module:
+          type: string
+          description: Module name. Set when `type` is `missing_test_levels`.
+        detail:
+          type: string
+          description: Human-readable summary of what is missing.
+        suggestion:
+          type: string
+          description: Suggested remediation, suitable for display to the operator.
+
+    CompatibilityResult:
+      type: object
+      required: [compatible, reviewed, schema_version, current_version, issues]
+      properties:
+        compatible:
+          type: boolean
+          description: True when the profile has no open compatibility issues against the current engine. A reviewed profile stays compatible even when it waives issues.
+        reviewed:
+          type: boolean
+          description: True when `schema_version` equals the current engine version.
+        schema_version:
+          type: string
+          description: The profile's stored `schema_version`.
+        current_version:
+          type: string
+          description: The current engine version.
+        issues:
+          type: array
+          description: Open issues. Always empty for a reviewed profile, except for an unparseable config.
+          items:
+            $ref: '#/components/schemas/CompatibilityIssue'
+        waived_issues:
+          type: array
+          description: Gaps found despite the review stamp. Present only when `reviewed` is true.
+          items:
+            $ref: '#/components/schemas/CompatibilityIssue'
+
+    CompatibilitySummary:
+      type: object
+      required: [id, name, compatible, issue_count, waived_count]
+      properties:
+        id:
+          type: integer
+          format: int64
+        name:
+          type: string
+        compatible:
+          type: boolean
+        issue_count:
+          type: integer
+        waived_count:
+          type: integer
+          description: Number of issues the profile's review is waiving. Zero unless the profile is reviewed.
+
+    ProfileDiffKey:
+      type: object
+      required: [key, default, value]
+      properties:
+        key:
+          type: string
+        default:
+          description: The value in the engine default profile.
+        value:
+          description: The value the profile sets.
+
+    ProfileDiffModule:
+      type: object
+      required: [module]
+      description: Per-key findings for one module of a keyed map property. Modules identical to the default are omitted.
+      properties:
+        module:
+          type: string
+        changed:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfileDiffKey'
+        missing:
+          type: array
+          description: Keys the engine default has and the profile does not restate.
+          items:
+            type: string
+        unknown:
+          type: array
+          description: Keys the profile sets that the engine default does not have.
+          items:
+            type: string
+
+    ProfileDiffProperty:
+      type: object
+      required: [path, kind, redundant]
+      properties:
+        path:
+          type: string
+          description: Profile property path, for example `resolver.defaults.timeout`.
+        kind:
+          type: string
+          enum: [changed, redundant, set, map]
+          description: |
+            `changed` and `redundant` are scalar or opaque properties compared by value;
+            `set` is the order-insensitive `test_cases` comparison;
+            `map` is a per-key comparison of `test_levels` or `test_cases_vars`.
+        redundant:
+          type: boolean
+          description: True when the property restates the engine default exactly, so removing it leaves the merged profile unchanged.
+        wholesale:
+          type: boolean
+          description: True when overriding the property replaces the whole default table (`test_cases`, `test_levels`), which makes omitted entries dangerous rather than inherited.
+        default:
+          description: The engine default value. Set for kind `changed`.
+        value:
+          description: The value the profile sets. Set for kind `changed`.
+        excluded:
+          type: array
+          description: Test cases the engine default runs and the profile does not. Set for kind `set`.
+          items:
+            type: string
+        unknown:
+          type: array
+          description: Test cases the profile lists that the engine default does not know. Set for kind `set`.
+          items:
+            type: string
+        modules:
+          type: array
+          description: Per-module findings. Set for kind `map`.
+          items:
+            $ref: '#/components/schemas/ProfileDiffModule'
+
+    ProfileDiff:
+      type: object
+      required: [summary, properties]
+      properties:
+        summary:
+          type: object
+          required: [deviations, redundant, missing, unknown]
+          properties:
+            deviations:
+              type: integer
+              description: Properties that differ from the engine default.
+            redundant:
+              type: integer
+              description: Properties that restate the engine default.
+            missing:
+              type: integer
+              description: Keys the engine default has and an overridden map property does not restate. Excluded test cases are not counted here.
+            unknown:
+              type: integer
+              description: Keys and test cases the profile sets that the engine default does not know.
+        properties:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProfileDiffProperty'
+
+    ProfilePatchRequest:
+      type: object
+      required: [op]
+      properties:
+        op:
+          type: string
+          enum:
+            - add_missing_test_cases
+            - add_missing_test_levels
+            - reset_test_cases
+            - reset_test_levels
+            - mark_reviewed
+            - clear_reviewed
+          description: Targeted compatibility operation to apply to the stored profile.
+        module:
+          type: string
+          description: Required when `op` is `reset_test_levels`. Names the `test_levels` module to remove from the override.
+
+    MarkAllReviewedResult:
+      type: object
+      required: [updated]
+      properties:
+        updated:
+          type: integer
+          description: Number of stored profiles whose `schema_version` was bumped to the current engine version.
+
+    RunList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Run'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        next_cursor:
+          type: string
+        prev_cursor:
+          type: string
+
+    Entry:
+      type: object
+      required: [id, run_id, domain_id, timestamp, module, testcase, tag, level]
+      properties:
+        id:
+          type: integer
+          format: int64
+        run_id:
+          type: string
+        domain_id:
+          type: integer
+          format: int64
+        domain:
+          type: string
+        timestamp:
+          type: number
+          format: float
+        module:
+          type: string
+        testcase:
+          type: string
+        tag:
+          type: string
+        level:
+          type: string
+        args:
+          type: object
+          additionalProperties: true
+
+    EntryList:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Entry'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+        next_cursor:
+          type: string
+        prev_cursor:
+          type: string
+
+    ErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+            details:
+              type: object
+              additionalProperties: true
+
+  responses:
+    ErrorResponse:
+      description: Error response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'

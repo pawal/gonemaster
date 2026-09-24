@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.13] - 2026-09-24
+
+zone09 reports the full MX RDATA and lowers the TLD apex MX finding to NOTICE. Engine fixes cover explicit EDNS queries, undelegated root zone tests, and CNAME loops across responses.
 
 ### Fixed
 

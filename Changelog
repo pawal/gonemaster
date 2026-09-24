@@ -15,6 +15,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Changed
 
+- build: bump to miekg/dns v0.6.115
 - docs: zone08 cites RFC 2181 section 10.3 and RFC 5321 section 5.1 for the MX CNAME check
 
 ## [v1.7.12] - 2026-09-20

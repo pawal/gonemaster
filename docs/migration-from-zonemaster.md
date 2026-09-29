@@ -47,6 +47,11 @@ Scope:
   overrides, not the file (see [Profiles](#profiles)).
 - Custom root hints. There is no `--hints` equivalent; the root hints are
   built in.
+- Root server probing. For a zone below a TLD, Basic01 and parent discovery
+  follow one working root server and probe the others only when that path
+  finds no parent or child, so faults in root servers that were not probed
+  are not reported. Testing a TLD still probes every root server
+  ([Basic01](specifications/tests/basic/basic01.md)).
 
 ## CLI
 

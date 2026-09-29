@@ -43,6 +43,12 @@ type recurseState struct {
 	// for the deepest zone serving the name, which a server that only delegated
 	// towards it is not.
 	answerSource queryer
+	// atRoot marks that ns holds the root servers, so the next referral is cached.
+	atRoot bool
+	// skipReferrals keeps the walk from starting at a cached root referral.
+	skipReferrals bool
+	// claim is held during the root step so concurrent walks wait for its referral.
+	claim *referralClaim
 }
 
 type traceEntry struct {
@@ -81,6 +87,18 @@ func (state *recurseState) unlock() {
 		return
 	}
 	mu.Unlock()
+}
+
+func (state *recurseState) isInProgress(name string, qtype string) bool {
+	state.lock()
+	defer state.unlock()
+	return state.inProgress[strings.ToLower(dnsname.New(name).String())][strings.ToUpper(qtype)]
+}
+
+func (state *recurseState) clearInProgress(name string, qtype string) {
+	state.lock()
+	defer state.unlock()
+	delete(state.inProgress[strings.ToLower(dnsname.New(name).String())], strings.ToUpper(qtype))
 }
 
 func (r *Recursor) recurse(ctx context.Context, name string, qtype string, qclass string, state *recurseState) (packet.Packet, *recurseState, error) {
@@ -325,6 +343,11 @@ func (r *Recursor) processOrderedResponse(ctx context.Context, nameObj dnsname.N
 			return packet.Packet{}, state, orderedActionContinue, nil
 		}
 		state.common = common
+		if state.atRoot {
+			state.atRoot = false
+			r.storeReferral(zname, resp, state.qname)
+			r.releaseClaim(state)
+		}
 
 		next, err := state.nsFrom(ctx, resp, state)
 		if err != nil {
@@ -525,6 +548,11 @@ func (r *Recursor) recurseUnordered(ctx context.Context, name string, qtype stri
 			zkey := strings.ToLower(redirectZName)
 			state.seen[zkey] = true
 			state.common = redirectCommon
+			if state.atRoot {
+				state.atRoot = false
+				r.storeReferral(redirectZName, redirectResp, state.qname)
+				r.releaseClaim(state)
+			}
 
 			next, err := state.nsFrom(ctx, redirectResp, state)
 			if err != nil {
@@ -607,6 +635,7 @@ func redirectName(resp packet.Packet) (string, bool) {
 }
 
 func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype string, qclass string, resp packet.Packet, state *recurseState) (packet.Packet, *recurseState, error) {
+	r.releaseClaim(state)
 	cnameRRs := resp.GetRecords("CNAME", "answer")
 	if len(cnameRRs) == 0 {
 		return resp, state, nil
@@ -705,15 +734,6 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 
 	targetName := dnsname.New(targetKey)
 	if !name.IsInBailiwick(targetName) {
-		root, err := r.RootServers(ctx)
-		if err != nil {
-			return packet.Packet{}, state, err
-		}
-		queryers := make([]queryer, 0, len(root))
-		for _, server := range root {
-			queryers = append(queryers, server)
-		}
-
 		// Use a fresh inProgress map for CNAME resolution. The parent's
 		// inProgress blocks re-resolution of nameserver addresses (e.g.
 		// ns1.example A) that were already resolved during the parent
@@ -721,17 +741,16 @@ func (r *Recursor) resolveCNAME(ctx context.Context, name dnsname.Name, qtype st
 		// via a different delegation path, so it must be able to resolve
 		// them independently. CNAME-specific loop detection is handled
 		// separately by tseen/tcount.
-		nextState := &recurseState{
-			ns:         queryers,
-			count:      0,
-			common:     0,
-			seen:       map[string]bool{},
-			inProgress: map[string]map[string]bool{},
-			tseen:      state.tseen,
-			tcount:     tcount,
-			mu:         state.mu,
-		}
-		return r.recurse(ctx, targetName.String(), qtype, qclass, nextState)
+		return r.recurseFromRoot(ctx, targetName.String(), qtype, qclass, func() *recurseState {
+			return &recurseState{
+				seen:          map[string]bool{},
+				inProgress:    map[string]map[string]bool{},
+				tseen:         state.tseen,
+				tcount:        tcount,
+				mu:            state.mu,
+				skipReferrals: state.skipReferrals,
+			}
+		})
 	}
 
 	return resp, state, nil

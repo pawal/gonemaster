@@ -49,7 +49,9 @@ func (r *Recursor) Parent(ctx context.Context, name string) (string, packet.Pack
 	}
 
 	state := &recurseState{
-		ns: queryers,
+		ns:            queryers,
+		atRoot:        true,
+		skipReferrals: true,
 	}
 
 	resp, state, err := r.recurse(ctx, nameObj.String(), "SOA", "IN", state)
@@ -192,33 +194,22 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 	}
 	state.unlock()
 
-	root, err := r.RootServers(ctx)
-	if err != nil {
-		return nil, err
-	}
-	buildQueryers := func() []queryer {
-		queryers := make([]queryer, 0, len(root))
-		for _, server := range root {
-			queryers = append(queryers, server)
-		}
-		return queryers
-	}
-
 	var pa, paaaa packet.Packet
+	var err error
 
 	parallelism := max(profile.FromContext(ctx).Resolver.Defaults.Parallel, 1)
 	if profile.FromContext(ctx).Resolver.Defaults.Unordered || isUnorderedContext(ctx) {
 		parallelism = 1
 	}
 	if parallelism == 1 {
-		pa, _, err = r.recurse(ctx, name, "A", "IN", &recurseState{
-			ns:         buildQueryers(),
-			count:      state.count,
-			common:     0,
-			seen:       map[string]bool{},
-			inProgress: state.inProgress,
-			glue:       state.glue,
-			mu:         state.mu,
+		pa, _, err = r.recurseFromRoot(ctx, name, "A", "IN", func() *recurseState {
+			return &recurseState{
+				count:      state.count,
+				seen:       map[string]bool{},
+				inProgress: state.inProgress,
+				glue:       state.glue,
+				mu:         state.mu,
+			}
 		})
 		if err != nil {
 			return nil, err
@@ -226,14 +217,14 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 		if pa.NoSuchName() {
 			return nil, nil
 		}
-		paaaa, _, err = r.recurse(ctx, name, "AAAA", "IN", &recurseState{
-			ns:         buildQueryers(),
-			count:      state.count,
-			common:     0,
-			seen:       map[string]bool{},
-			inProgress: state.inProgress,
-			glue:       state.glue,
-			mu:         state.mu,
+		paaaa, _, err = r.recurseFromRoot(ctx, name, "AAAA", "IN", func() *recurseState {
+			return &recurseState{
+				count:      state.count,
+				seen:       map[string]bool{},
+				inProgress: state.inProgress,
+				glue:       state.glue,
+				mu:         state.mu,
+			}
 		})
 		if err != nil {
 			return nil, err
@@ -247,24 +238,24 @@ func (r *Recursor) getAddressesFor(ctx context.Context, name string, state *recu
 
 		tasks := []parallel.Task[addrResult]{
 			func(ctx context.Context) (addrResult, error) {
-				resp, nextState, err := r.recurse(ctx, name, "A", "IN", &recurseState{
-					ns:         buildQueryers(),
-					count:      state.count,
-					common:     0,
-					seen:       map[string]bool{},
-					inProgress: cloneInProgressMap(baseInProgress),
-					glue:       cloneGlueMap(baseGlue),
+				resp, nextState, err := r.recurseFromRoot(ctx, name, "A", "IN", func() *recurseState {
+					return &recurseState{
+						count:      state.count,
+						seen:       map[string]bool{},
+						inProgress: cloneInProgressMap(baseInProgress),
+						glue:       cloneGlueMap(baseGlue),
+					}
 				})
 				return addrResult{resp: resp, state: nextState}, err
 			},
 			func(ctx context.Context) (addrResult, error) {
-				resp, nextState, err := r.recurse(ctx, name, "AAAA", "IN", &recurseState{
-					ns:         buildQueryers(),
-					count:      state.count,
-					common:     0,
-					seen:       map[string]bool{},
-					inProgress: cloneInProgressMap(baseInProgress),
-					glue:       cloneGlueMap(baseGlue),
+				resp, nextState, err := r.recurseFromRoot(ctx, name, "AAAA", "IN", func() *recurseState {
+					return &recurseState{
+						count:      state.count,
+						seen:       map[string]bool{},
+						inProgress: cloneInProgressMap(baseInProgress),
+						glue:       cloneGlueMap(baseGlue),
+					}
 				})
 				return addrResult{resp: resp, state: nextState}, err
 			},
@@ -320,6 +311,7 @@ func (r *Recursor) ClearCache() {
 	r.cacheMu.Lock()
 	r.recurseCache = map[string]map[string]map[string]*recurseCacheEntry{}
 	r.recurseCount = 0
+	r.referrals = nil
 	r.cacheMu.Unlock()
 }
 
@@ -385,23 +377,14 @@ func (r *Recursor) recurseWithNameservers(ctx context.Context, name string, qtyp
 	}()
 
 	if ns == nil {
-		root, err := r.RootServers(ctx)
-		if err != nil {
-			return packet.Packet{}, err
+		resp, _, err = r.recurseFromRoot(ctx, name, qtype, qclass, func() *recurseState { return &recurseState{} })
+	} else {
+		queryers := make([]queryer, 0, len(ns))
+		for _, server := range ns {
+			queryers = append(queryers, server)
 		}
-		ns = root
+		resp, _, err = r.recurse(ctx, name, qtype, qclass, &recurseState{ns: queryers})
 	}
-
-	queryers := make([]queryer, 0, len(ns))
-	for _, server := range ns {
-		queryers = append(queryers, server)
-	}
-
-	state := &recurseState{
-		ns: queryers,
-	}
-
-	resp, _, err = r.recurse(ctx, name, qtype, qclass, state)
 	if err != nil {
 		if ctx == nil || ctx.Err() == nil {
 			r.cacheStoreNegative(key, qtype, qclass, err)

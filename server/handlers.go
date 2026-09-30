@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -73,7 +74,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if !validateMinLevel(w, req.MinLevel) {
+	if !validateMinLevel(w, req.MinLevel) || !s.validateTests(w, req.Tests) {
 		return
 	}
 	tagNames, ok := validateTags(w, s, req.Tags)
@@ -407,7 +408,7 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
-	if !validateMinLevel(w, req.MinLevel) {
+	if !validateMinLevel(w, req.MinLevel) || !s.validateTests(w, req.Tests) {
 		return
 	}
 	tagNames, ok := validateTags(w, s, req.Tags)
@@ -495,6 +496,24 @@ func validateTags(w http.ResponseWriter, s *Server, tags []string) ([]string, bo
 
 // validateMinLevel rejects a min_level the engine cannot use. Empty is the
 // server default.
+// isExcluded reports whether the instance excludes the testcase.
+func (s *Server) isExcluded(testcase string) bool {
+	return slices.Contains(s.excludedTestcases, strings.ToLower(strings.TrimSpace(testcase)))
+}
+
+// validateTests writes 400 testcase_excluded when tests names an excluded testcase.
+func (s *Server) validateTests(w http.ResponseWriter, tests []string) bool {
+	for _, name := range tests {
+		if s.isExcluded(name) {
+			name = strings.ToLower(strings.TrimSpace(name))
+			writeError(w, http.StatusBadRequest, "testcase_excluded",
+				fmt.Sprintf("testcase %q is excluded on this instance", name), map[string]any{"testcase": name})
+			return false
+		}
+	}
+	return true
+}
+
 func validateMinLevel(w http.ResponseWriter, minLevel string) bool {
 	if strings.TrimSpace(minLevel) == "" {
 		return true

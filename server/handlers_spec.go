@@ -23,6 +23,8 @@ type SpecTestcase struct {
 	ID          string `json:"id"`
 	Module      string `json:"module"`
 	Description string `json:"description,omitempty"`
+	// Excluded is true when the instance never runs the testcase.
+	Excluded bool `json:"excluded,omitempty"`
 }
 
 // SpecTestcaseList is the GET /api/v1/spec/testcases response.
@@ -84,7 +86,7 @@ func (s *Server) handleSpecTestcases(w http.ResponseWriter, r *http.Request) {
 		if !ok || (module != "" && m != module) {
 			continue
 		}
-		items = append(items, SpecTestcase{ID: tc, Module: m, Description: testcaseDescriptions[strings.ToUpper(tc)]})
+		items = append(items, SpecTestcase{ID: tc, Module: m, Description: testcaseDescriptions[strings.ToUpper(tc)], Excluded: s.isExcluded(tc)})
 	}
 	writeJSON(w, http.StatusOK, SpecTestcaseList{Items: items, Total: len(items)})
 }
@@ -106,7 +108,7 @@ func (s *Server) handleSpecTestcase(w http.ResponseWriter, r *http.Request) {
 	}
 	locale := resolveResultLocale(r.URL.Query().Get("locale"))
 	detail := SpecTestcaseDetail{
-		SpecTestcase: SpecTestcase{ID: id, Module: module, Description: testcaseDescriptions[strings.ToUpper(id)]},
+		SpecTestcase: SpecTestcase{ID: id, Module: module, Description: testcaseDescriptions[strings.ToUpper(id)], Excluded: s.isExcluded(id)},
 		Locale:       locale,
 		Tags:         []SpecTag{},
 	}

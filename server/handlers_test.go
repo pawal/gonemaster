@@ -1551,3 +1551,22 @@ func TestListJobsReachesRunsBeyondTheMergeWindow(t *testing.T) {
 		t.Fatalf("last page should end at the newest run, got %v", ids(tail.Items))
 	}
 }
+
+func TestCreateJobRejectsExcludedTest(t *testing.T) {
+	srv := newTestServer(t, withConfig(excludeDNSSEC))
+	for _, tc := range []struct{ path, body string }{
+		{"/api/v1/jobs", `{"domain":"example.com","tests":["basic01","DNSSEC10"]}`},
+		{"/api/v1/jobs/batch", `{"domains":["example.com"],"tests":["dnssec10"]}`},
+	} {
+		body := wantErrorCode(t, doJSON(t, srv, http.MethodPost, tc.path, tc.body), http.StatusBadRequest, "testcase_excluded")
+		if body.Error.Details["testcase"] != "dnssec10" {
+			t.Fatalf("%s: details %v, want testcase dnssec10", tc.path, body.Error.Details)
+		}
+	}
+}
+
+func TestCreateJobWithoutTestsIgnoresExclude(t *testing.T) {
+	srv := newTestServer(t, withConfig(excludeDNSSEC))
+	wantStatus(t, doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tests":["basic01"]}`), http.StatusCreated)
+	wantStatus(t, doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`), http.StatusCreated)
+}

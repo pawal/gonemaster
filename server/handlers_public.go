@@ -59,6 +59,8 @@ type publicInfoResponse struct {
 	ShowScorePublic             bool `json:"show_score_public"`
 	ShowNameserverTimingsPublic bool `json:"show_nameserver_timings_public"`
 	ShowDNSSECChainPublic       bool `json:"show_dnssec_chain_public"`
+	// ExcludedTestcases lists the testcases this instance never runs.
+	ExcludedTestcases []string `json:"excluded_testcases"`
 }
 
 // handlePublicInfo handles GET /pub/api/v1/info.
@@ -70,6 +72,7 @@ func (s *Server) handlePublicInfo(w http.ResponseWriter, _ *http.Request) {
 		ShowScorePublic:             s.cfg.ShowScorePublic,
 		ShowNameserverTimingsPublic: s.cfg.ShowNameserverTimingsPublic,
 		ShowDNSSECChainPublic:       s.cfg.ShowDNSSECChainPublic,
+		ExcludedTestcases:           s.excludedTestcases,
 	})
 }
 
@@ -130,7 +133,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
-	if !validateMinLevel(w, req.MinLevel) {
+	if !validateMinLevel(w, req.MinLevel) || !s.validateTests(w, req.Tests) {
 		return
 	}
 	if !s.cfg.PublicAPI.AllowPrivateUndelegatedIP {

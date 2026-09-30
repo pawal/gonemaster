@@ -2,7 +2,10 @@ package server
 
 import (
 	"context"
+	"errors"
 	"net/netip"
+	"slices"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -597,5 +600,91 @@ func TestRunEngineForJobClampsNonGlobalGuard(t *testing.T) {
 	}
 	if !pAllow.Net.AllowNonGlobalTargets {
 		t.Fatal("expected effective net.allow_non_global_targets true (override honored)")
+	}
+}
+
+// excludeDNSSEC sets the instance exclusion to the dnssec module.
+func excludeDNSSEC(c *Config) { c.Exclude = []string{"dnssec"} }
+
+// effectiveTestcases returns test_cases from the run's stored effective profile.
+func effectiveTestcases(t *testing.T, srv *Server, jobID string) []string {
+	t.Helper()
+	run, ok := srv.store.GetRun(jobID)
+	if !ok {
+		t.Fatal("expected run")
+	}
+	effective, err := profile.FromJSON(run.EffectiveProfile)
+	if err != nil {
+		t.Fatalf("parse effective profile: %v", err)
+	}
+	out := []string{}
+	for _, item := range effective.TestCases {
+		name, _ := item.(string)
+		out = append(out, name)
+	}
+	return out
+}
+
+func TestRunJobExcludeBeatsStoredProfile(t *testing.T) {
+	srv := newTestServer(t, withConfig(excludeDNSSEC))
+	stored, err := srv.store.CreateProfile(StoredProfile{Name: "some", Config: `{"test_cases":["basic01","dnssec10"]}`})
+	if err != nil {
+		t.Fatalf("CreateProfile: %v", err)
+	}
+	var got engine.RunRequest
+	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		got = req
+		return nil, nil
+	}
+	job := Job{ID: "job-exclude-stored", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC(), ProfileID: &stored.ID}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	if err := srv.runJob(job.ID); err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+	if want := []string{"dnssec"}; !slices.Equal(got.Exclude, want) {
+		t.Fatalf("Exclude = %v, want %v", got.Exclude, want)
+	}
+	if got, want := effectiveTestcases(t, srv, job.ID), []string{"basic01"}; !slices.Equal(got, want) {
+		t.Fatalf("effective test_cases = %v, want %v", got, want)
+	}
+}
+
+func TestRunJobExcludeBeatsOverrides(t *testing.T) {
+	srv := newTestServer(t, withConfig(excludeDNSSEC), withEngineRunner(func(engine.RunRequest) ([]engine.LogEntry, error) { return nil, nil }))
+	job := Job{
+		ID:        "job-exclude-overrides",
+		Domain:    "example.com",
+		Status:    JobQueued,
+		CreatedAt: time.Now().UTC(),
+		Overrides: map[string]any{"test_cases": []any{"basic02", "dnssec07", "zone01"}},
+	}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	if err := srv.runJob(job.ID); err != nil {
+		t.Fatalf("run job: %v", err)
+	}
+	if got, want := effectiveTestcases(t, srv, job.ID), []string{"basic02", "zone01"}; !slices.Equal(got, want) {
+		t.Fatalf("effective test_cases = %v, want %v", got, want)
+	}
+}
+
+func TestRunJobExcludedTestFails(t *testing.T) {
+	srv := newTestServer(t, withConfig(excludeDNSSEC))
+	job := Job{ID: "job-excluded-test", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC(), Tests: []string{"dnssec10"}}
+	if _, err := srv.store.Create(job); err != nil {
+		t.Fatalf("create job: %v", err)
+	}
+	if err := srv.runJob(job.ID); !errors.Is(err, engine.ErrNotImplemented) {
+		t.Fatalf("run job: %v, want ErrNotImplemented", err)
+	}
+	got, ok := srv.store.Get(job.ID)
+	if !ok {
+		t.Fatal("expected job")
+	}
+	if got.Status != JobFailed || !strings.Contains(got.Error, `testcase "dnssec10" is excluded`) {
+		t.Fatalf("status %q error %q, want failed with the exclusion message", got.Status, got.Error)
 	}
 }

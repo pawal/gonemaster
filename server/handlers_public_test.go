@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -553,5 +554,27 @@ func TestCreateJobRejectsUnknownMinLevel(t *testing.T) {
 			rr = doJSON(t, srv, http.MethodPost, tc.path, tc.body("warning"))
 			wantStatus(t, rr, tc.ok)
 		})
+	}
+}
+
+func TestPublicCreateJobRejectsExcludedTest(t *testing.T) {
+	srv := newTestServer(t, withConfig(excludeDNSSEC))
+	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com","tests":["dnssec10"]}`)
+	wantErrorCode(t, resp, http.StatusBadRequest, "testcase_excluded")
+	wantStatus(t, doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`), http.StatusCreated)
+}
+
+func TestPublicInfoListsExcludedTestcases(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(c *Config) { c.Exclude = []string{"zone11", "basic"} }))
+	info := mustJSON[publicInfoResponse](t, doJSON(t, srv, http.MethodGet, "/pub/api/v1/info", nil), http.StatusOK)
+	if want := []string{"basic01", "basic02", "basic03", "zone11"}; !slices.Equal(info.ExcludedTestcases, want) {
+		t.Fatalf("excluded_testcases = %v, want %v", info.ExcludedTestcases, want)
+	}
+}
+
+func TestPublicInfoExcludedTestcasesEmpty(t *testing.T) {
+	resp := doJSON(t, newTestServer(t), http.MethodGet, "/pub/api/v1/info", nil)
+	if !strings.Contains(resp.Body.String(), `"excluded_testcases":[]`) {
+		t.Fatalf("expected an empty excluded_testcases list, got %s", resp.Body.String())
 	}
 }

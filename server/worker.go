@@ -338,6 +338,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, er
 		block := false
 		req.AllowNonGlobalTargets = &block
 	}
+	req.Exclude = s.cfg.Exclude
 	if s.cfg.PositiveCacheTTL != nil {
 		req.PositiveCacheTTL = s.cfg.PositiveCacheTTL
 	}

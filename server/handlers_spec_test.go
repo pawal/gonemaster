@@ -120,3 +120,28 @@ func TestSpecTestcaseNotFound(t *testing.T) {
 	resp := getSpec(t, srv, "/api/v1/spec/testcases/nope99", nil)
 	wantStatus(t, resp, http.StatusNotFound)
 }
+
+func TestSpecTestcasesMarkExcluded(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(c *Config) { c.Exclude = []string{"dnssec10"} }))
+	var list SpecTestcaseList
+	getSpec(t, srv, "/api/v1/spec/testcases?module=dnssec", &list)
+	excluded := []string{}
+	for _, it := range list.Items {
+		if it.Excluded {
+			excluded = append(excluded, it.ID)
+		}
+	}
+	if len(excluded) != 1 || excluded[0] != "dnssec10" || list.Total < 2 {
+		t.Fatalf("excluded %v of %d, want only dnssec10 in the full list", excluded, list.Total)
+	}
+	var detail SpecTestcaseDetail
+	getSpec(t, srv, "/api/v1/spec/testcases/dnssec10", &detail)
+	if !detail.Excluded {
+		t.Fatalf("detail excluded = false, want true")
+	}
+	var other SpecTestcaseDetail
+	getSpec(t, srv, "/api/v1/spec/testcases/dnssec09", &other)
+	if other.ID != "dnssec09" || other.Excluded {
+		t.Fatalf("dnssec09 excluded = true, want false")
+	}
+}

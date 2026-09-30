@@ -42,6 +42,7 @@ type Server struct {
 	cancels                  map[string]context.CancelFunc
 	rateLimiter              *RateLimiter
 	trustedProxies           []netip.Prefix
+	excludedTestcases        []string
 	hotCache                 *nameserverHotCache
 	delegationLookup         func(context.Context, string) DelegationInfo
 	configSources            map[string]SettingSource
@@ -121,6 +122,9 @@ func NewWithOptions(cfg Config) (*Server, error) {
 	if cfg.ListenAddr == "" {
 		cfg = DefaultConfig()
 	}
+	if _, err := engine.ExpandExclusions(cfg.Exclude); err != nil {
+		return nil, err
+	}
 
 	var store JobStore
 	if memoryDriver(cfg.Database.Driver) {
@@ -196,6 +200,10 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		s.metrics.SetRateLimitKeysSource(s.rateLimiter.Keys)
 	}
 	s.trustedProxies = parseTrustedProxies(cfg.TrustedProxyCIDRs)
+	s.excludedTestcases, _ = engine.ExpandExclusions(cfg.Exclude)
+	if s.excludedTestcases == nil {
+		s.excludedTestcases = []string{}
+	}
 	if cfg.CrossJobHotCache {
 		s.hotCache = newNameserverHotCache(0, cfg.EffectiveCrossJobHotCacheTTL())
 	}

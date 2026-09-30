@@ -178,6 +178,7 @@ type SpecTestcase struct {
 	ID          string `json:"id"`
 	Module      string `json:"module"`
 	Description string `json:"description"`
+	Excluded    bool   `json:"excluded,omitempty"`
 }
 
 // SpecTestcaseList is GET /spec/testcases.
@@ -197,6 +198,7 @@ type SpecTestcaseDetail struct {
 	ID          string    `json:"id"`
 	Module      string    `json:"module"`
 	Description string    `json:"description"`
+	Excluded    bool      `json:"excluded,omitempty"`
 	Locale      string    `json:"locale"`
 	Tags        []SpecTag `json:"tags"`
 }

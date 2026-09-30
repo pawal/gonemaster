@@ -367,6 +367,7 @@ type specTestcaseView struct {
 	ID          string `json:"id"`
 	Module      string `json:"module"`
 	Description string `json:"description"`
+	Excluded    bool   `json:"excluded"`
 }
 
 type specTestcaseListView struct {
@@ -384,6 +385,7 @@ type specTestcaseDetailView struct {
 	ID          string        `json:"id"`
 	Module      string        `json:"module"`
 	Description string        `json:"description"`
+	Excluded    bool          `json:"excluded"`
 	Locale      string        `json:"locale"`
 	Tags        []specTagView `json:"tags"`
 }

@@ -21,6 +21,7 @@ type specTestcaseOut struct {
 	ID          string `json:"id" jsonschema:"testcase id, e.g. dnssec09"`
 	Module      string `json:"module"`
 	Description string `json:"description,omitempty"`
+	Excluded    bool   `json:"excluded,omitempty" jsonschema:"true when the server never runs this testcase"`
 }
 
 type specListOutput struct {
@@ -39,7 +40,7 @@ func registerSpecList(srv *mcp.Server, api *apiClient) {
 		}
 		out := specListOutput{Testcases: []specTestcaseOut{}}
 		for _, t := range list.Items {
-			out.Testcases = append(out.Testcases, specTestcaseOut{ID: t.ID, Module: t.Module, Description: t.Description})
+			out.Testcases = append(out.Testcases, specTestcaseOut{ID: t.ID, Module: t.Module, Description: t.Description, Excluded: t.Excluded})
 		}
 		out.Count = len(out.Testcases)
 		return nil, out, nil
@@ -60,6 +61,7 @@ type specGetOutput struct {
 	ID          string       `json:"id"`
 	Module      string       `json:"module"`
 	Description string       `json:"description,omitempty"`
+	Excluded    bool         `json:"excluded,omitempty" jsonschema:"true when the server never runs this testcase"`
 	Locale      string       `json:"locale,omitempty"`
 	Tags        []specTagOut `json:"tags" jsonschema:"tags this testcase can emit, each with its rendered message"`
 }
@@ -81,7 +83,7 @@ func registerSpecGet(srv *mcp.Server, api *apiClient) {
 		if err != nil {
 			return nil, specGetOutput{}, toolError("get testcase", err)
 		}
-		out := specGetOutput{ID: d.ID, Module: d.Module, Description: d.Description, Locale: d.Locale, Tags: []specTagOut{}}
+		out := specGetOutput{ID: d.ID, Module: d.Module, Description: d.Description, Excluded: d.Excluded, Locale: d.Locale, Tags: []specTagOut{}}
 		for _, tg := range d.Tags {
 			out.Tags = append(out.Tags, specTagOut{Tag: tg.Tag, Message: tg.Message})
 		}

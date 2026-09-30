@@ -10,7 +10,7 @@ func TestSpecListTool(t *testing.T) {
 	api := fakeAPI(t, apitest.Opts{SpecList: &apitest.SpecTestcaseList{
 		Items: []apitest.SpecTestcase{
 			{ID: "dnssec09", Module: "dnssec", Description: "RRSIG validity"},
-			{ID: "dnssec10", Module: "dnssec", Description: "Zone signed"},
+			{ID: "dnssec10", Module: "dnssec", Description: "Zone signed", Excluded: true},
 		},
 		Total: 2,
 	}})
@@ -25,6 +25,22 @@ func TestSpecListTool(t *testing.T) {
 	}
 	if out.Testcases[0].ID != "dnssec09" || out.Testcases[0].Module != "dnssec" {
 		t.Errorf("first testcase wrong: %+v", out.Testcases[0])
+	}
+	if out.Testcases[0].Excluded || !out.Testcases[1].Excluded {
+		t.Errorf("excluded = %t, %t, want false, true", out.Testcases[0].Excluded, out.Testcases[1].Excluded)
+	}
+}
+
+func TestSpecGetToolExcluded(t *testing.T) {
+	api := fakeAPI(t, apitest.Opts{SpecDetail: &apitest.SpecTestcaseDetail{ID: "dnssec10", Module: "dnssec", Excluded: true, Locale: "en"}})
+
+	var out specGetOutput
+	res := callTool(t, api, "spec_get_testcase", map[string]any{"testcase": "dnssec10"}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	if !out.Excluded {
+		t.Errorf("excluded = false, want true")
 	}
 }
 

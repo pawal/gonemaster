@@ -1,6 +1,10 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -45,6 +49,8 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"--db-dsn DSN",
 		"GONEMASTER_DB_DRIVER",
 		"GONEMASTER_DB_DSN",
+		"--exclude NAME",
+		"GONEMASTER_EXCLUDE",
 	}
 	res.RequireErrContains(t, expected...)
 }
@@ -196,4 +202,43 @@ func TestRunPublicAPIRateLimitHelpText(t *testing.T) {
 		"GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX",
 		"GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW",
 	)
+}
+
+// dumpedExclude runs --dump-config with args and returns its exclude list.
+func dumpedExclude(t *testing.T, args ...string) []string {
+	t.Helper()
+	res := clitest.Run(t, run, append([]string{"--dump-config"}, args...)...)
+	res.RequireCode(t, 0)
+	var cfg struct {
+		Exclude []string `json:"exclude"`
+	}
+	if err := json.Unmarshal([]byte(res.Out), &cfg); err != nil {
+		t.Fatalf("parse dump-config: %v\n%s", err, res.Out)
+	}
+	return cfg.Exclude
+}
+
+func TestRunExcludeFlagDumpConfig(t *testing.T) {
+	t.Setenv("GONEMASTER_EXCLUDE", "zone11")
+	got := dumpedExclude(t, "--exclude", "dnssec10, Zone01", "--exclude", "basic")
+	if want := []string{"dnssec10", "Zone01", "basic"}; !slices.Equal(got, want) {
+		t.Fatalf("exclude = %v, want %v", got, want)
+	}
+}
+
+func TestRunExcludeConfigFile(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"exclude":["dnssec","zone11"]}`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	got := dumpedExclude(t, "--config", path)
+	if want := []string{"dnssec", "zone11"}; !slices.Equal(got, want) {
+		t.Fatalf("exclude = %v, want %v", got, want)
+	}
+}
+
+func TestRunExcludeUnknownFailsStartup(t *testing.T) {
+	res := clitest.Run(t, run, "--exclude", "dnssec,nope99", "--dump-config")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, `unknown excluded testcase or module "nope99"`)
 }

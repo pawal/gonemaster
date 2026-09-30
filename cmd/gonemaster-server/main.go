@@ -40,6 +40,16 @@ type usageLine struct {
 	detail string
 }
 
+// listFlag collects a repeatable string flag.
+type listFlag []string
+
+func (f *listFlag) String() string { return strings.Join(*f, ",") }
+
+func (f *listFlag) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}
+
 func main() {
 	os.Exit(run(os.Args[1:], os.Stdout, os.Stderr))
 }
@@ -66,6 +76,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var sourceAddr6 string
 	var minLevel string
 	var profilePath string
+	var excludes listFlag
 	var logFormat string
 	var logLevel string
 	var dbDriver string
@@ -123,6 +134,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		})
 		printUsageGroup(errOut, "Resolver/Profile", []usageLine{
 			{flag: "--profile PATH", detail: "Profile JSON/YAML path"},
+			{flag: "--exclude NAME", detail: "Skip a testcase or module in every run (repeatable, comma list) (env: GONEMASTER_EXCLUDE)"},
 			{flag: "--positive-cache-ttl N", detail: "Cache positive DNS responses (seconds)"},
 			{flag: "--negative-cache-ttl N", detail: "Cache negative DNS responses (seconds)"},
 			{flag: "--timeout N", detail: "Override resolver.defaults.timeout (seconds)"},
@@ -203,6 +215,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
 	fs.BoolVar(&pubAPIAllowPrivateUndelegatedIP, "public-api-allow-private-undelegated-ip", false, "Allow private/loopback IPs as undelegated NS targets on the public API (default off)")
 	fs.BoolVar(&pubAPIAllowNonGlobalTargets, "public-api-allow-non-global-targets", false, "Permit querying non-globally-reachable addresses; off clamps the engine guard on for every job (default off)")
+	fs.Var(&excludes, "exclude", "Skip a testcase or module in every run (repeatable, comma list)")
 	fs.StringVar(&trustedProxyCIDRs, "trusted-proxy-cidrs", "", "Comma-separated CIDRs allowed to set X-Forwarded-For (default empty = trust nothing)")
 	fs.StringVar(&adminTokenHashes, "admin-token-hashes", "", "Comma-separated admin token hashes (label=sha256:...) gating /api/v1 (default empty = open mode)")
 	fs.DurationVar(&readTimeout, "read-timeout", 0, "Per-connection read timeout (default 30s)")
@@ -387,6 +400,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if flagsSet["profile"] {
 		cfg.ProfilePath = profilePath
 	}
+	if flagsSet["exclude"] {
+		cfg.Exclude = splitList(excludes...)
+	}
 	if flagsSet["log-format"] {
 		cfg.LogFormat = logFormat
 	}
@@ -472,6 +488,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 	if err := server.ValidateLogConfig(cfg); err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+	if _, err := engine.ExpandExclusions(cfg.Exclude); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}

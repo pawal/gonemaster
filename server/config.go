@@ -181,6 +181,8 @@ type Config struct {
 	SourceAddr6 *string `json:"source_addr6,omitempty"`
 	MinLevel    string  `json:"min_level"`
 	ProfilePath string  `json:"profile_path,omitempty"`
+	// Exclude lists testcases and modules no run on this instance executes.
+	Exclude []string `json:"exclude,omitempty"`
 	// LogFormat selects the operational log encoding: "text" (default) or "json".
 	LogFormat string `json:"log_format,omitempty"`
 	// LogLevel sets the minimum operational log level: debug|info|warn|error.
@@ -297,6 +299,7 @@ type FileConfig struct {
 	SourceAddr6                 *string                 `json:"source_addr6"`
 	MinLevel                    *string                 `json:"min_level"`
 	ProfilePath                 *string                 `json:"profile_path"`
+	Exclude                     *[]string               `json:"exclude,omitempty"`
 	LogFormat                   *string                 `json:"log_format,omitempty"`
 	LogLevel                    *string                 `json:"log_level,omitempty"`
 	TrustedProxyCIDRs           *[]string               `json:"trusted_proxy_cidrs,omitempty"`
@@ -464,6 +467,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ProfilePath != nil {
 		c.ProfilePath = *file.ProfilePath
+	}
+	if file.Exclude != nil {
+		c.Exclude = append([]string(nil), *file.Exclude...)
 	}
 	if file.LogFormat != nil {
 		c.LogFormat = *file.LogFormat

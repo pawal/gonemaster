@@ -1,6 +1,8 @@
 package main
 
 import (
+	"io"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -311,5 +313,22 @@ func TestApplyEnvVarsMultipleFieldsTogether(t *testing.T) {
 	}
 	if warn.String() != "" {
 		t.Fatalf("unexpected warning: %q", warn.String())
+	}
+}
+
+func TestApplyEnvVarsExclude(t *testing.T) {
+	cfg := server.DefaultConfig()
+	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{"GONEMASTER_EXCLUDE": " dnssec, Zone11 ,,"}), io.Discard)
+	if want := []string{"dnssec", "Zone11"}; !slices.Equal(cfg.Exclude, want) {
+		t.Fatalf("Exclude = %v, want %v", cfg.Exclude, want)
+	}
+}
+
+func TestApplyEnvVarsExcludeFlagWins(t *testing.T) {
+	cfg := server.DefaultConfig()
+	cfg.Exclude = []string{"zone01"}
+	applyEnvVars(&cfg, map[string]bool{"exclude": true}, fakeEnv(map[string]string{"GONEMASTER_EXCLUDE": "dnssec"}), io.Discard)
+	if want := []string{"zone01"}; !slices.Equal(cfg.Exclude, want) {
+		t.Fatalf("Exclude = %v, want %v", cfg.Exclude, want)
 	}
 }

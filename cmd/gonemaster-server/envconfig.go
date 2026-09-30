@@ -90,6 +90,11 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyDuration("public-api-rate-limit-window", "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", &cfg.PublicAPI.RateLimitWindow)
 	applyBool("public-api-allow-private-undelegated-ip", "GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP", &cfg.PublicAPI.AllowPrivateUndelegatedIP)
 	applyBool("public-api-allow-non-global-targets", "GONEMASTER_PUBLIC_API_ALLOW_NON_GLOBAL_TARGETS", &cfg.PublicAPI.AllowNonGlobalTargets)
+	if !flagsSet["exclude"] {
+		if v := getenv("GONEMASTER_EXCLUDE"); v != "" {
+			cfg.Exclude = splitList(v)
+		}
+	}
 	if !flagsSet["trusted-proxy-cidrs"] {
 		if v := getenv("GONEMASTER_TRUSTED_PROXY_CIDRS"); v != "" {
 			cfg.TrustedProxyCIDRs = strings.Split(v, ",")
@@ -108,4 +113,17 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyString("analysis-vantage-label", "GONEMASTER_ANALYSIS_VANTAGE_LABEL", &cfg.Analysis.VantageLabel)
 	applyBool("cross-job-hot-cache", "GONEMASTER_CROSS_JOB_HOT_CACHE", &cfg.CrossJobHotCache)
 	applyInt("cross-job-hot-cache-ttl", "GONEMASTER_CROSS_JOB_HOT_CACHE_TTL", &cfg.CrossJobHotCacheTTLSeconds)
+}
+
+// splitList splits comma lists, trims values and drops empty ones.
+func splitList(values ...string) []string {
+	out := []string{}
+	for _, value := range values {
+		for _, part := range strings.Split(value, ",") {
+			if part = strings.TrimSpace(part); part != "" {
+				out = append(out, part)
+			}
+		}
+	}
+	return out
 }

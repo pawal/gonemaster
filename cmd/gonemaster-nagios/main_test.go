@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"os"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -28,6 +29,7 @@ func TestRunHelp(t *testing.T) {
 		"--force-ipv6",
 		"--source-addr4",
 		"--sourceaddr4",
+		"--exclude",
 	} {
 		if !strings.Contains(help, fragment) {
 			t.Fatalf("expected %q in usage output", fragment)
@@ -185,6 +187,42 @@ func TestRunRejectsInvalidFlags(t *testing.T) {
 		{"invalid grade-critical", []string{"-H", "example.com", "--grade-critical", "X"}, "--grade-critical"},
 		{"grade-warning not better than grade-critical", []string{"-H", "example.com", "--grade-warning", "F", "--grade-critical", "C"}, "--grade-warning must be a better grade"},
 	})
+}
+
+func TestRunRejectsBadExclude(t *testing.T) {
+	runRejectCases(t, []rejectCase{
+		{"unknown name", []string{"-H", "example.com", "--exclude", "basic01,nope99"}, `unknown excluded testcase or module "nope99"`},
+		{"excluded testcase", []string{"-H", "example.com", "--testcase", "dnssec04", "--exclude", "dnssec"}, `testcase "dnssec04" is excluded`},
+		{"excluded module", []string{"-H", "example.com", "--module", "dnssec", "--exclude", "dnssec"}, `module "dnssec" is excluded`},
+	})
+}
+
+func TestRunPassesExclude(t *testing.T) {
+	var captured engine.RunRequest
+	enginetest.Capture(t, &runEngine, &captured)
+
+	clitest.Run(t, run, "-H", "example.com", "--exclude", "dnssec10", "--exclude", "zone01,Basic03").RequireCode(t, 0)
+	if want := []string{"dnssec10", "zone01,Basic03"}; !slices.Equal(captured.Exclude, want) {
+		t.Fatalf("Exclude = %v, want %v", captured.Exclude, want)
+	}
+}
+
+func TestRRSIGWarnDaysHintOnExcludedDNSSEC04(t *testing.T) {
+	enginetest.Capture(t, &runEngine, nil)
+
+	res := clitest.Run(t, run, "-H", "example.com", "--exclude", "DNSSEC04", "--rrsig-warn-days", "14")
+	res.RequireCode(t, 0)
+	res.RequireErrContains(t, "--rrsig-warn-days only affects dnssec04, which --exclude removes")
+}
+
+func TestRRSIGWarnDaysNoHintOnFullRun(t *testing.T) {
+	enginetest.Capture(t, &runEngine, nil)
+
+	res := clitest.Run(t, run, "-H", "example.com", "--exclude", "dnssec10", "--rrsig-warn-days", "14")
+	res.RequireCode(t, 0)
+	if strings.Contains(res.Err, "--rrsig-warn-days only affects") {
+		t.Fatalf("unexpected hint: %q", res.Err)
+	}
 }
 
 func TestRunParsesPreferredAliases(t *testing.T) {

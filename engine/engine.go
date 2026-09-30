@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"runtime/debug"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -46,6 +47,8 @@ type RunRequest struct {
 	// Testcases limits execution to one or more testcases (for example
 	// {"basic02"} or {"consistency04", "delegation07"}).
 	Testcases []string
+	// Exclude removes testcases or modules from the final selection.
+	Exclude []string
 	// Profile is an optional path to a profile file that overrides defaults.
 	Profile string
 	// ProfileData is optional inline profile content (YAML/JSON) that
@@ -366,6 +369,86 @@ func normalizeRequest(req RunRequest) (string, []string, error) {
 	return module, testcases, nil
 }
 
+// ExpandExclusions returns the testcases named by values, in plan order.
+func ExpandExclusions(values []string) ([]string, error) {
+	excluded := map[string]bool{}
+	for _, value := range values {
+		for _, raw := range strings.Split(value, ",") {
+			name := strings.ToLower(strings.TrimSpace(raw))
+			if name == "" {
+				continue
+			}
+			if cases, ok := moduleTestcases[name]; ok {
+				for _, tc := range cases {
+					excluded[tc] = true
+				}
+				continue
+			}
+			if testcaseModule(name) == "" {
+				return nil, fmt.Errorf("unknown excluded testcase or module %q: %w", strings.TrimSpace(raw), ErrNotImplemented)
+			}
+			excluded[name] = true
+		}
+	}
+	out := []string{}
+	for _, moduleName := range moduleOrder {
+		for _, tc := range moduleTestcases[moduleName] {
+			if excluded[tc] {
+				out = append(out, tc)
+			}
+		}
+	}
+	return out, nil
+}
+
+// exclusionSet expands req.Exclude and rejects an explicit selection it covers.
+func exclusionSet(req RunRequest, module string, testcases []string) (map[string]bool, error) {
+	names, err := ExpandExclusions(req.Exclude)
+	if err != nil {
+		return nil, err
+	}
+	excluded := make(map[string]bool, len(names))
+	for _, name := range names {
+		excluded[name] = true
+	}
+	for _, name := range testcases {
+		if excluded[name] {
+			return nil, fmt.Errorf("testcase %q is excluded: %w", name, ErrNotImplemented)
+		}
+	}
+	if module != "" && len(testcases) == 0 && !slices.ContainsFunc(moduleTestcases[module], func(tc string) bool { return !excluded[tc] }) {
+		return nil, fmt.Errorf("module %q is excluded: %w", module, ErrNotImplemented)
+	}
+	return excluded, nil
+}
+
+// errAllExcluded reports an exclusion that leaves no testcase to run.
+var errAllExcluded = fmt.Errorf("no testcase remains after exclusion: %w", ErrNotImplemented)
+
+// excludeFromProfile removes excluded testcases from the profile's test_cases.
+func excludeFromProfile(p *profile.Profile, excluded map[string]bool) error {
+	if len(excluded) == 0 {
+		return nil
+	}
+	kept := []any{}
+	remaining := false
+	for _, item := range p.TestCases {
+		name, _ := item.(string)
+		name = strings.ToLower(strings.TrimSpace(name))
+		if excluded[name] {
+			continue
+		}
+		if testcaseModule(name) != "" {
+			remaining = true
+		}
+		kept = append(kept, item)
+	}
+	if !remaining {
+		return errAllExcluded
+	}
+	return p.Set("test_cases", kept)
+}
+
 // profileOverride parses the request's profile override, preferring inline
 // ProfileData over the Profile file path. Returns nil when neither is set.
 func (req RunRequest) profileOverride() (*profile.Profile, error) {
@@ -492,6 +575,13 @@ func buildProfile(req RunRequest, module string, testcases []string) (*profile.P
 			_ = p.Set("test_cases", toAnySlice(cases))
 		}
 	}
+	excluded, err := exclusionSet(req, module, testcases)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := excludeFromProfile(p, excluded); err != nil {
+		return nil, false, err
+	}
 
 	return p, autoDisabledIPv6, nil
 }
@@ -541,6 +631,13 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 		} else if len(req.Testcases) > 0 {
 			runner.Logger.AddWithoutCallback("UNKNOWN_METHOD", map[string]any{"testcase": strings.Join(req.Testcases, ",")}, "", "")
 		}
+		return nil, err
+	}
+	excluded, err := exclusionSet(req, module, testcases)
+	if err != nil {
+		return nil, err
+	}
+	if err := excludeFromProfile(runner.Profile, excluded); err != nil {
 		return nil, err
 	}
 

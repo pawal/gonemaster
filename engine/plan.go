@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"slices"
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -128,6 +129,29 @@ func AvailableTestcases() []string {
 
 // PlannedTestcases returns the list of test cases expected to run for the request.
 func PlannedTestcases(req RunRequest) ([]string, error) {
+	planned, err := plannedSelection(req)
+	if err != nil {
+		return nil, err
+	}
+	var explicit []string
+	if len(req.Testcases) > 0 {
+		explicit = planned
+	}
+	excluded, err := exclusionSet(req, strings.ToLower(strings.TrimSpace(req.Module)), explicit)
+	if err != nil {
+		return nil, err
+	}
+	if len(excluded) == 0 {
+		return planned, nil
+	}
+	planned = slices.DeleteFunc(planned, func(name string) bool { return excluded[name] })
+	if len(planned) == 0 {
+		return nil, errAllExcluded
+	}
+	return planned, nil
+}
+
+func plannedSelection(req RunRequest) ([]string, error) {
 	module := strings.ToLower(strings.TrimSpace(req.Module))
 
 	if module != "" && moduleTestcases[module] == nil {

@@ -23,7 +23,7 @@ Status: Final
 2. If child is root (`.`), emit `B01_CHILD_FOUND` and `B01_ROOT_HAS_NO_PARENT`, then emit `TEST_CASE_END` and return.
 3. If child has fake addresses (undelegated context), emit `B01_CHILD_FOUND` and `B01_PARENT_DISREGARDED`, then emit `TEST_CASE_END` and return.
 4. Start from root servers and iteratively probe with SOA/NS (and DNAME when needed), extending the intermediate name toward the child.
-   - For a child below a TLD (two or more labels) the root servers are not the parent, so the root level is walked through the first root server that refers onwards, and the root NS names in its `NS` answer are not resolved. A root server that fails is reported and the next one is tried.
+   - For a child below a TLD (two or more labels) the root servers are not the parent, so the root level is walked until one root server refers onwards or answers for the child itself, and the root NS names in the `NS` answers of the probed root servers are not resolved. A root server that fails is reported and the next one is tried.
    - If the walk then ends without a parent or without child evidence (no delegation, authoritative SOA or DNAME), it continues with the remaining root servers and re-queues every zone they add servers to, so the outcome is the one a walk through every root server gives.
 5. For each probed nameserver address:
    - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) per rrtype (`SOA`, `NS`, `DNAME`) and skip queries on disabled transports.
@@ -64,6 +64,9 @@ z.Name
 ```
 For each remaining label (BFS from "." down toward child):
    for each NS at that label:
+     +- label is "." on the one root path (child has two or more labels)
+        AND (a deeper label is queued OR parentFound non-empty)
+                                                   -> stop probing root servers
      +- already handled (zone, addr)?              -> skip
      +- transport disabled for SOA/NS/DNAME        -> IPV4_DISABLED / IPV6_DISABLED, skip
      +- otherwise                                  -> IPV4_ENABLED / IPV6_ENABLED
@@ -78,6 +81,7 @@ For each remaining label (BFS from "." down toward child):
          +- success
               -> extract NS names + A/AAAA glue (recurse to resolve missing glue),
                  enqueue new (label, ns) pairs
+              -> at "." on the one root path: drop the NS names, resolve nothing
 
    inner: prepend labels of child name to intermediate (parent walk)
      +- loopCount >= 1000   -> LOOP_PROTECTION (with caller, zone, intermediate),
@@ -107,6 +111,11 @@ For each remaining label (BFS from "." down toward child):
       |    +- otherwise                      -> parentFound, aaNodata
       +- IsRedirect with CNAME in answer     -> parentFound, cnameWithReferral
       +- any other shape                     -> B01_SERVER_ZONE_ERROR (query_type=SOA)
+
+   label queue empty on the one root path
+   AND (parentFound empty OR delegationFound, aaSOA and aaDname all empty)
+     -> leave the one root path, re-queue ".", probe the remaining root servers,
+        re-queue every label they add servers to
 ```
 {{% /expand %}}
 
@@ -195,7 +204,7 @@ For each remaining label (BFS from "." down toward child):
 | `B01_PARENT_UNDETERMINED` | `servers` | `array<object>` | Structured nameserver list across competing parents. |
 | `B01_ROOT_HAS_NO_PARENT` | `-` | `-` | No arguments. |
 | `B01_SERVER_ZONE_ERROR` | `query_name` | `string` | Queried owner name that failed validation. |
-| `B01_SERVER_ZONE_ERROR` | `rrtype` | `string` | Queried rrtype (`SOA` or `NS`). |
+| `B01_SERVER_ZONE_ERROR` | `query_type` | `string` | Queried rrtype (`SOA` or `NS`). |
 | `B01_SERVER_ZONE_ERROR` | `ns` | `string` | Nameserver identity (`ns` name only; use `address` for IP). |
 | `B01_SERVER_ZONE_ERROR` | `address` | `string` | Nameserver IP address for the same endpoint. |
 | `CNAME_CHAIN_TOO_LONG` | `query_name` | `string` | The qname whose CNAME chain exceeded the depth bound. |

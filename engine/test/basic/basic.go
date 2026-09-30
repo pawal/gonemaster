@@ -216,6 +216,8 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	allLabels := map[string]bool{".": true}
 	remainingLabels := []string{"."}
 	zoneLabels := z.Name.Labels()
+	// Below a TLD the roots are not the parent: one root that refers onwards is enough.
+	onePath := len(zoneLabels) >= 2
 
 	for len(remainingLabels) > 0 {
 		zoneName := remainingLabels[0]
@@ -224,6 +226,9 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 	serverLoop:
 		for len(remainingServers) > 0 {
+			if onePath && zoneName == "." && (len(remainingLabels) > 0 || len(parentFound) > 0) {
+				break
+			}
 			ns := remainingServers[0]
 			remainingServers = remainingServers[1:]
 			addr := ns.Address.String()
@@ -283,6 +288,10 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 						rrsNS[owner] = append(rrsNS[owner], addr)
 					}
 				}
+			}
+			if onePath && zoneName == "." {
+				// The hints list the roots; their names are only resolved on the full walk.
+				clear(rrsNS)
 			}
 
 			for nsName, addrs := range rrsNS {
@@ -551,6 +560,13 @@ func Basic01(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 
 				continue serverLoop
 			}
+		}
+
+		if onePath && len(remainingLabels) == 0 && (len(parentFound) == 0 || (len(delegationFound) == 0 && len(aaSOA) == 0 && len(aaDname) == 0)) {
+			// No parent or child through one root: walk the others as well, re-queueing any zone they add servers to.
+			onePath = false
+			allLabels = map[string]bool{".": true}
+			remainingLabels = []string{"."}
 		}
 	}
 

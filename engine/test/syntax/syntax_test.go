@@ -147,6 +147,19 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 				return nsPacket(".", "a.root")
 			case name == "." && kind == "SOA":
 				return soaPacket(".", "a.root", "hostmaster.example.com.")
+			default:
+				return tctest.Response(tctest.NotAuthoritative(),
+					tctest.Authority(tctest.NSRR("com", "ns.com.")),
+					tctest.Additional(tctest.ARR("ns.com", "192.0.2.2")))
+			}
+		})
+
+		// Concurrent lookups share the root step, so the parallel mail lookups
+		// are observed at the delegated server.
+		tctest.NSOn(t, baseCtx, r, "ns.com", "192.0.2.2", func(q tctest.Query) packet.Packet {
+			name := strings.ToLower(q.Name)
+			kind := strings.ToUpper(q.Type)
+			switch {
 			case name == "example.com" && kind == "MX":
 				return mxPacketMulti("example.com", "mail1.example.com.", "mail2.example.com.")
 			case name == "mail1.example.com" && kind == "A":

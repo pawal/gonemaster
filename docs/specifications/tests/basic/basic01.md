@@ -23,6 +23,8 @@ Status: Final
 2. If child is root (`.`), emit `B01_CHILD_FOUND` and `B01_ROOT_HAS_NO_PARENT`, then emit `TEST_CASE_END` and return.
 3. If child has fake addresses (undelegated context), emit `B01_CHILD_FOUND` and `B01_PARENT_DISREGARDED`, then emit `TEST_CASE_END` and return.
 4. Start from root servers and iteratively probe with SOA/NS (and DNAME when needed), extending the intermediate name toward the child.
+   - For a child below a TLD (two or more labels) the root servers are not the parent, so the root level is walked through the first root server that refers onwards, and the root NS names in its `NS` answer are not resolved. A root server that fails is reported and the next one is tried.
+   - If the walk then ends without a parent or without child evidence (no delegation, authoritative SOA or DNAME), it continues with the remaining root servers and re-queues every zone they add servers to, so the outcome is the one a walk through every root server gives.
 5. For each probed nameserver address:
    - Emit transport enable/disable tags (`IPV4_*`, `IPV6_*`) per rrtype (`SOA`, `NS`, `DNAME`) and skip queries on disabled transports.
    - Emit `B01_SERVER_ZONE_ERROR` when response requirements fail.
@@ -250,6 +252,7 @@ For each remaining label (BFS from "." down toward child):
 - Differences (Upstream vs Gonemaster):
   - Upstream: documents `B01_NO_CHILD` for the non-existing-child outcome. Gonemaster: also emits `B01_CHILD_NOT_EXIST` in fake-address mode.
   - Upstream: testcase summary does not list transport debug tags or `LOOP_PROTECTION`. Gonemaster: emits `IPV4_*`, `IPV6_*`, and `LOOP_PROTECTION`.
+  - Upstream: probes every root server for every child. Gonemaster: for a child below a TLD, follows one working root server and walks the others only when that path finds no parent or no child, so `B01_SERVER_ZONE_ERROR` is reported only for root servers that were probed.
   - Upstream: no diagnostic for parent nameservers that violate RFC 8020 by returning NXDOMAIN at an intermediate empty non-terminal while still delegating a deeper child; the child is treated as nonexistent. Gonemaster: emits `B01_PARENT_NXDOMAIN_HIDES_DELEGATION`, treats the directly-observed referral at the child as legitimate delegation evidence, emits `B01_CHILD_FOUND`, and lets the rest of the test suite run.
 - Potential upstream report:
   - `yes`
@@ -264,6 +267,7 @@ For each remaining label (BFS from "." down toward child):
 The following behaviors are implementation choices, not mandated by RFC 1034/1035:
 
 - **Traversal strategy**: The testcase probes iteratively from root servers using SOA, NS, and DNAME queries, extending the intermediate name toward the child zone at each step.  The DNS protocol specifies the resolution model but does not define how a testcase tool should walk the hierarchy.
+- **One root path below a TLD**: Every root server is probed only when the roots are the parent (a TLD child) or when one root path finds nothing.  Root server faults are a root or TLD issue, not one the owner of a deeper zone can act on.
 - **Sorted `servers` arguments**: Nameserver lists passed in tag arguments are sorted before joining with `;`.  Deterministic ordering simplifies reproducible output but is not a protocol requirement.
 - **Loop protection threshold**: Traversal stops at a fixed internal limit and emits `LOOP_PROTECTION`.  No DNS standard defines a specific iteration bound; the limit is a defensive implementation choice.
 

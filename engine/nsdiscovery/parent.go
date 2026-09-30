@@ -215,6 +215,8 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 	}
 
 	zLabels := z.Name.Labels()
+	// Below a TLD the roots are not the parent: one root that refers onwards is enough.
+	onePath := len(zLabels) >= 2
 
 	for len(remaining) > 0 {
 		zoneKey := firstKey(remaining)
@@ -223,6 +225,9 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 
 	serverLoop:
 		for len(servers) > 0 {
+			if onePath && zoneKey == "." && (len(remaining) > 0 || len(parentNS) > 0) {
+				break
+			}
 			ns := servers[0]
 			servers = servers[1:]
 
@@ -260,6 +265,10 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 			}
 
 			rrsNS := nsMapFromResponse(pNS, dnsname.New(zoneKey), "answer")
+			if onePath && zoneKey == "." {
+				// The hints list the roots; their names are only resolved on the full walk.
+				clear(rrsNS)
+			}
 			for nsName := range rrsNS {
 				if len(rrsNS[nsName]) == 0 {
 					for _, qtype := range []string{"A", "AAAA"} {
@@ -373,6 +382,12 @@ func ParentNameserversStatus(ctx context.Context, z *zone.Zone) ([]nameserver.Na
 				}
 				break
 			}
+		}
+
+		if onePath && len(remaining) == 0 && len(parentNS) == 0 {
+			// Nothing found through one root: walk the others as well.
+			onePath = false
+			remaining["."] = root
 		}
 	}
 

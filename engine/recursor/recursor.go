@@ -37,6 +37,8 @@ type Recursor struct {
 	inflight         map[string]*inflightLookup
 	negativeCacheTTL time.Duration
 	undelegatedRoot  bool
+	referrals        map[string]referralEntry
+	referralClaims   map[string]*referralClaim
 	cacheMu          sync.Mutex
 }
 
@@ -79,6 +81,9 @@ func (r *Recursor) AddFakeAddresses(domain string, data map[string][]string) err
 	}
 
 	domain = strings.ToLower(domain)
+	if domain == "." {
+		r.clearReferrals()
+	}
 	if r.fakeAddresses[domain] == nil {
 		r.fakeAddresses[domain] = map[string][]netip.Addr{}
 	}
@@ -148,6 +153,9 @@ func (r *Recursor) GetFakeNames(domain string) []string {
 // RemoveFakeAddresses deletes fake address data for a domain.
 func (r *Recursor) RemoveFakeAddresses(domain string) {
 	domain = strings.ToLower(domain)
+	if domain == "." {
+		r.clearReferrals()
+	}
 	delete(r.fakeAddresses, domain)
 }
 

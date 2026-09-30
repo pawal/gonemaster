@@ -555,9 +555,13 @@ func TestGetAddressesForParallelAAndAAAA(t *testing.T) {
 	}
 
 	r := fakeRootRecursor(t, "root.test", "192.0.2.53")
+	hookedNS(t, baseCtx, r, "root.test", "192.0.2.53", func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
+		return dnstest.From(dnstest.Referral("example", "ns1.example."), dnstest.Additional(dnstest.ARR("ns1.example", "192.0.2.54"))), nil
+	})
 
+	// Concurrent lookups share the root step, so A and AAAA meet at the delegated server.
 	aaaaStarted := make(chan struct{})
-	hookedNS(t, baseCtx, r, "root.test", "192.0.2.53", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	hookedNS(t, baseCtx, r, "ns1.example", "192.0.2.54", func(ctx context.Context, name string, qtype string, qclass string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		switch strings.ToUpper(qtype) {
 		case "A":
 			select {

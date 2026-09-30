@@ -311,17 +311,27 @@ func TestAddress02ParallelPTRQueries(t *testing.T) {
 			},
 		})
 
+		rootHook := func(q tctest.Query) packet.Packet {
+			if strings.EqualFold(q.Type, "PTR") {
+				return tctest.Response(tctest.NotAuthoritative(),
+					tctest.Authority(tctest.NSRR("in-addr.arpa", "ns.in-addr.arpa.")),
+					tctest.Additional(tctest.ARR("ns.in-addr.arpa", "192.0.2.3")))
+			}
+			return packet.Packet{}
+		}
+		tctest.NSOn(t, baseCtx, r, "a.root", "192.0.2.1", rootHook)
+		tctest.NSOn(t, baseCtx, r, "b.root", "192.0.2.2", rootHook)
+
+		// Concurrent lookups share the root step, so the parallel PTR queries
+		// are observed at the delegated server.
 		gate := tctest.NewGate()
-		hook := func(q tctest.Query) packet.Packet {
+		tctest.NSOn(t, baseCtx, r, "ns.in-addr.arpa", "192.0.2.3", func(q tctest.Query) packet.Packet {
 			if strings.EqualFold(q.Type, "PTR") {
 				gate.Arrive(q.Name)
 				return noAnswerPacket(q.Name, "PTR")
 			}
 			return packet.Packet{}
-		}
-
-		tctest.NSOn(t, baseCtx, r, "a.root", "192.0.2.1", hook)
-		tctest.NSOn(t, baseCtx, r, "b.root", "192.0.2.2", hook)
+		})
 
 		z := tctest.Zone(t, ".", r)
 
@@ -375,17 +385,27 @@ func TestAddress03ParallelPTRQueries(t *testing.T) {
 			},
 		})
 
+		rootHook := func(q tctest.Query) packet.Packet {
+			if strings.EqualFold(q.Type, "PTR") {
+				return tctest.Response(tctest.NotAuthoritative(),
+					tctest.Authority(tctest.NSRR("in-addr.arpa", "ns.in-addr.arpa.")),
+					tctest.Additional(tctest.ARR("ns.in-addr.arpa", "192.0.2.3")))
+			}
+			return packet.Packet{}
+		}
+		tctest.NSOn(t, baseCtx, r, "a.root", "192.0.2.1", rootHook)
+		tctest.NSOn(t, baseCtx, r, "b.root", "192.0.2.2", rootHook)
+
+		// Concurrent lookups share the root step, so the parallel PTR queries
+		// are observed at the delegated server.
 		gate := tctest.NewGate()
-		hook := func(q tctest.Query) packet.Packet {
+		tctest.NSOn(t, baseCtx, r, "ns.in-addr.arpa", "192.0.2.3", func(q tctest.Query) packet.Packet {
 			if strings.EqualFold(q.Type, "PTR") {
 				gate.Arrive(q.Name)
 				return ptrPacket(q.Name, "ptr.example.")
 			}
 			return packet.Packet{}
-		}
-
-		tctest.NSOn(t, baseCtx, r, "a.root", "192.0.2.1", hook)
-		tctest.NSOn(t, baseCtx, r, "b.root", "192.0.2.2", hook)
+		})
 
 		z := tctest.Zone(t, ".", r)
 

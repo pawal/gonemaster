@@ -2,6 +2,12 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Changed
+
+- engine: root referrals are cached and zones below a TLD walk from one root, cutting root queries by about 90%
+
 ## [v1.7.13] - 2026-09-24
 
 zone09 reports the full MX RDATA and lowers the TLD apex MX finding to NOTICE. Engine fixes cover explicit EDNS queries, undelegated root zone tests, and CNAME loops across responses.

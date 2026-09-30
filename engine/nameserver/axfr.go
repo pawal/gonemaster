@@ -123,7 +123,7 @@ func (ns Nameserver) transferIn(ctx context.Context, domain string, class string
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	ch, err := client.TransferIn(ctx, msg, "tcp", address)
+	ch, err := client.TransferIn(ctx, msg, address, nil)
 	if err != nil {
 		return err
 	}

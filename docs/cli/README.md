@@ -61,6 +61,7 @@ Additional output controls:
 
 - `--count` appends human-readable level and tag counts.
 - `--nstimes` appends per-nameserver timing statistics.
+- `--debug-queries` appends a per-nameserver query trace: attempts, timeouts, errors and skip decisions.
 - `--output PATH` writes selected output to a file.
 - `--save PATH` writes the DNS packet cache after the run.
 - `--restore PATH` primes the DNS packet cache before the run.
@@ -116,6 +117,7 @@ The flag groups below follow `gonemaster --help`.
 | `--json-stream` | bool | Stream newline-delimited JSON entries. |
 | `--count` | bool | Append count summaries in human output. |
 | `--nstimes` | bool | Append per-nameserver timing statistics. With `--json`, wraps output as `{"entries":[…],"nameserver_timings":[…]}`. |
+| `--debug-queries` | bool | Append a per-attempt query trace table: attempts, timeouts, errors, elapsed time and skip decisions per nameserver address. Human output only. |
 | `--no-progress` | bool | Disable progress indicator. |
 | `--score` | bool | Print score and grade summary after the run. |
 | `--no-score` | bool | Suppress score output. |
@@ -242,6 +244,14 @@ Include nameserver timing data in JSON output:
 gonemaster --json --nstimes example.com | jq .nameserver_timings
 ```
 
+Trace every query attempt and the skip decisions, slowest nameserver first:
+
+```sh
+gonemaster --debug-queries example.com
+```
+
+The columns and decision kinds are described in [debugging.md](debugging.md).
+
 Disable IPv6 and raise parallelism:
 
 ```sh
@@ -343,4 +353,5 @@ make badkeys-update
 - Testcase specifications: [specifications/tests/](../specifications/tests/)
 - Tag catalogs: [specifications/tags/](../specifications/tags/)
 - Cache format: [cache-format.md](cache-format.md)
+- Debugging a run: [debugging.md](debugging.md)
 - Scoring: [scoring.md](../scoring.md)

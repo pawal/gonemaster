@@ -58,6 +58,7 @@ Direct local tests with the `gonemaster` binary stay in [cli/](cli/README.md).
 - [server/metrics.md](server/metrics.md): Prometheus and JSON metrics.
 - [scoring.md](scoring.md): numeric scores and letter grades.
 - [cli/cache-format.md](cli/cache-format.md): packet cache save/restore file format.
+- [cli/debugging.md](cli/debugging.md): slow runs, query tracing, offline replay.
 - [migration-from-zonemaster.md](migration-from-zonemaster.md): migrating from a Zonemaster deployment.
 - [MIGRATION-1.1.md](MIGRATION-1.1.md): JSON output migration guide.
 - [specifications/](specifications/README.md): canonical testcase and tag specifications.

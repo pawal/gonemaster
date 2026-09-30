@@ -73,6 +73,11 @@ Results are printed with severity levels and can be output in several formats.
   wrapped as a JSON object with keys **entries** and **nameserver_timings** instead of a
   bare array.
 
+**--debug-queries**
+: Print a per-attempt query trace after the results: attempts, timeouts, errors,
+  elapsed time and slow-server decisions per nameserver address, slowest first.
+  Printed in human output only.
+
 **--no-progress**
 : Disable the progress indicator.
 
@@ -216,6 +221,10 @@ Show per-nameserver query timing statistics:
 Include nameserver timing data in JSON output:
 
     gonemaster --json --nstimes example.com | jq .nameserver_timings
+
+Trace every query attempt and the skip decisions:
+
+    gonemaster --debug-queries example.com
 
 Save and restore the DNS cache for faster re-runs:
 

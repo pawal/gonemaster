@@ -2536,6 +2536,9 @@ components:
           example: basic
         description:
           type: string
+        excluded:
+          type: boolean
+          description: True when the server excludes the testcase from every run; omitted otherwise.
 
     SpecTestcaseList:
       type: object
@@ -2626,6 +2629,9 @@ components:
           type: string
         tests:
           type: array
+          description: >-
+            Testcase ids to run. An id the server excludes is rejected with
+            `400 testcase_excluded`.
           items:
             type: string
         profile_id:
@@ -2673,6 +2679,9 @@ components:
           description: Expand all domains currently in this tag into the batch.
         tests:
           type: array
+          description: >-
+            Testcase ids to run. An id the server excludes is rejected with
+            `400 testcase_excluded`.
           items:
             type: string
         profile_id:
@@ -3317,7 +3326,7 @@ components:
 
     PublicInfo:
       type: object
-      required: [show_score_public, show_nameserver_timings_public]
+      required: [show_score_public, show_nameserver_timings_public, excluded_testcases]
       properties:
         show_score_public:
           type: boolean
@@ -3325,6 +3334,11 @@ components:
           type: boolean
         show_dnssec_chain_public:
           type: boolean
+        excluded_testcases:
+          type: array
+          description: Testcase ids the server excludes from every run, in run order.
+          items:
+            type: string
 
     FeatureFlags:
       type: object

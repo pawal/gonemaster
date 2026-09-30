@@ -58,6 +58,12 @@ variables, CLI flags. Later sources override earlier ones.
 **--profile** *PATH*
 : Load a custom profile from a JSON or YAML file.
 
+**--exclude** *NAME*
+: Skip a testcase or every testcase of a module in every run. May be repeated
+  and accepts a comma-separated list. No stored profile, job override or tag
+  default re-enables an excluded testcase. A job whose **tests** list names an
+  excluded testcase is rejected with HTTP 400. An unknown name fails startup.
+
 **--timeout** *SECONDS*
 : Query timeout in seconds.
 
@@ -162,6 +168,9 @@ variables, CLI flags. Later sources override earlier ones.
 **GONEMASTER_PROFILE**
 : Equivalent to **--profile**.
 
+**GONEMASTER_EXCLUDE**
+: Equivalent to **--exclude**, as a comma-separated list.
+
 **GONEMASTER_DEBUG**
 : Equivalent to **--debug**.
 
@@ -220,6 +229,7 @@ The **--config** file is JSON with optional fields:
       "log_format": "text",
       "log_level": "info",
       "profile_path": "",
+      "exclude": [],
       "database": {
         "driver": "sqlite",
         "dsn": "/var/lib/gonemaster/db.sqlite",

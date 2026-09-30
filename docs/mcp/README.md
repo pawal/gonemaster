@@ -89,8 +89,8 @@ Read tools (always available):
 | `latest_for` | List a domain's most recent completed runs. |
 | `run_search` | Search completed runs by domain, tag, status, severity, grade, or finish-time range. |
 | `run_diff` | Compare two runs at the tag level (added / removed / severity-changed). |
-| `spec_list_testcases` | List implemented testcases, optionally filtered to one module. |
-| `spec_get_testcase` | Get a testcase's module, description, and the tags it can emit with rendered messages. |
+| `spec_list_testcases` | List implemented testcases, optionally filtered to one module. `excluded` marks a testcase the server never runs. |
+| `spec_get_testcase` | Get a testcase's module, description, `excluded` flag, and the tags it can emit with rendered messages. |
 | `batch_list` | List recent batches (cohort runs), newest first, with status and completion; optional `label` tag-substring filter. |
 | `batch_get` | Poll a batch: total, per-status counts, and completion. |
 | `cohort_stats` | Grade and worst-severity distribution across a batch's runs. |

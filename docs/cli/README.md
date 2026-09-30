@@ -100,6 +100,7 @@ The flag groups below follow `gonemaster --help`.
 | `--domain DOMAIN` | string | Zone name to test. Required for runs when positional `DOMAIN` is not provided. |
 | `--module MODULE` | string | Run one module. |
 | `--testcase TESTCASE` | string (repeatable) | Run a specific testcase. May be passed multiple times to run several testcases, possibly across modules. Names are case-insensitive. |
+| `--exclude NAME` | string (repeatable) | Skip a testcase or every testcase of a module. Accepts a comma-separated list. See [Testcase selection](../profile-settings.md#testcase-selection). |
 | `--profile PATH` | string | Profile file in JSON or YAML. |
 
 ### Output
@@ -191,6 +192,12 @@ Run several testcases (across modules):
 
 ```sh
 gonemaster --testcase consistency04 --testcase delegation07 example.com
+```
+
+Run the profile without the DNSSEC module and zone11:
+
+```sh
+gonemaster --exclude dnssec,zone11 example.com
 ```
 
 Print JSON:

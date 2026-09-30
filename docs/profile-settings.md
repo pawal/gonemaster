@@ -98,6 +98,45 @@ release adds a testcase or a tag, the override silently keeps the old set. The
 `test_cases_vars` tunables are individual properties, so omitting one there just
 inherits it.
 
+## Testcase selection
+
+The testcases of a run are selected in three steps:
+
+1. The `test_cases` list of the effective profile.
+2. `--module` or `--testcase`, when given, replaces that list.
+3. `--exclude` removes testcases from the result.
+
+`--exclude` takes a testcase id or a module name. It is repeatable and accepts
+a comma-separated list. On the server the list comes from `exclude` in the
+configuration file, `GONEMASTER_EXCLUDE`, or `--exclude`. A stored profile, a
+job override or a tag default cannot re-enable an excluded testcase.
+
+A run fails when an exclusion names an unknown testcase or module, when
+`--testcase` or `--module` names an excluded testcase, or when no testcase
+remains. The server rejects a job, batch or public job whose `tests` list
+names an excluded testcase with HTTP 400 and code `testcase_excluded`.
+
+### Dependent testcases
+
+Some testcases run only on the outcome of an earlier testcase in the same
+module. A testcase that is not selected, in any of the three steps, has no
+outcome:
+
+| Not selected | Effect |
+| --- | --- |
+| `basic01` | `basic02` and `basic03` run whether or not the zone exists below its parent. |
+| `basic02` | In a full run the other modules run whether or not the zone is delegated and answers SOA authoritatively, and `CANNOT_CONTINUE` is not reported. `basic03` sends its query instead of reporting `HAS_NAMESERVER_NO_WWW_A_TEST`. |
+| `address02` | `address03` does not run. |
+| `syntax01` | `syntax04` to `syntax08` run whether or not the zone name contains only allowed characters. |
+| `syntax05` | `syntax06` and `syntax07` run whether or not the SOA query is answered. |
+| `dnssec07` | The other DNSSEC testcases run whether or not the zone is signed. |
+| `zone02` to `zone07` | When none of the six is selected, `zone10` to `zone13` run whether or not the SOA query is answered. |
+| `zone08` | `zone09` runs whether or not the MX query is answered. |
+| `zone11` | `zone13` runs whether or not `zone11` finds a valid SPF policy. |
+
+An operator SHOULD exclude `basic01`, `basic02` or `dnssec07` only when every
+tested zone is known to be delegated and, for `dnssec07`, signed.
+
 ## Comparing a profile against the defaults
 
 `POST /api/v1/profiles/diff` compares a profile config against the current

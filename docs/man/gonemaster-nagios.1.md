@@ -41,6 +41,13 @@ use with Nagios, Icinga, Sensu, and similar monitoring systems.
   optionally across modules: `--testcase consistency04 --testcase delegation07`.
   Names are case-insensitive.
 
+**--exclude** *NAME*
+: Skip a testcase or every testcase of a module. May be repeated and accepts a
+  comma-separated list. Applied after the profile, **--module** and
+  **--testcase**. An unknown name, an excluded testcase named by **--testcase**
+  or **--module**, or an empty result returns **UNKNOWN**. Names are
+  case-insensitive.
+
 **--profile** *PATH*
 : Load a custom profile from a JSON or YAML file.
 
@@ -145,6 +152,10 @@ Check with explicit Nagios thresholds and timeout:
 Run only DNSSEC checks:
 
     gonemaster-nagios --domain example.com --module dnssec
+
+Run everything except zone11:
+
+    gonemaster-nagios -H example.com --exclude zone11
 
 Grade-based monitoring - warn if grade C or worse, critical if grade F:
 

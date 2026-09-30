@@ -24,6 +24,7 @@ gonemaster-nagios -H example.com -w WARNING -c ERROR -t 15
 gonemaster-nagios -H example.com -vv
 gonemaster-nagios --domain example.com --module address
 gonemaster-nagios --domain example.com --testcase zone09
+gonemaster-nagios --domain example.com --exclude dnssec,zone11
 gonemaster-nagios --domain example.com --profile ./profile.json
 ```
 
@@ -38,6 +39,7 @@ gonemaster-nagios --domain example.com --profile ./profile.json
 ## Gonemaster-specific options
 - `--module` Run a single module
 - `--testcase` Run a specific testcase (repeatable; may span multiple modules)
+- `--exclude` Skip a testcase or module (repeatable; accepts a comma-separated list). An unknown name or a conflict with `--module` or `--testcase` returns `UNKNOWN`. See [Testcase selection](profile-settings.md#testcase-selection)
 - `--profile` Profile JSON/YAML path
 - `--no-ipv4` Disable IPv4 queries
 - `--no-ipv6` Disable IPv6 queries
@@ -145,8 +147,8 @@ gonemaster-nagios -H example.com --ns ns1.example/10.0.0.1 \
 ```
 
 `--rrsig-warn-days` sets the `REMAINING_SHORT` threshold in the DNSSEC04 profile
-variable. Using it without `--testcase dnssec04` or `--module dnssec` prints a
-warning but proceeds normally.
+variable. Using it without `--testcase dnssec04` or `--module dnssec`, or with
+`dnssec04` excluded, prints a warning but proceeds normally.
 
 Example Icinga2 service:
 

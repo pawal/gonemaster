@@ -32,6 +32,7 @@ gonemaster-server --dump-config
 | `cross_job_hot_cache_ttl_seconds` | TTL for cross-job hot-cache entries. |
 | `min_level` | Minimum log level stored and returned in results. |
 | `profile_path` | Default engine profile file. |
+| `exclude` | Testcase ids and module names that no run executes. See [Excluded testcases](#excluded-testcases). |
 | `public_url` | Site root the deployment answers at, e.g. `https://example.com/`. Also builds `og:image`, the API examples, `robots.txt` and `sitemap.xml`, so it is the root and not the public UI's own URL. |
 | `public_ui_path` | Path under `public_url` where visitors reach the public UI. Default `public/`; set `""` when a proxy serves it at the root. Does not move the server's own mount. |
 | `scoring_config_path` | Optional JSON scoring configuration file. |
@@ -55,6 +56,7 @@ gonemaster-server --dump-config
 | `GONEMASTER_STUCK_JOB_TIMEOUT` | `stuck_job_timeout_minutes` |
 | `GONEMASTER_MIN_LEVEL` | `min_level` |
 | `GONEMASTER_PROFILE` | `profile_path` |
+| `GONEMASTER_EXCLUDE` | `exclude` (comma-separated) |
 | `GONEMASTER_DEBUG` | `debug` |
 | `GONEMASTER_LOG_FORMAT` | `log_format` |
 | `GONEMASTER_LOG_LEVEL` | `log_level` |
@@ -101,6 +103,7 @@ Common flags:
 --no-cross-job-hot-cache
 --cross-job-hot-cache-ttl N
 --profile PATH
+--exclude NAME
 --min-level LEVEL
 --log-format text|json
 --log-level debug|info|warn|error
@@ -224,6 +227,15 @@ defaults. The server validates stored profile JSON on create and update.
 
 See the [Profile Settings Reference](../profile-settings.md) for every
 `resolver.defaults` knob, its default, range, and CLI flag.
+
+### Excluded testcases
+
+`exclude` removes testcases from every run on the instance, as defined in
+[Testcase selection](../profile-settings.md#testcase-selection).
+
+Each run stores its effective profile, whose `test_cases` list omits the
+excluded testcases. A run diff across a change of `exclude` reports the
+findings of a newly excluded testcase as cleared.
 
 ## Profile Compatibility
 

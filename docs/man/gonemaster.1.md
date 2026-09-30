@@ -29,6 +29,13 @@ Results are printed with severity levels and can be output in several formats.
   testcases, optionally across modules: `--testcase consistency04 --testcase
   delegation07`. Names are case-insensitive.
 
+**--exclude** *NAME*
+: Skip a testcase (e.g., dnssec10) or every testcase of a module (e.g.,
+  dnssec). May be repeated and accepts a comma-separated list. Applied after
+  the profile, **--module** and **--testcase**. An unknown name, an excluded
+  testcase named by **--testcase** or **--module**, or an empty result exits
+  with status 2. Names are case-insensitive.
+
 **--profile** *PATH*
 : Load a custom profile from a JSON or YAML file.
 
@@ -189,6 +196,10 @@ Run a single testcase:
 Run several testcases across modules:
 
     gonemaster --testcase consistency04 --testcase delegation07 example.com
+
+Run the profile without the DNSSEC module and zone11:
+
+    gonemaster --exclude dnssec,zone11 example.com
 
 Show all results including INFO level:
 

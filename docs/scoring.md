@@ -180,7 +180,10 @@ the score accordingly.
 **Profile affects score.** Scores are only meaningfully comparable across
 runs that use the same profile. A profile that disables DNSSEC tests
 eliminates all DNSSEC-category penalties, which can significantly inflate the
-score. When comparing scores, ensure the profile is consistent.
+score. When comparing scores, ensure the profile is consistent. A server
+`exclude` setting has the same effect: a category with no testcase run scores
+100 at its full weight, so scores are comparable only between instances with
+the same exclusion.
 
 **Zero-entry runs.** A run that produces zero entries (possible with very
 restrictive profiles) receives score 100, grade A. Bonus criteria cannot be

@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- engine: `--exclude` and the server `exclude` setting remove testcases or modules from every run
+
 ### Changed
 
 - build: bump to miekg/dns v0.6.117

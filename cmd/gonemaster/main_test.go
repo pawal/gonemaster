@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -77,6 +78,7 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"--save-max-entries N",
 		"--sourceaddr4 IPADDR",
 		"--sourceaddr6 IPADDR",
+		"--exclude NAME",
 	}
 	for _, fragment := range expected {
 		if !strings.Contains(help, fragment) {
@@ -229,6 +231,40 @@ func TestRunStopLevelTreatsContextCanceledAsSuccessForJSON(t *testing.T) {
 	}
 	if strings.TrimSpace(res.Err) != "" {
 		t.Fatalf("expected no stderr output, got %q", res.Err)
+	}
+}
+
+func TestRunPassesExclude(t *testing.T) {
+	var captured engine.RunRequest
+	enginetest.Capture(t, &runEngine, &captured)
+
+	clitest.Run(t, run, "--exclude", "dnssec10", "--exclude", "zone01,Basic03", "--json", "example.com").RequireCode(t, 0)
+	if want := []string{"dnssec10", "zone01,Basic03"}; !slices.Equal(captured.Exclude, want) {
+		t.Fatalf("Exclude = %v, want %v", captured.Exclude, want)
+	}
+}
+
+func TestRunRejectsBadExclude(t *testing.T) {
+	runRejectCases(t, []rejectCase{
+		{"unknown name", []string{"--exclude", "basic01,nope99", "example.com"}, `unknown excluded testcase or module "nope99"`},
+		{"excluded testcase", []string{"--testcase", "dnssec10", "--exclude", "dnssec", "example.com"}, `testcase "dnssec10" is excluded`},
+		{"excluded module", []string{"--module", "dnssec", "--exclude", "DNSSEC", "example.com"}, `module "dnssec" is excluded`},
+		{"dump-profile unknown name", []string{"--exclude", "nope99", "--dump-profile"}, `unknown excluded testcase or module "nope99"`},
+	})
+}
+
+func TestRunDumpProfileExcludes(t *testing.T) {
+	res := clitest.Run(t, run, "--exclude", "dnssec", "--dump-profile")
+	res.RequireCode(t, 0)
+	var payload struct {
+		TestCases []string `json:"test_cases"`
+	}
+	if err := json.Unmarshal([]byte(res.Out), &payload); err != nil {
+		t.Fatalf("expected JSON output, got %q (err=%v)", res.Out, err)
+	}
+	dnssec := slices.ContainsFunc(payload.TestCases, func(name string) bool { return strings.HasPrefix(name, "dnssec") })
+	if dnssec || !slices.Contains(payload.TestCases, "basic01") {
+		t.Fatalf("test_cases = %v, want every testcase but dnssec*", payload.TestCases)
 	}
 }
 

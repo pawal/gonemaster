@@ -54,6 +54,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var domain string
 	var module string
 	var testcases repeatableStringFlag
+	var excludes repeatableStringFlag
 	var profile string
 	var minLevel = "NOTICE"
 	var output string
@@ -125,6 +126,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--domain DOMAIN", detail: "Zone name to test (required for runs if positional DOMAIN is not provided)"},
 			{flag: "--module MODULE", detail: "Run a single module"},
 			{flag: "--testcase TESTCASE", detail: "Run a specific testcase (repeatable)"},
+			{flag: "--exclude NAME", detail: "Skip a testcase or module (repeatable, comma list)"},
 			{flag: "--profile PATH", detail: "Profile JSON/YAML path"},
 		})
 		printUsageGroup(errOut, "Output", []usageLine{
@@ -193,6 +195,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.StringVar(&domain, "domain", "", "Zone name to test (required)")
 	fs.StringVar(&module, "module", "", "Run a single module (optional)")
 	fs.Var(&testcases, "testcase", "Run a specific testcase (repeatable, e.g. --testcase basic02 --testcase delegation07)")
+	fs.Var(&excludes, "exclude", "Skip a testcase or module (repeatable, comma list, e.g. --exclude dnssec,zone11)")
 	fs.StringVar(&profile, "profile", "", "Profile JSON/YAML path (optional)")
 	fs.StringVar(&minLevel, "min-level", "NOTICE", "Minimum log level (optional, default NOTICE)")
 	fs.StringVar(&output, "output", "", "Write output to file (optional)")
@@ -570,6 +573,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		Domain:                domain,
 		Module:                module,
 		Testcases:             []string(testcases),
+		Exclude:               []string(excludes),
 		Profile:               profile,
 		MinLevel:              engineMinLevel,
 		CaptureMinLevel:       captureMinLevel,
@@ -702,6 +706,12 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	} else if normalized != "" {
 		domain = normalized
 		req.Domain = normalized
+	}
+	if len(excludes) > 0 {
+		if _, err := engine.PlannedTestcases(req); err != nil {
+			fmt.Fprintln(errOut, err.Error())
+			return 2
+		}
 	}
 
 	var packetCacheStore *nameserver.CacheStore

@@ -43,13 +43,15 @@ func writeQueryTrace(out io.Writer, c *querytrace.Collector) error {
 		strings.Repeat("=", qtNumberWidth) + " " +
 		strings.Repeat("=", qtNumberWidth) + " " +
 		strings.Repeat("=", qtNumberWidth) + " " +
+		strings.Repeat("=", qtNumberWidth) + " " +
 		strings.Repeat("=", qtNumberWidth+1)
 
-	header := fmt.Sprintf("%*s  %*s %*s %*s %*s  %s",
+	header := fmt.Sprintf("%*s  %*s %*s %*s %*s %*s  %s",
 		nameWidth, "Name servers",
 		qtNumberWidth, "Attempts",
 		qtNumberWidth, "Timeouts",
 		qtNumberWidth, "Errors",
+		qtNumberWidth, "Canceled",
 		qtNumberWidth+1, "Elapsed/ms",
 		"Decisions")
 	if _, err := fmt.Fprintln(out, header); err != nil {
@@ -60,14 +62,15 @@ func writeQueryTrace(out io.Writer, c *querytrace.Collector) error {
 	}
 
 	var grandElapsed float64
-	var grandAttempts, grandTimeouts, grandErrors int
+	var grandAttempts, grandTimeouts, grandErrors, grandCanceled int
 	for _, s := range stats {
 		elapsedMS := float64(s.TotalElapsed) / float64(time.Millisecond)
-		line := fmt.Sprintf("%*s  %*d %*d %*d %*.2f  %s",
+		line := fmt.Sprintf("%*s  %*d %*d %*d %*d %*.2f  %s",
 			nameWidth, traceNSLabel(s),
 			qtNumberWidth, s.Attempts,
 			qtNumberWidth, s.Timeouts,
 			qtNumberWidth, s.Errors,
+			qtNumberWidth, s.Canceled,
 			qtNumberWidth+1, elapsedMS,
 			formatDecisions(s.Decisions))
 		if _, err := fmt.Fprintln(out, line); err != nil {
@@ -77,16 +80,18 @@ func writeQueryTrace(out io.Writer, c *querytrace.Collector) error {
 		grandAttempts += s.Attempts
 		grandTimeouts += s.Timeouts
 		grandErrors += s.Errors
+		grandCanceled += s.Canceled
 	}
 
 	if _, err := fmt.Fprintln(out, divider); err != nil {
 		return err
 	}
-	summary := fmt.Sprintf("%*s  %*d %*d %*d %*.2f",
+	summary := fmt.Sprintf("%*s  %*d %*d %*d %*d %*.2f",
 		nameWidth, "Grand total",
 		qtNumberWidth, grandAttempts,
 		qtNumberWidth, grandTimeouts,
 		qtNumberWidth, grandErrors,
+		qtNumberWidth, grandCanceled,
 		qtNumberWidth+1, grandElapsed)
 	_, err := fmt.Fprintln(out, summary)
 	return err

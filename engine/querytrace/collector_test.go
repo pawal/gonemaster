@@ -72,3 +72,23 @@ func TestCollectorStatsSortedByElapsed(t *testing.T) {
 		t.Fatalf("Stats order = [%s %s %s], want [slow mid fast]", stats[0].Addr, stats[1].Addr, stats[2].Addr)
 	}
 }
+
+// TestCollectorCountsCanceledApartFromErrors checks canceled attempts never count as errors or timeouts.
+func TestCollectorCountsCanceledApartFromErrors(t *testing.T) {
+	c := NewCollector()
+	c.AttemptDone(AttemptEvent{NSAddr: "192.0.2.1", Elapsed: 4 * time.Millisecond, Outcome: OutcomeCanceled})
+	c.AttemptDone(AttemptEvent{NSAddr: "192.0.2.1", Elapsed: 6 * time.Millisecond, Outcome: OutcomeCanceled})
+	c.AttemptDone(AttemptEvent{NSAddr: "192.0.2.1", Elapsed: 5 * time.Millisecond, Outcome: OutcomeError})
+
+	stats := c.Stats()
+	if len(stats) != 1 {
+		t.Fatalf("Stats len = %d, want 1", len(stats))
+	}
+	s := stats[0]
+	if s.Attempts != 3 || s.Canceled != 2 || s.Errors != 1 || s.Timeouts != 0 {
+		t.Errorf("stats = {attempts:%d canceled:%d errors:%d timeouts:%d}, want {3 2 1 0}", s.Attempts, s.Canceled, s.Errors, s.Timeouts)
+	}
+	if want := 15 * time.Millisecond; s.TotalElapsed != want {
+		t.Errorf("TotalElapsed = %v, want %v", s.TotalElapsed, want)
+	}
+}

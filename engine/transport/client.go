@@ -283,6 +283,9 @@ func classifyOutcome(err error) querytrace.Outcome {
 	if err == nil {
 		return querytrace.OutcomeOK
 	}
+	if errors.Is(err, context.Canceled) {
+		return querytrace.OutcomeCanceled
+	}
 	if isTimeoutErr(err) {
 		return querytrace.OutcomeTimeout
 	}

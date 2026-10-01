@@ -3,6 +3,7 @@ package transport
 import (
 	"context"
 	"encoding/binary"
+	"errors"
 	"net"
 	"net/netip"
 	"sync/atomic"
@@ -946,6 +947,63 @@ func TestExchangeEmitsAttemptEventOnSuccess(t *testing.T) {
 	}
 	if events[0].QType != "A" {
 		t.Errorf("expected QType A, got %q", events[0].QType)
+	}
+}
+
+// TestExchangeTracesCancelAsCanceled checks that an exchange canceled mid-read is traced as canceled.
+func TestExchangeTracesCancelAsCanceled(t *testing.T) {
+	// Black-hole server: reads the query, never writes a reply.
+	addr, shutdown := startUDPDNSServer(t, func(_ context.Context, _ dns.ResponseWriter, _ *dns.Msg) {})
+	defer shutdown()
+
+	rec := &dnstest.RecordingTrace{}
+	ctx, cancel := context.WithCancel(querytrace.WithContext(context.Background(), rec))
+	time.AfterFunc(40*time.Millisecond, cancel)
+
+	client := &Client{}
+	client.SetUseTCP(false)
+	client.SetFallback(false)
+	client.SetRetries(0)
+	client.SetTimeout(2 * time.Second)
+	client.SetRetrans(2 * time.Second)
+
+	if _, err := client.Exchange(ctx, addr, BuildQuery("canceled.example.", dns.TypeSOA)); err == nil {
+		t.Fatal("expected a cancellation error, got nil")
+	}
+
+	events := rec.Attempts()
+	if len(events) != 1 {
+		t.Fatalf("expected exactly 1 attempt event, got %d: %+v", len(events), events)
+	}
+	if events[0].Outcome != querytrace.OutcomeCanceled {
+		t.Errorf("expected OutcomeCanceled, got %q (err %q)", events[0].Outcome, events[0].Err)
+	}
+}
+
+// TestClassifyOutcome checks that each exchange error maps to its trace outcome.
+func TestClassifyOutcome(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	_, dialErr := (&net.Dialer{}).DialContext(ctx, "udp", "192.0.2.1:53")
+	if dialErr == nil {
+		t.Fatal("expected a dial error on a canceled context")
+	}
+
+	cases := []struct {
+		name string
+		err  error
+		want querytrace.Outcome
+	}{
+		{"nil", nil, querytrace.OutcomeOK},
+		{"context canceled", context.Canceled, querytrace.OutcomeCanceled},
+		{"dial canceled", dialErr, querytrace.OutcomeCanceled},
+		{"deadline exceeded", context.DeadlineExceeded, querytrace.OutcomeTimeout},
+		{"connection refused", errors.New("connection refused"), querytrace.OutcomeError},
+	}
+	for _, tc := range cases {
+		if got := classifyOutcome(tc.err); got != tc.want {
+			t.Errorf("%s: classifyOutcome = %q, want %q", tc.name, got, tc.want)
+		}
 	}
 }
 

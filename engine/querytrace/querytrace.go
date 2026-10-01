@@ -14,6 +14,8 @@ const (
 	OutcomeTimeout Outcome = "timeout"
 	// OutcomeError marks an attempt that failed for a non-timeout reason.
 	OutcomeError Outcome = "error"
+	// OutcomeCanceled marks an attempt abandoned because its context was canceled.
+	OutcomeCanceled Outcome = "canceled"
 )
 
 // AttemptEvent describes one transport-level DNS attempt within the

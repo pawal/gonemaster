@@ -21,11 +21,15 @@ gonemaster --nstimes example.com
 `--debug-queries` appends a per-attempt trace, slowest address first:
 
 ```text
-Query trace: 1626 attempts (0 timeouts) across 127 nameservers
-Name servers        Attempts   Timeouts     Errors  Elapsed/ms  Decisions
-==================  ========== ========== ========== ===========
-192.5.6.30                  70          0         28     5331.42
-199.180.182.53              32          0          8     4151.67  skipped_errorcache:2
+Query trace: 1611 attempts (0 timeouts) across 119 nameservers
+  Name servers    Attempts   Timeouts     Errors   Canceled  Elapsed/ms  Decisions
+==============  ========== ========== ========== ========== ===========
+    192.0.2.30          65          0          0         26     5164.47
+ 198.51.100.53          32          0          0          8     4194.01
+ 203.0.113.133          72          0          0         12      561.60
+           ...
+==============  ========== ========== ========== ========== ===========
+   Grand total        1611          0          0        736    25278.21
 ```
 
 | Column | Meaning |
@@ -33,8 +37,9 @@ Name servers        Attempts   Timeouts     Errors  Elapsed/ms  Decisions
 | Name servers | `name/address` when the host name is known, else the address. |
 | Attempts | Transport attempts, counting retries and the TCP fallback after a truncated UDP reply. |
 | Timeouts | Attempts whose deadline fired with no response. |
-| Errors | Attempts that failed for another reason. This includes attempts abandoned because another server in the same batch answered first; a high error count on a responsive server is normal. |
-| Elapsed/ms | Sum of attempt wall-clock time for the address. |
+| Errors | Attempts that failed for another reason, such as a refused TCP connection or an unreachable network. |
+| Canceled | Attempts abandoned by the caller, for example when another server in the same batch answered first. A canceled attempt is not a nameserver failure. |
+| Elapsed/ms | Sum of attempt wall-clock time for the address. Attempts run in parallel, so the grand total exceeds the run time. |
 | Decisions | Slow-server controls that fired for the address, as `kind:count`. |
 
 Decision kinds:
@@ -74,9 +79,11 @@ at these levels; a tag without a level in the profile is DEBUG.
 
 | Level | Tags |
 |---|---|
-| DEBUG | `EXTERNAL_QUERY` (one line per query sent: `ns`, `address`, `query_name`, `query_type`), `BLACKLISTING`, `IS_BLACKLISTED`, `PACKET_BIG`, `TEST_CASE_START`, `TEST_CASE_END` |
+| DEBUG | `EXTERNAL_QUERY` (one line per query sent: `ns`, `address`, `query_name`, `query_type`), `BLACKLISTING`, `IS_BLACKLISTED`, `PACKET_BIG` |
 | DEBUG2 | `QUERY`, `RECURSE_QUERY`, `ERROR_CACHE_SKIP`, `REACHABILITY_CACHE_SKIP`, `NS_CREATED`, `CACHE_FETCHED`, `NO_SUCH_NAME`, `NO_SUCH_RECORD` |
 | DEBUG3 | `EXTERNAL_RESPONSE`, `CACHED_RETURN`, `EMPTY_RETURN` |
+
+Every module also logs `TEST_CASE_START` and `TEST_CASE_END` at DEBUG.
 
 ```sh
 gonemaster --raw --min-level DEBUG example.com | grep EXTERNAL_QUERY
@@ -88,7 +95,7 @@ gonemaster --raw --min-level DEBUG example.com | grep EXTERNAL_QUERY
 
 `--save` writes the DNS packet cache after a run and `--restore` primes it
 before one. A restored run answers from the cache and queries the network
-only on a miss. Human output ends with the line `packet cache: N hits,
+only on a miss. Human output includes the line `packet cache: N hits,
 M misses`.
 
 ```sh

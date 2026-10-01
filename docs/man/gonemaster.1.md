@@ -75,7 +75,8 @@ Results are printed with severity levels and can be output in several formats.
 
 **--debug-queries**
 : Print a per-attempt query trace after the results: attempts, timeouts, errors,
-  elapsed time and slow-server decisions per nameserver address, slowest first.
+  canceled attempts, elapsed time and slow-server decisions per nameserver address,
+  slowest first.
   Printed in human output only.
 
 **--no-progress**

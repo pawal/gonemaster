@@ -20,6 +20,7 @@ type NSStats struct {
 	Attempts     int
 	Timeouts     int
 	Errors       int
+	Canceled     int
 	TotalElapsed time.Duration
 	Decisions    map[DecisionKind]int
 }
@@ -55,6 +56,8 @@ func (c *Collector) AttemptDone(ev AttemptEvent) {
 		s.Timeouts++
 	case OutcomeError:
 		s.Errors++
+	case OutcomeCanceled:
+		s.Canceled++
 	}
 }
 

@@ -3,9 +3,12 @@ package analysis
 import (
 	"context"
 	"net/netip"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 
 	"codeberg.org/pawal/gonemaster/engine/asnlookup"
 	"codeberg.org/pawal/gonemaster/engine/nameserver"
@@ -43,10 +46,18 @@ type AsnlookupEnricher struct {
 	Resolver resolverAdapter
 	TTL      time.Duration
 
-	mu    sync.Mutex
-	addrs map[string]addrEntry
-	asns  map[int64]asnEntry
+	mu     sync.Mutex
+	addrs  map[string]addrEntry
+	asns   map[int64]asnEntry
+	labels singleflight.Group
+	now    func() time.Time
 }
+
+// Label cache lifetimes for lookups that yield no label.
+const (
+	asnEmptyTTL = 6 * time.Hour
+	asnErrorTTL = 5 * time.Minute
+)
 
 type addrEntry struct {
 	result AddressEnrichment
@@ -139,27 +150,57 @@ func (e *AsnlookupEnricher) EnrichASNLabel(ctx context.Context, asn int64) (stri
 	if e == nil || e.Resolver == nil || asn <= 0 {
 		return "", false
 	}
-
-	e.mu.Lock()
-	if entry, ok := e.asns[asn]; ok && time.Now().Before(entry.until) {
-		e.mu.Unlock()
-		return entry.label, entry.label != ""
+	if label, ok := e.cachedASNLabel(asn); ok {
+		return label, label != ""
 	}
-	e.mu.Unlock()
+	v, _, _ := e.labels.Do(strconv.FormatInt(asn, 10), func() (any, error) {
+		if label, ok := e.cachedASNLabel(asn); ok {
+			return label, nil
+		}
+		return e.lookupASNLabel(ctx, asn), nil
+	})
+	label := v.(string)
+	return label, label != ""
+}
 
+func (e *AsnlookupEnricher) cachedASNLabel(asn int64) (string, bool) {
+	e.mu.Lock()
+	defer e.mu.Unlock()
+	entry, ok := e.asns[asn]
+	if !ok || !e.clock().Before(entry.until) {
+		return "", false
+	}
+	return entry.label, true
+}
+
+// lookupASNLabel caches by outcome; a canceled or expired ctx is not cached.
+func (e *AsnlookupEnricher) lookupASNLabel(ctx context.Context, asn int64) string {
 	info, err := asnlookup.LookupASNInfo(e.recursionContext(ctx), e.Resolver, int(asn))
-	label := ""
-	if err == nil && info.Code == asnlookup.CodeFound {
-		label = info.Label
+	if ctx.Err() != nil {
+		return ""
+	}
+	label, ttl := "", min(e.TTL, asnErrorTTL)
+	switch {
+	case err == nil && info.Code == asnlookup.CodeFound:
+		label, ttl = info.Label, e.TTL
+	case err == nil && info.Code == asnlookup.CodeEmpty:
+		ttl = min(e.TTL, asnEmptyTTL)
 	}
 
 	e.mu.Lock()
 	if e.asns == nil {
 		e.asns = map[int64]asnEntry{}
 	}
-	e.asns[asn] = asnEntry{label: label, until: time.Now().Add(e.TTL)}
+	e.asns[asn] = asnEntry{label: label, until: e.clock().Add(ttl)}
 	e.mu.Unlock()
-	return label, label != ""
+	return label
+}
+
+func (e *AsnlookupEnricher) clock() time.Time {
+	if e.now != nil {
+		return e.now()
+	}
+	return time.Now()
 }
 
 func (a AddressEnrichment) hasData() bool {

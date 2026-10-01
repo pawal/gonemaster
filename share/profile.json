@@ -19,7 +19,6 @@
     "no_network": false,
     "resolver": {
         "defaults": {
-            "debug": false,
             "fallback": true,
             "retrans": 3,
             "retry": 2,

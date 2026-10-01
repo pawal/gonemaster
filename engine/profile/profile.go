@@ -50,8 +50,6 @@ type ResolverSettings struct {
 
 // ResolverDefaults mirrors resolver defaults from the profile.
 type ResolverDefaults struct {
-	// Debug enables resolver debug behavior.
-	Debug bool `json:"debug"`
 	// Fallback enables UDP-to-TCP fallback on truncation.
 	Fallback bool `json:"fallback"`
 	// Retrans sets the retransmission interval in seconds.

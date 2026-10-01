@@ -99,8 +99,6 @@ type RunRequest struct {
 	ASNCache *asnlookup.Cache
 	// LogCallback receives each log entry as it is created.
 	LogCallback func(*logger.Entry) error
-	// Debug sets resolver.defaults.debug, enabling query-lifecycle tracing.
-	Debug *bool
 	// QueryTrace, when set, receives query-lifecycle events for the run.
 	QueryTrace querytrace.QueryTrace
 	// Context controls cancellation and timeouts for the run.
@@ -503,11 +501,6 @@ func buildProfile(req RunRequest, module string, testcases []string) (*profile.P
 	}
 	if req.Unordered != nil {
 		if err := p.Set("resolver.defaults.unordered", *req.Unordered); err != nil {
-			return nil, false, err
-		}
-	}
-	if req.Debug != nil {
-		if err := p.Set("resolver.defaults.debug", *req.Debug); err != nil {
 			return nil, false, err
 		}
 	}

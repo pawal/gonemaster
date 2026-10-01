@@ -562,11 +562,8 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 
 	var queryCollector *querytrace.Collector
-	var debugFlag *bool
 	if debugQueries {
 		queryCollector = querytrace.NewCollector()
-		enabled := true
-		debugFlag = &enabled
 	}
 
 	req := engine.RunRequest{
@@ -577,7 +574,6 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		Profile:               profile,
 		MinLevel:              engineMinLevel,
 		CaptureMinLevel:       captureMinLevel,
-		Debug:                 debugFlag,
 		IPv4:                  ipv4Override,
 		IPv6:                  ipv6Override,
 		AllowNonGlobalTargets: allowNonGlobalOverride,

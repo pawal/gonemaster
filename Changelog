@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - build: bump to miekg/dns v0.6.117
+- engine: remove the `debug` profile key; stored profiles that carry it still load
 
 ### Fixed
 

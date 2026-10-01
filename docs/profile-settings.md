@@ -32,12 +32,12 @@ accepted bounds.
 | `fast_fail_timeout_count` | `3` | count (0-100) | - | Skip a nameserver/protocol after this many consecutive timeouts. `0` disables. Reacts to silence only. |
 | `nameserver_concurrency` | `0` | count (0-256) | - | Maximum concurrent queries to one nameserver address. `0` is unlimited. On the server the cap is shared across concurrent jobs; see [server performance](server/performance.md). |
 | `nameserver_max_total_ms` | `0` | milliseconds (0-600000) | - | Skip a nameserver address once cumulative query time in a run exceeds this. `0` disables. Unlike fast-fail it also bounds slow-but-responding servers. See [Bounding Slow Nameservers](server/configuration.md#bounding-slow-nameservers). |
-| `debug` | `false` | bool | `--debug-queries` | Emit a per-attempt query trace (including timeouts) and the control decisions taken. No overhead when off. |
 
-The `igntc`, `recurse`, and `usevc` keys are no longer profile properties. Stored
-profiles that still contain them load without error and the keys are ignored;
-per-query transport (TCP and the RD bit) is decided by the engine and individual
-testcases.
+The `debug`, `igntc`, `recurse`, and `usevc` keys are no longer profile
+properties. Stored profiles that still contain them load without error and the
+keys are ignored; per-query transport (TCP and the RD bit) is decided by the
+engine and individual testcases, and the query trace is enabled by
+`gonemaster --debug-queries`.
 
 Source addresses live alongside the defaults, under `resolver`:
 

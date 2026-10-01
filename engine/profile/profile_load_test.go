@@ -131,6 +131,33 @@ func TestFromJSONIgnoresRemovedResolverDefaults(t *testing.T) {
 	}
 }
 
+// TestFromJSONIgnoresRemovedDebug checks that a stored profile carrying the removed debug key still loads.
+func TestFromJSONIgnoresRemovedDebug(t *testing.T) {
+	p, err := FromJSON(`{"resolver":{"defaults":{"debug":true,"retry":4}}}`)
+	if err != nil {
+		t.Fatalf("from json: %v", err)
+	}
+	if _, err := p.Get("resolver.defaults.debug"); err == nil {
+		t.Fatal("expected resolver.defaults.debug to be unknown after removal")
+	}
+	value, err := p.Get("resolver.defaults.retry")
+	if err != nil || value != 4 {
+		t.Fatalf("expected retry 4 alongside the removed key, got %#v (err=%v)", value, err)
+	}
+	out, err := p.ToJSON()
+	if err != nil {
+		t.Fatalf("to json: %v", err)
+	}
+	var data map[string]any
+	if err := json.Unmarshal([]byte(out), &data); err != nil {
+		t.Fatalf("unmarshal: %v", err)
+	}
+	defaults := data["resolver"].(map[string]any)["defaults"].(map[string]any)
+	if _, ok := defaults["debug"]; ok {
+		t.Fatalf("expected no debug key in serialized defaults, got %v", defaults)
+	}
+}
+
 func TestFromJSONRejectsInvalidTypes(t *testing.T) {
 	if _, err := FromJSON(`{"net":{"ipv4":1}}`); err == nil {
 		t.Fatalf("expected error for invalid ipv4 type")

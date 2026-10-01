@@ -53,6 +53,7 @@ type propertyDef struct {
 // deprecatedProperties are profile keys removed from the schema but still
 // accepted and ignored when loading stored profiles.
 var deprecatedProperties = map[string]bool{
+	"resolver.defaults.debug":   true,
 	"resolver.defaults.igntc":   true,
 	"resolver.defaults.recurse": true,
 	"resolver.defaults.usevc":   true,
@@ -69,15 +70,6 @@ var propertyDefs = map[string]propertyDef{
 		},
 		getter: func(p *Profile) any {
 			return p.Cache
-		},
-	},
-	"resolver.defaults.debug": {
-		typ: propBool,
-		setter: func(p *Profile, value any) {
-			p.Resolver.Defaults.Debug = value.(bool)
-		},
-		getter: func(p *Profile) any {
-			return p.Resolver.Defaults.Debug
 		},
 	},
 	"resolver.defaults.fallback": {

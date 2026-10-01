@@ -26,6 +26,7 @@ type Server struct {
 	mux                      *http.ServeMux
 	store                    JobStore
 	analysis                 AnalysisController
+	asnLabeler               asnLabeler
 	queue                    Queue
 	workers                  workerPool
 	metrics                  *MetricsCollector
@@ -402,6 +403,7 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /profiles", s.handlePublicProfiles)
 	pubMux.HandleFunc("GET /jobs/{publicID}/result", s.handlePublicGetResult)
 	pubMux.HandleFunc("GET /jobs/{publicID}/dnssec-chain", s.handlePublicGetDNSSECChain)
+	pubMux.HandleFunc("GET /jobs/{publicID}/asn-names", s.handlePublicGetASNNames)
 	pubMux.HandleFunc("GET /jobs/{publicID}", s.handlePublicGetJob)
 	pubMux.HandleFunc("GET /locales", s.handleLocales)
 	pubMux.HandleFunc("GET /lookup/{domain}", s.handlePublicLookupDomain)

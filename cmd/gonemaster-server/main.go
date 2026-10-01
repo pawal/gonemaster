@@ -512,16 +512,18 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 	logger := srv.Logger()
+	// One ASN cache for analysis projection and public AS holder names.
+	var enricher *analysis.AsnlookupEnricher
+	if rec, err := recursor.New(); err == nil {
+		// ASN/prefix mappings change rarely, so cache results a month.
+		enricher = analysis.NewAsnlookupEnricher(rec, 30*24*time.Hour)
+		srv.SetASNLabeler(enricher)
+	} else {
+		logger.Warn("asn enrichment disabled", "err", err)
+	}
 	if ctrl, ok := analysis.NewControllerFromJobStore(srv.Store()); ok {
-		// Best-effort enrichment of per-address ASN/prefix and per-ASN
-		// label via the engine's cymru/ripe backends. A failure to build
-		// the recursor (e.g. network misconfiguration at startup) just
-		// leaves projection un-enriched instead of refusing to run.
-		if rec, err := recursor.New(); err == nil {
-			// ASN/prefix mappings change rarely, so cache results a month.
-			ctrl.SetEnricher(analysis.NewAsnlookupEnricher(rec, 30*24*time.Hour))
-		} else {
-			logger.Warn("analysis enrichment disabled", "err", err)
+		if enricher != nil {
+			ctrl.SetEnricher(enricher)
 		}
 		srv.SetAnalysisController(ctrl)
 	}

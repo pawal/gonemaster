@@ -120,6 +120,8 @@ func (s *Server) applySetting(key, val string) {
 		s.cfg.ShowNameserverTimingsPublic = val == "true"
 	case "show_dnssec_chain_public":
 		s.cfg.ShowDNSSECChainPublic = val == "true"
+	case "show_asn_names_public":
+		s.cfg.ShowASNNamesPublic = val == "true"
 	case "cross_job_hot_cache_ttl_seconds":
 		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
 			s.cfg.CrossJobHotCacheTTLSeconds = v
@@ -215,6 +217,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"show_nameserver_timings_admin":   {Value: cfg.ShowNameserverTimingsAdmin, Source: s.settingSource("show_nameserver_timings_admin")},
 		"show_nameserver_timings_public":  {Value: cfg.ShowNameserverTimingsPublic, Source: s.settingSource("show_nameserver_timings_public")},
 		"show_dnssec_chain_public":        {Value: cfg.ShowDNSSECChainPublic, Source: s.settingSource("show_dnssec_chain_public")},
+		"show_asn_names_public":           {Value: cfg.ShowASNNamesPublic, Source: s.settingSource("show_asn_names_public")},
 		"cross_job_hot_cache_ttl_seconds": {Value: cfg.CrossJobHotCacheTTLSeconds, Source: s.settingSource("cross_job_hot_cache_ttl_seconds")},
 	}
 

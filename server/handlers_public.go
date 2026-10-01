@@ -59,6 +59,7 @@ type publicInfoResponse struct {
 	ShowScorePublic             bool `json:"show_score_public"`
 	ShowNameserverTimingsPublic bool `json:"show_nameserver_timings_public"`
 	ShowDNSSECChainPublic       bool `json:"show_dnssec_chain_public"`
+	ShowASNNamesPublic          bool `json:"show_asn_names_public"`
 	// ExcludedTestcases lists the testcases this instance never runs.
 	ExcludedTestcases []string `json:"excluded_testcases"`
 }
@@ -72,6 +73,7 @@ func (s *Server) handlePublicInfo(w http.ResponseWriter, _ *http.Request) {
 		ShowScorePublic:             s.cfg.ShowScorePublic,
 		ShowNameserverTimingsPublic: s.cfg.ShowNameserverTimingsPublic,
 		ShowDNSSECChainPublic:       s.cfg.ShowDNSSECChainPublic,
+		ShowASNNamesPublic:          s.asnNamesEnabled(),
 		ExcludedTestcases:           s.excludedTestcases,
 	})
 }

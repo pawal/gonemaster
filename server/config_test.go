@@ -125,6 +125,9 @@ func TestShowFlagsDefaultTrueAndFollowFileConfig(t *testing.T) {
 		{"show_nameserver_timings_public",
 			func(c Config) bool { return c.ShowNameserverTimingsPublic },
 			func(f *FileConfig, v *bool) { f.ShowNameserverTimingsPublic = v }},
+		{"show_asn_names_public",
+			func(c Config) bool { return c.ShowASNNamesPublic },
+			func(f *FileConfig, v *bool) { f.ShowASNNamesPublic = v }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg := DefaultConfig()

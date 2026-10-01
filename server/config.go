@@ -233,6 +233,8 @@ type Config struct {
 	// ShowDNSSECChainPublic gates DNSSEC chain collection and the public chain
 	// endpoint and marker. Defaults to true.
 	ShowDNSSECChainPublic bool `json:"show_dnssec_chain_public"`
+	// ShowASNNamesPublic gates the public AS holder names endpoint. Defaults to true.
+	ShowASNNamesPublic bool `json:"show_asn_names_public"`
 }
 
 // PublicAPIFileConfig holds optional public API configuration from JSON.
@@ -319,6 +321,7 @@ type FileConfig struct {
 	ShowNameserverTimingsAdmin  *bool                   `json:"show_nameserver_timings_admin,omitempty"`
 	ShowNameserverTimingsPublic *bool                   `json:"show_nameserver_timings_public,omitempty"`
 	ShowDNSSECChainPublic       *bool                   `json:"show_dnssec_chain_public,omitempty"`
+	ShowASNNamesPublic          *bool                   `json:"show_asn_names_public,omitempty"`
 	CrossJobHotCache            *bool                   `json:"cross_job_hot_cache,omitempty"`
 	CrossJobHotCacheTTLSeconds  *int                    `json:"cross_job_hot_cache_ttl_seconds,omitempty"`
 }
@@ -341,6 +344,7 @@ func DefaultConfig() Config {
 		ShowNameserverTimingsAdmin:  true,
 		ShowNameserverTimingsPublic: true,
 		ShowDNSSECChainPublic:       true,
+		ShowASNNamesPublic:          true,
 		CrossJobHotCache:            true,
 		CrossJobHotCacheTTLSeconds:  defaultCrossJobHotCacheTTLSeconds,
 		ReadTimeout:                 Duration{30 * time.Second},
@@ -518,6 +522,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ShowDNSSECChainPublic != nil {
 		c.ShowDNSSECChainPublic = *file.ShowDNSSECChainPublic
+	}
+	if file.ShowASNNamesPublic != nil {
+		c.ShowASNNamesPublic = *file.ShowASNNamesPublic
 	}
 	if file.CrossJobHotCache != nil {
 		c.CrossJobHotCache = *file.CrossJobHotCache

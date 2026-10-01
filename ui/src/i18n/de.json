@@ -261,6 +261,8 @@
   "settings_help_allow_private_undelegated_ip": "Standardmäßig deaktiviert. Wenn aktiviert, werden Loopback-, Link-Local-, private, CGNAT-, Multicast- und Broadcast-IPs als undelegierte Nameserver-Ziele in der öffentlichen API erlaubt. Für internet-zugängliche Deployments deaktiviert lassen.",
   "settings_label_allow_non_global_targets": "Nicht global erreichbare Abfrageziele zulassen",
   "settings_help_allow_non_global_targets": "Standardmäßig deaktiviert. Wenn aktiviert, werden Abfragen an Nameserver-Adressen erlaubt, die privat, Loopback oder anderweitig nicht global erreichbar sind. Bei öffentlich erreichbaren Installationen deaktiviert lassen. Vom Betreiber angegebene undelegierte Adressen sind immer erlaubt.",
+  "settings_label_show_asn_names_public": "AS-Inhaber in öffentlicher UI anzeigen",
+  "settings_help_show_asn_names_public": "Den registrierten AS-Inhaber unter jedem Befund auf der öffentlichen Ergebnisseite anzeigen, der eine AS-Nummer nennt. Der Server fragt die Namen ab, wenn ein Ergebnis geöffnet wird. Deaktivieren, um diese Abfragen zu unterbinden.",
   "settings_group_general": "Allgemein",
   "settings_group_resolver": "Resolver & Profil",
   "settings_group_database": "Datenbank",

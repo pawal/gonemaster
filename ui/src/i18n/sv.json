@@ -588,6 +588,8 @@
   "settings_help_allow_private_undelegated_ip": "Avstängt som standard. När aktiverat tillåts loopback-, link-local-, privata, CGNAT-, multicast- och broadcast-IP-adresser som odelegerade namnservermål på det publika API:et. Lämna avstängt för internet-exponerade installationer.",
   "settings_label_allow_non_global_targets": "Tillåt icke-globala måladresser",
   "settings_help_allow_non_global_targets": "Avstängt som standard. När aktiverat tillåts frågor till namnserveradresser som är privata, loopback eller på annat sätt inte globalt nåbara. Lämna av för internetvända installationer. Operatörsangivna odelegerade adresser tillåts alltid.",
+  "settings_label_show_asn_names_public": "Visa AS-innehavare i det publika gränssnittet",
+  "settings_help_show_asn_names_public": "Visa den registrerade AS-innehavaren under varje fynd på den publika resultatsidan som nämner ett AS-nummer. Servern slår upp namnen när ett resultat öppnas. Avaktivera för att stoppa dessa uppslag.",
   "settings_group_general": "Allmänt",
   "settings_group_resolver": "Resolver & profil",
   "settings_group_database": "Databas",

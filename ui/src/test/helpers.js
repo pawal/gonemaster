@@ -121,5 +121,6 @@ export const serverSettingsFixture = (overrides = {}) => ({
   show_score_public: setting(true),
   show_nameserver_timings_admin: setting(true),
   show_nameserver_timings_public: setting(true),
+  show_asn_names_public: setting(true),
   ...overrides
 });

@@ -261,6 +261,8 @@
   "settings_help_allow_private_undelegated_ip": "Standaard uitgeschakeld. Indien ingeschakeld worden loopback-, link-local-, privé-, CGNAT-, multicast- en broadcast-IP's toegestaan als niet-gedelegeerde naamserverdoelen op de publieke API. Houd dit uitgeschakeld voor implementaties die op het internet gericht zijn.",
   "settings_label_allow_non_global_targets": "Niet-globale querydoelen toestaan",
   "settings_help_allow_non_global_targets": "Standaard uitgeschakeld. Indien ingeschakeld is het opvragen van naamserveradressen toegestaan die privé of loopback zijn of anderszins niet globaal bereikbaar. Houd dit uitgeschakeld voor implementaties die op het internet gericht zijn. Door de operator opgegeven niet-gedelegeerde adressen zijn altijd toegestaan.",
+  "settings_label_show_asn_names_public": "AS-houders tonen in publieke UI",
+  "settings_help_show_asn_names_public": "Toon de geregistreerde AS-houder onder elke bevinding op de publieke resultatenpagina die een AS-nummer noemt. De server zoekt de namen op wanneer een resultaat wordt geopend. Schakel uit om deze opzoekingen te stoppen.",
   "settings_group_general": "Algemeen",
   "settings_group_resolver": "Resolver en profiel",
   "settings_group_database": "Database",

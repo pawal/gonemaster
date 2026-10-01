@@ -43,6 +43,7 @@
         { key: "rate_limit_window", type: "text" },
         { key: "allow_private_undelegated_ip", type: "toggle" },
         { key: "allow_non_global_targets", type: "toggle" },
+        { key: "show_asn_names_public", type: "toggle" },
       ],
     },
     {

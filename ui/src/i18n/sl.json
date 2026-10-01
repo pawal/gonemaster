@@ -588,6 +588,8 @@
   "settings_help_allow_private_undelegated_ip": "Privzeto onemogočeno. Ko je omogočeno, so naslovi IP loopback, link-local, zasebni, CGNAT, multicast in broadcast dovoljeni kot nedelegirani cilji imenskih strežnikov v javnem API. Pustite onemogočeno za namestitve, izpostavljene internetu.",
   "settings_label_allow_non_global_targets": "Dovoli neglobalne cilje poizvedb",
   "settings_help_allow_non_global_targets": "Privzeto onemogočeno. Ko je omogočeno, so poizvedbe do zasebnih, povratno zančnih ali kako drugače globalno nedosegljivih naslovov imenskih strežnikov dovoljene. Pri napravah, izpostavljenih internetu, pustite onemogočeno. Naslovi, ki jih navede operater za nedelegirane teste, so vedno dovoljeni.",
+  "settings_label_show_asn_names_public": "Prikaži imetnike AS v javnem vmesniku",
+  "settings_help_show_asn_names_public": "Prikaži registriranega imetnika AS pod vsako ugotovitvijo na javni strani rezultatov, ki navaja številko AS. Strežnik poišče imena, ko se rezultat odpre. Onemogočite, da ustavite ta iskanja.",
   "settings_group_general": "Splošno",
   "settings_group_resolver": "Resolver in profil",
   "settings_group_database": "Podatkovna baza",

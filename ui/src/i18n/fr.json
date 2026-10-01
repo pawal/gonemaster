@@ -588,6 +588,8 @@
   "settings_help_allow_private_undelegated_ip": "Désactivé par défaut. Lorsqu'il est activé, autorise les IP loopback, link-local, privées, CGNAT, multicast et broadcast comme cibles de serveurs de noms non délégués sur l'API publique. Laissez désactivé pour les déploiements exposés à Internet.",
   "settings_label_allow_non_global_targets": "Autoriser les cibles de requête non globales",
   "settings_help_allow_non_global_targets": "Désactivé par défaut. Lorsqu'il est activé, autorise les requêtes vers des adresses de serveurs de noms privées, en loopback ou autrement non joignables globalement. Laissez désactivé pour les déploiements exposés à Internet. Les adresses non déléguées fournies par l'opérateur sont toujours autorisées.",
+  "settings_label_show_asn_names_public": "Afficher les titulaires d'AS dans l'interface publique",
+  "settings_help_show_asn_names_public": "Afficher le titulaire enregistré de l'AS sous chaque constat de la page de résultats publique qui cite un numéro d'AS. Le serveur recherche les noms à l'ouverture d'un résultat. Désactiver pour arrêter ces recherches.",
   "settings_group_general": "Général",
   "settings_group_resolver": "Résolveur & profil",
   "settings_group_database": "Base de données",

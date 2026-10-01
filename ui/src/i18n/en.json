@@ -261,6 +261,8 @@
   "settings_help_allow_private_undelegated_ip": "Disabled by default. When enabled, allows loopback, link-local, private, CGNAT, multicast, and broadcast IPs as undelegated nameserver targets on the public API. Keep disabled for internet-facing deployments.",
   "settings_label_allow_non_global_targets": "Allow non-global query targets",
   "settings_help_allow_non_global_targets": "Disabled by default. When enabled, permits querying nameserver addresses that are private, loopback, or otherwise not globally reachable. Keep disabled for internet-facing deployments. Operator-supplied undelegated addresses are always allowed.",
+  "settings_label_show_asn_names_public": "Show AS holders in public UI",
+  "settings_help_show_asn_names_public": "Display the registered AS holder under each finding on the public results page that names an AS number. The server looks up the names when a result is opened. Disable to stop these lookups.",
   "settings_group_general": "General",
   "settings_group_resolver": "Resolver & Profile",
   "settings_group_database": "Database",

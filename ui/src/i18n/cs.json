@@ -261,6 +261,8 @@
   "settings_help_allow_private_undelegated_ip": "Ve výchozím nastavení vypnuto. Po zapnutí povolí adresy loopback, link-local, soukromé, CGNAT, multicast a broadcast jako cíle nedelegovaných jmenných serverů ve veřejném API. Pro nasazení dostupná z internetu ponechte vypnuté.",
   "settings_label_allow_non_global_targets": "Povolit neglobální cíle dotazů",
   "settings_help_allow_non_global_targets": "Ve výchozím nastavení vypnuto. Po zapnutí umožní dotazovat se na adresy jmenných serverů, které jsou soukromé, loopback nebo jinak nedostupné globálně. Pro nasazení dostupná z internetu ponechte vypnuté. Nedelegované adresy zadané operátorem jsou vždy povoleny.",
+  "settings_label_show_asn_names_public": "Zobrazit držitele AS ve veřejném rozhraní",
+  "settings_help_show_asn_names_public": "Zobrazit registrovaného držitele AS u každého zjištění na veřejné stránce výsledků, které uvádí číslo AS. Server vyhledá názvy při otevření výsledku. Vypnutím tato vyhledávání zastavíte.",
   "settings_group_general": "Obecné",
   "settings_group_resolver": "Resolver a profil",
   "settings_group_database": "Databáze",

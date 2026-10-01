@@ -588,6 +588,8 @@
   "settings_help_allow_private_undelegated_ip": "Oletuksena pois päältä. Kun käytössä, sallii loopback-, link-local-, yksityiset, CGNAT-, multicast- ja broadcast-IP-osoitteet delegoimattomien nimipalvelimien kohteina julkisessa API:ssa. Pidä pois päältä internetiin näkyvissä asennuksissa.",
   "settings_label_allow_non_global_targets": "Salli ei-globaalit kyselykohteet",
   "settings_help_allow_non_global_targets": "Oletuksena pois päältä. Kun käytössä, sallii kyselyt nimipalvelinosoitteisiin, jotka ovat yksityisiä, loopback tai muuten ei globaalisti tavoitettavia. Pidä pois päältä internetiin näkyvissä asennuksissa. Operaattorin antamat delegoimattomat osoitteet sallitaan aina.",
+  "settings_label_show_asn_names_public": "Näytä AS-haltijat julkisessa käyttöliittymässä",
+  "settings_help_show_asn_names_public": "Näytä rekisteröity AS-haltija julkisen tulossivun jokaisen AS-numeron mainitsevan havainnon alla. Palvelin hakee nimet, kun tulos avataan. Poista käytöstä lopettaaksesi nämä haut.",
   "settings_group_general": "Yleiset",
   "settings_group_resolver": "Resolver ja profiili",
   "settings_group_database": "Tietokanta",

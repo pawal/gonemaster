@@ -154,4 +154,22 @@ describe("ServerSettings", () => {
     const toggle = screen.getByLabelText(/non-global query targets/i);
     expect(toggle.type).toBe("checkbox");
   });
+
+  it("renders the AS holders toggle and saves it", async () => {
+    const calls = [];
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (options.method === "PUT") calls.push(JSON.parse(options.body));
+      return settingsMock(url, options);
+    });
+    await renderLoaded(/Show AS holders in public UI/);
+
+    const toggle = screen.getByLabelText(/Show AS holders in public UI/);
+    expect(toggle.type).toBe("checkbox");
+    expect(toggle.checked).toBe(true);
+    await fireEvent.click(toggle);
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.length).toBe(1));
+    expect(calls[0].show_asn_names_public).toBe(false);
+  });
 });

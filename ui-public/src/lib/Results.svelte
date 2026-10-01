@@ -1,10 +1,12 @@
 <script>
   import { onMount, onDestroy } from "svelte";
   import { t } from "../i18n.js";
-  import { getResult } from "../api.js";
+  import { getResult, getAsnNames } from "../api.js";
+  import { asnsOf } from "../asn.js";
   import { LEVELS, levelClass, bannerClass, worstLevel } from "../severity.js";
   import ShareButton from "./ShareButton.svelte";
   import DnssecChain from "./DnssecChain.svelte";
+  import AsnNames from "./AsnNames.svelte";
   import GlossaryText from "./GlossaryText.svelte";
 
   // Force all <details> open before printing, restore after.
@@ -35,7 +37,7 @@
     return LEVELS.filter((l) => counts[l]).map((l) => ({ level: l, count: counts[l] }));
   }
 
-  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false, nameserverTimingsEnabled = true, dnssecChainEnabled = false, ontestparent, onscore } = $props();
+  let { publicID, domain = "", locale = "en", finishedAt = null, scoringEnabled = false, nameserverTimingsEnabled = true, dnssecChainEnabled = false, asnNamesEnabled = false, ontestparent, onscore } = $props();
 
   let finishedStr = $derived((() => {
     if (!finishedAt) return "";
@@ -86,6 +88,36 @@
 
   $effect(() => {
     fetchResult(publicID, locale);
+  });
+
+  // AS holder names, keyed by the public ID they were fetched for.
+  let asnNames = $state.raw({ pid: null, byAsn: new Map() });
+  let asnNamesFetchedFor = null;
+  let namesByAsn = $derived(asnNames.pid === publicID ? asnNames.byAsn : new Map());
+
+  const isShown = (e) => e.message && e.message !== e.raw;
+
+  async function fetchAsnNames(pid) {
+    try {
+      const res = await getAsnNames(pid);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (pid !== publicID) return;
+      const byAsn = new Map();
+      for (const holder of data?.asns ?? []) {
+        if (Number.isInteger(holder?.asn) && holder.name) byAsn.set(holder.asn, holder);
+      }
+      asnNames = { pid, byAsn };
+    } catch (_) { /* names are optional */ }
+  }
+
+  $effect(() => {
+    if (!asnNamesEnabled || loading || errorKey) return;
+    const pid = publicID;
+    if (asnNamesFetchedFor === pid) return;
+    if (!entries.some((e) => isShown(e) && asnsOf(e.args).length > 0)) return;
+    asnNamesFetchedFor = pid;
+    fetchAsnNames(pid);
   });
 
   // Group entries by module -> testcase, preserving insertion order.
@@ -362,7 +394,7 @@
                   </span>
                 </summary>
                 <div class="testcase-entries">
-                  {#each tcEntries.filter(e => e.message && e.message !== e.raw) as entry}
+                  {#each tcEntries.filter(isShown) as entry}
                     {@const modKey = (entry.module ?? "").toLowerCase()}
                     {@const headerKey = entry.tag && modKey ? `pub.tag.${modKey}.${entry.tag}.header` : null}
                     {@const descKey = entry.tag && modKey ? `pub.tag.${modKey}.${entry.tag}.desc` : null}
@@ -379,6 +411,7 @@
                           {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" - "}{/if}{entry.message}
                         </span>
                       </div>
+                      <AsnNames asns={asnsOf(entry.args)} names={namesByAsn} />
                       {#if hasExplanation}
                         <details class="result-explanation" data-testid="result-explanation">
                           <summary class="result-explanation-summary">
@@ -400,7 +433,7 @@
                 </div>
               </details>
             {:else}
-              {#each tcEntries.filter(e => e.message && e.message !== e.raw) as entry}
+              {#each tcEntries.filter(isShown) as entry}
                 {@const modKey = (entry.module ?? "").toLowerCase()}
                 {@const headerKey = entry.tag && modKey ? `pub.tag.${modKey}.${entry.tag}.header` : null}
                 {@const descKey = entry.tag && modKey ? `pub.tag.${modKey}.${entry.tag}.desc` : null}
@@ -416,6 +449,7 @@
                       {#if tagHeader}<strong class="result-tag-header" data-testid="result-tag-header">{tagHeader}</strong>{" - "}{/if}{entry.message}
                     </span>
                   </div>
+                  <AsnNames asns={asnsOf(entry.args)} names={namesByAsn} />
                   {#if hasExplanation}
                     <details class="result-explanation" data-testid="result-explanation">
                       <summary class="result-explanation-summary">

@@ -49,6 +49,15 @@ export async function getDnssecChain(publicID) {
 }
 
 /**
+ * Fetch the registered AS holder names for the AS numbers in a result.
+ * @param {string} publicID
+ * @returns {Promise<Response>}
+ */
+export async function getAsnNames(publicID) {
+  return fetch(`${API_BASE}/jobs/${encodeURIComponent(publicID)}/asn-names`);
+}
+
+/**
  * Fetch the list of available locale codes from the server.
  * @returns {Promise<Response>}
  */

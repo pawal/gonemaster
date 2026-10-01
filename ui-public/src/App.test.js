@@ -284,6 +284,20 @@ describe("App", () => {
     expect(screen.queryByTestId("dnssec-chain")).toBeNull();
   });
 
+  it("shows AS holder names when public info enables them", async () => {
+    goTo("/public/result/abc12345");
+    const asnEntry = { timestamp: 0, module: "CONNECTIVITY", testcase: "Connectivity03", tag: "IPV4_ONE_ASN", level: "WARNING", args: { asn: 199973 }, message: "One AS." };
+    fetchRouter([
+      ["/locales", localesResp],
+      ["/info", jsonResponse({ show_asn_names_public: true })],
+      ["jobs/abc12345/asn-names", jsonResponse({ complete: true, asns: [{ asn: 199973, name: "Migrationsverket", handle: "MIGR-AS", country: "SE", label: "MIGR-AS - Migrationsverket, SE" }] })],
+      ["jobs/abc12345/result", jsonResponse({ job_id: "x", status: "succeeded", raw: { locale: "en", entries: [asnEntry] } })],
+      ["/jobs/", jobResp("succeeded", "example.com", 100)],
+    ]);
+    render(App);
+    await waitFor(() => expect(screen.getByTestId("asn-names").textContent.trim()).toBe("AS199973: Migrationsverket (SE)"));
+  });
+
   it("shows ExpiredResult when job is expired", async () => {
     goTo("/public/result/abc12345");
     fetchRouter([

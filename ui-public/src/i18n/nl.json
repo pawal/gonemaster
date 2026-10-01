@@ -202,6 +202,7 @@
   "pub.result_status_error": "Fouten gevonden",
   "pub.result_status_critical": "Kritieke problemen gevonden",
   "pub.about_finding": "Over deze bevinding",
+  "pub.asn_holders": "Geregistreerde AS-houders",
   "pub.no_zone_heading": "Dit is geen DNS-zone",
   "pub.no_zone_body": "Er is geen DNS-zone voor {domain} gevonden, beginnend bij de rootservers.",
   "pub.no_zone_test_parent": "Test {parent} in plaats daarvan",

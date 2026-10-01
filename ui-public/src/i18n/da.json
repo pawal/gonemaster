@@ -202,6 +202,7 @@
   "pub.result_status_error": "Fejl fundet",
   "pub.result_status_critical": "Kritiske problemer fundet",
   "pub.about_finding": "Om dette fund",
+  "pub.asn_holders": "Registrerede AS-indehavere",
   "pub.no_zone_heading": "Dette er ikke en DNS-zone",
   "pub.no_zone_body": "Ingen DNS-zone for {domain} blev fundet, med start fra rodserverne.",
   "pub.no_zone_test_parent": "Test {parent} i stedet",

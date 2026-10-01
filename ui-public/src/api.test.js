@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { API_BASE, createJob, getJob, getResult, getLocales, getDnssecChain } from "./api.js";
+import { API_BASE, createJob, getJob, getResult, getLocales, getDnssecChain, getAsnNames } from "./api.js";
 import { jsonResponse } from "./test/helpers.js";
 
 describe("API_BASE", () => {
@@ -100,5 +100,21 @@ describe("getDnssecChain", () => {
   it("URL-encodes the publicID", async () => {
     await getDnssecChain("a b/c");
     expect(fetch).toHaveBeenCalledWith("/pub/api/v1/jobs/a%20b%2Fc/dnssec-chain");
+  });
+});
+
+describe("getAsnNames", () => {
+  beforeEach(() => {
+    global.fetch = vi.fn().mockResolvedValue(jsonResponse({}));
+  });
+
+  it("GETs /pub/api/v1/jobs/:publicID/asn-names", async () => {
+    await getAsnNames("abc12345");
+    expect(fetch).toHaveBeenCalledWith("/pub/api/v1/jobs/abc12345/asn-names");
+  });
+
+  it("URL-encodes the publicID", async () => {
+    await getAsnNames("a b/c");
+    expect(fetch).toHaveBeenCalledWith("/pub/api/v1/jobs/a%20b%2Fc/asn-names");
   });
 });

@@ -147,6 +147,7 @@
   let scoringEnabled = $state(false);
   let nameserverTimingsEnabled = $state(false);
   let dnssecChainEnabled = $state(false);
+  let asnNamesEnabled = $state(false);
 
   async function fetchLocales() {
     try {
@@ -276,6 +277,9 @@
         if (typeof data?.show_dnssec_chain_public === "boolean") {
           dnssecChainEnabled = data.show_dnssec_chain_public;
         }
+        if (typeof data?.show_asn_names_public === "boolean") {
+          asnNamesEnabled = data.show_asn_names_public;
+        }
       }
     } catch (_) { /* keep false - fail-safe */ }
   }
@@ -363,6 +367,7 @@
         {scoringEnabled}
         {nameserverTimingsEnabled}
         {dnssecChainEnabled}
+        {asnNamesEnabled}
         ontestparent={onTestParent}
         onscore={onScore}
       />

@@ -202,6 +202,7 @@
   "pub.result_status_error": "エラーが見つかりました",
   "pub.result_status_critical": "重大な問題が見つかりました",
   "pub.about_finding": "この検出結果について",
+  "pub.asn_holders": "登録済みのAS保有者",
   "pub.no_zone_heading": "これは DNS ゾーンではありません",
   "pub.no_zone_body": "ルートサーバーからたどっても、{domain} の DNS ゾーンは見つかりませんでした。",
   "pub.no_zone_test_parent": "代わりに {parent} をテスト",

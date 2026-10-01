@@ -202,6 +202,7 @@
   "pub.result_status_error": "Virheitä löydetty",
   "pub.result_status_critical": "Kriittisiä ongelmia löydetty",
   "pub.about_finding": "Tietoja tästä havainnosta",
+  "pub.asn_holders": "Rekisteröidyt AS-haltijat",
   "pub.no_zone_heading": "Tämä ei ole DNS-vyöhyke",
   "pub.no_zone_body": "DNS-vyöhykettä kohteelle {domain} ei löytynyt, juuripalvelimilta alkaen.",
   "pub.no_zone_test_parent": "Kokeile {parent} sen sijaan",

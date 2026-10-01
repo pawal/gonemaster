@@ -202,6 +202,7 @@
   "pub.result_status_error": "Najdene napake",
   "pub.result_status_critical": "Najdene kritične težave",
   "pub.about_finding": "O tej ugotovitvi",
+  "pub.asn_holders": "Registrirani imetniki AS",
   "pub.no_zone_heading": "To ni cona DNS",
   "pub.no_zone_body": "Za {domain} ni bilo najdene nobene cone DNS, začenši od korenskih strežnikov.",
   "pub.no_zone_test_parent": "Namesto tega preizkusite {parent}",

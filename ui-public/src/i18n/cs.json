@@ -202,6 +202,7 @@
   "pub.result_status_error": "Nalezeny chyby",
   "pub.result_status_critical": "Nalezeny kritické problémy",
   "pub.about_finding": "O tomto nálezu",
+  "pub.asn_holders": "Registrovaní držitelé AS",
   "pub.no_zone_heading": "Toto není zóna DNS",
   "pub.no_zone_body": "Pro doménu {domain} nebyla nalezena žádná zóna DNS při hledání od kořenových serverů.",
   "pub.no_zone_test_parent": "Otestovat místo toho {parent}",

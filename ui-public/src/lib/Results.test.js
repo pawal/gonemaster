@@ -1,7 +1,7 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/svelte";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import Results from "./Results.svelte";
-import { errorResponse, jsonResponse } from "../test/helpers.js";
+import { errorResponse, fetchRouter, jsonResponse } from "../test/helpers.js";
 
 const resultResp = (entries = [], testcase_descriptions = {}, nameserver_timings = []) =>
   jsonResponse({
@@ -513,5 +513,96 @@ describe("Results", () => {
     renderResults(markerResp(true), { domain: "example.com", dnssecChainEnabled: false });
     await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
     expect(screen.queryByTestId("dnssec-chain")).toBeNull();
+  });
+
+  // AS holder names
+
+  const asnEntry = {
+    timestamp: 0, module: "CONNECTIVITY", testcase: "Connectivity03", tag: "IPV4_ONE_ASN",
+    level: "WARNING", args: { asn: 199973 }, message: "All IPv4 nameservers in one AS (199973).",
+  };
+  const plainEntry = {
+    timestamp: 0, module: "CONNECTIVITY", testcase: "Connectivity03", tag: "IPV6_DIFFERENT_ASN",
+    level: "INFO", args: { ns_list: "ns1.example.com" }, message: "IPv6 spread over several AS.",
+  };
+  const namesResp = () => jsonResponse({
+    complete: true,
+    asns: [{ asn: 199973, name: "Migrationsverket", handle: "MIGR-AS", country: "SE", label: "MIGR-AS - Migrationsverket, SE" }],
+  });
+  const resultFor = (entries, locale = "en") =>
+    jsonResponse({ job_id: "x", status: "succeeded", raw: { locale, entries } });
+  const namesCalls = () => fetch.mock.calls.filter(([url]) => String(url).includes("/asn-names"));
+  const rowOf = (text) => screen.getAllByTestId("result-row")
+    .find((row) => row.querySelector(".result-message").textContent.includes(text));
+
+  it("fetches AS holder names once and shows them under the entry that names the AS", async () => {
+    fetchRouter([["/asn-names", namesResp()], ["/result", resultFor([asnEntry, plainEntry])]]);
+    render(Results, { props: { publicID: "abc12345", asnNamesEnabled: true } });
+
+    await waitFor(() => expect(screen.getByTestId("asn-names")).toBeTruthy());
+    expect(within(rowOf("in one AS")).getByTestId("asn-names").textContent.trim()).toBe("AS199973: Migrationsverket (SE)");
+    expect(within(rowOf("several AS")).queryByTestId("asn-names")).toBeNull();
+    expect(namesCalls().length).toBe(1);
+    expect(namesCalls()[0][0]).toBe("/pub/api/v1/jobs/abc12345/asn-names");
+  });
+
+  it.each([
+    ["the flag is off", false, [asnEntry]],
+    ["no entry has AS args", true, [plainEntry]],
+  ])("does not fetch AS holder names when %s", async (_, enabled, entries) => {
+    fetchRouter([["/asn-names", namesResp()], ["/result", resultFor(entries)]]);
+    render(Results, { props: { publicID: "abc12345", asnNamesEnabled: enabled } });
+
+    await waitFor(() => expect(screen.getByTestId("result-banner")).toBeTruthy());
+    expect(namesCalls().length).toBe(0);
+    expect(screen.queryByTestId("asn-names")).toBeNull();
+  });
+
+  it.each([
+    ["a 404", () => Promise.resolve(errorResponse(404))],
+    ["a 500", () => Promise.resolve(errorResponse(500))],
+    ["a network error", () => Promise.reject(new Error("offline"))],
+  ])("leaves the finding unchanged on %s", async (_, namesReply) => {
+    global.fetch = vi.fn().mockImplementation((url) =>
+      String(url).includes("/asn-names") ? namesReply() : Promise.resolve(resultFor([asnEntry])));
+    render(Results, { props: { publicID: "abc12345", asnNamesEnabled: true } });
+
+    await waitFor(() => expect(namesCalls().length).toBe(1));
+    await new Promise((r) => setTimeout(r, 0));
+    expect(rowOf("in one AS").textContent).toContain("All IPv4 nameservers in one AS (199973).");
+    expect(screen.queryByTestId("asn-names")).toBeNull();
+  });
+
+  it("keeps the names and does not refetch them on a locale switch", async () => {
+    const sv = { ...asnEntry, message: "Alla IPv4-namnservrar i ett AS (199973)." };
+    global.fetch = vi.fn().mockImplementation(async (url) => {
+      if (String(url).includes("/asn-names")) return namesResp();
+      return String(url).includes("locale=sv") ? resultFor([sv], "sv") : resultFor([asnEntry]);
+    });
+    const { rerender } = render(Results, { props: { publicID: "abc12345", locale: "en", asnNamesEnabled: true } });
+    await waitFor(() => expect(screen.getByTestId("asn-names")).toBeTruthy());
+
+    await rerender({ locale: "sv" });
+    await waitFor(() => expect(rowOf("ett AS")).toBeDefined());
+    expect(within(rowOf("ett AS")).getByTestId("asn-names").textContent.trim()).toBe("AS199973: Migrationsverket (SE)");
+    expect(namesCalls().length).toBe(1);
+  });
+
+  it("drops a names response for a public ID that is no longer shown", async () => {
+    let releaseFirst;
+    global.fetch = vi.fn().mockImplementation((url) => {
+      const u = String(url);
+      if (u.includes("first111/asn-names")) return new Promise((r) => { releaseFirst = () => r(namesResp()); });
+      if (u.includes("/asn-names")) return new Promise(() => {});
+      return Promise.resolve(resultFor([asnEntry]));
+    });
+    const { rerender } = render(Results, { props: { publicID: "first111", asnNamesEnabled: true } });
+    await waitFor(() => expect(namesCalls().length).toBe(1));
+
+    await rerender({ publicID: "second22" });
+    await waitFor(() => expect(namesCalls().length).toBe(2));
+    releaseFirst();
+    await new Promise((r) => setTimeout(r, 0));
+    expect(screen.queryByTestId("asn-names")).toBeNull();
   });
 });

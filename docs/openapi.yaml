@@ -1857,6 +1857,31 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /pub/api/v1/jobs/{public_id}/asn-names:
+    get:
+      tags: [Public]
+      summary: Get the registered holders of the AS numbers in a public result
+      description: >
+        Returns the registered holder of each AS number named in an `asn` or
+        `asns` argument of the stored result, at most 32, looked up through the
+        server's ASN label cache. Answers 404 `not_found` when the
+        `show_asn_names_public` flag is off, no ASN resolver is available, the
+        id is unknown, or the job has no stored result. A complete response
+        carries `Cache-Control: public, max-age=86400`; a response with
+        `complete` false carries `no-store`.
+      operationId: getPublicJobASNNames
+      parameters:
+        - $ref: '#/components/parameters/PublicIDPath'
+      responses:
+        '200':
+          description: AS holder names
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ASNNamesResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+
   /pub/api/v1/locales:
     get:
       tags: [Public]
@@ -3324,6 +3349,41 @@ components:
           type: string
           format: date-time
 
+    ASNNamesResponse:
+      type: object
+      required: [complete, asns]
+      properties:
+        complete:
+          type: boolean
+          description: False when a lookup was still pending at the 3 second deadline.
+        asns:
+          type: array
+          description: Holders in ascending AS number order; an AS number without a label is omitted.
+          items:
+            $ref: '#/components/schemas/ASNName'
+
+    ASNName:
+      type: object
+      required: [asn, name, handle, country, label]
+      properties:
+        asn:
+          type: integer
+          format: int64
+          minimum: 1
+          maximum: 4294967295
+        name:
+          type: string
+          description: Holder name parsed from the label.
+        handle:
+          type: string
+          description: Registry handle parsed from the label; empty when absent.
+        country:
+          type: string
+          description: ISO 3166 two-letter country code parsed from the label; empty when absent.
+        label:
+          type: string
+          description: Registry label without control characters, at most 255 characters.
+
     PublicInfo:
       type: object
       required: [show_score_public, show_nameserver_timings_public, excluded_testcases]
@@ -3334,6 +3394,9 @@ components:
           type: boolean
         show_dnssec_chain_public:
           type: boolean
+        show_asn_names_public:
+          type: boolean
+          description: True when the flag is on and an ASN resolver is available.
         excluded_testcases:
           type: array
           description: Testcase ids the server excludes from every run, in run order.

@@ -78,6 +78,12 @@ colour, and the legend names them. The section only appears
 when `show_dnssec_chain_public` is enabled and the run has chain data
 (public-UI runs only).
 
+A finding that names an AS number shows the registered holder of each AS below
+its message, as `AS199973: Migrationsverket (SE)`, with the full registry label
+as a tooltip. The page loads the names after the result has rendered; when they
+are unavailable, the finding shows without them. The names appear only when
+`show_asn_names_public` is enabled.
+
 The start page also shows a "Recent tests" list: tests started in the same
 browser, with the domain, the finish time, and the grade when public scoring
 is enabled. Each row links back to the stored result. The list is kept only

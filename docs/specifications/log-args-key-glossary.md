@@ -22,6 +22,7 @@ Scope:
 | `mname` | `string` | SOA MNAME hostname. | Hostname only. |
 | `signer` | `string` | Signer's Name of an RRSIG record. | Zone apex name. Never the owner name of the signed RRset. |
 | `zone` | `string` | Zone apex name a finding is about. | Never the zone under test. Use `signer` where the name comes from an RRSIG. |
+| `asn` | `int` | Autonomous system number. | Integer in 1 to 4294967295. Used where a finding names exactly one AS; `asns` carries a list. |
 
 ## Query Identity Keys
 

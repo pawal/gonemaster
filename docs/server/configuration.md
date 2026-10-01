@@ -305,18 +305,27 @@ can confirm the value took effect.
 
 ## Result Display Settings
 
-The config file can hide score and nameserver timing UI elements:
+The config file can hide score, nameserver timing and AS holder UI elements:
 
 ```json
 {
   "show_score_admin": true,
   "show_score_public": true,
   "show_nameserver_timings_admin": true,
-  "show_nameserver_timings_public": true
+  "show_nameserver_timings_public": true,
+  "show_asn_names_public": true
 }
 ```
 
 These settings affect UI display. They do not remove stored data.
+
+`show_asn_names_public` (default `true`) enables
+`GET /pub/api/v1/jobs/{public_id}/asn-names`, which the public UI calls to show
+the registered holder under each finding that names an AS number. When it is
+on, the server queries Team Cymru's IP to ASN mapping service outside test
+runs, for the AS numbers of each result that is opened. Set it to `false` to
+stop these queries. See
+[public-api-and-proxy.md](public-api-and-proxy.md#as-holder-names).
 
 ## Analysis Settings
 

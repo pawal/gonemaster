@@ -32,6 +32,7 @@ Public endpoint groups:
 | `GET /pub/api/v1/jobs/{public_id}` | Poll public job status. |
 | `GET /pub/api/v1/jobs/{public_id}/result` | Fetch a public job result. |
 | `GET /pub/api/v1/jobs/{public_id}/dnssec-chain` | Fetch the DNSSEC chain summary for a public run. |
+| `GET /pub/api/v1/jobs/{public_id}/asn-names` | Fetch the registered holders of the AS numbers in a public result. |
 | `GET /pub/api/v1/profiles` | List stored profiles marked public. |
 | `GET /pub/api/v1/locales` | List available locales. |
 | `GET /pub/api/v1/lookup/{domain}` | Public lookup helper. |
@@ -164,8 +165,9 @@ reverse-proxy cache absorbs repeat reads better than rate limiting does.
 
 The application sets `Cache-Control: public, max-age=300` on
 `GET /pub/api/v1/jobs/{public_id}/result` and, on hits, on
-`GET /pub/api/v1/jobs/{public_id}/dnssec-chain` (200 responses only). Public
-analysis snapshot endpoints already advertise `public, max-age=86400, immutable`
+`GET /pub/api/v1/jobs/{public_id}/dnssec-chain` (200 responses only), and
+`public, max-age=86400` on a complete `GET /pub/api/v1/jobs/{public_id}/asn-names`
+response. Public analysis snapshot endpoints already advertise `public, max-age=86400, immutable`
 when the snapshot slug is explicit in the path. Configure your reverse proxy
 or CDN to honour these headers - e.g. enable `proxy_cache` in nginx or
 caching at Caddy / Cloudflare / Fastly.
@@ -202,6 +204,48 @@ delegated below the apex, where names in that zone are evaluated.
 Version 3 also adds the roll-up status `undelegated`, a signed zone whose
 parent proves under signature that no delegation exists at the name. It is
 distinct from `island`, where the parent is silent about the zone.
+
+## AS Holder Names
+
+`GET /pub/api/v1/jobs/{public_id}/asn-names` returns the registered holder of
+each AS number that a stored result names in an `asn` or `asns` argument. The
+server resolves each holder with a `TXT` query for `AS<n>.<source>` over the
+Cymru sources of the effective profile's `asn_db`, which by default reach Team
+Cymru's IP to ASN mapping service. It queries only AS numbers the result names.
+
+```json
+{
+  "complete": true,
+  "asns": [
+    {
+      "asn": 199973,
+      "name": "Migrationsverket",
+      "handle": "MIGR-AS",
+      "country": "SE",
+      "label": "MIGR-AS - Migrationsverket, SE"
+    }
+  ]
+}
+```
+
+- `asns` holds at most 32 entries, in ascending AS number order. An AS number
+  without a label is omitted.
+- `label` is the registry label with control characters removed, at most 255
+  characters. `name`, `handle` and `country` are parsed from it; `handle` and
+  `country` are empty when the label carries none.
+- `complete` is `false` when a lookup was still pending after 3 seconds. The
+  pending lookups continue and fill the cache. A complete response carries
+  `Cache-Control: public, max-age=86400`; an incomplete one carries `no-store`.
+
+The server caches a label in memory for 30 days, an empty answer for 6 hours
+and a failed lookup for 5 minutes. A lookup that exceeds 10 seconds is
+abandoned and not cached.
+
+The endpoint returns `404` `not_found` when `show_asn_names_public` is off,
+when the server has no ASN resolver, when the public ID is unknown, or when the
+job has no stored result. `GET /pub/api/v1/info` reports
+`show_asn_names_public` as `true` only when the setting is on and the resolver
+is available.
 
 ## Reverse Proxy
 

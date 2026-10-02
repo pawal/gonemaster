@@ -122,5 +122,7 @@ export const serverSettingsFixture = (overrides = {}) => ({
   show_nameserver_timings_admin: setting(true),
   show_nameserver_timings_public: setting(true),
   show_asn_names_public: setting(true),
+  mcp_enabled: setting(false),
+  mcp_allow_write: setting(false),
   ...overrides
 });

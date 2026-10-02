@@ -172,4 +172,25 @@ describe("ServerSettings", () => {
     await waitFor(() => expect(calls.length).toBe(1));
     expect(calls[0].show_asn_names_public).toBe(false);
   });
+
+  it("renders the MCP toggles off and saves mcp_enabled", async () => {
+    const calls = [];
+    global.fetch.mockImplementation((url, options = {}) => {
+      if (options.method === "PUT") calls.push(JSON.parse(options.body));
+      return settingsMock(url, options);
+    });
+    await renderLoaded(/MCP endpoint/);
+
+    const enabled = screen.getByLabelText(/MCP endpoint/);
+    const write = screen.getByLabelText(/MCP write tools/);
+    expect(enabled.type).toBe("checkbox");
+    expect(enabled.checked).toBe(false);
+    expect(write.checked).toBe(false);
+    await fireEvent.click(enabled);
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.length).toBe(1));
+    expect(calls[0].mcp_enabled).toBe(true);
+    expect("mcp_allow_write" in calls[0]).toBe(false);
+  });
 });

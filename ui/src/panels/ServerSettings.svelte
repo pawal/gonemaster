@@ -66,6 +66,13 @@
         { key: "show_nameserver_timings_public", type: "toggle" },
       ],
     },
+    {
+      key: "settings_group_mcp",
+      settings: [
+        { key: "mcp_enabled", type: "toggle" },
+        { key: "mcp_allow_write", type: "toggle" },
+      ],
+    },
   ];
 
   const apiFetch = async (path, options) => apiCall(apiBase, path, options);

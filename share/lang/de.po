@@ -2206,6 +2206,38 @@ msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
 msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
 msgstr "Die Zone ist nicht signiert oder hat keinen DS-Record bei der übergeordneten Zone; die Adress-Records der In-Domain-Nameserver werden nicht validiert."
 
+msgctxt "DNSSEC:DS23_DENIAL_PROOF_CONSISTENT"
+msgid "The NSEC or NSEC3 records in the denial of existence response are consistent on name server(s) {servers}."
+msgstr "Die NSEC- oder NSEC3-Records in der Antwort, die die Nichtexistenz eines Namens belegt, sind auf Nameserver(n) {servers} konsistent."
+
+msgctxt "DNSSEC:DS23_MULTIPLE_NSEC3PARAM"
+msgid "More than one NSEC3PARAM record is published at the apex on name server(s) {servers}; more than one NSEC3 chain is in use, as during a parameter change."
+msgstr "Am Apex ist auf Nameserver(n) {servers} mehr als ein NSEC3PARAM-Record veröffentlicht. Es ist mehr als eine NSEC3-Kette in Gebrauch, wie während eines Parameterwechsels."
+
+msgctxt "DNSSEC:DS23_NO_DENIAL_PROOF"
+msgid "The response for a name that does not exist carries neither NSEC nor NSEC3 records on name server(s) {servers}."
+msgstr "Die Antwort für einen Namen, der nicht existiert, enthält auf Nameserver(n) {servers} weder NSEC- noch NSEC3-Records."
+
+msgctxt "DNSSEC:DS23_NSEC3_CHAIN_NOT_PUBLISHED"
+msgid "The NSEC3 chain serving the denial of existence has no matching NSEC3PARAM record at the apex on name server(s) {servers}."
+msgstr "Die NSEC3-Kette, die die Nichtexistenz belegt, hat auf Nameserver(n) {servers} keinen passenden NSEC3PARAM-Record am Apex."
+
+msgctxt "DNSSEC:DS23_NSEC3_DUPLICATE_NEXT"
+msgid "The NSEC3 records {owner} and {covered} carry the same Next Hashed Owner Name {next} on name server(s) {servers}."
+msgstr "Die NSEC3-Records {owner} und {covered} tragen auf Nameserver(n) {servers} denselben Next Hashed Owner Name {next}."
+
+msgctxt "DNSSEC:DS23_NSEC3_MIXED_PARAMETERS"
+msgid "The NSEC3 records in one denial of existence response do not share hash algorithm, iterations and salt on name server(s) {servers}."
+msgstr "Die NSEC3-Records in einer Antwort, die die Nichtexistenz belegt, haben auf Nameserver(n) {servers} nicht denselben Hash-Algorithmus, dieselben Iterationen und dasselbe Salt."
+
+msgctxt "DNSSEC:DS23_NSEC3_RANGES_OVERLAP"
+msgid "The NSEC3 record {owner} with Next Hashed Owner Name {next} covers the owner name of the NSEC3 record {covered} on name server(s) {servers}."
+msgstr "Der NSEC3-Record {owner} mit dem Next Hashed Owner Name {next} deckt auf Nameserver(n) {servers} den Eigentümernamen des NSEC3-Records {covered} ab."
+
+msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
+msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
+msgstr "Der NSEC-Record {owner} mit dem Next Domain Name {next} deckt auf Nameserver(n) {servers} den Eigentümernamen des NSEC-Records {covered} ab."
+
 msgctxt "NAMESERVER:NO_EDNS_SUPPORT"
 msgid "Nameserver {ns}/{address} does not support EDNS0 (replies with FORMERR)."
 msgstr "Der Nameserver {ns}/{address} unterstützt EDNS0 nicht (antwortet mit FORMERR)."

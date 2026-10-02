@@ -2298,6 +2298,38 @@ msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
 msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
 msgstr "Vyöhykettä ei ole allekirjoitettu tai sillä ei ole DS-tietuetta ylemmällä vyöhykkeellä; in-domain-nimipalvelimien osoitetietueita ei validoida."
 
+msgctxt "DNSSEC:DS23_DENIAL_PROOF_CONSISTENT"
+msgid "The NSEC or NSEC3 records in the denial of existence response are consistent on name server(s) {servers}."
+msgstr "Nimen olemattomuuden todistavan vastauksen NSEC- tai NSEC3-tietueet ovat keskenään johdonmukaisia nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS23_MULTIPLE_NSEC3PARAM"
+msgid "More than one NSEC3PARAM record is published at the apex on name server(s) {servers}; more than one NSEC3 chain is in use, as during a parameter change."
+msgstr "Vyöhykkeen juuressa on nimipalvelimilla {servers} julkaistu useampi kuin yksi NSEC3PARAM-tietue. Käytössä on useampi kuin yksi NSEC3-ketju, kuten parametrien vaihdon aikana."
+
+msgctxt "DNSSEC:DS23_NO_DENIAL_PROOF"
+msgid "The response for a name that does not exist carries neither NSEC nor NSEC3 records on name server(s) {servers}."
+msgstr "Olemattoman nimen vastauksessa ei ole NSEC- eikä NSEC3-tietueita nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_CHAIN_NOT_PUBLISHED"
+msgid "The NSEC3 chain serving the denial of existence has no matching NSEC3PARAM record at the apex on name server(s) {servers}."
+msgstr "Olemattomuuden todistavalla NSEC3-ketjulla ei ole vastaavaa NSEC3PARAM-tietuetta vyöhykkeen juuressa nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_DUPLICATE_NEXT"
+msgid "The NSEC3 records {owner} and {covered} carry the same Next Hashed Owner Name {next} on name server(s) {servers}."
+msgstr "NSEC3-tietueilla {owner} ja {covered} on sama Next Hashed Owner Name {next} nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_MIXED_PARAMETERS"
+msgid "The NSEC3 records in one denial of existence response do not share hash algorithm, iterations and salt on name server(s) {servers}."
+msgstr "Saman olemattomuuden todistavan vastauksen NSEC3-tietueilla ei ole samaa hajautusalgoritmia, iteraatioiden määrää ja suolaa (salt) nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_RANGES_OVERLAP"
+msgid "The NSEC3 record {owner} with Next Hashed Owner Name {next} covers the owner name of the NSEC3 record {covered} on name server(s) {servers}."
+msgstr "NSEC3-tietue {owner}, jonka Next Hashed Owner Name on {next}, kattaa NSEC3-tietueen {covered} omistajanimen nimipalvelimilla {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
+msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
+msgstr "NSEC-tietue {owner}, jonka Next Domain Name on {next}, kattaa NSEC-tietueen {covered} omistajanimen nimipalvelimilla {servers}."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

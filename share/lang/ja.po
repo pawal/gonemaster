@@ -2469,6 +2469,38 @@ msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
 msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
 msgstr "ゾーンは署名されていないか、親に DS レコードがありません。in-domain ネームサーバーのアドレスレコードは検証されません。"
 
+msgctxt "DNSSEC:DS23_DENIAL_PROOF_CONSISTENT"
+msgid "The NSEC or NSEC3 records in the denial of existence response are consistent on name server(s) {servers}."
+msgstr "名前の不存在を証明する応答の NSEC または NSEC3 レコードは、ネームサーバー {servers} で整合しています。"
+
+msgctxt "DNSSEC:DS23_MULTIPLE_NSEC3PARAM"
+msgid "More than one NSEC3PARAM record is published at the apex on name server(s) {servers}; more than one NSEC3 chain is in use, as during a parameter change."
+msgstr "ネームサーバー {servers} では、ゾーンの頂点に複数の NSEC3PARAM レコードが公開されています。パラメーター変更中のように、複数の NSEC3 チェーンが使用されています。"
+
+msgctxt "DNSSEC:DS23_NO_DENIAL_PROOF"
+msgid "The response for a name that does not exist carries neither NSEC nor NSEC3 records on name server(s) {servers}."
+msgstr "存在しない名前に対する応答に、ネームサーバー {servers} では NSEC レコードも NSEC3 レコードも含まれていません。"
+
+msgctxt "DNSSEC:DS23_NSEC3_CHAIN_NOT_PUBLISHED"
+msgid "The NSEC3 chain serving the denial of existence has no matching NSEC3PARAM record at the apex on name server(s) {servers}."
+msgstr "不存在を証明する NSEC3 チェーンに対応する NSEC3PARAM レコードが、ネームサーバー {servers} のゾーンの頂点にありません。"
+
+msgctxt "DNSSEC:DS23_NSEC3_DUPLICATE_NEXT"
+msgid "The NSEC3 records {owner} and {covered} carry the same Next Hashed Owner Name {next} on name server(s) {servers}."
+msgstr "NSEC3 レコード {owner} と {covered} は、ネームサーバー {servers} で同じ Next Hashed Owner Name {next} を持っています。"
+
+msgctxt "DNSSEC:DS23_NSEC3_MIXED_PARAMETERS"
+msgid "The NSEC3 records in one denial of existence response do not share hash algorithm, iterations and salt on name server(s) {servers}."
+msgstr "不存在を証明する 1 つの応答に含まれる NSEC3 レコードのハッシュアルゴリズム、反復回数、ソルトが、ネームサーバー {servers} で一致していません。"
+
+msgctxt "DNSSEC:DS23_NSEC3_RANGES_OVERLAP"
+msgid "The NSEC3 record {owner} with Next Hashed Owner Name {next} covers the owner name of the NSEC3 record {covered} on name server(s) {servers}."
+msgstr "Next Hashed Owner Name が {next} の NSEC3 レコード {owner} は、ネームサーバー {servers} で NSEC3 レコード {covered} の所有者名を範囲に含んでいます。"
+
+msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
+msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
+msgstr "Next Domain Name が {next} の NSEC レコード {owner} は、ネームサーバー {servers} で NSEC レコード {covered} の所有者名を範囲に含んでいます。"
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

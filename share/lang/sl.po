@@ -2210,6 +2210,38 @@ msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
 msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
 msgstr "Cona ni podpisana ali nima zapisa DS pri starševski coni; naslovni zapisi imenskih strežnikov v domeni (in-domain) niso preverjeni."
 
+msgctxt "DNSSEC:DS23_DENIAL_PROOF_CONSISTENT"
+msgid "The NSEC or NSEC3 records in the denial of existence response are consistent on name server(s) {servers}."
+msgstr "Zapisi NSEC ali NSEC3 v odgovoru, ki dokazuje neobstoj imena, so na imenskih strežnikih {servers} medsebojno skladni."
+
+msgctxt "DNSSEC:DS23_MULTIPLE_NSEC3PARAM"
+msgid "More than one NSEC3PARAM record is published at the apex on name server(s) {servers}; more than one NSEC3 chain is in use, as during a parameter change."
+msgstr "Na vrhu cone je na imenskih strežnikih {servers} objavljen več kot en zapis NSEC3PARAM. V uporabi je več kot ena veriga NSEC3, kot med menjavo parametrov."
+
+msgctxt "DNSSEC:DS23_NO_DENIAL_PROOF"
+msgid "The response for a name that does not exist carries neither NSEC nor NSEC3 records on name server(s) {servers}."
+msgstr "Odgovor za ime, ki ne obstaja, na imenskih strežnikih {servers} ne vsebuje niti zapisov NSEC niti zapisov NSEC3."
+
+msgctxt "DNSSEC:DS23_NSEC3_CHAIN_NOT_PUBLISHED"
+msgid "The NSEC3 chain serving the denial of existence has no matching NSEC3PARAM record at the apex on name server(s) {servers}."
+msgstr "Veriga NSEC3, ki dokazuje neobstoj imena, na imenskih strežnikih {servers} nima ustreznega zapisa NSEC3PARAM na vrhu cone."
+
+msgctxt "DNSSEC:DS23_NSEC3_DUPLICATE_NEXT"
+msgid "The NSEC3 records {owner} and {covered} carry the same Next Hashed Owner Name {next} on name server(s) {servers}."
+msgstr "Zapisa NSEC3 {owner} in {covered} imata na imenskih strežnikih {servers} enak Next Hashed Owner Name {next}."
+
+msgctxt "DNSSEC:DS23_NSEC3_MIXED_PARAMETERS"
+msgid "The NSEC3 records in one denial of existence response do not share hash algorithm, iterations and salt on name server(s) {servers}."
+msgstr "Zapisi NSEC3 v enem odgovoru, ki dokazuje neobstoj imena, na imenskih strežnikih {servers} nimajo enakega zgoščevalnega algoritma, iteracij in salt vrednosti."
+
+msgctxt "DNSSEC:DS23_NSEC3_RANGES_OVERLAP"
+msgid "The NSEC3 record {owner} with Next Hashed Owner Name {next} covers the owner name of the NSEC3 record {covered} on name server(s) {servers}."
+msgstr "Zapis NSEC3 {owner} z Next Hashed Owner Name {next} na imenskih strežnikih {servers} pokriva ime lastnika zapisa NSEC3 {covered}."
+
+msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
+msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
+msgstr "Zapis NSEC {owner} z Next Domain Name {next} na imenskih strežnikih {servers} pokriva ime lastnika zapisa NSEC {covered}."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

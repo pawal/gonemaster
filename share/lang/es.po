@@ -2320,6 +2320,38 @@ msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
 msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
 msgstr "La zona no está firmada o no tiene registro DS en la zona padre; los registros de dirección de los servidores de nombres dependientes (\"in-domain\") no se validan."
 
+msgctxt "DNSSEC:DS23_DENIAL_PROOF_CONSISTENT"
+msgid "The NSEC or NSEC3 records in the denial of existence response are consistent on name server(s) {servers}."
+msgstr "Los registros NSEC o NSEC3 de la respuesta que prueba la inexistencia de un nombre son coherentes en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS23_MULTIPLE_NSEC3PARAM"
+msgid "More than one NSEC3PARAM record is published at the apex on name server(s) {servers}; more than one NSEC3 chain is in use, as during a parameter change."
+msgstr "En el ápice de la zona hay más de un registro NSEC3PARAM publicado en los servidores de nombres {servers}. Hay más de una cadena NSEC3 en uso, como durante un cambio de parámetros."
+
+msgctxt "DNSSEC:DS23_NO_DENIAL_PROOF"
+msgid "The response for a name that does not exist carries neither NSEC nor NSEC3 records on name server(s) {servers}."
+msgstr "La respuesta para un nombre que no existe no lleva registros NSEC ni NSEC3 en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_CHAIN_NOT_PUBLISHED"
+msgid "The NSEC3 chain serving the denial of existence has no matching NSEC3PARAM record at the apex on name server(s) {servers}."
+msgstr "La cadena NSEC3 que prueba la inexistencia no tiene un registro NSEC3PARAM correspondiente en el ápice de la zona en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_DUPLICATE_NEXT"
+msgid "The NSEC3 records {owner} and {covered} carry the same Next Hashed Owner Name {next} on name server(s) {servers}."
+msgstr "Los registros NSEC3 {owner} y {covered} llevan el mismo Next Hashed Owner Name {next} en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_MIXED_PARAMETERS"
+msgid "The NSEC3 records in one denial of existence response do not share hash algorithm, iterations and salt on name server(s) {servers}."
+msgstr "Los registros NSEC3 de una misma respuesta que prueba la inexistencia no comparten algoritmo de hash, iteraciones y salt en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_RANGES_OVERLAP"
+msgid "The NSEC3 record {owner} with Next Hashed Owner Name {next} covers the owner name of the NSEC3 record {covered} on name server(s) {servers}."
+msgstr "El registro NSEC3 {owner} con Next Hashed Owner Name {next} cubre el nombre propietario del registro NSEC3 {covered} en los servidores de nombres {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
+msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
+msgstr "El registro NSEC {owner} con Next Domain Name {next} cubre el nombre propietario del registro NSEC {covered} en los servidores de nombres {servers}."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

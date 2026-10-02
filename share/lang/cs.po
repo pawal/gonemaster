@@ -1395,6 +1395,38 @@ msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
 msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
 msgstr "Zóna není podepsána nebo nemá záznam DS u nadřazené strany; adresní záznamy jmenných serverů v doméně (in-domain) se neověřují."
 
+msgctxt "DNSSEC:DS23_DENIAL_PROOF_CONSISTENT"
+msgid "The NSEC or NSEC3 records in the denial of existence response are consistent on name server(s) {servers}."
+msgstr "Záznamy NSEC nebo NSEC3 v odpovědi dokazující neexistenci jména jsou na jmenných serverech {servers} vzájemně konzistentní."
+
+msgctxt "DNSSEC:DS23_MULTIPLE_NSEC3PARAM"
+msgid "More than one NSEC3PARAM record is published at the apex on name server(s) {servers}; more than one NSEC3 chain is in use, as during a parameter change."
+msgstr "Na jmenných serverech {servers} je ve vrcholu zóny (apex) publikován více než jeden záznam NSEC3PARAM. Používá se více než jeden řetězec NSEC3, jako při změně parametrů."
+
+msgctxt "DNSSEC:DS23_NO_DENIAL_PROOF"
+msgid "The response for a name that does not exist carries neither NSEC nor NSEC3 records on name server(s) {servers}."
+msgstr "Odpověď na jméno, které neexistuje, neobsahuje na jmenných serverech {servers} ani záznamy NSEC, ani záznamy NSEC3."
+
+msgctxt "DNSSEC:DS23_NSEC3_CHAIN_NOT_PUBLISHED"
+msgid "The NSEC3 chain serving the denial of existence has no matching NSEC3PARAM record at the apex on name server(s) {servers}."
+msgstr "Řetězec NSEC3, který dokazuje neexistenci jména, nemá na jmenných serverech {servers} ve vrcholu zóny (apex) odpovídající záznam NSEC3PARAM."
+
+msgctxt "DNSSEC:DS23_NSEC3_DUPLICATE_NEXT"
+msgid "The NSEC3 records {owner} and {covered} carry the same Next Hashed Owner Name {next} on name server(s) {servers}."
+msgstr "Záznamy NSEC3 {owner} a {covered} mají na jmenných serverech {servers} stejné pole Next Hashed Owner Name {next}."
+
+msgctxt "DNSSEC:DS23_NSEC3_MIXED_PARAMETERS"
+msgid "The NSEC3 records in one denial of existence response do not share hash algorithm, iterations and salt on name server(s) {servers}."
+msgstr "Záznamy NSEC3 v jedné odpovědi dokazující neexistenci jména nemají na jmenných serverech {servers} shodný hašovací algoritmus, počet iterací a sůl (salt)."
+
+msgctxt "DNSSEC:DS23_NSEC3_RANGES_OVERLAP"
+msgid "The NSEC3 record {owner} with Next Hashed Owner Name {next} covers the owner name of the NSEC3 record {covered} on name server(s) {servers}."
+msgstr "Záznam NSEC3 {owner} s polem Next Hashed Owner Name {next} pokrývá na jmenných serverech {servers} jméno vlastníka záznamu NSEC3 {covered}."
+
+msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
+msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
+msgstr "Záznam NSEC {owner} s polem Next Domain Name {next} pokrývá na jmenných serverech {servers} jméno vlastníka záznamu NSEC {covered}."
+
 msgctxt "NAMESERVER:NO_EDNS_SUPPORT"
 msgid "Nameserver {ns}/{address} does not support EDNS0 (replies with FORMERR)."
 msgstr "Jmenný server {ns}/{address} nepodporuje EDNS0 (odpovídá s FORMERR)."

@@ -2250,6 +2250,38 @@ msgctxt "DNSSEC:DS22_ZONE_NOT_SECURE"
 msgid "The zone is not signed or has no DS record at the parent; the address records of in-domain name servers are not validated."
 msgstr "Zonen är inte signerad eller saknar DS-post hos föräldern. Adressposterna för in-domain-namnservrar valideras inte."
 
+msgctxt "DNSSEC:DS23_DENIAL_PROOF_CONSISTENT"
+msgid "The NSEC or NSEC3 records in the denial of existence response are consistent on name server(s) {servers}."
+msgstr "NSEC- eller NSEC3-posterna i svaret som bevisar att namnet inte finns är konsekventa på namnserver(ar) {servers}."
+
+msgctxt "DNSSEC:DS23_MULTIPLE_NSEC3PARAM"
+msgid "More than one NSEC3PARAM record is published at the apex on name server(s) {servers}; more than one NSEC3 chain is in use, as during a parameter change."
+msgstr "Fler än en NSEC3PARAM-post publiceras vid zonens apex på namnserver(ar) {servers}. Fler än en NSEC3-kedja är i bruk, som under ett parameterbyte."
+
+msgctxt "DNSSEC:DS23_NO_DENIAL_PROOF"
+msgid "The response for a name that does not exist carries neither NSEC nor NSEC3 records on name server(s) {servers}."
+msgstr "Svaret för ett namn som inte finns innehåller varken NSEC- eller NSEC3-poster på namnserver(ar) {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_CHAIN_NOT_PUBLISHED"
+msgid "The NSEC3 chain serving the denial of existence has no matching NSEC3PARAM record at the apex on name server(s) {servers}."
+msgstr "NSEC3-kedjan som bevisar att namnet inte finns saknar en matchande NSEC3PARAM-post vid zonens apex på namnserver(ar) {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_DUPLICATE_NEXT"
+msgid "The NSEC3 records {owner} and {covered} carry the same Next Hashed Owner Name {next} on name server(s) {servers}."
+msgstr "NSEC3-posterna {owner} och {covered} har samma Next Hashed Owner Name {next} på namnserver(ar) {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_MIXED_PARAMETERS"
+msgid "The NSEC3 records in one denial of existence response do not share hash algorithm, iterations and salt on name server(s) {servers}."
+msgstr "NSEC3-posterna i ett och samma svar som bevisar att namnet inte finns har inte samma hashalgoritm, iterationer och salt på namnserver(ar) {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC3_RANGES_OVERLAP"
+msgid "The NSEC3 record {owner} with Next Hashed Owner Name {next} covers the owner name of the NSEC3 record {covered} on name server(s) {servers}."
+msgstr "NSEC3-posten {owner} med Next Hashed Owner Name {next} täcker ägarnamnet för NSEC3-posten {covered} på namnserver(ar) {servers}."
+
+msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
+msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
+msgstr "NSEC-posten {owner} med Next Domain Name {next} täcker ägarnamnet för NSEC-posten {covered} på namnserver(ar) {servers}."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

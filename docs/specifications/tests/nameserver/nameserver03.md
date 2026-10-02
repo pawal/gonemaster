@@ -14,13 +14,14 @@ Status: Final
 - Profile/config knobs that affect behavior:
   - `net.ipv4` and `net.ipv6`: disabled transports are skipped with transport debug tags.
   - `resolver.defaults.parallel`: parallel nameserver query fanout.
+  - `net.allow_non_global_targets`: when `false`, transfers to addresses that are not globally reachable are blocked.
 
 ## Algorithm And Decision Flow
 1. Emit `TEST_CASE_START`.
 2. Read nameserver list from [`ZoneNameservers`](../../nameserver-resolution.md#zonenameservers), deduplicate by `name/ip`, preserving first-seen order.
 3. For each deduplicated nameserver (parallelized, input-order merged logs):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `AXFR`, then skip.
-   - Attempt AXFR for zone name.
+   - Attempt AXFR for zone name. The nameserver layer MUST NOT connect to an address that is not globally reachable unless `net.allow_non_global_targets` is `true` or the operator supplied the address; it logs `NON_GLOBAL_QUERY_BLOCKED` and returns no RR and no error.
    - Capture first RR returned by AXFR callback and stop callback immediately.
    - If AXFR call returns an error, record server as AXFR failure.
    - Else if first RR is an `SOA`, record server as AXFR available.
@@ -38,6 +39,7 @@ For each nameserver (parallel; fan-out = resolver.defaults.parallel):
 
    transport disabled for AXFR -> IPV4_DISABLED / IPV6_DISABLED, skip
    attempt AXFR for z.Name (callback captures first RR then stops)
+    +- address blocked as non-global          -> (no finding)
     +- AXFR call returns error                -> axfrFailure[ns]
     +- first RR is *dns.SOA                   -> axfrAvailable[ns]
     +- first RR not SOA                       -> (no finding)
@@ -101,4 +103,5 @@ The following behaviors are implementation choices, not mandated by RFC 5936 (DN
 ## Edge Cases And Limitations
 - Successful AXFR responses where first RR is not `SOA` emit no availability/failure tag.
 - Nameservers skipped due disabled transport do not contribute AXFR findings.
+- Nameservers whose address the non-global guard blocks do not contribute AXFR findings.
 - Only the first AXFR RR is inspected in testcase logic.

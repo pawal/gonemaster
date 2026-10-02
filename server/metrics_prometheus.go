@@ -46,6 +46,7 @@ type metricsPromSnapshot struct {
 
 	ForwardedHeadersStrippedTotal int64
 	RateLimitKeys                 int
+	MCPToolCalls                  []MetricsMCPToolCall
 
 	JobDurationHistogram boundedHistogram
 	JobDurationCount     int64
@@ -106,6 +107,7 @@ func (m *MetricsCollector) prometheusSnapshot() metricsPromSnapshot {
 
 		ForwardedHeadersStrippedTotal: m.forwardedStrippedTotal,
 		RateLimitKeys:                 rateLimitKeys,
+		MCPToolCalls:                  m.copyMCPToolCallsLocked(),
 
 		JobDurationHistogram: cloneBoundedHistogram(m.jobDuration),
 		JobDurationCount:     m.jobDurationCount,
@@ -225,6 +227,11 @@ func renderPrometheusMetrics(snapshot metricsPromSnapshot) []byte {
 
 	writePromHeader(&buf, "gonemaster_forwarded_headers_stripped_total", "Lifetime requests whose X-Forwarded-* headers were dropped as untrusted.", "counter")
 	writePromSample(&buf, "gonemaster_forwarded_headers_stripped_total", nil, snapshot.ForwardedHeadersStrippedTotal)
+	writePromHeader(&buf, "gonemaster_mcp_tool_calls_total", "Lifetime MCP tool calls served at /api/v1/mcp.", "counter")
+	for _, tc := range snapshot.MCPToolCalls {
+		writePromSample(&buf, "gonemaster_mcp_tool_calls_total", map[string]string{"tool": tc.Tool, "outcome": "ok"}, tc.Total-tc.Failed)
+		writePromSample(&buf, "gonemaster_mcp_tool_calls_total", map[string]string{"tool": tc.Tool, "outcome": "failed"}, tc.Failed)
+	}
 
 	writePromHeader(&buf, "gonemaster_rate_limit_keys", "Distinct client IPs currently tracked by the public rate limiter.", "gauge")
 	writePromSample(&buf, "gonemaster_rate_limit_keys", nil, snapshot.RateLimitKeys)

@@ -381,6 +381,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/analysis/cohorts", s.handleAnalysisCohorts)
 	apiMux.HandleFunc("/analysis/status", s.handleAnalysisStatus)
 
+	apiMux.Handle("/mcp", s.mcpHandler())
 	apiMux.HandleFunc("GET /features", s.handleFeatures)
 	apiMux.HandleFunc("/settings", s.handleSettings)
 	apiMux.HandleFunc("GET /scoring-config/defaults", s.handleScoringConfigDefaults)

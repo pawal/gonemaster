@@ -235,6 +235,10 @@ type Config struct {
 	ShowDNSSECChainPublic bool `json:"show_dnssec_chain_public"`
 	// ShowASNNamesPublic gates the public AS holder names endpoint. Defaults to true.
 	ShowASNNamesPublic bool `json:"show_asn_names_public"`
+	// MCPEnabled serves the MCP tools at POST /api/v1/mcp. Defaults to false.
+	MCPEnabled bool `json:"mcp_enabled"`
+	// MCPAllowWrite registers the MCP write tools. Defaults to false.
+	MCPAllowWrite bool `json:"mcp_allow_write"`
 }
 
 // PublicAPIFileConfig holds optional public API configuration from JSON.
@@ -322,6 +326,8 @@ type FileConfig struct {
 	ShowNameserverTimingsPublic *bool                   `json:"show_nameserver_timings_public,omitempty"`
 	ShowDNSSECChainPublic       *bool                   `json:"show_dnssec_chain_public,omitempty"`
 	ShowASNNamesPublic          *bool                   `json:"show_asn_names_public,omitempty"`
+	MCPEnabled                  *bool                   `json:"mcp_enabled,omitempty"`
+	MCPAllowWrite               *bool                   `json:"mcp_allow_write,omitempty"`
 	CrossJobHotCache            *bool                   `json:"cross_job_hot_cache,omitempty"`
 	CrossJobHotCacheTTLSeconds  *int                    `json:"cross_job_hot_cache_ttl_seconds,omitempty"`
 }
@@ -525,6 +531,12 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.ShowASNNamesPublic != nil {
 		c.ShowASNNamesPublic = *file.ShowASNNamesPublic
+	}
+	if file.MCPEnabled != nil {
+		c.MCPEnabled = *file.MCPEnabled
+	}
+	if file.MCPAllowWrite != nil {
+		c.MCPAllowWrite = *file.MCPAllowWrite
 	}
 	if file.CrossJobHotCache != nil {
 		c.CrossJobHotCache = *file.CrossJobHotCache

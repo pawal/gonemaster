@@ -123,6 +123,10 @@ func (s *Server) requestIDMiddleware(next http.Handler) http.Handler {
 			id = sanitizeRequestID(inbound)
 		}
 		if id == "" {
+			// In-process callers carry the outer request's ID on the context.
+			id = requestIDFromContext(r.Context())
+		}
+		if id == "" {
 			id = newRequestID()
 		}
 		w.Header().Set("X-Request-Id", id)

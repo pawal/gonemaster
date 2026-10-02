@@ -134,6 +134,7 @@ type MetricsAPISnapshot struct {
 	PanicsTotal       int64                    `json:"panics_total"`
 	Proxy             MetricsProxySnapshot     `json:"proxy"`
 	Routes            []MetricsAPIRouteMetrics `json:"routes"`
+	MCPToolCalls      []MetricsMCPToolCall     `json:"mcp_tool_calls"`
 }
 
 // MetricsProxySnapshot captures reverse-proxy and rate-limiter health.
@@ -243,6 +244,7 @@ type MetricsCollector struct {
 	apiPanicsTotal         int64
 	apiRoutes              map[string]*apiRouteMetrics
 	forwardedStrippedTotal int64
+	mcpToolCalls           map[string]*mcpToolCallMetrics
 	// nil when the rate limiter is disabled.
 	rateLimitKeysFn func() int
 
@@ -284,6 +286,7 @@ func newMetricsCollector(cfg Config, startedAt time.Time) *MetricsCollector {
 		apiStatusClassCounts: zeroStatusClassCounts(),
 		apiErrorCodeCounts:   map[string]int64{},
 		apiRoutes:            map[string]*apiRouteMetrics{},
+		mcpToolCalls:         map[string]*mcpToolCallMetrics{},
 		jobDuration:          newBoundedHistogram(metricsJobDurationBucketsMs[:]),
 		severityTotals:       zeroMetricsSeverityTotals(),
 		localeCounts:         map[string]int64{},
@@ -467,6 +470,44 @@ func (m *MetricsCollector) ObserveForwardedHeadersStripped() {
 	m.mu.Unlock()
 }
 
+// mcpToolCallMetrics counts calls of one MCP tool.
+type mcpToolCallMetrics struct {
+	total  int64
+	failed int64
+}
+
+// MetricsMCPToolCall is one tool's lifetime call counts.
+type MetricsMCPToolCall struct {
+	Tool   string `json:"tool"`
+	Total  int64  `json:"total"`
+	Failed int64  `json:"failed"`
+}
+
+// ObserveMCPToolCall records one call served at /api/v1/mcp.
+func (m *MetricsCollector) ObserveMCPToolCall(tool string, failed bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	c := m.mcpToolCalls[tool]
+	if c == nil {
+		c = &mcpToolCallMetrics{}
+		m.mcpToolCalls[tool] = c
+	}
+	c.total++
+	if failed {
+		c.failed++
+	}
+}
+
+// copyMCPToolCallsLocked snapshots the tool counters sorted by tool name.
+func (m *MetricsCollector) copyMCPToolCallsLocked() []MetricsMCPToolCall {
+	out := make([]MetricsMCPToolCall, 0, len(m.mcpToolCalls))
+	for tool, c := range m.mcpToolCalls {
+		out = append(out, MetricsMCPToolCall{Tool: tool, Total: c.total, Failed: c.failed})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Tool < out[j].Tool })
+	return out
+}
+
 // SetRateLimitKeysSource registers the gauge source for distinct limiter keys.
 func (m *MetricsCollector) SetRateLimitKeysSource(fn func() int) {
 	m.mu.Lock()
@@ -628,6 +669,7 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 	apiPanicsTotal := m.apiPanicsTotal
 	forwardedStrippedTotal := m.forwardedStrippedTotal
 	apiRoutes := m.copyAPIRouteMetricsLocked()
+	mcpToolCalls := m.copyMCPToolCallsLocked()
 	jobDurationCount := m.jobDurationCount
 	jobDurationTotalMs := m.jobDurationTotalMs
 	jobDurationPercentiles := MetricsPercentile{
@@ -691,7 +733,8 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 				ForwardedHeadersStrippedTotal: forwardedStrippedTotal,
 				RateLimitKeys:                 rateLimitKeys,
 			},
-			Routes: apiRoutes,
+			Routes:       apiRoutes,
+			MCPToolCalls: mcpToolCalls,
 		},
 		Quality: MetricsQualitySnapshot{
 			JobDurationMs: MetricsDurationSnapshot{

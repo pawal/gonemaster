@@ -554,6 +554,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	} else {
 		logger.Info("auth token mode", "tokens", n)
 	}
+	if cfg.MCPEnabled {
+		logger.Info("mcp endpoint enabled", "path", "/api/v1/mcp", "write_tools", cfg.MCPAllowWrite)
+	}
 
 	shutdownCh := make(chan os.Signal, 1)
 	signal.Notify(shutdownCh, syscall.SIGINT, syscall.SIGTERM)

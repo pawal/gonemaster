@@ -776,6 +776,10 @@ msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
 msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
 msgstr "La réponse {query_type} de {size} octets est tronquée même lorsqu'une charge utile de {payload} octets est annoncée ; les clients reçoivent donc une réponse tronquée plutôt qu'aucune réponse des serveurs de noms \"{servers}\"."
 
+msgctxt "CONNECTIVITY:CN05_TCP_ANSWER_TRUNCATED"
+msgid "The {query_type} answer is truncated over TCP as well: with a payload of {payload} bytes advertised, name servers \"{servers}\" return {size} bytes with the TC flag set, so clients receive no complete answer."
+msgstr "La réponse {query_type} est également tronquée en TCP : avec une charge utile annoncée de {payload} octets, les serveurs de noms \"{servers}\" renvoient {size} octets avec le drapeau TC positionné ; les clients ne reçoivent donc aucune réponse complète."
+
 msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
 msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
 msgstr "Aucune réponse n'est arrivée en UDP pour la requête {query_type} lorsqu'une charge utile de {payload} octets a été annoncée, alors que les mêmes serveurs de noms répondent à des requêtes plus petites ; la réponse fait {size} octets. Serveurs de noms \"{servers}\"."

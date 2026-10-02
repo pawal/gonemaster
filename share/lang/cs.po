@@ -443,6 +443,10 @@ msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
 msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
 msgstr "Odpověď na dotaz {query_type} o velikosti {size} bajtů je zkrácena i tehdy, když je ohlášen payload {payload} bajtů, takže klienti dostanou zkrácenou odpověď namísto ticha od jmenných serverů \"{servers}\"."
 
+msgctxt "CONNECTIVITY:CN05_TCP_ANSWER_TRUNCATED"
+msgid "The {query_type} answer is truncated over TCP as well: with a payload of {payload} bytes advertised, name servers \"{servers}\" return {size} bytes with the TC flag set, so clients receive no complete answer."
+msgstr "Odpověď na dotaz {query_type} je zkrácena i přes TCP: při ohlášeném payloadu {payload} bajtů vracejí jmenné servery \"{servers}\" {size} bajtů s nastaveným příznakem TC, takže klienti nedostanou úplnou odpověď."
+
 msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
 msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
 msgstr "Na dotaz {query_type} nepřišla přes UDP žádná odpověď, když byl ohlášen payload {payload} bajtů, přesto tytéž jmenné servery odpovídají na menší dotazy; odpověď má {size} bajtů. Jmenné servery \"{servers}\"."

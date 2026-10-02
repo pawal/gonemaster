@@ -649,6 +649,10 @@ msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
 msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
 msgstr "Svaret på {query_type}-spørringen på {size} byte blir trunkert selv når en payload på {payload} byte annonseres, så klienter får et trunkert svar i stedet for stillhet fra navnetjenerne \"{servers}\"."
 
+msgctxt "CONNECTIVITY:CN05_TCP_ANSWER_TRUNCATED"
+msgid "The {query_type} answer is truncated over TCP as well: with a payload of {payload} bytes advertised, name servers \"{servers}\" return {size} bytes with the TC flag set, so clients receive no complete answer."
+msgstr "Svaret på {query_type}-spørringen blir også trunkert over TCP: ved en annonsert payload på {payload} byte returnerer navnetjenerne \"{servers}\" {size} byte med TC-flagget satt, så klienter får ikke et fullstendig svar."
+
 msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
 msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
 msgstr "Det kom ingen svar over UDP på {query_type}-spørringen da en payload på {payload} byte ble annonsert, selv om de samme navnetjenerne svarer på mindre spørringer; svaret er {size} byte. Navnetjenere \"{servers}\"."

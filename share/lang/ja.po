@@ -567,6 +567,10 @@ msgctxt "CONNECTIVITY:CN05_SERVER_CAPS_UDP_ANSWER"
 msgid "The {query_type} answer of {size} bytes is truncated even when a payload of {payload} bytes is advertised, so clients get a truncated response rather than silence from name servers \"{servers}\"."
 msgstr "{size} バイトの {query_type} 応答は、{payload} バイトのペイロードを通知しても切り詰められます。クライアントは無応答ではなく切り詰められた応答を受け取ります。ネームサーバー \"{servers}\"。"
 
+msgctxt "CONNECTIVITY:CN05_TCP_ANSWER_TRUNCATED"
+msgid "The {query_type} answer is truncated over TCP as well: with a payload of {payload} bytes advertised, name servers \"{servers}\" return {size} bytes with the TC flag set, so clients receive no complete answer."
+msgstr "{query_type} 応答は TCP でも切り詰められます。通知されたペイロード {payload} バイトに対し、ネームサーバー \"{servers}\" は TC フラグを立てた {size} バイトを返すため、クライアントは完全な応答を受け取れません。"
+
 msgctxt "CONNECTIVITY:CN05_LARGE_ANSWER_NO_UDP_ANSWER"
 msgid "No answer arrived over UDP for the {query_type} query when a payload of {payload} bytes was advertised, although the same name servers answer smaller queries; the answer is {size} bytes. Name servers \"{servers}\"."
 msgstr "{payload} バイトのペイロードを通知したとき、{query_type} クエリに対する応答が UDP で届きませんでした。同じネームサーバーはより小さなクエリには応答します。応答のサイズは {size} バイトです。ネームサーバー \"{servers}\"。"

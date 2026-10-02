@@ -449,7 +449,7 @@ Scoring takes the severity default in the `dnssec` dimension. No
   `servers` argument carries the `{ns,address}` endpoints.
 - A NODATA response is evaluated for the signer and the signature validity of
   the NSEC or NSEC3 records it carries, not for the logical completeness of the
-  denial. DNSSEC10 owns denial completeness.
+  denial. DNSSEC23 owns denial completeness.
 - Wildcard-synthesised address records need no special handling:
   `dnssecutil.VerifyRRSIG` derives the wildcard owner from the RRSIG label
   count.

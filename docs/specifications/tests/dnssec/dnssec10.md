@@ -4,6 +4,7 @@ Status: Final
 
 ## Purpose
 - Verify that signed child-zone nameservers consistently provide NSEC or NSEC3 denial-of-existence material (including signatures and owner/type-shape checks) when querying for apex `NSEC` and `NSEC3PARAM`.
+- The apex NODATA proof read here carries one denial record. The consistency of a proof with several records, the denial of a name that does not exist, is owned by DNSSEC23.
 
 ## Preconditions And Inputs
 - Preconditions:

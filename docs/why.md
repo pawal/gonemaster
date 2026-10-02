@@ -108,10 +108,10 @@ is published as the
 The two projects now maintain separate specification sets, and gonemaster's has
 moved ahead in two ways that can be counted.
 
-**Coverage.** gonemaster implements 85 testcases. Upstream publishes 74 testcase
+**Coverage.** gonemaster implements 86 testcases. Upstream publishes 74 testcase
 specifications, one of which (`dnssec12`, DNSSEC algorithm completeness) is a
 placeholder that upstream states is not yet implemented. gonemaster implements
-the other 73, and adds twelve testcases that have no upstream counterpart:
+the other 73, and adds thirteen testcases that have no upstream counterpart:
 
 | Testcase | What it checks | Reference |
 |---|---|---|
@@ -120,6 +120,7 @@ the other 73, and adds twelve testcases that have no upstream counterpart:
 | `dnssec20` | that the NSEC/NSEC3 apex type bitmap matches the RR types actually present | RFC 4034, RFC 5155, RFC 8198 |
 | `dnssec21` | that the parent zone signs the DS RRset delegating the child | RFC 4035 |
 | `dnssec22` | that the address records of every in-domain nameserver name validate under the chain of trust of the zone | RFC 4035, RFC 9499 |
+| `dnssec23` | that the NSEC or NSEC3 records of one denial of existence response are consistent with each other and with the apex NSEC3PARAM RRset | RFC 4034, RFC 5155 |
 | `nameserver16` | NSID: which servers answer with one, and what it contains | RFC 5001 |
 | `nameserver17` | DNS Cookie support, and whether the Server Cookie is well formed and accepted | RFC 7873, RFC 9018 |
 | `nameserver18` | Extended DNS Errors from an authoritative server, classified by info-code | RFC 8914 |

@@ -6,6 +6,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
+- server: `auth.protect_public` requires the admin token on the public UI, the analysis UI and `/pub/api/v1`
 - engine: `--exclude` and the server `exclude` setting remove testcases or modules from every run
 - ui-public: show the registered AS holder under findings that name an AS number
 - server: add `GET /pub/api/v1/jobs/{public_id}/asn-names`

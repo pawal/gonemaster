@@ -57,7 +57,11 @@ export async function collectExportRows<T>(
 
 function csvCell(value: unknown): string {
   if (value === null || value === undefined) return "";
-  const str = String(value);
+  let str = String(value);
+  // A leading ' keeps a spreadsheet from reading the cell as a formula.
+  if (typeof value !== "number" && /^[=+\-@\t\r]/.test(str) && !/^[+-]?\d+(\.\d+)?$/.test(str)) {
+    str = "'" + str;
+  }
   if (/[",\n\r]/.test(str)) {
     return `"${str.replace(/"/g, '""')}"`;
   }

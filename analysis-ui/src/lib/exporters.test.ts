@@ -21,6 +21,19 @@ describe("rowsToCSV", () => {
     const csv = rowsToCSV([{ name: 'a,"b"\nc', count: 1 }], columns);
     expect(csv).toBe('Name,Count\n"a,""b""\nc",1\n');
   });
+
+  it("prefixes a ' to cells that start with a formula character", () => {
+    const names = ["=HYPERLINK(\"x\")", "+1+cmd", "-2+3", "@SUM(A1)", "\tx", "\rx"];
+    const csv = rowsToCSV(names.map((name) => ({ name, count: 1 })), columns);
+    expect(csv).toBe(
+      'Name,Count\n"\'=HYPERLINK(""x"")",1\n\'+1+cmd,1\n\'-2+3,1\n\'@SUM(A1),1\n\'\tx,1\n"\'\rx",1\n'
+    );
+  });
+
+  it("leaves numbers and numeric strings as they are", () => {
+    const csv = rowsToCSV([{ name: "-5", count: -3 }, { name: "+1.5", count: 0 }], columns);
+    expect(csv).toBe("Name,Count\n-5,-3\n+1.5,0\n");
+  });
 });
 
 describe("rowsToJSON", () => {

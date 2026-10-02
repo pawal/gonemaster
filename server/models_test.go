@@ -6,12 +6,12 @@ import (
 	"testing"
 )
 
-var base62RE = regexp.MustCompile(`^[a-zA-Z0-9]{8}$`)
+var base62RE = regexp.MustCompile(`^[a-zA-Z0-9]{12}$`)
 
 func TestGeneratePublicIDLength(t *testing.T) {
 	id := GeneratePublicID()
-	if len(id) != 8 {
-		t.Fatalf("got length %d, want 8", len(id))
+	if len(id) != 12 {
+		t.Fatalf("got length %d, want 12", len(id))
 	}
 }
 

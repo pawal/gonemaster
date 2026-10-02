@@ -578,3 +578,15 @@ func TestPublicInfoExcludedTestcasesEmpty(t *testing.T) {
 		t.Fatalf("expected an empty excluded_testcases list, got %s", resp.Body.String())
 	}
 }
+
+func TestPublicGetResolvesEightCharacterPublicID(t *testing.T) {
+	srv := newTestServer(t)
+	job, err := srv.store.Create(Job{ID: newID("job"), PublicID: "abcd1234", Domain: "example.com", Status: JobQueued})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+job.PublicID, nil)
+
+	wantStatus(t, resp, http.StatusOK)
+}

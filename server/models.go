@@ -12,9 +12,9 @@ import (
 )
 
 const publicIDAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
-const publicIDLen = 8
+const publicIDLen = 12
 
-// GeneratePublicID returns an 8-character base62 string using crypto/rand.
+// GeneratePublicID returns a 12-character base62 string using crypto/rand.
 func GeneratePublicID() string {
 	b := make([]byte, publicIDLen)
 	alphabetLen := big.NewInt(int64(len(publicIDAlphabet)))

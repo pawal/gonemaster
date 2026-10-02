@@ -184,9 +184,6 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.handleGetSettings(w, r)
 	case http.MethodPut:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handlePutSettings(w, r)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)

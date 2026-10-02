@@ -45,9 +45,6 @@ func (s *Server) handleDefaultProfile(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleProfiles(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleCreateProfile(w, r)
 	case http.MethodGet:
 		s.handleListProfiles(w)
@@ -65,14 +62,8 @@ func (s *Server) handleProfileByID(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		s.handleGetProfile(w, id)
 	case http.MethodPut:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleUpdateProfile(w, r, id)
 	case http.MethodDelete:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleDeleteProfile(w, id)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -249,14 +240,8 @@ func (s *Server) handleTagProfile(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodPut:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleSetTagProfile(w, r, name)
 	case http.MethodDelete:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleDeleteTagProfile(w, name)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)

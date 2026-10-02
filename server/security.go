@@ -82,6 +82,20 @@ func (s *Server) enforceCSRF(w http.ResponseWriter, r *http.Request) bool {
 	return true
 }
 
+// csrfMiddleware runs enforceCSRF on every method but GET, HEAD and OPTIONS.
+func (s *Server) csrfMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case http.MethodGet, http.MethodHead, http.MethodOptions:
+		default:
+			if !s.enforceCSRF(w, r) {
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func normalizedHostPort(hostport string, scheme string) (string, string, error) {
 	hostport = strings.TrimSpace(hostport)
 	if hostport == "" {

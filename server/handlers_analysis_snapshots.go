@@ -144,14 +144,8 @@ func (s *Server) handleAnalysisCohortSnapshotByID(w http.ResponseWriter, r *http
 	}
 	switch r.Method {
 	case http.MethodPost:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handlePatchAnalysisCohortSnapshot(w, r, store, cohort, snap)
 	case http.MethodDelete:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleRetireAnalysisCohortSnapshot(w, r, store, cohort, snap)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -171,9 +165,6 @@ const snapshotsCollectionVerb = "rematerialize"
 func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
-		return
-	}
-	if !s.enforceCSRF(w, r) {
 		return
 	}
 	store, ok := s.adminSnapshotStore(w)
@@ -206,9 +197,6 @@ func (s *Server) handleAnalysisCohortSnapshotRematerialize(w http.ResponseWriter
 // handleAnalysisCohortSnapshotsRematerialize rebuilds every snapshot in a
 // cohort, one at a time, keeping each snapshot's identity.
 func (s *Server) handleAnalysisCohortSnapshotsRematerialize(w http.ResponseWriter, r *http.Request) {
-	if !s.enforceCSRF(w, r) {
-		return
-	}
 	id, ok := parseCohortID(w, r)
 	if !ok {
 		return

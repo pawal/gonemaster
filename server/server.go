@@ -395,7 +395,7 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("/session", s.handleSession)
 
 	s.mux.Handle("/api/v1/", s.apiChain("/api/v1/unknown",
-		s.authMiddleware(http.StripPrefix("/api/v1", captureRoute("/api/v1", apiMux)))))
+		s.authMiddleware(s.csrfMiddleware(http.StripPrefix("/api/v1", captureRoute("/api/v1", apiMux))))))
 	// One fixed path with no router to match, so it labels itself.
 	s.mux.Handle("/api/v1", s.apiChain("/api/v1", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/api/v1/", http.StatusMovedPermanently)

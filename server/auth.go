@@ -152,9 +152,6 @@ func (s *Server) handleSession(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSessionLogin(w http.ResponseWriter, r *http.Request) {
-	if !s.enforceCSRF(w, r) {
-		return
-	}
 	var req struct {
 		Token string `json:"token"`
 	}
@@ -176,9 +173,6 @@ func (s *Server) handleSessionLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleSessionLogout(w http.ResponseWriter, r *http.Request) {
-	if !s.enforceCSRF(w, r) {
-		return
-	}
 	c := s.adminCookie(r, "")
 	c.MaxAge = -1
 	http.SetCookie(w, c)

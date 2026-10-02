@@ -50,9 +50,6 @@ func (s *Server) handleAnalysisCohorts(w http.ResponseWriter, r *http.Request) {
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, s.store.ListAnalysisCohorts())
 	case http.MethodPost:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleCreateAnalysisCohort(w, r)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -173,14 +170,8 @@ func (s *Server) handleAnalysisCohortByID(w http.ResponseWriter, r *http.Request
 	case http.MethodGet:
 		writeJSON(w, http.StatusOK, NewAnalysisCohortDetail(cohort, s.analysisCohortSourceDrift(cohort)))
 	case http.MethodPatch:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handlePatchAnalysisCohort(w, r, cohort)
 	case http.MethodDelete:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleDeleteAnalysisCohort(w, r, cohort)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -293,9 +284,6 @@ func (s *Server) handleAnalysisCohortRebuild(w http.ResponseWriter, r *http.Requ
 	if !ok {
 		return
 	}
-	if !s.enforceCSRF(w, r) {
-		return
-	}
 	if _, found := s.store.GetAnalysisCohort(id); !found {
 		writeError(w, http.StatusNotFound, "not_found", "cohort not found", nil)
 		return
@@ -357,9 +345,6 @@ func (s *Server) logAnalysisRebuildError(cohortID int64, err error) {
 func (s *Server) handleAnalysisCohortClear(w http.ResponseWriter, r *http.Request) {
 	id, ok := parseCohortID(w, r)
 	if !ok {
-		return
-	}
-	if !s.enforceCSRF(w, r) {
 		return
 	}
 	if _, found := s.store.GetAnalysisCohort(id); !found {

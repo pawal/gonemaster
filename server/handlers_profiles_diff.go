@@ -20,9 +20,6 @@ func (s *Server) handleProfileDiff(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
 		return
 	}
-	if !s.enforceCSRF(w, r) {
-		return
-	}
 
 	var req profileDiffRequest
 	if err := readJSON(r, s.cfg.MaxBodySize, &req); err != nil {

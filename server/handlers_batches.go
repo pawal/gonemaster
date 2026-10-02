@@ -212,9 +212,6 @@ func (s *Server) handleBatchDeletePreview(w http.ResponseWriter, r *http.Request
 // handlePatchBatch handles PATCH /api/v1/batches/{id}. Only mutable
 // field is snapshot_intent.
 func (s *Server) handlePatchBatch(w http.ResponseWriter, r *http.Request) {
-	if !s.enforceCSRF(w, r) {
-		return
-	}
 	batchID := strings.TrimSpace(r.PathValue("id"))
 	if batchID == "" {
 		writeError(w, http.StatusBadRequest, "missing_batch_id", "batch id is required", nil)
@@ -251,9 +248,6 @@ func (s *Server) handlePatchBatch(w http.ResponseWriter, r *http.Request) {
 // in-flight jobs for the batch, waits briefly for them to drain, then
 // removes the batch and every row derived from it.
 func (s *Server) handleDeleteBatch(w http.ResponseWriter, r *http.Request) {
-	if !s.enforceCSRF(w, r) {
-		return
-	}
 	batchID := strings.TrimSpace(r.PathValue("id"))
 	if batchID == "" {
 		writeError(w, http.StatusBadRequest, "missing_batch_id", "batch id is required", nil)

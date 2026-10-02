@@ -10,9 +10,6 @@ import (
 func (s *Server) handleTags(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleCreateTag(w, r)
 	case http.MethodGet:
 		s.handleListTags(w, r)
@@ -77,14 +74,8 @@ func (s *Server) handleTagByName(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodPut:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleUpdateTag(w, r, name)
 	case http.MethodDelete:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleDeleteTag(w, name)
 	default:
 		writeError(w, http.StatusMethodNotAllowed, "method_not_allowed", "method not allowed", nil)
@@ -130,9 +121,6 @@ func (s *Server) handleDeleteTag(w http.ResponseWriter, name string) {
 
 // handleTagPurge handles POST /api/v1/tags/{name}/purge.
 func (s *Server) handleTagPurge(w http.ResponseWriter, r *http.Request) {
-	if !s.enforceCSRF(w, r) {
-		return
-	}
 	name := r.PathValue("name")
 	if _, ok := s.store.GetTag(name); !ok {
 		writeError(w, http.StatusNotFound, "not_found", "tag not found", nil)
@@ -155,14 +143,8 @@ func (s *Server) handleTagDomains(w http.ResponseWriter, r *http.Request) {
 	}
 	switch r.Method {
 	case http.MethodPost:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleAddTagDomains(w, r, name)
 	case http.MethodDelete:
-		if !s.enforceCSRF(w, r) {
-			return
-		}
 		s.handleRemoveTagDomains(w, r, name)
 	case http.MethodGet:
 		s.handleListTagDomains(w, r, name)

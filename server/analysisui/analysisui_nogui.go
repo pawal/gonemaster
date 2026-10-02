@@ -45,3 +45,6 @@ func Handler(_ func() string) http.Handler {
 		http.Error(w, "ui not available", http.StatusNotFound)
 	})
 }
+
+// ScriptHashes returns nil: the info page has no inline scripts.
+func ScriptHashes() []string { return nil }

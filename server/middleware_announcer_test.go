@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 	"testing"
 
 	"codeberg.org/pawal/gonemaster/server/analysisui"
@@ -73,4 +74,23 @@ func fetch(t *testing.T, h http.Handler, path string) string {
 		t.Fatalf("read %s: %v", path, err)
 	}
 	return string(body)
+}
+
+func TestAnalysisCSPAllowsTheServedBootstrapScript(t *testing.T) {
+	if !analysisui.IsBuilt() {
+		t.Skip("analysis UI not built (run make ui-build); skipping CSP script hash check")
+	}
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodGet, "/analysis/", nil)
+	scripts := regexp.MustCompile(`(?s)<script>(.*?)</script>`).FindAllStringSubmatch(resp.Body.String(), -1)
+	if len(scripts) == 0 {
+		t.Fatal("served /analysis/ has no inline bootstrap script")
+	}
+	csp := resp.Header().Get("Content-Security-Policy")
+	for _, m := range scripts {
+		sum := sha256.Sum256([]byte(m[1]))
+		if want := "'sha256-" + base64.StdEncoding.EncodeToString(sum[:]) + "'"; !strings.Contains(csp, want) {
+			t.Errorf("CSP %q lacks %s for the served bootstrap script", csp, want)
+		}
+	}
 }

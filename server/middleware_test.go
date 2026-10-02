@@ -519,12 +519,11 @@ func TestSecurityHeadersCSPDropsUnsafeInlineStyles(t *testing.T) {
 		{
 			path: "/analysis/",
 			mustHave: []string{
-				"script-src 'self' 'unsafe-inline'",
+				"script-src 'self'",
 				"style-src 'self' 'unsafe-hashes' 'sha256-",
 			},
-			// script-src keeps 'unsafe-inline' for the bootstrap <script>;
-			// style-src must not regress to a blanket 'unsafe-inline'.
-			mustNotHave: []string{"style-src 'self' 'unsafe-inline'"},
+			// The bootstrap <script> is allowed by hash, not 'unsafe-inline'.
+			mustNotHave: []string{"'unsafe-inline'"},
 		},
 	}
 	for _, tc := range cases {

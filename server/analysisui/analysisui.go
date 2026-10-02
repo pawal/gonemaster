@@ -5,12 +5,15 @@ package analysisui
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"embed"
+	"encoding/base64"
 	"fmt"
 	"html"
 	"io/fs"
 	"net/http"
 	"path"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -99,6 +102,38 @@ func dist() (fs.FS, error) {
 		distSub, distErr = fs.Sub(distFS, "dist")
 	})
 	return distSub, distErr
+}
+
+var (
+	scriptHashesOnce sync.Once
+	scriptHashes     []string
+	inlineScript     = regexp.MustCompile(`(?s)<script\b([^>]*)>(.*?)</script>`)
+)
+
+// ScriptHashes returns a CSP hash source for each inline script in the embedded index.html.
+func ScriptHashes() []string {
+	scriptHashesOnce.Do(func() {
+		fsys, err := dist()
+		if err != nil {
+			return
+		}
+		if data, err := fs.ReadFile(fsys, "index.html"); err == nil {
+			scriptHashes = inlineScriptHashes(data)
+		}
+	})
+	return scriptHashes
+}
+
+func inlineScriptHashes(data []byte) []string {
+	var out []string
+	for _, m := range inlineScript.FindAllSubmatch(data, -1) {
+		if bytes.Contains(m[1], []byte("src=")) {
+			continue
+		}
+		sum := sha256.Sum256(m[2])
+		out = append(out, "'sha256-"+base64.StdEncoding.EncodeToString(sum[:])+"'")
+	}
+	return out
 }
 
 // IsBuilt reports whether the analysis UI assets have been embedded.

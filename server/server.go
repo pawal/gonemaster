@@ -262,7 +262,7 @@ func (s *Server) ReloadAuth(cfg AuthConfig) error {
 // are applied per API surface in routes(), not here.
 func (s *Server) Handler() http.Handler {
 	return s.stripUntrustedForwardedHeaders(
-		securityHeadersMiddleware(gzipMiddleware(s.mux)))
+		securityHeadersMiddleware(serveranalysisui.ScriptHashes(), gzipMiddleware(s.mux)))
 }
 
 // Store exposes the configured job store for optional integration layers.
@@ -283,11 +283,11 @@ const announcerStyleHash = "'sha256-S8qMpvofolR8Mpjy4kQvEm7m1q8clzU4dfDH0AmvZjo=
 // securityHeadersMiddleware sets defensive HTTP security headers on every
 // response. API paths get a restrictive CSP; UI/static paths get one that
 // allows same-origin scripts, styles, and data URIs.
-func securityHeadersMiddleware(next http.Handler) http.Handler {
+func securityHeadersMiddleware(analysisScripts []string, next http.Handler) http.Handler {
 	const apiCSP = "default-src 'none'"
 	const uiCSP = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
-	// script-src 'unsafe-inline': SvelteKit index.html bootstrap <script>.
-	const analysisCSP = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-hashes' " + announcerStyleHash + "; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+	// analysisScripts: SvelteKit index.html bootstrap <script>.
+	analysisCSP := "default-src 'self'; script-src " + strings.Join(append([]string{"'self'"}, analysisScripts...), " ") + "; style-src 'self' 'unsafe-hashes' " + announcerStyleHash + "; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
 		h.Set("X-Content-Type-Options", "nosniff")

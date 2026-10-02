@@ -3,8 +3,11 @@
 package analysisui
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -110,4 +113,23 @@ func TestServerMountsAnalysisRoute(t *testing.T) {
 	if resp.Code != http.StatusOK && resp.Code != http.StatusNotFound {
 		t.Fatalf("unexpected status for missing asset: %d", resp.Code)
 	}
+}
+
+func TestInlineScriptHashes(t *testing.T) {
+	page := []byte(`<head><script src="/a.js"></script><script>
+	boot()
+</script></head><body><script type="module">go()</script></body>`)
+	got := inlineScriptHashes(page)
+	want := []string{
+		"'sha256-" + sha256Base64("\n\tboot()\n") + "'",
+		"'sha256-" + sha256Base64("go()") + "'",
+	}
+	if !slices.Equal(got, want) {
+		t.Fatalf("inlineScriptHashes = %v, want %v", got, want)
+	}
+}
+
+func sha256Base64(s string) string {
+	sum := sha256.Sum256([]byte(s))
+	return base64.StdEncoding.EncodeToString(sum[:])
 }

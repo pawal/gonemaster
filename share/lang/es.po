@@ -1002,6 +1002,10 @@ msgstr ""
 "está destinado para DS. Obtenido de los servidores de nombres con "
 "direcciones IP \"{addresses}\"."
 
+msgctxt "DNSSEC:DS01_DS_ALGO_PRIVATE"
+msgid "The DS record with keytag {keytag} uses a digest algorithm {ds_algo_num} for private use. Fetched from parent name servers \"{servers}\"."
+msgstr "El registro DS con tag {keytag} utiliza un algoritmo de resumen (\"digest\") {ds_algo_num} de uso privado. Obtenido de los servidores de nombres padre \"{servers}\"."
+
 msgctxt "DNSSEC:DS01_DS_ALGO_RESERVED"
 msgid ""
 "DS record for zone {domain} with keytag {keytag} was created with an "
@@ -1012,6 +1016,22 @@ msgstr ""
 "algoritmo de resumen (\"digest\") (número de algoritmo {ds_algo_num} que no "
 "está asignado. Obtenido de los servidores de nombres con direcciones IP "
 "\"{addresses}\"."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_UNASSIGNED"
+msgid "The DS record with keytag {keytag} uses an unassigned digest algorithm {ds_algo_num} on parent name servers \"{servers}\"."
+msgstr "El registro DS con tag {keytag} utiliza un algoritmo de resumen (\"digest\") {ds_algo_num} no asignado en los servidores de nombres padre \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_NO_RESPONSE"
+msgid "No response or error in response from all parent name servers on the DS query. Name servers are \"{servers}\"."
+msgstr "Sin respuesta o error en la respuesta de todos los servidores de nombres padre a la consulta DS. Los servidores de nombres son \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_PARENT_SERVER_NO_DS"
+msgid "The following name servers do not provide DS record or have not been properly configured. Fetched from parent name servers \"{servers}\"."
+msgstr "Los siguientes servidores de nombres no proporcionan registro DS o no están configurados correctamente. Obtenido de los servidores de nombres padre \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_PARENT_ZONE_NO_DS"
+msgid "The parent zone provides no DS records for the child zone. Fetched from parent name servers \"{servers}\"."
+msgstr "La zona padre no proporciona registros DS para la zona hija. Obtenido de los servidores de nombres padre \"{servers}\"."
 
 msgctxt "DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM"
 msgid ""
@@ -1318,6 +1338,18 @@ msgstr ""
 "Los siguientes servidores responden con un registro NSEC3 que utiliza un "
 "flag sin asignar (bit {int}). Obtenido de los servidores de nombres: "
 "\"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_DEPRECATED"
+msgid "The DNSKEY with tag {keytag} uses deprecated algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}). Fetched from name servers \"{servers}\"."
+msgstr "La clave DNSKEY con etiqueta {keytag} usa el número de algoritmo obsoleto {algo_num} (\"{algo_descr}\", {algo_mnemo}). Obtenido de los servidores de nombres \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_NOT_RECOMMENDED"
+msgid "The DNSKEY with tag {keytag} uses unrecommended algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}). Fetched from name servers \"{servers}\"."
+msgstr "La clave DNSKEY con etiqueta {keytag} usa el número de algoritmo no recomendado {algo_num} (\"{algo_descr}\", {algo_mnemo}). Obtenido de los servidores de nombres \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_NOT_ZONE_SIGN"
+msgid "The DNSKEY with tag {keytag} uses algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}) which is not meant for zone signing. Fetched from name servers \"{servers}\"."
+msgstr "La clave DNSKEY con etiqueta {keytag} usa el número de algoritmo {algo_num} (\"{algo_descr}\", {algo_mnemo}), que no está destinado a la firma de zonas. Obtenido de los servidores de nombres \"{servers}\"."
 
 msgctxt "DNSSEC:DS08_DNSKEY_RRSIG_EXPIRED"
 msgid ""
@@ -2124,6 +2156,10 @@ msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_MULTI_KSK"
 msgid "Multiple SEP-flagged DNSKEYs found at the child zone (keytags: {keytags}). A KSK rollover may be in progress."
 msgstr "Se encontraron varias DNSKEY con la bandera SEP en la zona hija (keytags: {keytags}). Puede haber un rollover de KSK en curso."
 
+msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches known compromised key in blocklist \"{blocklist_name}\" on name server(s) {servers}."
+msgstr "DNSKEY con keytag {keytag} y algoritmo {algo_descr} ({algo_num}) coincide con una clave comprometida conocida de la lista de bloqueo \"{blocklist_name}\" en los servidores de nombres {servers}."
+
 msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
 msgid ""
 "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA "
@@ -2203,8 +2239,6 @@ msgstr "El tipo RR {query_type} existe en el ápex de la zona pero falta en el b
 msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
 msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
 msgstr "El tipo RR {query_type} existe en el ápex de la zona pero falta en el bitmap de tipos NSEC en los servidores de nombres {servers}. Esto permite el envenenamiento de caché mediante la caché negativa agresiva de la RFC 8198."
-msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
-msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 
 msgctxt "DNSSEC:DS21_ALGO_NOT_SUPPORTED"
 msgid "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
@@ -4044,6 +4078,10 @@ msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
 msgid "All tested nameservers in {servers} are globally reachable."
 msgstr "Todos los servidores de nombres probados en {servers} son accesibles globalmente."
 
+msgctxt "ADDRESS:A01_LOCAL_USE_ADDR"
+msgid "IP address(es) intended for local use on network or service provider level: \"{servers}\"."
+msgstr "Dirección(es) IP destinadas a uso local a nivel de red o de proveedor de servicios: \"{servers}\"."
+
 msgctxt "ADDRESS:A01_NO_GLOBALLY_REACHABLE_ADDR"
 msgid "None of the name servers IP addresses are listed as globally reachable."
 msgstr "Ninguna de las direcciones IP de los servidores de nombres está listada como accesible globalmente."
@@ -4072,6 +4110,30 @@ msgctxt "DNSSEC:DS05_ALGO_OK"
 msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {servers}."
 msgstr "La clave DNSKEY con etiqueta {keytag} usa el algoritmo {algo_num} ({algo_descr}, {algo_mnemo}) que es aceptable. Obtenido de los servidores de nombres {servers}."
 
+msgctxt "DNSSEC:DS05_ALGO_PRIVATE"
+msgid "The DNSKEY with tag {keytag} uses algorithm number {algo_num} which is reserved for private use. Fetched from name servers \"{servers}\"."
+msgstr "La clave DNSKEY con etiqueta {keytag} usa el número de algoritmo {algo_num}, reservado para uso privado. Obtenido de los servidores de nombres \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_RESERVED"
+msgid "The DNSKEY with tag {keytag} uses reserved algorithm number {algo_num}. Fetched from name servers \"{servers}\"."
+msgstr "La clave DNSKEY con etiqueta {keytag} usa el número de algoritmo reservado {algo_num}. Obtenido de los servidores de nombres \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_UNASSIGNED"
+msgid "The DNSKEY with tag {keytag} uses unassigned algorithm number {algo_num}. Fetched from name servers \"{servers}\"."
+msgstr "La clave DNSKEY con etiqueta {keytag} usa el número de algoritmo no asignado {algo_num}. Obtenido de los servidores de nombres \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_NO_RESPONSE"
+msgid "No response or error in response from all name servers on the DNSKEY query. Failing name servers \"{servers}\"."
+msgstr "Sin respuesta o error en la respuesta de todos los servidores de nombres a la consulta DNSKEY. Servidores de nombres fallidos \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_SERVER_NO_DNSSEC"
+msgid "Some name servers do not support DNSSEC or have not been properly configured. DNSKEY cannot be tested on those servers. Fetched from name servers \"{servers}\"."
+msgstr "Algunos servidores de nombres no admiten DNSSEC o no están configurados correctamente. No se puede probar DNSKEY en esos servidores. Obtenido de los servidores de nombres \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ZONE_NO_DNSSEC"
+msgid "The zone is not DNSSEC signed or not properly DNSSEC signed. DNSKEY cannot be tested. Fetched from name servers \"{servers}\"."
+msgstr "La zona no está firmada con DNSSEC o no está firmada correctamente. No se puede probar DNSKEY. Obtenido de los servidores de nombres \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_DS_FOR_SIGNED_ZONE"
 msgid "DS records are published in the parent zone for the signed zone."
 msgstr "Los registros DS están publicados en la zona padre para la zona firmada."
@@ -4079,6 +4141,18 @@ msgstr "Los registros DS están publicados en la zona padre para la zona firmada
 msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
 msgid "DS records found on parent name servers {servers}."
 msgstr "Registros DS encontrados en los servidores de nombres padre {servers}."
+
+msgctxt "DNSSEC:DS07_INCONSISTENT_DS"
+msgid "Inconsistent responses from parent name servers. Some include DS, others do not."
+msgstr "Respuestas incoherentes de los servidores de nombres padre. Algunas incluyen DS, otras no."
+
+msgctxt "DNSSEC:DS07_INCONSISTENT_SIGNED"
+msgid "Inconsistent responses from name servers. Some include signed responses, others do not."
+msgstr "Respuestas incoherentes de los servidores de nombres. Algunas incluyen respuestas firmadas, otras no."
+
+msgctxt "DNSSEC:DS07_NON_AUTH_RESPONSE_DNSKEY"
+msgid "The following name servers give a non authoritative response on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Los siguientes servidores de nombres dan una respuesta no autoritativa a la consulta DNSKEY con el bit DO activado. Servidores de nombres: \"{servers}\"."
 
 msgctxt "DNSSEC:DS07_NOT_SIGNED"
 msgid "The zone is not signed."
@@ -4090,9 +4164,17 @@ msgid ""
 "child zone). Name servers: \"{servers}\"."
 msgstr "Los siguientes servidores de nombres responden sin un RRset de DNSKEY firmado (zona hija sin firmar). Servidores de nombres: \"{servers}\"."
 
+msgctxt "DNSSEC:DS07_NO_DS_ON_PARENT_SERVER"
+msgid "The following parent name servers respond without DS record for the child zone. Name servers: \"{servers}\"."
+msgstr "Los siguientes servidores de nombres padre responden sin registro DS para la zona hija. Servidores de nombres: \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "La zona padre no tiene registro DS para la zona hijo firmada."
+
+msgctxt "DNSSEC:DS07_NO_RESPONSE_DNSKEY"
+msgid "The following name servers do not respond on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Los siguientes servidores de nombres no responden a la consulta DNSKEY con el bit DO activado. Servidores de nombres: \"{servers}\"."
 
 msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
 msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
@@ -4106,13 +4188,29 @@ msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
 msgid "Signed responses received from name servers {servers}."
 msgstr "Respuestas firmadas recibidas de los servidores de nombres {servers}."
 
+msgctxt "DNSSEC:DS07_UNEXP_RCODE_RESP_DNSKEY"
+msgid "The following name servers respond with RCODE \"{rcode}\" instead of expected \"NOERROR\" on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Los siguientes servidores de nombres responden con RCODE \"{rcode}\" en lugar del esperado \"NOERROR\" a la consulta DNSKEY con el bit DO activado. Servidores de nombres: \"{servers}\"."
+
 msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
 msgid "No SPF policy found for {domain}, which is not a mail domain."
 msgstr "No se encontró política SPF para {domain}, que no es un dominio de correo."
 
+msgctxt "ZONE:Z11_NON_NULL_SPF_NON_MAIL_DOMAIN"
+msgid "A non-null SPF policy was found on {domain}, although this type of domain (root, TLD or under .ARPA) is not expected to be used for email."
+msgstr "Se encontró una política SPF no vacía en {domain}, aunque no se espera que este tipo de dominio (raíz, TLD o bajo .ARPA) se use para correo electrónico."
+
 msgctxt "ZONE:Z11_NULL_SPF_NON_MAIL_DOMAIN"
 msgid "Null SPF policy found for {domain}, which is not a mail domain."
 msgstr "Política SPF nula encontrada para {domain}, que no es un dominio de correo."
+
+msgctxt "ZONE:Z11_SPF_MULTIPLE_RECORDS"
+msgid "The following name servers returned more than one SPF policy. Name servers: {servers}."
+msgstr "Los siguientes servidores de nombres devolvieron más de una política SPF. Servidores de nombres: {servers}."
+
+msgctxt "ZONE:Z11_SPF_SYNTAX_ERROR"
+msgid "The SPF policy of {domain} has a syntax error. Policy retrieved from the following nameservers: {servers}."
+msgstr "La política SPF de {domain} tiene un error de sintaxis. Política obtenida de los siguientes servidores de nombres: {servers}."
 
 msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
 msgid "SPF syntax is correct for {domain}."

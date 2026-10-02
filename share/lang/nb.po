@@ -933,6 +933,10 @@ msgstr ""
 "algoritme {ds_algo_num} ({ds_algo_mnemo}) som ikke er tenkt brukt for DS- "
 "poster. Hentet fra navnetjenere med IP-adressene \"{addresses}\"."
 
+msgctxt "DNSSEC:DS01_DS_ALGO_PRIVATE"
+msgid "The DS record with keytag {keytag} uses a digest algorithm {ds_algo_num} for private use. Fetched from parent name servers \"{servers}\"."
+msgstr "DS-posten med \"key tag\" {keytag} bruker en \"digest\"-algoritme {ds_algo_num} for privat bruk. Hentet fra foreldresonens navnetjenere \"{servers}\"."
+
 msgctxt "DNSSEC:DS01_DS_ALGO_RESERVED"
 msgid ""
 "DS record for zone {domain} with keytag {keytag} was created with an "
@@ -942,6 +946,22 @@ msgstr ""
 "DS-posten for sonen {domain} med \"key tag\" {keytag} er skapt med en "
 "\"digest\"-algoritme ({ds_algo_num}) som ikke er i bruk. Hentet fra "
 "navnetjenere med IP-adressene \"{addresses}\"."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_UNASSIGNED"
+msgid "The DS record with keytag {keytag} uses an unassigned digest algorithm {ds_algo_num} on parent name servers \"{servers}\"."
+msgstr "DS-posten med \"key tag\" {keytag} bruker en \"digest\"-algoritme {ds_algo_num} som ikke er tildelt, på foreldresonens navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_NO_RESPONSE"
+msgid "No response or error in response from all parent name servers on the DS query. Name servers are \"{servers}\"."
+msgstr "Ingen svar eller feil i svaret fra alle foreldresonens navnetjenere på DS-spørringen. Navnetjenerne er \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_PARENT_SERVER_NO_DS"
+msgid "The following name servers do not provide DS record or have not been properly configured. Fetched from parent name servers \"{servers}\"."
+msgstr "Følgende navnetjenere leverer ingen DS-post eller er ikke riktig konfigurert. Hentet fra foreldresonens navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_PARENT_ZONE_NO_DS"
+msgid "The parent zone provides no DS records for the child zone. Fetched from parent name servers \"{servers}\"."
+msgstr "Foreldresonen leverer ingen DS-poster for barnesonen. Hentet fra foreldresonens navnetjenere \"{servers}\"."
 
 msgctxt "DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM"
 msgid ""
@@ -1242,6 +1262,18 @@ msgid ""
 msgstr ""
 "Følgende navnetjenere svarer med en NSEC3-post der et ikke-tildelt flagg "
 "brukes (bit {int}). Hentet fra navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_DEPRECATED"
+msgid "The DNSKEY with tag {keytag} uses deprecated algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}). Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY med nøkkeltagg {keytag} bruker det foreldede algoritmenummeret {algo_num} (\"{algo_descr}\", {algo_mnemo}). Hentet fra navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_NOT_RECOMMENDED"
+msgid "The DNSKEY with tag {keytag} uses unrecommended algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}). Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY med nøkkeltagg {keytag} bruker det ikke anbefalte algoritmenummeret {algo_num} (\"{algo_descr}\", {algo_mnemo}). Hentet fra navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_NOT_ZONE_SIGN"
+msgid "The DNSKEY with tag {keytag} uses algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}) which is not meant for zone signing. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY med nøkkeltagg {keytag} bruker algoritmenummer {algo_num} (\"{algo_descr}\", {algo_mnemo}) som ikke er beregnet for sonesignering. Hentet fra navnetjenere \"{servers}\"."
 
 msgctxt "DNSSEC:DS08_DNSKEY_RRSIG_EXPIRED"
 msgid ""
@@ -2023,6 +2055,10 @@ msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_MULTI_KSK"
 msgid "Multiple SEP-flagged DNSKEYs found at the child zone (keytags: {keytags}). A KSK rollover may be in progress."
 msgstr "Flere DNSKEY-er med SEP-flagg ble funnet i barnesonen (keytags: {keytags}). En KSK-rollover kan være i gang."
 
+msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches known compromised key in blocklist \"{blocklist_name}\" on name server(s) {servers}."
+msgstr "DNSKEY med keytag {keytag} og algoritme {algo_descr} ({algo_num}) samsvarer med en kjent kompromittert nøkkel i blokkeringslisten \"{blocklist_name}\" på navnetjener(e) {servers}."
+
 msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
 msgid ""
 "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA "
@@ -2102,8 +2138,6 @@ msgstr "RR-type {query_type} finnes ved sonens apex, men mangler i NSEC3-typebit
 msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
 msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
 msgstr "RR-type {query_type} finnes ved sonens apex, men mangler i NSEC-typebitmap på navneserver(e) {servers}. Dette muliggjør cacheforgiftning via aggressiv negativ caching i henhold til RFC 8198."
-msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
-msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 
 msgctxt "DNSSEC:DS21_ALGO_NOT_SUPPORTED"
 msgid "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
@@ -3742,6 +3776,10 @@ msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
 msgid "All tested nameservers in {servers} are globally reachable."
 msgstr "Alle testede navnetjenere i {servers} er globalt tilgjengelige."
 
+msgctxt "ADDRESS:A01_LOCAL_USE_ADDR"
+msgid "IP address(es) intended for local use on network or service provider level: \"{servers}\"."
+msgstr "IP-adresse(r) beregnet for lokal bruk på nettverks- eller tjenesteleverandørnivå: \"{servers}\"."
+
 msgctxt "ADDRESS:A01_NO_GLOBALLY_REACHABLE_ADDR"
 msgid "None of the name servers IP addresses are listed as globally reachable."
 msgstr "Ingen av navnetjenernes IP-adresser er oppført som globalt tilgjengelige."
@@ -3770,6 +3808,30 @@ msgctxt "DNSSEC:DS05_ALGO_OK"
 msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {servers}."
 msgstr "DNSKEY med nøkkeltagg {keytag} bruker algoritme {algo_num} ({algo_descr}, {algo_mnemo}) som er akseptabel. Hentet fra navnetjenere {servers}."
 
+msgctxt "DNSSEC:DS05_ALGO_PRIVATE"
+msgid "The DNSKEY with tag {keytag} uses algorithm number {algo_num} which is reserved for private use. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY med nøkkeltagg {keytag} bruker algoritmenummer {algo_num} som er reservert for privat bruk. Hentet fra navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_RESERVED"
+msgid "The DNSKEY with tag {keytag} uses reserved algorithm number {algo_num}. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY med nøkkeltagg {keytag} bruker det reserverte algoritmenummeret {algo_num}. Hentet fra navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_UNASSIGNED"
+msgid "The DNSKEY with tag {keytag} uses unassigned algorithm number {algo_num}. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY med nøkkeltagg {keytag} bruker det ikke tildelte algoritmenummeret {algo_num}. Hentet fra navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_NO_RESPONSE"
+msgid "No response or error in response from all name servers on the DNSKEY query. Failing name servers \"{servers}\"."
+msgstr "Ingen svar eller feil i svaret fra alle navnetjenere på DNSKEY-spørringen. Feilende navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_SERVER_NO_DNSSEC"
+msgid "Some name servers do not support DNSSEC or have not been properly configured. DNSKEY cannot be tested on those servers. Fetched from name servers \"{servers}\"."
+msgstr "Noen navnetjenere støtter ikke DNSSEC eller er ikke riktig konfigurert. DNSKEY kan ikke testes på de tjenerne. Hentet fra navnetjenere \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ZONE_NO_DNSSEC"
+msgid "The zone is not DNSSEC signed or not properly DNSSEC signed. DNSKEY cannot be tested. Fetched from name servers \"{servers}\"."
+msgstr "Sonen er ikke DNSSEC-signert eller ikke riktig DNSSEC-signert. DNSKEY kan ikke testes. Hentet fra navnetjenere \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_DS_FOR_SIGNED_ZONE"
 msgid "DS records are published in the parent zone for the signed zone."
 msgstr "DS-poster er publisert i foreldresonen for den signerte sonen."
@@ -3778,9 +3840,25 @@ msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
 msgid "DS records found on parent name servers {servers}."
 msgstr "DS-poster funnet på foreldresonens navnetjenere {servers}."
 
+msgctxt "DNSSEC:DS07_INCONSISTENT_DS"
+msgid "Inconsistent responses from parent name servers. Some include DS, others do not."
+msgstr "Inkonsistente svar fra foreldresonens navnetjenere. Noen inneholder DS, andre ikke."
+
+msgctxt "DNSSEC:DS07_INCONSISTENT_SIGNED"
+msgid "Inconsistent responses from name servers. Some include signed responses, others do not."
+msgstr "Inkonsistente svar fra navnetjenerne. Noen inneholder signerte svar, andre ikke."
+
+msgctxt "DNSSEC:DS07_NON_AUTH_RESPONSE_DNSKEY"
+msgid "The following name servers give a non authoritative response on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Følgende navnetjenere gir et ikke-autoritativt svar på DNSKEY-spørringen med DO-biten satt. Navnetjenere: \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "Foreldresonen har ingen DS-post for den signerte barnesonen."
+
+msgctxt "DNSSEC:DS07_NO_RESPONSE_DNSKEY"
+msgid "The following name servers do not respond on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Følgende navnetjenere svarer ikke på DNSKEY-spørringen med DO-biten satt. Navnetjenere: \"{servers}\"."
 
 msgctxt "DNSSEC:DS07_NOT_SIGNED"
 msgid "The zone is not signed."
@@ -3791,6 +3869,10 @@ msgid ""
 "The following name servers respond without a signed DNSKEY RRset (unsigned "
 "child zone). Name servers: \"{servers}\"."
 msgstr "Følgende navnetjenere svarer uten et signert DNSKEY-RRset (usignert barnesone). Navnetjenere: \"{servers}\"."
+
+msgctxt "DNSSEC:DS07_NO_DS_ON_PARENT_SERVER"
+msgid "The following parent name servers respond without DS record for the child zone. Name servers: \"{servers}\"."
+msgstr "Følgende navnetjenere i foreldresonen svarer uten DS-post for barnesonen. Navnetjenere: \"{servers}\"."
 
 msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
 msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
@@ -3804,13 +3886,29 @@ msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
 msgid "Signed responses received from name servers {servers}."
 msgstr "Signerte svar mottatt fra navnetjenere {servers}."
 
+msgctxt "DNSSEC:DS07_UNEXP_RCODE_RESP_DNSKEY"
+msgid "The following name servers respond with RCODE \"{rcode}\" instead of expected \"NOERROR\" on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Følgende navnetjenere svarer med RCODE \"{rcode}\" i stedet for forventet \"NOERROR\" på DNSKEY-spørringen med DO-biten satt. Navnetjenere: \"{servers}\"."
+
 msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
 msgid "No SPF policy found for {domain}, which is not a mail domain."
 msgstr "Ingen SPF-policy funnet for {domain}, som ikke er et e-postdomene."
 
+msgctxt "ZONE:Z11_NON_NULL_SPF_NON_MAIL_DOMAIN"
+msgid "A non-null SPF policy was found on {domain}, although this type of domain (root, TLD or under .ARPA) is not expected to be used for email."
+msgstr "En ikke-tom SPF-policy ble funnet for {domain}, selv om denne typen domene (rot, toppdomene eller under .ARPA) ikke forventes å bli brukt til e-post."
+
 msgctxt "ZONE:Z11_NULL_SPF_NON_MAIL_DOMAIN"
 msgid "Null SPF policy found for {domain}, which is not a mail domain."
 msgstr "Null-SPF-policy funnet for {domain}, som ikke er et e-postdomene."
+
+msgctxt "ZONE:Z11_SPF_MULTIPLE_RECORDS"
+msgid "The following name servers returned more than one SPF policy. Name servers: {servers}."
+msgstr "Følgende navnetjenere returnerte mer enn én SPF-policy. Navnetjenere: {servers}."
+
+msgctxt "ZONE:Z11_SPF_SYNTAX_ERROR"
+msgid "The SPF policy of {domain} has a syntax error. Policy retrieved from the following nameservers: {servers}."
+msgstr "SPF-policyen for {domain} har en syntaksfeil. Policyen ble hentet fra følgende navnetjenere: {servers}."
 
 msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
 msgid "SPF syntax is correct for {domain}."

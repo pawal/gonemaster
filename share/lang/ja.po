@@ -1560,14 +1560,6 @@ msgstr ""
 "未知のモジュール {module} で {testcase} を実行しようとしました。"
 "既知のモジュール: {module_list}。"
 
-msgctxt "SYSTEM:FAKE_DELEGATION"
-msgid "Followed a fake delegation."
-msgstr "擬似委任をたどりました。"
-
-msgctxt "SYSTEM:ADDED_FAKE_DELEGATION"
-msgid "Added a fake delegation for domain {domain} to name server {ns}."
-msgstr "ドメイン {domain} について、ネームサーバー {ns} に擬似委任を追加しました。"
-
 msgctxt "SYSTEM:FAKE_DELEGATION_TO_SELF"
 msgid ""
 "Name server {ns} not adding fake delegation for domain {domain} to itself."
@@ -2384,8 +2376,6 @@ msgstr "RR タイプ {query_type} がゾーン頂点に存在しますが、ネ�
 msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
 msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
 msgstr "RR タイプ {query_type} がゾーン頂点に存在しますが、ネームサーバー {servers} の NSEC タイプビットマップに含まれていません。これにより RFC 8198 の積極的ネガティブキャッシュを介したキャッシュポイズニングが可能になります。"
-msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
-msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 
 msgctxt "DNSSEC:NO_RESPONSE"
 msgid "Nameserver {ns} did not respond."
@@ -3644,6 +3634,10 @@ msgstr "親の DS キータグ {keytags} に一致する DNSKEY が子ゾーン�
 msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_MULTI_KSK"
 msgid "Multiple SEP-flagged DNSKEYs found at the child zone (keytags: {keytags}). A KSK rollover may be in progress."
 msgstr "子ゾーンで SEP フラグ付き DNSKEY が複数見つかりました (キータグ: {keytags})。KSK ロールオーバーが進行中の可能性があります。"
+
+msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches known compromised key in blocklist \"{blocklist_name}\" on name server(s) {servers}."
+msgstr "キータグ {keytag}、アルゴリズム {algo_descr} ({algo_num}) の DNSKEY は、ネームサーバー {servers} でブロックリスト \"{blocklist_name}\" に登録された既知の侵害済み鍵と一致します。"
 
 msgctxt "SYSTEM:CLI_HEADER_SECONDS"
 msgid "Seconds"

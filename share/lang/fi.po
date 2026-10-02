@@ -990,6 +990,10 @@ msgstr ""
 "DS-tietueelle. Tiedot on haettu nimipalvelimilta joiden IP-osoitteet ovat "
 "\"{addresses}\"."
 
+msgctxt "DNSSEC:DS01_DS_ALGO_PRIVATE"
+msgid "The DS record with keytag {keytag} uses a digest algorithm {ds_algo_num} for private use. Fetched from parent name servers \"{servers}\"."
+msgstr "DS-tietue, jonka tunniste (keytag) on {keytag}, käyttää yksityiseen käyttöön tarkoitettua tiivistealgoritmia {ds_algo_num}. Tiedot on haettu ylemmän vyöhykkeen nimipalvelimilta \"{servers}\"."
+
 msgctxt "DNSSEC:DS01_DS_ALGO_RESERVED"
 msgid ""
 "DS record for zone {domain} with keytag {keytag} was created with an "
@@ -999,6 +1003,22 @@ msgstr ""
 "Zonen {domain} DS-tietue jonka tunniste (keytag) on {keytag} on luotu "
 "määrittämättömällä tiivistealgoritmilla {ds_algo_num}. Tiedot on haettu "
 "nimipalvelimilta joiden IP-osoitteet ovat \"{addresses}\"."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_UNASSIGNED"
+msgid "The DS record with keytag {keytag} uses an unassigned digest algorithm {ds_algo_num} on parent name servers \"{servers}\"."
+msgstr "DS-tietue, jonka tunniste (keytag) on {keytag}, käyttää määrittämätöntä tiivistealgoritmia {ds_algo_num} ylemmän vyöhykkeen nimipalvelimilla \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_NO_RESPONSE"
+msgid "No response or error in response from all parent name servers on the DS query. Name servers are \"{servers}\"."
+msgstr "Ei vastausta tai virheellinen vastaus kaikilta ylemmän vyöhykkeen nimipalvelimilta DS-kyselyyn. Nimipalvelimet ovat \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_PARENT_SERVER_NO_DS"
+msgid "The following name servers do not provide DS record or have not been properly configured. Fetched from parent name servers \"{servers}\"."
+msgstr "Seuraavat nimipalvelimet eivät tarjoa DS-tietuetta tai niitä ei ole määritetty oikein. Tiedot on haettu ylemmän vyöhykkeen nimipalvelimilta \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_PARENT_ZONE_NO_DS"
+msgid "The parent zone provides no DS records for the child zone. Fetched from parent name servers \"{servers}\"."
+msgstr "Ylempi vyöhyke ei tarjoa DS-tietueita alemmalle vyöhykkeelle. Tiedot on haettu ylemmän vyöhykkeen nimipalvelimilta \"{servers}\"."
 
 msgctxt "DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM"
 msgid ""
@@ -1303,6 +1323,18 @@ msgstr ""
 "Seuraavat palvelimet vastaavat NSEC3-tietueella, jossa käytetään "
 "määrittämätöntä lippua (bitti {int}). Tiedot haettu nimipalvelimilta "
 "\"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_DEPRECATED"
+msgid "The DNSKEY with tag {keytag} uses deprecated algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}). Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY avaintunnisteella {keytag} käyttää vanhentunutta algoritminumeroa {algo_num} (\"{algo_descr}\", {algo_mnemo}). Haettu nimipalvelimilta \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_NOT_RECOMMENDED"
+msgid "The DNSKEY with tag {keytag} uses unrecommended algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}). Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY avaintunnisteella {keytag} käyttää ei-suositeltua algoritminumeroa {algo_num} (\"{algo_descr}\", {algo_mnemo}). Haettu nimipalvelimilta \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_NOT_ZONE_SIGN"
+msgid "The DNSKEY with tag {keytag} uses algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}) which is not meant for zone signing. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY avaintunnisteella {keytag} käyttää algoritminumeroa {algo_num} (\"{algo_descr}\", {algo_mnemo}), jota ei ole tarkoitettu vyöhykkeen allekirjoittamiseen. Haettu nimipalvelimilta \"{servers}\"."
 
 msgctxt "DNSSEC:DS08_DNSKEY_RRSIG_EXPIRED"
 msgid ""
@@ -2102,6 +2134,10 @@ msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_MULTI_KSK"
 msgid "Multiple SEP-flagged DNSKEYs found at the child zone (keytags: {keytags}). A KSK rollover may be in progress."
 msgstr "Alemmalta vyöhykkeeltä löytyi useita SEP-lipulla merkittyjä DNSKEY-tietueita (tunnisteet: {keytags}). KSK-rollover voi olla käynnissä."
 
+msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches known compromised key in blocklist \"{blocklist_name}\" on name server(s) {servers}."
+msgstr "DNSKEY, jonka keytag on {keytag} ja algoritmi {algo_descr} ({algo_num}), vastaa tunnettua vaarantunutta avainta estolistalla \"{blocklist_name}\" nimipalvelimilla {servers}."
+
 msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
 msgid ""
 "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA "
@@ -2181,8 +2217,6 @@ msgstr "RR-tyyppi {query_type} on olemassa vyöhykkeen huipulla, mutta puuttuu N
 msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
 msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
 msgstr "RR-tyyppi {query_type} on olemassa vyöhykkeen huipulla, mutta puuttuu NSEC-tyyppibittikarttasta nimipalvelimilla {servers}. Tämä mahdollistaa välimuistin myrkyttämisen RFC 8198:n aggressiivisen negatiivisen välimuistitallennuksen kautta."
-msgid "{parent} sent a DS record, but {child} did not send a DNSKEY record."
-msgstr "{parent} sent a DS record, but {child} did not send a DNSKEY record."
 
 msgctxt "DNSSEC:DS21_ALGO_NOT_SUPPORTED"
 msgid "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
@@ -3813,15 +3847,6 @@ msgstr ""
 "Pyyntö ajaa {testcase} tuntemattomassa moduulissa {module}. Tunnetut "
 "moduulit: {module_list}."
 
-msgctxt "SYSTEM:FAKE_DELEGATION"
-msgid "Followed a fake delegation."
-msgstr "Seurattu väärää delegointia."
-
-msgctxt "SYSTEM:ADDED_FAKE_DELEGATION"
-msgid "Added a fake delegation for domain {domain} to name server {ns}."
-msgstr ""
-"Lisätty väärä delegointi verkkotunnukselle {domain} nimipalvelimelle {ns}."
-
 msgctxt "SYSTEM:FAKE_DELEGATION_TO_SELF"
 msgid ""
 "Name server {ns} not adding fake delegation for domain {domain} to itself."
@@ -3853,6 +3878,10 @@ msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
 msgid "All tested nameservers in {servers} are globally reachable."
 msgstr "Kaikki testatut nimipalvelimet {servers} ovat globaalisti tavoitettavissa."
 
+msgctxt "ADDRESS:A01_LOCAL_USE_ADDR"
+msgid "IP address(es) intended for local use on network or service provider level: \"{servers}\"."
+msgstr "IP-osoite(et) tarkoitettu paikalliseen käyttöön verkon tai palveluntarjoajan tasolla: \"{servers}\"."
+
 msgctxt "DNSSEC:DS01_DS_ALGO_OK"
 msgid "DS record with key tag {keytag} and digest algorithm {ds_algo_num} ({ds_algo_descr}) is acceptable. Fetched from name servers {servers}."
 msgstr "DS-tietue avaintunnisteella {keytag} ja tiivistealgoritmi {ds_algo_num} ({ds_algo_descr}) on hyväksyttävä. Haettu nimipalvelimilta {servers}."
@@ -3869,6 +3898,30 @@ msgctxt "DNSSEC:DS05_ALGO_OK"
 msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {servers}."
 msgstr "DNSKEY avaintunnisteella {keytag} käyttää algoritmia {algo_num} ({algo_descr}, {algo_mnemo}), joka on hyväksyttävä. Haettu nimipalvelimilta {servers}."
 
+msgctxt "DNSSEC:DS05_ALGO_PRIVATE"
+msgid "The DNSKEY with tag {keytag} uses algorithm number {algo_num} which is reserved for private use. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY avaintunnisteella {keytag} käyttää algoritminumeroa {algo_num}, joka on varattu yksityiseen käyttöön. Haettu nimipalvelimilta \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_RESERVED"
+msgid "The DNSKEY with tag {keytag} uses reserved algorithm number {algo_num}. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY avaintunnisteella {keytag} käyttää varattua algoritminumeroa {algo_num}. Haettu nimipalvelimilta \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_UNASSIGNED"
+msgid "The DNSKEY with tag {keytag} uses unassigned algorithm number {algo_num}. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY avaintunnisteella {keytag} käyttää määrittämätöntä algoritminumeroa {algo_num}. Haettu nimipalvelimilta \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_NO_RESPONSE"
+msgid "No response or error in response from all name servers on the DNSKEY query. Failing name servers \"{servers}\"."
+msgstr "Ei vastausta tai virheellinen vastaus kaikilta nimipalvelimilta DNSKEY-kyselyyn. Epäonnistuneet nimipalvelimet \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_SERVER_NO_DNSSEC"
+msgid "Some name servers do not support DNSSEC or have not been properly configured. DNSKEY cannot be tested on those servers. Fetched from name servers \"{servers}\"."
+msgstr "Jotkin nimipalvelimet eivät tue DNSSEC:iä tai niitä ei ole määritetty oikein. DNSKEY:tä ei voi testata näillä palvelimilla. Haettu nimipalvelimilta \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ZONE_NO_DNSSEC"
+msgid "The zone is not DNSSEC signed or not properly DNSSEC signed. DNSKEY cannot be tested. Fetched from name servers \"{servers}\"."
+msgstr "Vyöhykettä ei ole allekirjoitettu DNSSEC:llä tai sitä ei ole allekirjoitettu oikein. DNSKEY:tä ei voi testata. Haettu nimipalvelimilta \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_DS_FOR_SIGNED_ZONE"
 msgid "DS records are published in the parent zone for the signed zone."
 msgstr "DS-tietueet on julkaistu ylemmällä vyöhykkeellä allekirjoitetulle vyöhykkeelle."
@@ -3876,6 +3929,18 @@ msgstr "DS-tietueet on julkaistu ylemmällä vyöhykkeellä allekirjoitetulle vy
 msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
 msgid "DS records found on parent name servers {servers}."
 msgstr "DS-tietueet löydetty ylemmän vyöhykkeen nimipalvelimilta {servers}."
+
+msgctxt "DNSSEC:DS07_INCONSISTENT_DS"
+msgid "Inconsistent responses from parent name servers. Some include DS, others do not."
+msgstr "Epäjohdonmukaisia vastauksia ylemmän vyöhykkeen nimipalvelimilta. Osa sisältää DS-tietueen, osa ei."
+
+msgctxt "DNSSEC:DS07_INCONSISTENT_SIGNED"
+msgid "Inconsistent responses from name servers. Some include signed responses, others do not."
+msgstr "Epäjohdonmukaisia vastauksia nimipalvelimilta. Osa sisältää allekirjoitettuja vastauksia, osa ei."
+
+msgctxt "DNSSEC:DS07_NON_AUTH_RESPONSE_DNSKEY"
+msgid "The following name servers give a non authoritative response on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Seuraavat nimipalvelimet antavat ei-autoritatiivisen vastauksen DNSKEY-kyselyyn, jossa DO-bitti on asetettu. Nimipalvelimet: \"{servers}\"."
 
 msgctxt "DNSSEC:DS07_NOT_SIGNED"
 msgid "The zone is not signed."
@@ -3887,9 +3952,17 @@ msgid ""
 "child zone). Name servers: \"{servers}\"."
 msgstr "Seuraavat nimipalvelimet vastaavat ilman allekirjoitettua DNSKEY RRsetiä (allekirjoittamaton alempi vyöhyke). Nimipalvelimet: \"{servers}\"."
 
+msgctxt "DNSSEC:DS07_NO_DS_ON_PARENT_SERVER"
+msgid "The following parent name servers respond without DS record for the child zone. Name servers: \"{servers}\"."
+msgstr "Seuraavat ylemmän vyöhykkeen nimipalvelimet vastaavat ilman DS-tietuetta alemmalle vyöhykkeelle. Nimipalvelimet: \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "Ylemmällä vyöhykkeellä ei ole DS-tietuetta allekirjoitetulle alemmalle vyöhykkeelle."
+
+msgctxt "DNSSEC:DS07_NO_RESPONSE_DNSKEY"
+msgid "The following name servers do not respond on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Seuraavat nimipalvelimet eivät vastaa DNSKEY-kyselyyn, jossa DO-bitti on asetettu. Nimipalvelimet: \"{servers}\"."
 
 msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
 msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
@@ -3903,13 +3976,29 @@ msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
 msgid "Signed responses received from name servers {servers}."
 msgstr "Allekirjoitetut vastaukset vastaanotettu nimipalvelimilta {servers}."
 
+msgctxt "DNSSEC:DS07_UNEXP_RCODE_RESP_DNSKEY"
+msgid "The following name servers respond with RCODE \"{rcode}\" instead of expected \"NOERROR\" on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Seuraavat nimipalvelimet vastaavat RCODE-arvolla \"{rcode}\" odotetun \"NOERROR\"-arvon sijaan DNSKEY-kyselyyn, jossa DO-bitti on asetettu. Nimipalvelimet: \"{servers}\"."
+
 msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
 msgid "No SPF policy found for {domain}, which is not a mail domain."
 msgstr "SPF-käytäntöä ei löydetty vyöhykkeelle {domain}, joka ei ole sähköpostidomain."
 
+msgctxt "ZONE:Z11_NON_NULL_SPF_NON_MAIL_DOMAIN"
+msgid "A non-null SPF policy was found on {domain}, although this type of domain (root, TLD or under .ARPA) is not expected to be used for email."
+msgstr "Verkkotunnukselle {domain} löytyi ei-tyhjä SPF-käytäntö, vaikka tämäntyyppistä verkkotunnusta (juuri, TLD tai .ARPA:n alla) ei ole tarkoitettu sähköpostikäyttöön."
+
 msgctxt "ZONE:Z11_NULL_SPF_NON_MAIL_DOMAIN"
 msgid "Null SPF policy found for {domain}, which is not a mail domain."
 msgstr "Nolla-SPF-käytäntö löydetty vyöhykkeelle {domain}, joka ei ole sähköpostidomain."
+
+msgctxt "ZONE:Z11_SPF_MULTIPLE_RECORDS"
+msgid "The following name servers returned more than one SPF policy. Name servers: {servers}."
+msgstr "Seuraavat nimipalvelimet palauttivat useamman kuin yhden SPF-käytännön. Nimipalvelimet: {servers}."
+
+msgctxt "ZONE:Z11_SPF_SYNTAX_ERROR"
+msgid "The SPF policy of {domain} has a syntax error. Policy retrieved from the following nameservers: {servers}."
+msgstr "Verkkotunnuksen {domain} SPF-käytännössä on syntaksivirhe. Käytäntö haettiin seuraavilta nimipalvelimilta: {servers}."
 
 msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
 msgid "SPF syntax is correct for {domain}."

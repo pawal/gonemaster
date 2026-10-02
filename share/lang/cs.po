@@ -651,9 +651,29 @@ msgctxt "DNSSEC:DS01_DS_ALGO_NOT_DS"
 msgid "DS record for zone {domain} with keytag {keytag} was created by digest algorithm {ds_algo_num} ({ds_algo_mnemo}) which is not meant for DS. Fetched from the nameservers with IP addresses \"{addresses}\"."
 msgstr "DS záznam pro zónu {domain} s keytagem {keytag} byl vytvořen algoritmem digestu {ds_algo_num} ({ds_algo_mnemo}), který není určen pro DS. Získáno z jmenných serverů s IP adresami \"{addresses}\"."
 
+msgctxt "DNSSEC:DS01_DS_ALGO_PRIVATE"
+msgid "The DS record with keytag {keytag} uses a digest algorithm {ds_algo_num} for private use. Fetched from parent name servers \"{servers}\"."
+msgstr "DS záznam s keytagem {keytag} používá algoritmus digestu {ds_algo_num} určený pro soukromé použití. Získáno z jmenných serverů nadřazené zóny \"{servers}\"."
+
 msgctxt "DNSSEC:DS01_DS_ALGO_RESERVED"
 msgid "DS record for zone {domain} with keytag {keytag} was created with an unassigned digest algorithm (algorithm number {ds_algo_num}). Fetched from the nameservers with IP addresses \"{addresses}\"."
 msgstr "DS záznam pro zónu {domain} s keytagem {keytag} byl vytvořen nepřiřazeným algoritmem digestu (číslo algoritmu {ds_algo_num}). Získáno z jmenných serverů s IP adresami \"{addresses}\"."
+
+msgctxt "DNSSEC:DS01_DS_ALGO_UNASSIGNED"
+msgid "The DS record with keytag {keytag} uses an unassigned digest algorithm {ds_algo_num} on parent name servers \"{servers}\"."
+msgstr "DS záznam s keytagem {keytag} používá nepřiřazený algoritmus digestu {ds_algo_num} na jmenných serverech nadřazené zóny \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_NO_RESPONSE"
+msgid "No response or error in response from all parent name servers on the DS query. Name servers are \"{servers}\"."
+msgstr "Žádná odpověď nebo chyba v odpovědi od všech jmenných serverů nadřazené zóny na dotaz DS. Jmenné servery jsou \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_PARENT_SERVER_NO_DS"
+msgid "The following name servers do not provide DS record or have not been properly configured. Fetched from parent name servers \"{servers}\"."
+msgstr "Následující jmenné servery neposkytují DS záznam nebo nejsou správně nakonfigurovány. Získáno z jmenných serverů nadřazené zóny \"{servers}\"."
+
+msgctxt "DNSSEC:DS01_PARENT_ZONE_NO_DS"
+msgid "The parent zone provides no DS records for the child zone. Fetched from parent name servers \"{servers}\"."
+msgstr "Nadřazená zóna neposkytuje žádné DS záznamy pro podřízenou zónu. Získáno z jmenných serverů nadřazené zóny \"{servers}\"."
 
 msgctxt "DNSSEC:DS02_ALGO_NOT_SUPPORTED_BY_ZM"
 msgid "DNSKEY with tag {keytag} uses algorithm {algo_num} ({algo_mnemo}), which is not supported by this installation. Fetched from the nameservers with IP addresses \"{addresses}\"."
@@ -794,6 +814,18 @@ msgstr "Následující jmenné servery nepoužívají NSEC3, ale jiné ano. Test
 msgctxt "DNSSEC:DS03_UNASSIGNED_FLAG_USED"
 msgid "The following servers respond with an NSEC3 record where an unassigned flag is used (bit {int}). Fetched from name servers \"{servers}\"."
 msgstr "Následující servery odpovídají s NSEC3 záznamem, kde je použit nepřiřazený příznak (bit {int}). Získáno z jmenných serverů \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_DEPRECATED"
+msgid "The DNSKEY with tag {keytag} uses deprecated algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}). Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY s key tagem {keytag} používá zastaralé číslo algoritmu {algo_num} (\"{algo_descr}\", {algo_mnemo}). Získáno z jmenných serverů \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_NOT_RECOMMENDED"
+msgid "The DNSKEY with tag {keytag} uses unrecommended algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}). Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY s key tagem {keytag} používá nedoporučené číslo algoritmu {algo_num} (\"{algo_descr}\", {algo_mnemo}). Získáno z jmenných serverů \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_NOT_ZONE_SIGN"
+msgid "The DNSKEY with tag {keytag} uses algorithm number {algo_num} (\"{algo_descr}\", {algo_mnemo}) which is not meant for zone signing. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY s key tagem {keytag} používá číslo algoritmu {algo_num} (\"{algo_descr}\", {algo_mnemo}), které není určeno pro podepisování zón. Získáno z jmenných serverů \"{servers}\"."
 
 msgctxt "DNSSEC:DS08_DNSKEY_RRSIG_EXPIRED"
 msgid "RRSIG with keytag {keytag} and covering type DNSKEY has already expired. Fetched from the nameservers with IP addresses \"{addresses}\"."
@@ -1218,6 +1250,10 @@ msgstr "DS keytag(y) {keytags} nadřazené strany nemají odpovídající DNSKEY
 msgctxt "DNSSEC:DS18_ROLLOVER_EVIDENCE_MULTI_KSK"
 msgid "Multiple SEP-flagged DNSKEYs found at the child zone (keytags: {keytags}). A KSK rollover may be in progress."
 msgstr "V podřízené zóně bylo nalezeno více DNSKEY s příznakem SEP (keytagy: {keytags}). Může probíhat výměna KSK."
+
+msgctxt "DNSSEC:DS19_BADKEY_BLOCKLIST"
+msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) matches known compromised key in blocklist \"{blocklist_name}\" on name server(s) {servers}."
+msgstr "DNSKEY s keytagem {keytag} a algoritmem {algo_descr} ({algo_num}) odpovídá známému kompromitovanému klíči v blokovacím seznamu \"{blocklist_name}\" na jmenném serveru / serverech {servers}."
 
 msgctxt "DNSSEC:DS19_BADKEY_FERMAT"
 msgid "DNSKEY with keytag {keytag} and algorithm {algo_descr} ({algo_num}) has RSA modulus vulnerable to Fermat factorization (close primes) on name server(s) {servers}."
@@ -2158,6 +2194,10 @@ msgctxt "ADDRESS:A01_GLOBALLY_REACHABLE_ADDR"
 msgid "All tested nameservers in {servers} are globally reachable."
 msgstr "Všechny testované jmenné servery v {servers} jsou globálně dostupné."
 
+msgctxt "ADDRESS:A01_LOCAL_USE_ADDR"
+msgid "IP address(es) intended for local use on network or service provider level: \"{servers}\"."
+msgstr "IP adresa/adresy určené pro lokální použití na úrovni sítě nebo poskytovatele služeb: \"{servers}\"."
+
 msgctxt "ADDRESS:A01_NO_GLOBALLY_REACHABLE_ADDR"
 msgid "None of the name servers IP addresses are listed as globally reachable."
 msgstr "Žádná z IP adres jmenných serverů není uvedena jako globálně dostupná."
@@ -2186,6 +2226,30 @@ msgctxt "DNSSEC:DS05_ALGO_OK"
 msgid "DNSKEY with key tag {keytag} uses algorithm {algo_num} ({algo_descr}, {algo_mnemo}) which is acceptable. Fetched from name servers {servers}."
 msgstr "DNSKEY s key tagem {keytag} používá algoritmus {algo_num} ({algo_descr}, {algo_mnemo}), který je přijatelný. Získáno z jmenných serverů {servers}."
 
+msgctxt "DNSSEC:DS05_ALGO_PRIVATE"
+msgid "The DNSKEY with tag {keytag} uses algorithm number {algo_num} which is reserved for private use. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY s key tagem {keytag} používá číslo algoritmu {algo_num}, které je vyhrazeno pro soukromé použití. Získáno z jmenných serverů \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_RESERVED"
+msgid "The DNSKEY with tag {keytag} uses reserved algorithm number {algo_num}. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY s key tagem {keytag} používá vyhrazené číslo algoritmu {algo_num}. Získáno z jmenných serverů \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ALGO_UNASSIGNED"
+msgid "The DNSKEY with tag {keytag} uses unassigned algorithm number {algo_num}. Fetched from name servers \"{servers}\"."
+msgstr "DNSKEY s key tagem {keytag} používá nepřiřazené číslo algoritmu {algo_num}. Získáno z jmenných serverů \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_NO_RESPONSE"
+msgid "No response or error in response from all name servers on the DNSKEY query. Failing name servers \"{servers}\"."
+msgstr "Žádná odpověď nebo chyba v odpovědi od všech jmenných serverů na dotaz DNSKEY. Selhávající jmenné servery \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_SERVER_NO_DNSSEC"
+msgid "Some name servers do not support DNSSEC or have not been properly configured. DNSKEY cannot be tested on those servers. Fetched from name servers \"{servers}\"."
+msgstr "Některé jmenné servery nepodporují DNSSEC nebo nejsou správně nakonfigurovány. DNSKEY nelze na těchto serverech otestovat. Získáno z jmenných serverů \"{servers}\"."
+
+msgctxt "DNSSEC:DS05_ZONE_NO_DNSSEC"
+msgid "The zone is not DNSSEC signed or not properly DNSSEC signed. DNSKEY cannot be tested. Fetched from name servers \"{servers}\"."
+msgstr "Zóna není podepsána DNSSEC nebo není podepsána správně. DNSKEY nelze otestovat. Získáno z jmenných serverů \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_DS_FOR_SIGNED_ZONE"
 msgid "DS records are published in the parent zone for the signed zone."
 msgstr "V nadřazené zóně jsou pro podepsanou zónu publikovány DS záznamy."
@@ -2193,6 +2257,18 @@ msgstr "V nadřazené zóně jsou pro podepsanou zónu publikovány DS záznamy.
 msgctxt "DNSSEC:DS07_DS_ON_PARENT_SERVER"
 msgid "DS records found on parent name servers {servers}."
 msgstr "DS záznamy nalezeny na jmenných serverech nadřazené strany {servers}."
+
+msgctxt "DNSSEC:DS07_INCONSISTENT_DS"
+msgid "Inconsistent responses from parent name servers. Some include DS, others do not."
+msgstr "Nekonzistentní odpovědi od jmenných serverů nadřazené zóny. Některé obsahují DS, jiné ne."
+
+msgctxt "DNSSEC:DS07_INCONSISTENT_SIGNED"
+msgid "Inconsistent responses from name servers. Some include signed responses, others do not."
+msgstr "Nekonzistentní odpovědi od jmenných serverů. Některé obsahují podepsané odpovědi, jiné ne."
+
+msgctxt "DNSSEC:DS07_NON_AUTH_RESPONSE_DNSKEY"
+msgid "The following name servers give a non authoritative response on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Následující jmenné servery dávají neautoritativní odpověď na dotaz DNSKEY s nastaveným bitem DO. Jmenné servery: \"{servers}\"."
 
 msgctxt "DNSSEC:DS07_NOT_SIGNED"
 msgid "The zone is not signed."
@@ -2204,9 +2280,17 @@ msgid ""
 "child zone). Name servers: \"{servers}\"."
 msgstr "Následující jmenné servery odpovídají bez podepsaného DNSKEY RRset (nepodepsaná podřízená zóna). Jmenné servery: \"{servers}\"."
 
+msgctxt "DNSSEC:DS07_NO_DS_ON_PARENT_SERVER"
+msgid "The following parent name servers respond without DS record for the child zone. Name servers: \"{servers}\"."
+msgstr "Následující jmenné servery nadřazené zóny odpovídají bez DS záznamu pro podřízenou zónu. Jmenné servery: \"{servers}\"."
+
 msgctxt "DNSSEC:DS07_NO_DS_FOR_SIGNED_ZONE"
 msgid "The parent zone has no DS record for the signed child zone."
 msgstr "Nadřazená zóna nemá žádný DS záznam pro podepsanou podřízenou zónu."
+
+msgctxt "DNSSEC:DS07_NO_RESPONSE_DNSKEY"
+msgid "The following name servers do not respond on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Následující jmenné servery neodpovídají na dotaz DNSKEY s nastaveným bitem DO. Jmenné servery: \"{servers}\"."
 
 msgctxt "DNSSEC:DS07_PARENT_PROVES_NO_DELEGATION"
 msgid "The parent zone {parent} proves that no delegation exists at this zone name: the NSEC or NSEC3 record matching it carries no NS bit, and {parent} is itself anchored by a DS at its own parent. Validating resolvers reject this zone and every name in it. Returned from name server(s) {servers}."
@@ -2220,13 +2304,29 @@ msgctxt "DNSSEC:DS07_SIGNED_ON_SERVER"
 msgid "Signed responses received from name servers {servers}."
 msgstr "Podepsané odpovědi přijaty z jmenných serverů {servers}."
 
+msgctxt "DNSSEC:DS07_UNEXP_RCODE_RESP_DNSKEY"
+msgid "The following name servers respond with RCODE \"{rcode}\" instead of expected \"NOERROR\" on DNSKEY query with DO bit set. Name servers: \"{servers}\"."
+msgstr "Následující jmenné servery odpovídají s RCODE \"{rcode}\" místo očekávaného \"NOERROR\" na dotaz DNSKEY s nastaveným bitem DO. Jmenné servery: \"{servers}\"."
+
 msgctxt "ZONE:Z11_NO_SPF_NON_MAIL_DOMAIN"
 msgid "No SPF policy found for {domain}, which is not a mail domain."
 msgstr "Pro {domain}, která není poštovní doménou, nebyla nalezena žádná SPF politika."
 
+msgctxt "ZONE:Z11_NON_NULL_SPF_NON_MAIL_DOMAIN"
+msgid "A non-null SPF policy was found on {domain}, although this type of domain (root, TLD or under .ARPA) is not expected to be used for email."
+msgstr "Pro {domain} byla nalezena neprázdná SPF politika, přestože se u tohoto typu domény (kořen, TLD nebo pod .ARPA) nepředpokládá použití pro e-mail."
+
 msgctxt "ZONE:Z11_NULL_SPF_NON_MAIL_DOMAIN"
 msgid "Null SPF policy found for {domain}, which is not a mail domain."
 msgstr "Pro {domain}, která není poštovní doménou, byla nalezena prázdná SPF politika."
+
+msgctxt "ZONE:Z11_SPF_MULTIPLE_RECORDS"
+msgid "The following name servers returned more than one SPF policy. Name servers: {servers}."
+msgstr "Následující jmenné servery vrátily více než jednu SPF politiku. Jmenné servery: {servers}."
+
+msgctxt "ZONE:Z11_SPF_SYNTAX_ERROR"
+msgid "The SPF policy of {domain} has a syntax error. Policy retrieved from the following nameservers: {servers}."
+msgstr "SPF politika pro {domain} obsahuje syntaktickou chybu. Politika byla získána z následujících jmenných serverů: {servers}."
 
 msgctxt "ZONE:Z11_SPF_SYNTAX_OK"
 msgid "SPF syntax is correct for {domain}."

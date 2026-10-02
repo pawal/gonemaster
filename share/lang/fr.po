@@ -2624,6 +2624,7 @@ msgstr "Le type RR {query_type} existe à l'apex de la zone mais est absent du b
 msgctxt "DNSSEC:DS20_NSEC_BITMAP_MISMATCHES_RRTYPE"
 msgid "RR type {query_type} exists at the zone apex but is missing from the NSEC type bitmap on name server(s) {servers}. This enables cache poisoning via RFC 8198 aggressive negative caching."
 msgstr "Le type RR {query_type} existe à l'apex de la zone mais est absent du bitmap de types NSEC sur le(s) serveur(s) de noms {servers}. Cela permet l'empoisonnement du cache via la mise en cache négative agressive de la RFC 8198."
+
 msgctxt "DNSSEC:DS21_ALGO_NOT_SUPPORTED"
 msgid "Parent DS RRSIG with keytag {keytag} uses unsupported algorithm {algo_num} ({algo_mnemo}); skipping verification on parent name server(s) {addresses}."
 msgstr "La signature (RRSIG) de la zone parente couvrant l'enregistrement DS avec le tag {keytag} utilise un algorithme non pris en charge {algo_num} ({algo_mnemo}). La validation a été ignorée sur les serveurs de noms de la zone parente ayant les adresses IP \"{addresses}\"."

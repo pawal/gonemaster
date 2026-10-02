@@ -270,3 +270,29 @@ func TestApplyFileConfigAuth(t *testing.T) {
 		t.Fatalf("ApplyFileConfig did not apply auth block: %+v", cfg.Auth)
 	}
 }
+
+func TestSessionCookieSecureFollowsHTTPSPublicURLHost(t *testing.T) {
+	for _, tc := range []struct {
+		publicURL, host string
+		want            bool
+	}{
+		{"https://gm.example/", "gm.example", true},
+		{"https://gm.example/", "GM.example:8080", true},
+		{"https://gm.example/", "10.0.0.5:8080", false},
+		{"http://gm.example/", "gm.example", false},
+		{"", "gm.example", false},
+	} {
+		t.Run(tc.publicURL+" "+tc.host, func(t *testing.T) {
+			tok := "gm_secure"
+			srv := newTestServer(t, withAuth(tok), withConfig(func(c *Config) { c.PublicURL = tc.publicURL }))
+			for _, method := range []string{http.MethodPost, http.MethodDelete} {
+				rec := doJSON(t, srv, method, "/api/v1/session", `{"token":"`+tok+`"}`, withHost(tc.host))
+				wantStatus(t, rec, http.StatusOK)
+				c := cookieNamed(rec, adminCookieName)
+				if c == nil || c.Secure != tc.want {
+					t.Fatalf("%s cookie = %+v, want Secure %t", method, c, tc.want)
+				}
+			}
+		})
+	}
+}

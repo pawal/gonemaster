@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -186,7 +187,20 @@ func (s *Server) adminCookie(r *http.Request, value string) *http.Cookie {
 		Value:    value,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   requestScheme(r, s.trustedProxies) == "https",
+		Secure:   s.secureCookie(r),
 		SameSite: http.SameSiteStrictMode,
 	}
+}
+
+// secureCookie reports an https request, or a request to the host of an https public_url.
+func (s *Server) secureCookie(r *http.Request) bool {
+	if requestScheme(r, s.trustedProxies) == "https" {
+		return true
+	}
+	u, err := url.Parse(s.liveConfig().PublicURL)
+	if err != nil || u.Scheme != "https" {
+		return false
+	}
+	host, _, err := normalizedHostPort(r.Host, "http")
+	return err == nil && strings.EqualFold(u.Hostname(), host)
 }

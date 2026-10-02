@@ -582,6 +582,8 @@
   "settings_help_rate_limit_enabled": "Activar limitación de tasa por IP en envíos de trabajos públicos.",
   "settings_label_rate_limit_max": "Tasa máxima",
   "settings_help_rate_limit_max": "Máximo de envíos de trabajos por IP y ventana.",
+  "settings_label_rate_limit_get_max": "Tasa máxima de lecturas",
+  "settings_help_rate_limit_get_max": "Máximo de solicitudes de lectura contabilizadas por IP y ventana.",
   "settings_label_rate_limit_window": "Ventana de limitación",
   "settings_help_rate_limit_window": "Duración de la ventana deslizante para la limitación de tasa (ej. 10m).",
   "settings_label_allow_private_undelegated_ip": "Permitir IPs privadas no delegadas",

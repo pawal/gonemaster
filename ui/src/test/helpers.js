@@ -116,6 +116,7 @@ export const serverSettingsFixture = (overrides = {}) => ({
   public_url: setting(""),
   rate_limit_enabled: setting(false),
   rate_limit_max: setting(10),
+  rate_limit_get_max: setting(600),
   rate_limit_window: setting("10m0s"),
   show_score_admin: setting(true),
   show_score_public: setting(true),

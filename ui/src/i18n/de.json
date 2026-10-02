@@ -255,6 +255,8 @@
   "settings_help_rate_limit_enabled": "IP-basiertes Rate-Limiting für öffentliche Job-Einreichungen aktivieren.",
   "settings_label_rate_limit_max": "Rate-Limit Maximum",
   "settings_help_rate_limit_max": "Maximale Job-Einreichungen pro IP pro Zeitfenster.",
+  "settings_label_rate_limit_get_max": "Rate-Limit Maximum Lesezugriffe",
+  "settings_help_rate_limit_get_max": "Maximale gezählte Leseanfragen pro IP pro Zeitfenster.",
   "settings_label_rate_limit_window": "Rate-Limit-Zeitfenster",
   "settings_help_rate_limit_window": "Gleitendes Zeitfenster für das Rate-Limiting (z. B. 10m).",
   "settings_label_allow_private_undelegated_ip": "Private undelegierte IPs erlauben",

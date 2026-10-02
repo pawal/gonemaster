@@ -255,6 +255,8 @@
   "settings_help_rate_limit_enabled": "Enable per-IP rate limiting on public job submissions.",
   "settings_label_rate_limit_max": "Rate limit max",
   "settings_help_rate_limit_max": "Maximum job submissions per IP per window.",
+  "settings_label_rate_limit_get_max": "Rate limit max reads",
+  "settings_help_rate_limit_get_max": "Maximum metered read requests per IP per window.",
   "settings_label_rate_limit_window": "Rate limit window",
   "settings_help_rate_limit_window": "Sliding window duration for rate limiting (e.g. 10m).",
   "settings_label_allow_private_undelegated_ip": "Allow private undelegated IPs",

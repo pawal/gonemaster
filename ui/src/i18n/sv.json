@@ -582,6 +582,8 @@
   "settings_help_rate_limit_enabled": "Aktivera hastighetsbegränsning per IP för publika jobbinlämningar.",
   "settings_label_rate_limit_max": "Max antal förfrågningar",
   "settings_help_rate_limit_max": "Maximalt antal jobbinlämningar per IP per tidsfönster.",
+  "settings_label_rate_limit_get_max": "Max antal läsförfrågningar",
+  "settings_help_rate_limit_get_max": "Maximalt antal räknade läsförfrågningar per IP per tidsfönster.",
   "settings_label_rate_limit_window": "Tidsfönster för begränsning",
   "settings_help_rate_limit_window": "Glidande tidsfönster för hastighetsbegränsning (t.ex. 10m).",
   "settings_label_allow_private_undelegated_ip": "Tillåt privata odelegerade IP-adresser",

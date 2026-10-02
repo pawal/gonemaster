@@ -582,6 +582,8 @@
   "settings_help_rate_limit_enabled": "Ota käyttöön IP-kohtainen nopeusrajoitus julkisille työn lähetyksille.",
   "settings_label_rate_limit_max": "Nopeusrajoituksen enimmäismäärä",
   "settings_help_rate_limit_max": "Suurin sallittu työn lähetysten määrä per IP per aikaikkuna.",
+  "settings_label_rate_limit_get_max": "Lukupyyntöjen nopeusrajoituksen enimmäismäärä",
+  "settings_help_rate_limit_get_max": "Suurin sallittu laskettujen lukupyyntöjen määrä per IP per aikaikkuna.",
   "settings_label_rate_limit_window": "Rajoitusikkuna",
   "settings_help_rate_limit_window": "Liukuvan aikaikkunan kesto nopeusrajoitukselle (esim. 10m).",
   "settings_label_allow_private_undelegated_ip": "Salli yksityiset delegoimattomat IP-osoitteet",

@@ -255,6 +255,8 @@
   "settings_help_rate_limit_enabled": "Schakel snelheidsbeperking per IP in voor publieke taakinzendingen.",
   "settings_label_rate_limit_max": "Max. snelheidsbeperking",
   "settings_help_rate_limit_max": "Maximaal aantal taakinzendingen per IP per venster.",
+  "settings_label_rate_limit_get_max": "Max. snelheidsbeperking voor lezen",
+  "settings_help_rate_limit_get_max": "Maximaal aantal getelde leesverzoeken per IP per venster.",
   "settings_label_rate_limit_window": "Venster snelheidsbeperking",
   "settings_help_rate_limit_window": "Duur van het schuivende venster voor snelheidsbeperking (bijv. 10m).",
   "settings_label_allow_private_undelegated_ip": "Privé niet-gedelegeerde IP's toestaan",

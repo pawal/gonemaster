@@ -582,6 +582,8 @@
   "settings_help_rate_limit_enabled": "Activer la limitation de débit par IP pour les soumissions de jobs publics.",
   "settings_label_rate_limit_max": "Limite de débit max",
   "settings_help_rate_limit_max": "Nombre maximum de soumissions de jobs par IP et par fenêtre.",
+  "settings_label_rate_limit_get_max": "Limite de débit max en lecture",
+  "settings_help_rate_limit_get_max": "Nombre maximum de requêtes de lecture comptées par IP et par fenêtre.",
   "settings_label_rate_limit_window": "Fenêtre de limitation",
   "settings_help_rate_limit_window": "Durée de la fenêtre glissante pour la limitation de débit (ex. 10m).",
   "settings_label_allow_private_undelegated_ip": "Autoriser les IP privées non déléguées",

@@ -582,6 +582,8 @@
   "settings_help_rate_limit_enabled": "Aktiver frekvensbegrensning per IP for offentlige jobbinnsendinger.",
   "settings_label_rate_limit_max": "Maks frekvensbegrensning",
   "settings_help_rate_limit_max": "Maksimalt antall jobbinnsendinger per IP per vindu.",
+  "settings_label_rate_limit_get_max": "Maks frekvensbegrensning for lesing",
+  "settings_help_rate_limit_get_max": "Maksimalt antall målte leseforespørsler per IP per vindu.",
   "settings_label_rate_limit_window": "Begrensningsvindu",
   "settings_help_rate_limit_window": "Glidende vindusvarighet for frekvensbegrensning (f.eks. 10m).",
   "settings_label_allow_private_undelegated_ip": "Tillat private udelegerte IP-adresser",

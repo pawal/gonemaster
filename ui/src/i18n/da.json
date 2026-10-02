@@ -582,6 +582,8 @@
   "settings_help_rate_limit_enabled": "Aktivér hastighedsbegrænsning per IP for offentlige jobindsendelser.",
   "settings_label_rate_limit_max": "Maks hastighedsbegrænsning",
   "settings_help_rate_limit_max": "Maksimalt antal jobindsendelser per IP per vindue.",
+  "settings_label_rate_limit_get_max": "Maks hastighedsbegrænsning for læsning",
+  "settings_help_rate_limit_get_max": "Maksimalt antal målte læseforespørgsler per IP per vindue.",
   "settings_label_rate_limit_window": "Begrænsningsvindue",
   "settings_help_rate_limit_window": "Glidende vinduesvarighed for hastighedsbegrænsning (f.eks. 10m).",
   "settings_label_allow_private_undelegated_ip": "Tillad private undelegerede IP-adresser",

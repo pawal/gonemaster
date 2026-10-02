@@ -582,6 +582,8 @@
   "settings_help_rate_limit_enabled": "公開ジョブ送信のIPごとのレート制限を有効にします。",
   "settings_label_rate_limit_max": "レート制限の上限",
   "settings_help_rate_limit_max": "ウィンドウあたりのIPごとの最大ジョブ送信数。",
+  "settings_label_rate_limit_get_max": "読み取りのレート制限の上限",
+  "settings_help_rate_limit_get_max": "ウィンドウあたりのIPごとの計測対象の最大読み取りリクエスト数。",
   "settings_label_rate_limit_window": "レート制限ウィンドウ",
   "settings_help_rate_limit_window": "レート制限のスライディングウィンドウ期間 (例: 10m)。",
   "settings_label_allow_private_undelegated_ip": "プライベートな未委任IPを許可",

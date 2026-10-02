@@ -255,6 +255,8 @@
   "settings_help_rate_limit_enabled": "Zapnout omezení frekvence na IP pro veřejné odesílání úloh.",
   "settings_label_rate_limit_max": "Maximum omezení frekvence",
   "settings_help_rate_limit_max": "Maximální počet odeslaných úloh na IP za časové okno.",
+  "settings_label_rate_limit_get_max": "Maximum omezení frekvence čtení",
+  "settings_help_rate_limit_get_max": "Maximální počet měřených požadavků na čtení na IP za časové okno.",
   "settings_label_rate_limit_window": "Okno omezení frekvence",
   "settings_help_rate_limit_window": "Délka klouzavého okna pro omezení frekvence (např. 10m).",
   "settings_label_allow_private_undelegated_ip": "Povolit soukromé nedelegované IP",

@@ -582,6 +582,8 @@
   "settings_help_rate_limit_enabled": "Omogoči omejevanje hitrosti po IP-naslovu za javne oddaje opravil.",
   "settings_label_rate_limit_max": "Največje število zahtev",
   "settings_help_rate_limit_max": "Največje število oddaj opravil na IP-naslov na časovno okno.",
+  "settings_label_rate_limit_get_max": "Največje število bralnih zahtev",
+  "settings_help_rate_limit_get_max": "Največje število štetih bralnih zahtev na IP-naslov na časovno okno.",
   "settings_label_rate_limit_window": "Časovno okno omejitve",
   "settings_help_rate_limit_window": "Trajanje drsečega okna za omejevanje hitrosti (npr. 10m).",
   "settings_label_allow_private_undelegated_ip": "Dovoli zasebne nedelegirane naslove IP",

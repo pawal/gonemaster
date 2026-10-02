@@ -233,7 +233,7 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 		s.metrics.ObserveResultLocale(locale)
 		raw := *result.Raw
 		raw.Locale = locale
-		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
+		raw.Entries = localizeResultEntries(redactLocalEndpoints(result.Raw.Entries), locale)
 		result.Raw = &raw
 		result.TestcaseDescriptions = testcaseDescriptionsForEntries(raw.Entries)
 	}

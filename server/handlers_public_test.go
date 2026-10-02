@@ -639,3 +639,39 @@ func TestAdminCreateJobAcceptsDebugMinLevel(t *testing.T) {
 	rr := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", map[string]any{"domain": "example.com", "min_level": "DEBUG"})
 	wantStatus(t, rr, http.StatusCreated)
 }
+
+func TestPublicGetResultRedactsLocalEndpoint(t *testing.T) {
+	srv := newTestServer(t)
+	created, err := srv.store.Create(Job{ID: newID("job"), Domain: "example.com", Status: JobSucceeded, CreatedAt: time.Now().UTC(), Progress: 100})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	const exception = "read udp 10.0.0.5:61329->192.0.2.1:53: i/o timeout"
+	if err := srv.store.GraduateJob(created, []engine.LogEntry{
+		{Module: "SYSTEM", Tag: "EXTERNAL_RESPONSE", Level: "DEBUG3", Args: map[string]any{"exception": exception}},
+		{Module: "SYSTEM", Tag: "EXTERNAL_RESPONSE", Level: "DEBUG3", Args: map[string]any{"exception": "read udp [fd00::5]:5300->[2001:db8::1]:53: i/o timeout"}},
+	}); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
+
+	result := mustJSON[JobResult](t, doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil), http.StatusOK)
+	if result.Raw == nil || len(result.Raw.Entries) != 2 {
+		t.Fatalf("raw entries = %+v, want 2", result.Raw)
+	}
+	want := []string{"read udp 192.0.2.1:53: i/o timeout", "read udp [2001:db8::1]:53: i/o timeout"}
+	for i, e := range result.Raw.Entries {
+		if got := e.Args["exception"]; got != want[i] {
+			t.Errorf("entry %d exception = %q, want %q", i, got, want[i])
+		}
+		for _, text := range []string{e.Message, e.Raw} {
+			if strings.Contains(text, "10.0.0.5") || strings.Contains(text, "fd00::5") {
+				t.Errorf("entry %d text carries the local address: %q", i, text)
+			}
+		}
+	}
+
+	admin := mustJSON[JobResult](t, doJSON(t, srv, http.MethodGet, "/api/v1/jobs/"+created.ID+"/result", nil), http.StatusOK)
+	if admin.Raw == nil || len(admin.Raw.Entries) == 0 || admin.Raw.Entries[0].Args["exception"] != exception {
+		t.Errorf("admin result lost the local endpoint: %+v", admin.Raw)
+	}
+}

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"maps"
+	"regexp"
 	"strings"
 	"sync"
 
@@ -30,6 +32,26 @@ func resolveResultLocale(requested string) string {
 		return key
 	}
 	return "en"
+}
+
+// localEndpointInError matches the local endpoint of a net.OpError string,
+// "udp 10.0.0.5:5300->" in "read udp 10.0.0.5:5300->192.0.2.1:53: i/o timeout".
+var localEndpointInError = regexp.MustCompile(`\b((?:udp|tcp)[46]?) \S+?->`)
+
+// redactLocalEndpoints drops the server's own address and port from the
+// exception arg of entries, copying any args it changes.
+func redactLocalEndpoints(entries []JobResultEntry) []JobResultEntry {
+	out := make([]JobResultEntry, len(entries))
+	for i, e := range entries {
+		out[i] = e
+		exc, ok := e.Args["exception"].(string)
+		if !ok || !localEndpointInError.MatchString(exc) {
+			continue
+		}
+		out[i].Args = maps.Clone(e.Args)
+		out[i].Args["exception"] = localEndpointInError.ReplaceAllString(exc, "$1 ")
+	}
+	return out
 }
 
 func localizeResultEntries(entries []JobResultEntry, locale string) []JobResultEntry {

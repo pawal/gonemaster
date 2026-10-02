@@ -50,20 +50,18 @@ func (s *Server) Start() {
 
 	s.startStuckJobReaper(ctx)
 
-	if s.rateLimiter != nil {
-		go func() {
-			ticker := time.NewTicker(time.Minute)
-			defer ticker.Stop()
-			for {
-				select {
-				case <-ticker.C:
-					s.rateLimiter.Cleanup()
-				case <-ctx.Done():
-					return
-				}
+	go func() {
+		ticker := time.NewTicker(time.Minute)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				s.cleanupRateLimit()
+			case <-ctx.Done():
+				return
 			}
-		}()
-	}
+		}
+	}()
 
 	s.extData.Start(ctx)
 

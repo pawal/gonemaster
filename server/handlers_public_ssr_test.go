@@ -211,7 +211,7 @@ func TestResultPageGetsShareTheAPIsUnmeteredPath(t *testing.T) {
 		cfg.PublicAPI.RateLimitMax = 1
 		cfg.PublicAPI.RateLimitWindow = Duration{time.Hour}
 	}))
-	if srv.rateLimiter == nil {
+	if srv.rateLimiter.Load() == nil {
 		t.Fatal("rate limiter did not come up, the rest of this test proves nothing")
 	}
 

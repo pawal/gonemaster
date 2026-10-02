@@ -41,7 +41,7 @@ type Server struct {
 	engineLimiter            *engineLimiter
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
-	rateLimiter              *RateLimiter
+	rateLimiter              atomic.Pointer[RateLimiter]
 	trustedProxies           []netip.Prefix
 	excludedTestcases        []string
 	hotCache                 *nameserverHotCache
@@ -196,10 +196,8 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	}
 	// Bound as a method value so it reads s.lookup at call time.
 	s.delegationLookup = s.lookupDelegation
-	if cfg.PublicAPI.RateLimitEnabled {
-		s.rateLimiter = NewRateLimiter(cfg.PublicAPI.RateLimitMax, cfg.PublicAPI.RateLimitWindow.Duration)
-		s.metrics.SetRateLimitKeysSource(s.rateLimiter.Keys)
-	}
+	s.applyRateLimit(cfg.PublicAPI)
+	s.metrics.SetRateLimitKeysSource(s.rateLimitKeys)
 	s.trustedProxies = parseTrustedProxies(cfg.TrustedProxyCIDRs)
 	s.excludedTestcases, _ = engine.ExpandExclusions(cfg.Exclude)
 	if s.excludedTestcases == nil {
@@ -461,9 +459,7 @@ func (s *Server) routes() {
 	if d := s.cfg.PublicAPI.AnalysisRequestTimeout.Duration; d > 0 {
 		pubHandler = analysisTimeoutMiddleware(d, pubHandler)
 	}
-	if s.rateLimiter != nil {
-		pubHandler = rateLimitMiddleware(s.rateLimiter, s.trustedProxies, pubHandler)
-	}
+	pubHandler = rateLimitMiddleware(&s.rateLimiter, s.trustedProxies, pubHandler)
 	// Outside the rate limiter, so a 429 is counted rather than invisible.
 	pubHandler = s.apiChain("/pub/api/v1/unknown", pubHandler)
 	s.mux.Handle("/pub/api/v1/", pubHandler)

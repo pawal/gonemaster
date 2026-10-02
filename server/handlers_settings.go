@@ -156,15 +156,7 @@ func (s *Server) applySettingsToRuntime() {
 	// Update hot cache TTL.
 	s.hotCache.SetTTL(s.cfg.EffectiveCrossJobHotCacheTTL())
 
-	// Update rate limiter.
-	if s.cfg.PublicAPI.RateLimitEnabled {
-		s.rateLimiter = NewRateLimiter(
-			s.cfg.PublicAPI.RateLimitMax,
-			s.cfg.PublicAPI.RateLimitWindow.Duration,
-		)
-	} else {
-		s.rateLimiter = nil
-	}
+	s.applyRateLimit(s.cfg.PublicAPI)
 }
 
 // featuresResponse holds server-side feature flags exposed to the admin UI.

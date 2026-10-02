@@ -8,6 +8,7 @@ import (
 	"net/netip"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -162,19 +163,54 @@ func clientIP(r *http.Request, trusted []netip.Prefix) string {
 	return remote.Unmap().String()
 }
 
-// rateLimitMiddleware wraps next and applies rl to POST requests only.
-// Non-POST requests pass through unconditionally.
-// Blocked requests receive 429 with a Retry-After header.
-func rateLimitMiddleware(rl *RateLimiter, trusted []netip.Prefix, next http.Handler) http.Handler {
+// rateLimitMiddleware applies the limiter loaded from rl per request to POST
+// requests; a nil limiter passes. Blocked requests receive 429 with Retry-After.
+func rateLimitMiddleware(rl *atomic.Pointer[RateLimiter], trusted []netip.Prefix, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodPost {
-			ip := clientIP(r, trusted)
-			if ok, retryAfter := rl.Allow(ip); !ok {
-				w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
-				http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
-				return
-			}
+		if r.Method == http.MethodPost && !allowRequest(w, r, rl.Load(), trusted) {
+			return
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// allowRequest reports whether r is within rl, answering 429 when it is not.
+func allowRequest(w http.ResponseWriter, r *http.Request, rl *RateLimiter, trusted []netip.Prefix) bool {
+	if rl == nil {
+		return true
+	}
+	ok, retryAfter := rl.Allow(clientIP(r, trusted))
+	if !ok {
+		w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
+		http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)
+	}
+	return ok
+}
+
+// applyRateLimit stores a limiter matching api, keeping the current one when
+// its limits are unchanged.
+func (s *Server) applyRateLimit(api PublicAPIConfig) {
+	if !api.RateLimitEnabled {
+		s.rateLimiter.Store(nil)
+		return
+	}
+	if rl := s.rateLimiter.Load(); rl != nil && rl.max == api.RateLimitMax && rl.window == api.RateLimitWindow.Duration {
+		return
+	}
+	s.rateLimiter.Store(NewRateLimiter(api.RateLimitMax, api.RateLimitWindow.Duration))
+}
+
+// rateLimitKeys counts the keys of the live limiter, zero when disabled.
+func (s *Server) rateLimitKeys() int {
+	if rl := s.rateLimiter.Load(); rl != nil {
+		return rl.Keys()
+	}
+	return 0
+}
+
+// cleanupRateLimit evicts idle keys from the live limiter.
+func (s *Server) cleanupRateLimit() {
+	if rl := s.rateLimiter.Load(); rl != nil {
+		rl.Cleanup()
+	}
 }

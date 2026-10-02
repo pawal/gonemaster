@@ -202,7 +202,7 @@ func TestPutSettingsHotReloadsRuntime(t *testing.T) {
 	srv := newTestServer(t)
 
 	// Default: rate limiting disabled, worker_count=16.
-	if srv.rateLimiter != nil {
+	if srv.rateLimiter.Load() != nil {
 		t.Fatal("expected rateLimiter=nil initially")
 	}
 	if srv.cfg.WorkerCount != 16 {
@@ -225,7 +225,7 @@ func TestPutSettingsHotReloadsRuntime(t *testing.T) {
 	if !srv.cfg.PublicAPI.RateLimitEnabled {
 		t.Fatal("expected RateLimitEnabled=true after PUT")
 	}
-	if srv.rateLimiter == nil {
+	if srv.rateLimiter.Load() == nil {
 		t.Fatal("expected rateLimiter to be created after enabling rate limiting")
 	}
 
@@ -233,7 +233,7 @@ func TestPutSettingsHotReloadsRuntime(t *testing.T) {
 	resp2 := doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"rate_limit_enabled": false}`)
 	wantStatus(t, resp2, http.StatusOK)
 
-	if srv.rateLimiter != nil {
+	if srv.rateLimiter.Load() != nil {
 		t.Fatal("expected rateLimiter=nil after disabling rate limiting")
 	}
 }

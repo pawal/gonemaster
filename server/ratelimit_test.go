@@ -4,6 +4,8 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/netip"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"testing/synctest"
 	"time"
@@ -259,7 +261,7 @@ func TestRateLimitMiddlewareAllowsGETUnconditionally(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	})
-	h := rateLimitMiddleware(rl, nil, ok)
+	h := rateLimitMiddleware(limiterPtr(rl), nil, ok)
 
 	for range 5 {
 		resp := doHandler(t, h, http.MethodGet, "/whatever", nil)
@@ -272,7 +274,7 @@ func TestRateLimitMiddlewareBlocks429WithRetryAfter(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	})
-	h := rateLimitMiddleware(rl, nil, ok)
+	h := rateLimitMiddleware(limiterPtr(rl), nil, ok)
 
 	for range 2 {
 		resp := doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr("1.2.3.4:5000"), noContentType())
@@ -292,7 +294,7 @@ func TestRateLimitMiddlewareXForwardedForRespectedFromTrustedProxy(t *testing.T)
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	})
-	h := rateLimitMiddleware(rl, trusted, ok)
+	h := rateLimitMiddleware(limiterPtr(rl), trusted, ok)
 
 	makePost := func(xff string) int {
 		resp := doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr("10.0.0.1:1234"), withHeader("X-Forwarded-For", xff), noContentType())
@@ -320,7 +322,7 @@ func TestRateLimitMiddlewareIgnoresSpoofedXForwardedFor(t *testing.T) {
 	ok := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	})
-	h := rateLimitMiddleware(rl, nil, ok)
+	h := rateLimitMiddleware(limiterPtr(rl), nil, ok)
 
 	makePost := func(xff string) int {
 		resp := doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr("203.0.113.99:1234"), withHeader("X-Forwarded-For", xff), noContentType())
@@ -387,4 +389,90 @@ func TestServerRateLimitDoesNotApplyToGET(t *testing.T) {
 
 	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+job.PublicID, nil, withRemoteAddr("1.2.3.4:1234"))
 	wantStatus(t, resp, http.StatusOK)
+}
+
+// limiterPtr wraps rl for rateLimitMiddleware.
+func limiterPtr(rl *RateLimiter) *atomic.Pointer[RateLimiter] {
+	var p atomic.Pointer[RateLimiter]
+	p.Store(rl)
+	return &p
+}
+
+func TestCleanupSurvivesLimiterDisabledBySettings(t *testing.T) {
+	srv := newTestServer(t, withPublicAPI(func(c *PublicAPIConfig) {
+		c.RateLimitEnabled = true
+		c.RateLimitMax = 5
+	}))
+
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"rate_limit_enabled": false}`)
+	wantStatus(t, resp, http.StatusOK)
+	if srv.rateLimiter.Load() != nil {
+		t.Fatal("limiter still set after disabling it")
+	}
+
+	srv.cleanupRateLimit()
+}
+
+func TestRateLimitSettingsChangeConcurrentWithCleanupAndRequests(t *testing.T) {
+	srv := newTestServer(t)
+	h := rateLimitMiddleware(&srv.rateLimiter, nil, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	}))
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for range 200 {
+			srv.cleanupRateLimit()
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for range 200 {
+			doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr("192.0.2.1:1234"), noContentType())
+		}
+	}()
+	for i := range 200 {
+		srv.applyRateLimit(PublicAPIConfig{RateLimitEnabled: i%2 == 0, RateLimitMax: 1 + i%3, RateLimitWindow: Duration{time.Minute}})
+	}
+	wg.Wait()
+}
+
+func TestRateLimitEnabledBySettingsAppliesToNextPost(t *testing.T) {
+	srv := newTestServer(t)
+	post := func() int {
+		return doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withRemoteAddr("192.0.2.1:1234")).Code
+	}
+	if code := post(); code != http.StatusCreated {
+		t.Fatalf("POST before enabling: got %d, want 201", code)
+	}
+
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"rate_limit_enabled": true, "rate_limit_max": 1}`)
+	wantStatus(t, resp, http.StatusOK)
+
+	if code := post(); code != http.StatusCreated {
+		t.Fatalf("first POST after enabling: got %d, want 201", code)
+	}
+	if code := post(); code != http.StatusTooManyRequests {
+		t.Fatalf("second POST after enabling: got %d, want 429", code)
+	}
+}
+
+func TestRateLimitSettingsKeepLimiterWhenUnchanged(t *testing.T) {
+	srv := newTestServer(t)
+	api := PublicAPIConfig{RateLimitEnabled: true, RateLimitMax: 3, RateLimitWindow: Duration{time.Minute}}
+	srv.applyRateLimit(api)
+	first := srv.rateLimiter.Load()
+
+	srv.applyRateLimit(api)
+	if srv.rateLimiter.Load() != first {
+		t.Fatal("unchanged limits replaced the limiter and reset its counts")
+	}
+
+	api.RateLimitMax = 4
+	srv.applyRateLimit(api)
+	if srv.rateLimiter.Load() == first {
+		t.Fatal("changed limits kept the old limiter")
+	}
 }

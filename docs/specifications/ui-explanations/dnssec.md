@@ -120,6 +120,11 @@ Description:
 
 The nameservers of a zone are often named inside the zone itself, and then their addresses are part of the data the zone signs. If those addresses do not validate, a validating resolver that looks them up gets a failure and stops using the nameserver, even while the rest of the zone is correct. This check reads the address records of every such nameserver name from each of your nameservers and verifies them against the chain of trust of the zone.
 
+## Testcase dnssec23
+
+Description:
+
+When a name does not exist, a signed zone proves it with NSEC or NSEC3 records that each cover a range of names. This check asks every nameserver for a name that cannot exist and verifies that the records in the answer agree with each other and with the NSEC3 parameters published at the zone apex. Records that contradict each other make some validating resolvers reject the answer even though every signature is correct.
 ## Tag DS01_DS_ALGO_DEPRECATED
 
 Header: DS uses deprecated digest algorithm
@@ -1295,3 +1300,59 @@ Header: Nameserver address not signed
 Description:
 
 The address records of one of your nameservers carry no signature, although the name lies in a signed part of your zone and no insecure delegation accounts for the gap. Validating resolvers require a signature there, reject the unsigned answer, and cannot look the nameserver up.
+
+## Tag DS23_MULTIPLE_NSEC3PARAM
+
+Header: Several NSEC3 chains published
+
+Description:
+
+The zone announces more than one set of NSEC3 parameters at its apex, so more than one NSEC3 chain is published. This is the normal state while the NSEC3 parameters are being changed and is not an error. Once the change is complete, remove the old parameters so that a single chain remains.
+
+## Tag DS23_NO_DENIAL_PROOF
+
+Header: No proof that the name is missing
+
+Description:
+
+Your zone is signed, but the answer for a name that does not exist carries no NSEC or NSEC3 record. A validating resolver cannot verify that the name is missing and treats the answer as forged, so lookups of missing names fail. The nameserver may be stripping DNSSEC records or serving a zone whose chain of NSEC or NSEC3 records is incomplete.
+
+## Tag DS23_NSEC3_CHAIN_NOT_PUBLISHED
+
+Header: NSEC3 chain not published
+
+Description:
+
+The NSEC3 records in the answer use hash settings that the zone does not announce in the NSEC3PARAM record at its apex. Validating resolvers read the settings from the records themselves, but secondary nameservers choose the chain to serve from the NSEC3PARAM record, so a chain that is not announced can be served incompletely. Complete the change of NSEC3 parameters, or re-sign the zone with the announced ones.
+
+## Tag DS23_NSEC3_DUPLICATE_NEXT
+
+Header: Two NSEC3 records share a next name
+
+Description:
+
+Two NSEC3 records in one answer point to the same next hashed name, so the range of one includes the other. The chain was not rebuilt after a name was added or removed, which points to a signer or dynamic update fault. Some validating resolvers reject the answer even though every signature is correct. Re-sign the zone so that the chain is rebuilt.
+
+## Tag DS23_NSEC3_MIXED_PARAMETERS
+
+Header: NSEC3 records from different chains
+
+Description:
+
+The NSEC3 records in one answer use different hash settings, so they belong to different chains and cannot prove anything together. A validating resolver rejects the answer. This happens when a nameserver serves parts of two generations of the signed zone. Reload or transfer the zone again so that every nameserver serves one chain.
+
+## Tag DS23_NSEC3_RANGES_OVERLAP
+
+Header: NSEC3 ranges overlap
+
+Description:
+
+One NSEC3 record claims that no name exists in a range that contains the name of another NSEC3 record in the same answer, so the answer says that a name both exists and does not exist. The chain is broken and some validating resolvers reject the answer. Re-sign the zone so that the chain is rebuilt.
+
+## Tag DS23_NSEC_RANGES_OVERLAP
+
+Header: NSEC ranges overlap
+
+Description:
+
+One NSEC record claims that no name exists between two names, yet another NSEC record in the same answer is owned by a name in that gap, so the answer says that a name both exists and does not exist. The chain is broken and some validating resolvers reject the answer. Re-sign the zone so that the chain is rebuilt.

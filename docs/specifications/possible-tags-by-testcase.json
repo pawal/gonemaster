@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 85,
-    "unique_tag_count": 594
+    "testcase_count": 86,
+    "unique_tag_count": 602
   },
   "modules": {
     "address": {
@@ -697,6 +697,20 @@
         "DS22_NS_ADDRESS_UNSIGNED",
         "DS22_NS_ADDRESS_VALIDATES",
         "DS22_ZONE_NOT_SECURE",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
+      ],
+      "dnssec23": [
+        "DS23_DENIAL_PROOF_CONSISTENT",
+        "DS23_MULTIPLE_NSEC3PARAM",
+        "DS23_NO_DENIAL_PROOF",
+        "DS23_NSEC3_CHAIN_NOT_PUBLISHED",
+        "DS23_NSEC3_DUPLICATE_NEXT",
+        "DS23_NSEC3_MIXED_PARAMETERS",
+        "DS23_NSEC3_RANGES_OVERLAP",
+        "DS23_NSEC_RANGES_OVERLAP",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",

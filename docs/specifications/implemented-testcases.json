@@ -7,7 +7,7 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 85
+    "testcase_count": 86
   },
   "module_order": [
     "basic",
@@ -76,7 +76,8 @@
       "dnssec19",
       "dnssec20",
       "dnssec21",
-      "dnssec22"
+      "dnssec22",
+      "dnssec23"
     ],
     "nameserver": [
       "nameserver01",
@@ -171,6 +172,7 @@
     "dnssec20": "Verify that the NSEC/NSEC3 apex type bitmap accurately reflects the RR types actually present in the zone.",
     "dnssec21": "Verify that the parent zone correctly signs the DS RRset that delegates the child zone.",
     "dnssec22": "Verify that the address records (`A` and `AAAA`) of every in-domain nameserver name of the zone validate under the chain of trust of the zone.",
+    "dnssec23": "Verify that the NSEC or NSEC3 records a nameserver returns in one denial of",
     "nameserver01": "Detect whether authoritative nameservers also behave as recursors.",
     "nameserver02": "Validate EDNS(0) handling on authoritative nameservers.",
     "nameserver03": "Check whether nameservers allow AXFR zone transfer.",

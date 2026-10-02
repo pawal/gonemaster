@@ -59,6 +59,14 @@ Scope:
 | `ds_key_algo_descr` | `string` | Text description of the DS algorithm field value. | |
 | `ds_key_algo_mnemo` | `string` | DNSSEC algorithm mnemonic for the DS algorithm field value (for example `PRIVATEDNS`). | |
 
+## Denial Of Existence Keys
+
+| Key | Type | Meaning | Notes |
+| --- | --- | --- | --- |
+| `owner` | `string` | Owner name of the NSEC or NSEC3 record whose interval covers another record, lowercased. | The full name as served, hashed label included for NSEC3. |
+| `covered` | `string` | Owner name of the NSEC or NSEC3 record that lies inside the interval of `owner`, lowercased. | |
+| `next` | `string` | Next field of the record at `owner`. | Next Hashed Owner Name in base32hex for NSEC3, Next Domain Name for NSEC. |
+
 ## Temporal Keys
 
 | Key | Type | Meaning | Notes |

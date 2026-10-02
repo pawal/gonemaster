@@ -90,4 +90,37 @@ describe("Progress", () => {
       vi.useRealTimers();
     }
   });
+
+  it("waits for Retry-After after a 429 and resumes polling", async () => {
+    vi.useFakeTimers();
+    try {
+      global.fetch
+        .mockResolvedValueOnce(errorResponse(429, {}, { "Retry-After": "5" }))
+        .mockResolvedValueOnce(jobResp("running", 50));
+      render(Progress, { props: { publicID: "abc12345" } });
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(fetch).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(screen.getByRole("progressbar").getAttribute("aria-valuenow")).toBe("50");
+      expect(screen.queryByRole("alert")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries a 429 without Retry-After on the next interval", async () => {
+    vi.useFakeTimers();
+    try {
+      global.fetch
+        .mockResolvedValueOnce(errResp(429))
+        .mockResolvedValueOnce(jobResp("running", 50));
+      render(Progress, { props: { publicID: "abc12345" } });
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(screen.queryByRole("alert")).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

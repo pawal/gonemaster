@@ -12,10 +12,22 @@
   let status = $state("queued");
   let errorKey = $state("");
   let timer;
+  let resumeAt = 0;
+
+  // Retry-After in milliseconds, one poll interval when absent.
+  function retryAfterMs(res) {
+    const secs = Number(res.headers.get("Retry-After"));
+    return secs > 0 ? secs * 1000 : POLL_INTERVAL;
+  }
 
   async function poll() {
+    if (Date.now() < resumeAt) return;
     try {
       const res = await getJob(publicID);
+      if (res.status === 429) {
+        resumeAt = Date.now() + retryAfterMs(res);
+        return;
+      }
       if (!res.ok) {
         clearInterval(timer);
         if (res.status === 404) {

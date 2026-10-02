@@ -224,6 +224,7 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 		result.Raw = &raw
 		result.TestcaseDescriptions = testcaseDescriptionsForEntries(raw.Entries)
 	}
+	result.JobID, result.BatchID = "", ""
 	if !s.cfg.ShowScorePublic {
 		result.Score = nil
 	}

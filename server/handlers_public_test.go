@@ -590,3 +590,30 @@ func TestPublicGetResolvesEightCharacterPublicID(t *testing.T) {
 
 	wantStatus(t, resp, http.StatusOK)
 }
+
+func TestPublicGetResultOmitsInternalIDs(t *testing.T) {
+	srv := newTestServer(t)
+	created, err := srv.store.Create(Job{
+		ID: newID("job"), BatchID: "batch-1", Domain: "example.com",
+		Status: JobSucceeded, CreatedAt: time.Now().UTC(), Progress: 100,
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if err := srv.store.GraduateJob(created, nil); err != nil {
+		t.Fatalf("GraduateJob: %v", err)
+	}
+
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
+
+	body := mustJSON[map[string]any](t, resp, http.StatusOK)
+	for _, key := range []string{"job_id", "batch_id"} {
+		if _, ok := body[key]; ok {
+			t.Errorf("public result carries %q: %v", key, body[key])
+		}
+	}
+	admin := mustJSON[map[string]any](t, doJSON(t, srv, http.MethodGet, "/api/v1/jobs/"+created.ID+"/result", nil), http.StatusOK)
+	if admin["job_id"] != created.ID || admin["batch_id"] != "batch-1" {
+		t.Errorf("admin result ids = %v, %v, want %s and batch-1", admin["job_id"], admin["batch_id"], created.ID)
+	}
+}

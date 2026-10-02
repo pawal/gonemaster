@@ -871,7 +871,7 @@ type BatchDeletePreview struct {
 
 // JobResult holds the assembled output for a job/run.
 type JobResult struct {
-	JobID                string             `json:"job_id"`
+	JobID                string             `json:"job_id,omitempty"`
 	BatchID              string             `json:"batch_id,omitempty"`
 	Status               JobStatus          `json:"status"`
 	Summary              map[string]any     `json:"summary,omitempty"`

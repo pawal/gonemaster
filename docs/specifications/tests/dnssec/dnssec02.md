@@ -28,7 +28,7 @@ Status: Final
 5. For each unique child nameserver IP (parallelized):
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `DNSKEY` and skip.
    - Query DNSKEY with DNSSEC enabled.
-   - Require `NOERROR`, `OPT`, `DO`, `AA`, and at least one DNSKEY at child apex; otherwise skip.
+   - Require `NOERROR`, `OPT`, `DO`, `AA`, the TC flag clear, and at least one DNSKEY at child apex; otherwise skip. A truncated answer is a partial RRset, whichever transport delivered it.
    - Mark nameserver as responding.
    - For each DS record:
      - Find DNSKEY candidates by keytag and select a matching candidate (digest-checked when digest type is supported).
@@ -84,6 +84,7 @@ For each unique child NS IP (parallel; fan-out = resolver.defaults.parallel):
    transport disabled for DNSKEY -> IPV4_DISABLED / IPV6_DISABLED, skip
    query DNSKEY at z.Name, DNSSEC=on
     +- resp.Msg == nil / RCODE != NOERROR / no EDNS / !DO / !AA  -> skip
+    +- TC set (over UDP or TCP)                                  -> skip
     +- no DNSKEY at z.Name in answer                             -> skip
     +- no records parse as *dns.DNSKEY                           -> skip
     +- otherwise                                                 -> mark responding
@@ -233,6 +234,7 @@ emit TEST_CASE_END
 ## Edge Cases And Limitations
 - If parent DS discovery yields no DS records, testcase stops after boundary tags and emits no DS02 findings.
 - Child nameservers are deduplicated by IP before DNSKEY checks, so repeated names on one IP collapse into one probe context.
+- A DNSKEY answer with the TC flag set is skipped, including one received over TCP after the transport fell back from a truncated UDP answer. The nameserver is not marked responding and contributes to no `DS02_*` finding, so a missing RRSIG in a partial RRset is never reported as `DS02_NO_MATCHING_DNSKEY_RRSIG`. Connectivity05 reports the truncated TCP answer as `CN05_TCP_ANSWER_TRUNCATED`.
 - `DS02_NO_VALID_DNSKEY_FOR_ANY_DS` and `DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS` are mutually exclusive by implementation (`else if` branch).
 - A zone whose DS RRset names one key that signs the DNSKEY RRset and one that does not gets `DS02_NO_MATCHING_DNSKEY_RRSIG` for the second keytag and `DS02_MATCH_DS_DNSKEY` for the first. The two findings name different keytags and both hold.
 - DS algorithm field mismatch: a DS whose algorithm field differs from the keytag-matching DNSKEY algorithm never counts as a match. A zone whose only DS has a mismatched algorithm therefore gets both `DS02_DS_ALGO_DNSKEY_MISMATCH` and the summary `DS02_NO_VALID_DNSKEY_FOR_ANY_DS`; a zone with an additional correct DS keeps `DS02_MATCH_DS_DNSKEY` alongside the mismatch tag. The keytag-fallback selection of the candidate for the ZONE/SEP flag checks is unaffected.

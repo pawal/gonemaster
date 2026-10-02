@@ -46,7 +46,7 @@ func (ns Nameserver) AXFR(ctx context.Context, domain string, callback func(dns.
 	if ns.Address.Is6() && !prof.Net.IPv6 {
 		return nil
 	}
-	if (ns.state == nil || ns.state.axfrFunc == nil) && ns.blockNonGlobal(ctx, prof, loggerFromContextOrFallback(ctx, ns.log)) {
+	if (ns.state == nil || ns.state.axfrFunc == nil) && ns.blockNonGlobal(ctx, prof, loggerFromContextOrFallback(ctx, ns.log), "AXFR|"+domain+"|"+class) {
 		return nil
 	}
 

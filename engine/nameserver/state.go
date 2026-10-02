@@ -393,6 +393,8 @@ type nsState struct {
 	latency         latencyTracker
 	queryFunc       func(ctx context.Context, name string, qtype string, qclass string, opts *QueryOptions) (packet.Packet, error)
 	axfrFunc        func(ctx context.Context, domain string, callback func(dns.RR) bool, class string) error
+	// blockLogged holds the keys NON_GLOBAL_QUERY_BLOCKED was logged for.
+	blockLogged sync.Map
 }
 
 // CacheStore keeps nameserver objects and per-address query/error caches.

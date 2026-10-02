@@ -1714,6 +1714,76 @@ func TestNonGlobalAXFRGuard(t *testing.T) {
 	}
 }
 
+// runContext is a run on parent's shared cache, as the server builds one.
+func runContext(t *testing.T, parent *CacheStore) context.Context {
+	t.Helper()
+	ctx, _, _ := dnstest.Context(t)
+	return WithCache(ctx, parent.SnapshotForRun())
+}
+
+// answerHook answers every query with an empty NOERROR response.
+func answerHook(calls *int) queryHook {
+	return func(context.Context, string, string, string, *QueryOptions) (packet.Packet, error) {
+		*calls++
+		msg := new(dns.Msg)
+		msg.Response = true
+		return packet.Packet{Msg: msg}, nil
+	}
+}
+
+func TestNonGlobalGuardSkipsAnswersCachedByAnotherRun(t *testing.T) {
+	parent := NewCacheStore()
+	calls := 0
+	pinnedCtx := runContext(t, parent)
+	pinned := newNS(t, pinnedCtx, "ns.example", "10.0.0.1")
+	pinned.SetQueryHook(answerHook(&calls))
+	if resp, _ := pinned.QueryWithOptions(pinnedCtx, "example.com", "SOA", nil); resp.Msg == nil {
+		t.Fatal("pinned run got no answer, the rest of this test proves nothing")
+	}
+
+	ctx := runContext(t, parent)
+	resp, err := newNS(t, ctx, "ns.example", "10.0.0.1").QueryWithOptions(ctx, "example.com", "SOA", nil)
+	if err != nil || resp.Msg != nil {
+		t.Errorf("guarded run got msg=%v err=%v, want neither", resp.Msg != nil, err)
+	}
+	if !dnstest.HasTag(logger.FromContext(ctx).Entries(), "NON_GLOBAL_QUERY_BLOCKED") {
+		t.Error("guarded run did not log NON_GLOBAL_QUERY_BLOCKED")
+	}
+}
+
+func TestNonGlobalGuardLeavesTheSharedCacheEmpty(t *testing.T) {
+	parent := NewCacheStore()
+	ctx := runContext(t, parent)
+	_, _ = newNS(t, ctx, "ns.example", "10.0.0.1").QueryWithOptions(ctx, "example.com", "SOA", nil)
+
+	calls := 0
+	ctx = runContext(t, parent)
+	pinned := newNS(t, ctx, "ns.example", "10.0.0.1")
+	pinned.SetQueryHook(answerHook(&calls))
+	resp, _ := pinned.QueryWithOptions(ctx, "example.com", "SOA", nil)
+	if calls != 1 || resp.Msg == nil {
+		t.Errorf("pinned run after a blocked run: hook calls = %d, answer = %v, want 1 and an answer", calls, resp.Msg != nil)
+	}
+}
+
+func TestNonGlobalGuardLogsOncePerQuery(t *testing.T) {
+	ctx, _ := testContext(t)
+	ns := newNS(t, ctx, "ns.example", "10.0.0.1")
+	for _, qtype := range []string{"SOA", "SOA", "NS"} {
+		_, _ = ns.QueryWithOptions(ctx, "example.com", qtype, nil)
+	}
+
+	blocked := 0
+	for _, tag := range dnstest.Tags(logger.FromContext(ctx).Entries()) {
+		if tag == "NON_GLOBAL_QUERY_BLOCKED" {
+			blocked++
+		}
+	}
+	if blocked != 2 {
+		t.Errorf("NON_GLOBAL_QUERY_BLOCKED logged %d times, want 2 for two distinct queries", blocked)
+	}
+}
+
 // A synthesized response must reach a testcase in wire shape, with the OPT
 // moved out of the additional section, or its EDNS accessors read differently
 // than they do for a real response.

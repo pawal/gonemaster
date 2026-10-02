@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Fixed
 
 - dnssec02: a truncated `DNSKEY` answer no longer counts as a missing RRSIG
+- i18n: add the message translations missing from nine locales and the untranslated admin UI strings
 
 ## [v1.7.15] - 2026-10-02
 

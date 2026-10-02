@@ -776,7 +776,7 @@
   "tc.nameserver15": "Onthulling van de softwareversie door de naamserver",
   "tc.nameserver16": "Ondersteuning van EDNS NSID-optie",
   "tc.nameserver17": "Ondersteuning voor DNS Cookie",
-  "tc.nameserver18": "Extended DNS Errors (EDE)",
+  "tc.nameserver18": "Uitgebreide DNS-fouten (EDE)",
   "tc.syntax01": "Geen ongeldige tekens in de domeinnaam",
   "tc.syntax02": "Geen koppelteken aan het begin of einde van de domeinnaam",
   "tc.syntax03": "Geen dubbel koppelteken op positie 3 en 4 van de domeinnaam",

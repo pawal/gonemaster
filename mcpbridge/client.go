@@ -1,4 +1,4 @@
-package main
+package mcpbridge
 
 import (
 	"bytes"
@@ -12,33 +12,53 @@ import (
 	"strings"
 	"time"
 
-	"codeberg.org/pawal/gonemaster/cmd/internal/publicapi"
+	"codeberg.org/pawal/gonemaster/internal/publicapi"
 )
 
-// apiClient is a thin bearer-authenticated HTTP client for the admin API.
-type apiClient struct {
+// DefaultServerURL is the admin API base when none is configured.
+const DefaultServerURL = "http://localhost:8080/api/v1"
+
+// Client is a thin bearer-authenticated HTTP client for the admin API.
+type Client struct {
 	baseURL    string
 	token      string
 	httpClient *http.Client
+	tokenHint  string
+	urlHint    string
 }
 
-func newAPIClient(cfg config) (*apiClient, error) {
-	base, err := normalizeBaseURL(cfg.serverURL)
+// NewClient targets the admin API at baseURL; a nil hc gets a 30 s timeout.
+func NewClient(baseURL, token string, hc *http.Client) (*Client, error) {
+	base, err := normalizeBaseURL(baseURL)
 	if err != nil {
 		return nil, err
 	}
-	return &apiClient{
+	if hc == nil {
+		hc = &http.Client{Timeout: 30 * time.Second}
+	}
+	return &Client{
 		baseURL:    base,
-		token:      cfg.token,
-		httpClient: &http.Client{Timeout: cfg.timeout},
+		token:      token,
+		httpClient: hc,
+		tokenHint:  "set GONEMASTER_TOKEN to a valid admin token",
+		urlHint:    "check GONEMASTER_URL",
 	}, nil
 }
+
+// WithHints replaces the remedies named in auth and connectivity errors.
+func (c *Client) WithHints(tokenHint, urlHint string) *Client {
+	c.tokenHint, c.urlHint = tokenHint, urlHint
+	return c
+}
+
+// BaseURL is the normalized admin API base.
+func (c *Client) BaseURL() string { return c.baseURL }
 
 // normalizeBaseURL ensures the URL ends in the /api/v1 admin prefix.
 func normalizeBaseURL(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return defaultServerURL, nil
+		return DefaultServerURL, nil
 	}
 	if !strings.Contains(raw, "://") {
 		raw = "http://" + raw
@@ -64,13 +84,13 @@ func normalizeBaseURL(raw string) (string, error) {
 
 // doJSON sends a JSON request and decodes the response into out. Non-2xx returns
 // an *httpError carrying the status code.
-func (c *apiClient) doJSON(ctx context.Context, method, path string, body, out any) error {
+func (c *Client) doJSON(ctx context.Context, method, path string, body, out any) error {
 	return c.doJSONURL(ctx, method, strings.TrimRight(c.baseURL, "/")+path, body, out)
 }
 
 // doJSONURL is doJSON against an absolute URL, for the public API, which
 // sits beside the admin base rather than under it.
-func (c *apiClient) doJSONURL(ctx context.Context, method, full string, body, out any) error {
+func (c *Client) doJSONURL(ctx context.Context, method, full string, body, out any) error {
 	var payload io.Reader
 	if body != nil {
 		data, err := json.Marshal(body)
@@ -129,7 +149,7 @@ type whoamiResponse struct {
 	Authenticated bool   `json:"authenticated"`
 }
 
-func (c *apiClient) whoami(ctx context.Context) (whoamiResponse, error) {
+func (c *Client) whoami(ctx context.Context) (whoamiResponse, error) {
 	var out whoamiResponse
 	err := c.doJSON(ctx, http.MethodGet, "/whoami", nil, &out)
 	return out, err
@@ -212,25 +232,25 @@ type entryView struct {
 	Message  string `json:"message"`
 }
 
-func (c *apiClient) createJob(ctx context.Context, req createJobRequest) (jobView, error) {
+func (c *Client) createJob(ctx context.Context, req createJobRequest) (jobView, error) {
 	var out jobView
 	err := c.doJSON(ctx, http.MethodPost, "/jobs", req, &out)
 	return out, err
 }
 
-func (c *apiClient) getJob(ctx context.Context, id string) (jobView, error) {
+func (c *Client) getJob(ctx context.Context, id string) (jobView, error) {
 	var out jobView
 	err := c.doJSON(ctx, http.MethodGet, "/jobs/"+url.PathEscape(id), nil, &out)
 	return out, err
 }
 
-func (c *apiClient) getRun(ctx context.Context, id string) (runView, error) {
+func (c *Client) getRun(ctx context.Context, id string) (runView, error) {
 	var out runView
 	err := c.doJSON(ctx, http.MethodGet, "/runs/"+url.PathEscape(id), nil, &out)
 	return out, err
 }
 
-func (c *apiClient) getResult(ctx context.Context, id, locale string) (resultView, error) {
+func (c *Client) getResult(ctx context.Context, id, locale string) (resultView, error) {
 	var out resultView
 	path := "/jobs/" + url.PathEscape(id) + "/result"
 	if locale != "" {
@@ -253,19 +273,19 @@ type batchCreateResponse struct {
 	JobIDs  []string `json:"job_ids"`
 }
 
-func (c *apiClient) createBatch(ctx context.Context, req batchCreateRequest) (batchCreateResponse, error) {
+func (c *Client) createBatch(ctx context.Context, req batchCreateRequest) (batchCreateResponse, error) {
 	var out batchCreateResponse
 	err := c.doJSON(ctx, http.MethodPost, "/jobs/batch", req, &out)
 	return out, err
 }
 
-func (c *apiClient) cancelJob(ctx context.Context, id string) (jobView, error) {
+func (c *Client) cancelJob(ctx context.Context, id string) (jobView, error) {
 	var out jobView
 	err := c.doJSON(ctx, http.MethodPost, "/jobs/"+url.PathEscape(id)+"/cancel", nil, &out)
 	return out, err
 }
 
-func (c *apiClient) deleteBatch(ctx context.Context, id string) error {
+func (c *Client) deleteBatch(ctx context.Context, id string) error {
 	return c.doJSON(ctx, http.MethodDelete, "/batches/"+url.PathEscape(id), nil, nil)
 }
 
@@ -294,7 +314,7 @@ type entryListView struct {
 	Total int           `json:"total"`
 }
 
-func (c *apiClient) getBatch(ctx context.Context, id string) (batchSummaryView, error) {
+func (c *Client) getBatch(ctx context.Context, id string) (batchSummaryView, error) {
 	var out batchSummaryView
 	err := c.doJSON(ctx, http.MethodGet, "/batches/"+url.PathEscape(id), nil, &out)
 	return out, err
@@ -318,7 +338,7 @@ type batchListView struct {
 	Total int                 `json:"total"`
 }
 
-func (c *apiClient) listBatches(ctx context.Context, q url.Values) (batchListView, error) {
+func (c *Client) listBatches(ctx context.Context, q url.Values) (batchListView, error) {
 	var out batchListView
 	path := "/batches"
 	if len(q) > 0 {
@@ -328,7 +348,7 @@ func (c *apiClient) listBatches(ctx context.Context, q url.Values) (batchListVie
 	return out, err
 }
 
-func (c *apiClient) listEntries(ctx context.Context, q url.Values) (entryListView, error) {
+func (c *Client) listEntries(ctx context.Context, q url.Values) (entryListView, error) {
 	var out entryListView
 	path := "/entries"
 	if len(q) > 0 {
@@ -355,7 +375,7 @@ type batchTagValuesView struct {
 	Values        []tagValueRollupView `json:"values"`
 }
 
-func (c *apiClient) getBatchTagValues(ctx context.Context, id string, q url.Values) (batchTagValuesView, error) {
+func (c *Client) getBatchTagValues(ctx context.Context, id string, q url.Values) (batchTagValuesView, error) {
 	var out batchTagValuesView
 	path := "/batches/" + url.PathEscape(id) + "/tag-values"
 	if len(q) > 0 {
@@ -393,7 +413,7 @@ type specTestcaseDetailView struct {
 	Tags        []specTagView `json:"tags"`
 }
 
-func (c *apiClient) listSpecTestcases(ctx context.Context, category string) (specTestcaseListView, error) {
+func (c *Client) listSpecTestcases(ctx context.Context, category string) (specTestcaseListView, error) {
 	var out specTestcaseListView
 	path := "/spec/testcases"
 	if category != "" {
@@ -403,7 +423,7 @@ func (c *apiClient) listSpecTestcases(ctx context.Context, category string) (spe
 	return out, err
 }
 
-func (c *apiClient) getSpecTestcase(ctx context.Context, id, locale string) (specTestcaseDetailView, error) {
+func (c *Client) getSpecTestcase(ctx context.Context, id, locale string) (specTestcaseDetailView, error) {
 	var out specTestcaseDetailView
 	path := "/spec/testcases/" + url.PathEscape(id)
 	if locale != "" {
@@ -413,7 +433,7 @@ func (c *apiClient) getSpecTestcase(ctx context.Context, id, locale string) (spe
 	return out, err
 }
 
-func (c *apiClient) getRuns(ctx context.Context, q url.Values) (runListView, error) {
+func (c *Client) getRuns(ctx context.Context, q url.Values) (runListView, error) {
 	var out runListView
 	path := "/runs"
 	if len(q) > 0 {
@@ -423,7 +443,7 @@ func (c *apiClient) getRuns(ctx context.Context, q url.Values) (runListView, err
 	return out, err
 }
 
-func (c *apiClient) listRuns(ctx context.Context, domain string, limit int) (runListView, error) {
+func (c *Client) listRuns(ctx context.Context, domain string, limit int) (runListView, error) {
 	q := url.Values{}
 	if domain != "" {
 		q.Set("domain", domain)
@@ -443,7 +463,7 @@ type profileView struct {
 	Public      bool   `json:"public"`
 }
 
-func (c *apiClient) listProfiles(ctx context.Context) ([]profileView, error) {
+func (c *Client) listProfiles(ctx context.Context) ([]profileView, error) {
 	var out []profileView
 	err := c.doJSON(ctx, http.MethodGet, "/profiles", nil, &out)
 	return out, err
@@ -457,7 +477,7 @@ type domainTagView struct {
 	DefaultProfileID *int64 `json:"default_profile_id"`
 }
 
-func (c *apiClient) listDomainTags(ctx context.Context, limit int) ([]domainTagView, error) {
+func (c *Client) listDomainTags(ctx context.Context, limit int) ([]domainTagView, error) {
 	var out []domainTagView
 	path := "/tags"
 	if limit > 0 {
@@ -468,7 +488,7 @@ func (c *apiClient) listDomainTags(ctx context.Context, limit int) ([]domainTagV
 }
 
 // getPublic decodes a GET against the public API into out.
-func (c *apiClient) getPublic(ctx context.Context, path string, out any) error {
+func (c *Client) getPublic(ctx context.Context, path string, out any) error {
 	return c.doJSONURL(ctx, http.MethodGet, publicapi.Base(c.baseURL)+path, nil, out)
 }
 
@@ -607,19 +627,19 @@ type analysisReportView struct {
 	Clusters   []reportClusterView `json:"clusters"`
 }
 
-func (c *apiClient) getAnalysisCatalog(ctx context.Context) (analysisCatalogView, error) {
+func (c *Client) getAnalysisCatalog(ctx context.Context) (analysisCatalogView, error) {
 	var out analysisCatalogView
 	err := c.getPublic(ctx, "/analysis/catalog", &out)
 	return out, err
 }
 
-func (c *apiClient) listAnalysisSnapshots(ctx context.Context, datasetTag string) (analysisSnapshotListView, error) {
+func (c *Client) listAnalysisSnapshots(ctx context.Context, datasetTag string) (analysisSnapshotListView, error) {
 	var out analysisSnapshotListView
 	err := c.getPublic(ctx, "/analysis/cohorts/"+url.PathEscape(datasetTag)+"/snapshots", &out)
 	return out, err
 }
 
-func (c *apiClient) getAnalysisReport(ctx context.Context, datasetTag string, q url.Values) (analysisReportView, error) {
+func (c *Client) getAnalysisReport(ctx context.Context, datasetTag string, q url.Values) (analysisReportView, error) {
 	var out analysisReportView
 	path := "/analysis/cohorts/" + url.PathEscape(datasetTag) + "/report"
 	if len(q) > 0 {

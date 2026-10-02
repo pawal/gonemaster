@@ -7,18 +7,21 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"os/signal"
 	"strings"
 	"syscall"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/mcpbridge"
+
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 const (
 	serverName       = "gonemaster-mcp"
-	defaultServerURL = "http://localhost:8080/api/v1"
+	defaultServerURL = mcpbridge.DefaultServerURL
 	defaultTimeout   = 30 * time.Second
 )
 
@@ -112,18 +115,18 @@ func main() {
 	logger := slog.New(slog.NewTextHandler(os.Stderr, nil))
 
 	cfg := configFromEnv()
-	api, err := newAPIClient(cfg)
+	api, err := mcpbridge.NewClient(cfg.serverURL, cfg.token, &http.Client{Timeout: cfg.timeout})
 	if err != nil {
 		logger.Error("invalid configuration", "error", err)
 		os.Exit(1)
 	}
 
-	srv := newMCPServer(api, cfg.allowWrite)
+	srv := mcpbridge.NewServer(api, mcpbridge.Options{AllowWrite: cfg.allowWrite, Name: serverName, Version: version, Logger: logger})
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	logger.Info("starting "+serverName, "version", version, "server_url", api.baseURL, "auth", cfg.authMode(), "write_tools", cfg.allowWrite)
+	logger.Info("starting "+serverName, "version", version, "server_url", api.BaseURL(), "auth", cfg.authMode(), "write_tools", cfg.allowWrite)
 	if err := srv.Run(ctx, &mcp.StdioTransport{}); err != nil && !errors.Is(err, context.Canceled) {
 		logger.Error(serverName+" stopped", "error", err)
 		os.Exit(1)

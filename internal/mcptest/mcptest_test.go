@@ -5,7 +5,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"codeberg.org/pawal/gonemaster/cmd/internal/mcptest"
+	"codeberg.org/pawal/gonemaster/internal/mcptest"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )

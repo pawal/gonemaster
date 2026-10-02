@@ -1,4 +1,4 @@
-package main
+package mcpbridge
 
 import (
 	"context"
@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"codeberg.org/pawal/gonemaster/cmd/internal/mcptest"
 	"codeberg.org/pawal/gonemaster/internal/apitest"
+	"codeberg.org/pawal/gonemaster/internal/mcptest"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
@@ -52,7 +52,7 @@ func TestNormalizeBaseURL(t *testing.T) {
 		in   string
 		want string
 	}{
-		{"", defaultServerURL},
+		{"", DefaultServerURL},
 		{"http://localhost:8080", "http://localhost:8080/api/v1"},
 		{"http://localhost:8080/", "http://localhost:8080/api/v1"},
 		{"http://localhost:8080/api/v1", "http://localhost:8080/api/v1"},
@@ -74,7 +74,7 @@ func TestNormalizeBaseURL(t *testing.T) {
 
 // callPing wires the MCP server to an in-memory client and invokes the ping
 // tool, exercising the full tools/call round-trip plus the HTTP client.
-func callPing(t *testing.T, api *apiClient) pingOutput {
+func callPing(t *testing.T, api *Client) pingOutput {
 	t.Helper()
 	var out pingOutput
 	mcptest.Session(t, newMCPServer(api, false), func(ctx context.Context, session *mcp.ClientSession) {
@@ -99,18 +99,18 @@ func callPing(t *testing.T, api *apiClient) pingOutput {
 	return out
 }
 
-func clientFor(t *testing.T, serverURL, token string) *apiClient {
+func clientFor(t *testing.T, serverURL, token string) *Client {
 	t.Helper()
-	api, err := newAPIClient(config{serverURL: serverURL, token: token, timeout: 5 * time.Second})
+	api, err := NewClient(serverURL, token, &http.Client{Timeout: 5 * time.Second})
 	if err != nil {
-		t.Fatalf("newAPIClient: %v", err)
+		t.Fatalf("NewClient: %v", err)
 	}
 	return api
 }
 
 // fakeAPI starts a fake gonemaster-server for the test and returns a client
 // pointed at it, with no bearer token.
-func fakeAPI(t *testing.T, opts apitest.Opts) *apiClient {
+func fakeAPI(t *testing.T, opts apitest.Opts) *Client {
 	t.Helper()
 	return clientFor(t, apitest.New(t, opts).URL, "")
 }

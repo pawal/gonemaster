@@ -1,4 +1,4 @@
-package main
+package mcpbridge
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func registerHistoryTools(srv *mcp.Server, api *apiClient) {
+func registerHistoryTools(srv *mcp.Server, api *Client) {
 	registerRunSearch(srv, api)
 	registerRunDiff(srv, api)
 }
@@ -35,7 +35,7 @@ type runSearchOutput struct {
 	Runs  []runSummary `json:"runs"`
 }
 
-func registerRunSearch(srv *mcp.Server, api *apiClient) {
+func registerRunSearch(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_search",
 		Description: "Search completed runs by domain, tag, status, severity, grade, or finish-time range. Newest first.",
@@ -64,7 +64,7 @@ func registerRunSearch(srv *mcp.Server, api *apiClient) {
 
 		list, err := api.getRuns(ctx, q)
 		if err != nil {
-			return nil, runSearchOutput{}, toolError("search runs", err)
+			return nil, runSearchOutput{}, api.toolError("search runs", err)
 		}
 		out := runSearchOutput{Total: list.Total, Runs: []runSummary{}}
 		for _, r := range list.Items {
@@ -99,7 +99,7 @@ type runDiffOutput struct {
 	Changed []tagDelta `json:"changed" jsonschema:"tags in both runs whose severity changed"`
 }
 
-func registerRunDiff(srv *mcp.Server, api *apiClient) {
+func registerRunDiff(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_diff",
 		Description: "Compare two runs at the tag level: which tags were added, removed, or changed severity.",
@@ -116,11 +116,11 @@ func registerRunDiff(srv *mcp.Server, api *apiClient) {
 		}
 		resA, err := api.getResult(ctx, a, lang)
 		if err != nil {
-			return nil, runDiffOutput{}, toolError("get run_a", err)
+			return nil, runDiffOutput{}, api.toolError("get run_a", err)
 		}
 		resB, err := api.getResult(ctx, b, lang)
 		if err != nil {
-			return nil, runDiffOutput{}, toolError("get run_b", err)
+			return nil, runDiffOutput{}, api.toolError("get run_b", err)
 		}
 
 		ta, tb := worstLevelByTag(resA), worstLevelByTag(resB)

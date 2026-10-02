@@ -1,4 +1,4 @@
-package main
+package mcpbridge
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func registerSpecTools(srv *mcp.Server, api *apiClient) {
+func registerSpecTools(srv *mcp.Server, api *Client) {
 	registerSpecList(srv, api)
 	registerSpecGet(srv, api)
 }
@@ -29,7 +29,7 @@ type specListOutput struct {
 	Testcases []specTestcaseOut `json:"testcases"`
 }
 
-func registerSpecList(srv *mcp.Server, api *apiClient) {
+func registerSpecList(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "spec_list_testcases",
 		Description: "List gonemaster's implemented testcases, optionally filtered to one module.",
@@ -37,7 +37,7 @@ func registerSpecList(srv *mcp.Server, api *apiClient) {
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in specListInput) (*mcp.CallToolResult, specListOutput, error) {
 		list, err := api.listSpecTestcases(ctx, strings.TrimSpace(in.Category))
 		if err != nil {
-			return nil, specListOutput{}, toolError("list testcases", err)
+			return nil, specListOutput{}, api.toolError("list testcases", err)
 		}
 		out := specListOutput{Testcases: []specTestcaseOut{}}
 		for _, t := range list.Items {
@@ -67,7 +67,7 @@ type specGetOutput struct {
 	Tags        []specTagOut `json:"tags" jsonschema:"tags this testcase can emit, each with its rendered message"`
 }
 
-func registerSpecGet(srv *mcp.Server, api *apiClient) {
+func registerSpecGet(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "spec_get_testcase",
 		Description: "Get one testcase's module, description, and the tags it can emit with their rendered messages.",
@@ -83,7 +83,7 @@ func registerSpecGet(srv *mcp.Server, api *apiClient) {
 		}
 		d, err := api.getSpecTestcase(ctx, id, lang)
 		if err != nil {
-			return nil, specGetOutput{}, toolError("get testcase", err)
+			return nil, specGetOutput{}, api.toolError("get testcase", err)
 		}
 		out := specGetOutput{ID: d.ID, Module: d.Module, Description: d.Description, Excluded: d.Excluded, Locale: d.Locale, Tags: []specTagOut{}}
 		for _, tg := range d.Tags {

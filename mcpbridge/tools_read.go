@@ -1,4 +1,4 @@
-package main
+package mcpbridge
 
 import (
 	"context"
@@ -23,7 +23,8 @@ var (
 	pollInterval       = 1 * time.Second
 )
 
-const maxTestTimeout = 600 * time.Second
+// MaxTestTimeout bounds how long test_domain waits for a run.
+const MaxTestTimeout = 600 * time.Second
 
 // maxRunsLimit is the server's cap on a list limit.
 const maxRunsLimit = 500
@@ -62,7 +63,7 @@ type nsTiming struct {
 	Status     string  `json:"status,omitempty" jsonschema:"ok, unreachable, or unresolved"`
 }
 
-func registerReadTools(srv *mcp.Server, api *apiClient) {
+func registerReadTools(srv *mcp.Server, api *Client) {
 	registerTestDomain(srv, api)
 	registerRunGet(srv, api)
 	registerLatestFor(srv, api)
@@ -76,7 +77,7 @@ type testDomainInput struct {
 	MinLevel       string `json:"min_level,omitempty" jsonschema:"lowest severity to include in findings, e.g. NOTICE; omit for every stored level"`
 }
 
-func registerTestDomain(srv *mcp.Server, api *apiClient) {
+func registerTestDomain(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "test_domain",
 		Description: "Run a DNS test for a domain and wait for the result. Returns grade, score, findings, and per-nameserver response times.",
@@ -93,8 +94,8 @@ func registerTestDomain(srv *mcp.Server, api *apiClient) {
 		timeout := defaultTestTimeout
 		if in.TimeoutSeconds > 0 {
 			timeout = time.Duration(in.TimeoutSeconds) * time.Second
-			if timeout > maxTestTimeout {
-				timeout = maxTestTimeout
+			if timeout > MaxTestTimeout {
+				timeout = MaxTestTimeout
 			}
 		}
 
@@ -104,7 +105,7 @@ func registerTestDomain(srv *mcp.Server, api *apiClient) {
 		}
 		job, err := api.createJob(ctx, createReq)
 		if err != nil {
-			return nil, testResult{}, toolError("submit test", err)
+			return nil, testResult{}, api.toolError("submit test", err)
 		}
 
 		token := req.Params.GetProgressToken()
@@ -123,7 +124,7 @@ func registerTestDomain(srv *mcp.Server, api *apiClient) {
 				if pollCtx.Err() != nil {
 					return nil, testResult{}, pollTimeout(timeout, domain, job)
 				}
-				return nil, testResult{}, toolError("poll job", err)
+				return nil, testResult{}, api.toolError("poll job", err)
 			}
 			if token != nil && next.Progress != job.Progress {
 				notifyProgress(ctx, req.Session, token, next)
@@ -133,7 +134,7 @@ func registerTestDomain(srv *mcp.Server, api *apiClient) {
 
 		out := testResult{Domain: domain, RunID: job.ID, BatchID: job.BatchID, PublicID: job.PublicID, Status: job.Status, DurationMs: durationMs(job), Error: job.Error, Findings: []finding{}}
 		if err := fillResult(ctx, api, job.ID, langOrDefault(in.Lang), minLevel, &out); err != nil {
-			return nil, testResult{}, toolError("get result", err)
+			return nil, testResult{}, api.toolError("get result", err)
 		}
 		return nil, out, nil
 	})
@@ -153,7 +154,7 @@ type runGetInput struct {
 	MinLevel string `json:"min_level,omitempty" jsonschema:"lowest severity to include in findings, e.g. NOTICE; omit for every stored level"`
 }
 
-func registerRunGet(srv *mcp.Server, api *apiClient) {
+func registerRunGet(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_get",
 		Description: "Fetch a stored run's result by id: grade, score, findings, and per-nameserver response times.",
@@ -169,11 +170,11 @@ func registerRunGet(srv *mcp.Server, api *apiClient) {
 		}
 		run, err := api.getRun(ctx, id)
 		if err != nil {
-			return nil, testResult{}, toolError("get run", err)
+			return nil, testResult{}, api.toolError("get run", err)
 		}
 		out := testResult{Domain: run.Domain, RunID: run.ID, BatchID: run.BatchID, PublicID: run.PublicID, Status: run.Status, DurationMs: run.DurationMs, Error: run.Error, Findings: []finding{}}
 		if err := fillResult(ctx, api, id, langOrDefault(in.Lang), minLevel, &out); err != nil {
-			return nil, testResult{}, toolError("get result", err)
+			return nil, testResult{}, api.toolError("get result", err)
 		}
 		return nil, out, nil
 	})
@@ -203,7 +204,7 @@ type latestForOutput struct {
 	Runs   []runSummary `json:"runs" jsonschema:"completed runs, most recent first"`
 }
 
-func registerLatestFor(srv *mcp.Server, api *apiClient) {
+func registerLatestFor(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "latest_for",
 		Description: "List the most recent completed runs for a domain, newest first. The domain is matched exactly; use run_search for substrings.",
@@ -215,7 +216,7 @@ func registerLatestFor(srv *mcp.Server, api *apiClient) {
 		}
 		list, err := api.listRuns(ctx, domain, clampLimit(in.Limit, 5, maxRunsLimit))
 		if err != nil {
-			return nil, latestForOutput{}, toolError("list runs", err)
+			return nil, latestForOutput{}, api.toolError("list runs", err)
 		}
 		out := latestForOutput{Domain: domain, Runs: []runSummary{}}
 		for _, r := range list.Items {
@@ -239,7 +240,7 @@ func toRunSummary(r runView) runSummary {
 }
 
 // fillResult adds grade, findings and timings to out; a 404 leaves out as it is.
-func fillResult(ctx context.Context, api *apiClient, id, lang, minLevel string, out *testResult) error {
+func fillResult(ctx context.Context, api *Client, id, lang, minLevel string, out *testResult) error {
 	res, err := api.getResult(ctx, id, lang)
 	if err != nil {
 		var he *httpError
@@ -315,15 +316,13 @@ func durationMs(j jobView) int64 {
 	return j.FinishedAt.Sub(j.StartedAt).Milliseconds()
 }
 
-// toolError turns an HTTP failure into a stable, LLM-readable message. A 401
-// carries the fix; 4xx are caller errors; 5xx and transport failures are
-// server-side.
-func toolError(action string, err error) error {
+// toolError turns an HTTP failure into a stable, LLM-readable message.
+func (c *Client) toolError(action string, err error) error {
 	var he *httpError
 	if errors.As(err, &he) {
 		switch {
 		case he.status == 401:
-			return fmt.Errorf("%s failed: unauthorized (401); set GONEMASTER_TOKEN to a valid admin token", action)
+			return fmt.Errorf("%s failed: unauthorized (401); %s", action, c.tokenHint)
 		case he.status == 404:
 			return fmt.Errorf("%s failed: not found (404)", action)
 		case he.status >= 400 && he.status < 500:

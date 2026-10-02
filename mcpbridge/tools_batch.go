@@ -1,4 +1,4 @@
-package main
+package mcpbridge
 
 import (
 	"context"
@@ -13,7 +13,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func registerBatchTools(srv *mcp.Server, api *apiClient) {
+func registerBatchTools(srv *mcp.Server, api *Client) {
 	registerBatchGet(srv, api)
 	registerBatchList(srv, api)
 	registerCohortStats(srv, api)
@@ -45,7 +45,7 @@ type batchListOutput struct {
 	Batches []batchListItemOutput `json:"batches" jsonschema:"recent batches, newest first"`
 }
 
-func registerBatchList(srv *mcp.Server, api *apiClient) {
+func registerBatchList(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "batch_list",
 		Description: "List recent batches (cohort runs), newest first, with status and completion. " +
@@ -60,7 +60,7 @@ func registerBatchList(srv *mcp.Server, api *apiClient) {
 		q.Set("limit", strconv.Itoa(clampLimit(in.Limit, 20, 100)))
 		v, err := api.listBatches(ctx, q)
 		if err != nil {
-			return nil, batchListOutput{}, toolError("list batches", err)
+			return nil, batchListOutput{}, api.toolError("list batches", err)
 		}
 		out := batchListOutput{Total: v.Total, Batches: []batchListItemOutput{}}
 		for _, b := range v.Items {
@@ -95,7 +95,7 @@ type batchGetOutput struct {
 	FinishedAt   string         `json:"finished_at,omitempty"`
 }
 
-func registerBatchGet(srv *mcp.Server, api *apiClient) {
+func registerBatchGet(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "batch_get",
 		Description: "Get a batch's progress: total, per-status counts, completion, and timing. Use to poll a batch.",
@@ -107,7 +107,7 @@ func registerBatchGet(srv *mcp.Server, api *apiClient) {
 		}
 		b, err := api.getBatch(ctx, id)
 		if err != nil {
-			return nil, batchGetOutput{}, toolError("get batch", err)
+			return nil, batchGetOutput{}, api.toolError("get batch", err)
 		}
 		out := batchGetOutput{BatchID: b.BatchID, Tag: b.Tag, Total: b.Total, StatusCounts: b.StatusCounts}
 		out.Done = b.StatusCounts["queued"] == 0 && b.StatusCounts["running"] == 0 && b.StatusCounts["paused"] == 0
@@ -132,7 +132,7 @@ type cohortStatsOutput struct {
 	WorstLevels map[string]int `json:"worst_levels" jsonschema:"run count per worst severity level"`
 }
 
-func registerCohortStats(srv *mcp.Server, api *apiClient) {
+func registerCohortStats(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "cohort_stats",
 		Description: "Grade distribution and worst-severity distribution across the completed runs in a batch.",
@@ -144,7 +144,7 @@ func registerCohortStats(srv *mcp.Server, api *apiClient) {
 		}
 		b, err := api.getBatch(ctx, id)
 		if err != nil {
-			return nil, cohortStatsOutput{}, toolError("get batch", err)
+			return nil, cohortStatsOutput{}, api.toolError("get batch", err)
 		}
 		grades := b.Grades
 		if grades == nil {
@@ -163,7 +163,7 @@ func registerCohortStats(srv *mcp.Server, api *apiClient) {
 			q.Set("offset", strconv.Itoa(offset))
 			runs, err := api.getRuns(ctx, q)
 			if err != nil {
-				return nil, cohortStatsOutput{}, toolError("list batch runs", err)
+				return nil, cohortStatsOutput{}, api.toolError("list batch runs", err)
 			}
 			for _, r := range runs.Items {
 				total++
@@ -204,7 +204,7 @@ type cohortTagValuesOutput struct {
 	Values        []tagValueRollupOutput `json:"values" jsonschema:"values ranked by count, or by avg_score when weight_by_score is set"`
 }
 
-func registerCohortTagValues(srv *mcp.Server, api *apiClient) {
+func registerCohortTagValues(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "cohort_tag_values",
 		Description: "Roll up the values an argument takes across a completed batch: for the given (tag, arg), " +
@@ -242,7 +242,7 @@ func registerCohortTagValues(srv *mcp.Server, api *apiClient) {
 		}
 		v, err := api.getBatchTagValues(ctx, id, q)
 		if err != nil {
-			return nil, cohortTagValuesOutput{}, toolError("get batch tag values", err)
+			return nil, cohortTagValuesOutput{}, api.toolError("get batch tag values", err)
 		}
 		out := cohortTagValuesOutput{BatchID: v.BatchID, Tag: v.Tag, Arg: v.Arg, MinCount: v.MinCount, WeightByScore: v.WeightByScore}
 		out.Values = make([]tagValueRollupOutput, 0, len(v.Values))
@@ -284,7 +284,7 @@ type failuresByTagOutput struct {
 	Tags          []tagFailure `json:"tags" jsonschema:"tags ranked by distinct domains, highest first"`
 }
 
-func registerFailuresByTag(srv *mcp.Server, api *apiClient) {
+func registerFailuresByTag(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "failures_by_tag",
 		Description: "Rank the message tags driving failures in a batch, at or above a severity, by the number of domains carrying each, with example domains.",
@@ -313,8 +313,7 @@ func registerFailuresByTag(srv *mcp.Server, api *apiClient) {
 		examples := map[string][]string{}
 		out := failuresByTagOutput{BatchID: id, SeverityMin: minLevel}
 
-		// The entries level filter is exact, so query each qualifying level,
-		// most severe first.
+		// The entries level filter is exact, so query one level at a time, most severe first.
 	scan:
 		for _, level := range levelsDesc {
 			if levelRank[level] < minRank {
@@ -333,7 +332,7 @@ func registerFailuresByTag(srv *mcp.Server, api *apiClient) {
 				q.Set("offset", strconv.Itoa(offset))
 				list, err := api.listEntries(ctx, q)
 				if err != nil {
-					return nil, failuresByTagOutput{}, toolError("list entries", err)
+					return nil, failuresByTagOutput{}, api.toolError("list entries", err)
 				}
 				for _, e := range list.Items {
 					out.Scanned++
@@ -471,12 +470,12 @@ type cohortReportOutput struct {
 
 // resolveReportPair fills the dataset tag from the catalog and a missing
 // slug from the snapshot list, newest first.
-func resolveReportPair(ctx context.Context, api *apiClient, in cohortReportInput) (string, string, string, error) {
+func resolveReportPair(ctx context.Context, api *Client, in cohortReportInput) (string, string, string, error) {
 	datasetTag := strings.TrimSpace(in.DatasetTag)
 	if datasetTag == "" {
 		catalog, err := api.getAnalysisCatalog(ctx)
 		if err != nil {
-			return "", "", "", toolError("get analysis catalog", err)
+			return "", "", "", api.toolError("get analysis catalog", err)
 		}
 		datasetTag = catalog.DefaultTag
 		if datasetTag == "" && len(catalog.Cohorts) == 1 {
@@ -499,7 +498,7 @@ func resolveReportPair(ctx context.Context, api *apiClient, in cohortReportInput
 	}
 	list, err := api.listAnalysisSnapshots(ctx, datasetTag)
 	if err != nil {
-		return "", "", "", toolError("list snapshots", err)
+		return "", "", "", api.toolError("list snapshots", err)
 	}
 	if len(list.Snapshots) < 2 {
 		return "", "", "", errors.New("cohort " + datasetTag + " has fewer than two snapshots to compare")
@@ -589,7 +588,7 @@ func rankMovers(domains []reportDomainView, limit int) ([]cohortReportMover, boo
 	return out, truncated
 }
 
-func registerCohortReport(srv *mcp.Server, api *apiClient) {
+func registerCohortReport(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "cohort_report",
 		Description: "Compare two snapshots of an analysis cohort and classify every change as engine-driven " +
@@ -624,7 +623,7 @@ func registerCohortReport(srv *mcp.Server, api *apiClient) {
 		}
 		report, err := api.getAnalysisReport(ctx, datasetTag, q)
 		if err != nil {
-			return nil, cohortReportOutput{}, toolError("get cohort report", err)
+			return nil, cohortReportOutput{}, api.toolError("get cohort report", err)
 		}
 
 		vocab := report.Header.Vocabulary

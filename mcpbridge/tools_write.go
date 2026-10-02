@@ -1,4 +1,4 @@
-package main
+package mcpbridge
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 
 // registerWriteTools registers the mutating tools. It is only called when
 // GONEMASTER_MCP_ALLOW_WRITE is set, so a default install is read + test only.
-func registerWriteTools(srv *mcp.Server, api *apiClient) {
+func registerWriteTools(srv *mcp.Server, api *Client) {
 	registerBatchEnqueue(srv, api)
 	registerBatchCancel(srv, api)
 	registerCancelJob(srv, api)
@@ -28,7 +28,7 @@ type batchEnqueueOutput struct {
 	JobCount int    `json:"job_count" jsonschema:"number of jobs enqueued; poll with batch_get"`
 }
 
-func registerBatchEnqueue(srv *mcp.Server, api *apiClient) {
+func registerBatchEnqueue(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "batch_enqueue",
 		Description: "Enqueue a batch of domain tests. Provide explicit domains or from_tag (see domain_tag_list). Returns a batch id to poll.",
@@ -46,7 +46,7 @@ func registerBatchEnqueue(srv *mcp.Server, api *apiClient) {
 			Tags:    trimNonEmpty(in.Tags),
 		})
 		if err != nil {
-			return nil, batchEnqueueOutput{}, toolError("enqueue batch", err)
+			return nil, batchEnqueueOutput{}, api.toolError("enqueue batch", err)
 		}
 		return nil, batchEnqueueOutput{BatchID: resp.BatchID, JobCount: len(resp.JobIDs)}, nil
 	})
@@ -61,7 +61,7 @@ type batchCancelOutput struct {
 	Canceled bool   `json:"canceled"`
 }
 
-func registerBatchCancel(srv *mcp.Server, api *apiClient) {
+func registerBatchCancel(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "batch_cancel",
 		Description: "Cancel a batch's in-flight jobs and remove the batch and its derived data.",
@@ -72,7 +72,7 @@ func registerBatchCancel(srv *mcp.Server, api *apiClient) {
 			return nil, batchCancelOutput{}, errors.New("batch_id is required")
 		}
 		if err := api.deleteBatch(ctx, id); err != nil {
-			return nil, batchCancelOutput{}, toolError("cancel batch", err)
+			return nil, batchCancelOutput{}, api.toolError("cancel batch", err)
 		}
 		return nil, batchCancelOutput{BatchID: id, Canceled: true}, nil
 	})
@@ -87,7 +87,7 @@ type cancelJobOutput struct {
 	Status string `json:"status" jsonschema:"the job status after cancellation"`
 }
 
-func registerCancelJob(srv *mcp.Server, api *apiClient) {
+func registerCancelJob(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "cancel_job",
 		Description: "Cancel a single queued or running job.",
@@ -99,7 +99,7 @@ func registerCancelJob(srv *mcp.Server, api *apiClient) {
 		}
 		job, err := api.cancelJob(ctx, id)
 		if err != nil {
-			return nil, cancelJobOutput{}, toolError("cancel job", err)
+			return nil, cancelJobOutput{}, api.toolError("cancel job", err)
 		}
 		return nil, cancelJobOutput{JobID: job.ID, Status: job.Status}, nil
 	})

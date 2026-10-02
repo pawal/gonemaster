@@ -1,4 +1,4 @@
-package main
+package mcpbridge
 
 import (
 	"context"
@@ -9,15 +9,15 @@ import (
 	"testing"
 	"time"
 
-	"codeberg.org/pawal/gonemaster/cmd/internal/mcptest"
 	"codeberg.org/pawal/gonemaster/internal/apitest"
+	"codeberg.org/pawal/gonemaster/internal/mcptest"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // callTool runs one tools/call over an in-memory MCP session. On a successful
 // (non-error) result it decodes the structured output into out.
-func callTool(t *testing.T, api *apiClient, name string, args map[string]any, out any) *mcp.CallToolResult {
+func callTool(t *testing.T, api *Client, name string, args map[string]any, out any) *mcp.CallToolResult {
 	t.Helper()
 	var res *mcp.CallToolResult
 	mcptest.Session(t, newMCPServer(api, true), func(ctx context.Context, session *mcp.ClientSession) {

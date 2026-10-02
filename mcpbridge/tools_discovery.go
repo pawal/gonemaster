@@ -1,4 +1,4 @@
-package main
+package mcpbridge
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-func registerDiscoveryTools(srv *mcp.Server, api *apiClient) {
+func registerDiscoveryTools(srv *mcp.Server, api *Client) {
 	registerProfileList(srv, api)
 	registerDomainTagList(srv, api)
 	registerCohortList(srv, api)
@@ -28,7 +28,7 @@ type profileListOutput struct {
 	Profiles []profileOut `json:"profiles"`
 }
 
-func registerProfileList(srv *mcp.Server, api *apiClient) {
+func registerProfileList(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "profile_list",
 		Description: "List the stored test profiles: the id feeds test_domain's profile_id, the name feeds batch_enqueue's profile.",
@@ -36,7 +36,7 @@ func registerProfileList(srv *mcp.Server, api *apiClient) {
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ profileListInput) (*mcp.CallToolResult, profileListOutput, error) {
 		items, err := api.listProfiles(ctx)
 		if err != nil {
-			return nil, profileListOutput{}, toolError("list profiles", err)
+			return nil, profileListOutput{}, api.toolError("list profiles", err)
 		}
 		out := profileListOutput{Profiles: []profileOut{}}
 		for _, p := range items {
@@ -63,7 +63,7 @@ type domainTagListOutput struct {
 	Tags  []domainTagOut `json:"tags"`
 }
 
-func registerDomainTagList(srv *mcp.Server, api *apiClient) {
+func registerDomainTagList(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name: "domain_tag_list",
 		Description: "List user domain tags: named groups of domains that batches are built from and that batch_enqueue's " +
@@ -72,7 +72,7 @@ func registerDomainTagList(srv *mcp.Server, api *apiClient) {
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in domainTagListInput) (*mcp.CallToolResult, domainTagListOutput, error) {
 		items, err := api.listDomainTags(ctx, clampLimit(in.Limit, 100, maxRunsLimit))
 		if err != nil {
-			return nil, domainTagListOutput{}, toolError("list domain tags", err)
+			return nil, domainTagListOutput{}, api.toolError("list domain tags", err)
 		}
 		out := domainTagListOutput{Tags: []domainTagOut{}}
 		for _, t := range items {
@@ -107,7 +107,7 @@ type cohortListOutput struct {
 	Snapshots  []snapshotOut `json:"snapshots,omitempty"`
 }
 
-func registerCohortList(srv *mcp.Server, api *apiClient) {
+func registerCohortList(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "cohort_list",
 		Description: "List the public analysis cohorts and, when dataset_tag is given, that cohort's snapshots newest first. Slugs feed cohort_report's from and to.",
@@ -115,7 +115,7 @@ func registerCohortList(srv *mcp.Server, api *apiClient) {
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in cohortListInput) (*mcp.CallToolResult, cohortListOutput, error) {
 		catalog, err := api.getAnalysisCatalog(ctx)
 		if err != nil {
-			return nil, cohortListOutput{}, toolError("get analysis catalog", err)
+			return nil, cohortListOutput{}, api.toolError("get analysis catalog", err)
 		}
 		out := cohortListOutput{DefaultTag: catalog.DefaultTag, Cohorts: []cohortOut{}}
 		for _, c := range catalog.Cohorts {
@@ -127,7 +127,7 @@ func registerCohortList(srv *mcp.Server, api *apiClient) {
 		}
 		list, err := api.listAnalysisSnapshots(ctx, tag)
 		if err != nil {
-			return nil, cohortListOutput{}, toolError("list snapshots", err)
+			return nil, cohortListOutput{}, api.toolError("list snapshots", err)
 		}
 		out.DatasetTag = tag
 		out.Snapshots = []snapshotOut{}

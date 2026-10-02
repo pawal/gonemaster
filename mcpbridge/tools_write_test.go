@@ -1,17 +1,17 @@
-package main
+package mcpbridge
 
 import (
 	"context"
 	"testing"
 
-	"codeberg.org/pawal/gonemaster/cmd/internal/mcptest"
 	"codeberg.org/pawal/gonemaster/internal/apitest"
+	"codeberg.org/pawal/gonemaster/internal/mcptest"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
 // toolNames lists the tools a server registers for a given write gate.
-func toolNames(t *testing.T, api *apiClient, allowWrite bool) map[string]bool {
+func toolNames(t *testing.T, api *Client, allowWrite bool) map[string]bool {
 	t.Helper()
 	names := map[string]bool{}
 	mcptest.Session(t, newMCPServer(api, allowWrite), func(ctx context.Context, session *mcp.ClientSession) {

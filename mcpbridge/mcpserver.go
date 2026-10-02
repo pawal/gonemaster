@@ -1,29 +1,78 @@
-package main
+package mcpbridge
 
 import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
+	"time"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 )
 
-// newMCPServer builds the server and registers tools. Write tools register only
-// when allowWrite is set. SDK use is confined to this file so a later SDK swap
-// stays contained.
-func newMCPServer(api *apiClient, allowWrite bool) *mcp.Server {
-	opts := &mcp.ServerOptions{Instructions: serverInstructions(allowWrite)}
-	srv := mcp.NewServer(&mcp.Implementation{Name: serverName, Version: version}, opts)
+// Options configures NewServer.
+type Options struct {
+	// AllowWrite registers batch_enqueue, batch_cancel and cancel_job.
+	AllowWrite bool
+	// Name and Version identify the server to the client; defaults gonemaster-mcp and dev.
+	Name    string
+	Version string
+	// Logger receives one line per tool call; nil logs nothing.
+	Logger *slog.Logger
+	// OnToolCall observes each tool call, for metrics.
+	OnToolCall func(tool string, d time.Duration, failed bool)
+}
+
+// NewServer registers the tools against api; write tools only with AllowWrite.
+func NewServer(api *Client, opts Options) *mcp.Server {
+	if opts.Name == "" {
+		opts.Name = "gonemaster-mcp"
+	}
+	if opts.Version == "" {
+		opts.Version = "dev"
+	}
+	srv := mcp.NewServer(&mcp.Implementation{Name: opts.Name, Version: opts.Version},
+		&mcp.ServerOptions{Instructions: serverInstructions(opts.AllowWrite)})
+	srv.AddReceivingMiddleware(callObserver(opts))
 	registerPing(srv, api)
 	registerReadTools(srv, api)
 	registerSpecTools(srv, api)
 	registerDiscoveryTools(srv, api)
 	registerHistoryTools(srv, api)
 	registerBatchTools(srv, api)
-	if allowWrite {
+	if opts.AllowWrite {
 		registerWriteTools(srv, api)
 	}
 	return srv
+}
+
+// callObserver logs each tools/call and reports it to OnToolCall.
+func callObserver(opts Options) mcp.Middleware {
+	return func(next mcp.MethodHandler) mcp.MethodHandler {
+		return func(ctx context.Context, method string, req mcp.Request) (mcp.Result, error) {
+			if method != "tools/call" {
+				return next(ctx, method, req)
+			}
+			name := "?"
+			if p, ok := req.GetParams().(*mcp.CallToolParamsRaw); ok && p != nil {
+				name = p.Name
+			}
+			start := time.Now()
+			res, err := next(ctx, method, req)
+			failed := err != nil
+			if r, ok := res.(*mcp.CallToolResult); ok && r != nil && r.IsError {
+				failed = true
+			}
+			d := time.Since(start)
+			if opts.Logger != nil {
+				opts.Logger.Info("mcp tool call", "tool", name, "duration_ms", d.Milliseconds(), "failed", failed)
+			}
+			if opts.OnToolCall != nil {
+				opts.OnToolCall(name, d, failed)
+			}
+			return res, err
+		}
+	}
 }
 
 // serverInstructions is the connect-time blurb shown to the MCP client.
@@ -89,7 +138,7 @@ func writeHint(title string, destructive, openWorld bool) *mcp.ToolAnnotations {
 }
 
 // registerPing adds a connectivity + auth smoke-test tool.
-func registerPing(srv *mcp.Server, api *apiClient) {
+func registerPing(srv *mcp.Server, api *Client) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "ping",
 		Description: "Check connectivity to gonemaster-server and report its auth mode and whether this bridge is authenticated.",
@@ -98,7 +147,7 @@ func registerPing(srv *mcp.Server, api *apiClient) {
 		out := pingOutput{ServerURL: api.baseURL}
 		who, err := api.whoami(ctx)
 		if err != nil {
-			out.Detail = pingFailure(api.baseURL, err)
+			out.Detail = api.pingFailure(err)
 			return nil, out, nil
 		}
 		out.Reachable = true
@@ -114,10 +163,10 @@ func registerPing(srv *mcp.Server, api *apiClient) {
 }
 
 // pingFailure separates a dead address from a URL that is not the admin API.
-func pingFailure(baseURL string, err error) string {
+func (c *Client) pingFailure(err error) string {
 	var he *httpError
 	if errors.As(err, &he) {
-		return fmt.Sprintf("%s/whoami answered http %d: not a gonemaster-server admin API, check GONEMASTER_URL", baseURL, he.status)
+		return fmt.Sprintf("%s/whoami answered http %d: not a gonemaster-server admin API, %s", c.baseURL, he.status, c.urlHint)
 	}
 	return "gonemaster-server unreachable: " + err.Error()
 }

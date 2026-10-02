@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"codeberg.org/pawal/gonemaster/cmd/internal/publicapi"
+	"codeberg.org/pawal/gonemaster/internal/publicapi"
 )
 
 // ── Public API addressing ────────────────────────────────────────────────────

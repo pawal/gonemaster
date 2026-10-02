@@ -37,6 +37,19 @@ func TestGetSettings(t *testing.T) {
 	}
 }
 
+func TestGetSettingsRedactsDSNPassword(t *testing.T) {
+	srv := newTestServer(t)
+	srv.cfg.Database.Driver = "postgres"
+	srv.cfg.Database.DSN = "postgres://gm:s3cret@db:5432/gm"
+
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil)
+
+	settings := mustJSON[map[string]settingEntry](t, resp, http.StatusOK)
+	if got := settings["db_dsn"].Value; got != "postgres://gm:xxxxx@db:5432/gm" {
+		t.Fatalf("db_dsn = %v, want the redacted form", got)
+	}
+}
+
 func TestGetSettingsWithConfigSources(t *testing.T) {
 	srv := newTestServer(t)
 	srv.SetConfigSources(map[string]SettingSource{

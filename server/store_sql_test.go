@@ -2299,3 +2299,27 @@ func TestGetRunLazyScoreComputation(t *testing.T) {
 		}
 	})
 }
+
+// ---- redactDSN -------------------------------------------------------------
+
+func TestRedactDSN(t *testing.T) {
+	for _, tc := range []struct {
+		driver, dsn, want string
+	}{
+		{"postgres", "postgres://user:s3cret@host:5432/db?sslmode=disable", "postgres://user:xxxxx@host:5432/db?sslmode=disable"},
+		{"postgres", "postgresql://user:s3cret@host/db", "postgresql://user:xxxxx@host/db"},
+		{"postgres", "postgres://user@host/db?password=s3cret&sslmode=disable", "postgres://user@host/db?password=xxxxx&sslmode=disable"},
+		{"postgres", "host=db user=gm password=s3cret dbname=gm", "host=db user=gm password=xxxxx dbname=gm"},
+		{"postgres", "host=db password='s3 cr\\'et' sslpassword=k3y", "host=db password=xxxxx sslpassword=xxxxx"},
+		{"postgres", "host=db user=gm dbname=gm", "host=db user=gm dbname=gm"},
+		{"mariadb", "user:s3cret@tcp(host:3306)/db?charset=utf8mb4", "user:xxxxx@tcp(host:3306)/db?charset=utf8mb4"},
+		{"mysql", "user:p@ss/w:rd@tcp(host:3306)/db", "user:xxxxx@tcp(host:3306)/db"},
+		{"mariadb", "user@tcp(host:3306)/db", "user@tcp(host:3306)/db"},
+		{"mariadb", "/db", "/db"},
+		{"sqlite", "/var/lib/gonemaster/gonemaster.db", "/var/lib/gonemaster/gonemaster.db"},
+	} {
+		if got := redactDSN(tc.driver, tc.dsn); got != tc.want {
+			t.Errorf("redactDSN(%q, %q) = %q, want %q", tc.driver, tc.dsn, got, tc.want)
+		}
+	}
+}

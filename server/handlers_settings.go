@@ -197,7 +197,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 	settings := map[string]settingEntry{
 		"listen_addr":                     {Value: cfg.ListenAddr, Source: s.settingSource("listen_addr"), Readonly: true},
 		"db_driver":                       {Value: cfg.Database.Driver, Source: s.settingSource("db_driver"), Readonly: true},
-		"db_dsn":                          {Value: cfg.Database.DSN, Source: s.settingSource("db_dsn"), Readonly: true},
+		"db_dsn":                          {Value: redactDSN(cfg.Database.Driver, cfg.Database.DSN), Source: s.settingSource("db_dsn"), Readonly: true},
 		"profile_path":                    {Value: cfg.ProfilePath, Source: s.settingSource("profile_path"), Readonly: true},
 		"worker_count":                    {Value: cfg.WorkerCount, Source: s.settingSource("worker_count")},
 		"max_concurrent_jobs":             {Value: cfg.MaxConcurrentJobs, Source: s.settingSource("max_concurrent_jobs")},

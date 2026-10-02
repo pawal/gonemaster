@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -219,6 +221,40 @@ func mariadbDSN(dsn string) string {
 		return dsn + "&parseTime=true"
 	}
 	return dsn + "?parseTime=true"
+}
+
+// redactedPassword replaces a password in a redacted DSN.
+const redactedPassword = "xxxxx"
+
+// pgPasswordParam matches a password in a PostgreSQL key=value DSN or URL query.
+var pgPasswordParam = regexp.MustCompile(`(?i)(\b\w*password\s*=\s*)('(?:[^'\\]|\\.)*'|[^\s&]+)`)
+
+// redactDSN masks the password in dsn for display.
+func redactDSN(driver, dsn string) string {
+	switch driver {
+	case "postgres":
+		if u, err := url.Parse(dsn); err == nil && (u.Scheme == "postgres" || u.Scheme == "postgresql") {
+			dsn = u.Redacted()
+		}
+		return pgPasswordParam.ReplaceAllString(dsn, "${1}"+redactedPassword)
+	case "mariadb", "mysql":
+		// user:pass@net(addr)/db, split as the driver does: last '/', then last '@'.
+		slash := strings.LastIndex(dsn, "/")
+		if slash < 0 {
+			return dsn
+		}
+		at := strings.LastIndex(dsn[:slash], "@")
+		if at < 0 {
+			return dsn
+		}
+		colon := strings.Index(dsn[:at], ":")
+		if colon < 0 {
+			return dsn
+		}
+		return dsn[:colon+1] + redactedPassword + dsn[at:]
+	default:
+		return dsn
+	}
 }
 
 // openSQLDBWith is openSQLDB with explicit pool overrides from cfg.

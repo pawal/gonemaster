@@ -822,6 +822,46 @@ func TestDNSSEC02MatchNamesTheValidatingKeytag(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "DS02_DNSKEY_NOT_SIGNED_BY_ANY_DS", "DS02_NO_VALID_DNSKEY_FOR_ANY_DS")
 }
 
+// A truncated DNSKEY answer is a partial RRset, not a missing signature.
+func TestDNSSEC02TruncatedDNSKEYAnswerIsInconclusive(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	key, _ := signedDNSKEYPair(t, "example")
+	ds := key.ToDS(2)
+	if ds == nil {
+		t.Fatal("expected DS from DNSKEY")
+	}
+
+	parentNS := tctest.NS(t, ctx, "ns-parent.example", "192.0.2.48", func(q tctest.Query) packet.Packet {
+		if q.Type != "DS" {
+			return packet.Packet{}
+		}
+		dsCopy := *ds
+		return answerPacket(q.Name, dns.TypeDS, &dsCopy)
+	})
+	childNS := tctest.NS(t, ctx, "ns-child.example", "192.0.2.49", func(q tctest.Query) packet.Packet {
+		if q.Type != "DNSKEY" {
+			return packet.Packet{}
+		}
+		keyCopy := *key
+		p := answerPacket(q.Name, dns.TypeDNSKEY, &keyCopy)
+		p.Msg.Truncated = true
+		p.Protocol = "tcp"
+		return p
+	})
+	dnssec02Wire(t, parentNS, childNS)
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := DNSSEC02(ctx, &z)
+	if err != nil {
+		t.Fatalf("dnssec02: %v", err)
+	}
+
+	if got := tctest.TagsWithPrefix(entries, "DS02_"); len(got) != 0 {
+		t.Fatalf("expected no DS02_ tags from a truncated answer, got %v", got)
+	}
+}
+
 func TestDNSSEC02ParallelChildDNSKEYQueries(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx := tctest.Context(t)

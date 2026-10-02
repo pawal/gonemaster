@@ -9,6 +9,7 @@ serves the admin and public web interfaces.
 |---|---|---|
 | `/` | Trusted operators | Admin UI for jobs, batches, domains, tags, cohorts, and settings. |
 | `/api/v1/` | Trusted clients | Full admin API used by the admin UI, `gonemaster-client`, and scripts. |
+| `/api/v1/mcp` | Trusted clients | Model Context Protocol endpoint for AI agents, served when `mcp_enabled` is on. See [../mcp/server-endpoint.md](../mcp/server-endpoint.md). |
 | `/public/` | Public users | Single-domain public test UI. |
 | `/analysis/` | Public users | Read-only public cohort analysis UI. |
 | `/pub/api/v1/` | Public clients | Restricted API for public jobs, public profiles, and analysis views. |

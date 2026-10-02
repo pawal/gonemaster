@@ -9,6 +9,7 @@ servers:
     description: Local development (API base)
 
 tags:
+  - name: MCP
   - name: Jobs
   - name: Batches
   - name: Domains
@@ -456,6 +457,11 @@ paths:
           schema:
             type: string
           description: Filter by domain name substring.
+        - name: domain_exact
+          in: query
+          schema:
+            type: boolean
+          description: Match `domain` whole instead of as a substring.
         - name: batch
           in: query
           schema:
@@ -1371,6 +1377,30 @@ paths:
         '400':
           $ref: '#/components/responses/ErrorResponse'
 
+  /mcp:
+    post:
+      tags: [MCP]
+      summary: Model Context Protocol endpoint
+      operationId: mcp
+      description: |
+        Serves the gonemaster MCP tools as JSON-RPC 2.0 over Streamable HTTP
+        while the `mcp_enabled` setting is on. In token mode only
+        `Authorization: Bearer` is accepted. The endpoint is stateless: `GET`
+        and `DELETE` return 405. See docs/mcp/server-endpoint.md.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              description: A JSON-RPC 2.0 request, notification, or batch.
+      responses:
+        '200':
+          description: The JSON-RPC response, as `application/json` or `text/event-stream`.
+        '401':
+          description: Token mode without a bearer token.
+        '404':
+          description: The `mcp_enabled` setting is off.
   /metrics:
     get:
       tags: [Ops]
@@ -2837,6 +2867,11 @@ components:
           additionalProperties:
             type: integer
           description: Per-grade count of graduated runs in this batch. Absent when no runs have been scored.
+        worst_levels:
+          type: object
+          additionalProperties:
+            type: integer
+          description: Per-worst-level count of graduated runs in this batch. Absent when no run has one.
         items:
           type: array
           items:

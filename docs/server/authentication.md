@@ -118,6 +118,13 @@ curl -s -o /dev/null -w '%{http_code}\n' -b cookies.txt \
   browser cookie or client still using it gets `401`. There is no session store to
   clear; the cookie simply carries a token the server no longer recognises.
 
+## MCP clients
+
+The MCP endpoint at `POST /api/v1/mcp` uses the same tokens and accepts them
+as `Authorization: Bearer` only; the admin UI cookie is rejected there. The
+stdio bridge `gonemaster-mcp` reads the token from `GONEMASTER_TOKEN`. See
+[../mcp/README.md](../mcp/README.md).
+
 ## Turn auth off
 
 Empty `auth.admin_tokens` (or unset the environment variable) and reload or

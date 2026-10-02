@@ -302,6 +302,11 @@ server {
 `Strict-Transport-Security` belongs at the TLS-terminating proxy. Other common
 security headers are set by the application.
 
+When the MCP endpoint at `/api/v1/mcp` is exposed through the proxy, its
+location needs unbuffered event streams and a long read timeout; see
+[../mcp/server-endpoint.md](../mcp/server-endpoint.md#reverse-proxy) for the
+nginx and Caddy blocks.
+
 ## Caddy Example
 
 Caddy's `reverse_proxy` sets `X-Forwarded-For` automatically. Pair with

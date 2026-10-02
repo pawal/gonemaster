@@ -24,7 +24,8 @@ The engine comes with a small set of tools around it:
 - `gonemaster-nagios` - a Nagios and Icinga plugin that maps finding severities
   to service states.
 - `gonemaster-mcp` - a Model Context Protocol server, so an AI agent can run
-  tests, search and diff runs, and roll up cohort statistics.
+  tests, search and diff runs, and roll up cohort statistics; the server
+  serves the same tools over HTTP.
 
 A public instance runs at <https://gonemaster.evilbit.de/>. Locally, one command
 is enough:
@@ -170,9 +171,10 @@ these doing, and is it getting better?"
 - **Monitoring.** `gonemaster-nagios` puts a domain's delegation health into the
   monitoring system you already run. See
   [nagios](https://pawal.codeberg.page/gonemaster/nagios/).
-- **AI agents.** `gonemaster-mcp` exposes testing and analysis over the Model
-  Context Protocol: submit a test, search and diff runs, roll up failure tags and
-  tag values across a cohort. See
+- **AI agents.** gonemaster exposes testing and analysis over the Model
+  Context Protocol, through the `gonemaster-mcp` bridge or an endpoint in the
+  server: submit a test, search and diff runs, roll up failure tags and tag
+  values across a cohort. See
   [mcp](https://pawal.codeberg.page/gonemaster/mcp/).
 
 ## How it relates to the neighbours

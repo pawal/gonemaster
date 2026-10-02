@@ -327,6 +327,22 @@ runs, for the AS numbers of each result that is opened. Set it to `false` to
 stop these queries. See
 [public-api-and-proxy.md](public-api-and-proxy.md#as-holder-names).
 
+## MCP Settings
+
+```json
+{
+  "mcp_enabled": false,
+  "mcp_allow_write": false
+}
+```
+
+`mcp_enabled` (default `false`) serves the Model Context Protocol tools at
+`POST /api/v1/mcp`, behind the admin token auth. `mcp_allow_write` (default
+`false`) also registers the write tools `batch_enqueue`, `batch_cancel`, and
+`cancel_job`, for every token holder. Both are in the admin UI under
+Settings, MCP, and take effect without a restart. See
+[../mcp/server-endpoint.md](../mcp/server-endpoint.md).
+
 ## Analysis Settings
 
 The `analysis` block holds capture-time and presentation policy for the

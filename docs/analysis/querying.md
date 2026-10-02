@@ -11,7 +11,7 @@ admin API, SQL, or an MCP-capable agent.
 | `gonemaster-client` | Scripted exports, CSV pipelines. |
 | Admin API (`/api/v1/`) | Programmatic integration. |
 | SQL (sqlite / postgres / mariadb) | Ad-hoc joins, JSON arg lookups, large result sets. |
-| MCP (`gonemaster-mcp`) | Agent-driven exploration where the next question depends on the previous answer. See [../mcp/analysis-examples.md](../mcp/analysis-examples.md) and the bridge overview in [../mcp/README.md](../mcp/README.md). |
+| MCP (`gonemaster-mcp` or the server's `/api/v1/mcp`) | Agent-driven exploration where the next question depends on the previous answer. See [../mcp/analysis-examples.md](../mcp/analysis-examples.md) and the overview in [../mcp/README.md](../mcp/README.md). |
 
 ## Choose a Backend
 

@@ -244,8 +244,14 @@ The **--config** file is JSON with optional fields:
       "trusted_proxy_cidrs": ["127.0.0.1/32"],
       "read_timeout": "30s",
       "write_timeout": "60s",
-      "idle_timeout": "60s"
+      "idle_timeout": "60s",
+      "mcp_enabled": false,
+      "mcp_allow_write": false
     }
+
+**mcp_enabled** serves the Model Context Protocol tools at **POST
+/api/v1/mcp**; **mcp_allow_write** adds the write tools. Both default to
+false and can also be changed in the admin UI without a restart.
 
 ## FILES
 

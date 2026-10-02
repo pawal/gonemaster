@@ -1,8 +1,9 @@
 # MCP Analysis Examples
 
-Worked examples of driving gonemaster analysis from an MCP-capable agent.
-Companion to the bridge overview in [README.md](README.md), which covers
-build, configuration, and the full tool list.
+Worked examples of driving gonemaster analysis from an MCP-capable agent,
+through the stdio bridge or the server endpoint alike. Companion to
+[README.md](README.md), which covers the two deployments, and
+[tools.md](tools.md), the tool reference.
 
 The same questions can also be answered with SQL or the admin API; see
 [../analysis/querying.md](../analysis/querying.md) for those paths. MCP is
@@ -74,6 +75,14 @@ Feed the resulting `batch_id` into the cohort tools below.
 
 `batch_list` with no `label` lists the most recent batches across all tags.
 
+Three more discovery tools name the inputs other tools take:
+`domain_tag_list` lists the user domain tags that batches are built from
+(the `from_tag` of `batch_enqueue`), `profile_list` lists the test
+profiles (`profile_id` for `test_domain`, `profile` for `batch_enqueue`),
+and `cohort_list` lists the analysis cohorts and their snapshot slugs for
+`cohort_report`. User domain tags are unrelated to the finding tags that
+`failures_by_tag` ranks.
+
 ## Cohort Grade and Severity Distribution
 
 Goal: summarise quality across a completed batch.
@@ -98,10 +107,13 @@ failures_by_tag(
 )
 ```
 
-Returns tag names ranked by count, with three example domains per tag and
-the worst level seen for that tag. Use `severity_min="WARNING"` for the
-broader picture; `severity_min="ERROR"` narrows to the failures most worth
-acting on.
+Returns tag names ranked by `count`, the number of domains carrying the
+tag, with `entries` (the raw log entry count, higher when a tag fires once
+per nameserver), three example domains per tag, and the worst level seen.
+The scan runs from `CRITICAL` down, so when it hits its cap the severe
+levels are complete and `capped_at_level` names the one that was cut. Use
+`severity_min="WARNING"` for the broader picture; `severity_min="ERROR"`
+narrows to the failures most worth acting on.
 
 ## Operator / ASN Concentration
 
@@ -152,8 +164,8 @@ one operator. The model is documented in
 [../analysis/cohort-report.md](../analysis/cohort-report.md).
 
 Snapshots are captured per batch, so this is also how two batches of a
-cohort compare. `batch_list` does not give snapshot slugs; call
-`cohort_report` without them and it resolves the newest pair.
+cohort compare. `cohort_list(dataset_tag=...)` gives the snapshot slugs;
+`cohort_report` called without them resolves the newest pair.
 
 ## Follow a Finding to the Affected Runs
 
@@ -162,12 +174,14 @@ like?
 
 ```
 run_search(tag="SAME_IP_ADDRESS", level="ERROR", limit=20)
-run_get(run_id="job_1780476907230635262_134")
+run_get(id="job_1780476907230635262_134", min_level="WARNING")
 ```
 
 `run_search` filters completed runs by domain, tag, status, severity,
 grade, or finish-time range; `run_get` fetches one run's full result
-(per-testcase findings, per-nameserver response times, score breakdown).
+(per-testcase findings, per-nameserver response times, score). Without
+`min_level` every stored entry comes back, `INFO` included; with it only
+the issues do, and `level_counts` still shows the whole distribution.
 
 Each result row from `run_search`, `run_get`, and `latest_for` includes a
 `batch_id` (empty for ad-hoc runs) and a `public_id`. Build a shareable
@@ -179,8 +193,11 @@ Goal: did anything change between the last two test runs of a domain?
 
 ```
 latest_for(domain="example.se", limit=2)
-run_diff(run_id_a="<older>", run_id_b="<newer>")
+run_diff(run_a="<older>", run_b="<newer>")
 ```
+
+`latest_for` matches the domain whole, so `example.se` never returns
+`myexample.se`; `run_search` matches substrings unless `exact=true`.
 
 `run_diff` returns tag-level deltas (added, removed, severity-changed),
 which is the right granularity for "did this regression appear today, or
@@ -191,11 +208,13 @@ was it already there".
 Goal: re-run a single domain now and read the result.
 
 ```
-test_domain(domain="example.se")
+test_domain(domain="example.se", min_level="NOTICE")
 ```
 
 Synchronous: blocks until the engine finishes, returns grade, score,
-findings, and per-nameserver response times. No batch needed.
+findings, and per-nameserver response times. No batch needed. A client
+that passes a progress token sees the run's progress while it waits. Pass
+`profile_id` from `profile_list` to test with another profile.
 
 ## Inspect a Testcase
 
@@ -226,4 +245,5 @@ result into "what is gonemaster actually checking here".
   question depends on the previous answer.
 - **Calling write tools without enabling them.** `batch_enqueue`,
   `batch_cancel`, and `cancel_job` register only when
-  `GONEMASTER_MCP_ALLOW_WRITE=1` is set on the bridge.
+  `GONEMASTER_MCP_ALLOW_WRITE=1` is set on the bridge or `mcp_allow_write`
+  is on in the server.

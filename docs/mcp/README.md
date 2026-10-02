@@ -1,147 +1,108 @@
-# Gonemaster MCP Bridge
+# gonemaster and MCP
 
-`gonemaster-mcp` exposes `gonemaster-server`'s admin API to Model Context
-Protocol (MCP) clients as a set of tools. It speaks stdio MCP and forwards
-requests to the server over HTTP; it does not run the engine itself.
+gonemaster exposes its testing and analysis tools to AI agents over the
+Model Context Protocol (MCP). A connected agent can run a test, read and
+search stored runs, diff two runs, and roll up a batch: the grade
+distribution, the tags driving failures, the values an argument takes
+across a cohort, and a classified comparison of two cohort snapshots. The
+tools call the admin API of `gonemaster-server`; they run no engine of their
+own.
 
-Any MCP-compatible client or agent framework can drive it, for example Claude
-Code, Cursor, Cline, Zed, or a custom agent built on an MCP SDK. The client
-launches the bridge as a subprocess and talks to it over stdin/stdout.
+The same 17 read tools and 3 write tools are served two ways:
 
-## Build
+| | `gonemaster-mcp`, the stdio bridge | `gonemaster-server`, the HTTP endpoint |
+|---|---|---|
+| Runs | on the client host, as a subprocess the MCP client launches | inside `gonemaster-server`, at `POST /api/v1/mcp` |
+| Transport | stdio | Streamable HTTP |
+| Authentication | `GONEMASTER_TOKEN` in the bridge's environment | `Authorization: Bearer` on every request, with the same admin tokens |
+| Write tools | `GONEMASTER_MCP_ALLOW_WRITE=1` on the bridge | the `mcp_allow_write` setting |
+| Fits | one operator's machine; clients that speak stdio only | a shared server, several agents, no binary on the client host |
 
-```
-make build-gonemaster-mcp     # builds bin/gonemaster-mcp
-```
+- [server-endpoint.md](server-endpoint.md): enabling and operating the endpoint.
+- [clients.md](clients.md): configuration for Claude Code, Claude Desktop, Cursor, VS Code, Zed, and SDKs.
+- [tools.md](tools.md): every tool with its inputs, defaults, caps, and outputs.
+- [analysis-examples.md](analysis-examples.md): worked analysis sessions.
 
-Or install it onto your PATH:
+## Quick start: the server endpoint
 
-```
-make install-gonemaster-mcp
-```
+1. Put the server in token mode and mint a token; see
+   [../server/authentication.md](../server/authentication.md).
+2. Enable the endpoint. In the config file:
+   ```json
+   { "mcp_enabled": true }
+   ```
+   or in the admin UI, Settings, MCP, "MCP endpoint".
+3. Register it with the client, here Claude Code:
+   ```
+   claude mcp add --transport http gonemaster https://dns.example.com/api/v1/mcp \
+     --header "Authorization: Bearer gm_your_token_here"
+   ```
+4. Ask the agent to call `ping`. It reports `reachable: true`,
+   `auth_mode: token`, `authenticated: true`.
 
-## Configuration
+## Quick start: the stdio bridge
 
-The MCP client launches the bridge as a subprocess and passes configuration
-through environment variables. The only command-line flags are `--help` (`-h`)
-and `--version` (`-v`), which print and exit:
+1. Build or install the binary:
+   ```
+   make build-gonemaster-mcp        # bin/gonemaster-mcp
+   make install-gonemaster-mcp      # onto PATH
+   ```
+   Packaged installs place it at `/usr/bin/gonemaster-mcp`.
+2. Register it with the client, here Claude Code:
+   ```
+   claude mcp add gonemaster \
+     -e GONEMASTER_URL=https://dns.example.com \
+     -e GONEMASTER_TOKEN=gm_your_token_here \
+     -- /path/to/gonemaster-mcp
+   ```
+   Omit `GONEMASTER_TOKEN` against a server in open mode.
+3. Ask the agent to call `ping`.
+
+## Bridge configuration
+
+The MCP client launches `gonemaster-mcp` and passes its configuration
+through environment variables. The only command-line flags are `--help`
+(`-h`) and `--version` (`-v`), which print and exit.
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `GONEMASTER_URL` | `http://localhost:8080/api/v1` | Base URL of the gonemaster-server admin API. A bare host or origin is accepted; the `/api/v1` suffix is added automatically. |
-| `GONEMASTER_TOKEN` | (unset) | Admin token sent as `Authorization: Bearer`. Leave unset for an open-mode server. |
-| `GONEMASTER_MCP_ALLOW_WRITE` | (unset) | Set to `1` to register the mutating tools (`batch_enqueue`, `batch_cancel`, `cancel_job`). Unset by default, so a default install is read + `test_domain` only. |
+| `GONEMASTER_URL` | `http://localhost:8080/api/v1` | Base URL of the admin API. A bare host or origin is accepted; `/api/v1` is appended. |
+| `GONEMASTER_TOKEN` | unset | Admin token sent as `Authorization: Bearer`. Unset works against an open-mode server. |
+| `GONEMASTER_MCP_ALLOW_WRITE` | unset | `1`, `true`, `yes`, or `on` registers `batch_enqueue`, `batch_cancel`, and `cancel_job`. |
 
-The bridge writes logs to stderr; stdout carries only the MCP protocol.
+The bridge logs to stderr; stdout carries only the protocol.
 
-## Authentication
+## Verifying a connection
 
-The bridge mirrors `gonemaster-client`: when `GONEMASTER_TOKEN` is set it sends
-`Authorization: Bearer <token>` on every request; when it is unset it sends no
-credential, which works against a server running in open mode. If the server is
-in token mode and the token is missing or wrong, every call returns `401`. Mint
-a token with `gonemaster-server auth add-token`; see
-[../server/authentication.md](../server/authentication.md).
+`ping` is the smoke test for either deployment.
 
-## Connecting a client
-
-The configuration is the same shape everywhere: a command to run and an `env`
-block. Point `command` at the built binary.
-
-### Claude Code
-
-```
-claude mcp add gonemaster \
-  -e GONEMASTER_URL=http://localhost:8080 \
-  -e GONEMASTER_TOKEN=gm_your_token_here \
-  -- /path/to/gonemaster-mcp
-```
-
-### Claude Desktop
-
-Add an entry under `mcpServers` in `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "gonemaster": {
-      "command": "/path/to/gonemaster-mcp",
-      "env": {
-        "GONEMASTER_URL": "http://localhost:8080",
-        "GONEMASTER_TOKEN": "gm_your_token_here"
-      }
-    }
-  }
-}
-```
-
-Omit `GONEMASTER_TOKEN` when the server runs in open mode.
-
-## Tools
-
-Read tools (always available):
-
-| Tool | Purpose |
+| Result | Meaning |
 |---|---|
-| `ping` | Check connectivity and report the server's auth mode and whether the bridge is authenticated. |
-| `test_domain` | Run a DNS test for a domain and wait for the result: grade, score, findings, and per-nameserver response times. |
-| `run_get` | Fetch a stored run's result by id (grade, score, findings, nameserver response times). |
-| `latest_for` | List a domain's most recent completed runs. |
-| `run_search` | Search completed runs by domain, tag, status, severity, grade, or finish-time range. |
-| `run_diff` | Compare two runs at the tag level (added / removed / severity-changed). |
-| `spec_list_testcases` | List implemented testcases, optionally filtered to one module. `excluded` marks a testcase the server never runs. |
-| `spec_get_testcase` | Get a testcase's module, description, `excluded` flag, and the tags it can emit with rendered messages. |
-| `batch_list` | List recent batches (cohort runs), newest first, with status and completion; optional `label` tag-substring filter. |
-| `batch_get` | Poll a batch: total, per-status counts, and completion. |
-| `cohort_stats` | Grade and worst-severity distribution across a batch's runs. |
-| `cohort_tag_values` | Roll up the values a tag's argument takes across a batch (by count, or by mean score with `weight_by_score`), with sample domains. |
-| `failures_by_tag` | Rank the tags driving failures in a batch, with example domains. |
-| `cohort_report` | Compare two snapshots of an analysis cohort, classifying every change as engine-driven or real, with movers and clusters. |
+| `reachable: true`, `auth_mode: open`, `authenticated: true` | Open-mode server, no token needed. |
+| `reachable: true`, `auth_mode: token`, `authenticated: true` | Token accepted. |
+| `reachable: true`, `auth_mode: token`, `authenticated: false` | Token missing or wrong. The detail names the fix. |
+| `reachable: false`, detail "answered http 404" | Something answered at the URL, but it is not a gonemaster admin API. |
+| `reachable: false`, detail "unreachable" | Nothing answered: wrong host or port, or the server is down. |
 
-`cohort_tag_values` is the generic primitive for "what values does argument
-`<arg>` of tag `<tag>` take across this batch?". The `(tag, arg)` pair comes
-from the [log-args inventory](../specifications/log-args-inventory.json); use
-`spec_list_testcases` and `spec_get_testcase` to discover a module's tags. To
-rank the operators behind a batch by mean score, call it with
-`tag=IPV4_ONE_ASN`, `arg=asn`, `weight_by_score=true`; to also fold in ASNs that
-appear only in the `*_DIFFERENT_ASN` / `*_SAME_ASN` tags, call those tags too
-and union client-side.
+## The tools in brief
 
-`cohort_report` answers "did the cohort get worse, or did the engine start
-looking harder?". Each tag row is classified `new_in_engine`,
-`removed_from_engine`, `level_reclassified`, `cohort_change` or `unknown`,
-and each moving domain rolls up to `real`, `measurement`, `mixed` or
-`unknown`. Called with no arguments it compares the two newest snapshots of
-the default public cohort. Snapshots are captured per batch, so it is also
-the batch-to-batch comparison for a cohort under analysis.
+Read tools, always registered: `ping`, `test_domain`, `run_get`,
+`latest_for`, `run_search`, `run_diff`, `spec_list_testcases`,
+`spec_get_testcase`, `profile_list`, `domain_tag_list`, `cohort_list`,
+`batch_list`, `batch_get`, `cohort_stats`, `failures_by_tag`,
+`cohort_tag_values`, `cohort_report`.
 
-`run_get`, `run_search`, and `latest_for` include a `batch_id` field, so an
-agent can pivot from a known run to the batch (cohort) it belongs to. It is
-empty for ad-hoc single-domain runs.
+Write tools, registered only when enabled: `batch_enqueue`, `batch_cancel`,
+`cancel_job`.
 
-The same tools include a `public_id` field. Build a shareable public report
-link as `https://<host>/#/result/<public_id>`. It is empty for runs that have
-no public id.
-
-Write tools (registered only when `GONEMASTER_MCP_ALLOW_WRITE=1`):
-
-| Tool | Purpose |
-|---|---|
-| `batch_enqueue` | Enqueue a batch of domain tests (by `domains` or `from_tag`); returns a batch id to poll. |
-| `batch_cancel` | Cancel a batch's in-flight jobs and remove the batch. |
-| `cancel_job` | Cancel a single queued or running job. |
-
-## Verifying the connection
-
-After configuring the client, call the `ping` tool. A healthy open-mode setup
-reports `reachable: true` and `auth_mode: open`. In token mode a correct token
-reports `authenticated: true`; a missing or wrong token reports
-`authenticated: false` with a hint to set `GONEMASTER_TOKEN`.
+Every tool carries MCP annotations, so a client can tell a read from a
+write and a destructive write from an additive one before it asks the user
+for confirmation. `test_domain` reports progress while a run executes.
+[tools.md](tools.md) has the full reference.
 
 ## See also
 
-- [analysis-examples.md](analysis-examples.md) - worked examples driving
-  cohort discovery, failure-tag ranking, and ASN concentration analysis
-  through the read tools.
-- [../analysis/querying.md](../analysis/querying.md) - the same questions
-  answered through `gonemaster-client`, the admin API, and SQL.
+- [../analysis/querying.md](../analysis/querying.md): the same questions
+  through `gonemaster-client`, the admin API, and SQL.
+- [../server/authentication.md](../server/authentication.md): minting and
+  installing admin tokens.

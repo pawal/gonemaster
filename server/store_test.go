@@ -713,3 +713,19 @@ func TestInMemoryJobStoreConcurrentBasic(t *testing.T) {
 	default:
 	}
 }
+
+func TestListRunsDomainExact(t *testing.T) {
+	forEachStore(t, func(t *testing.T, store JobStore) {
+		seedGraduatedRun(t, store, runSpec{ID: "r_exact", Domain: "example.se"})
+		seedGraduatedRun(t, store, runSpec{ID: "r_super", Domain: "myexample.se"})
+
+		list := store.ListRuns(RunFilter{Domain: "Example.SE", DomainExact: true, Limit: 10})
+		if list.Total != 1 || list.Items[0].ID != "r_exact" {
+			t.Fatalf("exact domain filter: expected r_exact, got %v", list.Items)
+		}
+		list = store.ListRuns(RunFilter{Domain: "example.se", Limit: 10})
+		if list.Total != 2 {
+			t.Fatalf("substring domain filter: expected 2, got %d", list.Total)
+		}
+	})
+}

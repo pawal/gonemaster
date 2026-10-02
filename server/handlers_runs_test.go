@@ -335,3 +335,18 @@ func TestGetRunOmitsScoreWhenAdminScoringDisabled(t *testing.T) {
 		t.Fatal("expected Score/Grade to be nil when ShowScoreAdmin=false")
 	}
 }
+
+func TestListRunsFilterByDomainExact(t *testing.T) {
+	srv := newTestServer(t)
+	makeGraduatedJob(t, srv, "example.se", JobSucceeded)
+	makeGraduatedJob(t, srv, "myexample.se", JobSucceeded)
+
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/runs?domain=example.se&domain_exact=1", nil)
+	list := mustJSON[RunList](t, resp, http.StatusOK)
+	if list.Total != 1 {
+		t.Fatalf("expected total=1, got %d", list.Total)
+	}
+	if list.Items[0].Domain != "example.se" {
+		t.Fatalf("expected domain=example.se, got %q", list.Items[0].Domain)
+	}
+}

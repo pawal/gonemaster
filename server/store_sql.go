@@ -1551,7 +1551,9 @@ func (s *SQLJobStore) ListRuns(filter RunFilter) RunList {
 	if filter.EntryTag != "" {
 		conds = append(conds, "EXISTS (SELECT 1 FROM entries e WHERE e.run_id = runs.id AND e.tag = "+addArg(filter.EntryTag)+")")
 	}
-	if filter.Domain != "" {
+	if filter.Domain != "" && filter.DomainExact {
+		conds = append(conds, "LOWER(domain) = "+addArg(strings.ToLower(filter.Domain)))
+	} else if filter.Domain != "" {
 		conds = append(conds, "LOWER(domain) LIKE "+addArg("%"+strings.ToLower(filter.Domain)+"%"))
 	}
 	if filter.BatchID != "" {

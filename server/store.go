@@ -1016,6 +1016,15 @@ func runStartTime(r Run) time.Time {
 	return r.CreatedAt
 }
 
+// matchDomain compares case-insensitively, whole or as a substring.
+func matchDomain(domain, want string, exact bool) bool {
+	domain, want = strings.ToLower(domain), strings.ToLower(want)
+	if exact {
+		return domain == want
+	}
+	return strings.Contains(domain, want)
+}
+
 func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 	s.mu.RLock()
 	snapshot := make([]Run, 0, len(s.runs))
@@ -1060,7 +1069,7 @@ func (s *InMemoryJobStore) ListRuns(filter RunFilter) RunList {
 				continue
 			}
 		}
-		if filter.Domain != "" && !strings.Contains(strings.ToLower(r.Domain), strings.ToLower(filter.Domain)) {
+		if filter.Domain != "" && !matchDomain(r.Domain, filter.Domain, filter.DomainExact) {
 			continue
 		}
 		if filter.BatchID != "" && r.BatchID != filter.BatchID {

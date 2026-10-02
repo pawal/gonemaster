@@ -760,6 +760,7 @@ type DomainFilter struct {
 type RunFilter struct {
 	DomainID       int64
 	Domain         string
+	DomainExact    bool // match Domain whole, not as a substring
 	BatchID        string
 	Tag            string // domain tag (join via domain_tags)
 	EntryTag       string // log event tag (presence in entries)

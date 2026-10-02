@@ -671,3 +671,15 @@ func TestWriterWrappersUnwrap(t *testing.T) {
 		t.Fatal("text/plain must stay compressible")
 	}
 }
+
+func TestSecurityHeadersPageCSPsPinBaseAndFormTargets(t *testing.T) {
+	srv := newTestServer(t)
+	for _, path := range []string{"/", "/public/", "/analysis/"} {
+		csp := doJSON(t, srv, http.MethodGet, path, nil).Header().Get("Content-Security-Policy")
+		for _, want := range []string{"base-uri 'self'", "form-action 'self'"} {
+			if !strings.Contains(csp, want) {
+				t.Errorf("%s: CSP missing %q, got %q", path, want, csp)
+			}
+		}
+	}
+}

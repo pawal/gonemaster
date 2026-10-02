@@ -25,6 +25,9 @@ var (
 
 const maxTestTimeout = 600 * time.Second
 
+// maxRunsLimit is the server's cap on a list limit.
+const maxRunsLimit = 500
+
 type finding struct {
 	Tag      string `json:"tag" jsonschema:"the testcase message tag, e.g. SOATIME"`
 	Level    string `json:"level" jsonschema:"severity: DEBUG, INFO, NOTICE, WARNING, ERROR, or CRITICAL"`
@@ -34,17 +37,18 @@ type finding struct {
 }
 
 type testResult struct {
-	Domain            string     `json:"domain"`
-	RunID             string     `json:"run_id,omitempty" jsonschema:"the run/job id; pass to run_get"`
-	BatchID           string     `json:"batch_id,omitempty" jsonschema:"the batch this run belongs to; empty for ad-hoc single-domain runs"`
-	PublicID          string     `json:"public_id,omitempty" jsonschema:"the public report id; build a shareable link as /#/result/<public_id>"`
-	Status            string     `json:"status" jsonschema:"succeeded, failed, canceled, or expired"`
-	Grade             string     `json:"grade,omitempty" jsonschema:"letter grade A+ to F when scoring is available"`
-	Score             *int       `json:"score,omitempty" jsonschema:"numeric score 0-100 when scoring is available"`
-	DurationMs        int64      `json:"duration_ms,omitempty"`
-	Findings          []finding  `json:"findings" jsonschema:"all log entries; filter by level for issues"`
-	NameserverTimings []nsTiming `json:"nameserver_timings,omitempty" jsonschema:"per-nameserver query response-time statistics, in milliseconds"`
-	Error             string     `json:"error,omitempty" jsonschema:"failure reason when status is not succeeded"`
+	Domain            string         `json:"domain"`
+	RunID             string         `json:"run_id,omitempty" jsonschema:"the run/job id; pass to run_get"`
+	BatchID           string         `json:"batch_id,omitempty" jsonschema:"the batch this run belongs to; empty for ad-hoc single-domain runs"`
+	PublicID          string         `json:"public_id,omitempty" jsonschema:"the public report id; build a shareable link as /#/result/<public_id>"`
+	Status            string         `json:"status" jsonschema:"succeeded, failed, canceled, or expired"`
+	Grade             string         `json:"grade,omitempty" jsonschema:"letter grade A+ to F when scoring is available"`
+	Score             *int           `json:"score,omitempty" jsonschema:"numeric score 0-100 when scoring is available"`
+	DurationMs        int64          `json:"duration_ms,omitempty"`
+	Findings          []finding      `json:"findings" jsonschema:"stored log entries at or above min_level; filter by level for issues"`
+	LevelCounts       map[string]int `json:"level_counts,omitempty" jsonschema:"stored entries per severity level, before min_level"`
+	NameserverTimings []nsTiming     `json:"nameserver_timings,omitempty" jsonschema:"per-nameserver query response-time statistics, in milliseconds"`
+	Error             string         `json:"error,omitempty" jsonschema:"failure reason when status is not succeeded"`
 }
 
 type nsTiming struct {
@@ -66,18 +70,25 @@ func registerReadTools(srv *mcp.Server, api *apiClient) {
 
 type testDomainInput struct {
 	Domain         string `json:"domain" jsonschema:"the domain name to test, e.g. example.com"`
-	ProfileID      int64  `json:"profile_id,omitempty" jsonschema:"optional test profile id; omit for the default profile"`
+	ProfileID      int64  `json:"profile_id,omitempty" jsonschema:"optional test profile id (see profile_list); omit for the default profile"`
 	TimeoutSeconds int    `json:"timeout_seconds,omitempty" jsonschema:"max seconds to wait for the test (default 120, max 600)"`
+	Lang           string `json:"lang,omitempty" jsonschema:"language for rendered messages (default en)"`
+	MinLevel       string `json:"min_level,omitempty" jsonschema:"lowest severity to include in findings, e.g. NOTICE; omit for every stored level"`
 }
 
 func registerTestDomain(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "test_domain",
 		Description: "Run a DNS test for a domain and wait for the result. Returns grade, score, findings, and per-nameserver response times.",
-	}, func(ctx context.Context, _ *mcp.CallToolRequest, in testDomainInput) (*mcp.CallToolResult, testResult, error) {
+		Annotations: writeHint("Test a domain", false, true),
+	}, func(ctx context.Context, req *mcp.CallToolRequest, in testDomainInput) (*mcp.CallToolResult, testResult, error) {
 		domain := strings.TrimSpace(in.Domain)
 		if domain == "" {
 			return nil, testResult{}, errors.New("domain is required")
+		}
+		minLevel, err := parseMinLevel(in.MinLevel)
+		if err != nil {
+			return nil, testResult{}, err
 		}
 		timeout := defaultTestTimeout
 		if in.TimeoutSeconds > 0 {
@@ -87,15 +98,16 @@ func registerTestDomain(srv *mcp.Server, api *apiClient) {
 			}
 		}
 
-		req := createJobRequest{Domain: domain}
+		createReq := createJobRequest{Domain: domain}
 		if in.ProfileID > 0 {
-			req.ProfileID = &in.ProfileID
+			createReq.ProfileID = &in.ProfileID
 		}
-		job, err := api.createJob(ctx, req)
+		job, err := api.createJob(ctx, createReq)
 		if err != nil {
 			return nil, testResult{}, toolError("submit test", err)
 		}
 
+		token := req.Params.GetProgressToken()
 		pollCtx, cancel := context.WithTimeout(ctx, timeout)
 		defer cancel()
 		for !terminalStatuses[job.Status] {
@@ -113,46 +125,63 @@ func registerTestDomain(srv *mcp.Server, api *apiClient) {
 				}
 				return nil, testResult{}, toolError("poll job", err)
 			}
+			if token != nil && next.Progress != job.Progress {
+				notifyProgress(ctx, req.Session, token, next)
+			}
 			job = next
 		}
 
-		out := testResult{Domain: domain, RunID: job.ID, Status: job.Status, DurationMs: durationMs(job), Error: job.Error, Findings: []finding{}}
-		fillResult(ctx, api, job.ID, "en", &out)
+		out := testResult{Domain: domain, RunID: job.ID, BatchID: job.BatchID, PublicID: job.PublicID, Status: job.Status, DurationMs: durationMs(job), Error: job.Error, Findings: []finding{}}
+		if err := fillResult(ctx, api, job.ID, langOrDefault(in.Lang), minLevel, &out); err != nil {
+			return nil, testResult{}, toolError("get result", err)
+		}
 		return nil, out, nil
 	})
 }
 
+// notifyProgress forwards the job's percent to a client that asked for it.
+func notifyProgress(ctx context.Context, s *mcp.ServerSession, token any, job jobView) {
+	if s == nil {
+		return
+	}
+	_ = s.NotifyProgress(ctx, &mcp.ProgressNotificationParams{ProgressToken: token, Progress: float64(job.Progress), Total: 100, Message: job.Status})
+}
+
 type runGetInput struct {
-	ID   string `json:"id" jsonschema:"the run or job id"`
-	Lang string `json:"lang,omitempty" jsonschema:"language for rendered messages (default en)"`
+	ID       string `json:"id" jsonschema:"the run or job id"`
+	Lang     string `json:"lang,omitempty" jsonschema:"language for rendered messages (default en)"`
+	MinLevel string `json:"min_level,omitempty" jsonschema:"lowest severity to include in findings, e.g. NOTICE; omit for every stored level"`
 }
 
 func registerRunGet(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_get",
 		Description: "Fetch a stored run's result by id: grade, score, findings, and per-nameserver response times.",
+		Annotations: readOnly("Get a run"),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runGetInput) (*mcp.CallToolResult, testResult, error) {
 		id := strings.TrimSpace(in.ID)
 		if id == "" {
 			return nil, testResult{}, errors.New("id is required")
 		}
-		lang := strings.TrimSpace(in.Lang)
-		if lang == "" {
-			lang = "en"
+		minLevel, err := parseMinLevel(in.MinLevel)
+		if err != nil {
+			return nil, testResult{}, err
 		}
 		run, err := api.getRun(ctx, id)
 		if err != nil {
 			return nil, testResult{}, toolError("get run", err)
 		}
 		out := testResult{Domain: run.Domain, RunID: run.ID, BatchID: run.BatchID, PublicID: run.PublicID, Status: run.Status, DurationMs: run.DurationMs, Error: run.Error, Findings: []finding{}}
-		fillResult(ctx, api, id, lang, &out)
+		if err := fillResult(ctx, api, id, langOrDefault(in.Lang), minLevel, &out); err != nil {
+			return nil, testResult{}, toolError("get result", err)
+		}
 		return nil, out, nil
 	})
 }
 
 type latestForInput struct {
-	Domain string `json:"domain" jsonschema:"the domain name"`
-	Limit  int    `json:"limit,omitempty" jsonschema:"max runs to return (default 5)"`
+	Domain string `json:"domain" jsonschema:"the domain name, matched exactly"`
+	Limit  int    `json:"limit,omitempty" jsonschema:"max runs to return (default 5, max 500)"`
 }
 
 type runSummary struct {
@@ -177,17 +206,14 @@ type latestForOutput struct {
 func registerLatestFor(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "latest_for",
-		Description: "List the most recent completed runs for a domain, newest first.",
+		Description: "List the most recent completed runs for a domain, newest first. The domain is matched exactly; use run_search for substrings.",
+		Annotations: readOnly("Latest runs for a domain"),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in latestForInput) (*mcp.CallToolResult, latestForOutput, error) {
 		domain := strings.TrimSpace(in.Domain)
 		if domain == "" {
 			return nil, latestForOutput{}, errors.New("domain is required")
 		}
-		limit := in.Limit
-		if limit <= 0 {
-			limit = 5
-		}
-		list, err := api.listRuns(ctx, domain, limit)
+		list, err := api.listRuns(ctx, domain, clampLimit(in.Limit, 5, maxRunsLimit))
 		if err != nil {
 			return nil, latestForOutput{}, toolError("list runs", err)
 		}
@@ -212,13 +238,15 @@ func toRunSummary(r runView) runSummary {
 	return rs
 }
 
-// fillResult fetches a run's result and fills grade, score, and findings into
-// out. A missing result body (e.g. a job that failed before producing entries)
-// is not fatal: out keeps its status and error.
-func fillResult(ctx context.Context, api *apiClient, id, lang string, out *testResult) {
+// fillResult adds grade, findings and timings to out; a 404 leaves out as it is.
+func fillResult(ctx context.Context, api *apiClient, id, lang, minLevel string, out *testResult) error {
 	res, err := api.getResult(ctx, id, lang)
 	if err != nil {
-		return
+		var he *httpError
+		if errors.As(err, &he) && he.status == 404 {
+			return nil
+		}
+		return err
 	}
 	if res.Score != nil {
 		out.Grade = res.Score.Grade
@@ -226,9 +254,15 @@ func fillResult(ctx context.Context, api *apiClient, id, lang string, out *testR
 		out.Score = &score
 	}
 	if res.Raw != nil {
+		counts := map[string]int{}
 		for _, e := range res.Raw.Entries {
+			counts[e.Level]++
+			if levelRank[e.Level] < levelRank[minLevel] {
+				continue
+			}
 			out.Findings = append(out.Findings, finding{Tag: e.Tag, Level: e.Level, Module: e.Module, Testcase: e.Testcase, Message: e.Message})
 		}
+		out.LevelCounts = counts
 	}
 	for _, t := range res.NameserverTimings {
 		out.NameserverTimings = append(out.NameserverTimings, nsTiming{
@@ -237,6 +271,37 @@ func fillResult(ctx context.Context, api *apiClient, id, lang string, out *testR
 			Count: t.Count, Status: t.Status,
 		})
 	}
+	return nil
+}
+
+// parseMinLevel validates an optional severity floor.
+func parseMinLevel(s string) (string, error) {
+	s = strings.ToUpper(strings.TrimSpace(s))
+	if s == "" {
+		return "", nil
+	}
+	if _, ok := levelRank[s]; !ok {
+		return "", errors.New("min_level must be one of DEBUG, INFO, NOTICE, WARNING, ERROR, CRITICAL")
+	}
+	return s, nil
+}
+
+func langOrDefault(lang string) string {
+	if lang = strings.TrimSpace(lang); lang != "" {
+		return lang
+	}
+	return "en"
+}
+
+// clampLimit applies the default and the server's cap.
+func clampLimit(v, def, ceiling int) int {
+	if v <= 0 {
+		return def
+	}
+	if v > ceiling {
+		return ceiling
+	}
+	return v
 }
 
 func pollTimeout(timeout time.Duration, domain string, j jobView) error {

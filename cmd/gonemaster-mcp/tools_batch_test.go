@@ -208,3 +208,88 @@ func TestFailuresByTagSeverityFloor(t *testing.T) {
 		t.Errorf("ERROR floor should keep only DNSSEC09, got %+v", out.Tags)
 	}
 }
+
+func TestCohortStatsUsesWorstLevelsFromSummary(t *testing.T) {
+	var requests []string
+	api := fakeAPI(t, apitest.Opts{
+		RunsRequests: &requests,
+		Batch:        &apitest.BatchSummary{BatchID: "b1", Total: 1437, Grades: map[string]int{"A": 1000}, WorstLevels: map[string]int{"WARNING": 400, "INFO": 1037}},
+	})
+	var out cohortStatsOutput
+	res := callTool(t, api, "cohort_stats", map[string]any{"batch_id": "b1"}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	if out.Total != 1437 || out.WorstLevels["WARNING"] != 400 {
+		t.Errorf("stats wrong: %+v", out)
+	}
+	if len(requests) != 0 {
+		t.Errorf("expected no run paging when worst_levels is present, got %d requests", len(requests))
+	}
+}
+
+func TestFailuresByTagScansMostSevereFirstAndCountsDomains(t *testing.T) {
+	var levels []string
+	api := fakeAPI(t, apitest.Opts{EntriesLevels: &levels, Entries: []apitest.EntryRecord{
+		{Domain: "a.example", Tag: "SOATIME", Level: "WARNING"},
+		{Domain: "a.example", Tag: "SOATIME", Level: "WARNING"},
+		{Domain: "b.example", Tag: "DNSSEC09", Level: "ERROR"},
+	}})
+	var out failuresByTagOutput
+	res := callTool(t, api, "failures_by_tag", map[string]any{"batch_id": "b1"}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	if len(levels) != 3 || levels[0] != "CRITICAL" || levels[1] != "ERROR" || levels[2] != "WARNING" {
+		t.Errorf("scan order = %v, want CRITICAL, ERROR, WARNING", levels)
+	}
+	if len(out.Tags) != 2 {
+		t.Fatalf("tags = %+v", out.Tags)
+	}
+	for _, tg := range out.Tags {
+		if tg.Tag == "SOATIME" && (tg.Count != 1 || tg.Entries != 2) {
+			t.Errorf("SOATIME count/entries = %d/%d, want 1/2", tg.Count, tg.Entries)
+		}
+	}
+	if out.Tags[0].Entries < out.Tags[1].Entries {
+		t.Errorf("equal domain counts must rank by entries: %+v", out.Tags)
+	}
+}
+
+func TestFailuresByTagCapNamesTheLevel(t *testing.T) {
+	orig := maxFailureEntries
+	maxFailureEntries = 2
+	defer func() { maxFailureEntries = orig }()
+	api := fakeAPI(t, apitest.Opts{Entries: []apitest.EntryRecord{
+		{Domain: "a.example", Tag: "SOATIME", Level: "WARNING"},
+		{Domain: "b.example", Tag: "SOATIME", Level: "WARNING"},
+		{Domain: "c.example", Tag: "SOATIME", Level: "WARNING"},
+		{Domain: "d.example", Tag: "NS01", Level: "NOTICE"},
+	}})
+	var out failuresByTagOutput
+	callTool(t, api, "failures_by_tag", map[string]any{"batch_id": "b1", "severity_min": "NOTICE"}, &out)
+	if !out.Capped || out.CappedAtLevel != "NOTICE" {
+		t.Errorf("capped=%v at %q, want true at NOTICE", out.Capped, out.CappedAtLevel)
+	}
+	if len(out.Tags) != 1 || out.Tags[0].Tag != "SOATIME" || out.Tags[0].Count != 3 {
+		t.Errorf("WARNING must be complete before the cap: %+v", out.Tags)
+	}
+}
+
+func TestBatchListClampsLimit(t *testing.T) {
+	var captured url.Values
+	api := fakeAPI(t, apitest.Opts{BatchListQuery: &captured})
+	callTool(t, api, "batch_list", map[string]any{"limit": float64(1000)}, nil)
+	if captured.Get("limit") != "100" {
+		t.Errorf("limit = %q, want 100", captured.Get("limit"))
+	}
+}
+
+func TestCohortTagValuesClampsLimit(t *testing.T) {
+	var captured url.Values
+	api := fakeAPI(t, apitest.Opts{TagValuesQuery: &captured, TagValues: &apitest.TagValues{BatchID: "b1"}})
+	callTool(t, api, "cohort_tag_values", map[string]any{"batch_id": "b1", "tag": "N16_HAS_NSID", "arg": "nsid", "limit": float64(1000)}, nil)
+	if captured.Get("limit") != "500" {
+		t.Errorf("limit = %q, want 500", captured.Get("limit"))
+	}
+}

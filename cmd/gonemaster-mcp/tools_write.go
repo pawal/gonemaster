@@ -31,7 +31,8 @@ type batchEnqueueOutput struct {
 func registerBatchEnqueue(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "batch_enqueue",
-		Description: "Enqueue a batch of domain tests. Provide explicit domains or from_tag. Returns a batch id to poll.",
+		Description: "Enqueue a batch of domain tests. Provide explicit domains or from_tag (see domain_tag_list). Returns a batch id to poll.",
+		Annotations: writeHint("Enqueue a batch", false, true),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in batchEnqueueInput) (*mcp.CallToolResult, batchEnqueueOutput, error) {
 		domains := trimNonEmpty(in.Domains)
 		fromTag := strings.TrimSpace(in.FromTag)
@@ -64,6 +65,7 @@ func registerBatchCancel(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "batch_cancel",
 		Description: "Cancel a batch's in-flight jobs and remove the batch and its derived data.",
+		Annotations: writeHint("Cancel and delete a batch", true, false),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in batchCancelInput) (*mcp.CallToolResult, batchCancelOutput, error) {
 		id := strings.TrimSpace(in.BatchID)
 		if id == "" {
@@ -89,6 +91,7 @@ func registerCancelJob(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "cancel_job",
 		Description: "Cancel a single queued or running job.",
+		Annotations: writeHint("Cancel a job", true, false),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in cancelJobInput) (*mcp.CallToolResult, cancelJobOutput, error) {
 		id := strings.TrimSpace(in.JobID)
 		if id == "" {

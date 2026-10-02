@@ -18,13 +18,14 @@ func registerHistoryTools(srv *mcp.Server, api *apiClient) {
 
 type runSearchInput struct {
 	Domain         string `json:"domain,omitempty" jsonschema:"domain name or substring to match"`
+	Exact          bool   `json:"exact,omitempty" jsonschema:"match domain whole instead of as a substring"`
 	Tag            string `json:"tag,omitempty" jsonschema:"only runs that emitted this message tag"`
 	Status         string `json:"status,omitempty" jsonschema:"job status: succeeded, failed, canceled, expired"`
 	Level          string `json:"level,omitempty" jsonschema:"worst severity level, e.g. WARNING, ERROR, CRITICAL"`
 	Grade          string `json:"grade,omitempty" jsonschema:"letter grade, e.g. A, B, C"`
 	FinishedAfter  string `json:"finished_after,omitempty" jsonschema:"RFC3339 lower bound on finish time"`
 	FinishedBefore string `json:"finished_before,omitempty" jsonschema:"RFC3339 upper bound on finish time"`
-	Limit          int    `json:"limit,omitempty" jsonschema:"max runs to return (default 20)"`
+	Limit          int    `json:"limit,omitempty" jsonschema:"max runs to return (default 20, max 500)"`
 	Offset         int    `json:"offset,omitempty" jsonschema:"pagination offset"`
 }
 
@@ -38,6 +39,7 @@ func registerRunSearch(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_search",
 		Description: "Search completed runs by domain, tag, status, severity, grade, or finish-time range. Newest first.",
+		Annotations: readOnly("Search runs"),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runSearchInput) (*mcp.CallToolResult, runSearchOutput, error) {
 		q := url.Values{}
 		setIf := func(k, v string) {
@@ -46,17 +48,16 @@ func registerRunSearch(srv *mcp.Server, api *apiClient) {
 			}
 		}
 		setIf("domain", in.Domain)
+		if in.Exact && q.Get("domain") != "" {
+			q.Set("domain_exact", "1")
+		}
 		setIf("event_tag", in.Tag)
 		setIf("status", in.Status)
 		setIf("level", in.Level)
 		setIf("grade", in.Grade)
 		setIf("finished_after", in.FinishedAfter)
 		setIf("finished_before", in.FinishedBefore)
-		limit := in.Limit
-		if limit <= 0 {
-			limit = 20
-		}
-		q.Set("limit", strconv.Itoa(limit))
+		q.Set("limit", strconv.Itoa(clampLimit(in.Limit, 20, maxRunsLimit)))
 		if in.Offset > 0 {
 			q.Set("offset", strconv.Itoa(in.Offset))
 		}
@@ -102,6 +103,7 @@ func registerRunDiff(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "run_diff",
 		Description: "Compare two runs at the tag level: which tags were added, removed, or changed severity.",
+		Annotations: readOnly("Diff two runs"),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in runDiffInput) (*mcp.CallToolResult, runDiffOutput, error) {
 		a := strings.TrimSpace(in.RunA)
 		b := strings.TrimSpace(in.RunB)

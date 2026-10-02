@@ -396,3 +396,46 @@ func TestReportOptsServesTheReportFixture(t *testing.T) {
 		t.Fatalf("captured query = %v, want from=a to=b", captured)
 	}
 }
+
+func TestResultStatusOverridesTheBody(t *testing.T) {
+	srv := apitest.New(t, apitest.Opts{ResultStatus: 500, Result: &apitest.Result{JobID: "j"}})
+	if code := doGet(t, srv.URL, "/api/v1/jobs/j/result", "", nil); code != 500 {
+		t.Fatalf("result status = %d, want 500", code)
+	}
+}
+
+func TestTerminalJobCarriesPublicAndBatchID(t *testing.T) {
+	srv := apitest.New(t, apitest.Opts{JobPublicID: "Ab3xZ9k0", JobBatchID: "b9"})
+	var job apitest.Job
+	doGet(t, srv.URL, "/api/v1/jobs/job_1", "", &job)
+	if job.PublicID != "Ab3xZ9k0" || job.BatchID != "b9" || job.Progress != 100 {
+		t.Fatalf("terminal job = %+v", job)
+	}
+}
+
+func TestProfilesAndTagsRoutes(t *testing.T) {
+	srv := apitest.New(t, apitest.Opts{
+		Profiles: []apitest.Profile{{ID: 1, Name: "default"}},
+		Tags:     []apitest.Tag{{Name: "se-weekly", DomainCount: 3}},
+	})
+	var profiles []apitest.Profile
+	doGet(t, srv.URL, "/api/v1/profiles", "", &profiles)
+	if len(profiles) != 1 || profiles[0].Name != "default" {
+		t.Fatalf("profiles = %+v", profiles)
+	}
+	var tags []apitest.Tag
+	doGet(t, srv.URL, "/api/v1/tags", "", &tags)
+	if len(tags) != 1 || tags[0].DomainCount != 3 {
+		t.Fatalf("tags = %+v", tags)
+	}
+}
+
+func TestEntriesLevelsRecordsEveryQuery(t *testing.T) {
+	var levels []string
+	srv := apitest.New(t, apitest.Opts{EntriesLevels: &levels})
+	doGet(t, srv.URL, "/api/v1/entries?level=ERROR", "", nil)
+	doGet(t, srv.URL, "/api/v1/entries?level=WARNING", "", nil)
+	if len(levels) != 2 || levels[0] != "ERROR" || levels[1] != "WARNING" {
+		t.Fatalf("levels = %v", levels)
+	}
+}

@@ -33,11 +33,18 @@ type Opts struct {
 	FinalStatus string
 	// JobError is job.error at the terminal poll.
 	JobError string
+	// JobPublicID and JobBatchID are set on the job at the terminal poll.
+	JobPublicID string
+	JobBatchID  string
 
 	// Result answers GET /jobs|runs/{id}/result; nil yields 404.
 	Result *Result
 	// ResultsByID answers per id and is consulted before Result.
 	ResultsByID map[string]Result
+	// ResultStatus, when non-zero, makes every result route answer it with an error body.
+	ResultStatus int
+	// ResultQuery, when set, captures the query of the last result request.
+	ResultQuery *url.Values
 
 	// Run answers GET /runs/{id}; nil yields 404.
 	Run *Run
@@ -65,6 +72,13 @@ type Opts struct {
 
 	// Entries are the items of GET /entries, filtered by the level query.
 	Entries []EntryRecord
+	// EntriesLevels, when set, records the level query of every GET /entries.
+	EntriesLevels *[]string
+
+	// Profiles answers GET /profiles.
+	Profiles []Profile
+	// Tags answers GET /tags.
+	Tags []Tag
 
 	// SpecList answers GET /spec/testcases.
 	SpecList *SpecTestcaseList
@@ -149,11 +163,14 @@ func Handler(t testing.TB, opts Opts) http.Handler {
 		if p > opts.PollsUntilDone {
 			status = opts.FinalStatus
 		}
-		j := Job{ID: r.PathValue("id"), Domain: "example.com", Status: status}
+		j := Job{ID: r.PathValue("id"), Domain: "example.com", Status: status, Progress: 50}
 		if terminal(status) {
 			j.StartedAt = time.Unix(1000, 0)
 			j.FinishedAt = time.Unix(1008, 0) // 8000 ms
 			j.Error = opts.JobError
+			j.PublicID = opts.JobPublicID
+			j.BatchID = opts.JobBatchID
+			j.Progress = 100
 		}
 		writeJSON(w, http.StatusOK, j)
 	}))
@@ -177,6 +194,15 @@ func Handler(t testing.TB, opts Opts) http.Handler {
 	}))
 
 	result := func(w http.ResponseWriter, r *http.Request) {
+		if opts.ResultQuery != nil {
+			mu.Lock()
+			*opts.ResultQuery = r.URL.Query()
+			mu.Unlock()
+		}
+		if opts.ResultStatus != 0 {
+			writeJSON(w, opts.ResultStatus, errBody("result failed"))
+			return
+		}
 		if res, ok := opts.ResultsByID[r.PathValue("id")]; ok {
 			writeJSON(w, http.StatusOK, res)
 			return
@@ -255,6 +281,11 @@ func Handler(t testing.TB, opts Opts) http.Handler {
 
 	mux.HandleFunc("GET /api/v1/entries", route(func(w http.ResponseWriter, r *http.Request) {
 		level := r.URL.Query().Get("level")
+		if opts.EntriesLevels != nil {
+			mu.Lock()
+			*opts.EntriesLevels = append(*opts.EntriesLevels, level)
+			mu.Unlock()
+		}
 		items := []EntryRecord{}
 		for _, e := range opts.Entries {
 			if level == "" || e.Level == level {
@@ -262,6 +293,21 @@ func Handler(t testing.TB, opts Opts) http.Handler {
 			}
 		}
 		writeJSON(w, http.StatusOK, EntryList{Items: items, Total: len(items)})
+	}))
+
+	mux.HandleFunc("GET /api/v1/profiles", route(func(w http.ResponseWriter, _ *http.Request) {
+		items := opts.Profiles
+		if items == nil {
+			items = []Profile{}
+		}
+		writeJSON(w, http.StatusOK, items)
+	}))
+	mux.HandleFunc("GET /api/v1/tags", route(func(w http.ResponseWriter, _ *http.Request) {
+		items := opts.Tags
+		if items == nil {
+			items = []Tag{}
+		}
+		writeJSON(w, http.StatusOK, items)
 	}))
 
 	mux.HandleFunc("GET /api/v1/spec/testcases", route(func(w http.ResponseWriter, _ *http.Request) {

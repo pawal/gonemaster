@@ -3,6 +3,8 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -172,5 +174,55 @@ func TestPingUnreachable(t *testing.T) {
 	}
 	if out.Detail == "" {
 		t.Errorf("expected an error detail when unreachable")
+	}
+}
+
+func TestPingNotAnAdminAPI(t *testing.T) {
+	other := httptest.NewServer(http.NotFoundHandler())
+	defer other.Close()
+
+	out := callPing(t, clientFor(t, other.URL, ""))
+	if out.Reachable {
+		t.Fatalf("expected reachable=false, got %+v", out)
+	}
+	if !strings.Contains(out.Detail, "404") || !strings.Contains(out.Detail, "not a gonemaster-server") {
+		t.Errorf("detail = %q", out.Detail)
+	}
+}
+
+func TestToolAnnotations(t *testing.T) {
+	api := fakeAPI(t, apitest.Opts{})
+	tools := map[string]*mcp.Tool{}
+	mcptest.Session(t, newMCPServer(api, true), func(ctx context.Context, session *mcp.ClientSession) {
+		res, err := session.ListTools(ctx, nil)
+		if err != nil {
+			t.Fatalf("list tools: %v", err)
+		}
+		for _, tl := range res.Tools {
+			tools[tl.Name] = tl
+		}
+	})
+	for _, tl := range tools {
+		if tl.Annotations == nil {
+			t.Errorf("tool %s has no annotations", tl.Name)
+		}
+	}
+	if a := tools["ping"].Annotations; a == nil || !a.ReadOnlyHint {
+		t.Errorf("ping must be read-only: %+v", a)
+	}
+	if a := tools["batch_cancel"].Annotations; a == nil || a.DestructiveHint == nil || !*a.DestructiveHint {
+		t.Errorf("batch_cancel must be destructive: %+v", a)
+	}
+	if a := tools["test_domain"].Annotations; a == nil || a.ReadOnlyHint || a.OpenWorldHint == nil || !*a.OpenWorldHint {
+		t.Errorf("test_domain must be open-world and not read-only: %+v", a)
+	}
+}
+
+func TestServerInstructionsNameDiscoveryTools(t *testing.T) {
+	ro := serverInstructions(false)
+	for _, want := range []string{"profile_list", "domain_tag_list", "cohort_list", "min_level"} {
+		if !strings.Contains(ro, want) {
+			t.Errorf("instructions missing %q", want)
+		}
 	}
 }

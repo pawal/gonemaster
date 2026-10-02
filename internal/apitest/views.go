@@ -13,9 +13,10 @@ import (
 type Job struct {
 	ID         string    `json:"id"`
 	BatchID    string    `json:"batch_id,omitempty"`
+	PublicID   string    `json:"public_id,omitempty"`
+	Progress   int       `json:"progress"`
 	Domain     string    `json:"domain"`
 	Status     string    `json:"status"`
-	Progress   int       `json:"progress"`
 	Error      string    `json:"error,omitempty"`
 	CreatedAt  time.Time `json:"created_at"`
 	StartedAt  time.Time `json:"started_at"`
@@ -98,6 +99,7 @@ type BatchSummary struct {
 	Total        int            `json:"total"`
 	StatusCounts map[string]int `json:"status_counts"`
 	Grades       map[string]int `json:"grades,omitempty"`
+	WorstLevels  map[string]int `json:"worst_levels,omitempty"`
 	Items        []Job          `json:"items,omitempty"`
 	Limit        int            `json:"limit,omitempty"`
 	Offset       int            `json:"offset,omitempty"`
@@ -201,6 +203,22 @@ type SpecTestcaseDetail struct {
 	Excluded    bool      `json:"excluded,omitempty"`
 	Locale      string    `json:"locale"`
 	Tags        []SpecTag `json:"tags"`
+}
+
+// Profile is one item of GET /api/v1/profiles.
+type Profile struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Public      bool   `json:"public"`
+}
+
+// Tag is one item of GET /api/v1/tags, a user domain tag.
+type Tag struct {
+	Name             string `json:"name"`
+	Description      string `json:"description,omitempty"`
+	DomainCount      int    `json:"domain_count"`
+	DefaultProfileID *int64 `json:"default_profile_id,omitempty"`
 }
 
 // Whoami is GET /whoami.

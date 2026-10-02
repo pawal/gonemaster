@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"encoding/json"
+	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -275,5 +277,122 @@ func TestRunGetForwardsToken(t *testing.T) {
 	}
 	if out.Grade != "A+" {
 		t.Errorf("grade = %q, want A+", out.Grade)
+	}
+}
+
+func TestTestDomainExposesPublicAndBatchID(t *testing.T) {
+	api := fakeAPI(t, apitest.Opts{PollsUntilDone: 1, JobPublicID: "Ab3xZ9k0", JobBatchID: "b9"})
+	orig := pollInterval
+	pollInterval = 5 * time.Millisecond
+	defer func() { pollInterval = orig }()
+
+	var out testResult
+	res := callTool(t, api, "test_domain", map[string]any{"domain": "example.com"}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	if out.PublicID != "Ab3xZ9k0" || out.BatchID != "b9" {
+		t.Errorf("public_id/batch_id = %q/%q, want Ab3xZ9k0/b9", out.PublicID, out.BatchID)
+	}
+}
+
+func TestTestDomainForwardsLang(t *testing.T) {
+	var captured url.Values
+	api := fakeAPI(t, apitest.Opts{PollsUntilDone: 1, ResultQuery: &captured, Result: &apitest.Result{JobID: "job_1", Status: "succeeded"}})
+	orig := pollInterval
+	pollInterval = 5 * time.Millisecond
+	defer func() { pollInterval = orig }()
+
+	callTool(t, api, "test_domain", map[string]any{"domain": "example.com", "lang": "sv"}, nil)
+	if captured.Get("locale") != "sv" {
+		t.Errorf("locale = %q, want sv", captured.Get("locale"))
+	}
+}
+
+func TestTestDomainSendsProgress(t *testing.T) {
+	api := fakeAPI(t, apitest.Opts{PollsUntilDone: 2})
+	orig := pollInterval
+	pollInterval = 5 * time.Millisecond
+	defer func() { pollInterval = orig }()
+
+	var mu sync.Mutex
+	var got []float64
+	opts := &mcp.ClientOptions{ProgressNotificationHandler: func(_ context.Context, r *mcp.ProgressNotificationClientRequest) {
+		mu.Lock()
+		got = append(got, r.Params.Progress)
+		mu.Unlock()
+	}}
+	mcptest.SessionOpts(t, newMCPServer(api, false), opts, func(ctx context.Context, s *mcp.ClientSession) {
+		params := &mcp.CallToolParams{Name: "test_domain", Arguments: map[string]any{"domain": "example.com"}}
+		params.SetProgressToken("p1")
+		res, err := s.CallTool(ctx, params)
+		if err != nil || res.IsError {
+			t.Fatalf("test_domain: %v %s", err, errorText(res))
+		}
+		deadline := time.Now().Add(time.Second)
+		for {
+			mu.Lock()
+			n := len(got)
+			mu.Unlock()
+			if n >= 2 || time.Now().After(deadline) {
+				break
+			}
+			time.Sleep(time.Millisecond)
+		}
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	if len(got) != 2 || got[0] != 50 || got[1] != 100 {
+		t.Errorf("progress = %v, want [50 100]", got)
+	}
+}
+
+func TestRunGetMinLevelFiltersAndCounts(t *testing.T) {
+	api := fakeAPI(t, apitest.Opts{
+		Run: &apitest.Run{ID: "run_m", Domain: "x.example", Status: "succeeded"},
+		Result: &apitest.Result{JobID: "run_m", Status: "succeeded", Raw: &apitest.ResultRaw{Entries: []apitest.Entry{
+			{Module: "nameserver", Tag: "NS01", Level: "INFO"},
+			{Module: "consistency", Tag: "SOATIME", Level: "WARNING"},
+		}}},
+	})
+
+	var out testResult
+	res := callTool(t, api, "run_get", map[string]any{"id": "run_m", "min_level": "warning"}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	if len(out.Findings) != 1 || out.Findings[0].Tag != "SOATIME" {
+		t.Errorf("findings = %+v, want SOATIME only", out.Findings)
+	}
+	if out.LevelCounts["INFO"] != 1 || out.LevelCounts["WARNING"] != 1 {
+		t.Errorf("level_counts = %v", out.LevelCounts)
+	}
+}
+
+func TestRunGetRejectsUnknownMinLevel(t *testing.T) {
+	api := fakeAPI(t, apitest.Opts{Run: &apitest.Run{ID: "r", Domain: "d", Status: "succeeded"}})
+	res := callTool(t, api, "run_get", map[string]any{"id": "r", "min_level": "LOUD"}, nil)
+	if !res.IsError || !strings.Contains(errorText(res), "min_level") {
+		t.Fatalf("expected a min_level error, got %s", errorText(res))
+	}
+}
+
+func TestRunGetFailsOnResultServerError(t *testing.T) {
+	api := fakeAPI(t, apitest.Opts{Run: &apitest.Run{ID: "r", Domain: "d", Status: "succeeded"}, ResultStatus: 500})
+	res := callTool(t, api, "run_get", map[string]any{"id": "r"}, nil)
+	if !res.IsError || !strings.Contains(errorText(res), "500") {
+		t.Fatalf("expected a 500 tool error, got %s", errorText(res))
+	}
+}
+
+func TestLatestForMatchesExactlyAndClampsLimit(t *testing.T) {
+	var captured url.Values
+	api := fakeAPI(t, apitest.Opts{RunsQuery: &captured})
+	callTool(t, api, "latest_for", map[string]any{"domain": "example.se", "limit": float64(1000)}, nil)
+	if captured.Get("domain") != "example.se" || captured.Get("domain_exact") != "1" {
+		t.Errorf("query = %v, want domain_exact=1", captured)
+	}
+	if captured.Get("limit") != "500" {
+		t.Errorf("limit = %q, want 500", captured.Get("limit"))
 	}
 }

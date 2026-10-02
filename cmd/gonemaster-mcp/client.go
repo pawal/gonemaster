@@ -145,6 +145,8 @@ type createJobRequest struct {
 type jobView struct {
 	ID         string    `json:"id"`
 	Domain     string    `json:"domain"`
+	BatchID    string    `json:"batch_id"`
+	PublicID   string    `json:"public_id"`
 	Status     string    `json:"status"`
 	Progress   int       `json:"progress"`
 	Error      string    `json:"error"`
@@ -274,6 +276,7 @@ type batchSummaryView struct {
 	Total        int            `json:"total"`
 	StatusCounts map[string]int `json:"status_counts"`
 	Grades       map[string]int `json:"grades"`
+	WorstLevels  map[string]int `json:"worst_levels"`
 	CreatedAt    time.Time      `json:"created_at"`
 	FinishedAt   *time.Time     `json:"finished_at"`
 }
@@ -424,11 +427,44 @@ func (c *apiClient) listRuns(ctx context.Context, domain string, limit int) (run
 	q := url.Values{}
 	if domain != "" {
 		q.Set("domain", domain)
+		q.Set("domain_exact", "1")
 	}
 	if limit > 0 {
 		q.Set("limit", strconv.Itoa(limit))
 	}
 	return c.getRuns(ctx, q)
+}
+
+// profileView decodes one item of GET /profiles.
+type profileView struct {
+	ID          int64  `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+	Public      bool   `json:"public"`
+}
+
+func (c *apiClient) listProfiles(ctx context.Context) ([]profileView, error) {
+	var out []profileView
+	err := c.doJSON(ctx, http.MethodGet, "/profiles", nil, &out)
+	return out, err
+}
+
+// domainTagView decodes one item of GET /tags, a user domain tag.
+type domainTagView struct {
+	Name             string `json:"name"`
+	Description      string `json:"description"`
+	DomainCount      int    `json:"domain_count"`
+	DefaultProfileID *int64 `json:"default_profile_id"`
+}
+
+func (c *apiClient) listDomainTags(ctx context.Context, limit int) ([]domainTagView, error) {
+	var out []domainTagView
+	path := "/tags"
+	if limit > 0 {
+		path += "?limit=" + strconv.Itoa(limit)
+	}
+	err := c.doJSON(ctx, http.MethodGet, path, nil, &out)
+	return out, err
 }
 
 // getPublic decodes a GET against the public API into out.

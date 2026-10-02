@@ -33,6 +33,7 @@ func registerSpecList(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "spec_list_testcases",
 		Description: "List gonemaster's implemented testcases, optionally filtered to one module.",
+		Annotations: readOnly("List testcases"),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in specListInput) (*mcp.CallToolResult, specListOutput, error) {
 		list, err := api.listSpecTestcases(ctx, strings.TrimSpace(in.Category))
 		if err != nil {
@@ -70,6 +71,7 @@ func registerSpecGet(srv *mcp.Server, api *apiClient) {
 	mcp.AddTool(srv, &mcp.Tool{
 		Name:        "spec_get_testcase",
 		Description: "Get one testcase's module, description, and the tags it can emit with their rendered messages.",
+		Annotations: readOnly("Get a testcase"),
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in specGetInput) (*mcp.CallToolResult, specGetOutput, error) {
 		id := strings.TrimSpace(in.Testcase)
 		if id == "" {

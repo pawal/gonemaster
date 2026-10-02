@@ -12,6 +12,12 @@ import (
 // test that restores overridden package vars cannot race it.
 func Session(t testing.TB, srv *mcp.Server, fn func(ctx context.Context, session *mcp.ClientSession)) {
 	t.Helper()
+	SessionOpts(t, srv, nil, fn)
+}
+
+// SessionOpts is Session with client options, for progress and log handlers.
+func SessionOpts(t testing.TB, srv *mcp.Server, opts *mcp.ClientOptions, fn func(ctx context.Context, session *mcp.ClientSession)) {
+	t.Helper()
 	ctx, cancel := context.WithCancel(t.Context())
 	done := make(chan struct{})
 	defer func() { cancel(); <-done }()
@@ -19,7 +25,7 @@ func Session(t testing.TB, srv *mcp.Server, fn func(ctx context.Context, session
 	clientT, serverT := mcp.NewInMemoryTransports()
 	go func() { _ = srv.Run(ctx, serverT); close(done) }()
 
-	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, nil)
+	client := mcp.NewClient(&mcp.Implementation{Name: "test-client", Version: "test"}, opts)
 	session, err := client.Connect(ctx, clientT, nil)
 	if err != nil {
 		t.Fatalf("mcp client connect: %v", err)

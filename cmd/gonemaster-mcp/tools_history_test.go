@@ -86,3 +86,15 @@ func TestRunDiffRequiresBothIDs(t *testing.T) {
 		t.Fatalf("expected error when run_b missing")
 	}
 }
+
+func TestRunSearchExactAndClampedLimit(t *testing.T) {
+	var captured url.Values
+	api := fakeAPI(t, apitest.Opts{RunsQuery: &captured})
+	callTool(t, api, "run_search", map[string]any{"domain": "example.se", "exact": true, "limit": float64(1000)}, nil)
+	if captured.Get("domain_exact") != "1" {
+		t.Errorf("expected domain_exact=1, got %v", captured)
+	}
+	if captured.Get("limit") != "500" {
+		t.Errorf("limit = %q, want 500", captured.Get("limit"))
+	}
+}

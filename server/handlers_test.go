@@ -1570,3 +1570,21 @@ func TestCreateJobWithoutTestsIgnoresExclude(t *testing.T) {
 	wantStatus(t, doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com","tests":["basic01"]}`), http.StatusCreated)
 	wantStatus(t, doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain":"example.com"}`), http.StatusCreated)
 }
+
+func TestBatchSummaryIncludesWorstLevels(t *testing.T) {
+	srv := newTestServer(t)
+	batchID := "batch_levels"
+	now := time.Now().UTC()
+	_ = srv.store.CreateBatch(Batch{ID: batchID, CreatedAt: now, DomainCount: 3})
+	levels := map[string]string{"a.example": "WARNING", "b.example": "WARNING", "c.example": "ERROR"}
+	for domain, level := range levels {
+		job := Job{ID: newID("job"), BatchID: batchID, Domain: domain, Status: JobSucceeded, CreatedAt: now, StartedAt: now, FinishedAt: now}
+		createAndGraduate(t, srv.store, job, []engine.LogEntry{{Level: level, Tag: "T", Module: "M"}})
+	}
+
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/batches/"+batchID, nil)
+	summary := mustJSON[BatchSummary](t, resp, http.StatusOK)
+	if summary.WorstLevels["WARNING"] != 2 || summary.WorstLevels["ERROR"] != 1 {
+		t.Fatalf("worst_levels = %v, want WARNING:2 ERROR:1", summary.WorstLevels)
+	}
+}

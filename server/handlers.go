@@ -272,6 +272,15 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 	if len(grades) == 0 {
 		grades = nil
 	}
+	worstLevels := map[string]int{}
+	for _, run := range allRuns.Items {
+		if run.WorstLevel != "" {
+			worstLevels[run.WorstLevel]++
+		}
+	}
+	if len(worstLevels) == 0 {
+		worstLevels = nil
+	}
 
 	// Build combined item list (jobs + runs converted to jobs).
 	combined := make([]Job, 0, len(allJobs.Items)+len(allRuns.Items))
@@ -373,6 +382,7 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		Total:        total,
 		StatusCounts: statusCounts,
 		Grades:       grades,
+		WorstLevels:  worstLevels,
 		Items:        pageItems,
 		Limit:        limit,
 		Offset:       offset,

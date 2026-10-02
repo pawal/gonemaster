@@ -970,6 +970,7 @@ type BatchSummary struct {
 	Total        int            `json:"total"`
 	StatusCounts map[string]int `json:"status_counts"`
 	Grades       map[string]int `json:"grades,omitempty"`
+	WorstLevels  map[string]int `json:"worst_levels,omitempty"`
 	Items        []Job          `json:"items"`
 	Limit        int            `json:"limit,omitempty"`
 	Offset       int            `json:"offset,omitempty"`

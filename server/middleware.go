@@ -87,6 +87,9 @@ func (r *responseRecorder) Write(p []byte) (int, error) {
 	return n, err
 }
 
+// Unwrap exposes the wrapped writer to http.ResponseController.
+func (r *responseRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
 // Flush forwards flush requests when supported by the wrapped writer.
 func (r *responseRecorder) Flush() {
 	flusher, ok := r.ResponseWriter.(http.Flusher)
@@ -233,6 +236,9 @@ func (r *apiMetricsResponseRecorder) Write(p []byte) (int, error) {
 	}
 	return r.ResponseWriter.Write(p)
 }
+
+// Unwrap exposes the wrapped writer to http.ResponseController.
+func (r *apiMetricsResponseRecorder) Unwrap() http.ResponseWriter { return r.ResponseWriter }
 
 // Flush forwards flush requests when supported by the wrapped writer.
 func (r *apiMetricsResponseRecorder) Flush() {

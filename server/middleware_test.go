@@ -659,3 +659,15 @@ func TestStripUntrustedForwardedHeadersLeavesOtherHeaders(t *testing.T) {
 		t.Fatalf("X-Forwarded-For = %q, want it stripped", got)
 	}
 }
+
+func TestWriterWrappersUnwrap(t *testing.T) {
+	var _ interface{ Unwrap() http.ResponseWriter } = &responseRecorder{}
+	var _ interface{ Unwrap() http.ResponseWriter } = &apiMetricsResponseRecorder{}
+	var _ interface{ Unwrap() http.ResponseWriter } = &gzipResponseWriter{}
+	if isCompressibleContentType("text/event-stream") {
+		t.Fatal("event streams must not be compressed")
+	}
+	if !isCompressibleContentType("text/plain; charset=utf-8") {
+		t.Fatal("text/plain must stay compressible")
+	}
+}

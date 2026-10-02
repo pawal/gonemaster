@@ -60,6 +60,10 @@ func isCompressibleContentType(ct string) bool {
 		ct = ct[:i]
 	}
 	ct = strings.TrimSpace(strings.ToLower(ct))
+	// Event streams are flushed per event and must reach the client as written.
+	if ct == "text/event-stream" {
+		return false
+	}
 	for _, prefix := range compressibleTypes {
 		if strings.HasPrefix(ct, prefix) {
 			return true
@@ -79,6 +83,9 @@ type gzipResponseWriter struct {
 }
 
 func (g *gzipResponseWriter) Header() http.Header { return g.ResponseWriter.Header() }
+
+// Unwrap exposes the wrapped writer to http.ResponseController.
+func (g *gzipResponseWriter) Unwrap() http.ResponseWriter { return g.ResponseWriter }
 
 func (g *gzipResponseWriter) WriteHeader(status int) {
 	if g.status != 0 {

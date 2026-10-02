@@ -404,10 +404,10 @@ func (s *Server) routes() {
 	pubMux := http.NewServeMux()
 	pubMux.HandleFunc("POST /jobs", s.handlePublicCreateJob)
 	pubMux.HandleFunc("GET /profiles", s.handlePublicProfiles)
-	pubMux.HandleFunc("GET /jobs/{publicID}/result", s.handlePublicGetResult)
-	pubMux.HandleFunc("GET /jobs/{publicID}/dnssec-chain", s.handlePublicGetDNSSECChain)
-	pubMux.HandleFunc("GET /jobs/{publicID}/asn-names", s.handlePublicGetASNNames)
-	pubMux.HandleFunc("GET /jobs/{publicID}", s.handlePublicGetJob)
+	pubMux.HandleFunc("GET /jobs/{publicID}/result", s.limitGET(s.handlePublicGetResult))
+	pubMux.HandleFunc("GET /jobs/{publicID}/dnssec-chain", s.limitGET(s.handlePublicGetDNSSECChain))
+	pubMux.HandleFunc("GET /jobs/{publicID}/asn-names", s.limitGET(s.handlePublicGetASNNames))
+	pubMux.HandleFunc("GET /jobs/{publicID}", s.limitGET(s.handlePublicGetJob))
 	pubMux.HandleFunc("GET /locales", s.handleLocales)
 	pubMux.HandleFunc("GET /lookup/{domain}", s.limitGET(s.handlePublicLookupDomain))
 	pubMux.HandleFunc("GET /version", s.handlePublicVersion)
@@ -470,8 +470,9 @@ func (s *Server) routes() {
 
 	s.mux.Handle("GET /robots.txt", s.pageChain("/robots.txt", http.HandlerFunc(s.handleRobotsTxt)))
 	s.mux.Handle("GET /sitemap.xml", s.pageChain("/sitemap.xml", http.HandlerFunc(s.handleSitemap)))
-	s.mux.Handle("/public/", s.pageChain("/public/",
-		http.StripPrefix("/public", serverpublic.Handler(s.cfg.PublicURL, s.cfg.PublicUIPath, s.publicResultLookup()))))
+	publicPages := http.StripPrefix("/public", serverpublic.Handler(s.cfg.PublicURL, s.cfg.PublicUIPath, s.publicResultLookup()))
+	s.mux.Handle("/public/", s.pageChain("/public/", publicPages))
+	s.mux.Handle("GET /public/result/", s.pageChain("/public/", s.limitGET(publicPages.ServeHTTP)))
 	s.mux.Handle("/analysis/", s.pageChain("/analysis/", legacyTagRedirect(
 		http.StripPrefix("/analysis", serveranalysisui.Handler(s.cfg.PublicURL)),
 	)))

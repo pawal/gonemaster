@@ -202,9 +202,8 @@ func TestPublicUIUnknownResultIs404(t *testing.T) {
 	wantStatus(t, rr, http.StatusNotFound)
 }
 
-// The public limiter meters POST only, so result pages are no more metered
-// than the public API GETs they read from. Sharing the submission bucket with
-// page views would exhaust it in normal use, so this is deliberate.
+// Result pages share the GET budget of the public API reads they mirror, never
+// the submission budget, which page views would exhaust in normal use.
 func TestResultPageGetsShareTheAPIsUnmeteredPath(t *testing.T) {
 	srv := newTestServer(t, withConfig(func(cfg *Config) {
 		cfg.PublicAPI.RateLimitEnabled = true

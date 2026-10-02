@@ -586,3 +586,27 @@ func TestRateLimitGETMaxSetBySettingsApplies(t *testing.T) {
 		t.Fatalf("second lookup: got %d, want 429", code)
 	}
 }
+
+func TestRateLimitGETMetersPublicIDReads(t *testing.T) {
+	for _, path := range []string{
+		"/pub/api/v1/jobs/abcd1234",
+		"/pub/api/v1/jobs/abcd1234/result",
+		"/pub/api/v1/jobs/abcd1234/dnssec-chain",
+		"/pub/api/v1/jobs/abcd1234/asn-names",
+		"/public/result/abcd1234",
+	} {
+		srv := newTestServer(t, withPublicAPI(func(c *PublicAPIConfig) {
+			c.RateLimitEnabled = true
+			c.RateLimitGetMax = 1
+		}))
+		get := func() int {
+			return doJSON(t, srv, http.MethodGet, path, nil, withRemoteAddr("192.0.2.1:1234")).Code
+		}
+		if code := get(); code == http.StatusTooManyRequests {
+			t.Fatalf("%s: first GET was limited", path)
+		}
+		if code := get(); code != http.StatusTooManyRequests {
+			t.Fatalf("%s: second GET got %d, want 429", path, code)
+		}
+	}
+}

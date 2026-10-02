@@ -1,6 +1,7 @@
 package server
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 )
@@ -521,5 +522,98 @@ func TestPutSettingsAllowNonGlobalTargets(t *testing.T) {
 	settings := mustJSON[map[string]settingEntry](t, getResp, http.StatusOK)
 	if _, ok := settings["allow_non_global_targets"]; !ok {
 		t.Fatal("missing setting allow_non_global_targets")
+	}
+}
+
+func TestPutSettingsRejectsUnknownKeys(t *testing.T) {
+	for _, key := range []string{"no_such_setting", "scoring_config", "max_body_size"} {
+		t.Run(key, func(t *testing.T) {
+			srv := newTestServer(t)
+			resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", map[string]any{key: "1"})
+			wantErrorCode(t, resp, http.StatusBadRequest, "unknown_setting")
+			if _, ok := srv.store.GetSetting(key); ok {
+				t.Fatalf("%s was stored", key)
+			}
+		})
+	}
+}
+
+func TestPutSettingsRejectsOutOfRangeValues(t *testing.T) {
+	for _, tc := range []struct {
+		key string
+		val any
+	}{
+		{"worker_count", 0},
+		{"worker_count", 1025},
+		{"worker_count", 100000000},
+		{"worker_count", 1.5},
+		{"worker_count", "abc"},
+		{"max_concurrent_jobs", -1},
+		{"max_concurrent_jobs", 1025},
+		{"stuck_job_timeout_minutes", 525601},
+		{"retention_days", -1},
+		{"retention_days", 36501},
+		{"purge_interval_seconds", 0},
+		{"rate_limit_max", 0},
+		{"rate_limit_max", 100001},
+		{"rate_limit_get_max", 100001},
+		{"cross_job_hot_cache_ttl_seconds", 86401},
+		{"rate_limit_window", "0s"},
+		{"rate_limit_window", "-1m"},
+		{"rate_limit_window", "soon"},
+		{"min_level", "LOUD"},
+		{"min_level", ""},
+		{"rate_limit_enabled", "yes"},
+		{"show_score_public", nil},
+	} {
+		t.Run(fmt.Sprintf("%s=%v", tc.key, tc.val), func(t *testing.T) {
+			srv := newTestServer(t)
+			resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", map[string]any{tc.key: tc.val})
+			wantErrorCode(t, resp, http.StatusBadRequest, "invalid_setting")
+			if _, ok := srv.store.GetSetting(tc.key); ok {
+				t.Fatalf("%s was stored", tc.key)
+			}
+		})
+	}
+}
+
+func TestPutSettingsAcceptsRangeEdges(t *testing.T) {
+	srv := newTestServer(t)
+	body := `{"worker_count": 1024, "max_concurrent_jobs": 0, "rate_limit_max": 100000, "retention_days": 0, "min_level": "debug", "rate_limit_enabled": "true"}`
+	wantStatus(t, doJSON(t, srv, http.MethodPut, "/api/v1/settings", body), http.StatusOK)
+	if srv.cfg.WorkerCount != 1024 || srv.cfg.PublicAPI.RateLimitMax != 100000 || !srv.cfg.PublicAPI.RateLimitEnabled {
+		t.Fatalf("cfg = workers %d, rate_limit_max %d, enabled %t", srv.cfg.WorkerCount, srv.cfg.PublicAPI.RateLimitMax, srv.cfg.PublicAPI.RateLimitEnabled)
+	}
+}
+
+func TestPutSettingsStoresNothingWhenOneValueIsInvalid(t *testing.T) {
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"worker_count": 8, "rate_limit_max": 0}`)
+	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_setting")
+	if _, ok := srv.store.GetSetting("worker_count"); ok {
+		t.Fatal("worker_count was stored")
+	}
+}
+
+func TestPutSettingsRejectsOversizedBody(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(c *Config) { c.MaxBodySize = 32 }))
+	body := `{"show_score_public": true, "show_score_admin": true}`
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", body)
+	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_body")
+	if _, ok := srv.store.GetSetting("show_score_public"); ok {
+		t.Fatal("show_score_public was stored")
+	}
+}
+
+func TestApplyDatabaseSettingsIgnoresOutOfRangeValues(t *testing.T) {
+	srv := newTestServer(t)
+	_ = srv.store.SetSetting("worker_count", "100000000")
+	_ = srv.store.SetSetting("retention_days", "1000000000")
+	srv.ApplyDatabaseSettings()
+	if srv.cfg.WorkerCount != 16 {
+		t.Fatalf("WorkerCount = %d, want 16", srv.cfg.WorkerCount)
+	}
+	if srv.cfg.Database.RetentionDays != 0 {
+		t.Fatalf("RetentionDays = %d, want 0", srv.cfg.Database.RetentionDays)
 	}
 }

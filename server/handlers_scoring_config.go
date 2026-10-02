@@ -90,7 +90,7 @@ func (s *Server) handlePutScoringConfig(w http.ResponseWriter, r *http.Request) 
 	}
 
 	var cfg scoring.Config
-	if err := json.NewDecoder(r.Body).Decode(&cfg); err != nil {
+	if err := readJSON(r, s.cfg.MaxBodySize, &cfg); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_scoring_config", "invalid JSON: "+err.Error(), nil)
 		return
 	}

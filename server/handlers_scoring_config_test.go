@@ -390,3 +390,19 @@ func TestScoringConfigRuntimeUpdateAffectsGraduation(t *testing.T) {
 			result.Score.Score, defaultScore.Score)
 	}
 }
+
+func TestPutScoringConfigRejectsOversizedBody(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(c *Config) { c.MaxBodySize = 64 }))
+	raw, _ := json.Marshal(scoring.DefaultConfig())
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/scoring-config", raw)
+	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_scoring_config")
+	if _, ok := srv.store.GetSetting("scoring_config"); ok {
+		t.Fatal("scoring_config was stored")
+	}
+}
+
+func TestPutScoringConfigRejectsUnknownFields(t *testing.T) {
+	srv := newTestServer(t)
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/scoring-config", `{"tag_penalty": {"X": 1}}`)
+	wantErrorCode(t, resp, http.StatusBadRequest, "invalid_scoring_config")
+}

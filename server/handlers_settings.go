@@ -2,10 +2,13 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/scoring"
 )
 
@@ -67,49 +70,119 @@ func (s *Server) ApplyDatabaseSettings() {
 	}
 }
 
+// settingKind is the value type of a writable setting.
+type settingKind int
+
+const (
+	settingBool settingKind = iota
+	settingInt
+	settingDuration
+	settingLevel
+	settingString
+)
+
+// settingSpec is the type and integer range of a writable setting.
+type settingSpec struct {
+	kind     settingKind
+	min, max int
+}
+
+// writableSettings lists the keys PUT /settings accepts.
+var writableSettings = map[string]settingSpec{
+	"worker_count":                    {kind: settingInt, min: 1, max: 1024},
+	"max_concurrent_jobs":             {kind: settingInt, min: 0, max: 1024},
+	"stuck_job_timeout_minutes":       {kind: settingInt, min: 0, max: 525600},
+	"min_level":                       {kind: settingLevel},
+	"retention_days":                  {kind: settingInt, min: 0, max: 36500},
+	"purge_interval_seconds":          {kind: settingInt, min: 1, max: 31536000},
+	"public_url":                      {kind: settingString},
+	"rate_limit_enabled":              {kind: settingBool},
+	"rate_limit_max":                  {kind: settingInt, min: 1, max: 100000},
+	"rate_limit_get_max":              {kind: settingInt, min: 1, max: 100000},
+	"rate_limit_window":               {kind: settingDuration},
+	"allow_private_undelegated_ip":    {kind: settingBool},
+	"allow_non_global_targets":        {kind: settingBool},
+	"show_score_admin":                {kind: settingBool},
+	"show_score_public":               {kind: settingBool},
+	"show_nameserver_timings_admin":   {kind: settingBool},
+	"show_nameserver_timings_public":  {kind: settingBool},
+	"show_dnssec_chain_public":        {kind: settingBool},
+	"show_asn_names_public":           {kind: settingBool},
+	"mcp_enabled":                     {kind: settingBool},
+	"mcp_allow_write":                 {kind: settingBool},
+	"cross_job_hot_cache_ttl_seconds": {kind: settingInt, min: 1, max: 86400},
+}
+
+// checkSetting validates the stored string form of a writable setting.
+func checkSetting(key, val string) error {
+	spec, ok := writableSettings[key]
+	if !ok {
+		return fmt.Errorf("unknown setting: %s", key)
+	}
+	switch spec.kind {
+	case settingBool:
+		if val != "true" && val != "false" {
+			return fmt.Errorf("%s must be true or false", key)
+		}
+	case settingInt:
+		if v, err := strconv.Atoi(val); err != nil || v < spec.min || v > spec.max {
+			return fmt.Errorf("%s must be an integer from %d to %d", key, spec.min, spec.max)
+		}
+	case settingDuration:
+		if d, err := time.ParseDuration(val); err != nil || d <= 0 {
+			return fmt.Errorf("%s must be a positive duration such as 1m", key)
+		}
+	case settingLevel:
+		if _, ok := logger.Levels()[strings.ToUpper(val)]; !ok {
+			return fmt.Errorf("%s is not a log level: %s", key, val)
+		}
+	}
+	return nil
+}
+
 // applySetting writes a single setting value into s.cfg.
 func (s *Server) applySetting(key, val string) {
+	if key == "scoring_config" {
+		var cfg scoring.Config
+		if err := json.Unmarshal([]byte(val), &cfg); err == nil {
+			applyScoringConfigToStore(s.store, cfg)
+		}
+		return
+	}
+	if _, ok := writableSettings[key]; !ok {
+		return
+	}
+	if err := checkSetting(key, val); err != nil {
+		s.logger.Warn("stored setting ignored", "key", key, "error", err)
+		return
+	}
+	num, _ := strconv.Atoi(val)
 	switch key {
 	case "worker_count":
-		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
-			s.cfg.WorkerCount = v
-		}
+		s.cfg.WorkerCount = num
 	case "max_concurrent_jobs":
-		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
-			s.cfg.MaxConcurrentJobs = v
-		}
+		s.cfg.MaxConcurrentJobs = num
 	case "stuck_job_timeout_minutes":
-		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
-			s.cfg.StuckJobTimeoutMinutes = v
-		}
+		s.cfg.StuckJobTimeoutMinutes = num
 	case "min_level":
 		s.cfg.MinLevel = val
 	case "retention_days":
-		if v, err := strconv.Atoi(val); err == nil && v >= 0 {
-			s.cfg.Database.RetentionDays = v
-			s.retentionDays.Store(int64(v))
-		}
+		s.cfg.Database.RetentionDays = num
+		s.retentionDays.Store(int64(num))
 	case "purge_interval_seconds":
-		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
-			s.cfg.Database.PurgeIntervalSeconds = v
-			s.purgeIntervalSec.Store(int64(v))
-		}
+		s.cfg.Database.PurgeIntervalSeconds = num
+		s.purgeIntervalSec.Store(int64(num))
 	case "public_url":
 		s.cfg.PublicURL = val
 	case "rate_limit_enabled":
 		s.cfg.PublicAPI.RateLimitEnabled = val == "true"
 	case "rate_limit_max":
-		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
-			s.cfg.PublicAPI.RateLimitMax = v
-		}
+		s.cfg.PublicAPI.RateLimitMax = num
 	case "rate_limit_get_max":
-		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
-			s.cfg.PublicAPI.RateLimitGetMax = v
-		}
+		s.cfg.PublicAPI.RateLimitGetMax = num
 	case "rate_limit_window":
-		if d, err := time.ParseDuration(val); err == nil && d > 0 {
-			s.cfg.PublicAPI.RateLimitWindow = Duration{d}
-		}
+		d, _ := time.ParseDuration(val)
+		s.cfg.PublicAPI.RateLimitWindow = Duration{d}
 	case "allow_private_undelegated_ip":
 		s.cfg.PublicAPI.AllowPrivateUndelegatedIP = val == "true"
 	case "allow_non_global_targets":
@@ -134,14 +207,7 @@ func (s *Server) applySetting(key, val string) {
 	case "mcp_allow_write":
 		s.cfg.MCPAllowWrite = val == "true"
 	case "cross_job_hot_cache_ttl_seconds":
-		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
-			s.cfg.CrossJobHotCacheTTLSeconds = v
-		}
-	case "scoring_config":
-		var cfg scoring.Config
-		if err := json.Unmarshal([]byte(val), &cfg); err == nil {
-			applyScoringConfigToStore(s.store, cfg)
-		}
+		s.cfg.CrossJobHotCacheTTLSeconds = num
 	}
 }
 
@@ -254,7 +320,7 @@ func parseSettingValue(s string) any {
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	var updates map[string]json.RawMessage
-	if err := json.NewDecoder(r.Body).Decode(&updates); err != nil {
+	if err := readJSON(r, s.cfg.MaxBodySize, &updates); err != nil {
 		writeError(w, http.StatusBadRequest, "invalid_body", "invalid JSON body", nil)
 		return
 	}
@@ -265,16 +331,29 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 				"setting is read-only: "+key, nil)
 			return
 		}
+		if _, ok := writableSettings[key]; !ok {
+			writeError(w, http.StatusBadRequest, "unknown_setting", "unknown setting: "+key, nil)
+			return
+		}
 	}
 
+	values := make(map[string]string, len(updates))
 	for key, raw := range updates {
 		// Store as the raw JSON string value.
 		val := string(raw)
 		// Strip quotes from JSON strings for storage.
 		var s2 string
 		if json.Unmarshal(raw, &s2) == nil {
-			val = s2
+			val = strings.TrimSpace(s2)
 		}
+		if err := checkSetting(key, val); err != nil {
+			writeError(w, http.StatusBadRequest, "invalid_setting", err.Error(), nil)
+			return
+		}
+		values[key] = val
+	}
+
+	for key, val := range values {
 		if err := s.store.SetSetting(key, val); err != nil {
 			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
 			return

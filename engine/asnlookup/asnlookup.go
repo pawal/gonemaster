@@ -10,10 +10,12 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 
 	dns "codeberg.org/miekg/dns"
 	"codeberg.org/miekg/dns/dnsutil"
 
+	"codeberg.org/pawal/gonemaster/engine/constants"
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -60,6 +62,7 @@ const (
 )
 
 var errTryNext = errors.New("asn lookup: try next source")
+var errNonGlobalSource = errors.New("asn lookup: whois source is not globally reachable")
 var cymruSplit = regexp.MustCompile(`\s+\|\s*`)
 
 // Get returns the list of ASNs for an IP address.
@@ -248,9 +251,23 @@ func lookupCymru(ctx context.Context, resolver Resolver, ip netip.Addr, source s
 	}
 }
 
+// whoisDialer refuses every non-global address a source resolves to, unless net.allow_non_global_targets is set.
+func whoisDialer(ctx context.Context) *net.Dialer {
+	allow := profile.FromContext(ctx).Net.AllowNonGlobalTargets
+	return &net.Dialer{Control: func(_, address string, _ syscall.RawConn) error {
+		ap, err := netip.ParseAddrPort(address)
+		if err != nil {
+			return err
+		}
+		if !allow && !constants.IsQueryable(ap.Addr()) {
+			return errNonGlobalSource
+		}
+		return nil
+	}}
+}
+
 func lookupRipe(ctx context.Context, ip netip.Addr, source string) (Result, error) {
-	dialer := &net.Dialer{}
-	conn, err := dialer.DialContext(ctx, "tcp", net.JoinHostPort(source, "43"))
+	conn, err := whoisDialer(ctx).DialContext(ctx, "tcp", net.JoinHostPort(source, "43"))
 	if err != nil {
 		return Result{}, errTryNext
 	}

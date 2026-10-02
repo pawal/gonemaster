@@ -3,6 +3,7 @@ package asnlookup
 import (
 	"context"
 	"errors"
+	"net"
 	"net/netip"
 	"strings"
 	"testing"
@@ -248,5 +249,42 @@ func TestParseASNList(t *testing.T) {
 
 	if _, err := parseASNList("64500 foo"); err == nil || !strings.Contains(err.Error(), "isn't numeric") {
 		t.Fatalf("expected numeric error, got %v", err)
+	}
+}
+
+func TestWhoisDialerRefusesNonGlobalSources(t *testing.T) {
+	ln, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listen: %v", err)
+	}
+	defer ln.Close()
+	_, port, _ := net.SplitHostPort(ln.Addr().String())
+
+	ctx, prof, _ := testhelpers.Context(t)
+	for _, host := range []string{"127.0.0.1", "localhost"} {
+		if _, err := whoisDialer(ctx).DialContext(ctx, "tcp", net.JoinHostPort(host, port)); !errors.Is(err, errNonGlobalSource) {
+			t.Errorf("dial %s: err = %v, want errNonGlobalSource", host, err)
+		}
+	}
+
+	prof.Net.AllowNonGlobalTargets = true
+	conn, err := whoisDialer(ctx).DialContext(ctx, "tcp", ln.Addr().String())
+	if err != nil {
+		t.Fatalf("dial with allow_non_global_targets: %v", err)
+	}
+	conn.Close()
+}
+
+func TestGetWithPrefixRipeFallsThroughRefusedSource(t *testing.T) {
+	ctx, prof, _ := testhelpers.Context(t)
+	prof.ASNDB.Style = "ripe"
+	prof.ASNDB.Sources = map[string][]string{"ripe": {"127.0.0.1", "10.0.0.1"}}
+
+	result, err := GetWithPrefix(ctx, fakeResolver{}, netip.MustParseAddr("192.0.2.1"))
+	if err != nil {
+		t.Fatalf("GetWithPrefix error: %v", err)
+	}
+	if result.Code != CodeError {
+		t.Fatalf("Code = %s, want %s", result.Code, CodeError)
 	}
 }

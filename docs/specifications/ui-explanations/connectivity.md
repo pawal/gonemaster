@@ -278,6 +278,14 @@ Description:
 
 A client that offers a buffer large enough for your whole DNSKEY answer receives nothing at all, although the same nameservers answer smaller queries. The large reply is being dropped in front of the nameserver, typically by a firewall or middlebox that discards oversized or fragmented UDP packets. Resolvers that advertise a large buffer, as many older and embedded ones still do, spend a full timeout on every DNSKEY lookup and some fail outright. Two fixes work: let large UDP responses and IP fragments through the network in front of the nameserver, or configure the nameserver to truncate at a smaller size so clients receive a "too big" reply and retry over TCP.
 
+## Tag CN05_TCP_ANSWER_TRUNCATED
+
+Header: DNSKEY answer truncated over TCP as well
+
+Description:
+
+Your DNSKEY answer does not fit the UDP buffer resolvers advertise by default, so they retry over TCP. These nameservers cut the TCP answer to that same buffer size and flag it as truncated. TCP is the last resort, so a resolver either gives up on the nameserver or works from an incomplete set of keys and signatures, and validation fails on this address. The nameserver is applying a UDP limit to TCP; this is a fault in the nameserver software or in a device in front of it, and its operator needs to correct it.
+
 ## Tag CN05_UDP_LOSS_SIZE_DEPENDENT
 
 Header: Large UDP answers are lost, small ones arrive

@@ -123,18 +123,26 @@ func writeEntriesCSV(w http.ResponseWriter, entries []Entry, runScores map[strin
 		}
 		_ = cw.Write([]string{
 			strconv.FormatInt(e.ID, 10),
-			e.RunID,
+			csvText(e.RunID),
 			strconv.FormatInt(e.DomainID, 10),
-			e.Domain,
+			csvText(e.Domain),
 			strconv.FormatFloat(e.Timestamp, 'f', 3, 64),
-			e.Module,
-			e.Testcase,
-			e.Tag,
-			e.Level,
-			args,
+			csvText(e.Module),
+			csvText(e.Testcase),
+			csvText(e.Tag),
+			csvText(e.Level),
+			csvText(args),
 			score,
-			grade,
+			csvText(grade),
 		})
 	}
 	cw.Flush()
+}
+
+// csvText prefixes a ' to a cell a spreadsheet would read as a formula.
+func csvText(s string) string {
+	if s != "" && strings.ContainsRune("=+-@\t\r", rune(s[0])) {
+		return "'" + s
+	}
+	return s
 }

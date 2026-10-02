@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/csv"
 	"net/http"
 	"strings"
 	"testing"
@@ -249,5 +250,25 @@ func TestListEntriesCSVIncludesScoreAndGrade(t *testing.T) {
 	}
 	if gradeIdx >= len(fields) || fields[gradeIdx] == "" {
 		t.Fatalf("expected non-empty grade in data row, got fields: %v", fields)
+	}
+}
+
+func TestListEntriesCSVNeutralizesFormulaCells(t *testing.T) {
+	srv := newTestServer(t)
+	makeGraduatedJobWithEntries(t, srv, "=HYPERLINK(\"http://x\")", []engine.LogEntry{
+		{Module: "Basic", Testcase: "Basic01", Tag: "BASIC_WORKING_GLUE", Level: "INFO"},
+	})
+
+	resp := doJSON(t, srv, http.MethodGet, "/api/v1/entries?format=csv", nil)
+	wantStatus(t, resp, http.StatusOK)
+	rows, err := csv.NewReader(resp.Body).ReadAll()
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("parse CSV: rows %d, err %v", len(rows), err)
+	}
+	if got := rows[1][3]; got != "'=HYPERLINK(\"http://x\")" {
+		t.Errorf("domain cell = %q, want a leading '", got)
+	}
+	if got := rows[1][5]; got != "Basic" {
+		t.Errorf("module cell = %q, want Basic", got)
 	}
 }

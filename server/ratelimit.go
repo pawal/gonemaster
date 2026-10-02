@@ -196,17 +196,32 @@ func allowRequest(w http.ResponseWriter, r *http.Request, rl *RateLimiter, trust
 	return ok
 }
 
-// applyRateLimit stores a limiter matching api, keeping the current one when
-// its limits are unchanged.
+// limitGET meters next against the GET limiter.
+func (s *Server) limitGET(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if allowRequest(w, r, s.getRateLimiter.Load(), s.trustedProxies) {
+			next(w, r)
+		}
+	}
+}
+
+// applyRateLimit stores limiters matching api, keeping a current one when its
+// limits are unchanged.
 func (s *Server) applyRateLimit(api PublicAPIConfig) {
 	if !api.RateLimitEnabled {
 		s.rateLimiter.Store(nil)
+		s.getRateLimiter.Store(nil)
 		return
 	}
-	if rl := s.rateLimiter.Load(); rl != nil && rl.max == api.RateLimitMax && rl.window == api.RateLimitWindow.Duration {
-		return
+	storeLimiter(&s.rateLimiter, api.RateLimitMax, api.RateLimitWindow.Duration)
+	storeLimiter(&s.getRateLimiter, api.RateLimitGetMax, api.RateLimitWindow.Duration)
+}
+
+// storeLimiter stores a limiter with max and window in p unless p holds one.
+func storeLimiter(p *atomic.Pointer[RateLimiter], max int, window time.Duration) {
+	if rl := p.Load(); rl == nil || rl.max != max || rl.window != window {
+		p.Store(NewRateLimiter(max, window))
 	}
-	s.rateLimiter.Store(NewRateLimiter(api.RateLimitMax, api.RateLimitWindow.Duration))
 }
 
 // rateLimitKeys counts the keys of the live limiter, zero when disabled.
@@ -217,9 +232,11 @@ func (s *Server) rateLimitKeys() int {
 	return 0
 }
 
-// cleanupRateLimit evicts idle keys from the live limiter.
+// cleanupRateLimit evicts idle keys from the live limiters.
 func (s *Server) cleanupRateLimit() {
-	if rl := s.rateLimiter.Load(); rl != nil {
-		rl.Cleanup()
+	for _, rl := range []*RateLimiter{s.rateLimiter.Load(), s.getRateLimiter.Load()} {
+		if rl != nil {
+			rl.Cleanup()
+		}
 	}
 }

@@ -410,6 +410,20 @@ func TestApplyFileConfigPublicAPIRateLimitMax(t *testing.T) {
 	}
 }
 
+func TestApplyFileConfigPublicAPIRateLimitGetMax(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg.PublicAPI.RateLimitGetMax != 600 {
+		t.Fatalf("expected default rate_limit_get_max 600, got %d", cfg.PublicAPI.RateLimitGetMax)
+	}
+	max := 50
+	cfg.ApplyFileConfig(FileConfig{
+		PublicAPI: &PublicAPIFileConfig{RateLimitGetMax: &max},
+	})
+	if cfg.PublicAPI.RateLimitGetMax != 50 {
+		t.Fatalf("expected rate_limit_get_max 50, got %d", cfg.PublicAPI.RateLimitGetMax)
+	}
+}
+
 func TestApplyFileConfigPublicAPIRateLimitWindow(t *testing.T) {
 	cfg := DefaultConfig()
 	window := "1m"

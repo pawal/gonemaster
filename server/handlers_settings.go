@@ -102,6 +102,10 @@ func (s *Server) applySetting(key, val string) {
 		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
 			s.cfg.PublicAPI.RateLimitMax = v
 		}
+	case "rate_limit_get_max":
+		if v, err := strconv.Atoi(val); err == nil && v >= 1 {
+			s.cfg.PublicAPI.RateLimitGetMax = v
+		}
 	case "rate_limit_window":
 		if d, err := time.ParseDuration(val); err == nil && d > 0 {
 			s.cfg.PublicAPI.RateLimitWindow = Duration{d}
@@ -208,6 +212,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"public_url":                      {Value: cfg.PublicURL, Source: s.settingSource("public_url")},
 		"rate_limit_enabled":              {Value: cfg.PublicAPI.RateLimitEnabled, Source: s.settingSource("rate_limit_enabled")},
 		"rate_limit_max":                  {Value: cfg.PublicAPI.RateLimitMax, Source: s.settingSource("rate_limit_max")},
+		"rate_limit_get_max":              {Value: cfg.PublicAPI.RateLimitGetMax, Source: s.settingSource("rate_limit_get_max")},
 		"rate_limit_window":               {Value: cfg.PublicAPI.RateLimitWindow.Duration.String(), Source: s.settingSource("rate_limit_window")},
 		"allow_private_undelegated_ip":    {Value: cfg.PublicAPI.AllowPrivateUndelegatedIP, Source: s.settingSource("allow_private_undelegated_ip")},
 		"allow_non_global_targets":        {Value: cfg.PublicAPI.AllowNonGlobalTargets, Source: s.settingSource("allow_non_global_targets")},

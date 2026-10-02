@@ -96,6 +96,9 @@ type PublicAPIConfig struct {
 	// RateLimitMax is the maximum number of job submissions per window per IP.
 	// Default: 10.
 	RateLimitMax int `json:"rate_limit_max,omitempty"`
+	// RateLimitGetMax is the maximum number of metered GET requests per window
+	// per IP. Default: 600.
+	RateLimitGetMax int `json:"rate_limit_get_max,omitempty"`
 	// RateLimitWindow is the sliding window duration for rate limiting.
 	// Default: 5m.
 	RateLimitWindow Duration `json:"rate_limit_window"`
@@ -245,6 +248,7 @@ type Config struct {
 type PublicAPIFileConfig struct {
 	RateLimitEnabled          *bool   `json:"rate_limit_enabled,omitempty"`
 	RateLimitMax              *int    `json:"rate_limit_max,omitempty"`
+	RateLimitGetMax           *int    `json:"rate_limit_get_max,omitempty"`
 	RateLimitWindow           *string `json:"rate_limit_window,omitempty"`
 	AnalysisRequestTimeout    *string `json:"analysis_request_timeout,omitempty"`
 	AllowPrivateUndelegatedIP *bool   `json:"allow_private_undelegated_ip,omitempty"`
@@ -359,6 +363,7 @@ func DefaultConfig() Config {
 		PublicAPI: PublicAPIConfig{
 			RateLimitEnabled:       false,
 			RateLimitMax:           10,
+			RateLimitGetMax:        600,
 			RateLimitWindow:        Duration{10 * time.Minute},
 			AnalysisRequestTimeout: Duration{10 * time.Second},
 		},
@@ -573,6 +578,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 		}
 		if file.PublicAPI.RateLimitMax != nil {
 			c.PublicAPI.RateLimitMax = *file.PublicAPI.RateLimitMax
+		}
+		if file.PublicAPI.RateLimitGetMax != nil {
+			c.PublicAPI.RateLimitGetMax = *file.PublicAPI.RateLimitGetMax
 		}
 		if file.PublicAPI.RateLimitWindow != nil {
 			d, err := time.ParseDuration(*file.PublicAPI.RateLimitWindow)

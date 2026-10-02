@@ -85,6 +85,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var dbPurgeInterval int
 	var pubAPIRateLimitEnabled bool
 	var pubAPIRateLimitMax int
+	var pubAPIRateLimitGetMax int
 	var pubAPIRateLimitWindow time.Duration
 	var pubAPIAllowPrivateUndelegatedIP bool
 	var pubAPIAllowNonGlobalTargets bool
@@ -165,6 +166,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		printUsageGroup(errOut, "Public API", []usageLine{
 			{flag: "--public-api-rate-limit-enabled", detail: "Enable per-IP rate limiting on POST /pub/api/v1/jobs (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED)"},
 			{flag: "--public-api-rate-limit-max N", detail: "Max job submissions per IP per window (default 10) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX)"},
+			{flag: "--public-api-rate-limit-get-max N", detail: "Max metered GET requests per IP per window (default 600) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_GET_MAX)"},
 			{flag: "--public-api-rate-limit-window DURATION", detail: "Rate limit sliding window e.g. 5m (default 10m) (env: GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW)"},
 			{flag: "--public-api-allow-private-undelegated-ip", detail: "Allow private/loopback IPs as undelegated NS targets on the public API (default off; enable for internal deployments) (env: GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP)"},
 		})
@@ -212,6 +214,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.IntVar(&stuckJobTimeoutMinutes, "stuck-job-timeout", 0, "Fail abandoned running jobs after N minutes (0 = disable, default 20)")
 	fs.BoolVar(&pubAPIRateLimitEnabled, "public-api-rate-limit-enabled", false, "Enable per-IP rate limiting on POST /pub/api/v1/jobs")
 	fs.IntVar(&pubAPIRateLimitMax, "public-api-rate-limit-max", 0, "Max job submissions per IP per window (default 10)")
+	fs.IntVar(&pubAPIRateLimitGetMax, "public-api-rate-limit-get-max", 0, "Max metered GET requests per IP per window (default 600)")
 	fs.DurationVar(&pubAPIRateLimitWindow, "public-api-rate-limit-window", 0, "Rate limit sliding window e.g. 5m (default 10m)")
 	fs.BoolVar(&pubAPIAllowPrivateUndelegatedIP, "public-api-allow-private-undelegated-ip", false, "Allow private/loopback IPs as undelegated NS targets on the public API (default off)")
 	fs.BoolVar(&pubAPIAllowNonGlobalTargets, "public-api-allow-non-global-targets", false, "Permit querying non-globally-reachable addresses; off clamps the engine guard on for every job (default off)")
@@ -294,6 +297,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if flagsSet["public-api-rate-limit-max"] && pubAPIRateLimitMax < 1 {
 		fmt.Fprintln(errOut, "--public-api-rate-limit-max must be >= 1")
+		return 2
+	}
+	if flagsSet["public-api-rate-limit-get-max"] && pubAPIRateLimitGetMax < 1 {
+		fmt.Fprintln(errOut, "--public-api-rate-limit-get-max must be >= 1")
 		return 2
 	}
 	if flagsSet["public-api-rate-limit-window"] && pubAPIRateLimitWindow <= 0 {
@@ -429,6 +436,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if flagsSet["public-api-rate-limit-max"] {
 		cfg.PublicAPI.RateLimitMax = pubAPIRateLimitMax
+	}
+	if flagsSet["public-api-rate-limit-get-max"] {
+		cfg.PublicAPI.RateLimitGetMax = pubAPIRateLimitGetMax
 	}
 	if flagsSet["public-api-rate-limit-window"] {
 		cfg.PublicAPI.RateLimitWindow = server.Duration{Duration: pubAPIRateLimitWindow}
@@ -680,6 +690,7 @@ func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string
 		"stuck-job-timeout":             "stuck_job_timeout_minutes",
 		"public-api-rate-limit-enabled": "rate_limit_enabled",
 		"public-api-rate-limit-max":     "rate_limit_max",
+		"public-api-rate-limit-get-max": "rate_limit_get_max",
 		"public-api-rate-limit-window":  "rate_limit_window",
 		"public-api-allow-private-undelegated-ip": "allow_private_undelegated_ip",
 		"public-api-allow-non-global-targets":     "allow_non_global_targets",

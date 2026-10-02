@@ -87,6 +87,7 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyInt("stuck-job-timeout", "GONEMASTER_STUCK_JOB_TIMEOUT", &cfg.StuckJobTimeoutMinutes)
 	applyBool("public-api-rate-limit-enabled", "GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED", &cfg.PublicAPI.RateLimitEnabled)
 	applyInt("public-api-rate-limit-max", "GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX", &cfg.PublicAPI.RateLimitMax)
+	applyInt("public-api-rate-limit-get-max", "GONEMASTER_PUBLIC_API_RATE_LIMIT_GET_MAX", &cfg.PublicAPI.RateLimitGetMax)
 	applyDuration("public-api-rate-limit-window", "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", &cfg.PublicAPI.RateLimitWindow)
 	applyBool("public-api-allow-private-undelegated-ip", "GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP", &cfg.PublicAPI.AllowPrivateUndelegatedIP)
 	applyBool("public-api-allow-non-global-targets", "GONEMASTER_PUBLIC_API_ALLOW_NON_GLOBAL_TARGETS", &cfg.PublicAPI.AllowNonGlobalTargets)

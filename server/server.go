@@ -42,6 +42,7 @@ type Server struct {
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
 	rateLimiter              atomic.Pointer[RateLimiter]
+	getRateLimiter           atomic.Pointer[RateLimiter]
 	trustedProxies           []netip.Prefix
 	excludedTestcases        []string
 	hotCache                 *nameserverHotCache
@@ -405,7 +406,7 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /jobs/{publicID}/asn-names", s.handlePublicGetASNNames)
 	pubMux.HandleFunc("GET /jobs/{publicID}", s.handlePublicGetJob)
 	pubMux.HandleFunc("GET /locales", s.handleLocales)
-	pubMux.HandleFunc("GET /lookup/{domain}", s.handlePublicLookupDomain)
+	pubMux.HandleFunc("GET /lookup/{domain}", s.limitGET(s.handlePublicLookupDomain))
 	pubMux.HandleFunc("GET /version", s.handlePublicVersion)
 	pubMux.HandleFunc("GET /info", s.handlePublicInfo)
 	pubMux.HandleFunc("GET /analysis/catalog", s.handlePublicAnalysisCatalog)
@@ -418,7 +419,7 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/overview",
 		pubAnalysisSnapshotPath(s.handlePublicAnalysisOverview))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains",
-		pubAnalysisSnapshotPath(s.handlePublicAnalysisDomains))
+		s.limitGET(pubAnalysisSnapshotPath(s.handlePublicAnalysisDomains)))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains/{domain}",
 		pubAnalysisSnapshotPath(s.handlePublicAnalysisDomainDetail))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}/nameservers",
@@ -451,8 +452,8 @@ func (s *Server) routes() {
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots", s.handlePublicAnalysisSnapshots)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/snapshots/{slug}", s.handlePublicAnalysisSnapshotDetail)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/trends", s.handlePublicAnalysisTrends)
-	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/diff", s.handlePublicAnalysisDiff)
-	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/report", s.handlePublicAnalysisReport)
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/diff", s.limitGET(s.handlePublicAnalysisDiff))
+	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/report", s.limitGET(s.handlePublicAnalysisReport))
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}/history", s.handlePublicAnalysisEntityHistory)
 	pubMux.HandleFunc("GET /analysis/cohorts/{dataset_tag}", s.handlePublicAnalysisCohortDetail)
 	var pubHandler http.Handler = http.StripPrefix("/pub/api/v1", captureRoute("/pub/api/v1", pubMux))

@@ -2,11 +2,9 @@ package server
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -300,19 +298,11 @@ func newTestServer(t testing.TB, opts ...srvOpt) *Server {
 		srv = New(cfg)
 	}
 	// Closed port by default, so no test reaches a real resolver.
-	srv.lookup = lookupResolvers{servers: []string{"127.0.0.1:1"}, host: blackholeResolver}
+	srv.lookup = lookupResolvers{servers: []string{"127.0.0.1:1"}}
 	for _, apply := range setup.post {
 		apply(srv)
 	}
 	return srv
-}
-
-// blackholeResolver refuses instead of querying the system resolver.
-var blackholeResolver = &net.Resolver{
-	PreferGo: true,
-	Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
-		return (&net.Dialer{}).DialContext(ctx, "udp", "127.0.0.1:1")
-	},
 }
 
 // fakeJobStore wraps a store so a test can observe or fail individual calls.

@@ -19,6 +19,14 @@ const (
 	lookupFixtureKeyTag = 370
 )
 
+// The delegation the fixture serves for internal.example, to a cluster name.
+const (
+	lookupInternalZone = "internal.example."
+	lookupInternalNS   = "redis.default.svc."
+	lookupInternalIPv4 = "10.96.0.10"
+	lookupInternalIPv6 = "fd00::10"
+)
+
 // startLookupDNS serves that delegation on loopback and returns resolvers
 // pointing at it, so a lookup test drives the real query path offline.
 func startLookupDNS(t *testing.T) lookupResolvers {
@@ -47,14 +55,7 @@ func startLookupDNS(t *testing.T) lookupResolvers {
 		t.Fatal("lookup dns fixture failed to start")
 	}
 
-	addr := packetConn.LocalAddr().String()
-	host := &net.Resolver{
-		PreferGo: true,
-		Dial: func(ctx context.Context, _, _ string) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, "udp", addr)
-		},
-	}
-	return lookupResolvers{servers: []string{addr}, host: host}
+	return lookupResolvers{servers: []string{packetConn.LocalAddr().String()}}
 }
 
 // answerLookupFixture answers the NS, DS and A queries the lookup makes, and
@@ -80,6 +81,12 @@ func answerLookupFixture(_ context.Context, w dns.ResponseWriter, req *dns.Msg) 
 			}}}
 		case dns.RRToType(q) == dns.TypeA && q.Header().Name == lookupFixtureNS:
 			resp.Answer = []dns.RR{&dns.A{Hdr: hdr, A: rdata.A{Addr: netip.MustParseAddr(lookupFixtureIP)}}}
+		case dns.RRToType(q) == dns.TypeNS && q.Header().Name == lookupInternalZone:
+			resp.Answer = []dns.RR{&dns.NS{Hdr: hdr, NS: rdata.NS{Ns: lookupInternalNS}}}
+		case dns.RRToType(q) == dns.TypeA && q.Header().Name == lookupInternalNS:
+			resp.Answer = []dns.RR{&dns.A{Hdr: hdr, A: rdata.A{Addr: netip.MustParseAddr(lookupInternalIPv4)}}}
+		case dns.RRToType(q) == dns.TypeAAAA && q.Header().Name == lookupInternalNS:
+			resp.Answer = []dns.RR{&dns.AAAA{Hdr: hdr, AAAA: rdata.AAAA{Addr: netip.MustParseAddr(lookupInternalIPv6)}}}
 		}
 	}
 	_, _ = resp.WriteTo(w)

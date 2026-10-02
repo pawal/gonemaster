@@ -60,3 +60,38 @@ func TestPublicLookupMissingDomainReturns400(t *testing.T) {
 
 	wantStatus(t, resp, http.StatusBadRequest)
 }
+
+func TestPublicLookupDropsNonGlobalAddresses(t *testing.T) {
+	srv := newTestServer(t, withLookupResolvers(startLookupDNS(t)))
+
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/lookup/internal.example", nil)
+
+	wantStatus(t, resp, http.StatusOK)
+	var got DelegationInfo
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	wantNS := []DelegationNS{{NS: strings.TrimSuffix(lookupInternalNS, ".")}}
+	if !reflect.DeepEqual(got.Nameservers, wantNS) {
+		t.Errorf("nameservers = %+v, want %+v", got.Nameservers, wantNS)
+	}
+}
+
+func TestPublicLookupKeepsNonGlobalAddressesWhenAllowed(t *testing.T) {
+	srv := newTestServer(t, withLookupResolvers(startLookupDNS(t)), withPublicAPI(func(c *PublicAPIConfig) {
+		c.AllowNonGlobalTargets = true
+	}))
+
+	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/lookup/internal.example", nil)
+
+	wantStatus(t, resp, http.StatusOK)
+	var got DelegationInfo
+	if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	ns := strings.TrimSuffix(lookupInternalNS, ".")
+	wantNS := []DelegationNS{{NS: ns, IP: lookupInternalIPv4}, {NS: ns, IP: lookupInternalIPv6}}
+	if !reflect.DeepEqual(got.Nameservers, wantNS) {
+		t.Errorf("nameservers = %+v, want %+v", got.Nameservers, wantNS)
+	}
+}

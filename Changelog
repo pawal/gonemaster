@@ -9,6 +9,11 @@ All notable changes to all gonemaster components will be documented in this file
 - engine: `--exclude` and the server `exclude` setting remove testcases or modules from every run
 - ui-public: show the registered AS holder under findings that name an AS number
 - server: add `GET /pub/api/v1/jobs/{public_id}/asn-names`
+- server: serve the MCP tools at `POST /api/v1/mcp`, switched on by the `mcp_enabled` and `mcp_allow_write` settings
+- server: `domain_exact` on `GET /api/v1/runs`, `worst_levels` on `GET /api/v1/batches/{id}`
+- mcp: `profile_list`, `domain_tag_list` and `cohort_list` tools
+- mcp: tool annotations, progress notifications from `test_domain`, `min_level` and `level_counts` on results
+- docs: MCP documentation rewritten for the bridge and the server endpoint
 
 ### Changed
 
@@ -19,6 +24,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 - cli: `--debug-queries` counts canceled attempts in a Canceled column instead of under Errors
 - server: stop caching failed ASN label lookups for the full enrichment TTL
+- mcp: `latest_for` matched domains as substrings
+- mcp: `failures_by_tag` scanned levels in random order and counted entries, not domains
+- mcp: a failed result request was reported as a clean run
+- mcp: `test_domain` omitted `public_id` and `batch_id`; limits above the server cap were rejected
 
 ## [v1.7.14] - 2026-09-30
 

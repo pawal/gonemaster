@@ -74,6 +74,8 @@ startup and after each write, and logs and ignores a stored value outside them.
 | `read_timeout` | Per-connection read timeout (default 30s). |
 | `write_timeout` | Per-connection write timeout (default 60s). Must exceed `public_api.analysis_request_timeout`. |
 | `idle_timeout` | Idle keep-alive timeout (default 60s). |
+| `auth.admin_tokens` | Admin token hashes. Empty (default) is open mode. See [authentication.md](authentication.md). |
+| `auth.protect_public` | Requires an admin token on `/public/`, `/analysis/` and `/pub/api/v1/` too. Default `false`; MUST NOT be `true` without `auth.admin_tokens`. See [authentication.md](authentication.md#protect-the-public-surfaces). |
 | `public_api.allow_private_undelegated_ip` | Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated NS targets on the public API. Default `false`; enable on private/internal deployments. |
 | `public_api.allow_non_global_targets` | Permit querying non-globally-reachable nameserver addresses. Default `false`, which clamps the engine guard on for every job so no caller-selected profile can relax it; set `true` on private/internal deployments. Complements (does not replace) `allow_private_undelegated_ip`: that flag is admission-time input validation, this is the query-time guard. A public instance that wants to run private undelegated tests must set both. The guard also covers the RIPE whois sources of the profile `asn_db`, so an internal whois mirror requires `true`. |
 
@@ -114,6 +116,8 @@ startup and after each write, and logs and ignores a stored value outside them.
 | `GONEMASTER_EXTERNAL_DATA_MAX_REQUESTS_PER_MINUTE` | `external_data.max_requests_per_minute` |
 | `GONEMASTER_EXTERNAL_DATA_MAX_CACHED_RECORDS` | `external_data.max_cached_records` |
 | `GONEMASTER_ANALYSIS_VANTAGE_LABEL` | `analysis.vantage_label` |
+| `GONEMASTER_ADMIN_TOKEN_HASHES` | `auth.admin_tokens` (comma-separated `label=sha256:...`) |
+| `GONEMASTER_AUTH_PROTECT_PUBLIC` | `auth.protect_public` |
 
 Invalid integer, boolean, or duration values emit a warning and are ignored.
 
@@ -179,7 +183,9 @@ Resolver override flags:
 ```
 
 Database and public API flags are covered in [database.md](database.md) and
-[public-api-and-proxy.md](public-api-and-proxy.md).
+[public-api-and-proxy.md](public-api-and-proxy.md), and the authentication flags
+`--admin-token-hashes` and `--auth-protect-public` in
+[authentication.md](authentication.md).
 
 ## Config File Example
 

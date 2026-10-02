@@ -21,6 +21,9 @@ These are designed for public exposure:
 - `/analysis/`
 - `/pub/api/v1/`
 
+With `auth.protect_public` on, all three require an admin token; see
+[authentication.md](authentication.md#protect-the-public-surfaces).
+
 The public API addresses a job by its public ID and does not expose internal
 job, run, or batch IDs: public results omit `job_id` and `batch_id`, and the
 `exception` argument of an entry omits the server's own address and port. A

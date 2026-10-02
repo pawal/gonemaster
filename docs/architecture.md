@@ -78,11 +78,13 @@ Build tags:
 | `/analysis/` | - | Analysis UI. |
 | `/pub/api/v1/` | Public | Internet-facing. Rate-limited; scoped to public jobs and analysis reads. |
 
-`/` and `/api/v1/` have no built-in authentication. Deployments
-restrict them to a trusted network or place them behind a
+`/` and `/api/v1/` are open unless admin tokens are configured; see
+[server/authentication.md](server/authentication.md). Without tokens,
+deployments restrict them to a trusted network or place them behind a
 reverse-proxy auth layer. `/public/`, `/analysis/`, and
 `/pub/api/v1/` are designed for direct internet exposure behind a
-rate-limiting reverse proxy.
+rate-limiting reverse proxy, and require an admin token only when
+`auth.protect_public` is on.
 
 Further reading:
 [docs/cli/](cli/README.md),

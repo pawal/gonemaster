@@ -2,8 +2,9 @@
 
 The admin API (`/api/v1/*`) and the admin UI can be protected with bearer
 tokens. Authentication is opt-in: with no tokens configured the server runs in
-open mode and behaves exactly as before. The public API (`/pub/api/v1/*`) and
-public UI are never gated by this mechanism.
+open mode and behaves exactly as before. The public API (`/pub/api/v1/*`), the
+public UI and the analysis UI are gated only when `auth.protect_public` is on;
+see [Protect the public surfaces](#protect-the-public-surfaces).
 
 ## How it works
 
@@ -14,8 +15,9 @@ A token has two forms:
   so a leaked config file or backup exposes no usable credential
 
 The same token authenticates both API clients (via `Authorization: Bearer`) and
-the admin UI (via a session cookie set after you paste the token once). Only
-`/api/v1/*` is gated; `healthz`, `readyz`, `whoami`, and `session` stay open.
+the admin UI (via a session cookie set after you paste the token once). Without
+`protect_public`, only `/api/v1/*` is gated; `healthz`, `readyz`, `whoami`, and
+`session` stay open.
 
 ## Enable auth and create the first token
 
@@ -136,6 +138,62 @@ answers any other request with `403` and the code `csrf_origin_mismatch`
 before it routes the request. Clients that send no `Origin`, such as
 `gonemaster-client` and MCP clients, are not affected.
 
+## Protect the public surfaces
+
+`auth.protect_public` puts the public UI (`/public/`), the analysis UI
+(`/analysis/`) and the public API (`/pub/api/v1/*`) behind the same admin
+tokens. It is off by default and requires token mode: with `protect_public` on
+and no admin tokens the server refuses to start, and a reload into that state
+is rejected and keeps the previous configuration.
+
+It is read from one of three sources (a later source wins):
+
+- **JSON config file**, next to the token list. Edits are picked up on
+  `SIGHUP` / `systemctl reload`:
+  ```json
+  { "auth": { "admin_tokens": [ { "label": "laptop", "hash": "sha256:..." } ], "protect_public": true } }
+  ```
+- **Environment** `GONEMASTER_AUTH_PROTECT_PUBLIC=true`. Restart to apply.
+- **Flag** `--auth-protect-public`. Restart to apply.
+
+With `protect_public` on:
+
+- A page under `/public/` or `/analysis/` requested without a valid token
+  answers `401` with a form that asks for the admin token, at the URL
+  requested. Submitting a valid token sets the `gm_admin` session cookie and
+  loads that URL again. The form's language follows `?lang=`, then
+  `Accept-Language`.
+- A static asset under those paths requested without a token answers `401`
+  with no form.
+- `/pub/api/v1/*` answers `401` without a token, as `/api/v1/*` does. API
+  clients send `Authorization: Bearer`. A request with a method other than
+  `GET`, `HEAD` or `OPTIONS` MUST pass the same origin check as `/api/v1`.
+- A response that passes the check carries `Cache-Control: private` where it
+  would carry `public`, so a shared cache does not serve it to another visitor.
+- `robots.txt` answers `Disallow: /` without a `Sitemap` line, and
+  `sitemap.xml` answers `404`.
+- `/`, `/api/v1/*` and the MCP endpoint behave as without the switch.
+
+The form and its stylesheets, `/public/_auth/login.css` and
+`/analysis/_auth/login.css`, are the only responses under those paths served
+without a token, so a proxy that forwards `/public/*`, `/analysis/*` and
+`/pub/api/v1/*` needs no change.
+
+The cookie is the one the admin UI sets. On one host, a login in the admin UI
+also opens the public UI and the analysis UI, and the reverse. On a separate
+public host the visitor logs in there once. The public UIs have no log out
+control: the cookie lasts until the browser session ends, or until "Log out" in
+the admin UI on the same host.
+
+```
+curl -s -o /dev/null -w '%{http_code}\n' http://localhost:8080/pub/api/v1/version
+# -> 401
+curl -s -o /dev/null -w '%{http_code}\n' \
+  -H "Authorization: Bearer gm_..." \
+  http://localhost:8080/pub/api/v1/version
+# -> 200
+```
+
 ## MCP clients
 
 The MCP endpoint at `POST /api/v1/mcp` uses the same tokens and accepts them
@@ -145,14 +203,17 @@ stdio bridge `gonemaster-mcp` reads the token from `GONEMASTER_TOKEN`. See
 
 ## Turn auth off
 
-Empty `auth.admin_tokens` (or unset the environment variable) and reload or
-restart. The server logs an `auth open mode` line and the UI stops asking for a
-token.
+Empty `auth.admin_tokens` (or unset the environment variable) and turn
+`protect_public` off in the same change, then reload or restart. The server
+logs an `auth open mode` line and the UI stops asking for a token.
 
 ## Troubleshooting
 
 - **Every admin call returns 401:** auth is on and no valid token was sent. Log
   in again in the UI, or check `GONEMASTER_TOKEN` for clients.
+- **Startup fails with `protect_public requires admin_tokens`:** `protect_public`
+  is on and no token is configured. Add a token hash or turn `protect_public`
+  off.
 - **Lost the token:** the plaintext cannot be recovered from the hash. Mint a new
   one, add its hash, reload, and optionally drop the old hash.
 - **Locked out of the UI:** you still control the config file - mint a fresh

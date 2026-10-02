@@ -1,7 +1,9 @@
 package server
 
 import (
+	"context"
 	"net/http"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -21,6 +23,7 @@ type AnalysisReadStore interface {
 	GetAnalysisAddress(id int64) (AnalysisAddress, bool)
 	GetAnalysisPrefix(id int64) (AnalysisPrefix, bool)
 	GetAnalysisASN(asn int64) (AnalysisASN, bool)
+	ListAnalysisASNs(ctx context.Context, asns []int64) map[int64]AnalysisASN
 	ListAnalysisCohortSnapshots(cohortID int64) []AnalysisCohortSnapshot
 	GetAnalysisCohortSnapshotBySlug(cohortID int64, slug string) (AnalysisCohortSnapshot, bool)
 	GetDefaultSnapshotForCohort(cohortID int64) (AnalysisCohortSnapshot, bool)
@@ -33,7 +36,7 @@ type AnalysisReadStore interface {
 	ListSnapshotEndpointViewsByAddress(snapshotID int64, address, nameserver string) []AnalysisSnapshotEndpointView
 	ListSnapshotTagViews(snapshotID int64) []AnalysisSnapshotTagView
 	GetSnapshotTagView(snapshotID int64, tag string) (AnalysisSnapshotTagView, bool)
-	ListSnapshotDomainViews(snapshotID int64) []AnalysisSnapshotDomainView
+	ListSnapshotDomainViews(ctx context.Context, snapshotID int64) []AnalysisSnapshotDomainView
 	GetSnapshotDomainViewByName(snapshotID int64, name string) (AnalysisSnapshotDomainView, bool)
 	GetSnapshotASNView(snapshotID, asn int64) (AnalysisSnapshotASNView, bool)
 	ListSnapshotPrefixViews(snapshotID int64) []AnalysisSnapshotPrefixView
@@ -390,7 +393,7 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 		postureFilter = normalized
 	}
 
-	rows := readStore.ListSnapshotDomainViews(snapshot.ID)
+	rows := readStore.ListSnapshotDomainViews(r.Context(), snapshot.ID)
 	items := make([]PublicAnalysisDomainView, 0, len(rows))
 	for _, row := range rows {
 		if worstLevelFilter != "" && severityBucket(row.WorstLevel) != worstLevelFilter {
@@ -437,9 +440,6 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 			for asn := range asns {
 				asnCopy := asn
 				v.OperatorASN = &asnCopy
-				if meta, ok := readStore.GetAnalysisASN(asn); ok {
-					v.Operator = meta.Label
-				}
 			}
 		} else if len(asns) > 1 {
 			v.Operator = "Multiple"
@@ -462,8 +462,15 @@ func (s *Server) handlePublicAnalysisDomains(w http.ResponseWriter, r *http.Requ
 
 	total := len(items)
 	start, end := clampPage(filter.Limit, filter.Offset, total)
+	page := items[start:end]
+	labels := asnLabels(r.Context(), readStore, page, func(v PublicAnalysisDomainView) *int64 { return v.OperatorASN })
+	for i := range page {
+		if page[i].OperatorASN != nil {
+			page[i].Operator = labels[*page[i].OperatorASN]
+		}
+	}
 	writeJSON(w, http.StatusOK, PublicAnalysisListResponse[PublicAnalysisDomainView]{
-		Items:  items[start:end],
+		Items:  page,
 		Total:  total,
 		Limit:  filter.Limit,
 		Offset: filter.Offset,
@@ -539,6 +546,22 @@ func sortAnalysisDomainViews(items []PublicAnalysisDomainView, mode string) {
 	default:
 		sort.Slice(items, func(i, j int) bool { return items[i].Domain < items[j].Domain })
 	}
+}
+
+// asnLabels reads the labels of the ASNs asnOf picks from items in one query.
+func asnLabels[T any](ctx context.Context, readStore AnalysisReadStore, items []T, asnOf func(T) *int64) map[int64]string {
+	var asns []int64
+	for _, it := range items {
+		if asn := asnOf(it); asn != nil {
+			asns = append(asns, *asn)
+		}
+	}
+	slices.Sort(asns)
+	out := map[int64]string{}
+	for asn, meta := range readStore.ListAnalysisASNs(ctx, slices.Compact(asns)) {
+		out[asn] = meta.Label
+	}
+	return out
 }
 
 // sortByDomainCount sorts items by an integer extractor with the domain

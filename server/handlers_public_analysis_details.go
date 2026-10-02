@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"maps"
 	"net/http"
 	"net/url"
@@ -251,7 +252,7 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 	if readStore, canRead := s.store.(AnalysisReadStore); canRead && snapshot.ID != 0 {
 		snapshotView := publicAnalysisSnapshotView(snapshot)
 		detail.Snapshot = &snapshotView
-		populateCohortDetailFromViews(&detail, readStore, snapshot.ID)
+		populateCohortDetailFromViews(r.Context(), &detail, readStore, snapshot.ID)
 	} else if snapshot.ID == 0 {
 		detail.Status = PublicAnalysisStatusNoSnapshot
 	}
@@ -260,7 +261,7 @@ func (s *Server) handlePublicAnalysisCohortDetail(w http.ResponseWriter, r *http
 
 // populateCohortDetailFromViews fills totals + distributions from the
 // overview_v2 aggregate and the per-snapshot view tables.
-func populateCohortDetailFromViews(detail *PublicAnalysisCohortDetail, readStore AnalysisReadStore, snapshotID int64) {
+func populateCohortDetailFromViews(ctx context.Context, detail *PublicAnalysisCohortDetail, readStore AnalysisReadStore, snapshotID int64) {
 	if overview, ok := loadSnapshotOverviewV2(readStore, snapshotID); ok {
 		detail.DomainCount = overview.Totals.DomainCount
 		detail.NameserverCount = overview.Totals.NameserverCount
@@ -272,7 +273,7 @@ func populateCohortDetailFromViews(detail *PublicAnalysisCohortDetail, readStore
 		}
 		return
 	}
-	detail.DomainCount = len(readStore.ListSnapshotDomainViews(snapshotID))
+	detail.DomainCount = len(readStore.ListSnapshotDomainViews(ctx, snapshotID))
 	detail.NameserverCount = len(readStore.ListSnapshotNameserverViews(snapshotID))
 	detail.EndpointCount = len(readStore.ListSnapshotEndpointViews(snapshotID))
 	detail.ASNCount = len(readStore.ListSnapshotASNViews(snapshotID))

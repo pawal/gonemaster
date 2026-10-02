@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -2017,8 +2018,8 @@ func scanSnapshotDomainView(row rowScanner) (AnalysisSnapshotDomainView, error) 
 
 // ListSnapshotDomainViews returns every domain view row for one snapshot,
 // ordered by domain_name for stability.
-func (s *SQLJobStore) ListSnapshotDomainViews(snapshotID int64) []AnalysisSnapshotDomainView {
-	rows, err := s.db.Query(
+func (s *SQLJobStore) ListSnapshotDomainViews(ctx context.Context, snapshotID int64) []AnalysisSnapshotDomainView {
+	rows, err := s.db.QueryContext(ctx,
 		fmt.Sprintf(`SELECT %s
 			FROM analysis_snapshot_domain_view
 			WHERE snapshot_id = %s

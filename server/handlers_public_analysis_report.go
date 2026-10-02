@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"strings"
@@ -11,32 +12,39 @@ import (
 	"codeberg.org/pawal/gonemaster/scoring"
 )
 
-// analysisReportCacheSize caps the rendered reports kept in memory. A pair
-// is a few hundred kilobytes and only the pairs a reader is flipping
-// between are worth holding.
+// analysisReportCacheSize caps the rendered responses each analysis cache
+// keeps. A pair is a few hundred kilobytes and only the pairs a reader is
+// flipping between are worth holding.
 const analysisReportCacheSize = 16
 
-// analysisReportCache memoizes rendered reports per snapshot pair and
-// coalesces concurrent computes of the same pair.
-type analysisReportCache struct {
+// analysisCache memoizes rendered responses per snapshot pair and coalesces
+// concurrent computes of the same pair.
+type analysisCache[T any] struct {
 	mu      sync.Mutex
 	group   singleflight.Group
-	entries map[string]PublicAnalysisReportResponse
+	entries map[string]T
 	order   []string
 }
 
-func newAnalysisReportCache() *analysisReportCache {
-	return &analysisReportCache{entries: map[string]PublicAnalysisReportResponse{}}
+// analysisReportCache holds rendered cohort reports.
+type analysisReportCache = analysisCache[PublicAnalysisReportResponse]
+
+func newAnalysisCache[T any]() *analysisCache[T] {
+	return &analysisCache[T]{entries: map[string]T{}}
 }
 
-func (c *analysisReportCache) get(key string) (PublicAnalysisReportResponse, bool) {
+func newAnalysisReportCache() *analysisReportCache {
+	return newAnalysisCache[PublicAnalysisReportResponse]()
+}
+
+func (c *analysisCache[T]) get(key string) (T, bool) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	resp, ok := c.entries[key]
 	return resp, ok
 }
 
-func (c *analysisReportCache) put(key string, resp PublicAnalysisReportResponse) {
+func (c *analysisCache[T]) put(key string, resp T) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if _, ok := c.entries[key]; !ok {
@@ -51,19 +59,19 @@ func (c *analysisReportCache) put(key string, resp PublicAnalysisReportResponse)
 
 // reset drops every cached report. Called when the scoring configuration
 // changes, since attribution is computed under it.
-func (c *analysisReportCache) reset() {
+func (c *analysisCache[T]) reset() {
 	if c == nil {
 		return
 	}
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	c.entries = map[string]PublicAnalysisReportResponse{}
+	c.entries = map[string]T{}
 	c.order = nil
 }
 
-// compute returns the cached report for key, computing it once when several
+// compute returns the cached response for key, computing it once when several
 // requests race on the same pair.
-func (c *analysisReportCache) compute(key string, build func() PublicAnalysisReportResponse) PublicAnalysisReportResponse {
+func (c *analysisCache[T]) compute(key string, build func() T) T {
 	if resp, ok := c.get(key); ok {
 		return resp
 	}
@@ -75,20 +83,23 @@ func (c *analysisReportCache) compute(key string, build func() PublicAnalysisRep
 		c.put(key, resp)
 		return resp, nil
 	})
-	return v.(PublicAnalysisReportResponse)
+	return v.(T)
 }
 
-// reportCacheKey addresses one rendered report. Both snapshots' update
-// times are part of it so a rematerialize does not serve a stale report.
-func reportCacheKey(from, to AnalysisCohortSnapshot, minCluster, maxSpread int) string {
+// snapshotPairKey addresses one snapshot pair. Both snapshots' update times
+// are part of it so a rematerialize does not serve a stale response.
+func snapshotPairKey(from, to AnalysisCohortSnapshot) string {
 	return strings.Join([]string{
 		strconv.FormatInt(from.ID, 10),
 		strconv.FormatInt(from.UpdatedAt.UnixNano(), 10),
 		strconv.FormatInt(to.ID, 10),
 		strconv.FormatInt(to.UpdatedAt.UnixNano(), 10),
-		strconv.Itoa(minCluster),
-		strconv.Itoa(maxSpread),
 	}, ":")
+}
+
+// reportCacheKey addresses one rendered report.
+func reportCacheKey(from, to AnalysisCohortSnapshot, minCluster, maxSpread int) string {
+	return snapshotPairKey(from, to) + ":" + strconv.Itoa(minCluster) + ":" + strconv.Itoa(maxSpread)
 }
 
 // parseReportBound reads one positive integer query parameter, or writes a
@@ -181,13 +192,15 @@ func (s *Server) handlePublicAnalysisReport(w http.ResponseWriter, r *http.Reque
 		cfg = scoring.DefaultConfig()
 	}
 	key := reportCacheKey(fromSnap, toSnap, minCluster, maxSpread)
+	// Detached: a shared, cached build must not stop on one caller's timeout.
+	ctx := context.WithoutCancel(r.Context())
 	resp := s.reportCache.compute(key, func() PublicAnalysisReportResponse {
 		return buildAnalysisReport(reportInput{
 			DatasetTag:  cohort.SourceTag,
 			From:        fromSnap,
 			To:          toSnap,
-			FromDomains: readStore.ListSnapshotDomainViews(fromSnap.ID),
-			ToDomains:   readStore.ListSnapshotDomainViews(toSnap.ID),
+			FromDomains: readStore.ListSnapshotDomainViews(ctx, fromSnap.ID),
+			ToDomains:   readStore.ListSnapshotDomainViews(ctx, toSnap.ID),
 			FromTags:    readStore.ListSnapshotTagViews(fromSnap.ID),
 			ToTags:      readStore.ListSnapshotTagViews(toSnap.ID),
 			Scoring:     cfg,

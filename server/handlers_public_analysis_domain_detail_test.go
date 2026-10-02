@@ -270,7 +270,7 @@ func TestDomainViewListRoundTripPreservesPayload(t *testing.T) {
 		runID := "run-alpha.example-" + now.Format("20060102150405")
 		f.seedEndpoint(runID, "alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
 
-		rows := f.store.ListSnapshotDomainViews(f.snapshot.ID)
+		rows := f.store.ListSnapshotDomainViews(t.Context(), f.snapshot.ID)
 		if len(rows) != 1 {
 			t.Fatalf("rows = %d, want 1", len(rows))
 		}

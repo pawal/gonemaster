@@ -66,6 +66,8 @@ type Server struct {
 	snapshotSweepsInFlight map[int64]struct{}
 	// reportCache holds rendered cohort reports per snapshot pair.
 	reportCache *analysisReportCache
+	// diffCache holds domain-level diffs per snapshot pair.
+	diffCache   *analysisCache[PublicAnalysisDiffResponse]
 	adminTokens atomic.Pointer[tokenSet]
 	extData     *extdata.Provider
 	registry    registryLookup
@@ -191,6 +193,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		snapshotRematerializeInFlight: map[int64]struct{}{},
 		snapshotSweepsInFlight:        map[int64]struct{}{},
 		reportCache:                   newAnalysisReportCache(),
+		diffCache:                     newAnalysisCache[PublicAnalysisDiffResponse](),
 		engineRunner:                  engine.Run,
 		engineLimiter:                 newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                       map[string]context.CancelFunc{},

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"database/sql"
 	"errors"
 	"fmt"
@@ -579,6 +580,34 @@ func (s *SQLJobStore) upsertAnalysisASNIn(q sqlQuerier, asn int64, label string,
 // GetAnalysisASN returns a normalized ASN row by primary key.
 func (s *SQLJobStore) GetAnalysisASN(asn int64) (AnalysisASN, bool) {
 	return s.getAnalysisASNIn(s.db, asn)
+}
+
+// ListAnalysisASNs returns the ASN rows for asns in one query, keyed by ASN.
+func (s *SQLJobStore) ListAnalysisASNs(ctx context.Context, asns []int64) map[int64]AnalysisASN {
+	out := map[int64]AnalysisASN{}
+	if len(asns) == 0 {
+		return out
+	}
+	args := make([]any, len(asns))
+	for i, asn := range asns {
+		args[i] = asn
+	}
+	rows, err := s.db.QueryContext(ctx,
+		fmt.Sprintf(`SELECT %s FROM analysis_asns WHERE asn IN (%s)`, analysisASNCols, s.phRange(1, len(asns))),
+		args...,
+	)
+	if err != nil {
+		return out
+	}
+	defer rows.Close()
+	for rows.Next() {
+		item, err := scanAnalysisASNRow(rows)
+		if err != nil {
+			return out
+		}
+		out[item.ASN] = item
+	}
+	return out
 }
 
 func (s *SQLJobStore) getAnalysisASNIn(q sqlQuerier, asn int64) (AnalysisASN, bool) {

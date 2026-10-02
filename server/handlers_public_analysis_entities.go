@@ -503,9 +503,6 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 			for _, asn := range b.ASNs {
 				copy := asn
 				v.ASN = &copy
-				if meta, ok := readStore.GetAnalysisASN(asn); ok {
-					v.ASNLabel = meta.Label
-				}
 			}
 		}
 		items = append(items, v)
@@ -536,8 +533,15 @@ func (s *Server) handlePublicAnalysisPrefixes(w http.ResponseWriter, r *http.Req
 	})
 	total := len(items)
 	start, end := clampPage(filter.Limit, filter.Offset, total)
+	page := items[start:end]
+	labels := asnLabels(r.Context(), readStore, page, func(v PublicAnalysisPrefixView) *int64 { return v.ASN })
+	for i := range page {
+		if page[i].ASN != nil {
+			page[i].ASNLabel = labels[*page[i].ASN]
+		}
+	}
 	writeJSON(w, http.StatusOK, PublicAnalysisListResponse[PublicAnalysisPrefixView]{
-		Items:  items[start:end],
+		Items:  page,
 		Total:  total,
 		Limit:  filter.Limit,
 		Offset: filter.Offset,

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"sort"
@@ -459,8 +460,20 @@ func (s *Server) handlePublicAnalysisDiff(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	fromByName := indexDomainViewsByName(readStore.ListSnapshotDomainViews(fromSnap.ID))
-	toByName := indexDomainViewsByName(readStore.ListSnapshotDomainViews(toSnap.ID))
+	// Detached: a shared, cached build must not stop on one caller's timeout.
+	ctx := context.WithoutCancel(r.Context())
+	resp := s.diffCache.compute(snapshotPairKey(fromSnap, toSnap), func() PublicAnalysisDiffResponse {
+		return buildAnalysisDiff(cohort, fromSnap, toSnap,
+			readStore.ListSnapshotDomainViews(ctx, fromSnap.ID),
+			readStore.ListSnapshotDomainViews(ctx, toSnap.ID))
+	})
+	writeJSON(w, http.StatusOK, resp)
+}
+
+// buildAnalysisDiff computes the domain-level delta between two snapshots.
+func buildAnalysisDiff(cohort AnalysisCohort, fromSnap, toSnap AnalysisCohortSnapshot, fromRows, toRows []AnalysisSnapshotDomainView) PublicAnalysisDiffResponse {
+	fromByName := indexDomainViewsByName(fromRows)
+	toByName := indexDomainViewsByName(toRows)
 
 	added := []PublicAnalysisDiffEntry{}
 	removed := []PublicAnalysisDiffEntry{}
@@ -517,7 +530,7 @@ func (s *Server) handlePublicAnalysisDiff(w http.ResponseWriter, r *http.Request
 	sortDiffEntries(gradeChanged)
 	sortDiffEntries(levelChanged)
 
-	writeJSON(w, http.StatusOK, PublicAnalysisDiffResponse{
+	return PublicAnalysisDiffResponse{
 		DatasetTag:   cohort.SourceTag,
 		FromSlug:     fromSnap.Slug,
 		ToSlug:       toSnap.Slug,
@@ -526,7 +539,7 @@ func (s *Server) handlePublicAnalysisDiff(w http.ResponseWriter, r *http.Request
 		Removed:      removed,
 		GradeChanged: gradeChanged,
 		LevelChanged: levelChanged,
-	})
+	}
 }
 
 func indexDomainViewsByName(rows []AnalysisSnapshotDomainView) map[string]AnalysisSnapshotDomainView {

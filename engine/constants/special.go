@@ -39,7 +39,38 @@ func IsGloballyReachable(block *SpecialIPBlock) bool {
 
 // IsQueryable reports whether a DNS query may be sent to ip.
 func IsQueryable(ip netip.Addr) bool {
-	ip = ip.Unmap()
-	block := FindSpecialAddress(ip)
-	return block == nil || IsGloballyReachable(block)
+	return NotQueryableReason(ip) == ""
+}
+
+// NotQueryableReason names the range that makes ip not queryable, or returns
+// "" for a queryable address. An embedded IPv4 address must be queryable too.
+func NotQueryableReason(ip netip.Addr) string {
+	ip = ip.Unmap().WithZone("")
+	if block := FindSpecialAddress(ip); !IsGloballyReachable(block) {
+		return block.Name
+	}
+	if ip.IsMulticast() {
+		return "Multicast"
+	}
+	if v4, ok := embeddedIPv4(ip); ok {
+		if reason := NotQueryableReason(v4); reason != "" {
+			return "embedded " + reason
+		}
+	}
+	return ""
+}
+
+var (
+	nat64WellKnown = netip.MustParsePrefix("64:ff9b::/96")
+	ipv4Compatible = netip.MustParsePrefix("::/96")
+)
+
+// embeddedIPv4 returns the IPv4 address in the low 32 bits of a NAT64 well-known
+// prefix address (RFC 6052) or an IPv4-compatible address (RFC 4291).
+func embeddedIPv4(ip netip.Addr) (netip.Addr, bool) {
+	if !nat64WellKnown.Contains(ip) && !ipv4Compatible.Contains(ip) {
+		return netip.Addr{}, false
+	}
+	b := ip.As16()
+	return netip.AddrFrom4([4]byte(b[12:])), true
 }

@@ -74,3 +74,49 @@ func TestIsQueryable(t *testing.T) {
 		}
 	}
 }
+
+func TestIsQueryableEmbeddedIPv4(t *testing.T) {
+	cases := []struct {
+		addr string
+		want bool
+	}{
+		{"64:ff9b::808:808", true},
+		{"64:ff9b::a00:1", false},
+		{"64:ff9b::7f00:1", false},
+		{"64:ff9b::c0a8:101", false},
+		{"64:ff9b::c612:1", false},
+		{"64:ff9b:1::a00:1", false},
+		{"::8.8.8.8", true},
+		{"::10.0.0.1", false},
+		{"::192.168.1.1", false},
+		{"::198.18.0.1", false},
+		{"2002:808:808::1", false},
+		{"2002:a00:1::1", false},
+	}
+	for _, c := range cases {
+		if got := IsQueryable(netip.MustParseAddr(c.addr)); got != c.want {
+			t.Errorf("IsQueryable(%s) = %v, want %v", c.addr, got, c.want)
+		}
+	}
+}
+
+func TestIsQueryableRefusesMulticastAndZonedForms(t *testing.T) {
+	for _, addr := range []string{"224.0.0.1", "239.255.255.250", "ff02::1", "ff0e::1", "fe80::1%eth0", "fd00::1%eth0"} {
+		if IsQueryable(netip.MustParseAddr(addr)) {
+			t.Errorf("IsQueryable(%s) = true, want false", addr)
+		}
+	}
+}
+
+func TestNotQueryableReason(t *testing.T) {
+	for addr, want := range map[string]string{
+		"8.8.8.8":        "",
+		"10.0.0.1":       "Private-Use",
+		"224.0.0.1":      "Multicast",
+		"64:ff9b::a00:1": "embedded Private-Use",
+	} {
+		if got := NotQueryableReason(netip.MustParseAddr(addr)); got != want {
+			t.Errorf("NotQueryableReason(%s) = %q, want %q", addr, got, want)
+		}
+	}
+}

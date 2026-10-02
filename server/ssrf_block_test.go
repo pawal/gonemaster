@@ -64,7 +64,7 @@ func TestPublicCreateJobAllowsPrivateUndelegatedIPWhenEnabled(t *testing.T) {
 func TestPublicCreateJobAllowsPublicUndelegatedIP(t *testing.T) {
 	srv := newTestServer(t)
 
-	body := `{"domain":"example.com","nameservers":[{"ns":"ns1.example.","ip":"198.51.100.1"}]}`
+	body := `{"domain":"example.com","nameservers":[{"ns":"ns1.example.","ip":"9.9.9.9"}]}`
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
 
 	wantStatus(t, resp, http.StatusCreated)
@@ -74,7 +74,7 @@ func TestPublicCreateJobRejectsAnyPrivateIPInList(t *testing.T) {
 	srv := newTestServer(t)
 
 	body := `{"domain":"example.com","nameservers":[` +
-		`{"ns":"ns1.example.","ip":"198.51.100.1"},` +
+		`{"ns":"ns1.example.","ip":"9.9.9.9"},` +
 		`{"ns":"ns2.attacker.example","ip":"127.0.0.1"}` +
 		`]}`
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", body)
@@ -83,5 +83,23 @@ func TestPublicCreateJobRejectsAnyPrivateIPInList(t *testing.T) {
 	// Mention the offending index for operator clarity.
 	if !strings.Contains(out.Error.Message, "[1]") {
 		t.Logf("note: error message should reference the offending index: %q", out.Error.Message)
+	}
+}
+
+func TestIsBlockedPublicNameserverIPFollowsTheEngineGuard(t *testing.T) {
+	for _, ip := range []string{
+		"198.18.0.1", "240.0.0.1", "0.1.2.3", "192.0.0.1",
+		"192.0.2.1", "198.51.100.1", "203.0.113.1",
+		"2002:a00:1::1", "::10.0.0.1", "64:ff9b::a00:1", "64:ff9b:1::a00:1",
+		"fe80::1%eth0",
+	} {
+		if blocked, reason := isBlockedPublicNameserverIP(ip); !blocked || reason == "" {
+			t.Errorf("ip=%q: blocked=%v reason=%q, want blocked with a reason", ip, blocked, reason)
+		}
+	}
+	for _, ip := range []string{"9.9.9.9", "64:ff9b::808:808", "2001:4860:4860::8888"} {
+		if blocked, reason := isBlockedPublicNameserverIP(ip); blocked {
+			t.Errorf("ip=%q: blocked for %q, want allowed", ip, reason)
+		}
 	}
 }

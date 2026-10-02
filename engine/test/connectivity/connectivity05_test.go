@@ -2,6 +2,7 @@ package connectivity
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -330,6 +331,42 @@ func TestConnectivity05HugeAnswerSkipsProbe(t *testing.T) {
 	tctest.RequireTag(t, entries, tagAnswerNeedsTCP)
 	if rec.sent("probe") {
 		t.Fatalf("expected no probe above the 4096-byte ceiling; queries: %v", rec.kinds())
+	}
+}
+
+// A TCP answer with the TC flag is reported whichever path led to it.
+func TestConnectivity05TCPAnswerTruncated(t *testing.T) {
+	cut := truncated(withProtocol(dnskeyAnswer(t, 1, 40), protocolTCP))
+	for _, tc := range []struct {
+		name    string
+		answers map[string]packet.Packet
+	}{
+		{"fallback", map[string]packet.Packet{"reference": cut}},
+		{"forced tcp", map[string]packet.Packet{
+			"reference": truncated(withProtocol(dnskeyAnswer(t, 1, 40), protocolUDP)),
+			"tcp":       cut,
+		}},
+		{"loss branch", map[string]packet.Packet{
+			"reference": {},
+			"small":     truncated(withProtocol(dnskeyAnswer(t, 1, 40), protocolUDP)),
+			"tcp":       cut,
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := newRecorder(tc.answers)
+
+			entries := runConnectivity05(t, rec, "192.0.2.1")
+
+			entry := tctest.RequireTag(t, entries, tagTCPAnswerTruncated)
+			requireIntArg(t, entry, "size", answerSize(cut))
+			requireIntArg(t, entry, "payload", defaultEDNSPayload)
+			if got := tctest.TagsWithPrefix(entries, "CN05_"); !slices.Equal(got, []string{tagTCPAnswerTruncated}) {
+				t.Fatalf("expected only %s, got %v", tagTCPAnswerTruncated, got)
+			}
+			if rec.sent("probe") {
+				t.Fatalf("the full answer size is unknown, so no probe may be sent; queries: %v", rec.kinds())
+			}
+		})
 	}
 }
 

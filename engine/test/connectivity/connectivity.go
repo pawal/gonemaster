@@ -44,6 +44,7 @@ const (
 	tagDeliveredUDP         = "CN05_LARGE_ANSWER_DELIVERED_UDP"
 	tagNoUDPAnswer          = "CN05_LARGE_ANSWER_NO_UDP_ANSWER"
 	tagServerCapsUDP        = "CN05_SERVER_CAPS_UDP_ANSWER"
+	tagTCPAnswerTruncated   = "CN05_TCP_ANSWER_TRUNCATED"
 	tagUDPLossSizeDependent = "CN05_UDP_LOSS_SIZE_DEPENDENT"
 )
 
@@ -207,6 +208,7 @@ func Metadata() map[string][]string {
 			"CN05_LARGE_ANSWER_DELIVERED_UDP",
 			"CN05_LARGE_ANSWER_NO_UDP_ANSWER",
 			"CN05_SERVER_CAPS_UDP_ANSWER",
+			"CN05_TCP_ANSWER_TRUNCATED",
 			"CN05_UDP_LOSS_SIZE_DEPENDENT",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
@@ -767,12 +769,18 @@ func udpDelivery(ctx context.Context, ns nameserver.Nameserver, name string) []d
 	switch {
 	case resp.Protocol == protocolTCP:
 		// Truncated at the default payload; the transport fell back.
+		if resp.TC() {
+			return truncatedOverTCP(resp)
+		}
 		size = answerSize(resp)
 	case resp.TC():
 		// Fallback is off in the profile, so learn the size over TCP.
 		fetched, ok := fetchOverTCP(ctx, ns, name)
 		if !ok {
 			return nil
+		}
+		if fetched.TC() {
+			return truncatedOverTCP(fetched)
 		}
 		size = answerSize(fetched)
 	case resp.Protocol == protocolUDP:
@@ -813,7 +821,15 @@ func sizeDependentLoss(ctx context.Context, ns nameserver.Nameserver, name strin
 	if !ok {
 		return nil
 	}
+	if fetched.TC() {
+		return truncatedOverTCP(fetched)
+	}
 	return []deliveryOutcome{{tag: tagUDPLossSizeDependent, size: answerSize(fetched), payload: defaultEDNSPayload}}
+}
+
+// truncatedOverTCP is the outcome for a TCP answer that still carries the TC flag.
+func truncatedOverTCP(resp packet.Packet) []deliveryOutcome {
+	return []deliveryOutcome{{tag: tagTCPAnswerTruncated, size: answerSize(resp), payload: defaultEDNSPayload}}
 }
 
 func fetchOverTCP(ctx context.Context, ns nameserver.Nameserver, name string) (packet.Packet, bool) {

@@ -55,6 +55,7 @@ _Do not edit by hand - regenerate with the command above._
 | `CN05_LARGE_ANSWER_DELIVERED_UDP` | `INFO` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
 | `CN05_LARGE_ANSWER_NO_UDP_ANSWER` | `WARNING` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
 | `CN05_SERVER_CAPS_UDP_ANSWER` | `INFO` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
+| `CN05_TCP_ANSWER_TRUNCATED` | `ERROR` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
 | `CN05_UDP_LOSS_SIZE_DEPENDENT` | `WARNING` | [connectivity05](../tests/connectivity/connectivity05.md) | yes |
 | `CNAME_CHAIN_TOO_LONG` | `ERROR` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |
 | `CNAME_TARGET_UNRESOLVED` | `ERROR` | [connectivity01](../tests/connectivity/connectivity01.md) | yes |

@@ -14,7 +14,7 @@
   "summary": {
     "module_count": 9,
     "testcase_count": 85,
-    "unique_tag_count": 593
+    "unique_tag_count": 594
   },
   "modules": {
     "address": {
@@ -185,6 +185,7 @@
         "CN05_LARGE_ANSWER_DELIVERED_UDP",
         "CN05_LARGE_ANSWER_NO_UDP_ANSWER",
         "CN05_SERVER_CAPS_UDP_ANSWER",
+        "CN05_TCP_ANSWER_TRUNCATED",
         "CN05_UDP_LOSS_SIZE_DEPENDENT",
         "IPV4_DISABLED",
         "IPV6_DISABLED",

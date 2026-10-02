@@ -2,7 +2,11 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.15] - 2026-10-02
+
+`gonemaster-server` can now serve the MCP tools itself at `POST /api/v1/mcp`, as an alternative to the `gonemaster-mcp` stdio bridge. The endpoint is off by default; turn it on with `mcp_enabled`, and with `mcp_allow_write` for the write tools. It accepts the admin bearer tokens. A reverse proxy in front of it MUST allow `test_domain` to hold the connection for up to 600 s; see `docs/mcp/server-endpoint.md`. `failures_by_tag` now reports distinct domains in `count`, and the old entry count moved to `entries`. Upgrade `gonemaster-mcp` together with the server: against an older server, `latest_for` still matches domain substrings.
+
+New public IDs have 12 characters; existing 8-character IDs and links keep working.
 
 ### Added
 

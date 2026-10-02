@@ -1674,6 +1674,46 @@ func TestNonGlobalQueryGuard(t *testing.T) {
 	}
 }
 
+func TestNonGlobalAXFRGuard(t *testing.T) {
+	const blockTag = "NON_GLOBAL_QUERY_BLOCKED"
+	axfr := func(ctx context.Context, addr string) (bool, error) {
+		called := false
+		err := newNS(t, ctx, "ns.example", addr).AXFR(ctx, "example.com", func(dns.RR) bool {
+			called = true
+			return false
+		}, "IN")
+		return called, err
+	}
+
+	for _, addr := range []string{"127.0.0.1", "::1"} {
+		ctx, _ := testContext(t)
+		called, err := axfr(ctx, addr)
+		if err != nil {
+			t.Errorf("%s: blocked transfer returned error %v, want nil", addr, err)
+		}
+		if called {
+			t.Errorf("%s: blocked transfer delivered a record", addr)
+		}
+		if !dnstest.HasTag(logger.FromContext(ctx).Entries(), blockTag) {
+			t.Errorf("%s: expected %s", addr, blockTag)
+		}
+	}
+
+	ctx, prof := testContext(t)
+	prof.Net.AllowNonGlobalTargets = true
+	_, _ = axfr(ctx, "127.0.0.1")
+	if dnstest.HasTag(logger.FromContext(ctx).Entries(), blockTag) {
+		t.Errorf("guard disabled: did not expect %s", blockTag)
+	}
+
+	ctx, _ = testContext(t)
+	ctx = profile.WithAllowedTargets(ctx, map[netip.Addr]struct{}{netip.MustParseAddr("127.0.0.1"): {}})
+	_, _ = axfr(ctx, "127.0.0.1")
+	if dnstest.HasTag(logger.FromContext(ctx).Entries(), blockTag) {
+		t.Errorf("allow-set: did not expect %s", blockTag)
+	}
+}
+
 // A synthesized response must reach a testcase in wire shape, with the OPT
 // moved out of the additional section, or its EDNS accessors read differently
 // than they do for a real response.

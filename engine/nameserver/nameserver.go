@@ -212,17 +212,11 @@ func (ns Nameserver) QueryWithOptions(ctx context.Context, qname string, qtype s
 		return packet.Packet{}, fmt.Errorf("external query for %s %s attempted to %s while running with no_network", qname, qtype, ns.String())
 	}
 
-	// Guard real outbound queries against non-globally-reachable targets.
-	if ns.state == nil || ns.state.queryFunc == nil {
-		if !prof.Net.AllowNonGlobalTargets && !profile.IsAllowedTarget(ctx, ns.Address) && !constants.IsQueryable(ns.Address) {
-			blockArgs := map[string]any{"address": ns.Address.String()}
-			logargs.SetNS(blockArgs, ns.NameString(), ns.AddressString())
-			logSystemWithLogger(runLog, "NON_GLOBAL_QUERY_BLOCKED", blockArgs)
-			if ns.state != nil {
-				ns.state.cache.set(cacheKey, nil)
-			}
-			return packet.Packet{}, nil
+	if (ns.state == nil || ns.state.queryFunc == nil) && ns.blockNonGlobal(ctx, prof, runLog) {
+		if ns.state != nil {
+			ns.state.cache.set(cacheKey, nil)
 		}
+		return packet.Packet{}, nil
 	}
 
 	usevc := resolveUseVC(opts)
@@ -549,6 +543,17 @@ func (ns Nameserver) queryNetworkRaw(ctx context.Context, qname string, qtype st
 
 func logSystem(ctx context.Context, tag string, args map[string]any) {
 	logSystemWithLogger(loggerFromContextOrFallback(ctx, nil), tag, args)
+}
+
+// blockNonGlobal reports whether the guard refuses ns.Address, logging NON_GLOBAL_QUERY_BLOCKED.
+func (ns Nameserver) blockNonGlobal(ctx context.Context, prof *profile.Profile, runLog *logger.Logger) bool {
+	if prof.Net.AllowNonGlobalTargets || profile.IsAllowedTarget(ctx, ns.Address) || constants.IsQueryable(ns.Address) {
+		return false
+	}
+	args := map[string]any{"address": ns.Address.String()}
+	logargs.SetNS(args, ns.NameString(), ns.AddressString())
+	logSystemWithLogger(runLog, "NON_GLOBAL_QUERY_BLOCKED", args)
+	return true
 }
 
 func logSystemWithLogger(log *logger.Logger, tag string, args map[string]any) {

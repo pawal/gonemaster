@@ -19,7 +19,8 @@ The same 17 read tools and 3 write tools are served two ways:
 | Fits | one operator's machine; clients that speak stdio only | a shared server, several agents, no binary on the client host |
 
 - [server-endpoint.md](server-endpoint.md): enabling and operating the endpoint.
-- [clients.md](clients.md): configuration for Claude Code, Claude Desktop, Cursor, VS Code, Zed, and SDKs.
+- [clients.md](clients.md): configuration for Claude Code, Claude Desktop and claude.ai, Cursor, VS Code,
+  Windsurf, Zed, Gemini CLI, Codex CLI, and SDKs.
 - [tools.md](tools.md): every tool with its inputs, defaults, caps, and outputs.
 - [analysis-examples.md](analysis-examples.md): worked analysis sessions.
 

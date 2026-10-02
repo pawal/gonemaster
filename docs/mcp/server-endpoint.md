@@ -109,9 +109,11 @@ reverse_proxy /api/v1/mcp localhost:8080 {
 }
 ```
 
-The admin API is not meant for the public internet. Keep `/api/v1/`,
-including this path, on a private network or behind the proxy's own access
-control in addition to the token.
+The admin API is not meant for the public internet. Keep `/api/v1/` on a
+private network or behind the proxy's own access control in addition to the
+token. When clients connect from the internet, expose `/api/v1/mcp` alone:
+the tools call the admin API in-process, so no other path needs to be
+reachable.
 
 ## Observability
 

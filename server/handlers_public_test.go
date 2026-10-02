@@ -78,7 +78,7 @@ func TestPublicCreateJobRejectsPrivateProfile(t *testing.T) {
 
 	resp := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, profile.ID))
 
-	wantErrorCode(t, resp, http.StatusBadRequest, "profile_not_public")
+	wantErrorCode(t, resp, http.StatusBadRequest, "profile_not_found")
 }
 
 func TestPublicCreateJobRejectsProfileOverrides(t *testing.T) {
@@ -674,4 +674,28 @@ func TestPublicGetResultRedactsLocalEndpoint(t *testing.T) {
 	if admin.Raw == nil || len(admin.Raw.Entries) == 0 || admin.Raw.Entries[0].Args["exception"] != exception {
 		t.Errorf("admin result lost the local endpoint: %+v", admin.Raw)
 	}
+}
+
+func TestPublicCreateJobPrivateAndUnknownProfilesLookAlike(t *testing.T) {
+	srv := newTestServer(t)
+	private := createProfile(t, srv, `{"name":"private-profile","config":{"net":{"ipv4":true}},"public":false}`)
+
+	post := func(id int64) *httptest.ResponseRecorder {
+		return doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, id))
+	}
+	privateResp, unknownResp := post(private.ID), post(private.ID+1000)
+
+	if privateResp.Code != unknownResp.Code || privateResp.Body.String() != unknownResp.Body.String() {
+		t.Errorf("private profile answered %d %s, unknown answered %d %s",
+			privateResp.Code, privateResp.Body, unknownResp.Code, unknownResp.Body)
+	}
+}
+
+func TestAdminCreateJobAcceptsPrivateProfile(t *testing.T) {
+	srv := newTestServer(t)
+	private := createProfile(t, srv, `{"name":"private-profile","config":{"net":{"ipv4":true}},"public":false}`)
+
+	resp := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", fmt.Sprintf(`{"domain":"example.com","profile_id":%d}`, private.ID))
+
+	wantStatus(t, resp, http.StatusCreated)
 }

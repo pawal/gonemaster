@@ -376,12 +376,10 @@ func (s *Server) resolveStoredProfile(profileID *int64, publicOnly bool) (resolv
 	if *profileID <= 0 {
 		return resolvedProfileRef{}, "invalid_profile_id", "profile_id must be a positive integer"
 	}
+	// A public caller cannot tell a private profile from a missing one.
 	stored, ok := s.store.GetProfile(*profileID)
-	if !ok {
+	if !ok || (publicOnly && !stored.Public) {
 		return resolvedProfileRef{}, "profile_not_found", "profile not found"
-	}
-	if publicOnly && !stored.Public {
-		return resolvedProfileRef{}, "profile_not_public", "profile is not available in the public API"
 	}
 	return resolvedProfileRef{
 		ID:   &stored.ID,

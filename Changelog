@@ -14,11 +14,15 @@ All notable changes to all gonemaster components will be documented in this file
 - mcp: `profile_list`, `domain_tag_list` and `cohort_list` tools
 - mcp: tool annotations, progress notifications from `test_domain`, `min_level` and `level_counts` on results
 - docs: MCP documentation rewritten for the bridge and the server endpoint
+- server: `rate_limit_get_max` for public reads by ID, lookups and heavy analysis reads
 
 ### Changed
 
 - build: bump to miekg/dns v0.6.117
 - engine: remove the `debug` profile key; stored profiles that carry it still load
+- server: new public IDs have 12 characters; 8-character IDs still resolve
+- server: public results omit `job_id`, `batch_id` and the server's local address
+- server: the public API rejects `min_level` below INFO and answers `profile_not_found` for private profiles
 
 ### Fixed
 
@@ -28,6 +32,13 @@ All notable changes to all gonemaster components will be documented in this file
 - mcp: `failures_by_tag` scanned levels in random order and counted entries, not domains
 - mcp: a failed result request was reported as a clean run
 - mcp: `test_domain` omitted `public_id` and `batch_id`; limits above the server cap were rejected
+- server: rate limit settings apply live, disabling them no longer crashes, and IPv6 is keyed by /64
+- engine: the non-global guard covers AXFR, multicast and embedded IPv4, and runs before the shared cache
+- server: `/pub/api/v1/lookup` resolves over DNS and drops non-global addresses
+- server: public undelegated IPs are checked with the engine guard
+- server: settings no longer return the database password
+- server: snapshot domain and prefix lists page before ASN lookups, and the diff is cached
+- server: analysis domain detail honours `show_nameserver_timings_public`
 
 ## [v1.7.14] - 2026-09-30
 

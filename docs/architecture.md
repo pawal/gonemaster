@@ -503,16 +503,18 @@ is shaped for safe internet exposure:
 - `profile_overrides` are rejected: public users cannot inject
   arbitrary resolver settings.
 - `public_api.allow_private_undelegated_ip` defaults to `false`,
-  blocking loopback, link-local, private, CGNAT, multicast, and
-  broadcast IPs as undelegated NS targets.
+  refusing as undelegated NS targets the IPs the engine's non-global
+  query guard refuses.
 
 ### Rate limiting
 
 Public API rate limiting is **off by default** and is required for
 internet exposure. Configure with `public_api.rate_limit_enabled`,
-`rate_limit_max`, and `rate_limit_window`. The limit applies to
-`POST /pub/api/v1/jobs`, keyed by client IP after
-`X-Forwarded-For` resolution.
+`rate_limit_max`, `rate_limit_get_max`, and `rate_limit_window`.
+`rate_limit_max` counts public `POST` requests and `rate_limit_get_max`
+the public reads by ID, the lookup, and whole-snapshot analysis reads,
+keyed by client IPv4 address or IPv6 /64 after `X-Forwarded-For`
+resolution.
 
 ### Trusted proxies
 

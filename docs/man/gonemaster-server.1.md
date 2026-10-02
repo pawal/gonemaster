@@ -126,6 +126,9 @@ variables, CLI flags. Later sources override earlier ones.
 **--public-api-rate-limit-max** *N*
 : Maximum job submissions per IP per window (default: 10).
 
+**--public-api-rate-limit-get-max** *N*
+: Maximum metered GET requests per IP per window: public reads by ID, the lookup, and whole-snapshot analysis reads (default: 600).
+
 **--public-api-rate-limit-window** *DURATION*
 : Sliding window for rate limiting, e.g. **5m** or **1h** (default: 10m).
 
@@ -195,6 +198,9 @@ variables, CLI flags. Later sources override earlier ones.
 **GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX**
 : Equivalent to **--public-api-rate-limit-max**.
 
+**GONEMASTER_PUBLIC_API_RATE_LIMIT_GET_MAX**
+: Equivalent to **--public-api-rate-limit-get-max**.
+
 **GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW**
 : Equivalent to **--public-api-rate-limit-window**.
 
@@ -238,6 +244,7 @@ The **--config** file is JSON with optional fields:
       "public_api": {
         "rate_limit_enabled": true,
         "rate_limit_max": 10,
+        "rate_limit_get_max": 600,
         "rate_limit_window": "10m",
         "allow_private_undelegated_ip": false
       },

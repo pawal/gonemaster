@@ -65,6 +65,7 @@ gonemaster-server --dump-config
 | `GONEMASTER_DB_RETENTION_DAYS` | `database.retention_days` |
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED` | `public_api.rate_limit_enabled` |
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX` | `public_api.rate_limit_max` |
+| `GONEMASTER_PUBLIC_API_RATE_LIMIT_GET_MAX` | `public_api.rate_limit_get_max` |
 | `GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW` | `public_api.rate_limit_window` |
 | `GONEMASTER_PUBLIC_API_ALLOW_PRIVATE_UNDELEGATED_IP` | `public_api.allow_private_undelegated_ip` |
 | `GONEMASTER_PUBLIC_API_ALLOW_NON_GLOBAL_TARGETS` | `public_api.allow_non_global_targets` |
@@ -178,6 +179,7 @@ Database and public API flags are covered in [database.md](database.md) and
   "public_api": {
     "rate_limit_enabled": true,
     "rate_limit_max": 10,
+    "rate_limit_get_max": 600,
     "rate_limit_window": "10m",
     "allow_private_undelegated_ip": false,
     "allow_non_global_targets": false

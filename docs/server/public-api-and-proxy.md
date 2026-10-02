@@ -21,8 +21,14 @@ These are designed for public exposure:
 - `/analysis/`
 - `/pub/api/v1/`
 
-The public API uses opaque public IDs for public job lookup and does not expose
-internal job or run IDs. Public analysis endpoints are read-only.
+The public API addresses a job by its public ID and does not expose internal
+job, run, or batch IDs: public results omit `job_id` and `batch_id`, and the
+`exception` argument of an entry omits the server's own address and port. A
+public ID is 12 characters from `[A-Za-z0-9]`, drawn from `crypto/rand`, about
+71 bits. Earlier IDs have 8 characters, about 47 bits, and resolve unchanged.
+Every run has a public ID, admin and batch runs included, so a public ID is a
+capability for its result and MUST be shared only with those who may read it.
+Public analysis endpoints are read-only.
 
 Public endpoint groups:
 
@@ -35,14 +41,22 @@ Public endpoint groups:
 | `GET /pub/api/v1/jobs/{public_id}/asn-names` | Fetch the registered holders of the AS numbers in a public result. |
 | `GET /pub/api/v1/profiles` | List stored profiles marked public. |
 | `GET /pub/api/v1/locales` | List available locales. |
-| `GET /pub/api/v1/lookup/{domain}` | Public lookup helper. |
+| `GET /pub/api/v1/lookup/{domain}` | Look up the NS names, their addresses, and the DS records of a domain. |
 | `GET /pub/api/v1/version` | Public version metadata. |
 | `GET /pub/api/v1/info` | Public server info. |
 | `GET /pub/api/v1/analysis/*` | Read-only public analysis data. |
 
-Public job creation can use `profile_id` only when the selected stored profile
-is marked public. It rejects `profile_overrides` so public users cannot submit
-arbitrary resolver profile changes.
+Public job creation accepts `profile_id` only for a stored profile marked
+public; any other id, like one that does not exist, is answered with
+`400 profile_not_found`. It rejects `profile_overrides`, so public users cannot submit
+arbitrary resolver profile changes, and it rejects a `min_level` below `INFO`
+with `400 invalid_min_level`.
+
+The lookup queries the resolvers in `/etc/resolv.conf`, then 8.8.8.8 and
+1.1.1.1, for the NS and DS records of the domain and for the A and AAAA records
+of each NS name as an absolute name. It does not consult `/etc/hosts` or search
+domains. An address the [query-time guard](#query-time-guard-for-non-global-targets)
+refuses is omitted unless `allow_non_global_targets` is on.
 
 ## Rate Limiting
 
@@ -55,6 +69,7 @@ arbitrary resolver profile changes.
 gonemaster-server \
   --public-api-rate-limit-enabled \
   --public-api-rate-limit-max 10 \
+  --public-api-rate-limit-get-max 600 \
   --public-api-rate-limit-window 10m
 ```
 
@@ -64,12 +79,25 @@ Equivalent JSON config:
 "public_api": {
   "rate_limit_enabled": true,
   "rate_limit_max": 10,
+  "rate_limit_get_max": 600,
   "rate_limit_window": "10m"
 }
 ```
 
-The limiter applies to `POST` requests on `/pub/api/v1/`. Read endpoints are
-not throttled - see [Caching](#caching) below for the right tool there.
+The limiter keeps two budgets per client and window. `rate_limit_max` counts
+every `POST` on `/pub/api/v1/`. `rate_limit_get_max` counts the `GET` requests
+that resolve a public ID, query DNS, or read a whole snapshot:
+
+- `/pub/api/v1/jobs/{public_id}`, and its `/result`, `/dnssec-chain`, and
+  `/asn-names`
+- `/public/result/{public_id}`
+- `/pub/api/v1/lookup/{domain}`
+- `/pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains`
+- `/pub/api/v1/analysis/cohorts/{dataset_tag}/diff` and `/report`
+
+Other reads are not counted; see [Caching](#caching). A client is one IPv4
+address or one IPv6 /64. A rate limit change on the admin Settings page applies
+to the next request.
 
 Client IP is resolved from `RemoteAddr` by default. `X-Forwarded-For` is only
 honoured when the request's `RemoteAddr` falls inside one of the CIDRs listed
@@ -121,9 +149,10 @@ Blocked requests return `429 Too Many Requests` with `Retry-After`.
 ## Undelegated Nameserver IPs
 
 `POST /pub/api/v1/jobs` accepts `nameservers[].ip` for undelegated test mode.
-By default the public API refuses IPs in loopback / link-local / private /
-CGNAT / multicast / broadcast ranges. This stops a public deployment from
-being used as an internal-network probe via the engine's outbound DNS.
+By default the public API refuses, with `400 private_undelegated_ip`, every IP
+the [query-time guard](#query-time-guard-for-non-global-targets) refuses. This
+stops a public deployment from being used as an internal-network probe via the
+engine's outbound DNS.
 
 For private/internal deployments that legitimately need to test such
 targets, opt out:
@@ -140,9 +169,14 @@ The toggle is also exposed live on the admin Settings page.
 The check above validates only the IPs a caller *submits*. It cannot see
 addresses the engine learns later from parent glue or from resolving a
 nameserver name. A second, deeper guard runs at query time: the engine refuses
-to dial any non-globally-reachable address (loopback, RFC1918, CGNAT,
-link-local, ULA, documentation, benchmarking, and similar IANA special-purpose
-ranges) and emits a `NON_GLOBAL_QUERY_BLOCKED` notice instead.
+to send a DNS query or a zone transfer to an address that is not globally
+reachable, and emits a `NON_GLOBAL_QUERY_BLOCKED` notice instead. An address is
+not globally reachable when it is in an IANA special-purpose range not marked
+globally reachable (loopback, RFC 1918, CGNAT, link-local, ULA, documentation,
+benchmarking, and similar), when it is multicast, or when it is a NAT64
+well-known prefix address (`64:ff9b::/96`, RFC 6052) or an IPv4-compatible
+address (`::a.b.c.d`) whose IPv4 address is not globally reachable. A blocked
+query reads no answer from the cache that concurrent and recent runs share.
 
 This guard is on by default and clamped for every public job, so a
 caller-selected profile cannot relax it. Operator-pinned undelegated IPs
@@ -160,8 +194,8 @@ page). A public instance that runs private undelegated tests must enable both
 
 ## Caching
 
-Result reads are idempotent and the public ID is unguessable, so a CDN or
-reverse-proxy cache absorbs repeat reads better than rate limiting does.
+Result reads are idempotent, so a CDN or reverse-proxy cache absorbs repeat
+reads better than rate limiting does.
 
 The application sets `Cache-Control: public, max-age=300` on
 `GET /pub/api/v1/jobs/{public_id}/result` and, on hits, on

@@ -1808,7 +1808,11 @@ paths:
       tags: [Public]
       summary: Submit a public job
       operationId: createPublicJob
-      description: Public jobs return opaque public IDs. `profile_id` is allowed only for public stored profiles. `profile_overrides` is rejected.
+      description: >
+        Public jobs return opaque public IDs. `profile_id` is allowed only for
+        public stored profiles; any other id is rejected with
+        `400 profile_not_found`. `profile_overrides` is rejected. A `min_level`
+        below INFO is rejected with `400 invalid_min_level`.
       requestBody:
         required: true
         content:
@@ -1824,6 +1828,8 @@ paths:
                 $ref: '#/components/schemas/PublicJob'
         '400':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/jobs/{public_id}:
     get:
@@ -1841,6 +1847,8 @@ paths:
                 $ref: '#/components/schemas/PublicJob'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/jobs/{public_id}/result:
     get:
@@ -1862,6 +1870,8 @@ paths:
                 $ref: '#/components/schemas/JobResult'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/jobs/{public_id}/dnssec-chain:
     get:
@@ -1886,6 +1896,8 @@ paths:
                 $ref: '#/components/schemas/DNSSECChain'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/jobs/{public_id}/asn-names:
     get:
@@ -1911,6 +1923,8 @@ paths:
                 $ref: '#/components/schemas/ASNNamesResponse'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/locales:
     get:
@@ -1956,6 +1970,8 @@ paths:
                 $ref: '#/components/schemas/DelegationInfo'
         '400':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/version:
     get:
@@ -2061,6 +2077,8 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/snapshots/{slug}/domains/{domain}:
     get:
@@ -2412,6 +2430,8 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/report:
     get:
@@ -2481,6 +2501,8 @@ paths:
           $ref: '#/components/responses/ErrorResponse'
         '404':
           $ref: '#/components/responses/ErrorResponse'
+        '429':
+          $ref: '#/components/responses/RateLimited'
 
   /pub/api/v1/analysis/cohorts/{dataset_tag}/history:
     get:
@@ -2953,8 +2975,10 @@ components:
       properties:
         job_id:
           type: string
+          description: Absent on the public API.
         batch_id:
           type: string
+          description: Absent on the public API.
         status:
           $ref: '#/components/schemas/JobStatus'
         summary:
@@ -4587,3 +4611,9 @@ components:
         application/json:
           schema:
             $ref: '#/components/schemas/ErrorResponse'
+    RateLimited:
+      description: Rate limit exceeded. `Retry-After` gives the seconds to wait.
+      headers:
+        Retry-After:
+          schema:
+            type: integer

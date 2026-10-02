@@ -108,6 +108,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var dumpConfig bool
 	var shutdownTimeout time.Duration
 	var adminTokenHashes string
+	var authProtectPublic bool
 
 	flagsSet := make(map[string]bool)
 
@@ -157,6 +158,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		})
 		printUsageGroup(errOut, "Authentication", []usageLine{
 			{flag: "--admin-token-hashes LIST", detail: "Comma-separated admin token hashes (label=sha256:hex) gating /api/v1. Empty = open mode. Mint with 'gonemaster-server auth add-token'. (env: GONEMASTER_ADMIN_TOKEN_HASHES)"},
+			{flag: "--auth-protect-public", detail: "Require an admin token on /public/, /analysis/ and /pub/api/v1 too. Needs --admin-token-hashes or auth.admin_tokens. (env: GONEMASTER_AUTH_PROTECT_PUBLIC)"},
 		})
 		printUsageGroup(errOut, "HTTP timeouts", []usageLine{
 			{flag: "--read-timeout DURATION", detail: "Per-connection read timeout (default 30s). Caps slow request bodies. (env: GONEMASTER_READ_TIMEOUT)"},
@@ -221,6 +223,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.Var(&excludes, "exclude", "Skip a testcase or module in every run (repeatable, comma list)")
 	fs.StringVar(&trustedProxyCIDRs, "trusted-proxy-cidrs", "", "Comma-separated CIDRs allowed to set X-Forwarded-For (default empty = trust nothing)")
 	fs.StringVar(&adminTokenHashes, "admin-token-hashes", "", "Comma-separated admin token hashes (label=sha256:...) gating /api/v1 (default empty = open mode)")
+	fs.BoolVar(&authProtectPublic, "auth-protect-public", false, "Require an admin token on the public UI, analysis UI and public API (default off)")
 	fs.DurationVar(&readTimeout, "read-timeout", 0, "Per-connection read timeout (default 30s)")
 	fs.DurationVar(&writeTimeout, "write-timeout", 0, "Per-connection write timeout (default 60s)")
 	fs.DurationVar(&idleTimeout, "idle-timeout", 0, "Idle keep-alive timeout (default 60s)")
@@ -493,8 +496,11 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if flagsSet["admin-token-hashes"] {
 		cfg.Auth.AdminTokens = parseAdminTokenHashes(adminTokenHashes)
 	}
+	if flagsSet["auth-protect-public"] {
+		cfg.Auth.ProtectPublic = authProtectPublic
+	}
 	if err := server.ValidateAuthConfig(cfg.Auth); err != nil {
-		fmt.Fprintf(errOut, "invalid admin tokens: %v\n", err)
+		fmt.Fprintf(errOut, "invalid auth config: %v\n", err)
 		return 2
 	}
 	if err := server.ValidateLogConfig(cfg); err != nil {
@@ -566,7 +572,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	if n := len(cfg.Auth.AdminTokens); n == 0 {
 		logger.Info("auth open mode", "tokens", 0)
 	} else {
-		logger.Info("auth token mode", "tokens", n)
+		logger.Info("auth token mode", "tokens", n, "protect_public", cfg.Auth.ProtectPublic)
 	}
 	if cfg.MCPEnabled {
 		logger.Info("mcp endpoint enabled", "path", "/api/v1/mcp", "write_tools", cfg.MCPAllowWrite)
@@ -596,6 +602,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 				logger.Error("auth reload failed", "err", err)
 				continue
 			}
+			applyProtectPublic(&auth, os.Getenv("GONEMASTER_AUTH_PROTECT_PUBLIC"), flagsSet["auth-protect-public"], authProtectPublic)
 			if err := srv.ReloadAuth(auth); err != nil {
 				logger.Error("auth reload rejected", "err", err)
 				continue
@@ -603,7 +610,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			if n := len(auth.AdminTokens); n == 0 {
 				logger.Info("auth reloaded", "mode", "open", "tokens", 0)
 			} else {
-				logger.Info("auth reloaded", "mode", "token", "tokens", n)
+				logger.Info("auth reloaded", "mode", "token", "tokens", n, "protect_public", auth.ProtectPublic)
 			}
 		}
 	}()

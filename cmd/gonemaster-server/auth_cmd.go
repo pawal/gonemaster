@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 
 	"codeberg.org/pawal/gonemaster/server"
@@ -51,6 +52,17 @@ func resolveAuthConfig(configPath, envHashes, flagHashes string) (server.AuthCon
 		auth.AdminTokens = parseAdminTokenHashes(flagHashes)
 	}
 	return auth, nil
+}
+
+// applyProtectPublic overrides the file's protect_public with env, then flag, for SIGHUP reload.
+func applyProtectPublic(auth *server.AuthConfig, env string, flagSet, flagValue bool) {
+	if flagSet {
+		auth.ProtectPublic = flagValue
+		return
+	}
+	if b, err := strconv.ParseBool(env); err == nil {
+		auth.ProtectPublic = b
+	}
 }
 
 // runAuthCommand handles the "auth" subcommand group (currently add-token).

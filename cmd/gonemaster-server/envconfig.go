@@ -86,6 +86,7 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyInt("db-purge-interval", "GONEMASTER_DB_PURGE_INTERVAL", &cfg.Database.PurgeIntervalSeconds)
 	applyInt("stuck-job-timeout", "GONEMASTER_STUCK_JOB_TIMEOUT", &cfg.StuckJobTimeoutMinutes)
 	applyBool("public-api-rate-limit-enabled", "GONEMASTER_PUBLIC_API_RATE_LIMIT_ENABLED", &cfg.PublicAPI.RateLimitEnabled)
+	applyBool("auth-protect-public", "GONEMASTER_AUTH_PROTECT_PUBLIC", &cfg.Auth.ProtectPublic)
 	applyInt("public-api-rate-limit-max", "GONEMASTER_PUBLIC_API_RATE_LIMIT_MAX", &cfg.PublicAPI.RateLimitMax)
 	applyInt("public-api-rate-limit-get-max", "GONEMASTER_PUBLIC_API_RATE_LIMIT_GET_MAX", &cfg.PublicAPI.RateLimitGetMax)
 	applyDuration("public-api-rate-limit-window", "GONEMASTER_PUBLIC_API_RATE_LIMIT_WINDOW", &cfg.PublicAPI.RateLimitWindow)

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/engine/normalization"
 	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 )
@@ -135,7 +136,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_undelegated", err.Error(), nil)
 		return
 	}
-	if !validateMinLevel(w, req.MinLevel) || !s.validateTests(w, req.Tests) {
+	if !validateMinLevel(w, req.MinLevel) || !validatePublicMinLevel(w, req.MinLevel) || !s.validateTests(w, req.Tests) {
 		return
 	}
 	if !s.cfg.PublicAPI.AllowPrivateUndelegatedIP {
@@ -187,6 +188,18 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 		"origin", created.Origin)
 
 	writeJSON(w, http.StatusCreated, publicJobView(created))
+}
+
+// validatePublicMinLevel rejects a public min_level below INFO, which stores
+// every query and response.
+func validatePublicMinLevel(w http.ResponseWriter, minLevel string) bool {
+	levels := logger.Levels()
+	level, ok := levels[strings.ToUpper(strings.TrimSpace(minLevel))]
+	if !ok || level >= levels["INFO"] {
+		return true
+	}
+	writeError(w, http.StatusBadRequest, "invalid_min_level", "public min_level must be INFO or higher", nil)
+	return false
 }
 
 // handlePublicGetJob handles GET /pub/api/v1/jobs/{publicID}.

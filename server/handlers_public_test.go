@@ -617,3 +617,25 @@ func TestPublicGetResultOmitsInternalIDs(t *testing.T) {
 		t.Errorf("admin result ids = %v, %v, want %s and batch-1", admin["job_id"], admin["batch_id"], created.ID)
 	}
 }
+
+func TestPublicCreateJobRejectsMinLevelBelowInfo(t *testing.T) {
+	for _, level := range []string{"DEBUG", "debug2", "DEBUG3"} {
+		srv := newTestServer(t)
+		rr := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", map[string]any{"domain": "example.com", "min_level": level})
+		wantErrorCode(t, rr, http.StatusBadRequest, "invalid_min_level")
+		if got := len(srv.store.List(JobFilter{Limit: 10}).Items); got != 0 {
+			t.Fatalf("%s: %d job(s) created despite the rejection", level, got)
+		}
+	}
+	for _, level := range []string{"", "INFO", "notice"} {
+		srv := newTestServer(t)
+		rr := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", map[string]any{"domain": "example.com", "min_level": level})
+		wantStatus(t, rr, http.StatusCreated)
+	}
+}
+
+func TestAdminCreateJobAcceptsDebugMinLevel(t *testing.T) {
+	srv := newTestServer(t)
+	rr := doJSON(t, srv, http.MethodPost, "/api/v1/jobs", map[string]any{"domain": "example.com", "min_level": "DEBUG"})
+	wantStatus(t, rr, http.StatusCreated)
+}

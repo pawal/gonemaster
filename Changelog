@@ -6,6 +6,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 ### Added
 
+- dnssec23: new testcase checking that the NSEC or NSEC3 records of a negative response are consistent
 - connectivity05: report `CN05_TCP_ANSWER_TRUNCATED` when the `DNSKEY` answer received over TCP carries the TC flag
 
 ### Fixed

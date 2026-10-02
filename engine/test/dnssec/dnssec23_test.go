@@ -577,3 +577,39 @@ func TestDNSSEC23ProbeName(t *testing.T) {
 		t.Fatalf("probe = %q, want %q", got, ds23Probe)
 	}
 }
+
+// In a full run the DNSKEY and NSEC3PARAM answers come from the cache DNSSEC10 filled.
+func TestDNSSEC23ReusesDNSSEC10Queries(t *testing.T) {
+	ctx := tctest.Context(t)
+	f := newDS23Fixture(t)
+	f.signed()
+	f.denial(correctProof()...)
+	f.params(ds23Param(""))
+	f.answers[ds22Key("example", "NSEC")] = tctest.Response(tctest.Question("example", dns.TypeNSEC), tctest.Secure(),
+		tctest.Authority(tctest.SOARR("example"), correctProof()[0]))
+	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+	items := []nsdiscovery.NSItem{tctest.NSItem("ns1.example", "192.0.2.10")}
+	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return items, nil
+	})
+	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
+		return nil, nil
+	})
+	z, err := zone.New("example")
+	if err != nil {
+		t.Fatalf("zone new: %v", err)
+	}
+	if _, err := DNSSEC10(ctx, &z); err != nil {
+		t.Fatalf("DNSSEC10: %v", err)
+	}
+	entries, err := DNSSEC23(ctx, &z)
+	if err != nil {
+		t.Fatalf("DNSSEC23: %v", err)
+	}
+	tctest.RequireTags(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
+	for _, want := range []string{"example/DNSKEY", "example/NSEC3PARAM", ds23Probe + "/A"} {
+		if got := f.counts[want]; got != 1 {
+			t.Fatalf("%s questions = %d, want 1", want, got)
+		}
+	}
+}

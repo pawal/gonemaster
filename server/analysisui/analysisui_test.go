@@ -13,18 +13,18 @@ import (
 )
 
 func TestHandlerServesIndexHTMLForRoot(t *testing.T) {
-	body := spatest.IndexBody(t, Handler(""))
+	body := spatest.IndexBody(t, Handler(nil))
 	if !strings.Contains(body, "<!doctype html>") && !strings.Contains(body, "<!DOCTYPE html>") {
 		t.Fatalf("expected HTML body, got: %s", body[:min(200, len(body))])
 	}
 }
 
 func TestHandlerFallsBackToIndexForUnknownSPARoute(t *testing.T) {
-	spatest.IndexForRootAndUnknownPaths(t, Handler(""), "/cohort/tld/domains")
+	spatest.IndexForRootAndUnknownPaths(t, Handler(nil), "/cohort/tld/domains")
 }
 
 func TestHandlerRejectsNonGetMethods(t *testing.T) {
-	spatest.MethodNotAllowed(t, Handler(""))
+	spatest.MethodNotAllowed(t, Handler(nil))
 }
 
 func TestCleanRequestPath(t *testing.T) {
@@ -32,7 +32,7 @@ func TestCleanRequestPath(t *testing.T) {
 }
 
 func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
-	spatest.PathTraversalCannotEscape(t, Handler(""),
+	spatest.PathTraversalCannotEscape(t, Handler(nil),
 		"/../analysisui.go",
 		"/_app/../analysisui.go",
 		"/../../server/analysisui/analysisui.go",
@@ -72,7 +72,7 @@ func TestServeIndexDoesNotReflectRequestPath(t *testing.T) {
 	}
 	rr := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, `/%22%3E%3Cscript%3Ealert%281%29%3C%2Fscript%3E`, nil)
-	Handler("").ServeHTTP(rr, req)
+	Handler(nil).ServeHTTP(rr, req)
 	body := rr.Body.String()
 	if strings.Contains(body, "<script>alert(1)") {
 		t.Fatalf("request path reflected into served HTML: %s", body[:min(400, len(body))])
@@ -104,7 +104,7 @@ func TestServerMountsAnalysisRoute(t *testing.T) {
 	// which is mounted in server.go. Exercised via the embedded Handler here:
 	resp := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/_app/immutable/nothing.js", nil)
-	Handler("").ServeHTTP(resp, req)
+	Handler(nil).ServeHTTP(resp, req)
 	// unknown file under _app should either be a 404 or fall back to the SPA
 	// index; both are acceptable - just make sure we don't crash.
 	if resp.Code != http.StatusOK && resp.Code != http.StatusNotFound {

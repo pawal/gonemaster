@@ -31,7 +31,7 @@ func TestCleanRequestPath(t *testing.T) {
 }
 
 func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
-	spatest.PathTraversalCannotEscape(t, Handler("", DefaultUIPath, nil),
+	spatest.PathTraversalCannotEscape(t, Handler(nil, DefaultUIPath, nil),
 		"/../public.go",
 		"/../../server/public/public.go",
 		"/assets/../public.go",
@@ -42,23 +42,23 @@ func TestHandlerPathTraversalAttemptsCannotEscapeDist(t *testing.T) {
 }
 
 func TestHandlerMethodNotAllowed(t *testing.T) {
-	spatest.MethodNotAllowed(t, Handler("", DefaultUIPath, nil))
+	spatest.MethodNotAllowed(t, Handler(nil, DefaultUIPath, nil))
 }
 
 func TestHandlerServesIndexForRootAndUnknownPaths(t *testing.T) {
-	spatest.IndexForRootAndUnknownPaths(t, Handler("", DefaultUIPath, nil), "/not/a/real/path")
+	spatest.IndexForRootAndUnknownPaths(t, Handler(nil, DefaultUIPath, nil), "/not/a/real/path")
 }
 
 func TestHandlerServesAssetsWithCacheControl(t *testing.T) {
-	spatest.AssetsHaveImmutableCacheControl(t, Handler("", DefaultUIPath, nil), mustDist(t))
+	spatest.AssetsHaveImmutableCacheControl(t, Handler(nil, DefaultUIPath, nil), mustDist(t))
 }
 
 func TestHandlerServesFaviconFilesAndManifest(t *testing.T) {
-	spatest.FaviconFilesAndManifest(t, Handler("", DefaultUIPath, nil), mustDist(t))
+	spatest.FaviconFilesAndManifest(t, Handler(nil, DefaultUIPath, nil), mustDist(t))
 }
 
 func TestHandlerIndexIncludesFaviconLinks(t *testing.T) {
-	spatest.IndexLinksFavicons(t, Handler("", DefaultUIPath, nil), mustDist(t), "/public/")
+	spatest.IndexLinksFavicons(t, Handler(nil, DefaultUIPath, nil), mustDist(t), "/public/")
 }
 
 func TestServeIndexFallsBackToUnavailablePageWhenIndexMissing(t *testing.T) {

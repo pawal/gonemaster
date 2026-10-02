@@ -56,11 +56,14 @@ const noEmbeddedUIPage = `<!doctype html>
 `
 
 // Handler serves the embedded public UI with a basic SPA fallback.
-// publicURL is the canonical base URL of the deployment (e.g. "https://example.com/");
-// leave empty to auto-detect from the request's Host and X-Forwarded-Proto headers.
+// publicURL returns the canonical base URL of the deployment (e.g. "https://example.com/");
+// nil or empty means auto-detect from the request's Host and X-Forwarded-Proto headers.
 // uiPath is where visitors reach the UI under publicURL (see DefaultUIPath).
 // lookup renders result pages for non-scripting clients; nil disables that.
-func Handler(publicURL, uiPath string, lookup LookupResult) http.Handler {
+func Handler(publicURL func() string, uiPath string, lookup LookupResult) http.Handler {
+	if publicURL == nil {
+		publicURL = func() string { return "" }
+	}
 	fsys, err := dist()
 	if err != nil {
 		return unavailableUIHandler()
@@ -75,7 +78,7 @@ func Handler(publicURL, uiPath string, lookup LookupResult) http.Handler {
 
 		cleanPath := cleanRequestPath(r.URL.Path)
 		if cleanPath == "" || cleanPath == "index.html" {
-			serveIndex(fsys, w, r, publicURL, uiPath, nil)
+			serveIndex(fsys, w, r, publicURL(), uiPath, nil)
 			return
 		}
 
@@ -87,7 +90,7 @@ func Handler(publicURL, uiPath string, lookup LookupResult) http.Handler {
 			return
 		}
 
-		serveIndex(fsys, w, r, publicURL, uiPath, lookup)
+		serveIndex(fsys, w, r, publicURL(), uiPath, lookup)
 	})
 }
 

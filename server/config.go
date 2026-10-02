@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/server/extdata"
+	"codeberg.org/pawal/gonemaster/server/internal/baseurl"
 	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 )
 
@@ -418,6 +419,14 @@ func (c Config) EffectivePurgeInterval() time.Duration {
 		secs = defaultPurgeIntervalSeconds
 	}
 	return time.Duration(secs) * time.Second
+}
+
+// ValidatePublicURL reports whether public_url is an absolute http or https URL safe to substitute into pages.
+func ValidatePublicURL(s string) error {
+	if err := baseurl.Validate(s); err != nil {
+		return fmt.Errorf("invalid public_url %q: %w", s, err)
+	}
+	return nil
 }
 
 // LoadFileConfig loads configuration overrides from a JSON file.

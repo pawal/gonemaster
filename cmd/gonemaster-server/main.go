@@ -501,6 +501,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
+	if err := server.ValidatePublicURL(cfg.PublicURL); err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
 	if _, err := engine.ExpandExclusions(cfg.Exclude); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2

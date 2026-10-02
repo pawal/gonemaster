@@ -46,7 +46,7 @@ Found inline style in the embedded analysis-ui bundle:
 // the same Handler the production server uses.
 func extractAnalysisAnnouncerStyle(t *testing.T) string {
 	t.Helper()
-	h := analysisui.Handler("")
+	h := analysisui.Handler(nil)
 
 	indexBody := fetch(t, h, "/index.html")
 	entryRE := regexp.MustCompile(`/_app/immutable/entry/app\.[A-Za-z0-9_-]+\.js`)

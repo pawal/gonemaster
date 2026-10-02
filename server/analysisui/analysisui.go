@@ -47,9 +47,12 @@ const noEmbeddedUIPage = `<!doctype html>
 
 // Handler serves the embedded analysis dashboard with SPA fallback. Unknown
 // paths under the mount resolve to index.html so the client-side router can
-// handle them. publicURL is the canonical base URL of the deployment (e.g.
-// "https://example.com/"); empty means auto-detect from the request.
-func Handler(publicURL string) http.Handler {
+// handle them. publicURL returns the canonical base URL of the deployment (e.g.
+// "https://example.com/"); nil or empty means auto-detect from the request.
+func Handler(publicURL func() string) http.Handler {
+	if publicURL == nil {
+		publicURL = func() string { return "" }
+	}
 	fsys, err := dist()
 	if err != nil {
 		return unavailableUIHandler()
@@ -64,7 +67,7 @@ func Handler(publicURL string) http.Handler {
 
 		cleanPath := cleanRequestPath(r.URL.Path)
 		if cleanPath == "" || cleanPath == "index.html" {
-			serveIndex(fsys, w, r, publicURL)
+			serveIndex(fsys, w, r, publicURL())
 			return
 		}
 
@@ -78,7 +81,7 @@ func Handler(publicURL string) http.Handler {
 			return
 		}
 
-		serveIndex(fsys, w, r, publicURL)
+		serveIndex(fsys, w, r, publicURL())
 	})
 }
 

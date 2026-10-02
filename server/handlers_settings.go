@@ -10,6 +10,7 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/logger"
 	"codeberg.org/pawal/gonemaster/scoring"
+	"codeberg.org/pawal/gonemaster/server/internal/baseurl"
 )
 
 // SettingSource identifies where a config value was set.
@@ -80,7 +81,7 @@ const (
 	settingInt
 	settingDuration
 	settingLevel
-	settingString
+	settingURL
 )
 
 // settingSpec is the type and integer range of a writable setting.
@@ -97,7 +98,7 @@ var writableSettings = map[string]settingSpec{
 	"min_level":                       {kind: settingLevel},
 	"retention_days":                  {kind: settingInt, min: 0, max: 36500},
 	"purge_interval_seconds":          {kind: settingInt, min: 1, max: 31536000},
-	"public_url":                      {kind: settingString},
+	"public_url":                      {kind: settingURL},
 	"rate_limit_enabled":              {kind: settingBool},
 	"rate_limit_max":                  {kind: settingInt, min: 1, max: 100000},
 	"rate_limit_get_max":              {kind: settingInt, min: 1, max: 100000},
@@ -137,6 +138,10 @@ func checkSetting(key, val string) error {
 	case settingLevel:
 		if _, ok := logger.Levels()[strings.ToUpper(val)]; !ok {
 			return fmt.Errorf("%s is not a log level: %s", key, val)
+		}
+	case settingURL:
+		if err := baseurl.Validate(val); err != nil {
+			return fmt.Errorf("%s %w", key, err)
 		}
 	}
 	return nil

@@ -112,3 +112,34 @@ func TestResolveTrustsConfiguredValue(t *testing.T) {
 		t.Fatalf("Resolve() = %q, want the configured URL", got)
 	}
 }
+
+func TestValidate(t *testing.T) {
+	for _, s := range []string{"", "https://example.com/", "http://example.com", "https://example.com:8443/gm/", "https://[2001:db8::1]/", "https://bücher.example/"} {
+		if err := Validate(s); err != nil {
+			t.Errorf("Validate(%q) = %v, want nil", s, err)
+		}
+	}
+	for _, s := range []string{
+		"example.com",
+		"/public/",
+		"ftp://example.com/",
+		"javascript:alert(1)",
+		"https://",
+		"https://user:pw@example.com/",
+		`https://example.com/"><script>`,
+		"https://example.com/'",
+		"https://example.com/<",
+		`https://example.com/\`,
+		"https://example.com/`",
+		"https://example.com/ x",
+		"https://example.com/\nDisallow: /",
+		"https://example.com/\r",
+		"https://example.com/ ",
+		"https://example.com/?q=1",
+		"https://example.com/#top",
+	} {
+		if err := Validate(s); err == nil {
+			t.Errorf("Validate(%q) = nil, want an error", s)
+		}
+	}
+}

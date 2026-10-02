@@ -242,3 +242,13 @@ func TestRunExcludeUnknownFailsStartup(t *testing.T) {
 	res.RequireCode(t, 2)
 	res.RequireErrContains(t, `unknown excluded testcase or module "nope99"`)
 }
+
+func TestRunUnsafePublicURLFailsStartup(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "config.json")
+	if err := os.WriteFile(path, []byte(`{"public_url":"https://x.example/\"><script>"}`), 0o600); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+	res := clitest.Run(t, run, "--config", path, "--dump-config")
+	res.RequireCode(t, 2)
+	res.RequireErrContains(t, "invalid public_url")
+}

@@ -3,11 +3,14 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	serveranalysisui "codeberg.org/pawal/gonemaster/server/analysisui"
+	serverpublic "codeberg.org/pawal/gonemaster/server/public"
 )
 
 func TestGetSettings(t *testing.T) {
@@ -660,4 +663,47 @@ func TestPutSettingsDoesNotRaceRequestsOrWorkers(t *testing.T) {
 	}
 	close(stop)
 	wg.Wait()
+}
+
+func TestPutSettingsRejectsUnsafePublicURL(t *testing.T) {
+	for _, val := range []string{`https://x.example/"><script>alert(1)</script>`, "https://x.example/\nDisallow: /", "x.example", "https://x.example/?a=1"} {
+		t.Run(val, func(t *testing.T) {
+			srv := newTestServer(t)
+			resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", map[string]string{"public_url": val})
+			wantErrorCode(t, resp, http.StatusBadRequest, "invalid_setting")
+			if _, ok := srv.store.GetSetting("public_url"); ok {
+				t.Fatal("public_url was stored")
+			}
+		})
+	}
+}
+
+func TestApplyDatabaseSettingsIgnoresUnsafePublicURL(t *testing.T) {
+	srv := newTestServer(t, withConfig(func(c *Config) { c.PublicURL = "https://dns.example/" }))
+	_ = srv.store.SetSetting("public_url", `https://x.example/"><script>`)
+	srv.ApplyDatabaseSettings()
+	if srv.cfg.PublicURL != "https://dns.example/" {
+		t.Fatalf("PublicURL = %q, want https://dns.example/", srv.cfg.PublicURL)
+	}
+}
+
+func TestPutSettingsPublicURLReachesPagesLive(t *testing.T) {
+	srv := newTestServer(t)
+	body := `{"public_url": "https://live.example/"}`
+	wantStatus(t, doJSON(t, srv, http.MethodPut, "/api/v1/settings", body), http.StatusOK)
+
+	robots := doJSON(t, srv, http.MethodGet, "/robots.txt", nil)
+	if !strings.Contains(robots.Body.String(), "https://live.example/") {
+		t.Errorf("robots.txt does not use the new public_url: %s", robots.Body.String())
+	}
+	if serverpublic.IsBuilt() {
+		if b := doJSON(t, srv, http.MethodGet, "/public/", nil).Body.String(); !strings.Contains(b, `content="https://live.example/public/"`) {
+			t.Error("/public/ does not use the new public_url")
+		}
+	}
+	if serveranalysisui.IsBuilt() {
+		if b := doJSON(t, srv, http.MethodGet, "/analysis/", nil).Body.String(); !strings.Contains(b, `href="https://live.example/analysis/"`) {
+			t.Error("/analysis/ does not use the new public_url")
+		}
+	}
 }

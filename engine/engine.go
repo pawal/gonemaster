@@ -254,6 +254,7 @@ var dnssecTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry,
 	"dnssec20": dnssec.DNSSEC20,
 	"dnssec21": dnssec.DNSSEC21,
 	"dnssec22": dnssec.DNSSEC22,
+	"dnssec23": dnssec.DNSSEC23,
 }
 
 var zoneTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry, error){

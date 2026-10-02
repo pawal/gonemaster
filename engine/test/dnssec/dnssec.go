@@ -309,6 +309,16 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		}
 	}
 
+	if util.ShouldRunTest(ctx, "dnssec23") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC23(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
 	return results, nil
 }
 
@@ -671,6 +681,20 @@ func Metadata() map[string][]string {
 			"DS22_NS_ADDRESS_UNSIGNED",
 			"DS22_NS_ADDRESS_VALIDATES",
 			"DS22_ZONE_NOT_SECURE",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"dnssec23": {
+			"DS23_DENIAL_PROOF_CONSISTENT",
+			"DS23_MULTIPLE_NSEC3PARAM",
+			"DS23_NO_DENIAL_PROOF",
+			"DS23_NSEC3_CHAIN_NOT_PUBLISHED",
+			"DS23_NSEC3_DUPLICATE_NEXT",
+			"DS23_NSEC3_MIXED_PARAMETERS",
+			"DS23_NSEC3_RANGES_OVERLAP",
+			"DS23_NSEC_RANGES_OVERLAP",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -9991,6 +10015,339 @@ func DNSSEC22(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	return endTestcase("")
+}
+
+// dnssec23ProbeLabel is a fake A-label no registry accepts, prepended to the apex for the probe.
+const dnssec23ProbeLabel = "xn--gonemaster-dnssec23"
+
+// dnssec23ErrorTags are the DS23 tags that suppress the OK tag.
+var dnssec23ErrorTags = map[string]bool{
+	"DS23_NO_DENIAL_PROOF":           true,
+	"DS23_NSEC3_CHAIN_NOT_PUBLISHED": true,
+	"DS23_NSEC3_DUPLICATE_NEXT":      true,
+	"DS23_NSEC3_MIXED_PARAMETERS":    true,
+	"DS23_NSEC3_RANGES_OVERLAP":      true,
+	"DS23_NSEC_RANGES_OVERLAP":       true,
+}
+
+// dnssec23Finding is one rule violation seen on one nameserver.
+type dnssec23Finding struct {
+	tag     string
+	owner   string
+	covered string
+	next    string
+}
+
+// dnssec23Outcome is what one nameserver's probe response showed.
+type dnssec23Outcome struct {
+	servers    []logargs.Server
+	findings   []dnssec23Finding
+	consistent bool
+}
+
+// dnssec23Record is one denial record as an interval; key and nextKey are the comparison forms.
+type dnssec23Record struct {
+	owner   string
+	key     string
+	next    string
+	nextKey string
+}
+
+// covers reports whether key lies strictly inside the interval, wrapping at the chain end.
+func (r dnssec23Record) covers(key string, cmp func(a, b string) int) bool {
+	if cmp(r.nextKey, r.key) <= 0 {
+		return cmp(key, r.key) > 0 || cmp(key, r.nextKey) < 0
+	}
+	return cmp(key, r.key) > 0 && cmp(key, r.nextKey) < 0
+}
+
+// dnssec23Params keys one NSEC3 chain by hash algorithm, iterations and salt.
+func dnssec23Params(hash uint8, iterations uint16, salt string) string {
+	return strconv.Itoa(int(hash)) + ":" + strconv.Itoa(int(iterations)) + ":" + strings.ToUpper(salt)
+}
+
+// dnssec23NSEC3Records returns the authority NSEC3 records one label below the apex.
+func dnssec23NSEC3Records(resp packet.Packet, apex dnsname.Name) []*dns.NSEC3 {
+	var out []*dns.NSEC3
+	for _, rr := range resp.GetRecords("NSEC3", "authority") {
+		nsec3, ok := rr.(*dns.NSEC3)
+		if !ok {
+			continue
+		}
+		parent, ok := dnsname.New(nsec3.Hdr.Name).NextHigher()
+		if !ok || parent.Compare(apex) != 0 {
+			continue
+		}
+		out = append(out, nsec3)
+	}
+	return out
+}
+
+// dnssec23NSECRecords returns the authority NSEC records at or below the apex.
+func dnssec23NSECRecords(resp packet.Packet, apex dnsname.Name) []*dns.NSEC {
+	var out []*dns.NSEC
+	for _, rr := range resp.GetRecords("NSEC", "authority") {
+		nsec, ok := rr.(*dns.NSEC)
+		if !ok || !apex.IsInBailiwick(dnsname.New(nsec.Hdr.Name)) {
+			continue
+		}
+		out = append(out, nsec)
+	}
+	return out
+}
+
+// dnssec23NSEC3Intervals orders NSEC3 records by their hashed owner label.
+func dnssec23NSEC3Intervals(records []*dns.NSEC3) []dnssec23Record {
+	out := make([]dnssec23Record, 0, len(records))
+	for _, rr := range records {
+		owner := dnsname.New(rr.Hdr.Name)
+		out = append(out, dnssec23Record{
+			owner:   owner.StringLower(),
+			key:     strings.ToLower(owner.Labels()[0]),
+			next:    rr.NextDomain,
+			nextKey: strings.ToLower(rr.NextDomain),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].key < out[j].key })
+	return out
+}
+
+// dnssec23NSECIntervals orders NSEC records by canonical name order.
+func dnssec23NSECIntervals(records []*dns.NSEC) []dnssec23Record {
+	out := make([]dnssec23Record, 0, len(records))
+	for _, rr := range records {
+		owner := dnsname.New(rr.Hdr.Name)
+		next := dnsname.New(rr.NextDomain)
+		out = append(out, dnssec23Record{
+			owner:   owner.StringLower(),
+			key:     owner.FQDN(),
+			next:    next.StringLower(),
+			nextKey: next.FQDN(),
+		})
+	}
+	sort.Slice(out, func(i, j int) bool { return dns.CompareName(out[i].key, out[j].key) < 0 })
+	return out
+}
+
+// dnssec23DuplicateNext applies R2 and returns the index pairs it reported.
+func dnssec23DuplicateNext(records []dnssec23Record) ([]dnssec23Finding, map[[2]int]bool) {
+	var out []dnssec23Finding
+	reported := map[[2]int]bool{}
+	for i := range records {
+		for j := i + 1; j < len(records); j++ {
+			a, b := records[i], records[j]
+			if a.key == b.key || a.nextKey != b.nextKey {
+				continue
+			}
+			out = append(out, dnssec23Finding{tag: "DS23_NSEC3_DUPLICATE_NEXT", owner: a.owner, covered: b.owner, next: a.next})
+			reported[[2]int{i, j}] = true
+			reported[[2]int{j, i}] = true
+		}
+	}
+	return out, reported
+}
+
+// dnssec23Overlaps applies R1 to every ordered pair not in skip.
+func dnssec23Overlaps(tag string, records []dnssec23Record, cmp func(a, b string) int, skip map[[2]int]bool) []dnssec23Finding {
+	var out []dnssec23Finding
+	for i, a := range records {
+		for j, b := range records {
+			if i == j || skip[[2]int{i, j}] || cmp(a.key, b.key) == 0 {
+				continue
+			}
+			if a.covers(b.key, cmp) {
+				out = append(out, dnssec23Finding{tag: tag, owner: a.owner, next: a.next, covered: b.owner})
+			}
+		}
+	}
+	return out
+}
+
+// dnssec23EvaluateNSEC3 applies R1 to R5 to the NSEC3 records of one response.
+func dnssec23EvaluateNSEC3(ctx context.Context, ns nameserver.Nameserver, apex dnsname.Name, records []*dns.NSEC3, opts *nameserver.QueryOptions) []dnssec23Finding {
+	var findings []dnssec23Finding
+	chains := map[string]bool{}
+	for _, rr := range records {
+		chains[dnssec23Params(rr.Hash, rr.Iterations, rr.Salt)] = true
+	}
+	mixed := len(chains) > 1
+	if mixed {
+		findings = append(findings, dnssec23Finding{tag: "DS23_NSEC3_MIXED_PARAMETERS"})
+	} else {
+		intervals := dnssec23NSEC3Intervals(records)
+		duplicates, reported := dnssec23DuplicateNext(intervals)
+		findings = append(findings, duplicates...)
+		findings = append(findings, dnssec23Overlaps("DS23_NSEC3_RANGES_OVERLAP", intervals, strings.Compare, reported)...)
+	}
+
+	paramResp, _ := ns.QueryWithOptions(ctx, apex.String(), "NSEC3PARAM", opts)
+	if paramResp.Msg == nil || !paramResp.AA() || paramResp.Rcode() != "NOERROR" {
+		return findings
+	}
+	published := map[string]bool{}
+	count := 0
+	for _, rr := range paramResp.GetRecordsForName("NSEC3PARAM", apex, "answer") {
+		param, ok := rr.(*dns.NSEC3PARAM)
+		if !ok {
+			continue
+		}
+		count++
+		published[dnssec23Params(param.Hash, param.Iterations, param.Salt)] = true
+	}
+	if !mixed {
+		for chain := range chains {
+			if !published[chain] {
+				findings = append(findings, dnssec23Finding{tag: "DS23_NSEC3_CHAIN_NOT_PUBLISHED"})
+			}
+		}
+	}
+	if count > 1 {
+		findings = append(findings, dnssec23Finding{tag: "DS23_MULTIPLE_NSEC3PARAM"})
+	}
+	return findings
+}
+
+// dnssec23Evaluate reads one nameserver's proof; ok is false without a usable response.
+func dnssec23Evaluate(ctx context.Context, ns nameserver.Nameserver, apex dnsname.Name, probe string) (outcome dnssec23Outcome, ok bool) {
+	dnssecOn := true
+	opts := &nameserver.QueryOptions{DNSSEC: &dnssecOn}
+	keyResp, _ := ns.QueryWithOptions(ctx, apex.String(), "DNSKEY", opts)
+	if keyResp.Msg == nil || !keyResp.AA() || keyResp.Rcode() != "NOERROR" ||
+		len(keyResp.GetRecordsForName("DNSKEY", apex, "answer")) == 0 {
+		return outcome, false
+	}
+	resp, _ := ns.QueryWithOptions(ctx, probe, "A", opts)
+	if resp.Msg == nil || !resp.AA() || resp.TC() || (resp.Rcode() != "NOERROR" && resp.Rcode() != "NXDOMAIN") {
+		return outcome, false
+	}
+
+	nsec3s := dnssec23NSEC3Records(resp, apex)
+	nsecs := dnssec23NSECRecords(resp, apex)
+	if len(nsec3s) == 0 && len(nsecs) == 0 {
+		outcome.findings = []dnssec23Finding{{tag: "DS23_NO_DENIAL_PROOF"}}
+		return outcome, true
+	}
+	if len(nsec3s) > 0 {
+		outcome.findings = append(outcome.findings, dnssec23EvaluateNSEC3(ctx, ns, apex, nsec3s, opts)...)
+	}
+	if len(nsecs) > 0 {
+		outcome.findings = append(outcome.findings,
+			dnssec23Overlaps("DS23_NSEC_RANGES_OVERLAP", dnssec23NSECIntervals(nsecs), dns.CompareName, nil)...)
+	}
+	outcome.consistent = true
+	for _, finding := range outcome.findings {
+		if dnssec23ErrorTags[finding.tag] {
+			outcome.consistent = false
+		}
+	}
+	return outcome, true
+}
+
+// DNSSEC23 checks that the denial records of one negative response agree with each other and with the apex NSEC3PARAM RRset.
+func DNSSEC23(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "DNSSEC23"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+
+	delItems, err := delegationNameservers(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	zoneItems, err := zoneNameservers(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	groups := nameserversByIP(nameserversFromNSItems(ctx, z, append(delItems, zoneItems...)))
+	probe := z.Name.Prepend(dnssec23ProbeLabel).String()
+
+	outcomes := make([]dnssec23Outcome, len(groups))
+	tasks := make([]runner.Task, len(groups))
+	for i, group := range groups {
+		tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+			if len(group) == 0 {
+				return nil
+			}
+			buf := testlogger.Wrap(log, moduleName, testcase)
+			ns := group[0]
+			if disabled, derr := ipDisabledMessageWithLogger(ctx, buf, ns, "A"); derr != nil {
+				return derr
+			} else if disabled {
+				return nil
+			}
+			outcome, ok := dnssec23Evaluate(ctx, ns, z.Name, probe)
+			if !ok {
+				return nil
+			}
+			outcome.servers = dnssec22Endpoints(group)
+			outcomes[i] = outcome
+			return nil
+		}
+	}
+
+	entries, err := runner.Run(ctx, tasks, runner.Options{
+		Parallel:      profile.FromContext(ctx).Resolver.Defaults.Parallel,
+		CancelOnError: false,
+	})
+	results = append(results, entries...)
+	if err != nil {
+		return results, err
+	}
+
+	byFinding := map[dnssec23Finding][]logargs.Server{}
+	var findings []dnssec23Finding
+	var consistent []logargs.Server
+	for _, outcome := range outcomes {
+		for _, finding := range outcome.findings {
+			if _, seen := byFinding[finding]; !seen {
+				findings = append(findings, finding)
+			}
+			byFinding[finding] = append(byFinding[finding], outcome.servers...)
+		}
+		if outcome.consistent {
+			consistent = append(consistent, outcome.servers...)
+		}
+	}
+	sort.Slice(findings, func(i, j int) bool {
+		left, right := findings[i], findings[j]
+		if left.tag != right.tag {
+			return left.tag < right.tag
+		}
+		if left.owner != right.owner {
+			return left.owner < right.owner
+		}
+		if left.covered != right.covered {
+			return left.covered < right.covered
+		}
+		return left.next < right.next
+	})
+
+	sawError := false
+	for _, finding := range findings {
+		if dnssec23ErrorTags[finding.tag] {
+			sawError = true
+		}
+		args := map[string]any{}
+		if finding.owner != "" {
+			args = map[string]any{"owner": finding.owner, "next": finding.next, "covered": finding.covered}
+		}
+		setTypedServersFromEndpoints(args, byFinding[finding])
+		if err := appendLog(ctx, &results, testcase, finding.tag, args); err != nil {
+			return results, err
+		}
+	}
+
+	if !sawError && len(consistent) > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, consistent)
+		if err := appendLog(ctx, &results, testcase, "DS23_DENIAL_PROOF_CONSISTENT", args); err != nil {
+			return results, err
+		}
+	}
+
+	return results, appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase})
 }
 
 func algoPropertyFor(algo uint8) algoProperty {

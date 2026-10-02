@@ -310,7 +310,9 @@ func (s *Server) handlePublicAnalysisDomainDetail(w http.ResponseWriter, r *http
 	s.attachRegistryData(&detail, view.DomainName)
 	if entries, timings, ok := s.lookupSnapshotDomainRun(snapshot.BatchID, view.DomainID); ok {
 		detail.Entries = entries
-		detail.NameserverTimings = timings
+		if s.cfg.ShowNameserverTimingsPublic {
+			detail.NameserverTimings = timings
+		}
 	}
 
 	writeSnapshotCacheHeaders(w, r, snapshot)

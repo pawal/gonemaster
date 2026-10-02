@@ -324,6 +324,24 @@ func TestDomainDetailIncludesNameserverTimings(t *testing.T) {
 	})
 }
 
+func TestDomainDetailHonoursShowNameserverTimingsPublic(t *testing.T) {
+	f := newAnalysisAPITestFixture(t)
+	f.srv.cfg.ShowNameserverTimingsPublic = false
+	now := time.Date(2026, 4, 26, 10, 0, 0, 0, time.UTC)
+	f.seedGraduatedRun("alpha.example", now, []engine.LogEntry{
+		{Module: "BASIC", Testcase: "basic01", Tag: "B01_OK", Level: "NOTICE"},
+	}, NameserverTiming{Nameserver: "ns1.example", Address: "192.0.2.1", AvgMS: 20, Count: 5, Status: "ok"})
+	f.seedEndpoint("run-alpha.example-"+now.Format("20060102150405"), "alpha.example", "ns1.example", "192.0.2.1", "ipv4", now, 64500, "192.0.2.0/24")
+
+	got := mustJSON[PublicAnalysisDomainDetail](t, getPublic(t, f.srv, f.publicURL("domains/alpha.example")), http.StatusOK)
+	if len(got.NameserverTimings) != 0 {
+		t.Errorf("nameserver_timings = %+v, want none with show_nameserver_timings_public off", got.NameserverTimings)
+	}
+	if len(got.Entries) == 0 {
+		t.Error("entries dropped along with the timings")
+	}
+}
+
 // TestDomainDetailZoneFactFields covers the zone-fact fields on the detail
 // response: the per-family nameserver counts, and the weakest signing
 // algorithm carrying its label and tone so the client needs no mnemonic

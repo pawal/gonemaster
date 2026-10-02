@@ -174,12 +174,21 @@ func rateLimitMiddleware(rl *atomic.Pointer[RateLimiter], trusted []netip.Prefix
 	})
 }
 
+// rateLimitKey buckets an IPv6 client by its /64 and any other client by address.
+func rateLimitKey(ip string) string {
+	addr, err := netip.ParseAddr(ip)
+	if err != nil || !addr.Is6() || addr.Is4In6() {
+		return ip
+	}
+	return netip.PrefixFrom(addr.WithZone(""), 64).Masked().String()
+}
+
 // allowRequest reports whether r is within rl, answering 429 when it is not.
 func allowRequest(w http.ResponseWriter, r *http.Request, rl *RateLimiter, trusted []netip.Prefix) bool {
 	if rl == nil {
 		return true
 	}
-	ok, retryAfter := rl.Allow(clientIP(r, trusted))
+	ok, retryAfter := rl.Allow(rateLimitKey(clientIP(r, trusted)))
 	if !ok {
 		w.Header().Set("Retry-After", fmt.Sprintf("%d", retryAfter))
 		http.Error(w, "rate limit exceeded", http.StatusTooManyRequests)

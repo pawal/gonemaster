@@ -476,3 +476,36 @@ func TestRateLimitSettingsKeepLimiterWhenUnchanged(t *testing.T) {
 		t.Fatal("changed limits kept the old limiter")
 	}
 }
+
+func TestRateLimitKey(t *testing.T) {
+	for _, tc := range []struct{ ip, want string }{
+		{"192.0.2.1", "192.0.2.1"},
+		{"2001:db8:1:2:aaaa::1", "2001:db8:1:2::/64"},
+		{"2001:db8:1:2:ffff:ffff:ffff:ffff", "2001:db8:1:2::/64"},
+		{"fe80::1%eth0", "fe80::/64"},
+		{"not-an-ip", "not-an-ip"},
+	} {
+		if got := rateLimitKey(tc.ip); got != tc.want {
+			t.Errorf("rateLimitKey(%q) = %q, want %q", tc.ip, got, tc.want)
+		}
+	}
+}
+
+func TestRateLimitMiddlewareSharesIPv6Slash64(t *testing.T) {
+	h := rateLimitMiddleware(limiterPtr(NewRateLimiter(1, time.Minute)), nil, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusCreated)
+	}))
+	post := func(remote string) int {
+		return doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr(remote), noContentType()).Code
+	}
+
+	if code := post("[2001:db8:1:2::1]:1234"); code != http.StatusCreated {
+		t.Fatalf("first address in the /64: got %d, want 201", code)
+	}
+	if code := post("[2001:db8:1:2::2]:1234"); code != http.StatusTooManyRequests {
+		t.Fatalf("second address in the same /64: got %d, want 429", code)
+	}
+	if code := post("[2001:db8:1:3::1]:1234"); code != http.StatusCreated {
+		t.Fatalf("address in another /64: got %d, want 201", code)
+	}
+}

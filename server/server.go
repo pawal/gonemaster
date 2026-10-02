@@ -467,6 +467,8 @@ func (s *Server) routes() {
 		pubHandler = analysisTimeoutMiddleware(d, pubHandler)
 	}
 	pubHandler = rateLimitMiddleware(&s.rateLimiter, s.trustedProxies, pubHandler)
+	// Outside the rate limiter, so only authenticated calls are metered.
+	pubHandler = s.publicAPIAuthMiddleware(pubHandler)
 	// Outside the rate limiter, so a 429 is counted rather than invisible.
 	pubHandler = s.apiChain("/pub/api/v1/unknown", pubHandler)
 	s.mux.Handle("/pub/api/v1/", pubHandler)
@@ -475,11 +477,11 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /sitemap.xml", s.pageChain("/sitemap.xml", http.HandlerFunc(s.handleSitemap)))
 	publicURL := func() string { return s.liveConfig().PublicURL }
 	publicPages := http.StripPrefix("/public", serverpublic.Handler(publicURL, s.cfg.PublicUIPath, s.publicResultLookup()))
-	s.mux.Handle("/public/", s.pageChain("/public/", publicPages))
-	s.mux.Handle("GET /public/result/", s.pageChain("/public/", s.limitGET(publicPages.ServeHTTP)))
-	s.mux.Handle("/analysis/", s.pageChain("/analysis/", legacyTagRedirect(
+	s.mux.Handle("/public/", s.pageChain("/public/", s.publicPageGate("/public", publicPages)))
+	s.mux.Handle("GET /public/result/", s.pageChain("/public/", s.publicPageGate("/public", s.limitGET(publicPages.ServeHTTP))))
+	s.mux.Handle("/analysis/", s.pageChain("/analysis/", s.publicPageGate("/analysis", legacyTagRedirect(
 		http.StripPrefix("/analysis", serveranalysisui.Handler(publicURL)),
-	)))
+	))))
 	s.mux.Handle("/analysis", s.pageChain("/analysis", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/analysis/", http.StatusMovedPermanently)
 	})))

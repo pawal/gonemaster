@@ -22,8 +22,9 @@ type adminToken struct {
 
 // tokenSet is an immutable set of admin tokens. enabled is false in open mode.
 type tokenSet struct {
-	enabled bool
-	tokens  []adminToken
+	enabled       bool
+	protectPublic bool
+	tokens        []adminToken
 }
 
 // hashToken returns the "sha256:<hex>" form of a plaintext token.
@@ -62,6 +63,10 @@ func newTokenSet(cfg AuthConfig) (*tokenSet, error) {
 		ts.tokens = append(ts.tokens, adminToken{label: t.Label, hash: raw})
 	}
 	ts.enabled = len(ts.tokens) > 0
+	if cfg.ProtectPublic && !ts.enabled {
+		return nil, fmt.Errorf("protect_public requires admin_tokens")
+	}
+	ts.protectPublic = cfg.ProtectPublic
 	return ts, nil
 }
 
@@ -84,6 +89,33 @@ func (ts *tokenSet) match(plaintext string) (string, bool) {
 		}
 	}
 	return label, found == 1
+}
+
+// protects reports whether the public surfaces require a token from this set.
+func (ts *tokenSet) protects() bool { return ts.enabled && ts.protectPublic }
+
+// allows reports whether r carries a token from this set.
+func (ts *tokenSet) allows(r *http.Request) bool {
+	tok := credentialToken(r)
+	if tok == "" {
+		return false
+	}
+	_, ok := ts.match(tok)
+	return ok
+}
+
+// requireToken writes a 401 and returns false unless r carries a token from ts.
+func requireToken(ts *tokenSet, w http.ResponseWriter, r *http.Request) bool {
+	msg := "admin token required"
+	if tok := credentialToken(r); tok != "" {
+		if _, ok := ts.match(tok); ok {
+			return true
+		}
+		msg = "invalid admin token"
+	}
+	w.Header().Set("WWW-Authenticate", "Bearer")
+	writeError(w, http.StatusUnauthorized, "unauthorized", msg, nil)
+	return false
 }
 
 // authExemptPath reports paths reachable without a credential in token mode.
@@ -114,15 +146,7 @@ func (s *Server) authMiddleware(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		tok := credentialToken(r)
-		if tok == "" {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			writeError(w, http.StatusUnauthorized, "unauthorized", "admin token required", nil)
-			return
-		}
-		if _, ok := ts.match(tok); !ok {
-			w.Header().Set("WWW-Authenticate", "Bearer")
-			writeError(w, http.StatusUnauthorized, "unauthorized", "invalid admin token", nil)
+		if !requireToken(ts, w, r) {
 			return
 		}
 		next.ServeHTTP(w, r)

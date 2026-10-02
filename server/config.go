@@ -81,6 +81,8 @@ type ExternalDataConfig struct {
 // AuthConfig configures admin-API auth. Empty AdminTokens means open mode.
 type AuthConfig struct {
 	AdminTokens []AdminToken `json:"admin_tokens,omitempty"`
+	// ProtectPublic gates the public UI, analysis UI and public API with the admin tokens.
+	ProtectPublic bool `json:"protect_public,omitempty"`
 }
 
 // AdminToken is one admin credential, stored hashed. Scopes is reserved.

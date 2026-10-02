@@ -1002,10 +1002,18 @@ func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
 	base := strings.TrimRight(baseurl.Resolve(s.liveConfig().PublicURL, r), "/")
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
+	if s.authTokens().protects() {
+		fmt.Fprint(w, "User-agent: *\nDisallow: /\n")
+		return
+	}
 	fmt.Fprintf(w, "User-agent: *\nSitemap: %s/sitemap.xml\n", base)
 }
 
 func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
+	if s.authTokens().protects() {
+		http.NotFound(w, r)
+		return
+	}
 	base := baseurl.Resolve(s.liveConfig().PublicURL, r)
 	site := serverpublic.NewSite(base, s.cfg.PublicUIPath)
 

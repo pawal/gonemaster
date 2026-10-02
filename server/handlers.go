@@ -769,10 +769,11 @@ func (s *Server) handleGetJobResult(w http.ResponseWriter, r *http.Request, jobI
 		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
 		result.Raw = &raw
 	}
-	if !s.cfg.ShowScoreAdmin {
+	cfg := s.liveConfig()
+	if !cfg.ShowScoreAdmin {
 		result.Score = nil
 	}
-	if !s.cfg.ShowNameserverTimingsAdmin {
+	if !cfg.ShowNameserverTimingsAdmin {
 		result.NameserverTimings = nil
 	}
 	writeJSON(w, http.StatusOK, result)
@@ -968,7 +969,7 @@ func (s *Server) handleJobsPurge(w http.ResponseWriter, r *http.Request) {
 
 	days := req.OlderThanDays
 	if days == 0 {
-		days = s.cfg.Database.RetentionDays
+		days = s.liveConfig().Database.RetentionDays
 	}
 	if days == 0 {
 		writeError(w, http.StatusBadRequest, "retention_not_configured",
@@ -998,14 +999,14 @@ var analysisSitemapPaths = []string{
 }
 
 func (s *Server) handleRobotsTxt(w http.ResponseWriter, r *http.Request) {
-	base := strings.TrimRight(baseurl.Resolve(s.cfg.PublicURL, r), "/")
+	base := strings.TrimRight(baseurl.Resolve(s.liveConfig().PublicURL, r), "/")
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.Header().Set("Cache-Control", "public, max-age=3600")
 	fmt.Fprintf(w, "User-agent: *\nSitemap: %s/sitemap.xml\n", base)
 }
 
 func (s *Server) handleSitemap(w http.ResponseWriter, r *http.Request) {
-	base := baseurl.Resolve(s.cfg.PublicURL, r)
+	base := baseurl.Resolve(s.liveConfig().PublicURL, r)
 	site := serverpublic.NewSite(base, s.cfg.PublicUIPath)
 
 	// Every listed URL must repeat the whole alternate set.

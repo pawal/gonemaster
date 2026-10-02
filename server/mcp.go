@@ -26,7 +26,7 @@ func (s *Server) mcpHandler() http.Handler {
 		Logger:                       s.logger,
 	})
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !s.cfg.MCPEnabled {
+		if !s.liveConfig().MCPEnabled {
 			writeError(w, http.StatusNotFound, "not_found", "mcp endpoint disabled", nil)
 			return
 		}
@@ -50,7 +50,7 @@ func (s *Server) mcpServerFor(r *http.Request) *mcp.Server {
 	}
 	api.WithHints("the bearer token was rejected", "the admin API is not mounted at /api/v1")
 	return mcpbridge.NewServer(api, mcpbridge.Options{
-		AllowWrite: s.cfg.MCPAllowWrite,
+		AllowWrite: s.liveConfig().MCPAllowWrite,
 		Name:       "gonemaster-server",
 		Version:    engine.VersionFull(),
 		Logger:     s.logger,

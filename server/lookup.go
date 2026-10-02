@@ -74,7 +74,7 @@ func (s *Server) handlePublicLookupDomain(w http.ResponseWriter, r *http.Request
 
 // lookupDelegation resolves a delegation through the server's resolvers.
 func (s *Server) lookupDelegation(ctx context.Context, domain string) DelegationInfo {
-	return lookupDelegation(ctx, domain, s.lookup, s.cfg.PublicAPI.AllowNonGlobalTargets)
+	return lookupDelegation(ctx, domain, s.lookup, s.liveConfig().PublicAPI.AllowNonGlobalTargets)
 }
 
 // lookupDelegation queries DNS for NS and DS records of a domain.

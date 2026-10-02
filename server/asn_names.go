@@ -30,7 +30,7 @@ func (s *Server) SetASNLabeler(l asnLabeler) {
 }
 
 func (s *Server) asnNamesEnabled() bool {
-	return s.cfg.ShowASNNamesPublic && s.asnLabeler != nil
+	return s.liveConfig().ShowASNNamesPublic && s.asnLabeler != nil
 }
 
 type asnName struct {

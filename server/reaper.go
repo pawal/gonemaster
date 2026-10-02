@@ -32,7 +32,7 @@ func (s *Server) startStuckJobReaper(ctx context.Context) {
 // sweep safe for slow jobs and unsafe for two servers sharing one database:
 // each would reap the other's live work.
 func (s *Server) reapStuckJobs(now time.Time) int {
-	timeout := s.cfg.EffectiveStuckJobTimeout()
+	timeout := s.liveConfig().EffectiveStuckJobTimeout()
 	if timeout <= 0 {
 		return 0
 	}

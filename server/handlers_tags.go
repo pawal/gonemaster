@@ -204,7 +204,7 @@ func (s *Server) handleListTagDomains(w http.ResponseWriter, r *http.Request, ta
 	filter.MinLevel = strings.ToUpper(strings.TrimSpace(q.Get("min_level")))
 	filter.Sort = DomainSort(strings.TrimSpace(q.Get("sort")))
 	list := s.store.ListDomainsByTag(tag, filter)
-	if !s.cfg.ShowScoreAdmin {
+	if !s.liveConfig().ShowScoreAdmin {
 		for i := range list.Items {
 			list.Items[i].LatestScore = nil
 			list.Items[i].LatestGrade = nil

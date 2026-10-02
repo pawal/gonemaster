@@ -63,7 +63,7 @@ func (s *Server) handleListRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	list := s.store.ListRuns(filter)
-	if !s.cfg.ShowScoreAdmin {
+	if !s.liveConfig().ShowScoreAdmin {
 		for i := range list.Items {
 			list.Items[i].Score = nil
 			list.Items[i].Grade = nil
@@ -80,7 +80,7 @@ func (s *Server) handleGetRun(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "not_found", "run not found", nil)
 		return
 	}
-	if !s.cfg.ShowScoreAdmin {
+	if !s.liveConfig().ShowScoreAdmin {
 		run.Score = nil
 		run.Grade = nil
 	}
@@ -106,10 +106,11 @@ func (s *Server) handleGetRunResult(w http.ResponseWriter, r *http.Request) {
 		raw.Entries = localizeResultEntries(result.Raw.Entries, locale)
 		result.Raw = &raw
 	}
-	if !s.cfg.ShowScoreAdmin {
+	cfg := s.liveConfig()
+	if !cfg.ShowScoreAdmin {
 		result.Score = nil
 	}
-	if !s.cfg.ShowNameserverTimingsAdmin {
+	if !cfg.ShowNameserverTimingsAdmin {
 		result.NameserverTimings = nil
 	}
 	writeJSON(w, http.StatusOK, result)

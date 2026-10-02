@@ -38,7 +38,7 @@ func (s *Server) Start() {
 	s.workers.ctx = ctx
 	s.workers.cancel = cancel
 
-	workerCount := max(s.cfg.WorkerCount, 1)
+	workerCount := max(s.liveConfig().WorkerCount, 1)
 	for range workerCount {
 		s.startWorker()
 	}
@@ -305,14 +305,15 @@ type jobArtifacts struct {
 const maxDNSSECChainBytes = 60 * 1024
 
 func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, error) {
-	if s.engineLimiter != nil {
-		if err := s.engineLimiter.Acquire(ctx); err != nil {
+	if lim := s.engineLimiter.Load(); lim != nil {
+		if err := lim.Acquire(ctx); err != nil {
 			return jobArtifacts{}, err
 		}
-		defer s.engineLimiter.Release()
+		defer lim.Release()
 	}
 
-	minLevel := s.cfg.MinLevel
+	cfg := s.liveConfig()
+	minLevel := cfg.MinLevel
 	if job.MinLevel != "" {
 		minLevel = job.MinLevel
 	}
@@ -332,7 +333,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, er
 		req.IPv6 = &disabled
 	}
 	// Clamp the guard on unless the instance permits non-global targets.
-	if !s.cfg.PublicAPI.AllowNonGlobalTargets {
+	if !cfg.PublicAPI.AllowNonGlobalTargets {
 		block := false
 		req.AllowNonGlobalTargets = &block
 	}
@@ -394,7 +395,7 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, er
 
 	// Public jobs only; multi-testcase jobs keep the summary with most evidence.
 	var chainSummary *dnssecchain.Summary
-	if job.Origin == JobOriginPublic && s.cfg.ShowDNSSECChainPublic {
+	if job.Origin == JobOriginPublic && cfg.ShowDNSSECChainPublic {
 		req.DNSSECChainSink = func(sm *dnssecchain.Summary) {
 			if chainEvidenceScore(sm) >= chainEvidenceScore(chainSummary) {
 				chainSummary = sm

@@ -3,7 +3,11 @@ package server
 import (
 	"fmt"
 	"net/http"
+	"sync"
 	"testing"
+	"time"
+
+	"codeberg.org/pawal/gonemaster/engine"
 )
 
 func TestGetSettings(t *testing.T) {
@@ -616,4 +620,44 @@ func TestApplyDatabaseSettingsIgnoresOutOfRangeValues(t *testing.T) {
 	if srv.cfg.Database.RetentionDays != 0 {
 		t.Fatalf("RetentionDays = %d, want 0", srv.cfg.Database.RetentionDays)
 	}
+}
+
+func TestPutSettingsDoesNotRaceRequestsOrWorkers(t *testing.T) {
+	srv := newTestServer(t, withWorkers(2, 1), withEngineRunner(func(engine.RunRequest) ([]engine.LogEntry, error) {
+		return nil, nil
+	}))
+	srv.Start()
+	defer srv.Stop(t.Context())
+
+	stop := make(chan struct{})
+	var wg sync.WaitGroup
+	for _, path := range []string{"/api/v1/features", "/api/v1/settings", "/pub/api/v1/info", "/api/v1/runs"} {
+		wg.Go(func() {
+			for {
+				select {
+				case <-stop:
+					return
+				default:
+					doJSON(t, srv, http.MethodGet, path, nil)
+				}
+			}
+		})
+	}
+	wg.Go(func() {
+		for {
+			select {
+			case <-stop:
+				return
+			default:
+				doJSON(t, srv, http.MethodPost, "/api/v1/jobs", `{"domain": "example.com"}`)
+				time.Sleep(time.Millisecond)
+			}
+		}
+	})
+	for i := range 20 {
+		body := fmt.Sprintf(`{"show_score_admin": %t, "max_concurrent_jobs": %d, "min_level": "NOTICE"}`, i%2 == 0, i%3)
+		wantStatus(t, doJSON(t, srv, http.MethodPut, "/api/v1/settings", body), http.StatusOK)
+	}
+	close(stop)
+	wg.Wait()
 }

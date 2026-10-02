@@ -70,10 +70,11 @@ type publicInfoResponse struct {
 // components to display. On fetch failure, the public UI defaults to hiding
 // scoring (fail-safe).
 func (s *Server) handlePublicInfo(w http.ResponseWriter, _ *http.Request) {
+	cfg := s.liveConfig()
 	writeJSON(w, http.StatusOK, publicInfoResponse{
-		ShowScorePublic:             s.cfg.ShowScorePublic,
-		ShowNameserverTimingsPublic: s.cfg.ShowNameserverTimingsPublic,
-		ShowDNSSECChainPublic:       s.cfg.ShowDNSSECChainPublic,
+		ShowScorePublic:             cfg.ShowScorePublic,
+		ShowNameserverTimingsPublic: cfg.ShowNameserverTimingsPublic,
+		ShowDNSSECChainPublic:       cfg.ShowDNSSECChainPublic,
 		ShowASNNamesPublic:          s.asnNamesEnabled(),
 		ExcludedTestcases:           s.excludedTestcases,
 	})
@@ -139,7 +140,7 @@ func (s *Server) handlePublicCreateJob(w http.ResponseWriter, r *http.Request) {
 	if !validateMinLevel(w, req.MinLevel) || !validatePublicMinLevel(w, req.MinLevel) || !s.validateTests(w, req.Tests) {
 		return
 	}
-	if !s.cfg.PublicAPI.AllowPrivateUndelegatedIP {
+	if !s.liveConfig().PublicAPI.AllowPrivateUndelegatedIP {
 		for i, ns := range undelegatedNS {
 			if blocked, reason := isBlockedPublicNameserverIP(ns.IP); blocked {
 				writeError(w, http.StatusBadRequest, "private_undelegated_ip",
@@ -238,13 +239,14 @@ func (s *Server) handlePublicGetResult(w http.ResponseWriter, r *http.Request) {
 		result.TestcaseDescriptions = testcaseDescriptionsForEntries(raw.Entries)
 	}
 	result.JobID, result.BatchID = "", ""
-	if !s.cfg.ShowScorePublic {
+	cfg := s.liveConfig()
+	if !cfg.ShowScorePublic {
 		result.Score = nil
 	}
-	if !s.cfg.ShowNameserverTimingsPublic {
+	if !cfg.ShowNameserverTimingsPublic {
 		result.NameserverTimings = nil
 	}
-	if !s.cfg.ShowDNSSECChainPublic {
+	if !cfg.ShowDNSSECChainPublic {
 		result.HasDNSSECChain = false
 	}
 	// Let a CDN absorb repeat reads; short window so show_* flips propagate.
@@ -272,7 +274,7 @@ func (s *Server) publicResultLookup() serverpublic.LookupResult {
 			return serverpublic.ResultSummary{}, serverpublic.LookupNotFound
 		}
 		summary := serverpublic.ResultSummary{Domain: job.Domain, FinishedAt: job.FinishedAt}
-		if s.cfg.ShowScorePublic && result.Score != nil {
+		if s.liveConfig().ShowScorePublic && result.Score != nil {
 			summary.Grade = result.Score.Grade
 			summary.Score = result.Score.Score
 		}
@@ -316,7 +318,7 @@ func summaryFindings(entries []JobResultEntry, locale string) (findings []server
 // Flag-off and unknown id answer 404 not_found; a run without a blob answers
 // 404 no_chain_data with no cache header so a re-run is not masked.
 func (s *Server) handlePublicGetDNSSECChain(w http.ResponseWriter, r *http.Request) {
-	if !s.cfg.ShowDNSSECChainPublic {
+	if !s.liveConfig().ShowDNSSECChainPublic {
 		writeError(w, http.StatusNotFound, "not_found", "not found", nil)
 		return
 	}

@@ -60,6 +60,8 @@ func (s *Server) settingSource(key string) SettingSource {
 // CLI flags (tracked in configSources) take precedence and are not overridden.
 func (s *Server) ApplyDatabaseSettings() {
 	dbSettings := s.store.ListSettings()
+	s.cfgMu.Lock()
+	defer s.cfgMu.Unlock()
 	for key, val := range dbSettings {
 		if s.configSources != nil {
 			if s.configSources[key] == SourceCLIFlag {
@@ -211,22 +213,30 @@ func (s *Server) applySetting(key, val string) {
 	}
 }
 
+// liveConfig returns a copy of s.cfg taken under the settings lock.
+func (s *Server) liveConfig() Config {
+	s.cfgMu.RLock()
+	defer s.cfgMu.RUnlock()
+	return s.cfg
+}
+
 // applySettingsToRuntime updates live server components after settings change.
 // This handles hot-reload of mutable settings that affect runtime behavior.
 func (s *Server) applySettingsToRuntime() {
 	// Re-apply all DB settings to cfg (respecting CLI flag precedence).
 	s.ApplyDatabaseSettings()
+	cfg := s.liveConfig()
 
 	// Resize the worker pool to match the new worker_count.
-	s.resizeWorkerPool(s.cfg.WorkerCount)
+	s.resizeWorkerPool(cfg.WorkerCount)
 
 	// Update engine concurrency limiter.
-	s.engineLimiter = newEngineLimiter(s.cfg.MaxConcurrentJobs)
+	s.engineLimiter.Store(newEngineLimiter(cfg.MaxConcurrentJobs))
 
 	// Update hot cache TTL.
-	s.hotCache.SetTTL(s.cfg.EffectiveCrossJobHotCacheTTL())
+	s.hotCache.SetTTL(cfg.EffectiveCrossJobHotCacheTTL())
 
-	s.applyRateLimit(s.cfg.PublicAPI)
+	s.applyRateLimit(cfg.PublicAPI)
 }
 
 // featuresResponse holds server-side feature flags exposed to the admin UI.
@@ -239,9 +249,10 @@ type featuresResponse struct {
 // Returns a lightweight set of feature flags the admin UI reads on startup
 // to decide which UI components to display.
 func (s *Server) handleFeatures(w http.ResponseWriter, _ *http.Request) {
+	cfg := s.liveConfig()
 	writeJSON(w, http.StatusOK, featuresResponse{
-		ShowScoreAdmin:             s.cfg.ShowScoreAdmin,
-		ShowNameserverTimingsAdmin: s.cfg.ShowNameserverTimingsAdmin,
+		ShowScoreAdmin:             cfg.ShowScoreAdmin,
+		ShowNameserverTimingsAdmin: cfg.ShowNameserverTimingsAdmin,
 	})
 }
 
@@ -257,7 +268,7 @@ func (s *Server) handleSettings(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
-	cfg := s.cfg
+	cfg := s.liveConfig()
 	dbSettings := s.store.ListSettings()
 
 	// Build the settings map with current effective values.
@@ -353,6 +364,8 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		values[key] = val
 	}
 
+	s.settingsMu.Lock()
+	defer s.settingsMu.Unlock()
 	for key, val := range values {
 		if err := s.store.SetSetting(key, val); err != nil {
 			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)

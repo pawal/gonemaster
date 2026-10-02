@@ -35,7 +35,7 @@ func (s *Server) handleListDomains(w http.ResponseWriter, r *http.Request) {
 	}
 
 	list := s.store.ListDomains(filter)
-	if !s.cfg.ShowScoreAdmin {
+	if !s.liveConfig().ShowScoreAdmin {
 		for i := range list.Items {
 			list.Items[i].LatestScore = nil
 			list.Items[i].LatestGrade = nil
@@ -57,7 +57,7 @@ func (s *Server) handleGetDomain(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	domain.Tags = s.store.GetDomainTags(id)
-	if !s.cfg.ShowScoreAdmin {
+	if !s.liveConfig().ShowScoreAdmin {
 		domain.LatestScore = nil
 		domain.LatestGrade = nil
 	}
@@ -98,7 +98,7 @@ func (s *Server) handleGetDomainRuns(w http.ResponseWriter, r *http.Request) {
 	}
 
 	list := s.store.ListRuns(filter)
-	if !s.cfg.ShowScoreAdmin {
+	if !s.liveConfig().ShowScoreAdmin {
 		for i := range list.Items {
 			list.Items[i].Score = nil
 			list.Items[i].Grade = nil

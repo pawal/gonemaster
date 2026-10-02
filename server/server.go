@@ -22,7 +22,10 @@ import (
 
 // Server holds the HTTP API and supporting services.
 type Server struct {
+	// cfg fields that applySetting writes are read through liveConfig.
 	cfg                      Config
+	cfgMu                    sync.RWMutex
+	settingsMu               sync.Mutex
 	mux                      *http.ServeMux
 	store                    JobStore
 	analysis                 AnalysisController
@@ -38,7 +41,7 @@ type Server struct {
 	progressWriteMinInterval time.Duration
 	engineRunner             func(engine.RunRequest) ([]engine.LogEntry, error)
 	lookup                   lookupResolvers
-	engineLimiter            *engineLimiter
+	engineLimiter            atomic.Pointer[engineLimiter]
 	cancelMu                 sync.Mutex
 	cancels                  map[string]context.CancelFunc
 	rateLimiter              atomic.Pointer[RateLimiter]
@@ -195,9 +198,9 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 		reportCache:                   newAnalysisReportCache(),
 		diffCache:                     newAnalysisCache[PublicAnalysisDiffResponse](),
 		engineRunner:                  engine.Run,
-		engineLimiter:                 newEngineLimiter(cfg.MaxConcurrentJobs),
 		cancels:                       map[string]context.CancelFunc{},
 	}
+	s.engineLimiter.Store(newEngineLimiter(cfg.MaxConcurrentJobs))
 	// Bound as a method value so it reads s.lookup at call time.
 	s.delegationLookup = s.lookupDelegation
 	s.applyRateLimit(cfg.PublicAPI)

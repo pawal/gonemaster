@@ -176,7 +176,9 @@ globally reachable (loopback, RFC 1918, CGNAT, link-local, ULA, documentation,
 benchmarking, and similar), when it is multicast, or when it is a NAT64
 well-known prefix address (`64:ff9b::/96`, RFC 6052) or an IPv4-compatible
 address (`::a.b.c.d`) whose IPv4 address is not globally reachable. A blocked
-query reads no answer from the cache that concurrent and recent runs share.
+query reads no answer from the cache that concurrent and recent runs share. The
+same guard applies to the TCP connection to each RIPE whois source of the
+profile `asn_db`: a source that resolves only to such addresses is skipped.
 
 This guard is on by default and clamped for every public job, so a
 caller-selected profile cannot relax it. Operator-pinned undelegated IPs

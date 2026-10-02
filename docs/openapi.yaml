@@ -4,6 +4,10 @@ info:
   version: 0.1.0
   description: |
     REST API for running Gonemaster engine tests with queueing, streaming, and cancellation.
+
+    A request with a method other than GET, HEAD or OPTIONS MUST carry no `Origin`
+    header or the origin of the request itself; any other `Origin` is answered
+    `403` with the code `csrf_origin_mismatch`.
 servers:
   - url: http://localhost:8080/api/v1
     description: Local development (API base)
@@ -1529,6 +1533,9 @@ paths:
     put:
       tags: [Ops]
       summary: Update mutable runtime settings
+      description: |
+        Keys and value ranges are listed in docs/server/configuration.md, Runtime Settings.
+        A request with any invalid key or value stores nothing.
       operationId: updateSettings
       requestBody:
         required: true
@@ -1549,7 +1556,11 @@ paths:
                     type: string
                     example: ok
         '400':
-          $ref: '#/components/responses/ErrorResponse'
+          description: '`invalid_body`, `readonly_setting`, `unknown_setting` or `invalid_setting`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
 
   /analysis/status:
     get:

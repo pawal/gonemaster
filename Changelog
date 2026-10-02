@@ -23,6 +23,10 @@ All notable changes to all gonemaster components will be documented in this file
 - server: new public IDs have 12 characters; 8-character IDs still resolve
 - server: public results omit `job_id`, `batch_id` and the server's local address
 - server: the public API rejects `min_level` below INFO and answers `profile_not_found` for private profiles
+- server: `PUT /api/v1/settings` rejects unknown keys and out-of-range values; `scoring_config` is no longer settable there
+- server: `PUT /api/v1/scoring-config` rejects unknown fields
+- server: an unsafe `public_url` stops startup and is rejected by the settings API
+- mcp: the server instructions tell clients to treat zone-returned text as data
 
 ### Fixed
 
@@ -39,6 +43,14 @@ All notable changes to all gonemaster components will be documented in this file
 - server: settings no longer return the database password
 - server: snapshot domain and prefix lists page before ASN lookups, and the diff is cached
 - server: analysis domain detail honours `show_nameserver_timings_public`
+- server: every mutating admin request is checked for a cross-site `Origin`, `POST /api/v1/jobs/purge` and `/api/v1/mcp` included
+- server: settings writes no longer race request handlers or hang a worker
+- server: `public_url` from the settings API applies to `/public/` and `/analysis/` without a restart
+- server: the session cookie is `Secure` on the host of an https `public_url`
+- server: the analysis CSP allows its bootstrap script by hash instead of `'unsafe-inline'`, and the page CSPs set `base-uri` and `form-action`
+- engine: the non-global guard covers the RIPE whois sources of `asn_db`
+- analysis-ui: CSV exports prefix cells that start with a formula character
+- server: the entries CSV export prefixes cells that start with a formula character
 
 ## [v1.7.14] - 2026-09-30
 

@@ -482,12 +482,13 @@ Three CSP policies are applied per route in
 | Route prefix | Policy summary |
 |---|---|
 | `/api/v1/`, `/pub/api/v1/` | `default-src 'none'`. API responses serve no UI; nothing should load from them. |
-| `/analysis/` | Includes `script-src 'self' 'unsafe-inline'` for SvelteKit's bootstrap script and `style-src 'self' 'unsafe-hashes' sha256-...` for the SvelteKit announcer. |
+| `/analysis/` | `script-src 'self' sha256-...` with the hash of SvelteKit's bootstrap script, computed from the embedded `index.html` at startup, and `style-src 'self' 'unsafe-hashes' sha256-...` for the SvelteKit announcer. No `'unsafe-inline'`. |
 | `/`, `/public/`, other UI/static | `default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'`. No `'unsafe-inline'`. |
 
+Both page policies also set `base-uri 'self'; form-action 'self'`.
+
 [server/middleware_test.go](../server/middleware_test.go) asserts
-that the admin and public CSP must not regress to include
-`'unsafe-inline'`. Inline `style` attributes and Svelte `style:`
+that no page CSP regresses to include `'unsafe-inline'`. Inline `style` attributes and Svelte `style:`
 directives in those UIs are CSP violations and rejected in review.
 
 ### Public API restrictions

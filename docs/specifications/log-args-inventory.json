@@ -3296,7 +3296,7 @@
         {
           "tag": "ASN_LOOKUP_SOURCE",
           "file": "engine/asnlookup/asnlookup.go",
-          "line": 143,
+          "line": 146,
           "shape": "unknown"
         }
       ]

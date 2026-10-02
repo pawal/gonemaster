@@ -97,7 +97,10 @@ Write tools, registered only when enabled: `batch_enqueue`, `batch_cancel`,
 
 Every tool carries MCP annotations, so a client can tell a read from a
 write and a destructive write from an additive one before it asks the user
-for confirmation. `test_domain` reports progress while a run executes.
+for confirmation. Tool results quote text from the tested zone's
+nameservers; with write tools enabled, clients SHOULD confirm every
+destructive call. See
+[server-endpoint.md](server-endpoint.md#zone-controlled-text). `test_domain` reports progress while a run executes.
 [tools.md](tools.md) has the full reference.
 
 ## See also

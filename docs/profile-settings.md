@@ -57,7 +57,9 @@ These are part of the profile but configured elsewhere:
   globally reachable (loopback, RFC1918, CGNAT, link-local, ULA, documentation,
   benchmarking, and similar IANA special-purpose ranges, multicast, and NAT64 or
   IPv4-compatible forms of such IPv4 addresses), even when learned from glue or DNS
-  resolution, and emits a `NON_GLOBAL_QUERY_BLOCKED` notice instead. Set `true` (CLI
+  resolution, and emits a `NON_GLOBAL_QUERY_BLOCKED` notice instead. The same rule
+  applies to the RIPE whois sources of `asndb`: a source address that is not globally
+  reachable is skipped without a notice, as an unreachable source is. Set `true` (CLI
   `--allow-non-global`) on private/internal instances that test such zones. Addresses an
   operator pins explicitly via `--ns name/IP` (undelegated tests) are always queried
   regardless of this flag. Note: enabling the guard by default is a behavior change -

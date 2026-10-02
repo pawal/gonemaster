@@ -19,6 +19,37 @@ Print the effective config and exit:
 gonemaster-server --dump-config
 ```
 
+## Runtime Settings
+
+The admin UI Settings page and `PUT /api/v1/settings` store settings in the
+database. A stored setting overrides the config file and the environment, but
+not a command-line flag, and takes effect without a restart. This includes the
+rate limits and `public_url` on `/public/` and `/analysis/`.
+
+`PUT /api/v1/settings` takes a JSON object of setting names and values. The
+server stores nothing and answers `400` when a name is read-only
+(`readonly_setting`), when a name is not a runtime setting
+(`unknown_setting`), or when a value is outside its type or range
+(`invalid_setting`):
+
+| Setting | Accepted values |
+|---|---|
+| `worker_count` | Integer 1 to 1024. |
+| `max_concurrent_jobs` | Integer 0 to 1024. |
+| `stuck_job_timeout_minutes` | Integer 0 to 525600. |
+| `retention_days` | Integer 0 to 36500. |
+| `purge_interval_seconds` | Integer 1 to 31536000. |
+| `cross_job_hot_cache_ttl_seconds` | Integer 1 to 86400. |
+| `rate_limit_max`, `rate_limit_get_max` | Integer 1 to 100000. |
+| `rate_limit_window` | Duration above zero, such as `1m`. |
+| `min_level` | A log level name. |
+| `public_url` | As in [Core Settings](#core-settings). |
+| `rate_limit_enabled`, `allow_private_undelegated_ip`, `allow_non_global_targets`, `show_score_admin`, `show_score_public`, `show_nameserver_timings_admin`, `show_nameserver_timings_public`, `show_dnssec_chain_public`, `show_asn_names_public`, `mcp_enabled`, `mcp_allow_write` | `true` or `false`. |
+
+The read-only settings are `listen_addr`, `db_driver`, `db_dsn` and
+`profile_path`. The server checks stored settings against the same ranges at
+startup and after each write, and logs and ignores a stored value outside them.
+
 ## Core Settings
 
 | Setting | Purpose |
@@ -33,7 +64,7 @@ gonemaster-server --dump-config
 | `min_level` | Minimum log level stored and returned in results. |
 | `profile_path` | Default engine profile file. |
 | `exclude` | Testcase ids and module names that no run executes. See [Excluded testcases](#excluded-testcases). |
-| `public_url` | Site root the deployment answers at, e.g. `https://example.com/`. Also builds `og:image`, the API examples, `robots.txt` and `sitemap.xml`, so it is the root and not the public UI's own URL. |
+| `public_url` | Site root the deployment answers at, e.g. `https://example.com/`. Also builds `og:image`, the API examples, `robots.txt` and `sitemap.xml`, so it is the root and not the public UI's own URL. MUST be empty or an absolute `http` or `https` URL without userinfo, query, fragment, whitespace, control characters, quotes, angle brackets, backslash or backtick; the server refuses to start otherwise. |
 | `public_ui_path` | Path under `public_url` where visitors reach the public UI. Default `public/`; set `""` when a proxy serves it at the root. Does not move the server's own mount. |
 | `scoring_config_path` | Optional JSON scoring configuration file. |
 | `debug` | Captures request/response bodies in the access log and implies `log_level=debug`. |
@@ -44,7 +75,7 @@ gonemaster-server --dump-config
 | `write_timeout` | Per-connection write timeout (default 60s). Must exceed `public_api.analysis_request_timeout`. |
 | `idle_timeout` | Idle keep-alive timeout (default 60s). |
 | `public_api.allow_private_undelegated_ip` | Allow loopback / link-local / private / CGNAT / multicast / broadcast IPs as undelegated NS targets on the public API. Default `false`; enable on private/internal deployments. |
-| `public_api.allow_non_global_targets` | Permit querying non-globally-reachable nameserver addresses. Default `false`, which clamps the engine guard on for every job so no caller-selected profile can relax it; set `true` on private/internal deployments. Complements (does not replace) `allow_private_undelegated_ip`: that flag is admission-time input validation, this is the query-time guard. A public instance that wants to run private undelegated tests must set both. |
+| `public_api.allow_non_global_targets` | Permit querying non-globally-reachable nameserver addresses. Default `false`, which clamps the engine guard on for every job so no caller-selected profile can relax it; set `true` on private/internal deployments. Complements (does not replace) `allow_private_undelegated_ip`: that flag is admission-time input validation, this is the query-time guard. A public instance that wants to run private undelegated tests must set both. The guard also covers the RIPE whois sources of the profile `asn_db`, so an internal whois mirror requires `true`. |
 
 ## Environment Variables
 

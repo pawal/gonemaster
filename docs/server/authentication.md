@@ -64,8 +64,8 @@ tokens are active.
 ## Log into the admin UI
 
 1. Open the admin UI. In token mode it shows a "paste admin token" screen.
-2. Paste the plaintext token and submit. The server sets a secure, HttpOnly
-   session cookie and the dashboard appears.
+2. Paste the plaintext token and submit. The server sets an HttpOnly session
+   cookie and the dashboard appears.
 3. Use "Log out" to clear the cookie on that browser.
 
 ## Programmatic clients
@@ -117,6 +117,24 @@ curl -s -o /dev/null -w '%{http_code}\n' -b cookies.txt \
 - **Revoke:** delete that hash line and reload. It stops working immediately - any
   browser cookie or client still using it gets `401`. There is no session store to
   clear; the cookie simply carries a token the server no longer recognises.
+
+## Session cookie and request origin
+
+The session cookie `gm_admin` holds the plaintext token. It is `HttpOnly` and
+`SameSite=Strict`. It is `Secure` when the request arrives over HTTPS, directly
+or through a proxy in `trusted_proxy_cidrs` that sends
+`X-Forwarded-Proto: https`, and when `public_url` is an `https` URL whose host
+equals the host of the request.
+
+Log out clears the cookie in that browser only. The server keeps no session
+state: a copy of the cookie stays valid until its token hash is removed, as
+described under "Add or revoke tokens".
+
+A request to `/api/v1` with a method other than `GET`, `HEAD` or `OPTIONS`
+MUST carry no `Origin` header or the origin of the request itself. The server
+answers any other request with `403` and the code `csrf_origin_mismatch`
+before it routes the request. Clients that send no `Origin`, such as
+`gonemaster-client` and MCP clients, are not affected.
 
 ## MCP clients
 

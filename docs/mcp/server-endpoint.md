@@ -50,6 +50,20 @@ In open mode (no tokens configured) the endpoint is open to anyone who can
 reach `/api/v1`, as the admin API already is. Use token mode when
 `mcp_enabled` is on.
 
+A `POST` that carries an `Origin` header other than the server's own origin
+is refused with `403` and `csrf_origin_mismatch`, as on every mutating admin
+route.
+
+## Zone-controlled text
+
+Finding messages and args quote text that the tested zone's nameservers
+return, such as `version.bind` and NSID strings, at levels that survive
+`min_level=NOTICE`. A zone operator therefore controls part of every tool
+result. The server instructions tell the client to treat that text as data.
+With `mcp_allow_write` on, an agent that reads such text can call
+`batch_cancel` and `cancel_job`; clients SHOULD ask the user to confirm every
+call of a tool annotated as destructive.
+
 ## Protocol
 
 - Streamable HTTP, stateless: no `Mcp-Session-Id`, no server-to-client

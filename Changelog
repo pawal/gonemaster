@@ -8,6 +8,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 - dnssec23: new testcase checking that the NSEC or NSEC3 records of a negative response are consistent
 - connectivity05: report `CN05_TCP_ANSWER_TRUNCATED` when the `DNSKEY` answer received over TCP carries the TC flag
+- server: `ipv6_mode` setting overrides IPv6 detection
 
 ### Fixed
 
@@ -17,6 +18,7 @@ All notable changes to all gonemaster components will be documented in this file
 - consistency05: no `EXTRA_ADDRESS_CHILD` for a name already reported with `IN_DOMAIN_ADDR_MISMATCH`
 - server: keep nameserver response times when the NS lookup after a run fails
 - build: the UI build checks for Node.js 20.19, 22.13 or 24 and later instead of any Node.js 20
+- engine: IPv6 detection works behind IPv6 NAT
 
 ## [v1.7.15] - 2026-10-02
 

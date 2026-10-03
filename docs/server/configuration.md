@@ -43,6 +43,7 @@ server stores nothing and answers `400` when a name is read-only
 | `rate_limit_max`, `rate_limit_get_max` | Integer 1 to 100000. |
 | `rate_limit_window` | Duration above zero, such as `1m`. |
 | `min_level` | A log level name. |
+| `ipv6_mode` | `auto`, `on` or `off`. |
 | `public_url` | As in [Core Settings](#core-settings). |
 | `rate_limit_enabled`, `allow_private_undelegated_ip`, `allow_non_global_targets`, `show_score_admin`, `show_score_public`, `show_nameserver_timings_admin`, `show_nameserver_timings_public`, `show_dnssec_chain_public`, `show_asn_names_public`, `mcp_enabled`, `mcp_allow_write` | `true` or `false`. |
 
@@ -62,6 +63,7 @@ startup and after each write, and logs and ignores a stored value outside them.
 | `cross_job_hot_cache` | Enables cross-job nameserver cache sharing. |
 | `cross_job_hot_cache_ttl_seconds` | TTL for cross-job hot-cache entries. |
 | `min_level` | Minimum log level stored and returned in results. |
+| `ipv6_mode` | IPv6 in test runs. `auto` (default): before each run the engine checks that the host has a route to a global IPv6 address from a source address that is not link-local, and turns IPv6 off for the run without one, logging `IPV6_AUTO_DISABLED`. The check opens a UDP socket and sends nothing. `on`: no check; `net.ipv6` of the profile applies. `off`: no run sends IPv6 queries. A job that disables IPv6 keeps it off in every mode. |
 | `profile_path` | Default engine profile file. |
 | `exclude` | Testcase ids and module names that no run executes. See [Excluded testcases](#excluded-testcases). |
 | `public_url` | Site root the deployment answers at, e.g. `https://example.com/`. Also builds `og:image`, the API examples, `robots.txt` and `sitemap.xml`, so it is the root and not the public UI's own URL. MUST be empty or an absolute `http` or `https` URL without userinfo, query, fragment, whitespace, control characters, quotes, angle brackets, backslash or backtick; the server refuses to start otherwise. |
@@ -88,6 +90,7 @@ startup and after each write, and logs and ignores a stored value outside them.
 | `GONEMASTER_MAX_CONCURRENT_JOBS` | `max_concurrent_jobs` |
 | `GONEMASTER_STUCK_JOB_TIMEOUT` | `stuck_job_timeout_minutes` |
 | `GONEMASTER_MIN_LEVEL` | `min_level` |
+| `GONEMASTER_IPV6_MODE` | `ipv6_mode` |
 | `GONEMASTER_PROFILE` | `profile_path` |
 | `GONEMASTER_EXCLUDE` | `exclude` (comma-separated) |
 | `GONEMASTER_DEBUG` | `debug` |
@@ -203,6 +206,7 @@ Database and public API flags are covered in [database.md](database.md) and
   "retrans": 3,
   "fallback": true,
   "min_level": "INFO",
+  "ipv6_mode": "auto",
   "log_format": "text",
   "log_level": "info",
   "profile_path": "/etc/gonemaster/profile.json",

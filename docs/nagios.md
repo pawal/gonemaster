@@ -43,7 +43,7 @@ gonemaster-nagios --domain example.com --profile ./profile.json
 - `--profile` Profile JSON/YAML path
 - `--no-ipv4` Disable IPv4 queries
 - `--no-ipv6` Disable IPv6 queries
-- `--force-ipv6` Force IPv6 queries
+- `--force-ipv6` Force IPv6 queries; without it or `--no-ipv6`, IPv6 is off when the host has no route to a global IPv6 address
 - `--source-addr4` Override resolver IPv4 source address
 - `--source-addr6` Override resolver IPv6 source address
 - `--ns` Undelegated nameserver: `name` or `name/ip` (repeatable)

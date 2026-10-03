@@ -91,7 +91,9 @@ Results are printed with severity levels and can be output in several formats.
 : Disable IPv6 queries.
 
 **--ipv6**
-: Force IPv6 queries.
+: Force IPv6 queries. Without **--ipv6** or **--no-ipv6**, the run turns IPv6
+  off when the host has no route to a global IPv6 address, and logs
+  IPV6_AUTO_DISABLED.
 
 **--allow-non-global**
 : Allow querying private / non-globally-reachable nameserver addresses. Off by default; such targets are skipped with a NON_GLOBAL_QUERY_BLOCKED notice. Use for internal or split-horizon zones.

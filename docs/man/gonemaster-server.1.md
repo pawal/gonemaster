@@ -85,6 +85,12 @@ variables, CLI flags. Later sources override earlier ones.
 **--sourceaddr6** *IPADDR*
 : Source IPv6 address for outgoing queries.
 
+**--ipv6-mode** *MODE*
+: IPv6 in test runs. **auto** (default) checks before each run that the host
+  has a route to a global IPv6 address and turns IPv6 off for the run without
+  one. **on** skips the check and leaves IPv6 to the profile. **off** sends no
+  IPv6 queries. A job that disables IPv6 keeps it off in every mode.
+
 **--positive-cache-ttl** *SECONDS*
 : Cache positive DNS responses for this duration.
 
@@ -167,6 +173,9 @@ variables, CLI flags. Later sources override earlier ones.
 
 **GONEMASTER_MIN_LEVEL**
 : Equivalent to **--min-level**.
+
+**GONEMASTER_IPV6_MODE**
+: Equivalent to **--ipv6-mode**.
 
 **GONEMASTER_PROFILE**
 : Equivalent to **--profile**.

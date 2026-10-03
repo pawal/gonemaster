@@ -219,6 +219,31 @@ func TestApplyDatabaseSettingsRespectsCliFlags(t *testing.T) {
 	}
 }
 
+func TestGetSettingsFlagOutranksStoredValue(t *testing.T) {
+	srv := newTestServer(t,
+		withConfig(func(c *Config) { c.IPv6Mode = IPv6ModeOn }),
+		withConfigSources(map[string]SettingSource{"ipv6_mode": SourceCLIFlag}))
+	_ = srv.store.SetSetting("ipv6_mode", "off")
+	_ = srv.store.SetSetting("min_level", "ERROR")
+
+	settings := mustJSON[map[string]settingEntry](t, doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil), http.StatusOK)
+	if got := settings["ipv6_mode"]; got.Value != "on" || got.Source != SourceCLIFlag || !got.Readonly {
+		t.Fatalf("ipv6_mode = %+v, want on from cli_flag, read-only", got)
+	}
+	if got := settings["min_level"]; got.Value != "ERROR" || got.Source != SourceDatabase || got.Readonly {
+		t.Fatalf("min_level = %+v, want ERROR from database, writable", got)
+	}
+}
+
+func TestPutSettingsRejectsFlagSetKey(t *testing.T) {
+	srv := newTestServer(t, withConfigSources(map[string]SettingSource{"ipv6_mode": SourceCLIFlag}))
+	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"ipv6_mode": "off"}`)
+	wantErrorCode(t, resp, http.StatusBadRequest, "readonly_setting")
+	if _, ok := srv.store.GetSetting("ipv6_mode"); ok {
+		t.Fatal("ipv6_mode was stored")
+	}
+}
+
 func TestPutSettingsHotReloadsRuntime(t *testing.T) {
 	srv := newTestServer(t)
 

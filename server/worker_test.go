@@ -603,6 +603,40 @@ func TestRunEngineForJobClampsNonGlobalGuard(t *testing.T) {
 	}
 }
 
+func TestRunEngineForJobAppliesIPv6Mode(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		mode        string
+		jobDisables bool
+		wantIPv6    string
+		wantSkip    bool
+	}{
+		{name: "auto", mode: IPv6ModeAuto, wantIPv6: "<nil>"},
+		{name: "on", mode: IPv6ModeOn, wantIPv6: "<nil>", wantSkip: true},
+		{name: "off", mode: IPv6ModeOff, wantIPv6: "false"},
+		{name: "auto, job disables IPv6", mode: IPv6ModeAuto, jobDisables: true, wantIPv6: "false"},
+		{name: "on, job disables IPv6", mode: IPv6ModeOn, jobDisables: true, wantIPv6: "false"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			var captured engine.RunRequest
+			srv := newTestServer(t,
+				withConfig(func(c *Config) { c.IPv6Mode = tc.mode }),
+				withEngineRunner(func(req engine.RunRequest) ([]engine.LogEntry, error) { captured = req; return nil, nil }))
+			job := queuedJob("job-ipv6")
+			job.IPv6Disabled = tc.jobDisables
+			if _, err := srv.runEngineForJob(job, t.Context()); err != nil {
+				t.Fatalf("runEngineForJob: %v", err)
+			}
+			if got := boolPtrString(captured.IPv6); got != tc.wantIPv6 {
+				t.Fatalf("IPv6 = %s, want %s", got, tc.wantIPv6)
+			}
+			if captured.SkipIPv6Detect != tc.wantSkip {
+				t.Fatalf("SkipIPv6Detect = %t, want %t", captured.SkipIPv6Detect, tc.wantSkip)
+			}
+		})
+	}
+}
+
 // excludeDNSSEC sets the instance exclusion to the dnssec module.
 func excludeDNSSEC(c *Config) { c.Exclude = []string{"dnssec"} }
 

@@ -45,6 +45,8 @@ func TestRunHelpShowsGroupedFlags(t *testing.T) {
 		"--log-level LEVEL",
 		"--sourceaddr4 IPADDR",
 		"--sourceaddr6 IPADDR",
+		"--ipv6-mode MODE",
+		"GONEMASTER_IPV6_MODE",
 		"--db-driver DRIVER",
 		"--db-dsn DSN",
 		"GONEMASTER_DB_DRIVER",
@@ -167,6 +169,42 @@ func TestRunSourceAddr6Validation(t *testing.T) {
 	res := clitest.Run(t, run, "--sourceaddr6", "192.0.2.10")
 	res.RequireCode(t, 2)
 	res.RequireErrContains(t, "--sourceaddr6 must be a valid IPv6 address")
+}
+
+func TestRunIPv6Mode(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		env     string
+		args    []string
+		code    int
+		wantOut string
+		wantErr string
+	}{
+		{name: "default", args: []string{"--dump-config"}, wantOut: `"ipv6_mode": "auto"`},
+		{name: "flag", args: []string{"--dump-config", "--ipv6-mode", "off"}, wantOut: `"ipv6_mode": "off"`},
+		{name: "env", env: "on", args: []string{"--dump-config"}, wantOut: `"ipv6_mode": "on"`},
+		{name: "flag beats env", env: "on", args: []string{"--dump-config", "--ipv6-mode", "off"}, wantOut: `"ipv6_mode": "off"`},
+		{name: "invalid flag", args: []string{"--ipv6-mode", "maybe"}, code: 2, wantErr: `invalid ipv6_mode "maybe": want auto, on or off`},
+		{name: "invalid env", env: "ON", args: []string{"--dump-config"}, code: 2, wantErr: `invalid ipv6_mode "ON": want auto, on or off`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("GONEMASTER_IPV6_MODE", tc.env)
+			res := clitest.Run(t, run, tc.args...)
+			res.RequireCode(t, tc.code)
+			if tc.wantOut != "" {
+				res.RequireOutContains(t, tc.wantOut)
+			}
+			if tc.wantErr != "" {
+				res.RequireErrContains(t, tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestBuildConfigSourcesIPv6ModeFlag(t *testing.T) {
+	if got := buildConfigSources(map[string]bool{"ipv6-mode": true}, false)["ipv6_mode"]; got != "cli_flag" {
+		t.Fatalf("ipv6_mode source = %q, want cli_flag", got)
+	}
 }
 
 func TestRunPublicAPIRateLimitMaxValidation(t *testing.T) {

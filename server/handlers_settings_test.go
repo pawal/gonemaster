@@ -570,6 +570,10 @@ func TestPutSettingsRejectsOutOfRangeValues(t *testing.T) {
 		{"rate_limit_window", "soon"},
 		{"min_level", "LOUD"},
 		{"min_level", ""},
+		{"ipv6_mode", "maybe"},
+		{"ipv6_mode", "ON"},
+		{"ipv6_mode", ""},
+		{"ipv6_mode", true},
 		{"rate_limit_enabled", "yes"},
 		{"show_score_public", nil},
 	} {
@@ -622,6 +626,33 @@ func TestApplyDatabaseSettingsIgnoresOutOfRangeValues(t *testing.T) {
 	}
 	if srv.cfg.Database.RetentionDays != 0 {
 		t.Fatalf("RetentionDays = %d, want 0", srv.cfg.Database.RetentionDays)
+	}
+}
+
+func TestApplyDatabaseSettingsIgnoresUnknownIPv6Mode(t *testing.T) {
+	srv := newTestServer(t)
+	_ = srv.store.SetSetting("ipv6_mode", "sometimes")
+	srv.ApplyDatabaseSettings()
+	if srv.cfg.IPv6Mode != "auto" {
+		t.Fatalf("IPv6Mode = %q, want auto", srv.cfg.IPv6Mode)
+	}
+}
+
+func TestPutSettingsIPv6ModeAppliesToNextJob(t *testing.T) {
+	var captured engine.RunRequest
+	srv := newTestServer(t, withEngineRunner(func(req engine.RunRequest) ([]engine.LogEntry, error) { captured = req; return nil, nil }))
+
+	wantStatus(t, doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"ipv6_mode": "off"}`), http.StatusOK)
+	settings := mustJSON[map[string]settingEntry](t, doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil), http.StatusOK)
+	if got := settings["ipv6_mode"]; got.Value != "off" || got.Source != SourceDatabase {
+		t.Fatalf("ipv6_mode = %v from %s, want off from database", got.Value, got.Source)
+	}
+
+	if _, err := srv.runEngineForJob(queuedJob("job-ipv6-put"), t.Context()); err != nil {
+		t.Fatalf("runEngineForJob: %v", err)
+	}
+	if got := boolPtrString(captured.IPv6); got != "false" {
+		t.Fatalf("IPv6 = %s, want false", got)
 	}
 }
 

@@ -80,6 +80,10 @@ func TestApplyEnvVarsSetsFields(t *testing.T) {
 			get: func(c server.Config) any { return c.MinLevel }, want: "WARNING",
 		},
 		{
+			name: "ipv6 mode", env: "GONEMASTER_IPV6_MODE", value: "off",
+			get: func(c server.Config) any { return c.IPv6Mode }, want: "off",
+		},
+		{
 			name: "log format", env: "GONEMASTER_LOG_FORMAT", value: "json",
 			get: func(c server.Config) any { return c.LogFormat }, want: "json",
 		},

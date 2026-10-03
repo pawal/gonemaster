@@ -46,7 +46,9 @@ func (s *Server) SetConfigSources(sources map[string]SettingSource) {
 
 // settingSource returns the source for a given setting key.
 func (s *Server) settingSource(key string) SettingSource {
-	// Database overrides take priority when they exist.
+	if s.setByFlag(key) {
+		return SourceCLIFlag
+	}
 	if _, ok := s.store.GetSetting(key); ok {
 		return SourceDatabase
 	}
@@ -58,6 +60,11 @@ func (s *Server) settingSource(key string) SettingSource {
 	return SourceDefault
 }
 
+// setByFlag reports whether a command-line flag set key, which outranks a stored value.
+func (s *Server) setByFlag(key string) bool {
+	return s.configSources[key] == SourceCLIFlag
+}
+
 // ApplyDatabaseSettings loads settings from the DB and merges them into s.cfg.
 // CLI flags (tracked in configSources) take precedence and are not overridden.
 func (s *Server) ApplyDatabaseSettings() {
@@ -65,10 +72,8 @@ func (s *Server) ApplyDatabaseSettings() {
 	s.cfgMu.Lock()
 	defer s.cfgMu.Unlock()
 	for key, val := range dbSettings {
-		if s.configSources != nil {
-			if s.configSources[key] == SourceCLIFlag {
-				continue
-			}
+		if s.setByFlag(key) {
+			continue
 		}
 		s.applySetting(key, val)
 	}
@@ -319,9 +324,14 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 
 	// Apply database overrides to the value display.
 	for key, val := range dbSettings {
-		if entry, ok := settings[key]; ok {
+		if entry, ok := settings[key]; ok && entry.Source == SourceDatabase {
 			entry.Value = parseSettingValue(val)
-			entry.Source = SourceDatabase
+			settings[key] = entry
+		}
+	}
+	for key, entry := range settings {
+		if entry.Source == SourceCLIFlag {
+			entry.Readonly = true
 			settings[key] = entry
 		}
 	}
@@ -360,6 +370,11 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		}
 		if _, ok := writableSettings[key]; !ok {
 			writeError(w, http.StatusBadRequest, "unknown_setting", "unknown setting: "+key, nil)
+			return
+		}
+		if s.setByFlag(key) {
+			writeError(w, http.StatusBadRequest, "readonly_setting",
+				"setting is set by a command-line flag: "+key, nil)
 			return
 		}
 	}

@@ -26,6 +26,12 @@
       ],
     },
     {
+      key: "settings_group_resolver",
+      settings: [
+        { key: "ipv6_mode", type: "select", options: ["auto", "on", "off"], optionKey: "settings_option_ipv6_mode" },
+      ],
+    },
+    {
       key: "settings_group_database",
       settings: [
         { key: "db_driver", type: "text", readonly: true },
@@ -220,7 +226,7 @@
                 onchange={(e) => handleInput(s.key, e.target.value)}
               >
                 {#each s.options as opt}
-                  <option value={opt}>{opt}</option>
+                  <option value={opt}>{s.optionKey ? $t(`${s.optionKey}_${opt}`) : opt}</option>
                 {/each}
               </select>
             {:else if s.type === "number"}

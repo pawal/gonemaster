@@ -112,6 +112,7 @@ export const serverSettingsFixture = (overrides = {}) => ({
   worker_count: setting(4),
   max_concurrent_jobs: setting(0),
   min_level: { value: "INFO", source: "config_file" },
+  ipv6_mode: setting("auto"),
   retention_days: setting(0),
   public_url: setting(""),
   rate_limit_enabled: setting(false),

@@ -173,6 +173,20 @@ describe("ServerSettings", () => {
     expect(calls[0].show_asn_names_public).toBe(false);
   });
 
+  it("renders the IPv6 mode select with translated options and saves it", async () => {
+    const calls = capturePuts();
+    await renderLoaded(/IPv6 in test runs/);
+
+    const select = screen.getByLabelText(/IPv6 in test runs/);
+    expect(select.value).toBe("auto");
+    expect([...select.options].map((o) => o.textContent)).toEqual(["Auto", "On", "Off"]);
+    await fireEvent.change(select, { target: { value: "off" } });
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.length).toBe(1));
+    expect(calls[0]).toEqual({ ipv6_mode: "off" });
+  });
+
   it("renders the MCP toggles off and saves mcp_enabled", async () => {
     const calls = capturePuts();
     await renderLoaded(/MCP endpoint/);

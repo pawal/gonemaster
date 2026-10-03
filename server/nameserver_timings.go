@@ -255,39 +255,46 @@ func (s *Server) collectNameserverTimings(job Job, queryTimings map[string][]tim
 		return nil
 	}
 
+	// Undelegated input, then the child NS set from the run's own log.
 	targets := nameserverTimingTargets(job, DelegationInfo{})
+	if len(targets) == 0 {
+		targets = childNameserversFromEntries(entries)
+	}
+	// No child set logged: ask a resolver.
 	if len(targets) == 0 && s != nil && s.delegationLookup != nil {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		targets = nameserverTimingTargets(job, s.delegationLookup(ctx, job.Domain))
 	}
 	if len(targets) == 0 {
-		// Last-ditch fallback: pull the child zone's own NSes out of
-		// the engine's own log entries. The engine already discovered
-		// them during the test; the external delegation lookup can
-		// then fail without silently dropping all timings. Fixes the
-		// case where ~1.6% of TLDs had no timings because
-		// lookupDelegation happened to hit a DNS hiccup at test time.
-		targets = childNameserversFromEntries(entries)
+		if s != nil && s.logger != nil {
+			s.logger.Warn("nameserver timings dropped: no child nameserver set", "job_id", job.ID, "domain", job.Domain, "sampled_addresses", len(queryTimings))
+		}
+		return nil
 	}
 	return summarizeNameserverTimings(queryTimings, queryTimeouts, queryRefused, targets)
 }
 
-// childNameserversFromEntries collects (ns, address) pairs from engine
-// log entries that unambiguously name the child zone's own authoritative
-// NSes. Only the explicit child-side argument keys are trusted -
-// generic `servers` / `parent_servers` lists are not, since they also
-// carry parent-side data (root servers etc.) that would end up in the
-// timings list otherwise.
+// delegation01ChildTags carry the child NS set in servers.
+var delegation01ChildTags = map[string]bool{
+	"ENOUGH_NS_CHILD":          true,
+	"NOT_ENOUGH_NS_CHILD":      true,
+	"ENOUGH_IPV4_NS_CHILD":     true,
+	"NOT_ENOUGH_IPV4_NS_CHILD": true,
+	"ENOUGH_IPV6_NS_CHILD":     true,
+	"NOT_ENOUGH_IPV6_NS_CHILD": true,
+}
+
+// childNameserversFromEntries collects child (ns, address) pairs from the run's log.
 func childNameserversFromEntries(entries []engine.LogEntry) []nameserverTimingTarget {
 	if len(entries) == 0 {
 		return nil
 	}
 	seen := map[string]struct{}{}
 	var targets []nameserverTimingTarget
-	add := func(ns, addr string) {
-		ns = normalizeNameserverName(ns)
-		addr = strings.TrimSpace(addr)
+	add := func(item nameserverTimingTarget) {
+		ns := normalizeNameserverName(item.name)
+		addr := strings.TrimSpace(item.address)
 		if ns == "" {
 			return
 		}
@@ -299,36 +306,58 @@ func childNameserversFromEntries(entries []engine.LogEntry) []nameserverTimingTa
 		targets = append(targets, nameserverTimingTarget{name: ns, address: addr})
 	}
 	for _, entry := range entries {
+		if entry.Testcase == "Delegation01" && delegation01ChildTags[entry.Tag] {
+			for _, item := range serverPairs(entry.Args["servers"]) {
+				add(item)
+			}
+		}
 		for _, key := range []string{"child_servers", "zone_servers", "ns_set_servers"} {
-			raw, ok := entry.Args[key]
-			if !ok {
-				continue
-			}
-			list, ok := raw.([]any)
-			if !ok {
-				// Some callers materialize the list as []map[string]any
-				// instead of []any; handle that shape too.
-				typed, ok := raw.([]map[string]any)
-				if !ok {
-					continue
-				}
-				for _, item := range typed {
-					ns, _ := item["ns"].(string)
-					addr, _ := item["address"].(string)
-					add(ns, addr)
-				}
-				continue
-			}
-			for _, item := range list {
-				m, ok := item.(map[string]any)
-				if !ok {
-					continue
-				}
-				ns, _ := m["ns"].(string)
-				addr, _ := m["address"].(string)
-				add(ns, addr)
+			for _, item := range serverPairs(entry.Args[key]) {
+				add(item)
 			}
 		}
 	}
-	return targets
+	return dropResolvedNameOnlyTargets(targets)
+}
+
+// serverPairs reads a servers list in either shape.
+func serverPairs(raw any) []nameserverTimingTarget {
+	var items []map[string]any
+	switch list := raw.(type) {
+	case []map[string]any:
+		items = list
+	case []any:
+		for _, item := range list {
+			if m, ok := item.(map[string]any); ok {
+				items = append(items, m)
+			}
+		}
+	default:
+		return nil
+	}
+	out := make([]nameserverTimingTarget, 0, len(items))
+	for _, m := range items {
+		ns, _ := m["ns"].(string)
+		addr, _ := m["address"].(string)
+		out = append(out, nameserverTimingTarget{name: ns, address: addr})
+	}
+	return out
+}
+
+// dropResolvedNameOnlyTargets drops a name-only target whose name has an address.
+func dropResolvedNameOnlyTargets(targets []nameserverTimingTarget) []nameserverTimingTarget {
+	withAddress := map[string]bool{}
+	for _, item := range targets {
+		if item.address != "" {
+			withAddress[item.name] = true
+		}
+	}
+	out := targets[:0]
+	for _, item := range targets {
+		if item.address == "" && withAddress[item.name] {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }

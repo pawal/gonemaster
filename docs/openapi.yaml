@@ -3498,6 +3498,7 @@ components:
           enum: [default, config_file, database, cli_flag]
         readonly:
           type: boolean
+          description: True for a boot-time setting and for a setting set by a command-line flag.
 
     DelegationInfo:
       type: object

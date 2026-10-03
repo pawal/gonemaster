@@ -19,6 +19,7 @@ All notable changes to all gonemaster components will be documented in this file
 - server: keep nameserver response times when the NS lookup after a run fails
 - build: the UI build checks for Node.js 20.19, 22.13 or 24 and later instead of any Node.js 20
 - engine: IPv6 detection works behind IPv6 NAT
+- server: the settings page shows a flag-set setting as read-only, with its effective value
 
 ## [v1.7.15] - 2026-10-02
 

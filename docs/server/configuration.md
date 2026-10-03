@@ -47,9 +47,12 @@ server stores nothing and answers `400` when a name is read-only
 | `public_url` | As in [Core Settings](#core-settings). |
 | `rate_limit_enabled`, `allow_private_undelegated_ip`, `allow_non_global_targets`, `show_score_admin`, `show_score_public`, `show_nameserver_timings_admin`, `show_nameserver_timings_public`, `show_dnssec_chain_public`, `show_asn_names_public`, `mcp_enabled`, `mcp_allow_write` | `true` or `false`. |
 
-The read-only settings are `listen_addr`, `db_driver`, `db_dsn` and
-`profile_path`. The server checks stored settings against the same ranges at
-startup and after each write, and logs and ignores a stored value outside them.
+The read-only settings are `listen_addr`, `db_driver`, `db_dsn`,
+`profile_path`, and every setting set by a command-line flag.
+`GET /api/v1/settings` reports such a setting with its effective value, source
+`cli_flag` and `readonly` true, and the Settings page cannot change it. The
+server checks stored settings against the same ranges at startup and after each
+write, and logs and ignores a stored value outside them.
 
 ## Core Settings
 

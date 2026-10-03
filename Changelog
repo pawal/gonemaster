@@ -16,6 +16,7 @@ All notable changes to all gonemaster components will be documented in this file
 - consistency05: compare not-in-domain glue only against lookups that answered or were authoritatively denied
 - consistency05: no `EXTRA_ADDRESS_CHILD` for a name already reported with `IN_DOMAIN_ADDR_MISMATCH`
 - server: keep nameserver response times when the NS lookup after a run fails
+- build: the UI build checks for Node.js 20.19, 22.13 or 24 and later instead of any Node.js 20
 
 ## [v1.7.15] - 2026-10-02
 

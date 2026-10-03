@@ -11,7 +11,8 @@ UI_ANALYSIS_DIR := analysis-ui
 UI_STAMP := $(UI_DIR)/node_modules/.install-stamp
 UI_PUBLIC_STAMP := $(UI_PUBLIC_DIR)/node_modules/.install-stamp
 UI_ANALYSIS_STAMP := $(UI_ANALYSIS_DIR)/node_modules/.install-stamp
-NODE_MIN ?= 20
+# Node versions every UI dependency's engines field accepts (vite, vitest, jsdom, vite-plugin-svelte).
+NODE_RANGE := ^20.19, ^22.13 or 24+
 NPM_MIN ?= 11
 
 CMDS := gonemaster gonemaster-server gonemaster-client gonemaster-nagios gonemaster-mcp
@@ -41,7 +42,7 @@ help:
 	@echo "  vet              Run go vet"
 	@echo "  race             Run Go tests with -race"
 	@echo "  install          Install all commands (override CMD=gonemaster-server)"
-	@echo "  ui-check              Verify node/npm availability"
+	@echo "  ui-check              Verify the node and npm versions"
 	@echo "  ui-install            Install admin UI dependencies"
 	@echo "  ui-build              Build admin, public, and analysis embedded UIs"
 	@echo "  ui-dev                Run the admin UI dev server"
@@ -95,22 +96,18 @@ $(BIN_DIR):
 
 ui-check:
 	@command -v $(NODE) >/dev/null 2>&1 || { \
-		echo "Error: node not found. Install Node.js $(NODE_MIN)+ to build the UI."; \
+		echo "Error: node not found. Install Node.js $(NODE_RANGE) to build the UI."; \
 		exit 1; \
 	}
 	@command -v $(NPM) >/dev/null 2>&1 || { \
 		echo "Error: npm not found. Install npm $(NPM_MIN)+ to build the UI."; \
 		exit 1; \
 	}
-	@node_version=`$(NODE) -v 2>/dev/null | sed 's/^v//'`; \
-	npm_version=`$(NPM) -v 2>/dev/null`; \
-	if [ -n "$$node_version" ]; then \
-		major=$${node_version%%.*}; \
-		if [ "$$major" -lt "$(NODE_MIN)" ]; then \
-			echo "Error: Node.js $$node_version found. Need $(NODE_MIN)+ to build the UI."; \
-			exit 1; \
-		fi; \
-	fi; \
+	@$(NODE) -e 'const [a, b] = process.versions.node.split(".").map(Number); process.exit((a === 20 && b >= 19) || (a === 22 && b >= 13) || a >= 24 ? 0 : 1)' || { \
+		echo "Error: Node.js `$(NODE) -v` found. Need $(NODE_RANGE) to build the UI."; \
+		exit 1; \
+	}
+	@npm_version=`$(NPM) -v 2>/dev/null`; \
 	if [ -n "$$npm_version" ]; then \
 		major=$${npm_version%%.*}; \
 		if [ "$$major" -lt "$(NPM_MIN)" ]; then \

@@ -2,6 +2,7 @@ package consistency
 
 import (
 	"context"
+	"errors"
 	"net/netip"
 	"slices"
 	"sort"
@@ -545,6 +546,39 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	if _, ok := mismatch.Args["zone_addresses"]; ok {
 		t.Fatalf("legacy key zone_addresses should not be present: %#v", mismatch.Args)
 	}
+	// The mismatch already lists the child address.
+	tctest.RequireNoTag(t, entries, "EXTRA_ADDRESS_CHILD")
+}
+
+func TestConsistency05ExtraAddressChild(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+		return []dnsname.Name{dnsname.New("ns1.example")}, nil
+	})
+
+	authNS := tctest.NS(t, ctx, "auth.example", "192.0.2.53", func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Type, "A") && strings.EqualFold(q.Name, "ns1.example") {
+			return tctest.Response(tctest.Answers(tctest.ARR(q.Name, "192.0.2.1"), tctest.ARR(q.Name, "192.0.2.2")))
+		}
+		return packet.Packet{}
+	})
+
+	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+		return []nameserver.Nameserver{authNS}, nil
+	})
+
+	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+		if strings.EqualFold(qtype, "NS") {
+			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
+				"ns1.example": {"192.0.2.1"},
+			})}, nil
+		}
+		return []packet.Packet{}, nil
+	})
+
+	entries := runConsistency05(t, ctx, "example")
+	tctest.RequireNoTag(t, entries, "IN_DOMAIN_ADDR_MISMATCH", "ADDRESSES_MATCH")
 	entry := tctest.RequireTag(t, entries, "EXTRA_ADDRESS_CHILD")
 	addresses, ok := entry.Args["addresses"].([]string)
 	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.2" {
@@ -628,8 +662,8 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 		return []packet.Packet{}, nil
 	})
 
-	tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
-		return packet.Packet{}, nil
+	tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, name string, _ string) (packet.Packet, error) {
+		return nxdomainPacket(name), nil
 	})
 
 	entries := runConsistency05(t, ctx, "example")
@@ -646,6 +680,108 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	}
 	if _, ok := mismatch.Args["zone_addresses"]; ok {
 		t.Fatalf("legacy key zone_addresses should not be present: %#v", mismatch.Args)
+	}
+}
+
+func TestConsistency05OutOfDomainLookupSettlement(t *testing.T) {
+	nonAANXDOMAIN := nxdomainPacket("ns1.other")
+	nonAANXDOMAIN.Msg.Authoritative = false
+	nodata := tctest.Response(tctest.Authority(tctest.SOARR("other", tctest.MName("ns1.other"),
+		tctest.RName("hostmaster.other"), tctest.Serial(0), tctest.SOATimers(0, 0, 0, 0))))
+
+	cases := []struct {
+		name     string
+		resp     packet.Packet
+		err      error
+		mismatch bool
+	}{
+		{name: "no response", resp: packet.Packet{}},
+		{name: "lookup error", resp: packet.Packet{}, err: errors.New("timeout")},
+		{name: "servfail", resp: tctest.Response(tctest.Rcode(dns.RcodeServerFailure))},
+		{name: "non-authoritative nxdomain", resp: nonAANXDOMAIN},
+		{name: "authoritative referral", resp: tctest.Response(tctest.Authority(tctest.NSRRs("other", "ns1.other")...))},
+		{name: "authoritative nxdomain", resp: nxdomainPacket("ns1.other"), mismatch: true},
+		{name: "authoritative nodata", resp: nodata, mismatch: true},
+		{name: "other address", resp: addrPacket("ns1.other", "A", "192.0.2.9"), mismatch: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+				return []dnsname.Name{}, nil
+			})
+			tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{}, nil
+			})
+			tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+				if strings.EqualFold(qtype, "NS") {
+					return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
+						"ns1.other": {"192.0.2.1"},
+					})}, nil
+				}
+				return []packet.Packet{}, nil
+			})
+			tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
+				return tc.resp, tc.err
+			})
+
+			entries := runConsistency05(t, ctx, "example")
+			if tc.mismatch {
+				tctest.RequireTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
+				return
+			}
+			tctest.RequireNoTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
+		})
+	}
+}
+
+func TestConsistency05OutOfDomainComparesSettledFamilyOnly(t *testing.T) {
+	cases := []struct {
+		name     string
+		aaaa     packet.Packet
+		mismatch bool
+	}{
+		{name: "aaaa unanswered", aaaa: packet.Packet{}},
+		{name: "aaaa authoritative nodata", aaaa: tctest.Response(tctest.Authority(tctest.SOARR("other", tctest.MName("ns1.other"),
+			tctest.RName("hostmaster.other"), tctest.Serial(0), tctest.SOATimers(0, 0, 0, 0)))), mismatch: true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
+				return []dnsname.Name{}, nil
+			})
+			tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
+				return []nameserver.Nameserver{}, nil
+			})
+			tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
+				if strings.EqualFold(qtype, "NS") {
+					return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
+						"ns1.other": {"192.0.2.1", "2001:db8::1"},
+					})}, nil
+				}
+				return []packet.Packet{}, nil
+			})
+			tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, name string, qtype string) (packet.Packet, error) {
+				if strings.EqualFold(qtype, "A") {
+					return addrPacket(name, "A", "192.0.2.1"), nil
+				}
+				return tc.aaaa, nil
+			})
+
+			entries := runConsistency05(t, ctx, "example")
+			if !tc.mismatch {
+				tctest.RequireNoTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
+				return
+			}
+			mismatch := tctest.RequireTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
+			zone := tctest.EndpointsAt(mismatch.Args, "zone_servers")
+			if len(zone) != 1 || zone[0] != "ns1.other/192.0.2.1" {
+				t.Fatalf("expected zone_servers [ns1.other/192.0.2.1], got %v", zone)
+			}
+		})
 	}
 }
 

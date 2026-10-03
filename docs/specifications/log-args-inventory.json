@@ -202,7 +202,7 @@
         {
           "tag": "EXTRA_ADDRESS_CHILD",
           "file": "engine/test/consistency/consistency.go",
-          "line": 997,
+          "line": 999,
           "shape": "unknown"
         }
       ]
@@ -833,43 +833,43 @@
         {
           "tag": "INCONSISTENT_NS_TTL",
           "file": "engine/test/consistency/consistency.go",
-          "line": 797,
+          "line": 798,
           "shape": "int"
         },
         {
           "tag": "MULTIPLE_DELEGATION_NS_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 858,
+          "line": 859,
           "shape": "int"
         },
         {
           "tag": "MULTIPLE_NS_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 780,
+          "line": 781,
           "shape": "int"
         },
         {
           "tag": "MULTIPLE_SOA_MNAMES",
           "file": "engine/test/consistency/consistency.go",
-          "line": 1168,
+          "line": 1171,
           "shape": "int"
         },
         {
           "tag": "MULTIPLE_SOA_RNAMES",
           "file": "engine/test/consistency/consistency.go",
-          "line": 472,
+          "line": 473,
           "shape": "int"
         },
         {
           "tag": "MULTIPLE_SOA_SERIALS",
           "file": "engine/test/consistency/consistency.go",
-          "line": 317,
+          "line": 318,
           "shape": "int"
         },
         {
           "tag": "MULTIPLE_SOA_TIME_PARAMETER_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 619,
+          "line": 620,
           "shape": "int"
         }
       ]
@@ -1392,13 +1392,13 @@
         {
           "tag": "ONE_SOA_TIME_PARAMETER_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 610,
+          "line": 611,
           "shape": "unknown"
         },
         {
           "tag": "SOA_TIME_PARAMETER_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 634,
+          "line": 635,
           "shape": "unknown"
         }
       ]
@@ -1999,13 +1999,13 @@
         {
           "tag": "SOA_SERIAL",
           "file": "engine/test/consistency/consistency.go",
-          "line": 305,
+          "line": 306,
           "shape": "unknown"
         },
         {
           "tag": "SOA_SERIAL_VARIATION",
           "file": "engine/test/consistency/consistency.go",
-          "line": 349,
+          "line": 350,
           "shape": "unknown"
         }
       ]
@@ -2083,13 +2083,13 @@
         {
           "tag": "ONE_SOA_TIME_PARAMETER_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 610,
+          "line": 611,
           "shape": "unknown"
         },
         {
           "tag": "SOA_TIME_PARAMETER_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 634,
+          "line": 635,
           "shape": "unknown"
         }
       ]
@@ -2132,13 +2132,13 @@
         {
           "tag": "ONE_SOA_MNAME",
           "file": "engine/test/consistency/consistency.go",
-          "line": 1162,
+          "line": 1165,
           "shape": "unknown"
         },
         {
           "tag": "SOA_MNAME",
           "file": "engine/test/consistency/consistency.go",
-          "line": 1178,
+          "line": 1181,
           "shape": "unknown"
         }
       ]
@@ -2286,7 +2286,7 @@
         {
           "tag": "MISSING_ADDRESS_CHILD",
           "file": "engine/test/consistency/consistency.go",
-          "line": 969,
+          "line": 970,
           "shape": "unknown"
         },
         {
@@ -2336,7 +2336,7 @@
         {
           "tag": "MULTIPLE_DELEGATION_NS_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 858,
+          "line": 859,
           "shape": "unknown"
         }
       ]
@@ -2896,7 +2896,7 @@
         {
           "tag": "ONE_SOA_TIME_PARAMETER_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 610,
+          "line": 611,
           "shape": "unknown"
         },
         {
@@ -2926,7 +2926,7 @@
         {
           "tag": "SOA_TIME_PARAMETER_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 634,
+          "line": 635,
           "shape": "unknown"
         }
       ]
@@ -3033,7 +3033,7 @@
         {
           "tag": "ONE_SOA_TIME_PARAMETER_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 610,
+          "line": 611,
           "shape": "unknown"
         },
         {
@@ -3063,7 +3063,7 @@
         {
           "tag": "SOA_TIME_PARAMETER_SET",
           "file": "engine/test/consistency/consistency.go",
-          "line": 634,
+          "line": 635,
           "shape": "unknown"
         }
       ]
@@ -3089,7 +3089,7 @@
         {
           "tag": "ONE_SOA_RNAME",
           "file": "engine/test/consistency/consistency.go",
-          "line": 466,
+          "line": 467,
           "shape": "unknown"
         },
         {
@@ -3125,7 +3125,7 @@
         {
           "tag": "SOA_RNAME",
           "file": "engine/test/consistency/consistency.go",
-          "line": 482,
+          "line": 483,
           "shape": "unknown"
         }
       ]
@@ -3145,7 +3145,7 @@
         {
           "tag": "ONE_SOA_SERIAL",
           "file": "engine/test/consistency/consistency.go",
-          "line": 311,
+          "line": 312,
           "shape": "unknown"
         }
       ]
@@ -3166,13 +3166,13 @@
         {
           "tag": "SOA_SERIAL",
           "file": "engine/test/consistency/consistency.go",
-          "line": 305,
+          "line": 306,
           "shape": "unknown"
         },
         {
           "tag": "SOA_SERIAL_VARIATION",
           "file": "engine/test/consistency/consistency.go",
-          "line": 349,
+          "line": 350,
           "shape": "unknown"
         }
       ]
@@ -3193,13 +3193,13 @@
         {
           "tag": "SOA_SERIAL",
           "file": "engine/test/consistency/consistency.go",
-          "line": 305,
+          "line": 306,
           "shape": "unknown"
         },
         {
           "tag": "SOA_SERIAL_VARIATION",
           "file": "engine/test/consistency/consistency.go",
-          "line": 349,
+          "line": 350,
           "shape": "unknown"
         }
       ]
@@ -3502,7 +3502,7 @@
         {
           "tag": "INCONSISTENT_NS_TTL",
           "file": "engine/test/consistency/consistency.go",
-          "line": 797,
+          "line": 798,
           "shape": "int"
         }
       ]
@@ -3522,7 +3522,7 @@
         {
           "tag": "INCONSISTENT_NS_TTL",
           "file": "engine/test/consistency/consistency.go",
-          "line": 797,
+          "line": 798,
           "shape": "int"
         }
       ]
@@ -3759,7 +3759,7 @@
     {
       "tag": "CHILD_NS_FAILED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1379,
+      "line": 1382,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -3819,7 +3819,7 @@
     {
       "tag": "IPV4_DISABLED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1448,
+      "line": 1451,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -3909,7 +3909,7 @@
     {
       "tag": "IPV6_DISABLED",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1438,
+      "line": 1441,
       "args_expr": "withNameserverArgs(ns, map[string]any{\n\t\"query_type\": rrtype,\n})"
     },
     {
@@ -4029,37 +4029,37 @@
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/consistency/consistency.go",
-      "line": 239,
+      "line": 240,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/consistency/consistency.go",
-      "line": 417,
+      "line": 418,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/consistency/consistency.go",
-      "line": 552,
+      "line": 553,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/consistency/consistency.go",
-      "line": 705,
+      "line": 706,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1113,
+      "line": 1116,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1359,
+      "line": 1362,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
@@ -4125,61 +4125,61 @@
     {
       "tag": "NO_RESPONSE_NS_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 714,
+      "line": 715,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_NS_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 736,
+      "line": 737,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 248,
+      "line": 249,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 256,
+      "line": 257,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 426,
+      "line": 427,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 434,
+      "line": 435,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 561,
+      "line": 562,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 569,
+      "line": 570,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1122,
+      "line": 1125,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {
       "tag": "NO_RESPONSE_SOA_QUERY",
       "file": "engine/test/consistency/consistency.go",
-      "line": 1130,
+      "line": 1133,
       "args_expr": "withNameserverArgs(ns, nil)"
     },
     {

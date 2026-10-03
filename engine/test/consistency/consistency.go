@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"maps"
+	"net/netip"
 	"slices"
 	"sort"
 	"strconv"
@@ -983,6 +984,7 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 			if err := appendLog(ctx, &results, testcase, "IN_DOMAIN_ADDR_MISMATCH", args); err != nil {
 				return results, err
 			}
+			continue
 		}
 
 		ibExtraChild = append(ibExtraChild, addrKeysNotIn(childAddrs, glueAddrs)...)
@@ -1008,23 +1010,24 @@ func Consistency05(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		glueStrings := append([]string{}, extendedGlue[glueName]...)
 		childOOB := map[string]bool{}
 
-		respA, err := recurse(ctx, z, glueName, "A")
-		if err == nil && respA.Msg != nil {
+		respA, errA := recurse(ctx, z, glueName, "A")
+		if errA == nil && respA.Msg != nil {
 			for _, rr := range respA.GetRecordsForName("A", dnsname.New(glueName), "answer") {
 				childOOB[addrKey(rr)] = true
 			}
 		}
 
-		respAAAA, err := recurse(ctx, z, glueName, "AAAA")
-		if err == nil && respAAAA.Msg != nil {
+		respAAAA, errAAAA := recurse(ctx, z, glueName, "AAAA")
+		if errAAAA == nil && respAAAA.Msg != nil {
 			for _, rr := range respAAAA.GetRecordsForName("AAAA", dnsname.New(glueName), "answer") {
 				childOOB[addrKey(rr)] = true
 			}
 		}
 
+		settledA, settledAAAA := lookupSettled(respA, errA), lookupSettled(respAAAA, errAAAA)
 		var mismatchForGlue []string
 		for _, glueString := range glueStrings {
-			if childOOB[glueString] {
+			if childOOB[glueString] || !glueFamilySettled(glueString, settledA, settledAAAA) {
 				continue
 			}
 			mismatchForGlue = append(mismatchForGlue, glueString)
@@ -1454,6 +1457,33 @@ func ipDisabledMessageWithLogger(ctx context.Context, buf *testlogger.Buffer, ns
 		return true, nil
 	}
 	return false, nil
+}
+
+// lookupSettled reports whether a recursive lookup answered or authoritatively denied the name.
+func lookupSettled(resp packet.Packet, err error) bool {
+	if err != nil || resp.Msg == nil {
+		return false
+	}
+	switch resp.Msg.Rcode {
+	case dns.RcodeSuccess:
+		return len(resp.Msg.Answer) > 0 || (resp.AA() && resp.Type() != "referral")
+	case dns.RcodeNameError:
+		return resp.AA()
+	}
+	return false
+}
+
+// glueFamilySettled reports whether the lookup for the glue address family settled.
+func glueFamilySettled(glueString string, settledA, settledAAAA bool) bool {
+	_, address := parseAddrKey(glueString)
+	addr, err := netip.ParseAddr(address)
+	if err != nil {
+		return true
+	}
+	if addr.Is4() {
+		return settledA
+	}
+	return settledAAAA
 }
 
 func addrKey(rr dns.RR) string {

@@ -13,6 +13,8 @@ All notable changes to all gonemaster components will be documented in this file
 
 - dnssec02: a truncated `DNSKEY` answer no longer counts as a missing RRSIG
 - i18n: add the message translations missing from nine locales and the untranslated admin UI strings
+- consistency05: compare not-in-domain glue only against lookups that answered or were authoritatively denied
+- consistency05: no `EXTRA_ADDRESS_CHILD` for a name already reported with `IN_DOMAIN_ADDR_MISMATCH`
 
 ## [v1.7.15] - 2026-10-02
 

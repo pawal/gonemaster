@@ -51,10 +51,11 @@ Status: Final
 12. Compare in-domain glue against child address data, per NS name. Only names carrying at least one glue address take part; a name with no glue anywhere in the union is not compared, and is reported as missing glue by Delegation01 instead. For each such name, in sorted order:
    - Child serves no address record for the name -> emit `MISSING_ADDRESS_CHILD` with `ns`, and compare nothing further for that name.
    - Otherwise, glue addresses the child does not serve -> emit `IN_DOMAIN_ADDR_MISMATCH` with `ns`, `parent_servers` holding only those unconfirmed glue addresses, and `zone_servers` holding the child addresses for that name.
-   - Independently, child addresses absent from that name's glue accumulate into the aggregate `EXTRA_ADDRESS_CHILD`. A name may therefore produce both an in-domain mismatch and a contribution to the extra-address list.
+   - Otherwise, child addresses absent from that name's glue accumulate into the aggregate `EXTRA_ADDRESS_CHILD`. A name with an in-domain mismatch contributes nothing, since its `zone_servers` already lists the child addresses.
 13. For each not-in-domain NS name in extended glue:
    - Recurse A and AAAA, build child/public `owner/ip` set.
-   - If any parent glue item for that name is missing from child/public set, emit `NOT_IN_DOMAIN_ADDR_MISMATCH`.
+   - A lookup is settled when it returns NOERROR with answer records, or NXDOMAIN or NODATA with AA set. Glue addresses of a family whose lookup is not settled are not compared.
+   - If any compared parent glue item for that name is missing from child/public set, emit `NOT_IN_DOMAIN_ADDR_MISMATCH`.
 14. If no address fault was found, emit `ADDRESSES_MATCH`. A delegation carrying no glue at all reaches this point with nothing to disagree about and is reported as matching. The delegation NS-set tags from step 6 do not affect this guard.
 15. Emit `TEST_CASE_END`.
 
@@ -125,7 +126,7 @@ compare in-domain glue per NS name (sorted, only names with glue):
   childAddrs empty -> MISSING_ADDRESS_CHILD (ns); next name
   unconfirmed = glueAddrs NOT in childAddrs
      non-empty -> IN_DOMAIN_ADDR_MISMATCH (ns, parent_servers=unconfirmed,
-                                              zone_servers=childAddrs)
+                                              zone_servers=childAddrs); next name
   ibExtraChild += childAddrs NOT in glueAddrs
   ibExtraChild non-empty -> EXTRA_ADDRESS_CHILD (addresses)
 
@@ -135,7 +136,9 @@ compare in-domain glue per NS name (sorted, only names with glue):
 not-in-domain (per nsName in extendedGlue, sorted):
   recurse(z, nsName, "A");    add answers to childOOB
   recurse(z, nsName, "AAAA"); add answers to childOOB
-  for each parent glue string at nsName missing from childOOB:
+  settled = NOERROR with answers, or AA NXDOMAIN / AA NODATA
+  for each parent glue string at nsName whose family is settled
+  and that is missing from childOOB:
      append to mismatchForGlue and oobMismatch
   mismatchForGlue non-empty
      -> NOT_IN_DOMAIN_ADDR_MISMATCH (parent_servers, zone_servers)
@@ -153,12 +156,12 @@ emit TEST_CASE_END
 | `CHILD_NS_FAILED` | Child nameserver response for in-domain address lookup was unusable (non-AA/no referral/no accepted RCODE path). |
 | `CHILD_ZONE_LAME` | Every in-domain address lookup path failed for all in-domain NS names. |
 | `DELEGATION_NS_SET` | One distinct delegation NS name set (with the parent servers serving it), emitted per set when parents disagree. |
-| `EXTRA_ADDRESS_CHILD` | For names that have glue, the child serves addresses not present in that name's glue. |
+| `EXTRA_ADDRESS_CHILD` | For names that have glue and no in-domain mismatch, the child serves addresses not present in that name's glue. |
 | `IN_DOMAIN_ADDR_MISMATCH` | An in-domain name's glue contains addresses the child does not serve, while the child serves at least one address for it. Emitted once per affected name. |
 | `MISSING_ADDRESS_CHILD` | An in-domain name has glue in the delegation but the child zone serves no address record for it. Emitted once per affected name. |
 | `MULTIPLE_DELEGATION_NS_SET` | Responding parent nameservers serve more than one distinct delegation NS name set. |
 | `NO_RESPONSE` | A child nameserver did not return a response for an in-domain A/AAAA lookup. |
-| `NOT_IN_DOMAIN_ADDR_MISMATCH` | Not-in-domain glue contains addresses not found in recursive public A/AAAA results. |
+| `NOT_IN_DOMAIN_ADDR_MISMATCH` | Not-in-domain glue contains addresses not found in a settled recursive A/AAAA lookup. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |
 | `TEST_CASE_START` | Testcase start marker is emitted. |
 
@@ -203,13 +206,12 @@ emit TEST_CASE_END
 
 ## Differences From Upstream
 - Differences (Upstream vs Gonemaster):
-  - Upstream: names the mismatch tags `IN_BAILIWICK_ADDR_MISMATCH` and `OUT_OF_BAILIWICK_ADDR_MISMATCH`. Gonemaster: uses RFC 9499 terminology, `IN_DOMAIN_ADDR_MISMATCH` and `NOT_IN_DOMAIN_ADDR_MISMATCH`; the upstream names stay accepted as profile aliases.
-  - Upstream: outputs `IN_BAILIWICK_ADDR_MISMATCH` (`ERROR`) per unconfirmed glue address, including when the child serves no address at all for the name. Gonemaster: reports once per NS name, and splits the serves-nothing case out as `MISSING_ADDRESS_CHILD` (`NOTICE`).
-  - Upstream: outputs `EXTRA_ADDRESS_CHILD` per child address missing from glue, for every in-domain name including names with no glue. Gonemaster: aggregates them into one `EXTRA_ADDRESS_CHILD` and compares only names that carry glue, because trimmed glue cannot be told from glue that never existed; Delegation01 reports glue missing from the delegation.
-  - Upstream: emits `CHILD_ZONE_LAME` when every server fails for one in-domain NS name. Gonemaster: emits it only when every in-domain NS name failed on every server, so disjoint parent/child NS sets can still be classified as address mismatches.
-  - Upstream: builds the child-side address server set from parent glue and child address records together. Gonemaster: uses [`AllNameservers`](../../nameserver-resolution.md#allnameservers), and falls back to strict-glue endpoints only when that yields no usable endpoint.
-  - Upstream: follows a referral with a recursive lookup only when it points into a sub-zone of the child zone. Gonemaster: applies that fallback to any referral response.
-  - Upstream: does not compare delegations between parent nameservers. Gonemaster: groups responding parents by the delegation NS name set they serve and reports `MULTIPLE_DELEGATION_NS_SET` with one `DELEGATION_NS_SET` per set, reusing the NS responses already collected for glue (no extra queries).
+  - Upstream: `CS05_*` tag names. Gonemaster: `IN_DOMAIN_ADDR_MISMATCH`, `MISSING_ADDRESS_CHILD`, `EXTRA_ADDRESS_CHILD`, `NOT_IN_DOMAIN_ADDR_MISMATCH`, `ADDRESSES_MATCH`, `MULTIPLE_DELEGATION_NS_SET` and `DELEGATION_NS_SET` for `CS05_ID_ADDR_MISMATCH`, `CS05_ID_ADDR_MISSING`, `CS05_EXTRA_ADDR_CHILD`, `CS05_OOD_ADDR_MISMATCH`, `CS05_NO_MISMATCH_GLUE_ZONE`, `CS05_INCONSISTENT_DELEGATION` and `CS05_DELEGATION`.
+  - Upstream: `CS05_CHILD_ZONE_LAME` and `CS05_NO_NS_ADDR_CHILD` at `CRITICAL`. Gonemaster: one `CHILD_ZONE_LAME` at `ERROR`.
+  - Upstream: `CS05_OOD_ADDR_MISMATCH` at `WARNING`, compares in both directions, and skips a name whose lookup returns no address. Gonemaster: `ERROR`, reports glue absent from the lookup, including after an authoritative NXDOMAIN or NODATA.
+  - Upstream: keys the delegation comparison on NS names and glue, querying parents over TCP first. Gonemaster: keys on NS names only, over UDP with a large EDNS buffer.
+  - Upstream: reports missing glue as `CS05_MISSING_GLUE_FOR_NS`, `CS05_MISSING_GLUE_FOR_NS_UNDEL` and `CS05_MISSING_GLUE_FOR_ROOT_NS`. Gonemaster: Delegation01 reports `IN_DOMAIN_GLUE_MISSING`; undelegated input reports `FAKE_DELEGATION_IN_ZONE_NO_IP`.
+  - Upstream: suppresses `CS05_NO_MISMATCH_GLUE_ZONE` when any `CS05_*` tag fired. Gonemaster: `ADDRESSES_MATCH` depends on address faults only.
 - Potential upstream report:
   - `no`
 
@@ -243,7 +245,8 @@ The same asymmetry governs the address comparison:
 - Undelegated tests produce synthetic, identical delegations, so the delegation NS-set comparison stays silent there.
 - `CHILD_ZONE_LAME` short-circuits testcase execution and suppresses later mismatch checks when no usable in-domain address lookup path was found.
 - In-domain mismatch reporting is per NS name: a zone with several names carrying wrong glue produces one `IN_DOMAIN_ADDR_MISMATCH` per name, each naming only that name's unconfirmed addresses.
-- A single name can produce both `IN_DOMAIN_ADDR_MISMATCH` and a contribution to `EXTRA_ADDRESS_CHILD`, when its glue and its child addresses each hold entries the other lacks.
+- A name with `IN_DOMAIN_ADDR_MISMATCH` contributes nothing to `EXTRA_ADDRESS_CHILD`.
+- A not-in-domain lookup that times out, fails, or returns a non-authoritative empty answer leaves that family's glue uncompared. An authoritative NXDOMAIN or NODATA still reports the glue as a mismatch.
 - A zone whose parents supply no usable glue, including the root zone and a delegation whose nameservers are all not-in-domain, has nothing to compare and reports `ADDRESSES_MATCH`.
 - Not-in-domain mismatch reporting is per NS name group; each emission includes full parent list for that group.
 - Disabled IP versions affect child authoritative probes indirectly by filtering queried child servers.

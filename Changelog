@@ -2,24 +2,24 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.16] - 2026-10-04
+
+New testcase dnssec23, and IPv6 detection that works behind IPv6 NAT.
 
 ### Added
 
 - dnssec23: new testcase checking that the NSEC or NSEC3 records of a negative response are consistent
 - connectivity05: report `CN05_TCP_ANSWER_TRUNCATED` when the `DNSKEY` answer received over TCP carries the TC flag
-- server: `ipv6_mode` setting overrides IPv6 detection
 
 ### Fixed
 
+- engine, server: IPv6 detection works behind IPv6 NAT, and the new `ipv6_mode` setting overrides it
 - dnssec02: a truncated `DNSKEY` answer no longer counts as a missing RRSIG
-- i18n: add the message translations missing from nine locales and the untranslated admin UI strings
-- consistency05: compare not-in-domain glue only against lookups that answered or were authoritatively denied
-- consistency05: no `EXTRA_ADDRESS_CHILD` for a name already reported with `IN_DOMAIN_ADDR_MISMATCH`
+- consistency05: compare not-in-domain glue only against settled lookups, and no `EXTRA_ADDRESS_CHILD` for a name already reported with `IN_DOMAIN_ADDR_MISMATCH`
 - server: keep nameserver response times when the NS lookup after a run fails
+- server: the settings page shows a flag-set setting as read-only, with its effective value; `PUT /api/v1/settings` refuses it
+- i18n: add the message translations missing from nine locales and the untranslated admin UI strings
 - build: the UI build checks for Node.js 20.19, 22.13 or 24 and later instead of any Node.js 20
-- engine: IPv6 detection works behind IPv6 NAT
-- server: the settings page shows a flag-set setting as read-only, with its effective value
 
 ## [v1.7.15] - 2026-10-02
 

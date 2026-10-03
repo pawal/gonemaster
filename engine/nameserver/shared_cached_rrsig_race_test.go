@@ -100,7 +100,7 @@ func TestConcurrentVerifyOfSharedCachedRRSIG(t *testing.T) {
 	const jobs = 2
 
 	ctx, prof := testContext(t)
-	prof.Net.AllowNonGlobalTargets = true // the guard would refuse the TEST-NET address
+	prof.Net.AllowNonGlobalTargets = true // admits queries to the TEST-NET address
 	answer := signedDNSKEYResponse(t, qname)
 	stores := warmSharedCache(ctx, t, qname, addr, answer, jobs)
 
@@ -155,7 +155,7 @@ func TestConcurrentKeyTagOfSharedCachedDNSKEY(t *testing.T) {
 	const jobs = 2
 
 	ctx, prof := testContext(t)
-	prof.Net.AllowNonGlobalTargets = true // the guard would refuse the TEST-NET address
+	prof.Net.AllowNonGlobalTargets = true // admits queries to the TEST-NET address
 	answer := signedDNSKEYResponse(t, qname)
 	cachedKey, _, _ := dnskeyAndSig(t, answer)
 	if cachedKey.Tag != 0 {

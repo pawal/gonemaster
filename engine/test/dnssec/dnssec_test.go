@@ -1092,16 +1092,6 @@ func TestDNSSEC03SaltLengthCountsOctets(t *testing.T) {
 func TestDNSSEC03SamplesEveryNSEC3Chain(t *testing.T) {
 	ctx := tctest.Context(t)
 
-	chain := func(owner string, iterations uint16, salt string) *dns.NSEC3 {
-		rr := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
-		rr.Hash = 1
-		rr.Flags = 0
-		rr.Iterations = iterations
-		rr.SaltLength = uint8(len(salt) / 2)
-		rr.Salt = salt
-		return rr
-	}
-
 	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.13", func(q tctest.Query) packet.Packet {
 		switch q.Type {
 		case "DNSKEY":
@@ -1111,7 +1101,7 @@ func TestDNSSEC03SamplesEveryNSEC3Chain(t *testing.T) {
 			return tctest.Response(
 				tctest.Question(q.Name, dns.TypeNSEC),
 				tctest.Secure(),
-				tctest.Authority(chain(q.Name, 0, ""), chain(q.Name, 10, "aabbccdd")),
+				tctest.Authority(nsec3At(q.Name, "", 0), nsec3At(q.Name, "aabbccdd", 10)),
 			)
 		default:
 			return packet.Packet{}
@@ -1128,11 +1118,8 @@ func TestDNSSEC03SamplesEveryNSEC3Chain(t *testing.T) {
 		t.Fatalf("dnssec03: %v", err)
 	}
 
-	tctest.RequireTag(t, entries, "DS03_ERR_MULT_NSEC3")
-	tctest.RequireTag(t, entries, "DS03_INCONSISTENT_ITERATION")
-	tctest.RequireTag(t, entries, "DS03_INCONSISTENT_SALT_LENGTH")
-	tctest.RequireTag(t, entries, "DS03_LEGAL_ITERATION_VALUE")
-	tctest.RequireTag(t, entries, "DS03_LEGAL_EMPTY_SALT")
+	tctest.RequireTags(t, entries, "DS03_ERR_MULT_NSEC3", "DS03_INCONSISTENT_ITERATION", "DS03_INCONSISTENT_SALT_LENGTH",
+		"DS03_LEGAL_ITERATION_VALUE", "DS03_LEGAL_EMPTY_SALT")
 
 	illegal := tctest.RequireTag(t, entries, "DS03_ILLEGAL_ITERATION_VALUE")
 	if got, ok := illegal.Args["int"].(uint16); !ok || got != 10 {
@@ -5969,18 +5956,23 @@ func dnssec19RSAKey(t *testing.T, owner, modulusHex, exponentHex string) *dns.DN
 }
 
 func TestDNSSEC19WeakRSAKeys(t *testing.T) {
+	keyOK := []string{"DS19_KEY_OK"}
 	tests := []struct {
 		name     string
 		modulus  string
 		exponent string
 		tag      string
+		wantNo   []string
 	}{
-		{name: "close primes", modulus: dnssec19FermatN, exponent: "010001", tag: "DS19_BADKEY_FERMAT"},
-		{name: "small factors", modulus: dnssec19SmallFactorsN, exponent: "010001", tag: "DS19_BADKEY_SMALL_FACTORS"},
-		{name: "repeated bytes", modulus: dnssec19PatternN, exponent: "010001", tag: "DS19_BADKEY_PATTERN"},
-		{name: "roca fingerprint", modulus: dnssec19ROCAN, exponent: "010001", tag: "DS19_BADKEY_ROCA"},
-		{name: "exponent below three", modulus: dnssec19SoundN, exponent: "01", tag: "DS19_BADKEY_RSA_INVALID"},
-		{name: "small private exponent", modulus: dnssec19SmallDN, exponent: dnssec19SmallDE, tag: "DS19_BADKEY_SMALL_D"},
+		{name: "close primes", modulus: dnssec19FermatN, exponent: "010001", tag: "DS19_BADKEY_FERMAT", wantNo: keyOK},
+		{name: "small factors", modulus: dnssec19SmallFactorsN, exponent: "010001", tag: "DS19_BADKEY_SMALL_FACTORS", wantNo: keyOK},
+		{name: "repeated bytes", modulus: dnssec19PatternN, exponent: "010001", tag: "DS19_BADKEY_PATTERN", wantNo: keyOK},
+		{name: "roca fingerprint", modulus: dnssec19ROCAN, exponent: "010001", tag: "DS19_BADKEY_ROCA", wantNo: keyOK},
+		{name: "exponent below three", modulus: dnssec19SoundN, exponent: "01", tag: "DS19_BADKEY_RSA_INVALID", wantNo: keyOK},
+		{name: "small private exponent", modulus: dnssec19SmallDN, exponent: dnssec19SmallDE, tag: "DS19_BADKEY_SMALL_D", wantNo: keyOK},
+		{name: "sound key", modulus: dnssec19SoundN, exponent: "010001", tag: "DS19_KEY_OK", wantNo: []string{
+			"DS19_BADKEY_FERMAT", "DS19_BADKEY_PATTERN", "DS19_BADKEY_ROCA",
+			"DS19_BADKEY_RSA_INVALID", "DS19_BADKEY_SMALL_FACTORS", "DS19_BADKEY_SMALL_D"}},
 	}
 
 	for i, tt := range tests {
@@ -6000,11 +5992,7 @@ func TestDNSSEC19WeakRSAKeys(t *testing.T) {
 			})
 
 			tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-				return []nsdiscovery.NSItem{{
-					Name:       dnsname.New("ns1.example"),
-					Address:    addr,
-					HasAddress: true,
-				}}, nil
+				return tctest.NSItems("ns1.example/" + addr.String()), nil
 			})
 			tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 				return nil, nil
@@ -6019,8 +6007,7 @@ func TestDNSSEC19WeakRSAKeys(t *testing.T) {
 				t.Fatalf("dnssec19: %v", err)
 			}
 
-			tctest.RequireTags(t, entries, tt.tag)
-			tctest.RequireNoTag(t, entries, "DS19_KEY_OK")
+			tctest.RequireNoTag(t, entries, tt.wantNo...)
 
 			finding := tctest.RequireTag(t, entries, tt.tag)
 			if got, _ := finding.Args["algo_num"].(uint8); got != dns.RSASHA256 {
@@ -6032,50 +6019,6 @@ func TestDNSSEC19WeakRSAKeys(t *testing.T) {
 				}
 			}
 		})
-	}
-}
-
-// A sound RSA key passes every check.
-func TestDNSSEC19SoundRSAKey(t *testing.T) {
-	ctx := tctest.Context(t)
-
-	if err := profile.Effective().Set("badkeys.path", filepath.Join(t.TempDir(), "missing")); err != nil {
-		t.Fatalf("set badkeys.path: %v", err)
-	}
-
-	tctest.NS(t, ctx, "ns1.example", "192.0.2.220", func(q tctest.Query) packet.Packet {
-		if q.Type != "DNSKEY" {
-			return packet.Packet{}
-		}
-		return dnskeyPacket(q.Name, dnssec19RSAKey(t, q.Name, dnssec19SoundN, "010001"))
-	})
-
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return []nsdiscovery.NSItem{{
-			Name:       dnsname.New("ns1.example"),
-			Address:    netip.MustParseAddr("192.0.2.220"),
-			HasAddress: true,
-		}}, nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return nil, nil
-	})
-
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	entries, err := DNSSEC19(ctx, &z)
-	if err != nil {
-		t.Fatalf("dnssec19: %v", err)
-	}
-
-	tctest.RequireTags(t, entries, "DS19_KEY_OK")
-	for _, tag := range []string{
-		"DS19_BADKEY_FERMAT", "DS19_BADKEY_PATTERN", "DS19_BADKEY_ROCA",
-		"DS19_BADKEY_RSA_INVALID", "DS19_BADKEY_SMALL_FACTORS", "DS19_BADKEY_SMALL_D",
-	} {
-		tctest.RequireNoTag(t, entries, tag)
 	}
 }
 
@@ -6136,6 +6079,7 @@ func nsec3At(owner string, salt string, iterations uint16, types ...uint16) *dns
 	rr.Hash = dns.SHA1
 	rr.Iterations = iterations
 	rr.Salt = salt
+	rr.SaltLength = uint8(len(salt) / 2)
 	rr.TypeBitMap = types
 	return rr
 }

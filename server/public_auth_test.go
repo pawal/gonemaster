@@ -2,9 +2,8 @@ package server
 
 import (
 	"net/http"
+	"net/http/httptest"
 	"net/url"
-	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 
@@ -35,10 +34,9 @@ func isLoginPage(body string) bool {
 func TestPublicSurfacesOpenWhenProtectOff(t *testing.T) {
 	srv := newTestServer(t, withAuth(protectTok))
 	for _, path := range []string{"/pub/api/v1/version", "/public/", "/analysis/"} {
-		rr := doJSON(t, srv, http.MethodGet, path, nil)
-		if rr.Code != http.StatusOK {
-			t.Errorf("GET %s = %d, want 200", path, rr.Code)
-		}
+		t.Run(path, func(t *testing.T) {
+			wantStatus(t, doJSON(t, srv, http.MethodGet, path, nil), http.StatusOK)
+		})
 	}
 }
 
@@ -52,19 +50,19 @@ func TestProtectRequiresTokens(t *testing.T) {
 func TestProtectedPagesServeLoginForm(t *testing.T) {
 	srv := protectedServer(t)
 	for _, path := range []string{"/public/", "/public/result/abc123def456", "/analysis/", "/analysis/tags"} {
-		rr := doJSON(t, srv, http.MethodGet, path, nil)
-		if rr.Code != http.StatusUnauthorized {
-			t.Errorf("GET %s = %d, want 401", path, rr.Code)
-		}
-		if !isLoginPage(rr.Body.String()) {
-			t.Errorf("GET %s: body is not the login page: %s", path, rr.Body.String())
-		}
-		if got := rr.Header().Get("Cache-Control"); got != "no-store" {
-			t.Errorf("GET %s: Cache-Control = %q, want no-store", path, got)
-		}
-		if got := rr.Header().Get("WWW-Authenticate"); got != "Bearer" {
-			t.Errorf("GET %s: WWW-Authenticate = %q, want Bearer", path, got)
-		}
+		t.Run(path, func(t *testing.T) {
+			rr := doJSON(t, srv, http.MethodGet, path, nil)
+			wantStatus(t, rr, http.StatusUnauthorized)
+			if !isLoginPage(rr.Body.String()) {
+				t.Errorf("body is not the login page: %s", rr.Body.String())
+			}
+			if got := rr.Header().Get("Cache-Control"); got != "no-store" {
+				t.Errorf("Cache-Control = %q, want no-store", got)
+			}
+			if got := rr.Header().Get("WWW-Authenticate"); got != "Bearer" {
+				t.Errorf("WWW-Authenticate = %q, want Bearer", got)
+			}
+		})
 	}
 }
 
@@ -102,13 +100,13 @@ func TestProtectedHeadLoginHasNoBody(t *testing.T) {
 func TestProtectedAssetIs401(t *testing.T) {
 	srv := protectedServer(t)
 	for _, path := range []string{"/public/assets/index.js", "/analysis/_app/immutable/start.js"} {
-		rr := doJSON(t, srv, http.MethodGet, path, nil)
-		if rr.Code != http.StatusUnauthorized {
-			t.Errorf("GET %s = %d, want 401", path, rr.Code)
-		}
-		if isLoginPage(rr.Body.String()) {
-			t.Errorf("GET %s served the login page to an asset request", path)
-		}
+		t.Run(path, func(t *testing.T) {
+			rr := doJSON(t, srv, http.MethodGet, path, nil)
+			wantStatus(t, rr, http.StatusUnauthorized)
+			if isLoginPage(rr.Body.String()) {
+				t.Error("login page served to an asset request")
+			}
+		})
 	}
 }
 
@@ -261,9 +259,7 @@ func TestProtectedPublicJobPostChecksOrigin(t *testing.T) {
 	cookie := withCookie(&http.Cookie{Name: adminCookieName, Value: protectTok})
 
 	rr := doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", map[string]any{}, cookie, withOrigin("http://evil.example"))
-	if got := mustJSON[ErrorResponse](t, rr, http.StatusForbidden); got.Error.Code != "csrf_origin_mismatch" {
-		t.Errorf("code = %q, want csrf_origin_mismatch", got.Error.Code)
-	}
+	wantErrorCode(t, rr, http.StatusForbidden, "csrf_origin_mismatch")
 
 	rr = doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", map[string]any{}, cookie, sameOrigin())
 	wantStatus(t, rr, http.StatusBadRequest)
@@ -294,29 +290,21 @@ func TestProtectLeavesAdminSurfaces(t *testing.T) {
 func TestReloadAuthTogglesProtection(t *testing.T) {
 	srv := newTestServer(t, withAuth(protectTok))
 	tokens := []AdminToken{{Label: "a", Hash: hashToken(protectTok)}}
-	version := func() int { return doJSON(t, srv, http.MethodGet, "/pub/api/v1/version", nil).Code }
+	version := func() *httptest.ResponseRecorder { return doJSON(t, srv, http.MethodGet, "/pub/api/v1/version", nil) }
 
-	if got := version(); got != http.StatusOK {
-		t.Fatalf("before reload = %d, want 200", got)
-	}
+	wantStatus(t, version(), http.StatusOK)
 	if err := srv.ReloadAuth(AuthConfig{AdminTokens: tokens, ProtectPublic: true}); err != nil {
 		t.Fatal(err)
 	}
-	if got := version(); got != http.StatusUnauthorized {
-		t.Fatalf("after protect reload = %d, want 401", got)
-	}
+	wantStatus(t, version(), http.StatusUnauthorized)
 	if err := srv.ReloadAuth(AuthConfig{ProtectPublic: true}); err == nil {
 		t.Fatal("reload with protect and no tokens succeeded")
 	}
-	if got := version(); got != http.StatusUnauthorized {
-		t.Fatalf("after rejected reload = %d, want 401", got)
-	}
+	wantStatus(t, version(), http.StatusUnauthorized)
 	if err := srv.ReloadAuth(AuthConfig{AdminTokens: tokens}); err != nil {
 		t.Fatal(err)
 	}
-	if got := version(); got != http.StatusOK {
-		t.Fatalf("after unprotect reload = %d, want 200", got)
-	}
+	wantStatus(t, version(), http.StatusOK)
 }
 
 func TestProtectedLoginLocale(t *testing.T) {
@@ -334,11 +322,7 @@ func TestProtectedLoginLocale(t *testing.T) {
 }
 
 func TestLoadFileConfigProtectPublic(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "config.json")
-	raw := `{"auth":{"admin_tokens":[{"hash":"` + hashToken(protectTok) + `"}],"protect_public":true}}`
-	if err := os.WriteFile(path, []byte(raw), 0o600); err != nil {
-		t.Fatal(err)
-	}
+	path := writeTempJSON(t, `{"auth":{"admin_tokens":[{"hash":"`+hashToken(protectTok)+`"}],"protect_public":true}}`)
 	fc, err := LoadFileConfig(path)
 	if err != nil {
 		t.Fatal(err)

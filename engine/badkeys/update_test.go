@@ -16,8 +16,7 @@ import (
 	"github.com/ulikunitz/xz"
 )
 
-// updateFixture serves badkeysdata.json and the compressed blocklist it
-// points at, so an update runs its whole flow without reaching upstream.
+// updateFixture serves badkeysdata.json and the compressed blocklist it points at.
 type updateFixture struct {
 	srv       *httptest.Server
 	blocklist []byte
@@ -151,66 +150,122 @@ func TestUpdateSkipsDownloadWhenBlocklistMatches(t *testing.T) {
 	}
 }
 
-func TestUpdateRejectsShaMismatch(t *testing.T) {
-	f := newUpdateFixture(t, 2)
-	f.meta.BlocklistSHA256 = strings.Repeat("00", sha256.Size)
-
-	err := f.updater().Update(filepath.Join(t.TempDir(), "badkeys"), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "SHA-256 mismatch") {
-		t.Fatalf("expected a SHA-256 mismatch, got %v", err)
+func TestUpdateErrors(t *testing.T) {
+	tests := []struct {
+		name    string
+		entries int
+		mutate  func(t *testing.T, f *updateFixture, dir string)
+		wantErr string
+	}{
+		{
+			name:    "sha mismatch",
+			entries: 2,
+			mutate: func(_ *testing.T, f *updateFixture, _ string) {
+				f.meta.BlocklistSHA256 = strings.Repeat("00", sha256.Size)
+			},
+			wantErr: "SHA-256 mismatch",
+		},
+		{
+			// A blocklist that is not a whole number of 16 byte entries is rejected.
+			name:    "misaligned blocklist",
+			entries: 2,
+			mutate: func(_ *testing.T, f *updateFixture, _ string) {
+				f.blocklist = append(f.blocklist, 'x')
+				sum := sha256.Sum256(f.blocklist)
+				f.meta.BlocklistSHA256 = hex.EncodeToString(sum[:])
+			},
+			wantErr: "not a multiple of 16 bytes",
+		},
+		{
+			name:    "unsupported format",
+			entries: 1,
+			mutate: func(_ *testing.T, f *updateFixture, _ string) {
+				f.meta.BKFormat = bkFormat + 1
+			},
+			wantErr: "unsupported bkformat",
+		},
+		{
+			name:    "missing blocklist url",
+			entries: 1,
+			mutate: func(_ *testing.T, f *updateFixture, _ string) {
+				f.meta.BlocklistURL = ""
+			},
+			wantErr: "blocklist_url not present",
+		},
+		{
+			name:    "http error",
+			entries: 1,
+			mutate: func(_ *testing.T, f *updateFixture, _ string) {
+				f.metaStatus = http.StatusServiceUnavailable
+			},
+			wantErr: fmt.Sprintf("HTTP %d", http.StatusServiceUnavailable),
+		},
+		{
+			name:    "unparsable metadata",
+			entries: 1,
+			mutate: func(_ *testing.T, f *updateFixture, _ string) {
+				f.metaJSON = []byte("{not json")
+			},
+			wantErr: "parse badkeysdata.json",
+		},
+		{
+			name:    "blocklist download failure",
+			entries: 1,
+			mutate: func(_ *testing.T, f *updateFixture, _ string) {
+				f.meta.BlocklistURL = f.srv.URL + "/absent"
+			},
+			wantErr: "download blocklist",
+		},
+		{
+			name:    "non xz blocklist",
+			entries: 1,
+			mutate: func(_ *testing.T, f *updateFixture, _ string) {
+				f.blocklistBody = []byte("this is not compressed")
+			},
+			wantErr: "xz reader",
+		},
+		{
+			name:    "truncated blocklist",
+			entries: 64,
+			mutate: func(t *testing.T, f *updateFixture, _ string) {
+				full := xzCompress(t, f.blocklist)
+				f.blocklistBody = full[:len(full)-16]
+			},
+			wantErr: "xz decompress",
+		},
+		{
+			// A directory on the .tmp staging path blocks the blocklist write.
+			name:    "blocklist write failure",
+			entries: 1,
+			mutate: func(t *testing.T, _ *updateFixture, dir string) {
+				if err := os.MkdirAll(filepath.Join(dir, "blocklist.dat.tmp"), 0o755); err != nil {
+					t.Fatalf("mkdir blocker: %v", err)
+				}
+			},
+			wantErr: "write blocklist.dat",
+		},
+		{
+			name:    "metadata write failure",
+			entries: 1,
+			mutate: func(t *testing.T, _ *updateFixture, dir string) {
+				if err := os.MkdirAll(filepath.Join(dir, "badkeysdata.json.tmp"), 0o755); err != nil {
+					t.Fatalf("mkdir blocker: %v", err)
+				}
+			},
+			wantErr: "write badkeysdata.json",
+		},
 	}
-}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			f := newUpdateFixture(t, tc.entries)
+			dir := filepath.Join(t.TempDir(), "badkeys")
+			tc.mutate(t, f, dir)
 
-// A blocklist that is not a whole number of 16 byte entries is rejected.
-func TestUpdateRejectsMisalignedBlocklist(t *testing.T) {
-	f := newUpdateFixture(t, 2)
-	f.blocklist = append(f.blocklist, 'x')
-	sum := sha256.Sum256(f.blocklist)
-	f.meta.BlocklistSHA256 = hex.EncodeToString(sum[:])
-
-	err := f.updater().Update(filepath.Join(t.TempDir(), "badkeys"), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "not a multiple of 16 bytes") {
-		t.Fatalf("expected a size rejection, got %v", err)
-	}
-}
-
-func TestUpdateRejectsUnsupportedFormat(t *testing.T) {
-	f := newUpdateFixture(t, 1)
-	f.meta.BKFormat = bkFormat + 1
-
-	err := f.updater().Update(filepath.Join(t.TempDir(), "badkeys"), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "unsupported bkformat") {
-		t.Fatalf("expected an unsupported format error, got %v", err)
-	}
-}
-
-func TestUpdateRejectsMissingBlocklistURL(t *testing.T) {
-	f := newUpdateFixture(t, 1)
-	f.meta.BlocklistURL = ""
-
-	err := f.updater().Update(filepath.Join(t.TempDir(), "badkeys"), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "blocklist_url not present") {
-		t.Fatalf("expected a missing url error, got %v", err)
-	}
-}
-
-func TestUpdateReportsHTTPError(t *testing.T) {
-	f := newUpdateFixture(t, 1)
-	f.metaStatus = http.StatusServiceUnavailable
-
-	err := f.updater().Update(filepath.Join(t.TempDir(), "badkeys"), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), fmt.Sprintf("HTTP %d", http.StatusServiceUnavailable)) {
-		t.Fatalf("expected the status in the error, got %v", err)
-	}
-}
-
-func TestUpdateRejectsUnparsableMetadata(t *testing.T) {
-	f := newUpdateFixture(t, 1)
-	f.metaJSON = []byte("{not json")
-
-	err := f.updater().Update(filepath.Join(t.TempDir(), "badkeys"), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "parse badkeysdata.json") {
-		t.Fatalf("expected a parse error, got %v", err)
+			err := f.updater().Update(dir, &bytes.Buffer{})
+			if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+				t.Fatalf("expected %q in the error, got %v", tc.wantErr, err)
+			}
+		})
 	}
 }
 
@@ -238,8 +293,7 @@ func TestUpdaterZeroValueUsesUpstream(t *testing.T) {
 	}
 }
 
-// Update reaches the output directory before the network, so an unusable
-// path fails without fetching.
+// An unusable output path fails before any fetch.
 func TestUpdateRejectsUnusableOutputDir(t *testing.T) {
 	blocked := filepath.Join(t.TempDir(), "file")
 	if err := os.WriteFile(blocked, nil, 0o644); err != nil {
@@ -261,65 +315,6 @@ func TestUpdateReportsUnreachableEndpoint(t *testing.T) {
 	}
 }
 
-func TestUpdateReportsBlocklistDownloadFailure(t *testing.T) {
-	f := newUpdateFixture(t, 1)
-	f.meta.BlocklistURL = f.srv.URL + "/absent"
-
-	err := f.updater().Update(filepath.Join(t.TempDir(), "badkeys"), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "download blocklist") {
-		t.Fatalf("expected a blocklist download error, got %v", err)
-	}
-}
-
-func TestUpdateRejectsNonXZBlocklist(t *testing.T) {
-	f := newUpdateFixture(t, 1)
-	f.blocklistBody = []byte("this is not compressed")
-
-	err := f.updater().Update(filepath.Join(t.TempDir(), "badkeys"), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "xz reader") {
-		t.Fatalf("expected an xz reader error, got %v", err)
-	}
-}
-
-func TestUpdateRejectsTruncatedBlocklist(t *testing.T) {
-	f := newUpdateFixture(t, 64)
-	full := xzCompress(t, f.blocklist)
-	f.blocklistBody = full[:len(full)-16]
-
-	err := f.updater().Update(filepath.Join(t.TempDir(), "badkeys"), &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "xz decompress") {
-		t.Fatalf("expected an xz decompress error, got %v", err)
-	}
-}
-
-// writeAtomic stages through a .tmp path, so a directory sitting on that
-// name makes the write fail.
-func TestUpdateReportsBlocklistWriteFailure(t *testing.T) {
-	f := newUpdateFixture(t, 1)
-	dir := filepath.Join(t.TempDir(), "badkeys")
-	if err := os.MkdirAll(filepath.Join(dir, "blocklist.dat.tmp"), 0o755); err != nil {
-		t.Fatalf("mkdir blocker: %v", err)
-	}
-
-	err := f.updater().Update(dir, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "write blocklist.dat") {
-		t.Fatalf("expected a blocklist write error, got %v", err)
-	}
-}
-
-func TestUpdateReportsMetadataWriteFailure(t *testing.T) {
-	f := newUpdateFixture(t, 1)
-	dir := filepath.Join(t.TempDir(), "badkeys")
-	if err := os.MkdirAll(filepath.Join(dir, "badkeysdata.json.tmp"), 0o755); err != nil {
-		t.Fatalf("mkdir blocker: %v", err)
-	}
-
-	err := f.updater().Update(dir, &bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "write badkeysdata.json") {
-		t.Fatalf("expected a metadata write error, got %v", err)
-	}
-}
-
 // An unreadable blocklist.dat counts as absent, so the update redownloads.
 func TestUpdateTreatsUnreadableBlocklistAsAbsent(t *testing.T) {
 	f := newUpdateFixture(t, 1)
@@ -338,37 +333,30 @@ func TestUpdateTreatsUnreadableBlocklistAsAbsent(t *testing.T) {
 	}
 }
 
-func TestDefaultDataDirUsesXDGDataHome(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", "/xdg")
-
-	if got, want := DefaultDataDir(), filepath.Join("/xdg", "gonemaster", "badkeys"); got != want {
-		t.Errorf("DefaultDataDir() = %q, want %q", got, want)
+func TestDefaultDataDir(t *testing.T) {
+	tests := []struct {
+		name string
+		env  map[string]string
+		want string
+	}{
+		{"xdg data home", map[string]string{"XDG_DATA_HOME": "/xdg"}, filepath.Join("/xdg", "gonemaster", "badkeys")},
+		{"home without xdg", map[string]string{"XDG_DATA_HOME": "", "HOME": "/home/tester"}, filepath.Join("/home/tester", ".local", "share", "gonemaster", "badkeys")},
+		// With no home to resolve the path stays relative rather than empty.
+		{"no home", map[string]string{"XDG_DATA_HOME": "", "HOME": ""}, filepath.Join(".", ".local", "share", "gonemaster", "badkeys")},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			for key, value := range tc.env {
+				t.Setenv(key, value)
+			}
+			if got := DefaultDataDir(); got != tc.want {
+				t.Errorf("DefaultDataDir() = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 
-func TestDefaultDataDirUsesHomeWithoutXDG(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", "")
-	t.Setenv("HOME", "/home/tester")
-
-	want := filepath.Join("/home/tester", ".local", "share", "gonemaster", "badkeys")
-	if got := DefaultDataDir(); got != want {
-		t.Errorf("DefaultDataDir() = %q, want %q", got, want)
-	}
-}
-
-// With no home to resolve the path stays relative rather than empty.
-func TestDefaultDataDirFallsBackWithoutHome(t *testing.T) {
-	t.Setenv("XDG_DATA_HOME", "")
-	t.Setenv("HOME", "")
-
-	want := filepath.Join(".", ".local", "share", "gonemaster", "badkeys")
-	if got := DefaultDataDir(); got != want {
-		t.Errorf("DefaultDataDir() = %q, want %q", got, want)
-	}
-}
-
-// Off Linux and macOS the data sits under the home dot directory, and
-// XDG_DATA_HOME does not apply.
+// Off Linux and macOS the data sits under the home dot directory and XDG_DATA_HOME is ignored.
 func TestDataDirOutsideUnixIgnoresXDG(t *testing.T) {
 	want := filepath.Join("/home/tester", ".gonemaster", "badkeys")
 	if got := dataDir("windows", "/home/tester", "/xdg"); got != want {

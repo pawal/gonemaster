@@ -79,7 +79,7 @@ func TestRecurseOrderedRaceLossSetsCause(t *testing.T) {
 		prof := testhelpers.DefaultProfile(t)
 		prof.Resolver.Defaults.Parallel = 3
 		prof.Resolver.Defaults.Unordered = false
-		ctx := profile.WithContext(context.Background(), prof)
+		ctx := profile.WithContext(t.Context(), prof)
 
 		loser := &observingQueryer{}
 		winner := fakeQueryer{resp: answerPacket("www.example", "203.0.113.50")}
@@ -119,7 +119,7 @@ func TestRecurseUnorderedRaceLossSetsCause(t *testing.T) {
 		prof := testhelpers.DefaultProfile(t)
 		prof.Resolver.Defaults.Parallel = 2
 		prof.Resolver.Defaults.Unordered = true
-		ctx := profile.WithContext(context.Background(), prof)
+		ctx := profile.WithContext(t.Context(), prof)
 
 		loser := &observingQueryer{}
 		winner := fakeQueryer{resp: answerPacket("www.example", "203.0.113.60")}
@@ -168,7 +168,7 @@ func TestRecurseSkipsUpwardReferral(t *testing.T) {
 	}
 
 	r := &Recursor{}
-	resp, out, err := r.recurse(context.Background(), "www.child.example", "A", "IN", state)
+	resp, out, err := r.recurse(t.Context(), "www.child.example", "A", "IN", state)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -201,7 +201,7 @@ func TestRecurseFollowsDownwardReferral(t *testing.T) {
 	}
 
 	r := &Recursor{}
-	resp, _, err := r.recurse(context.Background(), "www.grandchild.child.example", "A", "IN", state)
+	resp, _, err := r.recurse(t.Context(), "www.grandchild.child.example", "A", "IN", state)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -218,7 +218,7 @@ func TestRecurseIgnoresRootReferral(t *testing.T) {
 	}
 
 	r := &Recursor{}
-	resp, _, err := r.recurse(context.Background(), "www.example", "A", "IN", state)
+	resp, _, err := r.recurse(t.Context(), "www.example", "A", "IN", state)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -269,7 +269,7 @@ func TestRecurseStopsOnCNAMEWithQtypeMismatch(t *testing.T) {
 	}
 
 	r := &Recursor{}
-	out, _, err := r.recurse(context.Background(), "www.example.com", "A", "IN", state)
+	out, _, err := r.recurse(t.Context(), "www.example.com", "A", "IN", state)
 	var ce *CNAMEError
 	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "qtype-mismatch" {
 		t.Fatalf("expected *CNAMEError unresolved/qtype-mismatch, got: %v", err)
@@ -289,7 +289,7 @@ func TestRecurseReturnsCandidateOnRefused(t *testing.T) {
 	}
 
 	r := &Recursor{}
-	resp, _, err := r.recurse(context.Background(), "example", "A", "IN", state)
+	resp, _, err := r.recurse(t.Context(), "example", "A", "IN", state)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -306,7 +306,7 @@ func TestRecurseStopsOnInProgress(t *testing.T) {
 	}
 
 	r := &Recursor{}
-	resp, _, err := r.recurse(context.Background(), "example", "A", "IN", state)
+	resp, _, err := r.recurse(t.Context(), "example", "A", "IN", state)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -322,7 +322,7 @@ func TestResolveCNAMEWithTargetAnswer(t *testing.T) {
 	resp.Msg.Answer = append(resp.Msg.Answer, aRR2)
 
 	r := &Recursor{}
-	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
+	out, _, err := r.resolveCNAME(t.Context(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -347,7 +347,7 @@ func TestResolveCNAMETooManyRecordsReturnsTooMany(t *testing.T) {
 	resp := packet.Packet{Msg: msg}
 
 	r := &Recursor{}
-	_, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
+	_, _, err := r.resolveCNAME(t.Context(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
 	var ce *CNAMEError
 	if !errors.As(err, &ce) || ce.Reason != CNAMETooMany {
 		t.Fatalf("expected *CNAMEError too-many, got: %v", err)
@@ -364,7 +364,7 @@ func TestResolveCNAMEBrokenChainReturnsUnresolved(t *testing.T) {
 	resp.Msg.Answer = append(resp.Msg.Answer, cnameUnrelated)
 
 	r := &Recursor{}
-	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
+	out, _, err := r.resolveCNAME(t.Context(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
 	var ce *CNAMEError
 	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "broken-chain" {
 		t.Fatalf("expected *CNAMEError unresolved/broken-chain, got: %v", err)
@@ -383,7 +383,7 @@ func TestResolveCNAMEQtypeMismatchReturnsUnresolved(t *testing.T) {
 	resp.Msg.Answer = append(resp.Msg.Answer, strayA)
 
 	r := &Recursor{}
-	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
+	out, _, err := r.resolveCNAME(t.Context(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
 	var ce *CNAMEError
 	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "qtype-mismatch" {
 		t.Fatalf("expected *CNAMEError unresolved/qtype-mismatch, got: %v", err)
@@ -400,7 +400,7 @@ func TestResolveCNAMEChainDepthExceededReturnsChainTooLong(t *testing.T) {
 
 	state := &recurseState{tcount: constants.CNAMEMaxChainLength}
 	r := &Recursor{}
-	_, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, state)
+	_, _, err := r.resolveCNAME(t.Context(), dnsname.New("www.example.com"), "A", "IN", resp, state)
 	var ce *CNAMEError
 	if !errors.As(err, &ce) || ce.Reason != CNAMEChainTooLong {
 		t.Fatalf("expected *CNAMEError chain-too-long, got: %v", err)
@@ -446,7 +446,7 @@ func TestResolveCNAMELoopReturnsUnresolved(t *testing.T) {
 	resp.Msg.Answer = append(resp.Msg.Answer, cnameRR2)
 
 	r := &Recursor{}
-	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
+	out, _, err := r.resolveCNAME(t.Context(), dnsname.New("www.example.com"), "A", "IN", resp, nil)
 	var ce *CNAMEError
 	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "loop" {
 		t.Fatalf("expected *CNAMEError unresolved/loop, got: %v", err)
@@ -457,8 +457,7 @@ func TestResolveCNAMELoopReturnsUnresolved(t *testing.T) {
 }
 
 func TestResolveCNAMEOuterLoopReturnsUnresolved(t *testing.T) {
-	// The target is already being resolved on this chain, so the chain loops
-	// across responses rather than inside one answer.
+	// The target is already in progress on this chain: a loop across responses, not inside one answer.
 	resp := cnamePacket("www.example.com", "alias.example.net", "203.0.113.12")
 	state := &recurseState{
 		inProgress: map[string]map[string]bool{
@@ -467,7 +466,7 @@ func TestResolveCNAMEOuterLoopReturnsUnresolved(t *testing.T) {
 	}
 
 	r := &Recursor{}
-	out, _, err := r.resolveCNAME(context.Background(), dnsname.New("www.example.com"), "A", "IN", resp, state)
+	out, _, err := r.resolveCNAME(t.Context(), dnsname.New("www.example.com"), "A", "IN", resp, state)
 	var ce *CNAMEError
 	if !errors.As(err, &ce) || ce.Reason != CNAMEUnresolved || ce.Detail != "loop-outer" {
 		t.Fatalf("expected *CNAMEError unresolved/loop-outer, got: %v", err)
@@ -477,9 +476,7 @@ func TestResolveCNAMEOuterLoopReturnsUnresolved(t *testing.T) {
 	}
 }
 
-// Authoritative servers answer from zone-file casing, not query casing, so a
-// classless IN-ADDR.ARPA chain arrives with an owner name in a different case
-// than the query name.
+// A classless IN-ADDR.ARPA chain arrives with an owner name cased differently from the query name.
 func TestRecurseFollowsMixedCaseCNAMEChain(t *testing.T) {
 	resp := cnamePacket("66.53.113.195.IN-ADDR.ARPA", "66.64-127.53.113.195.in-addr.arpa", "203.0.113.13")
 	resp.Msg.Answer = append(resp.Msg.Answer, dnstest.PTRRR("66.64-127.53.113.195.in-addr.arpa", "ns.example.com"))
@@ -491,7 +488,7 @@ func TestRecurseFollowsMixedCaseCNAMEChain(t *testing.T) {
 	}
 
 	r := &Recursor{}
-	out, _, err := r.recurse(context.Background(), "66.53.113.195.in-addr.arpa", "PTR", "IN", state)
+	out, _, err := r.recurse(t.Context(), "66.53.113.195.in-addr.arpa", "PTR", "IN", state)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

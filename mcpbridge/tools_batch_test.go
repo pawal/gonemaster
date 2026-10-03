@@ -2,6 +2,7 @@ package mcpbridge
 
 import (
 	"net/url"
+	"slices"
 	"testing"
 	"time"
 
@@ -240,16 +241,21 @@ func TestFailuresByTagScansMostSevereFirstAndCountsDomains(t *testing.T) {
 	if res.IsError {
 		t.Fatalf("unexpected tool error: %s", errorText(res))
 	}
-	if len(levels) != 3 || levels[0] != "CRITICAL" || levels[1] != "ERROR" || levels[2] != "WARNING" {
+	if !slices.Equal(levels, []string{"CRITICAL", "ERROR", "WARNING"}) {
 		t.Errorf("scan order = %v, want CRITICAL, ERROR, WARNING", levels)
 	}
 	if len(out.Tags) != 2 {
 		t.Fatalf("tags = %+v", out.Tags)
 	}
-	for _, tg := range out.Tags {
-		if tg.Tag == "SOATIME" && (tg.Count != 1 || tg.Entries != 2) {
-			t.Errorf("SOATIME count/entries = %d/%d, want 1/2", tg.Count, tg.Entries)
-		}
+	i := slices.IndexFunc(out.Tags, func(tg tagFailure) bool { return tg.Tag == "SOATIME" })
+	if i < 0 {
+		t.Fatalf("SOATIME missing from %+v", out.Tags)
+	}
+	if tg := out.Tags[i]; tg.Count != 1 || tg.Entries != 2 {
+		t.Errorf("SOATIME count/entries = %d/%d, want 1/2", tg.Count, tg.Entries)
+	}
+	if out.Tags[0].Tag != "SOATIME" || out.Tags[1].Tag != "DNSSEC09" {
+		t.Errorf("rank order = %s, %s, want SOATIME, DNSSEC09", out.Tags[0].Tag, out.Tags[1].Tag)
 	}
 	if out.Tags[0].Entries < out.Tags[1].Entries {
 		t.Errorf("equal domain counts must rank by entries: %+v", out.Tags)
@@ -257,9 +263,7 @@ func TestFailuresByTagScansMostSevereFirstAndCountsDomains(t *testing.T) {
 }
 
 func TestFailuresByTagCapNamesTheLevel(t *testing.T) {
-	orig := maxFailureEntries
-	maxFailureEntries = 2
-	defer func() { maxFailureEntries = orig }()
+	stub(t, &maxFailureEntries, 2)
 	api := fakeAPI(t, apitest.Opts{Entries: []apitest.EntryRecord{
 		{Domain: "a.example", Tag: "SOATIME", Level: "WARNING"},
 		{Domain: "b.example", Tag: "SOATIME", Level: "WARNING"},

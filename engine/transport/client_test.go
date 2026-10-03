@@ -957,7 +957,7 @@ func TestExchangeTracesCancelAsCanceled(t *testing.T) {
 	defer shutdown()
 
 	rec := &dnstest.RecordingTrace{}
-	ctx, cancel := context.WithCancel(querytrace.WithContext(context.Background(), rec))
+	ctx, cancel := context.WithCancel(querytrace.WithContext(t.Context(), rec))
 	time.AfterFunc(40*time.Millisecond, cancel)
 
 	client := &Client{}
@@ -982,7 +982,7 @@ func TestExchangeTracesCancelAsCanceled(t *testing.T) {
 
 // TestClassifyOutcome checks that each exchange error maps to its trace outcome.
 func TestClassifyOutcome(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, dialErr := (&net.Dialer{}).DialContext(ctx, "udp", "192.0.2.1:53")
 	if dialErr == nil {
@@ -1001,9 +1001,11 @@ func TestClassifyOutcome(t *testing.T) {
 		{"connection refused", errors.New("connection refused"), querytrace.OutcomeError},
 	}
 	for _, tc := range cases {
-		if got := classifyOutcome(tc.err); got != tc.want {
-			t.Errorf("%s: classifyOutcome = %q, want %q", tc.name, got, tc.want)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			if got := classifyOutcome(tc.err); got != tc.want {
+				t.Errorf("classifyOutcome = %q, want %q", got, tc.want)
+			}
+		})
 	}
 }
 

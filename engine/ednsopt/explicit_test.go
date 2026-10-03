@@ -19,8 +19,7 @@ func packUnpack(t *testing.T, msg *dns.Msg) *dns.Msg {
 	return wire
 }
 
-// Every message-level EDNS field is an OPT trigger in Pack, so a residual value
-// emits a second OPT alongside the explicit one.
+// ApplyExplicit clears every message-level EDNS field that triggers an OPT in Pack.
 func TestApplyExplicitClearsEveryTrigger(t *testing.T) {
 	msg := new(dns.Msg)
 	msg.UDPSize = 1232

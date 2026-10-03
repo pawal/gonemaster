@@ -66,19 +66,28 @@ func withMCP(allowWrite bool) srvOpt {
 	})
 }
 
+// structuredContent decodes a tool result's structured content into T.
+func structuredContent[T any](t *testing.T, res *mcp.CallToolResult) T {
+	t.Helper()
+	raw, err := json.Marshal(res.StructuredContent)
+	if err != nil {
+		t.Fatalf("marshal structured content: %v", err)
+	}
+	var out T
+	if err := json.Unmarshal(raw, &out); err != nil {
+		t.Fatalf("decode structured content: %v", err)
+	}
+	return out
+}
+
 func TestMCPEndpointDisabledIs404(t *testing.T) {
 	srv := newTestServer(t)
-	resp := doJSON(t, srv, http.MethodPost, "/api/v1/mcp", `{}`)
-	if resp.Code != http.StatusNotFound {
-		t.Fatalf("status = %d, want 404", resp.Code)
-	}
+	wantStatus(t, doJSON(t, srv, http.MethodPost, "/api/v1/mcp", `{}`), http.StatusNotFound)
 }
 
 func TestMCPEndpointRequiresBearerInTokenMode(t *testing.T) {
 	srv := newTestServer(t, withAuth("gm_secret"), withMCP(false))
-	if resp := doJSON(t, srv, http.MethodPost, "/api/v1/mcp", `{}`); resp.Code != http.StatusUnauthorized {
-		t.Fatalf("no credential: status = %d, want 401", resp.Code)
-	}
+	wantStatus(t, doJSON(t, srv, http.MethodPost, "/api/v1/mcp", `{}`), http.StatusUnauthorized)
 	resp := doJSON(t, srv, http.MethodPost, "/api/v1/mcp", `{}`, withCookie(&http.Cookie{Name: adminCookieName, Value: "gm_secret"}))
 	if resp.Code != http.StatusUnauthorized || !strings.Contains(resp.Body.String(), "bearer token required") {
 		t.Fatalf("cookie: status = %d body = %s, want 401 bearer token required", resp.Code, resp.Body.String())
@@ -98,13 +107,11 @@ func TestMCPEndpointListsReadToolsAndPings(t *testing.T) {
 	if err != nil || res.IsError {
 		t.Fatalf("ping: %v %+v", err, res)
 	}
-	var out struct {
+	out := structuredContent[struct {
 		Reachable     bool   `json:"reachable"`
 		AuthMode      string `json:"auth_mode"`
 		Authenticated bool   `json:"authenticated"`
-	}
-	raw, _ := json.Marshal(res.StructuredContent)
-	_ = json.Unmarshal(raw, &out)
+	}](t, res)
 	if !out.Reachable || out.AuthMode != "token" || !out.Authenticated {
 		t.Fatalf("ping = %+v, want reachable token authenticated", out)
 	}
@@ -129,14 +136,12 @@ func TestMCPEndpointLatestForReadsTheStore(t *testing.T) {
 	if err != nil || res.IsError {
 		t.Fatalf("latest_for: %v %+v", err, res)
 	}
-	var out struct {
+	out := structuredContent[struct {
 		Count int `json:"count"`
 		Runs  []struct {
 			Domain string `json:"domain"`
 		} `json:"runs"`
-	}
-	raw, _ := json.Marshal(res.StructuredContent)
-	_ = json.Unmarshal(raw, &out)
+	}](t, res)
 	if out.Count != 1 || out.Runs[0].Domain != "example.se" {
 		t.Fatalf("latest_for = %+v, want the one exact run", out)
 	}
@@ -144,13 +149,24 @@ func TestMCPEndpointLatestForReadsTheStore(t *testing.T) {
 
 // lockedBuffer is a log sink the server goroutine and the test may share.
 type lockedBuffer struct {
-	mu  sync.Mutex
-	buf bytes.Buffer
+	mu    sync.Mutex
+	buf   bytes.Buffer
+	await string
+	once  sync.Once
+	seen  chan struct{}
+}
+
+// awaitingBuffer is a lockedBuffer that closes seen on the first Write containing substr.
+func awaitingBuffer(substr string) *lockedBuffer {
+	return &lockedBuffer{await: substr, seen: make(chan struct{})}
 }
 
 func (b *lockedBuffer) Write(p []byte) (int, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	if b.seen != nil && bytes.Contains(p, []byte(b.await)) {
+		b.once.Do(func() { close(b.seen) })
+	}
 	return b.buf.Write(p)
 }
 
@@ -161,16 +177,17 @@ func (b *lockedBuffer) String() string {
 }
 
 func TestMCPEndpointSharesTheRequestID(t *testing.T) {
-	logs := &lockedBuffer{}
+	logs := awaitingBuffer(`"path":"/api/v1/mcp"`)
 	srv := newTestServer(t, withMCP(false), withLogTo(logs, "info"))
 	session, ctx := mcpSession(t, srv, "")
 	if _, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "latest_for", Arguments: map[string]any{"domain": "example.se"}}); err != nil {
 		t.Fatalf("latest_for: %v", err)
 	}
-	// The endpoint's own access log line lands after the response.
-	deadline := time.Now().Add(2 * time.Second)
-	for !strings.Contains(logs.String(), `"path":"/api/v1/mcp"`) && time.Now().Before(deadline) {
-		time.Sleep(5 * time.Millisecond)
+	// The access log line lands after the response; the httptest server runs on the real clock.
+	select {
+	case <-logs.seen:
+	case <-time.After(2 * time.Second):
+		t.Fatal("no access log line for /api/v1/mcp within 2s")
 	}
 
 	ids := map[string]string{}
@@ -236,14 +253,12 @@ func TestMCPEndpointRunsTestDomain(t *testing.T) {
 	if err != nil || res.IsError {
 		t.Fatalf("test_domain: %v %+v", err, res)
 	}
-	var out struct {
+	out := structuredContent[struct {
 		Status      string                 `json:"status"`
 		RunID       string                 `json:"run_id"`
 		Findings    []struct{ Tag string } `json:"findings"`
 		LevelCounts map[string]int         `json:"level_counts"`
-	}
-	raw, _ := json.Marshal(res.StructuredContent)
-	_ = json.Unmarshal(raw, &out)
+	}](t, res)
 	if out.Status != "succeeded" || out.RunID == "" {
 		t.Fatalf("result = %+v, want a succeeded run", out)
 	}

@@ -1725,9 +1725,7 @@ func runContext(t *testing.T, parent *CacheStore) context.Context {
 func answerHook(calls *int) queryHook {
 	return func(context.Context, string, string, string, *QueryOptions) (packet.Packet, error) {
 		*calls++
-		msg := new(dns.Msg)
-		msg.Response = true
-		return packet.Packet{Msg: msg}, nil
+		return dnstest.Response(dnstest.Reply(), dnstest.NotAuthoritative()), nil
 	}
 }
 
@@ -1784,14 +1782,9 @@ func TestNonGlobalGuardLogsOncePerQuery(t *testing.T) {
 	}
 }
 
-// A synthesized response must reach a testcase in wire shape, with the OPT
-// moved out of the additional section, or its EDNS accessors read differently
-// than they do for a real response.
+// A synthesized response reaches a testcase in wire shape, with no OPT in the additional section.
 func TestWireFormMatchesARealResponse(t *testing.T) {
-	msg := new(dns.Msg)
-	msg.Response = true
-	msg.Authoritative = true
-	dnsutil.SetQuestion(msg, "example.", dns.TypeDS)
+	msg := dnstest.Response(dnstest.Reply(), dnstest.Question("example.", dns.TypeDS)).Msg
 	setResponseEDNS(msg, true, 1232, nil)
 
 	wire := wireForm(msg)

@@ -626,15 +626,14 @@ func effectiveTestcases(t *testing.T, srv *Server, jobID string) []string {
 }
 
 func TestRunJobExcludeBeatsStoredProfile(t *testing.T) {
-	srv := newTestServer(t, withConfig(excludeDNSSEC))
+	var got engine.RunRequest
+	srv := newTestServer(t, withConfig(excludeDNSSEC), withEngineRunner(func(req engine.RunRequest) ([]engine.LogEntry, error) {
+		got = req
+		return nil, nil
+	}))
 	stored, err := srv.store.CreateProfile(StoredProfile{Name: "some", Config: `{"test_cases":["basic01","dnssec10"]}`})
 	if err != nil {
 		t.Fatalf("CreateProfile: %v", err)
-	}
-	var got engine.RunRequest
-	srv.engineRunner = func(req engine.RunRequest) ([]engine.LogEntry, error) {
-		got = req
-		return nil, nil
 	}
 	job := Job{ID: "job-exclude-stored", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC(), ProfileID: &stored.ID}
 	if _, err := srv.store.Create(job); err != nil {

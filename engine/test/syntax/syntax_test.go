@@ -154,8 +154,7 @@ func TestSyntax06ParallelMailServers(t *testing.T) {
 			}
 		})
 
-		// Concurrent lookups share the root step, so the parallel mail lookups
-		// are observed at the delegated server.
+		// The parallel mail lookups are observed at the delegated server.
 		tctest.NSOn(t, baseCtx, r, "ns.com", "192.0.2.2", func(q tctest.Query) packet.Packet {
 			name := strings.ToLower(q.Name)
 			kind := strings.ToUpper(q.Type)

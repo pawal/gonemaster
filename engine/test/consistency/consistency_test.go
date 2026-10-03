@@ -536,9 +536,9 @@ func TestConsistency05InBailiwickMismatch(t *testing.T) {
 	if len(parent) != 1 || parent[0] != "ns1.example/192.0.2.1" {
 		t.Fatalf("expected parent_servers [ns1.example/192.0.2.1], got %v", parent)
 	}
-	zone := tctest.EndpointsAt(mismatch.Args, "zone_servers")
-	if len(zone) != 1 || zone[0] != "ns1.example/192.0.2.2" {
-		t.Fatalf("expected zone_servers [ns1.example/192.0.2.2], got %v", zone)
+	zoneServers := tctest.EndpointsAt(mismatch.Args, "zone_servers")
+	if !slices.Equal(zoneServers, []string{"ns1.example/192.0.2.2"}) {
+		t.Fatalf("expected zone_servers [ns1.example/192.0.2.2], got %v", zoneServers)
 	}
 	if _, ok := mismatch.Args["parent_addresses"]; ok {
 		t.Fatalf("legacy key parent_addresses should not be present: %#v", mismatch.Args)
@@ -580,9 +580,8 @@ func TestConsistency05ExtraAddressChild(t *testing.T) {
 	entries := runConsistency05(t, ctx, "example")
 	tctest.RequireNoTag(t, entries, "IN_DOMAIN_ADDR_MISMATCH", "ADDRESSES_MATCH")
 	entry := tctest.RequireTag(t, entries, "EXTRA_ADDRESS_CHILD")
-	addresses, ok := entry.Args["addresses"].([]string)
-	if !ok || len(addresses) != 1 || addresses[0] != "192.0.2.2" {
-		t.Fatalf("expected typed addresses [192.0.2.2], got %#v", entry.Args["addresses"])
+	if addresses := tctest.Strings(t, entry.Args, "addresses"); !slices.Equal(addresses, []string{"192.0.2.2"}) {
+		t.Fatalf("expected addresses [192.0.2.2], got %v", addresses)
 	}
 	if _, ok := entry.Args["ns_ip_list"]; ok {
 		t.Fatalf("legacy key ns_ip_list should not be present: %#v", entry.Args)
@@ -643,28 +642,31 @@ func TestConsistency05DisjointParentChildNSDoesNotReportLame(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "EXTRA_ADDRESS_CHILD")
 }
 
-func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
-	ctx := tctest.Context(t)
-
+// stubOutOfDomainDelegation stubs an empty child, parent glue, and recurse with lookup.
+func stubOutOfDomainDelegation(t *testing.T, glue map[string][]string, lookup func(context.Context, *zone.Zone, string, string) (packet.Packet, error)) {
+	t.Helper()
 	tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
 		return []dnsname.Name{}, nil
 	})
 	tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
 		return []nameserver.Nameserver{}, nil
 	})
-
 	tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
 		if strings.EqualFold(qtype, "NS") {
-			return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
-				"ns1.other": {"192.0.2.1"},
-			})}, nil
+			return []packet.Packet{nsPacketWithGlue(name, glue)}, nil
 		}
 		return []packet.Packet{}, nil
 	})
+	tctest.Stub(t, &recurse, lookup)
+}
 
-	tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, name string, _ string) (packet.Packet, error) {
-		return nxdomainPacket(name), nil
-	})
+func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	stubOutOfDomainDelegation(t, map[string][]string{"ns1.other": {"192.0.2.1"}},
+		func(_ context.Context, _ *zone.Zone, name string, _ string) (packet.Packet, error) {
+			return nxdomainPacket(name), nil
+		})
 
 	entries := runConsistency05(t, ctx, "example")
 	mismatch := tctest.RequireTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
@@ -672,8 +674,8 @@ func TestConsistency05OutOfBailiwickMismatch(t *testing.T) {
 	if len(parent) != 1 || parent[0] != "ns1.other/192.0.2.1" {
 		t.Fatalf("expected parent_servers [ns1.other/192.0.2.1], got %v", parent)
 	}
-	if zone := tctest.EndpointsAt(mismatch.Args, "zone_servers"); len(zone) != 0 {
-		t.Fatalf("expected empty zone_servers for OOB mismatch, got %v", zone)
+	if zoneServers := tctest.EndpointsAt(mismatch.Args, "zone_servers"); len(zoneServers) != 0 {
+		t.Fatalf("expected empty zone_servers for OOB mismatch, got %v", zoneServers)
 	}
 	if _, ok := mismatch.Args["parent_addresses"]; ok {
 		t.Fatalf("legacy key parent_addresses should not be present: %#v", mismatch.Args)
@@ -708,23 +710,10 @@ func TestConsistency05OutOfDomainLookupSettlement(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tctest.Context(t)
-			tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
-				return []dnsname.Name{}, nil
-			})
-			tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-				return []nameserver.Nameserver{}, nil
-			})
-			tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
-				if strings.EqualFold(qtype, "NS") {
-					return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
-						"ns1.other": {"192.0.2.1"},
-					})}, nil
-				}
-				return []packet.Packet{}, nil
-			})
-			tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
-				return tc.resp, tc.err
-			})
+			stubOutOfDomainDelegation(t, map[string][]string{"ns1.other": {"192.0.2.1"}},
+				func(_ context.Context, _ *zone.Zone, _ string, _ string) (packet.Packet, error) {
+					return tc.resp, tc.err
+				})
 
 			entries := runConsistency05(t, ctx, "example")
 			if tc.mismatch {
@@ -750,26 +739,13 @@ func TestConsistency05OutOfDomainComparesSettledFamilyOnly(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			ctx := tctest.Context(t)
-			tctest.Stub(t, &allNSNames, func(_ context.Context, _ *zone.Zone) ([]dnsname.Name, error) {
-				return []dnsname.Name{}, nil
-			})
-			tctest.Stub(t, &allNameservers, func(_ context.Context, _ *zone.Zone) ([]nameserver.Nameserver, error) {
-				return []nameserver.Nameserver{}, nil
-			})
-			tctest.Stub(t, &queryParentAll, func(_ context.Context, _ *zone.Zone, name string, qtype string) ([]packet.Packet, error) {
-				if strings.EqualFold(qtype, "NS") {
-					return []packet.Packet{nsPacketWithGlue(name, map[string][]string{
-						"ns1.other": {"192.0.2.1", "2001:db8::1"},
-					})}, nil
-				}
-				return []packet.Packet{}, nil
-			})
-			tctest.Stub(t, &recurse, func(_ context.Context, _ *zone.Zone, name string, qtype string) (packet.Packet, error) {
-				if strings.EqualFold(qtype, "A") {
-					return addrPacket(name, "A", "192.0.2.1"), nil
-				}
-				return tc.aaaa, nil
-			})
+			stubOutOfDomainDelegation(t, map[string][]string{"ns1.other": {"192.0.2.1", "2001:db8::1"}},
+				func(_ context.Context, _ *zone.Zone, name string, qtype string) (packet.Packet, error) {
+					if strings.EqualFold(qtype, "A") {
+						return addrPacket(name, "A", "192.0.2.1"), nil
+					}
+					return tc.aaaa, nil
+				})
 
 			entries := runConsistency05(t, ctx, "example")
 			if !tc.mismatch {
@@ -777,19 +753,15 @@ func TestConsistency05OutOfDomainComparesSettledFamilyOnly(t *testing.T) {
 				return
 			}
 			mismatch := tctest.RequireTag(t, entries, "NOT_IN_DOMAIN_ADDR_MISMATCH")
-			zone := tctest.EndpointsAt(mismatch.Args, "zone_servers")
-			if len(zone) != 1 || zone[0] != "ns1.other/192.0.2.1" {
-				t.Fatalf("expected zone_servers [ns1.other/192.0.2.1], got %v", zone)
+			zoneServers := tctest.EndpointsAt(mismatch.Args, "zone_servers")
+			if !slices.Equal(zoneServers, []string{"ns1.other/192.0.2.1"}) {
+				t.Fatalf("expected zone_servers [ns1.other/192.0.2.1], got %v", zoneServers)
 			}
 		})
 	}
 }
 
-// A glueless out-of-bailiwick delegation must yield ADDRESSES_MATCH, not a
-// spurious NOT_IN_DOMAIN_ADDR_MISMATCH. gonemaster only compares glue the
-// parent actually returns, so an empty parent side never fabricates localhost
-// glue. Mirrors upstream consistency05 scenarios ADDRESSES-MATCH-8/9
-// (zonemaster-engine#1537).
+// A glueless out-of-bailiwick delegation yields ADDRESSES_MATCH; an empty parent side adds no glue.
 func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
 	addrHandler := func(name, v4, v6 string) tctest.Handler {
 		return func(q tctest.Query) packet.Packet {
@@ -850,11 +822,7 @@ func TestConsistency05GluelessOOBAddressesMatch(t *testing.T) {
 	}
 }
 
-// A parent that answers direct out-of-domain address queries with loopback (a
-// catch-all or wildcard zone) must not poison the glue set. Glue is read only
-// from the referral additional section, so a glueless referral yields no
-// out-of-domain glue and no spurious mismatch, even though the parent would
-// answer ns1.other/A with 127.0.0.1 (zonemaster-engine#1537).
+// A parent answering out-of-domain address queries with loopback does not poison the glue set.
 func TestConsistency05OutOfDomainParentLoopbackNoMismatch(t *testing.T) {
 	ctx := tctest.Context(t)
 

@@ -1,7 +1,6 @@
 package analysis
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
@@ -117,9 +116,7 @@ func TestControllerProjectRunSkipsNonSnapshotIntentBatch(t *testing.T) {
 	}
 }
 
-// TestControllerProjectRunSkipsUnsuccessfulRun covers the third pollution
-// gate: a run that failed or was canceled carries no entries, so projecting
-// it would count the domain as ungraded at severity OK.
+// A failed or canceled run is not projected.
 func TestControllerProjectRunSkipsUnsuccessfulRun(t *testing.T) {
 	for _, status := range []serverpkg.JobStatus{serverpkg.JobFailed, serverpkg.JobCanceled} {
 		t.Run(string(status), func(t *testing.T) {
@@ -162,7 +159,7 @@ func TestControllerRebuildCohortCapturesSnapshotsInline(t *testing.T) {
 	store.tags[run.DomainID] = []string{"tld"}
 
 	controller := NewController(store)
-	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+	if err := controller.RebuildCohort(t.Context(), 10); err != nil {
 		t.Fatalf("RebuildCohort: %v", err)
 	}
 	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-inline")
@@ -187,7 +184,7 @@ func TestControllerRebuildCohortReportsHintWhenNoEligibleRuns(t *testing.T) {
 	store.tags[run.DomainID] = []string{"tld"}
 
 	controller := NewController(store)
-	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+	if err := controller.RebuildCohort(t.Context(), 10); err != nil {
 		t.Fatalf("RebuildCohort: %v", err)
 	}
 	cohort, ok := store.GetAnalysisCohort(10)
@@ -312,7 +309,7 @@ func TestControllerCaptureCompletedSnapshotsPromotesOnBatchDrain(t *testing.T) {
 	if err := controller.ProjectRun(run.ID); err != nil {
 		t.Fatalf("ProjectRun: %v", err)
 	}
-	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+	if err := controller.CaptureCompletedSnapshots(t.Context()); err != nil {
 		t.Fatalf("CaptureCompletedSnapshots: %v", err)
 	}
 	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-drain")
@@ -325,7 +322,7 @@ func TestControllerCaptureCompletedSnapshotsPromotesOnBatchDrain(t *testing.T) {
 
 	// Drain the batch and run the capture pass again.
 	delete(store.queuedJobs, "batch-drain")
-	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+	if err := controller.CaptureCompletedSnapshots(t.Context()); err != nil {
 		t.Fatalf("CaptureCompletedSnapshots (drained): %v", err)
 	}
 	snap, _ = store.GetAnalysisCohortSnapshotByBatch(10, "batch-drain")
@@ -363,7 +360,7 @@ func TestControllerCaptureWaitsForProjectionDrain(t *testing.T) {
 	if err := controller.ProjectRun(runA.ID); err != nil {
 		t.Fatalf("ProjectRun A: %v", err)
 	}
-	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+	if err := controller.CaptureCompletedSnapshots(t.Context()); err != nil {
 		t.Fatalf("CaptureCompletedSnapshots: %v", err)
 	}
 	snap, ok := store.GetAnalysisCohortSnapshotByBatch(10, "batch-projecting")
@@ -377,7 +374,7 @@ func TestControllerCaptureWaitsForProjectionDrain(t *testing.T) {
 	if err := controller.ProjectRun(runB.ID); err != nil {
 		t.Fatalf("ProjectRun B: %v", err)
 	}
-	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+	if err := controller.CaptureCompletedSnapshots(t.Context()); err != nil {
 		t.Fatalf("CaptureCompletedSnapshots after projection drain: %v", err)
 	}
 	snap, _ = store.GetAnalysisCohortSnapshotByBatch(10, "batch-projecting")
@@ -422,7 +419,7 @@ func TestControllerCaptureSkipsMixedProfileSnapshot(t *testing.T) {
 	if err := controller.ProjectRun(runB.ID); err != nil {
 		t.Fatalf("ProjectRun B: %v", err)
 	}
-	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+	if err := controller.CaptureCompletedSnapshots(t.Context()); err != nil {
 		t.Fatalf("CaptureCompletedSnapshots: %v", err)
 	}
 	snap, _ := store.GetAnalysisCohortSnapshotByBatch(10, "batch-mixed")
@@ -499,7 +496,7 @@ func TestControllerRebuildCohortRegeneratesSnapshotsPerBatch(t *testing.T) {
 	}
 
 	controller := NewController(store)
-	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+	if err := controller.RebuildCohort(t.Context(), 10); err != nil {
 		t.Fatalf("RebuildCohort: %v", err)
 	}
 
@@ -516,7 +513,7 @@ func TestControllerRebuildCohortRegeneratesSnapshotsPerBatch(t *testing.T) {
 	// Running rebuild a second time must still end with exactly the two
 	// batch-keyed snapshots - the (cohort, batch) natural key is
 	// idempotent.
-	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+	if err := controller.RebuildCohort(t.Context(), 10); err != nil {
 		t.Fatalf("RebuildCohort 2: %v", err)
 	}
 	snapshotsForCohort := 0
@@ -550,7 +547,7 @@ func TestControllerRebuildCohortSkipsNonIntentBatches(t *testing.T) {
 	store.tags[run2.DomainID] = []string{"tld"}
 
 	controller := NewController(store)
-	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+	if err := controller.RebuildCohort(t.Context(), 10); err != nil {
 		t.Fatalf("RebuildCohort: %v", err)
 	}
 
@@ -606,7 +603,7 @@ func TestControllerCapturePromotesDefaultOnIntent(t *testing.T) {
 	if err := controller.ProjectRun(run.ID); err != nil {
 		t.Fatalf("ProjectRun: %v", err)
 	}
-	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+	if err := controller.CaptureCompletedSnapshots(t.Context()); err != nil {
 		t.Fatalf("CaptureCompletedSnapshots: %v", err)
 	}
 
@@ -655,7 +652,7 @@ func TestControllerCaptureWithoutIntentLeavesDefaultUntouched(t *testing.T) {
 	if err := controller.ProjectRun(run.ID); err != nil {
 		t.Fatalf("ProjectRun: %v", err)
 	}
-	if err := controller.CaptureCompletedSnapshots(context.Background()); err != nil {
+	if err := controller.CaptureCompletedSnapshots(t.Context()); err != nil {
 		t.Fatalf("CaptureCompletedSnapshots: %v", err)
 	}
 
@@ -706,7 +703,7 @@ func TestControllerRebuildCohortFlagsMixedProfilesAcrossRuns(t *testing.T) {
 	store.tags[runB.DomainID] = []string{"tld"}
 
 	controller := NewController(store)
-	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+	if err := controller.RebuildCohort(t.Context(), 10); err != nil {
 		t.Fatalf("RebuildCohort: %v", err)
 	}
 
@@ -722,8 +719,7 @@ func TestControllerRebuildCohortFlagsMixedProfilesAcrossRuns(t *testing.T) {
 	}
 }
 
-// Rebuild captures oldest batch first, so captured_at keeps the cohort's
-// chronology instead of following random map order.
+// Rebuild captures the oldest batch first.
 func TestControllerRebuildCohortCapturesOldestBatchFirst(t *testing.T) {
 	store, _ := snapshotLifecycleStore(t)
 	batchIDs := []string{"batch-1", "batch-2", "batch-3", "batch-4"}
@@ -741,7 +737,7 @@ func TestControllerRebuildCohortCapturesOldestBatchFirst(t *testing.T) {
 	}
 
 	controller := NewController(store)
-	if err := controller.RebuildCohort(context.Background(), 10); err != nil {
+	if err := controller.RebuildCohort(t.Context(), 10); err != nil {
 		t.Fatalf("RebuildCohort: %v", err)
 	}
 

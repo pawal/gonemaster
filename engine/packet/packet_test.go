@@ -349,8 +349,7 @@ func TestUniquePushInvalidInputs(t *testing.T) {
 	}
 }
 
-// A wire response carries the EDNS header fields on the message, not on an OPT
-// in the additional section; a fixture-only test hides that.
+// A wire response carries the EDNS header fields on the message, not on an additional OPT.
 func TestEdnsHelpersAfterWireRoundTrip(t *testing.T) {
 	msg := new(dns.Msg)
 	msg.Response = true

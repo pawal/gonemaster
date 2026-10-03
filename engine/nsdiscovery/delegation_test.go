@@ -215,9 +215,8 @@ func TestZoneNameserversUndelegatedInBailiwickUsesProvidedGlue(t *testing.T) {
 	})
 	z := newZone(t, "example", r)
 
-	ns := nstest.NS(t, ctx, r, "ns1.example", "192.0.2.53")
 	queryCalls := 0
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "ns1.example", "192.0.2.53", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		queryCalls++
 		return packet.Packet{}, nil
 	})
@@ -246,9 +245,8 @@ func TestZoneNameserversUndelegatedRootUsesProvidedGlue(t *testing.T) {
 	}
 	z := newZone(t, ".", r)
 
-	ns := nstest.NS(t, ctx, r, "ns1", "192.0.2.53")
 	queryCalls := 0
-	ns.SetQueryHook(func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+	nstest.HookedNS(t, ctx, r, "ns1", "192.0.2.53", func(_ context.Context, _ string, _ string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
 		queryCalls++
 		return packet.Packet{}, nil
 	})

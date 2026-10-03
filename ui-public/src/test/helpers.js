@@ -53,7 +53,8 @@ export const errorResponse = (status, body = {}, headers = {}) => ({
 export const fetchRouter = (routes, fallback = jsonResponse([])) => {
   global.fetch = vi.fn().mockImplementation(async (url) => {
     for (const [match, response] of routes) {
-      if (String(url).includes(match)) return response;
+      // A function route value is called with the url on each matching request.
+      if (String(url).includes(match)) return typeof response === "function" ? response(url) : response;
     }
     return fallback;
   });

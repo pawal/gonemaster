@@ -49,7 +49,7 @@ func TestEnrichAddressAttachesNameserverCache(t *testing.T) {
 	rr := &recordingResolver{}
 	e := NewAsnlookupEnricher(rr, time.Minute)
 
-	e.EnrichAddress(context.Background(), "8.8.8.8")
+	e.EnrichAddress(t.Context(), "8.8.8.8")
 
 	ctxs := rr.contexts()
 	if len(ctxs) == 0 {
@@ -67,7 +67,7 @@ func TestEnrichASNLabelAttachesNameserverCache(t *testing.T) {
 	rr := &recordingResolver{}
 	e := NewAsnlookupEnricher(rr, time.Minute)
 
-	e.EnrichASNLabel(context.Background(), 15169)
+	e.EnrichASNLabel(t.Context(), 15169)
 
 	ctxs := rr.contexts()
 	if len(ctxs) == 0 {
@@ -89,20 +89,19 @@ func TestEnrichAddressCachesWithinTTL(t *testing.T) {
 	rr := &recordingResolver{}
 	e := NewAsnlookupEnricher(rr, time.Hour)
 
-	e.EnrichAddress(context.Background(), "8.8.8.8")
+	e.EnrichAddress(t.Context(), "8.8.8.8")
 	afterFirst := len(rr.contexts())
 	if afterFirst == 0 {
 		t.Fatal("first lookup never reached the resolver")
 	}
 
-	e.EnrichAddress(context.Background(), "8.8.8.8")
+	e.EnrichAddress(t.Context(), "8.8.8.8")
 	if afterSecond := len(rr.contexts()); afterSecond != afterFirst {
 		t.Fatalf("second lookup re-queried the resolver (%d calls vs %d); result was not cached", afterSecond, afterFirst)
 	}
 }
 
-// labelResolver answers every query with one canned packet, optionally held
-// until gate closes.
+// labelResolver answers every query with one canned packet, blocking on gate when set.
 type labelResolver struct {
 	calls  atomic.Int32
 	answer func() packet.Packet
@@ -148,18 +147,18 @@ func newLabelEnricher(t *testing.T, answer func() packet.Packet) (*AsnlookupEnri
 func TestEnrichASNLabelCachesFoundForTTL(t *testing.T) {
 	e, rr, clk := newLabelEnricher(t, foundLabel)
 
-	label, ok := e.EnrichASNLabel(context.Background(), 199973)
+	label, ok := e.EnrichASNLabel(t.Context(), 199973)
 	if !ok || label != "MIGR-AS - Migrationsverket, SE" {
 		t.Fatalf("label = %q, %v", label, ok)
 	}
 	first := rr.calls.Load()
 	clk.advance(30*24*time.Hour - time.Minute)
-	e.EnrichASNLabel(context.Background(), 199973)
+	e.EnrichASNLabel(t.Context(), 199973)
 	if got := rr.calls.Load(); got != first {
 		t.Fatalf("lookup inside the TTL made %d calls, want %d", got, first)
 	}
 	clk.advance(2 * time.Minute)
-	e.EnrichASNLabel(context.Background(), 199973)
+	e.EnrichASNLabel(t.Context(), 199973)
 	if got := rr.calls.Load(); got == first {
 		t.Fatal("lookup past the TTL was served from the cache")
 	}
@@ -177,17 +176,17 @@ func TestEnrichASNLabelNegativeTTLs(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			e, rr, clk := newLabelEnricher(t, tc.answer)
 
-			if _, ok := e.EnrichASNLabel(context.Background(), 64500); ok {
+			if _, ok := e.EnrichASNLabel(t.Context(), 64500); ok {
 				t.Fatal("expected no label")
 			}
 			first := rr.calls.Load()
 			clk.advance(tc.ttl - time.Second)
-			e.EnrichASNLabel(context.Background(), 64500)
+			e.EnrichASNLabel(t.Context(), 64500)
 			if got := rr.calls.Load(); got != first {
 				t.Fatalf("lookup inside %s made %d calls, want %d", tc.ttl, got, first)
 			}
 			clk.advance(2 * time.Second)
-			e.EnrichASNLabel(context.Background(), 64500)
+			e.EnrichASNLabel(t.Context(), 64500)
 			if got := rr.calls.Load(); got == first {
 				t.Fatalf("lookup past %s was served from the cache", tc.ttl)
 			}
@@ -197,12 +196,12 @@ func TestEnrichASNLabelNegativeTTLs(t *testing.T) {
 
 func TestEnrichASNLabelCanceledNotCached(t *testing.T) {
 	e, rr, _ := newLabelEnricher(t, failedLabel)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
 	e.EnrichASNLabel(ctx, 64500)
 	first := rr.calls.Load()
-	e.EnrichASNLabel(context.Background(), 64500)
+	e.EnrichASNLabel(t.Context(), 64500)
 	if got := rr.calls.Load(); got == first {
 		t.Fatal("a canceled lookup was cached")
 	}
@@ -217,7 +216,7 @@ func TestEnrichASNLabelSingleFlight(t *testing.T) {
 		labels := make(chan string, n)
 		for range n {
 			go func() {
-				label, _ := e.EnrichASNLabel(context.Background(), 199973)
+				label, _ := e.EnrichASNLabel(t.Context(), 199973)
 				labels <- label
 			}()
 		}

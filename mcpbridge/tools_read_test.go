@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/url"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -59,9 +60,7 @@ func TestTestDomainSucceeds(t *testing.T) {
 		},
 	})
 
-	orig := pollInterval
-	pollInterval = 5 * time.Millisecond
-	defer func() { pollInterval = orig }()
+	stub(t, &pollInterval, 5*time.Millisecond)
 
 	var out testResult
 	res := callTool(t, api, "test_domain", map[string]any{"domain": "example.com"}, &out)
@@ -85,10 +84,8 @@ func TestTestDomainSucceeds(t *testing.T) {
 func TestTestDomainTimeout(t *testing.T) {
 	api := fakeAPI(t, apitest.Opts{PollsUntilDone: 1 << 30}) // never terminal
 
-	origP, origT := pollInterval, defaultTestTimeout
-	pollInterval = 5 * time.Millisecond
-	defaultTestTimeout = 40 * time.Millisecond
-	defer func() { pollInterval = origP; defaultTestTimeout = origT }()
+	stub(t, &pollInterval, 5*time.Millisecond)
+	stub(t, &defaultTestTimeout, 40*time.Millisecond)
 
 	res := callTool(t, api, "test_domain", map[string]any{"domain": "example.com"}, nil)
 	if !res.IsError {
@@ -282,9 +279,7 @@ func TestRunGetForwardsToken(t *testing.T) {
 
 func TestTestDomainExposesPublicAndBatchID(t *testing.T) {
 	api := fakeAPI(t, apitest.Opts{PollsUntilDone: 1, JobPublicID: "Ab3xZ9k0", JobBatchID: "b9"})
-	orig := pollInterval
-	pollInterval = 5 * time.Millisecond
-	defer func() { pollInterval = orig }()
+	stub(t, &pollInterval, 5*time.Millisecond)
 
 	var out testResult
 	res := callTool(t, api, "test_domain", map[string]any{"domain": "example.com"}, &out)
@@ -299,9 +294,7 @@ func TestTestDomainExposesPublicAndBatchID(t *testing.T) {
 func TestTestDomainForwardsLang(t *testing.T) {
 	var captured url.Values
 	api := fakeAPI(t, apitest.Opts{PollsUntilDone: 1, ResultQuery: &captured, Result: &apitest.Result{JobID: "job_1", Status: "succeeded"}})
-	orig := pollInterval
-	pollInterval = 5 * time.Millisecond
-	defer func() { pollInterval = orig }()
+	stub(t, &pollInterval, 5*time.Millisecond)
 
 	callTool(t, api, "test_domain", map[string]any{"domain": "example.com", "lang": "sv"}, nil)
 	if captured.Get("locale") != "sv" {
@@ -311,16 +304,19 @@ func TestTestDomainForwardsLang(t *testing.T) {
 
 func TestTestDomainSendsProgress(t *testing.T) {
 	api := fakeAPI(t, apitest.Opts{PollsUntilDone: 2})
-	orig := pollInterval
-	pollInterval = 5 * time.Millisecond
-	defer func() { pollInterval = orig }()
+	stub(t, &pollInterval, 5*time.Millisecond)
 
 	var mu sync.Mutex
 	var got []float64
+	// second closes when the second notification has arrived.
+	second := make(chan struct{})
 	opts := &mcp.ClientOptions{ProgressNotificationHandler: func(_ context.Context, r *mcp.ProgressNotificationClientRequest) {
 		mu.Lock()
+		defer mu.Unlock()
 		got = append(got, r.Params.Progress)
-		mu.Unlock()
+		if len(got) == 2 {
+			close(second)
+		}
 	}}
 	mcptest.SessionOpts(t, newMCPServer(api, false), opts, func(ctx context.Context, s *mcp.ClientSession) {
 		params := &mcp.CallToolParams{Name: "test_domain", Arguments: map[string]any{"domain": "example.com"}}
@@ -329,20 +325,15 @@ func TestTestDomainSendsProgress(t *testing.T) {
 		if err != nil || res.IsError {
 			t.Fatalf("test_domain: %v %s", err, errorText(res))
 		}
-		deadline := time.Now().Add(time.Second)
-		for {
-			mu.Lock()
-			n := len(got)
-			mu.Unlock()
-			if n >= 2 || time.Now().After(deadline) {
-				break
-			}
-			time.Sleep(time.Millisecond)
+		select {
+		case <-second:
+		case <-ctx.Done():
+			t.Fatalf("second progress notification never arrived: %v", ctx.Err())
 		}
 	})
 	mu.Lock()
 	defer mu.Unlock()
-	if len(got) != 2 || got[0] != 50 || got[1] != 100 {
+	if !slices.Equal(got, []float64{50, 100}) {
 		t.Errorf("progress = %v, want [50 100]", got)
 	}
 }

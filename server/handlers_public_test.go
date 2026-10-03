@@ -593,16 +593,7 @@ func TestPublicGetResolvesEightCharacterPublicID(t *testing.T) {
 
 func TestPublicGetResultOmitsInternalIDs(t *testing.T) {
 	srv := newTestServer(t)
-	created, err := srv.store.Create(Job{
-		ID: newID("job"), BatchID: "batch-1", Domain: "example.com",
-		Status: JobSucceeded, CreatedAt: time.Now().UTC(), Progress: 100,
-	})
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
-	if err := srv.store.GraduateJob(created, nil); err != nil {
-		t.Fatalf("GraduateJob: %v", err)
-	}
+	created := seedGraduatedRun(t, srv.store, runSpec{BatchID: "batch-1", Domain: "example.com", Status: JobSucceeded, Progress: 100})
 
 	resp := doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil)
 
@@ -642,17 +633,11 @@ func TestAdminCreateJobAcceptsDebugMinLevel(t *testing.T) {
 
 func TestPublicGetResultRedactsLocalEndpoint(t *testing.T) {
 	srv := newTestServer(t)
-	created, err := srv.store.Create(Job{ID: newID("job"), Domain: "example.com", Status: JobSucceeded, CreatedAt: time.Now().UTC(), Progress: 100})
-	if err != nil {
-		t.Fatalf("Create: %v", err)
-	}
 	const exception = "read udp 10.0.0.5:61329->192.0.2.1:53: i/o timeout"
-	if err := srv.store.GraduateJob(created, []engine.LogEntry{
+	created := seedGraduatedRun(t, srv.store, runSpec{Domain: "example.com", Status: JobSucceeded, Progress: 100, Entries: []engine.LogEntry{
 		{Module: "SYSTEM", Tag: "EXTERNAL_RESPONSE", Level: "DEBUG3", Args: map[string]any{"exception": exception}},
 		{Module: "SYSTEM", Tag: "EXTERNAL_RESPONSE", Level: "DEBUG3", Args: map[string]any{"exception": "read udp [fd00::5]:5300->[2001:db8::1]:53: i/o timeout"}},
-	}); err != nil {
-		t.Fatalf("GraduateJob: %v", err)
-	}
+	}})
 
 	result := mustJSON[JobResult](t, doJSON(t, srv, http.MethodGet, "/pub/api/v1/jobs/"+created.PublicID+"/result", nil), http.StatusOK)
 	if result.Raw == nil || len(result.Raw.Entries) != 2 {

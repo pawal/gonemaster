@@ -2,6 +2,7 @@ package dnssec
 
 import (
 	"context"
+	"maps"
 	"slices"
 	"strings"
 	"testing"
@@ -58,22 +59,16 @@ func (f *ds23Fixture) params(records ...*dns.NSEC3PARAM) {
 	f.answers[ds22Key("example", "NSEC3PARAM")] = tctest.Response(opts...)
 }
 
-// run runs DNSSEC23 on zone "example"; specs are "name" or "name/address", address 192.0.2.10 by default.
+// run runs DNSSEC23 on zone "example" delegated to the "name/address" specs.
 func (f *ds23Fixture) run(t *testing.T, ctx context.Context, specs ...string) []*logger.Entry {
 	t.Helper()
 	return ds23Run(t, ctx, "example", specs...)
 }
 
-func ds23Run(t *testing.T, ctx context.Context, zoneName string, specs ...string) []*logger.Entry {
+// ds23Zone stubs the delegation of zoneName to the "name/address" specs and returns the zone.
+func ds23Zone(t *testing.T, zoneName string, specs ...string) *zone.Zone {
 	t.Helper()
-	items := make([]nsdiscovery.NSItem, 0, len(specs))
-	for _, spec := range specs {
-		name, address, found := strings.Cut(spec, "/")
-		if !found {
-			address = "192.0.2.10"
-		}
-		items = append(items, tctest.NSItem(name, address))
-	}
+	items := tctest.NSItems(specs...)
 	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
 		return items, nil
 	})
@@ -84,7 +79,13 @@ func ds23Run(t *testing.T, ctx context.Context, zoneName string, specs ...string
 	if err != nil {
 		t.Fatalf("zone new: %v", err)
 	}
-	entries, err := DNSSEC23(ctx, &z)
+	return &z
+}
+
+// ds23Run runs DNSSEC23 on zoneName delegated to the "name/address" specs.
+func ds23Run(t *testing.T, ctx context.Context, zoneName string, specs ...string) []*logger.Entry {
+	t.Helper()
+	entries, err := DNSSEC23(ctx, ds23Zone(t, zoneName, specs...))
 	if err != nil {
 		t.Fatalf("DNSSEC23: %v", err)
 	}
@@ -93,11 +94,9 @@ func ds23Run(t *testing.T, ctx context.Context, zoneName string, specs ...string
 
 // ds23NSEC3 builds an NSEC3 owned by hash below zoneName, with no salt and no iterations.
 func ds23NSEC3(hash string, zoneName string, next string) *dns.NSEC3 {
-	rr := &dns.NSEC3{Hdr: dns.Header{Name: dnsutil.Fqdn(hash + "." + zoneName), Class: dns.ClassINET, TTL: 60}}
-	rr.Hash = dns.SHA1
+	rr := nsec3At(hash+"."+zoneName, "", 0, dns.TypeRRSIG)
 	rr.HashLength = uint8(len(next))
 	rr.NextDomain = next
-	rr.TypeBitMap = []uint16{dns.TypeRRSIG}
 	return rr
 }
 
@@ -108,10 +107,10 @@ func ds23Salted(rr *dns.NSEC3, salt string) *dns.NSEC3 {
 	return rr
 }
 
+// ds23NSEC builds an NSEC from owner to next.
 func ds23NSEC(owner string, next string) *dns.NSEC {
-	rr := &dns.NSEC{Hdr: dns.Header{Name: dnsutil.Fqdn(owner), Class: dns.ClassINET, TTL: 60}}
+	rr := nsecRecord(owner, dns.TypeRRSIG, dns.TypeNSEC)
 	rr.NextDomain = dnsutil.Fqdn(next)
-	rr.TypeBitMap = []uint16{dns.TypeRRSIG, dns.TypeNSEC}
 	return rr
 }
 
@@ -141,46 +140,57 @@ func correctProof() []dns.RR {
 	}
 }
 
-func TestDNSSEC23DuplicateNext(t *testing.T) {
-	ctx := tctest.Context(t)
-	f := newDS23Fixture(t)
-	f.signed()
-	f.denial(observedProof()...)
-	f.params(ds23Param(""))
-	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
-
-	entries := f.run(t, ctx, "ns1.example")
-	entry := tctest.RequireTag(t, entries, "DS23_NSEC3_DUPLICATE_NEXT")
-	tctest.RequireArg(t, entry, "owner", "thoko93k5mkqlce0n2o6nhvd09pnauk6.example")
-	tctest.RequireArg(t, entry, "covered", "tjtj5216ai7cv24b18s4flf9vlmf94rv.example")
-	tctest.RequireArg(t, entry, "next", "VIU5GCJLL1UM20BO5HN6N3TIO5JV0O9D")
-	tctest.RequireCount(t, entries, "DS23_NSEC3_DUPLICATE_NEXT", 1)
-	tctest.RequireNoTag(t, entries, "DS23_NSEC3_RANGES_OVERLAP", "DS23_DENIAL_PROOF_CONSISTENT")
-	for _, want := range []string{"example/DNSKEY", ds23Probe + "/A", "example/NSEC3PARAM"} {
-		if got := f.counts[want]; got != 1 {
-			t.Fatalf("%s questions = %d, want 1", want, got)
-		}
+func TestDNSSEC23ChainErrors(t *testing.T) {
+	cases := []struct {
+		name    string
+		denial  []dns.RR
+		params  []*dns.NSEC3PARAM
+		tag     string
+		owner   string
+		covered string
+		next    string
+		absent  []string
+		counts  map[string]int
+	}{
+		{name: "NSEC3 duplicate next", denial: observedProof(), params: []*dns.NSEC3PARAM{ds23Param("")},
+			tag: "DS23_NSEC3_DUPLICATE_NEXT", owner: "thoko93k5mkqlce0n2o6nhvd09pnauk6.example",
+			covered: "tjtj5216ai7cv24b18s4flf9vlmf94rv.example", next: "VIU5GCJLL1UM20BO5HN6N3TIO5JV0O9D",
+			absent: []string{"DS23_NSEC3_RANGES_OVERLAP", "DS23_DENIAL_PROOF_CONSISTENT"},
+			counts: map[string]int{"example/DNSKEY": 1, ds23Probe + "/A": 1, "example/NSEC3PARAM": 1}},
+		{name: "NSEC3 ranges overlap", denial: []dns.RR{ds23NSEC3("aaaa", "example", "CCCC"),
+			ds23NSEC3("bbbb", "example", "DDDD"), ds23NSEC3("dddd", "example", "AAAA")},
+			params: []*dns.NSEC3PARAM{ds23Param("")}, tag: "DS23_NSEC3_RANGES_OVERLAP",
+			owner: "aaaa.example", covered: "bbbb.example", next: "CCCC",
+			absent: []string{"DS23_NSEC3_DUPLICATE_NEXT", "DS23_DENIAL_PROOF_CONSISTENT"}},
+		{name: "NSEC ranges overlap", denial: []dns.RR{ds23NSEC("example", "m.example"), ds23NSEC("b.example", "z.example")},
+			tag: "DS23_NSEC_RANGES_OVERLAP", owner: "example", covered: "b.example", next: "m.example",
+			absent: []string{"DS23_DENIAL_PROOF_CONSISTENT"}},
 	}
-}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			f := newDS23Fixture(t)
+			f.signed()
+			f.denial(tc.denial...)
+			if tc.params != nil {
+				f.params(tc.params...)
+			}
+			ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-func TestDNSSEC23NSEC3RangesOverlap(t *testing.T) {
-	ctx := tctest.Context(t)
-	f := newDS23Fixture(t)
-	f.signed()
-	f.denial(
-		ds23NSEC3("aaaa", "example", "CCCC"),
-		ds23NSEC3("bbbb", "example", "DDDD"),
-		ds23NSEC3("dddd", "example", "AAAA"))
-	f.params(ds23Param(""))
-	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
-
-	entries := f.run(t, ctx, "ns1.example")
-	entry := tctest.RequireTag(t, entries, "DS23_NSEC3_RANGES_OVERLAP")
-	tctest.RequireArg(t, entry, "owner", "aaaa.example")
-	tctest.RequireArg(t, entry, "next", "CCCC")
-	tctest.RequireArg(t, entry, "covered", "bbbb.example")
-	tctest.RequireCount(t, entries, "DS23_NSEC3_RANGES_OVERLAP", 1)
-	tctest.RequireNoTag(t, entries, "DS23_NSEC3_DUPLICATE_NEXT", "DS23_DENIAL_PROOF_CONSISTENT")
+			entries := f.run(t, ctx, "ns1.example/192.0.2.10")
+			entry := tctest.RequireTag(t, entries, tc.tag)
+			tctest.RequireArg(t, entry, "owner", tc.owner)
+			tctest.RequireArg(t, entry, "covered", tc.covered)
+			tctest.RequireArg(t, entry, "next", tc.next)
+			tctest.RequireCount(t, entries, tc.tag, 1)
+			tctest.RequireNoTag(t, entries, tc.absent...)
+			for want, n := range tc.counts {
+				if got := f.counts[want]; got != n {
+					t.Fatalf("%s questions = %d, want %d", want, got, n)
+				}
+			}
+		})
+	}
 }
 
 func TestDNSSEC23ConsistentNSEC3(t *testing.T) {
@@ -207,7 +217,7 @@ func TestDNSSEC23ConsistentNSEC3(t *testing.T) {
 			f.params(ds23Param(""))
 			ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-			entries := f.run(t, ctx, "ns1.example")
+			entries := f.run(t, ctx, "ns1.example/192.0.2.10")
 			entry := tctest.RequireTag(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
 			if got := tctest.ServerEndpoints(t, entry.Args); !slices.Equal(got, []string{"ns1.example/192.0.2.10"}) {
 				t.Fatalf("servers = %v, want the one nameserver", got)
@@ -226,28 +236,12 @@ func TestDNSSEC23ConsistentNSEC(t *testing.T) {
 		ds23NSEC("xwin.example", "example"))
 	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-	entries := f.run(t, ctx, "ns1.example")
+	entries := f.run(t, ctx, "ns1.example/192.0.2.10")
 	tctest.RequireTags(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
 	tctest.RequireNoTag(t, entries, ds23ErrorTags...)
 	if got := f.counts["example/NSEC3PARAM"]; got != 0 {
 		t.Fatalf("NSEC3PARAM questions = %d, want 0", got)
 	}
-}
-
-func TestDNSSEC23NSECRangesOverlap(t *testing.T) {
-	ctx := tctest.Context(t)
-	f := newDS23Fixture(t)
-	f.signed()
-	f.denial(ds23NSEC("example", "m.example"), ds23NSEC("b.example", "z.example"))
-	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
-
-	entries := f.run(t, ctx, "ns1.example")
-	entry := tctest.RequireTag(t, entries, "DS23_NSEC_RANGES_OVERLAP")
-	tctest.RequireArg(t, entry, "owner", "example")
-	tctest.RequireArg(t, entry, "next", "m.example")
-	tctest.RequireArg(t, entry, "covered", "b.example")
-	tctest.RequireCount(t, entries, "DS23_NSEC_RANGES_OVERLAP", 1)
-	tctest.RequireNoTag(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
 }
 
 func TestDNSSEC23MixedParameters(t *testing.T) {
@@ -261,7 +255,7 @@ func TestDNSSEC23MixedParameters(t *testing.T) {
 	f.params(ds23Param("0011"), ds23Param("2233"))
 	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-	entries := f.run(t, ctx, "ns1.example")
+	entries := f.run(t, ctx, "ns1.example/192.0.2.10")
 	tctest.RequireTags(t, entries, "DS23_NSEC3_MIXED_PARAMETERS", "DS23_MULTIPLE_NSEC3PARAM")
 	tctest.RequireNoTag(t, entries, "DS23_NSEC3_DUPLICATE_NEXT", "DS23_NSEC3_RANGES_OVERLAP",
 		"DS23_NSEC3_CHAIN_NOT_PUBLISHED", "DS23_DENIAL_PROOF_CONSISTENT")
@@ -271,9 +265,15 @@ func TestDNSSEC23ChainNotPublished(t *testing.T) {
 	cases := []struct {
 		name   string
 		params func(f *ds23Fixture)
+		want   string
+		absent []string
 	}{
-		{"other salt", func(f *ds23Fixture) { f.params(ds23Param("AABB")) }},
-		{"no NSEC3PARAM", func(f *ds23Fixture) { f.params() }},
+		{"other salt", func(f *ds23Fixture) { f.params(ds23Param("AABB")) },
+			"DS23_NSEC3_CHAIN_NOT_PUBLISHED", []string{"DS23_DENIAL_PROOF_CONSISTENT"}},
+		{"no NSEC3PARAM", func(f *ds23Fixture) { f.params() },
+			"DS23_NSEC3_CHAIN_NOT_PUBLISHED", []string{"DS23_DENIAL_PROOF_CONSISTENT"}},
+		{"NSEC3PARAM unanswered", func(*ds23Fixture) {},
+			"DS23_DENIAL_PROOF_CONSISTENT", []string{"DS23_NSEC3_CHAIN_NOT_PUBLISHED", "DS23_MULTIPLE_NSEC3PARAM"}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -284,23 +284,11 @@ func TestDNSSEC23ChainNotPublished(t *testing.T) {
 			tc.params(f)
 			ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-			entries := f.run(t, ctx, "ns1.example")
-			tctest.RequireTags(t, entries, "DS23_NSEC3_CHAIN_NOT_PUBLISHED")
-			tctest.RequireNoTag(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
+			entries := f.run(t, ctx, "ns1.example/192.0.2.10")
+			tctest.RequireTags(t, entries, tc.want)
+			tctest.RequireNoTag(t, entries, tc.absent...)
 		})
 	}
-
-	t.Run("NSEC3PARAM unanswered", func(t *testing.T) {
-		ctx := tctest.Context(t)
-		f := newDS23Fixture(t)
-		f.signed()
-		f.denial(correctProof()...)
-		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
-
-		entries := f.run(t, ctx, "ns1.example")
-		tctest.RequireTags(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
-		tctest.RequireNoTag(t, entries, "DS23_NSEC3_CHAIN_NOT_PUBLISHED", "DS23_MULTIPLE_NSEC3PARAM")
-	})
 }
 
 func TestDNSSEC23MultipleNSEC3PARAM(t *testing.T) {
@@ -311,7 +299,7 @@ func TestDNSSEC23MultipleNSEC3PARAM(t *testing.T) {
 	f.params(ds23Param(""), ds23Param("AABB"))
 	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-	entries := f.run(t, ctx, "ns1.example")
+	entries := f.run(t, ctx, "ns1.example/192.0.2.10")
 	tctest.RequireTags(t, entries, "DS23_MULTIPLE_NSEC3PARAM", "DS23_DENIAL_PROOF_CONSISTENT")
 	tctest.RequireNoTag(t, entries, ds23ErrorTags...)
 }
@@ -326,39 +314,37 @@ func TestDNSSEC23CompactDenial(t *testing.T) {
 		tctest.Authority(tctest.SOARR("example"), nsec))
 	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-	entries := f.run(t, ctx, "ns1.example")
+	entries := f.run(t, ctx, "ns1.example/192.0.2.10")
 	tctest.RequireTags(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
 	tctest.RequireNoTag(t, entries, ds23ErrorTags...)
 }
 
 // A wildcard expansion carries the proof in its authority section and is read.
 func TestDNSSEC23WildcardExpansion(t *testing.T) {
-	t.Run("consistent", func(t *testing.T) {
-		ctx := tctest.Context(t)
-		f := newDS23Fixture(t)
-		f.signed()
-		f.answers[ds22Key(ds23Probe, "A")] = tctest.Response(tctest.Question(ds23Probe, dns.TypeA), tctest.Secure(),
-			tctest.Answers(tctest.ARR(ds23Probe, "192.0.2.1")), tctest.Authority(correctProof()[0]))
-		f.params(ds23Param(""))
-		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
+	cases := []struct {
+		name   string
+		proof  []dns.RR
+		want   string
+		absent []string
+	}{
+		{"consistent", correctProof()[:1], "DS23_DENIAL_PROOF_CONSISTENT", ds23ErrorTags},
+		{"duplicate next", observedProof(), "DS23_NSEC3_DUPLICATE_NEXT", nil},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := tctest.Context(t)
+			f := newDS23Fixture(t)
+			f.signed()
+			f.answers[ds22Key(ds23Probe, "A")] = tctest.Response(tctest.Question(ds23Probe, dns.TypeA), tctest.Secure(),
+				tctest.Answers(tctest.ARR(ds23Probe, "192.0.2.1")), tctest.Authority(tc.proof...))
+			f.params(ds23Param(""))
+			ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-		entries := f.run(t, ctx, "ns1.example")
-		tctest.RequireTags(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
-		tctest.RequireNoTag(t, entries, ds23ErrorTags...)
-	})
-
-	t.Run("duplicate next", func(t *testing.T) {
-		ctx := tctest.Context(t)
-		f := newDS23Fixture(t)
-		f.signed()
-		f.answers[ds22Key(ds23Probe, "A")] = tctest.Response(tctest.Question(ds23Probe, dns.TypeA), tctest.Secure(),
-			tctest.Answers(tctest.ARR(ds23Probe, "192.0.2.1")), tctest.Authority(observedProof()...))
-		f.params(ds23Param(""))
-		ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
-
-		entries := f.run(t, ctx, "ns1.example")
-		tctest.RequireTags(t, entries, "DS23_NSEC3_DUPLICATE_NEXT")
-	})
+			entries := f.run(t, ctx, "ns1.example/192.0.2.10")
+			tctest.RequireTags(t, entries, tc.want)
+			tctest.RequireNoTag(t, entries, tc.absent...)
+		})
+	}
 }
 
 func TestDNSSEC23UnsignedZoneIsSilent(t *testing.T) {
@@ -367,7 +353,7 @@ func TestDNSSEC23UnsignedZoneIsSilent(t *testing.T) {
 	f.denial(observedProof()...)
 	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-	entries := f.run(t, ctx, "ns1.example")
+	entries := f.run(t, ctx, "ns1.example/192.0.2.10")
 	if tags := tctest.TagsWithPrefix(entries, "DS23_"); len(tags) != 0 {
 		t.Fatalf("tags = %v, want none", tags)
 	}
@@ -394,7 +380,7 @@ func TestDNSSEC23NoDenialProof(t *testing.T) {
 			f.denial(tc.authority...)
 			ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-			entries := f.run(t, ctx, "ns1.example")
+			entries := f.run(t, ctx, "ns1.example/192.0.2.10")
 			entry := tctest.RequireTag(t, entries, "DS23_NO_DENIAL_PROOF")
 			if got := tctest.ServerEndpoints(t, entry.Args); !slices.Equal(got, []string{"ns1.example/192.0.2.10"}) {
 				t.Fatalf("servers = %v, want the one nameserver", got)
@@ -427,7 +413,7 @@ func TestDNSSEC23UnusableResponse(t *testing.T) {
 			f.answers[ds22Key(ds23Probe, "A")] = tc.answer
 			ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-			entries := f.run(t, ctx, "ns1.example")
+			entries := f.run(t, ctx, "ns1.example/192.0.2.10")
 			if tags := tctest.TagsWithPrefix(entries, "DS23_"); len(tags) != 0 {
 				t.Fatalf("tags = %v, want none", tags)
 			}
@@ -443,7 +429,7 @@ func TestDNSSEC23PerServerDisagreement(t *testing.T) {
 	f.params(ds23Param(""))
 	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-	healthy := &ds23Fixture{answers: (&ds22Fixture{answers: f.answers}).copyAnswers()}
+	healthy := &ds23Fixture{answers: maps.Clone(f.answers)}
 	healthy.denial(correctProof()...)
 	ds22Server(t, ctx, "ns2.example", "192.0.2.11", healthy.answers, nil)
 
@@ -464,7 +450,7 @@ func TestDNSSEC23SharedAddress(t *testing.T) {
 	f.params(ds23Param(""))
 	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
 
-	entries := f.run(t, ctx, "ns1.example", "ns2.example")
+	entries := f.run(t, ctx, "ns1.example/192.0.2.10", "ns2.example/192.0.2.10")
 	entry := tctest.RequireTag(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
 	if got := tctest.ServerEndpoints(t, entry.Args); !slices.Equal(got, []string{"ns1.example/192.0.2.10", "ns2.example/192.0.2.10"}) {
 		t.Fatalf("servers = %v, want both names", got)
@@ -505,7 +491,7 @@ func TestDNSSEC23RootZone(t *testing.T) {
 		tctest.Authority(ds23NSEC(".", "aaa."), ds23NSEC("xn--gk3at1e.", "xn--h2breg3eve.")))
 	ds22Server(t, ctx, "a.root-servers.net", "192.0.2.10", f.answers, f.counts)
 
-	entries := ds23Run(t, ctx, ".", "a.root-servers.net")
+	entries := ds23Run(t, ctx, ".", "a.root-servers.net/192.0.2.10")
 	tctest.RequireTags(t, entries, "DS23_DENIAL_PROOF_CONSISTENT")
 	tctest.RequireNoTag(t, entries, ds23ErrorTags...)
 	if got := f.counts["xn--gonemaster-dnssec23/A"]; got != 1 {
@@ -588,21 +574,11 @@ func TestDNSSEC23ReusesDNSSEC10Queries(t *testing.T) {
 	f.answers[ds22Key("example", "NSEC")] = tctest.Response(tctest.Question("example", dns.TypeNSEC), tctest.Secure(),
 		tctest.Authority(tctest.SOARR("example"), correctProof()[0]))
 	ds22Server(t, ctx, "ns1.example", "192.0.2.10", f.answers, f.counts)
-	items := []nsdiscovery.NSItem{tctest.NSItem("ns1.example", "192.0.2.10")}
-	tctest.Stub(t, &delegationNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return items, nil
-	})
-	tctest.Stub(t, &zoneNameservers, func(_ context.Context, _ *zone.Zone) ([]nsdiscovery.NSItem, error) {
-		return nil, nil
-	})
-	z, err := zone.New("example")
-	if err != nil {
-		t.Fatalf("zone new: %v", err)
-	}
-	if _, err := DNSSEC10(ctx, &z); err != nil {
+	z := ds23Zone(t, "example", "ns1.example/192.0.2.10")
+	if _, err := DNSSEC10(ctx, z); err != nil {
 		t.Fatalf("DNSSEC10: %v", err)
 	}
-	entries, err := DNSSEC23(ctx, &z)
+	entries, err := DNSSEC23(ctx, z)
 	if err != nil {
 		t.Fatalf("DNSSEC23: %v", err)
 	}

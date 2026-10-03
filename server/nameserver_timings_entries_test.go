@@ -60,10 +60,11 @@ func TestChildNameserversFromEntriesReadsDelegation01ChildTags(t *testing.T) {
 
 func TestCollectNameserverTimingsUsesRunEntriesBeforeLookup(t *testing.T) {
 	called := false
-	s := &Server{delegationLookup: func(context.Context, string) DelegationInfo {
+	s := newTestServer(t)
+	s.delegationLookup = func(context.Context, string) DelegationInfo {
 		called = true
 		return DelegationInfo{Nameservers: []DelegationNS{{NS: "ns7.example.test", IP: "192.0.2.7"}}}
-	}}
+	}
 	queryTimings := map[string][]time.Duration{
 		"ns1.example.test/192.0.2.1":    {10 * time.Millisecond},
 		"ns2.example.test/192.0.2.2":    {20 * time.Millisecond},
@@ -94,10 +95,11 @@ func TestCollectNameserverTimingsUsesRunEntriesBeforeLookup(t *testing.T) {
 
 func TestCollectNameserverTimingsFallsBackToLookupWithoutChildTags(t *testing.T) {
 	called := false
-	s := &Server{delegationLookup: func(context.Context, string) DelegationInfo {
+	s := newTestServer(t)
+	s.delegationLookup = func(context.Context, string) DelegationInfo {
 		called = true
 		return DelegationInfo{Nameservers: []DelegationNS{{NS: "ns1.example.test", IP: "192.0.2.1"}}}
-	}}
+	}
 	entries := []engine.LogEntry{{Testcase: "Delegation01", Tag: "ENOUGH_NS_DEL", Args: map[string]any{
 		"servers": []map[string]any{{"ns": "ns1.example.test"}},
 	}}}
@@ -114,10 +116,9 @@ func TestCollectNameserverTimingsFallsBackToLookupWithoutChildTags(t *testing.T)
 
 func TestCollectNameserverTimingsWarnsWhenNoChildSetIsKnown(t *testing.T) {
 	var buf bytes.Buffer
-	s := &Server{
-		logger:           slog.New(slog.NewTextHandler(&buf, nil)),
-		delegationLookup: func(context.Context, string) DelegationInfo { return DelegationInfo{} },
-	}
+	s := newTestServer(t)
+	s.logger = slog.New(slog.NewTextHandler(&buf, nil))
+	s.delegationLookup = func(context.Context, string) DelegationInfo { return DelegationInfo{} }
 	queryTimings := map[string][]time.Duration{"ns1.example.test/192.0.2.1": {10 * time.Millisecond}}
 
 	got := s.collectNameserverTimings(Job{ID: "job-1", Domain: "example.test"}, queryTimings, nil, nil, nil)

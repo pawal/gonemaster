@@ -20,8 +20,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
-// rootFixture is a root (a.root.test) referring names to the deepest cut in
-// delegate, and servers answering A by default; queries are counted per server.
+// rootFixture is a root referring names to the deepest cut in delegate, with counting A servers.
 type rootFixture struct {
 	r          *Recursor
 	ttl        uint32
@@ -151,8 +150,7 @@ func TestRecurseStartsAtCachedTLDReferral(t *testing.T) {
 	}
 }
 
-// Address lookups and out-of-bailiwick CNAME restarts also start at the cache;
-// the root is only asked for the "other" referral.
+// Address lookups and out-of-bailiwick CNAME restarts start at the cache, not the root.
 func TestRootStartedLookupsUseCachedReferral(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	f := newRootFixture(t, ctx, 3600)
@@ -223,8 +221,7 @@ func TestReferralCacheHonoursTTL(t *testing.T) {
 	})
 }
 
-// A cached TLD server that goes silent sends the lookup back to the root,
-// which now refers to ns2.example; the cache must pick up the new referral.
+// A silent cached TLD server sends the lookup back to the root, refreshing the cached referral.
 func TestRecurseFallsBackToRootWhenCachedServersFail(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	f := newRootFixture(t, ctx, 3600)
@@ -283,8 +280,7 @@ func TestReferralCacheClearedWhenRootChanges(t *testing.T) {
 	}
 }
 
-// Parent reads the parent zone from the referrals it walks, so it always starts
-// at the root; an explicit server set is asked directly.
+// Parent always starts at the root; an explicit server set is asked directly.
 func TestParentAndExplicitNameserversBypassReferralCache(t *testing.T) {
 	ctx, _, _ := testhelpers.Context(t)
 	f := newRootFixture(t, ctx, 3600)
@@ -334,8 +330,7 @@ func TestRecurseCachesRootReferralBelowTLD(t *testing.T) {
 	}
 }
 
-// Cold lookups under one TLD started together ask the root once; the others
-// wait for that referral while the root is held.
+// Concurrent cold lookups under one TLD ask the root once and the rest wait for that referral.
 func TestConcurrentLookupsShareOneRootReferral(t *testing.T) {
 	synctest.Test(t, func(t *testing.T) {
 		ctx, _, _ := testhelpers.Context(t)
@@ -369,8 +364,7 @@ func TestConcurrentLookupsShareOneRootReferral(t *testing.T) {
 	})
 }
 
-// A root CNAME into the same TLD must not wait on the walk's own claim; synctest
-// reports that wait as a deadlock. Both modes reach resolveCNAME differently.
+// A root CNAME into the same TLD does not wait on the walk's own claim, in either fan-out mode.
 func TestRootCNAMEDoesNotWaitOnOwnClaim(t *testing.T) {
 	for _, unordered := range []bool{true, false} {
 		t.Run(map[bool]string{true: "unordered", false: "ordered"}[unordered], func(t *testing.T) {
@@ -394,8 +388,7 @@ func TestRootCNAMEDoesNotWaitOnOwnClaim(t *testing.T) {
 	}
 }
 
-// A waiter goes to the root itself once referralWaitLimit passes, and a claim
-// that ends without a referral lets all waiters go to the root together.
+// A waiter goes to the root after referralWaitLimit or when the claim ends without a referral.
 func TestReferralWaitIsBoundedAndOneShot(t *testing.T) {
 	t.Run("bounded", func(t *testing.T) {
 		synctest.Test(t, func(t *testing.T) {

@@ -15,8 +15,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/packet"
 )
 
-// onePathRoot is a root server in the one-path fixture; broken, when set,
-// replaces the healthy answers.
+// onePathRoot is a fixture root; broken, when set, replaces the healthy answers.
 type onePathRoot struct {
 	name   string
 	addr   string
@@ -42,9 +41,7 @@ func referralTo(zoneName string, nsName string, addr string) packet.Packet {
 	return dnstest.From(dnstest.Referral(zoneName, nsName+"."), dnstest.Additional(dnstest.ARR(nsName, addr)))
 }
 
-// runOnePath builds the roots, ns.example (which delegates child.example) and a
-// silent ns.stale.example, then walks zoneName. It returns the parent set and
-// the number of queries each root received.
+// runOnePath walks zoneName through the roots and returns the parent set and per-root query counts.
 func runOnePath(t *testing.T, zoneName string, roots []onePathRoot, ipv6 bool) ([]nameserver.Nameserver, map[string]int32) {
 	t.Helper()
 	ctx, prof, _ := testhelpers.Context(t)
@@ -98,9 +95,7 @@ func runOnePath(t *testing.T, zoneName string, roots []onePathRoot, ipv6 bool) (
 	return parent, counts
 }
 
-// TestParentNameserversFollowsOneRootPath checks that a zone below a TLD is
-// walked through the first working root only, and that every way the first
-// roots can fail still ends with the parent set the full walk finds.
+// A zone below a TLD is walked through the first working root only, however the earlier roots fail.
 func TestParentNameserversFollowsOneRootPath(t *testing.T) {
 	silent := nstest.PacketHook(packet.Packet{})
 	refused := nstest.PacketHook(dnstest.Response(dnstest.Rcode(dns.RcodeRefused)))

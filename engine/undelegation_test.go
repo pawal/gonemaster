@@ -439,7 +439,8 @@ func TestApplyUndelegatedDelegationRootReplacesHints(t *testing.T) {
 	if err != nil {
 		t.Fatalf("zone glue names: %v", err)
 	}
-	if len(glue) != 2 || glue[0].String() != "ns1" || glue[1].String() != "ns2" {
+	sameName := func(got dnsname.Name, want string) bool { return got.String() == want }
+	if !slices.EqualFunc(glue, []string{"ns1", "ns2"}, sameName) {
 		t.Fatalf("unexpected delegation names: %v", glue)
 	}
 }

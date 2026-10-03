@@ -207,21 +207,26 @@ func TestRunPassesExclude(t *testing.T) {
 	}
 }
 
-func TestRRSIGWarnDaysHintOnExcludedDNSSEC04(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
+func TestRRSIGWarnDaysHint(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		args     []string
+		wantHint bool
+	}{
+		{"excluded dnssec04", []string{"-H", "example.com", "--exclude", "DNSSEC04", "--rrsig-warn-days", "14"}, true},
+		{"full run", []string{"-H", "example.com", "--exclude", "dnssec10", "--rrsig-warn-days", "14"}, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			enginetest.Capture(t, &runEngine, nil)
 
-	res := clitest.Run(t, run, "-H", "example.com", "--exclude", "DNSSEC04", "--rrsig-warn-days", "14")
-	res.RequireCode(t, 0)
-	res.RequireErrContains(t, "--rrsig-warn-days only affects dnssec04, which --exclude removes")
-}
-
-func TestRRSIGWarnDaysNoHintOnFullRun(t *testing.T) {
-	enginetest.Capture(t, &runEngine, nil)
-
-	res := clitest.Run(t, run, "-H", "example.com", "--exclude", "dnssec10", "--rrsig-warn-days", "14")
-	res.RequireCode(t, 0)
-	if strings.Contains(res.Err, "--rrsig-warn-days only affects") {
-		t.Fatalf("unexpected hint: %q", res.Err)
+			res := clitest.Run(t, run, tc.args...)
+			res.RequireCode(t, 0)
+			if tc.wantHint {
+				res.RequireErrContains(t, "--rrsig-warn-days only affects dnssec04, which --exclude removes")
+			} else if strings.Contains(res.Err, "--rrsig-warn-days only affects") {
+				t.Fatalf("unexpected hint: %q", res.Err)
+			}
+		})
 	}
 }
 

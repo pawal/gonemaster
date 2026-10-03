@@ -354,8 +354,7 @@ func TestJobStoreGraduateMissingJobReturnsError(t *testing.T) {
 	})
 }
 
-// A run that did not succeed carries no entries, so it must carry no score:
-// scoring an empty entry set yields 100 and a top grade.
+// Only a succeeded run carries a score and a grade.
 func TestJobStoreGraduateScoresOnlySucceededRuns(t *testing.T) {
 	forEachStore(t, func(t *testing.T, s JobStore) {
 		now := time.Now().UTC()
@@ -396,7 +395,11 @@ func TestJobStoreGraduateScoresOnlySucceededRuns(t *testing.T) {
 		}
 
 		// The denormalized domain fields follow the run.
-		for _, d := range s.ListDomains(DomainFilter{Limit: 10}).Items {
+		domains := s.ListDomains(DomainFilter{Limit: 10}).Items
+		if len(domains) != 3 {
+			t.Fatalf("domains = %d, want 3", len(domains))
+		}
+		for _, d := range domains {
 			scored := d.Name == "ok.example"
 			if got := d.LatestScore != nil; got != scored {
 				t.Fatalf("%s: domain scored %v, want %v", d.Name, got, scored)

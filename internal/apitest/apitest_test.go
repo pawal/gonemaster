@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -435,7 +436,7 @@ func TestEntriesLevelsRecordsEveryQuery(t *testing.T) {
 	srv := apitest.New(t, apitest.Opts{EntriesLevels: &levels})
 	doGet(t, srv.URL, "/api/v1/entries?level=ERROR", "", nil)
 	doGet(t, srv.URL, "/api/v1/entries?level=WARNING", "", nil)
-	if len(levels) != 2 || levels[0] != "ERROR" || levels[1] != "WARNING" {
+	if !slices.Equal(levels, []string{"ERROR", "WARNING"}) {
 		t.Fatalf("levels = %v", levels)
 	}
 }

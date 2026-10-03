@@ -18,13 +18,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/zone"
 )
 
-// Connectivity05 asks whether an authoritative address delivers the apex
-// DNSKEY answer over UDP. The fixtures below stand in for the transport, so a
-// handler returns what the transport would have returned: a response carrying
-// Protocol "tcp" is one the transport fetched over TCP after truncation, and an
-// empty packet is silence. Answers are packed so their wire length is real,
-// and the tests derive the expected size and probe payload from the fixture
-// rather than hardcoding them.
+// A fixture with Protocol "tcp" is a TCP fetch after truncation; an empty packet is silence.
 
 const testZone = "example"
 
@@ -193,7 +187,7 @@ func TestConnectivity05AnswerFitsUDP(t *testing.T) {
 	entries := runConnectivity05(t, rec, "192.0.2.1")
 
 	entry := tctest.RequireTag(t, entries, tagAnswerFitsUDP)
-	requireIntArg(t, entry, "size", answerSize(answer))
+	requireIntArg(t, entry, "size", 71)
 	requireIntArg(t, entry, "payload", defaultEDNSPayload)
 	if got := entry.Args["query_type"]; got != deliveryQueryType {
 		t.Fatalf("query_type = %#v, want %s", got, deliveryQueryType)
@@ -208,7 +202,7 @@ func TestConnectivity05AnswerFitsUDP(t *testing.T) {
 
 func TestConnectivity05ProbeDeliversLargeAnswer(t *testing.T) {
 	answer := largeAnswer(t)
-	size := answerSize(answer)
+	const size, payload = 2489, 2560
 	rec := newRecorder(map[string]packet.Packet{
 		"reference": withProtocol(answer, protocolTCP),
 		"probe":     withProtocol(answer, protocolUDP),
@@ -222,15 +216,15 @@ func TestConnectivity05ProbeDeliversLargeAnswer(t *testing.T) {
 
 	delivered := tctest.RequireTag(t, entries, tagDeliveredUDP)
 	requireIntArg(t, delivered, "size", size)
-	requireIntArg(t, delivered, "payload", int(probePayload(size)))
+	requireIntArg(t, delivered, "payload", payload)
 
 	probe, ok := rec.first("probe")
 	if !ok {
 		t.Fatalf("expected a probe query; queries: %v", rec.kinds())
 	}
 	opts := probe.Opts
-	if opts.EDNSSize == nil || *opts.EDNSSize != probePayload(size) {
-		t.Fatalf("probe EDNSSize = %v, want %d", opts.EDNSSize, probePayload(size))
+	if opts.EDNSSize == nil || *opts.EDNSSize != payload {
+		t.Fatalf("probe EDNSSize = %v, want %d", opts.EDNSSize, payload)
 	}
 	if opts.Fallback == nil || *opts.Fallback {
 		t.Fatalf("probe Fallback = %v, want false", opts.Fallback)
@@ -245,7 +239,7 @@ func TestConnectivity05ProbeDeliversLargeAnswer(t *testing.T) {
 
 func TestConnectivity05ProbeGetsNoAnswer(t *testing.T) {
 	answer := largeAnswer(t)
-	size := answerSize(answer)
+	const size, payload = 2489, 2560
 	rec := newRecorder(map[string]packet.Packet{
 		"reference": withProtocol(answer, protocolTCP),
 		"probe":     {},
@@ -256,12 +250,12 @@ func TestConnectivity05ProbeGetsNoAnswer(t *testing.T) {
 	tctest.RequireTag(t, entries, tagAnswerNeedsTCP)
 	lost := tctest.RequireTag(t, entries, tagNoUDPAnswer)
 	requireIntArg(t, lost, "size", size)
-	requireIntArg(t, lost, "payload", int(probePayload(size)))
+	requireIntArg(t, lost, "payload", payload)
 }
 
 func TestConnectivity05ProbeTruncatedCapsTheAnswer(t *testing.T) {
 	answer := largeAnswer(t)
-	size := answerSize(answer)
+	const size, payload = 2489, 2560
 	rec := newRecorder(map[string]packet.Packet{
 		"reference": withProtocol(answer, protocolTCP),
 		"probe":     truncated(withProtocol(dnskeyAnswer(t, 1, 40), protocolUDP)),
@@ -271,7 +265,7 @@ func TestConnectivity05ProbeTruncatedCapsTheAnswer(t *testing.T) {
 
 	capped := tctest.RequireTag(t, entries, tagServerCapsUDP)
 	requireIntArg(t, capped, "size", size)
-	requireIntArg(t, capped, "payload", int(probePayload(size)))
+	requireIntArg(t, capped, "payload", payload)
 
 	// Capping is the behaviour operators should be steered towards, so neither
 	// delivery warning may fire.
@@ -309,7 +303,7 @@ func TestConnectivity05SmallTruncatedAnswerSkipsProbe(t *testing.T) {
 	entries := runConnectivity05(t, rec, "192.0.2.1")
 
 	entry := tctest.RequireTag(t, entries, tagAnswerNeedsTCP)
-	requireIntArg(t, entry, "size", answerSize(answer))
+	requireIntArg(t, entry, "size", 71)
 	if rec.sent("probe") {
 		t.Fatalf("expected no probe for an answer within the advertised payload; queries: %v", rec.kinds())
 	}
@@ -358,7 +352,7 @@ func TestConnectivity05TCPAnswerTruncated(t *testing.T) {
 			entries := runConnectivity05(t, rec, "192.0.2.1")
 
 			entry := tctest.RequireTag(t, entries, tagTCPAnswerTruncated)
-			requireIntArg(t, entry, "size", answerSize(cut))
+			requireIntArg(t, entry, "size", 71)
 			requireIntArg(t, entry, "payload", defaultEDNSPayload)
 			if got := tctest.TagsWithPrefix(entries, "CN05_"); !slices.Equal(got, []string{tagTCPAnswerTruncated}) {
 				t.Fatalf("expected only %s, got %v", tagTCPAnswerTruncated, got)
@@ -381,7 +375,7 @@ func TestConnectivity05LossIsSizeDependent(t *testing.T) {
 	entries := runConnectivity05(t, rec, "192.0.2.1")
 
 	entry := tctest.RequireTag(t, entries, tagUDPLossSizeDependent)
-	requireIntArg(t, entry, "size", answerSize(answer))
+	requireIntArg(t, entry, "size", 2489)
 	requireIntArg(t, entry, "payload", defaultEDNSPayload)
 
 	// The small-answer probe must match nameserver13 exactly, or the two
@@ -477,7 +471,7 @@ func TestConnectivity05FitsUDPSummaryReportsLargestAnswer(t *testing.T) {
 		t.Fatalf("%s: %d entries, want 1", tagAnswerFitsUDP, got)
 	}
 	entry := tctest.RequireTag(t, entries, tagAnswerFitsUDP)
-	requireIntArg(t, entry, "size", answerSize(bigger))
+	requireIntArg(t, entry, "size", 357)
 	if got := tctest.ServerEndpoints(t, entry.Args); len(got) != 2 {
 		t.Fatalf("%s: servers = %v, want two entries", tagAnswerFitsUDP, got)
 	}

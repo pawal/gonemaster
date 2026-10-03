@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
@@ -131,7 +132,7 @@ func TestSpecTestcasesMarkExcluded(t *testing.T) {
 			excluded = append(excluded, it.ID)
 		}
 	}
-	if len(excluded) != 1 || excluded[0] != "dnssec10" || list.Total < 2 {
+	if !slices.Equal(excluded, []string{"dnssec10"}) || list.Total < 2 {
 		t.Fatalf("excluded %v of %d, want only dnssec10 in the full list", excluded, list.Total)
 	}
 	var detail SpecTestcaseDetail

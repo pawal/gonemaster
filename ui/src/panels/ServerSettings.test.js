@@ -14,6 +14,16 @@ const settingsMock = (url, options = {}) => {
   return jsonResponse({});
 };
 
+// Answers with settingsMock and returns the PUT bodies it receives.
+const capturePuts = () => {
+  const calls = [];
+  global.fetch.mockImplementation((url, options = {}) => {
+    if (options.method === "PUT") calls.push(JSON.parse(options.body));
+    return settingsMock(url, options);
+  });
+  return calls;
+};
+
 describe("ServerSettings", () => {
   beforeEach(() => {
     global.fetch = vi.fn();
@@ -78,13 +88,7 @@ describe("ServerSettings", () => {
   });
 
   it("sends PUT request with changed values on save", async () => {
-    const calls = [];
-    global.fetch.mockImplementation((url, options = {}) => {
-      const value = requestUrl(url);
-      if (options.method === "PUT") calls.push({ url: value, body: JSON.parse(options.body) });
-      return settingsMock(url, options);
-    });
-
+    const calls = capturePuts();
     await renderLoaded();
 
     const workerInput = screen.getByLabelText(/Worker count/);
@@ -94,7 +98,7 @@ describe("ServerSettings", () => {
     await waitFor(() => {
       expect(calls.length).toBe(1);
     });
-    expect(calls[0].body.worker_count).toBe(8);
+    expect(calls[0].worker_count).toBe(8);
   });
 
   it("shows success toast after saving settings", async () => {
@@ -156,11 +160,7 @@ describe("ServerSettings", () => {
   });
 
   it("renders the AS holders toggle and saves it", async () => {
-    const calls = [];
-    global.fetch.mockImplementation((url, options = {}) => {
-      if (options.method === "PUT") calls.push(JSON.parse(options.body));
-      return settingsMock(url, options);
-    });
+    const calls = capturePuts();
     await renderLoaded(/Show AS holders in public UI/);
 
     const toggle = screen.getByLabelText(/Show AS holders in public UI/);
@@ -174,11 +174,7 @@ describe("ServerSettings", () => {
   });
 
   it("renders the MCP toggles off and saves mcp_enabled", async () => {
-    const calls = [];
-    global.fetch.mockImplementation((url, options = {}) => {
-      if (options.method === "PUT") calls.push(JSON.parse(options.body));
-      return settingsMock(url, options);
-    });
+    const calls = capturePuts();
     await renderLoaded(/MCP endpoint/);
 
     const enabled = screen.getByLabelText(/MCP endpoint/);

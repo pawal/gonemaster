@@ -6,8 +6,7 @@ import (
 	dns "codeberg.org/miekg/dns"
 )
 
-// The library decodes the OPT header itself, so pack and unpack to confirm our
-// bit layout still agrees with it.
+// A pack and unpack round trip confirms the bit layout agrees with the library decoder.
 func TestFieldsSurviveWireRoundTrip(t *testing.T) {
 	opt := &dns.OPT{Hdr: dns.Header{Name: "."}}
 	SetUDPSize(opt, 1232)
@@ -21,14 +20,7 @@ func TestFieldsSurviveWireRoundTrip(t *testing.T) {
 	msg := new(dns.Msg)
 	msg.Response = true
 	msg.Extra = []dns.RR{opt}
-	if err := msg.Pack(); err != nil {
-		t.Fatalf("pack: %v", err)
-	}
-	wire := new(dns.Msg)
-	wire.Data = msg.Data
-	if err := wire.Unpack(); err != nil {
-		t.Fatalf("unpack: %v", err)
-	}
+	wire := packUnpack(t, msg)
 
 	if wire.UDPSize != 1232 {
 		t.Errorf("UDPSize = %d, want 1232", wire.UDPSize)

@@ -316,19 +316,27 @@ func TestApplyEnvVarsMultipleFieldsTogether(t *testing.T) {
 	}
 }
 
+// GONEMASTER_EXCLUDE splits on commas and yields to the --exclude flag.
 func TestApplyEnvVarsExclude(t *testing.T) {
-	cfg := server.DefaultConfig()
-	applyEnvVars(&cfg, map[string]bool{}, fakeEnv(map[string]string{"GONEMASTER_EXCLUDE": " dnssec, Zone11 ,,"}), io.Discard)
-	if want := []string{"dnssec", "Zone11"}; !slices.Equal(cfg.Exclude, want) {
-		t.Fatalf("Exclude = %v, want %v", cfg.Exclude, want)
-	}
-}
-
-func TestApplyEnvVarsExcludeFlagWins(t *testing.T) {
-	cfg := server.DefaultConfig()
-	cfg.Exclude = []string{"zone01"}
-	applyEnvVars(&cfg, map[string]bool{"exclude": true}, fakeEnv(map[string]string{"GONEMASTER_EXCLUDE": "dnssec"}), io.Discard)
-	if want := []string{"zone01"}; !slices.Equal(cfg.Exclude, want) {
-		t.Fatalf("Exclude = %v, want %v", cfg.Exclude, want)
+	for _, tc := range []struct {
+		name  string
+		pre   []string
+		flags map[string]bool
+		value string
+		want  []string
+	}{
+		{name: "splits and trims", flags: map[string]bool{}, value: " dnssec, Zone11 ,,", want: []string{"dnssec", "Zone11"}},
+		{name: "flag wins", pre: []string{"zone01"}, flags: map[string]bool{"exclude": true}, value: "dnssec", want: []string{"zone01"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := server.DefaultConfig()
+			if tc.pre != nil {
+				cfg.Exclude = tc.pre
+			}
+			applyEnvVars(&cfg, tc.flags, fakeEnv(map[string]string{"GONEMASTER_EXCLUDE": tc.value}), io.Discard)
+			if !slices.Equal(cfg.Exclude, tc.want) {
+				t.Fatalf("Exclude = %v, want %v", cfg.Exclude, tc.want)
+			}
+		})
 	}
 }

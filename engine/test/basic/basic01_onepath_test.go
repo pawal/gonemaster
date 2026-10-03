@@ -1,8 +1,8 @@
 package basic
 
 import (
-	"context"
 	"net"
+	"slices"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -11,7 +11,6 @@ import (
 
 	"codeberg.org/pawal/gonemaster/engine/internal/testhelpers"
 	"codeberg.org/pawal/gonemaster/engine/logger"
-	"codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/tctest"
 )
@@ -19,22 +18,20 @@ import (
 var onePathRootNames = []string{"ns1.root", "ns2.root", "ns3.root"}
 
 // onePathHealthyRoot serves the root zone and refers "example" to ns.example.
-func onePathHealthyRoot(_ context.Context, name string, qtype string, _ string, _ *nameserver.QueryOptions) (packet.Packet, error) {
+func onePathHealthyRoot(q tctest.Query) packet.Packet {
 	switch {
-	case name == "." && qtype == "SOA":
-		return soaPacket(".", "ns1.root", "hostmaster.root"), nil
-	case name == "." && qtype == "NS":
-		return nsPacketMulti(".", onePathRootNames...), nil
-	case strings.EqualFold(name, "example") && qtype == "SOA":
-		return referralPacket("example", "ns.example", net.IPv4(192, 0, 2, 10)), nil
+	case q.Name == "." && q.Type == "SOA":
+		return soaPacket(".", "ns1.root", "hostmaster.root")
+	case q.Name == "." && q.Type == "NS":
+		return nsPacketMulti(".", onePathRootNames...)
+	case strings.EqualFold(q.Name, "example") && q.Type == "SOA":
+		return referralPacket("example", "ns.example", net.IPv4(192, 0, 2, 10))
 	}
-	return packet.Packet{}, nil
+	return packet.Packet{}
 }
 
-// runBasic01OnePath runs Basic01 for zoneName against three roots, ns.example
-// (answering child.example SOA through child) and a silent ns.stale.example.
-// broken replaces a root's answers; the query count per root is returned.
-func runBasic01OnePath(t *testing.T, zoneName string, broken map[string]tctest.RawHandler, child tctest.RawHandler, ipv6Root bool) ([]*logger.Entry, map[string]int32) {
+// runBasic01OnePath runs Basic01 with broken overriding roots and child answering child.example.
+func runBasic01OnePath(t *testing.T, zoneName string, broken map[string]tctest.Handler, child tctest.Handler, ipv6Root bool) ([]*logger.Entry, map[string]int32) {
 	t.Helper()
 	ctx, prof, _ := testhelpers.Context(t)
 	prof.Net.IPv6 = !ipv6Root
@@ -57,26 +54,24 @@ func runBasic01OnePath(t *testing.T, zoneName string, broken map[string]tctest.R
 		}
 		counter := &atomic.Int32{}
 		counts[name] = counter
-		tctest.NSRaw(t, ctx, r, name, addr, func(ctx context.Context, qname string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
+		tctest.NSOn(t, ctx, r, name, addr, func(q tctest.Query) packet.Packet {
 			counter.Add(1)
-			return hook(ctx, qname, qtype, qclass, opts)
+			return hook(q)
 		})
 	}
-	tctest.NSRaw(t, ctx, r, "ns.example", "192.0.2.10", func(ctx context.Context, name string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
+	tctest.NSOn(t, ctx, r, "ns.example", "192.0.2.10", func(q tctest.Query) packet.Packet {
 		switch {
-		case strings.EqualFold(name, "example") && qtype == "SOA":
-			return soaPacket("example", "ns.example", "hostmaster.example"), nil
-		case strings.EqualFold(name, "example") && qtype == "NS":
+		case strings.EqualFold(q.Name, "example") && q.Type == "SOA":
+			return soaPacket("example", "ns.example", "hostmaster.example")
+		case strings.EqualFold(q.Name, "example") && q.Type == "NS":
 			return tctest.Response(tctest.Answers(tctest.NSRR("example", "ns.example")),
-				tctest.Additional(tctest.ARR("ns.example", "192.0.2.10"))), nil
-		case strings.EqualFold(name, "child.example"):
-			return child(ctx, name, qtype, qclass, opts)
+				tctest.Additional(tctest.ARR("ns.example", "192.0.2.10")))
+		case strings.EqualFold(q.Name, "child.example"):
+			return child(q)
 		}
-		return packet.Packet{}, nil
+		return packet.Packet{}
 	})
-	tctest.NSRaw(t, ctx, r, "ns.stale.example", "192.0.2.30", func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return packet.Packet{}, nil
-	})
+	tctest.NSOn(t, ctx, r, "ns.stale.example", "192.0.2.30", nil)
 
 	entries, err := Basic01(ctx, tctest.Zone(t, zoneName, r))
 	if err != nil {
@@ -89,8 +84,8 @@ func runBasic01OnePath(t *testing.T, zoneName string, broken map[string]tctest.R
 	return entries, out
 }
 
-func delegatedChild(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-	return referralPacket("child.example", "ns.child.example", net.IPv4(192, 0, 2, 20)), nil
+func delegatedChild(tctest.Query) packet.Packet {
+	return referralPacket("child.example", "ns.child.example", net.IPv4(192, 0, 2, 20))
 }
 
 // requireParentExample fails unless ns.example is reported as the parent of the child.
@@ -100,77 +95,58 @@ func requireParentExample(t *testing.T, entries []*logger.Entry) {
 		if entry == nil || entry.Tag != "B01_PARENT_FOUND" || entry.Args["domain"] != "example" {
 			continue
 		}
-		servers := tctest.Servers(t, entry.Args["servers"])
-		if len(servers) == 1 && servers[0]["ns"] == "ns.example" && servers[0]["address"] == "192.0.2.10" {
-			return
+		if got := tctest.ServerEndpoints(t, entry.Args); !slices.Equal(got, []string{"ns.example/192.0.2.10"}) {
+			t.Fatalf("B01_PARENT_FOUND for example = %v, want ns.example/192.0.2.10", got)
 		}
-		t.Fatalf("B01_PARENT_FOUND for example = %v, want ns.example/192.0.2.10", servers)
+		return
 	}
 	t.Fatalf("expected B01_PARENT_FOUND for example, got %v", tctest.Tags(entries))
 }
 
-// requireZoneError fails unless root reported B01_SERVER_ZONE_ERROR.
-func requireZoneError(t *testing.T, entries []*logger.Entry, root string) {
-	t.Helper()
-	for _, entry := range entries {
-		if entry != nil && entry.Tag == "B01_SERVER_ZONE_ERROR" && entry.Args["ns"] == root {
-			return
-		}
-	}
-	t.Fatalf("expected B01_SERVER_ZONE_ERROR for %s, got %v", root, tctest.Tags(entries))
-}
-
-// TestBasic01FollowsOneRootPath checks that a zone below a TLD is walked
-// through the first working root only, and that Basic01 still proves the child
-// exists, with the same parent, whichever way the first roots fail.
+// A zone below a TLD is walked through the first working root only; child and parent are found.
 func TestBasic01FollowsOneRootPath(t *testing.T) {
-	silent := func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return packet.Packet{}, nil
-	}
-	refused := func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return rcodePacket(dns.RcodeRefused), nil
-	}
-	nxdomainTLD := func(ctx context.Context, name string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
-		if name == "." {
-			return onePathHealthyRoot(ctx, name, qtype, qclass, opts)
+	silent := func(tctest.Query) packet.Packet { return packet.Packet{} }
+	refused := func(tctest.Query) packet.Packet { return rcodePacket(dns.RcodeRefused) }
+	nxdomainTLD := func(q tctest.Query) packet.Packet {
+		if q.Name == "." {
+			return onePathHealthyRoot(q)
 		}
-		return nxdomainAAPacket(), nil
+		return nxdomainAAPacket()
 	}
-	badSOA := func(ctx context.Context, name string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
-		if name == "." && qtype == "SOA" {
-			return emptyAnswerPacket(), nil
+	badSOA := func(q tctest.Query) packet.Packet {
+		if q.Name == "." && q.Type == "SOA" {
+			return emptyAnswerPacket()
 		}
-		return onePathHealthyRoot(ctx, name, qtype, qclass, opts)
+		return onePathHealthyRoot(q)
 	}
-	staleReferral := func(ctx context.Context, name string, qtype string, qclass string, opts *nameserver.QueryOptions) (packet.Packet, error) {
-		if strings.EqualFold(name, "example") {
-			return referralPacket("example", "ns.stale.example", net.IPv4(192, 0, 2, 30)), nil
+	staleReferral := func(q tctest.Query) packet.Packet {
+		if strings.EqualFold(q.Name, "example") {
+			return referralPacket("example", "ns.stale.example", net.IPv4(192, 0, 2, 30))
 		}
-		return onePathHealthyRoot(ctx, name, qtype, qclass, opts)
+		return onePathHealthyRoot(q)
 	}
 
 	tests := []struct {
 		name        string
-		broken      map[string]tctest.RawHandler
+		broken      map[string]tctest.Handler
 		ipv6Root    bool
 		wantAsked   []string
 		wantSkipped []string
 		zoneErrors  []string
 	}{
 		{name: "first root works", wantAsked: []string{"ns1.root"}, wantSkipped: []string{"ns2.root", "ns3.root"}},
-		{name: "first root silent", broken: map[string]tctest.RawHandler{"ns1.root": silent},
+		{name: "first root silent", broken: map[string]tctest.Handler{"ns1.root": silent},
 			wantAsked: []string{"ns1.root", "ns2.root"}, wantSkipped: []string{"ns3.root"}, zoneErrors: []string{"ns1.root"}},
-		{name: "first root refuses", broken: map[string]tctest.RawHandler{"ns1.root": refused},
+		{name: "first root refuses", broken: map[string]tctest.Handler{"ns1.root": refused},
 			wantAsked: []string{"ns1.root", "ns2.root"}, wantSkipped: []string{"ns3.root"}, zoneErrors: []string{"ns1.root"}},
-		{name: "first root bad SOA", broken: map[string]tctest.RawHandler{"ns1.root": badSOA},
+		{name: "first root bad SOA", broken: map[string]tctest.Handler{"ns1.root": badSOA},
 			wantAsked: []string{"ns1.root", "ns2.root"}, wantSkipped: []string{"ns3.root"}, zoneErrors: []string{"ns1.root"}},
-		// An NXDOMAIN from a root makes it a parent without the child, so the
-		// walk falls back to every root, as the full walk would.
-		{name: "first root NXDOMAIN for the TLD", broken: map[string]tctest.RawHandler{"ns1.root": nxdomainTLD},
+		// An NXDOMAIN root is a parent without the child, and the walk falls back to every root.
+		{name: "first root NXDOMAIN for the TLD", broken: map[string]tctest.Handler{"ns1.root": nxdomainTLD},
 			wantAsked: []string{"ns1.root", "ns2.root", "ns3.root"}},
-		{name: "first root refers to dead servers", broken: map[string]tctest.RawHandler{"ns1.root": staleReferral},
+		{name: "first root refers to dead servers", broken: map[string]tctest.Handler{"ns1.root": staleReferral},
 			wantAsked: []string{"ns1.root", "ns2.root", "ns3.root"}, zoneErrors: []string{"ns.stale.example"}},
-		{name: "all but the last root broken", broken: map[string]tctest.RawHandler{"ns1.root": refused, "ns2.root": silent},
+		{name: "all but the last root broken", broken: map[string]tctest.Handler{"ns1.root": refused, "ns2.root": silent},
 			wantAsked: []string{"ns1.root", "ns2.root", "ns3.root"}, zoneErrors: []string{"ns1.root", "ns2.root"}},
 		{name: "IPv6 root first with IPv6 disabled", ipv6Root: true, wantAsked: []string{"ns2.root"}, wantSkipped: []string{"ns1.root", "ns3.root"}},
 	}
@@ -181,8 +157,11 @@ func TestBasic01FollowsOneRootPath(t *testing.T) {
 			tctest.RequireTag(t, entries, "B01_CHILD_FOUND")
 			tctest.RequireNoTag(t, entries, "B01_NO_CHILD", "B01_PARENT_NOT_FOUND")
 			requireParentExample(t, entries)
+			zoneErrors := tctest.ArgValues(entries, "B01_SERVER_ZONE_ERROR", "ns")
 			for _, root := range tt.zoneErrors {
-				requireZoneError(t, entries, root)
+				if !slices.Contains(zoneErrors, root) {
+					t.Fatalf("expected B01_SERVER_ZONE_ERROR for %s, got %v", root, tctest.Tags(entries))
+				}
 			}
 			for _, name := range tt.wantAsked {
 				if counts[name] == 0 {
@@ -200,9 +179,7 @@ func TestBasic01FollowsOneRootPath(t *testing.T) {
 
 // A child that does not exist still gets B01_NO_CHILD, after every root was tried.
 func TestBasic01OneRootPathStillReportsNoChild(t *testing.T) {
-	missing := func(context.Context, string, string, string, *nameserver.QueryOptions) (packet.Packet, error) {
-		return nxdomainAAPacket(), nil
-	}
+	missing := func(tctest.Query) packet.Packet { return nxdomainAAPacket() }
 	entries, counts := runBasic01OnePath(t, "child.example", nil, missing, false)
 
 	tctest.RequireTag(t, entries, "B01_NO_CHILD")

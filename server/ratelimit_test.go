@@ -441,22 +441,16 @@ func TestRateLimitSettingsChangeConcurrentWithCleanupAndRequests(t *testing.T) {
 
 func TestRateLimitEnabledBySettingsAppliesToNextPost(t *testing.T) {
 	srv := newTestServer(t)
-	post := func() int {
-		return doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withRemoteAddr("192.0.2.1:1234")).Code
+	post := func() *httptest.ResponseRecorder {
+		return doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withRemoteAddr("192.0.2.1:1234"))
 	}
-	if code := post(); code != http.StatusCreated {
-		t.Fatalf("POST before enabling: got %d, want 201", code)
-	}
+	wantStatus(t, post(), http.StatusCreated)
 
 	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"rate_limit_enabled": true, "rate_limit_max": 1}`)
 	wantStatus(t, resp, http.StatusOK)
 
-	if code := post(); code != http.StatusCreated {
-		t.Fatalf("first POST after enabling: got %d, want 201", code)
-	}
-	if code := post(); code != http.StatusTooManyRequests {
-		t.Fatalf("second POST after enabling: got %d, want 429", code)
-	}
+	wantStatus(t, post(), http.StatusCreated)
+	wantStatus(t, post(), http.StatusTooManyRequests)
 }
 
 func TestRateLimitSettingsKeepLimiterWhenUnchanged(t *testing.T) {
@@ -495,41 +489,51 @@ func TestRateLimitMiddlewareSharesIPv6Slash64(t *testing.T) {
 	h := rateLimitMiddleware(limiterPtr(NewRateLimiter(1, time.Minute)), nil, http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusCreated)
 	}))
-	post := func(remote string) int {
-		return doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr(remote), noContentType()).Code
+	post := func(remote string) *httptest.ResponseRecorder {
+		return doHandler(t, h, http.MethodPost, "/jobs", `{}`, withRemoteAddr(remote), noContentType())
 	}
 
-	if code := post("[2001:db8:1:2::1]:1234"); code != http.StatusCreated {
-		t.Fatalf("first address in the /64: got %d, want 201", code)
-	}
-	if code := post("[2001:db8:1:2::2]:1234"); code != http.StatusTooManyRequests {
-		t.Fatalf("second address in the same /64: got %d, want 429", code)
-	}
-	if code := post("[2001:db8:1:3::1]:1234"); code != http.StatusCreated {
-		t.Fatalf("address in another /64: got %d, want 201", code)
-	}
+	wantStatus(t, post("[2001:db8:1:2::1]:1234"), http.StatusCreated)
+	wantStatus(t, post("[2001:db8:1:2::2]:1234"), http.StatusTooManyRequests)
+	wantStatus(t, post("[2001:db8:1:3::1]:1234"), http.StatusCreated)
 }
 
-func TestRateLimitGETMetersHeavyRoutes(t *testing.T) {
-	for _, path := range []string{
-		"/pub/api/v1/lookup/example.com",
-		"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/domains",
-		"/pub/api/v1/analysis/cohorts/tag/diff",
-		"/pub/api/v1/analysis/cohorts/tag/report",
+func TestRateLimitGETMetersRoutes(t *testing.T) {
+	for _, tc := range []struct {
+		name  string
+		paths []string
+	}{
+		{"heavy routes", []string{
+			"/pub/api/v1/lookup/example.com",
+			"/pub/api/v1/analysis/cohorts/tag/snapshots/latest/domains",
+			"/pub/api/v1/analysis/cohorts/tag/diff",
+			"/pub/api/v1/analysis/cohorts/tag/report",
+		}},
+		{"public id reads", []string{
+			"/pub/api/v1/jobs/abcd1234",
+			"/pub/api/v1/jobs/abcd1234/result",
+			"/pub/api/v1/jobs/abcd1234/dnssec-chain",
+			"/pub/api/v1/jobs/abcd1234/asn-names",
+			"/public/result/abcd1234",
+		}},
 	} {
-		srv := newTestServer(t, withPublicAPI(func(c *PublicAPIConfig) {
-			c.RateLimitEnabled = true
-			c.RateLimitGetMax = 1
-		}))
-		get := func() int {
-			return doJSON(t, srv, http.MethodGet, path, nil, withRemoteAddr("192.0.2.1:1234")).Code
-		}
-		if code := get(); code == http.StatusTooManyRequests {
-			t.Fatalf("%s: first GET was limited", path)
-		}
-		if code := get(); code != http.StatusTooManyRequests {
-			t.Fatalf("%s: second GET got %d, want 429", path, code)
-		}
+		t.Run(tc.name, func(t *testing.T) {
+			for _, path := range tc.paths {
+				t.Run(path, func(t *testing.T) {
+					srv := newTestServer(t, withPublicAPI(func(c *PublicAPIConfig) {
+						c.RateLimitEnabled = true
+						c.RateLimitGetMax = 1
+					}))
+					get := func() *httptest.ResponseRecorder {
+						return doJSON(t, srv, http.MethodGet, path, nil, withRemoteAddr("192.0.2.1:1234"))
+					}
+					if resp := get(); resp.Code == http.StatusTooManyRequests {
+						t.Fatal("first GET was limited")
+					}
+					wantStatus(t, get(), http.StatusTooManyRequests)
+				})
+			}
+		})
 	}
 }
 
@@ -550,25 +554,17 @@ func TestRateLimitGETAndPOSTBudgetsAreSeparate(t *testing.T) {
 		c.RateLimitMax = 1
 		c.RateLimitGetMax = 1
 	}))
-	lookup := func() int {
-		return doJSON(t, srv, http.MethodGet, "/pub/api/v1/lookup/example.com", nil, withRemoteAddr("192.0.2.1:1234")).Code
+	lookup := func() *httptest.ResponseRecorder {
+		return doJSON(t, srv, http.MethodGet, "/pub/api/v1/lookup/example.com", nil, withRemoteAddr("192.0.2.1:1234"))
 	}
-	post := func() int {
-		return doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withRemoteAddr("192.0.2.1:1234")).Code
+	post := func() *httptest.ResponseRecorder {
+		return doJSON(t, srv, http.MethodPost, "/pub/api/v1/jobs", `{"domain":"example.com"}`, withRemoteAddr("192.0.2.1:1234"))
 	}
 
-	if code := lookup(); code != http.StatusOK {
-		t.Fatalf("first lookup: got %d, want 200", code)
-	}
-	if code := post(); code != http.StatusCreated {
-		t.Fatalf("first POST after a lookup: got %d, want 201", code)
-	}
-	if code := lookup(); code != http.StatusTooManyRequests {
-		t.Fatalf("second lookup: got %d, want 429", code)
-	}
-	if code := post(); code != http.StatusTooManyRequests {
-		t.Fatalf("second POST: got %d, want 429", code)
-	}
+	wantStatus(t, lookup(), http.StatusOK)
+	wantStatus(t, post(), http.StatusCreated)
+	wantStatus(t, lookup(), http.StatusTooManyRequests)
+	wantStatus(t, post(), http.StatusTooManyRequests)
 }
 
 func TestRateLimitGETMaxSetBySettingsApplies(t *testing.T) {
@@ -576,37 +572,9 @@ func TestRateLimitGETMaxSetBySettingsApplies(t *testing.T) {
 	resp := doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"rate_limit_enabled": true, "rate_limit_get_max": 1}`)
 	wantStatus(t, resp, http.StatusOK)
 
-	lookup := func() int {
-		return doJSON(t, srv, http.MethodGet, "/pub/api/v1/lookup/example.com", nil, withRemoteAddr("192.0.2.1:1234")).Code
+	lookup := func() *httptest.ResponseRecorder {
+		return doJSON(t, srv, http.MethodGet, "/pub/api/v1/lookup/example.com", nil, withRemoteAddr("192.0.2.1:1234"))
 	}
-	if code := lookup(); code != http.StatusOK {
-		t.Fatalf("first lookup: got %d, want 200", code)
-	}
-	if code := lookup(); code != http.StatusTooManyRequests {
-		t.Fatalf("second lookup: got %d, want 429", code)
-	}
-}
-
-func TestRateLimitGETMetersPublicIDReads(t *testing.T) {
-	for _, path := range []string{
-		"/pub/api/v1/jobs/abcd1234",
-		"/pub/api/v1/jobs/abcd1234/result",
-		"/pub/api/v1/jobs/abcd1234/dnssec-chain",
-		"/pub/api/v1/jobs/abcd1234/asn-names",
-		"/public/result/abcd1234",
-	} {
-		srv := newTestServer(t, withPublicAPI(func(c *PublicAPIConfig) {
-			c.RateLimitEnabled = true
-			c.RateLimitGetMax = 1
-		}))
-		get := func() int {
-			return doJSON(t, srv, http.MethodGet, path, nil, withRemoteAddr("192.0.2.1:1234")).Code
-		}
-		if code := get(); code == http.StatusTooManyRequests {
-			t.Fatalf("%s: first GET was limited", path)
-		}
-		if code := get(); code != http.StatusTooManyRequests {
-			t.Fatalf("%s: second GET got %d, want 429", path, code)
-		}
-	}
+	wantStatus(t, lookup(), http.StatusOK)
+	wantStatus(t, lookup(), http.StatusTooManyRequests)
 }

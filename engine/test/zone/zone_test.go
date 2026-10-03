@@ -2,6 +2,7 @@ package zone
 
 import (
 	"context"
+	"fmt"
 	"slices"
 	"strings"
 	"sync"
@@ -456,10 +457,7 @@ func noMXPacket(owner string) packet.Packet {
 	return tctest.Response(tctest.Question(owner, dns.TypeMX))
 }
 
-// TestMXRDATAKey verifies the MX consistency key: it is built from RDATA
-// (preference + mail target) only, is independent of TTL, record order and
-// duplicate records, is case-insensitive on the target, and distinguishes
-// genuine RDATA differences (preference or target).
+// The MX consistency key depends on RDATA only, not TTL, order, duplicates or target case.
 func TestMXRDATAKey(t *testing.T) {
 	mk := func(ttl uint32, pref uint16, target string) dns.RR {
 		mx := &dns.MX{Hdr: dns.Header{Name: "example.com.", Class: dns.ClassINET, TTL: ttl}}
@@ -2015,24 +2013,26 @@ func TestZone08NoMXResponse(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "MX_RECORD_IS_CNAME", "MX_RECORD_IS_NOT_CNAME")
 }
 
-// runZone09 wires a single-nameserver zone09 run for a given zone name and MX
-// handler, and returns the emitted entries.
-func runZone09(t *testing.T, name string, mx func() packet.Packet) []*logger.Entry {
+// runZone09 runs zone09 on name with one nameserver per MX handler and returns the entries.
+func runZone09(t *testing.T, name string, mx ...func() packet.Packet) []*logger.Entry {
 	t.Helper()
 	ctx := tctest.Context(t)
 
-	ns := tctest.NS(t, ctx, "ns1.example", "192.0.2.1", func(q tctest.Query) packet.Packet {
-		switch q.Type {
-		case "SOA":
-			return soaPacket(name, 1, 1, 1, 1, 1)
-		case "MX":
-			return mx()
-		default:
-			return packet.Packet{}
-		}
-	})
+	servers := make([]ens.Nameserver, 0, len(mx))
+	for i, handler := range mx {
+		servers = append(servers, tctest.NS(t, ctx, fmt.Sprintf("ns%d.example", i+1), fmt.Sprintf("192.0.2.%d", i+1), func(q tctest.Query) packet.Packet {
+			switch q.Type {
+			case "SOA":
+				return soaPacket(name, 1, 1, 1, 1, 1)
+			case "MX":
+				return handler()
+			default:
+				return packet.Packet{}
+			}
+		}))
+	}
 	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns}, nil
+		return servers, nil
 	})
 
 	z := zonepkg.Zone{Name: dnsname.New(name)}
@@ -2957,51 +2957,9 @@ func TestZone15QueryBudget(t *testing.T) {
 	}
 }
 
-// runZone09Pair wires a two-nameserver zone09 run with one MX handler per server.
-func runZone09Pair(t *testing.T, name string, mx1, mx2 func() packet.Packet) []*logger.Entry {
-	t.Helper()
-	ctx := tctest.Context(t)
-
-	build := func(host, ip string, mx func() packet.Packet) ens.Nameserver {
-		return tctest.NS(t, ctx, host, ip, func(q tctest.Query) packet.Packet {
-			switch q.Type {
-			case "SOA":
-				return soaPacket(name, 1, 1, 1, 1, 1)
-			case "MX":
-				return mx()
-			default:
-				return packet.Packet{}
-			}
-		})
-	}
-	ns1 := build("ns1.example", "192.0.2.1", mx1)
-	ns2 := build("ns2.example", "192.0.2.2", mx2)
-	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zonepkg.Zone) ([]ens.Nameserver, error) {
-		return []ens.Nameserver{ns1, ns2}, nil
-	})
-
-	z := zonepkg.Zone{Name: dnsname.New(name)}
-	entries, err := Zone09(ctx, &z)
-	if err != nil {
-		t.Fatalf("zone09: %v", err)
-	}
-	return entries
-}
-
-// mxRDATAOf returns the mx_rdata argument of an entry.
-func mxRDATAOf(t *testing.T, entry *logger.Entry) []string {
-	t.Helper()
-	values, ok := entry.Args["mx_rdata"].([]string)
-	if !ok {
-		t.Fatalf("%s: expected mx_rdata list, got %#v", entry.Tag, entry.Args["mx_rdata"])
-	}
-	return values
-}
-
-// RFC 2181 s5: a repeated record carries one record's worth of data, so a
-// server repeating an MX record agrees with a server sending it once.
+// RFC 2181 section 5: a server repeating an MX record agrees with a server sending it once.
 func TestZone09DuplicateMXRecordIsOneVariant(t *testing.T) {
-	entries := runZone09Pair(t, "example.com",
+	entries := runZone09(t, "example.com",
 		func() packet.Packet {
 			return mxPacket("example.com", 300, mxRR{10, "mail.example."}, mxRR{10, "mail.example."})
 		},
@@ -3023,10 +2981,9 @@ func TestZone09DuplicateNullMXIsValid(t *testing.T) {
 	tctest.RequireNoTag(t, entries, "Z09_NULL_MX_WITH_OTHER_MX", "Z09_NULL_MX_NON_ZERO_PREF")
 }
 
-// Two servers sharing exchanges but differing in preference must be
-// distinguishable: mx_rdata differs while mail_targets matches.
+// A preference-only difference changes mx_rdata and leaves mail_targets equal.
 func TestZone09PreferenceOnlyDifferenceIsVisible(t *testing.T) {
-	entries := runZone09Pair(t, "example.com",
+	entries := runZone09(t, "example.com",
 		func() packet.Packet {
 			return mxPacket("example.com", 300, mxRR{10, "mail1.example."}, mxRR{20, "mail2.example."})
 		},
@@ -3039,17 +2996,16 @@ func TestZone09PreferenceOnlyDifferenceIsVisible(t *testing.T) {
 		t.Fatalf("expected 2 Z09_INCONSISTENT_MX_DATA entries, got %d (%v)", len(variants), tctest.Tags(entries))
 	}
 
-	first := mxRDATAOf(t, variants[0])
-	second := mxRDATAOf(t, variants[1])
+	first := tctest.Strings(t, variants[0].Args, "mx_rdata")
+	second := tctest.Strings(t, variants[1].Args, "mx_rdata")
 	if slices.Equal(first, second) {
 		t.Fatalf("preference-only difference must change mx_rdata, both are %v", first)
 	}
 
 	want := []string{"mail1.example", "mail2.example"}
 	for _, entry := range variants {
-		targets, ok := entry.Args["mail_targets"].([]string)
-		if !ok || !slices.Equal(targets, want) {
-			t.Fatalf("expected mail_targets %v, got %#v", want, entry.Args["mail_targets"])
+		if targets := tctest.Strings(t, entry.Args, "mail_targets"); !slices.Equal(targets, want) {
+			t.Fatalf("expected mail_targets %v, got %v", want, targets)
 		}
 	}
 }
@@ -3062,7 +3018,7 @@ func TestZone09MXDataRDATAIsSortedAndLowercased(t *testing.T) {
 
 	entry := tctest.RequireTag(t, entries, "Z09_MX_DATA")
 	want := []string{"10 mx1.example", "20 mx2.example"}
-	if got := mxRDATAOf(t, entry); !slices.Equal(got, want) {
+	if got := tctest.Strings(t, entry.Args, "mx_rdata"); !slices.Equal(got, want) {
 		t.Fatalf("expected mx_rdata %v, got %v", want, got)
 	}
 }
@@ -3074,12 +3030,11 @@ func TestZone09MXDataMailTargetsDeduplicated(t *testing.T) {
 	})
 
 	entry := tctest.RequireTag(t, entries, "Z09_MX_DATA")
-	targets, ok := entry.Args["mail_targets"].([]string)
-	if !ok || !slices.Equal(targets, []string{"mail.example"}) {
-		t.Fatalf("expected mail_targets [mail.example], got %#v", entry.Args["mail_targets"])
+	if targets := tctest.Strings(t, entry.Args, "mail_targets"); !slices.Equal(targets, []string{"mail.example"}) {
+		t.Fatalf("expected mail_targets [mail.example], got %v", targets)
 	}
 	want := []string{"10 mail.example", "20 mail.example"}
-	if got := mxRDATAOf(t, entry); !slices.Equal(got, want) {
+	if got := tctest.Strings(t, entry.Args, "mx_rdata"); !slices.Equal(got, want) {
 		t.Fatalf("expected mx_rdata %v, got %v", want, got)
 	}
 }

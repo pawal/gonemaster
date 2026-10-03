@@ -25,13 +25,11 @@ describe("AsnNames", () => {
     expect(screen.getAllByRole("listitem").map((li) => li.textContent)).toEqual(["AS199973: Migrationsverket (SE)"]);
   });
 
-  it("renders nothing when no AS has a name", () => {
-    render(AsnNames, { props: { asns: [1299], names: holders } });
-    expect(screen.queryByTestId("asn-names")).toBeNull();
-  });
-
-  it("renders nothing for an empty list", () => {
-    render(AsnNames, { props: { asns: [], names: holders } });
+  it.each([
+    ["no AS has a name", [1299]],
+    ["the list is empty", []],
+  ])("renders nothing when %s", (_, asns) => {
+    render(AsnNames, { props: { asns, names: holders } });
     expect(screen.queryByTestId("asn-names")).toBeNull();
   });
 });

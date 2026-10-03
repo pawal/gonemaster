@@ -84,8 +84,7 @@ func TestResolve(t *testing.T) {
 	}
 }
 
-// Go accepts a Host header carrying quotes or angle brackets, and the result is
-// substituted into HTML attributes and XML, so a non-host value is refused.
+// A Host value carrying quotes, brackets, spaces or a backslash is refused.
 func TestResolveRefusesHostileHost(t *testing.T) {
 	for _, host := range []string{
 		`evil"onload="alert(1)`,

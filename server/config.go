@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -185,8 +186,10 @@ type Config struct {
 	SourceAddr4 *string `json:"source_addr4,omitempty"`
 	// SourceAddr6 overrides resolver.source6 when set.
 	SourceAddr6 *string `json:"source_addr6,omitempty"`
-	MinLevel    string  `json:"min_level"`
-	ProfilePath string  `json:"profile_path,omitempty"`
+	// IPv6Mode is auto (route check per run), on (the profile decides) or off.
+	IPv6Mode    string `json:"ipv6_mode"`
+	MinLevel    string `json:"min_level"`
+	ProfilePath string `json:"profile_path,omitempty"`
 	// Exclude lists testcases and modules no run on this instance executes.
 	Exclude []string `json:"exclude,omitempty"`
 	// LogFormat selects the operational log encoding: "text" (default) or "json".
@@ -310,6 +313,7 @@ type FileConfig struct {
 	Fallback                    *bool                   `json:"fallback"`
 	SourceAddr4                 *string                 `json:"source_addr4"`
 	SourceAddr6                 *string                 `json:"source_addr6"`
+	IPv6Mode                    *string                 `json:"ipv6_mode,omitempty"`
 	MinLevel                    *string                 `json:"min_level"`
 	ProfilePath                 *string                 `json:"profile_path"`
 	Exclude                     *[]string               `json:"exclude,omitempty"`
@@ -348,6 +352,7 @@ func DefaultConfig() Config {
 		WorkerCount:                 16,
 		MaxConcurrentJobs:           0,
 		StuckJobTimeoutMinutes:      defaultStuckJobTimeoutMinutes,
+		IPv6Mode:                    IPv6ModeAuto,
 		MinLevel:                    "INFO",
 		LogFormat:                   "text",
 		LogLevel:                    "info",
@@ -423,6 +428,24 @@ func (c Config) EffectivePurgeInterval() time.Duration {
 	return time.Duration(secs) * time.Second
 }
 
+// IPv6 modes for Config.IPv6Mode.
+const (
+	IPv6ModeAuto = "auto"
+	IPv6ModeOn   = "on"
+	IPv6ModeOff  = "off"
+)
+
+// ipv6Modes lists the accepted ipv6_mode values.
+var ipv6Modes = []string{IPv6ModeAuto, IPv6ModeOn, IPv6ModeOff}
+
+// ValidateIPv6Mode reports whether mode is auto, on or off.
+func ValidateIPv6Mode(mode string) error {
+	if !slices.Contains(ipv6Modes, mode) {
+		return fmt.Errorf("invalid ipv6_mode %q: want auto, on or off", mode)
+	}
+	return nil
+}
+
 // ValidatePublicURL reports whether public_url is an absolute http or https URL safe to substitute into pages.
 func ValidatePublicURL(s string) error {
 	if err := baseurl.Validate(s); err != nil {
@@ -487,6 +510,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.SourceAddr6 != nil {
 		c.SourceAddr6 = file.SourceAddr6
+	}
+	if file.IPv6Mode != nil {
+		c.IPv6Mode = *file.IPv6Mode
 	}
 	if file.MinLevel != nil {
 		c.MinLevel = *file.MinLevel

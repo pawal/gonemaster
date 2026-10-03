@@ -74,6 +74,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var noFallback bool
 	var sourceAddr4 string
 	var sourceAddr6 string
+	var ipv6Mode string
 	var minLevel string
 	var profilePath string
 	var excludes listFlag
@@ -146,6 +147,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--no-fallback", detail: "Disable TCP fallback on UDP failure"},
 			{flag: "--sourceaddr4 IPADDR", detail: "Override resolver.source4 (IPv4 source address)"},
 			{flag: "--sourceaddr6 IPADDR", detail: "Override resolver.source6 (IPv6 source address)"},
+			{flag: "--ipv6-mode MODE", detail: "IPv6 in test runs: auto (default) checks for an IPv6 route before each run, on leaves it to the profile, off disables it (env: GONEMASTER_IPV6_MODE)"},
 		})
 		printUsageGroup(errOut, "Database", []usageLine{
 			{flag: "--db-driver DRIVER", detail: "Storage backend: memory (default), sqlite, postgres, or mariadb (env: GONEMASTER_DB_DRIVER)"},
@@ -205,6 +207,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.BoolVar(&noFallback, "no-fallback", false, "Disable TCP fallback on UDP failure (optional)")
 	fs.StringVar(&sourceAddr4, "sourceaddr4", "", "Override resolver.source4 (IPv4 source address) (optional)")
 	fs.StringVar(&sourceAddr6, "sourceaddr6", "", "Override resolver.source6 (IPv6 source address) (optional)")
+	fs.StringVar(&ipv6Mode, "ipv6-mode", "", "IPv6 in test runs: auto, on or off (default auto)")
 	fs.StringVar(&minLevel, "min-level", "", "Minimum log level (default INFO)")
 	fs.StringVar(&profilePath, "profile", "", "Profile JSON/YAML path (optional)")
 	fs.StringVar(&logFormat, "log-format", "", "Operational log encoding: text (default) or json")
@@ -404,6 +407,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		value := strings.TrimSpace(sourceAddr6)
 		cfg.SourceAddr6 = &value
 	}
+	if flagsSet["ipv6-mode"] {
+		cfg.IPv6Mode = ipv6Mode
+	}
 	if flagsSet["min-level"] {
 		cfg.MinLevel = minLevel
 	}
@@ -508,6 +514,10 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 		return 2
 	}
 	if err := server.ValidatePublicURL(cfg.PublicURL); err != nil {
+		fmt.Fprintln(errOut, err.Error())
+		return 2
+	}
+	if err := server.ValidateIPv6Mode(cfg.IPv6Mode); err != nil {
 		fmt.Fprintln(errOut, err.Error())
 		return 2
 	}
@@ -693,6 +703,7 @@ func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string
 		"workers":                       "worker_count",
 		"max-concurrent-jobs":           "max_concurrent_jobs",
 		"min-level":                     "min_level",
+		"ipv6-mode":                     "ipv6_mode",
 		"profile":                       "profile_path",
 		"db-driver":                     "db_driver",
 		"db-dsn":                        "db_dsn",

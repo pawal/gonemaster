@@ -328,9 +328,12 @@ func (s *Server) runEngineForJob(job Job, ctx context.Context) (jobArtifacts, er
 		disabled := false
 		req.IPv4 = &disabled
 	}
-	if job.IPv6Disabled {
+	switch {
+	case job.IPv6Disabled || cfg.IPv6Mode == IPv6ModeOff:
 		disabled := false
 		req.IPv6 = &disabled
+	case cfg.IPv6Mode == IPv6ModeOn:
+		req.SkipIPv6Detect = true
 	}
 	// Clamp the guard on unless the instance permits non-global targets.
 	if !cfg.PublicAPI.AllowNonGlobalTargets {

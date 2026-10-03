@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -82,12 +83,14 @@ const (
 	settingDuration
 	settingLevel
 	settingURL
+	settingEnum
 )
 
-// settingSpec is the type and integer range of a writable setting.
+// settingSpec is the type, integer range and enum values of a writable setting.
 type settingSpec struct {
 	kind     settingKind
 	min, max int
+	values   []string
 }
 
 // writableSettings lists the keys PUT /settings accepts.
@@ -96,6 +99,7 @@ var writableSettings = map[string]settingSpec{
 	"max_concurrent_jobs":             {kind: settingInt, min: 0, max: 1024},
 	"stuck_job_timeout_minutes":       {kind: settingInt, min: 0, max: 525600},
 	"min_level":                       {kind: settingLevel},
+	"ipv6_mode":                       {kind: settingEnum, values: ipv6Modes},
 	"retention_days":                  {kind: settingInt, min: 0, max: 36500},
 	"purge_interval_seconds":          {kind: settingInt, min: 1, max: 31536000},
 	"public_url":                      {kind: settingURL},
@@ -143,6 +147,10 @@ func checkSetting(key, val string) error {
 		if err := baseurl.Validate(val); err != nil {
 			return fmt.Errorf("%s %w", key, err)
 		}
+	case settingEnum:
+		if !slices.Contains(spec.values, val) {
+			return fmt.Errorf("%s must be one of %s", key, strings.Join(spec.values, ", "))
+		}
 	}
 	return nil
 }
@@ -173,6 +181,8 @@ func (s *Server) applySetting(key, val string) {
 		s.cfg.StuckJobTimeoutMinutes = num
 	case "min_level":
 		s.cfg.MinLevel = val
+	case "ipv6_mode":
+		s.cfg.IPv6Mode = val
 	case "retention_days":
 		s.cfg.Database.RetentionDays = num
 		s.retentionDays.Store(int64(num))
@@ -286,6 +296,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"max_concurrent_jobs":             {Value: cfg.MaxConcurrentJobs, Source: s.settingSource("max_concurrent_jobs")},
 		"stuck_job_timeout_minutes":       {Value: cfg.StuckJobTimeoutMinutes, Source: s.settingSource("stuck_job_timeout_minutes")},
 		"min_level":                       {Value: cfg.MinLevel, Source: s.settingSource("min_level")},
+		"ipv6_mode":                       {Value: cfg.IPv6Mode, Source: s.settingSource("ipv6_mode")},
 		"retention_days":                  {Value: cfg.Database.RetentionDays, Source: s.settingSource("retention_days")},
 		"purge_interval_seconds":          {Value: int(cfg.EffectivePurgeInterval() / time.Second), Source: s.settingSource("purge_interval_seconds")},
 		"public_url":                      {Value: cfg.PublicURL, Source: s.settingSource("public_url")},

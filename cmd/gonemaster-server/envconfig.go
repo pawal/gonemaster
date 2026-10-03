@@ -76,6 +76,7 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyInt("workers", "GONEMASTER_WORKER_COUNT", &cfg.WorkerCount)
 	applyInt("max-concurrent-jobs", "GONEMASTER_MAX_CONCURRENT_JOBS", &cfg.MaxConcurrentJobs)
 	applyString("min-level", "GONEMASTER_MIN_LEVEL", &cfg.MinLevel)
+	applyString("ipv6-mode", "GONEMASTER_IPV6_MODE", &cfg.IPv6Mode)
 	applyString("profile", "GONEMASTER_PROFILE", &cfg.ProfilePath)
 	applyString("log-format", "GONEMASTER_LOG_FORMAT", &cfg.LogFormat)
 	applyString("log-level", "GONEMASTER_LOG_LEVEL", &cfg.LogLevel)

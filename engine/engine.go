@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"os"
 	"runtime/debug"
 	"slices"
@@ -64,6 +65,8 @@ type RunRequest struct {
 	IPv4 *bool
 	// IPv6 overrides net.ipv6 when non-nil.
 	IPv6 *bool
+	// SkipIPv6Detect skips the host IPv6 route check; net.ipv6 then follows the profile.
+	SkipIPv6Detect bool
 	// AllowNonGlobalTargets overrides net.allow_non_global_targets when non-nil.
 	AllowNonGlobalTargets *bool
 	// Parallel overrides resolver.defaults.parallel when non-nil.
@@ -555,7 +558,7 @@ func buildProfile(req RunRequest, module string, testcases []string) (*profile.P
 			return nil, false, err
 		}
 	}
-	autoDisabledIPv6 := shouldAutoDisableIPv6(req, p.Net.IPv6)
+	autoDisabledIPv6 := shouldAutoDisableIPv6(req, p.Net.IPv6, net.Dial)
 	if autoDisabledIPv6 {
 		if err := p.Set("net.ipv6", false); err != nil {
 			return nil, false, err
@@ -664,7 +667,7 @@ func RunWithRunner(req RunRequest, runner *Runner) ([]LogEntry, error) {
 	}
 
 	if runner.AutoIPv6Disabled {
-		if _, err := runner.Logger.AddWithoutCallback("IPV6_AUTO_DISABLED", map[string]any{"reason": "no global IPv6 address detected"}, "", ""); err != nil {
+		if _, err := runner.Logger.AddWithoutCallback("IPV6_AUTO_DISABLED", map[string]any{"reason": "no route to a global IPv6 address"}, "", ""); err != nil {
 			return nil, err
 		}
 	}

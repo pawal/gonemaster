@@ -28,6 +28,22 @@ func readJSON(r *http.Request, maxBodySize int64, dst any) error {
 	return nil
 }
 
+// requestError is an API error not yet written.
+type requestError struct {
+	status  int
+	code    string
+	message string
+	details map[string]any
+}
+
+func badRequest(code, message string) *requestError {
+	return &requestError{status: http.StatusBadRequest, code: code, message: message}
+}
+
+func (e *requestError) write(w http.ResponseWriter) {
+	writeError(w, e.status, e.code, e.message, e.details)
+}
+
 func writeError(w http.ResponseWriter, status int, code string, message string, details map[string]any) {
 	if metricsWriter, ok := w.(metricsAwareResponseWriter); ok {
 		metricsWriter.SetErrorCode(code)

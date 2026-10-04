@@ -42,21 +42,28 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_json", err.Error(), nil)
 		return
 	}
-	if req.Nameservers != nil || req.DSInfo != nil {
-		writeError(w, http.StatusBadRequest, "undelegated_not_supported_for_batch", "undelegated input is only supported for POST /jobs", nil)
+	resp, rerr := s.submitBatch(req, "")
+	if rerr != nil {
+		rerr.write(w)
 		return
 	}
+	writeJSON(w, http.StatusAccepted, resp)
+}
+
+// submitBatch creates and enqueues a batch; origin is "" or BatchOriginSchedule.
+func (s *Server) submitBatch(req JobBatchRequest, origin string) (JobBatchResponse, *requestError) {
+	if req.Nameservers != nil || req.DSInfo != nil {
+		return JobBatchResponse{}, badRequest("undelegated_not_supported_for_batch", "undelegated input is only supported for POST /jobs")
+	}
 	if req.FromTag != "" && len(req.Domains) > 0 {
-		writeError(w, http.StatusBadRequest, "ambiguous_domains", "from_tag and domains are mutually exclusive", nil)
-		return
+		return JobBatchResponse{}, badRequest("ambiguous_domains", "from_tag and domains are mutually exclusive")
 	}
 
 	// Resolve domain list: either from an explicit list or from a tag.
 	domains := req.Domains
 	if req.FromTag != "" {
 		if _, ok := s.store.GetTag(req.FromTag); !ok {
-			writeError(w, http.StatusBadRequest, "tag_not_found", "tag not found: "+req.FromTag, nil)
-			return
+			return JobBatchResponse{}, badRequest("tag_not_found", "tag not found: "+req.FromTag)
 		}
 		list := s.store.ListDomainsByTag(req.FromTag, DomainFilter{Limit: 10000})
 		for _, d := range list.Items {
@@ -64,31 +71,31 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if len(domains) == 0 {
-		writeError(w, http.StatusBadRequest, "missing_domain", "domains is required", nil)
-		return
+		return JobBatchResponse{}, badRequest("missing_domain", "domains is required")
 	}
 
-	if !validateMinLevel(w, req.MinLevel) || !s.validateTests(w, req.Tests) {
-		return
+	if rerr := checkMinLevel(req.MinLevel); rerr != nil {
+		return JobBatchResponse{}, rerr
 	}
-	tagNames, ok := validateTags(w, s, req.Tags)
-	if !ok {
-		return
+	if rerr := s.checkTests(req.Tests); rerr != nil {
+		return JobBatchResponse{}, rerr
+	}
+	tagNames, rerr := s.checkTags(req.Tags)
+	if rerr != nil {
+		return JobBatchResponse{}, rerr
 	}
 	resolvedProfile := resolvedProfileRef{}
 	if req.ProfileID != nil {
 		var code, message string
 		resolvedProfile, code, message = s.resolveStoredProfile(req.ProfileID, false)
 		if code != "" {
-			writeError(w, http.StatusBadRequest, code, message, nil)
-			return
+			return JobBatchResponse{}, badRequest(code, message)
 		}
 	} else if len(req.ProfileOverrides) == 0 && req.FromTag != "" {
 		var code, message string
 		resolvedProfile, code, message = s.resolveDefaultProfileFromTags([]string{req.FromTag})
 		if code != "" {
-			writeError(w, http.StatusBadRequest, code, message, nil)
-			return
+			return JobBatchResponse{}, badRequest(code, message)
 		}
 	}
 
@@ -99,12 +106,10 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 	for _, domain := range domains {
 		trimmed := strings.TrimSpace(domain)
 		if trimmed == "" {
-			writeError(w, http.StatusBadRequest, "missing_domain", "domains is required", nil)
-			return
+			return JobBatchResponse{}, badRequest("missing_domain", "domains is required")
 		}
 		if errs, normalized := normalization.NormalizeName(trimmed); len(errs) > 0 {
-			writeError(w, http.StatusBadRequest, "invalid_domain", errs[0].Message(), nil)
-			return
+			return JobBatchResponse{}, badRequest("invalid_domain", errs[0].Message())
 		} else {
 			trimmed = normalized
 		}
@@ -125,8 +130,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		}
 		created, err := s.store.Create(job)
 		if err != nil {
-			writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
-			return
+			return JobBatchResponse{}, &requestError{status: http.StatusInternalServerError, code: "store_error", message: err.Error()}
 		}
 		_ = s.queue.Enqueue(created.ID, PriorityBatch)
 		s.metrics.ObserveJobSubmittedWithContext(created.BatchID, created.Domain, JobQueued)
@@ -134,8 +138,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		if len(tagNames) > 0 {
 			d, err := s.store.GetOrCreateDomain(trimmed)
 			if err != nil {
-				writeError(w, http.StatusInternalServerError, "store_error", err.Error(), nil)
-				return
+				return JobBatchResponse{}, &requestError{status: http.StatusInternalServerError, code: "store_error", message: err.Error()}
 			}
 			domainIDs = append(domainIDs, d.ID)
 		}
@@ -152,6 +155,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		DomainCount:    len(jobIDs),
 		CreatedAt:      now,
 		SnapshotIntent: req.SnapshotIntent,
+		Origin:         origin,
 	})
 
 	// Pin-on-capture intent, consumed once by the capture loop.
@@ -159,7 +163,7 @@ func (s *Server) handleJobsBatch(w http.ResponseWriter, r *http.Request) {
 		_ = s.store.SetSetting(PromoteDefaultSettingKey(batchID), "1")
 	}
 
-	writeJSON(w, http.StatusAccepted, JobBatchResponse{BatchID: batchID, JobIDs: jobIDs})
+	return JobBatchResponse{BatchID: batchID, JobIDs: jobIDs}, nil
 }
 
 func (s *Server) handleJobByID(w http.ResponseWriter, r *http.Request) {
@@ -480,6 +484,16 @@ func (s *Server) handleCreateJob(w http.ResponseWriter, r *http.Request) {
 // Returns the deduplicated list of non-empty tag names, or writes a 400 and
 // returns false if any tag is unknown.
 func validateTags(w http.ResponseWriter, s *Server, tags []string) ([]string, bool) {
+	names, rerr := s.checkTags(tags)
+	if rerr != nil {
+		rerr.write(w)
+		return nil, false
+	}
+	return names, true
+}
+
+// checkTags is validateTags without the response writer.
+func (s *Server) checkTags(tags []string) ([]string, *requestError) {
 	var names []string
 	for _, t := range tags {
 		t = strings.TrimSpace(t)
@@ -487,12 +501,11 @@ func validateTags(w http.ResponseWriter, s *Server, tags []string) ([]string, bo
 			continue
 		}
 		if _, ok := s.store.GetTag(t); !ok {
-			writeError(w, http.StatusBadRequest, "tag_not_found", "tag not found: "+t, nil)
-			return nil, false
+			return nil, badRequest("tag_not_found", "tag not found: "+t)
 		}
 		names = append(names, t)
 	}
-	return names, true
+	return names, nil
 }
 
 // validateMinLevel rejects a min_level the engine cannot use. Empty is the
@@ -504,33 +517,50 @@ func (s *Server) isExcluded(testcase string) bool {
 
 // validateTests writes 400 testcase_excluded when tests names an excluded testcase.
 func (s *Server) validateTests(w http.ResponseWriter, tests []string) bool {
-	for _, name := range tests {
-		if s.isExcluded(name) {
-			name = strings.ToLower(strings.TrimSpace(name))
-			writeError(w, http.StatusBadRequest, "testcase_excluded",
-				fmt.Sprintf("testcase %q is excluded on this instance", name), map[string]any{"testcase": name})
-			return false
-		}
+	if rerr := s.checkTests(tests); rerr != nil {
+		rerr.write(w)
+		return false
 	}
 	return true
 }
 
+// checkTests is validateTests without the response writer.
+func (s *Server) checkTests(tests []string) *requestError {
+	for _, name := range tests {
+		if s.isExcluded(name) {
+			name = strings.ToLower(strings.TrimSpace(name))
+			rerr := badRequest("testcase_excluded", fmt.Sprintf("testcase %q is excluded on this instance", name))
+			rerr.details = map[string]any{"testcase": name}
+			return rerr
+		}
+	}
+	return nil
+}
+
 func validateMinLevel(w http.ResponseWriter, minLevel string) bool {
+	if rerr := checkMinLevel(minLevel); rerr != nil {
+		rerr.write(w)
+		return false
+	}
+	return true
+}
+
+// checkMinLevel is validateMinLevel without the response writer.
+func checkMinLevel(minLevel string) *requestError {
 	if strings.TrimSpace(minLevel) == "" {
-		return true
+		return nil
 	}
 	levels := logger.Levels()
 	if _, ok := levels[strings.ToUpper(strings.TrimSpace(minLevel))]; ok {
-		return true
+		return nil
 	}
 	names := make([]string, 0, len(levels))
 	for name := range levels {
 		names = append(names, name)
 	}
 	sort.Slice(names, func(i, j int) bool { return levels[names[i]] < levels[names[j]] })
-	writeError(w, http.StatusBadRequest, "invalid_min_level",
-		fmt.Sprintf("min_level %q is not one of %s", minLevel, strings.Join(names, ", ")), nil)
-	return false
+	return badRequest("invalid_min_level",
+		fmt.Sprintf("min_level %q is not one of %s", minLevel, strings.Join(names, ", ")))
 }
 
 // MaxUndelegatedNameservers / MaxUndelegatedDSRecords cap the number of

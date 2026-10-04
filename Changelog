@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.17] - 2026-10-04
+
+New testcase dnssec24 for authenticated DNSSEC bootstrapping (RFC 9615), scheduled cohort snapshots, and dnssec23 now runs in the default profile.
 
 ### Added
 

@@ -8,6 +8,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 - tools: `make anchors-check` verifies the root trust anchors in `engine/dnssecutil` against IANA's signed `root-anchors.xml`
 
+### Changed
+
+- deps: bump miekg/dns to v0.6.118
+
 ## [v1.7.17] - 2026-10-04
 
 New testcase dnssec24 for authenticated DNSSEC bootstrapping (RFC 9615), scheduled cohort snapshots, and dnssec23 now runs in the default profile.

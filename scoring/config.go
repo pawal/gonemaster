@@ -146,6 +146,8 @@ func DefaultConfig() Config {
 			"DS09_RSA_EXPONENT_UNSUPPORTED": 0,
 			// DNSKEY_RSA_EXPONENT_LARGE: interoperability note about a valid key, no penalty.
 			"DNSKEY_RSA_EXPONENT_LARGE": 0,
+			// DS19_BLOCKLIST_NOT_FOUND: the badkeys blocklist is missing on the test host.
+			"DS19_BLOCKLIST_NOT_FOUND": 0,
 			// NO_IPV6_NS_CHILD / NO_IPV6_NS_DEL: zero nameservers have IPv6
 			// addresses - the zone is entirely unreachable over IPv6. Both are
 			// NOTICE (1 pt) by default but warrant the same weight as an ERROR.

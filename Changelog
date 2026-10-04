@@ -11,6 +11,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Changed
 
 - deps: bump miekg/dns to v0.6.118
+- scoring: `DS19_BLOCKLIST_NOT_FOUND` carries no penalty; a stored scoring config keeps the NOTICE penalty until reset to default
 
 ## [v1.7.17] - 2026-10-04
 

@@ -543,6 +543,7 @@ func TestComputeScoreNeutralTags(t *testing.T) {
 		{"SPF unknown modifier", "example.com", "ZONE", "zone_consistency", []string{"Z11_SPF_UNKNOWN_MODIFIER", "Z11_SPF_UNKNOWN_MODIFIER"}},
 		{"SPF macro target", "example.com", "ZONE", "zone_consistency", []string{"Z13_SPF_MACRO_TARGET", "Z13_SPF_MACRO_TARGET"}},
 		{"large RSA exponent", "example.se", "DNSSEC", "dnssec", []string{"DNSKEY_RSA_EXPONENT_LARGE", "DNSKEY_RSA_EXPONENT_LARGE"}},
+		{"badkeys blocklist missing", "example.se", "DNSSEC", "dnssec", []string{"DS19_BLOCKLIST_NOT_FOUND"}},
 		{"UDP answer needs TCP", "example.se", "CONNECTIVITY", "connectivity", []string{"CN05_ANSWER_NEEDS_TCP", "CN05_ANSWER_NEEDS_TCP"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

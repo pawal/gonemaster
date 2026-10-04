@@ -190,7 +190,7 @@ emit TEST_CASE_END
 | `DS19_BADKEY_SMALL_FACTORS` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS19_BADKEY_SMALL_D` | `ERROR` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS19_KEY_OK` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
-| `DS19_BLOCKLIST_NOT_FOUND` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
+| `DS19_BLOCKLIST_NOT_FOUND` | `NOTICE` | Default from `share/profile.json` (`test_levels.DNSSEC`); carries zero score penalty (`scoring` `TagPenalties`). |
 | `DS19_NO_DNSKEY` | `INFO` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `DS19_NO_RESPONSE` | `WARNING` | Default from `share/profile.json` (`test_levels.DNSSEC`). |
 | `IPV4_DISABLED` | `DEBUG` | Default from `share/profile.json` (`test_levels.DNSSEC`). |

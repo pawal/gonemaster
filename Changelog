@@ -12,6 +12,10 @@ All notable changes to all gonemaster components will be documented in this file
 - mcp: `cohort_schedule_list` tool
 - dnssec24: new testcase validating the RFC 9615 DNSSEC bootstrapping signals of a signed zone without DS
 
+### Fixed
+
+- dnssec23: runs in the default profile; it was missing from `test_cases` since v1.7.16
+
 ## [v1.7.16] - 2026-10-04
 
 New testcase dnssec23, and IPv6 detection that works behind IPv6 NAT.

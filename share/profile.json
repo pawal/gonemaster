@@ -806,6 +806,7 @@
         "dnssec20",
         "dnssec21",
         "dnssec22",
+        "dnssec23",
         "dnssec24",
         "delegation01",
         "delegation02",

@@ -144,6 +144,11 @@ variables, CLI flags. Later sources override earlier ones.
 **--public-api-allow-non-global-targets**
 : Permit querying non-globally-reachable nameserver addresses (default: off). When off, the engine guard is clamped on for every job so no caller-selected profile can relax it, covering private addresses learned from glue or DNS resolution that the admission check above cannot see. Enable on private/internal deployments. Complements, and does not replace, **--public-api-allow-private-undelegated-ip**; a public instance that runs private undelegated tests must set both.
 
+### Scheduler
+
+**--scheduler-enabled**=*BOOL*
+: Let the cohort scheduler submit the snapshot runs of due cohort schedules (default: **true**). **--scheduler-enabled=false** stops every schedule from firing and keeps the schedules; a flag-set value is read-only in the admin UI.
+
 ### Output
 
 **--min-level** *LEVEL*
@@ -230,6 +235,9 @@ variables, CLI flags. Later sources override earlier ones.
 
 **GONEMASTER_IDLE_TIMEOUT**
 : Equivalent to **--idle-timeout**.
+
+**GONEMASTER_SCHEDULER_ENABLED**
+: Equivalent to **--scheduler-enabled**.
 
 ## CONFIG FILE
 

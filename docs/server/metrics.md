@@ -59,6 +59,10 @@ Top-level fields:
 - `api.proxy.rate_limit_keys`: distinct client IPs the public rate limiter is tracking, `0` when it
   is disabled. Stuck at `1` while serving many visitors means they all share one bucket.
 
+`jobs.scheduled_runs` counts cohort scheduler firings by outcome (`submitted`, `skipped_missed`,
+`skipped_disabled`, `skipped_active`, `skipped_empty`, `error`). `health.scheduler_enabled` reports
+the `scheduler_enabled` setting.
+
 Commonly used fields:
 - `health.queue_depth`
 - `health.in_flight_jobs`
@@ -133,6 +137,7 @@ Included families:
 - Job lifecycle counters and current-status gauges.
 - API request counters plus per-route/per-method latency histograms.
 - `gonemaster_forwarded_headers_stripped_total` and the `gonemaster_rate_limit_keys` gauge.
+- `gonemaster_scheduled_runs_total{outcome}` and the `gonemaster_scheduler_enabled` gauge.
 - Job duration histogram, severity totals, and locale usage totals.
 
 Excluded from Prometheus output:

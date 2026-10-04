@@ -1,7 +1,7 @@
 # Server Operations
 
 This page covers day-to-day operation of `gonemaster-server`: jobs, batches,
-queue control, deletion, health, and metrics.
+queue control, scheduled snapshots, deletion, health, and metrics.
 
 ## Jobs and Batches
 
@@ -50,6 +50,30 @@ Priority tiers:
 
 Workers always drain normal jobs before batch jobs. Reordering is allowed only
 within the tier rules.
+
+## Background Work
+
+Besides the workers, the server runs these loops:
+
+| Loop | Interval | Work |
+|---|---|---|
+| Retention purge | `purge_interval_seconds` | Deletes terminal runs older than `retention_days`. |
+| Stuck job reaper | 1 minute | Fails abandoned running jobs; see [Jobs that will not finish](#jobs-that-will-not-finish). |
+| Snapshot capture | 30 seconds | Captures the snapshots of drained snapshot-intent batches. |
+| Cohort scheduler | 1 minute | Submits the snapshot runs of due cohort schedules. |
+
+The capture loop and the scheduler run only with the analysis controller, on
+the SQL backends. Both also run once at startup, so a restart captures a batch
+that drained while the server was down and fires a schedule that fell due.
+A schedule overdue at startup fires once whatever the number of occurrences
+it missed, unless its `catch_up` is false and it is over one hour late.
+
+Scheduled batches carry `origin` `schedule` and show a **scheduled** badge
+in the Batches tab. Each firing logs one `scheduled run` line with
+`cohort_id`, `tag`, `outcome`, `batch_id` and `next_run_at`, at `warn` for
+outcome `error`. `scheduler_enabled` stops all firing; see
+[configuration.md](configuration.md#scheduler-settings) and
+[../analysis/cohorts.md](../analysis/cohorts.md#scheduling).
 
 ## Retention and Deletion
 

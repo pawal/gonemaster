@@ -17,7 +17,8 @@ Features include:
 - domain registry browsing
 - tag creation, editing, deletion, and membership management
 - stored profile management
-- cohort and snapshot administration
+- cohort and snapshot administration, including the snapshot schedule
+  editor opened from a cohort's **Schedule** column
 - translated result messages
 - optional scoring and nameserver timing display
 

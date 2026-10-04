@@ -329,6 +329,53 @@ List one cohort's snapshot slugs, newest first, with the capture date and
 the domain count. The dataset tag defaults to the server's default public
 cohort.
 
+### cohorts schedules
+
+List every cohort snapshot schedule with its rule, next run and last outcome.
+
+### cohorts schedule *TAG*
+
+Show the snapshot schedule of the cohort whose source tag is *TAG*.
+
+### cohorts schedule set *TAG*
+
+Create or change a cohort's snapshot schedule. Unset flags keep the current
+value; a new schedule starts enabled, in UTC, with catch-up on.
+
+**--monthly** *LIST*
+: Monthly on days 1 to 28; **last** adds the last day of the month.
+
+**--weekly** *LIST*
+: Weekly on the named days, **mon** to **sun**.
+
+**--every** *N*
+: Every N days, 1 to 365.
+
+**--from** *DATE*
+: First date of an **--every** rule, YYYY-MM-DD (default today).
+
+**--at** *HH:MM*
+: Time of day.
+
+**--tz** *ZONE*
+: IANA time zone name.
+
+**--profile** *NAME*
+: Stored profile name or id; empty restores the tag default.
+
+**--promote-default**, **--no-promote-default**
+: Pin, or do not pin, each captured snapshot as cohort default.
+
+**--catch-up**, **--no-catch-up**
+: Run, or skip, an occurrence missed during downtime.
+
+**--enable**, **--disable**
+: Resume or pause the schedule.
+
+### cohorts schedule remove *TAG*
+
+Delete a cohort's snapshot schedule.
+
 ### queue pause
 
 Pause the job queue.
@@ -410,6 +457,10 @@ Find the cohorts and their snapshot slugs:
 
     gonemaster-client cohorts list
     gonemaster-client cohorts snapshots kommuner
+
+Snapshot the TLD cohort on the 1st and the 15th at 02:00 Stockholm time:
+
+    gonemaster-client cohorts schedule set tld --monthly 1,15 --at 02:00 --tz Europe/Stockholm
 
 Use a remote server with JSON output:
 

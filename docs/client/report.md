@@ -40,20 +40,8 @@ to a file.
 
 ## Finding a Cohort and a Snapshot Slug
 
-The `cohorts` group answers both:
-
-```sh
-gonemaster-client cohorts list
-gonemaster-client cohorts snapshots kommuner
-```
-
-`cohorts list` names every public cohort with its label, its snapshot count,
-and which one is the default. `cohorts snapshots` gives one cohort's slugs
-with the capture date and the domain count, newest first; its dataset tag is
-optional and resolves the same way `report` does.
-
-A snapshot is captured per batch, so comparing two batches of a cohort is the
-same call as comparing their snapshots.
+`cohorts list` names the public cohorts and `cohorts snapshots` a cohort's
+snapshot slugs; see [cohorts.md](cohorts.md).
 
 ## Output
 

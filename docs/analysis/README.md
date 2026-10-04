@@ -16,7 +16,7 @@ read-only cohort views for public analysis.
 1. Create a tag and add domains.
 2. Run a tagged batch.
 3. Create or enable a cohort for the tag.
-4. Capture a snapshot.
+4. Capture a snapshot, or schedule one.
 5. Share the public analysis URL.
 
 ## Guides

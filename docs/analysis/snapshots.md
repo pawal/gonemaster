@@ -19,6 +19,12 @@ Snapshots solve two operational problems:
    profile when configured, and `snapshot_intent = true`.
 4. The snapshot is `pending` until every job in the batch has graduated.
 
+### From a Schedule
+
+A cohort schedule submits the same batch as **Run new snapshot** on a
+recurrence, with the schedule's profile and default pin. See
+[cohorts.md](cohorts.md#scheduling).
+
 ### From the Batch Form
 
 1. Open the **Batches** tab.

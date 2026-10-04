@@ -45,7 +45,7 @@ server stores nothing and answers `400` when a name is read-only
 | `min_level` | A log level name. |
 | `ipv6_mode` | `auto`, `on` or `off`. |
 | `public_url` | As in [Core Settings](#core-settings). |
-| `rate_limit_enabled`, `allow_private_undelegated_ip`, `allow_non_global_targets`, `show_score_admin`, `show_score_public`, `show_nameserver_timings_admin`, `show_nameserver_timings_public`, `show_dnssec_chain_public`, `show_asn_names_public`, `mcp_enabled`, `mcp_allow_write` | `true` or `false`. |
+| `rate_limit_enabled`, `allow_private_undelegated_ip`, `allow_non_global_targets`, `show_score_admin`, `show_score_public`, `show_nameserver_timings_admin`, `show_nameserver_timings_public`, `show_dnssec_chain_public`, `show_asn_names_public`, `mcp_enabled`, `mcp_allow_write`, `scheduler_enabled` | `true` or `false`. |
 
 The read-only settings are `listen_addr`, `db_driver`, `db_dsn`,
 `profile_path`, and every setting set by a command-line flag.
@@ -124,6 +124,7 @@ write, and logs and ignores a stored value outside them.
 | `GONEMASTER_ANALYSIS_VANTAGE_LABEL` | `analysis.vantage_label` |
 | `GONEMASTER_ADMIN_TOKEN_HASHES` | `auth.admin_tokens` (comma-separated `label=sha256:...`) |
 | `GONEMASTER_AUTH_PROTECT_PUBLIC` | `auth.protect_public` |
+| `GONEMASTER_SCHEDULER_ENABLED` | `scheduler_enabled` |
 
 Invalid integer, boolean, or duration values emit a warning and are ignored.
 
@@ -172,6 +173,7 @@ Analysis flags:
 
 ```text
 --analysis-vantage-label LABEL
+--scheduler-enabled=false
 ```
 
 Resolver override flags:
@@ -388,6 +390,25 @@ stop these queries. See
 `cancel_job`, for every token holder. Both are in the admin UI under
 Settings, MCP, and take effect without a restart. See
 [../mcp/server-endpoint.md](../mcp/server-endpoint.md).
+
+## Scheduler Settings
+
+```json
+{
+  "scheduler_enabled": true
+}
+```
+
+`scheduler_enabled` (default `true`) lets the cohort scheduler submit the
+snapshot runs of due cohort schedules. When it is `false`, no schedule fires
+and every schedule is kept unchanged. When it returns to `true`, an overdue
+schedule is handled as after downtime: it fires once, or is skipped when
+`catch_up` is false and the occurrence is over one hour late. The value applies
+at the next check, within one minute, without a restart. It is in the admin
+UI under Settings, Scheduler. The flag `--scheduler-enabled=false` and
+`GONEMASTER_SCHEDULER_ENABLED=false` turn it off at startup; a flag-set value
+is read-only on the Settings page. See
+[../analysis/cohorts.md](../analysis/cohorts.md#scheduling).
 
 ## Analysis Settings
 

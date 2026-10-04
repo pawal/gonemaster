@@ -55,7 +55,7 @@ Exit codes:
 - `tags`: manage named domain collections.
 - `runs`: inspect completed historical runs.
 - `entries`: query stored log entries.
-- `cohorts`: list the public analysis cohorts and their snapshots.
+- `cohorts`: list the analysis cohorts and their snapshots, and manage their snapshot schedules.
 - `report`: compare two cohort snapshots and classify every change.
 
 ## Guides
@@ -63,6 +63,7 @@ Exit codes:
 - Jobs: [jobs.md](jobs.md)
 - Batches: [batches.md](batches.md)
 - Domains, tags, runs, and entries: [domains-tags-runs-entries.md](domains-tags-runs-entries.md)
+- Cohorts and schedules: [cohorts.md](cohorts.md)
 - Cohort report: [report.md](report.md)
 - Examples: [examples.md](examples.md)
 

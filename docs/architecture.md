@@ -1,6 +1,6 @@
 # gonemaster architecture
 
-Last reviewed: 2026-10-02.
+Last reviewed: 2026-10-04.
 
 ## 1. System overview
 
@@ -195,6 +195,7 @@ A second layer sits above `Run` for cohort analysis.
 |---|---|---|
 | `AnalysisCohort` | Admin overlay on one source `Tag`: label, public/analysis flags, default snapshot, sort order. | One per published cohort. |
 | `AnalysisCohortSnapshot` | Point-in-time view of a cohort, backed by exactly one snapshot-intent `Batch`. | Many per cohort. |
+| `AnalysisCohortSchedule` | Recurrence on which the scheduler submits the cohort's snapshot-intent batch, with the next occurrence and the last outcome. | At most one per cohort. |
 | `analysis_run_*` projections | Per-run facts (domain summary, tags, nameservers, addresses, ASNs, prefixes), materialized into each cohort by `analysis.ProjectRun`. | Many per (run, cohort). |
 | `analysis_snapshot_*` views | Per-snapshot pre-aggregated rows, materialized by `analysis.CaptureCompletedSnapshots`. Public read paths serve these directly. | Many per snapshot. |
 
@@ -311,6 +312,23 @@ calls when set above zero (default `0`: no extra cap; only the
 worker pool bounds concurrency). Useful when the engine is
 bottlenecked on something other than worker goroutines, e.g.
 resolver capacity or DNS rate budgets.
+
+### Background loops
+
+Beside the workers, `Start` runs loops on the worker context
+([server/worker.go](../server/worker.go)): the retention purge, the
+stuck job reaper and the rate limiter cleanup always, and with an
+analysis controller the snapshot capture loop (30 s) and the cohort
+scheduler (1 minute, [server/scheduler.go](../server/scheduler.go)).
+The capture loop and the scheduler also run once at startup.
+
+The scheduler lists the due `AnalysisCohortSchedule` rows, advances each
+`next_run_at` with a compare-and-set update before it submits, and
+records one outcome per occurrence. The claim makes a firing at most once
+and safe for several servers on one database. Recurrences are computed by
+[server/recurrence/](../server/recurrence/recurrence.go), a package with
+no server dependency. A panic fails one tick and is logged; the loop
+continues.
 
 ### Cancellation
 

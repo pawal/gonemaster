@@ -2,6 +2,15 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
+## [Unreleased]
+
+### Added
+
+- server: cohort snapshot schedules, the `scheduler_enabled` setting, and `origin` on scheduled batches
+- admin-ui: schedule column and editor in the cohort list, and a scheduled badge on batches
+- cli: `cohorts schedules` and `cohorts schedule` commands
+- mcp: `cohort_schedule_list` tool
+
 ## [v1.7.16] - 2026-10-04
 
 New testcase dnssec23, and IPv6 detection that works behind IPv6 NAT.

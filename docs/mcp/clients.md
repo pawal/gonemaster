@@ -233,5 +233,5 @@ during the run.
 ## Checking the connection
 
 Call `ping`. [README.md](README.md#verifying-a-connection) lists what each
-answer means. `tools/list` shows 17 tools, or 20 when the write tools are
+answer means. `tools/list` shows 18 tools, or 21 when the write tools are
 enabled.

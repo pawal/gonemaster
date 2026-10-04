@@ -104,6 +104,7 @@ Reference
   - profile_list names the test profiles; pass the id as test_domain's profile_id.
   - domain_tag_list names the user domain tags: groups of domains that batches are built from. They are unrelated to finding tags.
   - cohort_list names the analysis cohorts and their snapshots, whose slugs feed cohort_report.
+  - cohort_schedule_list shows when each cohort's next scheduled snapshot runs and what the last one did.
 
 Tags are stable identifiers; messages are human-readable renderings in the requested language (default en). ping reports connectivity and auth status.
 

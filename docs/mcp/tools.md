@@ -144,6 +144,15 @@ Lists the public analysis cohorts, and the snapshots of one when
 first, with `slug`, `label`, `captured_at`, `domain_count`. Slugs feed
 `cohort_report`.
 
+### cohort_schedule_list
+
+Lists the cohort snapshot schedules. No inputs. Output: `count`,
+`schedules` with `dataset_tag`, `label`, `enabled`, `summary` (the rule in
+English), `next_run_at`, `last_run_at`, `last_outcome` (`submitted`,
+`skipped_missed`, `skipped_disabled`, `skipped_active`, `skipped_empty` or
+`error`) and `last_batch_id`, which `batch_get` takes. A server without the
+analysis controller answers an error.
+
 ## Batches and cohorts
 
 A batch is one test run over many domains.

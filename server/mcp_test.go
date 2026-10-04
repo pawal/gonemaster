@@ -99,8 +99,8 @@ func TestMCPEndpointListsReadToolsAndPings(t *testing.T) {
 	session, ctx := mcpSession(t, srv, "gm_secret")
 
 	names := mcpToolNames(t, session, ctx)
-	if len(names) != 17 || !names["test_domain"] || !names["cohort_report"] || names["batch_enqueue"] {
-		t.Fatalf("tools = %v, want 17 read tools", names)
+	if len(names) != 18 || !names["test_domain"] || !names["cohort_schedule_list"] || names["batch_enqueue"] {
+		t.Fatalf("tools = %v, want 18 read tools", names)
 	}
 
 	res, err := session.CallTool(ctx, &mcp.CallToolParams{Name: "ping", Arguments: map[string]any{}})
@@ -121,8 +121,8 @@ func TestMCPEndpointWriteToolsFollowTheSetting(t *testing.T) {
 	srv := newTestServer(t, withMCP(true))
 	session, ctx := mcpSession(t, srv, "")
 	names := mcpToolNames(t, session, ctx)
-	if len(names) != 20 || !names["batch_enqueue"] || !names["batch_cancel"] || !names["cancel_job"] {
-		t.Fatalf("tools = %v, want 20 with the write tools", names)
+	if len(names) != 21 || !names["batch_enqueue"] || !names["batch_cancel"] || !names["cancel_job"] {
+		t.Fatalf("tools = %v, want 21 with the write tools", names)
 	}
 }
 

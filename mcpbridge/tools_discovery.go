@@ -12,6 +12,7 @@ func registerDiscoveryTools(srv *mcp.Server, api *Client) {
 	registerProfileList(srv, api)
 	registerDomainTagList(srv, api)
 	registerCohortList(srv, api)
+	registerCohortScheduleList(srv, api)
 }
 
 type profileListInput struct{}
@@ -138,6 +139,46 @@ func registerCohortList(srv *mcp.Server, api *Client) {
 			}
 			out.Snapshots = append(out.Snapshots, snap)
 		}
+		return nil, out, nil
+	})
+}
+
+type cohortScheduleListInput struct{}
+
+type cohortScheduleOut struct {
+	DatasetTag  string `json:"dataset_tag" jsonschema:"the cohort, as cohort_report's dataset_tag"`
+	Label       string `json:"label,omitempty"`
+	Enabled     bool   `json:"enabled"`
+	Summary     string `json:"summary" jsonschema:"the recurrence in English"`
+	NextRunAt   string `json:"next_run_at,omitempty"`
+	LastRunAt   string `json:"last_run_at,omitempty"`
+	LastOutcome string `json:"last_outcome,omitempty" jsonschema:"submitted, skipped_missed, skipped_disabled, skipped_active, skipped_empty or error"`
+	LastBatchID string `json:"last_batch_id,omitempty" jsonschema:"the last scheduled batch; pass to batch_get"`
+}
+
+type cohortScheduleListOutput struct {
+	Count     int                 `json:"count"`
+	Schedules []cohortScheduleOut `json:"schedules"`
+}
+
+func registerCohortScheduleList(srv *mcp.Server, api *Client) {
+	mcp.AddTool(srv, &mcp.Tool{
+		Name:        "cohort_schedule_list",
+		Description: "List the cohort snapshot schedules: the rule, the next run, and the outcome and batch of the last firing.",
+		Annotations: readOnly("List cohort schedules"),
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ cohortScheduleListInput) (*mcp.CallToolResult, cohortScheduleListOutput, error) {
+		items, err := api.listCohortSchedules(ctx)
+		if err != nil {
+			return nil, cohortScheduleListOutput{}, api.toolError("list cohort schedules", err)
+		}
+		out := cohortScheduleListOutput{Schedules: []cohortScheduleOut{}}
+		for _, s := range items {
+			out.Schedules = append(out.Schedules, cohortScheduleOut{
+				DatasetTag: s.SourceTag, Label: s.Label, Enabled: s.Enabled, Summary: s.Summary,
+				NextRunAt: s.NextRunAt, LastRunAt: s.LastRunAt, LastOutcome: s.LastOutcome, LastBatchID: s.LastBatchID,
+			})
+		}
+		out.Count = len(out.Schedules)
 		return nil, out, nil
 	})
 }

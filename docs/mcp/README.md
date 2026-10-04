@@ -8,7 +8,7 @@ across a cohort, and a classified comparison of two cohort snapshots. The
 tools call the admin API of `gonemaster-server`; they run no engine of their
 own.
 
-The same 17 read tools and 3 write tools are served two ways:
+The same 18 read tools and 3 write tools are served two ways:
 
 | | `gonemaster-mcp`, the stdio bridge | `gonemaster-server`, the HTTP endpoint |
 |---|---|---|

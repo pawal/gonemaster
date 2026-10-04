@@ -220,7 +220,7 @@ func TestToolAnnotations(t *testing.T) {
 
 func TestServerInstructionsNameDiscoveryTools(t *testing.T) {
 	ro := serverInstructions(false)
-	for _, want := range []string{"profile_list", "domain_tag_list", "cohort_list", "min_level"} {
+	for _, want := range []string{"profile_list", "domain_tag_list", "cohort_list", "cohort_schedule_list", "min_level"} {
 		if !strings.Contains(ro, want) {
 			t.Errorf("instructions missing %q", want)
 		}

@@ -487,6 +487,24 @@ func (c *Client) listDomainTags(ctx context.Context, limit int) ([]domainTagView
 	return out, err
 }
 
+// cohortScheduleView decodes one item of GET /analysis/schedules.
+type cohortScheduleView struct {
+	SourceTag   string `json:"source_tag"`
+	Label       string `json:"label"`
+	Enabled     bool   `json:"enabled"`
+	Summary     string `json:"summary"`
+	NextRunAt   string `json:"next_run_at"`
+	LastRunAt   string `json:"last_run_at"`
+	LastOutcome string `json:"last_outcome"`
+	LastBatchID string `json:"last_batch_id"`
+}
+
+func (c *Client) listCohortSchedules(ctx context.Context) ([]cohortScheduleView, error) {
+	var out []cohortScheduleView
+	err := c.doJSON(ctx, http.MethodGet, "/analysis/schedules", nil, &out)
+	return out, err
+}
+
 // getPublic decodes a GET against the public API into out.
 func (c *Client) getPublic(ctx context.Context, path string, out any) error {
 	return c.doJSONURL(ctx, http.MethodGet, publicapi.Base(c.baseURL)+path, nil, out)

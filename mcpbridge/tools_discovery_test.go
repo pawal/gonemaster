@@ -70,3 +70,36 @@ func TestCohortListWithSnapshots(t *testing.T) {
 		t.Errorf("captured_at = %q / %q", out.Snapshots[0].CapturedAt, out.Snapshots[1].CapturedAt)
 	}
 }
+
+func TestCohortScheduleList(t *testing.T) {
+	api := fakeAPI(t, apitest.Opts{Schedules: []apitest.CohortSchedule{
+		{CohortID: 1, SourceTag: "tld", Label: "TLD", Enabled: true, Summary: "Monthly, days 1 and 15, 02:00 Europe/Stockholm",
+			NextRunAt: "2026-11-01T01:00:00Z", LastRunAt: "2026-10-15T00:00:00Z", LastOutcome: "submitted", LastBatchID: "batch_9"},
+		{CohortID: 2, SourceTag: "gov", Summary: "Weekly, Monday, 23:30 UTC", NextRunAt: "2026-10-05T23:30:00Z"},
+	}})
+	var out cohortScheduleListOutput
+	res := callTool(t, api, "cohort_schedule_list", map[string]any{}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	want := cohortScheduleOut{DatasetTag: "tld", Label: "TLD", Enabled: true, Summary: "Monthly, days 1 and 15, 02:00 Europe/Stockholm",
+		NextRunAt: "2026-11-01T01:00:00Z", LastRunAt: "2026-10-15T00:00:00Z", LastOutcome: "submitted", LastBatchID: "batch_9"}
+	if out.Count != 2 || len(out.Schedules) != 2 || out.Schedules[0] != want {
+		t.Fatalf("schedules = %+v", out)
+	}
+	if got := out.Schedules[1]; got.DatasetTag != "gov" || got.Enabled || got.LastOutcome != "" {
+		t.Errorf("paused schedule = %+v", got)
+	}
+}
+
+func TestCohortScheduleListEmpty(t *testing.T) {
+	api := fakeAPI(t, apitest.Opts{})
+	var out cohortScheduleListOutput
+	res := callTool(t, api, "cohort_schedule_list", map[string]any{}, &out)
+	if res.IsError {
+		t.Fatalf("unexpected tool error: %s", errorText(res))
+	}
+	if out.Count != 0 || out.Schedules == nil {
+		t.Errorf("schedules = %+v, want an empty list", out)
+	}
+}

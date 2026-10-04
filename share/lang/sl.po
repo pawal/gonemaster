@@ -2242,6 +2242,70 @@ msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
 msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
 msgstr "Zapis NSEC {owner} z Next Domain Name {next} na imenskih strežnikih {servers} pokriva ime lastnika zapisa NSEC {covered}."
 
+msgctxt "DNSSEC:DS24_APEX_UNAVAILABLE"
+msgid "Name server(s) {servers} gave no authoritative answer for the CDS or CDNSKEY records at the zone apex, so DNSSEC bootstrapping cannot complete."
+msgstr "Imenski strežniki {servers} niso dali avtoritativnega odgovora za zapise CDS ali CDNSKEY na vrhu cone, zato zagona DNSSEC ni mogoče dokončati."
+
+msgctxt "DNSSEC:DS24_BOOTSTRAP_READY"
+msgid "Every DNSSEC bootstrapping signal validates and matches the CDS and CDNSKEY records at the zone apex. A parent that supports RFC 9615 can publish the DS records without delay."
+msgstr "Vsak signal za zagon DNSSEC je veljaven in se ujema z zapisi CDS in CDNSKEY na vrhu cone. Nadrejena cona, ki podpira RFC 9615, lahko zapise DS objavi brez zamude."
+
+msgctxt "DNSSEC:DS24_DELEGATION_SECURE"
+msgid "The parent zone has DS records for the zone on name server(s) {servers}, so DNSSEC bootstrapping does not apply."
+msgstr "Nadrejena cona ima zapise DS za cono na imenskih strežnikih {servers}, zato zagon DNSSEC ni uporaben."
+
+msgctxt "DNSSEC:DS24_DELETE_REQUESTED"
+msgid "The CDS and CDNSKEY records at the zone apex only request removal of the DS records, so DNSSEC bootstrapping does not apply."
+msgstr "Zapisi CDS in CDNSKEY na vrhu cone zahtevajo le odstranitev zapisov DS, zato zagon DNSSEC ni uporaben."
+
+msgctxt "DNSSEC:DS24_NO_CDS_CDNSKEY"
+msgid "The zone publishes no CDS or CDNSKEY records, so DNSSEC bootstrapping does not apply."
+msgstr "Cona ne objavlja zapisov CDS ali CDNSKEY, zato zagon DNSSEC ni uporaben."
+
+msgctxt "DNSSEC:DS24_NO_SIGNAL"
+msgid "No DNSSEC bootstrapping signal (RFC 9615) for the zone is published under name server(s) {servers}. The parent can accept the CDS or CDNSKEY records only without authentication."
+msgstr "Pod imenskimi strežniki {servers} ni objavljen noben signal za zagon DNSSEC (RFC 9615) za cono. Nadrejena cona lahko zapise CDS ali CDNSKEY sprejme le brez preverjanja pristnosti."
+
+msgctxt "DNSSEC:DS24_ONLY_IN_DOMAIN_NS"
+msgid "Every name server of the zone ({servers}) is inside the zone, so DNSSEC bootstrapping (RFC 9615) cannot be used."
+msgstr "Vsi imenski strežniki cone ({servers}) so znotraj cone, zato zagona DNSSEC (RFC 9615) ni mogoče uporabiti."
+
+msgctxt "DNSSEC:DS24_SIGNAL_AT_ZONE_CUT"
+msgid "The DNSSEC bootstrapping signal name {query_name} for name server {ns} is a zone cut, which RFC 9615 forbids."
+msgstr "Ime signala za zagon DNSSEC {query_name} za imenski strežnik {ns} je meja cone, kar RFC 9615 prepoveduje."
+
+msgctxt "DNSSEC:DS24_SIGNAL_CHAIN_BROKEN"
+msgid "The DNSSEC bootstrapping signal for name server {ns} does not validate: the chain of trust is broken at {zone}."
+msgstr "Signal za zagon DNSSEC za imenski strežnik {ns} ni veljaven: veriga zaupanja je prekinjena pri {zone}."
+
+msgctxt "DNSSEC:DS24_SIGNAL_MISMATCH"
+msgid "The {query_type} records of the DNSSEC bootstrapping signal {query_name} for name server {ns} differ from the {query_type} records at the zone apex."
+msgstr "Zapisi {query_type} signala za zagon DNSSEC {query_name} za imenski strežnik {ns} se razlikujejo od zapisov {query_type} na vrhu cone."
+
+msgctxt "DNSSEC:DS24_SIGNAL_MISSING"
+msgid "No DNSSEC bootstrapping signal is published at {query_name} for name server {ns}, while other name servers publish one."
+msgstr "Na {query_name} ni objavljen noben signal za zagon DNSSEC za imenski strežnik {ns}, medtem ko ga drugi imenski strežniki objavljajo."
+
+msgctxt "DNSSEC:DS24_SIGNAL_NAME_TOO_LONG"
+msgid "The DNSSEC bootstrapping signal name {query_name} for name server {ns} is longer than 255 octets and cannot exist."
+msgstr "Ime signala za zagon DNSSEC {query_name} za imenski strežnik {ns} je daljše od 255 oktetov in ne more obstajati."
+
+msgctxt "DNSSEC:DS24_SIGNAL_UNSIGNED"
+msgid "The {query_type} records of the DNSSEC bootstrapping signal {query_name} for name server {ns} carry no valid signature by zone {zone}."
+msgstr "Zapisi {query_type} signala za zagon DNSSEC {query_name} za imenski strežnik {ns} nimajo veljavnega podpisa cone {zone}."
+
+msgctxt "DNSSEC:DS24_SIGNAL_VALIDATED"
+msgid "The DNSSEC bootstrapping signal {query_name} for name server {ns} validates in zone {zone} and matches the zone apex."
+msgstr "Signal za zagon DNSSEC {query_name} za imenski strežnik {ns} je veljaven v coni {zone} in se ujema z vrhom cone."
+
+msgctxt "DNSSEC:DS24_SIGNAL_ZONE_INSECURE"
+msgid "The DNSSEC bootstrapping signal for name server {ns} cannot be validated: the delegation of {zone} has no DS records."
+msgstr "Signala za zagon DNSSEC za imenski strežnik {ns} ni mogoče preveriti: delegacija {zone} nima zapisov DS."
+
+msgctxt "DNSSEC:DS24_SIGNAL_ZONE_UNREACHABLE"
+msgid "The DNSSEC bootstrapping signal for name server {ns} cannot be retrieved: name server(s) {servers} for {zone} gave no usable answer."
+msgstr "Signala za zagon DNSSEC za imenski strežnik {ns} ni mogoče pridobiti: imenski strežniki {servers} za {zone} niso dali uporabnega odgovora."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

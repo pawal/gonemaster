@@ -2352,6 +2352,70 @@ msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
 msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
 msgstr "El registro NSEC {owner} con Next Domain Name {next} cubre el nombre propietario del registro NSEC {covered} en los servidores de nombres {servers}."
 
+msgctxt "DNSSEC:DS24_APEX_UNAVAILABLE"
+msgid "Name server(s) {servers} gave no authoritative answer for the CDS or CDNSKEY records at the zone apex, so DNSSEC bootstrapping cannot complete."
+msgstr "Los servidores de nombres {servers} no dieron ninguna respuesta autoritativa para los registros CDS o CDNSKEY en el ápex de la zona, por lo que el arranque DNSSEC no puede completarse."
+
+msgctxt "DNSSEC:DS24_BOOTSTRAP_READY"
+msgid "Every DNSSEC bootstrapping signal validates and matches the CDS and CDNSKEY records at the zone apex. A parent that supports RFC 9615 can publish the DS records without delay."
+msgstr "Cada señal de arranque DNSSEC se valida y coincide con los registros CDS y CDNSKEY en el ápex de la zona. Una zona padre que admita el RFC 9615 puede publicar los registros DS sin demora."
+
+msgctxt "DNSSEC:DS24_DELEGATION_SECURE"
+msgid "The parent zone has DS records for the zone on name server(s) {servers}, so DNSSEC bootstrapping does not apply."
+msgstr "La zona padre tiene registros DS para la zona en los servidores de nombres {servers}, por lo que el arranque DNSSEC no se aplica."
+
+msgctxt "DNSSEC:DS24_DELETE_REQUESTED"
+msgid "The CDS and CDNSKEY records at the zone apex only request removal of the DS records, so DNSSEC bootstrapping does not apply."
+msgstr "Los registros CDS y CDNSKEY en el ápex de la zona solo solicitan la eliminación de los registros DS, por lo que el arranque DNSSEC no se aplica."
+
+msgctxt "DNSSEC:DS24_NO_CDS_CDNSKEY"
+msgid "The zone publishes no CDS or CDNSKEY records, so DNSSEC bootstrapping does not apply."
+msgstr "La zona no publica registros CDS ni CDNSKEY, por lo que el arranque DNSSEC no se aplica."
+
+msgctxt "DNSSEC:DS24_NO_SIGNAL"
+msgid "No DNSSEC bootstrapping signal (RFC 9615) for the zone is published under name server(s) {servers}. The parent can accept the CDS or CDNSKEY records only without authentication."
+msgstr "No se publica ninguna señal de arranque DNSSEC (RFC 9615) para la zona bajo los servidores de nombres {servers}. La zona padre solo puede aceptar los registros CDS o CDNSKEY sin autenticación."
+
+msgctxt "DNSSEC:DS24_ONLY_IN_DOMAIN_NS"
+msgid "Every name server of the zone ({servers}) is inside the zone, so DNSSEC bootstrapping (RFC 9615) cannot be used."
+msgstr "Todos los servidores de nombres de la zona ({servers}) están dentro de la zona, por lo que no se puede usar el arranque DNSSEC (RFC 9615)."
+
+msgctxt "DNSSEC:DS24_SIGNAL_AT_ZONE_CUT"
+msgid "The DNSSEC bootstrapping signal name {query_name} for name server {ns} is a zone cut, which RFC 9615 forbids."
+msgstr "El nombre de señal de arranque DNSSEC {query_name} para el servidor de nombres {ns} es un corte de zona, lo que el RFC 9615 prohíbe."
+
+msgctxt "DNSSEC:DS24_SIGNAL_CHAIN_BROKEN"
+msgid "The DNSSEC bootstrapping signal for name server {ns} does not validate: the chain of trust is broken at {zone}."
+msgstr "La señal de arranque DNSSEC para el servidor de nombres {ns} no se valida: la cadena de confianza está rota en {zone}."
+
+msgctxt "DNSSEC:DS24_SIGNAL_MISMATCH"
+msgid "The {query_type} records of the DNSSEC bootstrapping signal {query_name} for name server {ns} differ from the {query_type} records at the zone apex."
+msgstr "Los registros {query_type} de la señal de arranque DNSSEC {query_name} para el servidor de nombres {ns} difieren de los registros {query_type} en el ápex de la zona."
+
+msgctxt "DNSSEC:DS24_SIGNAL_MISSING"
+msgid "No DNSSEC bootstrapping signal is published at {query_name} for name server {ns}, while other name servers publish one."
+msgstr "No se publica ninguna señal de arranque DNSSEC en {query_name} para el servidor de nombres {ns}, mientras que otros servidores de nombres publican una."
+
+msgctxt "DNSSEC:DS24_SIGNAL_NAME_TOO_LONG"
+msgid "The DNSSEC bootstrapping signal name {query_name} for name server {ns} is longer than 255 octets and cannot exist."
+msgstr "El nombre de señal de arranque DNSSEC {query_name} para el servidor de nombres {ns} supera los 255 octetos y no puede existir."
+
+msgctxt "DNSSEC:DS24_SIGNAL_UNSIGNED"
+msgid "The {query_type} records of the DNSSEC bootstrapping signal {query_name} for name server {ns} carry no valid signature by zone {zone}."
+msgstr "Los registros {query_type} de la señal de arranque DNSSEC {query_name} para el servidor de nombres {ns} no tienen ninguna firma válida de la zona {zone}."
+
+msgctxt "DNSSEC:DS24_SIGNAL_VALIDATED"
+msgid "The DNSSEC bootstrapping signal {query_name} for name server {ns} validates in zone {zone} and matches the zone apex."
+msgstr "La señal de arranque DNSSEC {query_name} para el servidor de nombres {ns} se valida en la zona {zone} y coincide con el ápex de la zona."
+
+msgctxt "DNSSEC:DS24_SIGNAL_ZONE_INSECURE"
+msgid "The DNSSEC bootstrapping signal for name server {ns} cannot be validated: the delegation of {zone} has no DS records."
+msgstr "La señal de arranque DNSSEC para el servidor de nombres {ns} no puede validarse: la delegación de {zone} no tiene registros DS."
+
+msgctxt "DNSSEC:DS24_SIGNAL_ZONE_UNREACHABLE"
+msgid "The DNSSEC bootstrapping signal for name server {ns} cannot be retrieved: name server(s) {servers} for {zone} gave no usable answer."
+msgstr "La señal de arranque DNSSEC para el servidor de nombres {ns} no puede obtenerse: los servidores de nombres {servers} de {zone} no dieron ninguna respuesta útil."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

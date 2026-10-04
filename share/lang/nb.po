@@ -2251,6 +2251,70 @@ msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
 msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
 msgstr "NSEC-posten {owner} med Next Domain Name {next} dekker eiernavnet til NSEC-posten {covered} på navnetjener(e) {servers}."
 
+msgctxt "DNSSEC:DS24_APEX_UNAVAILABLE"
+msgid "Name server(s) {servers} gave no authoritative answer for the CDS or CDNSKEY records at the zone apex, so DNSSEC bootstrapping cannot complete."
+msgstr "Navnetjener(e) {servers} ga ikke noe autoritativt svar for CDS- eller CDNSKEY-postene ved sonens apex, så DNSSEC-bootstrapping kan ikke fullføres."
+
+msgctxt "DNSSEC:DS24_BOOTSTRAP_READY"
+msgid "Every DNSSEC bootstrapping signal validates and matches the CDS and CDNSKEY records at the zone apex. A parent that supports RFC 9615 can publish the DS records without delay."
+msgstr "Hvert signal for DNSSEC-bootstrapping valideres og samsvarer med CDS- og CDNSKEY-postene ved sonens apex. En foreldresone som støtter RFC 9615, kan publisere DS-postene uten forsinkelse."
+
+msgctxt "DNSSEC:DS24_DELEGATION_SECURE"
+msgid "The parent zone has DS records for the zone on name server(s) {servers}, so DNSSEC bootstrapping does not apply."
+msgstr "Foreldresonen har DS-poster for sonen på navnetjener(e) {servers}, så DNSSEC-bootstrapping er ikke aktuelt."
+
+msgctxt "DNSSEC:DS24_DELETE_REQUESTED"
+msgid "The CDS and CDNSKEY records at the zone apex only request removal of the DS records, so DNSSEC bootstrapping does not apply."
+msgstr "CDS- og CDNSKEY-postene ved sonens apex ber bare om fjerning av DS-postene, så DNSSEC-bootstrapping er ikke aktuelt."
+
+msgctxt "DNSSEC:DS24_NO_CDS_CDNSKEY"
+msgid "The zone publishes no CDS or CDNSKEY records, so DNSSEC bootstrapping does not apply."
+msgstr "Sonen publiserer ingen CDS- eller CDNSKEY-poster, så DNSSEC-bootstrapping er ikke aktuelt."
+
+msgctxt "DNSSEC:DS24_NO_SIGNAL"
+msgid "No DNSSEC bootstrapping signal (RFC 9615) for the zone is published under name server(s) {servers}. The parent can accept the CDS or CDNSKEY records only without authentication."
+msgstr "Ingen signal for DNSSEC-bootstrapping (RFC 9615) for sonen er publisert under navnetjener(e) {servers}. Foreldresonen kan bare godta CDS- eller CDNSKEY-postene uten autentisering."
+
+msgctxt "DNSSEC:DS24_ONLY_IN_DOMAIN_NS"
+msgid "Every name server of the zone ({servers}) is inside the zone, so DNSSEC bootstrapping (RFC 9615) cannot be used."
+msgstr "Alle navnetjenerne til sonen ({servers}) ligger innenfor sonen, så DNSSEC-bootstrapping (RFC 9615) kan ikke brukes."
+
+msgctxt "DNSSEC:DS24_SIGNAL_AT_ZONE_CUT"
+msgid "The DNSSEC bootstrapping signal name {query_name} for name server {ns} is a zone cut, which RFC 9615 forbids."
+msgstr "Signalnavnet {query_name} for DNSSEC-bootstrapping for navnetjeneren {ns} er en sonegrense, noe RFC 9615 forbyr."
+
+msgctxt "DNSSEC:DS24_SIGNAL_CHAIN_BROKEN"
+msgid "The DNSSEC bootstrapping signal for name server {ns} does not validate: the chain of trust is broken at {zone}."
+msgstr "Signalet for DNSSEC-bootstrapping for navnetjeneren {ns} valideres ikke: tillitskjeden er brutt ved {zone}."
+
+msgctxt "DNSSEC:DS24_SIGNAL_MISMATCH"
+msgid "The {query_type} records of the DNSSEC bootstrapping signal {query_name} for name server {ns} differ from the {query_type} records at the zone apex."
+msgstr "{query_type}-postene i signalet {query_name} for DNSSEC-bootstrapping for navnetjeneren {ns} avviker fra {query_type}-postene ved sonens apex."
+
+msgctxt "DNSSEC:DS24_SIGNAL_MISSING"
+msgid "No DNSSEC bootstrapping signal is published at {query_name} for name server {ns}, while other name servers publish one."
+msgstr "Ingen signal for DNSSEC-bootstrapping er publisert ved {query_name} for navnetjeneren {ns}, mens andre navnetjenere publiserer et."
+
+msgctxt "DNSSEC:DS24_SIGNAL_NAME_TOO_LONG"
+msgid "The DNSSEC bootstrapping signal name {query_name} for name server {ns} is longer than 255 octets and cannot exist."
+msgstr "Signalnavnet {query_name} for DNSSEC-bootstrapping for navnetjeneren {ns} er lengre enn 255 oktetter og kan ikke finnes."
+
+msgctxt "DNSSEC:DS24_SIGNAL_UNSIGNED"
+msgid "The {query_type} records of the DNSSEC bootstrapping signal {query_name} for name server {ns} carry no valid signature by zone {zone}."
+msgstr "{query_type}-postene i signalet {query_name} for DNSSEC-bootstrapping for navnetjeneren {ns} har ingen gyldig signatur fra sonen {zone}."
+
+msgctxt "DNSSEC:DS24_SIGNAL_VALIDATED"
+msgid "The DNSSEC bootstrapping signal {query_name} for name server {ns} validates in zone {zone} and matches the zone apex."
+msgstr "Signalet {query_name} for DNSSEC-bootstrapping for navnetjeneren {ns} valideres i sonen {zone} og samsvarer med sonens apex."
+
+msgctxt "DNSSEC:DS24_SIGNAL_ZONE_INSECURE"
+msgid "The DNSSEC bootstrapping signal for name server {ns} cannot be validated: the delegation of {zone} has no DS records."
+msgstr "Signalet for DNSSEC-bootstrapping for navnetjeneren {ns} kan ikke valideres: delegeringen av {zone} har ingen DS-poster."
+
+msgctxt "DNSSEC:DS24_SIGNAL_ZONE_UNREACHABLE"
+msgid "The DNSSEC bootstrapping signal for name server {ns} cannot be retrieved: name server(s) {servers} for {zone} gave no usable answer."
+msgstr "Signalet for DNSSEC-bootstrapping for navnetjeneren {ns} kan ikke hentes: navnetjener(e) {servers} for {zone} ga ikke noe brukbart svar."
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

@@ -2501,6 +2501,70 @@ msgctxt "DNSSEC:DS23_NSEC_RANGES_OVERLAP"
 msgid "The NSEC record {owner} with Next Domain Name {next} covers the owner name of the NSEC record {covered} on name server(s) {servers}."
 msgstr "Next Domain Name が {next} の NSEC レコード {owner} は、ネームサーバー {servers} で NSEC レコード {covered} の所有者名を範囲に含んでいます。"
 
+msgctxt "DNSSEC:DS24_APEX_UNAVAILABLE"
+msgid "Name server(s) {servers} gave no authoritative answer for the CDS or CDNSKEY records at the zone apex, so DNSSEC bootstrapping cannot complete."
+msgstr "ネームサーバー {servers} はゾーン頂点の CDS または CDNSKEY レコードに権威ある応答を返さなかったため、DNSSEC ブートストラップを完了できません。"
+
+msgctxt "DNSSEC:DS24_BOOTSTRAP_READY"
+msgid "Every DNSSEC bootstrapping signal validates and matches the CDS and CDNSKEY records at the zone apex. A parent that supports RFC 9615 can publish the DS records without delay."
+msgstr "すべての DNSSEC ブートストラップシグナルが検証され、ゾーン頂点の CDS および CDNSKEY レコードと一致しています。RFC 9615 に対応した親ゾーンは DS レコードを遅延なく公開できます。"
+
+msgctxt "DNSSEC:DS24_DELEGATION_SECURE"
+msgid "The parent zone has DS records for the zone on name server(s) {servers}, so DNSSEC bootstrapping does not apply."
+msgstr "親ゾーンはネームサーバー {servers} でこのゾーンの DS レコードを持っているため、DNSSEC ブートストラップは適用されません。"
+
+msgctxt "DNSSEC:DS24_DELETE_REQUESTED"
+msgid "The CDS and CDNSKEY records at the zone apex only request removal of the DS records, so DNSSEC bootstrapping does not apply."
+msgstr "ゾーン頂点の CDS および CDNSKEY レコードは DS レコードの削除のみを要求しているため、DNSSEC ブートストラップは適用されません。"
+
+msgctxt "DNSSEC:DS24_NO_CDS_CDNSKEY"
+msgid "The zone publishes no CDS or CDNSKEY records, so DNSSEC bootstrapping does not apply."
+msgstr "ゾーンは CDS または CDNSKEY レコードを公開していないため、DNSSEC ブートストラップは適用されません。"
+
+msgctxt "DNSSEC:DS24_NO_SIGNAL"
+msgid "No DNSSEC bootstrapping signal (RFC 9615) for the zone is published under name server(s) {servers}. The parent can accept the CDS or CDNSKEY records only without authentication."
+msgstr "ネームサーバー {servers} の配下に、このゾーンの DNSSEC ブートストラップシグナル (RFC 9615) が公開されていません。親ゾーンは CDS または CDNSKEY レコードを認証なしでしか受け入れられません。"
+
+msgctxt "DNSSEC:DS24_ONLY_IN_DOMAIN_NS"
+msgid "Every name server of the zone ({servers}) is inside the zone, so DNSSEC bootstrapping (RFC 9615) cannot be used."
+msgstr "ゾーンのすべてのネームサーバー ({servers}) がゾーン内にあるため、DNSSEC ブートストラップ (RFC 9615) を使用できません。"
+
+msgctxt "DNSSEC:DS24_SIGNAL_AT_ZONE_CUT"
+msgid "The DNSSEC bootstrapping signal name {query_name} for name server {ns} is a zone cut, which RFC 9615 forbids."
+msgstr "ネームサーバー {ns} の DNSSEC ブートストラップシグナル名 {query_name} はゾーンカットになっており、RFC 9615 で禁止されています。"
+
+msgctxt "DNSSEC:DS24_SIGNAL_CHAIN_BROKEN"
+msgid "The DNSSEC bootstrapping signal for name server {ns} does not validate: the chain of trust is broken at {zone}."
+msgstr "ネームサーバー {ns} の DNSSEC ブートストラップシグナルは検証できません。信頼チェーンが {zone} で切れています。"
+
+msgctxt "DNSSEC:DS24_SIGNAL_MISMATCH"
+msgid "The {query_type} records of the DNSSEC bootstrapping signal {query_name} for name server {ns} differ from the {query_type} records at the zone apex."
+msgstr "ネームサーバー {ns} の DNSSEC ブートストラップシグナル {query_name} の {query_type} レコードは、ゾーン頂点の {query_type} レコードと異なります。"
+
+msgctxt "DNSSEC:DS24_SIGNAL_MISSING"
+msgid "No DNSSEC bootstrapping signal is published at {query_name} for name server {ns}, while other name servers publish one."
+msgstr "他のネームサーバーではシグナルが公開されているのに、ネームサーバー {ns} の DNSSEC ブートストラップシグナルが {query_name} に公開されていません。"
+
+msgctxt "DNSSEC:DS24_SIGNAL_NAME_TOO_LONG"
+msgid "The DNSSEC bootstrapping signal name {query_name} for name server {ns} is longer than 255 octets and cannot exist."
+msgstr "ネームサーバー {ns} の DNSSEC ブートストラップシグナル名 {query_name} は 255 オクテットを超えるため、存在できません。"
+
+msgctxt "DNSSEC:DS24_SIGNAL_UNSIGNED"
+msgid "The {query_type} records of the DNSSEC bootstrapping signal {query_name} for name server {ns} carry no valid signature by zone {zone}."
+msgstr "ネームサーバー {ns} の DNSSEC ブートストラップシグナル {query_name} の {query_type} レコードには、ゾーン {zone} による有効な署名がありません。"
+
+msgctxt "DNSSEC:DS24_SIGNAL_VALIDATED"
+msgid "The DNSSEC bootstrapping signal {query_name} for name server {ns} validates in zone {zone} and matches the zone apex."
+msgstr "ネームサーバー {ns} の DNSSEC ブートストラップシグナル {query_name} はゾーン {zone} で検証され、ゾーン頂点と一致しています。"
+
+msgctxt "DNSSEC:DS24_SIGNAL_ZONE_INSECURE"
+msgid "The DNSSEC bootstrapping signal for name server {ns} cannot be validated: the delegation of {zone} has no DS records."
+msgstr "ネームサーバー {ns} の DNSSEC ブートストラップシグナルは検証できません。{zone} の委任に DS レコードがありません。"
+
+msgctxt "DNSSEC:DS24_SIGNAL_ZONE_UNREACHABLE"
+msgid "The DNSSEC bootstrapping signal for name server {ns} cannot be retrieved: name server(s) {servers} for {zone} gave no usable answer."
+msgstr "ネームサーバー {ns} の DNSSEC ブートストラップシグナルを取得できません。{zone} のネームサーバー {servers} から有効な応答がありませんでした。"
+
 msgctxt "DNSSEC:DURATION_LONG"
 msgid ""
 "RRSIG with keytag {keytag} and covering type(s) {types} has a duration of "

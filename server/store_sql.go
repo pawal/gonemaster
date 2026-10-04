@@ -1777,24 +1777,24 @@ func (s *SQLJobStore) CreateBatch(batch Batch) error {
 	switch s.dialect.(type) {
 	case postgresDialect:
 		_, err := s.db.Exec(
-			`INSERT INTO batches (id, tag, created_at, domain_count, description, snapshot_intent)
-			 VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING`,
+			`INSERT INTO batches (id, tag, created_at, domain_count, description, snapshot_intent, origin)
+			 VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING`,
 			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt),
-			batch.DomainCount, batch.Description, snapshotIntent)
+			batch.DomainCount, batch.Description, snapshotIntent, batch.Origin)
 		return err
 	case mariadbDialect:
 		_, err := s.db.Exec(
-			`INSERT IGNORE INTO batches (id, tag, created_at, domain_count, description, snapshot_intent)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
+			`INSERT IGNORE INTO batches (id, tag, created_at, domain_count, description, snapshot_intent, origin)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt),
-			batch.DomainCount, batch.Description, snapshotIntent)
+			batch.DomainCount, batch.Description, snapshotIntent, batch.Origin)
 		return err
 	default:
 		_, err := s.db.Exec(
-			`INSERT OR IGNORE INTO batches (id, tag, created_at, domain_count, description, snapshot_intent)
-			 VALUES (?, ?, ?, ?, ?, ?)`,
+			`INSERT OR IGNORE INTO batches (id, tag, created_at, domain_count, description, snapshot_intent, origin)
+			 VALUES (?, ?, ?, ?, ?, ?, ?)`,
 			batch.ID, batch.Tag, formatSortableTimestamp(batch.CreatedAt),
-			batch.DomainCount, batch.Description, snapshotIntent)
+			batch.DomainCount, batch.Description, snapshotIntent, batch.Origin)
 		return err
 	}
 }
@@ -1815,7 +1815,7 @@ func (s *SQLJobStore) ListBatchesByTag(tag string, limit, offset int) BatchList 
 		return out
 	}
 	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description, snapshot_intent
+		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description, snapshot_intent, origin
 			FROM batches WHERE tag = %s
 			ORDER BY created_at DESC, id DESC
 			LIMIT %s OFFSET %s`, s.ph(1), s.ph(2), s.ph(3)),
@@ -1831,7 +1831,7 @@ func (s *SQLJobStore) ListBatchesByTag(tag string, limit, offset int) BatchList 
 			createdAt      string
 			snapshotIntent int
 		)
-		if err := rows.Scan(&b.ID, &b.Tag, &createdAt, &b.DomainCount, &b.Description, &snapshotIntent); err != nil {
+		if err := rows.Scan(&b.ID, &b.Tag, &createdAt, &b.DomainCount, &b.Description, &snapshotIntent, &b.Origin); err != nil {
 			return out
 		}
 		b.CreatedAt = parseTimestampStr(createdAt)
@@ -1864,7 +1864,7 @@ func (s *SQLJobStore) ListBatches(tagLike string, limit, offset int) BatchList {
 	}
 	dataArgs := append(append([]any{}, filterArgs...), limit, offset)
 	rows, err := s.db.Query(
-		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description, snapshot_intent
+		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description, snapshot_intent, origin
 			FROM batches%s
 			ORDER BY created_at DESC, id DESC
 			LIMIT %s OFFSET %s`, where, s.ph(len(filterArgs)+1), s.ph(len(filterArgs)+2)),
@@ -1880,7 +1880,7 @@ func (s *SQLJobStore) ListBatches(tagLike string, limit, offset int) BatchList {
 			createdAt      string
 			snapshotIntent int
 		)
-		if err := rows.Scan(&b.ID, &b.Tag, &createdAt, &b.DomainCount, &b.Description, &snapshotIntent); err != nil {
+		if err := rows.Scan(&b.ID, &b.Tag, &createdAt, &b.DomainCount, &b.Description, &snapshotIntent, &b.Origin); err != nil {
 			return out
 		}
 		b.CreatedAt = parseTimestampStr(createdAt)
@@ -2232,14 +2232,14 @@ func (s *SQLJobStore) SetBatchSnapshotIntent(batchID string, intent bool) error 
 // GetBatch returns a batch by ID.
 func (s *SQLJobStore) GetBatch(id string) (Batch, bool) {
 	var (
-		batchID, tag, createdAt, description string
-		domainCount                          int
-		snapshotIntent                       int
+		batchID, tag, createdAt, description, origin string
+		domainCount                                  int
+		snapshotIntent                               int
 	)
 	err := s.db.QueryRow(
-		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description, snapshot_intent FROM batches WHERE id = %s`, s.ph(1)),
+		fmt.Sprintf(`SELECT id, tag, created_at, domain_count, description, snapshot_intent, origin FROM batches WHERE id = %s`, s.ph(1)),
 		id,
-	).Scan(&batchID, &tag, &createdAt, &domainCount, &description, &snapshotIntent)
+	).Scan(&batchID, &tag, &createdAt, &domainCount, &description, &snapshotIntent, &origin)
 	if err != nil {
 		return Batch{}, false
 	}
@@ -2250,6 +2250,7 @@ func (s *SQLJobStore) GetBatch(id string) (Batch, bool) {
 		DomainCount:    domainCount,
 		Description:    description,
 		SnapshotIntent: intToBool(snapshotIntent),
+		Origin:         origin,
 	}, true
 }
 

@@ -644,6 +644,46 @@ var sqlMigrations = []sqlMigration{
 			`UPDATE domains SET latest_score = NULL, latest_grade = NULL WHERE latest_status <> 'succeeded'`,
 		},
 	},
+	{
+		// Cohort snapshot schedules, and the origin of a batch.
+		version: 16,
+		stmtsFn: func(d sqlDialect) []string {
+			return []string{
+				fmt.Sprintf(`CREATE TABLE IF NOT EXISTS analysis_cohort_schedules (
+					cohort_id       %[1]s        NOT NULL PRIMARY KEY,
+					enabled         INTEGER      NOT NULL DEFAULT 1,
+					kind            VARCHAR(16)  NOT NULL,
+					interval_days   INTEGER      NOT NULL DEFAULT 1,
+					anchor_date     VARCHAR(10)  NOT NULL DEFAULT '',
+					weekdays        INTEGER      NOT NULL DEFAULT 0,
+					days_of_month   INTEGER      NOT NULL DEFAULT 0,
+					last_day        INTEGER      NOT NULL DEFAULT 0,
+					time_of_day     VARCHAR(5)   NOT NULL,
+					timezone        VARCHAR(64)  NOT NULL DEFAULT 'UTC',
+					profile_id      %[1]s,
+					promote_default INTEGER      NOT NULL DEFAULT 0,
+					catch_up        INTEGER      NOT NULL DEFAULT 1,
+					next_run_at     VARCHAR(64)  NOT NULL,
+					last_run_at     TEXT,
+					last_batch_id   VARCHAR(255) NOT NULL DEFAULT '',
+					last_outcome    VARCHAR(32)  NOT NULL DEFAULT '',
+					last_error      TEXT         NOT NULL DEFAULT '',
+					created_at      TEXT         NOT NULL,
+					updated_at      TEXT         NOT NULL
+				)`, bigintType(d)),
+				`CREATE INDEX IF NOT EXISTS idx_analysis_cohort_schedules_due ON analysis_cohort_schedules(enabled, next_run_at)`,
+				`ALTER TABLE batches ADD COLUMN origin VARCHAR(16) NOT NULL DEFAULT ''`,
+			}
+		},
+	},
+}
+
+// bigintType is the 64-bit integer column type of d.
+func bigintType(d sqlDialect) string {
+	if _, ok := d.(sqliteDialect); ok {
+		return "INTEGER"
+	}
+	return "BIGINT"
 }
 
 // retiredAnalysisTags is frozen at migration 9; a later rename needs its

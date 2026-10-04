@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/server/recurrence"
 )
 
 // The JobStore contract, run against every implementation. Behaviour only one
@@ -1145,6 +1146,193 @@ func TestJobStorePurgeByTagReturnsZeroForUnknownTag(t *testing.T) {
 		}
 		if n != 0 {
 			t.Fatalf("expected 0 for unknown tag, got %d", n)
+		}
+	})
+}
+
+// ---- Batches and cohort schedules -------------------------------------------
+
+func TestJobStoreBatchOriginRoundTrip(t *testing.T) {
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		at := time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC)
+		for _, b := range []Batch{
+			{ID: "b-sched", Tag: "tld", CreatedAt: at, Origin: BatchOriginSchedule},
+			{ID: "b-manual", Tag: "tld", CreatedAt: at.Add(time.Minute)},
+		} {
+			if err := s.CreateBatch(b); err != nil {
+				t.Fatalf("CreateBatch %s: %v", b.ID, err)
+			}
+		}
+		got, ok := s.GetBatch("b-sched")
+		if !ok || got.Origin != BatchOriginSchedule {
+			t.Errorf("GetBatch origin = %q (found %v), want schedule", got.Origin, ok)
+		}
+		for name, list := range map[string]BatchList{
+			"ListBatches":      s.ListBatches("", 10, 0),
+			"ListBatchesByTag": s.ListBatchesByTag("tld", 10, 0),
+		} {
+			var origins []string
+			for _, b := range list.Items {
+				origins = append(origins, b.Origin)
+			}
+			if !slices.Equal(origins, []string{"", BatchOriginSchedule}) {
+				t.Errorf("%s origins = %q, want [\"\" schedule]", name, origins)
+			}
+		}
+	})
+}
+
+func TestJobStoreAnalysisCohortScheduleCRUD(t *testing.T) {
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		cohort := upsertCohort(t, s, "tld")
+		if _, ok := s.GetAnalysisCohortSchedule(cohort.ID); ok {
+			t.Fatal("schedule found before put")
+		}
+		next := time.Date(2026, 11, 1, 1, 0, 0, 0, time.UTC)
+		profileID := int64(7)
+		sched := newSchedule(cohort.ID, next)
+		sched.Rule = recurrence.Rule{
+			Kind: recurrence.KindMonthly, DaysOfMonth: 1<<1 | 1<<15,
+			TimeOfDay: recurrence.TimeOfDay{Hour: 2}, Zone: "Europe/Stockholm",
+		}
+		sched.ProfileID = &profileID
+		sched.PromoteDefault = true
+		sched.CatchUp = false
+		created := putSchedule(t, s, sched)
+
+		got, ok := s.GetAnalysisCohortSchedule(cohort.ID)
+		if !ok {
+			t.Fatal("schedule not found after put")
+		}
+		if want := sched.Rule.Canonical(); got.Rule != want {
+			t.Errorf("Rule = %#v, want %#v", got.Rule, want)
+		}
+		if got.ProfileID == nil || *got.ProfileID != 7 || !got.PromoteDefault || got.CatchUp || !got.Enabled {
+			t.Errorf("flags = profile %v promote %v catch_up %v enabled %v, want 7 true false true",
+				got.ProfileID, got.PromoteDefault, got.CatchUp, got.Enabled)
+		}
+		if !got.NextRunAt.Equal(next) || got.CreatedAt.IsZero() || !got.LastRunAt.IsZero() {
+			t.Errorf("times = next %s created %s last %s", got.NextRunAt, got.CreatedAt, got.LastRunAt)
+		}
+
+		ran := next.Add(time.Minute)
+		if err := s.RecordAnalysisCohortScheduleOutcome(cohort.ID, ran, "batch-1", ScheduleOutcomeSubmitted, ""); err != nil {
+			t.Fatalf("RecordAnalysisCohortScheduleOutcome: %v", err)
+		}
+		sched.Enabled = false
+		sched.ProfileID = nil
+		replaced := putSchedule(t, s, sched)
+		if replaced.Enabled || replaced.ProfileID != nil {
+			t.Errorf("replace kept enabled %v profile %v, want false nil", replaced.Enabled, replaced.ProfileID)
+		}
+		if !replaced.CreatedAt.Equal(created.CreatedAt) || !replaced.LastRunAt.Equal(ran) || replaced.LastBatchID != "batch-1" {
+			t.Errorf("replace lost history: created %s last %s batch %q", replaced.CreatedAt, replaced.LastRunAt, replaced.LastBatchID)
+		}
+
+		other := upsertCohort(t, s, "gov")
+		putSchedule(t, s, newSchedule(other.ID, next))
+		var ids []int64
+		for _, sc := range s.ListAnalysisCohortSchedules() {
+			ids = append(ids, sc.CohortID)
+		}
+		if !slices.Equal(ids, []int64{cohort.ID, other.ID}) {
+			t.Errorf("list ids = %v, want [%d %d]", ids, cohort.ID, other.ID)
+		}
+
+		if err := s.DeleteAnalysisCohortSchedule(cohort.ID); err != nil {
+			t.Fatalf("DeleteAnalysisCohortSchedule: %v", err)
+		}
+		if _, ok := s.GetAnalysisCohortSchedule(cohort.ID); ok {
+			t.Error("schedule found after delete")
+		}
+		if err := s.DeleteAnalysisCohort(other.ID); err != nil {
+			t.Fatalf("DeleteAnalysisCohort: %v", err)
+		}
+		if _, ok := s.GetAnalysisCohortSchedule(other.ID); ok {
+			t.Error("schedule survived its cohort")
+		}
+	})
+}
+
+func TestJobStoreListDueAnalysisCohortSchedules(t *testing.T) {
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		now := time.Date(2026, 10, 1, 2, 0, 0, 0, time.UTC)
+		late := upsertCohort(t, s, "late")
+		early := upsertCohort(t, s, "early")
+		off := upsertCohort(t, s, "off")
+		future := upsertCohort(t, s, "future")
+		putSchedule(t, s, newSchedule(late.ID, now))
+		putSchedule(t, s, newSchedule(early.ID, now.Add(-time.Hour)))
+		disabled := newSchedule(off.ID, now.Add(-time.Hour))
+		disabled.Enabled = false
+		putSchedule(t, s, disabled)
+		putSchedule(t, s, newSchedule(future.ID, now.Add(time.Second)))
+
+		var ids []int64
+		for _, sc := range s.ListDueAnalysisCohortSchedules(now) {
+			ids = append(ids, sc.CohortID)
+		}
+		if !slices.Equal(ids, []int64{early.ID, late.ID}) {
+			t.Errorf("due ids = %v, want [%d %d]", ids, early.ID, late.ID)
+		}
+	})
+}
+
+func TestJobStoreClaimAnalysisCohortSchedule(t *testing.T) {
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		cohort := upsertCohort(t, s, "tld")
+		due := time.Date(2026, 10, 1, 2, 0, 0, 0, time.UTC)
+		next := due.Add(24 * time.Hour)
+		putSchedule(t, s, newSchedule(cohort.ID, due))
+
+		if ok, err := s.ClaimAnalysisCohortSchedule(cohort.ID, due.Add(-time.Hour), next); err != nil || ok {
+			t.Fatalf("stale claim = %v %v, want false", ok, err)
+		}
+		if got, _ := s.GetAnalysisCohortSchedule(cohort.ID); !got.NextRunAt.Equal(due) {
+			t.Fatalf("stale claim moved next_run_at to %s", got.NextRunAt)
+		}
+		if ok, err := s.ClaimAnalysisCohortSchedule(cohort.ID, due, next); err != nil || !ok {
+			t.Fatalf("claim = %v %v, want true", ok, err)
+		}
+		if ok, _ := s.ClaimAnalysisCohortSchedule(cohort.ID, due, next.Add(time.Hour)); ok {
+			t.Error("second claim with the same expected succeeded")
+		}
+		if got, _ := s.GetAnalysisCohortSchedule(cohort.ID); !got.NextRunAt.Equal(next) {
+			t.Errorf("next_run_at = %s, want %s", got.NextRunAt, next)
+		}
+	})
+}
+
+func TestJobStoreRecordScheduleOutcomeKeepsLastBatch(t *testing.T) {
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		cohort := upsertCohort(t, s, "tld")
+		at := time.Date(2026, 10, 1, 2, 0, 0, 0, time.UTC)
+		putSchedule(t, s, newSchedule(cohort.ID, at))
+		if err := s.RecordAnalysisCohortScheduleOutcome(cohort.ID, at, "batch-1", ScheduleOutcomeSubmitted, ""); err != nil {
+			t.Fatalf("record submitted: %v", err)
+		}
+		if err := s.RecordAnalysisCohortScheduleOutcome(cohort.ID, at.Add(time.Hour), "", ScheduleOutcomeError, "boom"); err != nil {
+			t.Fatalf("record error: %v", err)
+		}
+		got, _ := s.GetAnalysisCohortSchedule(cohort.ID)
+		if got.LastBatchID != "batch-1" || got.LastOutcome != ScheduleOutcomeError || got.LastError != "boom" || !got.LastRunAt.Equal(at.Add(time.Hour)) {
+			t.Errorf("last = %q %q %q %s, want batch-1 error boom %s", got.LastBatchID, got.LastOutcome, got.LastError, got.LastRunAt, at.Add(time.Hour))
+		}
+	})
+}
+
+func TestJobStoreCountOutstandingJobsForBatch(t *testing.T) {
+	forEachStore(t, func(t *testing.T, s JobStore) {
+		job, err := s.Create(Job{ID: "j1", BatchID: "b1", Domain: "example.com", Status: JobQueued, CreatedAt: time.Now().UTC()})
+		if err != nil {
+			t.Fatalf("Create: %v", err)
+		}
+		if n, err := s.CountOutstandingJobsForBatch("b1"); err != nil || n != 1 {
+			t.Fatalf("outstanding = %d %v, want 1", n, err)
+		}
+		graduate(t, s, job, nil)
+		if n, err := s.CountOutstandingJobsForBatch("b1"); err != nil || n != 0 {
+			t.Errorf("outstanding after graduation = %d %v, want 0", n, err)
 		}
 	})
 }

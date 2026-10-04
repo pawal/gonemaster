@@ -269,10 +269,13 @@ func (s *SQLJobStore) SetAnalysisCohortProgress(id int64, done, total int) error
 	return nil
 }
 
-// DeleteAnalysisCohort removes one cohort catalog row and any materialized data
+// DeleteAnalysisCohort removes one cohort catalog row, its schedule and any materialized data
 // attached to it.
 func (s *SQLJobStore) DeleteAnalysisCohort(id int64) error {
 	if err := s.ClearAnalysisCohortMaterialization(id); err != nil {
+		return err
+	}
+	if err := s.DeleteAnalysisCohortSchedule(id); err != nil {
 		return err
 	}
 	_, err := s.db.Exec(

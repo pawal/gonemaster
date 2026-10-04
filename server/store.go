@@ -178,6 +178,18 @@ type JobStore interface {
 	UpsertAnalysisCohort(cohort AnalysisCohort) (AnalysisCohort, error)
 	DeleteAnalysisCohort(id int64) error
 
+	// Analysis cohort schedules, one per cohort.
+	GetAnalysisCohortSchedule(cohortID int64) (AnalysisCohortSchedule, bool)
+	PutAnalysisCohortSchedule(sched AnalysisCohortSchedule) (AnalysisCohortSchedule, error)
+	DeleteAnalysisCohortSchedule(cohortID int64) error
+	ListAnalysisCohortSchedules() []AnalysisCohortSchedule
+	ListDueAnalysisCohortSchedules(now time.Time) []AnalysisCohortSchedule
+	// ClaimAnalysisCohortSchedule advances next_run_at only if it still equals expected.
+	ClaimAnalysisCohortSchedule(cohortID int64, expected, next time.Time) (bool, error)
+	// RecordAnalysisCohortScheduleOutcome stores a firing; an empty batchID keeps the last one.
+	RecordAnalysisCohortScheduleOutcome(cohortID int64, ranAt time.Time, batchID, outcome, errText string) error
+	CountOutstandingJobsForBatch(batchID string) (int, error)
+
 	// Profile management.
 	CreateProfile(p StoredProfile) (StoredProfile, error)
 	GetProfile(id int64) (StoredProfile, bool)
@@ -233,6 +245,7 @@ type InMemoryJobStore struct {
 	// Analysis cohort catalog.
 	analysisCohorts       map[int64]AnalysisCohort
 	analysisCohortCounter int64
+	analysisSchedules     map[int64]AnalysisCohortSchedule
 
 	// Profiles.
 	profiles       map[int64]StoredProfile // id → StoredProfile
@@ -252,22 +265,23 @@ func (s *InMemoryJobStore) SetScoringConfig(cfg scoring.Config) {
 // NewInMemoryJobStore creates an empty in-memory job store.
 func NewInMemoryJobStore() *InMemoryJobStore {
 	return &InMemoryJobStore{
-		scoringCfg:      scoring.DefaultConfig(),
-		jobs:            map[string]Job{},
-		publicIDs:       map[string]string{},
-		runs:            map[string]Run{},
-		runPublicIDs:    map[string]string{},
-		entries:         map[string][]Entry{},
-		dnssecChains:    map[string]string{},
-		domains:         map[string]*Domain{},
-		domainsByID:     map[int64]*Domain{},
-		tags:            map[string]Tag{},
-		domainTags:      map[int64][]string{},
-		tagDomains:      map[string][]int64{},
-		batches:         map[string]Batch{},
-		analysisCohorts: map[int64]AnalysisCohort{},
-		profiles:        map[int64]StoredProfile{},
-		settings:        map[string]string{},
+		scoringCfg:        scoring.DefaultConfig(),
+		jobs:              map[string]Job{},
+		publicIDs:         map[string]string{},
+		runs:              map[string]Run{},
+		runPublicIDs:      map[string]string{},
+		entries:           map[string][]Entry{},
+		dnssecChains:      map[string]string{},
+		domains:           map[string]*Domain{},
+		domainsByID:       map[int64]*Domain{},
+		tags:              map[string]Tag{},
+		domainTags:        map[int64][]string{},
+		tagDomains:        map[string][]int64{},
+		batches:           map[string]Batch{},
+		analysisCohorts:   map[int64]AnalysisCohort{},
+		analysisSchedules: map[int64]AnalysisCohortSchedule{},
+		profiles:          map[int64]StoredProfile{},
+		settings:          map[string]string{},
 	}
 }
 
@@ -360,12 +374,122 @@ func (s *InMemoryJobStore) UpsertAnalysisCohort(cohort AnalysisCohort) (Analysis
 	return cohort, nil
 }
 
-// DeleteAnalysisCohort removes one cohort catalog row.
+// DeleteAnalysisCohort removes one cohort catalog row and its schedule.
 func (s *InMemoryJobStore) DeleteAnalysisCohort(id int64) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	delete(s.analysisCohorts, id)
+	delete(s.analysisSchedules, id)
 	return nil
+}
+
+// GetAnalysisCohortSchedule returns the schedule of one cohort.
+func (s *InMemoryJobStore) GetAnalysisCohortSchedule(cohortID int64) (AnalysisCohortSchedule, bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	sched, ok := s.analysisSchedules[cohortID]
+	return sched, ok
+}
+
+// PutAnalysisCohortSchedule creates or replaces a schedule and keeps its last run.
+func (s *InMemoryJobStore) PutAnalysisCohortSchedule(sched AnalysisCohortSchedule) (AnalysisCohortSchedule, error) {
+	if sched.CohortID <= 0 || sched.NextRunAt.IsZero() {
+		return AnalysisCohortSchedule{}, errors.New("cohort_id and next_run_at are required")
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	now := time.Now().UTC()
+	existing, ok := s.analysisSchedules[sched.CohortID]
+	if !ok {
+		existing = AnalysisCohortSchedule{CreatedAt: now}
+	}
+	sched.SourceTag, sched.Label = "", ""
+	sched.Rule = sched.Rule.Canonical()
+	sched.ProfileID = cloneInt64Ptr(sched.ProfileID)
+	sched.NextRunAt = sched.NextRunAt.UTC()
+	sched.LastRunAt, sched.LastBatchID = existing.LastRunAt, existing.LastBatchID
+	sched.LastOutcome, sched.LastError = existing.LastOutcome, existing.LastError
+	sched.CreatedAt, sched.UpdatedAt = existing.CreatedAt, now
+	s.analysisSchedules[sched.CohortID] = sched
+	return sched, nil
+}
+
+// DeleteAnalysisCohortSchedule removes the schedule of one cohort.
+func (s *InMemoryJobStore) DeleteAnalysisCohortSchedule(cohortID int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	delete(s.analysisSchedules, cohortID)
+	return nil
+}
+
+// ListAnalysisCohortSchedules returns every schedule by cohort id.
+func (s *InMemoryJobStore) ListAnalysisCohortSchedules() []AnalysisCohortSchedule {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	out := slices.Collect(maps.Values(s.analysisSchedules))
+	sort.Slice(out, func(i, j int) bool { return out[i].CohortID < out[j].CohortID })
+	return out
+}
+
+// ListDueAnalysisCohortSchedules returns enabled schedules due at now, oldest first.
+func (s *InMemoryJobStore) ListDueAnalysisCohortSchedules(now time.Time) []AnalysisCohortSchedule {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	var out []AnalysisCohortSchedule
+	for _, sched := range s.analysisSchedules {
+		if sched.Enabled && !sched.NextRunAt.After(now) {
+			out = append(out, sched)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool {
+		if !out[i].NextRunAt.Equal(out[j].NextRunAt) {
+			return out[i].NextRunAt.Before(out[j].NextRunAt)
+		}
+		return out[i].CohortID < out[j].CohortID
+	})
+	return out
+}
+
+// ClaimAnalysisCohortSchedule advances next_run_at only if it still equals expected.
+func (s *InMemoryJobStore) ClaimAnalysisCohortSchedule(cohortID int64, expected, next time.Time) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sched, ok := s.analysisSchedules[cohortID]
+	if !ok || !sched.Enabled || !sched.NextRunAt.Equal(expected) {
+		return false, nil
+	}
+	sched.NextRunAt = next.UTC()
+	s.analysisSchedules[cohortID] = sched
+	return true, nil
+}
+
+// RecordAnalysisCohortScheduleOutcome stores a firing; an empty batchID keeps the last one.
+func (s *InMemoryJobStore) RecordAnalysisCohortScheduleOutcome(cohortID int64, ranAt time.Time, batchID, outcome, errText string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	sched, ok := s.analysisSchedules[cohortID]
+	if !ok {
+		return nil
+	}
+	sched.LastRunAt, sched.LastOutcome, sched.LastError = ranAt.UTC(), outcome, errText
+	if batchID != "" {
+		sched.LastBatchID = batchID
+	}
+	s.analysisSchedules[cohortID] = sched
+	return nil
+}
+
+// CountOutstandingJobsForBatch returns queued, running and paused jobs of a batch.
+func (s *InMemoryJobStore) CountOutstandingJobsForBatch(batchID string) (int, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	n := 0
+	for _, job := range s.jobs {
+		if job.BatchID == batchID && (job.Status == JobQueued || job.Status == JobRunning || job.Status == JobPaused) {
+			n++
+		}
+	}
+	return n, nil
 }
 
 // Create inserts a new in-flight job. A PublicID is generated if not set.

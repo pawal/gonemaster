@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
+	"codeberg.org/pawal/gonemaster/server/recurrence"
 )
 
 // reqOpt customizes a request before it is served.
@@ -444,6 +445,42 @@ func graduate(t testing.TB, store JobStore, job Job, entries []engine.LogEntry) 
 		t.Fatalf("graduate job %q: %v", job.ID, err)
 	}
 	return job
+}
+
+// newSchedule builds an enabled daily 02:00 UTC schedule due at next.
+func newSchedule(cohortID int64, next time.Time) AnalysisCohortSchedule {
+	return AnalysisCohortSchedule{
+		CohortID: cohortID,
+		Enabled:  true,
+		Rule: recurrence.Rule{
+			Kind:         recurrence.KindInterval,
+			IntervalDays: 1,
+			AnchorDate:   recurrence.Date{Year: 2026, Month: time.January, Day: 1},
+			TimeOfDay:    recurrence.TimeOfDay{Hour: 2},
+		},
+		CatchUp:   true,
+		NextRunAt: next,
+	}
+}
+
+// putSchedule stores sched.
+func putSchedule(t testing.TB, store JobStore, sched AnalysisCohortSchedule) AnalysisCohortSchedule {
+	t.Helper()
+	stored, err := store.PutAnalysisCohortSchedule(sched)
+	if err != nil {
+		t.Fatalf("put schedule for cohort %d: %v", sched.CohortID, err)
+	}
+	return stored
+}
+
+// upsertCohort stores an analysis-enabled tag cohort.
+func upsertCohort(t testing.TB, store JobStore, tag string) AnalysisCohort {
+	t.Helper()
+	cohort, err := store.UpsertAnalysisCohort(AnalysisCohort{SourceType: "tag", SourceTag: tag, AnalysisEnabled: true})
+	if err != nil {
+		t.Fatalf("upsert cohort %q: %v", tag, err)
+	}
+	return cohort
 }
 
 // forEachStore runs fn as a subtest against the in-memory store and every SQL

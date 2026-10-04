@@ -4,11 +4,13 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"math/big"
+	"strings"
 	"time"
 
 	"codeberg.org/pawal/gonemaster/engine"
 	enginenameserver "codeberg.org/pawal/gonemaster/engine/nameserver"
 	"codeberg.org/pawal/gonemaster/scoring"
+	"codeberg.org/pawal/gonemaster/server/recurrence"
 )
 
 const publicIDAlphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
@@ -475,6 +477,170 @@ type Batch struct {
 	DomainCount    int       `json:"domain_count"`
 	Description    string    `json:"description,omitempty"`
 	SnapshotIntent bool      `json:"snapshot_intent,omitempty"`
+	// Origin is BatchOriginSchedule or empty.
+	Origin string `json:"origin,omitempty"`
+}
+
+// BatchOriginSchedule marks a batch the cohort scheduler submitted.
+const BatchOriginSchedule = "schedule"
+
+// Scheduled run outcomes.
+const (
+	ScheduleOutcomeSubmitted       = "submitted"
+	ScheduleOutcomeSkippedMissed   = "skipped_missed"
+	ScheduleOutcomeSkippedDisabled = "skipped_disabled"
+	ScheduleOutcomeSkippedActive   = "skipped_active"
+	ScheduleOutcomeSkippedEmpty    = "skipped_empty"
+	ScheduleOutcomeError           = "error"
+)
+
+// ScheduleRuleFields is the wire form of a recurrence rule.
+type ScheduleRuleFields struct {
+	Kind         string   `json:"kind"`
+	IntervalDays int      `json:"interval_days"`
+	AnchorDate   string   `json:"anchor_date"`
+	Weekdays     []string `json:"weekdays"`
+	DaysOfMonth  []int    `json:"days_of_month"`
+	LastDay      bool     `json:"last_day"`
+	TimeOfDay    string   `json:"time_of_day"`
+	Timezone     string   `json:"timezone"`
+}
+
+// Rule parses the fields the kind uses and validates the result.
+func (f ScheduleRuleFields) Rule() (recurrence.Rule, error) {
+	kind, err := recurrence.ParseKind(f.Kind)
+	if err != nil {
+		return recurrence.Rule{}, err
+	}
+	r := recurrence.Rule{Kind: kind, Zone: strings.TrimSpace(f.Timezone)}
+	switch kind {
+	case recurrence.KindInterval:
+		r.IntervalDays = f.IntervalDays
+		r.AnchorDate, err = recurrence.ParseDate(f.AnchorDate)
+	case recurrence.KindWeekly:
+		r.Weekdays, err = recurrence.ParseWeekdays(f.Weekdays)
+	case recurrence.KindMonthly:
+		r.DaysOfMonth, err = recurrence.ParseDays(f.DaysOfMonth)
+		r.LastDay = f.LastDay
+	}
+	if err != nil {
+		return recurrence.Rule{}, err
+	}
+	if r.TimeOfDay, err = recurrence.ParseTimeOfDay(f.TimeOfDay); err != nil {
+		return recurrence.Rule{}, err
+	}
+	r = r.Canonical()
+	return r, r.Validate()
+}
+
+func scheduleRuleFields(r recurrence.Rule) ScheduleRuleFields {
+	r = r.Canonical()
+	return ScheduleRuleFields{
+		Kind:         string(r.Kind),
+		IntervalDays: r.IntervalDays,
+		AnchorDate:   r.AnchorDate.String(),
+		Weekdays:     r.Weekdays.Names(),
+		DaysOfMonth:  r.DaysOfMonth.Days(),
+		LastDay:      r.LastDay,
+		TimeOfDay:    r.TimeOfDay.String(),
+		Timezone:     r.Zone,
+	}
+}
+
+// AnalysisCohortSchedule is the snapshot recurrence of one cohort.
+type AnalysisCohortSchedule struct {
+	CohortID int64
+	// SourceTag and Label are filled by the schedules list only.
+	SourceTag      string
+	Label          string
+	Enabled        bool
+	Rule           recurrence.Rule
+	ProfileID      *int64
+	PromoteDefault bool
+	CatchUp        bool
+	NextRunAt      time.Time
+	LastRunAt      time.Time
+	LastBatchID    string
+	LastOutcome    string
+	LastError      string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+}
+
+type analysisCohortScheduleJSON struct {
+	CohortID  int64  `json:"cohort_id"`
+	SourceTag string `json:"source_tag,omitempty"`
+	Label     string `json:"label,omitempty"`
+	Enabled   bool   `json:"enabled"`
+	ScheduleRuleFields
+	ProfileID      *int64     `json:"profile_id"`
+	PromoteDefault bool       `json:"promote_default"`
+	CatchUp        bool       `json:"catch_up"`
+	Summary        string     `json:"summary"`
+	NextRunAt      time.Time  `json:"next_run_at"`
+	LastRunAt      *time.Time `json:"last_run_at,omitempty"`
+	LastBatchID    string     `json:"last_batch_id,omitempty"`
+	LastOutcome    string     `json:"last_outcome,omitempty"`
+	LastError      string     `json:"last_error,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
+}
+
+// MarshalJSON flattens the rule and omits a zero LastRunAt.
+func (s AnalysisCohortSchedule) MarshalJSON() ([]byte, error) {
+	out := analysisCohortScheduleJSON{
+		CohortID:           s.CohortID,
+		SourceTag:          s.SourceTag,
+		Label:              s.Label,
+		Enabled:            s.Enabled,
+		ScheduleRuleFields: scheduleRuleFields(s.Rule),
+		ProfileID:          s.ProfileID,
+		PromoteDefault:     s.PromoteDefault,
+		CatchUp:            s.CatchUp,
+		Summary:            s.Rule.String(),
+		NextRunAt:          s.NextRunAt,
+		LastBatchID:        s.LastBatchID,
+		LastOutcome:        s.LastOutcome,
+		LastError:          s.LastError,
+		CreatedAt:          s.CreatedAt,
+		UpdatedAt:          s.UpdatedAt,
+	}
+	if !s.LastRunAt.IsZero() {
+		out.LastRunAt = &s.LastRunAt
+	}
+	return json.Marshal(out)
+}
+
+// UnmarshalJSON reads the MarshalJSON form.
+func (s *AnalysisCohortSchedule) UnmarshalJSON(raw []byte) error {
+	var in analysisCohortScheduleJSON
+	if err := json.Unmarshal(raw, &in); err != nil {
+		return err
+	}
+	rule, err := in.ScheduleRuleFields.Rule()
+	if err != nil {
+		return err
+	}
+	*s = AnalysisCohortSchedule{
+		CohortID:       in.CohortID,
+		SourceTag:      in.SourceTag,
+		Label:          in.Label,
+		Enabled:        in.Enabled,
+		Rule:           rule,
+		ProfileID:      in.ProfileID,
+		PromoteDefault: in.PromoteDefault,
+		CatchUp:        in.CatchUp,
+		NextRunAt:      in.NextRunAt,
+		LastBatchID:    in.LastBatchID,
+		LastOutcome:    in.LastOutcome,
+		LastError:      in.LastError,
+		CreatedAt:      in.CreatedAt,
+		UpdatedAt:      in.UpdatedAt,
+	}
+	if in.LastRunAt != nil {
+		s.LastRunAt = *in.LastRunAt
+	}
+	return nil
 }
 
 // AnalysisCohortSnapshot is one point-in-time materialization of a cohort,

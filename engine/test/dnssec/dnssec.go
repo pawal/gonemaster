@@ -26,6 +26,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/nsdiscovery"
 	"codeberg.org/pawal/gonemaster/engine/packet"
 	"codeberg.org/pawal/gonemaster/engine/profile"
+	"codeberg.org/pawal/gonemaster/engine/recursor"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/runner"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testcase"
 	"codeberg.org/pawal/gonemaster/engine/test/internal/testlogger"
@@ -312,6 +313,16 @@ func All(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if util.ShouldRunTest(ctx, "dnssec23") {
 		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
 			return DNSSEC23(ctx, z)
+		})
+		results = append(results, entries...)
+		if err != nil {
+			return results, err
+		}
+	}
+
+	if util.ShouldRunTest(ctx, "dnssec24") {
+		entries, err := testcase.Run(ctx, func(ctx context.Context) ([]*logger.Entry, error) {
+			return DNSSEC24(ctx, z)
 		})
 		results = append(results, entries...)
 		if err != nil {
@@ -695,6 +706,28 @@ func Metadata() map[string][]string {
 			"DS23_NSEC3_MIXED_PARAMETERS",
 			"DS23_NSEC3_RANGES_OVERLAP",
 			"DS23_NSEC_RANGES_OVERLAP",
+			"IPV4_DISABLED",
+			"IPV6_DISABLED",
+			"TEST_CASE_END",
+			"TEST_CASE_START",
+		},
+		"dnssec24": {
+			"DS24_APEX_UNAVAILABLE",
+			"DS24_BOOTSTRAP_READY",
+			"DS24_DELEGATION_SECURE",
+			"DS24_DELETE_REQUESTED",
+			"DS24_NO_CDS_CDNSKEY",
+			"DS24_NO_SIGNAL",
+			"DS24_ONLY_IN_DOMAIN_NS",
+			"DS24_SIGNAL_AT_ZONE_CUT",
+			"DS24_SIGNAL_CHAIN_BROKEN",
+			"DS24_SIGNAL_MISMATCH",
+			"DS24_SIGNAL_MISSING",
+			"DS24_SIGNAL_NAME_TOO_LONG",
+			"DS24_SIGNAL_UNSIGNED",
+			"DS24_SIGNAL_VALIDATED",
+			"DS24_SIGNAL_ZONE_INSECURE",
+			"DS24_SIGNAL_ZONE_UNREACHABLE",
 			"IPV4_DISABLED",
 			"IPV6_DISABLED",
 			"TEST_CASE_END",
@@ -10348,6 +10381,854 @@ func DNSSEC23(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 
 	return results, appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase})
+}
+
+// ds24MaxServers caps the servers asked per question on a signaling path.
+const ds24MaxServers = 2
+
+// DNSSEC24 inputs that do not come from a nameserver query.
+var (
+	delegationNSNames = func(ctx context.Context, z *zone.Zone) ([]dnsname.Name, error) { return z.GlueNames(ctx) }
+	rootTrustAnchors  = dnssecutil.RootTrustAnchors
+)
+
+type ds24Status int
+
+const (
+	ds24Secure ds24Status = iota
+	ds24Insecure
+	ds24Broken
+	ds24Unreachable
+	ds24Indeterminate
+)
+
+// ds24Verdict is the chain status at a zone cut; zone names the cut at fault.
+type ds24Verdict struct {
+	status  ds24Status
+	zone    string
+	servers []logargs.Server
+	keys    []*dns.DNSKEY
+}
+
+// ds24Level is one zone cut on the path to a signaling name.
+type ds24Level struct {
+	cut         dnsname.Name
+	parent      *ds24Level
+	ds          []dns.RR
+	dsSigs      []*dns.RRSIG
+	dsAt        time.Time
+	broken      bool
+	names       []dnsname.Name
+	glue        map[string][]netip.Addr
+	servers     []nameserver.Nameserver
+	resolved    bool
+	unreachable bool
+	tried       []logargs.Server
+	verified    bool
+	verdict     ds24Verdict
+}
+
+type ds24Kind int
+
+const (
+	ds24Absent ds24Kind = iota
+	ds24Signal
+	ds24AtCut
+	ds24Unreached
+)
+
+// ds24Found is where the descent for one signaling name ended.
+type ds24Found struct {
+	kind        ds24Kind
+	level       *ds24Level
+	server      nameserver.Nameserver
+	cdsResp     packet.Packet
+	cdnskeyResp packet.Packet
+	cds         []dns.RR
+	cdnskey     []dns.RR
+}
+
+// ds24Walker validates signaling names from the root hints, sharing levels by cut.
+type ds24Walker struct {
+	rec     *recursor.Recursor
+	anchors []dns.RR
+	levels  map[string]*ds24Level
+}
+
+func newDS24Walker(ctx context.Context, rec *recursor.Recursor, anchors []*dns.DS) *ds24Walker {
+	w := &ds24Walker{rec: rec, levels: map[string]*ds24Level{}}
+	for _, ds := range anchors {
+		w.anchors = append(w.anchors, ds)
+	}
+	root := &ds24Level{cut: dnsname.New("."), resolved: true}
+	if rec != nil {
+		servers, _ := rec.RootServers(ctx)
+		root.servers = ds24Pick(ds24ByName(ctx, servers))
+	}
+	w.store(root)
+	return w
+}
+
+func (w *ds24Walker) store(l *ds24Level) *ds24Level {
+	w.levels[l.cut.StringLower()] = l
+	return l
+}
+
+// ds24ByName groups servers by name, in order, leaving out disabled transports.
+func ds24ByName(ctx context.Context, servers []nameserver.Nameserver) [][]nameserver.Nameserver {
+	var groups [][]nameserver.Nameserver
+	for _, ns := range servers {
+		if !dnssec22TransportEnabled(ctx, ns) {
+			continue
+		}
+		if n := len(groups); n > 0 && groups[n-1][0].Name.Compare(ns.Name) == 0 {
+			groups[n-1] = append(groups[n-1], ns)
+			continue
+		}
+		groups = append(groups, []nameserver.Nameserver{ns})
+	}
+	return groups
+}
+
+// ds24Pick takes the first address of each name before the second of any.
+func ds24Pick(groups [][]nameserver.Nameserver) []nameserver.Nameserver {
+	var out []nameserver.Nameserver
+	for round := 0; len(out) < ds24MaxServers; round++ {
+		added := false
+		for _, group := range groups {
+			if round >= len(group) || len(out) == ds24MaxServers {
+				continue
+			}
+			out = append(out, group[round])
+			added = true
+		}
+		if !added {
+			break
+		}
+	}
+	return out
+}
+
+// ds24FirstServer returns servers with first in front, capped.
+func ds24FirstServer(servers []nameserver.Nameserver, first nameserver.Nameserver) []nameserver.Nameserver {
+	out := []nameserver.Nameserver{first}
+	for _, ns := range servers {
+		if len(out) == ds24MaxServers {
+			break
+		}
+		if ns.Address != first.Address || ns.Name.Compare(first.Name) != 0 {
+			out = append(out, ns)
+		}
+	}
+	return out
+}
+
+func ds24Endpoint(ns nameserver.Nameserver) logargs.Server {
+	return logargs.Server{NS: ns.NameString(), Address: ns.AddressString()}
+}
+
+// ds24Below reports whether child lies strictly below parent.
+func ds24Below(child dnsname.Name, parent dnsname.Name) bool {
+	return parent.IsInBailiwick(child) && child.Compare(parent) != 0
+}
+
+// serversOf resolves the servers of l on first use, glue before the recursor.
+func (w *ds24Walker) serversOf(ctx context.Context, l *ds24Level) []nameserver.Nameserver {
+	if l.resolved {
+		return l.servers
+	}
+	l.resolved = true
+	var groups [][]nameserver.Nameserver
+	for _, name := range l.names {
+		if len(groups) == ds24MaxServers {
+			break
+		}
+		addrs := l.glue[name.StringLower()]
+		if len(addrs) == 0 && w.rec != nil {
+			addrs, _ = w.rec.GetAddressesFor(ctx, name.String())
+		}
+		var group []nameserver.Nameserver
+		for _, addr := range addrs {
+			ns, err := nameserver.NewWithContext(ctx, name.String(), addr.String(), w.rec.Client())
+			if err == nil && dnssec22TransportEnabled(ctx, ns) {
+				group = append(group, ns)
+			}
+		}
+		if len(group) > 0 {
+			groups = append(groups, group)
+		}
+	}
+	l.servers = ds24Pick(groups)
+	return l.servers
+}
+
+// ds24ReferralCut returns the owner of the NS RRset a referral delegates to.
+func ds24ReferralCut(resp packet.Packet) (dnsname.Name, bool) {
+	if resp.Msg == nil || resp.AA() || resp.Rcode() != "NOERROR" || len(resp.Answer()) > 0 {
+		return dnsname.Name{}, false
+	}
+	ns := resp.GetRecords("NS", "authority")
+	if len(ns) == 0 {
+		return dnsname.Name{}, false
+	}
+	return dnsname.New(ns[0].Header().Name), true
+}
+
+// levelFromReferral returns the memoized level of cut, or builds it from the referral.
+func (w *ds24Walker) levelFromReferral(resp packet.Packet, cut dnsname.Name, parent *ds24Level) *ds24Level {
+	if known, ok := w.levels[cut.StringLower()]; ok {
+		return known
+	}
+	l := &ds24Level{cut: cut, parent: parent, dsAt: packetTime(resp), glue: map[string][]netip.Addr{}}
+	l.ds = resp.GetRecordsForName("DS", cut, "authority")
+	l.dsSigs = filterRRSIGByType(resp.GetRecordsForName("RRSIG", cut, "authority"), dns.TypeDS)
+	seen := map[string]bool{}
+	for _, rr := range resp.GetRecordsForName("NS", cut, "authority") {
+		ns, ok := rr.(*dns.NS)
+		if !ok {
+			continue
+		}
+		name := dnsname.New(strings.ToLower(ns.Ns))
+		if !seen[name.StringLower()] {
+			seen[name.StringLower()] = true
+			l.names = append(l.names, name)
+		}
+	}
+	sort.Slice(l.names, func(i, j int) bool { return l.names[i].Compare(l.names[j]) < 0 })
+	for _, rrtype := range []string{"A", "AAAA"} {
+		for _, rr := range resp.GetRecords(rrtype, "additional") {
+			owner := dnsname.New(rr.Header().Name)
+			key := owner.StringLower()
+			if !seen[key] || !parent.cut.IsInBailiwick(owner) {
+				continue
+			}
+			if addr, ok := dnssec22GlueAddress(rr); ok {
+				l.glue[key] = appendDistinct(l.glue[key], addr)
+			}
+		}
+	}
+	return w.store(l)
+}
+
+// start returns the deepest known level above n.
+func (w *ds24Walker) start(n dnsname.Name) *ds24Level {
+	for cur, ok := n.NextHigher(); ok; cur, ok = cur.NextHigher() {
+		if l, found := w.levels[cur.StringLower()]; found {
+			return l
+		}
+	}
+	return w.levels["."]
+}
+
+// locate descends to the zone answering n CDS authoritatively.
+func (w *ds24Walker) locate(ctx context.Context, n dnsname.Name) ds24Found {
+	level := w.start(n)
+	for range len(n.Labels()) + 1 {
+		if level.unreachable {
+			break
+		}
+		found, next := w.ask(ctx, level, n)
+		if next == nil {
+			level.unreachable = found.kind == ds24Unreached
+			return found
+		}
+		level = next
+	}
+	return ds24Found{kind: ds24Unreached, level: level}
+}
+
+// ask puts n CDS to the servers of level; next is set on a referral down the path.
+func (w *ds24Walker) ask(ctx context.Context, level *ds24Level, n dnsname.Name) (ds24Found, *ds24Level) {
+	for _, ns := range w.serversOf(ctx, level) {
+		level.tried = appendDistinct(level.tried, ds24Endpoint(ns))
+		resp := dnssec22Query(ctx, ns, n, "CDS")
+		if cut, ok := ds24ReferralCut(resp); ok {
+			if cut.Compare(n) == 0 {
+				return ds24Found{kind: ds24AtCut, level: level}, nil
+			}
+			if ds24Below(cut, level.cut) && cut.IsInBailiwick(n) {
+				return ds24Found{}, w.levelFromReferral(resp, cut, level)
+			}
+			continue
+		}
+		if resp.Msg == nil || !resp.AA() {
+			continue
+		}
+		switch resp.Rcode() {
+		case "NXDOMAIN":
+			return ds24Found{kind: ds24Absent, level: level, server: ns}, nil
+		case "NOERROR":
+		default:
+			continue
+		}
+		keyResp := dnssec22Query(ctx, ns, n, "CDNSKEY")
+		if keyResp.Msg == nil || !keyResp.AA() || (keyResp.Rcode() != "NOERROR" && keyResp.Rcode() != "NXDOMAIN") {
+			continue
+		}
+		found := ds24Found{kind: ds24Absent, level: level, server: ns, cdsResp: resp, cdnskeyResp: keyResp}
+		found.cds = resp.GetRecordsForName("CDS", n, "answer")
+		found.cdnskey = keyResp.GetRecordsForName("CDNSKEY", n, "answer")
+		if len(found.cds) > 0 || len(found.cdnskey) > 0 {
+			found.kind = ds24Signal
+		}
+		return found, nil
+	}
+	return ds24Found{kind: ds24Unreached, level: level}, nil
+}
+
+// ds24Signer returns the Signer's Name of the first RRSIG over a non-empty signaling RRset.
+func ds24Signer(found ds24Found, n dnsname.Name) (dnsname.Name, bool) {
+	for _, set := range []struct {
+		resp   packet.Packet
+		rrs    []dns.RR
+		rrtype uint16
+	}{{found.cdsResp, found.cds, dns.TypeCDS}, {found.cdnskeyResp, found.cdnskey, dns.TypeCDNSKEY}} {
+		if len(set.rrs) == 0 {
+			continue
+		}
+		if sigs := filterRRSIGByType(set.resp.GetRecordsForName("RRSIG", n, "answer"), set.rrtype); len(sigs) > 0 {
+			return dnsname.New(sigs[0].SignerName), true
+		}
+	}
+	return dnsname.Name{}, false
+}
+
+// signalZone returns the level of the signaling zone, a fault, or atCut.
+func (w *ds24Walker) signalZone(ctx context.Context, n dnsname.Name, found ds24Found) (*ds24Level, *ds24Verdict, bool) {
+	level := found.level
+	signer, ok := ds24Signer(found, n)
+	if !ok || !level.cut.IsInBailiwick(signer) || !signer.IsInBailiwick(n) || signer.Compare(level.cut) == 0 {
+		return level, nil, false
+	}
+	if signer.Compare(n) == 0 {
+		return nil, nil, true
+	}
+	z, fault := w.discover(ctx, level, signer, found.server)
+	return z, fault, false
+}
+
+// discover links a zone cut s below from that no referral marked, by s DS.
+func (w *ds24Walker) discover(ctx context.Context, from *ds24Level, s dnsname.Name, first nameserver.Nameserver) (*ds24Level, *ds24Verdict) {
+	if known, ok := w.levels[s.StringLower()]; ok {
+		return known, nil
+	}
+	cur := from
+	for range len(s.Labels()) {
+		var tried []logargs.Server
+		var next *ds24Level
+		for _, ns := range ds24FirstServer(w.serversOf(ctx, cur), first) {
+			tried = append(tried, ds24Endpoint(ns))
+			resp := dnssec22Query(ctx, ns, s, "DS")
+			if cut, ok := ds24ReferralCut(resp); ok {
+				if ds24Below(cut, cur.cut) && cut.IsInBailiwick(s) {
+					next = w.levelFromReferral(resp, cut, cur)
+					break
+				}
+				continue
+			}
+			if resp.Msg == nil || !resp.AA() {
+				continue
+			}
+			switch resp.Rcode() {
+			case "NXDOMAIN":
+				return w.store(&ds24Level{cut: s, parent: cur, broken: true}), nil
+			case "NOERROR":
+				return w.levelFromAnswer(ctx, cur, s, first, resp)
+			}
+		}
+		if next == nil {
+			return nil, &ds24Verdict{status: ds24Unreachable, zone: cur.cut.String(), servers: tried}
+		}
+		if next.cut.Compare(s) == 0 {
+			return next, nil
+		}
+		cur = next
+	}
+	return nil, &ds24Verdict{status: ds24Unreachable, zone: cur.cut.String()}
+}
+
+// levelFromAnswer builds the level of s from an authoritative answer to s DS.
+func (w *ds24Walker) levelFromAnswer(ctx context.Context, cur *ds24Level, s dnsname.Name, first nameserver.Nameserver, resp packet.Packet) (*ds24Level, *ds24Verdict) {
+	l := &ds24Level{cut: s, parent: cur, dsAt: packetTime(resp), resolved: true}
+	l.servers = ds24FirstServer(w.serversOf(ctx, cur), first)
+	l.ds = resp.GetRecordsForName("DS", s, "answer")
+	l.dsSigs = filterRRSIGByType(resp.GetRecordsForName("RRSIG", s, "answer"), dns.TypeDS)
+	if len(l.ds) > 0 && len(l.dsSigs) > 0 {
+		signer := dnsname.New(l.dsSigs[0].SignerName)
+		if ds24Below(signer, cur.cut) && ds24Below(s, signer) {
+			parent, fault := w.discover(ctx, cur, signer, first)
+			if fault != nil {
+				return nil, fault
+			}
+			l.parent = parent
+		}
+	}
+	return w.store(l), nil
+}
+
+// verify returns the memoized chain verdict of l, ancestors first.
+func (w *ds24Walker) verify(ctx context.Context, l *ds24Level) ds24Verdict {
+	if !l.verified {
+		l.verdict = w.check(ctx, l)
+		l.verified = true
+	}
+	return l.verdict
+}
+
+func (w *ds24Walker) check(ctx context.Context, l *ds24Level) ds24Verdict {
+	if l.parent == nil {
+		return w.keys(ctx, l, w.anchors)
+	}
+	parent := w.verify(ctx, l.parent)
+	if parent.status != ds24Secure {
+		return parent
+	}
+	zone := l.cut.String()
+	if l.broken {
+		return ds24Verdict{status: ds24Broken, zone: zone}
+	}
+	if len(l.ds) == 0 {
+		return ds24Verdict{status: ds24Insecure, zone: zone}
+	}
+	sigs := ds24SignedBy(l.dsSigs, l.parent.cut)
+	check := dnssec22VerifySigs(sigs, parent.keys, l.dsAt, func(*dns.RRSIG) []dns.RR { return l.ds })
+	if status := ds24StatusOf(check); status != ds24Secure {
+		return ds24Verdict{status: status, zone: zone}
+	}
+	return w.keys(ctx, l, l.ds)
+}
+
+// keys fetches the DNSKEY RRset of l and validates it against ds.
+func (w *ds24Walker) keys(ctx context.Context, l *ds24Level, ds []dns.RR) ds24Verdict {
+	zone := l.cut.String()
+	var tried []logargs.Server
+	for _, ns := range w.serversOf(ctx, l) {
+		tried = append(tried, ds24Endpoint(ns))
+		cut, answered := dnssec22ChildKeys(ctx, ns, l.cut, ds)
+		if !answered {
+			continue
+		}
+		switch cut.status {
+		case dnssec22SecureCut:
+			return ds24Verdict{status: ds24Secure, zone: zone, keys: cut.keys}
+		case dnssec22Indeterminate:
+			return ds24Verdict{status: ds24Indeterminate, zone: zone}
+		}
+		return ds24Verdict{status: ds24Broken, zone: zone}
+	}
+	return ds24Verdict{status: ds24Unreachable, zone: zone, servers: tried}
+}
+
+func ds24StatusOf(check dnssec22SigCheck) ds24Status {
+	switch dnssec22CutFromCheck(check) {
+	case dnssec22SecureCut:
+		return ds24Secure
+	case dnssec22Indeterminate:
+		return ds24Indeterminate
+	}
+	return ds24Broken
+}
+
+// ds24SignedBy keeps the signatures whose Signer's Name is signer.
+func ds24SignedBy(sigs []*dns.RRSIG, signer dnsname.Name) []*dns.RRSIG {
+	var out []*dns.RRSIG
+	for _, sig := range sigs {
+		if dnsname.New(sig.SignerName).Compare(signer) == 0 {
+			out = append(out, sig)
+		}
+	}
+	return out
+}
+
+// ds24SignalName returns _dsboot.<child>._signal.<ns>; false beyond 255 octets.
+func ds24SignalName(child dnsname.Name, ns dnsname.Name) (dnsname.Name, bool) {
+	labels := append([]string{"_dsboot"}, child.Labels()...)
+	labels = append(labels, "_signal")
+	labels = append(labels, ns.Labels()...)
+	wire := 1
+	for i, label := range labels {
+		labels[i] = strings.ToLower(label)
+		wire += len(label) + 1
+	}
+	return dnsname.NewFromLabels(labels), wire <= 255
+}
+
+// ds24IsDelete reports an RFC 8078 delete record.
+func ds24IsDelete(rr dns.RR) bool {
+	switch record := rr.(type) {
+	case *dns.CDS:
+		return record.Algorithm == 0
+	case *dns.CDNSKEY:
+		return record.Algorithm == 0
+	}
+	return false
+}
+
+// ds24Content returns the RDATA of CDS or CDNSKEY records, sorted and deduplicated.
+func ds24Content(rrs []dns.RR) []string {
+	var out []string
+	for _, rr := range rrs {
+		switch record := rr.(type) {
+		case *dns.CDS:
+			out = append(out, strconv.Itoa(int(record.KeyTag))+" "+strconv.Itoa(int(record.Algorithm))+" "+
+				strconv.Itoa(int(record.DigestType))+" "+strings.ToUpper(record.Digest))
+		case *dns.CDNSKEY:
+			out = append(out, strconv.Itoa(int(record.Flags))+" "+strconv.Itoa(int(record.Protocol))+" "+
+				strconv.Itoa(int(record.Algorithm))+" "+record.PublicKey)
+		}
+	}
+	slices.Sort(out)
+	return slices.Compact(out)
+}
+
+// ds24Apex is the apex view: the RRsets of each delegation server that answered, by type.
+type ds24Apex map[uint16][][]dns.RR
+
+// differs reports whether rrs differs from the apex RRset of any server.
+func (a ds24Apex) differs(rrtype uint16, rrs []dns.RR) bool {
+	want := ds24Content(rrs)
+	for _, rrset := range a[rrtype] {
+		if !slices.Equal(ds24Content(rrset), want) {
+			return true
+		}
+	}
+	return false
+}
+
+// ds24Domain is the outcome for the signaling name of one nameserver.
+type ds24Domain struct {
+	host      string
+	name      string
+	tooLong   bool
+	kind      ds24Kind
+	signaled  bool
+	fault     *ds24Verdict
+	zone      string
+	unsigned  []string
+	mismatch  []string
+	validated bool
+}
+
+// evaluate locates n and validates its signaling records against the apex.
+func (w *ds24Walker) evaluate(ctx context.Context, n dnsname.Name, apex ds24Apex) ds24Domain {
+	d := ds24Domain{name: n.String()}
+	found := w.locate(ctx, n)
+	d.kind = found.kind
+	switch found.kind {
+	case ds24Unreached:
+		d.fault = &ds24Verdict{status: ds24Unreachable, zone: found.level.cut.String(), servers: found.level.tried}
+		return d
+	case ds24Signal:
+		d.signaled = true
+	default:
+		return d
+	}
+	level, fault, atCut := w.signalZone(ctx, n, found)
+	switch {
+	case atCut:
+		d.kind = ds24AtCut
+		return d
+	case fault != nil:
+		d.fault = fault
+		return d
+	}
+	verdict := w.verify(ctx, level)
+	if verdict.status != ds24Secure {
+		d.fault = &verdict
+		return d
+	}
+	d.zone = level.cut.String()
+	indeterminate := false
+	for _, set := range []struct {
+		resp   packet.Packet
+		rrs    []dns.RR
+		rrtype uint16
+	}{{found.cdsResp, found.cds, dns.TypeCDS}, {found.cdnskeyResp, found.cdnskey, dns.TypeCDNSKEY}} {
+		qtype := dns.TypeToString[set.rrtype]
+		if len(set.rrs) > 0 {
+			sigs := ds24SignedBy(filterRRSIGByType(set.resp.GetRecordsForName("RRSIG", n, "answer"), set.rrtype), level.cut)
+			rrs := set.rrs
+			switch ds24StatusOf(dnssec22VerifySigs(sigs, verdict.keys, packetTime(set.resp), func(*dns.RRSIG) []dns.RR { return rrs })) {
+			case ds24Broken:
+				d.unsigned = append(d.unsigned, qtype)
+				continue
+			case ds24Indeterminate:
+				indeterminate = true
+			}
+		}
+		if apex.differs(set.rrtype, set.rrs) {
+			d.mismatch = append(d.mismatch, qtype)
+		}
+	}
+	d.validated = !indeterminate && len(d.unsigned) == 0 && len(d.mismatch) == 0
+	return d
+}
+
+// ds24ParentDS returns the parent servers holding a DS for the zone, fake data first.
+func ds24ParentDS(ctx context.Context, z *zone.Zone, testcase string) ([]logargs.Server, []*logger.Entry, error) {
+	var held []logargs.Server
+	if fakeParents, err := parentApexNameservers(ctx, z); err == nil {
+		for _, ns := range fakeParents {
+			if len(ns.FakeDSRecords(z.Name.String())) > 0 {
+				held = append(held, ds24Endpoint(ns))
+			}
+		}
+	}
+	if len(held) > 0 {
+		return held, nil, nil
+	}
+	parentNS, err := parentNameservers(ctx, z)
+	if err != nil {
+		return nil, nil, err
+	}
+	groups := nameserversByIP(parentNS)
+	holds := make([]bool, len(groups))
+	tasks := make([]runner.Task, len(groups))
+	for i, group := range groups {
+		tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+			buf := testlogger.Wrap(log, moduleName, testcase)
+			if disabled, err := ipDisabledMessageWithLogger(ctx, buf, group[0], "DS"); err != nil || disabled {
+				return err
+			}
+			resp := dnssec22Query(ctx, group[0], z.Name, "DS")
+			holds[i] = resp.Msg != nil && resp.AA() && resp.Rcode() == "NOERROR" && len(resp.GetRecordsForName("DS", z.Name, "answer")) > 0
+			return nil
+		}
+	}
+	entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: profile.FromContext(ctx).Resolver.Defaults.Parallel, CancelOnError: false})
+	for i, group := range groups {
+		if holds[i] {
+			held = append(held, dnssec22Endpoints(group)...)
+		}
+	}
+	return held, entries, err
+}
+
+// ds24ApexServer is what one delegation server returned at the apex.
+type ds24ApexServer struct {
+	servers   []logargs.Server
+	asked     bool
+	cdsOK     bool
+	cdnskeyOK bool
+	cds       []dns.RR
+	cdnskey   []dns.RR
+}
+
+// ds24ApexView asks each delegation server, by IP, for the apex CDS and CDNSKEY.
+func ds24ApexView(ctx context.Context, z *zone.Zone, testcase string) ([]ds24ApexServer, []*logger.Entry, error) {
+	glue, err := glueNameservers(ctx, z)
+	if err != nil {
+		return nil, nil, err
+	}
+	groups := nameserversByIP(glue)
+	outcomes := make([]ds24ApexServer, len(groups))
+	tasks := make([]runner.Task, len(groups))
+	for i, group := range groups {
+		tasks[i] = func(ctx context.Context, log *logger.Logger) error {
+			buf := testlogger.Wrap(log, moduleName, testcase)
+			outcome := ds24ApexServer{servers: dnssec22Endpoints(group)}
+			if disabled, err := ipDisabledMessageWithLogger(ctx, buf, group[0], "CDS", "CDNSKEY"); err != nil || disabled {
+				outcomes[i] = outcome
+				return err
+			}
+			outcome.asked = true
+			cdsResp := dnssec22Query(ctx, group[0], z.Name, "CDS")
+			if cdsResp.Msg != nil && cdsResp.AA() && cdsResp.Rcode() == "NOERROR" {
+				outcome.cdsOK = true
+				outcome.cds = cdsResp.GetRecordsForName("CDS", z.Name, "answer")
+			}
+			keyResp := dnssec22Query(ctx, group[0], z.Name, "CDNSKEY")
+			if keyResp.Msg != nil && keyResp.AA() && keyResp.Rcode() == "NOERROR" {
+				outcome.cdnskeyOK = true
+				outcome.cdnskey = keyResp.GetRecordsForName("CDNSKEY", z.Name, "answer")
+			}
+			outcomes[i] = outcome
+			return nil
+		}
+	}
+	entries, err := runner.Run(ctx, tasks, runner.Options{Parallel: profile.FromContext(ctx).Resolver.Defaults.Parallel, CancelOnError: false})
+	return outcomes, entries, err
+}
+
+// DNSSEC24 runs the DNSSEC24 test case.
+func DNSSEC24(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
+	const testcase = "DNSSEC24"
+	var results []*logger.Entry
+
+	if err := appendLog(ctx, &results, testcase, "TEST_CASE_START", map[string]any{"testcase": testcase}); err != nil {
+		return results, err
+	}
+	end := func() ([]*logger.Entry, error) {
+		return results, appendLog(ctx, &results, testcase, "TEST_CASE_END", map[string]any{"testcase": testcase})
+	}
+
+	held, entries, err := ds24ParentDS(ctx, z, testcase)
+	results = append(results, entries...)
+	if err != nil {
+		return results, err
+	}
+	if len(held) > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, held)
+		if err := appendLog(ctx, &results, testcase, "DS24_DELEGATION_SECURE", args); err != nil {
+			return results, err
+		}
+		return end()
+	}
+
+	view, entries, err := ds24ApexView(ctx, z, testcase)
+	results = append(results, entries...)
+	if err != nil {
+		return results, err
+	}
+	apex := ds24Apex{}
+	var unavailable []logargs.Server
+	records, deletes := 0, 0
+	for _, server := range view {
+		if !server.asked {
+			continue
+		}
+		if !server.cdsOK || !server.cdnskeyOK {
+			unavailable = append(unavailable, server.servers...)
+		}
+		if server.cdsOK {
+			apex[dns.TypeCDS] = append(apex[dns.TypeCDS], server.cds)
+		}
+		if server.cdnskeyOK {
+			apex[dns.TypeCDNSKEY] = append(apex[dns.TypeCDNSKEY], server.cdnskey)
+		}
+		for _, rr := range append(slices.Clone(server.cds), server.cdnskey...) {
+			records++
+			if ds24IsDelete(rr) {
+				deletes++
+			}
+		}
+	}
+	if records == 0 {
+		if err := appendLog(ctx, &results, testcase, "DS24_NO_CDS_CDNSKEY", map[string]any{}); err != nil {
+			return results, err
+		}
+		return end()
+	}
+	if deletes == records {
+		if err := appendLog(ctx, &results, testcase, "DS24_DELETE_REQUESTED", map[string]any{}); err != nil {
+			return results, err
+		}
+		return end()
+	}
+	if len(unavailable) > 0 {
+		args := map[string]any{}
+		setTypedServersFromEndpoints(args, unavailable)
+		if err := appendLog(ctx, &results, testcase, "DS24_APEX_UNAVAILABLE", args); err != nil {
+			return results, err
+		}
+	}
+
+	nsNames, err := delegationNSNames(ctx, z)
+	if err != nil {
+		return results, err
+	}
+	var all, hosts []string
+	for _, name := range nsNames {
+		host := name.StringLower()
+		if slices.Contains(all, host) {
+			continue
+		}
+		all = append(all, host)
+		if !z.Name.IsInBailiwick(name) {
+			hosts = append(hosts, host)
+		}
+	}
+	slices.Sort(hosts)
+	if len(hosts) == 0 {
+		args := map[string]any{}
+		setTypedServersFromNames(args, all)
+		if err := appendLog(ctx, &results, testcase, "DS24_ONLY_IN_DOMAIN_NS", args); err != nil {
+			return results, err
+		}
+		return end()
+	}
+
+	walker := newDS24Walker(ctx, z.Recursor(), rootTrustAnchors())
+	ready := len(unavailable) == 0
+	signaled := false
+	var absent []ds24Domain
+	for _, host := range hosts {
+		name, ok := ds24SignalName(z.Name, dnsname.New(host))
+		domain := ds24Domain{host: host, name: name.String(), tooLong: !ok}
+		if ok {
+			domain = walker.evaluate(ctx, name, apex)
+			domain.host = host
+		}
+		ready = ready && domain.validated
+		signaled = signaled || domain.signaled
+		if err := ds24Emit(ctx, &results, testcase, domain, &absent); err != nil {
+			return results, err
+		}
+	}
+
+	if signaled {
+		for _, domain := range absent {
+			if err := appendLog(ctx, &results, testcase, "DS24_SIGNAL_MISSING", map[string]any{"ns": domain.host, "query_name": domain.name}); err != nil {
+				return results, err
+			}
+		}
+	} else if len(absent) > 0 {
+		var names []string
+		for _, domain := range absent {
+			names = append(names, domain.host)
+		}
+		args := map[string]any{}
+		setTypedServersFromNames(args, names)
+		if err := appendLog(ctx, &results, testcase, "DS24_NO_SIGNAL", args); err != nil {
+			return results, err
+		}
+	}
+	if ready {
+		if err := appendLog(ctx, &results, testcase, "DS24_BOOTSTRAP_READY", map[string]any{}); err != nil {
+			return results, err
+		}
+	}
+	return end()
+}
+
+// ds24Emit logs the verdict of one signaling name; absent names are collected.
+func ds24Emit(ctx context.Context, results *[]*logger.Entry, testcase string, d ds24Domain, absent *[]ds24Domain) error {
+	switch {
+	case d.tooLong:
+		return appendLog(ctx, results, testcase, "DS24_SIGNAL_NAME_TOO_LONG", map[string]any{"ns": d.host, "query_name": d.name})
+	case d.kind == ds24AtCut:
+		return appendLog(ctx, results, testcase, "DS24_SIGNAL_AT_ZONE_CUT", map[string]any{"ns": d.host, "query_name": d.name})
+	case d.kind == ds24Absent:
+		*absent = append(*absent, d)
+		return nil
+	case d.fault != nil:
+		switch d.fault.status {
+		case ds24Insecure:
+			return appendLog(ctx, results, testcase, "DS24_SIGNAL_ZONE_INSECURE", map[string]any{"ns": d.host, "zone": d.fault.zone})
+		case ds24Broken:
+			return appendLog(ctx, results, testcase, "DS24_SIGNAL_CHAIN_BROKEN", map[string]any{"ns": d.host, "zone": d.fault.zone})
+		case ds24Unreachable:
+			args := map[string]any{"ns": d.host, "zone": d.fault.zone}
+			setTypedServersFromEndpoints(args, d.fault.servers)
+			return appendLog(ctx, results, testcase, "DS24_SIGNAL_ZONE_UNREACHABLE", args)
+		}
+		return nil
+	}
+	for _, qtype := range d.unsigned {
+		if err := appendLog(ctx, results, testcase, "DS24_SIGNAL_UNSIGNED", map[string]any{"ns": d.host, "query_name": d.name, "query_type": qtype, "zone": d.zone}); err != nil {
+			return err
+		}
+	}
+	for _, qtype := range d.mismatch {
+		if err := appendLog(ctx, results, testcase, "DS24_SIGNAL_MISMATCH", map[string]any{"ns": d.host, "query_name": d.name, "query_type": qtype}); err != nil {
+			return err
+		}
+	}
+	if d.validated {
+		return appendLog(ctx, results, testcase, "DS24_SIGNAL_VALIDATED", map[string]any{"ns": d.host, "query_name": d.name, "zone": d.zone})
+	}
+	return nil
 }
 
 func algoPropertyFor(algo uint8) algoProperty {

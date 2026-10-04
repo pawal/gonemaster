@@ -63,6 +63,7 @@ var testcaseDescriptions = map[string]string{
 	"DNSSEC21": "Parent zone signs the delegating DS RRset",
 	"DNSSEC22": "In-domain nameserver address records validate under the zone's chain of trust",
 	"DNSSEC23": "Denial of existence records are consistent within one response",
+	"DNSSEC24": "DNSSEC bootstrapping signals validate and match the apex",
 
 	// NAMESERVER
 	"NAMESERVER01": "A name server should not be a recursor",

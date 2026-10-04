@@ -135,7 +135,7 @@ type LogEntry struct {
 var ErrNotImplemented = errors.New("engine not implemented")
 
 // Version is the semantic version for this build.
-var Version = "1.7.16"
+var Version = "1.7.17"
 
 // Commit is optionally set at build time using -ldflags.
 var Commit = ""
@@ -258,6 +258,7 @@ var dnssecTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry,
 	"dnssec21": dnssec.DNSSEC21,
 	"dnssec22": dnssec.DNSSEC22,
 	"dnssec23": dnssec.DNSSEC23,
+	"dnssec24": dnssec.DNSSEC24,
 }
 
 var zoneTests = map[string]func(context.Context, *zone.Zone) ([]*logger.Entry, error){

@@ -191,6 +191,38 @@ paths:
         '400':
           $ref: '#/components/responses/ErrorResponse'
 
+  /batches:
+    get:
+      tags: [Batches]
+      summary: List batches
+      description: Newest first. `label` filters on a case-insensitive substring of the batch tag.
+      operationId: listBatches
+      parameters:
+        - name: label
+          in: query
+          schema:
+            type: string
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      responses:
+        '200':
+          description: Batch list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BatchListResponse'
+
   /batches/{batch_id}:
     get:
       tags: [Batches]
@@ -1715,6 +1747,121 @@ paths:
         '404':
           $ref: '#/components/responses/ErrorResponse'
 
+  /analysis/cohorts/{id}/schedule:
+    get:
+      tags: [Analysis]
+      summary: Get the snapshot schedule of a cohort
+      operationId: getAnalysisCohortSchedule
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '200':
+          description: Schedule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohortSchedule'
+        '404':
+          description: '`not_found` for an unknown cohort, `no_schedule` for a cohort without a schedule'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+    put:
+      tags: [Analysis]
+      summary: Create or replace the snapshot schedule of a cohort
+      description: |
+        The server computes `next_run_at` as the first occurrence after the time of the request.
+        The last run fields of an existing schedule are kept.
+      operationId: putAnalysisCohortSchedule
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisCohortSchedulePutRequest'
+      responses:
+        '200':
+          description: Stored schedule
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalysisCohortSchedule'
+        '400':
+          description: '`invalid_json`, `invalid_schedule`, `invalid_profile_id` or `profile_not_found`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          description: '`cohort_analysis_disabled`'
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+    delete:
+      tags: [Analysis]
+      summary: Remove the snapshot schedule of a cohort
+      operationId: deleteAnalysisCohortSchedule
+      parameters:
+        - $ref: '#/components/parameters/IDPath'
+      responses:
+        '204':
+          description: Schedule removed, or none existed
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/schedules:
+    get:
+      tags: [Analysis]
+      summary: List every cohort snapshot schedule
+      operationId: listAnalysisSchedules
+      responses:
+        '200':
+          description: Schedules ordered by cohort id, with `source_tag` and `label`
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AnalysisCohortSchedule'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
+  /analysis/schedules/preview:
+    post:
+      tags: [Analysis]
+      summary: Preview the next occurrences of a schedule rule
+      description: Validates the body as a schedule `PUT` does and stores nothing.
+      operationId: previewAnalysisSchedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AnalysisCohortSchedulePutRequest'
+      responses:
+        '200':
+          description: The next five occurrences
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SchedulePreviewResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ErrorResponse'
+
   /analysis/cohorts/{id}/snapshots/{slug}:
     post:
       tags: [Analysis]
@@ -2873,6 +3020,10 @@ components:
           type: string
         snapshot_intent:
           type: boolean
+        origin:
+          type: string
+          enum: [schedule]
+          description: '`schedule` for a batch the cohort scheduler submitted; absent otherwise.'
 
     BatchSummary:
       type: object
@@ -2909,6 +3060,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Job'
+        origin:
+          type: string
+          enum: [schedule]
+          description: '`schedule` for a batch the cohort scheduler submitted; absent otherwise.'
 
     BatchList:
       type: object
@@ -2918,6 +3073,52 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/Batch'
+        total:
+          type: integer
+        limit:
+          type: integer
+        offset:
+          type: integer
+
+    BatchListItem:
+      type: object
+      required: [batch_id, status, total, completed, completion, created_at]
+      properties:
+        batch_id:
+          type: string
+        tag:
+          type: string
+        description:
+          type: string
+        status:
+          type: string
+          enum: [running, done]
+        total:
+          type: integer
+        completed:
+          type: integer
+        completion:
+          type: integer
+          description: Completed runs as a percentage of the total, 0 to 100.
+        created_at:
+          type: string
+          format: date-time
+        finished_at:
+          type: string
+          format: date-time
+        origin:
+          type: string
+          enum: [schedule]
+          description: '`schedule` for a batch the cohort scheduler submitted; absent otherwise.'
+
+    BatchListResponse:
+      type: object
+      required: [items, total]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/BatchListItem'
         total:
           type: integer
         limit:
@@ -3628,6 +3829,121 @@ components:
         updated_at:
           type: string
           format: date-time
+
+    ScheduleRule:
+      type: object
+      required: [kind, time_of_day]
+      properties:
+        kind:
+          type: string
+          enum: [interval, weekly, monthly]
+        interval_days:
+          type: integer
+          minimum: 1
+          maximum: 365
+          description: '`interval`: days between occurrences.'
+        anchor_date:
+          type: string
+          format: date
+          description: '`interval`: date of the first occurrence, YYYY-MM-DD in `timezone`. Required for `interval`.'
+        weekdays:
+          type: array
+          items:
+            type: string
+            enum: [mon, tue, wed, thu, fri, sat, sun]
+          description: '`weekly`: at least one day.'
+        days_of_month:
+          type: array
+          items:
+            type: integer
+            minimum: 1
+            maximum: 28
+          description: '`monthly`: days of the month. `monthly` requires a day or `last_day`.'
+        last_day:
+          type: boolean
+          description: '`monthly`: also the last day of each month.'
+        time_of_day:
+          type: string
+          pattern: '^[0-2][0-9]:[0-5][0-9]$'
+          description: HH:MM wall clock time in `timezone`.
+        timezone:
+          type: string
+          default: UTC
+          description: IANA time zone name.
+
+    AnalysisCohortSchedulePutRequest:
+      allOf:
+        - $ref: '#/components/schemas/ScheduleRule'
+        - type: object
+          properties:
+            enabled:
+              type: boolean
+              default: true
+            profile_id:
+              type: integer
+              format: int64
+              nullable: true
+              description: Stored profile for the scheduled batch; null uses the tag default.
+            promote_default:
+              type: boolean
+              default: false
+              description: Pin the captured snapshot as the cohort default.
+            catch_up:
+              type: boolean
+              default: true
+              description: Run one missed occurrence after downtime; when false an occurrence over one hour late is skipped.
+
+    AnalysisCohortSchedule:
+      allOf:
+        - $ref: '#/components/schemas/AnalysisCohortSchedulePutRequest'
+        - type: object
+          required: [cohort_id, enabled, summary, next_run_at, created_at, updated_at]
+          properties:
+            cohort_id:
+              type: integer
+              format: int64
+            source_tag:
+              type: string
+              description: Present in the schedules list only.
+            label:
+              type: string
+              description: Present in the schedules list only.
+            summary:
+              type: string
+              description: The rule in English.
+            next_run_at:
+              type: string
+              format: date-time
+            last_run_at:
+              type: string
+              format: date-time
+              description: Absent until the schedule first fires.
+            last_batch_id:
+              type: string
+              description: The last batch the schedule submitted.
+            last_outcome:
+              type: string
+              enum: [submitted, skipped_missed, skipped_disabled, skipped_active, skipped_empty, error]
+            last_error:
+              type: string
+            created_at:
+              type: string
+              format: date-time
+            updated_at:
+              type: string
+              format: date-time
+
+    SchedulePreviewResponse:
+      type: object
+      required: [summary, next]
+      properties:
+        summary:
+          type: string
+        next:
+          type: array
+          items:
+            type: string
+            format: date-time
 
     AnalysisCohortUpsertRequest:
       type: object

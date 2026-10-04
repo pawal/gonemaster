@@ -384,9 +384,12 @@ func (s *Server) routes() {
 	apiMux.HandleFunc("POST /analysis/cohorts/{id}/snapshots/{slug}/rematerialize", s.handleAnalysisCohortSnapshotRematerialize)
 	apiMux.HandleFunc("/analysis/cohorts/{id}/snapshots/{slug}", s.handleAnalysisCohortSnapshotByID)
 	apiMux.HandleFunc("GET /analysis/cohorts/{id}/snapshots", s.handleAnalysisCohortSnapshots)
+	apiMux.HandleFunc("/analysis/cohorts/{id}/schedule", s.handleAnalysisCohortSchedule)
 	apiMux.HandleFunc("/analysis/cohorts/{id}", s.handleAnalysisCohortByID)
 	apiMux.HandleFunc("/analysis/cohorts", s.handleAnalysisCohorts)
 	apiMux.HandleFunc("/analysis/status", s.handleAnalysisStatus)
+	apiMux.HandleFunc("GET /analysis/schedules", s.handleAnalysisSchedules)
+	apiMux.HandleFunc("POST /analysis/schedules/preview", s.handleAnalysisSchedulePreview)
 
 	apiMux.Handle("/mcp", s.mcpHandler())
 	apiMux.HandleFunc("GET /features", s.handleFeatures)

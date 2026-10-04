@@ -42,6 +42,7 @@ type BatchListItem struct {
 	Completion  int        `json:"completion"`
 	CreatedAt   time.Time  `json:"created_at"`
 	FinishedAt  *time.Time `json:"finished_at,omitempty"`
+	Origin      string     `json:"origin,omitempty"`
 }
 
 // BatchListResponse is the body of GET /api/v1/batches.
@@ -77,6 +78,7 @@ func (s *Server) batchListItem(b Batch) BatchListItem {
 		Description: b.Description,
 		Total:       b.DomainCount,
 		CreatedAt:   b.CreatedAt,
+		Origin:      b.Origin,
 	}
 	runs := s.store.ListRuns(RunFilter{BatchID: b.ID, Limit: 1, Sort: JobSortFinishedAtDesc})
 	item.Completed = runs.Total

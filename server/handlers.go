@@ -387,6 +387,7 @@ func (s *Server) handleBatchByID(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:    createdAt,
 		StartedAt:    startedAt,
 		FinishedAt:   finishedAt,
+		Origin:       batchRecord.Origin,
 	}
 	writeJSON(w, http.StatusOK, summary)
 }

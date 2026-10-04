@@ -1146,6 +1146,7 @@ type BatchSummary struct {
 	CreatedAt    time.Time      `json:"created_at"`
 	StartedAt    *time.Time     `json:"started_at,omitempty"`
 	FinishedAt   *time.Time     `json:"finished_at,omitempty"`
+	Origin       string         `json:"origin,omitempty"`
 }
 
 // QueueReorderRequest reorders queued jobs.

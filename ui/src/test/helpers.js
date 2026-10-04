@@ -102,6 +102,27 @@ export const cohortFixture = (overrides = {}) => ({
   ...overrides
 });
 
+export const scheduleFixture = (overrides = {}) => ({
+  cohort_id: 1,
+  enabled: true,
+  kind: "monthly",
+  interval_days: 1,
+  anchor_date: "",
+  weekdays: [],
+  days_of_month: [1, 15],
+  last_day: false,
+  time_of_day: "02:00",
+  timezone: "Europe/Stockholm",
+  profile_id: null,
+  promote_default: false,
+  catch_up: true,
+  summary: "Monthly, days 1 and 15, 02:00 Europe/Stockholm",
+  next_run_at: "2026-11-01T01:00:00Z",
+  created_at: "2026-10-01T10:00:00Z",
+  updated_at: "2026-10-01T10:00:00Z",
+  ...overrides
+});
+
 const setting = (value, extra = {}) => ({ value, source: "default", ...extra });
 
 export const serverSettingsFixture = (overrides = {}) => ({
@@ -126,5 +147,6 @@ export const serverSettingsFixture = (overrides = {}) => ({
   show_asn_names_public: setting(true),
   mcp_enabled: setting(false),
   mcp_allow_write: setting(false),
+  scheduler_enabled: setting(true),
   ...overrides
 });

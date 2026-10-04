@@ -900,7 +900,7 @@
   {:else if activeTab === "cohorts"}
     <div class="grid panel-mt" id="panel-cohorts" role="tabpanel" aria-labelledby="tab-cohorts">
       <div class="card reveal delay-22 grid-span-full">
-        <AnalysisCohorts onDeleteBatch={openBatchDelete} refreshSignal={batchDeletedCounter} />
+        <AnalysisCohorts onDeleteBatch={openBatchDelete} refreshSignal={batchDeletedCounter} profiles={availableProfiles} />
       </div>
     </div>
   {:else if activeTab === "batches"}

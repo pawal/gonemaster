@@ -156,4 +156,46 @@ describe("BatchesPanel", () => {
     await fireEvent.click(row);
     expect(onNavigateJob).toHaveBeenCalledWith("job_done");
   });
+
+  const scheduledFetch = vi.fn().mockImplementation((path) => {
+    if (path.startsWith("/batches?")) {
+      return Promise.resolve({
+        items: [
+          { batch_id: "batch_sched", tag: "tld", status: "running", total: 2, completed: 0, completion: 0, created_at: "2026-10-01T00:00:00Z", origin: "schedule" },
+          { batch_id: "batch_manual", tag: "tld", status: "done", total: 2, completed: 2, completion: 100, created_at: "2026-09-30T00:00:00Z" },
+        ],
+        total: 2,
+      });
+    }
+    if (path.startsWith("/batches/")) {
+      return Promise.resolve({
+        batch_id: "batch_sched",
+        tag: "tld",
+        origin: "schedule",
+        total: 0,
+        status_counts: {},
+        items: [],
+        created_at: "2026-10-01T00:00:00Z",
+        next_cursor: "",
+        prev_cursor: "",
+        offset: 0,
+      });
+    }
+    return Promise.resolve({ items: [] });
+  });
+
+  it("marks only the scheduled batch in the list", async () => {
+    render(BatchesPanel, { props: baseProps({ apiFetch: scheduledFetch }) });
+
+    const scheduled = (await screen.findByText("batch_sched")).closest("tr");
+    const manual = screen.getByText("batch_manual").closest("tr");
+    expect(within(scheduled).getByText("scheduled")).toBeInTheDocument();
+    expect(within(manual).queryByText("scheduled")).toBeNull();
+  });
+
+  it("marks a scheduled batch in its detail", async () => {
+    render(BatchesPanel, { props: baseProps({ apiFetch: scheduledFetch, routeBatchId: "batch_sched" }) });
+
+    expect(await screen.findByText("scheduled")).toBeInTheDocument();
+  });
 });

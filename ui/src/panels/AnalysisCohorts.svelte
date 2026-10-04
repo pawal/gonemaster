@@ -15,8 +15,9 @@
   } from "../lib/sort.js";
   import InlineNotice from "../components/InlineNotice.svelte";
   import ConfirmDialog from "../components/ConfirmDialog.svelte";
+  import ScheduleEditor from "../components/ScheduleEditor.svelte";
 
-  let { apiBase = "/api/v1", onDeleteBatch = null, refreshSignal = 0 } = $props();
+  let { apiBase = "/api/v1", onDeleteBatch = null, refreshSignal = 0, profiles = [] } = $props();
 
   let loading = $state(false);
   let loadError = $state("");
@@ -82,6 +83,10 @@
   // Only cohorts with a reference list are fetched, and only on load.
   let driftByCohortId = $state({});
 
+  // Snapshot schedules keyed by cohort id, and the cohort whose editor is open.
+  let schedulesByCohortId = $state({});
+  let scheduleCohort = $state(null);
+
   // Snapshots are loaded lazily per-cohort (expand toggled by admin).
   let snapshotsByCohortId = $state({});
   let snapshotsLoadingIds = $state(new Set());
@@ -141,6 +146,7 @@
       cohorts = Array.isArray(result) ? result : [];
       if (!preserveNotice) clearNotice();
       loadDrift(cohorts);
+      loadSchedules();
     } catch (error) {
       loadError = error.message || $t("analysis_cohorts_load_error_generic");
     } finally {
@@ -177,6 +183,49 @@
         })
     );
     driftByCohortId = next;
+  }
+
+  async function loadSchedules() {
+    try {
+      const rows = await apiFetch("/analysis/schedules");
+      const next = {};
+      for (const row of Array.isArray(rows) ? rows : []) next[row.cohort_id] = row;
+      schedulesByCohortId = next;
+    } catch (_) {
+      // Without an analysis controller there are no schedules to show.
+      schedulesByCohortId = {};
+    }
+  }
+
+  function openScheduleEditor(cohort) {
+    openRunMenuCohortId = null;
+    scheduleCohort = cohort;
+  }
+
+  async function scheduleSaved(stored) {
+    const tag = scheduleCohort?.source_tag || "";
+    scheduleCohort = null;
+    await loadSchedules();
+    setNotice($t("analysis_schedule_saved", { tag, next: formatTimestamp(stored?.next_run_at) }), "ok");
+  }
+
+  async function scheduleRemoved() {
+    const tag = scheduleCohort?.source_tag || "";
+    scheduleCohort = null;
+    await loadSchedules();
+    setNotice($t("analysis_schedule_removed", { tag }), "ok");
+  }
+
+  const OUTCOME_WARN = new Set(["skipped_missed", "skipped_disabled", "skipped_active", "skipped_empty", "error"]);
+
+  function scheduleOutcomeText(sched) {
+    if (sched.last_outcome === "submitted") {
+      return $t("analysis_schedule_outcome_submitted", { id: shortID(sched.last_batch_id) });
+    }
+    if (sched.last_outcome === "error") {
+      return $t("analysis_schedule_outcome_error", { error: sched.last_error || "" });
+    }
+    return $t(`analysis_schedule_outcome_${sched.last_outcome}`);
   }
 
   const REFERENCE_LISTS = ["", "iana_tlds"];
@@ -632,7 +681,7 @@
         "ok"
       );
       expandedSnapshotCohortId = cohort.id;
-      await loadSnapshots(cohort, { refresh: true });
+      await Promise.all([loadSnapshots(cohort, { refresh: true }), loadSchedules()]);
     } catch (error) {
       setNotice(
         $t("analysis_cohorts_snapshot_submit_error", { error: error.message || "" }),
@@ -909,6 +958,7 @@
               <th scope="col" class="col-center">{$t("analysis_cohorts_col_public")}</th>
               <th scope="col" class="col-center">{$t("analysis_cohorts_col_default")}</th>
               <th scope="col">{$t("analysis_cohorts_col_materialization")}</th>
+              <th scope="col">{$t("analysis_cohorts_col_schedule")}</th>
               <th scope="col" class="col-right">{$t("analysis_cohorts_col_actions")}</th>
             </tr>
           </thead>
@@ -918,6 +968,7 @@
               {@const tone = materializationBadgeTone(cohort)}
               {@const runDisabled = busy || !cohort.analysis_enabled || submittingSnapshotCohortId === cohort.id}
               {@const drift = driftByCohortId[cohort.id]}
+              {@const sched = schedulesByCohortId[cohort.id]}
               <tr class:row-editing={editingCohortId === cohort.id}>
                 <th scope="row" class="cohort-cell">
                   <span class="cohort-tag">{cohort.source_tag}</span>
@@ -1026,6 +1077,33 @@
                     </span>
                   {/if}
                 </td>
+                <td class="schedule-cell">
+                  <button
+                    type="button"
+                    class="schedule-chip"
+                    disabled={!cohort.analysis_enabled}
+                    title={cohort.analysis_enabled ? $t("analysis_schedule_chip_title") : $t("analysis_schedule_disabled_title")}
+                    onclick={() => openScheduleEditor(cohort)}
+                  >
+                    {#if sched}
+                      <span class="schedule-summary">
+                        {sched.enabled ? sched.summary : $t("analysis_schedule_paused", { summary: sched.summary })}
+                      </span>
+                      {#if sched.enabled}
+                        <time class="schedule-line" datetime={sched.next_run_at}>
+                          {$t("analysis_schedule_next", { time: formatTimestamp(sched.next_run_at) })}
+                        </time>
+                      {/if}
+                      {#if sched.last_outcome}
+                        <span class="schedule-line" class:schedule-warn={OUTCOME_WARN.has(sched.last_outcome)}>
+                          {$t("analysis_schedule_last", { time: formatTimestamp(sched.last_run_at), outcome: scheduleOutcomeText(sched) })}
+                        </span>
+                      {/if}
+                    {:else}
+                      <span class="schedule-line">{$t("analysis_schedule_none")}</span>
+                    {/if}
+                  </button>
+                </td>
                 <td class="col-right">
                   <div class="row-actions">
                     <div class="run-split">
@@ -1048,6 +1126,10 @@
                           <button type="button" class="run-menu-item" role="menuitem"
                                   onclick={() => runSnapshot(cohort, { promoteDefault: true })}>
                             {$t("analysis_cohorts_run_snapshot_default")}
+                          </button>
+                          <button type="button" class="run-menu-item" role="menuitem"
+                                  onclick={() => openScheduleEditor(cohort)}>
+                            {$t("analysis_cohorts_run_snapshot_schedule")}
                           </button>
                         </div>
                       {/if}
@@ -1075,7 +1157,7 @@
                 {@const sortedSnaps = sortSnapshots(snaps)}
                 {@const mixed = snaps.some((s) => s.status === "failed_mixed_profiles")}
                 <tr class="snapshot-subrow">
-                  <td colspan="6">
+                  <td colspan="7">
                     {#if snapshotsLoadingIds.has(cohort.id) && snaps.length === 0}
                       <p class="small">{$t("analysis_cohorts_loading")}</p>
                     {:else if snaps.length === 0}
@@ -1342,6 +1424,17 @@
   </section>
 {/if}
 
+<ScheduleEditor
+  open={scheduleCohort !== null}
+  cohort={scheduleCohort}
+  schedule={scheduleCohort ? schedulesByCohortId[scheduleCohort.id] ?? null : null}
+  {profiles}
+  {apiBase}
+  onsave={scheduleSaved}
+  ondelete={scheduleRemoved}
+  onclose={() => (scheduleCohort = null)}
+/>
+
 <ConfirmDialog
   open={confirmState !== null}
   title={confirmProps?.title ?? ""}
@@ -1550,6 +1643,49 @@
     height: 100%;
     background: var(--accent-1, #4c9bff);
     transition: width 0.2s ease;
+  }
+
+  .schedule-chip {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 2px;
+    min-width: 22ch;
+    max-width: 30ch;
+    padding: 4px 8px;
+    overflow-wrap: anywhere;
+    text-align: left;
+    font-size: var(--text-xs);
+    font-weight: 400;
+    color: var(--ink);
+    background: transparent;
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    box-shadow: none;
+    cursor: pointer;
+  }
+
+  .schedule-chip:hover:not(:disabled) {
+    background: var(--surface-2);
+    transform: none;
+    box-shadow: none;
+  }
+
+  .schedule-chip:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .schedule-summary {
+    font-weight: 600;
+  }
+
+  .schedule-line {
+    color: var(--ink-2);
+  }
+
+  .schedule-line.schedule-warn {
+    color: var(--sev-warning-fg);
   }
 
   .snapshot-rebuilding-label {

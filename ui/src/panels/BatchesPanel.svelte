@@ -388,7 +388,10 @@
       <div class="kv">
         {#if selectedBatch.tag}
           <span>{$t("batch_tag_label")}</span>
-          <strong class="mono">{selectedBatch.tag}</strong>
+          <strong class="mono">
+            {selectedBatch.tag}
+            {#if selectedBatch.origin === "schedule"}<span class="pill snapshot-intent ml-quarter">{$t("batch_scheduled_pill")}</span>{/if}
+          </strong>
         {/if}
         <span>{$t("total_label")}</span>
         <strong>{selectedBatch.total}</strong>
@@ -597,7 +600,10 @@ example.org`}
               tabindex="0"
             >
               <td class="mono"><a href={href("batches", { batchId: b.batch_id })} onclick={(e) => { e.preventDefault(); e.stopPropagation(); onOpenBatch(b.batch_id); }}>{b.batch_id}</a></td>
-              <td>{b.tag || "-"}</td>
+              <td>
+                {b.tag || "-"}
+                {#if b.origin === "schedule"}<span class="pill snapshot-intent ml-quarter">{$t("batch_scheduled_pill")}</span>{/if}
+              </td>
               <td>{b.status}{#if b.completion != null} · {b.completion}%{/if}</td>
               <td>{b.created_at ? formatTimestampLocal(b.created_at) : "-"}</td>
               <td class="text-right" data-row-action>

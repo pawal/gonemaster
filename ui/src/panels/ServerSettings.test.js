@@ -203,4 +203,29 @@ describe("ServerSettings", () => {
     expect(calls[0].mcp_enabled).toBe(true);
     expect("mcp_allow_write" in calls[0]).toBe(false);
   });
+
+  it("renders the cohort scheduler toggle on and saves it off", async () => {
+    const calls = capturePuts();
+    await renderLoaded(/Cohort scheduler/);
+
+    const toggle = screen.getByLabelText(/Cohort scheduler/);
+    expect(toggle.type).toBe("checkbox");
+    expect(toggle.checked).toBe(true);
+    await fireEvent.click(toggle);
+    await fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+
+    await waitFor(() => expect(calls.length).toBe(1));
+    expect(calls[0]).toEqual({ scheduler_enabled: false });
+  });
+
+  it("renders a flag-set cohort scheduler toggle read-only", async () => {
+    global.fetch.mockImplementation(() => jsonResponse(serverSettingsFixture({
+      scheduler_enabled: { value: false, source: "cli_flag", readonly: true },
+    })));
+    await renderLoaded(/Cohort scheduler/);
+
+    const toggle = screen.getByLabelText(/Cohort scheduler/);
+    expect(toggle.disabled).toBe(true);
+    expect(toggle.checked).toBe(false);
+  });
 });

@@ -74,6 +74,12 @@
       ],
     },
     {
+      key: "settings_group_scheduler",
+      settings: [
+        { key: "scheduler_enabled", type: "toggle" },
+      ],
+    },
+    {
       key: "settings_group_mcp",
       settings: [
         { key: "mcp_enabled", type: "toggle" },

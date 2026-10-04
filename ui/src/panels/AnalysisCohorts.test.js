@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor, within } from "@testing-library/svelte";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import AnalysisCohorts from "./AnalysisCohorts.svelte";
-import { cohortFixture, jsonResponse, noContentResponse, requestUrl } from "../test/helpers.js";
+import { cohortFixture, jsonResponse, noContentResponse, requestUrl, scheduleFixture } from "../test/helpers.js";
 
 describe("AnalysisCohorts", () => {
   beforeEach(() => {
@@ -33,9 +33,29 @@ describe("AnalysisCohorts", () => {
     const created = [];
     const actions = [];
     const detailReads = [];
+    let schedules = scenario.schedules || [];
+    const scheduleWrites = [];
     global.fetch.mockImplementation((url, requestOptions = {}) => {
       const value = requestUrl(url);
       const method = requestOptions.method || "GET";
+
+      if (value === "/api/v1/analysis/schedules" && method === "GET") {
+        return jsonResponse(schedules);
+      }
+      if (value === "/api/v1/analysis/schedules/preview" && method === "POST") {
+        return jsonResponse({ summary: "Monthly, day 1, 02:00 UTC", next: ["2026-11-01T02:00:00Z"] });
+      }
+      const scheduleMatch = value.match(/^\/api\/v1\/analysis\/cohorts\/(\d+)\/schedule$/);
+      if (scheduleMatch) {
+        const id = Number(scheduleMatch[1]);
+        const body = requestOptions.body ? JSON.parse(requestOptions.body) : null;
+        scheduleWrites.push({ id, method, body });
+        schedules = schedules.filter((row) => row.cohort_id !== id);
+        if (method === "DELETE") return noContentResponse();
+        const stored = scheduleFixture({ ...body, cohort_id: id, summary: "Monthly, day 1, 02:00 UTC" });
+        schedules = [...schedules, stored];
+        return jsonResponse(stored);
+      }
 
       if (value === "/api/v1/tags?limit=500" && method === "GET") {
         return jsonResponse(existingTags.map((name) => ({ name })));
@@ -107,7 +127,7 @@ describe("AnalysisCohorts", () => {
       }
       return jsonResponse({});
     });
-    return { created, patched, actions, detailReads, getCohorts: () => cohorts };
+    return { created, patched, actions, detailReads, scheduleWrites, getCohorts: () => cohorts };
   };
 
   it("lists cohorts with status, default marker, and last-error detail", async () => {
@@ -1049,5 +1069,82 @@ describe("AnalysisCohorts", () => {
       ).length;
       expect(afterCalls).toBeGreaterThan(beforeCalls);
     });
+  });
+
+  const scheduleChip = async (tag) =>
+    within((await screen.findByText(tag)).closest("tr")).getByTitle(/snapshot schedule|to schedule snapshots/);
+
+  it.each([
+    ["no schedule", [], "Not scheduled"],
+    ["a schedule", [scheduleFixture()], "Monthly, days 1 and 15, 02:00 Europe/Stockholm"],
+    ["a paused schedule", [scheduleFixture({ enabled: false })], "Paused: Monthly, days 1 and 15, 02:00 Europe/Stockholm"],
+  ])("shows the schedule chip for %s", async (_name, schedules, text) => {
+    installFetch({ schedules });
+    render(AnalysisCohorts);
+
+    expect(within(await scheduleChip("tld")).getByText(text)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["submitted", { last_batch_id: "batch_42" }, /submitted batch_42/, false],
+    ["skipped_active", {}, /skipped: previous run still active/, true],
+    ["error", { last_error: "profile not found" }, /failed: profile not found/, true],
+  ])("shows the last %s outcome on the chip", async (outcome, extra, text, warn) => {
+    installFetch({ schedules: [scheduleFixture({ last_outcome: outcome, last_run_at: "2026-10-01T00:00:00Z", ...extra })] });
+    render(AnalysisCohorts);
+
+    const line = within(await scheduleChip("tld")).getByText(text);
+    expect(line.classList.contains("schedule-warn")).toBe(warn);
+  });
+
+  it("disables the schedule chip of a cohort with analysis off", async () => {
+    installFetch();
+    render(AnalysisCohorts);
+
+    const chip = await scheduleChip("gov");
+    expect(chip.disabled).toBe(true);
+    expect(chip.getAttribute("title")).toBe("Enable analysis for this cohort to schedule snapshots");
+  });
+
+  it("saves a schedule from the editor the chip opens and shows it on the row", async () => {
+    const { scheduleWrites } = installFetch();
+    render(AnalysisCohorts);
+
+    await fireEvent.click(await scheduleChip("tld"));
+    const editor = screen.getByRole("dialog", { name: "Snapshot schedule for tld" });
+    await fireEvent.click(within(editor).getByRole("button", { name: "Save schedule" }));
+
+    expect(await screen.findByText(/Schedule saved for tld/)).toBeInTheDocument();
+    expect(scheduleWrites).toHaveLength(1);
+    expect(scheduleWrites[0]).toMatchObject({ id: 1, method: "PUT", body: { kind: "monthly", days_of_month: [1], time_of_day: "02:00" } });
+    expect(within(await scheduleChip("tld")).getByText("Monthly, day 1, 02:00 UTC")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog", { name: "Snapshot schedule for tld" })).toBeNull();
+  });
+
+  it("opens the schedule editor from the run-options menu", async () => {
+    installFetch();
+    render(AnalysisCohorts);
+
+    const tldRow = (await screen.findByText("tld")).closest("tr");
+    await fireEvent.click(within(tldRow).getByRole("button", { name: "More run options" }));
+    await fireEvent.click(screen.getByRole("menuitem", { name: "Schedule..." }));
+
+    expect(screen.getByRole("dialog", { name: "Snapshot schedule for tld" })).toBeInTheDocument();
+    expect(screen.queryByRole("menu")).toBeNull();
+  });
+
+  it("removes a schedule after confirming", async () => {
+    const { scheduleWrites } = installFetch({ schedules: [scheduleFixture()] });
+    render(AnalysisCohorts);
+
+    await fireEvent.click(await scheduleChip("tld"));
+    const editor = screen.getByRole("dialog", { name: "Snapshot schedule for tld" });
+    await fireEvent.click(within(editor).getByRole("button", { name: "Remove schedule" }));
+    const confirm = screen.getByRole("dialog", { name: "Remove the snapshot schedule for tld?" });
+    await fireEvent.click(within(confirm).getByRole("button", { name: "Remove schedule" }));
+
+    expect(await screen.findByText("Schedule removed for tld.")).toBeInTheDocument();
+    expect(scheduleWrites).toEqual([{ id: 1, method: "DELETE", body: null }]);
+    expect(within(await scheduleChip("tld")).getByText("Not scheduled")).toBeInTheDocument();
   });
 });

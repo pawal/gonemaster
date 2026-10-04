@@ -351,7 +351,7 @@ func printUsage(out io.Writer) {
 	fmt.Fprintln(out, "  tags list|create|delete|domains|summary|add-domains")
 	fmt.Fprintln(out, "  runs list|get|results|diff")
 	fmt.Fprintln(out, "  entries query")
-	fmt.Fprintln(out, "  cohorts list|snapshots")
+	fmt.Fprintln(out, "  cohorts list|snapshots|schedules|schedule")
 	fmt.Fprintln(out, "  report [dataset-tag] --from SLUG --to SLUG")
 }
 

@@ -85,6 +85,15 @@ type Opts struct {
 	// SpecDetail answers GET /spec/testcases/{id}; nil yields 404.
 	SpecDetail *SpecTestcaseDetail
 
+	// Cohorts answers GET /analysis/cohorts.
+	Cohorts []AdminCohort
+	// Schedules answers GET /analysis/schedules and each cohort's GET schedule.
+	Schedules []CohortSchedule
+	// SchedulePut, when set, captures the PUT schedule body; the fake echoes it.
+	SchedulePut *CohortSchedule
+	// ScheduleDeletes, when set, records the cohort id of every DELETE schedule.
+	ScheduleDeletes *[]string
+
 	// AnalysisCatalog answers GET /pub/api/v1/analysis/catalog.
 	AnalysisCatalog *AnalysisCatalog
 	// AnalysisSnapshots answers a cohort's public snapshot list.
@@ -323,6 +332,50 @@ func Handler(t testing.TB, opts Opts) http.Handler {
 			return
 		}
 		writeJSON(w, http.StatusOK, *opts.SpecDetail)
+	}))
+
+	mux.HandleFunc("GET /api/v1/analysis/cohorts", route(func(w http.ResponseWriter, _ *http.Request) {
+		items := opts.Cohorts
+		if items == nil {
+			items = []AdminCohort{}
+		}
+		writeJSON(w, http.StatusOK, items)
+	}))
+	mux.HandleFunc("GET /api/v1/analysis/schedules", route(func(w http.ResponseWriter, _ *http.Request) {
+		items := opts.Schedules
+		if items == nil {
+			items = []CohortSchedule{}
+		}
+		writeJSON(w, http.StatusOK, items)
+	}))
+	mux.HandleFunc("GET /api/v1/analysis/cohorts/{id}/schedule", route(func(w http.ResponseWriter, r *http.Request) {
+		for _, s := range opts.Schedules {
+			if strconv.FormatInt(s.CohortID, 10) == r.PathValue("id") {
+				writeJSON(w, http.StatusOK, s)
+				return
+			}
+		}
+		writeJSON(w, http.StatusNotFound, map[string]any{"error": map[string]string{"code": "no_schedule", "message": "cohort has no schedule"}})
+	}))
+	mux.HandleFunc("PUT /api/v1/analysis/cohorts/{id}/schedule", route(func(w http.ResponseWriter, r *http.Request) {
+		var req CohortSchedule
+		_ = json.NewDecoder(r.Body).Decode(&req)
+		if opts.SchedulePut != nil {
+			mu.Lock()
+			*opts.SchedulePut = req
+			mu.Unlock()
+		}
+		req.CohortID, _ = strconv.ParseInt(r.PathValue("id"), 10, 64)
+		req.NextRunAt = "2026-11-01T01:00:00Z"
+		writeJSON(w, http.StatusOK, req)
+	}))
+	mux.HandleFunc("DELETE /api/v1/analysis/cohorts/{id}/schedule", route(func(w http.ResponseWriter, r *http.Request) {
+		if opts.ScheduleDeletes != nil {
+			mu.Lock()
+			*opts.ScheduleDeletes = append(*opts.ScheduleDeletes, r.PathValue("id"))
+			mu.Unlock()
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}))
 
 	// Public analysis reads. They carry no token guard, as on the server.

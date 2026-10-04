@@ -557,28 +557,6 @@ func isJSONFormat(format string) bool {
 
 // ── cohorts ──────────────────────────────────────────────────────────────────
 
-func runCohorts(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
-	const subs = "list|snapshots"
-	if len(args) == 0 {
-		fmt.Fprintln(errOut, "cohorts subcommand is required: "+subs)
-		return 2
-	}
-	if isHelpArg(args[0]) {
-		return groupUsage(out, "cohorts", subs)
-	}
-	cmd := args[0]
-	args = args[1:]
-	switch cmd {
-	case "list":
-		return runCohortsList(ctx, client, opts, args, out, errOut)
-	case "snapshots":
-		return runCohortsSnapshots(ctx, client, opts, args, out, errOut)
-	default:
-		fmt.Fprintf(errOut, "Unknown cohorts command %q\n", cmd)
-		return 2
-	}
-}
-
 // runCohortsList names the cohorts a report can be run over.
 func runCohortsList(ctx context.Context, client *apiClient, opts globalOptions, args []string, out io.Writer, errOut io.Writer) int {
 	fs := flag.NewFlagSet("cohorts list", flag.ContinueOnError)

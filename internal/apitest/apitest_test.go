@@ -440,3 +440,48 @@ func TestEntriesLevelsRecordsEveryQuery(t *testing.T) {
 		t.Fatalf("levels = %v", levels)
 	}
 }
+
+// doSend issues a request with a JSON body and returns the status.
+func doSend(t *testing.T, method, url string, body string) int {
+	t.Helper()
+	req, err := http.NewRequest(method, url, strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("new request: %v", err)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("%s %s: %v", method, url, err)
+	}
+	defer resp.Body.Close()
+	return resp.StatusCode
+}
+
+func TestScheduleRoutes(t *testing.T) {
+	var put apitest.CohortSchedule
+	var deletes []string
+	srv := apitest.New(t, apitest.Opts{
+		Cohorts:         []apitest.AdminCohort{{ID: 1, SourceTag: "tld"}},
+		Schedules:       []apitest.CohortSchedule{{CohortID: 1, Kind: "monthly"}},
+		SchedulePut:     &put,
+		ScheduleDeletes: &deletes,
+	})
+
+	var cohorts []apitest.AdminCohort
+	doGet(t, srv.URL, "/api/v1/analysis/cohorts", "", &cohorts)
+	if len(cohorts) != 1 || cohorts[0].SourceTag != "tld" {
+		t.Errorf("cohorts = %+v", cohorts)
+	}
+	var one apitest.CohortSchedule
+	if code := doGet(t, srv.URL, "/api/v1/analysis/cohorts/1/schedule", "", &one); code != http.StatusOK || one.Kind != "monthly" {
+		t.Errorf("GET schedule = %d %+v", code, one)
+	}
+	if code := doGet(t, srv.URL, "/api/v1/analysis/cohorts/2/schedule", "", nil); code != http.StatusNotFound {
+		t.Errorf("GET missing schedule = %d, want 404", code)
+	}
+	if code := doSend(t, http.MethodPut, srv.URL+"/api/v1/analysis/cohorts/2/schedule", `{"kind":"weekly"}`); code != http.StatusOK || put.Kind != "weekly" {
+		t.Errorf("PUT = %d captured %+v", code, put)
+	}
+	if code := doSend(t, http.MethodDelete, srv.URL+"/api/v1/analysis/cohorts/1/schedule", ""); code != http.StatusNoContent || !slices.Equal(deletes, []string{"1"}) {
+		t.Errorf("DELETE = %d recorded %v", code, deletes)
+	}
+}

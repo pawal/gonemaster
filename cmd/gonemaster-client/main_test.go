@@ -463,7 +463,7 @@ func TestHelpShorthand(t *testing.T) {
 		{[]string{"--help"}, "Usage: gonemaster-client [global options]"},
 		{[]string{"domains", "-h"}, "Usage: gonemaster-client domains <list|get|runs|tag|untag>"},
 		{[]string{"domains", "--help"}, "Usage: gonemaster-client domains <list|get|runs|tag|untag>"},
-		{[]string{"cohorts", "-h"}, "Usage: gonemaster-client cohorts <list|snapshots>"},
+		{[]string{"cohorts", "-h"}, "Usage: gonemaster-client cohorts <list|snapshots|schedules|schedule>"},
 		{[]string{"domains", "list", "-h"}, "Usage of domains list:"},
 		{[]string{"report", "-h"}, "Usage of report:"},
 	}

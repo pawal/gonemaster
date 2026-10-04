@@ -221,6 +221,40 @@ type Tag struct {
 	DefaultProfileID *int64 `json:"default_profile_id,omitempty"`
 }
 
+// AdminCohort is one item of GET /api/v1/analysis/cohorts.
+type AdminCohort struct {
+	ID              int64  `json:"id"`
+	SourceType      string `json:"source_type"`
+	SourceTag       string `json:"source_tag"`
+	Label           string `json:"label"`
+	AnalysisEnabled bool   `json:"analysis_enabled"`
+}
+
+// CohortSchedule is a cohort snapshot schedule as the admin API sends it.
+type CohortSchedule struct {
+	CohortID       int64    `json:"cohort_id"`
+	SourceTag      string   `json:"source_tag,omitempty"`
+	Label          string   `json:"label,omitempty"`
+	Enabled        bool     `json:"enabled"`
+	Kind           string   `json:"kind"`
+	IntervalDays   int      `json:"interval_days"`
+	AnchorDate     string   `json:"anchor_date"`
+	Weekdays       []string `json:"weekdays"`
+	DaysOfMonth    []int    `json:"days_of_month"`
+	LastDay        bool     `json:"last_day"`
+	TimeOfDay      string   `json:"time_of_day"`
+	Timezone       string   `json:"timezone"`
+	ProfileID      *int64   `json:"profile_id"`
+	PromoteDefault bool     `json:"promote_default"`
+	CatchUp        bool     `json:"catch_up"`
+	Summary        string   `json:"summary"`
+	NextRunAt      string   `json:"next_run_at"`
+	LastRunAt      string   `json:"last_run_at,omitempty"`
+	LastBatchID    string   `json:"last_batch_id,omitempty"`
+	LastOutcome    string   `json:"last_outcome,omitempty"`
+	LastError      string   `json:"last_error,omitempty"`
+}
+
 // Whoami is GET /whoami.
 type Whoami struct {
 	Mode          string `json:"mode"`

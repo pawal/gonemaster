@@ -807,6 +807,7 @@
   "tc.dnssec21": "DS RRset nadřazené zóny je podepsán platným DNSKEY",
   "tc.dnssec22": "Adresní záznamy jmenných serverů v doméně (in-domain) jsou ověřeny řetězem důvěry zóny",
   "tc.dnssec23": "Záznamy dokazující neexistenci jména jsou v rámci jedné odpovědi konzistentní",
+  "tc.dnssec24": "Signály pro DNSSEC bootstrapping jsou platné a shodují se s apexem zóny",
   "tc.nameserver01": "Jmenný server by neměl být rekurzor",
   "tc.nameserver02": "Test podpory EDNS0",
   "tc.nameserver03": "Test dostupnosti přenosu zóny (AXFR)",

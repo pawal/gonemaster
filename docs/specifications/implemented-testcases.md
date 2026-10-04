@@ -12,7 +12,7 @@ Notes:
 
 ## Summary
 - Modules: 9
-- Implemented testcases: 86
+- Implemented testcases: 87
 
 ## Regeneration
 
@@ -56,7 +56,7 @@ make spec-export-implemented
 - delegation06 - Verify SOA RRset existence on nameservers collected from delegation and child sources.
 - delegation07 - Compare parent-side and child-side NS name sets and report mismatches.
 
-### dnssec (22)
+### dnssec (23)
 - dnssec01 - Validate DS digest algorithm usage for the child delegation and classify each observed DS digest type.
 - dnssec02 - Verify that DS records found at the parent delegation match usable DNSKEYs in the child zone and that matching DNSKEYs can validate DNSKEY RRset signatures.
 - dnssec03 - Verify NSEC3 parameter consistency and policy compliance across child nameservers when DNSKEY support is present.
@@ -79,6 +79,7 @@ make spec-export-implemented
 - dnssec21 - Verify that the parent zone correctly signs the DS RRset that delegates the child zone.
 - dnssec22 - Verify that the address records (`A` and `AAAA`) of every in-domain nameserver name of the zone validate under the chain of trust of the zone.
 - dnssec23 - Verify that the NSEC or NSEC3 records a nameserver returns in one denial of
+- dnssec24 - Verify the authenticated DNSSEC bootstrapping signals of RFC 9615 for a
 
 ### nameserver (17)
 - nameserver01 - Detect whether authoritative nameservers also behave as recursors.

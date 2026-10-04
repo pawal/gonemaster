@@ -7,7 +7,7 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 86
+    "testcase_count": 87
   },
   "module_order": [
     "basic",
@@ -77,7 +77,8 @@
       "dnssec20",
       "dnssec21",
       "dnssec22",
-      "dnssec23"
+      "dnssec23",
+      "dnssec24"
     ],
     "nameserver": [
       "nameserver01",
@@ -173,6 +174,7 @@
     "dnssec21": "Verify that the parent zone correctly signs the DS RRset that delegates the child zone.",
     "dnssec22": "Verify that the address records (`A` and `AAAA`) of every in-domain nameserver name of the zone validate under the chain of trust of the zone.",
     "dnssec23": "Verify that the NSEC or NSEC3 records a nameserver returns in one denial of",
+    "dnssec24": "Verify the authenticated DNSSEC bootstrapping signals of RFC 9615 for a",
     "nameserver01": "Detect whether authoritative nameservers also behave as recursors.",
     "nameserver02": "Validate EDNS(0) handling on authoritative nameservers.",
     "nameserver03": "Check whether nameservers allow AXFR zone transfer.",

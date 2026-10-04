@@ -13,8 +13,8 @@
   ],
   "summary": {
     "module_count": 9,
-    "testcase_count": 86,
-    "unique_tag_count": 602
+    "testcase_count": 87,
+    "unique_tag_count": 618
   },
   "modules": {
     "address": {
@@ -711,6 +711,28 @@
         "DS23_NSEC3_MIXED_PARAMETERS",
         "DS23_NSEC3_RANGES_OVERLAP",
         "DS23_NSEC_RANGES_OVERLAP",
+        "IPV4_DISABLED",
+        "IPV6_DISABLED",
+        "TEST_CASE_END",
+        "TEST_CASE_START"
+      ],
+      "dnssec24": [
+        "DS24_APEX_UNAVAILABLE",
+        "DS24_BOOTSTRAP_READY",
+        "DS24_DELEGATION_SECURE",
+        "DS24_DELETE_REQUESTED",
+        "DS24_NO_CDS_CDNSKEY",
+        "DS24_NO_SIGNAL",
+        "DS24_ONLY_IN_DOMAIN_NS",
+        "DS24_SIGNAL_AT_ZONE_CUT",
+        "DS24_SIGNAL_CHAIN_BROKEN",
+        "DS24_SIGNAL_MISMATCH",
+        "DS24_SIGNAL_MISSING",
+        "DS24_SIGNAL_NAME_TOO_LONG",
+        "DS24_SIGNAL_UNSIGNED",
+        "DS24_SIGNAL_VALIDATED",
+        "DS24_SIGNAL_ZONE_INSECURE",
+        "DS24_SIGNAL_ZONE_UNREACHABLE",
         "IPV4_DISABLED",
         "IPV6_DISABLED",
         "TEST_CASE_END",

@@ -125,6 +125,12 @@ The nameservers of a zone are often named inside the zone itself, and then their
 Description:
 
 When a name does not exist, a signed zone proves it with NSEC or NSEC3 records that each cover a range of names. This check asks every nameserver for a name that cannot exist and verifies that the records in the answer agree with each other and with the NSEC3 parameters published at the zone apex. Records that contradict each other make some validating resolvers reject the answer even though every signature is correct.
+## Testcase dnssec24
+
+Description:
+
+A signed zone without a DS record at the parent is not yet protected by DNSSEC. Its DNS operator can prove that the CDS and CDNSKEY records of the zone are genuine by copying them into a signed zone of its own, under each nameserver name (RFC 9615). This check validates those copies from the root and compares them with the zone, so that a parent supporting the method can publish the DS record at once.
+
 ## Tag DS01_DS_ALGO_DEPRECATED
 
 Header: DS uses deprecated digest algorithm
@@ -1356,3 +1362,91 @@ Header: NSEC ranges overlap
 Description:
 
 One NSEC record claims that no name exists between two names, yet another NSEC record in the same answer is owned by a name in that gap, so the answer says that a name both exists and does not exist. The chain is broken and some validating resolvers reject the answer. Re-sign the zone so that the chain is rebuilt.
+
+## Tag DS24_APEX_UNAVAILABLE
+
+Header: Nameserver gave no CDS answer
+
+Description:
+
+A nameserver of your zone gave no authoritative answer when asked for the CDS or CDNSKEY records. A parent that bootstraps DNSSEC reads these records from every nameserver and stops until all of them answer.
+
+## Tag DS24_NO_SIGNAL
+
+Header: No bootstrapping proof
+
+Description:
+
+Your zone publishes CDS or CDNSKEY records but has no DS record at the parent, and your DNS operator publishes no authenticated copy of them (RFC 9615). The parent can accept the records only without proof, which some registries do after a waiting period and others not at all. Ask your DNS operator whether it supports authenticated DNSSEC bootstrapping.
+
+## Tag DS24_ONLY_IN_DOMAIN_NS
+
+Header: Bootstrapping needs an outside nameserver
+
+Description:
+
+All nameservers of your zone have names inside the zone itself. Authenticated bootstrapping needs at least one nameserver name outside the zone, because the proof is published under that name and must already be secured by DNSSEC.
+
+## Tag DS24_SIGNAL_AT_ZONE_CUT
+
+Header: Bootstrapping name is delegated
+
+Description:
+
+The name where your DNS operator publishes the bootstrapping proof is delegated as a zone of its own. RFC 9615 forbids this, and a parent rejects the proof.
+
+## Tag DS24_SIGNAL_CHAIN_BROKEN
+
+Header: Bootstrapping proof does not validate
+
+Description:
+
+The DNSSEC chain from the root to the zone that holds your DNS operator's bootstrapping proof is broken at the zone named in the message. A parent cannot trust the proof and does not publish the DS record. The operator must repair the DS records or signatures of that zone.
+
+## Tag DS24_SIGNAL_MISMATCH
+
+Header: Bootstrapping proof differs from the zone
+
+Description:
+
+The copy your DNS operator publishes as bootstrapping proof differs from the CDS or CDNSKEY records in your zone. A parent compares the two and stops on any difference. The copy must be refreshed whenever the records in the zone change.
+
+## Tag DS24_SIGNAL_MISSING
+
+Header: Bootstrapping proof missing for a nameserver
+
+Description:
+
+Your DNS operator publishes the bootstrapping proof under some of your nameserver names but not under this one. A parent needs the proof under every nameserver name outside your zone, so it stops.
+
+## Tag DS24_SIGNAL_NAME_TOO_LONG
+
+Header: Bootstrapping name too long
+
+Description:
+
+The name under which the bootstrapping proof would be published, built from your zone name and a nameserver name, is longer than the DNS allows. Authenticated bootstrapping cannot be used with this nameserver name.
+
+## Tag DS24_SIGNAL_UNSIGNED
+
+Header: Bootstrapping proof not signed
+
+Description:
+
+The bootstrapping proof published by your DNS operator carries no valid DNSSEC signature from the zone that holds it. A parent accepts the proof only when it validates, so it stops.
+
+## Tag DS24_SIGNAL_ZONE_INSECURE
+
+Header: Bootstrapping proof not secured
+
+Description:
+
+A zone on the path from the root to your DNS operator's bootstrapping proof has no DS record at its parent, so the proof cannot be validated. The operator must secure that zone with DNSSEC before the proof can be used.
+
+## Tag DS24_SIGNAL_ZONE_UNREACHABLE
+
+Header: Bootstrapping proof unreachable
+
+Description:
+
+The nameservers of a zone on the path to your DNS operator's bootstrapping proof gave no usable answer, so a parent cannot retrieve the proof. One cause is a nameserver that is listed for the zone but does not serve it.

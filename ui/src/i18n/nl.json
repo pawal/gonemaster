@@ -807,6 +807,7 @@
   "tc.dnssec21": "DS-RRset van bovenliggende zone is ondertekend door een geldige DNSKEY",
   "tc.dnssec22": "Adresrecords van in-domain-naamservers valideren onder de vertrouwensketen van de zone",
   "tc.dnssec23": "Records die bewijzen dat een naam niet bestaat, zijn consistent binnen één antwoord",
+  "tc.dnssec24": "Signalen voor DNSSEC-bootstrapping valideren en komen overeen met de zone-apex",
   "tc.nameserver01": "Een naamserver mag geen recursor zijn",
   "tc.nameserver02": "Test van EDNS0-ondersteuning",
   "tc.nameserver03": "Beschikbaarheid van zoneoverdracht (AXFR) testen",

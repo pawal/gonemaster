@@ -280,6 +280,7 @@
   "tc.dnssec21": "Le RRset DS de la zone parent est signé par un DNSKEY valide",
   "tc.dnssec22": "Les enregistrements d'adresse des serveurs de noms \"in-domain\" se valident dans la chaîne de confiance de la zone",
   "tc.dnssec23": "Les enregistrements prouvant l'inexistence sont cohérents au sein d'une même réponse",
+  "tc.dnssec24": "Les signaux d'amorçage DNSSEC se valident et correspondent au sommet de la zone",
   "tc.nameserver01": "Un serveur de noms ne devrait pas être un récurseur",
   "tc.nameserver02": "Test de la prise en charge EDNS0",
   "tc.nameserver03": "Test de la disponibilité du transfert de zone (AXFR)",

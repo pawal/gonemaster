@@ -280,6 +280,7 @@
   "tc.dnssec21": "Forældrezonens DS RRset er signeret af en gyldig DNSKEY",
   "tc.dnssec22": "Adresserecords for in-domain-navneservere validerer under zonens tillidskæde",
   "tc.dnssec23": "Records, der beviser at et navn ikke findes, er konsistente inden for ét svar",
+  "tc.dnssec24": "Signaler for DNSSEC-bootstrapping valideres og stemmer med zonens apex",
   "tc.nameserver01": "En navneserver bør ikke være en rekursor",
   "tc.nameserver02": "Test af EDNS0-understøttelse",
   "tc.nameserver03": "Test af tilgængelighed af zoneoverførsel (AXFR)",

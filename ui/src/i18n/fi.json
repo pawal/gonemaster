@@ -280,6 +280,7 @@
   "tc.dnssec21": "Ylätason vyöhykkeen DS-RRset on allekirjoitettu kelvollisella DNSKEY:llä",
   "tc.dnssec22": "In-domain-nimipalvelimien osoitetietueet validoituvat vyöhykkeen luottamusketjussa",
   "tc.dnssec23": "Olemattomuuden todistavat tietueet ovat yhden vastauksen sisällä johdonmukaisia",
+  "tc.dnssec24": "DNSSEC-käynnistyssignaalit validoituvat ja vastaavat vyöhykkeen huippua",
   "tc.nameserver01": "Nimipalvelin ei saisi olla rekursori",
   "tc.nameserver02": "EDNS0-tuen testi",
   "tc.nameserver03": "Vyöhykesiirron (AXFR) saatavuuden testi",

@@ -280,6 +280,7 @@
   "tc.dnssec21": "RRset DS nadrejene cone je podpisan z veljavnim DNSKEY",
   "tc.dnssec22": "Naslovni zapisi imenskih strežnikov v domeni (in-domain) so preverjeni v verigi zaupanja cone",
   "tc.dnssec23": "Zapisi, ki dokazujejo neobstoj imena, so znotraj enega odgovora skladni",
+  "tc.dnssec24": "Signali za zagon DNSSEC so veljavni in se ujemajo z vrhom cone",
   "tc.nameserver01": "Imenski strežnik ne bi smel biti rekurzor",
   "tc.nameserver02": "Test podpore EDNS0",
   "tc.nameserver03": "Test razpoložljivosti prenosa cone (AXFR)",

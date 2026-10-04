@@ -8,7 +8,7 @@ type rootAnchor struct {
 	digest string
 }
 
-// rootAnchors are KSK-2017 and KSK-2024 from root-anchors.xml.
+// rootAnchors are KSK-2017 and KSK-2024 from root-anchors.xml; make anchors-check verifies them.
 var rootAnchors = []rootAnchor{
 	{20326, "E06D44B80B8F1D39A95C0B0D7C65D08458E880409BBC683457104237C7F8EC8D"},
 	{38696, "683D2D0ACB8C9B712A1948B27F741219298D0A450D612C483AF444A4C0FB2B16"},

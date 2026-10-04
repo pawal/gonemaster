@@ -574,6 +574,13 @@ Builds without the `badkeys_embed` tag read the blocklist from
 `share/badkeys/` at runtime. The CI pipeline does not refresh the
 blocklist on its own.
 
+The root trust anchors in `engine/dnssecutil/anchors.go` change by a
+source edit at a root KSK roll. `make anchors-check` verifies them
+against IANA's `root-anchors.xml` and its detached signature, checked
+against the ICANN certificate in
+[tools/anchors-check/](../tools/anchors-check/). It needs the network
+and openssl, and is part of neither `make test` nor CI.
+
 Further reading:
 [docs/server/public-api-and-proxy.md](server/public-api-and-proxy.md).
 
@@ -850,6 +857,7 @@ yet described here; see [Chapter 15](#15-known-limitations).
 | Source | Mechanism | Frequency |
 |---|---|---|
 | badkeys blocklist | [tools/badkeys-update/](../tools/badkeys-update/) | Explicit operator step. |
+| IANA root trust anchors (`root-anchors.xml`) | Edited in `engine/dnssecutil/anchors.go`, verified by [tools/anchors-check/](../tools/anchors-check/). | At a root KSK roll. |
 | IANA registries (`named.root` from [IANA Root Files](https://www.iana.org/domains/root/files), special-purpose CSVs) | Manual replacement of files in `share/`. | When IANA publishes updates. |
 
 Further reading:
@@ -960,7 +968,7 @@ Top-level directories tracked in the repository.
 | [internal/](../internal/) | Test fakes and small helpers shared across packages. |
 | [scoring/](../scoring/) | Score and grade computation from run entries. |
 | [share/](../share/) | Embedded assets: default profile, named.root, IANA registries, translations, badkeys data. |
-| [tools/](../tools/) | Code-generation and spec tooling: testcase metadata, log-args inventory, i18n placeholders, badkeys-update, release-prune. |
+| [tools/](../tools/) | Code-generation and spec tooling: testcase metadata, log-args inventory, i18n placeholders, badkeys-update, release-prune, anchors-check. |
 | [ui/](../ui/) | Admin UI source (Svelte 5 + Vite). Embedded into `gonemaster-server`. |
 | [ui-public/](../ui-public/) | Public UI source. Embedded. |
 | [analysis-ui/](../analysis-ui/) | Cohort analysis UI source. Embedded. |

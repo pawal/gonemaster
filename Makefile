@@ -30,7 +30,7 @@ CMD ?= all
 	spec-generate-tags spec-check-tags spec-export-log-args spec-check-coherency spec-check-log-args spec-check-i18n-placeholders \
 	spec-check-go spec-check-node \
 	spec-check-ui-explanations \
-	architecture-check badkeys-update badkeys-update-embed man man-gz clean-man \
+	architecture-check anchors-check badkeys-update badkeys-update-embed man man-gz clean-man \
 	package-binaries package-deb package-rpm packages clean-packages
 
 help:
@@ -78,6 +78,7 @@ help:
 	@echo "  spec-check-node    The spec checks that need node"
 	@echo "  spec-check         Run spec-check-go + spec-check-node"
 	@echo "  architecture-check Verify docs/architecture.md against cmd/, build tags, drivers, and the Last reviewed date"
+	@echo "  anchors-check      Verify the root trust anchors in engine/dnssecutil against IANA (network, openssl)"
 	@echo "  docs             Build the documentation site (writes site/public/)"
 	@echo "  docs-serve       Serve the documentation site locally"
 	@echo "  man              Generate man pages from docs/man/*.md"
@@ -353,6 +354,9 @@ spec-check: spec-check-go spec-check-node
 
 architecture-check:
 	GOOS= GOARCH= $(GO) run ./tools/architecture-check
+
+anchors-check:
+	GOOS= GOARCH= $(GO) run ./tools/anchors-check
 
 badkeys-update:
 	GOOS= GOARCH= $(GO) run ./tools/badkeys-update --output share/badkeys

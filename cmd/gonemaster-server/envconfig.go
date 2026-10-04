@@ -115,6 +115,7 @@ func applyEnvVars(cfg *server.Config, flagsSet map[string]bool, getenv func(stri
 	applyInt("external-data-max-cached-records", "GONEMASTER_EXTERNAL_DATA_MAX_CACHED_RECORDS", &cfg.ExternalData.MaxCachedRecords)
 	applyString("analysis-vantage-label", "GONEMASTER_ANALYSIS_VANTAGE_LABEL", &cfg.Analysis.VantageLabel)
 	applyBool("cross-job-hot-cache", "GONEMASTER_CROSS_JOB_HOT_CACHE", &cfg.CrossJobHotCache)
+	applyBool("scheduler-enabled", "GONEMASTER_SCHEDULER_ENABLED", &cfg.SchedulerEnabled)
 	applyInt("cross-job-hot-cache-ttl", "GONEMASTER_CROSS_JOB_HOT_CACHE_TTL", &cfg.CrossJobHotCacheTTLSeconds)
 }
 

@@ -72,6 +72,7 @@ func (s *Server) Start() {
 			}
 		}()
 		startSnapshotCaptureLoop(ctx, s.analysis, s.logger)
+		s.startScheduleLoop(ctx)
 	}
 }
 

@@ -248,6 +248,8 @@ type Config struct {
 	MCPEnabled bool `json:"mcp_enabled"`
 	// MCPAllowWrite registers the MCP write tools. Defaults to false.
 	MCPAllowWrite bool `json:"mcp_allow_write"`
+	// SchedulerEnabled lets the cohort scheduler submit due runs. Defaults to true.
+	SchedulerEnabled bool `json:"scheduler_enabled"`
 }
 
 // PublicAPIFileConfig holds optional public API configuration from JSON.
@@ -339,6 +341,7 @@ type FileConfig struct {
 	ShowASNNamesPublic          *bool                   `json:"show_asn_names_public,omitempty"`
 	MCPEnabled                  *bool                   `json:"mcp_enabled,omitempty"`
 	MCPAllowWrite               *bool                   `json:"mcp_allow_write,omitempty"`
+	SchedulerEnabled            *bool                   `json:"scheduler_enabled,omitempty"`
 	CrossJobHotCache            *bool                   `json:"cross_job_hot_cache,omitempty"`
 	CrossJobHotCacheTTLSeconds  *int                    `json:"cross_job_hot_cache_ttl_seconds,omitempty"`
 }
@@ -365,6 +368,7 @@ func DefaultConfig() Config {
 		ShowASNNamesPublic:          true,
 		CrossJobHotCache:            true,
 		CrossJobHotCacheTTLSeconds:  defaultCrossJobHotCacheTTLSeconds,
+		SchedulerEnabled:            true,
 		ReadTimeout:                 Duration{30 * time.Second},
 		WriteTimeout:                Duration{60 * time.Second},
 		IdleTimeout:                 Duration{60 * time.Second},
@@ -579,6 +583,9 @@ func (c *Config) ApplyFileConfig(file FileConfig) {
 	}
 	if file.MCPAllowWrite != nil {
 		c.MCPAllowWrite = *file.MCPAllowWrite
+	}
+	if file.SchedulerEnabled != nil {
+		c.SchedulerEnabled = *file.SchedulerEnabled
 	}
 	if file.CrossJobHotCache != nil {
 		c.CrossJobHotCache = *file.CrossJobHotCache

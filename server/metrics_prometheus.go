@@ -20,6 +20,7 @@ type metricsPromSnapshot struct {
 	ActiveWorkers     int
 	MaxConcurrentJobs int
 	QueuePaused       bool
+	SchedulerEnabled  bool
 	QueueDepth        int64
 	InFlightJobs      int64
 
@@ -47,6 +48,7 @@ type metricsPromSnapshot struct {
 	ForwardedHeadersStrippedTotal int64
 	RateLimitKeys                 int
 	MCPToolCalls                  []MetricsMCPToolCall
+	ScheduledRuns                 map[string]int64
 
 	JobDurationHistogram boundedHistogram
 	JobDurationCount     int64
@@ -84,6 +86,8 @@ func (m *MetricsCollector) prometheusSnapshot() metricsPromSnapshot {
 		ActiveWorkers:        m.activeWorkers,
 		MaxConcurrentJobs:    m.maxConcurrentJobs,
 		QueuePaused:          m.queuePaused,
+		SchedulerEnabled:     m.schedulerEnabled,
+		ScheduledRuns:        copyStringCounts(m.scheduledRuns),
 		QueueDepth:           m.queueDepth,
 		InFlightJobs:         m.inFlight,
 		DNSQueriesIPv4:       m.dnsQueries4,
@@ -177,6 +181,9 @@ func renderPrometheusMetrics(snapshot metricsPromSnapshot) []byte {
 	writePromHeader(&buf, "gonemaster_queue_paused", "Whether queue processing is paused (1 paused, 0 running).", "gauge")
 	writePromSample(&buf, "gonemaster_queue_paused", nil, promBool(snapshot.QueuePaused))
 
+	writePromHeader(&buf, "gonemaster_scheduler_enabled", "Whether the cohort scheduler may submit runs (1 enabled, 0 off).", "gauge")
+	writePromSample(&buf, "gonemaster_scheduler_enabled", nil, promBool(snapshot.SchedulerEnabled))
+
 	writePromHeader(&buf, "gonemaster_queue_depth", "Current number of queued jobs.", "gauge")
 	writePromSample(&buf, "gonemaster_queue_depth", nil, snapshot.QueueDepth)
 
@@ -231,6 +238,11 @@ func renderPrometheusMetrics(snapshot metricsPromSnapshot) []byte {
 	for _, tc := range snapshot.MCPToolCalls {
 		writePromSample(&buf, "gonemaster_mcp_tool_calls_total", map[string]string{"tool": tc.Tool, "outcome": "ok"}, tc.Total-tc.Failed)
 		writePromSample(&buf, "gonemaster_mcp_tool_calls_total", map[string]string{"tool": tc.Tool, "outcome": "failed"}, tc.Failed)
+	}
+
+	writePromHeader(&buf, "gonemaster_scheduled_runs_total", "Lifetime cohort scheduler firings by outcome.", "counter")
+	for _, outcome := range sortedStringKeys(snapshot.ScheduledRuns) {
+		writePromSample(&buf, "gonemaster_scheduled_runs_total", map[string]string{"outcome": outcome}, snapshot.ScheduledRuns[outcome])
 	}
 
 	writePromHeader(&buf, "gonemaster_rate_limit_keys", "Distinct client IPs currently tracked by the public rate limiter.", "gauge")

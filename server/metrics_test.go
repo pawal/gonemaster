@@ -672,3 +672,30 @@ func TestMetricsCollectorExportsProxyCounters(t *testing.T) {
 		}
 	}
 }
+
+func TestMetricsCollectorExportsSchedulerMetrics(t *testing.T) {
+	collector := newMetricsCollector(DefaultConfig(), time.Date(2026, 2, 7, 12, 0, 0, 0, time.UTC))
+	collector.ObserveScheduledRun(ScheduleOutcomeSubmitted)
+	collector.ObserveScheduledRun(ScheduleOutcomeSubmitted)
+	collector.ObserveScheduledRun(ScheduleOutcomeSkippedActive)
+	collector.ObserveSchedulerEnabled(false)
+
+	snapshot := collector.Snapshot()
+	if snapshot.Health.SchedulerEnabled {
+		t.Error("health.scheduler_enabled = true, want false")
+	}
+	if got := snapshot.Jobs.ScheduledRuns; got[ScheduleOutcomeSubmitted] != 2 || got[ScheduleOutcomeSkippedActive] != 1 || len(got) != 2 {
+		t.Errorf("jobs.scheduled_runs = %v, want submitted 2 skipped_active 1", got)
+	}
+
+	prom := string(renderPrometheusMetrics(collector.prometheusSnapshot()))
+	for _, want := range []string{
+		"gonemaster_scheduler_enabled 0",
+		`gonemaster_scheduled_runs_total{outcome="skipped_active"} 1`,
+		`gonemaster_scheduled_runs_total{outcome="submitted"} 2`,
+	} {
+		if !strings.Contains(prom, want) {
+			t.Errorf("expected %q in prometheus output, got:\n%s", want, prom)
+		}
+	}
+}

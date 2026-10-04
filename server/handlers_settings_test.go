@@ -763,3 +763,23 @@ func TestPutSettingsPublicURLReachesPagesLive(t *testing.T) {
 		}
 	}
 }
+
+func TestPutSettingsSchedulerEnabled(t *testing.T) {
+	srv := newTestServer(t)
+	if !srv.schedulerEnabled.Load() {
+		t.Fatal("scheduler disabled by default")
+	}
+
+	wantStatus(t, doJSON(t, srv, http.MethodPut, "/api/v1/settings", `{"scheduler_enabled": false}`), http.StatusOK)
+
+	if srv.schedulerEnabled.Load() {
+		t.Error("scheduler still enabled after PUT")
+	}
+	if srv.metrics.Snapshot().Health.SchedulerEnabled {
+		t.Error("health.scheduler_enabled = true after PUT")
+	}
+	settings := mustJSON[map[string]settingEntry](t, doJSON(t, srv, http.MethodGet, "/api/v1/settings", nil), http.StatusOK)
+	if got := settings["scheduler_enabled"]; got.Value != false || got.Source != SourceDatabase {
+		t.Errorf("scheduler_enabled = %v from %q, want false from database", got.Value, got.Source)
+	}
+}

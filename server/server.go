@@ -53,6 +53,7 @@ type Server struct {
 	configSources            map[string]SettingSource
 	retentionDays            atomic.Int64
 	purgeIntervalSec         atomic.Int64
+	schedulerEnabled         atomic.Bool
 	// cohortRebuildsInFlight guards against overlapping rebuilds of the
 	// same cohort. Async-dispatched rebuilds record their cohort ID here;
 	// a second request for the same cohort is refused until the first
@@ -215,6 +216,7 @@ func newServer(cfg Config, store JobStore, queue Queue) *Server {
 	}
 	s.retentionDays.Store(int64(cfg.Database.RetentionDays))
 	s.purgeIntervalSec.Store(int64(cfg.EffectivePurgeInterval() / time.Second))
+	s.schedulerEnabled.Store(cfg.SchedulerEnabled)
 	ts, err := newTokenSet(cfg.Auth)
 	if err != nil {
 		s.logger.Warn("invalid admin_tokens, running in open mode", "err", err)

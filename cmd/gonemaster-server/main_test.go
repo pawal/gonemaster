@@ -207,6 +207,23 @@ func TestBuildConfigSourcesIPv6ModeFlag(t *testing.T) {
 	}
 }
 
+func TestRunSchedulerEnabledFlag(t *testing.T) {
+	res := clitest.Run(t, run, "--dump-config")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, `"scheduler_enabled": true`)
+
+	res = clitest.Run(t, run, "--dump-config", "--scheduler-enabled=false")
+	res.RequireCode(t, 0)
+	res.RequireOutContains(t, `"scheduler_enabled": false`)
+
+	res = clitest.Run(t, run, "-h")
+	res.RequireErrContains(t, "Scheduler:", "--scheduler-enabled", "GONEMASTER_SCHEDULER_ENABLED")
+
+	if got := buildConfigSources(map[string]bool{"scheduler-enabled": true}, false)["scheduler_enabled"]; got != "cli_flag" {
+		t.Errorf("scheduler_enabled source = %q, want cli_flag", got)
+	}
+}
+
 func TestRunPublicAPIRateLimitMaxValidation(t *testing.T) {
 	res := clitest.Run(t, run, "--public-api-rate-limit-max", "0")
 	res.RequireCode(t, 2)

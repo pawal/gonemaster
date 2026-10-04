@@ -155,6 +155,10 @@ func TestApplyEnvVarsSetsFields(t *testing.T) {
 			name: "analysis vantage label", env: "GONEMASTER_ANALYSIS_VANTAGE_LABEL", value: "Stockholm, SE",
 			get: func(c server.Config) any { return c.Analysis.VantageLabel }, want: "Stockholm, SE",
 		},
+		{
+			name: "scheduler disabled", env: "GONEMASTER_SCHEDULER_ENABLED", value: "false",
+			get: func(c server.Config) any { return c.SchedulerEnabled }, want: false,
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			cfg, warn := runApplyEnvVars(tc)

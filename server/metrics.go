@@ -106,6 +106,7 @@ type MetricsHealthSnapshot struct {
 	ActiveWorkers     int       `json:"active_workers"`
 	MaxConcurrentJobs int       `json:"max_concurrent_jobs"`
 	QueuePaused       bool      `json:"queue_paused"`
+	SchedulerEnabled  bool      `json:"scheduler_enabled"`
 	QueueDepth        int64     `json:"queue_depth"`
 	InFlightJobs      int64     `json:"in_flight_jobs"`
 	DNSQueriesTotal   int64     `json:"dns_queries_total"`
@@ -124,6 +125,8 @@ type MetricsJobsSnapshot struct {
 	CanceledTotal  int64            `json:"canceled_total"`
 	PurgedTotal    int64            `json:"purged_total"`
 	StatusCounts   map[string]int64 `json:"status_counts"`
+	// ScheduledRuns counts cohort scheduler firings by outcome.
+	ScheduledRuns map[string]int64 `json:"scheduled_runs"`
 }
 
 // MetricsAPISnapshot captures aggregate API request statistics.
@@ -220,6 +223,7 @@ type MetricsCollector struct {
 	nowFn             func() time.Time
 
 	queuePaused       bool
+	schedulerEnabled  bool
 	queueDepth        int64
 	inFlight          int64
 	dnsQueries        int64
@@ -245,6 +249,7 @@ type MetricsCollector struct {
 	apiRoutes              map[string]*apiRouteMetrics
 	forwardedStrippedTotal int64
 	mcpToolCalls           map[string]*mcpToolCallMetrics
+	scheduledRuns          map[string]int64
 	// nil when the rate limiter is disabled.
 	rateLimitKeysFn func() int
 
@@ -281,12 +286,14 @@ func newMetricsCollector(cfg Config, startedAt time.Time) *MetricsCollector {
 		workerCount:          cfg.WorkerCount,
 		activeWorkers:        activeWorkers,
 		maxConcurrentJobs:    cfg.MaxConcurrentJobs,
+		schedulerEnabled:     cfg.SchedulerEnabled,
 		nowFn:                func() time.Time { return time.Now().UTC() },
 		statusCounts:         zeroStatusCounts(),
 		apiStatusClassCounts: zeroStatusClassCounts(),
 		apiErrorCodeCounts:   map[string]int64{},
 		apiRoutes:            map[string]*apiRouteMetrics{},
 		mcpToolCalls:         map[string]*mcpToolCallMetrics{},
+		scheduledRuns:        map[string]int64{},
 		jobDuration:          newBoundedHistogram(metricsJobDurationBucketsMs[:]),
 		severityTotals:       zeroMetricsSeverityTotals(),
 		localeCounts:         map[string]int64{},
@@ -333,6 +340,20 @@ func (m *MetricsCollector) SnapshotWithLimits(domainLimit int, batchLimit int) M
 func (m *MetricsCollector) ObserveQueuePaused(paused bool) {
 	m.mu.Lock()
 	m.queuePaused = paused
+	m.mu.Unlock()
+}
+
+// ObserveSchedulerEnabled records whether the cohort scheduler may fire.
+func (m *MetricsCollector) ObserveSchedulerEnabled(enabled bool) {
+	m.mu.Lock()
+	m.schedulerEnabled = enabled
+	m.mu.Unlock()
+}
+
+// ObserveScheduledRun counts one scheduler firing by outcome.
+func (m *MetricsCollector) ObserveScheduledRun(outcome string) {
+	m.mu.Lock()
+	m.scheduledRuns[outcome]++
 	m.mu.Unlock()
 }
 
@@ -648,6 +669,8 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 	m.mu.Lock()
 	statusCounts := copyStatusCounts(m.statusCounts)
 	queuePaused := m.queuePaused
+	schedulerEnabled := m.schedulerEnabled
+	scheduledRuns := copyStringCounts(m.scheduledRuns)
 	queueDepth := m.queueDepth
 	inFlight := m.inFlight
 	dnsQueries := m.dnsQueries
@@ -707,6 +730,7 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 			ActiveWorkers:     m.activeWorkers,
 			MaxConcurrentJobs: m.maxConcurrentJobs,
 			QueuePaused:       queuePaused,
+			SchedulerEnabled:  schedulerEnabled,
 			QueueDepth:        queueDepth,
 			InFlightJobs:      inFlight,
 			DNSQueriesTotal:   dnsQueries,
@@ -723,6 +747,7 @@ func (m *MetricsCollector) snapshotAtWithLimits(now time.Time, domainLimit int, 
 			CanceledTotal:  canceledTotal,
 			PurgedTotal:    purgedTotal,
 			StatusCounts:   statusCounts,
+			ScheduledRuns:  scheduledRuns,
 		},
 		API: MetricsAPISnapshot{
 			RequestsTotal:     apiRequestsTotal,

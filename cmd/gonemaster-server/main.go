@@ -15,6 +15,8 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	// Zone names resolve on hosts without a zoneinfo directory.
+	_ "time/tzdata"
 
 	"codeberg.org/pawal/gonemaster/engine"
 	"codeberg.org/pawal/gonemaster/engine/profile"
@@ -110,6 +112,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	var shutdownTimeout time.Duration
 	var adminTokenHashes string
 	var authProtectPublic bool
+	var schedulerEnabled bool
 
 	flagsSet := make(map[string]bool)
 
@@ -154,6 +157,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 			{flag: "--db-dsn DSN", detail: "SQLite file path (e.g. /var/lib/gonemaster/jobs.db) or postgres/mariadb connection string (env: GONEMASTER_DB_DSN)"},
 			{flag: "--db-retention-days N", detail: "Delete completed jobs older than N days (0 = keep forever) (env: GONEMASTER_DB_RETENTION_DAYS)"},
 			{flag: "--db-purge-interval N", detail: "Retention purge sweep interval in seconds (default 3600) (env: GONEMASTER_DB_PURGE_INTERVAL)"},
+		})
+		printUsageGroup(errOut, "Scheduler", []usageLine{
+			{flag: "--scheduler-enabled", detail: "Let the cohort scheduler submit due snapshot runs (default true; off with --scheduler-enabled=false) (env: GONEMASTER_SCHEDULER_ENABLED)"},
 		})
 		printUsageGroup(errOut, "Reverse proxy", []usageLine{
 			{flag: "--trusted-proxy-cidrs LIST", detail: "Comma-separated CIDRs (or bare IPs) of reverse proxies allowed to set X-Forwarded-For. Empty = trust nothing (RemoteAddr only). Leave empty when the server is exposed directly. (env: GONEMASTER_TRUSTED_PROXY_CIDRS)"},
@@ -227,6 +233,7 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	fs.StringVar(&trustedProxyCIDRs, "trusted-proxy-cidrs", "", "Comma-separated CIDRs allowed to set X-Forwarded-For (default empty = trust nothing)")
 	fs.StringVar(&adminTokenHashes, "admin-token-hashes", "", "Comma-separated admin token hashes (label=sha256:...) gating /api/v1 (default empty = open mode)")
 	fs.BoolVar(&authProtectPublic, "auth-protect-public", false, "Require an admin token on the public UI, analysis UI and public API (default off)")
+	fs.BoolVar(&schedulerEnabled, "scheduler-enabled", true, "Let the cohort scheduler submit due snapshot runs (default true)")
 	fs.DurationVar(&readTimeout, "read-timeout", 0, "Per-connection read timeout (default 30s)")
 	fs.DurationVar(&writeTimeout, "write-timeout", 0, "Per-connection write timeout (default 60s)")
 	fs.DurationVar(&idleTimeout, "idle-timeout", 0, "Idle keep-alive timeout (default 60s)")
@@ -398,6 +405,9 @@ func run(args []string, out io.Writer, errOut io.Writer) int {
 	}
 	if flagsSet["cross-job-hot-cache-ttl"] {
 		cfg.CrossJobHotCacheTTLSeconds = crossJobHotCacheTTL
+	}
+	if flagsSet["scheduler-enabled"] {
+		cfg.SchedulerEnabled = schedulerEnabled
 	}
 	if flagsSet["sourceaddr4"] {
 		value := strings.TrimSpace(sourceAddr4)
@@ -720,6 +730,7 @@ func buildConfigSources(flagsSet map[string]bool, hasConfigFile bool) map[string
 		"read-timeout":                            "read_timeout",
 		"write-timeout":                           "write_timeout",
 		"idle-timeout":                            "idle_timeout",
+		"scheduler-enabled":                       "scheduler_enabled",
 	}
 
 	sources := make(map[string]server.SettingSource)

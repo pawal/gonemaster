@@ -122,6 +122,7 @@ var writableSettings = map[string]settingSpec{
 	"show_asn_names_public":           {kind: settingBool},
 	"mcp_enabled":                     {kind: settingBool},
 	"mcp_allow_write":                 {kind: settingBool},
+	"scheduler_enabled":               {kind: settingBool},
 	"cross_job_hot_cache_ttl_seconds": {kind: settingInt, min: 1, max: 86400},
 }
 
@@ -228,6 +229,10 @@ func (s *Server) applySetting(key, val string) {
 		}
 	case "mcp_allow_write":
 		s.cfg.MCPAllowWrite = val == "true"
+	case "scheduler_enabled":
+		s.cfg.SchedulerEnabled = val == "true"
+		s.schedulerEnabled.Store(s.cfg.SchedulerEnabled)
+		s.metrics.ObserveSchedulerEnabled(s.cfg.SchedulerEnabled)
 	case "cross_job_hot_cache_ttl_seconds":
 		s.cfg.CrossJobHotCacheTTLSeconds = num
 	}
@@ -319,6 +324,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, _ *http.Request) {
 		"show_asn_names_public":           {Value: cfg.ShowASNNamesPublic, Source: s.settingSource("show_asn_names_public")},
 		"mcp_enabled":                     {Value: cfg.MCPEnabled, Source: s.settingSource("mcp_enabled")},
 		"mcp_allow_write":                 {Value: cfg.MCPAllowWrite, Source: s.settingSource("mcp_allow_write")},
+		"scheduler_enabled":               {Value: cfg.SchedulerEnabled, Source: s.settingSource("scheduler_enabled")},
 		"cross_job_hot_cache_ttl_seconds": {Value: cfg.CrossJobHotCacheTTLSeconds, Source: s.settingSource("cross_job_hot_cache_ttl_seconds")},
 	}
 

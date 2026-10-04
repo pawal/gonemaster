@@ -996,25 +996,27 @@ func Zone08(ctx context.Context, z *zonepkg.Zone) ([]*logger.Entry, error) {
 			if !ok {
 				continue
 			}
-			p2, err := queryAuth(ctx, z, mx.Mx, "CNAME")
+			exchange := dnsname.New(mx.Mx)
+			// The null MX exchange is the root; Zone09 judges it.
+			if len(exchange.Labels()) == 0 {
+				continue
+			}
+			p2, err := queryAuth(ctx, z, mx.Mx, "A")
 			if err != nil {
 				return results, err
 			}
-			if p2.Msg != nil {
-				// Name the exchange so several MX records stay distinguishable.
-				exchange := dnsname.New(mx.Mx).String()
-				if p2.HasRRsOfTypeForName("CNAME", dnsname.New(mx.Mx), "answer") {
-					if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_CNAME", map[string]any{
-						"mx": exchange,
-					}); err != nil {
-						return results, err
-					}
-				} else {
-					if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_NOT_CNAME", map[string]any{
-						"mx": exchange,
-					}); err != nil {
-						return results, err
-					}
+			if p2.Msg == nil {
+				continue
+			}
+			args := map[string]any{"mx": exchange.String()}
+			switch {
+			case p2.HasRRsOfTypeForName("CNAME", exchange, "answer"):
+				if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_CNAME", args); err != nil {
+					return results, err
+				}
+			case p2.Rcode() == "NOERROR" || p2.Rcode() == "NXDOMAIN":
+				if err := appendLog(ctx, &results, testcase, "MX_RECORD_IS_NOT_CNAME", args); err != nil {
+					return results, err
 				}
 			}
 		}

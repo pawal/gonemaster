@@ -390,9 +390,12 @@ Implementation-defined choices, none of them mandated by the protocol:
 - Code paths:
   - `engine/test/dnssec/dnssec.go` (DNSSEC24 testcase function and signaling
     walker).
+  - `engine/dsboot/dsboot.go` (signaling name, signaling hosts, delete
+    records, content comparison).
   - `engine/dnssecutil/anchors.go` (root trust anchors).
 - Related tests:
   - `engine/test/dnssec/dnssec24_test.go`.
+  - `engine/dsboot/dsboot_test.go`.
 - References:
   - RFC 9615 sections 3.1, 3.2, 4.1, 4.2, 4.4 (authenticated bootstrapping).
   - RFC 8078 sections 3 and 4 (acceptance policy, delete records).

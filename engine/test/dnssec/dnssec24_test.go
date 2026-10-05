@@ -312,24 +312,6 @@ func (o *ds24Op) walker() *ds24Walker {
 	return newDS24Walker(o.ctx, o.rec, rootTrustAnchors())
 }
 
-func TestDNSSEC24SignalName(t *testing.T) {
-	name, ok := ds24SignalName(dnsname.New("Example.CO.uk"), dnsname.New("NS1.example.net"))
-	if !ok || name.String() != "_dsboot.example.co.uk._signal.ns1.example.net" {
-		t.Fatalf("signal name = %q, %v", name.String(), ok)
-	}
-	// Wire length 1 + 8 + 2 x 64 + 8 + 64 + (n + 1) + 2: 255 octets at n = 43.
-	label := strings.Repeat("b", 63)
-	for _, tc := range []struct {
-		middle int
-		ok     bool
-	}{{43, true}, {44, false}} {
-		host := dnsname.New(label + "." + strings.Repeat("c", tc.middle) + ".x")
-		if _, ok := ds24SignalName(dnsname.New(label+"."+label), host); ok != tc.ok {
-			t.Errorf("middle label of %d octets: ok = %v, want %v", tc.middle, ok, tc.ok)
-		}
-	}
-}
-
 func TestDNSSEC24WalkerValidatesThroughReferrals(t *testing.T) {
 	o := newDS24Op(t)
 	zoneName := o.signalZone(ds24NS1, ds24Signed)

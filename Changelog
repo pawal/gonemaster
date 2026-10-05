@@ -4,6 +4,10 @@ All notable changes to all gonemaster components will be documented in this file
 
 ## [Unreleased]
 
+### Added
+
+- engine: package `dsboot` exports the RFC 9615 signaling name and the CDS and CDNSKEY tests of dnssec24
+
 ### Changed
 
 - nameserver10, nameserver11, nameserver12, nameserver13: passing servers yield `N10_EDNS_VERSION_OK`, `N11_UNKNOWN_OPTION_OK`, `Z_FLAGS_CLEAR` and `N13_EDNS_RESPONSE_OK` at INFO

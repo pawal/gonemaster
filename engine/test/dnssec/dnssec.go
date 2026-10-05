@@ -19,6 +19,7 @@ import (
 	"codeberg.org/pawal/gonemaster/engine/dnsname"
 	"codeberg.org/pawal/gonemaster/engine/dnssecchain"
 	"codeberg.org/pawal/gonemaster/engine/dnssecutil"
+	"codeberg.org/pawal/gonemaster/engine/dsboot"
 	"codeberg.org/pawal/gonemaster/engine/internal/parallel"
 	"codeberg.org/pawal/gonemaster/engine/logargs"
 	"codeberg.org/pawal/gonemaster/engine/logger"
@@ -10834,55 +10835,13 @@ func ds24SignedBy(sigs []*dns.RRSIG, signer dnsname.Name) []*dns.RRSIG {
 	return out
 }
 
-// ds24SignalName returns _dsboot.<child>._signal.<ns>; false beyond 255 octets.
-func ds24SignalName(child dnsname.Name, ns dnsname.Name) (dnsname.Name, bool) {
-	labels := append([]string{"_dsboot"}, child.Labels()...)
-	labels = append(labels, "_signal")
-	labels = append(labels, ns.Labels()...)
-	wire := 1
-	for i, label := range labels {
-		labels[i] = strings.ToLower(label)
-		wire += len(label) + 1
-	}
-	return dnsname.NewFromLabels(labels), wire <= 255
-}
-
-// ds24IsDelete reports an RFC 8078 delete record.
-func ds24IsDelete(rr dns.RR) bool {
-	switch record := rr.(type) {
-	case *dns.CDS:
-		return record.Algorithm == 0
-	case *dns.CDNSKEY:
-		return record.Algorithm == 0
-	}
-	return false
-}
-
-// ds24Content returns the RDATA of CDS or CDNSKEY records, sorted and deduplicated.
-func ds24Content(rrs []dns.RR) []string {
-	var out []string
-	for _, rr := range rrs {
-		switch record := rr.(type) {
-		case *dns.CDS:
-			out = append(out, strconv.Itoa(int(record.KeyTag))+" "+strconv.Itoa(int(record.Algorithm))+" "+
-				strconv.Itoa(int(record.DigestType))+" "+strings.ToUpper(record.Digest))
-		case *dns.CDNSKEY:
-			out = append(out, strconv.Itoa(int(record.Flags))+" "+strconv.Itoa(int(record.Protocol))+" "+
-				strconv.Itoa(int(record.Algorithm))+" "+record.PublicKey)
-		}
-	}
-	slices.Sort(out)
-	return slices.Compact(out)
-}
-
 // ds24Apex is the apex view: the RRsets of each delegation server that answered, by type.
 type ds24Apex map[uint16][][]dns.RR
 
 // differs reports whether rrs differs from the apex RRset of any server.
 func (a ds24Apex) differs(rrtype uint16, rrs []dns.RR) bool {
-	want := ds24Content(rrs)
 	for _, rrset := range a[rrtype] {
-		if !slices.Equal(ds24Content(rrset), want) {
+		if !dsboot.Equal(rrset, rrs) {
 			return true
 		}
 	}
@@ -11077,7 +11036,7 @@ func DNSSEC24(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	}
 	apex := ds24Apex{}
 	var unavailable []logargs.Server
-	records, deletes := 0, 0
+	var cds, cdnskey []dns.RR
 	for _, server := range view {
 		if !server.asked {
 			continue
@@ -11091,20 +11050,16 @@ func DNSSEC24(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 		if server.cdnskeyOK {
 			apex[dns.TypeCDNSKEY] = append(apex[dns.TypeCDNSKEY], server.cdnskey)
 		}
-		for _, rr := range append(slices.Clone(server.cds), server.cdnskey...) {
-			records++
-			if ds24IsDelete(rr) {
-				deletes++
-			}
-		}
+		cds = append(cds, server.cds...)
+		cdnskey = append(cdnskey, server.cdnskey...)
 	}
-	if records == 0 {
+	if len(cds)+len(cdnskey) == 0 {
 		if err := appendLog(ctx, &results, testcase, "DS24_NO_CDS_CDNSKEY", map[string]any{}); err != nil {
 			return results, err
 		}
 		return end()
 	}
-	if deletes == records {
+	if !dsboot.RequestsDS(cds, cdnskey) {
 		if err := appendLog(ctx, &results, testcase, "DS24_DELETE_REQUESTED", map[string]any{}); err != nil {
 			return results, err
 		}
@@ -11122,18 +11077,13 @@ func DNSSEC24(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	if err != nil {
 		return results, err
 	}
-	var all, hosts []string
+	var all []string
 	for _, name := range nsNames {
-		host := name.StringLower()
-		if slices.Contains(all, host) {
-			continue
-		}
-		all = append(all, host)
-		if !z.Name.IsInBailiwick(name) {
-			hosts = append(hosts, host)
+		if host := name.StringLower(); !slices.Contains(all, host) {
+			all = append(all, host)
 		}
 	}
-	slices.Sort(hosts)
+	hosts := dsboot.SignalingHosts(z.Name, nsNames)
 	if len(hosts) == 0 {
 		args := map[string]any{}
 		setTypedServersFromNames(args, all)
@@ -11148,11 +11098,11 @@ func DNSSEC24(ctx context.Context, z *zone.Zone) ([]*logger.Entry, error) {
 	signaled := false
 	var absent []ds24Domain
 	for _, host := range hosts {
-		name, ok := ds24SignalName(z.Name, dnsname.New(host))
-		domain := ds24Domain{host: host, name: name.String(), tooLong: !ok}
+		name, ok := dsboot.SignalName(z.Name, host)
+		domain := ds24Domain{host: host.String(), name: name.String(), tooLong: !ok}
 		if ok {
 			domain = walker.evaluate(ctx, name, apex)
-			domain.host = host
+			domain.host = host.String()
 		}
 		ready = ready && domain.validated
 		signaled = signaled || domain.signaled

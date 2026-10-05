@@ -7,6 +7,7 @@ All notable changes to all gonemaster components will be documented in this file
 ### Added
 
 - tools: `make anchors-check` verifies the root trust anchors in `engine/dnssecutil` against IANA's signed `root-anchors.xml`
+- tools: `make spec-check` fails when a spec severity level is missing from or differs from `share/profile.json`
 
 ### Changed
 

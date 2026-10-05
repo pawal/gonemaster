@@ -37,10 +37,12 @@ func (v *validationState) addWarning(format string, args ...any) {
 func main() {
 	var (
 		specsRoot      string
+		profilePath    string
 		scanAppendLogs bool
 	)
 
 	flag.StringVar(&specsRoot, "specs-root", "docs/specifications/tests", "Path to canonical testcase specifications")
+	flag.StringVar(&profilePath, "profile", "share/profile.json", "Path to profile.json")
 	flag.BoolVar(&scanAppendLogs, "scan-append-log", false, "Scan append*Log tag literals and report tags missing from metadata")
 	flag.Parse()
 
@@ -50,6 +52,11 @@ func main() {
 		os.Exit(1)
 	}
 	knownTagsByModule := specdata.KnownTagsByModule()
+	testLevels, err := specdata.TestLevels(profilePath)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "load profile levels: %v\n", err)
+		os.Exit(1)
+	}
 
 	state := &validationState{}
 
@@ -129,6 +136,15 @@ func main() {
 			if !emittedTags[tag] {
 				state.addError("metadata tag missing from canonical spec %s: %s", filePath, tag)
 			}
+		}
+
+		specLevels, err := parseSeverityLevels(filePath)
+		if err != nil {
+			state.addError("parse severity levels in %s: %v", filePath, err)
+			continue
+		}
+		for _, line := range severityMismatches(filePath, module, specLevels, testLevels) {
+			state.addError("%s", line)
 		}
 	}
 
@@ -211,13 +227,61 @@ func testcaseKey(module string, testcase string) string {
 }
 
 func parseEmittedTags(path string) (map[string]bool, error) {
+	rows, err := tableRows(path, "## emitted tags")
+	if err != nil {
+		return nil, err
+	}
+	tags := map[string]bool{}
+	for _, cells := range rows {
+		if tag := normalizeTagCell(cells[0]); tag != "" {
+			tags[tag] = true
+		}
+	}
+	return tags, nil
+}
+
+// parseSeverityLevels returns the level per tag from the severity table.
+func parseSeverityLevels(path string) (map[string]string, error) {
+	rows, err := tableRows(path, "## severity levels per tag")
+	if err != nil {
+		return nil, err
+	}
+	levels := map[string]string{}
+	for _, cells := range rows {
+		tag := normalizeTagCell(cells[0])
+		if tag == "" || len(cells) < 2 {
+			continue
+		}
+		levels[tag] = strings.ToUpper(strings.Trim(cells[1], "` "))
+	}
+	return levels, nil
+}
+
+// severityMismatches lists spec levels absent from or unequal to the profile.
+func severityMismatches(path string, module string, specLevels map[string]string, testLevels map[string]map[string]string) []string {
+	section := strings.ToUpper(module)
+	var out []string
+	for _, tag := range slices.Sorted(maps.Keys(specLevels)) {
+		want, ok := testLevels[section][tag]
+		switch {
+		case !ok:
+			out = append(out, fmt.Sprintf("severity level missing from share/profile.json test_levels.%s: %s (%s)", section, tag, path))
+		case !strings.EqualFold(want, specLevels[tag]):
+			out = append(out, fmt.Sprintf("severity level mismatch in %s: %s is %s, share/profile.json has %s", path, tag, specLevels[tag], strings.ToUpper(want)))
+		}
+	}
+	return out
+}
+
+// tableRows returns the trimmed cells of each table row under the heading.
+func tableRows(path string, heading string) ([][]string, error) {
 	file, err := os.Open(path)
 	if err != nil {
 		return nil, err
 	}
 	defer file.Close()
 
-	tags := map[string]bool{}
+	var rows [][]string
 	inSection := false
 
 	scanner := bufio.NewScanner(file)
@@ -225,7 +289,7 @@ func parseEmittedTags(path string) (map[string]bool, error) {
 		line := strings.TrimSpace(scanner.Text())
 
 		if strings.HasPrefix(line, "## ") {
-			if strings.HasPrefix(strings.ToLower(line), "## emitted tags") {
+			if strings.HasPrefix(strings.ToLower(line), heading) {
 				inSection = true
 				continue
 			}
@@ -239,28 +303,24 @@ func parseEmittedTags(path string) (map[string]bool, error) {
 			continue
 		}
 
-		parts := strings.Split(line, "|")
-		if len(parts) < 3 {
+		parts := strings.Split(strings.TrimSuffix(line, "|"), "|")
+		if len(parts) < 2 {
 			continue
 		}
-
-		cell := strings.TrimSpace(parts[1])
-		if cell == "" || strings.HasPrefix(cell, "---") {
+		cells := make([]string, 0, len(parts)-1)
+		for _, part := range parts[1:] {
+			cells = append(cells, strings.TrimSpace(part))
+		}
+		if cells[0] == "" || strings.HasPrefix(cells[0], "---") {
 			continue
 		}
-
-		tag := normalizeTagCell(cell)
-		if tag == "" {
-			continue
-		}
-		tags[tag] = true
+		rows = append(rows, cells)
 	}
 
 	if err := scanner.Err(); err != nil {
 		return nil, err
 	}
-
-	return tags, nil
+	return rows, nil
 }
 
 func normalizeTagCell(cell string) string {

@@ -2,6 +2,7 @@ package specdata
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -108,6 +109,21 @@ func readSpecPurpose(path string) (string, error) {
 		}
 	}
 	return "", fmt.Errorf("no Purpose bullet in %s", path)
+}
+
+// TestLevels returns test_levels from a profile file, keyed by module and tag.
+func TestLevels(path string) (map[string]map[string]string, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+	var p struct {
+		TestLevels map[string]map[string]string `json:"test_levels"`
+	}
+	if err := json.Unmarshal(data, &p); err != nil {
+		return nil, err
+	}
+	return p.TestLevels, nil
 }
 
 func normalizeTags(input map[string][]string) map[string][]string {

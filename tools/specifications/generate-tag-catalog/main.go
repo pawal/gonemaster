@@ -13,7 +13,6 @@ package main
 import (
 	"bufio"
 	"bytes"
-	"encoding/json"
 	"flag"
 	"fmt"
 	"maps"
@@ -68,10 +67,6 @@ var moduleMetadataSource = map[string]string{
 	"zone":         "engine/test/zone/zone.go",
 }
 
-type profile struct {
-	TestLevels map[string]map[string]string `json:"test_levels"`
-}
-
 func main() {
 	var (
 		outputDir   string
@@ -87,7 +82,7 @@ func main() {
 
 	modules := specdata.KnownTagsByModule()
 
-	prof, err := loadProfile(profilePath)
+	levels, err := specdata.TestLevels(profilePath)
 	if err != nil {
 		fatalf("load profile: %v", err)
 	}
@@ -105,7 +100,7 @@ func main() {
 		}
 
 		displayName := moduleDisplayName[moduleName]
-		moduleLevels := prof.TestLevels[displayName]
+		moduleLevels := levels[displayName]
 
 		content := generateCatalog(moduleName, displayName, testcaseMap, moduleLevels, i18nCoverage)
 		outPath := filepath.Join(outputDir, moduleName+".md")
@@ -250,19 +245,6 @@ func testcaseLinksInline(moduleName string, testcases []string) string {
 		parts = append(parts, link)
 	}
 	return strings.Join(parts, ", ")
-}
-
-// loadProfile reads and unmarshals share/profile.json.
-func loadProfile(path string) (*profile, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, err
-	}
-	var p profile
-	if err := json.Unmarshal(data, &p); err != nil {
-		return nil, err
-	}
-	return &p, nil
 }
 
 // loadI18nCoverage scans all *.po files in dir and returns a set of

@@ -2,16 +2,18 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.19] - 2026-10-05
+
+More passing checks report at INFO, and package `dsboot` exports the RFC 9615 signaling helpers of dnssec24.
 
 ### Added
 
-- engine: package `dsboot` exports the RFC 9615 signaling name and the CDS and CDNSKEY tests of dnssec24
+- engine: package `dsboot` exports the RFC 9615 signaling helpers of dnssec24
 
 ### Changed
 
-- nameserver10, nameserver11, nameserver12, nameserver13: passing servers yield `N10_EDNS_VERSION_OK`, `N11_UNKNOWN_OPTION_OK`, `Z_FLAGS_CLEAR` and `N13_EDNS_RESPONSE_OK` at INFO
-- zone08: an exchange without an authoritative answer from the zone yields `MX_RECORD_NOT_CHECKED` at INFO
+- nameserver10, nameserver11, nameserver12, nameserver13: passing servers are reported at INFO
+- zone08: `MX_RECORD_NOT_CHECKED` at INFO for an exchange the zone cannot answer for
 - nameserver05: `AAAA_WELL_PROCESSED` also covers a zone without apex AAAA records
 - zone01, dnssec24: `Z01_MNAME_IS_MASTER`, `DS24_DELEGATION_SECURE`, `DS24_NO_CDS_CDNSKEY` and `DS24_DELETE_REQUESTED` are INFO
 
@@ -19,9 +21,9 @@ All notable changes to all gonemaster components will be documented in this file
 
 - nameserver02: a nameserver without a response no longer suppresses `EDNS0_SUPPORT`
 - nameserver03: a transfer that ends without a record is an `AXFR_FAILURE`
-- dnssec14: `KEY_SIZE_OK` is emitted when no key finding fires; it was unreachable
-- zone05, zone10: transport tags and an unresponsive server no longer suppress `EXPIRE_MINIMUM_VALUE_OK` and `ONE_SOA`
-- syntax07: MNAME findings carry their profile level instead of DEBUG; a malformed MNAME now lowers the score
+- dnssec14: `KEY_SIZE_OK` is emitted when no key finding fires
+- zone05, zone10: transport failures no longer suppress `EXPIRE_MINIMUM_VALUE_OK` and `ONE_SOA`
+- syntax07: MNAME findings carry their profile level and count in the score
 - ui-public: dnssec22, dnssec23 and dnssec24 show their titles instead of the testcase id
 - ui-public: dnssec23 overlap explanations describe cached false NXDOMAIN
 

@@ -350,6 +350,26 @@ func TestNameserver03AXFRAvailable(t *testing.T) {
 	tctest.RequireTags(t, entries, "AXFR_AVAILABLE")
 }
 
+func TestNameserver03EmptyTransferIsFailure(t *testing.T) {
+	ctx := tctest.Context(t)
+
+	ns1 := tctest.NS(t, ctx, "ns1.example", "192.0.2.4", nil)
+	ns1.SetAXFRHook(func(_ context.Context, _ string, _ func(dns.RR) bool, _ string) error {
+		return nil
+	})
+	tctest.Stub(t, &authoritativeNS, func(_ context.Context, _ *zone.Zone) ([]ens.Nameserver, error) {
+		return []ens.Nameserver{ns1}, nil
+	})
+
+	z := zone.Zone{Name: dnsname.New("example")}
+	entries, err := Nameserver03(ctx, &z)
+	if err != nil {
+		t.Fatalf("nameserver03: %v", err)
+	}
+	tctest.RequireTags(t, entries, "AXFR_FAILURE")
+	tctest.RequireNoTag(t, entries, "AXFR_AVAILABLE")
+}
+
 func TestNameserver03BlockedAddressYieldsNoFinding(t *testing.T) {
 	ctx := tctest.Context(t)
 	ns1 := tctest.NS(t, ctx, "ns1.example", "127.0.0.1", nil) // no AXFR hook

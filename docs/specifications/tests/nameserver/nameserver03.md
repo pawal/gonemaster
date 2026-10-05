@@ -23,7 +23,7 @@ Status: Final
    - If transport is disabled, emit `IPV4_DISABLED` or `IPV6_DISABLED` for rrtype `AXFR`, then skip.
    - Attempt AXFR for zone name. The nameserver layer MUST NOT connect to an address that is not globally reachable unless `net.allow_non_global_targets` is `true` or the operator supplied the address; it logs `NON_GLOBAL_QUERY_BLOCKED` and returns no RR and no error.
    - Capture first RR returned by AXFR callback and stop callback immediately.
-   - If AXFR call returns an error, record server as AXFR failure.
+   - If AXFR call returns an error, or the transfer ends without delivering a record, record server as AXFR failure.
    - Else if first RR is an `SOA`, record server as AXFR available.
    - Else (AXFR succeeded but first RR is not `SOA`): no record for this nameserver.
 4. After all parallel tasks, emit a single consolidated `AXFR_FAILURE` with `servers` list (if any), and a single consolidated `AXFR_AVAILABLE` with `servers` list (if any).
@@ -41,6 +41,7 @@ For each nameserver (parallel; fan-out = resolver.defaults.parallel):
    attempt AXFR for z.Name (callback captures first RR then stops)
     +- address blocked as non-global          -> (no finding)
     +- AXFR call returns error                -> axfrFailure[ns]
+    +- transfer ends without a record         -> axfrFailure[ns]
     +- first RR is *dns.SOA                   -> axfrAvailable[ns]
     +- first RR not SOA                       -> (no finding)
 
@@ -56,7 +57,7 @@ emit TEST_CASE_END
 | Tag | Emitted when |
 | --- | --- |
 | `AXFR_AVAILABLE` | AXFR succeeded and the first transfer RR was `SOA`. |
-| `AXFR_FAILURE` | AXFR call returned an error. |
+| `AXFR_FAILURE` | AXFR call returned an error, or the transfer ended without a record. |
 | `IPV4_DISABLED` | IPv4 nameserver evaluation is skipped because IPv4 is disabled. |
 | `IPV6_DISABLED` | IPv6 nameserver evaluation is skipped because IPv6 is disabled. |
 | `TEST_CASE_END` | Testcase completion marker is emitted. |

@@ -17,6 +17,9 @@ import (
 // errCachedAXFRFailure marks a restored no-transfer entry as a failure.
 var errCachedAXFRFailure = errors.New("cached AXFR failure")
 
+// errEmptyTransfer marks a transfer that ended without a record.
+var errEmptyTransfer = errors.New("AXFR ended without records")
+
 // AXFR performs a zone transfer and streams RRs to the callback. A per-run cache,
 // when present, is consulted first and the streamed result recorded on a miss.
 func (ns Nameserver) AXFR(ctx context.Context, domain string, callback func(dns.RR) bool, class string) error {
@@ -60,6 +63,9 @@ func (ns Nameserver) AXFR(ctx context.Context, domain string, callback func(dns.
 	}
 
 	err := ns.transferIn(ctx, domain, class, recording, prof)
+	if err == nil && len(collected) == 0 {
+		err = errEmptyTransfer
+	}
 
 	if store != nil {
 		switch {

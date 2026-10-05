@@ -1113,5 +1113,13 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Bootstrapping proof unreachable",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "The nameservers of a zone on the path to your DNS operator's bootstrapping proof gave no usable answer, so a parent cannot retrieve the proof. One cause is a nameserver that is listed for the zone but does not serve it.",
   "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX target not checked for an alias",
-  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "One of your MX records points at a hostname that none of your nameservers answers for authoritatively, which is the case when another provider hosts your mail. This check reads only the answers of your own nameservers, so it cannot tell whether that hostname is an alias (CNAME). RFC 2181 section 10.3 forbids an alias as an MX target; the zone that holds the hostname must comply."
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "One of your MX records points at a hostname that none of your nameservers answers for authoritatively, which is the case when another provider hosts your mail. This check reads only the answers of your own nameservers, so it cannot tell whether that hostname is an alias (CNAME). RFC 2181 section 10.3 forbids an alias as an MX target; the zone that holds the hostname must comply.",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.header": "EDNS Z flags cleared",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.desc": "Your nameservers answer a query with unassigned EDNS Z bits set and leave those bits clear in the response, as RFC 6891 section 6.1.4 requires. A resolver can therefore trust the flags it reads in an answer.",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.header": "EDNS version handled",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.desc": "Your nameservers answer a query with an EDNS version they do not implement with the BADVERS error and the version they do implement, as RFC 6891 section 6.1.3 requires. A resolver reads that answer to fall back to a version the server understands.",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.header": "Unknown EDNS option ignored",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.desc": "Your nameservers ignore an EDNS option they do not understand and answer the query normally, as RFC 6891 section 6.1.2 requires. A new EDNS option can therefore be deployed without breaking resolution of your zone.",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.header": "Small EDNS buffer handled",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.desc": "Your nameservers answer a DNSSEC query that allows only 512 bytes of payload without errors, and a truncated answer keeps its EDNS record. A resolver therefore knows to retry the query over TCP with EDNS."
 }

@@ -158,6 +158,14 @@ Description:
 
 A nameserver returned an EDNS response with reserved Z bits set instead of zero. RFC 6891 requires a sender to clear those bits, and each one that is assigned later carries a real meaning, so a resolver implementing a newer EDNS flag can read the stray bits as a capability the server does not actually have.
 
+## Tag Z_FLAGS_CLEAR
+
+Header: EDNS Z flags cleared
+
+Description:
+
+Your nameservers answer a query with unassigned EDNS Z bits set and leave those bits clear in the response, as RFC 6891 section 6.1.4 requires. A resolver can therefore trust the flags it reads in an answer.
+
 ## Tag DIFFERENT_SOURCE_IP
 
 Header: Reply came from a different IP
@@ -286,6 +294,14 @@ Description:
 
 A nameserver returned a response code to an EDNS version 1 query that is not the one the standard requires. This indicates a broken EDNS implementation and will affect how modern resolvers decide what capabilities to use when contacting the server.
 
+## Tag N10_EDNS_VERSION_OK
+
+Header: EDNS version handled
+
+Description:
+
+Your nameservers answer a query with an EDNS version they do not implement with the BADVERS error and the version they do implement, as RFC 6891 section 6.1.3 requires. A resolver reads that answer to fall back to a version the server understands.
+
 ## Tag N11_NO_EDNS
 
 Header: EDNS support disappears with unknown option
@@ -334,6 +350,14 @@ Description:
 
 A nameserver forgot to set the "authoritative answer" flag when the query included an unknown EDNS option, though its answer should otherwise have been authoritative. Resolvers rely on this flag to know the data can be trusted; without it, they may discard the response.
 
+## Tag N11_UNKNOWN_OPTION_OK
+
+Header: Unknown EDNS option ignored
+
+Description:
+
+Your nameservers ignore an EDNS option they do not understand and answer the query normally, as RFC 6891 section 6.1.2 requires. A new EDNS option can therefore be deployed without breaking resolution of your zone.
+
 ## Tag MISSING_OPT_IN_TRUNCATED
 
 Header: Truncated reply missing OPT record
@@ -341,6 +365,14 @@ Header: Truncated reply missing OPT record
 Description:
 
 A nameserver sent a truncated response but left out the EDNS OPT record the standard requires. Without it, the resolver cannot confirm that the server still supports EDNS and may not know whether to retry over TCP, which causes timeouts and stalled lookups.
+
+## Tag N13_EDNS_RESPONSE_OK
+
+Header: Small EDNS buffer handled
+
+Description:
+
+Your nameservers answer a DNSSEC query that allows only 512 bytes of payload without errors, and a truncated answer keeps its EDNS record. A resolver therefore knows to retry the query over TCP with EDNS.
 
 ## Tag N15_SOFTWARE_VERSION
 

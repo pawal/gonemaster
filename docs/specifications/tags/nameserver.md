@@ -37,7 +37,7 @@ _Do not edit by hand - regenerate with the command above._
 | `IS_A_RECURSOR` | `ERROR` | [nameserver01](../tests/nameserver/nameserver01.md) | yes |
 | `MISSING_OPT_IN_TRUNCATED` | `WARNING` | [nameserver13](../tests/nameserver/nameserver13.md) | yes |
 | `N10_EDNS_RESPONSE_ERROR` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | yes |
-| `N10_EDNS_VERSION_OK` | `INFO` | [nameserver10](../tests/nameserver/nameserver10.md) | **no** |
+| `N10_EDNS_VERSION_OK` | `INFO` | [nameserver10](../tests/nameserver/nameserver10.md) | yes |
 | `N10_NO_RESPONSE_EDNS1_QUERY` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | yes |
 | `N10_UNEXPECTED_RCODE` | `WARNING` | [nameserver10](../tests/nameserver/nameserver10.md) | yes |
 | `N11_NO_EDNS` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
@@ -45,9 +45,9 @@ _Do not edit by hand - regenerate with the command above._
 | `N11_RETURNS_UNKNOWN_OPTION_CODE` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
 | `N11_UNEXPECTED_ANSWER_SECTION` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
 | `N11_UNEXPECTED_RCODE` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
-| `N11_UNKNOWN_OPTION_OK` | `INFO` | [nameserver11](../tests/nameserver/nameserver11.md) | **no** |
+| `N11_UNKNOWN_OPTION_OK` | `INFO` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
 | `N11_UNSET_AA` | `WARNING` | [nameserver11](../tests/nameserver/nameserver11.md) | yes |
-| `N13_EDNS_RESPONSE_OK` | `INFO` | [nameserver13](../tests/nameserver/nameserver13.md) | **no** |
+| `N13_EDNS_RESPONSE_OK` | `INFO` | [nameserver13](../tests/nameserver/nameserver13.md) | yes |
 | `N15_ERROR_ON_VERSION_QUERY` | `NOTICE` | [nameserver15](../tests/nameserver/nameserver15.md) | yes |
 | `N15_NO_VERSION_REVEALED` | `INFO` | [nameserver15](../tests/nameserver/nameserver15.md) | yes |
 | `N15_SOFTWARE_VERSION` | `NOTICE` | [nameserver15](../tests/nameserver/nameserver15.md) | yes |
@@ -83,18 +83,9 @@ _Do not edit by hand - regenerate with the command above._
 | `TEST_CASE_START` | `DEBUG` | [nameserver01](../tests/nameserver/nameserver01.md), [nameserver02](../tests/nameserver/nameserver02.md), [nameserver03](../tests/nameserver/nameserver03.md), [nameserver04](../tests/nameserver/nameserver04.md), [nameserver05](../tests/nameserver/nameserver05.md), [nameserver06](../tests/nameserver/nameserver06.md), [nameserver07](../tests/nameserver/nameserver07.md), [nameserver08](../tests/nameserver/nameserver08.md), [nameserver09](../tests/nameserver/nameserver09.md), [nameserver10](../tests/nameserver/nameserver10.md), [nameserver11](../tests/nameserver/nameserver11.md), [nameserver12](../tests/nameserver/nameserver12.md), [nameserver13](../tests/nameserver/nameserver13.md), [nameserver15](../tests/nameserver/nameserver15.md), [nameserver16](../tests/nameserver/nameserver16.md), [nameserver17](../tests/nameserver/nameserver17.md), [nameserver18](../tests/nameserver/nameserver18.md) | yes |
 | `UPWARD_REFERRAL` | `WARNING` | [nameserver07](../tests/nameserver/nameserver07.md) | yes |
 | `UPWARD_REFERRAL_IRRELEVANT` | `INFO` | [nameserver07](../tests/nameserver/nameserver07.md) | yes |
-| `Z_FLAGS_CLEAR` | `INFO` | [nameserver12](../tests/nameserver/nameserver12.md) | **no** |
+| `Z_FLAGS_CLEAR` | `INFO` | [nameserver12](../tests/nameserver/nameserver12.md) | yes |
 | `Z_FLAGS_NOTCLEAR` | `WARNING` | [nameserver12](../tests/nameserver/nameserver12.md) | yes |
 
 ## i18n Notes
 
-### Tags Missing From Locale Files
-
-These tags have no `NAMESERVER:<TAG>` `msgctxt` entry in any `.po` file.
-They will render as the raw tag name in translated output.
-
-- `N10_EDNS_VERSION_OK`
-- `N11_UNKNOWN_OPTION_OK`
-- `N13_EDNS_RESPONSE_OK`
-- `Z_FLAGS_CLEAR`
-
+All tags have i18n coverage and no stale entries found.

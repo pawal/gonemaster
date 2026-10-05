@@ -1113,5 +1113,13 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "ブートストラップ証明に到達できない",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "DNS運用者のブートストラップ証明までの経路にあるゾーンのネームサーバーが有効な応答を返さなかったため、親ゾーンは証明を取得できません。原因の一つは、ゾーンのネームサーバーとして登録されているのに、そのゾーンを提供していないネームサーバーです。",
   "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MXターゲットのエイリアス確認は未実施",
-  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "お客様のMXレコードの1つが、お客様のどのネームサーバーも権威応答を返さないホスト名を指しています。これは別のプロバイダーがメールを運用している場合に該当します。このチェックはお客様自身のネームサーバーの応答だけを読むため、そのホスト名がエイリアス（CNAME）かどうかを判断できません。RFC 2181 セクション10.3 はMXのターゲットにエイリアスを使うことを禁止しており、そのホスト名を含むゾーンがこれに従う必要があります。"
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "お客様のMXレコードの1つが、お客様のどのネームサーバーも権威応答を返さないホスト名を指しています。これは別のプロバイダーがメールを運用している場合に該当します。このチェックはお客様自身のネームサーバーの応答だけを読むため、そのホスト名がエイリアス（CNAME）かどうかを判断できません。RFC 2181 セクション10.3 はMXのターゲットにエイリアスを使うことを禁止しており、そのホスト名を含むゾーンがこれに従う必要があります。",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.header": "EDNSのZフラグがクリアされている",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.desc": "お客様のネームサーバーは、未割り当てのEDNS Zビットを立てたクエリに対し、RFC 6891 セクション6.1.4 が求めるとおり、応答ではそれらのビットをクリアしたままにします。そのため、リゾルバーは応答から読み取ったフラグを信頼できます。",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.header": "EDNSバージョンが正しく処理された",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.desc": "お客様のネームサーバーは、実装していないEDNSバージョンを使うクエリに対し、RFC 6891 セクション6.1.3 が求めるとおり、BADVERSエラーと実装しているバージョンで応答します。リゾルバーはこの応答を読んで、サーバーが理解できるバージョンに切り替えます。",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.header": "不明なEDNSオプションが無視された",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.desc": "お客様のネームサーバーは、RFC 6891 セクション6.1.2 が求めるとおり、理解できないEDNSオプションを無視してクエリに通常どおり応答します。そのため、新しいEDNSオプションを導入してもゾーンの名前解決が壊れることはありません。",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.header": "小さなEDNSバッファが正しく処理された",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.desc": "お客様のネームサーバーは、ペイロードを512バイトまでしか許さないDNSSECクエリにエラーなく応答し、切り詰められた応答でもEDNSレコードを保持します。そのため、リゾルバーはEDNS付きのTCPでクエリを再試行すべきことがわかります。"
 }

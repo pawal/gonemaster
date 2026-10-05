@@ -1113,5 +1113,13 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Bootstrapbewijs onbereikbaar",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "De naamservers van een zone op het pad naar het bootstrapbewijs van uw DNS-operator gaven geen bruikbaar antwoord, dus een bovenliggende zone kan het bewijs niet ophalen. Een oorzaak is een naamserver die voor de zone vermeld staat maar haar niet bedient.",
   "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX-doel niet gecontroleerd op alias",
-  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Een van uw MX-records verwijst naar een hostnaam waarvoor geen van uw naamservers autoritatief antwoordt; dat is het geval wanneer een andere aanbieder uw e-mail verzorgt. Deze controle leest alleen de antwoorden van uw eigen naamservers en kan dus niet vaststellen of die hostnaam een alias (CNAME) is. RFC 2181 sectie 10.3 verbiedt een alias als MX-doel; de zone die de hostnaam bevat, moet zich daaraan houden."
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Een van uw MX-records verwijst naar een hostnaam waarvoor geen van uw naamservers autoritatief antwoordt; dat is het geval wanneer een andere aanbieder uw e-mail verzorgt. Deze controle leest alleen de antwoorden van uw eigen naamservers en kan dus niet vaststellen of die hostnaam een alias (CNAME) is. RFC 2181 sectie 10.3 verbiedt een alias als MX-doel; de zone die de hostnaam bevat, moet zich daaraan houden.",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.header": "EDNS Z-vlaggen gewist",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.desc": "Uw naamservers beantwoorden een query met niet-toegewezen EDNS Z-bits gezet en laten die bits in het antwoord gewist, zoals RFC 6891 sectie 6.1.4 vereist. Een resolver kan daardoor vertrouwen op de vlaggen die hij in een antwoord leest.",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.header": "EDNS-versie correct afgehandeld",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.desc": "Uw naamservers beantwoorden een query met een EDNS-versie die ze niet implementeren met de fout BADVERS en de versie die ze wel implementeren, zoals RFC 6891 sectie 6.1.3 vereist. Een resolver leest dat antwoord om terug te vallen op een versie die de server begrijpt.",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.header": "Onbekende EDNS-optie genegeerd",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.desc": "Uw naamservers negeren een EDNS-optie die ze niet begrijpen en beantwoorden de query normaal, zoals RFC 6891 sectie 6.1.2 vereist. Een nieuwe EDNS-optie kan daardoor worden ingevoerd zonder de resolutie van uw zone te verstoren.",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.header": "Kleine EDNS-buffer correct afgehandeld",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.desc": "Uw naamservers beantwoorden zonder fouten een DNSSEC-query die slechts 512 bytes payload toestaat, en een afgekapt antwoord behoudt zijn EDNS-record. Een resolver weet daardoor dat hij de query via TCP met EDNS moet herhalen."
 }

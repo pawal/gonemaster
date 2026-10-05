@@ -1113,5 +1113,13 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Zaváděcí důkaz je nedostupný",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Jmenné servery zóny na cestě k zaváděcímu důkazu vašeho provozovatele DNS nedaly žádnou použitelnou odpověď, takže nadřazená zóna nemůže důkaz získat. Jednou z příčin je jmenný server, který je pro zónu uveden, ale neobsluhuje ji.",
   "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "Cíl MX nebyl ověřen na alias",
-  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Jeden z vašich záznamů MX odkazuje na hostname, pro který žádný z vašich jmenných serverů neodpovídá autoritativně; tak je tomu, když vaši poštu provozuje jiný poskytovatel. Tato kontrola čte pouze odpovědi vašich vlastních jmenných serverů, a proto nemůže zjistit, zda je tento hostname alias (CNAME). RFC 2181 část 10.3 zakazuje alias jako cíl MX; požadavek musí splnit zóna, která tento hostname obsahuje."
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Jeden z vašich záznamů MX odkazuje na hostname, pro který žádný z vašich jmenných serverů neodpovídá autoritativně; tak je tomu, když vaši poštu provozuje jiný poskytovatel. Tato kontrola čte pouze odpovědi vašich vlastních jmenných serverů, a proto nemůže zjistit, zda je tento hostname alias (CNAME). RFC 2181 část 10.3 zakazuje alias jako cíl MX; požadavek musí splnit zóna, která tento hostname obsahuje.",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.header": "Příznaky Z v EDNS jsou vynulovány",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.desc": "Vaše jmenné servery odpovídají na dotaz s nastavenými nepřidělenými bity EDNS Z a v odpovědi tyto bity ponechávají vynulované, jak vyžaduje RFC 6891 část 6.1.4. Resolver proto může věřit příznakům, které v odpovědi přečte.",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.header": "Verze EDNS zpracována správně",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.desc": "Vaše jmenné servery odpovídají na dotaz s verzí EDNS, kterou neimplementují, chybou BADVERS a verzí, kterou implementují, jak vyžaduje RFC 6891 část 6.1.3. Resolver podle této odpovědi přejde na verzi, které server rozumí.",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.header": "Neznámá volba EDNS ignorována",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.desc": "Vaše jmenné servery ignorují volbu EDNS, které nerozumějí, a na dotaz odpovídají běžně, jak vyžaduje RFC 6891 část 6.1.2. Novou volbu EDNS lze proto nasadit, aniž by se narušil překlad vaší zóny.",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.header": "Malá vyrovnávací paměť EDNS zpracována",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.desc": "Vaše jmenné servery odpovídají bez chyb na dotaz DNSSEC, který povoluje jen 512 bajtů payloadu, a zkrácená odpověď si ponechává svůj záznam EDNS. Resolver proto ví, že má dotaz zopakovat přes TCP s EDNS."
 }

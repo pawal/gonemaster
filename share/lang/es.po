@@ -2909,6 +2909,10 @@ msgstr ""
 "El servidor de nombres {ns}/{address} responde a una consulta EDNS con una respuesta "
 "truncada sin EDNS."
 
+msgctxt "NAMESERVER:N13_EDNS_RESPONSE_OK"
+msgid "The following nameservers answer an EDNS query with a 512 byte payload size without problems: {servers}."
+msgstr "Los siguientes servidores de nombres responden sin problemas a una consulta EDNS con un tamaño de carga útil de 512 bytes: {servers}."
+
 msgctxt "NAMESERVER:NO_EDNS_SUPPORT"
 msgid "Nameserver {ns}/{address} does not support EDNS0 (replies with FORMERR)."
 msgstr ""
@@ -2949,6 +2953,10 @@ msgstr ""
 "Se espera un RCODE pero se recibe una respuesta errónea a una consulta con "
 "EDNS versión 1. Obtenido de los servidores de nombres con direcciones IP "
 "\"{addresses}\"."
+
+msgctxt "NAMESERVER:N10_EDNS_VERSION_OK"
+msgid "Nameservers with IP addresses \"{addresses}\" answer a query with EDNS version 1 with BADVERS and EDNS version 0."
+msgstr "Los servidores de nombres con direcciones IP \"{addresses}\" responden a una consulta con EDNS versión 1 con BADVERS y EDNS versión 0."
 
 msgctxt "NAMESERVER:N10_NO_RESPONSE_EDNS1_QUERY"
 msgid ""
@@ -2991,6 +2999,10 @@ msgid ""
 msgstr ""
 "La respuesta DNS contiene un código de opción EDNS desconocido. Obtenido de "
 "los servidores de nombres \"{addresses}\"."
+
+msgctxt "NAMESERVER:N11_UNKNOWN_OPTION_OK"
+msgid "Nameservers with IP addresses \"{addresses}\" ignore an unknown EDNS option-code."
+msgstr "Los servidores de nombres con direcciones IP \"{addresses}\" ignoran un código de opción EDNS desconocido."
 
 msgctxt "NAMESERVER:N11_UNEXPECTED_ANSWER_SECTION"
 msgid ""
@@ -3179,6 +3191,10 @@ msgid "Nameserver {ns}/{address} has one or more unknown EDNS Z flag bits set."
 msgstr ""
 "El servidor de nombres {ns}/{address} tiene encendidos uno o más flags \"Z\" "
 "desconocidos en EDNS."
+
+msgctxt "NAMESERVER:Z_FLAGS_CLEAR"
+msgid "The following nameservers clear the unknown EDNS Z flag bits in their responses: {servers}."
+msgstr "Los siguientes servidores de nombres ponen a cero los flags \"Z\" desconocidos de EDNS en sus respuestas: {servers}."
 
 msgctxt "SYNTAX:DISCOURAGED_DOUBLE_DASH"
 msgid ""

@@ -1113,5 +1113,13 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Dokaz za zagon ni dosegljiv",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Imenski strežniki cone na poti do dokaza za zagon vašega operaterja DNS niso dali uporabnega odgovora, zato nadrejena cona dokaza ne more pridobiti. Eden od vzrokov je imenski strežnik, ki je naveden za cono, vendar je ne streže.",
   "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "Cilj MX ni preverjen glede aliasa",
-  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Eden od vaših zapisov MX kaže na ime gostitelja, za katerega noben od vaših imenskih strežnikov ne odgovarja avtoritativno; tako je, kadar vašo pošto upravlja drug ponudnik. Ta preverba bere samo odgovore vaših lastnih imenskih strežnikov, zato ne more ugotoviti, ali je to ime gostitelja alias (CNAME). RFC 2181 razdelek 10.3 prepoveduje alias kot cilj MX; cona, ki vsebuje ime gostitelja, mora to upoštevati."
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Eden od vaših zapisov MX kaže na ime gostitelja, za katerega noben od vaših imenskih strežnikov ne odgovarja avtoritativno; tako je, kadar vašo pošto upravlja drug ponudnik. Ta preverba bere samo odgovore vaših lastnih imenskih strežnikov, zato ne more ugotoviti, ali je to ime gostitelja alias (CNAME). RFC 2181 razdelek 10.3 prepoveduje alias kot cilj MX; cona, ki vsebuje ime gostitelja, mora to upoštevati.",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.header": "Zastavice Z v EDNS so ponastavljene",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.desc": "Vaši imenski strežniki na poizvedbo z nastavljenimi nedodeljenimi biti EDNS Z odgovorijo s temi biti, ponastavljenimi na nič, kot zahteva RFC 6891 razdelek 6.1.4. Razreševalnik zato lahko zaupa zastavicam, ki jih prebere v odgovoru.",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.header": "Različica EDNS pravilno obravnavana",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.desc": "Vaši imenski strežniki na poizvedbo z različico EDNS, ki je ne izvajajo, odgovorijo z napako BADVERS in različico, ki jo izvajajo, kot zahteva RFC 6891 razdelek 6.1.3. Razreševalnik iz tega odgovora preide na različico, ki jo strežnik razume.",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.header": "Neznana možnost EDNS prezrta",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.desc": "Vaši imenski strežniki prezrejo možnost EDNS, ki je ne razumejo, in na poizvedbo odgovorijo običajno, kot zahteva RFC 6891 razdelek 6.1.2. Novo možnost EDNS je zato mogoče uvesti, ne da bi to porušilo razreševanje vaše cone.",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.header": "Majhen medpomnilnik EDNS pravilno obravnavan",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.desc": "Vaši imenski strežniki brez napak odgovorijo na poizvedbo DNSSEC, ki dovoljuje le 512 bajtov payloada, okrnjen odgovor pa ohrani svoj zapis EDNS. Razreševalnik zato ve, da mora poizvedbo ponoviti prek TCP z EDNS."
 }

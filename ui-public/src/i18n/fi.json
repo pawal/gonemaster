@@ -1113,5 +1113,13 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Käynnistystodiste ei ole tavoitettavissa",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "DNS-operaattorisi käynnistystodisteeseen johtavalla polulla olevan vyöhykkeen nimipalvelimet eivät antaneet käyttökelpoista vastausta, joten ylempi vyöhyke ei voi noutaa todistetta. Yksi syy on nimipalvelin, joka on merkitty vyöhykkeelle mutta ei palvele sitä.",
   "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX-kohdetta ei tarkistettu aliaksen osalta",
-  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Yksi MX-tietueistasi osoittaa isäntänimeen, josta yksikään nimipalvelimistasi ei vastaa autoritatiivisesti; näin on, kun toinen palveluntarjoaja hoitaa sähköpostisi. Tämä tarkistus lukee vain omien nimipalvelimiesi vastaukset, joten se ei voi selvittää, onko isäntänimi alias (CNAME). RFC 2181 kohta 10.3 kieltää aliaksen MX:n kohteena; isäntänimen sisältävän vyöhykkeen on noudatettava sitä."
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "Yksi MX-tietueistasi osoittaa isäntänimeen, josta yksikään nimipalvelimistasi ei vastaa autoritatiivisesti; näin on, kun toinen palveluntarjoaja hoitaa sähköpostisi. Tämä tarkistus lukee vain omien nimipalvelimiesi vastaukset, joten se ei voi selvittää, onko isäntänimi alias (CNAME). RFC 2181 kohta 10.3 kieltää aliaksen MX:n kohteena; isäntänimen sisältävän vyöhykkeen on noudatettava sitä.",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.header": "EDNS:n Z-liput nollattu",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.desc": "Nimipalvelimesi vastaavat kyselyyn, jossa on asetettu varaamattomia EDNS Z -bittejä, ja jättävät nämä bitit nollatuiksi vastauksessa, kuten RFC 6891 kohta 6.1.4 vaatii. Resolveri voi siksi luottaa vastauksesta lukemiinsa lippuihin.",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.header": "EDNS-versio käsitelty oikein",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.desc": "Nimipalvelimesi vastaavat kyselyyn, jonka EDNS-versiota ne eivät toteuta, BADVERS-virheellä ja toteuttamallaan versiolla, kuten RFC 6891 kohta 6.1.3 vaatii. Resolveri palaa tämän vastauksen perusteella versioon, jota palvelin ymmärtää.",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.header": "Tuntematon EDNS-optio ohitettu",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.desc": "Nimipalvelimesi ohittavat EDNS-option, jota ne eivät ymmärrä, ja vastaavat kyselyyn normaalisti, kuten RFC 6891 kohta 6.1.2 vaatii. Uusi EDNS-optio voidaan siksi ottaa käyttöön rikkomatta vyöhykkeesi nimenselvitystä.",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.header": "Pieni EDNS-puskuri käsitelty",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.desc": "Nimipalvelimesi vastaavat virheittä DNSSEC-kyselyyn, joka sallii vain 512 tavun hyötykuorman, ja typistetty vastaus säilyttää EDNS-tietueensa. Resolveri tietää siksi toistaa kyselyn TCP:n kautta EDNS:n kanssa."
 }

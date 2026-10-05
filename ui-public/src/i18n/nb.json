@@ -1113,5 +1113,13 @@
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.header": "Bootstrapping-beviset kan ikke nås",
   "pub.tag.dnssec.DS24_SIGNAL_ZONE_UNREACHABLE.desc": "Navnetjenerne for en sone på veien til DNS-operatørens bootstrapping-bevis ga ikke noe brukbart svar, så en foreldresone kan ikke hente beviset. En årsak er en navnetjener som er oppført for sonen, men ikke betjener den.",
   "pub.tag.zone.MX_RECORD_NOT_CHECKED.header": "MX-mål ikke kontrollert for alias",
-  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "En av MX-postene dine peker på et vertsnavn som ingen av navnetjenerne dine svarer autoritativt for; slik er det når en annen leverandør håndterer e-posten din. Denne kontrollen leser bare svarene fra dine egne navnetjenere og kan derfor ikke avgjøre om vertsnavnet er et alias (CNAME). RFC 2181 avsnitt 10.3 forbyr et alias som MX-mål; sonen som inneholder vertsnavnet, må overholde dette."
+  "pub.tag.zone.MX_RECORD_NOT_CHECKED.desc": "En av MX-postene dine peker på et vertsnavn som ingen av navnetjenerne dine svarer autoritativt for; slik er det når en annen leverandør håndterer e-posten din. Denne kontrollen leser bare svarene fra dine egne navnetjenere og kan derfor ikke avgjøre om vertsnavnet er et alias (CNAME). RFC 2181 avsnitt 10.3 forbyr et alias som MX-mål; sonen som inneholder vertsnavnet, må overholde dette.",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.header": "EDNS Z-flagg nullstilt",
+  "pub.tag.nameserver.Z_FLAGS_CLEAR.desc": "Navnetjenerne dine svarer på en spørring med ikke-tildelte EDNS Z-bits satt og lar disse bitene være nullstilt i svaret, slik RFC 6891 avsnitt 6.1.4 krever. En resolver kan derfor stole på flaggene den leser i et svar.",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.header": "EDNS-versjon håndtert riktig",
+  "pub.tag.nameserver.N10_EDNS_VERSION_OK.desc": "Navnetjenerne dine svarer på en spørring med en EDNS-versjon de ikke implementerer, med feilen BADVERS og versjonen de implementerer, slik RFC 6891 avsnitt 6.1.3 krever. En resolver bruker svaret til å falle tilbake til en versjon tjeneren forstår.",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.header": "Ukjent EDNS-opsjon ignorert",
+  "pub.tag.nameserver.N11_UNKNOWN_OPTION_OK.desc": "Navnetjenerne dine ignorerer en EDNS-opsjon de ikke forstår, og besvarer spørringen normalt, slik RFC 6891 avsnitt 6.1.2 krever. En ny EDNS-opsjon kan derfor tas i bruk uten å bryte oppslag i sonen din.",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.header": "Liten EDNS-buffer håndtert",
+  "pub.tag.nameserver.N13_EDNS_RESPONSE_OK.desc": "Navnetjenerne dine svarer uten feil på en DNSSEC-spørring som bare tillater 512 byte payload, og et trunkert svar beholder EDNS-posten sin. En resolver vet derfor at den skal gjenta spørringen over TCP med EDNS."
 }

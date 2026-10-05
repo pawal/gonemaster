@@ -1096,6 +1096,10 @@ msgstr ""
 "RCODE を期待しましたが、EDNS version 1 クエリに対して不正な応答を受信しました。"
 "取得元ネームサーバー IP: {addresses}"
 
+msgctxt "NAMESERVER:N10_EDNS_VERSION_OK"
+msgid "Nameservers with IP addresses \"{addresses}\" answer a query with EDNS version 1 with BADVERS and EDNS version 0."
+msgstr "IP アドレス \"{addresses}\" のネームサーバーは、EDNS version 1 クエリに BADVERS と EDNS version 0 で応答します。"
+
 msgctxt "NAMESERVER:N10_NO_RESPONSE_EDNS1_QUERY"
 msgid ""
 "No response to an EDNS version 1 query. Fetched from the nameservers with IP "
@@ -1705,6 +1709,10 @@ msgstr ""
 "ネームサーバー {ns}/{address} は EDNS クエリに対して、EDNS を含まない"
 "切り詰め応答を返しました。"
 
+msgctxt "NAMESERVER:N13_EDNS_RESPONSE_OK"
+msgid "The following nameservers answer an EDNS query with a 512 byte payload size without problems: {servers}."
+msgstr "次のネームサーバーはペイロードサイズ 512 バイトの EDNS クエリへ問題なく応答します: {servers}。"
+
 msgctxt "NAMESERVER:N11_NO_EDNS"
 msgid ""
 "The DNS response, on query with unknown EDNS option-code, does not contain "
@@ -1728,6 +1736,10 @@ msgid ""
 msgstr ""
 "DNS 応答に未知の EDNS option-code が含まれています。"
 "応答元ネームサーバー: \"{addresses}\"。"
+
+msgctxt "NAMESERVER:N11_UNKNOWN_OPTION_OK"
+msgid "Nameservers with IP addresses \"{addresses}\" ignore an unknown EDNS option-code."
+msgstr "IP アドレス \"{addresses}\" のネームサーバーは、未知の EDNS option-code を無視します。"
 
 msgctxt "NAMESERVER:N11_UNEXPECTED_ANSWER_SECTION"
 msgid ""
@@ -1922,6 +1934,10 @@ msgstr "ルートゾーンでは上位リファラルのテストをスキップ
 msgctxt "NAMESERVER:Z_FLAGS_NOTCLEAR"
 msgid "Nameserver {ns}/{address} has one or more unknown EDNS Z flag bits set."
 msgstr "ネームサーバー {ns}/{address} は未知の EDNS Z フラグビットを 1 つ以上立てています。"
+
+msgctxt "NAMESERVER:Z_FLAGS_CLEAR"
+msgid "The following nameservers clear the unknown EDNS Z flag bits in their responses: {servers}."
+msgstr "次のネームサーバーは応答で未知の EDNS Z フラグビットをクリアします: {servers}。"
 
 msgctxt "ZONE:RETRY_MINIMUM_VALUE_LOWER"
 msgid ""

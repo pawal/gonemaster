@@ -2,7 +2,9 @@
 
 All notable changes to all gonemaster components will be documented in this file.
 
-## [Unreleased]
+## [v1.7.18] - 2026-10-05
+
+zone08 probes MX exchanges with an `A` query, and spec-check verifies testcase severity levels against the profile.
 
 ### Added
 
@@ -18,7 +20,7 @@ All notable changes to all gonemaster components will be documented in this file
 
 - engine: `SOA_MNAME` is INFO and the zone `IPV4_DISABLED` and `IPV6_DISABLED` tags are DEBUG2; both lacked a profile level
 - docs: testcase spec severity tables match `share/profile.json`
-- zone08: probe each MX exchange with an `A` query, skip the null MX exchange, and give no verdict on an error RCODE
+- zone08: probe MX exchanges with an `A` query and skip the null MX
 
 ## [v1.7.17] - 2026-10-04
 
